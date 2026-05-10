@@ -36,8 +36,21 @@ export function createOpsServiceRoleClient(): OpsServiceClientResult {
     }
   }
 
-  const admin = createClient(supabaseUrl, serviceRole, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-  return { ok: true, admin }
+  try {
+    const admin = createClient(supabaseUrl, serviceRole, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    return { ok: true, admin }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      ok: false,
+      status: 500,
+      body: {
+        ok: false,
+        error: 'supabase_client_init_failed',
+        detail: msg.slice(0, 400),
+      },
+    }
+  }
 }

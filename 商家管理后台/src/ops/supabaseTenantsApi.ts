@@ -2,6 +2,14 @@
 
 import type { RegistryTenant } from './opsRegistryApi'
 
+function parseJsonBody(raw: string): Record<string, unknown> {
+  try {
+    return JSON.parse(raw || '{}') as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
 export type SupabaseTenantRow = {
   tenant_id: string
   merchant_name: string
@@ -25,7 +33,8 @@ export async function fetchSupabaseTenantsForOps(): Promise<
     return { ok: false, error: 'not_configured' }
   }
   const res = await fetch('/api/ops-supabase/tenants')
-  const j = (await res.json().catch(() => ({}))) as {
+  const raw = await res.text()
+  const j = parseJsonBody(raw) as {
     ok?: boolean
     rows?: SupabaseTenantRow[]
     error?: string
@@ -33,11 +42,12 @@ export async function fetchSupabaseTenantsForOps(): Promise<
     detail?: string
   }
   if (!res.ok || !j.ok) {
+    const fallbackDetail = raw.trim().slice(0, 400)
     return {
       ok: false,
-      error: j.error ?? `http_${res.status}`,
-      hint: j.hint,
-      detail: j.detail,
+      error: (typeof j.error === 'string' && j.error) || `http_${res.status}`,
+      hint: typeof j.hint === 'string' ? j.hint : undefined,
+      detail: (typeof j.detail === 'string' && j.detail) || fallbackDetail || undefined,
     }
   }
   const rows = Array.isArray(j.rows) ? j.rows : []
@@ -63,14 +73,20 @@ export async function fetchTenantWalletLedgerForOps(
   const res = await fetch(
     `/api/ops-supabase/tenants/wallet-ledger?tenant_id=${encodeURIComponent(tenantId)}`,
   )
-  const j = (await res.json().catch(() => ({}))) as {
+  const raw = await res.text()
+  const j = parseJsonBody(raw) as {
     ok?: boolean
     rows?: OpsWalletLedgerRow[]
     error?: string
     hint?: string
+    detail?: string
   }
   if (!res.ok || !j.ok) {
-    return { ok: false, error: j.error ?? `http_${res.status}`, hint: j.hint }
+    return {
+      ok: false,
+      error: (typeof j.error === 'string' && j.error) || `http_${res.status}`,
+      hint: typeof j.hint === 'string' ? j.hint : undefined,
+    }
   }
   return { ok: true, rows: Array.isArray(j.rows) ? j.rows : [] }
 }
@@ -117,8 +133,17 @@ export async function patchSupabaseTenant(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; detail?: string }
-  if (!res.ok || !j.ok) return { ok: false, error: j.error ?? `http_${res.status}`, detail: j.detail }
+  const raw = await res.text()
+  const j = parseJsonBody(raw) as { ok?: boolean; error?: string; detail?: string }
+  if (!res.ok || !j.ok) {
+    const detail =
+      (typeof j.detail === 'string' && j.detail) || (raw.trim() ? raw.trim().slice(0, 400) : undefined)
+    return {
+      ok: false,
+      error: (typeof j.error === 'string' && j.error) || `http_${res.status}`,
+      detail,
+    }
+  }
   return { ok: true }
 }
 
@@ -132,7 +157,16 @@ export async function resetSupabaseTenantAuthPassword(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: tenantId, password }),
   })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; detail?: string }
-  if (!res.ok || !j.ok) return { ok: false, error: j.error ?? `http_${res.status}`, detail: j.detail }
+  const raw = await res.text()
+  const j = parseJsonBody(raw) as { ok?: boolean; error?: string; detail?: string }
+  if (!res.ok || !j.ok) {
+    const detail =
+      (typeof j.detail === 'string' && j.detail) || (raw.trim() ? raw.trim().slice(0, 400) : undefined)
+    return {
+      ok: false,
+      error: (typeof j.error === 'string' && j.error) || `http_${res.status}`,
+      detail,
+    }
+  }
   return { ok: true }
 }
