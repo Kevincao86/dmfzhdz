@@ -3,7 +3,7 @@
  */
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../../../web版/merchant-erp/src/lib/aiVendorCatalogShared'
+import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared'
 import type {
   AiVendorCatalogEntry,
   RegistryFile,
@@ -14,14 +14,14 @@ import type {
   RegistryVideoAi,
   RegistryVideoSubmission,
   RegistryVendorKeys,
-} from '../../../web版/merchant-erp/src/lib/opsRegistryTypes'
-import { filterLegacyDemoRecruitmentOrders } from '../../../web版/merchant-erp/src/lib/recruitmentLegacyDemoOrders'
-import { normalizeRegistryVideoAi } from '../../../web版/merchant-erp/src/lib/registryVideoAiNormalize'
+} from '../meooRegistryShared/opsRegistryTypes'
+import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders'
+import { normalizeRegistryVideoAi } from '../meooRegistryShared/registryVideoAiNormalize'
 import {
   DEFAULT_AI,
   normalizeRegistryFile,
   registryForPersistentFile,
-} from '../../../web版/merchant-erp/vite-plugins/opsRegistryGatewayCore'
+} from '../meooRegistryShared/opsRegistryGatewayCore'
 
 function sha256Hex(plain: string): string {
   return createHash('sha256').update(plain, 'utf8').digest('hex')

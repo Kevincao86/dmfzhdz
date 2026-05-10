@@ -14,7 +14,7 @@ import {
   isBuiltinAiVendorId,
   isValidAiVendorSlug,
   slugifyAiVendorCandidate,
-} from '../../../../web版/merchant-erp/src/lib/aiVendorCatalogShared'
+} from '../../meooRegistryShared/aiVendorCatalogShared'
 import { cn } from '../../cn'
 import {
   fetchRegistry,
