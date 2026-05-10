@@ -96,10 +96,11 @@ export default function OpsCustomersListPage() {
     const sb = await fetchSupabaseTenantsForOps()
     if (sb.ok) {
       const fromSb = supabaseRowsToRegistryTenants(sb.rows)
-      const loginSet = new Set(fromSb.map((x) => x.loginName.trim().toLowerCase()))
+      const loginKey = (login: string | undefined) => String(login ?? '').trim().toLowerCase()
+      const loginSet = new Set(fromSb.map((x) => loginKey(x.loginName)))
       merged = [
         ...fromSb,
-        ...regTenants.filter((t) => !loginSet.has(t.loginName.trim().toLowerCase())),
+        ...regTenants.filter((t) => !loginSet.has(loginKey(t.loginName))),
       ]
     } else if (sb.error !== 'not_configured') {
       setSyncHint((prev) => prev ?? (sb.hint ?? sb.detail ?? `Supabase 列表失败：${sb.error}`))

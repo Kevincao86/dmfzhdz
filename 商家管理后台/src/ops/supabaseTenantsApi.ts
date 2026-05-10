@@ -22,7 +22,7 @@ export type SupabaseTenantRow = {
   service_expire_at?: string | null
   created_at: string
   updated_at: string
-  owner_user_id: string
+  owner_user_id?: string | null
 }
 
 /** 是否应对同源 `/api/ops-supabase/*` 发请求（线上恒为 true） */
@@ -99,33 +99,43 @@ export async function fetchTenantWalletLedgerForOps(
 }
 
 export function supabaseRowsToRegistryTenants(rows: SupabaseTenantRow[]): RegistryTenant[] {
-  return rows.map((r) => {
-    const st = r.account_status
-    const accountStatus: RegistryTenant['accountStatus'] =
-      st === 'disabled' || st === 'frozen' ? st : 'normal'
-    const email = typeof r.user_email === 'string' ? r.user_email.trim() : ''
-    return {
-      id: r.tenant_id,
-      source: 'supabase',
-      loginName: r.login_name,
-      merchantName: r.merchant_name,
-      industry: '云服务',
-      registeredAt: r.created_at,
-      accountStatus,
-      trialDays: Math.max(0, Number(r.trial_days) || 0),
-      officialDays: Math.max(0, Number(r.official_days) || 0),
-      updatedAt: r.updated_at,
-      authLoginEmail: email || undefined,
-      walletBalanceCents:
-        typeof r.wallet_balance_cents === 'number' && Number.isFinite(r.wallet_balance_cents)
-          ? Math.max(0, Math.floor(r.wallet_balance_cents))
-          : 0,
-      serviceExpireAt:
-        typeof r.service_expire_at === 'string' && r.service_expire_at.trim()
-          ? r.service_expire_at
-          : undefined,
-    }
-  })
+  const now = new Date().toISOString()
+  return rows
+    .map((r) => {
+      const tid = typeof r.tenant_id === 'string' ? r.tenant_id.trim() : ''
+      const loginRaw = typeof r.login_name === 'string' ? r.login_name.trim() : ''
+      const loginName = loginRaw || '—'
+      const merchantRaw = typeof r.merchant_name === 'string' ? r.merchant_name.trim() : ''
+      const merchantName = merchantRaw || '—'
+      const st = typeof r.account_status === 'string' ? r.account_status : ''
+      const accountStatus: RegistryTenant['accountStatus'] =
+        st === 'disabled' || st === 'frozen' ? st : 'normal'
+      const email = typeof r.user_email === 'string' ? r.user_email.trim() : ''
+      const created = typeof r.created_at === 'string' && r.created_at.trim() ? r.created_at : now
+      const updated = typeof r.updated_at === 'string' && r.updated_at.trim() ? r.updated_at : created
+      return {
+        id: tid,
+        source: 'supabase' as const,
+        loginName,
+        merchantName,
+        industry: '云服务',
+        registeredAt: created,
+        accountStatus,
+        trialDays: Math.max(0, Number(r.trial_days) || 0),
+        officialDays: Math.max(0, Number(r.official_days) || 0),
+        updatedAt: updated,
+        authLoginEmail: email || undefined,
+        walletBalanceCents:
+          typeof r.wallet_balance_cents === 'number' && Number.isFinite(r.wallet_balance_cents)
+            ? Math.max(0, Math.floor(r.wallet_balance_cents))
+            : 0,
+        serviceExpireAt:
+          typeof r.service_expire_at === 'string' && r.service_expire_at.trim()
+            ? r.service_expire_at
+            : undefined,
+      }
+    })
+    .filter((t) => t.id.length > 0)
 }
 
 export async function patchSupabaseTenant(body: {

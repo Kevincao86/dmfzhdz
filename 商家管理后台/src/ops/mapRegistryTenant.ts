@@ -20,10 +20,12 @@ function planExpireLine(t: RegistryTenant): string {
 export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
   const tag =
     t.source === 'erp' ? 'ERP 同步' : t.source === 'supabase' ? 'Supabase' : '运营创建'
+  const loginLabel = String(t.loginName ?? '—').trim() || '—'
+  const merchantLabel = String(t.merchantName ?? '—').trim() || '—'
   return {
     id: t.id,
-    companyName: t.merchantName,
-    contactName: `${t.loginName}（${tag}）`,
+    companyName: merchantLabel,
+    contactName: `${loginLabel}（${tag}）`,
     phone: t.source === 'erp' ? '同步' : t.source === 'supabase' ? 'Auth' : '—',
     industry: t.industry || '—',
     registeredAt: fmt(t.registeredAt),
