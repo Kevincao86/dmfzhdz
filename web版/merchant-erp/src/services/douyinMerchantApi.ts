@@ -80,16 +80,23 @@ function url(path: string) {
 export async function postDouyinBind(
   payload: DouyinBindPayload,
 ): Promise<DouyinBindResult> {
-  // 独立 Serverless：避免与其它 api/**/*.ts 共用巨型 includeFiles（vite-plugins）导致绑定函数 OOM
-  const res = await fetch(url('/api/douyin-bind'), {
+  const body = JSON.stringify({
+    appId: payload.appId,
+    appSecret: payload.appSecret,
+    merchantId: payload.merchantId,
+  })
+  let res = await fetch(url('/api/douyin-bind'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      appId: payload.appId,
-      appSecret: payload.appSecret,
-      merchantId: payload.merchantId,
-    }),
+    body,
   })
+  if (res.status === 404) {
+    res = await fetch(url('/api/merchant/douyin/bind'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    })
+  }
   const rawText = await res.text()
   let data: Record<string, unknown> = {}
   try {
