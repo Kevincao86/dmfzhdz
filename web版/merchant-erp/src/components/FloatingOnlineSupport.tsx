@@ -7,6 +7,7 @@ import {
   getSupportRelayWsUrl,
   type SupportRelayChatLine,
 } from '../lib/supportRelay'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
 type ChatRole = 'user' | 'bot' | 'agent' | 'ops' | 'system'
 
@@ -15,6 +16,13 @@ type ChatMessage = {
   role: ChatRole
   text: string
   at: string
+}
+
+const DEFAULT_BOT: ChatMessage = {
+  id: 'm0',
+  role: 'bot',
+  text: '您好，我是店魔方智能助手，可解答常见问题。如需人工协助，请点击下方「转人工服务」。',
+  at: '',
 }
 
 function nowTime(): string {
@@ -27,6 +35,20 @@ function relayFromToRole(from: SupportRelayChatLine['from']): ChatRole {
   if (from === 'agent') return 'agent'
   if (from === 'bot') return 'bot'
   return 'user'
+}
+
+function rowToChatMessage(row: {
+  from_role: string
+  text: string
+  ts: number
+  client_msg_id: string
+}): ChatMessage {
+  return {
+    id: row.client_msg_id,
+    role: relayFromToRole(row.from_role as SupportRelayChatLine['from']),
+    text: row.text,
+    at: formatSupportRelayTime(row.ts),
+  }
 }
 
 type FloatingOnlineSupportProps = {
@@ -51,12 +73,7 @@ export default function FloatingOnlineSupport({
   const [relayReady, setRelayReady] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'm0',
-      role: 'bot',
-      text: '您好，我是店魔方智能助手，可解答常见问题。如需人工协助，请点击下方「转人工服务」。',
-      at: nowTime(),
-    },
+    { ...DEFAULT_BOT, at: nowTime() },
   ])
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -81,30 +98,47 @@ export default function FloatingOnlineSupport({
     scrollBottom()
   }, [messages, open, scrollBottom])
 
-  /** 未配置 ws 地址时视为「仅本地」成功；已配置管理后台直连但未连上则为 false（避免界面已发、运营台收不到） */
-  const relayEmit = useCallback((from: SupportRelayChatLine['from'], text: string, id: string): boolean => {
-    const base = getSupportRelayWsUrl()
-    if (!base) return true
-    const ws = wsRef.current
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false
-    const payload: SupportRelayChatLine = {
-      type: 'chat',
-      sessionId: sessionIdRef.current,
-      from,
-      text,
-      ts: Date.now(),
-      id,
-    }
-    ws.send(JSON.stringify(payload))
-    return true
-  }, [])
+  const emitRelayLine = useCallback(
+    async (from: SupportRelayChatLine['from'], text: string, id: string): Promise<boolean> => {
+      const wsUrl = getSupportRelayWsUrl()
+      if (wsUrl) {
+        const ws = wsRef.current
+        if (!ws || ws.readyState !== WebSocket.OPEN) return false
+        const payload: SupportRelayChatLine = {
+          type: 'chat',
+          sessionId: sessionIdRef.current,
+          from,
+          text,
+          ts: Date.now(),
+          id,
+        }
+        ws.send(JSON.stringify(payload))
+        return true
+      }
+      if (supabaseConfigured && supabase) {
+        const { data } = await supabase.auth.getUser()
+        const uid = data.user?.id
+        if (!uid) return false
+        const { error } = await supabase.from('support_relay_messages').insert({
+          session_id: sessionIdRef.current,
+          customer_id: customerIdRef.current.trim() || null,
+          enterprise_name: enterpriseNameRef.current.trim() || null,
+          from_role: from,
+          text,
+          ts: Date.now(),
+          client_msg_id: id,
+          author_user_id: uid,
+        })
+        return !error
+      }
+      return true
+    },
+    [],
+  )
 
   useEffect(() => {
     const base = getSupportRelayWsUrl()
-    if (!base) {
-      setRelayReady(false)
-      return
-    }
+    if (!base) return
 
     let disposed = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -203,7 +237,87 @@ export default function FloatingOnlineSupport({
     }
   }, [])
 
-  /** 登录信息变更后补发 identify，便于运营台更新企业名称 / 客户ID（不重连 WS） */
+  /** 生产环境：无 WS 时经 Supabase 表同步（须已执行迁移 support_relay_messages） */
+  useEffect(() => {
+    if (getSupportRelayWsUrl()) return
+    if (!supabaseConfigured || !supabase) {
+      setRelayReady(true)
+      return
+    }
+
+    const sid = sessionIdRef.current
+    let cancelled = false
+    let ch: ReturnType<typeof supabase.channel> | null = null
+
+    void (async () => {
+      try {
+        const { data: rows, error } = await supabase
+          .from('support_relay_messages')
+          .select('from_role,text,ts,client_msg_id')
+          .eq('session_id', sid)
+          .order('ts', { ascending: true })
+          .limit(200)
+
+        if (cancelled) return
+
+        if (error) {
+          setRelayReady(true)
+          return
+        }
+
+        if (rows && rows.length > 0) {
+          setMessages(
+            rows.map((r) =>
+              rowToChatMessage(r as { from_role: string; text: string; ts: number; client_msg_id: string }),
+            ),
+          )
+        }
+
+        ch = supabase
+          .channel(`meoo-support:${sid}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'support_relay_messages',
+              filter: `session_id=eq.${sid}`,
+            },
+            (payload) => {
+              const row = payload.new as {
+                from_role: string
+                text: string
+                ts: number
+                client_msg_id: string
+              }
+              if (!row?.client_msg_id) return
+              setMessages((prev) => {
+                if (prev.some((m) => m.id === row.client_msg_id)) return prev
+                return [...prev, rowToChatMessage(row)]
+              })
+            },
+          )
+          .subscribe((status) => {
+            if (
+              status === 'SUBSCRIBED' ||
+              status === 'CHANNEL_ERROR' ||
+              status === 'TIMED_OUT'
+            ) {
+              setRelayReady(true)
+            }
+          })
+      } catch {
+        if (!cancelled) setRelayReady(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      void ch?.unsubscribe()
+    }
+  }, [])
+
+  /** 登录信息变更后补发 identify（WebSocket）；云端模式写入随每条消息携带 customerId */
   useEffect(() => {
     const ws = wsRef.current
     const base = getSupportRelayWsUrl()
@@ -233,53 +347,67 @@ export default function FloatingOnlineSupport({
     const sysText =
       '已为您接入店魔方人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
     const bid = pushMessage('system', sysText)
-    const synced = relayEmit('system', sysText, bid)
-    window.setTimeout(() => {
+    void emitRelayLine('system', sysText, bid).then((synced) => {
       setConnecting(false)
-      if (!getSupportRelayWsUrl() || synced) {
+      const wsUrl = getSupportRelayWsUrl()
+      const cloud = !wsUrl && supabaseConfigured && supabase
+      if (!wsUrl && !cloud) {
+        setHumanMode(true)
+        return
+      }
+      if (synced) {
         setHumanMode(true)
       } else {
         pushMessage(
           'system',
-          '暂无法连接到人工客服会话。请稍后重试，或通过电话 / 工单联系您的客户经理；若为贵司私有化环境，请联系管理员确认客服通道已启用。',
+          wsUrl
+            ? '暂无法连接到人工客服会话。请稍后重试，或通过电话 / 工单联系您的客户经理；若为贵司私有化环境，请联系管理员确认客服通道已启用。'
+            : '消息未能写入云端会话表，请确认已执行数据库迁移 support_relay_messages 且当前账号已登录。',
         )
       }
-    }, 400)
+    })
   }
 
   const send = () => {
-    if (getSupportRelayWsUrl() && !relayReady) return
+    const wsUrl = getSupportRelayWsUrl()
+    const cloud = !wsUrl && supabaseConfigured && supabase
+    if ((wsUrl || cloud) && !relayReady) return
     const t = input.trim()
     if (!t) return
     setInput('')
     const uid = pushMessage('user', t)
-    const synced = relayEmit('user', t, uid)
-    if (!synced && getSupportRelayWsUrl()) {
-      pushMessage(
-        'system',
-        '消息尚未送达人工客服，请稍后重试或换一种联系方式。若长时间无法连接，请联系管理员。',
-      )
-    }
-    if (!humanMode) {
-      window.setTimeout(() => {
-        const botText =
-          '已收到您的问题。若需人工深度处理（如账号异常、合同与开票），请点击「转人工服务」。'
-        const bid = pushMessage('bot', botText)
-        relayEmit('bot', botText, bid)
-      }, 500)
-    }
+    void emitRelayLine('user', t, uid).then((synced) => {
+      if (!synced && (wsUrl || cloud)) {
+        pushMessage(
+          'system',
+          '消息尚未送达客服通道，请稍后重试或换一种联系方式。若长时间无法连接，请联系管理员。',
+        )
+      }
+      if (!humanMode) {
+        window.setTimeout(() => {
+          const botText =
+            '已收到您的问题。若需人工深度处理（如账号异常、合同与开票），请点击「转人工服务」。'
+          const bid = pushMessage('bot', botText)
+          void emitRelayLine('bot', botText, bid)
+        }, 500)
+      }
+    })
   }
 
   const relayBase = getSupportRelayWsUrl()
-  const relayBlocked = Boolean(relayBase && !relayReady)
-  const statusExtra =
-    !relayBase
-      ? null
-      : relayReady
-        ? ' · 运营台直连已接通'
-        : customSupportWsUrl
-          ? ' · 正在连接自定义 ws…'
-          : ' · 正在连接管理后台…'
+  const relayBlocked = Boolean((relayBase && !relayReady) || (!relayBase && supabaseConfigured && supabase && !relayReady))
+
+  const statusExtra = relayBase
+    ? relayReady
+      ? ' · 运营台直连已接通'
+      : customSupportWsUrl
+        ? ' · 正在连接自定义 ws…'
+        : ' · 正在连接管理后台…'
+    : supabaseConfigured && supabase
+      ? relayReady
+        ? ' · 云端会话已同步'
+        : ' · 正在连接云端会话…'
+      : null
 
   return (
     <>
@@ -302,7 +430,7 @@ export default function FloatingOnlineSupport({
                     {humanMode ? '人工客服已接入' : connecting ? '接入中…' : '智能助手 · 可转人工'}
                     {statusExtra}
                   </p>
-                    {relayBlocked ? (
+                  {relayBlocked ? (
                     <p className="mt-0.5 line-clamp-2 text-[10px] text-amber-200">
                       会话通道暂时中断，系统将自动重试。请稍候片刻；若长时间未恢复，请联系管理员或服务提供方排查网络与客服通道配置。
                     </p>

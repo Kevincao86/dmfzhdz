@@ -1,4 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import OpsLoginPage from './ops/OpsLoginPage'
+import OpsRequireAuth from './ops/OpsRequireAuth'
 import OpsAdminLayout from './ops/OpsAdminLayout'
 import OpsAccountsPermissionsPage from './ops/pages/OpsAccountsPermissionsPage'
 import OpsAiModelsPage from './ops/pages/OpsAiModelsPage'
@@ -12,7 +14,15 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<OpsAdminLayout />}>
+        <Route path="/login" element={<OpsLoginPage />} />
+        <Route
+          path="/"
+          element={
+            <OpsRequireAuth>
+              <OpsAdminLayout />
+            </OpsRequireAuth>
+          }
+        >
           <Route index element={<Navigate to="/customers" replace />} />
           <Route path="customers" element={<OpsCustomersListPage />} />
           <Route path="customers/:customerId" element={<OpsCustomerDetailPage />} />
