@@ -1,0 +1,42 @@
+/**
+ * Vercel：POST /api/ops-supabase/payment-orders/confirm
+ */
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
+import { confirmOpsPaymentOrderAdmin } from '../../../src/ops/paymentOrdersAdminBackend'
+
+function bodyRaw(req: VercelRequest): string {
+  if (typeof req.body === 'string') return req.body
+  if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
+  return '{}'
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
+  if (req.method !== 'POST') {
+    res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+    return
+  }
+
+  let body: Record<string, unknown>
+  try {
+    body = JSON.parse(bodyRaw(req) || '{}') as Record<string, unknown>
+  } catch {
+    res.status(400).send(JSON.stringify({ ok: false, error: 'invalid_json' }))
+    return
+  }
+
+  const client = createOpsServiceRoleClient()
+  if (!client.ok) {
+    res.status(client.status).send(JSON.stringify(client.body))
+    return
+  }
+
+  const cr = await confirmOpsPaymentOrderAdmin(client.admin, body)
+  if (!cr.ok) {
+    res.status(cr.status).send(JSON.stringify(cr.body))
+    return
+  }
+  res.status(200).send(JSON.stringify({ ok: true }))
+}

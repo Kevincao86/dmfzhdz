@@ -129,6 +129,9 @@ export default function FloatingOnlineSupport({
           client_msg_id: id,
           author_user_id: uid,
         })
+        if (error) {
+          console.warn('[support_relay_messages]', error.message, error.code ?? '')
+        }
         return !error
       }
       return true
@@ -362,7 +365,7 @@ export default function FloatingOnlineSupport({
           'system',
           wsUrl
             ? '暂无法连接到人工客服会话。请稍后重试，或通过电话 / 工单联系您的客户经理；若为贵司私有化环境，请联系管理员确认客服通道已启用。'
-            : '消息未能写入云端会话表，请确认已执行数据库迁移 support_relay_messages 且当前账号已登录。',
+            : '消息未能写入云端会话表：请在 Supabase 执行迁移 support_relay_messages（含表与 RLS），并确认已登录；浏览器控制台可查看具体报错。',
         )
       }
     })

@@ -95,7 +95,7 @@ export default function OpsAiModelsPage() {
       }
     } catch {
       setHint(
-        '无法读写注册表：请重启本目录 npm run dev，并确认项目根下可创建 .meoo-dev-sync 目录。',
+        '无法读写注册表：本地请重启 npm run dev 并确保项目根可写 .meoo-dev-sync；线上请在 Supabase 执行迁移 ops_registry_snapshot，并确认 Vercel 已部署 /api/ops-sync 且配置了 SUPABASE_SERVICE_ROLE_KEY。',
       )
     } finally {
       if (!bg) setLoading(false)

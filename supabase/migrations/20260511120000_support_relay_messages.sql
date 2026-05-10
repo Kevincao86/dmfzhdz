@@ -47,5 +47,16 @@ create policy "support_relay_messages_select_participant"
 
 grant select, insert on public.support_relay_messages to authenticated;
 
--- Realtime：商家端订阅本会话新消息
-alter publication supabase_realtime add table public.support_relay_messages;
+-- Realtime：商家端订阅本会话新消息（重复执行迁移时跳过已加入的表）
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'support_relay_messages'
+  ) then
+    execute 'alter publication supabase_realtime add table public.support_relay_messages';
+  end if;
+end $$;

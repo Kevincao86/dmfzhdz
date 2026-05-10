@@ -242,7 +242,7 @@ export default function OpsSupportWorkbenchPage() {
     }
 
     let disposed = false
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let reconnectTimer: number | null = null
     let attempt = 0
     let activeWs: WebSocket | null = null
 
