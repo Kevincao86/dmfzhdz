@@ -702,8 +702,13 @@ export async function handleDouyinBindPost(
   res: ServerResponse,
   bodyRaw: string,
 ): Promise<void> {
-  const r = await runDouyinMerchantBind(bodyRaw)
-  json(res, r.statusCode, r.body)
+  try {
+    const r = await runDouyinMerchantBind(bodyRaw)
+    json(res, r.statusCode, r.body)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 500, { message: msg || '抖音绑定处理异常' })
+  }
 }
 
 function collectUploadableLeafCategoryIds(nodes: unknown): string[] {

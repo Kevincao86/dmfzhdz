@@ -21,7 +21,7 @@ import {
   DEFAULT_AI,
   normalizeRegistryFile,
   registryForPersistentFile,
-} from '../../../web版/merchant-erp/vite-plugins/opsRegistryGatewayShared'
+} from '../../../web版/merchant-erp/vite-plugins/opsRegistryGatewayCore'
 
 function sha256Hex(plain: string): string {
   return createHash('sha256').update(plain, 'utf8').digest('hex')

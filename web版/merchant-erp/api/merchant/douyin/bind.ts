@@ -25,6 +25,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const r = await runDouyinMerchantBind(rawBody(req))
-  res.status(r.statusCode).send(JSON.stringify(r.body))
+  try {
+    const r = await runDouyinMerchantBind(rawBody(req))
+    res.status(r.statusCode).send(JSON.stringify(r.body))
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    res.status(500).send(JSON.stringify({ message: msg || '抖音绑定处理异常' }))
+  }
 }
