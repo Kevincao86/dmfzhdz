@@ -123,6 +123,7 @@ async function edgePost(
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
+  try {
   if (req.method !== 'GET') {
     res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
     return
@@ -211,4 +212,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         '请配置 SUPABASE_SERVICE_ROLE_KEY（推荐），或 SUPABASE_ANON_KEY + MEOO_PROVISION_SECRET 并部署 ops-list-tenants。',
     }),
   )
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    res.status(500).send(
+      JSON.stringify({
+        ok: false,
+        error: 'tenants_list_handler_failed',
+        detail: msg.slice(0, 800),
+      }),
+    )
+  }
 }

@@ -189,7 +189,7 @@ export default function OpsCustomersListPage() {
           ? await patchSupabaseTenant({ id: t.id, accountStatus: 'normal' })
           : await patchTenant({ id: t.id, accountStatus: 'normal' })
         if (!r.ok) {
-          window.alert(r.error ?? '更新账号状态失败')
+          window.alert([r.error, r.detail].filter(Boolean).join(' — ') || '更新账号状态失败')
           return
         }
         await reload()
@@ -206,9 +206,9 @@ export default function OpsCustomersListPage() {
     try {
       const r = isSupabaseTenant(t)
         ? await patchSupabaseTenant({ id: t.id, accountStatus: kind })
-        : await patchTenant({ id: c.id, accountStatus: kind })
+        : await patchTenant({ id: t.id, accountStatus: kind })
       if (!r.ok) {
-        window.alert(r.error ?? '更新账号状态失败')
+        window.alert([r.error, r.detail].filter(Boolean).join(' — ') || '更新账号状态失败')
         return
       }
       await reload()

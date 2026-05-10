@@ -126,8 +126,28 @@ function mapHttpError(status: number): string {
 
 export async function fetchRegistry(): Promise<RegistryFile> {
   const res = await fetch('/api/ops-sync/registry')
-  if (!res.ok) throw new Error(mapHttpError(res.status))
-  return (await res.json()) as RegistryFile
+  const text = await res.text()
+  if (!res.ok) {
+    try {
+      const j = JSON.parse(text) as {
+        error?: string
+        detail?: string
+        hint?: string
+        ok?: boolean
+      }
+      const parts = [j.detail, j.hint, j.error].filter((x) => typeof x === 'string' && x.trim())
+      if (parts.length) throw new Error(parts.join(' — '))
+    } catch (e) {
+      if (e instanceof Error && e.message && !e.message.startsWith('Unexpected')) throw e
+    }
+    const snippet = text.trim().slice(0, 280)
+    throw new Error(snippet || mapHttpError(res.status))
+  }
+  try {
+    return JSON.parse(text) as RegistryFile
+  } catch {
+    throw new Error('注册表接口返回非 JSON，请检查 Vercel /api/ops-sync 是否部署成功')
+  }
 }
 
 export type ManualTenantPayload = {
@@ -160,15 +180,28 @@ export type PatchTenantPayload = {
   password?: string
 }
 
-export async function patchTenant(body: PatchTenantPayload): Promise<{ ok: boolean; error?: string }> {
+export async function patchTenant(body: PatchTenantPayload): Promise<{
+  ok: boolean
+  error?: string
+  detail?: string
+}> {
   const res = await fetch('/api/ops-sync/tenants/patch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-  if (!res.ok) return { ok: false, error: j.error ?? mapHttpError(res.status) }
-  return { ok: j.ok !== false }
+  const j = (await res.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+    detail?: string
+  }
+  if (!res.ok)
+    return {
+      ok: false,
+      error: j.error ?? mapHttpError(res.status),
+      detail: typeof j.detail === 'string' ? j.detail : undefined,
+    }
+  return { ok: j.ok !== false, detail: typeof j.detail === 'string' ? j.detail : undefined }
 }
 
 export async function postAiModels(body: {
