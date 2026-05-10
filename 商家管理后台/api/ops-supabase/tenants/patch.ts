@@ -3,7 +3,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { opsTenantPatchAdmin } from '../../../src/ops/opsTenantsMutationsBackend'
+import { opsTenantPatchAdmin } from '../../lib/opsTenantsMutationsBackend'
 
 function bodyRaw(req: VercelRequest): string {
   if (typeof req.body === 'string') return req.body
