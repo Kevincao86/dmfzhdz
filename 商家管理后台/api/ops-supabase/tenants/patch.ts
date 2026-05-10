@@ -2,9 +2,9 @@
  * Vercel：POST /api/ops-supabase/tenants/patch
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { opsTenantPatchAdmin } from '../../lib/opsTenantsMutationsBackend'
-import { sendOpsJson } from '../../lib/safeVercelJson'
+import { createOpsServiceRoleClient } from '../../createOpsServiceRoleClient'
+import { opsTenantPatchAdmin } from '../../opsTenantsMutationsBackend'
+import { sendOpsJson } from '../../safeOpsJson'
 
 export const config = { maxDuration: 60 }
 

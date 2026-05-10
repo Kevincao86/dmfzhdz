@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
-import { sendOpsJson } from '../../lib/safeVercelJson'
+import { sendOpsJson } from '../../safeOpsJson'
 
 export const config = { maxDuration: 60 }
 

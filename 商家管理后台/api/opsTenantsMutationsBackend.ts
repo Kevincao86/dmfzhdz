@@ -1,6 +1,6 @@
 /**
  * 运营台 tenants 变更：Service Role 直连；供 Vite 插件与 Vercel API 共用。
- * 放在 api/lib，避免 Vercel Serverless 从 src 打包进不必要依赖导致 FUNCTION_INVOCATION_FAILED。
+ * 置于 api 根目录，避免 Vercel Serverless 打包后 api/lib 相对路径解析失败。
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 
