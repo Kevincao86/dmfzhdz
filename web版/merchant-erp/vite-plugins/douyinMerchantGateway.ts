@@ -34,14 +34,16 @@
  * 能力授权与门店绑定：见抖音「auth_with_bind」文档（生产网关实现）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import crypto from 'node:crypto'
+import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract'
 import {
-  merchantDouyinSessionSecret,
-  openDouyinSessionCredentials,
-  sealDouyinSessionCredentials,
-} from './douyinSessionSeal'
+  type DouyinMerchantSession,
+  douyinMerchantDevSessions,
+} from './douyinMerchantDevSessions'
+import { openDouyinSessionCredentials } from './douyinSessionSeal'
 import { mockDouyinProductStore } from './mockDouyinProductStore'
+
+export { runDouyinMerchantBind }
 
 const DOUYIN_CLIENT_TOKEN_URL = 'https://open.douyin.com/oauth/client_token/'
 const DOUYIN_SHOP_POI_QUERY = 'https://open.douyin.com/goodlife/v1/shop/poi/query/'
@@ -89,24 +91,13 @@ export type MerchantReviewRowDouyin = {
   replyText?: string
 }
 
-type Session = {
-  clientKey: string
-  clientSecret: string
-  merchantId: string
-  /** 抖音 client access_token（clt.*） */
-  douyinToken: string
-  douyinExpiresAtMs: number
-}
-
-const sessions = new Map<string, Session>()
-
 /** 同一 Lambda 实例内缓存解密后的会话，减少重复申请 client_token */
-const sealedSessionRuntimeCache = new Map<string, Session>()
+const sealedSessionRuntimeCache = new Map<string, DouyinMerchantSession>()
 
-function resolveSession(authToken: string): Session | undefined {
+function resolveSession(authToken: string): DouyinMerchantSession | undefined {
   const t = authToken.trim()
   if (!t) return undefined
-  const mem = sessions.get(t)
+  const mem = douyinMerchantDevSessions.get(t)
   if (mem) return mem
   let cached = sealedSessionRuntimeCache.get(t)
   if (cached) return cached
@@ -186,7 +177,7 @@ async function fetchDouyinClientToken(
   return { token, expiresIn }
 }
 
-async function ensureDouyinToken(s: Session): Promise<string> {
+async function ensureDouyinToken(s: DouyinMerchantSession): Promise<string> {
   const skew = 120_000
   if (s.douyinToken && Date.now() < s.douyinExpiresAtMs - skew) {
     return s.douyinToken
@@ -645,73 +636,6 @@ function rowBrandHay(row: unknown): string {
     .join(' ')
   const acct = rowPoiAccountNameForBrand(row)
   return `${fromPoi} ${fromStruct} ${acct}`.trim().toLowerCase()
-}
-
-/** 供 Vite 中间件与 Vercel `/api/merchant/douyin/bind` 共用；线上须配置 MERCHANT_DOUYIN_SESSION_SECRET 以返回加密令牌（无状态）。 */
-export async function runDouyinMerchantBind(
-  bodyRaw: string,
-): Promise<{ statusCode: number; body: Record<string, unknown> }> {
-  let body: { appId?: string; appSecret?: string; merchantId?: string }
-  try {
-    body = JSON.parse(bodyRaw || '{}') as typeof body
-  } catch {
-    return { statusCode: 400, body: { message: '请求体须为 JSON' } }
-  }
-  const clientKey = String(body.appId ?? '').trim()
-  const clientSecret = String(body.appSecret ?? '').trim()
-  const merchantId = String(body.merchantId ?? '').trim()
-  if (!clientKey || !clientSecret || !merchantId) {
-    return {
-      statusCode: 400,
-      body: { message: '请提供 appId（client_key）、appSecret（client_secret）、merchantId（account_id）' },
-    }
-  }
-
-  try {
-    const session: Session = {
-      clientKey,
-      clientSecret,
-      merchantId,
-      douyinToken: '',
-      douyinExpiresAtMs: 0,
-    }
-    const token = await ensureDouyinToken(session)
-    const first = await shopPoiQueryPage(merchantId, token, 1, 1)
-    const d = first.data as Record<string, unknown> | undefined
-    const pois = (d?.pois as unknown[]) ?? []
-    const accountName = accountNameFromPois(pois)
-
-    const secret = merchantDouyinSessionSecret()
-    let accessToken: string
-    if (secret) {
-      accessToken = sealDouyinSessionCredentials({ clientKey, clientSecret, merchantId }, secret)
-    } else {
-      const sid = crypto.randomBytes(32).toString('hex')
-      sessions.set(sid, session)
-      accessToken = sid
-    }
-
-    return {
-      statusCode: 200,
-      body: {
-        accessToken,
-        accountName: accountName ?? undefined,
-        message: secret
-          ? '已绑定抖音来客（线上加密会话，请在部署环境配置 MERCHANT_DOUYIN_SESSION_SECRET）。'
-          : '已建立直连抖音开放平台的本地会话（仅开发服务器内存）。',
-      },
-    }
-  } catch (e) {
-    const aborted =
-      e instanceof Error &&
-      (e.name === 'AbortError' || /aborted|timeout/i.test(e.message))
-    const detail = aborted
-      ? `连接抖音开放平台超时（${Math.round(DOUYIN_FETCH_TIMEOUT_MS / 1000)}s）。请稍后重试；若持续失败，可在 Vercel → Functions → 区域改为东京(hnd1)/首尔(icn1)等离大陆更近的节点后再试。`
-      : e instanceof Error
-        ? e.message
-        : String(e)
-    return { statusCode: 502, body: { message: `抖音鉴权或门店查询失败：${detail}` } }
-  }
 }
 
 export async function handleDouyinBindPost(
