@@ -4,6 +4,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
 import { opsTenantPatchAdmin } from '../../lib/opsTenantsMutationsBackend'
+import { sendOpsJson } from '../../lib/safeVercelJson'
+
+export const config = { maxDuration: 60 }
 
 function bodyRaw(req: VercelRequest): string {
   if (typeof req.body === 'string') return req.body
@@ -43,12 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(200).send(JSON.stringify({ ok: true }))
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).send(
-      JSON.stringify({
-        ok: false,
-        error: 'tenant_patch_handler_failed',
-        detail: msg.slice(0, 800),
-      }),
-    )
+    sendOpsJson(res, 500, {
+      ok: false,
+      error: 'tenant_patch_handler_failed',
+      detail: msg.slice(0, 800),
+    })
   }
 }

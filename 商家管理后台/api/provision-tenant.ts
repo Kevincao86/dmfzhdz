@@ -9,6 +9,9 @@
  * 本地开发仍由 vite-plugins/provisionTenantProxy 处理同源 POST。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { sendOpsJson } from './lib/safeVercelJson'
+
+export const config = { maxDuration: 60 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
@@ -205,59 +208,68 @@ async function forwardToProvisionEdge(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  try {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-  if (req.method !== 'POST') {
-    res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
-    return
-  }
+    if (req.method !== 'POST') {
+      res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+      return
+    }
 
-  const rawBody =
-    typeof req.body === 'string'
-      ? req.body
-      : req.body !== undefined && req.body !== null
-        ? JSON.stringify(req.body)
-        : '{}'
+    const rawBody =
+      typeof req.body === 'string'
+        ? req.body
+        : req.body !== undefined && req.body !== null
+          ? JSON.stringify(req.body)
+          : '{}'
 
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
-  const serviceRole = (
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE ??
-    ''
-  ).trim()
-  const anon = (process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
-  const secret = (process.env.MEOO_PROVISION_SECRET ?? '').trim()
+    const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
+    const serviceRole = (
+      process.env.SUPABASE_SERVICE_ROLE_KEY ??
+      process.env.SUPABASE_SERVICE_ROLE ??
+      ''
+    ).trim()
+    const anon = (process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+    const secret = (process.env.MEOO_PROVISION_SECRET ?? '').trim()
 
-  const tenantDomain =
-    (
-      process.env.VITE_SUPABASE_TENANT_EMAIL_DOMAIN ??
-      process.env.TENANT_EMAIL_DOMAIN ??
-      'users.meoo.test'
-    ).trim() || 'users.meoo.test'
+    const tenantDomain =
+      (
+        process.env.VITE_SUPABASE_TENANT_EMAIL_DOMAIN ??
+        process.env.TENANT_EMAIL_DOMAIN ??
+        'users.meoo.test'
+      ).trim() || 'users.meoo.test'
 
-  const missingEnv: string[] = []
-  if (!supabaseUrl) missingEnv.push('VITE_SUPABASE_URL 或 SUPABASE_URL')
-  if (!serviceRole) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY（不要用 VITE_ 前缀；变量须勾选 Production）')
-  if (!anon) missingEnv.push('SUPABASE_ANON_KEY 或 VITE_SUPABASE_ANON_KEY')
-  if (!secret) missingEnv.push('MEOO_PROVISION_SECRET')
+    const missingEnv: string[] = []
+    if (!supabaseUrl) missingEnv.push('VITE_SUPABASE_URL 或 SUPABASE_URL')
+    if (!serviceRole) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY（不要用 VITE_ 前缀；变量须勾选 Production）')
+    if (!anon) missingEnv.push('SUPABASE_ANON_KEY 或 VITE_SUPABASE_ANON_KEY')
+    if (!secret) missingEnv.push('MEOO_PROVISION_SECRET')
 
-  if (supabaseUrl && serviceRole) {
-    await sendFetchResponse(res, await provisionWithServiceRole(supabaseUrl, serviceRole, rawBody, tenantDomain))
-    return
-  }
+    if (supabaseUrl && serviceRole) {
+      await sendFetchResponse(res, await provisionWithServiceRole(supabaseUrl, serviceRole, rawBody, tenantDomain))
+      return
+    }
 
-  if (supabaseUrl && anon && secret) {
-    await sendFetchResponse(res, await forwardToProvisionEdge(supabaseUrl, anon, secret, rawBody))
-    return
-  }
+    if (supabaseUrl && anon && secret) {
+      await sendFetchResponse(res, await forwardToProvisionEdge(supabaseUrl, anon, secret, rawBody))
+      return
+    }
 
-  res.status(503).send(
-    JSON.stringify({
+    res.status(503).send(
+      JSON.stringify({
+        ok: false,
+        error: 'provision_not_configured',
+        missingEnv,
+        hint:
+          '推荐：在 Vercel 增加 SUPABASE_SERVICE_ROLE_KEY（与 Dashboard API service_role 一致）并重新部署。备选：配置 MEOO_PROVISION_SECRET 并在 Supabase 部署 Edge Function provision-tenant。',
+      }),
+    )
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    sendOpsJson(res, 500, {
       ok: false,
-      error: 'provision_not_configured',
-      missingEnv,
-      hint:
-        '推荐：在 Vercel 增加 SUPABASE_SERVICE_ROLE_KEY（与 Dashboard API service_role 一致）并重新部署。备选：配置 MEOO_PROVISION_SECRET 并在 Supabase 部署 Edge Function provision-tenant。',
-    }),
-  )
+      error: 'provision_handler_failed',
+      detail: msg.slice(0, 800),
+    })
+  }
 }

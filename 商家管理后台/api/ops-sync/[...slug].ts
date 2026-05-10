@@ -3,7 +3,10 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createOpsServiceRoleClient } from '../lib/createOpsServiceRoleClient'
+import { sendOpsJson } from '../lib/safeVercelJson'
 import { dispatchOpsRegistrySupabase } from '../../src/ops/opsRegistrySupabaseDispatch'
+
+export const config = { maxDuration: 60 }
 
 function rawBody(req: VercelRequest): string {
   if (typeof req.body === 'string') return req.body
@@ -65,13 +68,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(out.status).send(payload)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).send(
-      JSON.stringify({
-        ok: false,
-        error: 'ops_sync_handler_failed',
-        detail: msg.slice(0, 800),
-        hint: '请查看 Vercel Function Logs；常见原因：未执行迁移 ops_registry_snapshot、缺少 SUPABASE_SERVICE_ROLE_KEY。',
-      }),
-    )
+    sendOpsJson(res, 500, {
+      ok: false,
+      error: 'ops_sync_handler_failed',
+      detail: msg.slice(0, 800),
+      hint: '请查看 Vercel Function Logs；常见原因：未执行迁移 ops_registry_snapshot、缺少 SUPABASE_SERVICE_ROLE_KEY。',
+    })
   }
 }

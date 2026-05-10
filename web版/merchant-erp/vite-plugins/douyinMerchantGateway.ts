@@ -39,8 +39,8 @@ import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract'
 import {
   type DouyinMerchantSession,
   douyinMerchantDevSessions,
-} from './douyinMerchantDevSessions'
-import { openDouyinSessionCredentials } from './douyinSessionSeal'
+  openDouyinSessionCredentials,
+} from '../api/merchant/douyin/bindShared'
 import { mockDouyinProductStore } from './mockDouyinProductStore'
 
 export { runDouyinMerchantBind }
