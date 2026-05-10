@@ -49,7 +49,7 @@ function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVend
   return catalogCustomEntriesOnly(out)
 }
 
-const DEFAULT_AI: RegistryAiModels = {
+export const DEFAULT_AI: RegistryAiModels = {
   textModel: 'qwen',
   imageModel: 'qwen',
   updatedAt: new Date(0).toISOString(),
@@ -57,7 +57,7 @@ const DEFAULT_AI: RegistryAiModels = {
   controlledByOps: false,
 }
 
-function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): RegistryFile {
+export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): RegistryFile {
   const tenants: RegistryTenant[] = Array.isArray(parsed?.tenants) ? (parsed!.tenants as RegistryTenant[]) : []
   const ai: RegistryAiModels = { ...DEFAULT_AI }
   if (parsed?.aiModels && typeof parsed.aiModels === 'object') {
@@ -129,7 +129,7 @@ function json(res: ServerResponse, code: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-function registryForPersistentFile(data: RegistryFile): RegistryFile {
+export function registryForPersistentFile(data: RegistryFile): RegistryFile {
   const vendorKeys = normalizeVendorKeysFromDisk(data.vendorKeys)
   return {
     ...data,

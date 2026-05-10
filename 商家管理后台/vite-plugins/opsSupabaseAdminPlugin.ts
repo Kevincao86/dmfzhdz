@@ -7,9 +7,16 @@ import { createClient } from '@supabase/supabase-js'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import {
-  rechargeCreditFromVerifiedCents,
-  subscriptionDaysFromVerifiedCents,
-} from '../src/ops/paymentTierLogic'
+  confirmOpsPaymentOrderAdmin,
+  deleteOpsPaymentOrderAdmin,
+  listOpsPaymentOrders,
+  verifyOpsPaymentOrderAdmin,
+} from '../src/ops/paymentOrdersAdminBackend'
+import {
+  opsTenantPatchAdmin,
+  opsTenantResetPasswordAdmin,
+  opsTenantWalletLedgerAdmin,
+} from '../src/ops/opsTenantsMutationsBackend'
 
 /** 官方本地 `supabase start` 固定 demo JWT（仅用于 127.0.0.1:54321，勿用于线上）。 */
 const LOCAL_SUPABASE_DEMO_SERVICE_ROLE =
@@ -318,29 +325,19 @@ export function opsSupabaseAdminPlugin(): Plugin {
             } catch {
               tenantId = ''
             }
-            if (!tenantId || !/^[0-9a-f-]{36}$/i.test(tenantId)) {
-              json(res, 400, { ok: false, error: 'invalid_tenant_id' })
-              return
-            }
             const admin = createClient(supabaseUrl, effectiveKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             })
-            const { data: ledgerRows, error: le } = await admin
-              .from('tenant_wallet_ledger')
-              .select('id, tenant_id, delta_cents, balance_after_cents, reason, ref_order_id, created_at')
-              .eq('tenant_id', tenantId)
-              .order('created_at', { ascending: false })
-              .limit(200)
-            if (le) {
-              json(res, 502, {
-                ok: false,
-                error: 'wallet_ledger_select_failed',
-                detail: le.message,
-                hint: supabaseUnreachableHint(le.message),
-              })
+            const lr = await opsTenantWalletLedgerAdmin(admin, tenantId)
+            if (!lr.ok) {
+              const hint =
+                lr.status === 502 && typeof lr.body.detail === 'string'
+                  ? supabaseUnreachableHint(lr.body.detail as string)
+                  : undefined
+              json(res, lr.status, hint ? { ...lr.body, hint } : lr.body)
               return
             }
-            json(res, 200, { ok: true, rows: ledgerRows ?? [] })
+            json(res, 200, { ok: true, rows: lr.rows })
             return
           }
 
@@ -353,40 +350,14 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_json' })
               return
             }
-            const id = typeof body.id === 'string' ? body.id.trim() : ''
-            if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-              json(res, 400, { ok: false, error: 'invalid_id' })
-              return
-            }
 
             if (effectiveKey) {
-              const patch: Record<string, unknown> = {
-                updated_at: new Date().toISOString(),
-              }
-              if (typeof body.merchantName === 'string' && body.merchantName.trim())
-                patch.name = body.merchantName.trim()
-              if (body.accountStatus === 'normal' || body.accountStatus === 'disabled' || body.accountStatus === 'frozen') {
-                patch.account_status = body.accountStatus
-              }
-              if (typeof body.trialDays === 'number' && Number.isFinite(body.trialDays)) {
-                patch.trial_days = Math.max(0, Math.min(3650, Math.floor(body.trialDays)))
-              }
-              if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
-                patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
-              }
-              const upstream = await fetch(`${supabaseUrl}/rest/v1/tenants?id=eq.${encodeURIComponent(id)}`, {
-                method: 'PATCH',
-                headers: {
-                  apikey: effectiveKey,
-                  Authorization: `Bearer ${effectiveKey}`,
-                  'Content-Type': 'application/json',
-                  Prefer: 'return=minimal',
-                },
-                body: JSON.stringify(patch),
+              const admin = createClient(supabaseUrl, effectiveKey, {
+                auth: { autoRefreshToken: false, persistSession: false },
               })
-              if (!upstream.ok) {
-                const t = await upstream.text()
-                json(res, upstream.status, { ok: false, error: 'patch_failed', detail: t.slice(0, 600) })
+              const pr = await opsTenantPatchAdmin(admin, body)
+              if (!pr.ok) {
+                json(res, pr.status, pr.body)
                 return
               }
               json(res, 200, { ok: true })
@@ -424,41 +395,23 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_json' })
               return
             }
-            const id = typeof body.id === 'string' ? body.id.trim() : ''
-            if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-              json(res, 400, { ok: false, error: 'invalid_id' })
-              return
-            }
-            const rawPw = typeof body.password === 'string' ? body.password : ''
-            const password = rawPw.length >= 6 ? rawPw : '123456'
 
             if (effectiveKey) {
               const admin = createClient(supabaseUrl, effectiveKey, {
                 auth: { autoRefreshToken: false, persistSession: false },
               })
-              const { data: members, error: me } = await admin
-                .from('tenant_members')
-                .select('user_id')
-                .eq('tenant_id', id)
-                .eq('role', 'owner')
-                .limit(1)
-              if (me) {
-                json(res, 502, { ok: false, error: 'members_lookup_failed', detail: me.message })
-                return
-              }
-              const uid = members?.[0]?.user_id
-              if (!uid || typeof uid !== 'string') {
-                json(res, 404, { ok: false, error: 'owner_not_found' })
-                return
-              }
-              const { error: ue } = await admin.auth.admin.updateUserById(uid, { password })
-              if (ue) {
-                json(res, 502, { ok: false, error: 'auth_update_failed', detail: ue.message })
+              const rr = await opsTenantResetPasswordAdmin(admin, body)
+              if (!rr.ok) {
+                json(res, rr.status, rr.body)
                 return
               }
               json(res, 200, { ok: true })
               return
             }
+
+            const id = typeof body.id === 'string' ? body.id.trim() : ''
+            const rawPw = typeof body.password === 'string' ? body.password : ''
+            const password = rawPw.length >= 6 ? rawPw : '123456'
 
             if (anon && secret) {
               const er = await edgePost(supabaseUrl, anon, secret, 'ops-reset-tenant-auth-password', {
@@ -498,29 +451,12 @@ export function opsSupabaseAdminPlugin(): Plugin {
             const admin = createClient(supabaseUrl, effectiveKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             })
-            const { data: orders, error: oe } = await admin
-              .from('merchant_payment_orders')
-              .select('*, tenants(name)')
-              .order('created_at', { ascending: false })
-              .limit(400)
-            if (oe) {
-              json(res, 502, {
-                ok: false,
-                error: 'payment_orders_select_failed',
-                detail: oe.message,
-                hint: supabaseUnreachableHint(oe.message),
-              })
+            const lr = await listOpsPaymentOrders(admin)
+            if (!lr.ok) {
+              json(res, lr.status, lr.body)
               return
             }
-            const rows = (orders ?? []).map((raw: Record<string, unknown>) => {
-              const tn = raw.tenants as { name?: string } | null | undefined
-              const { tenants: _drop, ...rest } = raw
-              return {
-                ...rest,
-                merchant_name: tn?.name ?? null,
-              }
-            })
-            json(res, 200, { ok: true, rows })
+            json(res, 200, { ok: true, rows: lr.data.rows })
             return
           }
 
@@ -537,78 +473,12 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_json' })
               return
             }
-            const id = typeof body.id === 'string' ? body.id.trim() : ''
-            const verified =
-              typeof body.verified_amount_cents === 'number' && Number.isFinite(body.verified_amount_cents)
-                ? Math.floor(body.verified_amount_cents)
-                : NaN
-            if (!id || !/^[0-9a-f-]{36}$/i.test(id) || !Number.isFinite(verified) || verified <= 0) {
-              json(res, 400, { ok: false, error: 'invalid_payload' })
-              return
-            }
             const admin = createClient(supabaseUrl, effectiveKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             })
-            const { data: ord, error: ordErr } = await admin
-              .from('merchant_payment_orders')
-              .select('id, status, order_kind, amount_cents, tenant_id')
-              .eq('id', id)
-              .maybeSingle()
-            if (ordErr) {
-              json(res, 502, { ok: false, error: 'order_load_failed', detail: ordErr.message })
-              return
-            }
-            if (!ord || ord.status !== 'pending') {
-              json(res, 409, { ok: false, error: 'not_pending_or_missing' })
-              return
-            }
-            if (ord.order_kind === 'refund') {
-              const declared = Number(ord.amount_cents)
-              if (!Number.isFinite(declared) || declared <= 0) {
-                json(res, 400, { ok: false, error: 'invalid_order_amount' })
-                return
-              }
-              if (verified > declared) {
-                json(res, 400, { ok: false, error: 'refund_verify_exceeds_declared' })
-                return
-              }
-              const { data: tenant, error: te } = await admin
-                .from('tenants')
-                .select('wallet_balance_cents')
-                .eq('id', String(ord.tenant_id))
-                .maybeSingle()
-              if (te || !tenant) {
-                json(res, 502, { ok: false, error: 'tenant_load_failed', detail: te?.message })
-                return
-              }
-              const bal =
-                typeof tenant.wallet_balance_cents === 'number' && Number.isFinite(tenant.wallet_balance_cents)
-                  ? tenant.wallet_balance_cents
-                  : 0
-              if (verified > bal) {
-                json(res, 400, { ok: false, error: 'refund_verify_exceeds_wallet' })
-                return
-              }
-            }
-            const nowIso = new Date().toISOString()
-            const { data: updated, error: ue } = await admin
-              .from('merchant_payment_orders')
-              .update({
-                verified_amount_cents: verified,
-                verified_at: nowIso,
-                status: 'amount_verified',
-                updated_at: nowIso,
-              })
-              .eq('id', id)
-              .eq('status', 'pending')
-              .select('id')
-              .maybeSingle()
-            if (ue) {
-              json(res, 502, { ok: false, error: 'verify_failed', detail: ue.message })
-              return
-            }
-            if (!updated?.id) {
-              json(res, 409, { ok: false, error: 'not_pending_or_missing' })
+            const vr = await verifyOpsPaymentOrderAdmin(admin, body)
+            if (!vr.ok) {
+              json(res, vr.status, vr.body)
               return
             }
             json(res, 200, { ok: true })
@@ -628,209 +498,15 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_json' })
               return
             }
-            const id = typeof body.id === 'string' ? body.id.trim() : ''
-            if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-              json(res, 400, { ok: false, error: 'invalid_id' })
-              return
-            }
             const admin = createClient(supabaseUrl, effectiveKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             })
-            const { data: order, error: oe } = await admin.from('merchant_payment_orders').select('*').eq('id', id).maybeSingle()
-            if (oe) {
-              json(res, 502, { ok: false, error: 'order_load_failed', detail: oe.message })
+            const cr = await confirmOpsPaymentOrderAdmin(admin, body)
+            if (!cr.ok) {
+              json(res, cr.status, cr.body)
               return
             }
-            if (!order || order.status !== 'amount_verified') {
-              json(res, 409, { ok: false, error: 'order_not_ready' })
-              return
-            }
-            const vc = Number(order.verified_amount_cents)
-            if (!Number.isFinite(vc) || vc <= 0) {
-              json(res, 400, { ok: false, error: 'invalid_verified_amount' })
-              return
-            }
-            const tenantId = String(order.tenant_id)
-            const nowIso = new Date().toISOString()
-
-            if (order.order_kind === 'subscription') {
-              const days = subscriptionDaysFromVerifiedCents(vc)
-              if (days <= 0) {
-                json(res, 400, { ok: false, error: 'cannot_derive_days' })
-                return
-              }
-              const { data: tenant, error: te } = await admin
-                .from('tenants')
-                .select('service_expire_at, official_days')
-                .eq('id', tenantId)
-                .maybeSingle()
-              if (te || !tenant) {
-                json(res, 502, { ok: false, error: 'tenant_load_failed', detail: te?.message })
-                return
-              }
-              const nowMs = Date.now()
-              let baseMs = nowMs
-              if (tenant.service_expire_at) {
-                const se = new Date(String(tenant.service_expire_at)).getTime()
-                if (Number.isFinite(se) && se > baseMs) baseMs = se
-              }
-              const newExpireMs = baseMs + days * 86400000
-              const newExpireIso = new Date(newExpireMs).toISOString()
-              const prevOfficial = typeof tenant.official_days === 'number' ? tenant.official_days : 0
-              const { error: upTe } = await admin
-                .from('tenants')
-                .update({
-                  service_expire_at: newExpireIso,
-                  official_days: prevOfficial + days,
-                  updated_at: nowIso,
-                })
-                .eq('id', tenantId)
-              if (upTe) {
-                json(res, 502, { ok: false, error: 'tenant_update_failed', detail: upTe.message })
-                return
-              }
-              const { error: upOr } = await admin
-                .from('merchant_payment_orders')
-                .update({
-                  status: 'confirmed',
-                  confirmed_at: nowIso,
-                  extend_days_applied: days,
-                  wallet_credit_cents_applied: null,
-                  updated_at: nowIso,
-                })
-                .eq('id', id)
-                .eq('status', 'amount_verified')
-              if (upOr) {
-                json(res, 502, { ok: false, error: 'order_finalize_failed', detail: upOr.message })
-                return
-              }
-              json(res, 200, { ok: true })
-              return
-            }
-
-            if (order.order_kind === 'recharge') {
-              const credit = rechargeCreditFromVerifiedCents(vc)
-              if (credit <= 0) {
-                json(res, 400, { ok: false, error: 'invalid_credit' })
-                return
-              }
-              const { data: tenant, error: te } = await admin
-                .from('tenants')
-                .select('wallet_balance_cents')
-                .eq('id', tenantId)
-                .maybeSingle()
-              if (te || !tenant) {
-                json(res, 502, { ok: false, error: 'tenant_load_failed', detail: te?.message })
-                return
-              }
-              const prevBal =
-                typeof tenant.wallet_balance_cents === 'number' && Number.isFinite(tenant.wallet_balance_cents)
-                  ? tenant.wallet_balance_cents
-                  : 0
-              const newBal = prevBal + credit
-              const { error: upTe } = await admin
-                .from('tenants')
-                .update({
-                  wallet_balance_cents: newBal,
-                  updated_at: nowIso,
-                })
-                .eq('id', tenantId)
-              if (upTe) {
-                json(res, 502, { ok: false, error: 'tenant_wallet_update_failed', detail: upTe.message })
-                return
-              }
-              const { error: le } = await admin.from('tenant_wallet_ledger').insert({
-                tenant_id: tenantId,
-                delta_cents: credit,
-                balance_after_cents: newBal,
-                reason: '充值到账（运营确认）',
-                ref_order_id: id,
-              })
-              if (le) {
-                json(res, 502, { ok: false, error: 'ledger_insert_failed', detail: le.message })
-                return
-              }
-              const { error: upOr } = await admin
-                .from('merchant_payment_orders')
-                .update({
-                  status: 'confirmed',
-                  confirmed_at: nowIso,
-                  extend_days_applied: null,
-                  wallet_credit_cents_applied: credit,
-                  updated_at: nowIso,
-                })
-                .eq('id', id)
-                .eq('status', 'amount_verified')
-              if (upOr) {
-                json(res, 502, { ok: false, error: 'order_finalize_failed', detail: upOr.message })
-                return
-              }
-              json(res, 200, { ok: true })
-              return
-            }
-
-            if (order.order_kind === 'refund') {
-              const debit = vc
-              const { data: tenant, error: te } = await admin
-                .from('tenants')
-                .select('wallet_balance_cents')
-                .eq('id', tenantId)
-                .maybeSingle()
-              if (te || !tenant) {
-                json(res, 502, { ok: false, error: 'tenant_load_failed', detail: te?.message })
-                return
-              }
-              const prevBal =
-                typeof tenant.wallet_balance_cents === 'number' && Number.isFinite(tenant.wallet_balance_cents)
-                  ? tenant.wallet_balance_cents
-                  : 0
-              if (debit > prevBal) {
-                json(res, 400, { ok: false, error: 'insufficient_wallet_for_refund' })
-                return
-              }
-              const newBal = prevBal - debit
-              const { error: upTe } = await admin
-                .from('tenants')
-                .update({
-                  wallet_balance_cents: newBal,
-                  updated_at: nowIso,
-                })
-                .eq('id', tenantId)
-              if (upTe) {
-                json(res, 502, { ok: false, error: 'tenant_wallet_update_failed', detail: upTe.message })
-                return
-              }
-              const { error: le } = await admin.from('tenant_wallet_ledger').insert({
-                tenant_id: tenantId,
-                delta_cents: -debit,
-                balance_after_cents: newBal,
-                reason: '退款扣减（运营确认）',
-                ref_order_id: id,
-              })
-              if (le) {
-                json(res, 502, { ok: false, error: 'ledger_insert_failed', detail: le.message })
-                return
-              }
-              const { error: upOr } = await admin
-                .from('merchant_payment_orders')
-                .update({
-                  status: 'confirmed',
-                  confirmed_at: nowIso,
-                  extend_days_applied: null,
-                  wallet_credit_cents_applied: null,
-                  updated_at: nowIso,
-                })
-                .eq('id', id)
-                .eq('status', 'amount_verified')
-              if (upOr) {
-                json(res, 502, { ok: false, error: 'order_finalize_failed', detail: upOr.message })
-                return
-              }
-              json(res, 200, { ok: true })
-              return
-            }
-
-            json(res, 400, { ok: false, error: 'unknown_order_kind' })
+            json(res, 200, { ok: true })
             return
           }
 
@@ -847,43 +523,12 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'invalid_json' })
               return
             }
-            const id = typeof body.id === 'string' ? body.id.trim() : ''
-            if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-              json(res, 400, { ok: false, error: 'invalid_id' })
-              return
-            }
             const admin = createClient(supabaseUrl, effectiveKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             })
-            const { data: order, error: oe } = await admin
-              .from('merchant_payment_orders')
-              .select('id, status')
-              .eq('id', id)
-              .maybeSingle()
-            if (oe) {
-              json(res, 502, { ok: false, error: 'order_load_failed', detail: oe.message })
-              return
-            }
-            if (!order) {
-              json(res, 404, { ok: false, error: 'not_found' })
-              return
-            }
-            const st = String(order.status)
-            if (st === 'confirmed') {
-              json(res, 409, {
-                ok: false,
-                error: 'cannot_delete_confirmed',
-                hint: '已确认入账的订单不可删除，如需冲正请另行处理。',
-              })
-              return
-            }
-            if (st !== 'pending' && st !== 'amount_verified' && st !== 'cancelled') {
-              json(res, 409, { ok: false, error: 'cannot_delete_status' })
-              return
-            }
-            const { error: de } = await admin.from('merchant_payment_orders').delete().eq('id', id)
-            if (de) {
-              json(res, 502, { ok: false, error: 'delete_failed', detail: de.message })
+            const dr = await deleteOpsPaymentOrderAdmin(admin, body)
+            if (!dr.ok) {
+              json(res, dr.status, dr.body)
               return
             }
             json(res, 200, { ok: true })

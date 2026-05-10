@@ -8,10 +8,15 @@ import type {
   RegistryVideoSubmission,
 } from './opsRegistryTypes'
 
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+/** 注册表与商户网关分离：优先运营台域名（线上 ERP 静态站无 /api/ops-sync 时需配置）。 */
+function registryApiBase(): string {
+  const admin = (import.meta.env.VITE_MERCHANT_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, '')?.trim()
+  if (admin) return admin
+  return (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+}
 
 function url(path: string) {
-  const b = apiBase()
+  const b = registryApiBase()
   return `${b}${path}`
 }
 

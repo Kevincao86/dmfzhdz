@@ -36,6 +36,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import crypto from 'node:crypto'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract'
+import {
+  merchantDouyinSessionSecret,
+  openDouyinSessionCredentials,
+  sealDouyinSessionCredentials,
+} from './douyinSessionSeal'
 import { mockDouyinProductStore } from './mockDouyinProductStore'
 
 const DOUYIN_CLIENT_TOKEN_URL = 'https://open.douyin.com/oauth/client_token/'
@@ -84,6 +89,29 @@ type Session = {
 }
 
 const sessions = new Map<string, Session>()
+
+/** 同一 Lambda 实例内缓存解密后的会话，减少重复申请 client_token */
+const sealedSessionRuntimeCache = new Map<string, Session>()
+
+function resolveSession(authToken: string): Session | undefined {
+  const t = authToken.trim()
+  if (!t) return undefined
+  const mem = sessions.get(t)
+  if (mem) return mem
+  let cached = sealedSessionRuntimeCache.get(t)
+  if (cached) return cached
+  const opened = openDouyinSessionCredentials(t)
+  if (!opened) return undefined
+  cached = {
+    clientKey: opened.clientKey,
+    clientSecret: opened.clientSecret,
+    merchantId: opened.merchantId,
+    douyinToken: '',
+    douyinExpiresAtMs: 0,
+  }
+  sealedSessionRuntimeCache.set(t, cached)
+  return cached
+}
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -609,24 +637,24 @@ function rowBrandHay(row: unknown): string {
   return `${fromPoi} ${fromStruct} ${acct}`.trim().toLowerCase()
 }
 
-export async function handleDouyinBindPost(
-  _req: IncomingMessage,
-  res: ServerResponse,
+/** 供 Vite 中间件与 Vercel `/api/merchant/douyin/bind` 共用；线上须配置 MERCHANT_DOUYIN_SESSION_SECRET 以返回加密令牌（无状态）。 */
+export async function runDouyinMerchantBind(
   bodyRaw: string,
-): Promise<void> {
+): Promise<{ statusCode: number; body: Record<string, unknown> }> {
   let body: { appId?: string; appSecret?: string; merchantId?: string }
   try {
     body = JSON.parse(bodyRaw || '{}') as typeof body
   } catch {
-    json(res, 400, { message: '请求体须为 JSON' })
-    return
+    return { statusCode: 400, body: { message: '请求体须为 JSON' } }
   }
   const clientKey = String(body.appId ?? '').trim()
   const clientSecret = String(body.appSecret ?? '').trim()
   const merchantId = String(body.merchantId ?? '').trim()
   if (!clientKey || !clientSecret || !merchantId) {
-    json(res, 400, { message: '请提供 appId（client_key）、appSecret（client_secret）、merchantId（account_id）' })
-    return
+    return {
+      statusCode: 400,
+      body: { message: '请提供 appId（client_key）、appSecret（client_secret）、merchantId（account_id）' },
+    }
   }
 
   try {
@@ -643,18 +671,39 @@ export async function handleDouyinBindPost(
     const pois = (d?.pois as unknown[]) ?? []
     const accountName = accountNameFromPois(pois)
 
-    const sid = crypto.randomBytes(32).toString('hex')
-    sessions.set(sid, session)
+    const secret = merchantDouyinSessionSecret()
+    let accessToken: string
+    if (secret) {
+      accessToken = sealDouyinSessionCredentials({ clientKey, clientSecret, merchantId }, secret)
+    } else {
+      const sid = crypto.randomBytes(32).toString('hex')
+      sessions.set(sid, session)
+      accessToken = sid
+    }
 
-    json(res, 200, {
-      accessToken: sid,
-      accountName: accountName ?? undefined,
-      message: '已建立直连抖音开放平台的本地会话（仅开发服务器内存）。',
-    })
+    return {
+      statusCode: 200,
+      body: {
+        accessToken,
+        accountName: accountName ?? undefined,
+        message: secret
+          ? '已绑定抖音来客（线上加密会话，请在部署环境配置 MERCHANT_DOUYIN_SESSION_SECRET）。'
+          : '已建立直连抖音开放平台的本地会话（仅开发服务器内存）。',
+      },
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    json(res, 502, { message: `抖音鉴权或门店查询失败：${msg}` })
+    return { statusCode: 502, body: { message: `抖音鉴权或门店查询失败：${msg}` } }
   }
+}
+
+export async function handleDouyinBindPost(
+  _req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const r = await runDouyinMerchantBind(bodyRaw)
+  json(res, r.statusCode, r.body)
 }
 
 function collectUploadableLeafCategoryIds(nodes: unknown): string[] {
@@ -688,7 +737,7 @@ export async function handleDouyinGoodsCategoryGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -734,7 +783,7 @@ export async function handleDouyinGoodsProductOnlineQueryGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -787,7 +836,7 @@ export async function handleDouyinGoodsProductDraftQueryGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -834,7 +883,7 @@ export async function handleDouyinGoodsIndustryScopeGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -887,7 +936,7 @@ export async function handleDouyinStoresGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -990,7 +1039,7 @@ export async function handleDouyinBrandsGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -1058,7 +1107,7 @@ export async function handleDouyinStoreDecorationGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -1119,7 +1168,7 @@ export async function handleDouyinStoreDetailGet(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -1193,7 +1242,7 @@ export async function handleDouyinPoiClaimPost(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -1391,7 +1440,7 @@ export async function handleDouyinGoodsProductSavePost(
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
     return
   }
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { message: '会话无效或已失效，请重新绑定' })
     return
@@ -1534,7 +1583,7 @@ export async function fetchDouyinFinanceReconcileRows(
   endYmd: string,
 ): Promise<{ rows: FinanceReconcileRowPayload[]; warnings: string[] }> {
   const warnings: string[] = []
-  const session = sessions.get(bearerToken)
+  const session = bearerToken ? resolveSession(bearerToken) : undefined
   if (!session) {
     warnings.push('当前 Bearer 非抖音来客绑定会话，无法拉取抖音订单；请使用「抖音绑定」返回的 accessToken。')
     return { rows: [], warnings }
@@ -1686,7 +1735,7 @@ export async function fetchDouyinAkteReviews(
   bearerToken: string,
 ): Promise<{ ok: true; items: MerchantReviewRowDouyin[] } | { ok: false; message: string }> {
   const auth = bearerToken.trim()
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     return { ok: false, message: '会话无效或未绑定抖音来客，请先完成绑定。' }
   }
@@ -1789,7 +1838,7 @@ export async function postDouyinAkteCommentReply(
   text: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const auth = bearerToken.trim()
-  const session = sessions.get(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     return { ok: false, message: '会话无效或未绑定抖音来客。' }
   }
