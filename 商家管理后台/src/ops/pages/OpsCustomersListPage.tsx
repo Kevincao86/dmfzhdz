@@ -378,11 +378,13 @@ export default function OpsCustomersListPage() {
             return
           }
           setFormErr(
-            pr.hint
-              ? `${pr.error ?? 'Supabase 开通失败'}（${pr.hint}）`
-              : pr.detail
-                ? `${pr.error ?? '开通失败'}：${pr.detail}`
-                : pr.error ?? 'Supabase 开通失败',
+            pr.missingEnv?.length
+              ? `${pr.error ?? 'provision_not_configured'}：${pr.missingEnv.join('；')}`
+              : pr.hint
+                ? `${pr.error ?? 'Supabase 开通失败'}（${pr.hint}）`
+                : pr.detail
+                  ? `${pr.error ?? '开通失败'}：${pr.detail}`
+                  : pr.error ?? 'Supabase 开通失败',
           )
           return
         }

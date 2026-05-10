@@ -19,6 +19,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@vercel/node": "^5.5.16",
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
