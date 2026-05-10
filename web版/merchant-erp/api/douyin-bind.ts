@@ -1,11 +1,27 @@
 /**
- * 独立入口：抖音来客绑定。生产路径：POST /api/douyin-bind
- * 使用动态 import(bindRuntime)，避免构建产物在个别环境下顶层初始化异常导致 FUNCTION_INVOCATION_FAILED。
+ * 独立入口：POST /api/douyin-bind
+ *
+ * 勿使用单独的 `./lib/*` 小文件：Vercel Node ESM 产物曾出现
+ * `ERR_MODULE_NOT_FOUND .../api/lib/safeJsonResponse`。辅助函数直接写在本文件内。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendSafeJson } from './lib/safeJsonResponse'
+import { runDouyinMerchantBind } from './merchant/douyin/bindRuntime'
 
 export const config = { maxDuration: 60 }
+
+function sendSafeJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
+  try {
+    if (res.writableEnded) return
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.status(status).send(JSON.stringify(body))
+  } catch {
+    try {
+      if (!res.writableEnded) res.end()
+    } catch {
+      /* noop */
+    }
+  }
+}
 
 function rawBody(req: VercelRequest): string {
   try {
@@ -32,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const { runDouyinMerchantBind } = await import('./merchant/douyin/bindRuntime')
     const r = await runDouyinMerchantBind(rawBody(req))
     let payload: string
     try {
@@ -48,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const msg = e instanceof Error ? e.message : String(e)
     sendSafeJson(res, 500, {
       message: msg || '抖音绑定处理异常',
-      hint: '若为加载绑定模块失败，请查看 Vercel Logs；可确认 Root Directory 为 web版/merchant-erp 且已部署 api/douyin-bind。',
+      hint: '若仍为模块加载错误，请查看 Vercel Logs；Root Directory 须为 web版/merchant-erp。',
     })
   }
 }

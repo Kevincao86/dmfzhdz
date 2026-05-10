@@ -103,7 +103,9 @@ export default function OpsCustomersListPage() {
         ...regTenants.filter((t) => !loginSet.has(loginKey(t.loginName))),
       ]
     } else if (sb.error !== 'not_configured') {
-      setSyncHint((prev) => prev ?? (sb.hint ?? sb.detail ?? `Supabase 列表失败：${sb.error}`))
+      const sbMsg = sb.hint ?? sb.detail ?? `Supabase 列表失败：${sb.error}`
+      // 勿用 prev ??：线上注册表失败时已写入 hint，会盖住 tenants API 真实报错（不便排查密钥/迁移）。
+      setSyncHint((prev) => (prev ? `${prev} | ${sbMsg}` : sbMsg))
     }
     setTenants(merged)
   }, [])
