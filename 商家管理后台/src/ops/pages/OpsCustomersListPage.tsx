@@ -10,6 +10,7 @@ import {
   fetchSupabaseTenantsForOps,
   patchSupabaseTenant,
   resetSupabaseTenantAuthPassword,
+  supabaseOpsAvailableOnClient,
   supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
 
@@ -92,18 +93,16 @@ export default function OpsCustomersListPage() {
     }
 
     let merged: RegistryTenant[] = [...regTenants]
-    if (import.meta.env.VITE_SUPABASE_URL?.trim()) {
-      const sb = await fetchSupabaseTenantsForOps()
-      if (sb.ok) {
-        const fromSb = supabaseRowsToRegistryTenants(sb.rows)
-        const loginSet = new Set(fromSb.map((x) => x.loginName.trim().toLowerCase()))
-        merged = [
-          ...fromSb,
-          ...regTenants.filter((t) => !loginSet.has(t.loginName.trim().toLowerCase())),
-        ]
-      } else if (sb.error !== 'not_configured') {
-        setSyncHint((prev) => prev ?? (sb.hint ?? sb.detail ?? `Supabase 列表失败：${sb.error}`))
-      }
+    const sb = await fetchSupabaseTenantsForOps()
+    if (sb.ok) {
+      const fromSb = supabaseRowsToRegistryTenants(sb.rows)
+      const loginSet = new Set(fromSb.map((x) => x.loginName.trim().toLowerCase()))
+      merged = [
+        ...fromSb,
+        ...regTenants.filter((t) => !loginSet.has(t.loginName.trim().toLowerCase())),
+      ]
+    } else if (sb.error !== 'not_configured') {
+      setSyncHint((prev) => prev ?? (sb.hint ?? sb.detail ?? `Supabase 列表失败：${sb.error}`))
     }
     setTenants(merged)
   }, [])
@@ -226,8 +225,8 @@ export default function OpsCustomersListPage() {
     setRowResetPwdBusy(c.id)
     try {
       if (isSupabaseTenant(t)) {
-        if (!import.meta.env.VITE_SUPABASE_URL?.trim()) {
-          window.alert('未配置 Supabase，无法重置云端密码。')
+        if (!supabaseOpsAvailableOnClient()) {
+          window.alert('当前环境未启用 Supabase 运营接口，无法重置云端密码。')
           return
         }
         const r = await resetSupabaseTenantAuthPassword(t.id, OPS_RESET_PASSWORD)
@@ -348,7 +347,7 @@ export default function OpsCustomersListPage() {
     }
     setSubmitting(true)
     try {
-      if (import.meta.env.VITE_SUPABASE_URL) {
+      if (import.meta.env.PROD || import.meta.env.VITE_SUPABASE_URL) {
         const pr = await postProvisionTenant({ loginName, password, merchantName, trialDays, officialDays })
         if (!pr.ok) {
           if (pr.error === 'login_exists') {

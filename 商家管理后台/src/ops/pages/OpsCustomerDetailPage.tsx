@@ -49,16 +49,14 @@ async function loadMergedTenants(): Promise<RegistryTenant[]> {
     regTenants = []
   }
   let merged: RegistryTenant[] = [...regTenants]
-  if (import.meta.env.VITE_SUPABASE_URL?.trim()) {
-    const sb = await fetchSupabaseTenantsForOps()
-    if (sb.ok) {
-      const fromSb = supabaseRowsToRegistryTenants(sb.rows)
-      const loginSet = new Set(fromSb.map((x) => x.loginName.trim().toLowerCase()))
-      merged = [
-        ...fromSb,
-        ...regTenants.filter((t) => !loginSet.has(t.loginName.trim().toLowerCase())),
-      ]
-    }
+  const sb = await fetchSupabaseTenantsForOps()
+  if (sb.ok) {
+    const fromSb = supabaseRowsToRegistryTenants(sb.rows)
+    const loginSet = new Set(fromSb.map((x) => x.loginName.trim().toLowerCase()))
+    merged = [
+      ...fromSb,
+      ...regTenants.filter((t) => !loginSet.has(t.loginName.trim().toLowerCase())),
+    ]
   }
   return merged
 }

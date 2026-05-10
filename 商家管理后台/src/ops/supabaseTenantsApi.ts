@@ -25,11 +25,18 @@ export type SupabaseTenantRow = {
   owner_user_id: string
 }
 
+/** 是否应对同源 `/api/ops-supabase/*` 发请求（线上恒为 true） */
+export function supabaseOpsAvailableOnClient(): boolean {
+  // 线上列表走同源 API，服务端用 SUPABASE_URL + SERVICE_ROLE；不要求构建时注入 VITE_SUPABASE_URL。
+  if (import.meta.env.PROD) return true
+  return !!import.meta.env.VITE_SUPABASE_URL?.trim()
+}
+
 export async function fetchSupabaseTenantsForOps(): Promise<
   | { ok: true; rows: SupabaseTenantRow[] }
   | { ok: false; error: string; hint?: string; detail?: string }
 > {
-  if (!import.meta.env.VITE_SUPABASE_URL?.trim()) {
+  if (!supabaseOpsAvailableOnClient()) {
     return { ok: false, error: 'not_configured' }
   }
   const res = await fetch('/api/ops-supabase/tenants')
@@ -67,7 +74,7 @@ export type OpsWalletLedgerRow = {
 export async function fetchTenantWalletLedgerForOps(
   tenantId: string,
 ): Promise<{ ok: true; rows: OpsWalletLedgerRow[] } | { ok: false; error: string; hint?: string }> {
-  if (!import.meta.env.VITE_SUPABASE_URL?.trim()) {
+  if (!supabaseOpsAvailableOnClient()) {
     return { ok: false, error: 'not_configured' }
   }
   const res = await fetch(
