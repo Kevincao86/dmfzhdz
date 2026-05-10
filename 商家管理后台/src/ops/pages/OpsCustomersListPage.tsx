@@ -348,6 +348,11 @@ export default function OpsCustomersListPage() {
         const pr = await postProvisionTenant({ loginName, password, merchantName, trialDays, officialDays })
         if (!pr.ok) {
           if (pr.error === 'login_exists') {
+            if (!import.meta.env.DEV) {
+              setFormErr('该登录名在 Supabase 中已存在，请在列表中查找或更换账户名。')
+              await reload()
+              return
+            }
             let reg: Awaited<ReturnType<typeof fetchRegistry>>
             try {
               reg = await fetchRegistry()
@@ -388,6 +393,22 @@ export default function OpsCustomersListPage() {
           )
           return
         }
+        // 云端已开通：生产环境无 /api/ops-sync 注册表接口，勿再 postManualTenant
+        if (import.meta.env.DEV) {
+          const rSync = await postManualTenant({ loginName, password, merchantName, trialDays, officialDays })
+          if (!rSync.ok) {
+            setFormErr(
+              rSync.error === 'login_exists'
+                ? '该账户名已存在'
+                : rSync.error ?? '云端已开通，但写入本地注册表失败',
+            )
+            return
+          }
+        }
+        setCreateOpen(false)
+        setForm({ loginName: '', password: '', merchantName: '', trialDays: '14', officialDays: '365' })
+        await reload()
+        return
       }
       const r = await postManualTenant({ loginName, password, merchantName, trialDays, officialDays })
       if (!r.ok) {
@@ -408,8 +429,8 @@ export default function OpsCustomersListPage() {
         <h1 className="text-xl font-semibold text-white">客户管理</h1>
         <p className="mt-1 text-sm text-slate-500">
           已配置 Supabase 时，列表<strong className="text-slate-400">优先展示云端租户</strong>
-          （Auth + public.tenants），并与注册表去重合并；未配置时仅显示项目根注册表。手动创建会走云端开通并写入注册表，便于 ERP
-          子账号同步登录。
+          （Auth + public.tenants），并与注册表去重合并；未配置时仅显示项目根注册表。手动创建走云端开通；本机 dev 另写入注册表便于 ERP
+          同步，线上无注册表接口时不写入。
         </p>
         {syncHint ? <p className="mt-2 text-xs text-amber-400/90">{syncHint}</p> : null}
       </div>
