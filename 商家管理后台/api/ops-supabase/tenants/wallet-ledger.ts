@@ -2,9 +2,9 @@
  * Vercel：GET /api/ops-supabase/tenants/wallet-ledger?tenant_id=
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { opsTenantWalletLedgerAdmin } from '../../lib/opsTenantsMutationsBackend'
-import { sendOpsJson } from '../../lib/safeVercelJson'
+import { createOpsServiceRoleClient } from '../../createOpsServiceRoleClient'
+import { opsTenantWalletLedgerAdmin } from '../../opsTenantsMutationsBackend'
+import { sendOpsJson } from '../../safeOpsJson'
 
 export const config = { maxDuration: 60 }
 

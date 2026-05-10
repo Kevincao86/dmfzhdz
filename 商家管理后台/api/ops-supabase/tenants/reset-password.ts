@@ -2,9 +2,9 @@
  * Vercel：POST /api/ops-supabase/tenants/reset-password
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { opsTenantResetPasswordAdmin } from '../../lib/opsTenantsMutationsBackend'
-import { sendOpsJson } from '../../lib/safeVercelJson'
+import { createOpsServiceRoleClient } from '../../createOpsServiceRoleClient'
+import { opsTenantResetPasswordAdmin } from '../../opsTenantsMutationsBackend'
+import { sendOpsJson } from '../../safeOpsJson'
 
 export const config = { maxDuration: 60 }
 

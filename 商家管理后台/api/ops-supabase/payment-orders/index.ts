@@ -2,8 +2,8 @@
  * Vercel：GET /api/ops-supabase/payment-orders（运营台订单列表）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { sendOpsJson } from '../../lib/safeVercelJson'
+import { createOpsServiceRoleClient } from '../../createOpsServiceRoleClient'
+import { sendOpsJson } from '../../safeOpsJson'
 import { listOpsPaymentOrders } from '../../../src/ops/paymentOrdersAdminBackend'
 
 export const config = { maxDuration: 60 }

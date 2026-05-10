@@ -9,7 +9,7 @@
  * 本地开发仍由 vite-plugins/provisionTenantProxy 处理同源 POST。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendOpsJson } from './lib/safeVercelJson'
+import { sendOpsJson } from './safeOpsJson'
 
 export const config = { maxDuration: 60 }
 

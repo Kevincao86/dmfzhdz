@@ -2,8 +2,8 @@
  * Vercel：POST /api/ops-supabase/payment-orders/confirm
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { sendOpsJson } from '../../lib/safeVercelJson'
+import { createOpsServiceRoleClient } from '../../createOpsServiceRoleClient'
+import { sendOpsJson } from '../../safeOpsJson'
 import { confirmOpsPaymentOrderAdmin } from '../../../src/ops/paymentOrdersAdminBackend'
 
 export const config = { maxDuration: 60 }

@@ -16,7 +16,7 @@ import {
   opsTenantPatchAdmin,
   opsTenantResetPasswordAdmin,
   opsTenantWalletLedgerAdmin,
-} from '../api/lib/opsTenantsMutationsBackend'
+} from '../api/opsTenantsMutationsBackend'
 
 /** 官方本地 `supabase start` 固定 demo JWT（仅用于 127.0.0.1:54321，勿用于线上）。 */
 const LOCAL_SUPABASE_DEMO_SERVICE_ROLE =

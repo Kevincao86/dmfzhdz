@@ -2,8 +2,8 @@
  * Vercel：/api/ops-sync/* 注册表（Supabase ops_registry_snapshot），与 ERP 拉取同源。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../lib/createOpsServiceRoleClient'
-import { sendOpsJson } from '../lib/safeVercelJson'
+import { createOpsServiceRoleClient } from '../createOpsServiceRoleClient'
+import { sendOpsJson } from '../safeOpsJson'
 import { dispatchOpsRegistrySupabase } from '../../src/ops/opsRegistrySupabaseDispatch'
 
 export const config = { maxDuration: 60 }
