@@ -8,11 +8,33 @@ import { dispatchOpsRegistrySupabase } from '../../src/ops/opsRegistrySupabaseDi
 
 export const config = { maxDuration: 60 }
 
+const OPS_SYNC_PREFIX = '/api/ops-sync/'
+
+/** Vercel 部分环境下 catch-all 的 req.query.slug 为空，需从 URL 解析，否则 urlPath 变成 /api/ops-sync/ 导致注册表 404 */
+function slugSegmentsFromRequest(req: VercelRequest): string[] {
+  const slug = req.query.slug
+  if (Array.isArray(slug)) return slug.map(String).filter(Boolean)
+  if (typeof slug === 'string' && slug.trim()) {
+    return slug.includes('/') ? slug.split('/').filter(Boolean) : [slug.trim()]
+  }
+  const url = typeof req.url === 'string' ? req.url : ''
+  const pathOnly = url.split('?')[0]?.trim() ?? ''
+  if (pathOnly.startsWith(OPS_SYNC_PREFIX)) {
+    const rest = pathOnly.slice(OPS_SYNC_PREFIX.length)
+    return rest ? rest.split('/').filter(Boolean) : []
+  }
+  return []
+}
+
 function rawBody(req: VercelRequest): string {
-  if (typeof req.body === 'string') return req.body
-  if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
-  if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
-  return ''
+  try {
+    if (typeof req.body === 'string') return req.body
+    if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
+    if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
+    return ''
+  } catch {
+    return ''
+  }
 }
 
 function sendCors(res: VercelResponse) {
@@ -31,9 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const slug = req.query.slug
-    const parts = Array.isArray(slug) ? slug : slug ? [slug] : []
-    const urlPath = '/api/ops-sync/' + parts.join('/')
+    const parts = slugSegmentsFromRequest(req)
+    const urlPath = OPS_SYNC_PREFIX + parts.join('/')
 
     const method = req.method ?? 'GET'
     const bodyRaw =
