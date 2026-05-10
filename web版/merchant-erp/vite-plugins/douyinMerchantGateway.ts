@@ -67,6 +67,16 @@ const DOUYIN_HERMES_TRADE_ORDER_QUERY = 'https://open.douyin.com/goodlife/v1/her
 const DOUYIN_AKTE_COMMENT_QUERY = 'https://open.douyin.com/goodlife/v1/akte/comment/query/'
 const DOUYIN_AKTE_COMMENT_REPLY = 'https://open.douyin.com/goodlife/v1/akte/comment/reply/'
 
+/** 绑定链路若 hang 住，Vercel 会以 FUNCTION_INVOCATION_FAILED 结束；对抖音出口强制限时 */
+const DOUYIN_FETCH_TIMEOUT_MS = 25_000
+
+function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
+  return fetch(input, {
+    ...init,
+    signal: AbortSignal.timeout(DOUYIN_FETCH_TIMEOUT_MS),
+  })
+}
+
 export type MerchantReviewRowDouyin = {
   id: string
   platform: 'douyin'
@@ -151,7 +161,7 @@ async function fetchDouyinClientToken(
   clientKey: string,
   clientSecret: string,
 ): Promise<{ token: string; expiresIn: number }> {
-  const res = await fetch(DOUYIN_CLIENT_TOKEN_URL, {
+  const res = await douyinFetch(DOUYIN_CLIENT_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -203,7 +213,7 @@ async function shopPoiQueryPage(
     u.searchParams.set('relation_type', String(relationType))
   }
 
-  const res = await fetch(u.toString(), {
+  const res = await douyinFetch(u.toString(), {
     method: 'GET',
     headers: {
       'access-token': accessToken,
@@ -692,8 +702,15 @@ export async function runDouyinMerchantBind(
       },
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { statusCode: 502, body: { message: `抖音鉴权或门店查询失败：${msg}` } }
+    const aborted =
+      e instanceof Error &&
+      (e.name === 'AbortError' || /aborted|timeout/i.test(e.message))
+    const detail = aborted
+      ? `连接抖音开放平台超时（${Math.round(DOUYIN_FETCH_TIMEOUT_MS / 1000)}s）。请稍后重试；若持续失败，可在 Vercel → Functions → 区域改为东京(hnd1)/首尔(icn1)等离大陆更近的节点后再试。`
+      : e instanceof Error
+        ? e.message
+        : String(e)
+    return { statusCode: 502, body: { message: `抖音鉴权或门店查询失败：${detail}` } }
   }
 }
 

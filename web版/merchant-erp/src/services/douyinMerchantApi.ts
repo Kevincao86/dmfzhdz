@@ -97,10 +97,18 @@ export async function postDouyinBind(
     /* 非 JSON（常为 Vercel/HTML 报错页） */
   }
   if (!res.ok) {
+    const errObj = data.error && typeof data.error === 'object' ? (data.error as Record<string, unknown>) : null
+    const nestedMsg =
+      typeof errObj?.message === 'string'
+        ? errObj.message
+        : typeof data.detail === 'string'
+          ? data.detail
+          : undefined
     const msg =
       (typeof data.message === 'string' && data.message) ||
+      nestedMsg ||
       (typeof data.error === 'string' && data.error) ||
-      rawText.trim().slice(0, 240) ||
+      rawText.trim().slice(0, 320) ||
       `HTTP ${res.status}`
     return { ok: false, message: msg }
   }
