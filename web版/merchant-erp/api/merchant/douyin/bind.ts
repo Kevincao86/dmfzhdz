@@ -8,10 +8,14 @@ import { runDouyinMerchantBind } from './bindRuntime'
 export const config = { maxDuration: 60 }
 
 function rawBody(req: VercelRequest): string {
-  if (typeof req.body === 'string') return req.body
-  if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
-  if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
-  return '{}'
+  try {
+    if (typeof req.body === 'string') return req.body
+    if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
+    if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
+    return '{}'
+  } catch {
+    return '{}'
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
