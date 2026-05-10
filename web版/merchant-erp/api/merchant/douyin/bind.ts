@@ -1,6 +1,6 @@
 /**
  * 显式路由：部分 CDN / 托管对 catch-all 的 POST 返回 405，单独暴露绑定接口。
- * 须静态 import + vercel.json includeFiles(vite-plugins)，否则线上打包不包含网关文件。
+ * 静态 import `../../../vite-plugins/...` + vercel.json `includeFiles: vite-plugins/**`，Serverless 才能带上网关与 `src/lib` 依赖。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { runDouyinMerchantBind } from '../../../vite-plugins/douyinMerchantGateway'
