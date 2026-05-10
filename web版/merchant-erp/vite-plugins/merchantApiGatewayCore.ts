@@ -894,8 +894,9 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       }
 
       return false
-  } catch {
-    json(res, 500, { message: 'merchant api gateway error' })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 500, { message: msg || 'merchant api gateway error' })
     return true
   }
 }
