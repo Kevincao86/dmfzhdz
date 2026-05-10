@@ -3,7 +3,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createOpsServiceRoleClient } from '../../lib/createOpsServiceRoleClient'
-import { opsTenantWalletLedgerAdmin } from '../../../src/ops/opsTenantsMutationsBackend'
+import { opsTenantWalletLedgerAdmin } from '../../lib/opsTenantsMutationsBackend'
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
