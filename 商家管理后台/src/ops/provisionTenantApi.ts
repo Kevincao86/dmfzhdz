@@ -21,6 +21,7 @@ export async function postProvisionTenant(body: ManualTenantPayload): Promise<{
   email?: string
   hint?: string
   detail?: string
+  missingEnv?: string[]
 }> {
   const res = await fetch('/api/provision-tenant', {
     method: 'POST',
@@ -34,6 +35,7 @@ export async function postProvisionTenant(body: ManualTenantPayload): Promise<{
     email?: string
     detail?: string
     hint?: string
+    missingEnv?: string[]
   }
   if (!res.ok) {
     return {
@@ -41,6 +43,7 @@ export async function postProvisionTenant(body: ManualTenantPayload): Promise<{
       error: j.error ?? `http_${res.status}`,
       detail: j.detail,
       hint: j.hint,
+      missingEnv: Array.isArray(j.missingEnv) ? j.missingEnv : undefined,
     }
   }
   return {
