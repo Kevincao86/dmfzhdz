@@ -4,6 +4,9 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { sendOpsJson } from '../../lib/safeVercelJson'
+
+export const config = { maxDuration: 60 }
 
 type TenantRow = {
   id: string
@@ -124,102 +127,100 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
   try {
-  if (req.method !== 'GET') {
-    res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
-    return
-  }
+    if (req.method !== 'GET') {
+      res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+      return
+    }
 
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
-  const serviceRole = (
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.SUPABASE_SERVICE_ROLE ??
-    ''
-  ).trim()
-  const anon = (process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
-  const secret = (process.env.MEOO_PROVISION_SECRET ?? '').trim()
+    const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
+    const serviceRole = (
+      process.env.SUPABASE_SERVICE_ROLE_KEY ??
+      process.env.SUPABASE_SERVICE_ROLE ??
+      ''
+    ).trim()
+    const anon = (process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+    const secret = (process.env.MEOO_PROVISION_SECRET ?? '').trim()
 
-  if (!supabaseUrl) {
+    if (!supabaseUrl) {
+      res.status(503).send(
+        JSON.stringify({
+          ok: false,
+          error: 'supabase_admin_not_configured',
+          hint: '配置 VITE_SUPABASE_URL 或 SUPABASE_URL（Production 环境）。',
+        }),
+      )
+      return
+    }
+
+    if (serviceRole) {
+      const lr = await listTenantsWithAdminClient(supabaseUrl, serviceRole)
+      if (lr.ok) {
+        res.status(200).send(JSON.stringify({ ok: true, rows: lr.rows }))
+        return
+      }
+      if (anon && secret) {
+        const er = await edgePost(supabaseUrl, anon, secret, {})
+        if (er.ok && er.data.ok !== false) {
+          const rows = Array.isArray(er.data.rows) ? er.data.rows : []
+          res.status(200).send(JSON.stringify({ ok: true, rows }))
+          return
+        }
+        const detail = [lr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
+        res.status(er.status >= 400 ? er.status : 502).send(
+          JSON.stringify({
+            ok: false,
+            error: 'list_failed',
+            detail,
+            hint:
+              'Service Role 列租户失败，且 Edge ops-list-tenants 无有效数据。请核对 SUPABASE_SERVICE_ROLE_KEY、数据库权限，或部署 ops-list-tenants。',
+          }),
+        )
+        return
+      }
+      res.status(502).send(
+        JSON.stringify({
+          ok: false,
+          error: lr.message,
+          detail: lr.detail,
+          hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
+        }),
+      )
+      return
+    }
+
+    if (anon && secret) {
+      const er = await edgePost(supabaseUrl, anon, secret, {})
+      if (!er.ok || er.data.ok === false) {
+        const detail = JSON.stringify(er.data).slice(0, 800)
+        res.status(er.status >= 400 ? er.status : 502).send(
+          JSON.stringify({
+            ok: false,
+            error: 'edge_list_failed',
+            detail,
+            hint: '未配置 SUPABASE_SERVICE_ROLE_KEY 时依赖 Edge ops-list-tenants；请部署该函数并配置 MEOO_PROVISION_SECRET。',
+          }),
+        )
+        return
+      }
+      const rows = Array.isArray(er.data.rows) ? er.data.rows : []
+      res.status(200).send(JSON.stringify({ ok: true, rows }))
+      return
+    }
+
     res.status(503).send(
       JSON.stringify({
         ok: false,
         error: 'supabase_admin_not_configured',
-        hint: '配置 VITE_SUPABASE_URL 或 SUPABASE_URL（Production 环境）。',
+        hint:
+          '请配置 SUPABASE_SERVICE_ROLE_KEY（推荐），或 SUPABASE_ANON_KEY + MEOO_PROVISION_SECRET 并部署 ops-list-tenants。',
       }),
     )
-    return
-  }
-
-  if (serviceRole) {
-    const lr = await listTenantsWithAdminClient(supabaseUrl, serviceRole)
-    if (lr.ok) {
-      res.status(200).send(JSON.stringify({ ok: true, rows: lr.rows }))
-      return
-    }
-    if (anon && secret) {
-      const er = await edgePost(supabaseUrl, anon, secret, {})
-      if (er.ok && er.data.ok !== false) {
-        const rows = Array.isArray(er.data.rows) ? er.data.rows : []
-        res.status(200).send(JSON.stringify({ ok: true, rows }))
-        return
-      }
-      const detail = [lr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
-      res.status(er.status >= 400 ? er.status : 502).send(
-        JSON.stringify({
-          ok: false,
-          error: 'list_failed',
-          detail,
-          hint:
-            'Service Role 列租户失败，且 Edge ops-list-tenants 无有效数据。请核对 SUPABASE_SERVICE_ROLE_KEY、数据库权限，或部署 ops-list-tenants。',
-        }),
-      )
-      return
-    }
-    res.status(502).send(
-      JSON.stringify({
-        ok: false,
-        error: lr.message,
-        detail: lr.detail,
-        hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
-      }),
-    )
-    return
-  }
-
-  if (anon && secret) {
-    const er = await edgePost(supabaseUrl, anon, secret, {})
-    if (!er.ok || er.data.ok === false) {
-      const detail = JSON.stringify(er.data).slice(0, 800)
-      res.status(er.status >= 400 ? er.status : 502).send(
-        JSON.stringify({
-          ok: false,
-          error: 'edge_list_failed',
-          detail,
-          hint: '未配置 SUPABASE_SERVICE_ROLE_KEY 时依赖 Edge ops-list-tenants；请部署该函数并配置 MEOO_PROVISION_SECRET。',
-        }),
-      )
-      return
-    }
-    const rows = Array.isArray(er.data.rows) ? er.data.rows : []
-    res.status(200).send(JSON.stringify({ ok: true, rows }))
-    return
-  }
-
-  res.status(503).send(
-    JSON.stringify({
-      ok: false,
-      error: 'supabase_admin_not_configured',
-      hint:
-        '请配置 SUPABASE_SERVICE_ROLE_KEY（推荐），或 SUPABASE_ANON_KEY + MEOO_PROVISION_SECRET 并部署 ops-list-tenants。',
-    }),
-  )
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).send(
-      JSON.stringify({
-        ok: false,
-        error: 'tenants_list_handler_failed',
-        detail: msg.slice(0, 800),
-      }),
-    )
+    sendOpsJson(res, 500, {
+      ok: false,
+      error: 'tenants_list_handler_failed',
+      detail: msg.slice(0, 800),
+    })
   }
 }

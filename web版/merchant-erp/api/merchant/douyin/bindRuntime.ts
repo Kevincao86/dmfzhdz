@@ -5,12 +5,10 @@
 import crypto from 'node:crypto'
 import {
   douyinMerchantDevSessions,
-  type DouyinMerchantSession,
-} from '../../../vite-plugins/douyinMerchantDevSessions'
-import {
   merchantDouyinSessionSecret,
   sealDouyinSessionCredentials,
-} from '../../../vite-plugins/douyinSessionSeal'
+  type DouyinMerchantSession,
+} from './bindShared'
 
 const DOUYIN_CLIENT_TOKEN_URL = 'https://open.douyin.com/oauth/client_token/'
 const DOUYIN_SHOP_POI_QUERY = 'https://open.douyin.com/goodlife/v1/shop/poi/query/'

@@ -5,6 +5,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { runDouyinMerchantBind } from './bindRuntime'
 
+export const config = { maxDuration: 60 }
+
 function rawBody(req: VercelRequest): string {
   if (typeof req.body === 'string') return req.body
   if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
@@ -37,6 +39,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(r.statusCode).send(payload)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).send(JSON.stringify({ message: msg || '抖音绑定处理异常' }))
+    try {
+      if (!res.writableEnded) {
+        res.status(500).send(JSON.stringify({ message: msg || '抖音绑定处理异常' }))
+      }
+    } catch {
+      try {
+        if (!res.writableEnded) res.end()
+      } catch {
+        /* noop */
+      }
+    }
   }
 }
