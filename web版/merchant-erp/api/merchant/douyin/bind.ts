@@ -1,8 +1,9 @@
 /**
  * 显式路由：部分 CDN / 托管对 catch-all 的 POST 返回 405，单独暴露绑定接口。
- * 动态 import：模块加载失败时仍能返回 JSON，避免 Vercel 裸 500。
+ * 须静态 import + vercel.json includeFiles(vite-plugins)，否则线上打包不包含网关文件。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { runDouyinMerchantBind } from '../../../vite-plugins/douyinMerchantGateway'
 
 function rawBody(req: VercelRequest): string {
   if (typeof req.body === 'string') return req.body
@@ -26,7 +27,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    const { runDouyinMerchantBind } = await import('../../../vite-plugins/douyinMerchantGateway')
     const r = await runDouyinMerchantBind(rawBody(req))
     let payload: string
     try {
