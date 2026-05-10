@@ -93,9 +93,12 @@ export default function OpsAiModelsPage() {
         setVideoAi(reg.videoAi ? { ...reg.videoAi } : {})
         setVideoAiUpdatedAt(reg.videoAiUpdatedAt ?? '')
       }
-    } catch {
+    } catch (e) {
+      const detail = e instanceof Error ? e.message.trim() : String(e)
       setHint(
-        '无法读写注册表：本地请重启 npm run dev 并确保项目根可写 .meoo-dev-sync；线上请在 Supabase 执行迁移 ops_registry_snapshot，并确认 Vercel 已部署 /api/ops-sync 且配置了 SUPABASE_SERVICE_ROLE_KEY。',
+        detail
+          ? `注册表请求失败：${detail}`
+          : '无法读写注册表：本地请重启 npm run dev 并确保项目根可写 .meoo-dev-sync；线上请在 Supabase 执行迁移 ops_registry_snapshot，并确认 Vercel 已部署 /api/ops-sync 且运营台环境配置了 SUPABASE_SERVICE_ROLE_KEY。',
       )
     } finally {
       if (!bg) setLoading(false)

@@ -89,16 +89,18 @@ export async function postDouyinBind(
       merchantId: payload.merchantId,
     }),
   })
+  const rawText = await res.text()
   let data: Record<string, unknown> = {}
   try {
-    data = (await res.json()) as Record<string, unknown>
+    data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
   } catch {
-    /* 非 JSON 响应 */
+    /* 非 JSON（常为 Vercel/HTML 报错页） */
   }
   if (!res.ok) {
     const msg =
       (typeof data.message === 'string' && data.message) ||
       (typeof data.error === 'string' && data.error) ||
+      rawText.trim().slice(0, 240) ||
       `HTTP ${res.status}`
     return { ok: false, message: msg }
   }
