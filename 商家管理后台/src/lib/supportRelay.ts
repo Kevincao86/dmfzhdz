@@ -7,6 +7,9 @@ export type SupportRelayChatLine = {
   text: string
   ts: number
   id: string
+  /** HTTP 轮询时随消息带上，便于运营台展示 */
+  customerId?: string
+  enterpriseName?: string
 }
 
 /** 商家连接或更新资料时下发，供运营台展示客户名称与 ID */

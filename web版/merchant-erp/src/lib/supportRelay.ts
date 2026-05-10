@@ -7,6 +7,8 @@ export type SupportRelayChatLine = {
   text: string
   ts: number
   id: string
+  customerId?: string
+  enterpriseName?: string
 }
 
 export type SupportRelaySessionMetaMessage = {

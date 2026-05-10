@@ -137,9 +137,103 @@ export default function OpsSupportWorkbenchPage() {
     typeof import.meta.env.VITE_SUPPORT_RELAY_WS === 'string' &&
     import.meta.env.VITE_SUPPORT_RELAY_WS.trim().length > 0
 
+  const httpPollToken =
+    typeof import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN === 'string'
+      ? import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN.trim()
+      : ''
+  const useHttpPoll = !relayUrl && Boolean(httpPollToken)
+  const maxPollTsRef = useRef(0)
+  const [httpPollReady, setHttpPollReady] = useState(false)
+  const channelReady = relayUrl ? relayReady : useHttpPoll ? httpPollReady : false
+
   useEffect(() => {
     selectedIdRef.current = selectedId
   }, [selectedId])
+
+  const applyIncomingChatLine = useCallback((line: SupportRelayChatLine) => {
+    const sid = line.sessionId
+    const sel = selectedIdRef.current
+    const isActive = sel === sid || sel === null
+    const cid = line.customerId?.trim()
+    const en = line.enterpriseName?.trim()
+    if (cid || en) {
+      setSessionProfiles((prev) => ({
+        ...prev,
+        [sid]: {
+          customerId: cid || prev[sid]?.customerId,
+          enterpriseName: en || prev[sid]?.enterpriseName,
+        },
+      }))
+    }
+    setSessions((prev) => {
+      const cur = prev[sid]
+      const nextUnread = isActive ? 0 : (cur?.unread ?? 0) + 1
+      return {
+        ...prev,
+        [sid]: {
+          lastText: line.text,
+          lastTs: line.ts,
+          unread: nextUnread,
+        },
+      }
+    })
+    setMsgsBySession((prev) => {
+      const list = prev[sid] ?? []
+      if (list.some((x) => x.id === line.id)) return prev
+      const core: SupportRelayChatLine = {
+        type: 'chat',
+        sessionId: sid,
+        from: line.from,
+        text: line.text,
+        ts: line.ts,
+        id: line.id,
+      }
+      return { ...prev, [sid]: [...list, core] }
+    })
+    setSelectedId((prev) => prev ?? sid)
+  }, [])
+
+  useEffect(() => {
+    if (!useHttpPoll || !httpPollToken) return
+
+    let cancelled = false
+
+    const tick = async () => {
+      if (cancelled) return
+      try {
+        const since = maxPollTsRef.current
+        const res = await fetch(`/api/support-poll?sinceTs=${since}`, {
+          headers: { Authorization: `Bearer ${httpPollToken}` },
+        })
+        if (!res.ok) return
+        const data = (await res.json()) as {
+          ok?: boolean
+          messages?: SupportRelayChatLine[]
+        }
+        if (!data.ok || !Array.isArray(data.messages)) return
+        setHttpPollReady(true)
+        const initialSince = since
+        for (const raw of data.messages) {
+          const line = raw as SupportRelayChatLine
+          if (!line.sessionId || !line.id) continue
+          applyIncomingChatLine(line)
+          maxPollTsRef.current = Math.max(maxPollTsRef.current, line.ts)
+        }
+        if (initialSince === 0 && maxPollTsRef.current === 0) {
+          maxPollTsRef.current = Date.now()
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    void tick()
+    const id = window.setInterval(() => void tick(), 2000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [useHttpPoll, httpPollToken, applyIncomingChatLine])
 
   useEffect(() => {
     if (!relayUrl) {
@@ -237,28 +331,7 @@ export default function OpsSupportWorkbenchPage() {
           return
         }
         if (typ !== 'chat') return
-        const line = data as SupportRelayChatLine
-        const sid = line.sessionId
-        const sel = selectedIdRef.current
-        const isActive = sel === sid || sel === null
-        setSessions((prev) => {
-          const cur = prev[sid]
-          const nextUnread = isActive ? 0 : (cur?.unread ?? 0) + 1
-          return {
-            ...prev,
-            [sid]: {
-              lastText: line.text,
-              lastTs: line.ts,
-              unread: nextUnread,
-            },
-          }
-        })
-        setMsgsBySession((prev) => {
-          const list = prev[sid] ?? []
-          if (list.some((x) => x.id === line.id)) return prev
-          return { ...prev, [sid]: [...list, line] }
-        })
-        setSelectedId((prev) => prev ?? sid)
+        applyIncomingChatLine(data as SupportRelayChatLine)
       }
     }
 
@@ -275,7 +348,7 @@ export default function OpsSupportWorkbenchPage() {
       }
       activeWs = null
     }
-  }, [relayUrl])
+  }, [relayUrl, applyIncomingChatLine])
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -427,8 +500,7 @@ export default function OpsSupportWorkbenchPage() {
   const sendOpsReply = () => {
     const t = reply.trim()
     const sid = selectedId
-    const ws = wsRef.current
-    if (!t || !sid || !ws || ws.readyState !== WebSocket.OPEN) return
+    if (!t || !sid) return
     const id = `ops_${Date.now()}_${Math.random().toString(36).slice(2)}`
     const line: SupportRelayChatLine = {
       type: 'chat',
@@ -438,21 +510,56 @@ export default function OpsSupportWorkbenchPage() {
       ts: Date.now(),
       id,
     }
-    ws.send(JSON.stringify(line))
-    setReply('')
-    setMsgsBySession((prev) => {
-      const list = prev[sid] ?? []
-      if (list.some((x) => x.id === line.id)) return prev
-      return { ...prev, [sid]: [...list, line] }
-    })
-    setSessions((prev) => ({
-      ...prev,
-      [sid]: {
-        lastText: line.text,
-        lastTs: line.ts,
-        unread: 0,
-      },
-    }))
+
+    const ws = wsRef.current
+    if (relayUrl && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(line))
+      setReply('')
+      setMsgsBySession((prev) => {
+        const list = prev[sid] ?? []
+        if (list.some((x) => x.id === line.id)) return prev
+        return { ...prev, [sid]: [...list, line] }
+      })
+      setSessions((prev) => ({
+        ...prev,
+        [sid]: {
+          lastText: line.text,
+          lastTs: line.ts,
+          unread: 0,
+        },
+      }))
+      maxPollTsRef.current = Math.max(maxPollTsRef.current, line.ts)
+      return
+    }
+
+    if (useHttpPoll && httpPollToken) {
+      void (async () => {
+        const res = await fetch('/api/support-ops-send', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${httpPollToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sessionId: sid, text: t, id }),
+        })
+        if (!res.ok) return
+        setReply('')
+        setMsgsBySession((prev) => {
+          const list = prev[sid] ?? []
+          if (list.some((x) => x.id === line.id)) return prev
+          return { ...prev, [sid]: [...list, line] }
+        })
+        setSessions((prev) => ({
+          ...prev,
+          [sid]: {
+            lastText: line.text,
+            lastTs: line.ts,
+            unread: 0,
+          },
+        }))
+        maxPollTsRef.current = Math.max(maxPollTsRef.current, line.ts)
+      })()
+    }
   }
 
   const lines = selectedId ? (msgsBySession[selectedId] ?? []) : []
@@ -462,17 +569,22 @@ export default function OpsSupportWorkbenchPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">在线客服</h1>
         <p className="mt-1 text-sm text-slate-500">
-          商家 ERP 悬浮窗直连本控制台 WebSocket（路径 /__meoo_support_online）；生产请替换为统一 IM 网关。
+          开发环境可走 WebSocket（/__meoo_support_online）；生产可在 Supabase 表 support_relay_messages 上启用云端同步，并在本项目中配置{' '}
+          <code className="rounded bg-black/30 px-1">VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN</code> 与 Vercel 服务端同名密钥及{' '}
+          <code className="rounded bg-black/30 px-1">SUPABASE_SERVICE_ROLE_KEY</code>。
         </p>
       </div>
 
-      {!relayUrl ? (
+      {!relayUrl && !useHttpPoll ? (
         <div className="flex items-center gap-2 rounded-xl border border-amber-900/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100/90">
           <WifiOff className="h-4 w-4 shrink-0" />
-          未配置在线客服 WebSocket 地址（生产构建需设置{' '}
-          <code className="rounded bg-black/30 px-1">VITE_SUPPORT_RELAY_WS</code>）。
+          未配置客服通道：请设置{' '}
+          <code className="rounded bg-black/30 px-1">VITE_SUPPORT_RELAY_WS</code>（自建 WS），或在执行迁移 support_relay_messages 后设置{' '}
+          <code className="rounded bg-black/30 px-1">VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN</code> 启用云端 HTTP 轮询。
         </div>
-      ) : (
+      ) : null}
+
+      {relayUrl ? (
         <div
           className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${
             relayReady
@@ -487,7 +599,22 @@ export default function OpsSupportWorkbenchPage() {
               : `已连接本机开发服务 ${relayUrl}（可在 .env 中覆盖 VITE_SUPPORT_RELAY_WS）`
             : `正在连接 ${relayUrl}… 请先启动本项目的 npm run dev（终端出现 [support-online-ws] 已挂载）。`}
         </div>
-      )}
+      ) : null}
+
+      {useHttpPoll ? (
+        <div
+          className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${
+            httpPollReady
+              ? 'border-emerald-900/40 bg-emerald-950/30 text-emerald-100/90'
+              : 'border-slate-700 bg-slate-900 text-slate-300'
+          }`}
+        >
+          {httpPollReady ? <Wifi className="h-4 w-4 shrink-0" /> : <WifiOff className="h-4 w-4 shrink-0" />}
+          {httpPollReady
+            ? '云端会话同步已启用（HTTP 轮询 Supabase，约每 2 秒刷新）'
+            : '正在连接云端会话接口… 请确认 Vercel 已配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。'}
+        </div>
+      ) : null}
 
       {tplEditorOpen && (
         <div
@@ -614,7 +741,7 @@ export default function OpsSupportWorkbenchPage() {
               </button>
               <button
                 type="button"
-                disabled={exportBusy || !relayUrl}
+                disabled={exportBusy || (!relayUrl && !useHttpPoll)}
                 onClick={() => void runExport()}
                 className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:pointer-events-none disabled:opacity-40"
               >
@@ -632,7 +759,7 @@ export default function OpsSupportWorkbenchPage() {
             <button
               type="button"
               onClick={openExportModal}
-              disabled={!relayUrl}
+              disabled={!relayUrl && !useHttpPoll}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-indigo-500 hover:text-white disabled:pointer-events-none disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
@@ -840,7 +967,7 @@ export default function OpsSupportWorkbenchPage() {
                       key={`${i}-${t.slice(0, 8)}`}
                       type="button"
                       onClick={() => applyTemplate(t)}
-                      disabled={!selectedId || !relayReady}
+                      disabled={!selectedId || !channelReady}
                       className="max-w-[14rem] truncate rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-left text-[11px] text-slate-300 hover:border-indigo-600 hover:text-white disabled:opacity-40"
                       title={t}
                     >
@@ -858,14 +985,14 @@ export default function OpsSupportWorkbenchPage() {
                         sendOpsReply()
                       }
                     }}
-                    disabled={!selectedId || !relayReady}
+                    disabled={!selectedId || !channelReady}
                     placeholder={selectedId ? '输入回复…' : '请先选择会话'}
                     className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={sendOpsReply}
-                    disabled={!selectedId || !relayReady}
+                    disabled={!selectedId || !channelReady}
                     className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500 disabled:pointer-events-none disabled:opacity-40"
                   >
                     <Send className="h-3.5 w-3.5" />
