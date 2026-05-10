@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Connect } from 'vite'
 import type { Plugin } from 'vite'
 import { loadEnv } from 'vite'
+import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime'
 import { handleMerchantApiGatewayCore } from './merchantApiGatewayCore'
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -19,13 +20,44 @@ function readBody(req: IncomingMessage): Promise<string> {
 function attach(middlewares: Connect.Server, env: Record<string, string>, viteRoot: string) {
   middlewares.use(async (req, res, next) => {
     const raw = req.url ?? ''
+    const host = req.headers.host ?? 'localhost'
+    const loc = new URL(raw, `http://${host}`)
+
+    if (loc.pathname === '/api/douyin-bind') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Allow', 'POST, OPTIONS')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ message: 'Method Not Allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const r = await runDouyinMerchantBind(bodyRaw)
+        res.statusCode = r.statusCode
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify(r.body))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ message: msg || '抖音绑定处理异常' }))
+      }
+      return
+    }
+
     if (!raw.startsWith('/api/merchant/')) {
       next()
       return
     }
 
-    const host = req.headers.host ?? 'localhost'
-    const url = new URL(raw, `http://${host}`)
+    const url = loc
     const pathname = url.pathname
     const method = req.method ?? 'GET'
 

@@ -35,6 +35,20 @@ function flattenVercelHeaders(
   return out
 }
 
+function slugSegmentsFromRequest(req: VercelRequest): string[] {
+  const slug = req.query.slug
+  if (Array.isArray(slug)) return slug.map(String).filter(Boolean)
+  if (typeof slug === 'string' && slug.trim()) return slug.split('/').filter(Boolean)
+  const url = typeof req.url === 'string' ? req.url : ''
+  const pathOnly = url.split('?')[0] ?? ''
+  const prefix = '/api/merchant/'
+  if (pathOnly.startsWith(prefix)) {
+    const rest = pathOnly.slice(prefix.length)
+    return rest ? rest.split('/').filter(Boolean) : []
+  }
+  return []
+}
+
 function sendMerchantJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   try {
     if (res.writableEnded) return
@@ -58,8 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const slug = req.query.slug
-  const parts = Array.isArray(slug) ? slug : slug ? [slug] : []
+  const parts = slugSegmentsFromRequest(req)
   const pathname = '/api/merchant/' + parts.join('/')
   const slugPath = parts.join('/')
 

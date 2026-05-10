@@ -11,7 +11,7 @@
  *
  * 门店品牌列表：GET /api/merchant/douyin/brands → 代理 goodlife/v2/shop/brand/query/（与来客「门店品牌」一致，非门店名称）
  *
- * 部署：Vercel 上同源已实现 `/api/merchant/*`（见 api/merchant/[...slug].ts）；生产须配置 MERCHANT_DOUYIN_SESSION_SECRET。
+ * 部署：绑定走同源 `POST /api/douyin-bind`（轻量 Serverless）；其余 `/api/merchant/*` 见 [...slug]。生产须配置 MERCHANT_DOUYIN_SESSION_SECRET。
  * 若网关部署在其他域名，设置 VITE_MERCHANT_API_BASE_URL（不以 / 结尾）；未设置则走同源。
  */
 
@@ -80,7 +80,8 @@ function url(path: string) {
 export async function postDouyinBind(
   payload: DouyinBindPayload,
 ): Promise<DouyinBindResult> {
-  const res = await fetch(url('/api/merchant/douyin/bind'), {
+  // 独立 Serverless：避免与其它 api/**/*.ts 共用巨型 includeFiles（vite-plugins）导致绑定函数 OOM
+  const res = await fetch(url('/api/douyin-bind'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
