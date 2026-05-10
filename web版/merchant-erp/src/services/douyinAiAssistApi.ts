@@ -1,0 +1,478 @@
+/**
+ * 抖音来客商品创建 — AI 辅助（标题 / 说明 / 图片 / 豆包质检），经 `POST /api/merchant/douyin/goods/ai/assist` 转发。
+ * 本地 dev：Vite 网关按 `model` 调用上游；Key 来自 .env 或请求体 `vendor_keys`（由本模块合并 localStorage）。
+ * 文案：MiniMax、通义千问、豆包；生图：MiniMax、通义万相（wanx）、豆包（Seedream）；质检：仅豆包对话。
+ */
+
+import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
+import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
+
+export { listAiUiModelOptions } from './merchantAiVendorCatalogClient'
+
+const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
+
+function url(path: string) {
+  const b = apiBase().replace(/\/$/, '')
+  return `${b}${path}`
+}
+
+function readSession(key: string): string | null {
+  try {
+    const v = sessionStorage.getItem(key)
+    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null
+  } catch {
+    return null
+  }
+}
+
+function authHeaders(): HeadersInit {
+  const token = readSession('meoo_douyin_merchant_token')
+  const h: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+  if (token) h.Authorization = `Bearer ${token}`
+  return h
+}
+
+async function parseJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await res.json()) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+export type AiModelId = string
+export type ImageAiModelId = string
+
+/** GEO 综合评分 / 咨询测试：仅走通义与豆包（MiniMax 不参与，避免额度与链路不一致） */
+export type GeoTextAiModelId = 'qwen' | 'doubao'
+
+export const GEO_TEXT_AI_MODEL_OPTIONS: { id: GeoTextAiModelId; label: string }[] = [
+  { id: 'qwen', label: '通义千问' },
+  { id: 'doubao', label: '豆包' },
+]
+
+export function coerceGeoTextAiModel(id: AiModelId): GeoTextAiModelId {
+  return id === 'doubao' ? 'doubao' : 'qwen'
+}
+
+export type AiAssistAction =
+  | 'optimize_title'
+  | 'generate_desc'
+  | 'image_generate'
+  | 'image_enhance'
+  | 'analyze_product_quality'
+  /** 运营：图文稿件（与商品 AI 同源网关，需抖音 Bearer） */
+  | 'operation_article'
+  /** 运营：选题推荐 */
+  | 'operation_topic'
+  /** GEO：将门店知识包与用户咨询一并送入已绑定的文本模型（联调/实测） */
+  | 'geo_ai_consult'
+  /** GEO：基于抖音来客门店事实 JSON 输出三维度得分与待办（JSON） */
+  | 'geo_ai_score'
+
+export type QualityProductPayload = {
+  id: string
+  name: string
+  price_yuan?: number
+  title?: string
+  main_image_url?: string
+  detail_excerpt?: string
+}
+
+export type QualityDimensionScore = { score: number; comment: string }
+
+export type ProductQualityItem = {
+  productId: string
+  productName: string
+  overall: number
+  titleHeat: QualityDimensionScore
+  mainImage: QualityDimensionScore
+  detailPage: QualityDimensionScore
+  /** 标价合理性、与毛利/行业参考的匹配度及调价/套餐建议等 */
+  priceAnalysis: QualityDimensionScore
+  suggestions: string[]
+}
+
+/** 质检时传入的门店定价/毛利上下文（与网关约定字段） */
+export type ProductQualityPricingContext = {
+  industry_name: string
+  industry_path?: string
+  benchmark_note?: string
+  /** 商家在 ERP 中配置的门店综合毛利率（%），按平台 */
+  merchant_gross_margin_percent: { douyin: number; meituan: number; xhs: number }
+  /** 行业建议参考毛利率（%），可选 */
+  suggested_benchmark_percent?: { douyin: number; meituan: number; xhs: number }
+}
+
+export type AiAssistRequest = {
+  model: AiModelId
+  action: AiAssistAction
+  /** 当前商品名称（用于上下文） */
+  product_name: string
+  /** 标题框内用户输入，用于「智能优化」改写 */
+  title_draft?: string
+  /** 待美化图片 URL 列表（enhance）；单张或多张 */
+  image_urls?: string[]
+  image_role?: 'head' | 'aux' | 'env'
+  /** 商品质量分析：与 action=analyze_product_quality 联用 */
+  products?: QualityProductPayload[]
+  /** 与 analyze_product_quality 联用：行业与毛利率，供模型评估售价合理性 */
+  pricing_context?: ProductQualityPricingContext
+  /** 与 geo_ai_consult 联用：本页维护的 GEO 结构化知识（事实、FAQ、问法等） */
+  geo_knowledge_pack?: string
+  /** 与 geo_ai_score 联用：抖音门店事实等 JSON 字符串 */
+  geo_score_context?: string
+}
+
+export type AiAssistResult =
+  | { ok: false; message: string; needVendorKey?: string }
+  | { ok: true; title?: string; description?: string; image_urls?: string[] }
+
+function parseNeedVendorKey(data: Record<string, unknown>): string | undefined {
+  if (data.code !== 'NEED_VENDOR_KEY') return undefined
+  const v = data.vendor
+  if (typeof v !== 'string') return undefined
+  const id = v.trim().toLowerCase()
+  return isValidAiVendorSlug(id) ? id : undefined
+}
+
+function buildAssistPayload(body: AiAssistRequest): Record<string, unknown> {
+  const keys = readVendorKeyMap()
+  const vendor_keys: Record<string, string> = {}
+  for (const [id, raw] of Object.entries(keys)) {
+    if (!isValidAiVendorSlug(id)) continue
+    const t = raw?.trim()
+    if (t) vendor_keys[id] = t
+  }
+  const base: Record<string, unknown> = { ...body }
+  if (Object.keys(vendor_keys).length > 0) base.vendor_keys = vendor_keys
+  return base
+}
+
+export async function postDouyinGoodsAiAssist(body: AiAssistRequest): Promise<AiAssistResult> {
+  const res = await fetch(url('/api/merchant/douyin/goods/ai/assist'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(buildAssistPayload(body)),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  if (data.ok === false) {
+    const needVendorKey = parseNeedVendorKey(data)
+    return {
+      ok: false,
+      message: typeof data.message === 'string' ? data.message : 'AI 请求失败',
+      ...(needVendorKey ? { needVendorKey } : {}),
+    }
+  }
+  const title = typeof data.title === 'string' ? data.title : undefined
+  const description = typeof data.description === 'string' ? data.description : undefined
+  const rawUrls = data.image_urls
+  const image_urls = Array.isArray(rawUrls)
+    ? rawUrls.map((x) => String(x)).filter((u) => u.length > 0)
+    : undefined
+  return { ok: true, title, description, image_urls }
+}
+
+/** GEO 页：用当前知识包 + 用户原问调用与商品 AI 同源网关（需抖音 Bearer + 已配置模型 Key） */
+export async function postGeoAiConsult(body: {
+  model: AiModelId
+  /** 门店展示名，写入对话上下文标题 */
+  store_display_name: string
+  geo_knowledge_pack: string
+  user_question: string
+}): Promise<AiAssistResult> {
+  return postDouyinGoodsAiAssist({
+    model: body.model,
+    action: 'geo_ai_consult',
+    product_name: body.store_display_name.trim() || '本店 GEO',
+    title_draft: body.user_question.trim(),
+    geo_knowledge_pack: body.geo_knowledge_pack.trim(),
+  })
+}
+
+export type GeoAiScorePayload = {
+  infoCompletenessPercent: number
+  questionCoveragePercent: number
+  contentFreshnessPercent: number
+  rationale_zh: string
+  todos: { title: string; type: string; priority: string }[]
+  covered_queries?: { q: string; covered: boolean }[]
+}
+
+function clampInt(n: unknown, fallback: number): number {
+  const x = typeof n === 'number' ? n : Number(n)
+  if (!Number.isFinite(x)) return fallback
+  return Math.min(100, Math.max(0, Math.round(x)))
+}
+
+function normalizeGeoAiScorePayload(raw: Record<string, unknown>): GeoAiScorePayload | null {
+  const infoCompletenessPercent = clampInt(raw.infoCompletenessPercent ?? raw.info_completeness_percent, 0)
+  const questionCoveragePercent = clampInt(raw.questionCoveragePercent ?? raw.question_coverage_percent, 0)
+  const contentFreshnessPercent = clampInt(raw.contentFreshnessPercent ?? raw.content_freshness_percent, 0)
+  const rationale_zh =
+    typeof raw.rationale_zh === 'string'
+      ? raw.rationale_zh.trim()
+      : typeof raw.rationale === 'string'
+        ? raw.rationale.trim()
+        : ''
+  const todosIn = raw.todos
+  const todos: { title: string; type: string; priority: string }[] = []
+  if (Array.isArray(todosIn)) {
+    for (const row of todosIn.slice(0, 8)) {
+      if (!row || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      const title = typeof o.title === 'string' ? o.title.trim() : ''
+      if (!title) continue
+      const type = typeof o.type === 'string' ? o.type.trim() : '门店'
+      const priority = typeof o.priority === 'string' ? o.priority.trim().toLowerCase() : 'medium'
+      todos.push({ title, type, priority: priority === 'high' ? 'high' : 'medium' })
+    }
+  }
+  const cqIn = raw.covered_queries ?? raw.coveredQueries
+  const covered_queries: { q: string; covered: boolean }[] = []
+  if (Array.isArray(cqIn)) {
+    for (const row of cqIn.slice(0, 12)) {
+      if (!row || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      const q = typeof o.q === 'string' ? o.q.trim() : ''
+      if (!q) continue
+      covered_queries.push({ q, covered: Boolean(o.covered) })
+    }
+  }
+  return {
+    infoCompletenessPercent,
+    questionCoveragePercent,
+    contentFreshnessPercent,
+    rationale_zh: rationale_zh || '模型未给出摘要',
+    todos,
+    ...(covered_queries.length ? { covered_queries } : {}),
+  }
+}
+
+export type GeoAiScoreResult =
+  | { ok: false; message: string; needVendorKey?: string }
+  | { ok: true; source: 'ai'; payload: GeoAiScorePayload }
+
+/** 调用已绑定文本模型输出 GEO 三维度；网关解析失败时由调用方回退确定性算法 */
+export async function postGeoAiScore(body: {
+  model: AiModelId
+  geo_score_context: string
+  product_name?: string
+}): Promise<GeoAiScoreResult> {
+  const res = await fetch(url('/api/merchant/douyin/goods/ai/assist'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(
+      buildAssistPayload({
+        model: body.model,
+        action: 'geo_ai_score',
+        product_name: (body.product_name ?? 'GEO综合评分').trim().slice(0, 120),
+        title_draft: 'geo_score',
+        geo_score_context: body.geo_score_context.trim(),
+      }),
+    ),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  if (data.ok === false) {
+    const needVendorKey = parseNeedVendorKey(data)
+    return {
+      ok: false,
+      message: typeof data.message === 'string' ? data.message : 'AI 请求失败',
+      ...(needVendorKey ? { needVendorKey } : {}),
+    }
+  }
+  const rawScore = data.geo_ai_score
+  if (rawScore && typeof rawScore === 'object' && !Array.isArray(rawScore)) {
+    const payload = normalizeGeoAiScorePayload(rawScore as Record<string, unknown>)
+    if (payload) {
+      return { ok: true, source: 'ai', payload }
+    }
+  }
+  const parseErr =
+    typeof data.geo_ai_parse_error === 'string' ? data.geo_ai_parse_error : '模型未返回可解析的 geo_ai_score'
+  return {
+    ok: false,
+    message: parseErr,
+  }
+}
+
+export type ProductQualityAnalysisResult =
+  | { ok: false; message: string; needVendorKey?: string }
+  | { ok: true; items: ProductQualityItem[]; parseError?: string; rawExcerpt?: string }
+
+function coerceQualityItem(row: unknown): ProductQualityItem | null {
+  if (!row || typeof row !== 'object') return null
+  const r = row as Record<string, unknown>
+  const dim = (x: unknown): QualityDimensionScore => {
+    if (!x || typeof x !== 'object') return { score: 0, comment: '—' }
+    const o = x as Record<string, unknown>
+    const score = Math.min(100, Math.max(0, Math.round(Number(o.score))))
+    const comment =
+      typeof o.comment === 'string'
+        ? o.comment
+        : typeof o.summary === 'string'
+          ? o.summary
+          : '—'
+    return { score: Number.isFinite(score) ? score : 0, comment }
+  }
+  const productId = String(r.productId ?? '').trim()
+  const productName = String(r.productName ?? '').trim()
+  if (!productId || !productName) return null
+  const overall = Math.min(100, Math.max(0, Math.round(Number(r.overall))))
+  const suggestions = Array.isArray(r.suggestions)
+    ? r.suggestions.map((s) => String(s).trim()).filter(Boolean)
+    : []
+  const titleHeat = dim(r.titleHeat)
+  const mainImage = dim(r.mainImage)
+  const detailPage = dim(r.detailPage)
+  const rec = r as Record<string, unknown>
+  const rawPriceDim =
+    rec.priceAnalysis ??
+    rec.price_analysis ??
+    rec.priceCompetitiveness ??
+    rec.pricingAnalysis
+  let priceAnalysis = dim(rawPriceDim)
+  if (!rawPriceDim || typeof rawPriceDim !== 'object') {
+    priceAnalysis = {
+      score: Math.round((titleHeat.score + mainImage.score + detailPage.score) / 3),
+      comment:
+        '响应中未包含独立价格分析字段，暂以标题/主图/详情三项均分作参考；请重新跑质检以获取「价格分析」得分。',
+    }
+  }
+  return {
+    productId,
+    productName,
+    overall: Number.isFinite(overall) ? overall : 0,
+    titleHeat,
+    mainImage,
+    detailPage,
+    priceAnalysis,
+    suggestions,
+  }
+}
+
+const DEFAULT_QUALITY_TIMEOUT_MS = 90_000
+
+/**
+ * 使用豆包（火山方舟）对话模型，对已上传/已同步商品做多维度质量评分。
+ * 经 `POST /api/merchant/douyin/goods/ai/assist` + action `analyze_product_quality`，Key 同其它 AI：`.env` 或浏览器 vendor_keys。
+ */
+export async function postDouyinProductQualityAnalysis(
+  products: QualityProductPayload[],
+  opts?: {
+    signal?: AbortSignal
+    timeoutMs?: number
+    pricingContext?: ProductQualityPricingContext
+  },
+): Promise<ProductQualityAnalysisResult> {
+  if (products.length === 0) {
+    return { ok: false, message: '没有可分析的商品' }
+  }
+  const body: AiAssistRequest = {
+    model: 'doubao',
+    action: 'analyze_product_quality',
+    product_name: (products[0]?.name?.trim() || '商品质量分析').slice(0, 200),
+    products: products.map((p, i) => {
+      const id = p.id.trim() || `item-${i}`
+      const name = (p.name?.trim() || `商品 ${id}`).slice(0, 200)
+      return {
+        id,
+        name,
+        ...(p.price_yuan !== undefined ? { price_yuan: p.price_yuan } : {}),
+        ...(p.title?.trim() ? { title: p.title.trim() } : {}),
+        ...(p.main_image_url?.trim() ? { main_image_url: p.main_image_url.trim() } : {}),
+        ...(p.detail_excerpt?.trim() ? { detail_excerpt: p.detail_excerpt.trim() } : {}),
+      }
+    }),
+    ...(opts?.pricingContext ? { pricing_context: opts.pricingContext } : {}),
+  }
+
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_QUALITY_TIMEOUT_MS
+  const outer = opts?.signal
+  const controller = new AbortController()
+  const t = window.setTimeout(() => controller.abort(), timeoutMs)
+  const onOuterAbort = () => controller.abort()
+  if (outer) {
+    if (outer.aborted) controller.abort()
+    else outer.addEventListener('abort', onOuterAbort, { once: true })
+  }
+
+  let res: Response
+  try {
+    res = await fetch(url('/api/merchant/douyin/goods/ai/assist'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(buildAssistPayload(body)),
+      signal: controller.signal,
+    })
+  } catch (e) {
+    const name = e instanceof DOMException ? e.name : e instanceof Error ? e.name : ''
+    if (name === 'AbortError') {
+      const cancelled = outer?.aborted === true
+      return {
+        ok: false,
+        message: cancelled
+          ? '已取消分析'
+          : `请求超时（>${Math.round(timeoutMs / 1000)}s），请确认已运行带网关的开发服务（npm run dev）且网络可达`,
+      }
+    }
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  } finally {
+    window.clearTimeout(t)
+    outer?.removeEventListener('abort', onOuterAbort)
+  }
+
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  if (data.ok === false) {
+    const needVendorKey = parseNeedVendorKey(data)
+    return {
+      ok: false,
+      message: typeof data.message === 'string' ? data.message : 'AI 请求失败',
+      ...(needVendorKey ? { needVendorKey } : {}),
+    }
+  }
+  const rawItems = data.quality_items
+  const parseErr =
+    typeof data.quality_parse_error === 'string' ? data.quality_parse_error : undefined
+  const rawExcerpt =
+    typeof data.quality_raw_excerpt === 'string' ? data.quality_raw_excerpt : undefined
+  if (!Array.isArray(rawItems)) {
+    return {
+      ok: false,
+      message: parseErr || '响应缺少 quality_items',
+    }
+  }
+  const items: ProductQualityItem[] = []
+  for (const row of rawItems) {
+    const it = coerceQualityItem(row)
+    if (it) items.push(it)
+  }
+  if (items.length === 0 && parseErr) {
+    return { ok: true, items: [], parseError: parseErr, rawExcerpt }
+  }
+  if (items.length === 0) {
+    return { ok: false, message: parseErr || '未能解析质检结果' }
+  }
+  return { ok: true, items, parseError: parseErr, rawExcerpt }
+}

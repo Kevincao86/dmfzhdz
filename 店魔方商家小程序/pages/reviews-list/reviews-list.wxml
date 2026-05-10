@@ -1,0 +1,88 @@
+<view class="page">
+  <view wx:if="{{!erpOk}}" class="hero warn meoo-card">
+    <text class="hero-title">未连接商家后台</text>
+    <text class="hero-desc">请先让技术人员配置连接电脑端商家后台，与电脑上打开的地址一致。</text>
+  </view>
+
+  <view wx:else class="toolbar">
+    <scroll-view scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="row-inner">
+        <view
+          wx:for="{{plats}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onPlat"
+          class="chip {{activePlat === item.id ? 'chip-on' : ''}}"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </scroll-view>
+    <scroll-view scroll-x class="h-scroll sub" enhanced show-scrollbar="{{false}}">
+      <view class="row-inner">
+        <view
+          wx:for="{{sentiments}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onSent"
+          class="chip sm {{sentiment === item.id ? 'chip-on' : ''}}"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </scroll-view>
+    <scroll-view scroll-x class="h-scroll sub" enhanced show-scrollbar="{{false}}">
+      <view class="row-inner">
+        <view
+          wx:for="{{replyTabs}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onReplyTab"
+          class="chip sm {{replyStatus === item.id ? 'chip-on' : ''}}"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </scroll-view>
+    <view class="toolbar-foot">
+      <text wx:if="{{statsText}}" class="stats">{{statsText}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="state meoo-card">加载中…</view>
+  <view wx:elif="{{errMsg}}" class="state meoo-card err">
+    <text class="e-title">暂无法加载</text>
+    <text class="e-body">{{errMsg}}</text>
+  </view>
+  <block wx:else>
+    <view wx:if="{{items.length === 0}}" class="state meoo-card">暂无评价数据</view>
+    <view wx:for="{{items}}" wx:key="id" class="rev meoo-card">
+      <view class="rev-head">
+        <text class="rev-user">{{item.userName}}</text>
+        <text class="rev-star">{{item.ratingStars}} 星</text>
+      </view>
+      <text class="rev-body">{{item.content}}</text>
+      <text class="rev-time">{{item.createdAt}}</text>
+      <view wx:if="{{item.replied}}" class="reply-done">
+        <text class="reply-label">商家回复</text>
+        <text class="reply-body">{{item.replyText}}</text>
+      </view>
+      <view wx:if="{{!item.replied && replyingId !== item.id}}" class="rev-actions">
+        <button class="mini primary" size="mini" data-id="{{item.id}}" bindtap="startReply">回复</button>
+      </view>
+      <view wx:if="{{replyingId === item.id}}" class="reply-editor">
+        <textarea
+          class="reply-ta"
+          placeholder="输入回复内容（与电脑端一致）"
+          maxlength="{{500}}"
+          bindinput="onReplyInput"
+          value="{{replyDraft}}"
+        />
+        <view class="reply-btns">
+          <button class="mini ghost" size="mini" bindtap="cancelReply">取消</button>
+          <button class="mini primary" size="mini" data-id="{{item.id}}" bindtap="submitReply">发送</button>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

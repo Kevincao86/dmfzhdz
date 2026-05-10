@@ -1,0 +1,13 @@
+.DS_Store
+
+# dev：ERP 与管理后台共用的注册表（勿提交真实 Key）
+.meoo-dev-sync/
+
+# Supabase 本地与密钥
+supabase/.branches
+supabase/.temp
+supabase/.env
+node_modules/
+
+# 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
+店魔方商家小程序/utils/config.local.js

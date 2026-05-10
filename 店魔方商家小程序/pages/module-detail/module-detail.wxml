@@ -1,0 +1,20 @@
+<view class="wrap">
+  <view class="hero-bg">
+    <view class="meoo-card hero">
+      <view class="hero-top">
+        <text class="hero-kicker">店魔方 · 商家</text>
+        <text class="hero-tag">与电脑端一致</text>
+      </view>
+      <text class="hero-title">{{navTitle}}</text>
+      <text class="hero-lead">小程序侧重随手记、语音录入；复杂表单与批量操作建议在电脑端商家后台完成。</text>
+    </view>
+  </view>
+  <view class="meoo-card body-card">
+    <text class="body-label">功能说明</text>
+    <text class="body-text">{{body}}</text>
+  </view>
+  <view class="meoo-card tip-card">
+    <text class="tip-label">提示</text>
+    <text class="tip-text">商品列表、评论等与电脑端共用后台能力；各平台店铺授权与账号密钥仅在电脑端「系统设置」操作，小程序不提供绑定入口。</text>
+  </view>
+</view>

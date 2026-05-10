@@ -1,0 +1,472 @@
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  Bell,
+  ChevronDown,
+  ChevronRight,
+  LogOut,
+  Menu,
+  PanelLeft,
+  Search,
+  Settings,
+  User,
+  Users,
+  Wallet,
+  X,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { childActive, NAV_ITEMS, pathActive } from '../config/nav'
+import { cn } from '../cn'
+import FloatingOnlineSupport from './FloatingOnlineSupport'
+import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
+import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+
+const LOGO_URL =
+  'https://conversation.cdn.meoo.host/conversations/303854542116876288/image/2026-04-19/1776572864869-QQ20260411-182006.png?auth_key=8a7202e5357981fdf3188b7876e08124302b12ef0775b8202ba2d0f06cd31d49'
+
+export default function MeooLayout() {
+  const location = useLocation()
+  const pathname = location.pathname
+  const navigate = useNavigate()
+  const [collapsed, setCollapsed] = useState(false)
+  const [openGroups, setOpenGroups] = useState<string[]>([])
+  const [userOpen, setUserOpen] = useState(false)
+  const [personalSettingsOpen, setPersonalSettingsOpen] = useState(false)
+  const [personalSettingsFormKey, setPersonalSettingsFormKey] = useState(0)
+  const [adminName, setAdminName] = useState('管理员')
+  const [enterpriseName, setEnterpriseName] = useState('')
+  const [accountType] = useState('主账号')
+  const [phone] = useState('138****8888')
+
+  useEffect(() => {
+    const client = supabase
+    if (!supabaseConfigured || !client) return
+    const apply = () => {
+      void (async () => {
+        const { data } = await client.auth.getUser()
+        const u = data.user
+        if (!u) {
+          setAdminName('管理员')
+          setEnterpriseName('')
+          return
+        }
+        const meta = u.user_metadata as { login_name?: string } | undefined
+        setAdminName(meta?.login_name ?? u.email?.split('@')[0] ?? '用户')
+        const tid = await fetchPrimaryTenantId(client)
+        if (tid) {
+          const en = await fetchTenantEnterpriseName(client, tid)
+          setEnterpriseName(en ?? '')
+        } else {
+          setEnterpriseName('')
+        }
+      })()
+    }
+    apply()
+    const { data: sub } = client.auth.onAuthStateChange(() => apply())
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  const defaultOpen = useMemo(() => {
+    const paths: string[] = []
+    for (const item of NAV_ITEMS) {
+      if (!item.children) continue
+      if (
+        item.children.some((c) => childActive(pathname, c.path)) ||
+        pathActive(pathname, item.path)
+      ) {
+        paths.push(item.path)
+      }
+    }
+    return paths
+  }, [pathname])
+
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const merged = new Set([...prev, ...defaultOpen])
+      return [...merged]
+    })
+  }, [defaultOpen])
+
+  const toggleGroup = (path: string) => {
+    setOpenGroups((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path],
+    )
+  }
+
+  /** 切换商户主账号：登出后进入登录页；未启用云端时跳转本地子账号管理 */
+  const handleSwitchAccount = () => {
+    setUserOpen(false)
+    void (async () => {
+      if (supabaseConfigured && supabase) {
+        await supabase.auth.signOut()
+        navigate('/login', {
+          replace: true,
+          state: { infoHint: '已退出当前账号，请输入其他商户账户名与密码登录' },
+        })
+        return
+      }
+      navigate({ pathname: '/settings', search: 'tab=accounts' })
+    })()
+  }
+
+  const sidebarWidth = collapsed ? 'w-16' : 'w-64'
+  const mainMargin = collapsed ? 'ml-16' : 'ml-64'
+
+  return (
+    <div className="flex min-h-screen bg-slate-100">
+      <aside
+        className={cn(
+          'fixed left-0 top-0 z-40 flex h-screen flex-shrink-0 flex-col border-r border-slate-800/90 bg-slate-950 shadow-[6px_0_32px_-12px_rgba(15,23,42,0.65)] transition-all duration-300',
+          sidebarWidth,
+        )}
+      >
+        <div className="flex h-16 items-center border-b border-slate-800/90 px-4">
+          {!collapsed && (
+            <>
+              <img
+                src={LOGO_URL}
+                alt="店魔方AI智能ERP"
+                className="mr-2 h-10 w-auto"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+              <span className="text-lg font-semibold tracking-tight text-white">
+                店魔方AI智能ERP
+              </span>
+            </>
+          )}
+          {collapsed && (
+            <img
+              src={LOGO_URL}
+              alt="店魔方AI智能ERP"
+              className="mx-auto h-8 w-auto"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          )}
+        </div>
+
+        <nav className="h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon
+            const active = item.children
+              ? item.children.some((c) => childActive(pathname, c.path))
+              : pathActive(pathname, item.path)
+
+            if (item.children) {
+              const open = openGroups.includes(item.path)
+              return (
+                <div key={item.path} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => !collapsed && toggleGroup(item.path)}
+                    onMouseEnter={() => collapsed && setOpenGroups([item.path])}
+                    onMouseLeave={() => collapsed && setOpenGroups([])}
+                    className={cn(
+                      'flex w-full items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                      collapsed ? 'justify-center' : 'justify-between',
+                      active
+                        ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-500/25'
+                        : 'text-slate-300 hover:bg-slate-800/90 hover:text-white',
+                    )}
+                  >
+                    <div className="flex items-center">
+                      <Icon
+                        className={cn(
+                          'h-5 w-5',
+                          !collapsed && 'mr-3',
+                          active ? 'text-cyan-400' : 'text-slate-500',
+                        )}
+                      />
+                      {!collapsed && item.label}
+                    </div>
+                    {!collapsed &&
+                      (open ? (
+                        <ChevronDown className="h-4 w-4 text-slate-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-slate-500" />
+                      ))}
+                  </button>
+
+                  {open && !collapsed && (
+                    <div className="ml-4 mt-1 space-y-1">
+                      {item.children.map((c) => (
+                        <NavLink
+                          key={c.path}
+                          to={c.path}
+                          end={c.path === '/finance'}
+                          className={({ isActive }) =>
+                            cn(
+                              'block rounded-lg px-3 py-2 text-sm transition-colors',
+                              isActive
+                                ? 'bg-cyan-500/15 font-medium text-cyan-100'
+                                : 'text-slate-400 hover:bg-slate-800/80 hover:text-white',
+                            )
+                          }
+                        >
+                          {c.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+
+                  {collapsed && open && (
+                    <div className="absolute left-full top-0 z-50 ml-2 w-48 rounded-xl border border-slate-700 bg-slate-900 py-2 shadow-xl shadow-black/40">
+                      <div className="border-b border-slate-800 px-3 py-2 text-xs font-medium text-slate-400">
+                        {item.label}
+                      </div>
+                      {item.children.map((c) => (
+                        <NavLink
+                          key={c.path}
+                          to={c.path}
+                          end={c.path === '/finance'}
+                          className={({ isActive }) =>
+                            cn(
+                              'block px-3 py-2 text-sm transition-colors',
+                              isActive
+                                ? 'bg-cyan-500/15 font-medium text-cyan-100'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white',
+                            )
+                          }
+                        >
+                          {c.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/'}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                    collapsed ? 'justify-center' : '',
+                    isActive
+                      ? 'bg-cyan-500/15 text-cyan-100 ring-1 ring-cyan-500/25'
+                      : 'text-slate-300 hover:bg-slate-800/90 hover:text-white',
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon
+                      className={cn(
+                        'h-5 w-5',
+                        !collapsed && 'mr-3',
+                        isActive ? 'text-cyan-400' : 'text-slate-500',
+                      )}
+                    />
+                    {!collapsed && item.label}
+                  </>
+                )}
+              </NavLink>
+            )
+          })}
+        </nav>
+      </aside>
+
+      <div className={cn('flex min-w-0 flex-1 flex-col transition-all duration-300', mainMargin)}>
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/90 bg-white/85 px-6 shadow-sm shadow-slate-900/[0.04] backdrop-blur-xl">
+          <div className="flex flex-1 items-center">
+            <button
+              type="button"
+              onClick={() => setCollapsed((v) => !v)}
+              className="mr-4 flex items-center justify-center rounded-xl p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              aria-label="折叠侧栏"
+            >
+              {collapsed ? (
+                <Menu className="h-5 w-5" />
+              ) : (
+                <PanelLeft className="h-5 w-5" />
+              )}
+            </button>
+            <div className="relative w-96 max-w-full">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="搜索功能、数据..."
+                className="w-full rounded-xl border border-slate-200/90 bg-slate-50/90 py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cyan-400/60 focus:outline-none focus:ring-4 focus:ring-cyan-500/15"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              className="relative rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+            >
+              <Bell className="h-5 w-5" />
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setUserOpen((v) => !v)}
+                className="flex items-center space-x-3 rounded-xl border-l border-slate-200/90 py-2 pl-4 pr-2 transition-colors hover:bg-slate-50"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 shadow-md shadow-cyan-900/20">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium text-slate-800">{adminName}</span>
+                  <span className="text-xs text-slate-500">
+                    {accountType === '子账号' ? '子账号' : '主账号'}
+                  </span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-slate-400 transition-transform',
+                    userOpen && 'rotate-180',
+                  )}
+                />
+              </button>
+
+              <AnimatePresence>
+                {userOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200/90 bg-white py-2 shadow-xl shadow-slate-900/10 ring-1 ring-slate-100"
+                  >
+                    <div className="border-b border-slate-100 px-4 py-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-teal-600 shadow-md">
+                          <User className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{adminName}</p>
+                          <p className="text-xs text-slate-500">{phone}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="py-1">
+                      <button
+                        type="button"
+                        onClick={() => void handleSwitchAccount()}
+                        className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        <Users className="mr-3 h-4 w-4 text-slate-400" />
+                        切换账号
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                        onClick={() => {
+                          setUserOpen(false)
+                          navigate('/wallet')
+                        }}
+                      >
+                        <Wallet className="mr-3 h-4 w-4 text-violet-500" />
+                        我的钱包
+                      </button>
+                      <button
+                        type="button"
+                        className="flex w-full items-center px-4 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
+                        onClick={() => {
+                          setUserOpen(false)
+                          setPersonalSettingsFormKey((k) => k + 1)
+                          setPersonalSettingsOpen(true)
+                        }}
+                      >
+                        <Settings className="mr-3 h-4 w-4 text-slate-400" />
+                        个人设置
+                      </button>
+                    </div>
+                    <div className="border-t border-slate-100 py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserOpen(false)
+                          void (async () => {
+                            if (supabase) {
+                              await supabase.auth.signOut()
+                              navigate('/login')
+                              return
+                            }
+                            window.location.reload()
+                          })()
+                        }}
+                        className="flex w-full items-center px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        <LogOut className="mr-3 h-4 w-4" />
+                        退出登录
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </header>
+
+        <main className="erp-main erp-main-surface flex-1 overflow-auto p-6 lg:p-8">
+          <Outlet />
+        </main>
+      </div>
+
+      {personalSettingsOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="meoo-personal-settings-title"
+          onClick={() => setPersonalSettingsOpen(false)}
+        >
+          <div
+            className="max-h-[min(90vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl shadow-slate-900/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 id="meoo-personal-settings-title" className="text-lg font-semibold text-slate-900">
+                个人设置
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPersonalSettingsOpen(false)}
+                className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                aria-label="关闭"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {supabaseConfigured ? (
+              <SupabaseChangePasswordForm key={personalSettingsFormKey} />
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <p className="font-medium">当前未启用云端登录</p>
+                <p className="mt-1 text-amber-900/95">
+                  请先由管理员在完成云端登录相关配置（服务地址与安全密钥），并重启 ERP
+                  后，即可在此修改主账号登录密码。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPersonalSettingsOpen(false)
+                    navigate({ pathname: '/settings', search: 'tab=accounts' })
+                  }}
+                  className="mt-4 w-full rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 py-2.5 text-sm font-medium text-white transition hover:brightness-110"
+                >
+                  前往系统设置
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
+    </div>
+  )
+}

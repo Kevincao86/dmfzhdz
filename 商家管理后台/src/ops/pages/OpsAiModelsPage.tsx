@@ -1,0 +1,687 @@
+import {
+  Cpu,
+  KeyRound,
+  Pencil,
+  PlusCircle,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  catalogCustomEntriesOnly,
+  isBuiltinAiVendorId,
+  isValidAiVendorSlug,
+  slugifyAiVendorCandidate,
+} from '../../../../web版/merchant-erp/src/lib/aiVendorCatalogShared'
+import { cn } from '../../cn'
+import {
+  fetchRegistry,
+  postAiModels,
+  postVideoAiBindings,
+  postVendorKeys,
+  type AiVendorCatalogEntry,
+  type RegistryVideoAi,
+  type RegistryVendorKeys,
+} from '../opsRegistryApi'
+
+export default function OpsAiModelsPage() {
+  const [catalogFull, setCatalogFull] = useState<AiVendorCatalogEntry[]>([])
+  const [textModel, setTextModel] = useState<string>('qwen')
+  const [imageModel, setImageModel] = useState<string>('qwen')
+  const [keys, setKeys] = useState<RegistryVendorKeys>({})
+  const [updatedAt, setUpdatedAt] = useState<string>('')
+  const [vkAt, setVkAt] = useState<string>('')
+  const [controlled, setControlled] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const [videoAi, setVideoAi] = useState<RegistryVideoAi>({})
+  const [videoAiSaving, setVideoAiSaving] = useState(false)
+  const [videoAiUpdatedAt, setVideoAiUpdatedAt] = useState<string>('')
+
+  const [editingVendorKeys, setEditingVendorKeysState] = useState(false)
+  const [editingVideoAi, setEditingVideoAiState] = useState(false)
+  const vendorKeysBaseline = useRef<RegistryVendorKeys>({})
+  const videoAiBaseline = useRef<RegistryVideoAi>({})
+
+  const editingVendorKeysRef = useRef(false)
+  const editingVideoAiRef = useRef(false)
+
+  /** Ref 必须与 state 同时更新（不可依赖 useEffect），否则定时 pull 会先读到旧 ref 而覆盖正在编辑的内容。 */
+  const setEditingVendorKeys = (next: boolean) => {
+    editingVendorKeysRef.current = next
+    setEditingVendorKeysState(next)
+  }
+  const setEditingVideoAi = (next: boolean) => {
+    editingVideoAiRef.current = next
+    setEditingVideoAiState(next)
+  }
+
+  const [addOpen, setAddOpen] = useState(false)
+  const [addLabel, setAddLabel] = useState('')
+  const [addSlug, setAddSlug] = useState('')
+  const [addHint, setAddHint] = useState('')
+  const [addErr, setAddErr] = useState<string | null>(null)
+
+  const allowedIds = useMemo(() => new Set(catalogFull.map((e) => e.id)), [catalogFull])
+
+  const pull = useCallback(async (opts?: { background?: boolean }) => {
+    const bg = !!opts?.background
+    if (!bg) {
+      setLoading(true)
+      setHint(null)
+    }
+    try {
+      const reg = await fetchRegistry()
+      const cat = Array.isArray(reg.aiVendorCatalog) ? reg.aiVendorCatalog : []
+      const ids = new Set(cat.map((x) => x.id))
+      const tm = reg.aiModels.textModel.trim().toLowerCase()
+      const im = reg.aiModels.imageModel.trim().toLowerCase()
+      setCatalogFull(cat)
+      setTextModel(ids.has(tm) ? tm : 'qwen')
+      setImageModel(ids.has(im) ? im : 'qwen')
+      setUpdatedAt(reg.aiModels.updatedAt)
+      setControlled(!!reg.aiModels.controlledByOps)
+      if (!editingVendorKeysRef.current) {
+        setKeys({ ...reg.vendorKeys })
+        setVkAt(reg.vendorKeysUpdatedAt)
+      }
+      if (!editingVideoAiRef.current) {
+        setVideoAi(reg.videoAi ? { ...reg.videoAi } : {})
+        setVideoAiUpdatedAt(reg.videoAiUpdatedAt ?? '')
+      }
+    } catch {
+      setHint(
+        '无法读写注册表：请重启本目录 npm run dev，并确认项目根下可创建 .meoo-dev-sync 目录。',
+      )
+    } finally {
+      if (!bg) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void pull()
+    const t = window.setInterval(() => void pull({ background: true }), 5000)
+    return () => window.clearInterval(t)
+  }, [pull])
+
+  const saveAll = async () => {
+    setSaving(true)
+    setHint(null)
+    try {
+      const payloadKeys: RegistryVendorKeys = {}
+      for (const e of catalogFull) {
+        const v = keys[e.id]
+        if (typeof v === 'string') payloadKeys[e.id] = v
+      }
+      await postVendorKeys({
+        keys: payloadKeys,
+        aiVendorCatalog: catalogCustomEntriesOnly(catalogFull),
+        lastWriter: 'ops',
+      })
+      await postAiModels({ textModel, imageModel, lastWriter: 'ops' })
+      await pull()
+      setEditingVendorKeys(false)
+    } catch {
+      setHint('保存失败：请确认本后台 dev 已重启并具备写项目目录权限。')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveVendorKeysSection = async () => {
+    setSaving(true)
+    setHint(null)
+    try {
+      const payloadKeys: RegistryVendorKeys = {}
+      for (const e of catalogFull) {
+        const v = keys[e.id]
+        if (typeof v === 'string') payloadKeys[e.id] = v
+      }
+      await postVendorKeys({
+        keys: payloadKeys,
+        aiVendorCatalog: catalogCustomEntriesOnly(catalogFull),
+        lastWriter: 'ops',
+      })
+      await pull()
+      setEditingVendorKeys(false)
+    } catch {
+      setHint('各厂商 Key 保存失败：请确认本后台 dev 可写注册表。')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const beginEditVendorKeys = () => {
+    vendorKeysBaseline.current = { ...keys }
+    setEditingVendorKeys(true)
+    setHint(null)
+  }
+
+  const cancelEditVendorKeys = () => {
+    setKeys({ ...vendorKeysBaseline.current })
+    setEditingVendorKeys(false)
+    setHint(null)
+  }
+
+  const saveVideoAiBindings = async () => {
+    setVideoAiSaving(true)
+    setHint(null)
+    try {
+      await postVideoAiBindings({ videoAi, lastWriter: 'ops' })
+      await pull()
+      videoAiBaseline.current = { ...videoAi }
+      setEditingVideoAi(false)
+    } catch {
+      setHint('短视频 API 保存失败：请确认本后台 dev 可写注册表目录。')
+    } finally {
+      setVideoAiSaving(false)
+    }
+  }
+
+  const beginEditVideoAi = () => {
+    videoAiBaseline.current = { ...videoAi }
+    setEditingVideoAi(true)
+    setHint(null)
+  }
+
+  const cancelEditVideoAi = () => {
+    setVideoAi({ ...videoAiBaseline.current })
+    setEditingVideoAi(false)
+    setHint(null)
+  }
+
+  const pushModelsOnly = async (nextText: string, nextImage: string) => {
+    setHint(null)
+    const nt = nextText.trim().toLowerCase()
+    const ni = nextImage.trim().toLowerCase()
+    if (!allowedIds.has(nt) || !allowedIds.has(ni)) {
+      setHint('所选模型须在上方目录中存在，请先同步注册表后再选。')
+      return
+    }
+    setTextModel(nt)
+    setImageModel(ni)
+    try {
+      await postAiModels({ textModel: nt, imageModel: ni, lastWriter: 'ops' })
+      await pull()
+    } catch {
+      setHint('模型同步失败，请确认本后台 dev 与注册表可写。')
+    }
+  }
+
+  const openAddVendor = () => {
+    setAddErr(null)
+    setAddLabel('')
+    setAddSlug('')
+    setAddHint('')
+    setAddOpen(true)
+  }
+
+  const submitAddVendor = () => {
+    setAddErr(null)
+    const label = addLabel.trim()
+    if (!label) {
+      setAddErr('请填写显示名称')
+      return
+    }
+    const slug = (addSlug.trim() || slugifyAiVendorCandidate(label, String(Date.now()))).toLowerCase()
+    if (!isValidAiVendorSlug(slug)) {
+      setAddErr('ID 格式无效：须以小写字母开头，2～48 位小写字母、数字、_-')
+      return
+    }
+    if (isBuiltinAiVendorId(slug)) {
+      setAddErr('与内置 MiniMax / 通义千问 / 豆包冲突，请换 ID')
+      return
+    }
+    if (catalogFull.some((x) => x.id === slug)) {
+      setAddErr('该 ID 已存在')
+      return
+    }
+    const hintRow = addHint.trim() ? addHint.trim().slice(0, 280) : undefined
+    setCatalogFull((prev) => [...prev, { id: slug, label: label.slice(0, 64), hint: hintRow }])
+    setAddOpen(false)
+  }
+
+  const removeVendor = (id: string) => {
+    if (!editingVendorKeys) {
+      setHint('请先在本区块点击「编辑」后再移除自定义供应商。')
+      return
+    }
+    if (isBuiltinAiVendorId(id)) return
+    const ok = window.confirm(`确定从目录移除「${id}」及其 Key？ERP 将不再显示该项。`)
+    if (!ok) return
+    setCatalogFull((prev) => prev.filter((x) => x.id !== id))
+    setKeys((prev) => {
+      const n = { ...prev }
+      delete n[id]
+      return n
+    })
+    setTextModel((t) => (t === id ? 'qwen' : t))
+    setImageModel((t) => (t === id ? 'qwen' : t))
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-white">AI 模型</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            在此维护<strong className="text-slate-400">默认文案 / 生图模型</strong>、各厂商
+            <strong className="text-slate-400"> API Key</strong>
+            ，以及<strong className="text-slate-400">短视频（可灵 / Seedance）网关绑定</strong>
+            ；并可通过「新增 AI 供应商」扩展目录。保存后写入项目根{' '}
+            <span className="font-mono text-slate-400">.meoo-dev-sync</span>，ERP 约 2.5 秒内拉取。
+            商户 ERP「短视频优化」页<strong className="text-slate-400">仅选择模型与参数</strong>
+            ，不在商户端暴露密钥。
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={openAddVendor}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-950/80 px-3 py-2 text-sm text-emerald-100 hover:bg-emerald-900/70"
+          >
+            <PlusCircle className="h-4 w-4" />
+            新增 AI 供应商
+          </button>
+          <button
+            type="button"
+            onClick={() => void pull()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            立即同步
+          </button>
+          <button
+            type="button"
+            onClick={() => void saveAll()}
+            disabled={saving || loading || editingVendorKeys || editingVideoAi}
+            title={
+              editingVendorKeys || editingVideoAi
+                ? '请先在各密钥区块保存或取消后再使用顶部一键保存'
+                : undefined
+            }
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          >
+            <KeyRound className="h-4 w-4" />
+            {saving ? '保存中…' : '保存模型与 Key'}
+          </button>
+        </div>
+      </div>
+
+      {hint ? <p className="text-sm text-amber-400/90">{hint}</p> : null}
+
+      {addOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !saving && setAddOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white">新增 AI 供应商</h2>
+              <button type="button" className="text-slate-400 hover:text-white" onClick={() => setAddOpen(false)}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">显示名称（如：OpenAI）</label>
+                <input
+                  value={addLabel}
+                  onChange={(e) => setAddLabel(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                  placeholder="在 ERP 与各页 pills 中展示"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">
+                  供应商 ID slug（ASCII，小写）；留空则根据名称自动生成
+                </label>
+                <input
+                  value={addSlug}
+                  onChange={(e) => setAddSlug(e.target.value.toLowerCase())}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-slate-100"
+                  placeholder="如 my_vendor"
+                  autoCapitalize="off"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">说明 / Key 占位提示（可选）</label>
+                <input
+                  value={addHint}
+                  onChange={(e) => setAddHint(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                  placeholder="会显示在 ERP 弹窗与各厂商字段下方"
+                />
+              </div>
+              {addErr ? <p className="text-xs text-red-400">{addErr}</p> : null}
+              <button
+                type="button"
+                onClick={() => submitAddVendor()}
+                className="w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
+              >
+                加入目录（随后在「各厂商 API Key」中点「编辑」，填写 Key 后再点区块内「保存」或顶部「保存模型与 Key」）
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <Sparkles className="h-4 w-4 text-violet-400" />
+          默认文案 / 生图模型
+        </h2>
+        <p className="mb-4 text-xs text-slate-500">
+          模型配置更新时间：{updatedAt ? new Date(updatedAt).toLocaleString('zh-CN') : '—'} · 运营接管：
+          {controlled ? '是' : '否'}
+        </p>
+
+        <p className="text-xs font-medium text-indigo-200/90">默认文案模型</p>
+        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="默认文案 AI 模型">
+          {catalogFull.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="radio"
+              aria-checked={textModel === m.id}
+              onClick={() => void pushModelsOnly(m.id, imageModel)}
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                textModel === m.id
+                  ? 'border-indigo-500 bg-indigo-600 text-white'
+                  : 'border-slate-600 bg-slate-950 text-slate-300 hover:bg-slate-800',
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="mt-4 text-xs font-medium text-violet-200/90">默认生图模型</p>
+        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="默认生图 AI 模型">
+          {catalogFull.map((m) => (
+            <button
+              key={`img-${m.id}`}
+              type="button"
+              role="radio"
+              aria-checked={imageModel === m.id}
+              onClick={() => void pushModelsOnly(textModel, m.id)}
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                imageModel === m.id
+                  ? 'border-violet-500 bg-violet-600 text-white'
+                  : 'border-slate-600 bg-slate-950 text-slate-300 hover:bg-slate-800',
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <KeyRound className="h-4 w-4 text-amber-400" />
+            各厂商 API Key
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {!editingVendorKeys ? (
+              <button
+                type="button"
+                onClick={beginEditVendorKeys}
+                disabled={loading || saving || editingVideoAi}
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-800/70 bg-amber-950/50 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-900/35 disabled:opacity-50"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                编辑
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => cancelEditVendorKeys()}
+                  disabled={loading || saving}
+                  className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveVendorKeysSection()}
+                  disabled={loading || saving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+                >
+                  {saving ? '保存中…' : '保存'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <p className="mb-4 text-xs text-slate-500">
+          与原先 ERP 弹窗一致：点击<strong className="text-slate-400">编辑</strong>后可录入或清空各厂商 Key，
+          <strong className="text-slate-400">保存</strong>
+          后写入注册表并由 ERP 拉取（dev）。生产请接入密钥管理系统；勿将真实 Key 提交 Git。
+        </p>
+        <p className="text-xs text-slate-600">Key 更新时间：{vkAt ? new Date(vkAt).toLocaleString('zh-CN') : '—'}</p>
+        <div className="mt-4 space-y-4">
+          {catalogFull.map((k) => (
+            <div key={k.id}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <label className="block text-xs font-medium text-slate-300">
+                  {k.label}（<span className="font-mono text-slate-500">{k.id}</span>）
+                </label>
+                {!isBuiltinAiVendorId(k.id) ? (
+                  <button
+                    type="button"
+                    onClick={() => removeVendor(k.id)}
+                    disabled={!editingVendorKeys || loading || saving}
+                    className="inline-flex items-center gap-1 rounded-md border border-red-900/50 px-2 py-0.5 text-[10px] text-red-300 hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    移除
+                  </button>
+                ) : null}
+              </div>
+              <input
+                type="password"
+                autoComplete="off"
+                readOnly={!editingVendorKeys}
+                disabled={loading}
+                value={editingVendorKeys ? (keys[k.id] ?? '') : ''}
+                onChange={(e) => setKeys((prev) => ({ ...prev, [k.id]: e.target.value }))}
+                placeholder={
+                  (keys[k.id] ?? '').trim() && !editingVendorKeys
+                    ? '已保存 · 请点击区块上方「编辑」修改'
+                    : '留空表示清除该厂商 Key'
+                }
+                className={cn(
+                  'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
+                  !editingVendorKeys && 'cursor-default opacity-80',
+                )}
+              />
+              {!editingVendorKeys && (keys[k.id] ?? '').trim() ? (
+                <p className="mt-1 text-[11px] text-emerald-500/90">密钥已保存在注册表中。</p>
+              ) : null}
+              {!editingVendorKeys && !(keys[k.id] ?? '').trim() ? (
+                <p className="mt-1 text-[11px] text-slate-600">此项尚未配置密钥。</p>
+              ) : null}
+              <p className="mt-1 text-[11px] text-slate-500">
+                {k.hint?.trim() ?? 'ERP 会使用此 Key；非内置网关厂商需在 merchant-erp 扩展上游后方可实际推理。'}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <Sparkles className="h-4 w-4 text-cyan-400" />
+            短视频 / 视频模型 API（可灵 + Seedance / 方舟）
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {!editingVideoAi ? (
+              <button
+                type="button"
+                onClick={beginEditVideoAi}
+                disabled={loading || videoAiSaving || editingVendorKeys}
+                className="inline-flex items-center gap-2 rounded-lg border border-cyan-800 bg-cyan-950/60 px-3 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                编辑
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => cancelEditVideoAi()}
+                  disabled={loading || videoAiSaving}
+                  className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveVideoAiBindings()}
+                  disabled={loading || videoAiSaving}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {videoAiSaving ? '保存中…' : '保存'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <p className="mb-4 text-xs text-slate-500">
+          以下凭据由<strong className="text-slate-400">运营侧</strong>维护，供商户 ERP 短视频页经 dev 网关调用。
+          更新时间：{videoAiUpdatedAt ? new Date(videoAiUpdatedAt).toLocaleString('zh-CN') : '—'}
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">可灵 Access Key（JWT iss）</label>
+            <input
+              type="password"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={editingVideoAi ? (videoAi.klingAccessKey ?? '') : ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, klingAccessKey: e.target.value }))}
+              placeholder={
+                (videoAi.klingAccessKey ?? '').trim() && !editingVideoAi
+                  ? '已保存 · 请点击「编辑」修改'
+                  : '留空则清除'
+              }
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">可灵 Secret Key（JWT 签名）</label>
+            <input
+              type="password"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={editingVideoAi ? (videoAi.klingSecretKey ?? '') : ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, klingSecretKey: e.target.value }))}
+              placeholder={
+                (videoAi.klingSecretKey ?? '').trim() && !editingVideoAi
+                  ? '已保存 · 请点击「编辑」修改'
+                  : '留空则清除'
+              }
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
+              可灵 API 根域（可选，如 https://api.klingai.com，留空用默认）
+            </label>
+            <input
+              type="text"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.klingApiBase ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, klingApiBase: e.target.value }))}
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
+              Seedance · 方舟视频接入点列表（逗号分隔「显示名|ep-xxxx」）
+            </label>
+            <textarea
+              spellCheck={false}
+              rows={3}
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.arkVideoEndpoints ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: e.target.value }))}
+              placeholder="Seedance 2 Pro|ep-xxxxxxxx, Lite|ep-yyyyyyyy"
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
+              方舟视频专用 API Key（可选；留空则由商户网关使用上方「豆包」Key）
+            </label>
+            <input
+              type="password"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={editingVideoAi ? (videoAi.arkVideoApiKey ?? '') : ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, arkVideoApiKey: e.target.value }))}
+              placeholder={
+                (videoAi.arkVideoApiKey ?? '').trim() && !editingVideoAi
+                  ? '已保存 · 请点击「编辑」修改'
+                  : '与豆包不同时再填'
+              }
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <Cpu className="h-4 w-4 text-slate-400" />
+          说明
+        </h2>
+        <ul className="list-inside list-disc space-y-1 text-xs text-slate-500">
+          <li>「各厂商 API Key」与「短视频 API」需先<strong className="text-slate-400">编辑</strong>再<strong className="text-slate-400">保存</strong>写入注册表；编辑未保存时可点取消放弃修改。</li>
+          <li>顶层「保存模型与 Key」在任一分区仍处于编辑状态时不可用，请先保存或取消该分区。</li>
+          <li>磁盘：注册表文件为项目根 <span className="font-mono text-slate-400">.meoo-dev-sync/registry.json</span>；GET 网关合并内置厂商目录再下发 ERP。</li>
+          <li>
+            「短视频 API」与本页 Key 互不覆盖：ERP 服务端优先读部署环境变量，未配置时再回退本注册表中运营填写的绑定。
+          </li>
+        </ul>
+      </section>
+    </div>
+  )
+}

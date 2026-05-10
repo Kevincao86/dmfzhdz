@@ -1,0 +1,24 @@
+<view class="wrap">
+  <view class="brand">
+    <text class="tag">LOCAL LIFE OS</text>
+    <text class="title">店魔方 · 商家端</text>
+    <text class="desc">与电脑端商家后台使用同一账号与数据；本页仅用于登录。</text>
+  </view>
+
+  <view class="card meoo-card">
+    <text class="card-title">登录</text>
+    <text class="meoo-hint card-sub">账户名与密码由运营端开通（与电脑端相同）。</text>
+
+    <view class="field">
+      <text class="meoo-label">账户名</text>
+      <input class="meoo-input" placeholder="门店简称或工号" value="{{loginName}}" bindinput="onLoginName" />
+    </view>
+    <view class="field">
+      <text class="meoo-label">密码</text>
+      <input class="meoo-input" password placeholder="至少 6 位" value="{{password}}" bindinput="onPassword" />
+    </view>
+    <text wx:if="{{err}}" class="err">{{err}}</text>
+
+    <button class="meoo-btn-primary btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">进入工作台</button>
+  </view>
+</view>

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "评论管理",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#f3f6fb",
+  "enablePullDownRefresh": true
+}

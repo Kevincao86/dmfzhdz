@@ -1,0 +1,91 @@
+<view class="page">
+  <view wx:if="{{!erpOk}}" class="hero warn meoo-card">
+    <text class="hero-title">未连接商家后台</text>
+    <text class="hero-desc">当前小程序找不到电脑上的商家后台地址。开发调试时请让技术人员把本机配置文件里的后台网址，改成与您电脑上打开的商家后台一致（同一 Wi‑Fi 下一般为 http 开头的局域网地址）。</text>
+  </view>
+
+  <view wx:else class="hero ok meoo-card">
+    <view class="hero-row">
+      <text class="hero-title">商品列表</text>
+      <text class="hero-badge">与电脑端一致</text>
+    </view>
+    <text class="hero-desc">{{hintBanner}}</text>
+    <view class="hero-actions">
+      <button class="mini-btn primary" size="mini" bindtap="goVoice">语音录入</button>
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="tabs-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="tabs-inner">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onTab"
+        class="tab-pill {{activePlat === item.id ? 'tab-on' : ''}}"
+      >
+        <text class="tab-short">{{item.short}}</text>
+        <text class="tab-label">{{item.label}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="search-wrap meoo-card">
+    <text class="search-icon">⌕</text>
+    <input
+      class="search-input"
+      placeholder="筛选商品名称"
+      placeholder-class="search-ph"
+      confirm-type="search"
+      bindinput="onKeyword"
+      value="{{keyword}}"
+    />
+  </view>
+
+  <view wx:if="{{loading}}" class="state-card meoo-card">
+    <text class="state-text">加载中…</text>
+  </view>
+
+  <view wx:elif="{{errMsg}}" class="state-card meoo-card err">
+    <text class="state-title">暂无法加载</text>
+    <text class="state-text">{{errMsg}}</text>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{note}}" class="note-strip">{{note}}</view>
+    <view wx:if="{{displayItems.length === 0}}" class="state-card meoo-card">
+      <text class="state-title">暂无商品</text>
+      <text class="state-text">该平台还没有商品，或电脑端尚未同步到手机。您可在电脑端商家后台维护商品，或使用下方「语音录入」先建草稿。</text>
+    </view>
+    <view wx:for="{{displayItems}}" wx:key="id" class="prod-card meoo-card">
+      <view class="prod-top" bindtap="onOpenItem" data-id="{{item.id}}" data-name="{{item.name}}">
+        <view class="prod-main">
+          <text class="prod-name">{{item.name}}</text>
+          <text class="prod-meta">{{item.platform}} · {{item.store}}</text>
+        </view>
+        <text class="prod-price">¥{{item.price}}</text>
+      </view>
+      <view class="prod-foot">
+        <text class="status-pill">{{item.status}}</text>
+        <view class="prod-actions">
+          <button
+            wx:if="{{activePlat === 'douyin'}}"
+            class="mini-btn teal"
+            size="mini"
+            loading="{{syncingId === item.id}}"
+            disabled="{{syncingId !== '' && syncingId !== item.id}}"
+            catchtap="onSync"
+            data-id="{{item.id}}"
+          >
+            同步
+          </button>
+          <button class="mini-btn ghost" size="mini" bindtap="onOpenItem" data-id="{{item.id}}" data-name="{{item.name}}">
+            编辑草稿
+          </button>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <view class="bottom-space" />
+</view>

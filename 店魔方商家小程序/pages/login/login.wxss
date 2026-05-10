@@ -1,0 +1,62 @@
+.wrap {
+  min-height: 100vh;
+  padding: 56rpx 36rpx 80rpx;
+  box-sizing: border-box;
+  background: linear-gradient(185deg, #e0efff 0%, #f3f6fb 45%);
+}
+
+.brand {
+  margin-bottom: 44rpx;
+}
+
+.tag {
+  font-size: 20rpx;
+  letter-spacing: 0.18em;
+  color: #0284c7;
+  font-weight: 600;
+  display: block;
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 16rpx;
+  display: block;
+}
+
+.desc {
+  font-size: 26rpx;
+  color: #64748b;
+  margin-top: 16rpx;
+  line-height: 1.55;
+  display: block;
+}
+
+.card-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+}
+
+.card-sub {
+  margin: 12rpx 0 32rpx;
+  display: block;
+}
+
+.field {
+  margin-bottom: 28rpx;
+}
+
+.err {
+  color: #dc2626;
+  font-size: 24rpx;
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+.btn {
+  margin-top: 16rpx;
+  border: none;
+}

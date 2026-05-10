@@ -1,0 +1,32 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/home/home",
+    "pages/dashboard/dashboard",
+    "pages/module-detail/module-detail",
+    "pages/wallet/wallet",
+    "pages/recruitment/recruitment",
+    "pages/product-list/product-list",
+    "pages/reviews-list/reviews-list",
+    "pages/product-voice/product-voice",
+    "pages/product-edit/product-edit",
+    "pages/shortvideo-voice/shortvideo-voice",
+    "pages/shortvideo-edit/shortvideo-edit",
+    "pages/recruit-voice/recruit-voice",
+    "pages/recruit-edit/recruit-edit"
+  ],
+  "window": {
+    "navigationBarTitleText": "店魔方商家",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f3f6fb",
+    "backgroundTextStyle": "dark"
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "用于语音描述商品、短视频脚本或达人需求，便于 AI 生成草稿"
+    }
+  },
+  "requiredPrivateInfos": [],
+  "lazyCodeLoading": "requiredComponents"
+}

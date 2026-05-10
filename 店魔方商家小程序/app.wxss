@@ -1,0 +1,152 @@
+page {
+  background: #f3f6fb;
+  color: #1e293b;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.meoo-card {
+  background: #ffffff;
+  border: 1rpx solid rgba(15, 23, 42, 0.06);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 10rpx 40rpx rgba(15, 23, 42, 0.06);
+}
+
+.meoo-btn-primary {
+  background: linear-gradient(95deg, #0ea5e9, #06b6d4 45%, #14b8a6);
+  color: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx 32rpx;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8rpx 24rpx rgba(14, 165, 233, 0.28);
+}
+
+.meoo-btn-ghost {
+  border: 1rpx solid rgba(148, 163, 184, 0.55);
+  color: #475569;
+  border-radius: 16rpx;
+  padding: 24rpx 32rpx;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.meoo-input {
+  background: #f8fafc;
+  border: 1rpx solid rgba(148, 163, 184, 0.45);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  color: #0f172a;
+}
+
+.meoo-label {
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.meoo-hint {
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* 语音录入页 */
+.voice-page {
+  padding: 28rpx;
+  padding-bottom: 48rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eef6ff 0%, #f3f6fb 35%);
+}
+
+.voice-hero {
+  margin-bottom: 24rpx;
+}
+
+.voice-hero-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+}
+
+.voice-hero-desc {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.55;
+  display: block;
+}
+
+.voice-steps {
+  margin-bottom: 28rpx;
+  padding: 24rpx 28rpx;
+}
+
+.voice-steps-title {
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 16rpx;
+  display: block;
+}
+
+.voice-step-row {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 14rpx;
+}
+
+.voice-step-num {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 999rpx;
+  background: rgba(14, 165, 233, 0.15);
+  color: #0284c7;
+  font-size: 22rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.voice-step-text {
+  flex: 1;
+  font-size: 24rpx;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.voice-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.voice-record-btn {
+  min-height: 96rpx;
+  line-height: 1.4;
+}
+
+.voice-pulse {
+  margin-top: 28rpx;
+  text-align: center;
+  color: #0284c7;
+  font-size: 26rpx;
+}
+
+.edit-section-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 32rpx 0 16rpx;
+  display: block;
+}
+
+.edit-page-hint {
+  margin-bottom: 24rpx;
+}

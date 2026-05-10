@@ -1,0 +1,162 @@
+<scroll-view scroll-y class="home-scroll" enhanced show-scrollbar="{{false}}">
+  <!-- 顶栏 -->
+  <view class="top-bar">
+    <view class="store-block">
+      <view class="avatar">
+        <text class="avatar-text">店</text>
+      </view>
+      <view class="store-text">
+        <text class="store-name">{{storeName}}</text>
+        <view class="status-pill">{{statusText}}</view>
+      </view>
+    </view>
+    <navigator url="/pages/dashboard/dashboard" class="top-link" hover-class="top-link-hover">数据详情 ›</navigator>
+  </view>
+
+  <!-- 经营数据 -->
+  <view class="score-panel">
+    <navigator url="/pages/wallet/wallet" class="score-left score-left-link" hover-class="score-left-hover">
+      <text class="score-label">{{scoreLabel}}</text>
+      <view class="score-ring">
+        <text class="score-num">{{score}}</text>
+      </view>
+      <text class="score-sub">{{scoreHint}}</text>
+      <text wx:if="{{balanceLoaded}}" class="score-tap-hint">流水明细 ›</text>
+    </navigator>
+    <view class="score-metrics">
+      <view class="metric" wx:for="{{metrics}}" wx:key="label">
+        <text class="metric-val">{{item.value}}</text>
+        <text class="metric-lab">{{item.label}}</text>
+        <text class="metric-sub">{{item.sub}}</text>
+      </view>
+    </view>
+    <view class="score-banner">{{dataBanner}}</view>
+  </view>
+
+  <view wx:if="{{!erpLinked}}" class="erp-hint pad-x">
+    <text class="erp-hint-text">
+      达人招募与电脑端互通：请让技术人员在本机配置里，把小程序连接的后台地址改成您电脑上商家后台打开的网址（手机与电脑需同一 Wi‑Fi，一般为 http 开头的局域网地址）。
+    </text>
+  </view>
+
+  <!-- 特色功能 -->
+  <view class="featured-wrap pad-x">
+    <view class="section-title-row">
+      <view class="section-title-left">
+        <text class="spark">✦</text>
+        <text class="section-main-title">特色功能</text>
+      </view>
+      <text class="section-tag">语音 · GEO</text>
+    </view>
+    <text class="featured-lead">先用口述快速记一笔，再到编辑页细改；钱包与流水已与电脑端账号打通</text>
+    <view class="featured-grid">
+      <navigator
+        wx:for="{{featured}}"
+        wx:key="id"
+        url="{{item.url}}"
+        class="feat-tile feat-theme-{{item.theme}}"
+        hover-class="feat-hover"
+      >
+        <view class="feat-tile-top">
+          <view class="feat-icon-ring">
+            <text class="feat-glyph">{{item.glyph}}</text>
+          </view>
+          <text class="feat-arrow">›</text>
+        </view>
+        <text class="feat-title">{{item.title}}</text>
+        <text class="feat-desc">{{item.desc}}</text>
+      </navigator>
+    </view>
+  </view>
+
+  <!-- 常用功能 -->
+  <view class="section-head func-head">
+    <view class="section-title-row flat">
+      <text class="section-main-title dark">常用功能</text>
+      <text class="section-tip">滑动翻页</text>
+    </view>
+  </view>
+  <swiper
+    class="icon-swiper"
+    style="height: {{swiperH}}rpx;"
+    indicator-dots="{{iconPages.length > 1}}"
+    indicator-color="rgba(37,99,235,.15)"
+    indicator-active-color="#2563eb"
+    circular="{{false}}"
+    autoplay="{{false}}"
+  >
+    <swiper-item wx:for="{{iconPages}}" wx:for-index="pi" wx:key="pi">
+      <view class="icon-grid">
+        <navigator
+          wx:for="{{item}}"
+          wx:for-item="cell"
+          wx:key="title"
+          url="{{cell.url}}"
+          class="icon-cell"
+          hover-class="icon-cell-hover"
+        >
+          <view class="icon-bubble ic-{{cell.tone}}">
+            <text class="icon-glyph">{{cell.glyph}}</text>
+          </view>
+          <text class="icon-title">{{cell.title}}</text>
+        </navigator>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <!-- 待办 -->
+  <view class="section-head pad-x">
+    <text class="section-main-title dark">待办事项</text>
+    <text class="section-more">共 {{todoTotal}} 项 ›</text>
+  </view>
+  <view class="todo-card pad-x">
+    <block wx:for="{{todos}}" wx:key="title">
+      <navigator url="{{item.url}}" class="todo-row" hover-class="todo-row-hover">
+        <view class="todo-icon-wrap">!</view>
+        <view class="todo-body">
+          <text class="todo-title">{{item.title}}</text>
+          <text class="todo-sub">{{item.sub}}</text>
+        </view>
+        <text class="todo-action">去处理</text>
+      </navigator>
+    </block>
+  </view>
+
+  <!-- 快捷推荐 -->
+  <view class="section-head pad-x">
+    <text class="section-main-title dark">快捷推荐</text>
+    <navigator url="/pages/wallet/wallet" class="section-more" hover-class="top-link-hover">更多 ›</navigator>
+  </view>
+  <view class="promo-wrap pad-x">
+    <block wx:for="{{promos}}" wx:key="key">
+      <navigator
+        wx:if="{{item.size === 'large'}}"
+        url="{{item.url}}"
+        class="promo-lg promo-theme-{{item.theme}}"
+        hover-class="promo-hover"
+      >
+        <text class="promo-lg-title">{{item.title}}</text>
+        <text class="promo-lg-sub">{{item.sub}}</text>
+        <text class="promo-lg-btn">进入</text>
+      </navigator>
+    </block>
+    <view class="promo-stack">
+      <block wx:for="{{promos}}" wx:key="key">
+        <navigator
+          wx:if="{{item.size === 'small'}}"
+          url="{{item.url}}"
+          class="promo-sm promo-theme-{{item.theme}}"
+          hover-class="promo-hover"
+        >
+          <text class="promo-sm-title">{{item.title}}</text>
+          <text class="promo-sm-sub">{{item.sub}}</text>
+        </navigator>
+      </block>
+    </view>
+  </view>
+
+  <view class="logout-row pad-x">
+    <text class="logout-link" bindtap="onLogout">退出登录</text>
+  </view>
+  <view class="home-footer-space"></view>
+</scroll-view>

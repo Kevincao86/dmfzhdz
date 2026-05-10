@@ -1,0 +1,1010 @@
+/**
+ * 抖音来客商品创建 — 经 ERP 网关代理的 OpenAPI 对齐路径。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/category.get
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save
+ */
+
+const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
+
+function url(path: string) {
+  const b = apiBase().replace(/\/$/, '')
+  return `${b}${path}`
+}
+
+function readSession(key: string): string | null {
+  try {
+    const v = sessionStorage.getItem(key)
+    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null
+  } catch {
+    return null
+  }
+}
+
+function authHeaders(): HeadersInit {
+  const token = readSession('meoo_douyin_merchant_token')
+  const h: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+  if (token) h.Authorization = `Bearer ${token}`
+  return h
+}
+
+export type DouyinCategoryTreeNode = {
+  category_id: string
+  name: string
+  parent_id: string
+  level: number
+  is_leaf: boolean
+  enable: boolean
+  /** 为 true 时平台禁止在该类目发品 */
+  is_publish_block?: boolean
+  sub_tree_infos?: DouyinCategoryTreeNode[]
+}
+
+/** 抖音类目 id 常为 64 位整型，浏览器 JSON.parse 会丢精度；在解析前把数字改为字符串。 */
+function quoteInt64CategoryIdFieldsInJson(raw: string): string {
+  return raw
+    .replace(/"category_id"\s*:\s*(\d+)\b/g, '"category_id":"$1"')
+    .replace(/"parent_id"\s*:\s*(\d+)\b/g, '"parent_id":"$1"')
+}
+
+function pickSubTreeArray(raw: Record<string, unknown>): Record<string, unknown>[] | undefined {
+  const a = raw.sub_tree_infos ?? raw.sub_tree_info ?? raw.children ?? raw.category_list
+  return Array.isArray(a) ? (a as Record<string, unknown>[]) : undefined
+}
+
+function pickCategoryId(raw: Record<string, unknown>): string {
+  const v = raw.category_id ?? raw.id ?? raw.categoryId
+  if (typeof v === 'string') return v.trim()
+  if (typeof v === 'number' && Number.isFinite(v)) return String(Math.trunc(v))
+  return ''
+}
+
+function pickParentId(raw: Record<string, unknown>): string {
+  const v = raw.parent_id ?? raw.parentId
+  if (typeof v === 'string') return v.trim()
+  if (typeof v === 'number' && Number.isFinite(v)) return String(Math.trunc(v))
+  return ''
+}
+
+function normalizeCategoryNode(raw: Record<string, unknown>): DouyinCategoryTreeNode {
+  const subs = pickSubTreeArray(raw)
+  return {
+    category_id: pickCategoryId(raw),
+    name: String(raw.name ?? ''),
+    parent_id: pickParentId(raw),
+    level: Number(raw.level) || 0,
+    is_leaf: Boolean(raw.is_leaf),
+    enable: raw.enable !== false,
+    is_publish_block: raw.is_publish_block === true,
+    sub_tree_infos: subs?.length ? subs.map((x) => normalizeCategoryNode(x)) : undefined,
+  }
+}
+
+export function normalizeCategoryTree(raw: unknown[]): DouyinCategoryTreeNode[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((x) => normalizeCategoryNode(x as Record<string, unknown>))
+}
+
+/** 与开发网关 industry-scope 解析规则一致：末级 + enable + 非封禁 */
+export function collectUploadableLeafCategoryIdsFromTree(
+  nodes: DouyinCategoryTreeNode[],
+): string[] {
+  const out: string[] = []
+  const walk = (arr: DouyinCategoryTreeNode[]) => {
+    for (const n of arr) {
+      if (n.is_leaf && n.category_id && n.enable !== false && !n.is_publish_block) {
+        out.push(n.category_id)
+      }
+      if (n.sub_tree_infos?.length) walk(n.sub_tree_infos)
+    }
+  }
+  walk(nodes)
+  return out
+}
+
+export type ImageUploadResult =
+  | { ok: false; message: string }
+  | { ok: true; url: string }
+
+/** 本地走 JSON 上传；生产请换抖音素材能力返回可公网访问的 URL */
+export async function uploadDouyinProductImage(file: File): Promise<ImageUploadResult> {
+  const max = 5 * 1024 * 1024
+  if (file.size > max) {
+    return { ok: false, message: '单张图片不超过 5MB' }
+  }
+  let contentBase64: string
+  try {
+    contentBase64 = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => {
+        const s = String(r.result ?? '')
+        const i = s.indexOf(',')
+        resolve(i >= 0 ? s.slice(i + 1) : s)
+      }
+      r.onerror = () => reject(new Error('读取文件失败'))
+      r.readAsDataURL(file)
+    })
+  } catch {
+    return { ok: false, message: '读取文件失败' }
+  }
+  const res = await fetch(url('/api/merchant/douyin/goods/image/upload'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type || 'image/jpeg',
+      contentBase64,
+    }),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const u = typeof data.url === 'string' ? data.url : ''
+  if (!u) return { ok: false, message: '上传接口未返回 url' }
+  return { ok: true, url: u }
+}
+
+export type IndustryScopeResult =
+  | {
+      ok: true
+      industryName: string
+      /** 行业允许创建的三级类目 id（与类目树叶子求交后决定可选黑色） */
+      uploadableLeafCategoryIds: string[]
+    }
+  | { ok: false; message: string }
+
+export type CategoryGetResult =
+  | { ok: false; message: string }
+  | { ok: true; category_tree_infos: DouyinCategoryTreeNode[] }
+
+export type ProductTypeOption = {
+  product_type: number
+  label: string
+  /** false 时 UI 置灰不可选 */
+  eligible: boolean
+}
+
+export type ProductTypesResult =
+  | { ok: true; types: ProductTypeOption[] }
+  | { ok: false; message: string }
+
+export type TemplateAttr = {
+  key: string
+  name: string
+  is_required: boolean
+  is_multi: boolean
+  value_type: string
+  desc?: string
+}
+
+/** template/get 与 goods/save 对齐的投放渠道、职人带货、售后枚举等（网关可按类目/类型裁剪） */
+export type TemplateSelectOption = { value: string; label: string }
+
+export type TradeRuleDefaults = {
+  consume_date_mode: 'days' | 'calendar'
+  consume_valid_days: number
+  non_consume_date_mode: 'all_dates' | 'partial_dates'
+  daily_consume_mode: 'all_day' | 'time_slots'
+  purchase_limit_mode: 'none' | 'limited'
+  purchase_limit_max: number
+  after_sale_policy: string
+  reserve_mode: 'none' | 'required'
+  reserve_advance_value: number
+  reserve_advance_unit: 'day' | 'hour'
+  reserve_channel: 'phone' | 'online'
+}
+
+export type GoodsTemplateResult =
+  | { ok: false; message: string }
+  | {
+      ok: true
+      product_attrs: TemplateAttr[]
+      sku_attrs: TemplateAttr[]
+      sales_channels: TemplateSelectOption[]
+      staff_sales_options: TemplateSelectOption[]
+      after_sale_policies: TemplateSelectOption[]
+      trade_rule_defaults: TradeRuleDefaults
+    }
+
+export type ComboPackageItem = {
+  name: string
+  quantity: number
+  origin_price_yuan: number
+  /** 匹配到的抖音线上商品 id，随 package_combo 提交供网关映射 save */
+  product_id?: string
+  sku_id?: string
+}
+
+export type ComboPackageGroup = {
+  pick_rule: string
+  items: ComboPackageItem[]
+}
+
+/** template/get 未返回时的占位，与来客后台常见投放渠道对齐 */
+export const DEFAULT_TEMPLATE_SALES_CHANNELS: TemplateSelectOption[] = [
+  { value: 'unlimited', label: '不限制' },
+  { value: 'live_only', label: '仅直播间' },
+  { value: 'offline_only', label: '仅线下' },
+  { value: 'newcomer_only', label: '仅新人频道' },
+  { value: 'online_only', label: '仅线上' },
+  { value: 'free_trial_only', label: '仅免费试' },
+  { value: 'group_mall_only', label: '仅团购商城' },
+  { value: 'live_and_acquisition', label: '直播间+获客卡' },
+  { value: 'event_only', label: '仅活动报名' },
+]
+
+export const DEFAULT_STAFF_SALES_OPTIONS: TemplateSelectOption[] = [
+  { value: 'allow', label: '允许' },
+  { value: 'deny', label: '不允许' },
+]
+
+export const DEFAULT_AFTER_SALE_POLICIES: TemplateSelectOption[] = [
+  { value: 'refund_anytime', label: '随时退' },
+  { value: 'refund_auto_expire', label: '过期自动退' },
+  { value: 'no_refund', label: '不可退' },
+]
+
+/** 聚合详情表单，网关负责映射为 product/save 的 product、sku 结构 */
+export type DouyinProductDetailPayload = {
+  /** 已存在商品时传入，网关走更新/覆盖草稿 */
+  product_id?: string
+  out_id: string
+  category_id: string
+  product_type: number
+  merchant_display_name?: string
+  /**
+   * 收款方式：网关映射 goodlife 商品 save 中与结算/分账相关字段（如总店统一收款、门店独立收款等）。
+   * 具体枚举以开放平台当前类目模板为准。
+   */
+  payment_collect_mode?: 'per_poi' | 'merchant_unified' | 'platform_agent'
+  product_name: string
+  product_desc?: string
+  /** 售价（元）→ 网关转 actual_amount 等 */
+  price_yuan: number
+  origin_price_yuan?: number
+  head_image_urls: string[]
+  aux_image_urls: string[]
+  env_image_urls: string[]
+  /** 适用门店 poi_id 列表 */
+  poi_ids: string[]
+  /** 团购（product_type=1）套餐搭配，网关映射 goodlife 套餐/商品组结构 */
+  package_combo?: { groups: ComboPackageGroup[] }
+  /** 售卖、库存、交易、消费等扩展块（JSON 透传网关拼装 attr_key_value_map） */
+  sales_info: Record<string, unknown>
+  trade_rules: Record<string, unknown>
+  consume_rules: Record<string, unknown>
+}
+
+export type ProductSaveResult =
+  | { ok: true; product_id?: string; message?: string }
+  | { ok: false; message: string }
+
+export type DouyinGoodsProductGetResult =
+  | { ok: true; detail: DouyinProductDetailPayload }
+  | { ok: false; message: string }
+
+/**
+ * 商品查询：对齐网关代理的 goodlife 商品详情/草稿查询（路径约定，生产由网关实现）。
+ */
+export async function getDouyinGoodsProductGet(productId: string): Promise<DouyinGoodsProductGetResult> {
+  const id = productId.trim()
+  if (!id) return { ok: false, message: '缺少 product_id' }
+  const q = new URLSearchParams({ product_id: id })
+  const res = await fetch(url(`/api/merchant/douyin/goods/product/get?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const d = data.data as Record<string, unknown> | undefined
+  if (!d || typeof d !== 'object') {
+    return { ok: false, message: '响应缺少 data' }
+  }
+  const detail = d.detail as DouyinProductDetailPayload | undefined
+  if (!detail || typeof detail !== 'object') {
+    return { ok: false, message: '响应缺少 data.detail' }
+  }
+  return { ok: true, detail }
+}
+
+export type ProductSyncResult = { ok: true; message?: string } | { ok: false; message: string }
+
+/** 将 ERP 内编辑结果同步至平台（上架/更新；由网关代理各平台 OpenAPI） */
+export async function postDouyinGoodsProductSync(productId: string): Promise<ProductSyncResult> {
+  const id = productId.trim()
+  if (!id) return { ok: false, message: '缺少 product_id' }
+  const res = await fetch(url('/api/merchant/douyin/goods/product/sync'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ product_id: id }),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  return {
+    ok: true,
+    message: typeof data.message === 'string' ? data.message : undefined,
+  }
+}
+
+async function parseJson(res: Response): Promise<Record<string, unknown>> {
+  try {
+    return (await res.json()) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+/** 查询商品线上数据列表 online.query 解析后的单行（用于团购单品匹配） */
+export type DouyinOnlineProductHit = {
+  product_id: string
+  product_name: string
+  sku_id?: string
+  /** 优先 sku.actual_amount，按分→元启发式换算 */
+  price_yuan?: number
+  online_status?: number
+  /** online：已上线；draft：草稿/审核中；local：本系统演示列表 */
+  source?: 'online' | 'draft' | 'local'
+}
+
+function amountFieldToYuan(v: unknown): number | undefined {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return undefined
+  if (v > 1e15) return undefined
+  if (v >= 100 && v < 1e12) return Math.round(v) / 100
+  if (v > 0 && v < 1e6) return v
+  return undefined
+}
+
+function normalizeOnlineProductEntry(raw: unknown): DouyinOnlineProductHit | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const prod =
+    row.product && typeof row.product === 'object'
+      ? (row.product as Record<string, unknown>)
+      : row
+  const product_id = String(prod.product_id ?? prod.id ?? '').trim()
+  const product_name = String(prod.product_name ?? prod.name ?? '').trim()
+  if (!product_id && !product_name) return null
+  const sku =
+    row.sku && typeof row.sku === 'object' ? (row.sku as Record<string, unknown>) : null
+  const skus = Array.isArray(row.skus) ? row.skus : []
+  const firstSku =
+    (skus[0] && typeof skus[0] === 'object' ? (skus[0] as Record<string, unknown>) : null) ?? sku
+  let sku_id: string | undefined
+  let price_yuan: number | undefined
+  if (firstSku) {
+    sku_id = String(firstSku.sku_id ?? firstSku.out_sku_id ?? '').trim() || undefined
+    price_yuan =
+      amountFieldToYuan(firstSku.actual_amount) ?? amountFieldToYuan(firstSku.origin_amount)
+  }
+  const online_status =
+    typeof row.online_status === 'number' ? row.online_status : undefined
+  return {
+    product_id: product_id || sku_id || product_name,
+    product_name: product_name || product_id,
+    sku_id,
+    price_yuan,
+    online_status,
+  }
+}
+
+function douyinDataBizError(inner: Record<string, unknown> | undefined): string | undefined {
+  if (!inner || typeof inner.error_code !== 'number' || inner.error_code === 0) return undefined
+  return typeof inner.description === 'string' ? inner.description : `抖音 error_code=${inner.error_code}`
+}
+
+function extractProductsArrayFromDouyinPayload(data: Record<string, unknown>): unknown[] {
+  const inner = data.data as Record<string, unknown> | undefined
+  const arr = (inner?.products ?? inner?.product_list ?? data.products) as unknown
+  if (Array.isArray(arr)) return arr
+  return []
+}
+
+/** 与类目/门店等接口一致：显式传 account_id，避免仅依赖网关会话默认值与前端来客账户不一致。 */
+function appendDouyinAccountIdToQuery(qs: URLSearchParams): void {
+  const id = readSession('meoo_douyin_merchant_id')
+  if (id) qs.set('account_id', id)
+}
+
+function mergeDedupeProductHits(batches: DouyinOnlineProductHit[][]): DouyinOnlineProductHit[] {
+  const seen = new Set<string>()
+  const out: DouyinOnlineProductHit[] = []
+  for (const batch of batches) {
+    for (const h of batch) {
+      const id = h.product_id?.trim()
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      out.push(h)
+    }
+  }
+  return out
+}
+
+async function fetchOnlineQueryHits(
+  qs: URLSearchParams,
+): Promise<{ hits: DouyinOnlineProductHit[]; httpErr?: string; bizErr?: string }> {
+  const q = new URLSearchParams(qs.toString())
+  appendDouyinAccountIdToQuery(q)
+  const res = await fetch(url(`/api/merchant/douyin/goods/product/online/query?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      hits: [],
+      httpErr: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const inner = data.data as Record<string, unknown> | undefined
+  const bizErr = douyinDataBizError(inner)
+  const products = extractProductsArrayFromDouyinPayload(data)
+  const hits: DouyinOnlineProductHit[] = []
+  for (const p of products) {
+    const h = normalizeOnlineProductEntry(p)
+    if (h) hits.push({ ...h, source: 'online' })
+  }
+  return { hits, bizErr: hits.length === 0 ? bizErr : undefined }
+}
+
+async function fetchDraftQueryHitsFiltered(keyword: string, count: number): Promise<DouyinOnlineProductHit[]> {
+  const q = new URLSearchParams()
+  q.set('count', String(Math.min(50, Math.max(5, count))))
+  appendDouyinAccountIdToQuery(q)
+  const res = await fetch(url(`/api/merchant/douyin/goods/product/draft/query?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) return []
+  const inner = data.data as Record<string, unknown> | undefined
+  if (inner && typeof inner.error_code === 'number' && inner.error_code !== 0) return []
+  const products = extractProductsArrayFromDouyinPayload(data)
+  const k = keyword.toLowerCase()
+  const out: DouyinOnlineProductHit[] = []
+  for (const p of products) {
+    const h = normalizeOnlineProductEntry(p)
+    if (!h) continue
+    if (!h.product_name.toLowerCase().includes(k)) continue
+    out.push({ ...h, source: 'draft' })
+  }
+  return out
+}
+
+/** 本系统演示商品列表（与 save 缓存同源），keyword 由网关 mock 支持 */
+async function fetchLocalSavedGoodsHits(keyword: string): Promise<DouyinOnlineProductHit[]> {
+  const q = new URLSearchParams({
+    page: '1',
+    page_size: '50',
+    keyword: keyword.slice(0, 40),
+  })
+  appendDouyinAccountIdToQuery(q)
+  const res = await fetch(url(`/api/merchant/douyin/goods/products?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) return []
+  const inner = data.data as Record<string, unknown> | undefined
+  const items = (inner?.items ?? data.items) as unknown
+  if (!Array.isArray(items)) return []
+  const k = keyword.toLowerCase()
+  const out: DouyinOnlineProductHit[] = []
+  for (const row of items) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const id = String(r.id ?? '').trim()
+    const name = String(r.name ?? '').trim()
+    if (!id || !name.toLowerCase().includes(k)) continue
+    const price = Number(r.price)
+    out.push({
+      product_id: id,
+      product_name: name,
+      price_yuan: Number.isFinite(price) ? price : undefined,
+      source: 'local',
+    })
+  }
+  return out
+}
+
+/**
+ * 团购单品匹配：合并「线上商品 online.query」+「商品草稿 draft.query」（与创建/保存 goods 同源）+ 本系统已存演示列表。
+ * 新建商品场景下线上库常为空，草稿列表可命中未上架的 save 结果。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/online.query
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/query
+ */
+export async function getDouyinGoodsProductOnlineQuery(params: {
+  product_name: string
+  count?: number
+  cursor?: string
+  goods_query_type?: string
+}): Promise<
+  | { ok: true; hits: DouyinOnlineProductHit[]; next_cursor?: string }
+  | { ok: false; message: string }
+> {
+  const kw = params.product_name.trim()
+  if (kw.length < 1) {
+    return { ok: false, message: '请输入商品名称关键词后再搜索' }
+  }
+  const count = Math.min(50, Math.max(5, params.count ?? 12))
+
+  const base = new URLSearchParams()
+  base.set('product_name', kw.slice(0, 30))
+  base.set('count', String(count))
+  if (params.cursor) base.set('cursor', params.cursor)
+
+  const explicitGqt = params.goods_query_type?.trim()
+  let onlineHits: DouyinOnlineProductHit[] = []
+  let httpErr: string | undefined
+  let bizErr: string | undefined
+
+  if (explicitGqt) {
+    const q = new URLSearchParams(base.toString())
+    q.set('goods_query_type', explicitGqt || '2')
+    const r = await fetchOnlineQueryHits(q)
+    onlineHits = r.hits
+    httpErr = r.httpErr
+    bizErr = r.bizErr
+  } else {
+    const q2 = new URLSearchParams(base.toString())
+    q2.set('goods_query_type', '2')
+    const q3 = new URLSearchParams(base.toString())
+    q3.set('goods_query_type', '3')
+    const [r2, r3] = await Promise.all([fetchOnlineQueryHits(q2), fetchOnlineQueryHits(q3)])
+    onlineHits = mergeDedupeProductHits([r2.hits, r3.hits])
+    httpErr = r2.httpErr && r3.httpErr ? r2.httpErr ?? r3.httpErr : undefined
+    bizErr = onlineHits.length === 0 ? r2.bizErr ?? r3.bizErr : undefined
+  }
+
+  const draftHits = await fetchDraftQueryHitsFiltered(kw, count)
+  let merged = mergeDedupeProductHits([onlineHits, draftHits])
+
+  if (merged.length === 0) {
+    const localHits = await fetchLocalSavedGoodsHits(kw)
+    merged = mergeDedupeProductHits([merged, localHits])
+  }
+
+  if (merged.length === 0) {
+    if (httpErr) return { ok: false, message: httpErr }
+    if (bizErr) return { ok: false, message: bizErr }
+    return { ok: true, hits: [], next_cursor: undefined }
+  }
+
+  return { ok: true, hits: merged, next_cursor: undefined }
+}
+
+/** category/get 专用：保留类目 id 精度，并兼容网关包装 `{ message, data }`。 */
+async function parseCategoryGetJsonResponse(res: Response): Promise<Record<string, unknown>> {
+  let raw = ''
+  try {
+    raw = await res.text()
+  } catch {
+    return {}
+  }
+  try {
+    const fixed = quoteInt64CategoryIdFieldsInJson(raw)
+    return JSON.parse(fixed) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+/** 行业圈定可发三级类目（网关可合并门店资质 / 类目资质结果） */
+export async function getDouyinIndustryCategoryScope(): Promise<IndustryScopeResult> {
+  const accountId = readSession('meoo_douyin_merchant_id')
+  const q = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+  const res = await fetch(url(`/api/merchant/douyin/goods/industry-scope${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const d = data.data as Record<string, unknown> | undefined
+  const industryName = typeof d?.industry_name === 'string' ? d.industry_name : '未知行业'
+  const raw = d?.uploadable_leaf_category_ids
+  const uploadableLeafCategoryIds = Array.isArray(raw)
+    ? raw.map((x) => String(x)).filter((x) => x.length > 0)
+    : []
+  return { ok: true, industryName, uploadableLeafCategoryIds }
+}
+
+/** 对齐 category/get 树形结果（单请求；需补全子树请用 getDouyinGoodsCategoryTreeMerged） */
+export async function getDouyinGoodsCategoryTree(): Promise<CategoryGetResult> {
+  const accountId = readSession('meoo_douyin_merchant_id')
+  const q = new URLSearchParams()
+  q.set('query_category_type', '1')
+  if (accountId) q.set('account_id', accountId)
+  return requestCategoryTreeQuery(q)
+}
+
+async function requestCategoryTreeQuery(q: URLSearchParams): Promise<CategoryGetResult> {
+  const res = await fetch(url(`/api/merchant/douyin/goods/category/get?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseCategoryGetJsonResponse(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const d = data.data as Record<string, unknown> | undefined
+  if (d && typeof d.error_code === 'number' && d.error_code !== 0) {
+    const desc = typeof d.description === 'string' ? d.description : `error_code=${d.error_code}`
+    return { ok: false, message: desc }
+  }
+  const tree = d?.category_tree_infos
+  if (!Array.isArray(tree)) {
+    return { ok: false, message: '类目数据格式异常（缺少 category_tree_infos）' }
+  }
+  const normalized = normalizeCategoryTree(tree)
+  return { ok: true, category_tree_infos: normalized }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** 非叶子且缺少有效子树时，需再调 category/get?category_id= 补全（抖音文档：按 id 返回直系子类目） */
+function categoryNodeNeedsSubtreeFetch(n: DouyinCategoryTreeNode): boolean {
+  if (n.is_leaf || !n.category_id) return false
+  const subs = n.sub_tree_infos
+  if (!subs || subs.length === 0) return true
+  return subs.every((s) => !s.category_id)
+}
+
+function extractChildrenFromCategoryGetPayload(
+  d: Record<string, unknown> | undefined,
+  parentCategoryId: string,
+): DouyinCategoryTreeNode[] {
+  if (!d || typeof d !== 'object') return []
+  if (typeof d.error_code === 'number' && d.error_code !== 0) return []
+  const parentStr = String(parentCategoryId)
+  const treeRaw = d.category_tree_infos
+  if (Array.isArray(treeRaw) && treeRaw.length > 0) {
+    const norm = normalizeCategoryTree(treeRaw as Record<string, unknown>[])
+    if (norm.length === 1) {
+      const root = norm[0]
+      if (root.category_id === parentStr && root.sub_tree_infos?.length) {
+        return root.sub_tree_infos
+      }
+      if (root.sub_tree_infos?.length) return root.sub_tree_infos
+      return norm
+    }
+    const hit = norm.find((n) => n.category_id === parentStr)
+    if (hit?.sub_tree_infos?.length) return hit.sub_tree_infos
+    return norm
+  }
+  const infos = d.category_infos
+  if (Array.isArray(infos) && infos.length > 0) {
+    const norm = normalizeCategoryTree(infos as Record<string, unknown>[])
+    const byParent = norm.filter((n) => n.parent_id === parentStr)
+    return byParent.length > 0 ? byParent : norm
+  }
+  return []
+}
+
+async function fetchCategorySubtreeByParentId(parentCategoryId: string): Promise<DouyinCategoryTreeNode[]> {
+  const accountId = readSession('meoo_douyin_merchant_id')
+  const q = new URLSearchParams()
+  q.set('query_category_type', '1')
+  q.set('category_id', parentCategoryId)
+  if (accountId) q.set('account_id', accountId)
+  const res = await fetch(url(`/api/merchant/douyin/goods/category/get?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseCategoryGetJsonResponse(res)
+  if (!res.ok) return []
+  const d = data.data as Record<string, unknown> | undefined
+  return extractChildrenFromCategoryGetPayload(d, parentCategoryId)
+}
+
+function cloneCategoryTree(nodes: DouyinCategoryTreeNode[]): DouyinCategoryTreeNode[] {
+  return nodes.map((n) => ({
+    ...n,
+    sub_tree_infos: n.sub_tree_infos?.length ? cloneCategoryTree(n.sub_tree_infos) : undefined,
+  }))
+}
+
+function findCategoryNodeMutable(
+  nodes: DouyinCategoryTreeNode[],
+  id: string,
+): DouyinCategoryTreeNode | null {
+  for (const n of nodes) {
+    if (n.category_id === id) return n
+    if (n.sub_tree_infos?.length) {
+      const f = findCategoryNodeMutable(n.sub_tree_infos, id)
+      if (f) return f
+    }
+  }
+  return null
+}
+
+/** 将 `category/get?category_id=<parent>` 返回的子节点合并进内存树（用于按需补全二/三级）。 */
+export function mergeDouyinCategoryChildrenIntoTree(
+  tree: DouyinCategoryTreeNode[],
+  parentCategoryId: string,
+  children: DouyinCategoryTreeNode[],
+): DouyinCategoryTreeNode[] {
+  const pid = parentCategoryId.trim()
+  if (!pid || children.length === 0) return tree
+  const next = cloneCategoryTree(tree)
+  const p = findCategoryNodeMutable(next, pid)
+  if (p) p.sub_tree_infos = children
+  return next
+}
+
+/** 对齐文档：按 `category_id` 查询直系子类目（`query_category_type=1` 树形）。 */
+export async function fetchDouyinGoodsCategoryChildren(
+  parentCategoryId: string,
+): Promise<DouyinCategoryTreeNode[]> {
+  const id = parentCategoryId.trim()
+  if (!id) return []
+  return fetchCategorySubtreeByParentId(id)
+}
+
+async function enrichCategoryTreeMissingSubtrees(
+  roots: DouyinCategoryTreeNode[],
+  options: { maxExtraRequests: number; delayMs: number },
+): Promise<void> {
+  let used = 0
+  const queued = new Set<string>()
+  const walk = async (nodes: DouyinCategoryTreeNode[]) => {
+    for (const node of nodes) {
+      if (used >= options.maxExtraRequests) return
+      if (categoryNodeNeedsSubtreeFetch(node) && !queued.has(node.category_id)) {
+        queued.add(node.category_id)
+        await sleep(options.delayMs)
+        used += 1
+        const children = await fetchCategorySubtreeByParentId(node.category_id)
+        if (children.length > 0) {
+          node.sub_tree_infos = children
+        }
+      }
+      if (node.sub_tree_infos?.length) await walk(node.sub_tree_infos)
+    }
+  }
+  await walk(roots)
+}
+
+/**
+ * 在 `goodlife/v1/goods/category/get` 全树基础上，对仍缺少 `sub_tree_infos` 的非叶子节点按 `category_id` 逐级补拉并合并，
+ * 以覆盖平台只返回浅层、需二次查询的场景（与 account_id 门店可发类目一致）。
+ * 先尝试 `category_id=0` + `query_category_type=1`（文档：返回全部一级及子树），失败再回退无 category_id 请求。
+ * @param maxExtraRequests 额外请求上限（默认 800，一级下二级较多时需拉高；间隔约 35ms 贴近 QPS 35）
+ */
+export async function getDouyinGoodsCategoryTreeMerged(
+  maxExtraRequests = 800,
+  delayMs = 35,
+): Promise<CategoryGetResult> {
+  const accountId = readSession('meoo_douyin_merchant_id')
+  const q0 = new URLSearchParams()
+  q0.set('query_category_type', '1')
+  q0.set('category_id', '0')
+  if (accountId) q0.set('account_id', accountId)
+  let base = await requestCategoryTreeQuery(q0)
+  if (!base.ok) {
+    base = await getDouyinGoodsCategoryTree()
+  }
+  if (!base.ok) return base
+  try {
+    await enrichCategoryTreeMissingSubtrees(base.category_tree_infos, {
+      maxExtraRequests,
+      delayMs,
+    })
+  } catch {
+    /* 合并失败时仍返回首包全树 */
+  }
+  return base
+}
+
+export async function getDouyinProductTypesForCategory(
+  leafCategoryId: string,
+): Promise<ProductTypesResult> {
+  const res = await fetch(
+    url(
+      `/api/merchant/douyin/goods/product-types?${new URLSearchParams({ category_id: leafCategoryId })}`,
+    ),
+    { method: 'GET', headers: authHeaders() },
+  )
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const typesRaw = data.types ?? data.data
+  const types = Array.isArray(typesRaw)
+    ? (typesRaw as Record<string, unknown>[])
+        .map((t) => ({
+          product_type: Number(t.product_type),
+          label: String(t.label ?? t.name ?? ''),
+          eligible: Boolean(t.eligible !== false),
+        }))
+        .filter((t) => t.label && Number.isFinite(t.product_type))
+    : []
+  return { ok: true, types }
+}
+
+function mapSelectOptions(raw: unknown): TemplateSelectOption[] {
+  if (!Array.isArray(raw)) return []
+  return (raw as Record<string, unknown>[])
+    .map((o) => ({
+      value: String(o.value ?? o.id ?? ''),
+      label: String(o.label ?? o.name ?? o.value ?? ''),
+    }))
+    .filter((o) => o.value && o.label)
+}
+
+function defaultTradeRuleDefaults(productType: number): TradeRuleDefaults {
+  const isVoucher = productType === 2
+  return {
+    consume_date_mode: 'days',
+    consume_valid_days: isVoucher ? 365 : 90,
+    non_consume_date_mode: 'all_dates',
+    daily_consume_mode: 'all_day',
+    purchase_limit_mode: 'none',
+    purchase_limit_max: 1,
+    after_sale_policy: 'refund_anytime',
+    reserve_mode: isVoucher ? 'none' : 'required',
+    reserve_advance_value: 1,
+    reserve_advance_unit: 'day',
+    reserve_channel: 'phone',
+  }
+}
+
+function parseTradeRuleDefaults(raw: unknown, productType: number): TradeRuleDefaults {
+  const base = defaultTradeRuleDefaults(productType)
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base
+  const o = raw as Record<string, unknown>
+  const pickStr = (k: string, d: string) => (typeof o[k] === 'string' ? (o[k] as string) : d)
+  const pickNum = (k: string, d: number) => {
+    const n = Number(o[k])
+    return Number.isFinite(n) ? n : d
+  }
+  const cdm = pickStr('consume_date_mode', base.consume_date_mode)
+  const dcm = pickStr('daily_consume_mode', base.daily_consume_mode)
+  const plm = pickStr('purchase_limit_mode', base.purchase_limit_mode)
+  const rm = pickStr('reserve_mode', base.reserve_mode)
+  const ru = pickStr('reserve_advance_unit', base.reserve_advance_unit)
+  const rc = pickStr('reserve_channel', base.reserve_channel)
+  const ncd = pickStr('non_consume_date_mode', base.non_consume_date_mode)
+  return {
+    consume_date_mode: cdm === 'calendar' ? 'calendar' : 'days',
+    consume_valid_days: pickNum('consume_valid_days', base.consume_valid_days),
+    non_consume_date_mode: ncd === 'partial_dates' ? 'partial_dates' : 'all_dates',
+    daily_consume_mode: dcm === 'time_slots' ? 'time_slots' : 'all_day',
+    purchase_limit_mode: plm === 'limited' ? 'limited' : 'none',
+    purchase_limit_max: pickNum('purchase_limit_max', base.purchase_limit_max),
+    after_sale_policy: pickStr('after_sale_policy', base.after_sale_policy),
+    reserve_mode: rm === 'required' ? 'required' : 'none',
+    reserve_advance_value: pickNum('reserve_advance_value', base.reserve_advance_value),
+    reserve_advance_unit: ru === 'hour' ? 'hour' : 'day',
+    reserve_channel: rc === 'online' ? 'online' : 'phone',
+  }
+}
+
+export async function getDouyinGoodsTemplate(params: {
+  category_id: string
+  product_type: number
+}): Promise<GoodsTemplateResult> {
+  const q = new URLSearchParams({
+    category_id: params.category_id,
+    product_type: String(params.product_type),
+  })
+  const res = await fetch(url(`/api/merchant/douyin/goods/template/get?${q}`), {
+    method: 'GET',
+    headers: authHeaders(),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const d = data.data as Record<string, unknown> | undefined
+  const mapAttrs = (arr: unknown): TemplateAttr[] =>
+    Array.isArray(arr)
+      ? (arr as Record<string, unknown>[]).map((a) => ({
+          key: String(a.key ?? ''),
+          name: String(a.name ?? a.key ?? ''),
+          is_required: Boolean(a.is_required),
+          is_multi: Boolean(a.is_multi),
+          value_type: String(a.value_type ?? 'STRING'),
+          desc: typeof a.desc === 'string' ? a.desc : undefined,
+        }))
+      : []
+  const sales_channels =
+    mapSelectOptions(d?.sales_channels).length > 0
+      ? mapSelectOptions(d?.sales_channels)
+      : DEFAULT_TEMPLATE_SALES_CHANNELS
+  const staff_sales_options =
+    mapSelectOptions(d?.staff_sales_options).length > 0
+      ? mapSelectOptions(d?.staff_sales_options)
+      : DEFAULT_STAFF_SALES_OPTIONS
+  const after_sale_policies =
+    mapSelectOptions(d?.after_sale_policies).length > 0
+      ? mapSelectOptions(d?.after_sale_policies)
+      : DEFAULT_AFTER_SALE_POLICIES
+  const trade_rule_defaults = parseTradeRuleDefaults(d?.trade_rule_defaults, params.product_type)
+  return {
+    ok: true,
+    product_attrs: mapAttrs(d?.product_attrs),
+    sku_attrs: mapAttrs(d?.sku_attrs),
+    sales_channels,
+    staff_sales_options,
+    after_sale_policies,
+    trade_rule_defaults,
+  }
+}
+
+export async function postDouyinGoodsProductSave(params: {
+  mode: 'draft' | 'submit'
+  detail: DouyinProductDetailPayload
+}): Promise<ProductSaveResult> {
+  const res = await fetch(url('/api/merchant/douyin/goods/product/save'), {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      mode: params.mode,
+      product: params.detail,
+    }),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  const inner = data.data as Record<string, unknown> | undefined
+  if (!inner || typeof inner !== 'object') {
+    return { ok: false, message: '保存响应异常：缺少 data' }
+  }
+  const ec = typeof inner.error_code === 'number' ? inner.error_code : 0
+  if (ec !== 0) {
+    return {
+      ok: false,
+      message:
+        (typeof inner?.description === 'string' && inner.description) || `抖音 error_code=${ec}`,
+    }
+  }
+  const pidRaw = inner?.product_id
+  const product_id =
+    typeof pidRaw === 'string'
+      ? pidRaw.trim()
+      : typeof pidRaw === 'number' && Number.isFinite(pidRaw)
+        ? String(Math.trunc(pidRaw))
+        : undefined
+  const message = typeof data.message === 'string' ? data.message : undefined
+  return {
+    ok: true,
+    product_id,
+    message: message ?? '已同步至抖音来客商品库（goodlife/v1/goods/product/save/ 成功）。',
+  }
+}

@@ -1,0 +1,29 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import OpsAdminLayout from './ops/OpsAdminLayout'
+import OpsAccountsPermissionsPage from './ops/pages/OpsAccountsPermissionsPage'
+import OpsAiModelsPage from './ops/pages/OpsAiModelsPage'
+import OpsCustomerDetailPage from './ops/pages/OpsCustomerDetailPage'
+import OpsCustomersListPage from './ops/pages/OpsCustomersListPage'
+import OpsRecruitmentOrdersPage from './ops/pages/OpsRecruitmentOrdersPage'
+import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
+import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<OpsAdminLayout />}>
+          <Route index element={<Navigate to="/customers" replace />} />
+          <Route path="customers" element={<OpsCustomersListPage />} />
+          <Route path="customers/:customerId" element={<OpsCustomerDetailPage />} />
+          <Route path="accounts" element={<OpsAccountsPermissionsPage />} />
+          <Route path="recruitment-orders" element={<OpsRecruitmentOrdersPage />} />
+          <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
+          <Route path="ai-models" element={<OpsAiModelsPage />} />
+          <Route path="support" element={<OpsSupportWorkbenchPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}

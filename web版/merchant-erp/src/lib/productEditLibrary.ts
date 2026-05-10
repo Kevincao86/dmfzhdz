@@ -1,0 +1,104 @@
+/** 商品列表本地草稿库：创建商品「保存草稿」成功后写入，供 /products/list 与各平台 Tab 合并展示 */
+
+export const MEOO_PRODUCT_EDIT_LIBRARY_KEY = 'meoo_product_edit_library_v1'
+
+export type ProductEditLibraryRow = {
+  id: string
+  name: string
+  platform: string
+  store: string
+  status: string
+  price: number
+  /** 与 `CreatePlatformId` 一致，用于商品列表按平台 Tab 过滤 */
+  platformApi?: 'douyin' | 'meituan' | 'xiaohongshu' | 'jd'
+}
+
+/** 商品列表/创建页「草稿」状态，用于 Brief 向导等拉取本地草稿箱 */
+function isDraftBoxStatus(status: string): boolean {
+  const s = status.trim()
+  return s === '草稿' || s.includes('草稿')
+}
+
+/**
+ * 从 ERP 商品草稿库（创建商品保存草稿写入的本地库）生成 Brief 可选商品。
+ * @param keyword 可选；为空则返回全部草稿（最多 limit 条）
+ */
+export function loadProductEditLibraryDraftBriefPicks(keyword?: string, limit = 48): { id: string; name: string; priceYuan: number }[] {
+  const kw = keyword?.trim().toLowerCase() ?? ''
+  const rows = loadProductEditLibrary().filter((r) => {
+    if (!isDraftBoxStatus(r.status)) return false
+    if (!kw) return true
+    return r.name.toLowerCase().includes(kw) || r.store.toLowerCase().includes(kw) || r.platform.toLowerCase().includes(kw)
+  })
+  return rows.slice(0, limit).map((r) => ({
+    id: `erp-draft:${r.id}`,
+    name: `${r.name}（ERP草稿）`,
+    priceYuan: Math.max(0, Math.round(Number(r.price) || 0)),
+  }))
+}
+
+export function loadProductEditLibrary(): ProductEditLibraryRow[] {
+  try {
+    const raw = window.localStorage.getItem(MEOO_PRODUCT_EDIT_LIBRARY_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw) as unknown
+    if (!Array.isArray(arr)) return []
+    const out: ProductEditLibraryRow[] = []
+    for (const x of arr) {
+      if (!x || typeof x !== 'object') continue
+      const o = x as Record<string, unknown>
+      const id = String(o.id ?? '').trim()
+      const name = String(o.name ?? '').trim()
+      if (!id || !name) continue
+      const price = Number(o.price)
+      const api = o.platformApi
+      out.push({
+        id,
+        name,
+        platform: String(o.platform ?? '抖音来客').trim() || '抖音来客',
+        store: String(o.store ?? '—').trim() || '—',
+        status: String(o.status ?? '草稿').trim() || '草稿',
+        price: Number.isFinite(price) ? price : 0,
+        ...(api === 'douyin' || api === 'meituan' || api === 'xiaohongshu' || api === 'jd'
+          ? { platformApi: api }
+          : {}),
+      })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function persist(rows: ProductEditLibraryRow[]) {
+  try {
+    window.localStorage.setItem(MEOO_PRODUCT_EDIT_LIBRARY_KEY, JSON.stringify(rows))
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 按 id 覆盖或插入到列表头部（草稿再次保存则更新） */
+export function upsertProductEditLibraryDraft(row: ProductEditLibraryRow): void {
+  const prev = loadProductEditLibrary()
+  const idx = prev.findIndex((p) => p.id === row.id)
+  const next =
+    idx >= 0
+      ? [...prev.slice(0, idx), { ...prev[idx], ...row }, ...prev.slice(idx + 1)]
+      : [row, ...prev]
+  persist(next)
+}
+
+/** 将列表中的旧 id 换为平台 product_id（去重后置顶） */
+export function replaceProductEditLibraryRowId(oldId: string, row: ProductEditLibraryRow): void {
+  const o = oldId.trim()
+  if (!o) return
+  const prev = loadProductEditLibrary()
+  const next = prev.filter((p) => p.id !== o && p.id !== row.id)
+  persist([row, ...next])
+}

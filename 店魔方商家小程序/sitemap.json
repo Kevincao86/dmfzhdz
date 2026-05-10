@@ -1,0 +1,4 @@
+{
+  "desc": "店魔方商家小程序",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

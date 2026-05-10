@@ -1,0 +1,30 @@
+<view class="rec-page">
+  <view class="meoo-card rec-banner">
+    <text class="rec-banner-title">与电脑端招募互通</text>
+    <text class="meoo-hint">
+      请让技术人员把小程序连接的后台地址，配置成与您电脑上打开的商家后台一致。配置好后，这里提交的招募单会与电脑端「达人招募」是同一份数据。
+    </text>
+  </view>
+
+  <view class="meoo-card rec-actions">
+    <button class="meoo-btn-primary" bindtap="goVoice">语音录入招募</button>
+    <button class="meoo-btn-ghost rec-mt" bindtap="goForm">表单编辑并提交</button>
+  </view>
+
+  <view wx:if="{{unconfigured}}" class="rec-center meoo-hint">
+    尚未连接电脑端商家后台，无法加载或与电脑端同步招募单。请联系技术人员按示例创建本地配置，并填写后台访问地址。
+  </view>
+
+  <view wx:elif="{{loading}}" class="rec-center">加载中…</view>
+  <view wx:elif="{{err}}" class="rec-center rec-err">{{err}}</view>
+
+  <block wx:elif="{{!unconfigured}}">
+    <text wx:if="{{filterHint}}" class="rec-filter-hint">{{filterHint}}</text>
+    <view wx:for="{{rows}}" wx:key="id" class="meoo-card rec-row">
+      <text class="rec-row-title">{{item.customerName}} · ¥{{item.serviceAmount}}</text>
+      <text class="rec-row-sub">{{item.createdAt}} · {{item.statusLabel}}</text>
+      <text class="rec-row-sum">{{item.infoSummary}}</text>
+    </view>
+    <view wx:if="{{rows.length === 0}}" class="rec-center meoo-hint">暂无招募单，可先语音或表单提交。</view>
+  </block>
+</view>

@@ -1,0 +1,42 @@
+<scroll-view scroll-y class="edit-scroll">
+  <view class="edit-head meoo-card">
+    <text class="edit-head-title">商品草稿</text>
+    <text class="edit-head-desc">以下为 AI / 语音识别预填；正式上架与同步请在电脑端商家后台完成。</text>
+  </view>
+
+  <text class="edit-section-title">基础信息</text>
+  <view class="field">
+    <text class="meoo-label">分类 / 品类</text>
+    <input class="meoo-input" value="{{categoryName}}" data-k="categoryName" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">商品类型</text>
+    <input class="meoo-input" value="{{productType}}" data-k="productType" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">标题</text>
+    <input class="meoo-input" value="{{title}}" data-k="title" bindinput="onField" />
+  </view>
+
+  <text class="edit-section-title">卖点与价格</text>
+  <view class="field">
+    <text class="meoo-label">副标题 / 卖点</text>
+    <textarea class="meoo-input area" value="{{subtitle}}" data-k="subtitle" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">价格提示</text>
+    <input class="meoo-input" value="{{priceHint}}" data-k="priceHint" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">标签（逗号分隔）</text>
+    <input class="meoo-input" value="{{tags}}" data-k="tags" bindinput="onField" />
+  </view>
+
+  <text class="edit-section-title">原始识别</text>
+  <view class="field">
+    <textarea class="meoo-input area small" value="{{rawText}}" data-k="rawText" bindinput="onField" />
+  </view>
+
+  <button class="meoo-btn-primary btn" bindtap="onSubmit">保存草稿</button>
+  <view class="edit-tail-space"></view>
+</scroll-view>
