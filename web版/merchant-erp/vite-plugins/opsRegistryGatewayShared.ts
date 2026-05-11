@@ -7,8 +7,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
-import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../src/lib/aiVendorCatalogShared'
-import { filterLegacyDemoRecruitmentOrders } from '../src/lib/recruitmentLegacyDemoOrders'
+import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../src/lib/aiVendorCatalogShared.js'
+import { filterLegacyDemoRecruitmentOrders } from '../src/lib/recruitmentLegacyDemoOrders.js'
 import type {
   AiVendorCatalogEntry,
   RegistryFile,
@@ -19,11 +19,11 @@ import type {
   RegistryVideoAi,
   RegistryVideoSubmission,
   RegistryVendorKeys,
-} from '../src/lib/opsRegistryTypes'
-import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize'
-import { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore'
+} from '../src/lib/opsRegistryTypes.js'
+import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
+import { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
 
-export { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore'
+export { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
 
 export type OpsRegistryGatewayOptions = {
   registryDir: (viteProjectRoot: string) => string

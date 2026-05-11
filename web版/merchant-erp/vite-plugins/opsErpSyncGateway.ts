@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { Plugin } from 'vite'
-import { createOpsRegistryGatewayPlugin } from './opsRegistryGatewayShared'
+import { createOpsRegistryGatewayPlugin } from './opsRegistryGatewayShared.js'
 
 /** 注册表落在「项目根/.meoo-dev-sync」，与管理后台共用 */
 export function opsErpSyncGatewayPlugin(): Plugin {

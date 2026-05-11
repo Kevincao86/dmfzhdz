@@ -7,10 +7,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 
-import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared'
-import type { RegistryFile } from '../src/lib/opsRegistryTypes.ts'
-import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize'
-import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream'
+import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
+import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
+import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
+import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 
 /**
  * 与环境变量合并：非空 env 优先生效；否则使用项目根 `.meoo-dev-sync/registry.json`
@@ -526,7 +526,7 @@ export async function handleMerchantAiVideoRoutes(input: {
 
   if (method === 'POST' && pathname === '/api/merchant/ai/video/kling/start') {
     const cred = pickKlingCreds(env)
-    if (!cred.ok) {
+    if (cred.ok === false) {
       json(res, 400, { ok: false, message: cred.msg })
       return true
     }
@@ -626,7 +626,7 @@ export async function handleMerchantAiVideoRoutes(input: {
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/kling/status') {
     const cred = pickKlingCreds(env)
-    if (!cred.ok) {
+    if (cred.ok === false) {
       json(res, 400, { ok: false, message: cred.msg })
       return true
     }
@@ -679,7 +679,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const r = await arkCreateVideoTask(env, parsed)
-    if (r.ok) {
+    if (r.ok === true) {
       json(res, 200, { ok: true, taskId: r.taskId })
       return true
     }
@@ -694,7 +694,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const r = await arkGetVideoTask(env, taskIdSd)
-    if (r.ok) {
+    if (r.ok === true) {
       json(res, 200, { ok: true, ...r.state })
       return true
     }

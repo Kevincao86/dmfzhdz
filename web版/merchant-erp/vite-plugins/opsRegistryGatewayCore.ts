@@ -6,7 +6,7 @@ import {
   catalogCustomEntriesOnly,
   mergeBuiltinAiVendorCatalog,
   normalizeVendorKeysFromDisk,
-} from '../src/lib/aiVendorCatalogShared'
+} from '../src/lib/aiVendorCatalogShared.js'
 import type {
   AiVendorCatalogEntry,
   RegistryAiModels,
@@ -16,8 +16,8 @@ import type {
   RegistryTalentPoolRow,
   RegistryTenant,
   RegistryVideoSubmission,
-} from '../src/lib/opsRegistryTypes'
-import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize'
+} from '../src/lib/opsRegistryTypes.js'
+import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 
 function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVendorCatalogEntry[] {
   const raw = parsed?.aiVendorCatalog

@@ -3,7 +3,7 @@
  * 聚合各平台对账数据：抖音来客走开放平台真实接口；美团/小红书待接开放平台后在此扩展。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway'
+import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status

@@ -6,7 +6,7 @@
  */
 import type { ServerResponse } from 'node:http'
 
-import { isBuiltinAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared'
+import { isBuiltinAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 
 export type MerchantAiEnv = Record<string, string>
 

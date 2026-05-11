@@ -17,16 +17,16 @@ import {
   fetchDouyinAkteReviews,
   parseDouyinReviewCompositeId,
   postDouyinAkteCommentReply,
-} from './douyinMerchantGateway'
-import { handleFinanceReconcileGet } from './financeReconcileGateway'
-import { mockDouyinProductStore } from './mockDouyinProductStore'
+} from './douyinMerchantGateway.js'
+import { handleFinanceReconcileGet } from './financeReconcileGateway.js'
+import { mockDouyinProductStore } from './mockDouyinProductStore.js'
 import {
   generateGrossMarginSuggestionByAi,
   generateReviewReplyByDoubao,
   handleDouyinGoodsAiAssist,
   type MerchantAiEnv,
-} from './merchantAiUpstream'
-import { handleMerchantAiVideoRoutes } from './merchantVideoAiGateway'
+} from './merchantAiUpstream.js'
+import { handleMerchantAiVideoRoutes } from './merchantVideoAiGateway.js'
 
 type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs'
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
