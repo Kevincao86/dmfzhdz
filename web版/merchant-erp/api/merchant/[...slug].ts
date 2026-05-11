@@ -94,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (isDouyinBindPost) {
     try {
-      const { runDouyinMerchantBind } = await import('./douyin/bindRuntime')
+      const { runDouyinMerchantBind } = await import('../douyinMerchantBindCore')
       const bodyRaw = rawBody(req)
       const r = await runDouyinMerchantBind(bodyRaw)
       let payload: string
