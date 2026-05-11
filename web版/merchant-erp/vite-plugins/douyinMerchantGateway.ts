@@ -935,6 +935,14 @@ export async function handleDouyinGoodsCategoryGet(
       },
     })
     const raw = await dr.text()
+    const trimmed = raw.trim()
+    if (trimmed.startsWith('<')) {
+      json(res, 502, {
+        message:
+          '抖音类目接口返回了 HTML（多为鉴权/频控/WAF 或上游错误页），请稍后重试或重新绑定；若部署在同域，请确认 Vercel 未将 /api 回退到 index.html。',
+      })
+      return
+    }
     res.statusCode = dr.status
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
     res.end(raw)
