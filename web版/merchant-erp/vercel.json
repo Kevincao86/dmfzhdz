@@ -4,17 +4,15 @@
   "outputDirectory": "dist",
   "functions": {
     "api/merchant/[...slug].ts": {
-      "includeFiles": ["vite-plugins/**", "src/lib/**"],
+      "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
     "api/**/*.ts": {
       "maxDuration": 60
     }
   },
-  "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
