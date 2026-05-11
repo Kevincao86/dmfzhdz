@@ -1,4 +1,4 @@
 /**
- * 绑定逻辑实现：`douyinMerchantBindCore.ts`（与 Vite 网关共用）。
+ * Vite 网关绑定：实现见 `api/douyin-bind.ts`。
  */
-export { runDouyinMerchantBind } from '../../douyinMerchantBindCore'
+export { runDouyinMerchantBind } from '../../douyin-bind'

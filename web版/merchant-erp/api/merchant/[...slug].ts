@@ -4,7 +4,7 @@
  * 注意：不要在文件顶层静态 import `merchantApiGatewayCore`。
  * 该模块会同步拖入整份 douyinMerchantGateway、merchantAiUpstream、视频网关等，Serverless 冷启动易内存/初始化超时，
  * 在尚未写入响应前就崩溃 → 前端只看到 `FUNCTION_INVOCATION_FAILED`。
- * `POST /api/merchant/douyin/bind` 在下方优先用动态 import 仅加载 `./douyin/bindRuntime`；其余路由再动态加载 gateway。
+ * `POST /api/merchant/douyin/bind` 优先动态 import `../douyin-bind`（单文件实现）；其余路由再动态加载 gateway。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
@@ -94,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (isDouyinBindPost) {
     try {
-      const { runDouyinMerchantBind } = await import('../douyinMerchantBindCore')
+      const { runDouyinMerchantBind } = await import('../douyin-bind')
       const bodyRaw = rawBody(req)
       const r = await runDouyinMerchantBind(bodyRaw)
       let payload: string
