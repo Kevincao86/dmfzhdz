@@ -237,7 +237,11 @@ export async function getDouyinStores(params: {
   if (params.claimScope === 'claiming' || params.claimScope === 'claimed') {
     q.set('claimScope', params.claimScope)
   }
-  if (params.relationType) q.set('relationType', params.relationType)
+  const rt =
+    params.relationType != null && String(params.relationType).trim() !== ''
+      ? String(params.relationType).trim()
+      : 'all'
+  q.set('relationType', rt || 'all')
   if (params.refresh) q.set('sync', '1')
   const pc = params.provinceCity?.trim()
   if (pc) q.set('provinceCity', pc)

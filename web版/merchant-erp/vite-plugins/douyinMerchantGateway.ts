@@ -391,11 +391,16 @@ async function fetchMergedAllPois(
   accountId: string,
   accessToken: string,
 ): Promise<{ pois: unknown[]; total: number }> {
-  const packs = await Promise.all([
-    fetchAllPoiPages(accountId, accessToken, 0),
-    fetchAllPoiPages(accountId, accessToken, 1),
-    fetchAllPoiPages(accountId, accessToken, 2),
-  ])
+  /** 某一 relation_type 无权限或报错时不应拖垮整页门店列表 */
+  const packs = await Promise.all(
+    ([0, 1, 2] as const).map(async (rt) => {
+      try {
+        return await fetchAllPoiPages(accountId, accessToken, rt)
+      } catch {
+        return { pois: [] as unknown[], total: 0 }
+      }
+    }),
+  )
   const seen = new Set<string>()
   const merged: unknown[] = []
   for (const pack of packs) {
@@ -439,7 +444,12 @@ async function getCachedPoiList(
     relationSpec === 'all'
       ? await fetchMergedAllPois(accountId, accessToken)
       : await fetchAllPoiPages(accountId, accessToken, relationSpec)
-  poiListCache.set(cacheKey, { ts: now, pois: pack.pois, total: pack.total })
+  /** 勿缓存「空列表」：避免首次瞬时失败/权限抖动导致长时间空白 */
+  if (pack.pois.length > 0) {
+    poiListCache.set(cacheKey, { ts: now, pois: pack.pois, total: pack.total })
+  } else {
+    poiListCache.delete(cacheKey)
+  }
   return pack
 }
 
