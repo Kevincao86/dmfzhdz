@@ -454,7 +454,7 @@ export async function handleMerchantAiVideoRoutes(input: {
           ? user
           : `${user}\n\n上次输出无法解析。请只输出合法 JSON，segments 数组长度必须=${segmentCount}，键名用 prompt，不要其它字符。`
       const chat = await merchantChatCompletion(env, parsed, plannerModel, LONGFORM_PLAN_SYSTEM, userMsg)
-      if (!chat.ok) {
+      if (chat.ok === false) {
         json(res, 502, { ok: false, message: chat.message })
         return true
       }
