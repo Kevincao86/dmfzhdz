@@ -12,6 +12,7 @@
  * 门店品牌列表：GET /api/merchant/douyin/brands → 代理 goodlife/v2/shop/brand/query/（与来客「门店品牌」一致，非门店名称）
  *
  * 部署：绑定依次尝试 `POST /api/douyin-bind`、`/api/meoo-douyin-bind`、`/api/merchant/douyin/bind`（跳过 HTML/404 等基础设施响应）。
+ * 门店/品牌等 GET：优先顶层 `/api/meoo-douyin-*`（与 ping 同级），再回退 `/api/merchant/douyin/*`——生产上多层 merchant 路径曾被 SPA 改写为 HTML。
  * 生产须配置 MERCHANT_DOUYIN_SESSION_SECRET。
  * 若网关部署在其他域名，设置 VITE_MERCHANT_API_BASE_URL（不以 / 结尾）；未设置则走同源。
  */
@@ -270,15 +271,33 @@ export async function getDouyinStores(params: {
   /* 后端应将 merchantId 映射为抖音 account_id，并代理 GET goodlife/v1/shop/poi/query/。
    * 官方单次 size 最大 50：若账户门店数＞50，须循环翻页直至取完再合并为 ERP 的 items/total，并返回 accountName（或由各条 poi.account.root_account.account_name 解析）。 */
 
-  const res = await fetch(url(`/api/merchant/douyin/stores?${q}`), {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${params.accessToken}`,
-      Accept: 'application/json',
-    },
-  })
+  const qs = `?${q}`
+  const storePaths = ['/api/meoo-douyin-stores', '/api/merchant/douyin/stores'] as const
+  let res: Response | null = null
+  let rawText = ''
+  for (const p of storePaths) {
+    const r = await fetch(url(`${p}${qs}`), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        Accept: 'application/json',
+      },
+    })
+    const text = await r.text()
+    const ct = r.headers.get('content-type') ?? ''
+    if (r.ok && responseLooksLikeHtml(text, ct)) continue
+    res = r
+    rawText = text
+    break
+  }
+  if (!res) {
+    return {
+      ok: false,
+      message:
+        '门店接口返回了 HTML 而非 JSON（已尝试 meoo 顶路径与 merchant 路径）。请部署含 api/meoo-douyin-stores 与 vercel.json 中 /api/(.*) 放行规则。',
+    }
+  }
 
-  const rawText = await res.text()
   const ct = res.headers.get('content-type') ?? ''
   const trimmed = rawText.trimStart()
   const looksHtml = trimmed.startsWith('<') || /text\/html/i.test(ct)
@@ -286,7 +305,7 @@ export async function getDouyinStores(params: {
     return {
       ok: false,
       message:
-        '门店接口返回了 HTML 而非 JSON（常见于部署将 /api 请求交给了 SPA）。请确认 Vercel 已识别 api/merchant Functions，且未错误重写 /api/*。',
+        '门店接口返回了 HTML 而非 JSON（常见于部署将 /api 请求交给了 SPA）。请确认 Vercel 已识别 api Functions。',
     }
   }
 
@@ -425,18 +444,36 @@ export async function getDouyinMerchantBrands(params: {
   const mid = params.merchantId?.trim()
   if (mid) q.set('merchantId', mid)
 
-  const res = await fetch(url(`/api/merchant/douyin/brands?${q}`), {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${params.accessToken}`,
-      Accept: 'application/json',
-    },
-  })
+  const qs = `?${q}`
+  const brandPaths = ['/api/meoo-douyin-brands', '/api/merchant/douyin/brands'] as const
+  let res: Response | null = null
+  let rawText = ''
+  for (const p of brandPaths) {
+    const r = await fetch(url(`${p}${qs}`), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        Accept: 'application/json',
+      },
+    })
+    const text = await r.text()
+    const ct = r.headers.get('content-type') ?? ''
+    if (r.ok && responseLooksLikeHtml(text, ct)) continue
+    res = r
+    rawText = text
+    break
+  }
   let raw: Record<string, unknown> = {}
   try {
-    raw = (await res.json()) as Record<string, unknown>
+    raw = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
   } catch {
-    /* ignore */
+    raw = {}
+  }
+  if (!res) {
+    return {
+      ok: false,
+      message: '品牌接口不可用（均为 HTML 或非 JSON）。请确认已部署 /api/meoo-douyin-brands。',
+    }
   }
   if (!res.ok) {
     const msg =
@@ -508,18 +545,33 @@ export async function getDouyinStoreDetail(params: {
   const q = new URLSearchParams({ poiId: params.poiId.trim() })
   const tid = params.taskIds?.trim()
   if (tid) q.set('taskIds', tid)
-  const res = await fetch(url(`/api/merchant/douyin/stores/detail?${q}`), {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${params.accessToken}`,
-      Accept: 'application/json',
-    },
-  })
+  const qs = `?${q}`
+  const detailPaths = ['/api/meoo-douyin-store-detail', '/api/merchant/douyin/stores/detail'] as const
+  let res: Response | null = null
+  let rawText = ''
+  for (const p of detailPaths) {
+    const r = await fetch(url(`${p}${qs}`), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        Accept: 'application/json',
+      },
+    })
+    const text = await r.text()
+    const ct = r.headers.get('content-type') ?? ''
+    if (r.ok && responseLooksLikeHtml(text, ct)) continue
+    res = r
+    rawText = text
+    break
+  }
   let data: Record<string, unknown> = {}
   try {
-    data = (await res.json()) as Record<string, unknown>
+    data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
   } catch {
-    /* ignore */
+    data = {}
+  }
+  if (!res) {
+    return { ok: false, message: '门店详情接口不可用（均为 HTML）。请确认已部署 /api/meoo-douyin-store-detail。' }
   }
   if (!res.ok) {
     const msg =
@@ -562,16 +614,30 @@ export async function postDouyinPoiClaim(params: {
   body: Record<string, unknown>
 }): Promise<DouyinPoiClaimResult> {
   try {
-    const res = await fetch(url('/api/merchant/douyin/stores/poi/claim'), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${params.accessToken}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(params.body),
-    })
-    const bodyText = await res.text()
+    const claimPaths = ['/api/meoo-douyin-poi-claim', '/api/merchant/douyin/stores/poi/claim'] as const
+    const bodyJson = JSON.stringify(params.body)
+    let res: Response | null = null
+    let bodyText = ''
+    for (const p of claimPaths) {
+      const r = await fetch(url(p), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${params.accessToken}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: bodyJson,
+      })
+      const text = await r.text()
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.ok && responseLooksLikeHtml(text, ct)) continue
+      res = r
+      bodyText = text
+      break
+    }
+    if (!res) {
+      return { ok: false, message: '认领接口不可用（返回 HTML）。请确认已部署 /api/meoo-douyin-poi-claim。' }
+    }
     if (!res.ok) {
       let msg = `HTTP ${res.status}`
       try {
