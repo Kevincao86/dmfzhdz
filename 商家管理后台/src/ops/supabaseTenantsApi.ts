@@ -39,7 +39,8 @@ export async function fetchSupabaseTenantsForOps(): Promise<
   if (!supabaseOpsAvailableOnClient()) {
     return { ok: false, error: 'not_configured' }
   }
-  const res = await fetch('/api/ops-supabase/tenants')
+  /** 线上须直达独立 Serverless 文件（避免 /tenants 依赖 rewrite 或与旧路由混淆） */
+  const res = await fetch('/api/ops-supabase/tenants-list')
   const raw = await res.text()
   const j = parseJsonBody(raw) as {
     ok?: boolean

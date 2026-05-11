@@ -22,7 +22,7 @@ export type OpsPaymentOrderRow = {
 export async function fetchOpsPaymentOrders(): Promise<
   { ok: true; rows: OpsPaymentOrderRow[] } | { ok: false; error: string; hint?: string }
 > {
-  const res = await fetch('/api/ops-supabase/payment-orders')
+  const res = await fetch('/api/ops-supabase/payment-orders-list')
   const j = (await res.json().catch(() => ({}))) as {
     ok?: boolean
     rows?: OpsPaymentOrderRow[]

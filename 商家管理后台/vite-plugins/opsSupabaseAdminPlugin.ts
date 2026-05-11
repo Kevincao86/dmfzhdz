@@ -164,6 +164,15 @@ function json(res: ServerResponse, code: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
+/** 与线上 fetch 路径一致（独立文件 tenants-list.ts，不依赖 Vercel rewrite） */
+function isTenantListPath(urlPath: string): boolean {
+  return urlPath === '/api/ops-supabase/tenants' || urlPath === '/api/ops-supabase/tenants-list'
+}
+
+function isPaymentOrdersListPath(urlPath: string): boolean {
+  return urlPath === '/api/ops-supabase/payment-orders' || urlPath === '/api/ops-supabase/payment-orders-list'
+}
+
 async function edgePost(
   supabaseUrl: string,
   anon: string,
@@ -217,11 +226,11 @@ export function opsSupabaseAdminPlugin(): Plugin {
         sendCors()
 
         const isOpsSupabaseRoute =
-          urlPath === '/api/ops-supabase/tenants' ||
+          isTenantListPath(urlPath) ||
           urlPath === '/api/ops-supabase/tenants/wallet-ledger' ||
           urlPath === '/api/ops-supabase/tenants/patch' ||
           urlPath === '/api/ops-supabase/tenants/reset-password' ||
-          urlPath === '/api/ops-supabase/payment-orders' ||
+          isPaymentOrdersListPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/verify' ||
           urlPath === '/api/ops-supabase/payment-orders/confirm' ||
           urlPath === '/api/ops-supabase/payment-orders/delete'
@@ -231,9 +240,9 @@ export function opsSupabaseAdminPlugin(): Plugin {
 
         if (!supabaseUrl) {
           if (
-            (urlPath === '/api/ops-supabase/tenants' && method === 'GET') ||
+            (isTenantListPath(urlPath) && method === 'GET') ||
             (urlPath === '/api/ops-supabase/tenants/wallet-ledger' && method === 'GET') ||
-            (urlPath === '/api/ops-supabase/payment-orders' && method === 'GET')
+            (isPaymentOrdersListPath(urlPath) && method === 'GET')
           ) {
             json(res, 503, {
               ok: false,
@@ -246,7 +255,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
         }
 
         try {
-          if (method === 'GET' && urlPath === '/api/ops-supabase/tenants') {
+          if (method === 'GET' && isTenantListPath(urlPath)) {
             let rows: unknown[] = []
 
             if (effectiveKey) {
@@ -439,7 +448,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
             return
           }
 
-          if (method === 'GET' && urlPath === '/api/ops-supabase/payment-orders') {
+          if (method === 'GET' && isPaymentOrdersListPath(urlPath)) {
             if (!effectiveKey) {
               json(res, 503, {
                 ok: false,
