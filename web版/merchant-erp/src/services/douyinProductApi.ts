@@ -81,6 +81,51 @@ export function normalizeCategoryTree(raw: unknown[]): DouyinCategoryTreeNode[] 
   return raw.map((x) => normalizeCategoryNode(x as Record<string, unknown>))
 }
 
+/**
+ * 解析 category/get 内层业务对象：多为 `{ data: { error_code, category_tree_infos? } }`，
+ * 少数响应把类目字段放在根级或与文档不一致，这里一并兼容。
+ */
+function pickCategoryGetInnerData(root: Record<string, unknown>): Record<string, unknown> | undefined {
+  const nested = root.data
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    const inner = nested as Record<string, unknown>
+    if (
+      'category_tree_infos' in inner ||
+      'category_infos' in inner ||
+      typeof inner.error_code === 'number'
+    ) {
+      return inner
+    }
+  }
+  if (
+    'category_tree_infos' in root ||
+    'category_infos' in root ||
+    typeof root.error_code === 'number'
+  ) {
+    return root
+  }
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>
+  }
+  return undefined
+}
+
+/** 树形字段可能是数组、单根对象，或与 query_category_type=0 一样只给 category_infos */
+function coerceCategoryTreeRootArray(d: Record<string, unknown>): Record<string, unknown>[] | undefined {
+  let raw: unknown = d.category_tree_infos
+  if (raw != null && typeof raw === 'object' && !Array.isArray(raw)) {
+    raw = [raw as Record<string, unknown>]
+  }
+  if (Array.isArray(raw)) {
+    return raw as Record<string, unknown>[]
+  }
+  const infos = d.category_infos
+  if (Array.isArray(infos) && infos.length > 0) {
+    return infos as Record<string, unknown>[]
+  }
+  return undefined
+}
+
 /** 与开发网关 industry-scope 解析规则一致：末级 + enable + 非封禁 */
 export function collectUploadableLeafCategoryIdsFromTree(
   nodes: DouyinCategoryTreeNode[],
@@ -643,14 +688,24 @@ async function requestCategoryTreeQuery(q: URLSearchParams): Promise<CategoryGet
       message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
     }
   }
-  const d = data.data as Record<string, unknown> | undefined
+  if (Object.keys(data).length === 0) {
+    return {
+      ok: false,
+      message: '类目接口返回无法解析（响应体非 JSON 或已截断，请重试或检查绑定）',
+    }
+  }
+  const d = pickCategoryGetInnerData(data)
   if (d && typeof d.error_code === 'number' && d.error_code !== 0) {
     const desc = typeof d.description === 'string' ? d.description : `error_code=${d.error_code}`
     return { ok: false, message: desc }
   }
-  const tree = d?.category_tree_infos
-  if (!Array.isArray(tree)) {
-    return { ok: false, message: '类目数据格式异常（缺少 category_tree_infos）' }
+  const tree = d ? coerceCategoryTreeRootArray(d) : undefined
+  if (tree === undefined) {
+    const hint =
+      d && typeof d.description === 'string' && d.description.trim()
+        ? d.description.trim()
+        : '抖音未返回 category_tree_infos / category_infos，请确认应用具备 life.capacity.goods.query 权限或稍后重试'
+    return { ok: false, message: `类目数据格式异常（${hint}）` }
   }
   const normalized = normalizeCategoryTree(tree)
   return { ok: true, category_tree_infos: normalized }
@@ -675,9 +730,9 @@ function extractChildrenFromCategoryGetPayload(
   if (!d || typeof d !== 'object') return []
   if (typeof d.error_code === 'number' && d.error_code !== 0) return []
   const parentStr = String(parentCategoryId)
-  const treeRaw = d.category_tree_infos
-  if (Array.isArray(treeRaw) && treeRaw.length > 0) {
-    const norm = normalizeCategoryTree(treeRaw as Record<string, unknown>[])
+  const treeRawArr = coerceCategoryTreeRootArray(d)
+  if (Array.isArray(treeRawArr) && treeRawArr.length > 0) {
+    const norm = normalizeCategoryTree(treeRawArr)
     if (norm.length === 1) {
       const root = norm[0]
       if (root.category_id === parentStr && root.sub_tree_infos?.length) {
@@ -711,7 +766,7 @@ async function fetchCategorySubtreeByParentId(parentCategoryId: string): Promise
   })
   const data = await parseCategoryGetJsonResponse(res)
   if (!res.ok) return []
-  const d = data.data as Record<string, unknown> | undefined
+  const d = pickCategoryGetInnerData(data)
   return extractChildrenFromCategoryGetPayload(d, parentCategoryId)
 }
 
