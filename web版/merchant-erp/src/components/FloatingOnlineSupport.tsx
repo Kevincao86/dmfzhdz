@@ -313,31 +313,35 @@ export default function FloatingOnlineSupport({
       return (rows ?? []) as RelayRow[]
     }
 
+    const runPollMerge = () => {
+      if (cancelled) return
+      void (async () => {
+        const next = await fetchSessionRows()
+        if (cancelled || !next) return
+        setMessages((prev) => mergeRelayChatMessages(prev, next))
+      })()
+    }
+
+    let authSub: { unsubscribe: () => void } | null = null
+
     void (async () => {
       try {
-        const rows = await fetchSessionRows()
+        await client.auth.getSession()
 
+        const rows = await fetchSessionRows()
         if (cancelled) return
 
-        if (!rows) {
-          setRelayReady(true)
-          return
-        }
-
-        if (rows.length > 0) {
+        if (rows && rows.length > 0) {
           setMessages(rows.map((r) => rowToChatMessage(r)))
         }
 
-        const poll = () => {
-          if (cancelled) return
-          void (async () => {
-            const next = await fetchSessionRows()
-            if (cancelled || !next) return
-            setMessages((prev) => mergeRelayChatMessages(prev, next))
-          })()
-        }
+        pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
+        runPollMerge()
 
-        pollTimer = window.setInterval(poll, SUPPORT_RELAY_POLL_MS)
+        const { data } = client.auth.onAuthStateChange(() => {
+          runPollMerge()
+        })
+        authSub = data.subscription
 
         ch = client
           .channel(`meoo-support:${sid}`)
@@ -370,12 +374,21 @@ export default function FloatingOnlineSupport({
             }
           })
       } catch {
-        if (!cancelled) setRelayReady(true)
+        if (!cancelled) {
+          pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
+          runPollMerge()
+          const { data } = client.auth.onAuthStateChange(() => {
+            runPollMerge()
+          })
+          authSub = data.subscription
+          setRelayReady(true)
+        }
       }
     })()
 
     return () => {
       cancelled = true
+      authSub?.unsubscribe()
       if (pollTimer) window.clearInterval(pollTimer)
       void ch?.unsubscribe()
     }
