@@ -7,6 +7,9 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/douyin/webhook.ts": {
+      "maxDuration": 30
+    },
     "api/meoo-douyin-stores.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
