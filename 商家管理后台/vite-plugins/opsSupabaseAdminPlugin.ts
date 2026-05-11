@@ -174,7 +174,16 @@ function isTenantListPath(urlPath: string): boolean {
 }
 
 function isPaymentOrdersListPath(urlPath: string): boolean {
-  return urlPath === '/api/ops-supabase/payment-orders' || urlPath === '/api/ops-supabase/payment-orders-list'
+  return (
+    urlPath === '/api/ops-supabase/payment-orders' ||
+    urlPath === '/api/ops-supabase/payment-orders-list' ||
+    urlPath === '/api/meoo-supabase-payment-orders-list'
+  )
+}
+
+/** 根目录单文件 API：须进入本中间件（路径不以 /api/ops-supabase/ 开头） */
+function isMeooFlatOpsGetPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-supabase-tenants-list' || urlPath === '/api/meoo-supabase-payment-orders-list'
 }
 
 /** 与线上 fetch 一致：api 根目录单文件 + fetch PostgREST */
@@ -218,7 +227,8 @@ export function opsSupabaseAdminPlugin(): Plugin {
         if (
           !urlPath.startsWith('/api/ops-supabase/') &&
           !isMeooTenantsPatchPath(urlPath) &&
-          !isMeooTenantsResetPasswordPath(urlPath)
+          !isMeooTenantsResetPasswordPath(urlPath) &&
+          !isMeooFlatOpsGetPath(urlPath)
         ) {
           return next()
         }
