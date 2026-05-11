@@ -408,6 +408,14 @@ function extractPoisFromShopQueryData(data: Record<string, unknown> | undefined)
   return []
 }
 
+/** 抖音 shop.query 易返回「请求太过频繁」：翻页与多种 relation 之间稍作间隔 */
+const SHOP_QUERY_PAGE_DELAY_MS = 140
+const SHOP_QUERY_RELATION_SWITCH_DELAY_MS = 320
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
 /** 按 relation_type 翻页拉全量（最多 200 页），供认领拆分、tabCounts、装修列表复用 */
 async function fetchAllPoiPages(
   accountId: string,
@@ -417,6 +425,7 @@ async function fetchAllPoiPages(
   const all: unknown[] = []
   let reportedTotal = 0
   for (let page = 1; page <= 200; page++) {
+    if (page > 1) await sleep(SHOP_QUERY_PAGE_DELAY_MS)
     const j = await shopPoiQueryPage(accountId, accessToken, page, 50, relationType)
     const data = j.data as Record<string, unknown> | undefined
     if (!data) break
@@ -454,6 +463,7 @@ async function fetchMergedAllPois(
   const packs: { pois: unknown[]; total: number }[] = []
   const errors: string[] = []
   for (const rt of [0, 1, 2] as const) {
+    if (packs.length > 0) await sleep(SHOP_QUERY_RELATION_SWITCH_DELAY_MS)
     try {
       packs.push(await fetchAllPoiPages(accountId, accessToken, rt))
     } catch (e) {
@@ -470,6 +480,7 @@ async function fetchMergedAllPois(
   const relationWarnings = [...errors]
   if (merged.length === 0 && errors.length === 0) {
     try {
+      await sleep(SHOP_QUERY_RELATION_SWITCH_DELAY_MS)
       const omitPack = await fetchAllPoiPages(accountId, accessToken, undefined)
       mergePoiPacksInto([omitPack], seen, merged)
     } catch (e) {
