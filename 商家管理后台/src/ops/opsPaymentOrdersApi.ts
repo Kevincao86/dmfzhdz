@@ -40,7 +40,7 @@ export async function verifyOpsPaymentOrder(body: {
   id: string
   verified_amount_cents: number
 }): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch('/api/ops-supabase/payment-orders/verify', {
+  const res = await fetch('/api/meoo-supabase-payment-orders-verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
