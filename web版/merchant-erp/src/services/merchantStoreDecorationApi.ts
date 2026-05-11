@@ -1,7 +1,7 @@
 /**
  * 多平台「店铺装修」列表：经网关代理各平台门店装修 / 装修状态查询等 OpenAPI。
  *
- * - 抖音来客：由后端聚合门店查询 + 装修能力相关接口
+ * - 抖音来客：优先 GET `/api/meoo-douyin-store-decoration`（与 ping 同级），再回退 `/api/merchant/douyin/store-decoration`
  * - 美团 / 小红书：`GET /api/merchant/{meituan|xhs}/store-decoration`
  *
  * Query：`page`, `pageSize`, `keyword?`；Header：`Authorization: Bearer <token>`
@@ -14,6 +14,11 @@ const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | un
 function url(path: string) {
   const b = apiBase().replace(/\/$/, '')
   return `${b}${path}`
+}
+
+function responseLooksLikeHtml(text: string, contentType: string): boolean {
+  const trimmed = text.trimStart()
+  return trimmed.startsWith('<') || /text\/html/i.test(contentType)
 }
 
 export type StoreDecorationRow = {
@@ -98,18 +103,43 @@ export async function fetchStoreDecorationsForPlatform(
 
   const segment = storeTabApiSegment(tab)
   try {
-    const res = await fetch(url(`/api/merchant/${segment}/store-decoration?${q}`), {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    })
+    const qs = `?${q}`
+    const decorationPaths =
+      tab === 'douyin'
+        ? ([`/api/meoo-douyin-store-decoration${qs}`, `/api/merchant/${segment}/store-decoration${qs}`] as const)
+        : ([`/api/merchant/${segment}/store-decoration${qs}`] as const)
+
+    let res: Response | null = null
+    let rawText = ''
+    for (const path of decorationPaths) {
+      const r = await fetch(url(path), {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      })
+      const text = await r.text()
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.ok && responseLooksLikeHtml(text, ct)) continue
+      res = r
+      rawText = text
+      break
+    }
+
     let data: Record<string, unknown> = {}
     try {
-      data = (await res.json()) as Record<string, unknown>
+      data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
     } catch {
-      /* ignore */
+      data = {}
+    }
+
+    if (!res) {
+      return {
+        ok: false,
+        message:
+          '店铺装修列表接口返回了网页而非 JSON（已尝试 meoo 路径）。请确认已部署 api/meoo-douyin-store-decoration。',
+      }
     }
     if (!res.ok) {
       const msg =
