@@ -1032,14 +1032,34 @@ export async function getDouyinGoodsTemplate(params: {
   category_id: string
   product_type: number
 }): Promise<GoodsTemplateResult> {
-  const q = new URLSearchParams({
+  const qs = new URLSearchParams({
     category_id: params.category_id,
     product_type: String(params.product_type),
-  })
-  const res = await fetch(url(`/api/merchant/douyin/goods/template/get?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
+  }).toString()
+  const paths = ['/api/meoo-douyin-goods-template-get', '/api/merchant/douyin/goods/template/get'] as const
+  const headers = authHeaders()
+  for (const p of paths) {
+    const res = await fetch(url(`${p}?${qs}`), { method: 'GET', headers })
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    if (res.status === 404) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+      }
+    }
+    return mapDouyinGoodsTemplatePayload(data, params.product_type)
+  }
+  const res = await fetch(url(`${paths[1]}?${qs}`), { method: 'GET', headers })
   const data = await parseJson(res)
   if (!res.ok) {
     return {
@@ -1047,6 +1067,13 @@ export async function getDouyinGoodsTemplate(params: {
       message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
     }
   }
+  return mapDouyinGoodsTemplatePayload(data, params.product_type)
+}
+
+function mapDouyinGoodsTemplatePayload(
+  data: Record<string, unknown>,
+  productType: number,
+): GoodsTemplateResult {
   const d = data.data as Record<string, unknown> | undefined
   const mapAttrs = (arr: unknown): TemplateAttr[] =>
     Array.isArray(arr)
@@ -1071,7 +1098,7 @@ export async function getDouyinGoodsTemplate(params: {
     mapSelectOptions(d?.after_sale_policies).length > 0
       ? mapSelectOptions(d?.after_sale_policies)
       : DEFAULT_AFTER_SALE_POLICIES
-  const trade_rule_defaults = parseTradeRuleDefaults(d?.trade_rule_defaults, params.product_type)
+  const trade_rule_defaults = parseTradeRuleDefaults(d?.trade_rule_defaults, productType)
   return {
     ok: true,
     product_attrs: mapAttrs(d?.product_attrs),
