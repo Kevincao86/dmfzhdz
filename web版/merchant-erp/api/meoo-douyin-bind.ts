@@ -1,8 +1,6 @@
 /**
- * 独立入口：POST /api/douyin-bind
- *
- * 勿使用单独的 `./lib/*` 小文件：Vercel Node ESM 产物曾出现
- * `ERR_MODULE_NOT_FOUND .../api/lib/safeJsonResponse`。辅助函数直接写在本文件内。
+ * 扁平绑定入口：POST /api/meoo-douyin-bind
+ * 与 douyin-bind 同源逻辑；优先给前端调用，减少嵌套路由与打包追踪问题导致的 FUNCTION_INVOCATION_FAILED。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
@@ -34,11 +32,12 @@ function rawBody(req: VercelRequest): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+
   try {
     if (req.method === 'OPTIONS') {
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       res.status(204).end()
       return
     }
@@ -64,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const msg = e instanceof Error ? e.message : String(e)
     sendSafeJson(res, 500, {
       message: msg || '抖音绑定处理异常',
-      hint: '若仍为模块加载错误，请查看 Vercel Logs；Root Directory 须为 web版/merchant-erp。',
+      hint: '模块加载失败时请查看 Vercel Logs；确认 Root Directory 为 web版/merchant-erp，且已部署 api/merchant/douyin/*。',
     })
   }
 }
