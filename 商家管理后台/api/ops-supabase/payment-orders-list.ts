@@ -1,10 +1,11 @@
 /**
- * Vercel：GET /api/ops-supabase/payment-orders（运营台订单列表）。
+ * Vercel：GET /api/ops-supabase/payment-orders-list（对外 rewrite → /api/ops-supabase/payment-orders）
+ * 避免 payment-orders/index.ts 与同目录兄弟路由并存时的打包问题。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../../createOpsServiceRoleClient'
-import { sendOpsJson } from '../../safeOpsJson'
-import { listOpsPaymentOrders } from '../../../src/ops/paymentOrdersAdminBackend'
+import { createOpsServiceRoleClient } from '../createOpsServiceRoleClient'
+import { sendOpsJson } from '../safeOpsJson'
+import { listOpsPaymentOrders } from '../../src/ops/paymentOrdersAdminBackend'
 
 export const config = { maxDuration: 60 }
 

@@ -30,7 +30,11 @@ function jsonResponse(status: number, body: Record<string, unknown>): Response {
 
 async function sendFetchResponse(res: VercelResponse, r: Response): Promise<void> {
   const text = await r.text()
-  res.status(r.status).setHeader('Content-Type', 'application/json; charset=utf-8').send(text)
+  const code = Number(r.status)
+  const status = Number.isFinite(code) && code >= 100 && code <= 599 ? code : 500
+  if (!res.writableEnded) {
+    res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8').send(text)
+  }
 }
 
 function loginNameToEmail(loginName: string, domain: string): string {
