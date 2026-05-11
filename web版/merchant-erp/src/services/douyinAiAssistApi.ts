@@ -1,5 +1,6 @@
 /**
- * 抖音来客商品创建 — AI 辅助（标题 / 说明 / 图片 / 豆包质检），经 `POST /api/merchant/douyin/goods/ai/assist` 转发。
+ * 抖音来客商品创建 — AI 辅助（标题 / 说明 / 图片 / 豆包质检）。
+ * 优先 `POST /api/meoo-douyin-goods-ai-assist`，回退 `POST /api/merchant/douyin/goods/ai/assist`。
  * 本地 dev：Vite 网关按 `model` 调用上游；Key 来自 .env 或请求体 `vendor_keys`（由本模块合并 localStorage）。
  * 文案：MiniMax、通义千问、豆包；生图：MiniMax、通义万相（wanx）、豆包（Seedream）；质检：仅豆包对话。
  */
@@ -144,12 +145,33 @@ function buildAssistPayload(body: AiAssistRequest): Record<string, unknown> {
   return base
 }
 
+const AI_ASSIST_PATHS = ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist'] as const
+
+/** 与类目/线上搜品同源：优先顶层 meoo，避开生产环境深层 /api/merchant/* 404 */
+async function postAiAssistFetch(
+  bodyObj: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const bodyStr = JSON.stringify(bodyObj)
+  const headers = authHeaders()
+  for (const p of AI_ASSIST_PATHS) {
+    const res = await fetch(url(p), { method: 'POST', headers, body: bodyStr, signal })
+    const text = await res.text()
+    const trim = text.trimStart()
+    const ct = res.headers.get('content-type') ?? ''
+    if (res.status === 404) continue
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    return new Response(text, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
+    })
+  }
+  return fetch(url(AI_ASSIST_PATHS[1]), { method: 'POST', headers, body: bodyStr, signal })
+}
+
 export async function postDouyinGoodsAiAssist(body: AiAssistRequest): Promise<AiAssistResult> {
-  const res = await fetch(url('/api/merchant/douyin/goods/ai/assist'), {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(buildAssistPayload(body)),
-  })
+  const res = await postAiAssistFetch(buildAssistPayload(body))
   const data = await parseJson(res)
   if (!res.ok) {
     return {
@@ -260,19 +282,15 @@ export async function postGeoAiScore(body: {
   geo_score_context: string
   product_name?: string
 }): Promise<GeoAiScoreResult> {
-  const res = await fetch(url('/api/merchant/douyin/goods/ai/assist'), {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(
-      buildAssistPayload({
-        model: body.model,
-        action: 'geo_ai_score',
-        product_name: (body.product_name ?? 'GEO综合评分').trim().slice(0, 120),
-        title_draft: 'geo_score',
-        geo_score_context: body.geo_score_context.trim(),
-      }),
-    ),
-  })
+  const res = await postAiAssistFetch(
+    buildAssistPayload({
+      model: body.model,
+      action: 'geo_ai_score',
+      product_name: (body.product_name ?? 'GEO综合评分').trim().slice(0, 120),
+      title_draft: 'geo_score',
+      geo_score_context: body.geo_score_context.trim(),
+    }),
+  )
   const data = await parseJson(res)
   if (!res.ok) {
     return {
@@ -406,12 +424,7 @@ export async function postDouyinProductQualityAnalysis(
 
   let res: Response
   try {
-    res = await fetch(url('/api/merchant/douyin/goods/ai/assist'), {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(buildAssistPayload(body)),
-      signal: controller.signal,
-    })
+    res = await postAiAssistFetch(buildAssistPayload(body), controller.signal)
   } catch (e) {
     const name = e instanceof DOMException ? e.name : e instanceof Error ? e.name : ''
     if (name === 'AbortError') {
