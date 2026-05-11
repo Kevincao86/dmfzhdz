@@ -980,10 +980,17 @@ export async function handleDouyinGoodsProductOnlineQueryGet(
     u.searchParams.set('count', String(count))
     const cursor = (url.searchParams.get('cursor') ?? '').trim()
     if (cursor) u.searchParams.set('cursor', cursor)
-    const gqt = (url.searchParams.get('goods_query_type') ?? '2').trim()
-    u.searchParams.set('goods_query_type', gqt || '2')
-    const gct = (url.searchParams.get('goods_creator_type') ?? '').trim()
-    if (gct) u.searchParams.set('goods_creator_type', gct)
+    /** 文档：传 goods_query_type 时 goods_creator_type 不生效；不传则可配合 goods_creator_type 查商家/服务商创建的商品 */
+    const gqtRaw = url.searchParams.get('goods_query_type')
+    if (gqtRaw !== null) {
+      const gqt = gqtRaw.trim()
+      if (gqt) u.searchParams.set('goods_query_type', gqt)
+    }
+    const gctRaw = url.searchParams.get('goods_creator_type')
+    if (gctRaw !== null) {
+      const gct = gctRaw.trim()
+      if (gct) u.searchParams.set('goods_creator_type', gct)
+    }
     const status = (url.searchParams.get('status') ?? '').trim()
     if (status) u.searchParams.set('status', status)
 

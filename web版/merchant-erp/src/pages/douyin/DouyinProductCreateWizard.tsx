@@ -332,7 +332,7 @@ export default function DouyinProductCreateWizard({
       comboSearchTimers.current.delete(key)
       void (async () => {
         const q = keyword.trim()
-        if (q.length < 2) {
+        if (q.length < 1) {
           setComboMatch((m) => ({ ...m, [key]: { open: false, loading: false, hits: [] } }))
           return
         }
@@ -353,7 +353,7 @@ export default function DouyinProductCreateWizard({
             hits: r.hits,
             err: r.hits.length
               ? undefined
-              : '未命中：已查线上商品、商品草稿及本店已存列表；可先「保存草稿」后再搜，或直接手填名称',
+              : '未命中：已按抖音 online.query 尝试自研/服务商口径及商家与服务商创建来源；若账号下确无已审核上架商品，接口本身也会为空，可直接手填名称继续保存',
           },
         }))
       })()
@@ -1596,7 +1596,7 @@ export default function DouyinProductCreateWizard({
                                                 hits: r.hits,
                                                 err: r.hits.length
                                                   ? undefined
-                                                  : '未命中：已查线上+草稿+本店列表；可先保存商品草稿后再搜',
+                                                  : '未命中：已按 online.query 多策略检索；无上架商品时为空属正常，可手填名称',
                                               },
                                             }))
                                           })()
