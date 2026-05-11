@@ -286,6 +286,7 @@ export async function getDouyinStores(params: {
     const text = await r.text()
     const ct = r.headers.get('content-type') ?? ''
     if (r.ok && responseLooksLikeHtml(text, ct)) continue
+    if (r.status === 404) continue
     res = r
     rawText = text
     break

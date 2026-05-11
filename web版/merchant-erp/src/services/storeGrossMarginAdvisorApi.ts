@@ -1,6 +1,6 @@
 /**
  * 门店毛利建议：由网关根据「门店配置行业」聚合类目并查询行业综合毛利率（全网口径），返回建议值。
- * 部署：`GET /api/merchant/store/gross-margin-advisor`（可选 `Authorization: Bearer` 抖音来客 token）
+ * 部署：优先 `GET /api/meoo-store-gross-margin-advisor`，回退 `GET /api/merchant/store/gross-margin-advisor`（可选 Bearer 抖音来客 token）
  */
 
 import { readMerchantSession } from '../lib/merchantSession'
@@ -55,19 +55,41 @@ export async function fetchStoreGrossMarginAdvisor(
   if (cid) q.set('categoryId', cid)
   const ip = query?.industryPath?.trim()
   if (ip) q.set('industryPath', ip)
+  const qs = `?${q}`
+  const paths = ['/api/meoo-store-gross-margin-advisor', '/api/merchant/store/gross-margin-advisor'] as const
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
   try {
-    const res = await fetch(url(`/api/merchant/store/gross-margin-advisor?${q}`), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    })
+    let res: Response | null = null
     let data: Record<string, unknown> = {}
-    try {
-      data = (await res.json()) as Record<string, unknown>
-    } catch {
-      /* ignore */
+    for (const p of paths) {
+      const r = await fetch(url(`${p}${qs}`), { method: 'GET', headers })
+      const text = await r.text()
+      const ct = r.headers.get('content-type') ?? ''
+      const trim = text.trimStart()
+      if (r.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+      if (r.status === 404) continue
+      let j: Record<string, unknown> = {}
+      try {
+        j = JSON.parse(text || '{}') as Record<string, unknown>
+      } catch {
+        j = {}
+      }
+      res = r
+      data = j
+      break
+    }
+    if (!res) {
+      const r = await fetch(url(`${paths[1]}${qs}`), { method: 'GET', headers })
+      const text = await r.text()
+      try {
+        data = JSON.parse(text || '{}') as Record<string, unknown>
+      } catch {
+        data = {}
+      }
+      res = r
     }
     if (!res.ok) {
       return {
