@@ -1,15 +1,38 @@
 /**
- * Vercel：GET /api/ops-supabase/tenants-list（对外通过 vercel.json rewrite 映射为 /api/ops-supabase/tenants）
+ * Vercel：GET /api/meoo-supabase-tenants-list
  *
- * 勿再放回 tenants/index.ts：与同目录 patch/wallet-ledger 等并存时，Vercel 对「文件夹 + index.ts」
- * 的打包存在已知问题，会导致 FUNCTION_INVOCATION_FAILED。
- *
- * 本地 dev 仍走 vite-plugins/opsSupabaseAdminPlugin 的 `/api/ops-supabase/tenants`。
+ * 从 ops-supabase 子目录挪到 api 根：避免 Vercel 在深层路径与其它 api 邻居打包时异常崩溃。
+ * 前端须请求本路径（见 supabaseTenantsApi）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendOpsJson } from '../safeOpsJson'
 
 export const config = { maxDuration: 60 }
+
+function sendOpsJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
+  try {
+    if (res.writableEnded || res.headersSent) return
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.status(status).send(JSON.stringify(body))
+  } catch {
+    try {
+      if (!res.writableEnded && !res.headersSent) res.end()
+    } catch {
+      /* noop */
+    }
+  }
+}
+
+function jsonSend(res: VercelResponse, status: number, payload: unknown): void {
+  try {
+    const raw = JSON.stringify(payload)
+    if (!res.writableEnded && !res.headersSent) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      res.status(status).send(raw)
+    }
+  } catch {
+    sendOpsJson(res, 500, { ok: false, error: 'json_send_failed' })
+  }
+}
 
 type TenantRow = {
   id: string
@@ -121,11 +144,11 @@ async function listTenantsWithServiceRoleFetch(
               (typeof meta?.login_name === 'string' && meta.login_name.trim()) ||
               (email ? email.split('@')[0] ?? '' : '')
           } catch {
-            /* 单条用户信息解析失败不影响列表 */
+            /* ignore */
           }
         }
       } catch {
-        /* 单条 Auth 请求失败不影响列表 */
+        /* ignore */
       }
     }
     out.push({
@@ -170,10 +193,8 @@ async function edgePost(
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   try {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8')
-
     if (req.method !== 'GET') {
-      res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+      jsonSend(res, 405, { ok: false, error: 'method_not_allowed' })
       return
     }
 
@@ -187,49 +208,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const secret = (process.env.MEOO_PROVISION_SECRET ?? '').trim()
 
     if (!supabaseUrl) {
-      res.status(503).send(
-        JSON.stringify({
-          ok: false,
-          error: 'supabase_admin_not_configured',
-          hint: '配置 VITE_SUPABASE_URL 或 SUPABASE_URL（Production 环境）。',
-        }),
-      )
+      jsonSend(res, 503, {
+        ok: false,
+        error: 'supabase_admin_not_configured',
+        hint: '配置 VITE_SUPABASE_URL 或 SUPABASE_URL（Production 环境）。',
+      })
       return
     }
 
     if (serviceRole) {
       const lr = await listTenantsWithServiceRoleFetch(supabaseUrl, serviceRole)
       if (lr.ok) {
-        res.status(200).send(JSON.stringify({ ok: true, rows: lr.rows }))
+        jsonSend(res, 200, { ok: true, rows: lr.rows })
         return
       }
       if (anon && secret) {
         const er = await edgePost(supabaseUrl, anon, secret, {})
         if (er.ok && er.data.ok !== false) {
           const rows = Array.isArray(er.data.rows) ? er.data.rows : []
-          res.status(200).send(JSON.stringify({ ok: true, rows }))
+          jsonSend(res, 200, { ok: true, rows })
           return
         }
         const detail = [lr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
-        res.status(er.status >= 400 ? er.status : 502).send(
-          JSON.stringify({
-            ok: false,
-            error: 'list_failed',
-            detail,
-            hint:
-              'Service Role 列租户失败，且 Edge ops-list-tenants 无有效数据。请核对 SUPABASE_SERVICE_ROLE_KEY、数据库权限，或部署 ops-list-tenants。',
-          }),
-        )
+        jsonSend(res, er.status >= 400 ? er.status : 502, {
+          ok: false,
+          error: 'list_failed',
+          detail,
+          hint:
+            'Service Role 列租户失败，且 Edge ops-list-tenants 无有效数据。请核对 SUPABASE_SERVICE_ROLE_KEY、数据库权限，或部署 ops-list-tenants。',
+        })
         return
       }
-      res.status(502).send(
-        JSON.stringify({
-          ok: false,
-          error: lr.message,
-          detail: lr.detail,
-          hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
-        }),
-      )
+      jsonSend(res, 502, {
+        ok: false,
+        error: lr.message,
+        detail: lr.detail,
+        hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
+      })
       return
     }
 
@@ -237,29 +252,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const er = await edgePost(supabaseUrl, anon, secret, {})
       if (!er.ok || er.data.ok === false) {
         const detail = JSON.stringify(er.data).slice(0, 800)
-        res.status(er.status >= 400 ? er.status : 502).send(
-          JSON.stringify({
-            ok: false,
-            error: 'edge_list_failed',
-            detail,
-            hint: '未配置 SUPABASE_SERVICE_ROLE_KEY 时依赖 Edge ops-list-tenants；请部署该函数并配置 MEOO_PROVISION_SECRET。',
-          }),
-        )
+        jsonSend(res, er.status >= 400 ? er.status : 502, {
+          ok: false,
+          error: 'edge_list_failed',
+          detail,
+          hint: '未配置 SUPABASE_SERVICE_ROLE_KEY 时依赖 Edge ops-list-tenants；请部署该函数并配置 MEOO_PROVISION_SECRET。',
+        })
         return
       }
       const rows = Array.isArray(er.data.rows) ? er.data.rows : []
-      res.status(200).send(JSON.stringify({ ok: true, rows }))
+      jsonSend(res, 200, { ok: true, rows })
       return
     }
 
-    res.status(503).send(
-      JSON.stringify({
-        ok: false,
-        error: 'supabase_admin_not_configured',
-        hint:
-          '请配置 SUPABASE_SERVICE_ROLE_KEY（推荐），或 SUPABASE_ANON_KEY + MEOO_PROVISION_SECRET 并部署 ops-list-tenants。',
-      }),
-    )
+    jsonSend(res, 503, {
+      ok: false,
+      error: 'supabase_admin_not_configured',
+      hint:
+        '请配置 SUPABASE_SERVICE_ROLE_KEY（推荐），或 SUPABASE_ANON_KEY + MEOO_PROVISION_SECRET 并部署 ops-list-tenants。',
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

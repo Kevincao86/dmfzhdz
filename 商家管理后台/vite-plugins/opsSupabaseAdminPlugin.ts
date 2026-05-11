@@ -164,9 +164,13 @@ function json(res: ServerResponse, code: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-/** 与线上 fetch 路径一致（独立文件 tenants-list.ts，不依赖 Vercel rewrite） */
+/** 与线上 fetch 路径一致（api 根目录 meoo-supabase-tenants-list.ts） */
 function isTenantListPath(urlPath: string): boolean {
-  return urlPath === '/api/ops-supabase/tenants' || urlPath === '/api/ops-supabase/tenants-list'
+  return (
+    urlPath === '/api/ops-supabase/tenants' ||
+    urlPath === '/api/ops-supabase/tenants-list' ||
+    urlPath === '/api/meoo-supabase-tenants-list'
+  )
 }
 
 function isPaymentOrdersListPath(urlPath: string): boolean {
