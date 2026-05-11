@@ -132,6 +132,9 @@ export default function DouyinProductCreateWizard({
   const [productType, setProductType] = useState<number | null>(null)
   const [typesLoading, setTypesLoading] = useState(false)
   const [typesLoadError, setTypesLoadError] = useState<string | null>(null)
+  /** 第二步 → 第三步：拉模板失败时须在第二步展示（actionMsg 仅在第三步 DOM 内渲染，否则会「点了没反应」） */
+  const [detailPrepLoading, setDetailPrepLoading] = useState(false)
+  const [detailPrepError, setDetailPrepError] = useState<string | null>(null)
 
   const [storeModalOpen, setStoreModalOpen] = useState(false)
   const [modalKeyword, setModalKeyword] = useState('')
@@ -500,6 +503,10 @@ export default function DouyinProductCreateWizard({
     }
   }, [cat3])
 
+  useEffect(() => {
+    setDetailPrepError(null)
+  }, [cat3, productType])
+
   const canNextCategory =
     cat1 &&
     cat2 &&
@@ -559,52 +566,60 @@ export default function DouyinProductCreateWizard({
 
   const goDetail = async () => {
     if (!cat3 || productType == null) return
-    const tpl = await getDouyinGoodsTemplate({ category_id: cat3, product_type: productType })
-    if (!tpl.ok) {
-      setActionMsg({ text: tpl.message, ok: false })
-      return
-    }
-    setSalesChannelOptions(tpl.sales_channels)
-    setStaffSalesOptions(tpl.staff_sales_options)
-    setAfterSalePolicyOptions(tpl.after_sale_policies)
-    setSalesChannel((prev) =>
-      tpl.sales_channels.some((x) => x.value === prev)
-        ? prev
-        : (tpl.sales_channels[0]?.value ?? 'unlimited'),
-    )
-    setStaffSales((prev) =>
-      tpl.staff_sales_options.some((x) => x.value === prev)
-        ? prev
-        : (tpl.staff_sales_options[0]?.value ?? 'allow'),
-    )
-    const d = tpl.trade_rule_defaults
-    setConsumeDateMode(d.consume_date_mode)
-    setConsumeValidDays(String(d.consume_valid_days))
-    setNonConsumeDateMode(d.non_consume_date_mode)
-    setDailyAllDay(d.daily_consume_mode === 'all_day')
-    setCustomerPurchaseLimitMode(d.purchase_limit_mode)
-    setCustomerPurchaseLimitMax(String(d.purchase_limit_max))
-    setAfterSalePolicy(d.after_sale_policy)
-    setReserveMode(d.reserve_mode)
-    setReserveAdvance(String(d.reserve_advance_value))
-    setReserveUnit(d.reserve_advance_unit)
-    if (productType === 1) {
-      setComboGroups((prev) =>
-        prev.length > 0
+    setDetailPrepLoading(true)
+    setDetailPrepError(null)
+    try {
+      const tpl = await getDouyinGoodsTemplate({ category_id: cat3, product_type: productType })
+      if (!tpl.ok) {
+        setDetailPrepError(tpl.message)
+        return
+      }
+      setSalesChannelOptions(tpl.sales_channels)
+      setStaffSalesOptions(tpl.staff_sales_options)
+      setAfterSalePolicyOptions(tpl.after_sale_policies)
+      setSalesChannel((prev) =>
+        tpl.sales_channels.some((x) => x.value === prev)
           ? prev
-          : [
-              {
-                id: newId('g'),
-                pickRule: '全部必选',
-                items: [{ id: newId('i'), name: '', qty: '1', price: '' }],
-              },
-            ],
+          : (tpl.sales_channels[0]?.value ?? 'unlimited'),
       )
-    } else {
-      setComboGroups([])
+      setStaffSales((prev) =>
+        tpl.staff_sales_options.some((x) => x.value === prev)
+          ? prev
+          : (tpl.staff_sales_options[0]?.value ?? 'allow'),
+      )
+      const d = tpl.trade_rule_defaults
+      setConsumeDateMode(d.consume_date_mode)
+      setConsumeValidDays(String(d.consume_valid_days))
+      setNonConsumeDateMode(d.non_consume_date_mode)
+      setDailyAllDay(d.daily_consume_mode === 'all_day')
+      setCustomerPurchaseLimitMode(d.purchase_limit_mode)
+      setCustomerPurchaseLimitMax(String(d.purchase_limit_max))
+      setAfterSalePolicy(d.after_sale_policy)
+      setReserveMode(d.reserve_mode)
+      setReserveAdvance(String(d.reserve_advance_value))
+      setReserveUnit(d.reserve_advance_unit)
+      if (productType === 1) {
+        setComboGroups((prev) =>
+          prev.length > 0
+            ? prev
+            : [
+                {
+                  id: newId('g'),
+                  pickRule: '全部必选',
+                  items: [{ id: newId('i'), name: '', qty: '1', price: '' }],
+                },
+              ],
+        )
+      } else {
+        setComboGroups([])
+      }
+      setStep('detail')
+      setActionMsg(null)
+    } catch (e) {
+      setDetailPrepError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setDetailPrepLoading(false)
     }
-    setStep('detail')
-    setActionMsg(null)
   }
 
   useEffect(() => {
@@ -1264,6 +1279,14 @@ export default function DouyinProductCreateWizard({
             </div>
           ) : (
             <div className="mt-4 space-y-2">
+              {detailPrepError ? (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                  进入下一步失败：{detailPrepError}
+                  <span className="mt-1 block text-xs text-amber-800">
+                    多为商品模板接口不可用（Network 中查看 template/get 或 meoo-douyin-goods-template-get）。
+                  </span>
+                </div>
+              ) : null}
               {productTypes.map((t) => (
                 <label
                   key={t.product_type}
@@ -1291,18 +1314,21 @@ export default function DouyinProductCreateWizard({
           <div className="mt-6 flex justify-between">
             <button
               type="button"
-              onClick={() => setStep('category')}
+              onClick={() => {
+                setDetailPrepError(null)
+                setStep('category')
+              }}
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
               上一步
             </button>
             <button
               type="button"
-              disabled={!canNextType}
+              disabled={!canNextType || detailPrepLoading}
               onClick={() => void goDetail()}
               className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
             >
-              下一步
+              {detailPrepLoading ? '加载模板…' : '下一步'}
             </button>
           </div>
         </section>
