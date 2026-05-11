@@ -662,6 +662,28 @@ async function parseCategoryGetJsonResponse(res: Response): Promise<{
   return { root: {}, parseFault: 'json_invalid', rawLen: raw.length }
 }
 
+type CategoryGetParsed = Awaited<ReturnType<typeof parseCategoryGetJsonResponse>>
+
+/** 优先顶层 meoo 路由（与 meoo-douyin-stores 同理），404/HTML 时再试 merchant 深层路径 */
+async function fetchCategoryGetPreferFlatPath(q: URLSearchParams): Promise<{
+  res: Response
+  parsed: CategoryGetParsed
+}> {
+  const qs = `?${q}`
+  const paths = ['/api/meoo-douyin-goods-category-get', '/api/merchant/douyin/goods/category/get'] as const
+  for (const p of paths) {
+    const res = await fetch(url(`${p}${qs}`), { method: 'GET', headers: authHeaders() })
+    const parsed = await parseCategoryGetJsonResponse(res)
+    if (res.ok && parsed.parseFault === 'html') continue
+    if (res.status === 404) continue
+    return { res, parsed }
+  }
+  const fallback = paths[paths.length - 1]
+  const res = await fetch(url(`${fallback}${qs}`), { method: 'GET', headers: authHeaders() })
+  const parsed = await parseCategoryGetJsonResponse(res)
+  return { res, parsed }
+}
+
 /** 行业圈定可发三级类目（网关可合并门店资质 / 类目资质结果） */
 export async function getDouyinIndustryCategoryScope(): Promise<IndustryScopeResult> {
   const accountId = readMerchantSession('meoo_douyin_merchant_id')
@@ -696,11 +718,8 @@ export async function getDouyinGoodsCategoryTree(): Promise<CategoryGetResult> {
 }
 
 async function requestCategoryTreeQuery(q: URLSearchParams): Promise<CategoryGetResult> {
-  const res = await fetch(url(`/api/merchant/douyin/goods/category/get?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
-  const { root: data, parseFault, rawLen } = await parseCategoryGetJsonResponse(res)
+  const { res, parsed } = await fetchCategoryGetPreferFlatPath(q)
+  const { root: data, parseFault, rawLen } = parsed
   if (!res.ok) {
     return {
       ok: false,
@@ -787,11 +806,8 @@ async function fetchCategorySubtreeByParentId(parentCategoryId: string): Promise
   q.set('query_category_type', '1')
   q.set('category_id', parentCategoryId)
   if (accountId) q.set('account_id', accountId)
-  const res = await fetch(url(`/api/merchant/douyin/goods/category/get?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
-  const { root: data } = await parseCategoryGetJsonResponse(res)
+  const { res, parsed } = await fetchCategoryGetPreferFlatPath(q)
+  const { root: data } = parsed
   if (!res.ok) return []
   const d = pickCategoryGetInnerData(data)
   return extractChildrenFromCategoryGetPayload(d, parentCategoryId)
