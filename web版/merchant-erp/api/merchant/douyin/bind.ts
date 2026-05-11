@@ -3,7 +3,6 @@
  * 绑定逻辑走同目录 `bindRuntime.ts`（轻量），勿直接 import 整份 douyinMerchantGateway，以免 Vercel 打包过大触发 FUNCTION_INVOCATION_FAILED。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { runDouyinMerchantBind } from './bindRuntime'
 
 export const config = { maxDuration: 60 }
 
@@ -20,9 +19,11 @@ function rawBody(req: VercelRequest): string {
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') {
-    res.setHeader('Allow', 'POST, OPTIONS')
     res.status(204).end()
     return
   }
@@ -33,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
+    const { runDouyinMerchantBind } = await import('./bindRuntime')
     const r = await runDouyinMerchantBind(rawBody(req))
     let payload: string
     try {

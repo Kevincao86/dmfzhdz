@@ -11,7 +11,8 @@
  *
  * 门店品牌列表：GET /api/merchant/douyin/brands → 代理 goodlife/v2/shop/brand/query/（与来客「门店品牌」一致，非门店名称）
  *
- * 部署：绑定走同源 `POST /api/douyin-bind`（轻量 Serverless）；其余 `/api/merchant/*` 见 [...slug]。生产须配置 MERCHANT_DOUYIN_SESSION_SECRET。
+ * 部署：绑定依次尝试 `POST /api/meoo-douyin-bind`、`/api/douyin-bind`、`/api/merchant/douyin/bind`（避免单一路由打包/网关异常）。
+ * 生产须配置 MERCHANT_DOUYIN_SESSION_SECRET。
  * 若网关部署在其他域名，设置 VITE_MERCHANT_API_BASE_URL（不以 / 结尾）；未设置则走同源。
  */
 
@@ -93,22 +94,49 @@ export async function postDouyinBind(
   const timeoutId = setTimeout(() => ctrl.abort(), DOUYIN_BIND_CLIENT_TIMEOUT_MS)
   const clearBindTimer = () => clearTimeout(timeoutId)
 
+  const bindPaths = ['/api/meoo-douyin-bind', '/api/douyin-bind', '/api/merchant/douyin/bind'] as const
+
   try {
-    let res = await fetch(url('/api/douyin-bind'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: ctrl.signal,
-    })
-    if (res.status === 404) {
-      res = await fetch(url('/api/merchant/douyin/bind'), {
+    let res: Response | null = null
+    let rawText = ''
+    for (const p of bindPaths) {
+      const r = await fetch(url(p), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
         signal: ctrl.signal,
       })
+      const text = await r.text()
+      if (r.ok) {
+        res = r
+        rawText = text
+        break
+      }
+      let parsed: Record<string, unknown> = {}
+      try {
+        parsed = (JSON.parse(text || '{}') as Record<string, unknown>) ?? {}
+      } catch {
+        parsed = {}
+      }
+      const apiMsg = typeof parsed.message === 'string' ? parsed.message : ''
+      const infraFail =
+        r.status === 404 ||
+        (!apiMsg &&
+          (/FUNCTION_INVOCATION_FAILED|A server error has occurred/i.test(text) ||
+            text.trim().startsWith('<!') ||
+            text.trim().startsWith('<html')))
+      if (infraFail) continue
+      res = r
+      rawText = text
+      break
     }
-    const rawText = await res.text()
+    if (!res) {
+      return {
+        ok: false,
+        message:
+          '绑定服务不可用（多条路径均失败）。请确认 Vercel 已部署最新代码且 Functions 正常；也可稍后在 Vercel Logs 中查看报错。',
+      }
+    }
     let data: Record<string, unknown> = {}
     try {
       data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}

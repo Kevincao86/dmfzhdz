@@ -72,6 +72,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  res.setHeader('Access-Control-Allow-Origin', '*')
+
   const parts = slugSegmentsFromRequest(req)
   const pathname = '/api/merchant/' + parts.join('/')
   const slugPath = parts.join('/')
@@ -82,8 +84,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const pathWithQuery = pathname + search
 
   const method = (req.method ?? 'GET').toUpperCase()
+  /** 部分环境下 req.query.slug 异常，仅靠 slugPath 会误判进入大包网关 → OOM / FUNCTION_INVOCATION_FAILED */
+  const rawPathOnly = urlStr.split('?')[0]?.replace(/\/+$/, '') ?? ''
+  const isDouyinBindPost =
+    method === 'POST' &&
+    (slugPath === 'douyin/bind' ||
+      rawPathOnly === '/api/merchant/douyin/bind' ||
+      rawPathOnly.endsWith('/api/merchant/douyin/bind'))
 
-  if (method === 'POST' && slugPath === 'douyin/bind') {
+  if (isDouyinBindPost) {
     try {
       const { runDouyinMerchantBind } = await import('./douyin/bindRuntime')
       const bodyRaw = rawBody(req)
