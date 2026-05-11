@@ -120,7 +120,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = (req.url ?? '').split('?')[0]
-        if (!url.startsWith('/api/ops-sync')) return next()
+        if (!url.startsWith('/api/ops-sync') && url !== '/api/meoo-ops-sync-registry') return next()
 
         const viteRoot = server.config.root
         const method = req.method ?? 'GET'
@@ -141,7 +141,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
         sendCors()
 
         try {
-          if (method === 'GET' && url === '/api/ops-sync/registry') {
+          if (method === 'GET' && (url === '/api/ops-sync/registry' || url === '/api/meoo-ops-sync-registry')) {
             const data = ensureRegistry(viteRoot)
             const before = data.recruitmentOrders ?? []
             const cleaned = filterLegacyDemoRecruitmentOrders(before)

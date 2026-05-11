@@ -125,29 +125,38 @@ function mapHttpError(status: number): string {
 }
 
 export async function fetchRegistry(): Promise<RegistryFile> {
-  const res = await fetch('/api/ops-sync/registry')
-  const text = await res.text()
-  if (!res.ok) {
+  const paths = ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
+  let lastErr: Error | undefined
+  for (const path of paths) {
     try {
-      const j = JSON.parse(text) as {
-        error?: string
-        detail?: string
-        hint?: string
-        ok?: boolean
+      const res = await fetch(path)
+      const text = await res.text()
+      if (!res.ok) {
+        try {
+          const j = JSON.parse(text) as {
+            error?: string
+            detail?: string
+            hint?: string
+            ok?: boolean
+          }
+          const parts = [j.detail, j.hint, j.error].filter((x) => typeof x === 'string' && x.trim())
+          if (parts.length) throw new Error(parts.join(' — '))
+        } catch (e) {
+          if (e instanceof Error && e.message && !e.message.startsWith('Unexpected')) throw e
+        }
+        const snippet = text.trim().slice(0, 280)
+        throw new Error(snippet || mapHttpError(res.status))
       }
-      const parts = [j.detail, j.hint, j.error].filter((x) => typeof x === 'string' && x.trim())
-      if (parts.length) throw new Error(parts.join(' — '))
+      try {
+        return JSON.parse(text) as RegistryFile
+      } catch {
+        throw new Error('注册表接口返回非 JSON，请检查 Vercel 是否已部署 /api/meoo-ops-sync-registry')
+      }
     } catch (e) {
-      if (e instanceof Error && e.message && !e.message.startsWith('Unexpected')) throw e
+      lastErr = e instanceof Error ? e : new Error(String(e))
     }
-    const snippet = text.trim().slice(0, 280)
-    throw new Error(snippet || mapHttpError(res.status))
   }
-  try {
-    return JSON.parse(text) as RegistryFile
-  } catch {
-    throw new Error('注册表接口返回非 JSON，请检查 Vercel /api/ops-sync 是否部署成功')
-  }
+  throw lastErr ?? new Error('fetch_registry_failed')
 }
 
 export type ManualTenantPayload = {

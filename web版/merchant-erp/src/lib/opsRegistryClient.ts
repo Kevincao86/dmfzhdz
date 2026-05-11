@@ -20,10 +20,24 @@ function url(path: string) {
   return `${b}${path}`
 }
 
-export async function fetchOpsRegistry(): Promise<RegistryFile> {
-  const res = await fetch(url('/api/ops-sync/registry'))
+async function fetchRegistryAt(path: string): Promise<RegistryFile> {
+  const res = await fetch(url(path))
+  const text = await res.text()
   if (!res.ok) throw new Error(`registry ${res.status}`)
-  return (await res.json()) as RegistryFile
+  try {
+    return JSON.parse(text) as RegistryFile
+  } catch {
+    throw new Error('registry_non_json')
+  }
+}
+
+/** 优先扁平路由，规避运营台 catch-all 异常；失败时回退 `/api/ops-sync/registry`。 */
+export async function fetchOpsRegistry(): Promise<RegistryFile> {
+  try {
+    return await fetchRegistryAt('/api/meoo-ops-sync-registry')
+  } catch {
+    return await fetchRegistryAt('/api/ops-sync/registry')
+  }
 }
 
 export async function pushErpTenant(tenant: RegistryTenant): Promise<void> {
