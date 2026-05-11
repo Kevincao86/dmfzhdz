@@ -177,6 +177,15 @@ function isPaymentOrdersListPath(urlPath: string): boolean {
   return urlPath === '/api/ops-supabase/payment-orders' || urlPath === '/api/ops-supabase/payment-orders-list'
 }
 
+/** 与线上 fetch 一致：api 根目录单文件 + fetch PostgREST */
+function isMeooTenantsPatchPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-supabase-tenants-patch'
+}
+
+function isMeooTenantsResetPasswordPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-supabase-tenants-reset-password'
+}
+
 async function edgePost(
   supabaseUrl: string,
   anon: string,
@@ -206,7 +215,13 @@ export function opsSupabaseAdminPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const reqUrl = req.url ?? ''
         const urlPath = reqUrl.split('?')[0]
-        if (!urlPath.startsWith('/api/ops-supabase/')) return next()
+        if (
+          !urlPath.startsWith('/api/ops-supabase/') &&
+          !isMeooTenantsPatchPath(urlPath) &&
+          !isMeooTenantsResetPasswordPath(urlPath)
+        ) {
+          return next()
+        }
 
         const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
         const serviceKeyEnv = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
@@ -234,6 +249,8 @@ export function opsSupabaseAdminPlugin(): Plugin {
           urlPath === '/api/ops-supabase/tenants/wallet-ledger' ||
           urlPath === '/api/ops-supabase/tenants/patch' ||
           urlPath === '/api/ops-supabase/tenants/reset-password' ||
+          isMeooTenantsPatchPath(urlPath) ||
+          isMeooTenantsResetPasswordPath(urlPath) ||
           isPaymentOrdersListPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/verify' ||
           urlPath === '/api/ops-supabase/payment-orders/confirm' ||
@@ -246,7 +263,9 @@ export function opsSupabaseAdminPlugin(): Plugin {
           if (
             (isTenantListPath(urlPath) && method === 'GET') ||
             (urlPath === '/api/ops-supabase/tenants/wallet-ledger' && method === 'GET') ||
-            (isPaymentOrdersListPath(urlPath) && method === 'GET')
+            (isPaymentOrdersListPath(urlPath) && method === 'GET') ||
+            (isMeooTenantsPatchPath(urlPath) && method === 'POST') ||
+            (isMeooTenantsResetPasswordPath(urlPath) && method === 'POST')
           ) {
             json(res, 503, {
               ok: false,
@@ -354,7 +373,10 @@ export function opsSupabaseAdminPlugin(): Plugin {
             return
           }
 
-          if (method === 'POST' && urlPath === '/api/ops-supabase/tenants/patch') {
+          if (
+            method === 'POST' &&
+            (urlPath === '/api/ops-supabase/tenants/patch' || isMeooTenantsPatchPath(urlPath))
+          ) {
             const raw = await readBody(req as IncomingMessage)
             let body: Record<string, unknown>
             try {
@@ -399,7 +421,11 @@ export function opsSupabaseAdminPlugin(): Plugin {
             return
           }
 
-          if (method === 'POST' && urlPath === '/api/ops-supabase/tenants/reset-password') {
+          if (
+            method === 'POST' &&
+            (urlPath === '/api/ops-supabase/tenants/reset-password' ||
+              isMeooTenantsResetPasswordPath(urlPath))
+          ) {
             const raw = await readBody(req as IncomingMessage)
             let body: Record<string, unknown>
             try {

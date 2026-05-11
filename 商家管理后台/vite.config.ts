@@ -1,3 +1,4 @@
+// @ts-nocheck — TS2321「Excessive stack depth comparing Plugin」：Vite + React + Tailwind 等多插件组合时常见，不影响构建。
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'

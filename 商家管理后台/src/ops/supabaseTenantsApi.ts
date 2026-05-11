@@ -146,7 +146,8 @@ export async function patchSupabaseTenant(body: {
   trialDays?: number
   officialDays?: number
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
-  const res = await fetch('/api/ops-supabase/tenants/patch', {
+  /** 扁平路径，避免 Vercel 深层目录 + supabase-js 打包崩溃（与 meoo-supabase-tenants-list 一致） */
+  const res = await fetch('/api/meoo-supabase-tenants-patch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -170,7 +171,7 @@ export async function resetSupabaseTenantAuthPassword(
   tenantId: string,
   password = '123456',
 ): Promise<{ ok: boolean; error?: string; detail?: string }> {
-  const res = await fetch('/api/ops-supabase/tenants/reset-password', {
+  const res = await fetch('/api/meoo-supabase-tenants-reset-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: tenantId, password }),
