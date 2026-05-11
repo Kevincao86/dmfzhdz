@@ -2,6 +2,10 @@ import { Eye, EyeOff, Search, User } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
+  readMerchantSession,
+  writeMerchantSession,
+} from '../../lib/merchantSession'
+import {
   getDouyinStores,
   postDouyinBind,
   type DouyinStoreRow,
@@ -14,49 +18,32 @@ const META_APP_ID = 'meoo_douyin_app_id'
 const META_MERCHANT_ID = 'meoo_douyin_merchant_id'
 const META_ACCOUNT_NAME = 'meoo_douyin_account_name'
 
-function readSession(key: string) {
-  try {
-    return sessionStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function writeSession(key: string, value: string | null) {
-  try {
-    if (value == null) sessionStorage.removeItem(key)
-    else sessionStorage.setItem(key, value)
-  } catch {
-    /* ignore */
-  }
-}
-
 type PageSize = 10 | 50 | 100
 
 export default function DouyinMerchantSection() {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
-    readSession(TOKEN_KEY),
+    readMerchantSession(TOKEN_KEY),
   )
   const [bindOpen, setBindOpen] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(() => readSession(AUTO_KEY) !== '0')
+  const [autoRefresh, setAutoRefresh] = useState(() => readMerchantSession(AUTO_KEY) !== '0')
   const [manualRefreshing, setManualRefreshing] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
-  const [appId, setAppId] = useState(() => readSession(META_APP_ID) ?? '')
+  const [appId, setAppId] = useState(() => readMerchantSession(META_APP_ID) ?? '')
   const [appSecret, setAppSecret] = useState('')
   const [merchantId, setMerchantId] = useState(
-    () => readSession(META_MERCHANT_ID) ?? '',
+    () => readMerchantSession(META_MERCHANT_ID) ?? '',
   )
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
   /** true = 密文；与按钮图标「当前可执行动作」一致：遮罩时显示眼睛=点击显示明文 */
   const [secretMasked, setSecretMasked] = useState(true)
   const [boundMerchantId, setBoundMerchantId] = useState(() => {
-    if (readSession(TOKEN_KEY)) return readSession(META_MERCHANT_ID) ?? ''
+    if (readMerchantSession(TOKEN_KEY)) return readMerchantSession(META_MERCHANT_ID) ?? ''
     return ''
   })
   const [boundAccountName, setBoundAccountName] = useState(() => {
-    if (readSession(TOKEN_KEY)) return readSession(META_ACCOUNT_NAME) ?? ''
+    if (readMerchantSession(TOKEN_KEY)) return readMerchantSession(META_ACCOUNT_NAME) ?? ''
     return ''
   })
 
@@ -83,8 +70,8 @@ export default function DouyinMerchantSection() {
 
   useEffect(() => {
     if (accessToken) {
-      setBoundMerchantId(readSession(META_MERCHANT_ID) ?? '')
-      setBoundAccountName(readSession(META_ACCOUNT_NAME) ?? '')
+      setBoundMerchantId(readMerchantSession(META_MERCHANT_ID) ?? '')
+      setBoundAccountName(readMerchantSession(META_ACCOUNT_NAME) ?? '')
     } else {
       setBoundMerchantId('')
       setBoundAccountName('')
@@ -113,7 +100,7 @@ export default function DouyinMerchantSection() {
       const mid =
         opts?.merchantIdOverride?.trim() ||
         boundMerchantId.trim() ||
-        readSession(META_MERCHANT_ID)?.trim() ||
+        readMerchantSession(META_MERCHANT_ID)?.trim() ||
         undefined
       const silent = opts?.silent ?? false
       if (!silent) setListLoading(true)
@@ -147,7 +134,7 @@ export default function DouyinMerchantSection() {
       const syncName = res.accountName?.trim()
       if (syncName) {
         setBoundAccountName(syncName)
-        writeSession(META_ACCOUNT_NAME, syncName)
+        writeMerchantSession(META_ACCOUNT_NAME, syncName)
       }
       setLastSyncAt(new Date().toLocaleString('zh-CN'))
     },
@@ -155,7 +142,7 @@ export default function DouyinMerchantSection() {
   )
 
   const persistAuto = (v: boolean) => {
-    writeSession(AUTO_KEY, v ? '1' : '0')
+    writeMerchantSession(AUTO_KEY, v ? '1' : '0')
     setAutoRefresh(v)
   }
 
@@ -237,12 +224,12 @@ export default function DouyinMerchantSection() {
         setBindError(r.message)
         return
       }
-      writeSession(TOKEN_KEY, r.accessToken)
-      writeSession(META_APP_ID, appId.trim())
-      writeSession(META_MERCHANT_ID, merchantId.trim())
+      writeMerchantSession(TOKEN_KEY, r.accessToken)
+      writeMerchantSession(META_APP_ID, appId.trim())
+      writeMerchantSession(META_MERCHANT_ID, merchantId.trim())
       const accName = r.accountName?.trim()
-      if (accName) writeSession(META_ACCOUNT_NAME, accName)
-      else writeSession(META_ACCOUNT_NAME, null)
+      if (accName) writeMerchantSession(META_ACCOUNT_NAME, accName)
+      else writeMerchantSession(META_ACCOUNT_NAME, null)
       setBoundMerchantId(merchantId.trim())
       setBoundAccountName(accName ?? '')
       setAccessToken(r.accessToken)
@@ -263,8 +250,8 @@ export default function DouyinMerchantSection() {
   }
 
   const disconnect = () => {
-    writeSession(TOKEN_KEY, null)
-    writeSession(META_ACCOUNT_NAME, null)
+    writeMerchantSession(TOKEN_KEY, null)
+    writeMerchantSession(META_ACCOUNT_NAME, null)
     setBoundMerchantId('')
     setBoundAccountName('')
     setAccessToken(null)
@@ -362,6 +349,9 @@ export default function DouyinMerchantSection() {
               autoRefreshEnabled={autoRefresh}
               onAutoRefreshEnabledChange={persistAuto}
             />
+            <p className="mt-3 text-xs text-gray-600">
+              绑定凭证保存在本机浏览器（跨标签页共享）；自动刷新仅重新拉取门店列表，不会因接口失败而解除绑定。只有点击「断开连接」才会清除绑定。
+            </p>
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5">

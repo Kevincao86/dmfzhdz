@@ -5,6 +5,8 @@
  * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save
  */
 
+import { readMerchantSession } from '../lib/merchantSession'
+
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
 function url(path: string) {
@@ -12,17 +14,8 @@ function url(path: string) {
   return `${b}${path}`
 }
 
-function readSession(key: string): string | null {
-  try {
-    const v = sessionStorage.getItem(key)
-    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null
-  } catch {
-    return null
-  }
-}
-
 function authHeaders(): HeadersInit {
-  const token = readSession('meoo_douyin_merchant_token')
+  const token = readMerchantSession('meoo_douyin_merchant_token')
   const h: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -418,7 +411,7 @@ function extractProductsArrayFromDouyinPayload(data: Record<string, unknown>): u
 
 /** 与类目/门店等接口一致：显式传 account_id，避免仅依赖网关会话默认值与前端来客账户不一致。 */
 function appendDouyinAccountIdToQuery(qs: URLSearchParams): void {
-  const id = readSession('meoo_douyin_merchant_id')
+  const id = readMerchantSession('meoo_douyin_merchant_id')
   if (id) qs.set('account_id', id)
 }
 
@@ -607,7 +600,7 @@ async function parseCategoryGetJsonResponse(res: Response): Promise<Record<strin
 
 /** 行业圈定可发三级类目（网关可合并门店资质 / 类目资质结果） */
 export async function getDouyinIndustryCategoryScope(): Promise<IndustryScopeResult> {
-  const accountId = readSession('meoo_douyin_merchant_id')
+  const accountId = readMerchantSession('meoo_douyin_merchant_id')
   const q = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
   const res = await fetch(url(`/api/merchant/douyin/goods/industry-scope${q}`), {
     method: 'GET',
@@ -631,7 +624,7 @@ export async function getDouyinIndustryCategoryScope(): Promise<IndustryScopeRes
 
 /** 对齐 category/get 树形结果（单请求；需补全子树请用 getDouyinGoodsCategoryTreeMerged） */
 export async function getDouyinGoodsCategoryTree(): Promise<CategoryGetResult> {
-  const accountId = readSession('meoo_douyin_merchant_id')
+  const accountId = readMerchantSession('meoo_douyin_merchant_id')
   const q = new URLSearchParams()
   q.set('query_category_type', '1')
   if (accountId) q.set('account_id', accountId)
@@ -707,7 +700,7 @@ function extractChildrenFromCategoryGetPayload(
 }
 
 async function fetchCategorySubtreeByParentId(parentCategoryId: string): Promise<DouyinCategoryTreeNode[]> {
-  const accountId = readSession('meoo_douyin_merchant_id')
+  const accountId = readMerchantSession('meoo_douyin_merchant_id')
   const q = new URLSearchParams()
   q.set('query_category_type', '1')
   q.set('category_id', parentCategoryId)
@@ -800,7 +793,7 @@ export async function getDouyinGoodsCategoryTreeMerged(
   maxExtraRequests = 800,
   delayMs = 35,
 ): Promise<CategoryGetResult> {
-  const accountId = readSession('meoo_douyin_merchant_id')
+  const accountId = readMerchantSession('meoo_douyin_merchant_id')
   const q0 = new URLSearchParams()
   q0.set('query_category_type', '1')
   q0.set('category_id', '0')
