@@ -416,8 +416,11 @@ function normalizeOnlineProductEntry(raw: unknown): DouyinOnlineProductHit | nul
     row.product && typeof row.product === 'object'
       ? (row.product as Record<string, unknown>)
       : row
-  const product_id = String(prod.product_id ?? prod.id ?? '').trim()
-  const product_name = String(prod.product_name ?? prod.name ?? '').trim()
+  /** 文档示例含 product_id / out_id / spu_id；线上列表项顶层也可能带 product_id */
+  const product_id = String(
+    prod.product_id ?? prod.id ?? prod.out_id ?? prod.spu_id ?? row.product_id ?? row.out_id ?? '',
+  ).trim()
+  const product_name = String(prod.product_name ?? prod.name ?? row.product_name ?? '').trim()
   if (!product_id && !product_name) return null
   const sku =
     row.sku && typeof row.sku === 'object' ? (row.sku as Record<string, unknown>) : null
@@ -442,9 +445,17 @@ function normalizeOnlineProductEntry(raw: unknown): DouyinOnlineProductHit | nul
   }
 }
 
+function numericBizErrorCode(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v)
+  return undefined
+}
+
 function douyinDataBizError(inner: Record<string, unknown> | undefined): string | undefined {
-  if (!inner || typeof inner.error_code !== 'number' || inner.error_code === 0) return undefined
-  return typeof inner.description === 'string' ? inner.description : `抖音 error_code=${inner.error_code}`
+  if (!inner) return undefined
+  const ec = numericBizErrorCode(inner.error_code)
+  if (ec === undefined || ec === 0) return undefined
+  return typeof inner.description === 'string' ? inner.description : `抖音 error_code=${ec}`
 }
 
 function extractProductsArrayFromDouyinPayload(data: Record<string, unknown>): unknown[] {
@@ -655,6 +666,22 @@ export async function getDouyinGoodsProductOnlineQuery(params: {
     onlineHits = mergeDedupeProductHits([r2.hits, r3.hits])
     httpErr = r2.httpErr && r3.httpErr ? r2.httpErr ?? r3.httpErr : undefined
     bizErr = onlineHits.length === 0 ? r2.bizErr ?? r3.bizErr : undefined
+
+    /**
+     * 文档：自研商家 goods_query_type=2、服务商=3；二者都无结果时，再试仅 goods_creator_type（不传 goods_query_type 时该字段生效）。
+     * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/online.query
+     */
+    if (onlineHits.length === 0 && !httpErr) {
+      const qMerch = new URLSearchParams(base.toString())
+      qMerch.set('goods_creator_type', '1')
+      const qSvc = new URLSearchParams(base.toString())
+      qSvc.set('goods_creator_type', '0')
+      const [rm, rs] = await Promise.all([fetchOnlineQueryHits(qMerch), fetchOnlineQueryHits(qSvc)])
+      onlineHits = mergeDedupeProductHits([onlineHits, rm.hits, rs.hits])
+      if (!bizErr && onlineHits.length === 0) {
+        bizErr = rm.bizErr ?? rs.bizErr ?? bizErr
+      }
+    }
   }
 
   const draftHits = await fetchDraftQueryHitsFiltered(kw, count)
