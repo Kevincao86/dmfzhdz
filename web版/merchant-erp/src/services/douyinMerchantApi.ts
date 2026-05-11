@@ -19,6 +19,9 @@ import { extractLifeBrandStructName } from '../lib/douyinLifeBrandExtract'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
+/** 浏览器 → 同源绑定接口；服务端再调抖音（服务端约 25s 超时），此处略放宽避免永久挂起 */
+const DOUYIN_BIND_CLIENT_TIMEOUT_MS = 70_000
+
 export const DOUYIN_SHOP_POI_QUERY_DOC =
   'https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/life.capacity.shop/store-management/shop.query'
 
@@ -85,58 +88,86 @@ export async function postDouyinBind(
     appSecret: payload.appSecret,
     merchantId: payload.merchantId,
   })
-  let res = await fetch(url('/api/douyin-bind'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  })
-  if (res.status === 404) {
-    res = await fetch(url('/api/merchant/douyin/bind'), {
+
+  const ctrl = new AbortController()
+  const timeoutId = setTimeout(() => ctrl.abort(), DOUYIN_BIND_CLIENT_TIMEOUT_MS)
+  const clearBindTimer = () => clearTimeout(timeoutId)
+
+  try {
+    let res = await fetch(url('/api/douyin-bind'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
+      signal: ctrl.signal,
     })
-  }
-  const rawText = await res.text()
-  let data: Record<string, unknown> = {}
-  try {
-    data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
-  } catch {
-    /* 非 JSON（常为 Vercel/HTML 报错页） */
-  }
-  if (!res.ok) {
-    const errObj = data.error && typeof data.error === 'object' ? (data.error as Record<string, unknown>) : null
-    const nestedMsg =
-      typeof errObj?.message === 'string'
-        ? errObj.message
-        : typeof data.detail === 'string'
-          ? data.detail
-          : undefined
-    const msg =
-      (typeof data.message === 'string' && data.message) ||
-      nestedMsg ||
-      (typeof data.error === 'string' && data.error) ||
-      rawText.trim().slice(0, 320) ||
-      `HTTP ${res.status}`
-    return { ok: false, message: msg }
-  }
-  const token = data.accessToken ?? data.token
-  if (typeof token !== 'string' || !token) {
-    return {
-      ok: false,
-      message:
-        '绑定接口未返回 accessToken（或 token），请后端按约定返回 JSON：{ "accessToken": "..." }',
+    if (res.status === 404) {
+      res = await fetch(url('/api/merchant/douyin/bind'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: ctrl.signal,
+      })
     }
-  }
-  const accountName =
-    (typeof data.accountName === 'string' && data.accountName) ||
-    (typeof data.merchantName === 'string' && data.merchantName) ||
-    undefined
-  return {
-    ok: true,
-    accessToken: token,
-    accountName,
-    message: typeof data.message === 'string' ? data.message : undefined,
+    const rawText = await res.text()
+    let data: Record<string, unknown> = {}
+    try {
+      data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
+    } catch {
+      /* 非 JSON（常为 Vercel/HTML 报错页） */
+    }
+    if (!res.ok) {
+      const errObj = data.error && typeof data.error === 'object' ? (data.error as Record<string, unknown>) : null
+      const nestedMsg =
+        typeof errObj?.message === 'string'
+          ? errObj.message
+          : typeof data.detail === 'string'
+            ? data.detail
+            : undefined
+      const msg =
+        (typeof data.message === 'string' && data.message) ||
+        nestedMsg ||
+        (typeof data.error === 'string' && data.error) ||
+        rawText.trim().slice(0, 320) ||
+        `HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const token = data.accessToken ?? data.token
+    if (typeof token !== 'string' || !token) {
+      return {
+        ok: false,
+        message:
+          '绑定接口未返回 accessToken（或 token），请后端按约定返回 JSON：{ "accessToken": "..." }',
+      }
+    }
+    const accountName =
+      (typeof data.accountName === 'string' && data.accountName) ||
+      (typeof data.merchantName === 'string' && data.merchantName) ||
+      undefined
+    return {
+      ok: true,
+      accessToken: token,
+      accountName,
+      message: typeof data.message === 'string' ? data.message : undefined,
+    }
+  } catch (e) {
+    const aborted =
+      (typeof DOMException !== 'undefined' && e instanceof DOMException && e.name === 'AbortError') ||
+      (e instanceof Error && e.name === 'AbortError')
+    if (aborted) {
+      return {
+        ok: false,
+        message: `绑定请求超时（${Math.round(DOUYIN_BIND_CLIENT_TIMEOUT_MS / 1000)} 秒）。请检查网络或稍后重试；部署在海外时请将 Functions 区域调至离大陆更近的节点（如东京 hnd1）。`,
+      }
+    }
+    const msg =
+      e instanceof TypeError
+        ? '无法连接绑定服务：请确认已在本机启动商家 ERP（npm run dev），且页面地址与开发服务器一致（勿混用 localhost 与 127.0.0.1）。'
+        : e instanceof Error
+          ? e.message
+          : String(e)
+    return { ok: false, message: msg }
+  } finally {
+    clearBindTimer()
   }
 }
 

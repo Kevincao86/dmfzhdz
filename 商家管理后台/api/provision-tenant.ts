@@ -13,6 +13,14 @@ import { sendOpsJson } from './safeOpsJson'
 
 export const config = { maxDuration: 60 }
 
+function bodyRaw(req: VercelRequest): string {
+  if (typeof req.body === 'string') return req.body
+  if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
+  if (req.body !== undefined && req.body !== null && typeof req.body === 'object')
+    return JSON.stringify(req.body)
+  return '{}'
+}
+
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -216,12 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const rawBody =
-      typeof req.body === 'string'
-        ? req.body
-        : req.body !== undefined && req.body !== null
-          ? JSON.stringify(req.body)
-          : '{}'
+    const rawBody = bodyRaw(req)
 
     const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
     const serviceRole = (

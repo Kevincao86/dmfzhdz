@@ -1,9 +1,11 @@
 /**
  * Vercel Serverless（Node）：运营台列出 public.tenants + owner 登录信息。
  * 本地 dev 仍由 vite-plugins/opsSupabaseAdminPlugin 处理同源 GET。
+ *
+ * 使用原生 fetch 访问 PostgREST / Auth Admin，避免 @supabase/supabase-js 在部分 Vercel Serverless
+ * 打包环境下触发运行时崩溃（表现为 FUNCTION_INVOCATION_FAILED、前端只看到 http_500）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
 import { sendOpsJson } from '../../safeOpsJson'
 
 export const config = { maxDuration: 60 }
@@ -20,45 +22,73 @@ type TenantRow = {
   updated_at: string
 }
 
-async function listTenantsWithAdminClient(
+function serviceRoleHeaders(serviceKey: string): Record<string, string> {
+  return {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    Accept: 'application/json',
+  }
+}
+
+async function listTenantsWithServiceRoleFetch(
   supabaseUrl: string,
   serviceKey: string,
 ): Promise<{ ok: true; rows: Record<string, unknown>[] } | { ok: false; message: string; detail?: string }> {
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const base = supabaseUrl.replace(/\/$/, '')
+  const headers = serviceRoleHeaders(serviceKey)
 
   const fullTenantSelect =
-    'id, name, account_status, trial_days, official_days, wallet_balance_cents, service_expire_at, created_at, updated_at'
+    'id,name,account_status,trial_days,official_days,wallet_balance_cents,service_expire_at,created_at,updated_at'
+  const fullUrl = `${base}/rest/v1/tenants?select=${encodeURIComponent(fullTenantSelect)}&order=created_at.desc`
+
+  const tr = await fetch(fullUrl, { headers })
+  const ttext = await tr.text()
 
   let trows: TenantRow[] | null = null
-  const fullRes = await admin.from('tenants').select(fullTenantSelect).order('created_at', { ascending: false })
 
-  if (!fullRes.error) {
-    trows = (fullRes.data ?? []) as TenantRow[]
-  } else if (
-    /wallet_balance_cents|service_expire_at|does not exist|Could not find|schema cache/i.test(fullRes.error.message)
-  ) {
-    const legacy = await admin
-      .from('tenants')
-      .select('id, name, account_status, trial_days, official_days, created_at, updated_at')
-      .order('created_at', { ascending: false })
-    if (legacy.error) {
-      return { ok: false, message: 'tenants_select_failed', detail: legacy.error.message }
+  if (tr.ok) {
+    try {
+      trows = JSON.parse(ttext || '[]') as TenantRow[]
+    } catch {
+      return { ok: false, message: 'tenants_select_failed', detail: ttext.slice(0, 400) }
     }
-    trows = (legacy.data ?? []).map((row) => ({
-      ...(row as Omit<TenantRow, 'wallet_balance_cents' | 'service_expire_at'>),
-      wallet_balance_cents: 0,
-      service_expire_at: null,
-    }))
+  } else if (
+    /wallet_balance_cents|service_expire_at|does not exist|Could not find|schema cache/i.test(ttext)
+  ) {
+    const legacyUrl = `${base}/rest/v1/tenants?select=id,name,account_status,trial_days,official_days,created_at,updated_at&order=created_at.desc`
+    const legacy = await fetch(legacyUrl, { headers })
+    const ltext = await legacy.text()
+    if (!legacy.ok) {
+      return { ok: false, message: 'tenants_select_failed', detail: ltext.slice(0, 400) }
+    }
+    try {
+      const legacyRows = JSON.parse(ltext || '[]') as Omit<
+        TenantRow,
+        'wallet_balance_cents' | 'service_expire_at'
+      >[]
+      trows = legacyRows.map((row) => ({
+        ...row,
+        wallet_balance_cents: 0,
+        service_expire_at: null,
+      }))
+    } catch {
+      return { ok: false, message: 'tenants_select_failed', detail: ltext.slice(0, 400) }
+    }
   } else {
-    return { ok: false, message: 'tenants_select_failed', detail: fullRes.error.message }
+    return { ok: false, message: 'tenants_select_failed', detail: ttext.slice(0, 400) }
   }
 
-  const { data: mrows, error: e2 } = await admin.from('tenant_members').select('tenant_id, user_id, role').eq('role', 'owner')
-
-  if (e2) {
-    return { ok: false, message: 'members_select_failed', detail: e2.message }
+  const memUrl = `${base}/rest/v1/tenant_members?select=tenant_id,user_id,role&role=eq.owner`
+  const mr = await fetch(memUrl, { headers })
+  const mtext = await mr.text()
+  if (!mr.ok) {
+    return { ok: false, message: 'members_select_failed', detail: mtext.slice(0, 400) }
+  }
+  let mrows: { tenant_id?: string; user_id?: string; role?: string }[]
+  try {
+    mrows = JSON.parse(mtext || '[]') as typeof mrows
+  } catch {
+    return { ok: false, message: 'members_select_failed', detail: mtext.slice(0, 400) }
   }
 
   const ownerByTenant = new Map<string, string>()
@@ -74,13 +104,27 @@ async function listTenantsWithAdminClient(
     let login_name = ''
     let user_email = ''
     if (uid) {
-      const { data: uwrap, error: ue } = await admin.auth.admin.getUserById(uid)
-      if (!ue && uwrap?.user) {
-        const u = uwrap.user
-        const meta = u.user_metadata as { login_name?: string } | undefined
-        login_name =
-          (typeof meta?.login_name === 'string' && meta.login_name.trim()) || (u.email?.split('@')[0] ?? '')
-        user_email = u.email ?? ''
+      try {
+        const ur = await fetch(`${base}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
+          headers,
+        })
+        const utext = await ur.text()
+        if (ur.ok) {
+          try {
+            const wrap = JSON.parse(utext) as Record<string, unknown>
+            const u = (wrap.user ?? wrap) as Record<string, unknown>
+            const meta = u.user_metadata as { login_name?: string } | undefined
+            const email = typeof u.email === 'string' ? u.email : ''
+            user_email = email
+            login_name =
+              (typeof meta?.login_name === 'string' && meta.login_name.trim()) ||
+              (email ? email.split('@')[0] ?? '' : '')
+          } catch {
+            /* 单条用户信息解析失败不影响列表 */
+          }
+        }
+      } catch {
+        /* 单条 Auth 请求失败不影响列表 */
       }
     }
     out.push({
@@ -124,9 +168,9 @@ async function edgePost(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-
   try {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
     if (req.method !== 'GET') {
       res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
       return
@@ -153,7 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     if (serviceRole) {
-      const lr = await listTenantsWithAdminClient(supabaseUrl, serviceRole)
+      const lr = await listTenantsWithServiceRoleFetch(supabaseUrl, serviceRole)
       if (lr.ok) {
         res.status(200).send(JSON.stringify({ ok: true, rows: lr.rows }))
         return
