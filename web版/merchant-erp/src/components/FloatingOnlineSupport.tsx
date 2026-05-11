@@ -7,18 +7,14 @@ import {
   getSupportRelayWsUrl,
   type SupportRelayChatLine,
 } from '../lib/supportRelay'
+import {
+  type ChatMessage,
+  type ChatRole,
+  mergeRelayChatMessages,
+  relayFromToRole,
+  rowToChatMessage,
+} from '../lib/supportRelayChatMerge'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-
-type ChatRole = 'user' | 'bot' | 'agent' | 'ops' | 'system'
-
-type ChatMessage = {
-  id: string
-  role: ChatRole
-  text: string
-  at: string
-  /** 用于合并云端历史与轮询结果排序 */
-  ts: number
-}
 
 const DEFAULT_BOT: ChatMessage = {
   id: 'm0',
@@ -30,44 +26,6 @@ const DEFAULT_BOT: ChatMessage = {
 
 function nowTime(): string {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function relayFromToRole(from: SupportRelayChatLine['from']): ChatRole {
-  if (from === 'ops') return 'ops'
-  if (from === 'system') return 'system'
-  if (from === 'agent') return 'agent'
-  if (from === 'bot') return 'bot'
-  return 'user'
-}
-
-function rowToChatMessage(row: {
-  from_role: string
-  text: string
-  ts: number
-  client_msg_id: string
-}): ChatMessage {
-  return {
-    id: row.client_msg_id,
-    role: relayFromToRole(row.from_role as SupportRelayChatLine['from']),
-    text: row.text,
-    at: formatSupportRelayTime(row.ts),
-    ts: row.ts,
-  }
-}
-
-/** 轮询与 Realtime 兜底合并：同一 client_msg_id 以服务端行为准 */
-function mergeRelayChatMessages(
-  prev: ChatMessage[],
-  rows: Array<{ from_role: string; text: string; ts: number; client_msg_id: string }>,
-): ChatMessage[] {
-  const map = new Map<string, ChatMessage>()
-  for (const m of prev) map.set(m.id, m)
-  for (const r of rows) {
-    map.set(r.client_msg_id, rowToChatMessage(r))
-  }
-  return [...map.values()].sort((a, b) =>
-    a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id),
-  )
 }
 
 const SUPPORT_RELAY_POLL_MS = 4000
@@ -85,6 +43,7 @@ export default function FloatingOnlineSupport({
 }: FloatingOnlineSupportProps) {
   const panelId = useId()
   const sessionIdRef = useRef(getOrCreateSupportRelaySessionId())
+  const relaySyncRef = useRef<(() => void) | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const customerIdRef = useRef(customerId)
   const enterpriseNameRef = useRef(enterpriseName)
@@ -322,11 +281,21 @@ export default function FloatingOnlineSupport({
       })()
     }
 
+    relaySyncRef.current = runPollMerge
+
     let authSub: { unsubscribe: () => void } | null = null
+
+    const bindRealtimeJwt = async () => {
+      const {
+        data: { session },
+      } = await client.auth.getSession()
+      await client.realtime.setAuth(session?.access_token ?? '')
+    }
 
     void (async () => {
       try {
         await client.auth.getSession()
+        await bindRealtimeJwt()
 
         const rows = await fetchSessionRows()
         if (cancelled) return
@@ -338,7 +307,8 @@ export default function FloatingOnlineSupport({
         pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
         runPollMerge()
 
-        const { data } = client.auth.onAuthStateChange(() => {
+        const { data } = client.auth.onAuthStateChange(async (_event, session) => {
+          await client.realtime.setAuth(session?.access_token ?? '')
           runPollMerge()
         })
         authSub = data.subscription
@@ -351,11 +321,10 @@ export default function FloatingOnlineSupport({
               event: 'INSERT',
               schema: 'public',
               table: 'support_relay_messages',
-              filter: `session_id=eq.${sid}`,
             },
             (payload) => {
-              const row = payload.new as RelayRow
-              if (!row?.client_msg_id) return
+              const row = payload.new as RelayRow & { session_id?: string }
+              if (row.session_id !== sid || !row.client_msg_id) return
               setMessages((prev) => {
                 if (prev.some((m) => m.id === row.client_msg_id)) return prev
                 return [...prev, rowToChatMessage(row)].sort((a, b) =>
@@ -377,7 +346,8 @@ export default function FloatingOnlineSupport({
         if (!cancelled) {
           pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
           runPollMerge()
-          const { data } = client.auth.onAuthStateChange(() => {
+          const { data } = client.auth.onAuthStateChange(async (_event, session) => {
+            await client.realtime.setAuth(session?.access_token ?? '')
             runPollMerge()
           })
           authSub = data.subscription
@@ -388,10 +358,27 @@ export default function FloatingOnlineSupport({
 
     return () => {
       cancelled = true
+      relaySyncRef.current = null
       authSub?.unsubscribe()
       if (pollTimer) window.clearInterval(pollTimer)
       void ch?.unsubscribe()
     }
+  }, [])
+
+  /** 打开面板或回到前台时立即对齐云端（不依赖 Realtime） */
+  useEffect(() => {
+    if (!open) return
+    if (getSupportRelayWsUrl()) return
+    if (!supabaseConfigured || !supabase) return
+    queueMicrotask(() => relaySyncRef.current?.())
+  }, [open])
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') queueMicrotask(() => relaySyncRef.current?.())
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
   /** 登录信息变更后补发 identify（WebSocket）；云端模式写入随每条消息携带 customerId */

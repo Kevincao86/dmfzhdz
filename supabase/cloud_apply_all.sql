@@ -253,18 +253,29 @@ create policy "support_relay_messages_insert_merchant"
     and from_role in ('user', 'bot', 'agent', 'system')
   );
 
+create or replace function public.support_relay_user_participates_in_session(p_session_id text)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1
+    from public.support_relay_messages m
+    where m.session_id = p_session_id
+      and m.author_user_id is not distinct from auth.uid()
+  );
+$$;
+
+revoke all on function public.support_relay_user_participates_in_session(text) from public;
+grant execute on function public.support_relay_user_participates_in_session(text) to authenticated;
+
 create policy "support_relay_messages_select_participant"
   on public.support_relay_messages
   for select
   to authenticated
-  using (
-    exists (
-      select 1
-      from public.support_relay_messages x
-      where x.session_id = support_relay_messages.session_id
-        and x.author_user_id = auth.uid()
-    )
-  );
+  using (public.support_relay_user_participates_in_session(session_id));
 
 grant select, insert on public.support_relay_messages to authenticated;
 
