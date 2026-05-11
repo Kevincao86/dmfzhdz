@@ -103,24 +103,44 @@ function parseDouyinEnvelope(raw: string): Record<string, unknown> {
   }
 }
 
+function numericErrorCode(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'bigint') return Number(v)
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v)
+  return undefined
+}
+
 function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string } {
+  const rootCode = numericErrorCode(j.error_code)
+  if (rootCode !== undefined && rootCode !== 0) {
+    return { ok: false, msg: String(j.description ?? j.msg ?? `抖音根 error_code=${rootCode}`) }
+  }
   const data = j.data
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
-    const code = d.error_code
-    if (typeof code === 'number' && code !== 0) {
+    const code = numericErrorCode(d.error_code)
+    if (code !== undefined && code !== 0) {
       return { ok: false, msg: String(d.description ?? `抖音 error_code=${code}`) }
     }
   }
   const extra = j.extra
   if (extra && typeof extra === 'object') {
     const e = extra as Record<string, unknown>
-    const code = e.error_code
-    if (typeof code === 'number' && code !== 0) {
+    const code = numericErrorCode(e.error_code)
+    if (code !== undefined && code !== 0) {
       return { ok: false, msg: String(e.description ?? `抖音 extra error_code=${code}`) }
     }
   }
   return { ok: true }
+}
+
+function extractPoisFromShopQueryData(data: Record<string, unknown> | undefined): unknown[] {
+  if (!data || typeof data !== 'object') return []
+  const direct = data.pois
+  if (Array.isArray(direct)) return direct
+  const alt = data.list ?? data.poi_list ?? data.shop_list ?? data.shops ?? data.records
+  if (Array.isArray(alt)) return alt
+  return []
 }
 
 async function fetchDouyinClientToken(
@@ -246,7 +266,7 @@ export async function runDouyinMerchantBind(
     const token = await ensureDouyinToken(session)
     const first = await shopPoiQueryPage(merchantId, token, 1, 1)
     const d = first.data as Record<string, unknown> | undefined
-    const pois = (d?.pois as unknown[]) ?? []
+    const pois = extractPoisFromShopQueryData(d)
     const accountName = accountNameFromPois(pois)
 
     const secret = merchantDouyinSessionSecret()
