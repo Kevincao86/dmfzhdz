@@ -34,14 +34,14 @@
  * 能力授权与门店绑定：见抖音「auth_with_bind」文档（生产网关实现）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.ts'
-import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract'
+import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
+import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
   type DouyinMerchantSession,
   douyinMerchantDevSessions,
   openDouyinSessionCredentials,
-} from '../api/merchant/douyin/bindShared.ts'
-import { mockDouyinProductStore } from './mockDouyinProductStore'
+} from '../api/merchant/douyin/bindShared.js'
+import { mockDouyinProductStore } from './mockDouyinProductStore.js'
 
 export { runDouyinMerchantBind }
 
@@ -1255,7 +1255,7 @@ export async function handleDouyinStoreDetailGet(
     let taskQueryError: string | undefined
     if (taskIdList.length > 0) {
       const tq = await poiTaskQueryGet(taskIdList, token, accountId)
-      if (tq.ok) {
+      if (tq.ok === true) {
         taskBody = tq.body
       } else {
         taskQueryError = tq.message
@@ -1270,8 +1270,8 @@ export async function handleDouyinStoreDetailGet(
         error_code: 0,
         description: '',
       },
-      certInfo: cert.ok ? cert.body : undefined,
-      certInfoError: cert.ok ? undefined : cert.message,
+      certInfo: cert.ok === true ? cert.body : undefined,
+      certInfoError: cert.ok === false ? cert.message : undefined,
       taskQuery: taskBody,
       taskQueryError,
     })

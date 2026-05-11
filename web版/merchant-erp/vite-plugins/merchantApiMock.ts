@@ -5,8 +5,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Connect } from 'vite'
 import type { Plugin } from 'vite'
 import { loadEnv } from 'vite'
-import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.ts'
-import { handleMerchantApiGatewayCore } from './merchantApiGatewayCore'
+import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
+import { handleMerchantApiGatewayCore } from './merchantApiGatewayCore.js'
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
