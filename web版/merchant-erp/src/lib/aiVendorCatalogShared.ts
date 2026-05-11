@@ -1,4 +1,4 @@
-import type { AiVendorCatalogEntry } from './opsRegistryTypes'
+import type { AiVendorCatalogEntry } from './opsRegistryTypes.ts'
 
 export const BUILTIN_AI_VENDOR_IDS = ['minimax', 'qwen', 'doubao'] as const
 export type BuiltinAiVendorId = (typeof BUILTIN_AI_VENDOR_IDS)[number]

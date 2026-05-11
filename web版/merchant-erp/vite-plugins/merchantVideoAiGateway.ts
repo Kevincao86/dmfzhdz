@@ -8,7 +8,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared'
-import type { RegistryFile } from '../src/lib/opsRegistryTypes'
+import type { RegistryFile } from '../src/lib/opsRegistryTypes.ts'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream'
 
@@ -679,11 +679,11 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const r = await arkCreateVideoTask(env, parsed)
-    if (!r.ok) {
-      json(res, r.status && r.status >= 400 ? r.status : 400, { ok: false, message: r.msg })
+    if (r.ok) {
+      json(res, 200, { ok: true, taskId: r.taskId })
       return true
     }
-    json(res, 200, { ok: true, taskId: r.taskId })
+    json(res, r.status && r.status >= 400 ? r.status : 400, { ok: false, message: r.msg })
     return true
   }
 
@@ -694,14 +694,14 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const r = await arkGetVideoTask(env, taskIdSd)
-    if (!r.ok) {
-      json(res, r.status && r.status >= 400 ? r.status : 502, {
-        ok: false,
-        message: r.msg,
-      })
+    if (r.ok) {
+      json(res, 200, { ok: true, ...r.state })
       return true
     }
-    json(res, 200, { ok: true, ...r.state })
+    json(res, r.status && r.status >= 400 ? r.status : 502, {
+      ok: false,
+      message: r.msg,
+    })
     return true
   }
 

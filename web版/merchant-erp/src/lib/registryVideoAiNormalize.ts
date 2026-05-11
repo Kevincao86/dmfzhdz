@@ -1,4 +1,4 @@
-import type { RegistryVideoAi } from './opsRegistryTypes'
+import type { RegistryVideoAi } from './opsRegistryTypes.ts'
 
 /** 运营台与 dev 注册表共用的 videoAi 规范化（去空白、截断长度）。 */
 export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {

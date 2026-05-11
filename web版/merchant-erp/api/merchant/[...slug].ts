@@ -107,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (isDouyinBindPost) {
     try {
-      const { runDouyinMerchantBind } = await import('../douyin-bind')
+      const { runDouyinMerchantBind } = await import('../douyin-bind.ts')
       const bodyRaw = rawBody(req)
       const r = await runDouyinMerchantBind(bodyRaw)
       let payload: string
@@ -130,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const bodyRaw =
     method === 'POST' || method === 'PUT' || method === 'PATCH' ? rawBody(req) : ''
 
-  const { handleMerchantApiGatewayCore } = await import('../../vite-plugins/merchantApiGatewayCore')
+  const { handleMerchantApiGatewayCore } = await import('../../vite-plugins/merchantApiGatewayCore.ts')
 
   const { req: mReq, res: mRes } = createMocks<IncomingMessage, ServerResponse>({
     method: method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS',
