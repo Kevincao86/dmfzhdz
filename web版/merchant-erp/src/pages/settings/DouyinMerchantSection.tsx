@@ -115,7 +115,7 @@ export default function DouyinMerchantSection() {
         merchantId: mid,
       })
       if (!silent) setListLoading(false)
-      if (!res.ok) {
+      if (res.ok === false) {
         setListError(res.message)
         if (!silent) {
           setRows([])
@@ -209,28 +209,33 @@ export default function DouyinMerchantSection() {
       return
     }
     setBindSubmitting(true)
-    const r = await postDouyinBind({
-      appId: appId.trim(),
-      appSecret: appSecret.trim(),
-      merchantId: merchantId.trim(),
-    })
-    setBindSubmitting(false)
-    if (!r.ok) {
-      setBindError(r.message)
-      return
+    try {
+      const r = await postDouyinBind({
+        appId: appId.trim(),
+        appSecret: appSecret.trim(),
+        merchantId: merchantId.trim(),
+      })
+      if (!r.ok) {
+        setBindError(r.message)
+        return
+      }
+      writeSession(TOKEN_KEY, r.accessToken)
+      writeSession(META_APP_ID, appId.trim())
+      writeSession(META_MERCHANT_ID, merchantId.trim())
+      const accName = r.accountName?.trim()
+      if (accName) writeSession(META_ACCOUNT_NAME, accName)
+      else writeSession(META_ACCOUNT_NAME, null)
+      setBoundMerchantId(merchantId.trim())
+      setBoundAccountName(accName ?? '')
+      setAccessToken(r.accessToken)
+      setAppSecret('')
+      setBindOpen(false)
+      setPage(1)
+    } catch (e) {
+      setBindError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBindSubmitting(false)
     }
-    writeSession(TOKEN_KEY, r.accessToken)
-    writeSession(META_APP_ID, appId.trim())
-    writeSession(META_MERCHANT_ID, merchantId.trim())
-    const accName = r.accountName?.trim()
-    if (accName) writeSession(META_ACCOUNT_NAME, accName)
-    else writeSession(META_ACCOUNT_NAME, null)
-    setBoundMerchantId(merchantId.trim())
-    setBoundAccountName(accName ?? '')
-    setAccessToken(r.accessToken)
-    setAppSecret('')
-    setBindOpen(false)
-    setPage(1)
   }
 
   const disconnect = () => {

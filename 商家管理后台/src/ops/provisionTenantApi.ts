@@ -28,7 +28,8 @@ export async function postProvisionTenant(body: ManualTenantPayload): Promise<{
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const j = (await res.json().catch(() => ({}))) as {
+  const raw = await res.text()
+  let j: {
     ok?: boolean
     error?: string
     tenantId?: string
@@ -36,12 +37,18 @@ export async function postProvisionTenant(body: ManualTenantPayload): Promise<{
     detail?: string
     hint?: string
     missingEnv?: string[]
+  } = {}
+  try {
+    j = JSON.parse(raw || '{}') as typeof j
+  } catch {
+    j = {}
   }
   if (!res.ok) {
+    const fallback = raw.trim().slice(0, 500)
     return {
       ok: false,
       error: j.error ?? `http_${res.status}`,
-      detail: j.detail,
+      detail: j.detail ?? (fallback || undefined),
       hint: j.hint,
       missingEnv: Array.isArray(j.missingEnv) ? j.missingEnv : undefined,
     }
