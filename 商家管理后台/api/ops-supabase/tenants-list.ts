@@ -1,12 +1,13 @@
 /**
- * Vercel Serverless（Node）：运营台列出 public.tenants + owner 登录信息。
- * 本地 dev 仍由 vite-plugins/opsSupabaseAdminPlugin 处理同源 GET。
+ * Vercel：GET /api/ops-supabase/tenants-list（对外通过 vercel.json rewrite 映射为 /api/ops-supabase/tenants）
  *
- * 使用原生 fetch 访问 PostgREST / Auth Admin，避免 @supabase/supabase-js 在部分 Vercel Serverless
- * 打包环境下触发运行时崩溃（表现为 FUNCTION_INVOCATION_FAILED、前端只看到 http_500）。
+ * 勿再放回 tenants/index.ts：与同目录 patch/wallet-ledger 等并存时，Vercel 对「文件夹 + index.ts」
+ * 的打包存在已知问题，会导致 FUNCTION_INVOCATION_FAILED。
+ *
+ * 本地 dev 仍走 vite-plugins/opsSupabaseAdminPlugin 的 `/api/ops-supabase/tenants`。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sendOpsJson } from '../../safeOpsJson'
+import { sendOpsJson } from '../safeOpsJson'
 
 export const config = { maxDuration: 60 }
 
