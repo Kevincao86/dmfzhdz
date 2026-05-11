@@ -39,8 +39,8 @@ export async function fetchSupabaseTenantsForOps(): Promise<
   if (!supabaseOpsAvailableOnClient()) {
     return { ok: false, error: 'not_configured' }
   }
-  /** 线上须直达独立 Serverless 文件（避免 /tenants 依赖 rewrite 或与旧路由混淆） */
-  const res = await fetch('/api/ops-supabase/tenants-list')
+  /** api 根路径单文件，避免 Vercel 在 ops-supabase 深层目录打包崩溃 */
+  const res = await fetch('/api/meoo-supabase-tenants-list')
   const raw = await res.text()
   const j = parseJsonBody(raw) as {
     ok?: boolean
