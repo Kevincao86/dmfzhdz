@@ -260,15 +260,36 @@ export async function getDouyinStores(params: {
   /* 后端应将 merchantId 映射为抖音 account_id，并代理 GET goodlife/v1/shop/poi/query/。
    * 官方单次 size 最大 50：若账户门店数＞50，须循环翻页直至取完再合并为 ERP 的 items/total，并返回 accountName（或由各条 poi.account.root_account.account_name 解析）。 */
 
-  const res = await fetch(url(`/api/merchant/douyin/stores?${q}`), {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${params.accessToken}`,
-      Accept: 'application/json',
-    },
-  })
+  const qs = `?${q}`
+  /** 顶层 `/api/meoo-douyin-stores` 与嵌套 `[...slug]` 等价；优先扁平路径，规避部分部署下 merchant 动态路由未命中、请求落到 SPA HTML */
+  const storePaths = ['/api/meoo-douyin-stores', '/api/merchant/douyin/stores'] as const
+  let res: Response | null = null
+  let rawText = ''
+  for (const p of storePaths) {
+    const r = await fetch(url(`${p}${qs}`), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+        Accept: 'application/json',
+      },
+    })
+    const text = await r.text()
+    const ct = r.headers.get('content-type') ?? ''
+    const trimmed = text.trimStart()
+    const looksHtml = trimmed.startsWith('<') || /text\/html/i.test(ct)
+    if (r.ok && looksHtml) continue
+    res = r
+    rawText = text
+    break
+  }
+  if (!res) {
+    return {
+      ok: false,
+      message:
+        '门店接口返回了 HTML 而非 JSON（已依次尝试 /api/meoo-douyin-stores、/api/merchant/douyin/stores）。请确认 Vercel 项目 Root Directory 为 web版/merchant-erp，且 Production 已部署含 api/*.ts Functions。',
+    }
+  }
 
-  const rawText = await res.text()
   const ct = res.headers.get('content-type') ?? ''
   const trimmed = rawText.trimStart()
   const looksHtml = trimmed.startsWith('<') || /text\/html/i.test(ct)
@@ -276,7 +297,7 @@ export async function getDouyinStores(params: {
     return {
       ok: false,
       message:
-        '门店接口返回了 HTML 而非 JSON（常见于部署将 /api 请求交给了 SPA）。请确认 Vercel 已识别 api/merchant Functions，且未错误重写 /api/*。',
+        '门店接口返回了 HTML 而非 JSON（常见于部署将 /api 请求交给了 SPA）。请确认 Vercel 已识别 api Functions，且 vercel.json 与官方 Vite SPA 文档一致。',
     }
   }
 
