@@ -48,12 +48,25 @@ function headersForNodeMocks(
   return out
 }
 
+/** 部分边缘/代理会把 req.url 写成绝对 URL，startsWith('/api/') 会失败 → slug 为空 → 网关 404 */
+function pathOnlyFromRequestUrl(url: string): string {
+  const raw = url.split('?')[0] ?? ''
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    try {
+      return new URL(raw).pathname
+    } catch {
+      return raw
+    }
+  }
+  return raw
+}
+
 function slugSegmentsFromRequest(req: VercelRequest): string[] {
   const slug = req.query.slug
   if (Array.isArray(slug)) return slug.map(String).filter(Boolean)
   if (typeof slug === 'string' && slug.trim()) return slug.split('/').filter(Boolean)
   const url = typeof req.url === 'string' ? req.url : ''
-  const pathOnly = url.split('?')[0] ?? ''
+  const pathOnly = pathOnlyFromRequestUrl(url)
   const prefix = '/api/merchant/'
   if (pathOnly.startsWith(prefix)) {
     const rest = pathOnly.slice(prefix.length)
@@ -98,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const method = (req.method ?? 'GET').toUpperCase()
   /** 部分环境下 req.query.slug 异常，仅靠 slugPath 会误判进入大包网关 → OOM / FUNCTION_INVOCATION_FAILED */
-  const rawPathOnly = urlStr.split('?')[0]?.replace(/\/+$/, '') ?? ''
+  const rawPathOnly = pathOnlyFromRequestUrl(urlStr).replace(/\/+$/, '') ?? ''
   const isDouyinBindPost =
     method === 'POST' &&
     (slugPath === 'douyin/bind' ||
