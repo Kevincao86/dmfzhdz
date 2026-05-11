@@ -129,6 +129,10 @@ function parseDouyinEnvelope(raw: string): Record<string, unknown> {
 }
 
 function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string } {
+  const rootCode = j.error_code
+  if (typeof rootCode === 'number' && rootCode !== 0) {
+    return { ok: false, msg: String(j.description ?? j.msg ?? `抖音根 error_code=${rootCode}`) }
+  }
   const data = j.data
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
@@ -361,8 +365,39 @@ function poiSearchHay(row: unknown): string {
 function extractRowPoiId(row: unknown): string {
   if (!row || typeof row !== 'object') return ''
   const o = row as Record<string, unknown>
-  const poi = o.poi && typeof o.poi === 'object' ? (o.poi as Record<string, unknown>) : o
-  return String(poi.poi_id ?? o.poi_id ?? '').trim()
+  const poi =
+    o.poi && typeof o.poi === 'object' && !Array.isArray(o.poi)
+      ? (o.poi as Record<string, unknown>)
+      : null
+  const fromNested = poi
+    ? String(poi.poi_id ?? poi.poiId ?? poi.id ?? '').trim()
+    : ''
+  if (fromNested) return fromNested
+  return String(o.poi_id ?? o.poiId ?? o.id ?? o.shop_id ?? '').trim()
+}
+
+/** 无 poi_id 时用名称+地址去重，避免接口字段漂移导致「有数据却 0 条」 */
+function stableFallbackPoiKey(row: unknown): string {
+  if (!row || typeof row !== 'object') return ''
+  const o = row as Record<string, unknown>
+  const poi =
+    o.poi && typeof o.poi === 'object' && !Array.isArray(o.poi)
+      ? (o.poi as Record<string, unknown>)
+      : o
+  const name = String(poi.poi_name ?? o.poi_name ?? poi.name ?? o.name ?? '').trim()
+  const addr = String(poi.address ?? o.address ?? poi.address_detail ?? o.address_detail ?? '').trim()
+  const tail = `${name}|${addr}`.trim()
+  return tail ? `fb:${tail.slice(0, 240)}` : ''
+}
+
+/** 兼容部分响应把列表放在 list / poi_list 或扁平数组 */
+function extractPoisFromShopQueryData(data: Record<string, unknown> | undefined): unknown[] {
+  if (!data || typeof data !== 'object') return []
+  const direct = data.pois
+  if (Array.isArray(direct)) return direct
+  const alt = data.list ?? data.poi_list ?? data.shop_list ?? data.shops ?? data.records
+  if (Array.isArray(alt)) return alt
+  return []
 }
 
 /** 按 relation_type 翻页拉全量（最多 200 页），供认领拆分、tabCounts、装修列表复用 */
@@ -378,7 +413,7 @@ async function fetchAllPoiPages(
     const data = j.data as Record<string, unknown> | undefined
     if (!data) break
     if (page === 1) reportedTotal = Number(data.total) || 0
-    const pois = data.pois
+    const pois = extractPoisFromShopQueryData(data)
     if (!Array.isArray(pois) || pois.length === 0) break
     all.push(...pois)
     if (pois.length < 50) break
@@ -391,25 +426,33 @@ async function fetchMergedAllPois(
   accountId: string,
   accessToken: string,
 ): Promise<{ pois: unknown[]; total: number }> {
-  /** 某一 relation_type 无权限或报错时不应拖垮整页门店列表 */
-  const packs = await Promise.all(
-    ([0, 1, 2] as const).map(async (rt) => {
-      try {
-        return await fetchAllPoiPages(accountId, accessToken, rt)
-      } catch {
-        return { pois: [] as unknown[], total: 0 }
-      }
-    }),
-  )
+  /** 串行降低瞬时 QPS；原先 Promise.all + 全程静默失败会导致线上「永远 0 条」 */
+  const packs: { pois: unknown[]; total: number }[] = []
+  const errors: string[] = []
+  for (const rt of [0, 1, 2] as const) {
+    try {
+      packs.push(await fetchAllPoiPages(accountId, accessToken, rt))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      errors.push(`relation_type=${rt}：${msg.slice(0, 320)}`)
+      packs.push({ pois: [], total: 0 })
+    }
+  }
   const seen = new Set<string>()
   const merged: unknown[] = []
   for (const pack of packs) {
     for (const row of pack.pois) {
-      const id = extractRowPoiId(row)
+      let id = extractRowPoiId(row)
+      if (!id) id = stableFallbackPoiKey(row)
       if (!id || seen.has(id)) continue
       seen.add(id)
       merged.push(row)
     }
+  }
+  if (merged.length === 0 && errors.length === 3) {
+    throw new Error(
+      `抖音 shop.query 三种 relation_type 均失败（请核对 life.capacity.shop 与账户 ID）：${errors.join(' | ')}`,
+    )
   }
   return { pois: merged, total: merged.length }
 }
