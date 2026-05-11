@@ -190,6 +190,10 @@ function isMeooPaymentOrdersVerifyPath(urlPath: string): boolean {
   return urlPath === '/api/meoo-supabase-payment-orders-verify'
 }
 
+function isMeooPaymentOrdersConfirmPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-supabase-payment-orders-confirm'
+}
+
 /** 与线上 fetch 一致：api 根目录单文件 + fetch PostgREST */
 function isMeooTenantsPatchPath(urlPath: string): boolean {
   return urlPath === '/api/meoo-supabase-tenants-patch'
@@ -233,7 +237,8 @@ export function opsSupabaseAdminPlugin(): Plugin {
           !isMeooTenantsPatchPath(urlPath) &&
           !isMeooTenantsResetPasswordPath(urlPath) &&
           !isMeooFlatOpsGetPath(urlPath) &&
-          !isMeooPaymentOrdersVerifyPath(urlPath)
+          !isMeooPaymentOrdersVerifyPath(urlPath) &&
+          !isMeooPaymentOrdersConfirmPath(urlPath)
         ) {
           return next()
         }
@@ -270,6 +275,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
           urlPath === '/api/ops-supabase/payment-orders/verify' ||
           isMeooPaymentOrdersVerifyPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/confirm' ||
+          isMeooPaymentOrdersConfirmPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/delete'
         if (!isOpsSupabaseRoute) {
           return next()
@@ -282,7 +288,8 @@ export function opsSupabaseAdminPlugin(): Plugin {
             (isPaymentOrdersListPath(urlPath) && method === 'GET') ||
             (isMeooTenantsPatchPath(urlPath) && method === 'POST') ||
             (isMeooTenantsResetPasswordPath(urlPath) && method === 'POST') ||
-            (isMeooPaymentOrdersVerifyPath(urlPath) && method === 'POST')
+            (isMeooPaymentOrdersVerifyPath(urlPath) && method === 'POST') ||
+            (isMeooPaymentOrdersConfirmPath(urlPath) && method === 'POST')
           ) {
             json(res, 503, {
               ok: false,
@@ -544,7 +551,10 @@ export function opsSupabaseAdminPlugin(): Plugin {
             return
           }
 
-          if (method === 'POST' && urlPath === '/api/ops-supabase/payment-orders/confirm') {
+          if (
+            method === 'POST' &&
+            (urlPath === '/api/ops-supabase/payment-orders/confirm' || isMeooPaymentOrdersConfirmPath(urlPath))
+          ) {
             if (!effectiveKey) {
               json(res, 503, { ok: false, error: 'supabase_admin_not_configured' })
               return

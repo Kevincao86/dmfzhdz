@@ -51,7 +51,7 @@ export async function verifyOpsPaymentOrder(body: {
 }
 
 export async function confirmOpsPaymentOrder(body: { id: string }): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch('/api/ops-supabase/payment-orders/confirm', {
+  const res = await fetch('/api/meoo-supabase-payment-orders-confirm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
