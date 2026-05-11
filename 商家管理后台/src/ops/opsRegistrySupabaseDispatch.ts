@@ -1,12 +1,11 @@
 /**
  * 线上：注册表读写 Supabase ops_registry_snapshot；逻辑与 vite-plugins opsRegistryGatewayShared 对齐。
+ * 通过 RegistrySnapshotIo 注入读写实现（Vercel 使用 fetch PostgREST，避免 supabase-js）。
  */
 import { createHash } from 'node:crypto'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared'
 import type {
   AiVendorCatalogEntry,
-  RegistryFile,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -17,31 +16,11 @@ import type {
 } from '../meooRegistryShared/opsRegistryTypes'
 import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders'
 import { normalizeRegistryVideoAi } from '../meooRegistryShared/registryVideoAiNormalize'
-import {
-  DEFAULT_AI,
-  normalizeRegistryFile,
-  registryForPersistentFile,
-} from '../meooRegistryShared/opsRegistryGatewayCore'
+import { DEFAULT_AI } from '../meooRegistryShared/opsRegistryGatewayCore'
+import type { RegistrySnapshotIo } from './registrySnapshotIo'
 
 function sha256Hex(plain: string): string {
   return createHash('sha256').update(plain, 'utf8').digest('hex')
-}
-
-async function loadRegistry(admin: SupabaseClient): Promise<RegistryFile> {
-  const { data, error } = await admin.from('ops_registry_snapshot').select('registry').eq('id', 1).maybeSingle()
-  if (error) throw new Error(error.message)
-  const parsed = (data?.registry ?? null) as Partial<RegistryFile> | null
-  return normalizeRegistryFile(parsed)
-}
-
-async function saveRegistry(admin: SupabaseClient, data: RegistryFile): Promise<void> {
-  const persist = registryForPersistentFile(data)
-  const { error } = await admin.from('ops_registry_snapshot').upsert({
-    id: 1,
-    registry: persist as unknown as Record<string, unknown>,
-    updated_at: new Date().toISOString(),
-  })
-  if (error) throw new Error(error.message)
 }
 
 export async function dispatchOpsRegistrySupabase(opts: {
@@ -49,18 +28,18 @@ export async function dispatchOpsRegistrySupabase(opts: {
   /** e.g. /api/ops-sync/registry */
   urlPath: string
   bodyRaw: string
-  admin: SupabaseClient
+  io: RegistrySnapshotIo
 }): Promise<{ status: number; body: unknown }> {
-  const { method, urlPath, bodyRaw, admin } = opts
+  const { method, urlPath, bodyRaw, io } = opts
 
   try {
     if (method === 'GET' && urlPath === '/api/ops-sync/registry') {
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const before = data.recruitmentOrders ?? []
       const cleaned = filterLegacyDemoRecruitmentOrders(before)
       if (cleaned.length !== before.length) {
         data.recruitmentOrders = cleaned
-        await saveRegistry(admin, data)
+        await io.save(data)
       }
       return { status: 200, body: data }
     }
@@ -71,7 +50,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!tenant || !tenant.id || !tenant.loginName) {
         return { status: 400, body: { ok: false, error: 'invalid_tenant' } }
       }
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const nextTenants = data.tenants.filter((t) => t.id !== tenant.id)
       nextTenants.push({
         ...tenant,
@@ -79,7 +58,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         updatedAt: new Date().toISOString(),
       })
       data.tenants = nextTenants
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
@@ -101,7 +80,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (loginName.length < 2 || password.length < 6 || merchantName.length < 1) {
         return { status: 400, body: { ok: false, error: 'invalid_fields' } }
       }
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const lnKey = loginName.toLowerCase()
       if (data.tenants.some((t) => (t.loginName ?? '').trim().toLowerCase() === lnKey)) {
         return { status: 409, body: { ok: false, error: 'login_exists' } }
@@ -129,7 +108,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         updatedAt: now.toISOString(),
       }
       data.tenants.push(row)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true, id } }
     }
 
@@ -142,7 +121,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       const textModel = (body.textModel ?? '').trim() || DEFAULT_AI.textModel
       const imageModel = (body.imageModel ?? '').trim() || DEFAULT_AI.imageModel
       const lastWriter = body.lastWriter === 'ops' ? 'ops' : 'erp'
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const controlledByOps = lastWriter === 'ops' ? true : data.aiModels.controlledByOps
       data.aiModels = {
         textModel,
@@ -151,7 +130,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         lastWriter,
         controlledByOps,
       }
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
@@ -161,7 +140,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         lastWriter?: 'erp' | 'ops'
       }
       const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const nextAi = normalizeRegistryVideoAi(body.videoAi ?? {})
       data.videoAi = Object.keys(nextAi).length > 0 ? nextAi : {}
       data.videoAiUpdatedAt = new Date().toISOString()
@@ -174,7 +153,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
           lastWriter: 'ops',
         }
       }
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
@@ -185,7 +164,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         lastWriter?: 'erp' | 'ops'
       }
       const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const next: RegistryVendorKeys = { ...data.vendorKeys }
       const patch = body.keys && typeof body.keys === 'object' ? body.keys : {}
       for (const [id, v] of Object.entries(patch)) {
@@ -211,7 +190,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
           lastWriter: 'ops',
         }
       }
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
@@ -229,7 +208,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!id) {
         return { status: 400, body: { ok: false, error: 'missing_id' } }
       }
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const idx = data.tenants.findIndex((t) => t.id === id)
       if (idx < 0) {
         return { status: 404, body: { ok: false, error: 'not_found' } }
@@ -268,7 +247,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       }
       cur.updatedAt = new Date().toISOString()
       data.tenants[idx] = cur
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
@@ -278,20 +257,20 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!order || !order.id || !order.customerName) {
         return { status: 400, body: { ok: false, error: 'invalid_order' } }
       }
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const list = [...(data.recruitmentOrders ?? [])]
       list.unshift(order)
       data.recruitmentOrders = list.slice(0, 200)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/recruitment-orders/set') {
       const body = JSON.parse(bodyRaw || '{}') as { orders?: RegistryRecruitmentOrder[] }
       const orders = Array.isArray(body.orders) ? body.orders : []
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       data.recruitmentOrders = orders.slice(0, 200)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
@@ -314,51 +293,51 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!okStatus) {
         return { status: 400, body: { ok: false, error: 'invalid_patch' } }
       }
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const idx = data.recruitmentOrders?.findIndex((o) => o.id === id) ?? -1
       if (!data.recruitmentOrders || idx < 0) {
         return { status: 404, body: { ok: false, error: 'not_found' } }
       }
       data.recruitmentOrders[idx] = { ...data.recruitmentOrders[idx]!, status }
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {
       const body = JSON.parse(bodyRaw || '{}') as { candidates?: RegistryTalentPoolRow[] }
       const candidates = Array.isArray(body.candidates) ? body.candidates : []
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       const list = [...(data.talentPoolCandidates ?? [])]
       for (const c of [...candidates].reverse()) list.unshift(c)
       data.talentPoolCandidates = list.slice(0, 240)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/set') {
       const body = JSON.parse(bodyRaw || '{}') as { candidates?: RegistryTalentPoolRow[] }
       const candidates = Array.isArray(body.candidates) ? body.candidates : []
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       data.talentPoolCandidates = candidates.slice(0, 240)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/recruitment-schedule/set') {
       const body = JSON.parse(bodyRaw || '{}') as { rows?: RegistryScheduleRow[] }
       const rows = Array.isArray(body.rows) ? body.rows : []
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       data.recruitmentScheduleRows = rows.slice(0, 400)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/recruitment-videos/set') {
       const body = JSON.parse(bodyRaw || '{}') as { videos?: RegistryVideoSubmission[] }
       const videos = Array.isArray(body.videos) ? body.videos : []
-      const data = await loadRegistry(admin)
+      const data = await io.load()
       data.recruitmentVideoSubmissions = videos.slice(0, 400)
-      await saveRegistry(admin, data)
+      await io.save(data)
       return { status: 200, body: { ok: true } }
     }
 
