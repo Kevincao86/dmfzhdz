@@ -3,6 +3,7 @@ import { buildErpRegistryTenant } from '../lib/buildErpRegistryTenant'
 import { syncManualTenantsFromRegistry } from '../lib/syncRegistryManualAccounts'
 import {
   MEOO_REGISTRY_AI_APPLIED_AT_KEY,
+  MEOO_REGISTRY_AI_SESSION_BOOTSTRAP_KEY,
   MEOO_REGISTRY_SYNC_EVENT,
   MEOO_VENDOR_KEYS_APPLIED_AT_KEY,
 } from '../lib/opsRegistryConstants'
@@ -31,10 +32,10 @@ function vendorIdSyncedFromOps(reg: RegistryFile, raw: string): boolean {
 function applyAiFromRegistry(reg: RegistryFile) {
   const remote = reg.aiModels
   const lastApplied = sessionStorage.getItem(MEOO_REGISTRY_AI_APPLIED_AT_KEY) ?? ''
+  const sessionBootDone = sessionStorage.getItem(MEOO_REGISTRY_AI_SESSION_BOOTSTRAP_KEY) === '1'
+  const writerSaysOps = remote.controlledByOps === true || remote.lastWriter === 'ops'
   const shouldApply =
-    remote.controlledByOps === true
-      ? remote.updatedAt > lastApplied
-      : remote.lastWriter === 'ops' && remote.updatedAt > lastApplied
+    remote.updatedAt > lastApplied && (writerSaysOps || !sessionBootDone)
   if (!shouldApply) return
 
   const tm = remote.textModel
@@ -42,6 +43,7 @@ function applyAiFromRegistry(reg: RegistryFile) {
   if (vendorIdSyncedFromOps(reg, tm)) writeStoredAiModel(tm.trim().toLowerCase())
   if (vendorIdSyncedFromOps(reg, im)) writeStoredImageAiModel(im.trim().toLowerCase())
   sessionStorage.setItem(MEOO_REGISTRY_AI_APPLIED_AT_KEY, remote.updatedAt)
+  sessionStorage.setItem(MEOO_REGISTRY_AI_SESSION_BOOTSTRAP_KEY, '1')
 }
 
 function applyVendorKeysFromRegistry(reg: RegistryFile) {
