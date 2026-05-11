@@ -567,26 +567,51 @@ function pickNum(v: unknown): number | undefined {
   return undefined
 }
 
-/** 店铺装修列表：由门店 POI 聚合可展示字段（若后续接入独立装修查询接口可在此替换数据源） */
-function rowToDecorationItem(row: unknown): Record<string, unknown> {
-  if (!row || typeof row !== 'object') {
-    return { id: '-', name: '（无效数据）' }
+function getPoiExt(poi: Record<string, unknown>): Record<string, unknown> | null {
+  const ext = poi.poi_ext
+  if (ext && typeof ext === 'object' && !Array.isArray(ext)) return ext as Record<string, unknown>
+  return null
+}
+
+/** 与前端 normalizeStoreRow 对齐：抖音 shop.query 实际常含 poi_ext / attributes，文档示例仅列基础 poi 字段 */
+function pickStrMerged(
+  poi: Record<string, unknown>,
+  ext: Record<string, unknown> | null,
+  keys: string[],
+): string | undefined {
+  for (const bag of [poi, ext].filter((x): x is Record<string, unknown> => x != null)) {
+    for (const k of keys) {
+      const v = bag[k]
+      if (typeof v === 'string' && v.trim()) return v.trim()
+      if (typeof v === 'number' && !Number.isNaN(v)) return String(v)
+      if (typeof v === 'boolean') return v ? '是' : '否'
+    }
   }
-  const o = row as Record<string, unknown>
-  const poi = o.poi && typeof o.poi === 'object' ? (o.poi as Record<string, unknown>) : o
-  const id = String(poi.poi_id ?? o.poi_id ?? '').trim() || '-'
-  const name = String(poi.poi_name ?? o.poi_name ?? '未命名门店')
-  const auditStatus = pickStr(poi, [
-    'shop_audit_status',
-    'poi_audit_status',
-    'audit_status',
-    'auditStatus',
-    'decorate_audit_status',
-  ])
-  const optimization = pickStr(poi, ['optimization_suggestion', 'optimization', 'suggest_reason'])
-  const storeInfoStatus = pickStr(poi, ['poi_info_status', 'store_info_status', 'info_complete_status'])
-  const staffDisplay = pickStr(poi, ['staff_display_status', 'talent_display_status', 'employee_display_status'])
-  const coverImageUrl = pickStr(poi, [
+  return undefined
+}
+
+function pickStrDeep(
+  poi: Record<string, unknown>,
+  ext: Record<string, unknown> | null,
+  keys: string[],
+): string | undefined {
+  const direct = pickStrMerged(poi, ext, keys)
+  if (direct) return direct
+  const nests = [poi.attributes, poi.attr, ext?.attributes, ext?.attr].filter(
+    (x): x is Record<string, unknown> =>
+      x != null && typeof x === 'object' && !Array.isArray(x),
+  )
+  for (const nest of nests) {
+    const hit = pickStr(nest, keys)
+    if (hit) return hit
+    const hit2 = pickStrMerged(nest, null, keys)
+    if (hit2) return hit2
+  }
+  return undefined
+}
+
+function pickCoverMerged(poi: Record<string, unknown>, ext: Record<string, unknown> | null): string | undefined {
+  const keys = [
     'head_image_url',
     'head_image',
     'cover_url',
@@ -594,13 +619,130 @@ function rowToDecorationItem(row: unknown): Record<string, unknown> {
     'icon_url',
     'image_url',
     'display_image',
+    'thumbnail',
+    'thumbnail_url',
+    'front_img',
+    'main_pic',
+    'main_picture',
+  ]
+  const direct = pickStrMerged(poi, ext, keys)
+  if (direct) return direct
+  const albumKeys = ['photos', 'images', 'poi_photos', 'album', 'pic_list', 'image_list', 'store_images']
+  for (const bag of [poi, ext].filter((x): x is Record<string, unknown> => x != null)) {
+    for (const ak of albumKeys) {
+      const al = bag[ak]
+      if (!Array.isArray(al) || al.length === 0) continue
+      const x = al[0]
+      if (typeof x === 'string' && x.trim()) return x.trim()
+      if (x && typeof x === 'object') {
+        const o = x as Record<string, unknown>
+        const u = o.url ?? o.uri ?? o.image_url ?? o.thumb_url ?? o.cover_url
+        if (typeof u === 'string' && u.trim()) return u.trim()
+      }
+    }
+  }
+  return undefined
+}
+
+function countAlbumMerged(poi: Record<string, unknown>, ext: Record<string, unknown> | null): number | undefined {
+  const albumKeys = [
+    'image_list',
+    'images',
+    'photos',
+    'poi_photos',
+    'album',
+    'pic_list',
+    'store_images',
+    'pic_urls',
+    'shop_photos',
+  ]
+  for (const bag of [poi, ext].filter((x): x is Record<string, unknown> => x != null)) {
+    for (const k of albumKeys) {
+      const v = bag[k]
+      if (Array.isArray(v) && v.length > 0) return v.length
+    }
+  }
+  const n = pickNum(poi.album_count ?? poi.image_count ?? poi.photo_count)
+  if (n != null) return n
+  if (ext) return pickNum(ext.album_count ?? ext.image_count ?? ext.photo_count)
+  return undefined
+}
+
+/** 店铺装修列表：由门店 POI + poi_ext 聚合（与 douyinMerchantApi.normalizeStoreRow 同源字段策略） */
+function rowToDecorationItem(row: unknown): Record<string, unknown> {
+  if (!row || typeof row !== 'object') {
+    return { id: '-', name: '（无效数据）' }
+  }
+  const o = row as Record<string, unknown>
+  const poi = getPoiRecord(row)
+  const ext = getPoiExt(poi)
+
+  const id = String(poi.poi_id ?? o.poi_id ?? '').trim() || '-'
+  const name = String(poi.poi_name ?? o.poi_name ?? '未命名门店')
+
+  const auditStatus =
+    pickStrDeep(poi, ext, [
+      'shop_audit_status',
+      'poi_audit_status',
+      'audit_status',
+      'decorate_audit_status',
+      'claim_audit_status',
+      'audit_status_desc',
+      'shop_audit_status_desc',
+      'shopAuditStatus',
+      'poiAuditStatus',
+      'auditStatus',
+      'decorateAuditStatus',
+    ]) ??
+    pickStrMerged(o, null, ['claim_status', 'claimStatus', 'audit_status', 'auditStatus'])
+
+  const optimization = pickStrDeep(poi, ext, [
+    'optimization_suggestion',
+    'optimization',
+    'suggest_reason',
+    'optimize_suggestion',
+    'decorate_suggestion',
+    'optimization_tip',
   ])
-  let albumCount: number | undefined
-  if (Array.isArray(poi.image_list)) albumCount = poi.image_list.length
-  else if (Array.isArray(poi.images)) albumCount = poi.images.length
-  else albumCount = pickNum(poi.album_count ?? poi.image_count)
-  const signatureDishes = pickStr(poi, ['signature_dishes', 'recommend_dishes', 'specialty'])
-  const announcement = pickStr(poi, ['announcement', 'notice', 'bulletin'])
+
+  const storeInfoStatus = pickStrDeep(poi, ext, [
+    'poi_info_status',
+    'store_info_status',
+    'info_complete_status',
+    'completeness',
+    'info_status',
+    'storeInfoStatus',
+    'poiInfoStatus',
+  ])
+
+  const staffDisplay = pickStrDeep(poi, ext, [
+    'staff_display_status',
+    'talent_display_status',
+    'employee_display_status',
+    'craftsman_display_status',
+    'staffDisplayStatus',
+    'talent_display',
+  ])
+
+  const coverImageUrl = pickCoverMerged(poi, ext)
+  const albumCount = countAlbumMerged(poi, ext)
+
+  const signatureDishes = pickStrDeep(poi, ext, [
+    'signature_dishes',
+    'recommend_dishes',
+    'specialty',
+    'recommend_food',
+    'signatureDishes',
+  ])
+
+  const announcement = pickStrDeep(poi, ext, [
+    'announcement',
+    'notice',
+    'bulletin',
+    'official_notice',
+    'store_notice',
+  ])
+
   return {
     id,
     name,
@@ -1202,7 +1344,8 @@ export async function handleDouyinStoreDecorationGet(
     json(res, 200, {
       items,
       total,
-      message: '由 goodlife/v1/shop/poi/query 聚合的装修维度字段；独立装修状态接口接入后可替换数据源。',
+      message:
+        '由 goodlife/v1/shop/poi/query 的 poi + poi_ext（及 attributes）聚合展示字段；若列为「—」多为抖音未返回该维度或需单独开通装修类能力。',
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
