@@ -5,6 +5,7 @@
  * `ERR_MODULE_NOT_FOUND .../api/lib/safeJsonResponse`。辅助函数直接写在本文件内。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { runDouyinMerchantBind } from './douyinMerchantBindCore'
 
 export const config = { maxDuration: 60 }
 
@@ -48,7 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const { runDouyinMerchantBind } = await import('./merchant/douyin/bindRuntime')
     const r = await runDouyinMerchantBind(rawBody(req))
     let payload: string
     try {

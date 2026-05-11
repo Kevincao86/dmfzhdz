@@ -3,6 +3,7 @@
  * 绑定逻辑走同目录 `bindRuntime.ts`（轻量），勿直接 import 整份 douyinMerchantGateway，以免 Vercel 打包过大触发 FUNCTION_INVOCATION_FAILED。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { runDouyinMerchantBind } from '../../douyinMerchantBindCore'
 
 export const config = { maxDuration: 60 }
 
@@ -34,7 +35,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    const { runDouyinMerchantBind } = await import('./bindRuntime')
     const r = await runDouyinMerchantBind(rawBody(req))
     let payload: string
     try {

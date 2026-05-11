@@ -3,6 +3,7 @@
  * 与 douyin-bind 同源逻辑；优先给前端调用，减少嵌套路由与打包追踪问题导致的 FUNCTION_INVOCATION_FAILED。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { runDouyinMerchantBind } from './douyinMerchantBindCore'
 
 export const config = { maxDuration: 60 }
 
@@ -47,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const { runDouyinMerchantBind } = await import('./merchant/douyin/bindRuntime')
     const r = await runDouyinMerchantBind(rawBody(req))
     let payload: string
     try {

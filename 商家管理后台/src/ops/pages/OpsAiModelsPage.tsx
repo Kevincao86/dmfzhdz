@@ -13,6 +13,7 @@ import {
   catalogCustomEntriesOnly,
   isBuiltinAiVendorId,
   isValidAiVendorSlug,
+  mergeBuiltinAiVendorCatalog,
   slugifyAiVendorCandidate,
 } from '../../meooRegistryShared/aiVendorCatalogShared'
 import { cn } from '../../cn'
@@ -76,11 +77,12 @@ export default function OpsAiModelsPage() {
     }
     try {
       const reg = await fetchRegistry()
-      const cat = Array.isArray(reg.aiVendorCatalog) ? reg.aiVendorCatalog : []
+      const catRaw = Array.isArray(reg.aiVendorCatalog) ? reg.aiVendorCatalog : []
+      const cat = mergeBuiltinAiVendorCatalog(catRaw)
+      setCatalogFull(cat)
       const ids = new Set(cat.map((x) => x.id))
       const tm = reg.aiModels.textModel.trim().toLowerCase()
       const im = reg.aiModels.imageModel.trim().toLowerCase()
-      setCatalogFull(cat)
       setTextModel(ids.has(tm) ? tm : 'qwen')
       setImageModel(ids.has(im) ? im : 'qwen')
       setUpdatedAt(reg.aiModels.updatedAt)
@@ -100,6 +102,7 @@ export default function OpsAiModelsPage() {
           ? `注册表请求失败：${detail}`
           : '无法读写注册表：本地请重启 npm run dev 并确保项目根可写 .meoo-dev-sync；线上请在 Supabase 执行迁移 ops_registry_snapshot，并确认 Vercel 已部署 /api/ops-sync 且运营台环境配置了 SUPABASE_SERVICE_ROLE_KEY。',
       )
+      setCatalogFull((prev) => (prev.length > 0 ? prev : mergeBuiltinAiVendorCatalog([])))
     } finally {
       if (!bg) setLoading(false)
     }
