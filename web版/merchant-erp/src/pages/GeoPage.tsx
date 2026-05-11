@@ -154,11 +154,7 @@ function buildGeoAiKnowledgePack(args: {
 }
 
 function readDouyinToken(): string | null {
-  try {
-    return sessionStorage.getItem('meoo_douyin_merchant_token')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_merchant_token')
 }
 
 function isValidTab(v: string | null): v is GeoTabId {

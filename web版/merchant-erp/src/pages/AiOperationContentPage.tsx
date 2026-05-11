@@ -2,6 +2,7 @@ import { Copy, Loader2, Sparkles, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import DouyinStorePickerModal from '../components/store/DouyinStorePickerModal'
 import { cn } from '../cn'
+import { readMerchantSession } from '../lib/merchantSession'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import {
   listAiUiModelOptions,
@@ -23,11 +24,7 @@ const PLATFORM_OPTIONS: { id: PlatformId; label: string; disabled?: boolean }[] 
 ]
 
 function readDouyinToken(): string | null {
-  try {
-    return sessionStorage.getItem('meoo_douyin_merchant_token')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_merchant_token')
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {

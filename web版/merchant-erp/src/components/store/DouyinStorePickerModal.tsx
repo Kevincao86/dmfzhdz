@@ -1,22 +1,15 @@
 import { Loader2, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '../../cn'
+import { readMerchantSession } from '../../lib/merchantSession'
 import { getDouyinStores } from '../../services/douyinMerchantApi'
 
 function readToken() {
-  try {
-    return sessionStorage.getItem('meoo_douyin_merchant_token')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_merchant_token')
 }
 
 function readMerchantId() {
-  try {
-    return sessionStorage.getItem('meoo_douyin_merchant_id')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_merchant_id')
 }
 
 export type DouyinStorePickerModalProps = {

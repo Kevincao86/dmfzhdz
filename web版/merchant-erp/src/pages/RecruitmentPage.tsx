@@ -606,13 +606,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                       disabled={storesSyncing}
                       onClick={async () => {
                         setStoresErr(null)
-                        const tok = (() => {
-                          try {
-                            return sessionStorage.getItem('meoo_douyin_merchant_token')?.trim() || null
-                          } catch {
-                            return null
-                          }
-                        })()
+                        const tok = readMerchantSession('meoo_douyin_merchant_token')
                         if (!tok) {
                           setStoresErr('请先在系统设置绑定抖音来客并登录门店账号')
                           return

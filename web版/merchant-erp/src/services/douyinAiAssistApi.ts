@@ -5,6 +5,7 @@
  */
 
 import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
+import { readMerchantSession } from '../lib/merchantSession'
 import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
 
 export { listAiUiModelOptions } from './merchantAiVendorCatalogClient'
@@ -16,17 +17,8 @@ function url(path: string) {
   return `${b}${path}`
 }
 
-function readSession(key: string): string | null {
-  try {
-    const v = sessionStorage.getItem(key)
-    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null
-  } catch {
-    return null
-  }
-}
-
 function authHeaders(): HeadersInit {
-  const token = readSession('meoo_douyin_merchant_token')
+  const token = readMerchantSession('meoo_douyin_merchant_token')
   const h: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',

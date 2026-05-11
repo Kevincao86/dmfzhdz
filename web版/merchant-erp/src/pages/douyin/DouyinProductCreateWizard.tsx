@@ -13,6 +13,7 @@ import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/prod
 import { Link } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
+import { readMerchantSession } from '../../lib/merchantSession'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
   pickerChildrenOf,
@@ -95,27 +96,15 @@ function normalizePickRule(rule: string, itemCount: number): string {
 }
 
 function readToken() {
-  try {
-    return sessionStorage.getItem('meoo_douyin_merchant_token')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_merchant_token')
 }
 
 function readMerchantId() {
-  try {
-    return sessionStorage.getItem('meoo_douyin_merchant_id')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_merchant_id')
 }
 
 function readAccountName() {
-  try {
-    return sessionStorage.getItem('meoo_douyin_account_name')?.trim() || null
-  } catch {
-    return null
-  }
+  return readMerchantSession('meoo_douyin_account_name')
 }
 
 export type DouyinProductWizardProps = {
