@@ -1,10 +1,16 @@
 import { Eye, EyeOff, Search, User } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
+import {
+  deleteDouyinBindingCloud,
+  fetchDouyinBindingCloud,
+  upsertDouyinBindingCloud,
+} from '../../lib/merchantDouyinCloudBinding'
 import {
   readMerchantSession,
   writeMerchantSession,
 } from '../../lib/merchantSession'
+import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import {
   getDouyinStores,
   postDouyinBind,
@@ -58,6 +64,60 @@ export default function DouyinMerchantSection() {
   const [listError, setListError] = useState<string | null>(null)
   /** 网关返回的 emptyHint / relationWarnings，便于区分「真无门店」与「部分 relation 失败」 */
   const [storesHint, setStoresHint] = useState<string | null>(null)
+
+  const bindOpenRef = useRef(false)
+  useEffect(() => {
+    bindOpenRef.current = bindOpen
+  }, [bindOpen])
+
+  /** 登录 Supabase 后：优先从云端恢复绑定；仅有本地时备份到云端（换设备可用） */
+  useEffect(() => {
+    if (!supabaseConfigured || !supabase) return
+    const sb = supabase
+
+    const hydrate = async () => {
+      const {
+        data: { session },
+      } = await sb.auth.getSession()
+      if (!session?.user) return
+      if (bindOpenRef.current) return
+
+      const cloud = await fetchDouyinBindingCloud(sb)
+      if (cloud) {
+        writeMerchantSession(TOKEN_KEY, cloud.sealed_credentials)
+        if (cloud.client_key) writeMerchantSession(META_APP_ID, cloud.client_key)
+        if (cloud.merchant_account_id) writeMerchantSession(META_MERCHANT_ID, cloud.merchant_account_id)
+        if (cloud.account_display_name) writeMerchantSession(META_ACCOUNT_NAME, cloud.account_display_name)
+        else writeMerchantSession(META_ACCOUNT_NAME, null)
+        setAccessToken(cloud.sealed_credentials)
+        setBoundMerchantId(cloud.merchant_account_id ?? '')
+        setBoundAccountName(cloud.account_display_name ?? '')
+        setAppId(cloud.client_key ?? '')
+        setMerchantId(cloud.merchant_account_id ?? '')
+        return
+      }
+
+      const localTok = readMerchantSession(TOKEN_KEY)
+      const appIdL = readMerchantSession(META_APP_ID)
+      const midL = readMerchantSession(META_MERCHANT_ID)
+      const accL = readMerchantSession(META_ACCOUNT_NAME)
+      if (localTok && appIdL && midL) {
+        const up = await upsertDouyinBindingCloud(sb, {
+          sealedToken: localTok,
+          clientKey: appIdL,
+          merchantAccountId: midL,
+          accountDisplayName: accL,
+        })
+        if (up.ok === false) console.warn('[douyin] 本地绑定备份到云端失败:', up.message)
+      }
+    }
+
+    void hydrate()
+    const {
+      data: { subscription },
+    } = sb.auth.onAuthStateChange(() => void hydrate())
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedKeyword(keyword.trim()), 350)
@@ -233,6 +293,15 @@ export default function DouyinMerchantSection() {
       setBoundMerchantId(merchantId.trim())
       setBoundAccountName(accName ?? '')
       setAccessToken(r.accessToken)
+      if (supabaseConfigured && supabase) {
+        const cr = await upsertDouyinBindingCloud(supabase, {
+          sealedToken: r.accessToken,
+          clientKey: appId.trim(),
+          merchantAccountId: merchantId.trim(),
+          accountDisplayName: accName ?? null,
+        })
+        if (cr.ok === false) console.warn('[douyin] 绑定成功后云端同步失败:', cr.message)
+      }
       setAppSecret('')
       setBindOpen(false)
       setPage(1)
@@ -250,16 +319,25 @@ export default function DouyinMerchantSection() {
   }
 
   const disconnect = () => {
-    writeMerchantSession(TOKEN_KEY, null)
-    writeMerchantSession(META_ACCOUNT_NAME, null)
-    setBoundMerchantId('')
-    setBoundAccountName('')
-    setAccessToken(null)
-    setRows([])
-    setTotal(0)
-    setLastSyncAt(null)
-    setListError(null)
-    setStoresHint(null)
+    void (async () => {
+      try {
+        if (supabaseConfigured && supabase) {
+          const d = await deleteDouyinBindingCloud(supabase)
+          if (d.ok === false) console.warn('[douyin] 云端解绑失败:', d.message)
+        }
+      } finally {
+        writeMerchantSession(TOKEN_KEY, null)
+        writeMerchantSession(META_ACCOUNT_NAME, null)
+        setBoundMerchantId('')
+        setBoundAccountName('')
+        setAccessToken(null)
+        setRows([])
+        setTotal(0)
+        setLastSyncAt(null)
+        setListError(null)
+        setStoresHint(null)
+      }
+    })()
   }
 
   return (
@@ -272,7 +350,14 @@ export default function DouyinMerchantSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">抖音来客商家版</h3>
             <p className="text-sm text-gray-500">
-              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细（分页与搜索由接口支持）
+              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细（分页与搜索由接口支持）。
+              {supabaseConfigured ? (
+                <span className="mt-1 block text-gray-600">
+                  已登录商户主账号时，绑定会写入 Supabase（表{' '}
+                  <code className="rounded bg-gray-100 px-1 text-xs">tenant_merchant_bindings</code>
+                  ）；换电脑登录同一账号可自动恢复。部署前请在 Supabase 执行仓库内对应迁移 SQL。
+                </span>
+              ) : null}
             </p>
           </div>
         </div>
