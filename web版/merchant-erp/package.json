@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "relay-smoke": "node scripts/support-relay-smoke.mjs",
+    "test:support-merge": "node scripts/support-relay-merge-test.mjs",
     "dev": "node scripts/ensure-vite-dev.mjs --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
