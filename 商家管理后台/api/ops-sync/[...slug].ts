@@ -2,7 +2,7 @@
  * Vercel：/api/ops-sync/* 注册表（Supabase ops_registry_snapshot），与 ERP 拉取同源。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createOpsServiceRoleClient } from '../createOpsServiceRoleClient'
+import { createRegistrySnapshotIoFetch } from '../meooRegistrySnapshotIo'
 import { sendOpsJson } from '../safeOpsJson'
 import { dispatchOpsRegistrySupabase } from '../../src/ops/opsRegistrySupabaseDispatch'
 
@@ -60,17 +60,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const bodyRaw =
       method === 'POST' || method === 'PUT' || method === 'PATCH' ? rawBody(req) : ''
 
-    const client = createOpsServiceRoleClient()
-    if (!client.ok) {
-      res.status(client.status).send(JSON.stringify(client.body))
+    const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+    const serviceRole = (
+      process.env.SUPABASE_SERVICE_ROLE_KEY ??
+      process.env.SUPABASE_SERVICE_ROLE ??
+      ''
+    ).trim()
+
+    if (!supabaseUrl || !serviceRole) {
+      res.status(503).send(
+        JSON.stringify({
+          ok: false,
+          error: 'supabase_admin_not_configured',
+          hint:
+            '注册表快照需要 VITE_SUPABASE_URL（或 SUPABASE_URL）与 SUPABASE_SERVICE_ROLE_KEY；并在 Supabase 执行迁移 ops_registry_snapshot。',
+        }),
+      )
       return
     }
+
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
 
     const out = await dispatchOpsRegistrySupabase({
       method,
       urlPath,
       bodyRaw,
-      admin: client.admin,
+      io,
     })
 
     let payload: string
