@@ -3,9 +3,19 @@
  *
  * 抖音来客 `meoo_douyin_*` 使用 **localStorage**：`sessionStorage` 按标签页隔离，新开标签/部分场景会读不到
  * token，界面误判「掉绑定」；除用户点击「断开连接」外不应丢失绑定态。
+ * 已登录 Supabase 商户账号时，设置页会将绑定同步到 `tenant_merchant_bindings`，换设备可从云端恢复。
  *
  * 其它商家键仍走 sessionStorage（保持原行为）。
  */
+
+/** 登出或切换账号时清空，避免下一账号误用上一账号的本地抖音凭证 */
+const DOUYIN_LOCAL_KEYS = [
+  'meoo_douyin_merchant_token',
+  'meoo_douyin_auto_refresh',
+  'meoo_douyin_app_id',
+  'meoo_douyin_merchant_id',
+  'meoo_douyin_account_name',
+] as const
 
 function isDouyinBindingKey(key: string): boolean {
   return key.startsWith('meoo_douyin_')
@@ -52,5 +62,11 @@ export function writeMerchantSession(key: string, value: string | null): void {
     else sessionStorage.setItem(key, value)
   } catch {
     /* ignore */
+  }
+}
+
+export function clearDouyinMerchantBindingLocal(): void {
+  for (const k of DOUYIN_LOCAL_KEYS) {
+    writeMerchantSession(k, null)
   }
 }

@@ -19,6 +19,7 @@ import { childActive, NAV_ITEMS, pathActive } from '../config/nav'
 import { cn } from '../cn'
 import FloatingOnlineSupport from './FloatingOnlineSupport'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
+import { clearDouyinMerchantBindingLocal } from '../lib/merchantSession'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
@@ -47,6 +48,7 @@ export default function MeooLayout() {
         const { data } = await client.auth.getUser()
         const u = data.user
         if (!u) {
+          clearDouyinMerchantBindingLocal()
           setAdminName('管理员')
           setEnterpriseName('')
           return
