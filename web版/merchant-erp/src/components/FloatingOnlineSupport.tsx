@@ -16,6 +16,8 @@ type ChatMessage = {
   role: ChatRole
   text: string
   at: string
+  /** 用于合并云端历史与轮询结果排序 */
+  ts: number
 }
 
 const DEFAULT_BOT: ChatMessage = {
@@ -23,6 +25,7 @@ const DEFAULT_BOT: ChatMessage = {
   role: 'bot',
   text: '您好，我是店魔方智能助手，可解答常见问题。如需人工协助，请点击下方「转人工服务」。',
   at: '',
+  ts: 0,
 }
 
 function nowTime(): string {
@@ -48,8 +51,26 @@ function rowToChatMessage(row: {
     role: relayFromToRole(row.from_role as SupportRelayChatLine['from']),
     text: row.text,
     at: formatSupportRelayTime(row.ts),
+    ts: row.ts,
   }
 }
+
+/** 轮询与 Realtime 兜底合并：同一 client_msg_id 以服务端行为准 */
+function mergeRelayChatMessages(
+  prev: ChatMessage[],
+  rows: Array<{ from_role: string; text: string; ts: number; client_msg_id: string }>,
+): ChatMessage[] {
+  const map = new Map<string, ChatMessage>()
+  for (const m of prev) map.set(m.id, m)
+  for (const r of rows) {
+    map.set(r.client_msg_id, rowToChatMessage(r))
+  }
+  return [...map.values()].sort((a, b) =>
+    a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id),
+  )
+}
+
+const SUPPORT_RELAY_POLL_MS = 4000
 
 type FloatingOnlineSupportProps = {
   /** 登录账户编号（如 DMF001），运营台展示为「客户ID」 */
@@ -73,7 +94,7 @@ export default function FloatingOnlineSupport({
   const [relayReady, setRelayReady] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    { ...DEFAULT_BOT, at: nowTime() },
+    { ...DEFAULT_BOT, at: nowTime(), ts: 0 },
   ])
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -240,6 +261,7 @@ export default function FloatingOnlineSupport({
               role: relayFromToRole(line.from),
               text: line.text,
               at: formatSupportRelayTime(line.ts),
+              ts: line.ts,
             },
           ]
         })
@@ -269,35 +291,55 @@ export default function FloatingOnlineSupport({
       return
     }
 
+    const client = supabase
     const sid = sessionIdRef.current
     let cancelled = false
-    let ch: ReturnType<typeof supabase.channel> | null = null
+    let ch: ReturnType<typeof client.channel> | null = null
+    let pollTimer: ReturnType<typeof setInterval> | null = null
+
+    type RelayRow = { from_role: string; text: string; ts: number; client_msg_id: string }
+
+    const fetchSessionRows = async (): Promise<RelayRow[] | null> => {
+      const { data: rows, error } = await client
+        .from('support_relay_messages')
+        .select('from_role,text,ts,client_msg_id')
+        .eq('session_id', sid)
+        .order('ts', { ascending: true })
+        .limit(200)
+      if (error) {
+        console.warn('[support_relay_messages] select', error.message, error.code ?? '')
+        return null
+      }
+      return (rows ?? []) as RelayRow[]
+    }
 
     void (async () => {
       try {
-        const { data: rows, error } = await supabase
-          .from('support_relay_messages')
-          .select('from_role,text,ts,client_msg_id')
-          .eq('session_id', sid)
-          .order('ts', { ascending: true })
-          .limit(200)
+        const rows = await fetchSessionRows()
 
         if (cancelled) return
 
-        if (error) {
+        if (!rows) {
           setRelayReady(true)
           return
         }
 
-        if (rows && rows.length > 0) {
-          setMessages(
-            rows.map((r) =>
-              rowToChatMessage(r as { from_role: string; text: string; ts: number; client_msg_id: string }),
-            ),
-          )
+        if (rows.length > 0) {
+          setMessages(rows.map((r) => rowToChatMessage(r)))
         }
 
-        ch = supabase
+        const poll = () => {
+          if (cancelled) return
+          void (async () => {
+            const next = await fetchSessionRows()
+            if (cancelled || !next) return
+            setMessages((prev) => mergeRelayChatMessages(prev, next))
+          })()
+        }
+
+        pollTimer = window.setInterval(poll, SUPPORT_RELAY_POLL_MS)
+
+        ch = client
           .channel(`meoo-support:${sid}`)
           .on(
             'postgres_changes',
@@ -308,16 +350,13 @@ export default function FloatingOnlineSupport({
               filter: `session_id=eq.${sid}`,
             },
             (payload) => {
-              const row = payload.new as {
-                from_role: string
-                text: string
-                ts: number
-                client_msg_id: string
-              }
+              const row = payload.new as RelayRow
               if (!row?.client_msg_id) return
               setMessages((prev) => {
                 if (prev.some((m) => m.id === row.client_msg_id)) return prev
-                return [...prev, rowToChatMessage(row)]
+                return [...prev, rowToChatMessage(row)].sort((a, b) =>
+                  a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id),
+                )
               })
             },
           )
@@ -337,6 +376,7 @@ export default function FloatingOnlineSupport({
 
     return () => {
       cancelled = true
+      if (pollTimer) window.clearInterval(pollTimer)
       void ch?.unsubscribe()
     }
   }, [])
@@ -361,7 +401,8 @@ export default function FloatingOnlineSupport({
 
   const pushMessage = useCallback((role: ChatRole, text: string, id?: string) => {
     const mid = id ?? `m_${Date.now()}_${Math.random().toString(36).slice(2)}`
-    setMessages((prev) => [...prev, { id: mid, role, text, at: nowTime() }])
+    const ts = Date.now()
+    setMessages((prev) => [...prev, { id: mid, role, text, at: nowTime(), ts }])
     return mid
   }, [])
 
