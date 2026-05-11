@@ -34,13 +34,13 @@
  * 能力授权与门店绑定：见抖音「auth_with_bind」文档（生产网关实现）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime'
+import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.ts'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract'
 import {
   type DouyinMerchantSession,
   douyinMerchantDevSessions,
   openDouyinSessionCredentials,
-} from '../api/merchant/douyin/bindShared'
+} from '../api/merchant/douyin/bindShared.ts'
 import { mockDouyinProductStore } from './mockDouyinProductStore'
 
 export { runDouyinMerchantBind }
