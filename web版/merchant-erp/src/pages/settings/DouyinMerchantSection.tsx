@@ -66,6 +66,8 @@ export default function DouyinMerchantSection() {
   const [storesHint, setStoresHint] = useState<string | null>(null)
 
   const bindOpenRef = useRef(false)
+  /** 绑定成功后会 setAccessToken 并显式 loadStores；避免与下方 useEffect 再叠一次全量 shop.query（易触发抖音限流） */
+  const skipNextStoresAutoLoadRef = useRef(false)
   useEffect(() => {
     bindOpenRef.current = bindOpen
   }, [bindOpen])
@@ -220,6 +222,10 @@ export default function DouyinMerchantSection() {
   }, [loadStores])
 
   useEffect(() => {
+    if (skipNextStoresAutoLoadRef.current) {
+      skipNextStoresAutoLoadRef.current = false
+      return
+    }
     void loadStores()
   }, [loadStores])
 
@@ -284,6 +290,7 @@ export default function DouyinMerchantSection() {
         setBindError(r.message)
         return
       }
+      skipNextStoresAutoLoadRef.current = true
       writeMerchantSession(TOKEN_KEY, r.accessToken)
       writeMerchantSession(META_APP_ID, appId.trim())
       writeMerchantSession(META_MERCHANT_ID, merchantId.trim())
@@ -305,7 +312,7 @@ export default function DouyinMerchantSection() {
       setAppSecret('')
       setBindOpen(false)
       setPage(1)
-      void loadStores({
+      await loadStores({
         silent: false,
         refresh: true,
         accessTokenOverride: r.accessToken,
