@@ -219,3 +219,64 @@ alter table public.merchant_payment_orders
 alter table public.merchant_payment_orders
   add constraint merchant_payment_orders_order_kind_check
   check (order_kind in ('subscription', 'recharge', 'refund'));
+
+-- ---------- 20260511120000_support_relay_messages（在线客服 · ERP 写 Supabase，运营台 service_role 轮询）----------
+create table if not exists public.support_relay_messages (
+  id uuid primary key default gen_random_uuid(),
+  session_id text not null,
+  customer_id text,
+  enterprise_name text,
+  from_role text not null
+    check (from_role in ('user', 'bot', 'agent', 'system', 'ops')),
+  text text not null,
+  ts bigint not null,
+  client_msg_id text not null,
+  author_user_id uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (session_id, client_msg_id)
+);
+
+create index if not exists support_relay_messages_session_ts_idx
+  on public.support_relay_messages (session_id, ts);
+
+alter table public.support_relay_messages enable row level security;
+
+drop policy if exists "support_relay_messages_insert_merchant" on public.support_relay_messages;
+drop policy if exists "support_relay_messages_select_participant" on public.support_relay_messages;
+
+create policy "support_relay_messages_insert_merchant"
+  on public.support_relay_messages
+  for insert
+  to authenticated
+  with check (
+    author_user_id = auth.uid()
+    and from_role in ('user', 'bot', 'agent', 'system')
+  );
+
+create policy "support_relay_messages_select_participant"
+  on public.support_relay_messages
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.support_relay_messages x
+      where x.session_id = support_relay_messages.session_id
+        and x.author_user_id = auth.uid()
+    )
+  );
+
+grant select, insert on public.support_relay_messages to authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'support_relay_messages'
+  ) then
+    execute 'alter publication supabase_realtime add table public.support_relay_messages';
+  end if;
+end $$;

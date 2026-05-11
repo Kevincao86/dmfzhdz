@@ -99,11 +99,17 @@ export default function FloatingOnlineSupport({
   }, [messages, open, scrollBottom])
 
   const emitRelayLine = useCallback(
-    async (from: SupportRelayChatLine['from'], text: string, id: string): Promise<boolean> => {
+    async (
+      from: SupportRelayChatLine['from'],
+      text: string,
+      id: string,
+    ): Promise<{ ok: boolean; detail?: string }> => {
       const wsUrl = getSupportRelayWsUrl()
       if (wsUrl) {
         const ws = wsRef.current
-        if (!ws || ws.readyState !== WebSocket.OPEN) return false
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          return { ok: false, detail: '客服 WebSocket 未连接。' }
+        }
         const payload: SupportRelayChatLine = {
           type: 'chat',
           sessionId: sessionIdRef.current,
@@ -113,12 +119,17 @@ export default function FloatingOnlineSupport({
           id,
         }
         ws.send(JSON.stringify(payload))
-        return true
+        return { ok: true }
       }
       if (supabaseConfigured && supabase) {
         const { data } = await supabase.auth.getUser()
         const uid = data.user?.id
-        if (!uid) return false
+        if (!uid) {
+          return {
+            ok: false,
+            detail: '请先登录商户账号后再使用在线客服云端同步。',
+          }
+        }
         const { error } = await supabase.from('support_relay_messages').insert({
           session_id: sessionIdRef.current,
           customer_id: customerIdRef.current.trim() || null,
@@ -131,10 +142,20 @@ export default function FloatingOnlineSupport({
         })
         if (error) {
           console.warn('[support_relay_messages]', error.message, error.code ?? '')
+          const hint =
+            error.code === '42P01' || /relation|does not exist/i.test(error.message)
+              ? '数据库缺少表：请在 Supabase SQL Editor 执行迁移文件 supabase/migrations/20260511120000_support_relay_messages.sql（或运行合并脚本 cloud_apply_all.sql 中的对应段落）。'
+              : error.code === '42501' || /row-level security|RLS/i.test(error.message)
+                ? '无写入权限（RLS）：请确认已执行上述迁移中的策略，且当前账号已登录。'
+                : ''
+          return {
+            ok: false,
+            detail: [error.message, error.code ? `code=${error.code}` : '', hint].filter(Boolean).join(' '),
+          }
         }
-        return !error
+        return { ok: true }
       }
-      return true
+      return { ok: true }
     },
     [],
   )
@@ -350,7 +371,7 @@ export default function FloatingOnlineSupport({
     const sysText =
       '已为您接入店魔方人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
     const bid = pushMessage('system', sysText)
-    void emitRelayLine('system', sysText, bid).then((synced) => {
+    void emitRelayLine('system', sysText, bid).then((r) => {
       setConnecting(false)
       const wsUrl = getSupportRelayWsUrl()
       const cloud = !wsUrl && supabaseConfigured && supabase
@@ -358,14 +379,14 @@ export default function FloatingOnlineSupport({
         setHumanMode(true)
         return
       }
-      if (synced) {
+      if (r.ok) {
         setHumanMode(true)
       } else {
         pushMessage(
           'system',
           wsUrl
-            ? '暂无法连接到人工客服会话。请稍后重试，或通过电话 / 工单联系您的客户经理；若为贵司私有化环境，请联系管理员确认客服通道已启用。'
-            : '消息未能写入云端会话表：请在 Supabase 执行迁移 support_relay_messages（含表与 RLS），并确认已登录；浏览器控制台可查看具体报错。',
+            ? `暂无法连接到人工客服会话：${r.detail ?? 'WebSocket 不可用'}。请稍后重试或通过其他渠道联系客户经理。`
+            : `消息未能写入云端会话表。${r.detail ?? ''} 详见控制台 [support_relay_messages]。`,
         )
       }
     })
@@ -379,11 +400,11 @@ export default function FloatingOnlineSupport({
     if (!t) return
     setInput('')
     const uid = pushMessage('user', t)
-    void emitRelayLine('user', t, uid).then((synced) => {
-      if (!synced && (wsUrl || cloud)) {
+    void emitRelayLine('user', t, uid).then((r) => {
+      if (!r.ok && (wsUrl || cloud)) {
         pushMessage(
           'system',
-          '消息尚未送达客服通道，请稍后重试或换一种联系方式。若长时间无法连接，请联系管理员。',
+          `消息尚未送达客服通道。${r.detail ?? ''}`.trim(),
         )
       }
       if (!humanMode) {
