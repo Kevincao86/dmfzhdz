@@ -65,7 +65,7 @@ async function syncOneReviewPlatform(
       return { ok: false, message: '请先绑定抖音来客后再同步评价。' }
     }
     const r = await fetchDouyinAkteReviews(bearer.trim())
-    if (!r.ok) return r
+    if (r.ok === false) return { ok: false, message: r.message }
     reviewsState.douyin = r.items as ReviewRow[]
     reviewsSyncedAt.douyin = new Date().toISOString()
     return {
@@ -741,15 +741,15 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         if (scope === 'all') {
           for (const pl of ['douyin', 'meituan', 'xhs'] as const) {
             const r = await syncOneReviewPlatform(pl, tok)
-            if (!r.ok && pl === 'douyin') {
+            if (r.ok === false && pl === 'douyin') {
               json(res, 502, { ok: false, message: r.message })
               return true
             }
-            if (r.ok) parts.push(r.message)
+            if (r.ok === true) parts.push(r.message)
           }
         } else {
           const r = await syncOneReviewPlatform(scope, tok)
-          if (!r.ok) {
+          if (r.ok === false) {
             json(res, 502, { ok: false, message: r.message })
             return true
           }
@@ -801,7 +801,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             return true
           }
           const pr = await postDouyinAkteCommentReply(tok, parsed.poiId, parsed.rateId, content)
-          if (!pr.ok) {
+          if (pr.ok === false) {
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
@@ -872,7 +872,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           ratingStars: row.ratingStars,
           sentiment: row.sentiment,
         })
-        if (!aiRes.ok) {
+        if (aiRes.ok === false) {
           json(res, 502, { ok: false, message: aiRes.message })
           return true
         }
