@@ -22,7 +22,8 @@ export type OpsPaymentOrderRow = {
 export async function fetchOpsPaymentOrders(): Promise<
   { ok: true; rows: OpsPaymentOrderRow[] } | { ok: false; error: string; hint?: string }
 > {
-  const res = await fetch('/api/ops-supabase/payment-orders-list')
+  /** 扁平路径，避免 ops-supabase/payment-orders-list + supabase-js 在 Vercel 上崩溃 */
+  const res = await fetch('/api/meoo-supabase-payment-orders-list')
   const j = (await res.json().catch(() => ({}))) as {
     ok?: boolean
     rows?: OpsPaymentOrderRow[]
