@@ -899,12 +899,14 @@ export async function handleDouyinStoresGet(
   const keyword = (url.searchParams.get('keyword') ?? '').trim().toLowerCase()
   const claimScopeRaw = (url.searchParams.get('claimScope') ?? 'claimed').trim().toLowerCase()
   const claimScope = claimScopeRaw === 'claiming' ? 'claiming' : 'claimed'
-  const rt = (url.searchParams.get('relationType') ?? '').trim()
-  let relationSpec: RelationSpec = 0
-  if (rt === 'all') relationSpec = 'all'
+  /** 未传时默认 all：仅查 relation_type=0 时许多账户在关联/挂靠关系下门店为空 */
+  const rtRaw = url.searchParams.get('relationType')
+  const rt = !rtRaw?.trim() ? 'all' : rtRaw.trim()
+  let relationSpec: RelationSpec = 'all'
+  if (rt === '0') relationSpec = 0
   else if (rt === '1') relationSpec = 1
   else if (rt === '2') relationSpec = 2
-  else if (rt === '0') relationSpec = 0
+  else if (rt === 'all') relationSpec = 'all'
 
   const forceRefresh =
     url.searchParams.get('refresh') === '1' ||
@@ -929,7 +931,10 @@ export async function handleDouyinStoresGet(
     }
 
     const tabCounts = { claimed: claimedBucket.length, claiming: claimingBucket.length }
-    const scopeBucket = claimScope === 'claiming' ? claimingBucket : claimedBucket
+    let scopeBucket = claimScope === 'claiming' ? claimingBucket : claimedBucket
+    if (claimScope !== 'claiming' && scopeBucket.length === 0 && allPois.length > 0) {
+      scopeBucket = allPois
+    }
 
     let filtered = scopeBucket
     const claimStatusFilter = (url.searchParams.get('claimStatusFilter') ?? 'all').trim()
@@ -1062,12 +1067,13 @@ export async function handleDouyinStoreDecorationGet(
   const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
   const pageSize = Math.min(100, Math.max(1, Number(url.searchParams.get('pageSize')) || 10))
   const keyword = (url.searchParams.get('keyword') ?? '').trim().toLowerCase()
-  const rt = (url.searchParams.get('relationType') ?? '0').trim()
-  let relationSpec: RelationSpec = 0
-  if (rt === 'all') relationSpec = 'all'
-  else if (rt === '1') relationSpec = 1
-  else if (rt === '2') relationSpec = 2
-  else if (rt === '0') relationSpec = 0
+  const rtRawDecor = url.searchParams.get('relationType')
+  const rtDecor = !rtRawDecor?.trim() ? 'all' : rtRawDecor.trim()
+  let relationSpec: RelationSpec = 'all'
+  if (rtDecor === '0') relationSpec = 0
+  else if (rtDecor === '1') relationSpec = 1
+  else if (rtDecor === '2') relationSpec = 2
+  else if (rtDecor === 'all') relationSpec = 'all'
 
   const forceRefresh =
     url.searchParams.get('refresh') === '1' ||
