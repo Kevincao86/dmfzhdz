@@ -69,6 +69,8 @@ export default function DouyinMerchantSection() {
   const [total, setTotal] = useState(0)
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
+  /** 网关返回的 emptyHint / relationWarnings，便于区分「真无门店」与「部分 relation 失败」 */
+  const [storesHint, setStoresHint] = useState<string | null>(null)
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedKeyword(keyword.trim()), 350)
@@ -105,6 +107,7 @@ export default function DouyinMerchantSection() {
       if (!tok) {
         setRows([])
         setTotal(0)
+        setStoresHint(null)
         return
       }
       const mid =
@@ -127,6 +130,7 @@ export default function DouyinMerchantSection() {
       if (!silent) setListLoading(false)
       if (res.ok === false) {
         setListError(res.message)
+        setStoresHint(null)
         if (!silent) {
           setRows([])
           setTotal(0)
@@ -134,6 +138,10 @@ export default function DouyinMerchantSection() {
         return
       }
       setListError(null)
+      const hintParts: string[] = []
+      if (res.relationWarnings?.length) hintParts.push(...res.relationWarnings)
+      if (res.emptyHint) hintParts.push(res.emptyHint)
+      setStoresHint(hintParts.length ? hintParts.join('\n\n') : null)
       setRows(res.items)
       setTotal(res.total)
       const syncName = res.accountName?.trim()
@@ -264,6 +272,7 @@ export default function DouyinMerchantSection() {
     setTotal(0)
     setLastSyncAt(null)
     setListError(null)
+    setStoresHint(null)
   }
 
   return (
@@ -413,8 +422,22 @@ export default function DouyinMerchantSection() {
                   ) : rows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-3 py-10 text-center text-gray-500">
-                        暂无门店数据。请核对来客「账户 ID」与 App 权限（life.capacity.shop），或调整搜索条件；本地
-                        dev 由 Vite 直连抖音接口。
+                        {storesHint ? (
+                          <div className="mx-auto max-w-xl space-y-3 text-left">
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 whitespace-pre-wrap">
+                              {storesHint}
+                            </div>
+                            <p className="text-center text-gray-500">
+                              若仍有疑问：请核对来客「账户 ID」与开放平台 scope（life.capacity.shop）；本地 dev 由 Vite
+                              直连抖音接口。
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            暂无门店数据。请核对来客「账户 ID」与 App 权限（life.capacity.shop），或调整搜索条件；本地
+                            dev 由 Vite 直连抖音接口。
+                          </>
+                        )}
                       </td>
                     </tr>
                   ) : (

@@ -73,6 +73,10 @@ export type DouyinStoresResult =
       accountName?: string
       /** 已认领 / 认领中 数量，由网关聚合抖音认领相关接口后返回 */
       tabCounts?: StoreTabCounts
+      /** 网关返回：抖音侧 relation_type 部分失败时的可读摘要 */
+      relationWarnings?: string[]
+      /** 网关返回：列表为空时的排查说明 */
+      emptyHint?: string
     }
   | { ok: false; message: string }
 
@@ -264,11 +268,23 @@ export async function getDouyinStores(params: {
     },
   })
 
+  const rawText = await res.text()
+  const ct = res.headers.get('content-type') ?? ''
+  const trimmed = rawText.trimStart()
+  const looksHtml = trimmed.startsWith('<') || /text\/html/i.test(ct)
+  if (res.ok && looksHtml) {
+    return {
+      ok: false,
+      message:
+        '门店接口返回了 HTML 而非 JSON（常见于部署将 /api 请求交给了 SPA）。请确认 Vercel 已识别 api/merchant Functions，且未错误重写 /api/*。',
+    }
+  }
+
   let data: Record<string, unknown> = {}
   try {
-    data = (await res.json()) as Record<string, unknown>
+    data = (JSON.parse(rawText || '{}') as Record<string, unknown>) ?? {}
   } catch {
-    /* ignore */
+    data = {}
   }
 
   if (!res.ok) {
@@ -571,6 +587,8 @@ export function adaptMerchantStoresPayload(data: Record<string, unknown>): {
   total: number
   accountName?: string
   tabCounts?: StoreTabCounts
+  relationWarnings?: string[]
+  emptyHint?: string
 } {
   const { rows: rawRows, total: parsedTotal } = extractStoreRowsPayload(data)
   const items: DouyinStoreRow[] = rawRows.map((row) => normalizeStoreRow(row))
@@ -586,7 +604,19 @@ export function adaptMerchantStoresPayload(data: Record<string, unknown>): {
   const accountName = extractAccountNameFromStoresPayload(data, rawRows)
   const tabCounts = extractTabCounts(data)
 
-  return { items, total, accountName, tabCounts }
+  const relationWarnings = Array.isArray(data.relationWarnings)
+    ? data.relationWarnings.filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+    : undefined
+  const emptyHint = typeof data.emptyHint === 'string' && data.emptyHint.trim() ? data.emptyHint.trim() : undefined
+
+  return {
+    items,
+    total,
+    accountName,
+    tabCounts,
+    relationWarnings: relationWarnings?.length ? relationWarnings : undefined,
+    emptyHint,
+  }
 }
 
 /**

@@ -128,24 +128,32 @@ function parseDouyinEnvelope(raw: string): Record<string, unknown> {
   }
 }
 
+/** 抖音部分字段以字符串形式返回 error_code，仅用 number 判断会漏掉业务失败 */
+function numericErrorCode(v: unknown): number | undefined {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'bigint') return Number(v)
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v)
+  return undefined
+}
+
 function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string } {
-  const rootCode = j.error_code
-  if (typeof rootCode === 'number' && rootCode !== 0) {
+  const rootCode = numericErrorCode(j.error_code)
+  if (rootCode !== undefined && rootCode !== 0) {
     return { ok: false, msg: String(j.description ?? j.msg ?? `抖音根 error_code=${rootCode}`) }
   }
   const data = j.data
   if (data && typeof data === 'object') {
     const d = data as Record<string, unknown>
-    const code = d.error_code
-    if (typeof code === 'number' && code !== 0) {
+    const code = numericErrorCode(d.error_code)
+    if (code !== undefined && code !== 0) {
       return { ok: false, msg: String(d.description ?? `抖音 error_code=${code}`) }
     }
   }
   const extra = j.extra
   if (extra && typeof extra === 'object') {
     const e = extra as Record<string, unknown>
-    const code = e.error_code
-    if (typeof code === 'number' && code !== 0) {
+    const code = numericErrorCode(e.error_code)
+    if (code !== undefined && code !== 0) {
       return { ok: false, msg: String(e.description ?? `抖音 extra error_code=${code}`) }
     }
   }
@@ -422,10 +430,26 @@ async function fetchAllPoiPages(
   return { pois: all, total: reportedTotal || all.length }
 }
 
+function mergePoiPacksInto(
+  packs: { pois: unknown[]; total: number }[],
+  seen: Set<string>,
+  merged: unknown[],
+): void {
+  for (const pack of packs) {
+    for (const row of pack.pois) {
+      let id = extractRowPoiId(row)
+      if (!id) id = stableFallbackPoiKey(row)
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      merged.push(row)
+    }
+  }
+}
+
 async function fetchMergedAllPois(
   accountId: string,
   accessToken: string,
-): Promise<{ pois: unknown[]; total: number }> {
+): Promise<{ pois: unknown[]; total: number; relationWarnings: string[] }> {
   /** 串行降低瞬时 QPS；原先 Promise.all + 全程静默失败会导致线上「永远 0 条」 */
   const packs: { pois: unknown[]; total: number }[] = []
   const errors: string[] = []
@@ -440,21 +464,26 @@ async function fetchMergedAllPois(
   }
   const seen = new Set<string>()
   const merged: unknown[] = []
-  for (const pack of packs) {
-    for (const row of pack.pois) {
-      let id = extractRowPoiId(row)
-      if (!id) id = stableFallbackPoiKey(row)
-      if (!id || seen.has(id)) continue
-      seen.add(id)
-      merged.push(row)
+  mergePoiPacksInto(packs, seen, merged)
+
+  /** 文档：不传 relation_type 时按认领(0)处理；个别账号显式 0/1/2 与省略行为不一致时再兜一层 */
+  const relationWarnings = [...errors]
+  if (merged.length === 0 && errors.length === 0) {
+    try {
+      const omitPack = await fetchAllPoiPages(accountId, accessToken, undefined)
+      mergePoiPacksInto([omitPack], seen, merged)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      relationWarnings.push(`relation_type=默认(不传)：${msg.slice(0, 320)}`)
     }
   }
+
   if (merged.length === 0 && errors.length === 3) {
     throw new Error(
       `抖音 shop.query 三种 relation_type 均失败（请核对 life.capacity.shop 与账户 ID）：${errors.join(' | ')}`,
     )
   }
-  return { pois: merged, total: merged.length }
+  return { pois: merged, total: merged.length, relationWarnings }
 }
 
 const POI_LIST_CACHE_TTL_MS = 45_000
@@ -474,7 +503,7 @@ async function getCachedPoiList(
   accessToken: string,
   relationSpec: RelationSpec,
   forceRefresh: boolean,
-): Promise<{ pois: unknown[]; total: number }> {
+): Promise<{ pois: unknown[]; total: number; relationWarnings?: string[] }> {
   const cacheKey = `${sessionKey}::${accountId}::rt:${relationSpec}`
   const now = Date.now()
   if (!forceRefresh) {
@@ -486,14 +515,16 @@ async function getCachedPoiList(
   const pack =
     relationSpec === 'all'
       ? await fetchMergedAllPois(accountId, accessToken)
-      : await fetchAllPoiPages(accountId, accessToken, relationSpec)
+      : { ...(await fetchAllPoiPages(accountId, accessToken, relationSpec)), relationWarnings: [] }
   /** 勿缓存「空列表」：避免首次瞬时失败/权限抖动导致长时间空白 */
   if (pack.pois.length > 0) {
     poiListCache.set(cacheKey, { ts: now, pois: pack.pois, total: pack.total })
   } else {
     poiListCache.delete(cacheKey)
   }
-  return pack
+  const relationWarnings =
+    relationSpec === 'all' && pack.relationWarnings?.length ? pack.relationWarnings : undefined
+  return { pois: pack.pois, total: pack.total, relationWarnings }
 }
 
 /** 认领中：综合抖音返回的状态字段做保守识别（无明确「进行中」语义时归为已认领侧） */
@@ -974,7 +1005,13 @@ export async function handleDouyinStoresGet(
       clearSessionPoiCache(auth)
     }
 
-    const { pois: allPois } = await getCachedPoiList(auth, accountId, token, relationSpec, forceRefresh)
+    const { pois: allPois, relationWarnings } = await getCachedPoiList(
+      auth,
+      accountId,
+      token,
+      relationSpec,
+      forceRefresh,
+    )
 
     const claimedBucket: unknown[] = []
     const claimingBucket: unknown[] = []
@@ -1016,9 +1053,20 @@ export async function handleDouyinStoresGet(
     const slice = filtered.slice(start, start + pageSize)
     const accountName = accountNameFromPois(slice.length ? slice : allPois)
 
+    const relationWarnOut =
+      relationWarnings?.filter((w) => typeof w === 'string' && w.trim()) ?? []
+    const emptyHint =
+      total === 0
+        ? allPois.length === 0
+          ? '抖音 shop.query 在当前账户下返回 0 条门店。绑定成功只表示 client_token 有效；请核对来客 PC 端右上角「账户 ID」与开放平台授权一致，且门店已在该账户下完成认领。若仅有「关联/挂靠」门店，本接口已合并 relation_type 0/1/2。'
+          : '当前筛选条件下无门店，请清空搜索词或筛选条件后重试。'
+        : undefined
+
     json(res, 200, {
       accountName,
       tabCounts,
+      relationWarnings: relationWarnOut.length ? relationWarnOut : undefined,
+      emptyHint,
       data: {
         pois: slice,
         total,
