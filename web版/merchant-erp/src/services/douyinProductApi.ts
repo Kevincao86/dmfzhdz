@@ -627,20 +627,39 @@ export async function getDouyinGoodsProductOnlineQuery(params: {
   return { ok: true, hits: merged, next_cursor: undefined }
 }
 
-/** category/get 专用：保留类目 id 精度，并兼容网关包装 `{ message, data }`。 */
-async function parseCategoryGetJsonResponse(res: Response): Promise<Record<string, unknown>> {
+/** category/get 专用：保留类目 id 精度；先尝试原样 JSON，再尝试 int64 字段加引号（避免替换破坏合法 JSON）。 */
+async function parseCategoryGetJsonResponse(res: Response): Promise<{
+  root: Record<string, unknown>
+  parseFault?: 'read_failed' | 'empty' | 'html' | 'json_invalid'
+  rawLen?: number
+}> {
   let raw = ''
   try {
     raw = await res.text()
   } catch {
-    return {}
+    return { root: {}, parseFault: 'read_failed', rawLen: 0 }
   }
-  try {
-    const fixed = quoteInt64CategoryIdFieldsInJson(raw)
-    return JSON.parse(fixed) as Record<string, unknown>
-  } catch {
-    return {}
+  const trimmed = raw.trim()
+  if (!trimmed) {
+    return { root: {}, parseFault: 'empty', rawLen: raw.length }
   }
+  if (trimmed.startsWith('<')) {
+    return { root: {}, parseFault: 'html', rawLen: raw.length }
+  }
+  const variants: string[] = [raw]
+  const fixed = quoteInt64CategoryIdFieldsInJson(raw)
+  if (fixed !== raw) variants.push(fixed)
+  for (const cand of variants) {
+    try {
+      const parsed = JSON.parse(cand) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { root: parsed as Record<string, unknown>, rawLen: raw.length }
+      }
+    } catch {
+      /* try next variant */
+    }
+  }
+  return { root: {}, parseFault: 'json_invalid', rawLen: raw.length }
 }
 
 /** 行业圈定可发三级类目（网关可合并门店资质 / 类目资质结果） */
@@ -681,17 +700,25 @@ async function requestCategoryTreeQuery(q: URLSearchParams): Promise<CategoryGet
     method: 'GET',
     headers: authHeaders(),
   })
-  const data = await parseCategoryGetJsonResponse(res)
+  const { root: data, parseFault, rawLen } = await parseCategoryGetJsonResponse(res)
   if (!res.ok) {
     return {
       ok: false,
       message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
     }
   }
-  if (Object.keys(data).length === 0) {
+  if (parseFault) {
+    const detail =
+      parseFault === 'empty'
+        ? '响应体为空（网关或上游未返回内容）'
+        : parseFault === 'html'
+          ? '返回了 HTML（多为 CDN/网关错误页，请稍后再试）'
+          : parseFault === 'read_failed'
+            ? '读取响应失败'
+            : `无法解析为 JSON（约 ${rawLen ?? 0} 字符；可能响应过大被截断或非 JSON）`
     return {
       ok: false,
-      message: '类目接口返回无法解析（响应体非 JSON 或已截断，请重试或检查绑定）',
+      message: `类目接口异常：${detail}。请重试或在浏览器 Network 中查看 category/get 响应。`,
     }
   }
   const d = pickCategoryGetInnerData(data)
@@ -764,7 +791,7 @@ async function fetchCategorySubtreeByParentId(parentCategoryId: string): Promise
     method: 'GET',
     headers: authHeaders(),
   })
-  const data = await parseCategoryGetJsonResponse(res)
+  const { root: data } = await parseCategoryGetJsonResponse(res)
   if (!res.ok) return []
   const d = pickCategoryGetInnerData(data)
   return extractChildrenFromCategoryGetPayload(d, parentCategoryId)
