@@ -11,7 +11,7 @@
  *
  * 门店品牌列表：GET /api/merchant/douyin/brands → 代理 goodlife/v2/shop/brand/query/（与来客「门店品牌」一致，非门店名称）
  *
- * 部署：绑定依次尝试 `POST /api/meoo-douyin-bind`、`/api/douyin-bind`、`/api/merchant/douyin/bind`（避免单一路由打包/网关异常）。
+ * 部署：绑定依次尝试 `POST /api/douyin-bind`、`/api/meoo-douyin-bind`、`/api/merchant/douyin/bind`（跳过 HTML/404 等基础设施响应）。
  * 生产须配置 MERCHANT_DOUYIN_SESSION_SECRET。
  * 若网关部署在其他域名，设置 VITE_MERCHANT_API_BASE_URL（不以 / 结尾）；未设置则走同源。
  */
@@ -85,6 +85,12 @@ function url(path: string) {
   return `${b}${path}`
 }
 
+/** SPA / CDN 常对 /api 返回 200 + index.html；须视为失败并换路径或修路由 */
+function responseLooksLikeHtml(text: string, contentType: string): boolean {
+  const trimmed = text.trimStart()
+  return trimmed.startsWith('<') || /text\/html/i.test(contentType)
+}
+
 export async function postDouyinBind(
   payload: DouyinBindPayload,
 ): Promise<DouyinBindResult> {
@@ -98,7 +104,8 @@ export async function postDouyinBind(
   const timeoutId = setTimeout(() => ctrl.abort(), DOUYIN_BIND_CLIENT_TIMEOUT_MS)
   const clearBindTimer = () => clearTimeout(timeoutId)
 
-  const bindPaths = ['/api/meoo-douyin-bind', '/api/douyin-bind', '/api/merchant/douyin/bind'] as const
+  /** 扁平 `/api/douyin-bind` 优先：最少间接、最易被边缘路由命中 */
+  const bindPaths = ['/api/douyin-bind', '/api/meoo-douyin-bind', '/api/merchant/douyin/bind'] as const
 
   try {
     let res: Response | null = null
@@ -111,6 +118,10 @@ export async function postDouyinBind(
         signal: ctrl.signal,
       })
       const text = await r.text()
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.ok && responseLooksLikeHtml(text, ct)) {
+        continue
+      }
       if (r.ok) {
         res = r
         rawText = text
@@ -127,8 +138,7 @@ export async function postDouyinBind(
         r.status === 404 ||
         (!apiMsg &&
           (/FUNCTION_INVOCATION_FAILED|A server error has occurred/i.test(text) ||
-            text.trim().startsWith('<!') ||
-            text.trim().startsWith('<html')))
+            responseLooksLikeHtml(text, ct)))
       if (infraFail) continue
       res = r
       rawText = text
@@ -138,7 +148,7 @@ export async function postDouyinBind(
       return {
         ok: false,
         message:
-          '绑定服务不可用（多条路径均失败）。请确认 Vercel 已部署最新代码且 Functions 正常；也可稍后在 Vercel Logs 中查看报错。',
+          '绑定服务不可用：多条路径均返回网页（HTML）或基础设施错误，说明请求未命中 Serverless（常见于 SPA 抢占了 /api）。请确认 Vercel 项目 Root Directory 为 web版/merchant-erp，且 vercel.json 已包含先于 SPA 的 `/api/:path*` 放行规则；打开 /api/ping 应返回 JSON。',
       }
     }
     let data: Record<string, unknown> = {}
