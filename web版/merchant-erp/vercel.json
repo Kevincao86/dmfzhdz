@@ -4,7 +4,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/merchant/[...slug].ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
+      "includeFiles": ["vite-plugins/**", "src/lib/**"],
       "maxDuration": 60
     },
     "api/**/*.ts": {
@@ -13,11 +13,7 @@
   },
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/:path*",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
