@@ -35,6 +35,19 @@ function flattenVercelHeaders(
   return out
 }
 
+/** node-mocks-http / IncomingMessage 侧惯例为小写头名；否则 Authorization 可能读不到 Bearer */
+function headersForNodeMocks(
+  h: Record<string, string | string[] | undefined>,
+): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {}
+  for (const [k, v] of Object.entries(h)) {
+    if (v === undefined) continue
+    const key = k.toLowerCase()
+    out[key] = Array.isArray(v) ? v.join(', ') : v
+  }
+  return out
+}
+
 function slugSegmentsFromRequest(req: VercelRequest): string[] {
   const slug = req.query.slug
   if (Array.isArray(slug)) return slug.map(String).filter(Boolean)
@@ -122,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const { req: mReq, res: mRes } = createMocks<IncomingMessage, ServerResponse>({
     method: method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS',
     url: pathWithQuery,
-    headers: flattenVercelHeaders(req.headers) as Record<string, string>,
+    headers: headersForNodeMocks(flattenVercelHeaders(req.headers)) as Record<string, string>,
     ...(bodyRaw ? { body: bodyRaw as unknown as Record<string, string> } : {}),
   })
 

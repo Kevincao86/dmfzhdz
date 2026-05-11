@@ -94,13 +94,21 @@ export default function DouyinMerchantSection() {
   }, [bindOpen])
 
   const loadStores = useCallback(
-    async (opts?: { silent?: boolean }) => {
-      if (!accessToken) {
+    async (opts?: {
+      silent?: boolean
+      refresh?: boolean
+      /** 绑定成功瞬间 state 尚未提交，需显式传入 */
+      accessTokenOverride?: string
+      merchantIdOverride?: string
+    }) => {
+      const tok = (opts?.accessTokenOverride ?? accessToken)?.trim()
+      if (!tok) {
         setRows([])
         setTotal(0)
         return
       }
       const mid =
+        opts?.merchantIdOverride?.trim() ||
         boundMerchantId.trim() ||
         readSession(META_MERCHANT_ID)?.trim() ||
         undefined
@@ -108,11 +116,13 @@ export default function DouyinMerchantSection() {
       if (!silent) setListLoading(true)
       if (!silent) setListError(null)
       const res = await getDouyinStores({
-        accessToken,
+        accessToken: tok,
         page,
         pageSize,
         keyword: debouncedKeyword || undefined,
         merchantId: mid,
+        relationType: 'all',
+        refresh: opts?.refresh,
       })
       if (!silent) setListLoading(false)
       if (res.ok === false) {
@@ -144,7 +154,7 @@ export default function DouyinMerchantSection() {
   const manualRefresh = useCallback(async () => {
     setManualRefreshing(true)
     try {
-      await loadStores({ silent: false })
+      await loadStores({ silent: false, refresh: true })
     } finally {
       setManualRefreshing(false)
     }
@@ -231,6 +241,12 @@ export default function DouyinMerchantSection() {
       setAppSecret('')
       setBindOpen(false)
       setPage(1)
+      void loadStores({
+        silent: false,
+        refresh: true,
+        accessTokenOverride: r.accessToken,
+        merchantIdOverride: merchantId.trim(),
+      })
     } catch (e) {
       setBindError(e instanceof Error ? e.message : String(e))
     } finally {
