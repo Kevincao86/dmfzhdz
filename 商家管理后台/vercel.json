@@ -10,14 +10,6 @@
   },
   "rewrites": [
     {
-      "source": "/api/ops-supabase/tenants",
-      "destination": "/api/ops-supabase/tenants-list"
-    },
-    {
-      "source": "/api/ops-supabase/payment-orders",
-      "destination": "/api/ops-supabase/payment-orders-list"
-    },
-    {
       "source": "/:path*",
       "destination": "/index.html"
     }
