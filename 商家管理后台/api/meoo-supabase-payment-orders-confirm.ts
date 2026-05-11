@@ -1,14 +1,32 @@
 /**
  * Vercel：POST /api/meoo-supabase-payment-orders-confirm
  * 纯 fetch PostgREST，语义对齐 confirmOpsPaymentOrderAdmin（无 supabase-js）。
+ *
+ * 计费公式内联在此文件：切勿从 ../src 引用模块，否则 Vercel 打包 api 函数时常见 MODULE_NOT_FOUND → 500。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import {
-  rechargeCreditFromVerifiedCents,
-  subscriptionDaysFromVerifiedCents,
-} from '../src/ops/paymentTierLogic'
 
 export const config = { maxDuration: 60 }
+
+/** 与 src/ops/paymentTierLogic.ts / web版 meooPaymentTiers 保持一致 */
+const SUBSCRIPTION_TIER_CENTS = new Map<number, number>([
+  [9900, 30],
+  [26800, 90],
+  [69800, 365],
+])
+
+function subscriptionDaysFromVerifiedCents(verifiedCents: number): number {
+  if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return 0
+  const hit = SUBSCRIPTION_TIER_CENTS.get(verifiedCents)
+  if (hit !== undefined) return hit
+  const unit = 9900 / 30
+  return Math.max(1, Math.floor(verifiedCents / unit))
+}
+
+function rechargeCreditFromVerifiedCents(verifiedCents: number): number {
+  if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return 0
+  return Math.floor(verifiedCents)
+}
 
 function sendOpsJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   try {
@@ -89,6 +107,21 @@ function postJsonHeaders(serviceKey: string): Record<string, string> {
 
 type OrderRow = Record<string, unknown>
 
+/** PostgREST Prefer:return=representation 多为 JSON 数组；部分网关/版本可能对单行返回单个对象 */
+function parseRepresentationRows(text: string): unknown[] {
+  const raw = (text || '').trim()
+  if (!raw) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  if (Array.isArray(parsed)) return parsed
+  if (parsed && typeof parsed === 'object') return [parsed]
+  return []
+}
+
 async function finalizeOrder(
   base: string,
   serviceRole: string,
@@ -109,17 +142,8 @@ async function finalizeOrder(
       body: { ok: false, error: 'order_finalize_failed', detail: text.slice(0, 400) },
     }
   }
-  let rows: unknown[]
-  try {
-    rows = JSON.parse(text || '[]') as unknown[]
-  } catch {
-    return {
-      ok: false,
-      status: 502,
-      body: { ok: false, error: 'order_finalize_failed', detail: text.slice(0, 200) },
-    }
-  }
-  if (!Array.isArray(rows) || rows.length === 0) {
+  const rows = parseRepresentationRows(text)
+  if (rows.length === 0) {
     return { ok: false, status: 409, body: { ok: false, error: 'order_not_ready' } }
   }
   return { ok: true }

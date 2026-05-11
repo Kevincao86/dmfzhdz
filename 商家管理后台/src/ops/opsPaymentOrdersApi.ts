@@ -56,8 +56,12 @@ export async function confirmOpsPaymentOrder(body: { id: string }): Promise<{ ok
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-  if (!res.ok || !j.ok) return { ok: false, error: j.error ?? `http_${res.status}` }
+  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; detail?: string }
+  if (!res.ok || !j.ok) {
+    const code = (typeof j.error === 'string' && j.error) || `http_${res.status}`
+    const detail = typeof j.detail === 'string' && j.detail.trim() ? j.detail.trim().slice(0, 500) : ''
+    return { ok: false, error: detail ? `${code}\n${detail}` : code }
+  }
   return { ok: true }
 }
 
