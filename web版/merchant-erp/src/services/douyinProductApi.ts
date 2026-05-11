@@ -915,12 +915,41 @@ export async function getDouyinGoodsCategoryTreeMerged(
 export async function getDouyinProductTypesForCategory(
   leafCategoryId: string,
 ): Promise<ProductTypesResult> {
-  const res = await fetch(
-    url(
-      `/api/merchant/douyin/goods/product-types?${new URLSearchParams({ category_id: leafCategoryId })}`,
-    ),
-    { method: 'GET', headers: authHeaders() },
-  )
+  const qs = new URLSearchParams({ category_id: leafCategoryId }).toString()
+  const paths = ['/api/meoo-douyin-goods-product-types', '/api/merchant/douyin/goods/product-types'] as const
+  const headers = authHeaders()
+  for (const p of paths) {
+    const res = await fetch(url(`${p}?${qs}`), { method: 'GET', headers })
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    if (res.status === 404) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+      }
+    }
+    const typesRaw = data.types ?? data.data
+    const types = Array.isArray(typesRaw)
+      ? (typesRaw as Record<string, unknown>[])
+          .map((t) => ({
+            product_type: Number(t.product_type),
+            label: String(t.label ?? t.name ?? ''),
+            eligible: Boolean(t.eligible !== false),
+          }))
+          .filter((t) => t.label && Number.isFinite(t.product_type))
+      : []
+    return { ok: true, types }
+  }
+  const res = await fetch(url(`${paths[1]}?${qs}`), { method: 'GET', headers })
   const data = await parseJson(res)
   if (!res.ok) {
     return {

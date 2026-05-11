@@ -131,6 +131,7 @@ export default function DouyinProductCreateWizard({
   const [productTypes, setProductTypes] = useState<ProductTypeOption[]>([])
   const [productType, setProductType] = useState<number | null>(null)
   const [typesLoading, setTypesLoading] = useState(false)
+  const [typesLoadError, setTypesLoadError] = useState<string | null>(null)
 
   const [storeModalOpen, setStoreModalOpen] = useState(false)
   const [modalKeyword, setModalKeyword] = useState('')
@@ -479,12 +480,18 @@ export default function DouyinProductCreateWizard({
     let cancelled = false
     const run = async () => {
       setTypesLoading(true)
+      setTypesLoadError(null)
       const r = await getDouyinProductTypesForCategory(cat3)
       if (cancelled) return
       setTypesLoading(false)
       if (r.ok) {
         setProductTypes(r.types)
         setProductType(null)
+        setTypesLoadError(r.types.length === 0 ? '当前类目未返回可选商品类型，请换类目或检查绑定与网关。' : null)
+      } else {
+        setProductTypes([])
+        setProductType(null)
+        setTypesLoadError(r.message)
       }
     }
     void run()
@@ -1250,6 +1257,10 @@ export default function DouyinProductCreateWizard({
             <div className="mt-6 flex items-center text-gray-500">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               加载商品类型…
+            </div>
+          ) : typesLoadError ? (
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {typesLoadError}
             </div>
           ) : (
             <div className="mt-4 space-y-2">

@@ -15,6 +15,10 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-douyin-goods-product-types.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-store-gross-margin-advisor.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
