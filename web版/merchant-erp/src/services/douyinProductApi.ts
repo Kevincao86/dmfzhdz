@@ -474,16 +474,10 @@ function mergeDedupeProductHits(batches: DouyinOnlineProductHit[][]): DouyinOnli
   return out
 }
 
-async function fetchOnlineQueryHits(
-  qs: URLSearchParams,
-): Promise<{ hits: DouyinOnlineProductHit[]; httpErr?: string; bizErr?: string }> {
-  const q = new URLSearchParams(qs.toString())
-  appendDouyinAccountIdToQuery(q)
-  const res = await fetch(url(`/api/merchant/douyin/goods/product/online/query?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
-  const data = await parseJson(res)
+function parseOnlineQueryResponse(
+  res: Response,
+  data: Record<string, unknown>,
+): { hits: DouyinOnlineProductHit[]; httpErr?: string; bizErr?: string } {
   if (!res.ok) {
     return {
       hits: [],
@@ -501,15 +495,68 @@ async function fetchOnlineQueryHits(
   return { hits, bizErr: hits.length === 0 ? bizErr : undefined }
 }
 
+async function fetchOnlineQueryHits(
+  qs: URLSearchParams,
+): Promise<{ hits: DouyinOnlineProductHit[]; httpErr?: string; bizErr?: string }> {
+  const q = new URLSearchParams(qs.toString())
+  appendDouyinAccountIdToQuery(q)
+  const qsStr = q.toString()
+  const paths = [
+    '/api/meoo-douyin-goods-product-online-query',
+    '/api/merchant/douyin/goods/product/online/query',
+  ] as const
+  const headers = authHeaders()
+  for (const p of paths) {
+    const res = await fetch(url(`${p}?${qsStr}`), { method: 'GET', headers })
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    if (res.status === 404) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    return parseOnlineQueryResponse(res, data)
+  }
+  const res = await fetch(url(`${paths[1]}?${qsStr}`), { method: 'GET', headers })
+  const data = await parseJson(res)
+  return parseOnlineQueryResponse(res, data)
+}
+
 async function fetchDraftQueryHitsFiltered(keyword: string, count: number): Promise<DouyinOnlineProductHit[]> {
   const q = new URLSearchParams()
   q.set('count', String(Math.min(50, Math.max(5, count))))
   appendDouyinAccountIdToQuery(q)
-  const res = await fetch(url(`/api/merchant/douyin/goods/product/draft/query?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
-  const data = await parseJson(res)
+  const qsStr = q.toString()
+  const paths = [
+    '/api/meoo-douyin-goods-product-draft-query',
+    '/api/merchant/douyin/goods/product/draft/query',
+  ] as const
+  const headers = authHeaders()
+  let data: Record<string, unknown> = {}
+  let res: Response | null = null
+  for (const p of paths) {
+    const r = await fetch(url(`${p}?${qsStr}`), { method: 'GET', headers })
+    const text = await r.text()
+    const ct = r.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (r.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    if (r.status === 404) continue
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    res = r
+    break
+  }
+  if (!res) {
+    res = await fetch(url(`${paths[1]}?${qsStr}`), { method: 'GET', headers })
+    data = await parseJson(res)
+  }
   if (!res.ok) return []
   const inner = data.data as Record<string, unknown> | undefined
   if (inner && typeof inner.error_code === 'number' && inner.error_code !== 0) return []
