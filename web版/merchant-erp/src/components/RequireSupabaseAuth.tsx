@@ -51,14 +51,27 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       setReady(true)
     }
 
-    // 不单独依赖 INITIAL_SESSION：部分环境下事件顺序晚于首屏，会导致 ready 一直为 false（表现为白屏/一直转圈）
-    void sb.auth.getSession().then(({ data }) => {
-      if (cancelled) return
-      void applySession(Boolean(data.session))
-    })
+    /**
+     * 首屏必须以 getSession() 为准：订阅 onAuthStateChange 时，部分环境会先同步派发
+     * INITIAL_SESSION 且 session 为 null，若此时立刻 applySession(false)，会在 getSession 尚未返回
+     * 有效会话前把用户踢回登录页（表现为「加载会话」后立刻回弹登录）。
+     * 后续 TOKEN_REFRESHED / SIGNED_IN / SIGNED_OUT 等仍照常处理。
+     */
+    void sb.auth
+      .getSession()
+      .then(({ data }) => {
+        if (cancelled) return
+        void applySession(Boolean(data.session))
+      })
+      .catch((e) => {
+        console.error('[ERP] getSession 失败', e)
+        if (cancelled) return
+        void applySession(false)
+      })
 
-    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
       if (cancelled) return
+      if (event === 'INITIAL_SESSION') return
       void applySession(Boolean(session))
     })
 

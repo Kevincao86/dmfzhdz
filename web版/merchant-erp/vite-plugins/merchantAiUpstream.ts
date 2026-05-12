@@ -392,6 +392,8 @@ function messageContentToText(msg: Record<string, unknown> | undefined): string 
       if (typeof p === 'string' && p.trim()) parts.push(p.trim())
       else if (p && typeof p === 'object') {
         const o = p as Record<string, unknown>
+        const typ = String(o.type ?? '').toLowerCase()
+        if (typ === 'reasoning' || typ === 'thinking' || typ === 'chain_of_thought') continue
         if (typeof o.text === 'string' && o.text.trim()) parts.push(o.text.trim())
       }
     }
@@ -400,10 +402,26 @@ function messageContentToText(msg: Record<string, unknown> | undefined): string 
   return null
 }
 
-/** MiniMax 等厂商在 message.content 中夹带 <think>…</think>，需去掉再作为标题/说明 */
+/**
+ * MiniMax / 推理模型常在 content 中夹带思考块；只保留对用户可见的正文。
+ * 覆盖 redacted_thinking、think、reasoning 等（含未闭合时截断尾部）。
+ */
 function polishVisibleAssistantText(s: string): string {
   let t = s.trim()
-  t = t.replace(/<think>[\s\S]*?<\/redacted_thinking>/gi, '').trim()
+  for (let i = 0; i < 12; i++) {
+    const prev = t
+    t = t
+      .replace(/<redacted_thinking>[\s\S]*?<\/redacted_thinking>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<analysis>[\s\S]*?<\/analysis>/gi, '')
+      .trim()
+    if (t === prev) break
+  }
+  t = t.replace(/<think>[\s\S]*$/gi, '').trim()
+  t = t.replace(/<redacted_thinking>[\s\S]*$/gi, '').trim()
+
+
   return t
 }
 
@@ -422,10 +440,10 @@ function extractChatCompletionText(data: Record<string, unknown>): string {
   if (c0) {
     const msg = c0.message as Record<string, unknown> | undefined
     const fromMsg = messageContentToText(msg)
-    if (fromMsg) return polishVisibleAssistantText(fromMsg)
-    const reasoning =
-      msg && typeof msg.reasoning_content === 'string' ? msg.reasoning_content.trim() : ''
-    if (reasoning) return polishVisibleAssistantText(reasoning)
+    if (fromMsg) {
+      const polished = polishVisibleAssistantText(fromMsg)
+      if (polished) return polished
+    }
     if (typeof c0.text === 'string' && c0.text.trim())
       return polishVisibleAssistantText(c0.text.trim())
   }

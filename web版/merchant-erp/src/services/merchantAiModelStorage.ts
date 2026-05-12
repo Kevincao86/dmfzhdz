@@ -24,6 +24,9 @@ function selectableAiIds(): Set<string> {
 }
 
 /** 按目录顺序，选用第一个已配置浏览器端 Key 的厂商；均无 Key 时退回目录首项（通常为 MiniMax）。 */
+/** 网关 runImageGenerate 仅支持这三家；自动生图勿选仅文案的自定义厂商 slug */
+const BUILTIN_IMAGE_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
+
 export function pickAutoResolvedTextModel(): string {
   const opts = listAiUiModelOptions()
   const keys = readVendorKeyMap()
@@ -34,7 +37,17 @@ export function pickAutoResolvedTextModel(): string {
 }
 
 export function pickAutoResolvedImageModel(): string {
-  return pickAutoResolvedTextModel()
+  const keys = readVendorKeyMap()
+  for (const id of BUILTIN_IMAGE_VENDOR_ORDER) {
+    if (keys[id]?.trim()) return id
+  }
+  const opts = listAiUiModelOptions()
+  for (const o of opts) {
+    if (BUILTIN_IMAGE_VENDOR_ORDER.includes(o.id as (typeof BUILTIN_IMAGE_VENDOR_ORDER)[number])) {
+      if (keys[o.id]?.trim()) return o.id
+    }
+  }
+  return 'qwen'
 }
 
 function normalizeTextModelStored(raw: string | null | undefined): string {
@@ -46,8 +59,23 @@ function normalizeTextModelStored(raw: string | null | undefined): string {
   return pickAutoResolvedTextModel()
 }
 
+function isBuiltinImageVendorId(id: string): boolean {
+  return (BUILTIN_IMAGE_VENDOR_ORDER as readonly string[]).includes(id)
+}
+
 function normalizeImageModelStored(raw: string | null | undefined): string {
-  return normalizeTextModelStored(raw)
+  const s = raw?.trim().toLowerCase() ?? ''
+  if (s === 'deepseek') return 'minimax'
+  if (s === 'auto' || !s) return pickAutoResolvedImageModel()
+  if (selectableAiIds().has(s)) {
+    if (isBuiltinImageVendorId(s)) return s
+    return pickAutoResolvedImageModel()
+  }
+  if (isValidAiVendorSlug(s)) {
+    if (isBuiltinImageVendorId(s)) return s
+    return pickAutoResolvedImageModel()
+  }
+  return pickAutoResolvedImageModel()
 }
 
 export function readStoredAiModel(): string {

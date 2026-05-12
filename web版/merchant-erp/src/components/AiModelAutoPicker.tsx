@@ -141,6 +141,8 @@ export default function AiModelAutoPicker({
       writeImageAiAuto(next)
       if (!next) {
         writeImageAiManualModel(pickAutoResolvedImageModel())
+      } else {
+        writeImageAiManualModel(pickAutoResolvedImageModel())
       }
     }
     bump()
