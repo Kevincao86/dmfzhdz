@@ -1,5 +1,8 @@
 export const SUPPORT_RELAY_SESSION_STORAGE_KEY = 'meoo_support_relay_sid'
 
+/** 未登录访客与云端会话对齐用（与 session_id 同存 localStorage，避免同 sid 多标签指纹不一致误拉历史） */
+export const SUPPORT_RELAY_GUEST_FP_KEY = 'meoo_support_relay_guest_fp'
+
 export type SupportRelayChatLine = {
   type: 'chat'
   sessionId: string
@@ -58,6 +61,26 @@ export function getOrCreateSupportRelaySessionId(): string {
     return sid
   } catch {
     return randomSid()
+  }
+}
+
+function randomGuestFingerprint(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID().replace(/-/g, '')
+  }
+  return `gf_${Date.now()}_${Math.random().toString(36).slice(2, 18)}`
+}
+
+/** 登录前在线客服：与 Supabase anon 策略及 RPC 对齐 */
+export function getOrCreateSupportRelayGuestFingerprint(): string {
+  try {
+    const existing = window.localStorage.getItem(SUPPORT_RELAY_GUEST_FP_KEY)
+    if (existing && existing.trim().length >= 16) return existing.trim()
+    const fp = randomGuestFingerprint()
+    window.localStorage.setItem(SUPPORT_RELAY_GUEST_FP_KEY, fp)
+    return fp
+  } catch {
+    return randomGuestFingerprint()
   }
 }
 

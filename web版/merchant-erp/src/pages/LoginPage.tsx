@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Cpu, MapPin, ShieldCheck, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
 import { cn } from '../cn'
+import FloatingOnlineSupport from '../components/FloatingOnlineSupport'
 import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../lib/tenantAuthEmail'
@@ -144,12 +145,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className={cn(
-        'relative min-h-[100dvh] min-h-screen overflow-x-hidden bg-slate-950',
-        'pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]',
-      )}
-    >
+    <>
+      <div
+        className={cn(
+          'relative min-h-[100dvh] min-h-screen overflow-x-hidden bg-slate-950',
+          'pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]',
+        )}
+      >
       <div
         className="pointer-events-none fixed inset-0 opacity-35"
         aria-hidden
@@ -367,5 +369,7 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+    <FloatingOnlineSupport customerId={loginName.trim()} />
+    </>
   )
 }

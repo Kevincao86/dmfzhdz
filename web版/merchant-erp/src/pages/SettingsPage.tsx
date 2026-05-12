@@ -13,7 +13,11 @@ import { useLocation } from 'react-router-dom'
 import { cn } from '../cn'
 import MeooPayQrModal from '../components/MeooPayQrModal'
 import { MEOO_TRIAL_SNAPSHOT_KEY } from '../lib/opsRegistryConstants'
-import { fetchPrimaryTenantId, insertMerchantPaymentOrder } from '../lib/tenantBilling'
+import {
+  fetchPrimaryTenantId,
+  fetchTenantServiceExpireAt,
+  insertMerchantPaymentOrder,
+} from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
 import DouyinMerchantSection from './settings/DouyinMerchantSection'
@@ -78,6 +82,8 @@ export default function SettingsPage() {
   const [merchantPlat, setMerchantPlat] = useState<'douyin' | 'meituan' | 'xhs'>('douyin')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
+  const [officialExpireAtIso, setOfficialExpireAtIso] = useState<string | null | undefined>(undefined)
+  /** undefined：未拉取；null：无记录 */
 
   const closeSubModal = () => setSubModalOpen(false)
 
@@ -116,6 +122,32 @@ export default function SettingsPage() {
     const ms = trialEnd.getTime() - now.getTime()
     return Math.max(0, Math.ceil(ms / 86400000))
   }, [trialEnd])
+
+  const officialLeftDays = useMemo(() => {
+    if (!officialExpireAtIso) return null
+    const end = new Date(officialExpireAtIso)
+    if (Number.isNaN(end.getTime())) return null
+    return Math.ceil((end.getTime() - Date.now()) / 86400000)
+  }, [officialExpireAtIso])
+
+  useEffect(() => {
+    if (!supabaseConfigured || !supabase) {
+      setOfficialExpireAtIso(undefined)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { serviceExpireAt } = await fetchTenantServiceExpireAt(supabase)
+        if (!cancelled) setOfficialExpireAtIso(serviceExpireAt)
+      } catch {
+        if (!cancelled) setOfficialExpireAtIso(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabaseConfigured])
 
   useEffect(() => {
     try {
@@ -237,9 +269,9 @@ export default function SettingsPage() {
             <div className="space-y-6">
               <h3 className="text-lg font-medium text-gray-900">订阅与试用</h3>
               <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                「运营管控台同步」字段（商家显示名、正式版权益天数等）仅在
+                商家显示名等资料在
                 <strong className="font-medium text-gray-800"> 运营管控台 → 客户管理 </strong>
-                中维护，与 dev 注册表对齐；ERP 此处不再展示以免混淆。
+                维护；右侧「正式版到期」来自租户服务有效期（运营确认到账后自动延长）。
               </p>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
@@ -269,6 +301,37 @@ export default function SettingsPage() {
                   <p className="ui-hint-block text-sm text-gray-600">
                     基础版 <strong className="text-gray-900">¥99 / 月</strong>，支持自动续费，到期前可随时取消。
                   </p>
+                  <div className="mt-4 space-y-1 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-3 text-sm text-gray-800">
+                    {!supabaseConfigured || !supabase ? (
+                      <p className="text-gray-600">接入 Supabase 登录后可查看当前租户正式版服务有效期。</p>
+                    ) : officialExpireAtIso === undefined ? (
+                      <p className="text-gray-500">正在加载服务有效期…</p>
+                    ) : officialExpireAtIso ? (
+                      <>
+                        <p>
+                          <span className="text-gray-500">正式版到期：</span>
+                          {formatCnDate(new Date(officialExpireAtIso))}
+                        </p>
+                        <p className="pt-1 font-medium text-gray-900">
+                          {officialLeftDays != null && officialLeftDays > 0 ? (
+                            <>
+                              剩余服务：<span className="tabular-nums">{officialLeftDays}</span> 天
+                            </>
+                          ) : officialLeftDays != null && officialLeftDays === 0 ? (
+                            <>今日到期，请尽快续费</>
+                          ) : officialLeftDays != null && officialLeftDays < 0 ? (
+                            <span className="text-amber-700">
+                              已过期 <span className="tabular-nums">{Math.abs(officialLeftDays)}</span> 天，续费后可恢复全功能
+                            </span>
+                          ) : null}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-gray-600">
+                        当前未记录正式版到期时间。完成订阅并由运营确认到账后，将在此显示服务截止日期。
+                      </p>
+                    )}
+                  </div>
                   <ul className="ui-hint-block mt-3 list-inside list-disc space-y-1 text-sm text-gray-600">
                     <li>到期成功续费：保持全部编辑与同步能力</li>
                     <li>续费失败：降级为查看模式（不可新建商品、达人招募等）</li>
@@ -384,7 +447,7 @@ export default function SettingsPage() {
           {tab === 'accounts' && (
             <div className="space-y-8">
               <div>
-                <h3 className="mb-1 text-lg font-medium text-gray-900">本地子账号（演示）</h3>
+                <h3 className="mb-1 text-lg font-medium text-gray-900">本地子账号</h3>
                 <p className="mb-4 text-sm text-gray-500">
                   主账号改密请使用右上角头像 → 个人设置。
                 </p>
