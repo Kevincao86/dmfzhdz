@@ -119,6 +119,11 @@ export default function LoginPage() {
         setErr(error.message.includes('Invalid login') ? '账号或密码错误' : error.message)
         return
       }
+      const { data: sessWrap } = await sb.auth.getSession()
+      if (!sessWrap.session) {
+        setErr('会话尚未写入，请稍候再点一次「登录」或刷新页面后重试')
+        return
+      }
       const gate = await assertTenantAccessAllowed(sb)
       if (!gate.ok) {
         await sb.auth.signOut()

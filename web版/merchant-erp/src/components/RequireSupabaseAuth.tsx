@@ -1,11 +1,14 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
+import {
+  assertTenantAccessAllowed,
+  type TenantGateResult,
+} from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
-/** 单次 getSession 竞态上限：避免对 Supabase 请求挂起时整页永久「正在加载会话」 */
-const GET_SESSION_RACE_MS = 10_000
+/** 单次 getSession 竞态上限（与「约 10 秒误态」区分：过短会误判；过长仅影响首屏兜底） */
+const GET_SESSION_RACE_MS = 30_000
 /** 首几秒内的「无会话」信号可能是 Auth 初始化顺序问题，合并后再判定 */
 const NO_SESSION_DEBOUNCE_MS = 600
 /** 首屏仅在此窗口内对「无会话」做防抖；之后无会话视为真实登出 */
@@ -17,6 +20,11 @@ const LOADING_HARD_RELOAD_MS = 5_000
 
 type SessionRaceOk = { kind: 'ok'; session: Session | null }
 type SessionRaceTimeout = { kind: 'timeout' }
+
+/** 租户校验返回「未登录」多为 getSession 尚未跟上 SIGNED_IN，勿 signOut，改为同步轮询 */
+function gateLooksTransientNotLoggedIn(g: TenantGateResult): boolean {
+  return !g.ok && typeof g.message === 'string' && g.message.includes('未登录')
+}
 
 function raceGetSession(
   getSession: () => ReturnType<NonNullable<typeof supabase>['auth']['getSession']>,
@@ -77,6 +85,10 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       const gate = await assertTenantAccessAllowed(sb)
       if (cancelled || gen !== gateGen) return
       if (!gate.ok) {
+        if (gateLooksTransientNotLoggedIn(gate)) {
+          enterSessionSync()
+          return
+        }
         await sb.auth.signOut()
         setSessionSyncPending(false)
         setAccessBlockMessage(gate.message)
@@ -173,6 +185,9 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
           void (async () => {
             const gate = await assertTenantAccessAllowed(sb)
             if (!gate.ok) {
+              if (gateLooksTransientNotLoggedIn(gate)) {
+                return
+              }
               await sb.auth.signOut()
               setSessionSyncPending(false)
               setAccessBlockMessage(gate.message)
@@ -194,6 +209,8 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
   useEffect(() => {
     if (!supabaseConfigured) return
     if (accessBlockMessage) return
+    const path = window.location.pathname.replace(/\/+$/, '') || '/'
+    if (path.endsWith('/login')) return
     const inAuthLoading =
       !ready ||
       sessionSyncPending ||
