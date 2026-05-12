@@ -23,6 +23,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
+import AiModelAutoPicker from '../components/AiModelAutoPicker'
 import {
   AI_ADAPTATION_RULE,
   CONTENT_FRESHNESS,
@@ -53,7 +54,6 @@ import {
   coerceGeoTextAiModel,
   postGeoAiConsult,
   postGeoAiScore,
-  type GeoTextAiModelId,
 } from '../services/douyinAiAssistApi'
 import {
   fetchAllDouyinClaimedStoresPages,
@@ -61,11 +61,7 @@ import {
   getDouyinStores,
   type DouyinStoreRow,
 } from '../services/douyinMerchantApi'
-import {
-  readStoredAiModel,
-  subscribeStoredAiModel,
-  writeStoredAiModel,
-} from '../services/merchantAiModelStorage'
+import { resolveTextAiModelForRequest } from '../services/merchantAiModelStorage'
 
 const TABS = [
   { id: 'overview' as const, label: '概览' },
@@ -173,9 +169,7 @@ export default function GeoPage() {
     new Date().toLocaleString('zh-CN', { hour12: false }),
   )
 
-  const [textAiModel, setTextAiModel] = useState<GeoTextAiModelId>(() =>
-    coerceGeoTextAiModel(readStoredAiModel()),
-  )
+  const [aiModelUiTick, setAiModelUiTick] = useState(0)
   const [consultQuestion, setConsultQuestion] = useState(
     '这家店营业到几点？有停车位吗？',
   )
@@ -203,10 +197,6 @@ export default function GeoPage() {
   const [scoreBusy, setScoreBusy] = useState(false)
   const [storesSyncErr, setStoresSyncErr] = useState<string | null>(null)
   const [accountNameFromApi, setAccountNameFromApi] = useState<string | undefined>(undefined)
-
-  useEffect(() => {
-    return subscribeStoredAiModel((id) => setTextAiModel(coerceGeoTextAiModel(id)))
-  }, [])
 
   useEffect(() => {
     const tok = readDouyinToken()
@@ -407,7 +397,7 @@ export default function GeoPage() {
             ? `品牌:${brandKeyword.trim()}`
             : '账户聚合门店'
       const aiRes = await postGeoAiScore({
-        model: textAiModel,
+        model: coerceGeoTextAiModel(resolveTextAiModelForRequest()),
         geo_score_context: ctx,
         product_name: `GEO｜${labelForAi}`,
       })
@@ -446,7 +436,7 @@ export default function GeoPage() {
     } finally {
       setScoreBusy(false)
     }
-  }, [accountNameFromApi, brandKeyword, geoScope, selectedPoiId, textAiModel])
+  }, [accountNameFromApi, brandKeyword, geoScope, selectedPoiId, aiModelUiTick])
 
   const geoTodos = useMemo((): GeoTodoRow[] => {
     const seen = new Set<string>()
@@ -541,7 +531,7 @@ export default function GeoPage() {
     setConsultBusy(true)
     try {
       const r = await postGeoAiConsult({
-        model: textAiModel,
+        model: coerceGeoTextAiModel(resolveTextAiModelForRequest()),
         store_display_name: scopeDisplayName.slice(0, 80),
         geo_knowledge_pack: geoKnowledgePack,
         user_question: q,
@@ -558,7 +548,7 @@ export default function GeoPage() {
     } finally {
       setConsultBusy(false)
     }
-  }, [consultQuestion, geoKnowledgePack, liveMetrics, activeStores.length, scopeDisplayName, textAiModel])
+  }, [consultQuestion, geoKnowledgePack, liveMetrics, activeStores.length, scopeDisplayName, aiModelUiTick])
 
   const kpiCards = useMemo(
     () =>
@@ -846,27 +836,16 @@ export default function GeoPage() {
 
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <div>
-              <label htmlFor="geo-consult-model-select" className="text-sm font-medium text-gray-900">
-                模型筛选
-              </label>
-              <select
-                id="geo-consult-model-select"
-                value={textAiModel}
-                onChange={(e) => {
-                  const id = e.target.value as GeoTextAiModelId
-                  writeStoredAiModel(id)
-                  setTextAiModel(id)
-                }}
-                className="mt-2 block w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                {GEO_TEXT_AI_MODEL_OPTIONS.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-gray-900">文本模型</span>
+                <AiModelAutoPicker
+                  kind="text"
+                  options={GEO_TEXT_AI_MODEL_OPTIONS}
+                  onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
+                />
+              </div>
               <p className="mt-1.5 text-xs text-gray-500">
-                本页「综合评分」与「AI 咨询测试」仅使用通义千问或豆包；系统设置里若默认 MiniMax，在本页会自动按通义发起请求。
+                自动模式与系统设置默认一致；关闭后可指定通义或豆包。本页请求前会将模型规范为 GEO 支持的通义/豆包。
               </p>
             </div>
 

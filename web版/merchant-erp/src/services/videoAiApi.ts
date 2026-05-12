@@ -20,6 +20,11 @@ async function parseJsonSafe<T>(res: Response): Promise<T | null> {
   }
 }
 
+function responseLooksLikeHtml(text: string, contentType: string): boolean {
+  const t = text.trimStart()
+  return t.startsWith('<') || /text\/html/i.test(contentType)
+}
+
 function buildVideoPostBody(body: Record<string, unknown>): Record<string, unknown> {
   const keys = readVendorKeyMap()
   const vendor_keys: Record<string, string> = {}
@@ -34,9 +39,22 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
 }
 
 export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
-  const res = await fetch('/api/merchant/ai/video/config')
-  const j = await parseJsonSafe<VideoAiBackendConfig>(res)
-  return j ?? null
+  const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
+  for (const p of paths) {
+    const res = await fetch(p)
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    if (res.status === 404) continue
+    if (res.ok && responseLooksLikeHtml(text, ct)) continue
+    let j: VideoAiBackendConfig | null = null
+    try {
+      j = JSON.parse(text) as VideoAiBackendConfig
+    } catch {
+      j = null
+    }
+    if (res.ok && j && typeof j.klingConfigured === 'boolean') return j
+  }
+  return null
 }
 
 export type LongformPlanMode = 'optimize' | 'generate_text' | 'generate_frames'

@@ -1,5 +1,5 @@
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
-import { readStoredAiModel } from './merchantAiModelStorage'
+import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
 
 const FALLBACK_TAGS = [
   '招牌菜',
@@ -44,7 +44,7 @@ function parseJsonTags(text: string): string[] | null {
 
 /** 按当前绑定模型与行业，向 AI 请求 Brief 用商品/场景标签（失败则回退本地词表） */
 export async function fetchIndustryProductTagsAi(industry: string): Promise<string[]> {
-  const model = readStoredAiModel() as AiModelId
+  const model = resolveTextAiModelForRequest() as AiModelId
   const titleDraft = `经营行业：${industry || '餐饮'}。
 请只输出一个 JSON 数组（字符串数组），包含 10～14 个适合「本地生活达人探店 Brief」的中文标签词。
 示例：["招牌菜","限时特惠","商务宴请"]
@@ -88,7 +88,7 @@ export async function generateThreeKolBriefs(args: {
   secondary?: BriefProductPick | null
   tags: string[]
 }): Promise<[string, string, string]> {
-  const model = readStoredAiModel() as AiModelId
+  const model = resolveTextAiModelForRequest() as AiModelId
   const sec = args.secondary
   const titleDraft = `你是达人商务与内容策划。请根据以下事实，写 3 个不同风格的「达人探店合作 Brief」，用于 ${args.platformLabel} 投放；行业：${args.industry || '餐饮'}。
 主推商品：${args.main.name}（约 ¥${args.main.priceYuan}）

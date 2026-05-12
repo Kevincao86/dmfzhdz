@@ -1369,45 +1369,36 @@ export default function DouyinProductCreateWizard({
 
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  文案与生图可分别设置；左侧「自动 / 手动」为当前模式，点开可切换或搜索模型。
+                <p className="mt-1 text-xs text-gray-600">
+                  左侧「自动」与系统设置默认一致；关闭后可指定模型。当前请求：文案{' '}
+                  <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>
+                  ，生图 <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>。
                 </p>
-                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-8">
+                <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-gray-800">文案</span>
+                    <p className="text-xs font-medium text-gray-800">文案</p>
+                    <div className="mt-2">
                       <AiModelAutoPicker
                         kind="text"
                         options={aiModelPickOptions}
                         onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
                       />
                     </div>
-                    <p className="mt-2 text-xs text-gray-600">
-                      当前请求：
-                      <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>
-                    </p>
-                    <p id="douyin-ai-text-model-active" className="mt-1 text-xs text-gray-500">
-                      「AI 智能优化」「根据商品名称 AI 生成说明」使用上述模型。
-                    </p>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-gray-800">生图</span>
+                    <p className="text-xs font-medium text-gray-800">生图</p>
+                    <div className="mt-2">
                       <AiModelAutoPicker
                         kind="image"
                         options={aiModelPickOptions}
                         onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
                       />
                     </div>
-                    <p className="mt-2 text-xs text-gray-600">
-                      当前请求：
-                      <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>
-                    </p>
-                    <p id="douyin-ai-image-model-active" className="mt-1 text-xs text-gray-500">
-                      头图、辅助图、环境图的 AI 生成与美化。
-                    </p>
                   </div>
                 </div>
+                <p id="douyin-ai-text-model-active" className="mt-3 text-xs text-gray-500">
+                  「AI 智能优化」「根据商品名称 AI 生成说明」使用文案模型；头图 / 辅助图 / 环境图使用生图模型。
+                </p>
               </section>
 
               <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -1781,6 +1772,9 @@ export default function DouyinProductCreateWizard({
 
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900">售价与图片</h3>
+            <p id="douyin-ai-image-model-active" className="mt-2 text-xs text-gray-500">
+              头图、辅助图、环境图的 AI 生成与美化使用上方「目前绑定的 AI 模型」中的生图设置。
+            </p>
             <p className="mt-3 text-xs text-blue-600">服务费以平台结算为准，此处仅采集标价</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
@@ -1804,6 +1798,9 @@ export default function DouyinProductCreateWizard({
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
+            </div>
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-xs text-gray-700">
+              图片须符合抖音来客规范。上传后将用于商品素材；若在体验环境中未接通正式上传通道，则可能显示示意图地址。
             </div>
             <input
               ref={headFileRef}
@@ -1841,7 +1838,7 @@ export default function DouyinProductCreateWizard({
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                已上传则批量美化当前头图；未上传则按商品名称与上方「生图」绑定模型生成一张。
+                已上传则批量美化当前头图；未上传则按商品名称与上方「目前绑定的 AI 模型」中的生图设置生成一张。
               </p>
               <div className="mt-2 flex flex-wrap items-start gap-3">
                 <button

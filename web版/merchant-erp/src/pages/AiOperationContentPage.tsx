@@ -316,7 +316,7 @@ export default function AiOperationContentPage() {
         <div className="mt-6 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            <span className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型（文案）</span>
+            <span className="text-sm font-semibold text-gray-900">文案用 AI 模型</span>
             <AiModelAutoPicker
               kind="text"
               options={aiModelPickOptions}
@@ -324,7 +324,7 @@ export default function AiOperationContentPage() {
             />
           </div>
           <p className="mt-2 text-xs text-gray-600">
-            按钮左侧「自动 / 手动」为当前模式；自动时与系统设置默认一致。当前请求使用：
+            开启「自动」时与系统设置默认一致；关闭后可指定模型。当前请求使用：
             <span className="font-medium text-gray-800">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>

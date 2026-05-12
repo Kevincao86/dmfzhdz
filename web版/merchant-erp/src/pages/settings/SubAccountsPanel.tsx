@@ -1,6 +1,7 @@
 import { KeyRound, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { cn } from '../../cn'
+import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import {
   hashPassword,
   readJobRoles,
@@ -28,6 +29,7 @@ export default function SubAccountsPanel() {
   })
   const [resetPwd, setResetPwd] = useState({ password: '', confirm: '' })
   const [err, setErr] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const reload = useCallback(() => {
     setAccounts(readSubAccounts())
@@ -90,18 +92,47 @@ export default function SubAccountsPanel() {
       setErr('两次输入的密码不一致')
       return
     }
-    const passwordHash = await hashPassword(form.password)
-    const row: SubAccountRecord = {
-      id: newId(),
-      loginName,
-      passwordHash,
-      jobRoleId: form.jobRoleId,
-      status: 'active',
-      createdAt: new Date().toISOString(),
+    if (!supabaseConfigured || !supabase) {
+      setErr('当前环境未配置 Supabase，无法创建可登录子账号。')
+      return
     }
-    upsertSubAccount(row)
-    reload()
-    closeCreate()
+    const { data: sessWrap } = await supabase.auth.getSession()
+    const token = sessWrap.session?.access_token
+    if (!token) {
+      setErr('请先使用主账号登录后再创建子账号。')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/meoo-tenant-subaccount-mutate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'create', loginName, password: form.password }),
+      })
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; cloudUserId?: string }
+      if (!res.ok || !j.ok) {
+        setErr(typeof j.message === 'string' ? j.message : `创建失败（HTTP ${res.status}）`)
+        return
+      }
+      const passwordHash = await hashPassword(form.password)
+      const row: SubAccountRecord = {
+        id: newId(),
+        loginName,
+        passwordHash,
+        jobRoleId: form.jobRoleId,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        cloudUserId: typeof j.cloudUserId === 'string' ? j.cloudUserId : undefined,
+      }
+      upsertSubAccount(row)
+      reload()
+      closeCreate()
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const submitReset = async () => {
@@ -115,14 +146,47 @@ export default function SubAccountsPanel() {
       setErr('两次输入的密码不一致')
       return
     }
-    const passwordHash = await hashPassword(resetPwd.password)
-    upsertSubAccount({
-      ...resetFor,
-      passwordHash,
-    })
-    reload()
-    setResetFor(null)
-    setResetPwd({ password: '', confirm: '' })
+    if (!supabaseConfigured || !supabase) {
+      setErr('当前环境未配置 Supabase，无法同步重置登录密码。')
+      return
+    }
+    const { data: sessWrap } = await supabase.auth.getSession()
+    const token = sessWrap.session?.access_token
+    if (!token) {
+      setErr('请先使用主账号登录后再重置密码。')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/meoo-tenant-subaccount-mutate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'reset_password',
+          loginName: resetFor.loginName,
+          password: resetPwd.password,
+          cloudUserId: resetFor.cloudUserId,
+        }),
+      })
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+      if (!res.ok || !j.ok) {
+        setErr(typeof j.message === 'string' ? j.message : `重置失败（HTTP ${res.status}）`)
+        return
+      }
+      const passwordHash = await hashPassword(resetPwd.password)
+      upsertSubAccount({
+        ...resetFor,
+        passwordHash,
+      })
+      reload()
+      setResetFor(null)
+      setResetPwd({ password: '', confirm: '' })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const toggleStatus = (row: SubAccountRecord) => {
@@ -133,8 +197,38 @@ export default function SubAccountsPanel() {
     reload()
   }
 
-  const onDelete = (row: SubAccountRecord) => {
+  const onDelete = async (row: SubAccountRecord) => {
     if (!window.confirm(`确定删除子账号「${row.loginName}」？此操作不可恢复。`)) return
+    if (supabaseConfigured && supabase) {
+      const { data: sessWrap } = await supabase.auth.getSession()
+      const token = sessWrap.session?.access_token
+      if (!token) {
+        window.alert('请先使用主账号登录后再删除子账号（需同步删除云端登录）。')
+        return
+      }
+      setSubmitting(true)
+      try {
+        const res = await fetch('/api/meoo-tenant-subaccount-mutate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: 'delete',
+            loginName: row.loginName,
+            cloudUserId: row.cloudUserId,
+          }),
+        })
+        const j = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
+        if (!res.ok || !j.ok) {
+          window.alert(typeof j.message === 'string' ? j.message : `删除失败（HTTP ${res.status}）`)
+          return
+        }
+      } finally {
+        setSubmitting(false)
+      }
+    }
     removeSubAccount(row.id)
     reload()
   }
@@ -160,7 +254,7 @@ export default function SubAccountsPanel() {
         <button
           type="button"
           onClick={openCreate}
-          disabled={jobRoles.length === 0}
+          disabled={jobRoles.length === 0 || submitting}
           className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -272,7 +366,10 @@ export default function SubAccountsPanel() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="mb-4 text-xs text-gray-500">子账号仅可使用登录账号与密码登录（演示数据存于浏览器）。</p>
+            <p className="mb-4 text-xs text-gray-500">
+              创建后会在 Supabase 注册同名租户邮箱账号，子账号使用<strong className="font-medium text-gray-700"> 登录账号 + 密码</strong>
+              在登录页登录；岗位与权限仍保存在本机浏览器。
+            </p>
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">登录账号</label>
@@ -328,9 +425,10 @@ export default function SubAccountsPanel() {
               <button
                 type="button"
                 onClick={() => void submitCreate()}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                disabled={submitting}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                创建
+                {submitting ? '提交中…' : '创建'}
               </button>
             </div>
           </div>
@@ -408,9 +506,10 @@ export default function SubAccountsPanel() {
               <button
                 type="button"
                 onClick={() => void submitReset()}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                disabled={submitting}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                保存
+                {submitting ? '提交中…' : '保存'}
               </button>
             </div>
           </div>
