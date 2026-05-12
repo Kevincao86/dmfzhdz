@@ -12,6 +12,7 @@ import {
 import { loadProductEditLibrary, replaceProductEditLibraryRowId } from '../lib/productEditLibrary'
 import {
   postDouyinGoodsProductSave,
+  postDouyinGoodsProductSync,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
 
@@ -207,26 +208,11 @@ export async function postMerchantProductSync(
   }
   const id = productId.trim()
 
-  const res = await fetch(url('/api/merchant/douyin/goods/product/sync'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ product_id: id }),
-  })
-  let data: Record<string, unknown> = {}
-  try {
-    data = (await res.json()) as Record<string, unknown>
-  } catch {
-    /* ignore */
+  const syncRes = await postDouyinGoodsProductSync(id)
+  if (syncRes.ok) {
+    return { ok: true, message: syncRes.message }
   }
-  if (res.ok) {
-    return { ok: true, message: typeof data.message === 'string' ? data.message : undefined }
-  }
-
-  const syncErr = (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`
+  const syncErr = syncRes.message
 
   const snapshot = loadDraftDetailSnapshot(id)
   if (snapshot) {

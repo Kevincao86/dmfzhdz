@@ -14,6 +14,33 @@ function url(path: string) {
   return `${b}${path}`
 }
 
+/**
+ * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
+ * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
+ */
+function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
+  const out: string[] = []
+  const add = (u: string) => {
+    const t = u.trim()
+    if (!t || out.includes(t)) return
+    out.push(t)
+  }
+  for (const raw of paths) {
+    const path = raw.startsWith('/') ? raw : `/${raw}`
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      try {
+        add(new URL(path, window.location.origin).href)
+      } catch {
+        /* ignore */
+      }
+    }
+    const b = apiBase().replace(/\/$/, '')
+    if (b) add(`${b}${path}`)
+    else if (typeof window === 'undefined') add(path)
+  }
+  return out
+}
+
 function authHeaders(): HeadersInit {
   const token = readMerchantSession('meoo_douyin_merchant_token')
   const h: Record<string, string> = {
@@ -363,21 +390,42 @@ export type ProductSyncResult = { ok: true; message?: string } | { ok: false; me
 export async function postDouyinGoodsProductSync(productId: string): Promise<ProductSyncResult> {
   const id = productId.trim()
   if (!id) return { ok: false, message: '缺少 product_id' }
-  const res = await fetch(url('/api/merchant/douyin/goods/product/sync'), {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ product_id: id }),
-  })
-  const data = await parseJson(res)
-  if (!res.ok) {
+  const bodyStr = JSON.stringify({ product_id: id })
+  const headers = authHeaders()
+  const paths = ['/api/meoo-douyin-goods-product-sync', '/api/merchant/douyin/goods/product/sync'] as const
+  const targets = merchantApiFetchUrlCandidates(paths)
+  let lastStatus = 0
+  for (const target of targets) {
+    const res = await fetch(target, { method: 'POST', headers, body: bodyStr })
+    lastStatus = res.status
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (res.status === 404) continue
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+      }
+    }
     return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+      ok: true,
+      message: typeof data.message === 'string' ? data.message : undefined,
     }
   }
   return {
-    ok: true,
-    message: typeof data.message === 'string' ? data.message : undefined,
+    ok: false,
+    message:
+      lastStatus === 404
+        ? '同步接口返回 404：请部署含 /api/meoo-douyin-goods-product-sync 的版本，或检查 VITE_MERCHANT_API_BASE_URL。'
+        : `HTTP ${lastStatus || 404}`,
   }
 }
 
@@ -1218,7 +1266,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
   }
 }
 
-/** 与类目/线上搜品同源：优先顶层 meoo，避开生产环境深层 /api/merchant/* 404 */
+/** 与类目/线上搜品同源：优先顶层 meoo + 当前页同源，避开生产深层 /api/merchant/* 或错误 API 基址 404 */
 export async function postDouyinGoodsProductSave(params: {
   mode: 'draft' | 'submit'
   detail: DouyinProductDetailPayload
@@ -1229,8 +1277,11 @@ export async function postDouyinGoodsProductSave(params: {
   })
   const headers = authHeaders()
   const paths = ['/api/meoo-douyin-goods-product-save', '/api/merchant/douyin/goods/product/save'] as const
-  for (const p of paths) {
-    const res = await fetch(url(p), { method: 'POST', headers, body: bodyStr })
+  const targets = merchantApiFetchUrlCandidates(paths)
+  let lastStatus = 0
+  for (const target of targets) {
+    const res = await fetch(target, { method: 'POST', headers, body: bodyStr })
+    lastStatus = res.status
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
     const trim = text.trimStart()
@@ -1244,7 +1295,11 @@ export async function postDouyinGoodsProductSave(params: {
     }
     return parseProductSaveResponse(res, data)
   }
-  const res = await fetch(url(paths[1]), { method: 'POST', headers, body: bodyStr })
-  const data = await parseJson(res)
-  return parseProductSaveResponse(res, data)
+  return {
+    ok: false,
+    message:
+      lastStatus === 404
+        ? '保存接口返回 404：请确认商户 ERP 已部署含「/api/meoo-douyin-goods-product-save」的版本并已 Redeploy；若配置了 VITE_MERCHANT_API_BASE_URL，请改为当前站点或留空，以免请求打到不含该接口的旧网关。'
+        : `HTTP ${lastStatus || 404}`,
+  }
 }
