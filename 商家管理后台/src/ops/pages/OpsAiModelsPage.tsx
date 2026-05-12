@@ -14,9 +14,11 @@ import {
   isBuiltinAiVendorId,
   isValidAiVendorSlug,
   mergeBuiltinAiVendorCatalog,
+  normalizeCatalogLogoUrl,
   slugifyAiVendorCandidate,
 } from '../../meooRegistryShared/aiVendorCatalogShared'
 import { cn } from '../../cn'
+import AiVendorCatalogAvatar from '../../components/AiVendorCatalogAvatar'
 import {
   fetchRegistry,
   postAiModels,
@@ -63,6 +65,7 @@ export default function OpsAiModelsPage() {
   const [addLabel, setAddLabel] = useState('')
   const [addSlug, setAddSlug] = useState('')
   const [addHint, setAddHint] = useState('')
+  const [addLogoUrl, setAddLogoUrl] = useState('')
   const [addErr, setAddErr] = useState<string | null>(null)
 
   const pull = useCallback(async (opts?: { background?: boolean }) => {
@@ -197,6 +200,7 @@ export default function OpsAiModelsPage() {
     setAddLabel('')
     setAddSlug('')
     setAddHint('')
+    setAddLogoUrl('')
     setAddOpen(true)
   }
 
@@ -221,7 +225,11 @@ export default function OpsAiModelsPage() {
       return
     }
     const hintRow = addHint.trim() ? addHint.trim().slice(0, 280) : undefined
-    setCatalogFull((prev) => [...prev, { id: slug, label: label.slice(0, 64), hint: hintRow }])
+    const logoUrl = normalizeCatalogLogoUrl(addLogoUrl)
+    setCatalogFull((prev) => [
+      ...prev,
+      { id: slug, label: label.slice(0, 64), hint: hintRow, ...(logoUrl ? { logoUrl } : {}) },
+    ])
     setAddOpen(false)
   }
 
@@ -342,6 +350,18 @@ export default function OpsAiModelsPage() {
                   placeholder="会显示在 ERP 弹窗与各厂商字段下方"
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">
+                  Logo 图片地址（可选，https 或 ERP 相对路径如 /ai-vendors/xxx.svg）
+                </label>
+                <input
+                  value={addLogoUrl}
+                  onChange={(e) => setAddLogoUrl(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100"
+                  placeholder="https://…"
+                  autoCapitalize="off"
+                />
+              </div>
               {addErr ? <p className="text-xs text-red-400">{addErr}</p> : null}
               <button
                 type="button"
@@ -423,8 +443,11 @@ export default function OpsAiModelsPage() {
           {catalogFull.map((k) => (
             <div key={k.id}>
               <div className="mb-1 flex items-center justify-between gap-2">
-                <label className="block text-xs font-medium text-slate-300">
-                  {k.label}（<span className="font-mono text-slate-500">{k.id}</span>）
+                <label className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-slate-300">
+                  <AiVendorCatalogAvatar id={k.id} label={k.label} logoUrl={k.logoUrl} size="sm" />
+                  <span className="min-w-0 truncate">
+                    {k.label}（<span className="font-mono text-slate-500">{k.id}</span>）
+                  </span>
                 </label>
                 {!isBuiltinAiVendorId(k.id) ? (
                   <button
@@ -464,6 +487,23 @@ export default function OpsAiModelsPage() {
               <p className="mt-1 text-[11px] text-slate-500">
                 {k.hint?.trim() ?? 'ERP 会使用此 Key；非内置网关厂商需在 merchant-erp 扩展上游后方可实际推理。'}
               </p>
+              {!isBuiltinAiVendorId(k.id) && editingVendorKeys ? (
+                <div className="mt-2">
+                  <label className="mb-1 block text-[11px] text-slate-500">
+                    Logo 图片地址（可选；商户 ERP 下拉与设置页展示）
+                  </label>
+                  <input
+                    type="text"
+                    value={k.logoUrl ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setCatalogFull((prev) => prev.map((x) => (x.id === k.id ? { ...x, logoUrl: v } : x)))
+                    }}
+                    placeholder="https://… 或 /path/logo.svg"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600"
+                  />
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

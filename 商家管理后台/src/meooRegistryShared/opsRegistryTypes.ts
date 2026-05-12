@@ -21,6 +21,8 @@ export type AiVendorCatalogEntry = {
   id: string
   label: string
   hint?: string
+  /** 可选：HTTPS 图床地址，或商户 ERP 同域相对路径（如 `/ai-vendors/foo.svg`） */
+  logoUrl?: string
 }
 
 export type RegistryTenant = {
