@@ -158,10 +158,11 @@ export default function SettingsPage() {
       setOfficialCumulativeDays(undefined)
       return
     }
+    const sb = supabase
     let cancelled = false
     const run = async () => {
       try {
-        const snap = await fetchTenantSubscriptionSnapshot(supabase)
+        const snap = await fetchTenantSubscriptionSnapshot(sb)
         if (cancelled) return
         setOfficialExpireAtIso(snap.serviceExpireAt)
         setOfficialCumulativeDays(snap.officialDays)
@@ -175,7 +176,7 @@ export default function SettingsPage() {
     void run()
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
+    } = sb.auth.onAuthStateChange(() => {
       void run()
     })
     return () => {
