@@ -32,8 +32,11 @@
  * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/life.capacity.shop/poi.update
  *
  * 能力授权与门店绑定：见抖音「auth_with_bind」文档（生产网关实现）。
+ *
+ * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { douyinOpenApiUrl } from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
@@ -44,30 +47,6 @@ import {
 import { mockDouyinProductStore } from './mockDouyinProductStore.js'
 
 export { runDouyinMerchantBind }
-
-const DOUYIN_CLIENT_TOKEN_URL = 'https://open.douyin.com/oauth/client_token/'
-const DOUYIN_SHOP_POI_QUERY = 'https://open.douyin.com/goodlife/v1/shop/poi/query/'
-/** 与来客 PC 端「门店品牌」一致；v1 /shop/brand/* 在网关侧为 Unsupported path(Janus)，须走 v2 */
-const DOUYIN_SHOP_BRAND_QUERY_V2 = 'https://open.douyin.com/goodlife/v2/shop/brand/query/'
-const DOUYIN_POI_CLAIM = 'https://open.douyin.com/goodlife/v1/poi/poi/claim/'
-const DOUYIN_POI_CERT_INFO = 'https://open.douyin.com/goodlife/v1/poi/cert/info/'
-const DOUYIN_POI_TASK_QUERY = 'https://open.douyin.com/goodlife/v1/poi/task/query/'
-const DOUYIN_GOODS_CATEGORY_GET = 'https://open.douyin.com/goodlife/v1/goods/category/get/'
-const DOUYIN_GOODS_PRODUCT_ONLINE_QUERY = 'https://open.douyin.com/goodlife/v1/goods/product/online/query/'
-const DOUYIN_GOODS_PRODUCT_DRAFT_QUERY = 'https://open.douyin.com/goodlife/v1/goods/product/draft/query/'
-const DOUYIN_GOODS_TEMPLATE_GET = 'https://open.douyin.com/goodlife/v1/goods/template/get/'
-const DOUYIN_GOODS_PRODUCT_SAVE = 'https://open.douyin.com/goodlife/v1/goods/product/save/'
-/**
- * 订单查询（Hermes 交易域；文档载明主要面向即配类订单，其它类型需换用对应 OpenAPI）
- * @see https://partner.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/catering/group-buy-solution/order-query/order-inquiry
- */
-const DOUYIN_HERMES_TRADE_ORDER_QUERY = 'https://open.douyin.com/goodlife/v1/hermes/trade/order/query/'
-/**
- * 评价查询 / 回复（餐饮团购方案；需在开放平台开通 life.capacity.catering.comment）
- * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/catering/dining-group-solution/food-review/query_comment
- */
-const DOUYIN_AKTE_COMMENT_QUERY = 'https://open.douyin.com/goodlife/v1/akte/comment/query/'
-const DOUYIN_AKTE_COMMENT_REPLY = 'https://open.douyin.com/goodlife/v1/akte/comment/reply/'
 
 /** 绑定链路若 hang 住，Vercel 会以 FUNCTION_INVOCATION_FAILED 结束；对抖音出口强制限时 */
 const DOUYIN_FETCH_TIMEOUT_MS = 25_000
@@ -164,7 +143,7 @@ async function fetchDouyinClientToken(
   clientKey: string,
   clientSecret: string,
 ): Promise<{ token: string; expiresIn: number }> {
-  const res = await douyinFetch(DOUYIN_CLIENT_TOKEN_URL, {
+  const res = await douyinFetch(douyinOpenApiUrl('/oauth/client_token/'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -208,7 +187,7 @@ async function shopPoiQueryPage(
   /** 0 认领 / 1 关联 / 2 挂靠；不传则走平台默认（认领） */
   relationType?: 0 | 1 | 2,
 ): Promise<Record<string, unknown>> {
-  const u = new URL(DOUYIN_SHOP_POI_QUERY)
+  const u = new URL(douyinOpenApiUrl('/goodlife/v1/shop/poi/query/'))
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('page', String(Math.max(1, page)))
   u.searchParams.set('size', String(Math.min(50, Math.max(1, size))))
@@ -240,7 +219,7 @@ async function shopPoiQuerySinglePoi(
   accountId: string,
   accessToken: string,
 ): Promise<Record<string, unknown>> {
-  const u = new URL(DOUYIN_SHOP_POI_QUERY)
+  const u = new URL(douyinOpenApiUrl('/goodlife/v1/shop/poi/query/'))
   u.searchParams.set('poi_id', poiId.trim())
   u.searchParams.set('page', '1')
   u.searchParams.set('size', '20')
@@ -269,7 +248,7 @@ async function poiCertInfoGet(
   accessToken: string,
   rpcTransitAccount: string,
 ): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; message: string }> {
-  const u = new URL(DOUYIN_POI_CERT_INFO)
+  const u = new URL(douyinOpenApiUrl('/goodlife/v1/poi/cert/info/'))
   u.searchParams.set('merchant_life_account_id', merchantLifeAccountId.trim())
   u.searchParams.set('poi_id', poiId.trim())
   try {
@@ -303,7 +282,7 @@ async function poiTaskQueryGet(
 ): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; message: string }> {
   const ids = taskIds.map((t) => t.trim()).filter(Boolean)
   if (ids.length === 0) return { ok: true, body: {} }
-  const u = new URL(DOUYIN_POI_TASK_QUERY)
+  const u = new URL(douyinOpenApiUrl('/goodlife/v1/poi/task/query/'))
   u.searchParams.set('task_ids', JSON.stringify(ids))
   try {
     const res = await fetch(u.toString(), {
@@ -930,7 +909,7 @@ export async function handleDouyinGoodsCategoryGet(
     const token = await ensureDouyinToken(session)
     const accountId =
       (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const u = new URL(DOUYIN_GOODS_CATEGORY_GET)
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/category/get/'))
     u.searchParams.set('account_id', accountId)
     const qct = (url.searchParams.get('query_category_type') ?? '1').trim()
     u.searchParams.set('query_category_type', qct || '1')
@@ -983,7 +962,7 @@ export async function handleDouyinGoodsProductOnlineQueryGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const u = new URL(DOUYIN_GOODS_PRODUCT_ONLINE_QUERY)
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/product/online/query/'))
     u.searchParams.set('account_id', accountId)
     const pn = (url.searchParams.get('product_name') ?? '').trim().slice(0, 30)
     if (pn) u.searchParams.set('product_name', pn)
@@ -1043,7 +1022,7 @@ export async function handleDouyinGoodsProductDraftQueryGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const u = new URL(DOUYIN_GOODS_PRODUCT_DRAFT_QUERY)
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/product/draft/query/'))
     u.searchParams.set('account_id', accountId)
     const count = Math.min(50, Math.max(1, Number(url.searchParams.get('count')) || 20))
     u.searchParams.set('count', String(count))
@@ -1091,7 +1070,7 @@ export async function handleDouyinGoodsIndustryScopeGet(
     const token = await ensureDouyinToken(session)
     const accountId =
       (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const u = new URL(DOUYIN_GOODS_CATEGORY_GET)
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/category/get/'))
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('query_category_type', '1')
 
@@ -1279,7 +1258,7 @@ export async function handleDouyinBrandsGet(
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
 
-    const u = new URL(DOUYIN_SHOP_BRAND_QUERY_V2)
+    const u = new URL(douyinOpenApiUrl('/goodlife/v2/shop/brand/query/'))
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('page', String(page))
     u.searchParams.set('size', String(pageSize))
@@ -1494,7 +1473,7 @@ export async function handleDouyinPoiClaimPost(
       typeof b.target_type === 'number' || typeof b.target_type === 'string'
         ? body
         : { ...b, target_type: 100 }
-    const dr = await fetch(DOUYIN_POI_CLAIM, {
+    const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/poi/poi/claim/'), {
       method: 'POST',
       headers: {
         'access-token': token,
@@ -1545,7 +1524,7 @@ async function fetchTemplateProductAttrs(
   productType: number,
 ): Promise<Record<string, unknown>[]> {
   if (!categoryId) return []
-  const u = new URL(DOUYIN_GOODS_TEMPLATE_GET)
+  const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
   u.searchParams.set('product_type', String(productType))
@@ -1693,7 +1672,7 @@ export async function handleDouyinGoodsProductSavePost(
     const accountId = session.merchantId
     const saveBody = await buildGoodlifeProductSaveBody(accountId, token, erp, mode)
 
-    const dr = await fetch(DOUYIN_GOODS_PRODUCT_SAVE, {
+    const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
       method: 'POST',
       headers: {
         'access-token': token,
@@ -1829,7 +1808,7 @@ export async function fetchDouyinFinanceReconcileRows(
     const maxPages = 100
 
     while (page <= maxPages) {
-      const u = new URL(DOUYIN_HERMES_TRADE_ORDER_QUERY)
+      const u = new URL(douyinOpenApiUrl('/goodlife/v1/hermes/trade/order/query/'))
       u.searchParams.set('account_id', accountId)
       u.searchParams.set('page_num', String(page))
       u.searchParams.set('page_size', String(pageSize))
@@ -1970,7 +1949,7 @@ export async function fetchDouyinAkteReviews(
     const out: MerchantReviewRowDouyin[] = []
     let cursor = '0'
     for (let page = 0; page < 80; page += 1) {
-      const u = new URL(DOUYIN_AKTE_COMMENT_QUERY)
+      const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
       u.searchParams.set('account_id', accountId)
       u.searchParams.set('start_time', String(startSec))
       u.searchParams.set('end_time', String(nowSec))
@@ -2077,7 +2056,7 @@ export async function postDouyinAkteCommentReply(
   if (!body.text) return { ok: false, message: '回复内容不能为空' }
   try {
     const accessToken = await ensureDouyinToken(session)
-    const dr = await fetch(DOUYIN_AKTE_COMMENT_REPLY, {
+    const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/akte/comment/reply/'), {
       method: 'POST',
       headers: {
         'access-token': accessToken,
