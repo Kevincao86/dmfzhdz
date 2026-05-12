@@ -84,7 +84,8 @@ export default function LoginPage() {
         setErr(gate.message)
         return
       }
-      navigate('/', { replace: true })
+      /** 整页进入后台，避免 SPA 内跳转时会话未就绪（与加载超 5 秒刷新同一思路） */
+      window.location.assign(new URL(import.meta.env.BASE_URL, window.location.origin).href)
     })
   }, [navigate])
 
@@ -124,7 +125,8 @@ export default function LoginPage() {
         setErr(gate.message)
         return
       }
-      navigate('/', { replace: true })
+      /** 登录成功后整页打开工作台，不 client-side navigate，避免退回登录页 */
+      window.location.assign(new URL(import.meta.env.BASE_URL, window.location.origin).href)
     } finally {
       setBusy(false)
     }
