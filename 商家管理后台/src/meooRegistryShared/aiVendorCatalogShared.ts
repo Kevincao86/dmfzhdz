@@ -32,19 +32,19 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
     id: 'minimax',
     label: 'MiniMax',
     hint: 'platform.minimax.io · OpenAI 兼容',
-    logoUrl: '/ai-vendors/minimax.svg',
+    logoUrl: '/ai-vendors/minimax.png',
   },
   {
     id: 'qwen',
     label: '通义千问',
     hint: '阿里云 DashScope / 通义',
-    logoUrl: '/ai-vendors/qwen.svg',
+    logoUrl: '/ai-vendors/qwen.png',
   },
   {
     id: 'doubao',
     label: '豆包',
     hint: '火山引擎方舟 Ark',
-    logoUrl: '/ai-vendors/doubao.svg',
+    logoUrl: '/ai-vendors/doubao.png',
   },
 ]
 

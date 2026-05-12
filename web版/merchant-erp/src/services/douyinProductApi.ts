@@ -333,6 +333,8 @@ export type DouyinProductDetailPayload = {
   out_id: string
   category_id: string
   product_type: number
+  /** 来客根账户昵称，写入 goodlife product.save 的 `product.account_name` */
+  account_name?: string
   merchant_display_name?: string
   /**
    * 收款方式：网关映射 goodlife 商品 save 中与结算/分账相关字段（如总店统一收款、门店独立收款等）。

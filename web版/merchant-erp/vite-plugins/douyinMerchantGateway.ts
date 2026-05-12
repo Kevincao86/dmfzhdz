@@ -1778,6 +1778,38 @@ function resolveProductOutIdForSave(erp: Record<string, unknown>): string {
   return `erp-${randomUUID()}`.slice(0, 128)
 }
 
+/** goodlife product.save 要求 `product.account_name`（根账户昵称）；与 Rpc-Transit-Life-Account 不同 */
+async function resolveProductAccountNameForSave(
+  sessionKey: string,
+  session: DouyinMerchantSession,
+  accountId: string,
+  erp: Record<string, unknown>,
+): Promise<string> {
+  const direct = String(
+    erp.account_name ?? (erp as Record<string, unknown>).accountName ?? '',
+  ).trim()
+  if (direct) return direct
+
+  const fromCache = accountNameFromPois(
+    (await getCachedPoiList(sessionKey, session, accountId, 'all', false)).pois,
+  )
+  if (typeof fromCache === 'string' && fromCache.trim()) return fromCache.trim()
+
+  try {
+    const j = await withDouyinClientTokenRetry(session, { sessionKey }, (access) =>
+      shopPoiQueryPage(accountId, access, 1, 30),
+    )
+    const data = j.data as Record<string, unknown> | undefined
+    const pois = data ? extractPoisFromShopQueryData(data) : []
+    const list = Array.isArray(pois) ? pois : []
+    const n = accountNameFromPois(list)
+    if (typeof n === 'string' && n.trim()) return n.trim()
+  } catch {
+    // 由调用方统一提示
+  }
+  return ''
+}
+
 /**
  * 将 ERP 聚合表单映射为 goodlife/v1/goods/product/save 的 Body（含单 SKU）。
  * 头图写入 template/get 返回的 IMAGE 类 attr（按名称/类型启发式匹配）。
@@ -1787,6 +1819,7 @@ async function buildGoodlifeProductSaveBody(
   token: string,
   erp: Record<string, unknown>,
   _mode: 'draft' | 'submit',
+  account_name: string,
 ): Promise<Record<string, unknown>> {
   const product_name = String(erp.product_name ?? '').trim()
   const desc = String(erp.product_desc ?? product_name).trim()
@@ -1843,6 +1876,7 @@ async function buildGoodlifeProductSaveBody(
     biz_line: 1,
     open_biz_type: 1,
     out_id,
+    account_name,
     sold_start_time: nowMs,
     sold_end_time: oneYearMs,
     pois: poi_ids.map((poi_id) => ({ poi_id })),
@@ -1921,7 +1955,15 @@ export async function handleDouyinGoodsProductSavePost(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    const saveBody = await buildGoodlifeProductSaveBody(accountId, token, erp, mode)
+    const accountName = await resolveProductAccountNameForSave(auth, session, accountId, erp)
+    if (!accountName) {
+      json(res, 400, {
+        message:
+          '缺少抖音来客商品所需的 account_name（根账户昵称）。请先在系统设置完成绑定并加载门店列表，或保存时带上 account_name 后重试。',
+      })
+      return
+    }
+    const saveBody = await buildGoodlifeProductSaveBody(accountId, token, erp, mode, accountName)
 
     const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
       method: 'POST',
