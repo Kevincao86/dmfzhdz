@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
@@ -10,8 +10,8 @@ const GET_SESSION_RACE_MS = 10_000
 const NO_SESSION_DEBOUNCE_MS = 600
 /** 首屏仅在此窗口内对「无会话」做防抖；之后无会话视为真实登出 */
 const NO_SESSION_DEBOUNCE_BOOT_MS = 4_500
-/** 应大于 assertTenantAccessAllowed 内超时 + getSession 余量 */
-const AUTH_BOOTSTRAP_MAX_WAIT_MS = 28_000
+/** 无会话时在后台轮询 getSession 的间隔（不跳转登录页，直至拿到会话） */
+const SESSION_POLL_MS = 2_000
 
 type SessionRaceOk = { kind: 'ok'; session: Session | null }
 type SessionRaceTimeout = { kind: 'timeout' }
@@ -28,14 +28,19 @@ function raceGetSession(
 }
 
 export default function RequireSupabaseAuth({ children }: { children: ReactNode }) {
-  const navigate = useNavigate()
   const [ready, setReady] = useState(false)
   const [allowed, setAllowed] = useState(false)
+  /** 租户校验失败等业务原因：仅展示说明与手动去登录，不 replace 改 URL */
+  const [accessBlockMessage, setAccessBlockMessage] = useState<string | null>(null)
+  /** 已判定暂无会话或 getSession 超时：轮询同步会话，不自动跳 /login */
+  const [sessionSyncPending, setSessionSyncPending] = useState(false)
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) {
       setAllowed(true)
       setReady(true)
+      setSessionSyncPending(false)
+      setAccessBlockMessage(null)
       return
     }
 
@@ -45,7 +50,6 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     let bootResolved = false
     const bootStartedAt = Date.now()
     let noSessionTimer: ReturnType<typeof setTimeout> | undefined
-    /** 已在本次挂载中见过非空 session 时，忽略 getSession/可见性/Auth 管道里偶发 null（除非 SIGNED_OUT），避免误踢回登录 */
     const sessionEverSeenRef = { current: false }
 
     const markBootResolved = () => {
@@ -59,13 +63,19 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       }
     }
 
+    const enterSessionSync = () => {
+      setAccessBlockMessage(null)
+      setSessionSyncPending(true)
+      setAllowed(false)
+      setReady(true)
+    }
+
     const applySession = async (hasSession: boolean) => {
       const gen = ++gateGen
       if (cancelled) return
       if (!hasSession) {
         markBootResolved()
-        setAllowed(false)
-        setReady(true)
+        enterSessionSync()
         return
       }
       const gate = await assertTenantAccessAllowed(sb)
@@ -73,12 +83,15 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       if (!gate.ok) {
         await sb.auth.signOut()
         markBootResolved()
+        setSessionSyncPending(false)
+        setAccessBlockMessage(gate.message)
         setAllowed(false)
         setReady(true)
-        navigate('/login', { replace: true, state: { authMessage: gate.message } })
         return
       }
       markBootResolved()
+      setSessionSyncPending(false)
+      setAccessBlockMessage(null)
       setAllowed(true)
       setReady(true)
     }
@@ -120,8 +133,10 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       if (cancelled) return
       if (r.kind === 'timeout') {
         console.warn(
-          `[ERP] getSession 超过 ${GET_SESSION_RACE_MS / 1000}s 仍未返回，可能无法访问 Supabase。将等待 Auth 状态回调；请检查网络与 VITE_SUPABASE_URL。`,
+          `[ERP] getSession 超过 ${GET_SESSION_RACE_MS / 1000}s 仍未返回，可能无法访问 Supabase。将轮询会话；请检查网络与 VITE_SUPABASE_URL。`,
         )
+        markBootResolved()
+        enterSessionSync()
         return
       }
       handleHasSession(r.session, { fromAuth: false })
@@ -146,30 +161,42 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     }
     document.addEventListener('visibilitychange', onVis)
 
-    const emergencyId = window.setTimeout(() => {
-      if (cancelled || bootResolved) return
-      bootResolved = true
-      clearNoSessionDebounce()
-      console.warn(
-        '[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及 Supabase 项目是否可达。',
-      )
-      setAllowed(false)
-      setReady(true)
-      navigate('/login', {
-        replace: true,
-        state: { authMessage: '会话加载超时，请检查网络与 Supabase 配置后重新登录' },
-      })
-    }, AUTH_BOOTSTRAP_MAX_WAIT_MS)
-
     return () => {
       cancelled = true
       clearNoSessionDebounce()
       clearTimeout(visTimer)
-      window.clearTimeout(emergencyId)
       sub.subscription.unsubscribe()
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [navigate])
+  }, [])
+
+  useEffect(() => {
+    if (!sessionSyncPending || !supabaseConfigured || !supabase) return
+    const sb = supabase
+    const tick = () => {
+      void raceGetSession(() => sb.auth.getSession()).then((r) => {
+        if (r.kind === 'timeout') return
+        if (r.session) {
+          void (async () => {
+            const gate = await assertTenantAccessAllowed(sb)
+            if (!gate.ok) {
+              await sb.auth.signOut()
+              setSessionSyncPending(false)
+              setAccessBlockMessage(gate.message)
+              setAllowed(false)
+              return
+            }
+            setSessionSyncPending(false)
+            setAccessBlockMessage(null)
+            setAllowed(true)
+          })()
+        }
+      })
+    }
+    tick()
+    const id = window.setInterval(tick, SESSION_POLL_MS)
+    return () => window.clearInterval(id)
+  }, [sessionSyncPending])
 
   if (!ready) {
     return (
@@ -184,8 +211,38 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     )
   }
 
-  if (supabaseConfigured && !allowed) {
-    return <Navigate to="/login" replace />
+  if (supabaseConfigured && accessBlockMessage) {
+    return (
+      <div className="erp-main-surface flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="max-w-md text-sm font-medium text-red-700">{accessBlockMessage}</p>
+        <Link
+          to="/login"
+          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+        >
+          前往登录页
+        </Link>
+      </div>
+    )
+  }
+
+  if (supabaseConfigured && sessionSyncPending) {
+    return (
+      <div className="erp-main-surface flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+        <div
+          className="h-11 w-11 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent"
+          aria-label="同步登录状态"
+          role="status"
+        />
+        <p className="text-sm font-medium text-slate-600">正在同步登录状态…</p>
+        <p className="max-w-sm text-xs text-slate-500">
+          若您已在其他标签页登录，此处会自动进入后台；也可手动
+          <Link to="/login" className="mx-1 text-cyan-600 underline underline-offset-2">
+            打开登录页
+          </Link>
+          。
+        </p>
+      </div>
+    )
   }
 
   return <>{children}</>
