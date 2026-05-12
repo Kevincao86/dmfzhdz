@@ -47,14 +47,9 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     const sb = supabase
     let cancelled = false
     let gateGen = 0
-    let bootResolved = false
     const bootStartedAt = Date.now()
     let noSessionTimer: ReturnType<typeof setTimeout> | undefined
     const sessionEverSeenRef = { current: false }
-
-    const markBootResolved = () => {
-      bootResolved = true
-    }
 
     const clearNoSessionDebounce = () => {
       if (noSessionTimer !== undefined) {
@@ -74,7 +69,6 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       const gen = ++gateGen
       if (cancelled) return
       if (!hasSession) {
-        markBootResolved()
         enterSessionSync()
         return
       }
@@ -82,14 +76,12 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       if (cancelled || gen !== gateGen) return
       if (!gate.ok) {
         await sb.auth.signOut()
-        markBootResolved()
         setSessionSyncPending(false)
         setAccessBlockMessage(gate.message)
         setAllowed(false)
         setReady(true)
         return
       }
-      markBootResolved()
       setSessionSyncPending(false)
       setAccessBlockMessage(null)
       setAllowed(true)
@@ -135,7 +127,6 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
         console.warn(
           `[ERP] getSession 超过 ${GET_SESSION_RACE_MS / 1000}s 仍未返回，可能无法访问 Supabase。将轮询会话；请检查网络与 VITE_SUPABASE_URL。`,
         )
-        markBootResolved()
         enterSessionSync()
         return
       }
@@ -241,6 +232,19 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
           </Link>
           。
         </p>
+      </div>
+    )
+  }
+
+  if (supabaseConfigured && !allowed) {
+    return (
+      <div className="erp-main-surface flex min-h-screen flex-col items-center justify-center gap-4">
+        <div
+          className="h-11 w-11 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent"
+          aria-label="加载中"
+          role="status"
+        />
+        <p className="text-sm font-medium text-slate-600">正在准备…</p>
       </div>
     )
   }
