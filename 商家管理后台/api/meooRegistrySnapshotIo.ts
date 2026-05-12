@@ -1,12 +1,9 @@
 /**
  * Supabase public.ops_registry_snapshot：Service Role + fetch PostgREST（无 supabase-js）。
+ * normalize / persist 对 opsRegistryGatewayCore 使用动态 import，减轻 GET 注册表冷启动体积，降低 FUNCTION_INVOCATION_FAILED。
  */
 import { filterLegacyDemoRecruitmentOrders } from '../src/meooRegistryShared/recruitmentLegacyDemoOrders'
 import type { RegistryFile } from '../src/meooRegistryShared/opsRegistryTypes'
-import {
-  normalizeRegistryFile,
-  registryForPersistentFile,
-} from '../src/meooRegistryShared/opsRegistryGatewayCore'
 import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo'
 
 function srHeaders(serviceKey: string): Record<string, string> {
@@ -37,10 +34,12 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
         throw new Error(`registry_snapshot_parse_failed: ${t.slice(0, 200)}`)
       }
       const parsed = (rows[0]?.registry ?? null) as Partial<RegistryFile> | null
+      const { normalizeRegistryFile } = await import('../src/meooRegistryShared/opsRegistryGatewayCore.js')
       return normalizeRegistryFile(parsed)
     },
 
     async save(data: RegistryFile): Promise<void> {
+      const { registryForPersistentFile } = await import('../src/meooRegistryShared/opsRegistryGatewayCore.js')
       const persist = registryForPersistentFile(data)
       const nowIso = new Date().toISOString()
       const body = JSON.stringify({

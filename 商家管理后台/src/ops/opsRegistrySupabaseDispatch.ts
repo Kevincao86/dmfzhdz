@@ -3,20 +3,14 @@
  * 通过 RegistrySnapshotIo 注入读写实现（Vercel 使用 fetch PostgREST，避免 supabase-js）。
  */
 import { createHash } from 'node:crypto'
-import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared'
 import type {
-  AiVendorCatalogEntry,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
   RegistryTenant,
-  RegistryVideoAi,
   RegistryVideoSubmission,
-  RegistryVendorKeys,
 } from '../meooRegistryShared/opsRegistryTypes'
 import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders'
-import { normalizeRegistryVideoAi } from '../meooRegistryShared/registryVideoAiNormalize'
-import { DEFAULT_AI } from '../meooRegistryShared/opsRegistryGatewayCore'
 import type { RegistrySnapshotIo } from './registrySnapshotIo'
 
 function sha256Hex(plain: string): string {
@@ -113,85 +107,18 @@ export async function dispatchOpsRegistrySupabase(opts: {
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/ai') {
-      const body = JSON.parse(bodyRaw || '{}') as {
-        textModel?: string
-        imageModel?: string
-        lastWriter?: 'erp' | 'ops'
-      }
-      const textModel = (body.textModel ?? '').trim() || DEFAULT_AI.textModel
-      const imageModel = (body.imageModel ?? '').trim() || DEFAULT_AI.imageModel
-      const lastWriter = body.lastWriter === 'ops' ? 'ops' : 'erp'
-      const data = await io.load()
-      const controlledByOps = lastWriter === 'ops' ? true : data.aiModels.controlledByOps
-      data.aiModels = {
-        textModel,
-        imageModel,
-        updatedAt: new Date().toISOString(),
-        lastWriter,
-        controlledByOps,
-      }
-      await io.save(data)
-      return { status: 200, body: { ok: true } }
+      const { opsRegistrySupabaseSaveAiModels } = await import('./opsRegistrySupabaseAiWrites.js')
+      return opsRegistrySupabaseSaveAiModels(io, bodyRaw)
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/video-ai') {
-      const body = JSON.parse(bodyRaw || '{}') as {
-        videoAi?: RegistryVideoAi
-        lastWriter?: 'erp' | 'ops'
-      }
-      const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
-      const data = await io.load()
-      const nextAi = normalizeRegistryVideoAi(body.videoAi ?? {})
-      data.videoAi = Object.keys(nextAi).length > 0 ? nextAi : {}
-      data.videoAiUpdatedAt = new Date().toISOString()
-      data.videoAiWriter = lastWriter
-      if (lastWriter === 'ops') {
-        data.aiModels = {
-          ...data.aiModels,
-          controlledByOps: true,
-          updatedAt: new Date().toISOString(),
-          lastWriter: 'ops',
-        }
-      }
-      await io.save(data)
-      return { status: 200, body: { ok: true } }
+      const { opsRegistrySupabaseSaveVideoAi } = await import('./opsRegistrySupabaseAiWrites.js')
+      return opsRegistrySupabaseSaveVideoAi(io, bodyRaw)
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/vendor-keys') {
-      const body = JSON.parse(bodyRaw || '{}') as {
-        keys?: RegistryVendorKeys
-        aiVendorCatalog?: AiVendorCatalogEntry[]
-        lastWriter?: 'erp' | 'ops'
-      }
-      const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
-      const data = await io.load()
-      const next: RegistryVendorKeys = { ...data.vendorKeys }
-      const patch = body.keys && typeof body.keys === 'object' ? body.keys : {}
-      for (const [id, v] of Object.entries(patch)) {
-        if (!isValidAiVendorSlug(id)) continue
-        if (v === undefined) continue
-        const t = typeof v === 'string' ? v.trim() : ''
-        if (t) next[id] = t
-        else delete next[id]
-      }
-      data.vendorKeys = next
-      if (body.aiVendorCatalog !== undefined) {
-        data.aiVendorCatalog = mergeBuiltinAiVendorCatalog(
-          Array.isArray(body.aiVendorCatalog) ? body.aiVendorCatalog : [],
-        )
-      }
-      data.vendorKeysUpdatedAt = new Date().toISOString()
-      data.vendorKeysWriter = lastWriter
-      if (lastWriter === 'ops') {
-        data.aiModels = {
-          ...data.aiModels,
-          controlledByOps: true,
-          updatedAt: new Date().toISOString(),
-          lastWriter: 'ops',
-        }
-      }
-      await io.save(data)
-      return { status: 200, body: { ok: true } }
+      const { opsRegistrySupabaseSaveVendorKeys } = await import('./opsRegistrySupabaseAiWrites.js')
+      return opsRegistrySupabaseSaveVendorKeys(io, bodyRaw)
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/tenants/patch') {
