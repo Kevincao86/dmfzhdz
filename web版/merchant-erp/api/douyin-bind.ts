@@ -100,6 +100,25 @@ function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response>
   })
 }
 
+function isLikelyWhitelistIpReject(detail: string): boolean {
+  return /IP[^\s]*不在白名单|whitelist|白名单/i.test(detail)
+}
+
+function whitelistDeployHint(): string {
+  const relay = process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
+  const oauth = process.env.DOUYIN_OPENAPI_OAUTH_BASE_URL?.trim()
+  const oauthIsOfficialOnly =
+    !!oauth &&
+    /^https:\/\/open\.douyin\.com\/?$/i.test(oauth.replace(/\/+$/, ''))
+  if (oauthIsOfficialOnly && relay) {
+    return ' 已配置 DOUYIN_OPENAPI_BASE_URL 固定出口，但 DOUYIN_OPENAPI_OAUTH_BASE_URL 指向官方域名，OAuth 仍走云平台出口触发白名单校验。请删除该变量或与中继根保持一致。'
+  }
+  if (!relay) {
+    return ' 开放平台白名单对应「请求抖音时的来源 IP」：Vercel/Serverless 出口与控制台报备 EIP 不一致。请在部署环境设置 DOUYIN_OPENAPI_BASE_URL 为 EIP 上反代 https://open.douyin.com 的根路径（与同机「服务器 IP 白名单」一致）；配置后 OAuth 与同出口同源，无需单独设 OAUTH_URL。'
+  }
+  return ''
+}
+
 function numericErrorCode(v: unknown): number | undefined {
   if (typeof v === 'number' && Number.isFinite(v)) return v
   if (typeof v === 'bigint') return Number(v)
@@ -272,7 +291,12 @@ export async function runDouyinMerchantBind(
       : e instanceof Error
         ? e.message
         : String(e)
-    return { statusCode: 502, body: { message: `抖音鉴权或门店查询失败：${detail}` } }
+    const whitelistHint =
+      detail && !aborted && isLikelyWhitelistIpReject(detail) ? whitelistDeployHint() : ''
+    return {
+      statusCode: 502,
+      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}` },
+    }
   }
 }
 
