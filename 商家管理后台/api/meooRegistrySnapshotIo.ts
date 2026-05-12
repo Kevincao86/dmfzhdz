@@ -1,6 +1,7 @@
 /**
  * Supabase public.ops_registry_snapshot：Service Role + fetch PostgREST（无 supabase-js）。
  */
+import { filterLegacyDemoRecruitmentOrders } from '../src/meooRegistryShared/recruitmentLegacyDemoOrders'
 import type { RegistryFile } from '../src/meooRegistryShared/opsRegistryTypes'
 import {
   normalizeRegistryFile,
@@ -62,4 +63,16 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
       }
     },
   }
+}
+
+/** 运营台 /api/meoo-ops-sync-registry GET：与 dispatch GET 行为一致，避免拉入含 node:crypto 的整包 dispatch（降低 Vercel 运行时崩溃风险） */
+export async function loadRegistrySnapshotForGet(io: RegistrySnapshotIo): Promise<RegistryFile> {
+  const data = await io.load()
+  const before = data.recruitmentOrders ?? []
+  const cleaned = filterLegacyDemoRecruitmentOrders(before)
+  if (cleaned.length !== before.length) {
+    data.recruitmentOrders = cleaned
+    await io.save(data)
+  }
+  return data
 }

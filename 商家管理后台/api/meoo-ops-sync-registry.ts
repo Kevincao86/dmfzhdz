@@ -3,9 +3,8 @@
  * ERP / 运营台拉注册表应优先请求本路径（跨域已设 CORS）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch } from './meooRegistrySnapshotIo'
+import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from './meooRegistrySnapshotIo'
 import { sendOpsJson } from './safeOpsJson'
-import { dispatchOpsRegistrySupabase } from '../src/ops/opsRegistrySupabaseDispatch'
 
 export const config = { maxDuration: 60 }
 
@@ -16,14 +15,14 @@ function sendCors(res: VercelResponse) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  sendCors(res)
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-
   try {
+    sendCors(res)
     if (req.method === 'OPTIONS') {
       res.status(204).end()
       return
     }
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
     if (req.method !== 'GET') {
       res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
       return
@@ -49,17 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const out = await dispatchOpsRegistrySupabase({
-      method: 'GET',
-      urlPath: '/api/ops-sync/registry',
-      bodyRaw: '',
-      io,
-    })
+    const data = await loadRegistrySnapshotForGet(io)
 
-    const status = typeof out.status === 'number' && Number.isFinite(out.status) ? out.status : 500
     let payload: string
     try {
-      payload = typeof out.body === 'string' ? out.body : JSON.stringify(out.body)
+      payload = JSON.stringify(data)
     } catch (stringifyErr) {
       const hint = stringifyErr instanceof Error ? stringifyErr.message : String(stringifyErr)
       sendOpsJson(res, 500, {
@@ -69,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       })
       return
     }
-    res.status(status).send(payload)
+    res.status(200).send(payload)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

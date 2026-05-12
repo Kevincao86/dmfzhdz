@@ -2,7 +2,7 @@
  * Vercel：/api/ops-sync/* 注册表（Supabase ops_registry_snapshot），与 ERP 拉取同源。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch } from '../meooRegistrySnapshotIo'
+import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../meooRegistrySnapshotIo'
 import { sendOpsJson } from '../safeOpsJson'
 import { dispatchOpsRegistrySupabase } from '../../src/ops/opsRegistrySupabaseDispatch'
 
@@ -44,14 +44,13 @@ function sendCors(res: VercelResponse) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  sendCors(res)
-  res.setHeader('Content-Type', 'application/json; charset=utf-8')
-
   try {
+    sendCors(res)
     if (req.method === 'OPTIONS') {
       res.status(204).end()
       return
     }
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
     const parts = slugSegmentsFromRequest(req)
     const urlPath = OPS_SYNC_PREFIX + parts.join('/')
@@ -80,6 +79,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+
+    if (method === 'GET' && urlPath === '/api/ops-sync/registry') {
+      const data = await loadRegistrySnapshotForGet(io)
+      let payload: string
+      try {
+        payload = JSON.stringify(data)
+      } catch (stringifyErr) {
+        const hint = stringifyErr instanceof Error ? stringifyErr.message : String(stringifyErr)
+        payload = JSON.stringify({
+          ok: false,
+          error: 'registry_response_not_serializable',
+          detail: hint.slice(0, 400),
+        })
+        res.status(500).send(payload)
+        return
+      }
+      res.status(200).send(payload)
+      return
+    }
 
     const out = await dispatchOpsRegistrySupabase({
       method,
