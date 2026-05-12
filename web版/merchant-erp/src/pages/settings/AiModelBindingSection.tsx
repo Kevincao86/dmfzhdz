@@ -81,7 +81,7 @@ export default function AiModelBindingSection() {
       </div>
       <p className="text-sm font-medium text-gray-900">目前绑定的 AI 模型</p>
       <p className="mt-1 text-xs text-gray-500">
-        文案与生图可分别设置；按钮左侧「自动 / 手动」为当前模式，点开可切换自动跟随系统默认或指定模型。
+        文案与生图可分别设置；左侧开关为「自动」（跟随下方所选默认），右侧按钮展开后可搜索并指定模型。
       </p>
       <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-10">
         <div className="min-w-0 flex-1">

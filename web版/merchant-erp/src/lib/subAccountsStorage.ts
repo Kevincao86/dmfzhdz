@@ -39,7 +39,10 @@ export type SubAccountRecord = {
   jobRoleId: string
   status: 'active' | 'disabled'
   createdAt: string
+  /** 与 Supabase auth.users.id 对应，便于云端重置/删除 */
+  cloudUserId?: string
 }
+
 
 const BUILTIN_IDS: Record<LegacySubAccountRole, string> = {
   admin: 'job_builtin_admin',
@@ -216,7 +219,8 @@ function parseAccount(raw: unknown): SubAccountRecord | null {
     if (legacy) jobRoleId = BUILTIN_IDS[legacy]
   }
   if (!id || !loginName || !passwordHash || !jobRoleId || !createdAt) return null
-  return { id, loginName, passwordHash, jobRoleId, status, createdAt }
+  const cloudUserId = typeof o.cloudUserId === 'string' && o.cloudUserId.trim() ? o.cloudUserId.trim() : undefined
+  return { id, loginName, passwordHash, jobRoleId, status, createdAt, cloudUserId }
 }
 
 export function readSubAccounts(): SubAccountRecord[] {

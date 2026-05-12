@@ -21,6 +21,11 @@ export function readMerchantSupabaseAdminEnv(): MerchantSupabaseAdminEnvParts {
   return { supabaseUrl, serviceRole, missingParts }
 }
 
+/** 校验用户 JWT（anon）与 Service Role 分离；Vercel 上常配 SUPABASE_ANON_KEY。 */
+export function readMerchantSupabaseAnonKey(): string {
+  return (process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '').trim()
+}
+
 /** 给人看的配置说明（JSON hint 字段等） */
 export function merchantSupabaseAdminEnvConfigureHint(missingParts: ('url' | 'serviceRole')[]): string {
   const lines: string[] = [

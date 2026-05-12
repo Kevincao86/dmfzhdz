@@ -36,6 +36,11 @@ type AiModelAutoPickerProps = {
   className?: string
   /** 自动/手动或模型变化时通知父级（用于刷新 title 等） */
   onResolutionChange?: () => void
+  /**
+   * 在按钮旁常驻「自动」开关（下拉内不再重复），避免用户找不到自动模式。
+   * @default true
+   */
+  showInlineAutoToggle?: boolean
 }
 
 function labelForId(options: readonly AiModelAutoPickerOption[], id: string): string {
@@ -48,6 +53,7 @@ export default function AiModelAutoPicker({
   disabled = false,
   className,
   onResolutionChange,
+  showInlineAutoToggle = true,
 }: AiModelAutoPickerProps) {
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -104,7 +110,13 @@ export default function AiModelAutoPicker({
     return kind === 'text' ? readTextAiManualModel() : readImageAiManualModel()
   }, [kind, tick])
 
-  const modelLabel = auto ? labelForId(options, defaultStoredId) : labelForId(options, manualId)
+  const triggerLabel = showInlineAutoToggle
+    ? auto
+      ? labelForId(options, defaultStoredId)
+      : `指定：${labelForId(options, manualId)}`
+    : auto
+      ? `自动 · ${labelForId(options, defaultStoredId)}`
+      : labelForId(options, manualId)
 
   const filteredOptions = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -142,8 +154,34 @@ export default function AiModelAutoPicker({
     setSearch('')
   }
 
+  const inlineAuto = showInlineAutoToggle && !disabled
+
   return (
-    <div ref={rootRef} className={cn('relative inline-block text-left', className)}>
+    <div ref={rootRef} className={cn('relative flex flex-wrap items-center gap-2 text-left', className)}>
+      {inlineAuto ? (
+        <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm">
+          <span className="text-[11px] font-semibold text-gray-700">自动</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={auto}
+            aria-label={kind === 'text' ? '文案模型跟随系统默认' : '生图模型跟随系统默认'}
+            onClick={() => setAuto(!auto)}
+            className={cn(
+              'relative h-6 w-10 shrink-0 rounded-full transition-colors',
+              auto ? 'bg-emerald-500' : 'bg-gray-300',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                auto && 'translate-x-4',
+              )}
+            />
+          </button>
+        </div>
+      ) : null}
+
       <button
         type="button"
         disabled={disabled}
@@ -152,24 +190,14 @@ export default function AiModelAutoPicker({
         aria-controls={panelId}
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
-          'inline-flex min-w-[9.5rem] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+          'inline-flex min-w-[8.5rem] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
           kind === 'text'
             ? 'border-indigo-200 bg-white text-indigo-900 hover:bg-indigo-50'
             : 'border-violet-200 bg-white text-violet-900 hover:bg-violet-50',
           disabled && 'cursor-not-allowed opacity-60',
         )}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span
-            className={cn(
-              'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide',
-              auto ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600',
-            )}
-          >
-            {auto ? '自动' : '手动'}
-          </span>
-          <span className="truncate">{modelLabel}</span>
-        </span>
+        <span className="truncate">{triggerLabel}</span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 opacity-70', open && 'rotate-180')} aria-hidden />
       </button>
 
@@ -178,7 +206,7 @@ export default function AiModelAutoPicker({
           id={panelId}
           role="dialog"
           aria-label={kind === 'text' ? '文案 AI 模型' : '生图 AI 模型'}
-          className="absolute left-0 z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white py-2 shadow-xl ring-1 ring-black/5"
+          className="absolute left-0 top-full z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white py-2 shadow-xl ring-1 ring-black/5"
         >
           <div className="px-3 pb-2">
             <input
@@ -189,33 +217,39 @@ export default function AiModelAutoPicker({
             />
           </div>
 
-          <div className="border-b border-gray-100 px-3 py-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">自动</p>
-                <p className="mt-0.5 text-[11px] leading-snug text-gray-500">
-                  跟随系统设置中的默认模型；运营侧更新后约 2.5 秒内生效。
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={auto}
-                onClick={() => setAuto(!auto)}
-                className={cn(
-                  'relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors',
-                  auto ? 'bg-emerald-500' : 'bg-gray-300',
-                )}
-              >
-                <span
+          {!showInlineAutoToggle ? (
+            <div className="border-b border-gray-100 px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">自动</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-gray-500">
+                    跟随系统设置中的默认模型；运营侧更新后约 2.5 秒内生效。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={auto}
+                  onClick={() => setAuto(!auto)}
                   className={cn(
-                    'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                    auto && 'translate-x-4',
+                    'relative mt-0.5 h-6 w-10 shrink-0 rounded-full transition-colors',
+                    auto ? 'bg-emerald-500' : 'bg-gray-300',
                   )}
-                />
-              </button>
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                      auto && 'translate-x-4',
+                    )}
+                  />
+                </button>
+              </div>
             </div>
-          </div>
+          ) : auto ? (
+            <p className="border-b border-gray-100 px-3 pb-2 text-[11px] leading-snug text-gray-500">
+              已开启自动：与系统设置中的默认模型一致（约 2.5 秒与运营下发同步）。关闭「自动」后可搜索并指定模型。
+            </p>
+          ) : null}
 
           {!auto ? (
             <div className="max-h-52 overflow-y-auto px-2 pt-1">

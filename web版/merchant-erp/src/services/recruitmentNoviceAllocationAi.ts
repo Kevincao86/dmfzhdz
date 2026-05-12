@@ -1,5 +1,5 @@
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
-import { readStoredAiModel } from './merchantAiModelStorage'
+import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
 
 /** 达人档位分配策略（影响 AI / 离线估算权重） */
 export type KolTierStrategy = 'more_v3' | 'more_v4' | 'more_v5'
@@ -125,7 +125,7 @@ export async function requestNoviceKolAllocationAi(params: {
   budgetYuan: number
   strategy: KolTierStrategy
 }): Promise<NoviceAllocation | null> {
-  const model = readStoredAiModel() as AiModelId
+  const model = resolveTextAiModelForRequest() as AiModelId
   const stratZh = kolTierStrategyLabel(params.strategy)
   const titleDraft = `你是本地生活达人招募成本顾问。根据城市达人撮合的行情（可合理假设），为商家做一次「档位人数」分配建议。
 

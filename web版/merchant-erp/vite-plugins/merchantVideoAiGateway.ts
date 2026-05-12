@@ -149,16 +149,23 @@ function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
     env.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ??
     ''
   ).trim()
-  if (!raw) return []
   const out: ArkVideoModelOption[] = []
-  for (const part of raw.split(',')) {
-    const seg = part.trim()
-    if (!seg) continue
-    const pipes = seg.split('|').map((s) => s.trim())
-    if (pipes.length >= 2 && pipes[1]) {
-      out.push({ label: pipes[0] || pipes[1], endpointId: pipes[1] })
-    } else if (pipes.length === 1 && pipes[0]) {
-      out.push({ label: pipes[0], endpointId: pipes[0] })
+  if (raw) {
+    for (const part of raw.split(',')) {
+      const seg = part.trim()
+      if (!seg) continue
+      const pipes = seg.split('|').map((s) => s.trim())
+      if (pipes.length >= 2 && pipes[1]) {
+        out.push({ label: pipes[0] || pipes[1], endpointId: pipes[1] })
+      } else if (pipes.length === 1 && pipes[0]) {
+        out.push({ label: pipes[0], endpointId: pipes[0] })
+      }
+    }
+  }
+  if (out.length === 0) {
+    const fb = String((env as Record<string, string>).MERCHANT_AI_ARK_VIDEO_FALLBACK_ENDPOINT ?? '').trim()
+    if (fb && /^ep-[a-z0-9_-]+$/i.test(fb)) {
+      out.push({ label: '默认视频接入点', endpointId: fb })
     }
   }
   return out
