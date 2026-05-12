@@ -65,10 +65,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(200).send(payload)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const aborted = e instanceof Error && (e.name === 'AbortError' || /aborted|timeout/i.test(msg))
     sendOpsJson(res, 500, {
       ok: false,
-      error: 'meoo_ops_sync_registry_failed',
+      error: aborted ? 'registry_snapshot_fetch_timeout' : 'meoo_ops_sync_registry_failed',
       detail: msg.slice(0, 800),
+      ...(aborted
+        ? {
+            hint:
+              '拉取 Supabase ops_registry_snapshot 超时（约 22s）。请核对 SUPABASE_URL / Service Role、表是否存在；若 Vercel 在东京(hnd1)而库在境外，可在 Project → Functions 调整区域或换更近的 Supabase 区域。',
+          }
+        : {}),
     })
   }
 }

@@ -6,6 +6,17 @@ import { filterLegacyDemoRecruitmentOrders } from '../src/meooRegistryShared/rec
 import type { RegistryFile } from '../src/meooRegistryShared/opsRegistryTypes'
 import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo'
 
+const SNAPSHOT_FETCH_TIMEOUT_MS = 22_000
+
+function fetchTimeoutSignal(ms: number): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), ms)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 function srHeaders(serviceKey: string): Record<string, string> {
   return {
     apikey: serviceKey,
@@ -18,11 +29,12 @@ function srHeaders(serviceKey: string): Record<string, string> {
 export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKey: string): RegistrySnapshotIo {
   const base = supabaseUrl.replace(/\/$/, '')
   const key = serviceRoleKey.trim()
+  const snapSignal = () => fetchTimeoutSignal(SNAPSHOT_FETCH_TIMEOUT_MS)
 
   return {
     async load(): Promise<RegistryFile> {
       const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=registry`
-      const r = await fetch(url, { headers: srHeaders(key) })
+      const r = await fetch(url, { headers: srHeaders(key), signal: snapSignal() })
       const t = await r.text()
       if (!r.ok) {
         throw new Error(t.slice(0, 400))
@@ -55,6 +67,7 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
           Prefer: 'resolution=merge-duplicates,return=minimal',
         },
         body,
+        signal: snapSignal(),
       })
       const t = await r.text()
       if (!r.ok) {
@@ -71,7 +84,13 @@ export async function loadRegistrySnapshotForGet(io: RegistrySnapshotIo): Promis
   const cleaned = filterLegacyDemoRecruitmentOrders(before)
   if (cleaned.length !== before.length) {
     data.recruitmentOrders = cleaned
-    await io.save(data)
+    try {
+      await io.save(data)
+    } catch (e) {
+      // GET 仍以清理后的内存结果响应；持久化失败不应拖垮整次 Function（否则 Vercel 直接 FUNCTION_INVOCATION_FAILED / 502）
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[loadRegistrySnapshotForGet] persist cleaned recruitmentOrders failed:', msg.slice(0, 500))
+    }
   }
   return data
 }

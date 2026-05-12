@@ -3,6 +3,16 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/meoo-ops-sync-registry.ts": {
+      "maxDuration": 60,
+      "memory": 2048,
+      "includeFiles": "src/**"
+    },
+    "api/ops-sync/[...slug].ts": {
+      "maxDuration": 60,
+      "memory": 2048,
+      "includeFiles": "src/**"
+    },
     "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 1024,
