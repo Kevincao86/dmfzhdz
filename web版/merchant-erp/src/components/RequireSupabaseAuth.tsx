@@ -1,10 +1,31 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
 import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
-/** 应大于 assertTenantAccessAllowed 内超时 + getSession 余量，避免误杀仍在校验中的会话 */
-const AUTH_BOOTSTRAP_MAX_WAIT_MS = 20_000
+/** 单次 getSession 竞态上限：避免对 Supabase 请求挂起时整页永久「正在加载会话」 */
+const GET_SESSION_RACE_MS = 10_000
+/** 首几秒内的「无会话」信号可能是 Auth 初始化顺序问题，合并后再判定 */
+const NO_SESSION_DEBOUNCE_MS = 600
+/** 首屏仅在此窗口内对「无会话」做防抖；之后无会话视为真实登出 */
+const NO_SESSION_DEBOUNCE_BOOT_MS = 4_500
+/** 应大于 assertTenantAccessAllowed 内超时 + getSession 余量 */
+const AUTH_BOOTSTRAP_MAX_WAIT_MS = 28_000
+
+type SessionRaceOk = { kind: 'ok'; session: Session | null }
+type SessionRaceTimeout = { kind: 'timeout' }
+
+function raceGetSession(
+  getSession: () => ReturnType<NonNullable<typeof supabase>['auth']['getSession']>,
+): Promise<SessionRaceOk | SessionRaceTimeout> {
+  return Promise.race([
+    getSession().then((r): SessionRaceOk => ({ kind: 'ok', session: r.data.session })),
+    new Promise<SessionRaceTimeout>((resolve) => {
+      window.setTimeout(() => resolve({ kind: 'timeout' }), GET_SESSION_RACE_MS)
+    }),
+  ])
+}
 
 export default function RequireSupabaseAuth({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
@@ -22,9 +43,20 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     let cancelled = false
     let gateGen = 0
     let bootResolved = false
+    const bootStartedAt = Date.now()
+    let noSessionTimer: ReturnType<typeof setTimeout> | undefined
+    /** 已在本次挂载中见过非空 session 时，忽略 Auth 管道里偶发的 null（除非 SIGNED_OUT），避免误踢回登录 */
+    const sessionEverSeenRef = { current: false }
 
     const markBootResolved = () => {
       bootResolved = true
+    }
+
+    const clearNoSessionDebounce = () => {
+      if (noSessionTimer !== undefined) {
+        clearTimeout(noSessionTimer)
+        noSessionTimer = undefined
+      }
     }
 
     const applySession = async (hasSession: boolean) => {
@@ -51,15 +83,51 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       setReady(true)
     }
 
-    // 不单独依赖 INITIAL_SESSION：部分环境下事件顺序晚于首屏，会导致 ready 一直为 false（表现为白屏/一直转圈）
-    void sb.auth.getSession().then(({ data }) => {
+    const scheduleNoSession = () => {
+      clearNoSessionDebounce()
+      const inDebounceWindow = Date.now() - bootStartedAt < NO_SESSION_DEBOUNCE_BOOT_MS
+      if (!inDebounceWindow) {
+        void applySession(false)
+        return
+      }
+      noSessionTimer = window.setTimeout(() => {
+        noSessionTimer = undefined
+        if (cancelled) return
+        void applySession(false)
+      }, NO_SESSION_DEBOUNCE_MS)
+    }
+
+    const handleHasSession = (
+      session: Session | null,
+      opts?: { fromAuth?: boolean; authEvent?: string },
+    ) => {
       if (cancelled) return
-      void applySession(Boolean(data.session))
+      if (session) {
+        sessionEverSeenRef.current = true
+        clearNoSessionDebounce()
+        void applySession(true)
+        return
+      }
+      if (opts?.fromAuth && sessionEverSeenRef.current && opts.authEvent !== 'SIGNED_OUT') {
+        return
+      }
+      scheduleNoSession()
+    }
+
+    void raceGetSession(() => sb.auth.getSession()).then((r) => {
+      if (cancelled) return
+      if (r.kind === 'timeout') {
+        console.warn(
+          `[ERP] getSession 超过 ${GET_SESSION_RACE_MS / 1000}s 仍未返回，可能无法访问 Supabase。将等待 Auth 状态回调；请检查网络与 VITE_SUPABASE_URL。`,
+        )
+        return
+      }
+      handleHasSession(r.session, { fromAuth: false })
     })
 
-    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
       if (cancelled) return
-      void applySession(Boolean(session))
+      handleHasSession(session, { fromAuth: true, authEvent: event })
     })
 
     let visTimer: ReturnType<typeof setTimeout> | undefined
@@ -67,9 +135,10 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       if (document.visibilityState !== 'visible') return
       clearTimeout(visTimer)
       visTimer = setTimeout(() => {
-        void sb.auth.getSession().then(({ data }) => {
+        void raceGetSession(() => sb.auth.getSession()).then((r) => {
           if (cancelled) return
-          void applySession(Boolean(data.session))
+          if (r.kind === 'timeout') return
+          handleHasSession(r.session, { fromAuth: false })
         })
       }, 400)
     }
@@ -78,7 +147,8 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     const emergencyId = window.setTimeout(() => {
       if (cancelled || bootResolved) return
       bootResolved = true
-      console.warn('[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及本地 Supabase 是否已启动。')
+      clearNoSessionDebounce()
+      console.warn('[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及 Supabase 项目是否可达。')
       setAllowed(false)
       setReady(true)
       navigate('/login', {
@@ -89,6 +159,7 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
 
     return () => {
       cancelled = true
+      clearNoSessionDebounce()
       clearTimeout(visTimer)
       window.clearTimeout(emergencyId)
       sub.subscription.unsubscribe()
