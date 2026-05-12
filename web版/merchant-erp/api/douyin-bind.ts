@@ -6,7 +6,12 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
-import { douyinOpenApiUrl, exchangeDouyinClientToken, parseDouyinJson } from './douyinOpenApiBase.js'
+import {
+  douyinOpenApiUrl,
+  exchangeDouyinClientToken,
+  extractPoisFromShopQueryData,
+  parseDouyinOpenApiEnvelope,
+} from './douyinOpenApiBase.js'
 
 export type DouyinMerchantSession = {
   clientKey: string
@@ -135,15 +140,6 @@ function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string }
   return { ok: true }
 }
 
-function extractPoisFromShopQueryData(data: Record<string, unknown> | undefined): unknown[] {
-  if (!data || typeof data !== 'object') return []
-  const direct = data.pois
-  if (Array.isArray(direct)) return direct
-  const alt = data.list ?? data.poi_list ?? data.shop_list ?? data.shops ?? data.records
-  if (Array.isArray(alt)) return alt
-  return []
-}
-
 async function fetchDouyinClientToken(
   clientKey: string,
   clientSecret: string,
@@ -185,7 +181,7 @@ async function shopPoiQueryPage(
   if (!res.ok) {
     throw new Error(`shop/query HTTP ${res.status}：${raw.slice(0, 400)}`)
   }
-  const j = parseDouyinJson(raw)
+  const j = parseDouyinOpenApiEnvelope(raw, 'shop/query')
   const err = getDataError(j)
   if (!err.ok) throw new Error(err.msg ?? 'shop/query 业务错误')
   return j
