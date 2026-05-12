@@ -6,6 +6,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
+import { douyinOpenApiUrl } from './douyinOpenApiBase.js'
 
 export type DouyinMerchantSession = {
   clientKey: string
@@ -75,8 +76,6 @@ export function merchantDouyinSessionSecret(): string {
   return process.env.MERCHANT_DOUYIN_SESSION_SECRET?.trim() ?? ''
 }
 
-const DOUYIN_CLIENT_TOKEN_URL = 'https://open.douyin.com/oauth/client_token/'
-const DOUYIN_SHOP_POI_QUERY = 'https://open.douyin.com/goodlife/v1/shop/poi/query/'
 const DOUYIN_FETCH_TIMEOUT_MS = 25_000
 
 function fetchTimeoutSignal(ms: number): AbortSignal {
@@ -147,7 +146,7 @@ async function fetchDouyinClientToken(
   clientKey: string,
   clientSecret: string,
 ): Promise<{ token: string; expiresIn: number }> {
-  const res = await douyinFetch(DOUYIN_CLIENT_TOKEN_URL, {
+  const res = await douyinFetch(douyinOpenApiUrl('/oauth/client_token/'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -189,7 +188,7 @@ async function shopPoiQueryPage(
   page: number,
   size: number,
 ): Promise<Record<string, unknown>> {
-  const u = new URL(DOUYIN_SHOP_POI_QUERY)
+  const u = new URL(douyinOpenApiUrl('/goodlife/v1/shop/poi/query/'))
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('page', String(Math.max(1, page)))
   u.searchParams.set('size', String(Math.min(50, Math.max(1, size))))
