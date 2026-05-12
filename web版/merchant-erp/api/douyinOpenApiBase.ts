@@ -3,9 +3,9 @@
  *
  * - **DOUYIN_OPENAPI_BASE_URL**：本地生活等路径（如 `/goodlife/*`）基址；不设则 `https://open.douyin.com`。
  * - **DOUYIN_OPENAPI_OAUTH_BASE_URL**：OAuth（`/oauth/*`，含 `client_token`）基址。
- *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：OAuth 与同一条固定出口中继，避免只有 goodlife 走 EIP、client_token 仍走云函数出口触发「IP 不在白名单」。
+ *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：先走同一中继；若中继对 `client_token` 仍返回 HTML（常见 Nginx 未透传 POST JSON），**自动再请求官方** `https://open.douyin.com/oauth/client_token/`。goodlife 仍只走中继，满足 IP 白名单。
  *   **不设且未配置中继**：默认 `https://open.douyin.com`。
- *   若中继对 POST OAuth 有问题，仍可显式设 `DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com`，仅 OAuth 直连。
+ *   可显式设 `DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com` 跳过中继上的 OAuth（与自动回落等价，仅少一次无效请求）。
  *
  * Vercel：Environment Variables 中配置上述变量（勿以 / 结尾）。
  */
@@ -124,16 +124,47 @@ export async function fetchGoodlifeWithOfficialFallback(
   return { status: r1.status, raw: raw1, usedOfficialFallback: false }
 }
 
+/** JSON POST 再 form POST；任一步得到 2xx 且像 JSON 即返回，否则返回最后一条响应（含非 2xx）。 */
+async function fetchClientTokenJsonThenForm(
+  fetchFn: DouyinFetchFn,
+  tokenUrl: string,
+  jsonBody: string,
+  formBody: string,
+): Promise<{ status: number; raw: string }> {
+  const tryJson = await fetchFn(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: jsonBody,
+  })
+  let raw = await tryJson.text()
+  if (!tryJson.ok) {
+    return { status: tryJson.status, raw }
+  }
+  if (!responseLooksLikeHtml(raw) && looksLikeJsonObject(raw)) {
+    return { status: tryJson.status, raw }
+  }
+  const tryForm = await fetchFn(tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    },
+    body: formBody,
+  })
+  raw = await tryForm.text()
+  return { status: tryForm.status, raw }
+}
+
 /**
- * 申请 client_token：先 JSON POST，若 200 但返回 HTML（反代未透传 body 等）再尝试 x-www-form-urlencoded。
- * OAuth URL 走 `douyinOpenApiUrl('/oauth/...')`：已配固定出口中继时与同基址同源；否则直连官方。
+ * 申请 client_token：中继上先 JSON 再 form；仍 HTML 或非 JSON 时，若当前 OAuth 基址非官方则自动改打官方
+ * `https://open.douyin.com/oauth/client_token/`（goodlife 仍只走 DOUYIN_OPENAPI_BASE_URL，白名单不变）。
  */
 export async function exchangeDouyinClientToken(
   clientKey: string,
   clientSecret: string,
   fetchFn: DouyinFetchFn,
 ): Promise<{ token: string; expiresIn: number }> {
-  const url = douyinOpenApiUrl('/oauth/client_token/')
+  const primaryUrl = douyinOpenApiUrl('/oauth/client_token/')
   const jsonBody = JSON.stringify({
     client_key: clientKey,
     client_secret: clientSecret,
@@ -173,38 +204,35 @@ export async function exchangeDouyinClientToken(
     return { token: extracted.token, expiresIn: extracted.expiresIn }
   }
 
-  const tryJson = await fetchFn(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: jsonBody,
-  })
-  let raw = await tryJson.text()
-  if (!tryJson.ok) {
-    throw new Error(`client_token HTTP ${tryJson.status}：${raw.slice(0, 300)}`)
+  let { status, raw } = await fetchClientTokenJsonThenForm(fetchFn, primaryUrl, jsonBody, formBody)
+  const oauthBase = normalizedOauthBase()
+  const relayLooksBroken =
+    oauthBase !== DEFAULT_BASE &&
+    status >= 200 &&
+    status < 300 &&
+    (responseLooksLikeHtml(raw) || !looksLikeJsonObject(raw))
+  if (relayLooksBroken) {
+    const officialUrl = `${DEFAULT_BASE}/oauth/client_token/`
+    const second = await fetchClientTokenJsonThenForm(fetchFn, officialUrl, jsonBody, formBody)
+    if (second.status >= 200 && second.status < 300) {
+      status = second.status
+      raw = second.raw
+    }
   }
 
-  if (responseLooksLikeHtml(raw) || !looksLikeJsonObject(raw)) {
-    const tryForm = await fetchFn(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-      },
-      body: formBody,
-    })
-    raw = await tryForm.text()
-    if (!tryForm.ok) {
-      throw new Error(`client_token（form 重试）HTTP ${tryForm.status}：${raw.slice(0, 300)}`)
-    }
+  if (status < 200 || status >= 300) {
+    throw new Error(`client_token HTTP ${status}：${raw.slice(0, 300)}`)
   }
 
   if (responseLooksLikeHtml(raw)) {
     throw new Error(
-      `client_token 仍返回 HTML（抖音开放平台网页），说明 OAuth 请求未到达 JSON 接口。请将 Nginx 对 /oauth/client_token/ 透传 POST body，或设置 DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com（goodlife 继续用 DOUYIN_OPENAPI_BASE_URL 走固定 IP）。摘要：${raw.slice(0, 240)}`,
+      `client_token 仍返回 HTML（抖音开放平台网页）。请修正 Nginx：对 /oauth/client_token/ 透传 POST body 与 JSON Content-Type，且 proxy_pass 须落到 open.douyin.com 的 API 路径；或设置 DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com。摘要：${raw.slice(0, 240)}`,
     )
   }
 
-  return parseSuccess(raw, 'JSON 或 form 重试')
+  const via =
+    relayLooksBroken && oauthBase !== DEFAULT_BASE ? '官方 OAuth 回落（中继曾返回 HTML）' : 'JSON 或 form 重试'
+  return parseSuccess(raw, via)
 }
 
 /** 解析抖音 JSON 响应（去 BOM）；失败时返回 {}，与其它接口容错一致 */
