@@ -221,32 +221,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       if (lr.ok) {
         jsonSend(res, 200, { ok: true, rows: lr.rows })
         return
-      }
-      const listErr = lr
-      if (anon && secret) {
-        const er = await edgePost(supabaseUrl, anon, secret, {})
-        if (er.ok && er.data.ok !== false) {
-          const rows = Array.isArray(er.data.rows) ? er.data.rows : []
-          jsonSend(res, 200, { ok: true, rows })
+      } else {
+        const listErr = lr
+        if (anon && secret) {
+          const er = await edgePost(supabaseUrl, anon, secret, {})
+          if (er.ok && er.data.ok !== false) {
+            const rows = Array.isArray(er.data.rows) ? er.data.rows : []
+            jsonSend(res, 200, { ok: true, rows })
+            return
+          }
+          const detail = [listErr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
+          jsonSend(res, er.status >= 400 ? er.status : 502, {
+            ok: false,
+            error: 'list_failed',
+            detail,
+            hint:
+              'Service Role 列租户失败，且 Edge ops-list-tenants 无有效数据。请核对 SUPABASE_SERVICE_ROLE_KEY、数据库权限，或部署 ops-list-tenants。',
+          })
           return
         }
-        const detail = [listErr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
-        jsonSend(res, er.status >= 400 ? er.status : 502, {
+        jsonSend(res, 502, {
           ok: false,
-          error: 'list_failed',
-          detail,
-          hint:
-            'Service Role 列租户失败，且 Edge ops-list-tenants 无有效数据。请核对 SUPABASE_SERVICE_ROLE_KEY、数据库权限，或部署 ops-list-tenants。',
+          error: listErr.message,
+          detail: listErr.detail,
+          hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
         })
         return
       }
-      jsonSend(res, 502, {
-        ok: false,
-        error: listErr.message,
-        detail: listErr.detail,
-        hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
-      })
-      return
     }
 
     if (anon && secret) {

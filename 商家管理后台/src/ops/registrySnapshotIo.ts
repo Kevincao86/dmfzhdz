@@ -1,4 +1,4 @@
-import type { RegistryFile } from '../meooRegistryShared/opsRegistryTypes'
+import type { RegistryFile } from '../meooRegistryShared/opsRegistryTypes.js'
 
 /** 注册表快照读写抽象：线上用 PostgREST fetch，dev 仍走磁盘网关 */
 export type RegistrySnapshotIo = {

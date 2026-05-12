@@ -2,15 +2,15 @@
  * 运营台注册表中与 AI 模型 / Key / 短视频网关相关的写入（无 node:crypto）。
  * 供独立 Vercel 路由与 dispatch 共用，避免 POST 冷启动拉整包租户/招聘逻辑导致 FUNCTION_INVOCATION_FAILED。
  */
-import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared'
+import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared.js'
 import type {
   AiVendorCatalogEntry,
   RegistryVendorKeys,
   RegistryVideoAi,
-} from '../meooRegistryShared/opsRegistryTypes'
-import { DEFAULT_AI } from '../meooRegistryShared/opsRegistryGatewayCore'
-import { normalizeRegistryVideoAi } from '../meooRegistryShared/registryVideoAiNormalize'
-import type { RegistrySnapshotIo } from './registrySnapshotIo'
+} from '../meooRegistryShared/opsRegistryTypes.js'
+import { DEFAULT_AI } from '../meooRegistryShared/opsRegistryGatewayCore.js'
+import { normalizeRegistryVideoAi } from '../meooRegistryShared/registryVideoAiNormalize.js'
+import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 export async function opsRegistrySupabaseSaveVendorKeys(
   io: RegistrySnapshotIo,

@@ -9,9 +9,9 @@ import type {
   RegistryTalentPoolRow,
   RegistryTenant,
   RegistryVideoSubmission,
-} from '../meooRegistryShared/opsRegistryTypes'
-import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders'
-import type { RegistrySnapshotIo } from './registrySnapshotIo'
+} from '../meooRegistryShared/opsRegistryTypes.js'
+import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders.js'
+import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
   return createHash('sha256').update(plain, 'utf8').digest('hex')
