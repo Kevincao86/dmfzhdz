@@ -6,7 +6,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
-import { douyinOpenApiUrl } from './douyinOpenApiBase.js'
+import { douyinOpenApiUrl, extractClientTokenPayload, parseDouyinJson } from './douyinOpenApiBase.js'
 
 export type DouyinMerchantSession = {
   clientKey: string
@@ -94,14 +94,6 @@ function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response>
   })
 }
 
-function parseDouyinEnvelope(raw: string): Record<string, unknown> {
-  try {
-    return JSON.parse(raw || '{}') as Record<string, unknown>
-  } catch {
-    return {}
-  }
-}
-
 function numericErrorCode(v: unknown): number | undefined {
   if (typeof v === 'number' && Number.isFinite(v)) return v
   if (typeof v === 'bigint') return Number(v)
@@ -113,6 +105,16 @@ function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string }
   const rootCode = numericErrorCode(j.error_code)
   if (rootCode !== undefined && rootCode !== 0) {
     return { ok: false, msg: String(j.description ?? j.msg ?? `抖音根 error_code=${rootCode}`) }
+  }
+  const mes = typeof j.message === 'string' ? j.message.trim().toLowerCase() : ''
+  if (mes === 'error' || mes === 'fail' || mes === 'failed') {
+    const data = j.data
+    const d =
+      data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : undefined
+    return {
+      ok: false,
+      msg: String(d?.description ?? j.description ?? j.msg ?? '抖音接口返回失败'),
+    }
   }
   const data = j.data
   if (data && typeof data === 'object') {
@@ -159,16 +161,31 @@ async function fetchDouyinClientToken(
   if (!res.ok) {
     throw new Error(`client_token HTTP ${res.status}：${raw.slice(0, 300)}`)
   }
-  const j = parseDouyinEnvelope(raw)
+  const trimmed = (raw ?? '').replace(/^\uFEFF/, '').trim()
+  let j: Record<string, unknown>
+  try {
+    const v = JSON.parse(trimmed || '{}') as unknown
+    if (!v || typeof v !== 'object' || Array.isArray(v)) {
+      throw new Error(`client_token 期望 JSON 对象，实际：${trimmed.slice(0, 280)}`)
+    }
+    j = v as Record<string, unknown>
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('client_token')) throw e
+    throw new Error(`client_token 返回非 JSON（请核对 DOUYIN_OPENAPI_BASE_URL 反代是否透传 body）：${trimmed.slice(0, 280)}`)
+  }
   const err = getDataError(j)
   if (!err.ok) {
     throw new Error(err.msg ?? `client_token 业务错误`)
   }
-  const data = j.data as Record<string, unknown> | undefined
-  const token = String(data?.access_token ?? j.access_token ?? '')
-  if (!token) throw new Error('client_token 响应缺少 access_token')
-  const expiresIn = Number(data?.expires_in ?? 7200)
-  return { token, expiresIn }
+  const extracted = extractClientTokenPayload(j)
+  if (!extracted) {
+    const rootK = Object.keys(j).join(',')
+    const d = j.data
+    const dk =
+      d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d as object).join(',') : typeof d
+    throw new Error(`client_token 响应缺少 access_token（根字段: ${rootK}；data: ${dk}）`)
+  }
+  return { token: extracted.token, expiresIn: extracted.expiresIn }
 }
 
 async function ensureDouyinToken(s: DouyinMerchantSession): Promise<string> {
@@ -205,7 +222,7 @@ async function shopPoiQueryPage(
   if (!res.ok) {
     throw new Error(`shop/query HTTP ${res.status}：${raw.slice(0, 400)}`)
   }
-  const j = parseDouyinEnvelope(raw)
+  const j = parseDouyinJson(raw)
   const err = getDataError(j)
   if (!err.ok) throw new Error(err.msg ?? 'shop/query 业务错误')
   return j

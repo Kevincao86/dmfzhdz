@@ -36,7 +36,7 @@
  * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { douyinOpenApiUrl } from '../api/douyinOpenApiBase.js'
+import { douyinOpenApiUrl, extractClientTokenPayload, parseDouyinJson } from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
@@ -99,14 +99,6 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-function parseDouyinEnvelope(raw: string): Record<string, unknown> {
-  try {
-    return JSON.parse(raw || '{}') as Record<string, unknown>
-  } catch {
-    return {}
-  }
-}
-
 /** 抖音部分字段以字符串形式返回 error_code，仅用 number 判断会漏掉业务失败 */
 function numericErrorCode(v: unknown): number | undefined {
   if (typeof v === 'number' && Number.isFinite(v)) return v
@@ -119,6 +111,16 @@ function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string }
   const rootCode = numericErrorCode(j.error_code)
   if (rootCode !== undefined && rootCode !== 0) {
     return { ok: false, msg: String(j.description ?? j.msg ?? `抖音根 error_code=${rootCode}`) }
+  }
+  const mes = typeof j.message === 'string' ? j.message.trim().toLowerCase() : ''
+  if (mes === 'error' || mes === 'fail' || mes === 'failed') {
+    const data = j.data
+    const d =
+      data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : undefined
+    return {
+      ok: false,
+      msg: String(d?.description ?? j.description ?? j.msg ?? '抖音接口返回失败'),
+    }
   }
   const data = j.data
   if (data && typeof data === 'object') {
@@ -156,16 +158,31 @@ async function fetchDouyinClientToken(
   if (!res.ok) {
     throw new Error(`client_token HTTP ${res.status}：${raw.slice(0, 300)}`)
   }
-  const j = parseDouyinEnvelope(raw)
+  const trimmed = (raw ?? '').replace(/^\uFEFF/, '').trim()
+  let j: Record<string, unknown>
+  try {
+    const v = JSON.parse(trimmed || '{}') as unknown
+    if (!v || typeof v !== 'object' || Array.isArray(v)) {
+      throw new Error(`client_token 期望 JSON 对象，实际：${trimmed.slice(0, 280)}`)
+    }
+    j = v as Record<string, unknown>
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith('client_token')) throw e
+    throw new Error(`client_token 返回非 JSON（请核对 DOUYIN_OPENAPI_BASE_URL 反代是否透传 body）：${trimmed.slice(0, 280)}`)
+  }
   const err = getDataError(j)
   if (!err.ok) {
     throw new Error(err.msg ?? `client_token 业务错误`)
   }
-  const data = j.data as Record<string, unknown> | undefined
-  const token = String(data?.access_token ?? j.access_token ?? '')
-  if (!token) throw new Error('client_token 响应缺少 access_token')
-  const expiresIn = Number(data?.expires_in ?? 7200)
-  return { token, expiresIn }
+  const extracted = extractClientTokenPayload(j)
+  if (!extracted) {
+    const rootK = Object.keys(j).join(',')
+    const d = j.data
+    const dk =
+      d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d as object).join(',') : typeof d
+    throw new Error(`client_token 响应缺少 access_token（根字段: ${rootK}；data: ${dk}）`)
+  }
+  return { token: extracted.token, expiresIn: extracted.expiresIn }
 }
 
 async function ensureDouyinToken(s: DouyinMerchantSession): Promise<string> {
@@ -207,7 +224,7 @@ async function shopPoiQueryPage(
   if (!res.ok) {
     throw new Error(`shop/query HTTP ${res.status}：${raw.slice(0, 400)}`)
   }
-  const j = parseDouyinEnvelope(raw)
+  const j = parseDouyinJson(raw)
   const err = getDataError(j)
   if (!err.ok) throw new Error(err.msg ?? 'shop/query 业务错误')
   return j
@@ -235,7 +252,7 @@ async function shopPoiQuerySinglePoi(
   if (!res.ok) {
     throw new Error(`shop/query(poi_id) HTTP ${res.status}：${raw.slice(0, 400)}`)
   }
-  const j = parseDouyinEnvelope(raw)
+  const j = parseDouyinJson(raw)
   const err = getDataError(j)
   if (!err.ok) throw new Error(err.msg ?? 'shop/query(poi_id) 业务错误')
   return j
@@ -261,7 +278,7 @@ async function poiCertInfoGet(
       },
     })
     const raw = await res.text()
-    const j = parseDouyinEnvelope(raw) as Record<string, unknown>
+    const j = parseDouyinJson(raw) as Record<string, unknown>
     if (!res.ok) {
       return { ok: false, message: `cert/info HTTP ${res.status}：${raw.slice(0, 400)}` }
     }
@@ -294,7 +311,7 @@ async function poiTaskQueryGet(
       },
     })
     const raw = await res.text()
-    const j = parseDouyinEnvelope(raw) as Record<string, unknown>
+    const j = parseDouyinJson(raw) as Record<string, unknown>
     if (!res.ok) {
       return { ok: false, message: `task/query HTTP ${res.status}：${raw.slice(0, 400)}` }
     }
@@ -1083,7 +1100,7 @@ export async function handleDouyinGoodsIndustryScopeGet(
       },
     })
     const raw = await dr.text()
-    const j = parseDouyinEnvelope(raw)
+    const j = parseDouyinJson(raw)
     const data = j.data as Record<string, unknown> | undefined
     const tree = data?.category_tree_infos
     const uploadable = collectUploadableLeafCategoryIds(tree)
@@ -1537,7 +1554,7 @@ async function fetchTemplateProductAttrs(
     },
   })
   const raw = await dr.text()
-  const j = parseDouyinEnvelope(raw)
+  const j = parseDouyinJson(raw)
   if (!getDataError(j).ok) return []
   const data = j.data as Record<string, unknown> | undefined
   const arr = data?.product_attrs
@@ -1682,7 +1699,7 @@ export async function handleDouyinGoodsProductSavePost(
       body: JSON.stringify(saveBody),
     })
     const raw = await dr.text()
-    const j = parseDouyinEnvelope(raw)
+    const j = parseDouyinJson(raw)
     const bizOk = getDataError(j).ok
     const data = j.data as Record<string, unknown> | undefined
     const pid = typeof data?.product_id === 'string' ? data.product_id.trim() : ''
@@ -1825,7 +1842,7 @@ export async function fetchDouyinFinanceReconcileRows(
         },
       })
       const raw = await dr.text()
-      const j = parseDouyinEnvelope(raw)
+      const j = parseDouyinJson(raw)
       if (!dr.ok) {
         warnings.push(`抖音订单查询 HTTP ${dr.status}：${raw.slice(0, 240)}`)
         break
@@ -1965,7 +1982,7 @@ export async function fetchDouyinAkteReviews(
         },
       })
       const raw = await dr.text()
-      const j = parseDouyinEnvelope(raw)
+      const j = parseDouyinJson(raw)
       const err = getDataError(j)
       if (!dr.ok) {
         return { ok: false, message: raw.slice(0, 400) || `评价查询 HTTP ${dr.status}` }
@@ -2066,7 +2083,7 @@ export async function postDouyinAkteCommentReply(
       body: JSON.stringify(body),
     })
     const raw = await dr.text()
-    const j = parseDouyinEnvelope(raw)
+    const j = parseDouyinJson(raw)
     const err = getDataError(j)
     if (!dr.ok) {
       return { ok: false, message: raw.slice(0, 400) || `回复评价 HTTP ${dr.status}` }
