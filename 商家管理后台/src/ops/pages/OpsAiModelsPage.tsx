@@ -8,7 +8,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   catalogCustomEntriesOnly,
   isBuiltinAiVendorId,
@@ -29,8 +29,6 @@ import {
 
 export default function OpsAiModelsPage() {
   const [catalogFull, setCatalogFull] = useState<AiVendorCatalogEntry[]>([])
-  const [textModel, setTextModel] = useState<string>('qwen')
-  const [imageModel, setImageModel] = useState<string>('qwen')
   const [keys, setKeys] = useState<RegistryVendorKeys>({})
   const [updatedAt, setUpdatedAt] = useState<string>('')
   const [vkAt, setVkAt] = useState<string>('')
@@ -67,8 +65,6 @@ export default function OpsAiModelsPage() {
   const [addHint, setAddHint] = useState('')
   const [addErr, setAddErr] = useState<string | null>(null)
 
-  const allowedIds = useMemo(() => new Set(catalogFull.map((e) => e.id)), [catalogFull])
-
   const pull = useCallback(async (opts?: { background?: boolean }) => {
     const bg = !!opts?.background
     if (!bg) {
@@ -80,11 +76,6 @@ export default function OpsAiModelsPage() {
       const catRaw = Array.isArray(reg.aiVendorCatalog) ? reg.aiVendorCatalog : []
       const cat = mergeBuiltinAiVendorCatalog(catRaw)
       setCatalogFull(cat)
-      const ids = new Set(cat.map((x) => x.id))
-      const tm = reg.aiModels.textModel.trim().toLowerCase()
-      const im = reg.aiModels.imageModel.trim().toLowerCase()
-      setTextModel(ids.has(tm) ? tm : 'qwen')
-      setImageModel(ids.has(im) ? im : 'qwen')
       setUpdatedAt(reg.aiModels.updatedAt)
       setControlled(!!reg.aiModels.controlledByOps)
       if (!editingVendorKeysRef.current) {
@@ -128,7 +119,7 @@ export default function OpsAiModelsPage() {
         aiVendorCatalog: catalogCustomEntriesOnly(catalogFull),
         lastWriter: 'ops',
       })
-      await postAiModels({ textModel, imageModel, lastWriter: 'ops' })
+      await postAiModels({ textModel: 'auto', imageModel: 'auto', lastWriter: 'ops' })
       await pull()
       setEditingVendorKeys(false)
     } catch {
@@ -152,6 +143,7 @@ export default function OpsAiModelsPage() {
         aiVendorCatalog: catalogCustomEntriesOnly(catalogFull),
         lastWriter: 'ops',
       })
+      await postAiModels({ textModel: 'auto', imageModel: 'auto', lastWriter: 'ops' })
       await pull()
       setEditingVendorKeys(false)
     } catch {
@@ -198,24 +190,6 @@ export default function OpsAiModelsPage() {
     setVideoAi({ ...videoAiBaseline.current })
     setEditingVideoAi(false)
     setHint(null)
-  }
-
-  const pushModelsOnly = async (nextText: string, nextImage: string) => {
-    setHint(null)
-    const nt = nextText.trim().toLowerCase()
-    const ni = nextImage.trim().toLowerCase()
-    if (!allowedIds.has(nt) || !allowedIds.has(ni)) {
-      setHint('所选模型须在上方目录中存在，请先同步注册表后再选。')
-      return
-    }
-    setTextModel(nt)
-    setImageModel(ni)
-    try {
-      await postAiModels({ textModel: nt, imageModel: ni, lastWriter: 'ops' })
-      await pull()
-    } catch {
-      setHint('模型同步失败，请确认本后台 dev 与注册表可写。')
-    }
   }
 
   const openAddVendor = () => {
@@ -265,8 +239,6 @@ export default function OpsAiModelsPage() {
       delete n[id]
       return n
     })
-    setTextModel((t) => (t === id ? 'qwen' : t))
-    setImageModel((t) => (t === id ? 'qwen' : t))
   }
 
   return (
@@ -275,10 +247,11 @@ export default function OpsAiModelsPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">AI 模型</h1>
           <p className="mt-1 text-sm text-slate-500">
-            在此维护<strong className="text-slate-400">默认文案 / 生图模型</strong>、各厂商
-            <strong className="text-slate-400"> API Key</strong>
-            ，以及<strong className="text-slate-400">短视频（可灵 / Seedance）网关绑定</strong>
-            ；并可通过「新增 AI 供应商」扩展目录。保存后写入项目根{' '}
+            在此维护各厂商 <strong className="text-slate-400">API Key</strong>、
+            <strong className="text-slate-400">AI 供应商目录</strong>
+            ，以及 <strong className="text-slate-400">短视频（可灵 / Seedance）网关绑定</strong>
+            。商户 ERP 文案 / 生图默认<strong className="text-slate-400">自动</strong>
+            选用已配置 Key 的厂商，不再由运营台固定「默认模型」。保存后写入项目根{' '}
             <span className="font-mono text-slate-400">.meoo-dev-sync</span>，ERP 约 2.5 秒内拉取。
             商户 ERP「短视频优化」页<strong className="text-slate-400">仅选择模型与参数</strong>
             ，不在商户端暴露密钥。
@@ -385,54 +358,20 @@ export default function OpsAiModelsPage() {
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
         <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-200">
           <Sparkles className="h-4 w-4 text-violet-400" />
-          默认文案 / 生图模型
+          租户侧 AI 路由说明
         </h2>
-        <p className="mb-4 text-xs text-slate-500">
-          模型配置更新时间：{updatedAt ? new Date(updatedAt).toLocaleString('zh-CN') : '—'} · 运营接管：
+        <p className="text-xs leading-relaxed text-slate-500">
+          商户 ERP 默认<strong className="text-slate-400">自动</strong>
+          选择模型：按供应商目录顺序，优先使用<strong className="text-slate-400">已配置 Key</strong>
+          的厂商；商户可在各业务页关闭「自动」后手动指定。注册表字段{' '}
+          <span className="font-mono text-slate-400">textModel / imageModel</span> 固定为{' '}
+          <span className="font-mono text-slate-400">auto</span>
+          （保存各厂商 Key 或顶部一键保存时写入）。
+        </p>
+        <p className="mt-3 text-xs text-slate-500">
+          路由元数据更新时间：{updatedAt ? new Date(updatedAt).toLocaleString('zh-CN') : '—'} · 运营接管：
           {controlled ? '是' : '否'}
         </p>
-
-        <p className="text-xs font-medium text-indigo-200/90">默认文案模型</p>
-        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="默认文案 AI 模型">
-          {catalogFull.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={textModel === m.id}
-              onClick={() => void pushModelsOnly(m.id, imageModel)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                textModel === m.id
-                  ? 'border-indigo-500 bg-indigo-600 text-white'
-                  : 'border-slate-600 bg-slate-950 text-slate-300 hover:bg-slate-800',
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        <p className="mt-4 text-xs font-medium text-violet-200/90">默认生图模型</p>
-        <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="默认生图 AI 模型">
-          {catalogFull.map((m) => (
-            <button
-              key={`img-${m.id}`}
-              type="button"
-              role="radio"
-              aria-checked={imageModel === m.id}
-              onClick={() => void pushModelsOnly(textModel, m.id)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                imageModel === m.id
-                  ? 'border-violet-500 bg-violet-600 text-white'
-                  : 'border-slate-600 bg-slate-950 text-slate-300 hover:bg-slate-800',
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
       </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">

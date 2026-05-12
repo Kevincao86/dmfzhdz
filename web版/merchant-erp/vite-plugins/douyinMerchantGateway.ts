@@ -1527,13 +1527,13 @@ function pickProductImageAttrKey(attrs: Record<string, unknown>[]): string | nul
   return scored[0] && scored[0].score > 0 ? scored[0].key : null
 }
 
-async function fetchTemplateProductAttrs(
+async function fetchTemplateAttrsBundle(
   accountId: string,
   token: string,
   categoryId: string,
   productType: number,
-): Promise<Record<string, unknown>[]> {
-  if (!categoryId) return []
+): Promise<{ productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] }> {
+  if (!categoryId) return { productAttrs: [], skuAttrs: [] }
   const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
@@ -1548,10 +1548,220 @@ async function fetchTemplateProductAttrs(
   })
   const raw = await dr.text()
   const j = parseDouyinJson(raw)
-  if (!getDataError(j).ok) return []
+  if (!getDataError(j).ok) return { productAttrs: [], skuAttrs: [] }
   const data = j.data as Record<string, unknown> | undefined
-  const arr = data?.product_attrs
-  return Array.isArray(arr) ? (arr as Record<string, unknown>[]) : []
+  const pa = data?.product_attrs
+  const sa = data?.sku_attrs
+  return {
+    productAttrs: Array.isArray(pa) ? (pa as Record<string, unknown>[]) : [],
+    skuAttrs: Array.isArray(sa) ? (sa as Record<string, unknown>[]) : [],
+  }
+}
+
+function jsonImageUrlList(urls: string[]): string {
+  return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
+}
+
+function mergeGoodlifeProductAttrMapFromErp(
+  attrs: Record<string, unknown>[],
+  erp: Record<string, unknown>,
+  base: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...base }
+  const trade =
+    erp.trade_rules && typeof erp.trade_rules === 'object' ? (erp.trade_rules as Record<string, unknown>) : {}
+  const consume =
+    erp.consume_rules && typeof erp.consume_rules === 'object' ? (erp.consume_rules as Record<string, unknown>) : {}
+  const sales =
+    erp.sales_info && typeof erp.sales_info === 'object' ? (erp.sales_info as Record<string, unknown>) : {}
+
+  const headUrls = Array.isArray(erp.head_image_urls)
+    ? (erp.head_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
+    : []
+  const auxUrls = Array.isArray(erp.aux_image_urls)
+    ? (erp.aux_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
+    : []
+  const envUrls = Array.isArray(erp.env_image_urls)
+    ? (erp.env_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
+    : []
+  const carouselUrls = [...headUrls, ...auxUrls]
+
+  const productName = String(erp.product_name ?? '').trim()
+  const productDesc = String(erp.product_desc ?? '').trim()
+  const otherExplain = typeof consume.other === 'string' ? consume.other.trim() : ''
+  const usageBlob = [otherExplain, `交易/售卖：${JSON.stringify({ trade, sales })}`]
+    .filter((x) => x.length > 0)
+    .join('\n\n')
+    .slice(0, 12000)
+
+  const pkgJson =
+    erp.package_combo && typeof erp.package_combo === 'object'
+      ? JSON.stringify(erp.package_combo).slice(0, 120_000)
+      : ''
+
+  const imageAttrs: Record<string, unknown>[] = []
+  const otherAttrs: Record<string, unknown>[] = []
+  for (const a of attrs) {
+    const vt = String(a.value_type ?? '').toUpperCase()
+    if (vt.includes('IMAGE') || vt === 'PIC') imageAttrs.push(a)
+    else otherAttrs.push(a)
+  }
+
+  let envPool = [...envUrls]
+  const carouselPool = [...carouselUrls]
+
+  const takeCarousel = (multi: boolean): string[] => {
+    if (carouselPool.length === 0) return []
+    if (multi) {
+      const chunk = carouselPool.splice(0, 30)
+      return chunk
+    }
+    const one = carouselPool.shift()
+    return one ? [one] : []
+  }
+
+  const takeEnv = (multi: boolean): string[] => {
+    if (envPool.length === 0) return []
+    if (multi) {
+      const chunk = envPool.splice(0, 15)
+      return chunk
+    }
+    const one = envPool.shift()
+    return one ? [one] : []
+  }
+
+  for (const a of imageAttrs.sort((x, y) => Number(!!y.is_required) - Number(!!x.is_required))) {
+    const key = String(a.key ?? '').trim()
+    if (!key || out[key]) continue
+    const multi = Boolean(a.is_multi)
+    const name = String(a.name ?? '')
+    let urls: string[] = []
+    if (/环境|场景/.test(name)) urls = takeEnv(multi)
+    if (urls.length === 0) urls = takeCarousel(multi)
+    if (urls.length === 0 && headUrls[0]) urls = [headUrls[0]!]
+    if (urls.length === 0) continue
+    out[key] = jsonImageUrlList(urls)
+  }
+
+  const sorted = [...otherAttrs].sort((a, b) => Number(!!b.is_required) - Number(!!a.is_required))
+  for (const a of sorted) {
+    const key = String(a.key ?? '').trim()
+    if (!key || out[key]) continue
+    const name = String(a.name ?? '')
+    const vt = String(a.value_type ?? '').toUpperCase()
+    const req = Boolean(a.is_required)
+
+    if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || /套餐|搭配|组合/.test(name)) {
+      if (pkgJson) {
+        out[key] = pkgJson
+        continue
+      }
+    }
+
+    if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
+      if (/标题|商品名称|名称(?!规范)/.test(name) && productName) {
+        out[key] = productName.slice(0, 2000)
+        continue
+      }
+      if (/详情|图文|介绍|卖点|描述/.test(name)) {
+        const v = (productDesc || productName).slice(0, 12000)
+        if (v) {
+          out[key] = v
+          continue
+        }
+      }
+      if (/购买须知|使用说明|温馨提示|使用规则|注意事项|其他说明/.test(name)) {
+        const v = (usageBlob || productDesc || productName).slice(0, 12000)
+        if (v || req) {
+          out[key] = v || productName.slice(0, 500) || '详见商品名称'
+          continue
+        }
+      }
+      if (/券|码类型|三方|平台券/.test(name) && trade.coupon_type != null && String(trade.coupon_type).trim()) {
+        out[key] = String(trade.coupon_type).trim().slice(0, 256)
+        continue
+      }
+    }
+
+    if (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') {
+      if (/有效|天数|天/.test(name) && trade.consume_valid_days != null) {
+        const n = Math.max(0, Math.floor(Number(trade.consume_valid_days) || 0))
+        out[key] = String(n)
+        continue
+      }
+      if (/库存|数量/.test(name) && sales.stock_qty != null) {
+        const n = Math.max(0, Math.floor(Number(sales.stock_qty) || 0))
+        out[key] = String(n)
+        continue
+      }
+    }
+
+    if ((vt === 'BOOL' || vt === 'BOOLEAN') && req) {
+      out[key] = 'false'
+      continue
+    }
+
+    if (req && !out[key]) {
+      if (vt === 'STRING' || vt === 'TEXT' || vt === '' || !vt) {
+        out[key] = (productDesc || productName || '-').slice(0, 2000)
+      } else if (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') {
+        out[key] = '0'
+      }
+    }
+  }
+
+  for (const a of attrs) {
+    const key = String(a.key ?? '').trim()
+    if (!key || out[key]) continue
+    if (!Boolean(a.is_required)) continue
+    const vt = String(a.value_type ?? '').toUpperCase()
+    if (vt.includes('IMAGE') || vt === 'PIC') {
+      if (headUrls[0]) out[key] = jsonImageUrlList([headUrls[0]!])
+    } else if (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') {
+      out[key] = '0'
+    } else {
+      out[key] = (productDesc || productName || '-').slice(0, 2000)
+    }
+  }
+
+  return out
+}
+
+function mergeGoodlifeSkuAttrMapFromTemplate(
+  skuAttrs: Record<string, unknown>[],
+  productName: string,
+  actualFen: number,
+  originFen: number,
+  stockQty: number,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  const sorted = [...skuAttrs].sort((a, b) => Number(!!b.is_required) - Number(!!a.is_required))
+  for (const a of sorted) {
+    const key = String(a.key ?? '').trim()
+    if (!key || out[key]) continue
+    const name = String(a.name ?? '')
+    const vt = String(a.value_type ?? '').toUpperCase()
+    const req = Boolean(a.is_required)
+    if ((vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') && /售价|实付|现价|团购/.test(name)) {
+      out[key] = String(actualFen)
+      continue
+    }
+    if ((vt === 'INT' || vt === 'LONG') && /原价|划线/.test(name)) {
+      out[key] = String(originFen)
+      continue
+    }
+    if ((vt === 'INT' || vt === 'LONG') && /库存/.test(name)) {
+      out[key] = String(stockQty)
+      continue
+    }
+    if ((vt === 'STRING' || vt === 'TEXT') && /名称|规格/.test(name)) {
+      out[key] = productName.slice(0, 120)
+      continue
+    }
+    if (req && !out[key] && (vt === 'STRING' || vt === 'TEXT')) out[key] = productName.slice(0, 120)
+    if (req && !out[key] && (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER')) out[key] = String(actualFen)
+  }
+  return out
 }
 
 /**
@@ -1603,12 +1813,24 @@ async function buildGoodlifeProductSaveBody(
   const stockQty =
     Number.isFinite(stockQtyRaw) && stockQtyRaw > 0 ? Math.min(Math.floor(stockQtyRaw), 99_999_999) : 999_999
 
-  const attrs = await fetchTemplateProductAttrs(accountId, token, category_id, product_type)
+  const { productAttrs: attrs, skuAttrs } = await fetchTemplateAttrsBundle(
+    accountId,
+    token,
+    category_id,
+    product_type,
+  )
+  const auxUrls = Array.isArray(erp.aux_image_urls)
+    ? (erp.aux_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
+    : []
+  const carouselUrls = [...headUrls, ...auxUrls]
+
   const attr_key_value_map: Record<string, string> = {}
   const imageKey = pickProductImageAttrKey(attrs)
-  if (imageKey && headUrls.length > 0) {
-    attr_key_value_map[imageKey] = JSON.stringify(headUrls.slice(0, 30).map((url) => ({ url })))
+  if (imageKey && carouselUrls.length > 0) {
+    attr_key_value_map[imageKey] = jsonImageUrlList(carouselUrls)
   }
+
+  const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erp, attr_key_value_map)
 
   const nowMs = Date.now()
   const oneYearMs = nowMs + 366 * 86400000
@@ -1625,14 +1847,16 @@ async function buildGoodlifeProductSaveBody(
     sold_end_time: oneYearMs,
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
-  if (Object.keys(attr_key_value_map).length > 0) {
-    product.attr_key_value_map = attr_key_value_map
+  if (Object.keys(mergedProductAttrs).length > 0) {
+    product.attr_key_value_map = mergedProductAttrs
   }
   if (product_id_existing) {
     product.product_id = product_id_existing
   }
 
+  const skuAttrMap = mergeGoodlifeSkuAttrMapFromTemplate(skuAttrs, product_name, actualFen, originFen, stockQty)
   const sku: Record<string, unknown> = {
+    sku_name: product_name.slice(0, 120),
     actual_amount: actualFen,
     origin_amount: originFen,
     status: 1,
@@ -1644,6 +1868,9 @@ async function buildGoodlifeProductSaveBody(
       sold_count: 0,
       limit_type: 1,
     },
+  }
+  if (Object.keys(skuAttrMap).length > 0) {
+    sku.attr_key_value_map = skuAttrMap
   }
 
   return {
