@@ -1,11 +1,10 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import type { Session } from '@supabase/supabase-js'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
 /**
- * 路由守卫：仅判断「是否已登录」（Supabase 会话是否存在）。
- * 不再做竞态/防抖/轮询/整页刷新/租户门控等逻辑。
+ * 路由守卫：仅判断是否存在 Supabase 会话。
+ * 必须以 onAuthStateChange 为准：先并行 getSession 会在登录刚完成时读到 null，误跳 /login。
  */
 export default function RequireSupabaseAuth({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
@@ -19,18 +18,28 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     }
 
     const sb = supabase
-    const apply = (session: Session | null) => {
-      setHasSession(Boolean(session))
-      setReady(true)
-    }
-
-    void sb.auth.getSession().then(({ data }) => apply(data.session))
+    /** 已收到 Auth 管道至少一次回调（含 INITIAL_SESSION），避免仅用 getSession 竞态 */
+    const heardFromAuthRef = { current: false }
 
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
-      apply(session)
+      heardFromAuthRef.current = true
+      setHasSession(Boolean(session))
+      setReady(true)
     })
 
-    return () => sub.subscription.unsubscribe()
+    const fallbackId = window.setTimeout(() => {
+      if (heardFromAuthRef.current) return
+      void sb.auth.getSession().then(({ data }) => {
+        setHasSession(Boolean(data.session))
+        setReady(true)
+      })
+    }, 320)
+
+    return () => {
+      heardFromAuthRef.current = true
+      window.clearTimeout(fallbackId)
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
   if (!ready) {
