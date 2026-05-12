@@ -12,6 +12,8 @@ const NO_SESSION_DEBOUNCE_MS = 600
 const NO_SESSION_DEBOUNCE_BOOT_MS = 4_500
 /** 无会话时在后台轮询 getSession 的间隔（不跳转登录页，直至拿到会话） */
 const SESSION_POLL_MS = 2_000
+/** 会话守卫全屏「加载中」超过此时长则整页刷新，避免卡死或误态；不使用 replace 跳 /login */
+const LOADING_HARD_RELOAD_MS = 5_000
 
 type SessionRaceOk = { kind: 'ok'; session: Session | null }
 type SessionRaceTimeout = { kind: 'timeout' }
@@ -189,6 +191,19 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     return () => window.clearInterval(id)
   }, [sessionSyncPending])
 
+  const authLoadingNoBlock =
+    supabaseConfigured &&
+    !accessBlockMessage &&
+    (!ready || sessionSyncPending || (!allowed && !sessionSyncPending))
+
+  useEffect(() => {
+    if (!authLoadingNoBlock) return
+    const id = window.setTimeout(() => {
+      window.location.reload()
+    }, LOADING_HARD_RELOAD_MS)
+    return () => window.clearTimeout(id)
+  }, [authLoadingNoBlock])
+
   if (!ready) {
     return (
       <div className="erp-main-surface flex min-h-screen flex-col items-center justify-center gap-4">
@@ -198,6 +213,9 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
           role="status"
         />
         <p className="text-sm font-medium text-slate-600">正在加载会话…</p>
+        <p className="max-w-sm text-center text-xs text-slate-500">
+          若超过 {LOADING_HARD_RELOAD_MS / 1000} 秒仍未进入，将自动刷新本页（不会跳转登录页）。
+        </p>
       </div>
     )
   }
@@ -225,12 +243,8 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
           role="status"
         />
         <p className="text-sm font-medium text-slate-600">正在同步登录状态…</p>
-        <p className="max-w-sm text-xs text-slate-500">
-          若您已在其他标签页登录，此处会自动进入后台；也可手动
-          <Link to="/login" className="mx-1 text-cyan-600 underline underline-offset-2">
-            打开登录页
-          </Link>
-          。
+        <p className="max-w-sm text-center text-xs text-slate-500">
+          若超过 {LOADING_HARD_RELOAD_MS / 1000} 秒仍未进入，将自动刷新本页（不会跳转登录页）。
         </p>
       </div>
     )
@@ -245,6 +259,9 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
           role="status"
         />
         <p className="text-sm font-medium text-slate-600">正在准备…</p>
+        <p className="max-w-sm text-center text-xs text-slate-500">
+          若超过 {LOADING_HARD_RELOAD_MS / 1000} 秒仍未进入，将自动刷新本页（不会跳转登录页）。
+        </p>
       </div>
     )
   }
