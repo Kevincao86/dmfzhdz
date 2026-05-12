@@ -6,7 +6,7 @@
     "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 1024,
-      "includeFiles": "{src/meooRegistryShared,src/ops}/**"
+      "includeFiles": "src/**"
     }
   },
   "rewrites": [
