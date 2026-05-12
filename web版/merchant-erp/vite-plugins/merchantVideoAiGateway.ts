@@ -11,26 +11,13 @@ import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
+import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
-/**
- * 与环境变量合并：非空 env 优先生效；否则使用项目根 `.meoo-dev-sync/registry.json`
- * 运营管控台写入的 `videoAi` 与注册表内 `vendorKeys.doubao`。
- */
-export function mergeVideoAiMerchantEnv(
-  viteRoot: string | undefined,
-  base: MerchantAiEnv,
-): MerchantAiEnv {
-  const out: MerchantAiEnv = { ...base }
-  if (!viteRoot) return out
-  const registryPath = path.join(path.resolve(viteRoot, '..', '..', '.meoo-dev-sync'), 'registry.json')
-  let reg: Partial<RegistryFile>
-  try {
-    if (!fs.existsSync(registryPath)) return out
-    reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Partial<RegistryFile>
-  } catch {
-    return out
-  }
-
+/** 将注册表中的 videoAi / vendorKeys 合入 env：非空 env 优先生效（与本地 registry.json 规则一致）。 */
+function applyRegistrySliceToVideoAiEnv(
+  out: MerchantAiEnv,
+  reg: Partial<Pick<RegistryFile, 'videoAi' | 'vendorKeys'>>,
+): void {
   const vx = normalizeRegistryVideoAi(reg.videoAi)
   const vk = normalizeVendorKeysFromDisk(reg.vendorKeys)
 
@@ -62,7 +49,49 @@ export function mergeVideoAiMerchantEnv(
       out.MERCHANT_AI_QWEN_KEY = fromVendor
     }
   }
+}
 
+/**
+ * 与环境变量合并：非空 env 优先生效；否则使用项目根 `.meoo-dev-sync/registry.json`
+ * 运营管控台写入的 `videoAi` 与注册表内 `vendorKeys.doubao`。
+ */
+export function mergeVideoAiMerchantEnv(
+  viteRoot: string | undefined,
+  base: MerchantAiEnv,
+): MerchantAiEnv {
+  const out: MerchantAiEnv = { ...base }
+  if (!viteRoot) return out
+  const registryPath = path.join(path.resolve(viteRoot, '..', '..', '.meoo-dev-sync'), 'registry.json')
+  try {
+    if (!fs.existsSync(registryPath)) return out
+    const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Partial<RegistryFile>
+    applyRegistrySliceToVideoAiEnv(out, reg)
+  } catch {
+    return out
+  }
+
+  return out
+}
+
+/**
+ * 本地 registry.json 之上，再合并 Supabase `ops_registry_snapshot`（与商品 AI 同源）。
+ * 线上 Vercel 无 `.meoo-dev-sync` 时依赖此路径读取运营台「短视频 / 视频模型 API」绑定。
+ */
+export async function mergeVideoAiMerchantEnvWithSnapshot(
+  viteRoot: string | undefined,
+  base: MerchantAiEnv,
+): Promise<MerchantAiEnv> {
+  const out = mergeVideoAiMerchantEnv(viteRoot, base)
+  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
+  if (!supabaseUrl || !serviceRole) return out
+  try {
+    const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    applyRegistrySliceToVideoAiEnv(out, { videoAi: data.videoAi, vendorKeys: data.vendorKeys })
+  } catch {
+    /* 未配 Supabase 或快照不可读时保留 .env / 本地 registry 结果 */
+  }
   return out
 }
 
@@ -401,7 +430,7 @@ export async function handleMerchantAiVideoRoutes(input: {
   env: MerchantAiEnv
 }): Promise<boolean> {
   const { method, pathname, searchParams, res, bodyRaw, env: rawEnv } = input
-  const env = mergeVideoAiMerchantEnv(input.viteRoot, rawEnv)
+  const env = await mergeVideoAiMerchantEnvWithSnapshot(input.viteRoot, rawEnv)
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/config') {
     const kCfg = pickKlingCreds(env)
@@ -417,7 +446,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         qwen: qwenOk,
       },
       credentialNote:
-        '商户端仅可选择模型能力与参数；可灵密钥、方舟 Key / 视频推理接入点由运营人员在「管控台 · AI模型」中绑定（dev 落盘于项目根 .meoo-dev-sync）。',
+        '商户端仅可选择模型能力与参数；可灵密钥、方舟 Key / 视频推理接入点由运营人员在「管控台 · AI模型」中维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。',
     })
     return true
   }
