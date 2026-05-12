@@ -67,7 +67,8 @@ export async function assertTenantAccessAllowed(
   const timeoutPromise = new Promise<TenantGateResult>((resolve) => {
     timeoutId = setTimeout(() => {
       console.warn(
-        '[ERP] 校验租户状态超时（网络或 Supabase 不可达）。本次暂时允许进入；请检查 VITE_SUPABASE_URL 与网络。',
+        '[ERP] 校验租户状态超时：对 PostgREST `GET …/rest/v1/tenant_members`（与 `auth.getSession`）的等待已超过',
+        `${timeoutMs}ms。多为到 Supabase 的 HTTPS 慢或被拦截。本次暂时允许进入；若需严格校验请检查网络与 VITE_SUPABASE_URL。`,
       )
       resolve({ ok: true })
     }, timeoutMs)

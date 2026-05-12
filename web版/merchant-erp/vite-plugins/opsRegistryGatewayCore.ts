@@ -5,6 +5,7 @@
 import {
   catalogCustomEntriesOnly,
   mergeBuiltinAiVendorCatalog,
+  normalizeCatalogLogoUrl,
   normalizeVendorKeysFromDisk,
 } from '../src/lib/aiVendorCatalogShared.js'
 import type {
@@ -30,7 +31,8 @@ function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVend
     if (!id) continue
     const label = typeof r.label === 'string' && r.label.trim() ? r.label.trim() : id
     const hint = typeof r.hint === 'string' && r.hint.trim() ? r.hint.trim().slice(0, 280) : undefined
-    out.push({ id, label: label.slice(0, 64), hint })
+    const logoUrl = normalizeCatalogLogoUrl(r.logoUrl)
+    out.push({ id, label: label.slice(0, 64), hint, ...(logoUrl ? { logoUrl } : {}) })
   }
   return catalogCustomEntriesOnly(out)
 }

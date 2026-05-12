@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import AiVendorCatalogAvatar from './AiVendorCatalogAvatar'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalogClient'
@@ -24,7 +25,7 @@ import {
 
 export type AiModelAutoPickerKind = 'text' | 'image'
 
-export type AiModelAutoPickerOption = { id: string; label: string; hint?: string }
+export type AiModelAutoPickerOption = { id: string; label: string; hint?: string; logoUrl?: string }
 
 type AiModelAutoPickerProps = {
   kind: AiModelAutoPickerKind
@@ -43,6 +44,10 @@ type AiModelAutoPickerProps = {
 
 function labelForId(options: readonly AiModelAutoPickerOption[], id: string): string {
   return options.find((o) => o.id === id)?.label ?? id
+}
+
+function optionById(options: readonly AiModelAutoPickerOption[], id: string): AiModelAutoPickerOption | undefined {
+  return options.find((o) => o.id === id)
 }
 
 export default function AiModelAutoPicker({
@@ -111,10 +116,18 @@ export default function AiModelAutoPicker({
       ? `自动 · ${labelForId(options, effectiveId)}`
       : labelForId(options, manualId)
 
+  const manualOpt = optionById(options, manualId)
+  const effectiveOpt = optionById(options, effectiveId)
+
   const filteredOptions = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return [...options]
-    return options.filter((o) => o.label.toLowerCase().includes(q) || o.id.toLowerCase().includes(q))
+    return options.filter(
+      (o) =>
+        o.label.toLowerCase().includes(q) ||
+        o.id.toLowerCase().includes(q) ||
+        (o.hint && o.hint.toLowerCase().includes(q)),
+    )
   }, [options, search])
 
   const setAuto = (next: boolean) => {
@@ -175,6 +188,17 @@ export default function AiModelAutoPicker({
         </div>
       ) : null}
 
+      {inlineAuto && auto && options.length > 0 ? (
+        <div
+          className="flex max-w-[10.5rem] items-center gap-0.5 overflow-hidden rounded-full border border-gray-100 bg-white/95 px-1.5 py-1 shadow-sm sm:max-w-[14rem]"
+          title={options.map((o) => o.label).join('、')}
+        >
+          {options.map((o) => (
+            <AiVendorCatalogAvatar key={o.id} id={o.id} label={o.label} logoUrl={o.logoUrl} size="xs" />
+          ))}
+        </div>
+      ) : null}
+
       <button
         type="button"
         disabled={disabled}
@@ -190,7 +214,25 @@ export default function AiModelAutoPicker({
           disabled && 'cursor-not-allowed opacity-60',
         )}
       >
-        <span className="truncate">{triggerLabel}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-2 truncate">
+          {!auto && manualOpt ? (
+            <AiVendorCatalogAvatar
+              id={manualOpt.id}
+              label={manualOpt.label}
+              logoUrl={manualOpt.logoUrl}
+              size="xs"
+            />
+          ) : null}
+          {showInlineAutoToggle ? null : auto && effectiveOpt ? (
+            <AiVendorCatalogAvatar
+              id={effectiveOpt.id}
+              label={effectiveOpt.label}
+              logoUrl={effectiveOpt.logoUrl}
+              size="xs"
+            />
+          ) : null}
+          <span className="truncate">{triggerLabel}</span>
+        </span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 opacity-70', open && 'rotate-180')} aria-hidden />
       </button>
 
@@ -239,10 +281,25 @@ export default function AiModelAutoPicker({
               </div>
             </div>
           ) : auto ? (
-            <p className="border-b border-gray-100 px-3 pb-2 text-[11px] leading-snug text-gray-500">
-              已开启自动：按目录顺序优先使用<strong className="font-medium text-gray-700"> 已配置 API Key</strong>
-              的厂商；关闭「自动」后可搜索并指定模型。
-            </p>
+            <div className="space-y-2 border-b border-gray-100 px-3 pb-2">
+              <p className="text-[11px] leading-snug text-gray-500">
+                已开启自动：按目录顺序优先使用<strong className="font-medium text-gray-700"> 已配置 API Key</strong>
+                的厂商；关闭「自动」后可搜索并指定模型。
+              </p>
+              {options.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {options.map((o) => (
+                    <div
+                      key={o.id}
+                      className="flex items-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50/90 px-2 py-1"
+                    >
+                      <AiVendorCatalogAvatar id={o.id} label={o.label} logoUrl={o.logoUrl} size="sm" />
+                      <span className="text-xs font-medium text-gray-800">{o.label}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           {!auto ? (
@@ -257,19 +314,29 @@ export default function AiModelAutoPicker({
                     type="button"
                     onClick={() => pickModel(m.id)}
                     className={cn(
-                      'flex w-full items-center rounded-lg px-2 py-1.5 text-left text-xs font-medium text-gray-800 hover:bg-gray-50',
-                      effectiveId === m.id && 'bg-indigo-50 text-indigo-900',
+                      'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-gray-800 hover:bg-gray-50',
+                      effectiveId === m.id &&
+                        (kind === 'text' ? 'bg-indigo-50 text-indigo-900' : 'bg-violet-50 text-violet-900'),
                     )}
                   >
-                    {m.label}
+                    <AiVendorCatalogAvatar id={m.id} label={m.label} logoUrl={m.logoUrl} size="sm" />
+                    <span className="min-w-0 flex-1 truncate">{m.label}</span>
                   </button>
                 ))
               )}
             </div>
           ) : null}
 
-          <p className="mt-1 border-t border-gray-50 px-3 pt-2 text-[10px] text-gray-400">
-            当前请求将使用：{labelForId(options, effectiveId)}
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-gray-50 px-3 pt-2 text-[10px] text-gray-400">
+            <span>当前请求将使用：</span>
+            {effectiveOpt ? (
+              <>
+                <AiVendorCatalogAvatar id={effectiveOpt.id} label={effectiveOpt.label} logoUrl={effectiveOpt.logoUrl} size="xs" />
+                <span className="font-medium text-gray-600">{effectiveOpt.label}</span>
+              </>
+            ) : (
+              <span className="font-medium text-gray-600">{labelForId(options, effectiveId)}</span>
+            )}
           </p>
         </div>
       ) : null}

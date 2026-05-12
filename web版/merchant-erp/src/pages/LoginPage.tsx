@@ -44,6 +44,15 @@ const POSTER_SLIDES = [
 
 const CAROUSEL_MS = 5200
 
+/** Supabase Auth 在部分网络下可能长时间无响应；超时后提示用户而非永久「登录中…」 */
+const SIGN_IN_TIMEOUT_MS = 28_000
+
+function rejectAfter(ms: number, reason: string): Promise<never> {
+  return new Promise((_, reject) => {
+    window.setTimeout(() => reject(new Error(reason)), ms)
+  })
+}
+
 /**
  * 登录页：大屏左侧表单、右侧品牌海报轮播；小屏纵向堆叠。
  */
@@ -76,16 +85,32 @@ export default function LoginPage() {
       return
     }
     const sb = supabase
-    void sb.auth.getSession().then(async ({ data }) => {
-      if (!data.session) return
-      const gate = await assertTenantAccessAllowed(sb)
-      if (!gate.ok) {
-        await sb.auth.signOut()
-        setErr(gate.message)
-        return
+    const probeSession = async () => {
+      try {
+        const wrap = await Promise.race([
+          sb.auth.getSession(),
+          rejectAfter(18_000, 'get_session_probe_timeout'),
+        ])
+        const { data } = wrap as Awaited<ReturnType<typeof sb.auth.getSession>>
+        if (!data.session) return
+        const gate = await assertTenantAccessAllowed(sb)
+        if (!gate.ok) {
+          await sb.auth.signOut()
+          setErr(gate.message)
+          return
+        }
+        navigate('/', { replace: true })
+      } catch (e) {
+        if (e instanceof Error && e.message === 'get_session_probe_timeout') {
+          console.warn(
+            '[ERP] 登录页：getSession 超时（请求 Supabase Auth 会话接口，多为到 *.supabase.co 的 HTTPS 慢或不可达）',
+          )
+          return
+        }
+        console.error('[ERP] 登录页会话探测失败', e)
       }
-      navigate('/', { replace: true })
-    })
+    }
+    void probeSession()
   }, [navigate])
 
   useEffect(() => {
@@ -113,7 +138,28 @@ export default function LoginPage() {
     try {
       const sb = supabase
       const email = loginNameToTenantEmail(name)
-      const { error } = await sb.auth.signInWithPassword({ email, password })
+      /**
+       * 登录涉及的网络请求（均在 VITE_SUPABASE_URL 主机上，一般为 *.supabase.co）：
+       * 1) POST …/auth/v1/token?grant_type=password — 账号密码校验（此前无超时，弱网会一直「登录中…」）
+       * 2) 成功后 assertTenantAccessAllowed：getSession + GET …/rest/v1/tenant_members（默认约 12s 内会放弃等待并放行或失败）
+       */
+      let signInResult: Awaited<ReturnType<typeof sb.auth.signInWithPassword>>
+      try {
+        signInResult = await Promise.race([
+          sb.auth.signInWithPassword({ email, password }),
+          rejectAfter(SIGN_IN_TIMEOUT_MS, 'sign_in_timeout'),
+        ])
+      } catch (e) {
+        if (e instanceof Error && e.message === 'sign_in_timeout') {
+          setErr(
+            '登录请求超时：本步对应 Supabase「身份认证」接口（浏览器访问 `…/auth/v1/token`，HTTPS）。常见原因：当前网络到海外节点延迟高、丢包、DNS 异常，或防火墙/代理拦截。成功登录后还会请求同一域名下的 `…/rest/v1/tenant_members` 校验商户状态。可尝试切换网络、关闭系统代理或让管理员放行 *.supabase.co。',
+          )
+          return
+        }
+        setErr(e instanceof Error ? e.message : '登录失败，请重试')
+        return
+      }
+      const { error } = signInResult
       if (error) {
         setErr(error.message.includes('Invalid login') ? '账号或密码错误' : error.message)
         return

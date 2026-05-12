@@ -8,10 +8,44 @@ export function isValidAiVendorSlug(id: string): boolean {
   return /^[a-z][a-z0-9_-]{1,47}$/.test(id)
 }
 
+/** 仅允许 https 或相对路径（商户 ERP 静态资源），避免 javascript: 等注入 */
+export function normalizeCatalogLogoUrl(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const t = raw.trim()
+  if (!t || t.length > 512) return undefined
+  if (t.startsWith('/')) {
+    if (t.startsWith('//')) return undefined
+    if (/[\s<>"'`]/.test(t)) return undefined
+    return t
+  }
+  try {
+    const u = new URL(t)
+    if (u.protocol !== 'https:') return undefined
+    return t
+  } catch {
+    return undefined
+  }
+}
+
 export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
-  { id: 'minimax', label: 'MiniMax', hint: 'platform.minimax.io · OpenAI 兼容' },
-  { id: 'qwen', label: '通义千问', hint: '阿里云 DashScope / 通义' },
-  { id: 'doubao', label: '豆包', hint: '火山引擎方舟 Ark' },
+  {
+    id: 'minimax',
+    label: 'MiniMax',
+    hint: 'platform.minimax.io · OpenAI 兼容',
+    logoUrl: '/ai-vendors/minimax.svg',
+  },
+  {
+    id: 'qwen',
+    label: '通义千问',
+    hint: '阿里云 DashScope / 通义',
+    logoUrl: '/ai-vendors/qwen.svg',
+  },
+  {
+    id: 'doubao',
+    label: '豆包',
+    hint: '火山引擎方舟 Ark',
+    logoUrl: '/ai-vendors/doubao.svg',
+  },
 ]
 
 const BUILTIN_ID_SET = new Set<string>(BUILTIN_AI_VENDOR_IDS)
@@ -32,8 +66,9 @@ export function mergeBuiltinAiVendorCatalog(custom: AiVendorCatalogEntry[] | und
     if (isBuiltinAiVendorId(id)) continue
     const label = typeof e.label === 'string' && e.label.trim() ? e.label.trim() : id
     const hint = typeof e.hint === 'string' && e.hint.trim() ? e.hint.trim().slice(0, 280) : undefined
+    const logoUrl = normalizeCatalogLogoUrl(e.logoUrl)
     seen.add(id)
-    out.push({ id, label: label.slice(0, 64), hint })
+    out.push({ id, label: label.slice(0, 64), hint, ...(logoUrl ? { logoUrl } : {}) })
   }
   return out
 }
