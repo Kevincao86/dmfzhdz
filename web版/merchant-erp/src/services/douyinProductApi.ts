@@ -41,6 +41,16 @@ function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   return out
 }
 
+/**
+ * 未部署的 /api 常落到 SPA（HTML）或纯 404 页；JSON 多为网关或抖音上游业务响应，不应再换 URL 重试。
+ */
+function isLikelyRouteMiss404(res: Response, trimBody: string, contentType: string): boolean {
+  if (res.status !== 404) return false
+  const t = trimBody
+  if (/application\/json/i.test(contentType) || t.startsWith('{') || t.startsWith('[')) return false
+  return true
+}
+
 function authHeaders(): HeadersInit {
   const token = readMerchantSession('meoo_douyin_merchant_token')
   const h: Record<string, string> = {
@@ -401,7 +411,7 @@ export async function postDouyinGoodsProductSync(productId: string): Promise<Pro
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
     const trim = text.trimStart()
-    if (res.status === 404) continue
+    if (isLikelyRouteMiss404(res, trim, ct)) continue
     if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
     let data: Record<string, unknown> = {}
     try {
@@ -410,10 +420,12 @@ export async function postDouyinGoodsProductSync(productId: string): Promise<Pro
       data = {}
     }
     if (!res.ok) {
-      return {
-        ok: false,
-        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
-      }
+      const msg =
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.description === 'string' && data.description) ||
+        (typeof data.err_msg === 'string' && data.err_msg) ||
+        `HTTP ${res.status}`
+      return { ok: false, message: msg }
     }
     return {
       ok: true,
@@ -1234,10 +1246,12 @@ function mapDouyinGoodsTemplatePayload(
 
 function parseProductSaveResponse(res: Response, data: Record<string, unknown>): ProductSaveResult {
   if (!res.ok) {
-    return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
-    }
+    const msg =
+      (typeof data.message === 'string' && data.message) ||
+      (typeof data.description === 'string' && data.description) ||
+      (typeof data.err_msg === 'string' && data.err_msg) ||
+      `HTTP ${res.status}`
+    return { ok: false, message: msg }
   }
   const inner = data.data as Record<string, unknown> | undefined
   if (!inner || typeof inner !== 'object') {
@@ -1285,7 +1299,7 @@ export async function postDouyinGoodsProductSave(params: {
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
     const trim = text.trimStart()
-    if (res.status === 404) continue
+    if (isLikelyRouteMiss404(res, trim, ct)) continue
     if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
     let data: Record<string, unknown> = {}
     try {
