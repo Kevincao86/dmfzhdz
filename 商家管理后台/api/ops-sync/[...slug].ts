@@ -2,8 +2,8 @@
  * Vercel：/api/ops-sync/* 注册表（Supabase ops_registry_snapshot），与 ERP 拉取同源。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../meooRegistrySnapshotIo'
-import { sendOpsJson } from '../safeOpsJson'
+import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../meooRegistrySnapshotIo.js'
+import { sendOpsJson } from '../safeOpsJson.js'
 
 export const config = { maxDuration: 60 }
 

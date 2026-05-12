@@ -3,8 +3,8 @@
  * ERP / 运营台拉注册表应优先请求本路径（跨域已设 CORS）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from './meooRegistrySnapshotIo'
-import { sendOpsJson } from './safeOpsJson'
+import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from './meooRegistrySnapshotIo.js'
+import { sendOpsJson } from './safeOpsJson.js'
 
 export const config = { maxDuration: 60 }
 
