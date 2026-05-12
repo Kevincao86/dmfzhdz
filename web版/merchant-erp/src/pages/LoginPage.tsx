@@ -111,6 +111,11 @@ export default function LoginPage() {
         setErr(error.message.includes('Invalid login') ? '账号或密码错误' : error.message)
         return
       }
+      const { data: after } = await sb.auth.getSession()
+      if (!after.session) {
+        setErr('登录已成功，但未读到会话。请刷新本页或稍后再试。')
+        return
+      }
       navigate('/', { replace: true })
     } finally {
       setBusy(false)
