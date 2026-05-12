@@ -1184,19 +1184,7 @@ function mapDouyinGoodsTemplatePayload(
   }
 }
 
-export async function postDouyinGoodsProductSave(params: {
-  mode: 'draft' | 'submit'
-  detail: DouyinProductDetailPayload
-}): Promise<ProductSaveResult> {
-  const res = await fetch(url('/api/merchant/douyin/goods/product/save'), {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      mode: params.mode,
-      product: params.detail,
-    }),
-  })
-  const data = await parseJson(res)
+function parseProductSaveResponse(res: Response, data: Record<string, unknown>): ProductSaveResult {
   if (!res.ok) {
     return {
       ok: false,
@@ -1228,4 +1216,35 @@ export async function postDouyinGoodsProductSave(params: {
     product_id,
     message: message ?? '已同步至抖音来客商品库（goodlife/v1/goods/product/save/ 成功）。',
   }
+}
+
+/** 与类目/线上搜品同源：优先顶层 meoo，避开生产环境深层 /api/merchant/* 404 */
+export async function postDouyinGoodsProductSave(params: {
+  mode: 'draft' | 'submit'
+  detail: DouyinProductDetailPayload
+}): Promise<ProductSaveResult> {
+  const bodyStr = JSON.stringify({
+    mode: params.mode,
+    product: params.detail,
+  })
+  const headers = authHeaders()
+  const paths = ['/api/meoo-douyin-goods-product-save', '/api/merchant/douyin/goods/product/save'] as const
+  for (const p of paths) {
+    const res = await fetch(url(p), { method: 'POST', headers, body: bodyStr })
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (res.status === 404) continue
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    return parseProductSaveResponse(res, data)
+  }
+  const res = await fetch(url(paths[1]), { method: 'POST', headers, body: bodyStr })
+  const data = await parseJson(res)
+  return parseProductSaveResponse(res, data)
 }
