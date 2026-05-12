@@ -2,8 +2,8 @@
  * 运营台注册表「轻量 POST」共用：AI Key / 模型 / 短视频网关等独立路由，避免走 catch-all 时加载整份 dispatch。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch } from './meooRegistrySnapshotIo'
-import { sendOpsJson } from './safeOpsJson'
+import { createRegistrySnapshotIoFetch } from './meooRegistrySnapshotIo.js'
+import { sendOpsJson } from './safeOpsJson.js'
 import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo'
 
 export const opsRegistrySyncLiteFnConfig = { maxDuration: 60 }
