@@ -3,8 +3,11 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
-/** 应大于 assertTenantAccessAllowed 内超时 + getSession 余量，避免误杀仍在校验中的会话 */
-const AUTH_BOOTSTRAP_MAX_WAIT_MS = 20_000
+/**
+ * 须覆盖：getSession 慢 + assertTenantAccessAllowed 内 Promise.race 最长约 12s + 余量。
+ * 首屏改为「先 await getSession 再订阅」后，整体可能略长于原先并行方案。
+ */
+const AUTH_BOOTSTRAP_MAX_WAIT_MS = 45_000
 
 export default function RequireSupabaseAuth({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
@@ -22,20 +25,42 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     let cancelled = false
     let gateGen = 0
     let bootResolved = false
+    /** 在异步 bootstrap 完成后再赋值，供 cleanup 取消订阅 */
+    let authSubscription: ReturnType<typeof sb.auth.onAuthStateChange>['data'] | null = null
 
     const markBootResolved = () => {
       bootResolved = true
     }
 
-    const applySession = async (hasSession: boolean) => {
+    /**
+     * 在判定「无会话」前做一次短时重读：部分环境下 storage 尚未灌入内存时 getSession 会先返回 null，
+     * 与 INITIAL_SESSION 竞态同源；仅对「当前判定为无 session」做补救，避免误踢回登录页。
+     */
+    const reconfirmHasSession = async (): Promise<boolean> => {
+      let { data } = await sb.auth.getSession()
+      if (data.session) return true
+      await new Promise((r) => setTimeout(r, 100))
+      ;({ data } = await sb.auth.getSession())
+      return Boolean(data.session)
+    }
+
+    const applySession = async (hasSessionHint: boolean) => {
       const gen = ++gateGen
       if (cancelled) return
-      if (!hasSession) {
+
+      let has = hasSessionHint
+      if (!has) {
+        has = await reconfirmHasSession()
+        if (cancelled || gen !== gateGen) return
+      }
+
+      if (!has) {
         markBootResolved()
         setAllowed(false)
         setReady(true)
         return
       }
+
       const gate = await assertTenantAccessAllowed(sb)
       if (cancelled || gen !== gateGen) return
       if (!gate.ok) {
@@ -50,30 +75,6 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       setAllowed(true)
       setReady(true)
     }
-
-    /**
-     * 首屏必须以 getSession() 为准：订阅 onAuthStateChange 时，部分环境会先同步派发
-     * INITIAL_SESSION 且 session 为 null，若此时立刻 applySession(false)，会在 getSession 尚未返回
-     * 有效会话前把用户踢回登录页（表现为「加载会话」后立刻回弹登录）。
-     * 后续 TOKEN_REFRESHED / SIGNED_IN / SIGNED_OUT 等仍照常处理。
-     */
-    void sb.auth
-      .getSession()
-      .then(({ data }) => {
-        if (cancelled) return
-        void applySession(Boolean(data.session))
-      })
-      .catch((e) => {
-        console.error('[ERP] getSession 失败', e)
-        if (cancelled) return
-        void applySession(false)
-      })
-
-    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return
-      if (event === 'INITIAL_SESSION') return
-      void applySession(Boolean(session))
-    })
 
     let visTimer: ReturnType<typeof setTimeout> | undefined
     const onVis = () => {
@@ -91,7 +92,9 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     const emergencyId = window.setTimeout(() => {
       if (cancelled || bootResolved) return
       bootResolved = true
-      console.warn('[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及本地 Supabase 是否已启动。')
+      console.warn(
+        '[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及浏览器是否拦截第三方 Cookie。',
+      )
       setAllowed(false)
       setReady(true)
       navigate('/login', {
@@ -100,11 +103,31 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       })
     }, AUTH_BOOTSTRAP_MAX_WAIT_MS)
 
+    void (async () => {
+      try {
+        const { data } = await sb.auth.getSession()
+        if (cancelled) return
+        await applySession(Boolean(data.session))
+      } catch (e) {
+        console.error('[ERP] getSession 失败', e)
+        if (!cancelled) await applySession(false)
+      }
+      if (cancelled) return
+
+      const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+        if (cancelled) return
+        /** 首屏已由上方 await getSession + applySession 处理，避免与「先 null 后恢复」竞态 */
+        if (event === 'INITIAL_SESSION') return
+        void applySession(Boolean(session))
+      })
+      authSubscription = sub
+    })()
+
     return () => {
       cancelled = true
       clearTimeout(visTimer)
       window.clearTimeout(emergencyId)
-      sub.subscription.unsubscribe()
+      authSubscription?.subscription.unsubscribe()
       document.removeEventListener('visibilitychange', onVis)
     }
   }, [navigate])
