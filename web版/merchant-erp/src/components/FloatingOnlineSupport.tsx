@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { cn } from '../cn'
 import {
   formatSupportRelayTime,
+  getOrCreateSupportRelayGuestFingerprint,
   getOrCreateSupportRelaySessionId,
   getSupportRelayWsUrl,
   type SupportRelayChatLine,
@@ -102,15 +103,9 @@ export default function FloatingOnlineSupport({
         return { ok: true }
       }
       if (supabaseConfigured && supabase) {
-        const { data } = await supabase.auth.getUser()
-        const uid = data.user?.id
-        if (!uid) {
-          return {
-            ok: false,
-            detail: '请先登录商户账号后再使用在线客服云端同步。',
-          }
-        }
-        const { error } = await supabase.from('support_relay_messages').insert({
+        const { data: auth } = await supabase.auth.getUser()
+        const uid = auth.user?.id ?? null
+        const row: Record<string, unknown> = {
           session_id: sessionIdRef.current,
           customer_id: customerIdRef.current.trim() || null,
           enterprise_name: enterpriseNameRef.current.trim() || null,
@@ -118,16 +113,24 @@ export default function FloatingOnlineSupport({
           text,
           ts: Date.now(),
           client_msg_id: id,
-          author_user_id: uid,
-        })
+        }
+        if (uid) {
+          row.author_user_id = uid
+        } else {
+          row.author_user_id = null
+          row.guest_fingerprint = getOrCreateSupportRelayGuestFingerprint()
+        }
+        const { error } = await supabase.from('support_relay_messages').insert(row as never)
         if (error) {
           console.warn('[support_relay_messages]', error.message, error.code ?? '')
           const hint =
             error.code === '42P01' || /relation|does not exist/i.test(error.message)
               ? '数据库缺少表：请在 Supabase SQL Editor 执行迁移文件 supabase/migrations/20260511120000_support_relay_messages.sql（或运行合并脚本 cloud_apply_all.sql 中的对应段落）。'
               : error.code === '42501' || /row-level security|RLS/i.test(error.message)
-                ? '无写入权限（RLS）：请确认已执行上述迁移中的策略，且当前账号已登录。'
-                : ''
+                ? '无写入权限（RLS）：请确认已执行客服相关迁移（含登录页访客策略），且当前网络可访问 Supabase。'
+                : /guest_fingerprint|support_relay_guest_fetch_session|PGRST202/i.test(error.message)
+                  ? '请执行迁移 supabase/migrations/20260514100000_support_relay_guest_login_page.sql 以启用登录页在线客服同步。'
+                  : ''
           return {
             ok: false,
             detail: [error.message, error.code ? `code=${error.code}` : '', hint].filter(Boolean).join(' '),
@@ -259,6 +262,31 @@ export default function FloatingOnlineSupport({
     type RelayRow = { from_role: string; text: string; ts: number; client_msg_id: string }
 
     const fetchSessionRows = async (): Promise<RelayRow[] | null> => {
+      const { data: auth } = await client.auth.getUser()
+      const uid = auth.user?.id ?? null
+
+      if (!uid) {
+        const fp = getOrCreateSupportRelayGuestFingerprint()
+        const { data, error } = await client.rpc('support_relay_guest_fetch_session', {
+          p_session_id: sid,
+          p_guest_fingerprint: fp,
+        })
+        if (error) {
+          console.warn('[support_relay_guest_fetch_session]', error.message, error.code ?? '')
+          return null
+        }
+        const raw = Array.isArray(data) ? data : []
+        return raw.map((r): RelayRow => {
+          const row = r as Record<string, unknown>
+          return {
+            from_role: String(row.from_role ?? ''),
+            text: String(row.text ?? ''),
+            ts: Number(row.ts ?? 0),
+            client_msg_id: String(row.client_msg_id ?? ''),
+          }
+        })
+      }
+
       const { data: rows, error } = await client
         .from('support_relay_messages')
         .select('from_role,text,ts,client_msg_id')

@@ -32,6 +32,29 @@ export async function fetchPrimaryTenantId(supabase: SupabaseClient): Promise<st
   return data.tenant_id as string
 }
 
+/** 正式版服务到期（运营确认到账后写入 tenants.service_expire_at） */
+export async function fetchTenantServiceExpireAt(
+  supabase: SupabaseClient,
+): Promise<{ tenantId: string | null; serviceExpireAt: string | null }> {
+  const tenantId = await fetchPrimaryTenantId(supabase)
+  if (!tenantId) return { tenantId: null, serviceExpireAt: null }
+
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('service_expire_at')
+    .eq('id', tenantId)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingDbObjectError(error.message)) return { tenantId, serviceExpireAt: null }
+    throw error
+  }
+
+  const raw = data?.service_expire_at
+  const serviceExpireAt = typeof raw === 'string' && raw.trim() ? raw.trim() : null
+  return { tenantId, serviceExpireAt }
+}
+
 export async function fetchTenantWalletSummary(supabase: SupabaseClient, tenantId: string) {
   let balance = 0
   let expire: string | null = null
