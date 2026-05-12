@@ -3,11 +3,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export type TenantGateResult = { ok: true } | { ok: false; message: string }
 
 const DEFAULT_GATE_TIMEOUT_MS = 12_000
+/** 登录/跳转首屏时 getSession 可能晚一拍于 SIGNED_IN，短暂重试避免误判未登录并 signOut */
+const GET_SESSION_RETRY_MS = 120
+const GET_SESSION_RETRY_ATTEMPTS = 4
 
 async function assertTenantAccessAllowedCore(supabase: SupabaseClient): Promise<TenantGateResult> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  let session = (await supabase.auth.getSession()).data.session
+  for (let i = 0; !session && i < GET_SESSION_RETRY_ATTEMPTS; i++) {
+    await new Promise((r) => setTimeout(r, GET_SESSION_RETRY_MS))
+    session = (await supabase.auth.getSession()).data.session
+  }
   if (!session) return { ok: false, message: '未登录' }
 
   const { data: rows, error } = await supabase
