@@ -104,7 +104,7 @@ function isLikelyWhitelistIpReject(detail: string): boolean {
   return /IP[^\s]*不在白名单|whitelist|白名单/i.test(detail)
 }
 
-function whitelistDeployHint(): string {
+function whitelistDeployHint(detail: string): string {
   const relay = process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
   const oauth = process.env.DOUYIN_OPENAPI_OAUTH_BASE_URL?.trim()
   const oauthIsOfficialOnly =
@@ -115,6 +115,9 @@ function whitelistDeployHint(): string {
   }
   if (!relay) {
     return ' 开放平台白名单对应「请求抖音时的来源 IP」：Vercel/Serverless 出口与控制台报备 EIP 不一致。请在部署环境设置 DOUYIN_OPENAPI_BASE_URL 为 EIP 上反代 https://open.douyin.com 的根路径（与同机「服务器 IP 白名单」一致）；配置后 OAuth 与同出口同源，无需单独设 OAUTH_URL。'
+  }
+  if (relay && isLikelyWhitelistIpReject(detail)) {
+    return ' 已配置 EIP 中继仍出现 IP 白名单时：多为 goodlife 经中继返回了 HTML，请求回落到官方域名后出口变为 Vercel。请修正 Nginx：`location /douyin/` 使用 `proxy_pass https://open.douyin.com/;`，且 GET 必须保留查询串；或为开放平台白名单补充 Vercel 出口网段。'
   }
   return ''
 }
@@ -292,10 +295,17 @@ export async function runDouyinMerchantBind(
         ? e.message
         : String(e)
     const whitelistHint =
-      detail && !aborted && isLikelyWhitelistIpReject(detail) ? whitelistDeployHint() : ''
+      detail && !aborted && isLikelyWhitelistIpReject(detail) ? whitelistDeployHint(detail) : ''
+    const relayHtmlHint =
+      detail &&
+      !aborted &&
+      /返回 HTML|HTML 而非 JSON/i.test(detail) &&
+      process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
+        ? ' 根因多为 Nginx 未把 GET /douyin/goodlife/... 转到 open.douyin.com（须 proxy_pass https://open.douyin.com/; 且勿只配 POST）。部署本版本后若中继仍返回 HTML，会再试官方一次；官方若报 IP 白名单，请先修好中继使 goodlife 从 EIP 出站。'
+        : ''
     return {
       statusCode: 502,
-      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}` },
+      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}${relayHtmlHint}` },
     }
   }
 }
