@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Cpu, MapPin, ShieldCheck, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
 import { cn } from '../cn'
 import FloatingOnlineSupport from '../components/FloatingOnlineSupport'
-import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../lib/tenantAuthEmail'
 import { PosterDataArt, PosterFutureArt, PosterLocalLifeArt } from './login/LoginPosterArt'
@@ -76,16 +75,9 @@ export default function LoginPage() {
       return
     }
     const sb = supabase
-    void sb.auth.getSession().then(async ({ data }) => {
+    void sb.auth.getSession().then(({ data }) => {
       if (!data.session) return
-      const gate = await assertTenantAccessAllowed(sb)
-      if (!gate.ok) {
-        await sb.auth.signOut()
-        setErr(gate.message)
-        return
-      }
-      /** 整页进入后台，避免 SPA 内跳转时会话未就绪（与加载超 5 秒刷新同一思路） */
-      window.location.assign(new URL(import.meta.env.BASE_URL, window.location.origin).href)
+      navigate('/', { replace: true })
     })
   }, [navigate])
 
@@ -119,19 +111,7 @@ export default function LoginPage() {
         setErr(error.message.includes('Invalid login') ? '账号或密码错误' : error.message)
         return
       }
-      const { data: sessWrap } = await sb.auth.getSession()
-      if (!sessWrap.session) {
-        setErr('会话尚未写入，请稍候再点一次「登录」或刷新页面后重试')
-        return
-      }
-      const gate = await assertTenantAccessAllowed(sb)
-      if (!gate.ok) {
-        await sb.auth.signOut()
-        setErr(gate.message)
-        return
-      }
-      /** 登录成功后整页打开工作台，不 client-side navigate，避免退回登录页 */
-      window.location.assign(new URL(import.meta.env.BASE_URL, window.location.origin).href)
+      navigate('/', { replace: true })
     } finally {
       setBusy(false)
     }
