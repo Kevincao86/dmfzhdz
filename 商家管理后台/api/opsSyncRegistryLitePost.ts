@@ -4,7 +4,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createRegistrySnapshotIoFetch } from './meooRegistrySnapshotIo.js'
 import { sendOpsJson } from './safeOpsJson.js'
-import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo'
+import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo.js'
 
 export const opsRegistrySyncLiteFnConfig = { maxDuration: 60 }
 

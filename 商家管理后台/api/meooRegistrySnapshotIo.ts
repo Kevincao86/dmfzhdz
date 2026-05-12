@@ -2,9 +2,9 @@
  * Supabase public.ops_registry_snapshot：Service Role + fetch PostgREST（无 supabase-js）。
  * normalize / persist 对 opsRegistryGatewayCore 使用动态 import，减轻 GET 注册表冷启动体积，降低 FUNCTION_INVOCATION_FAILED。
  */
-import { filterLegacyDemoRecruitmentOrders } from '../src/meooRegistryShared/recruitmentLegacyDemoOrders'
-import type { RegistryFile } from '../src/meooRegistryShared/opsRegistryTypes'
-import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo'
+import { filterLegacyDemoRecruitmentOrders } from '../src/meooRegistryShared/recruitmentLegacyDemoOrders.js'
+import type { RegistryFile } from '../src/meooRegistryShared/opsRegistryTypes.js'
+import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo.js'
 
 const SNAPSHOT_FETCH_TIMEOUT_MS = 22_000
 
