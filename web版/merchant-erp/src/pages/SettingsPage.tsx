@@ -8,14 +8,14 @@ import {
   Store,
   Users,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { cn } from '../cn'
 import MeooPayQrModal from '../components/MeooPayQrModal'
 import { MEOO_TRIAL_SNAPSHOT_KEY } from '../lib/opsRegistryConstants'
 import {
   fetchPrimaryTenantId,
-  fetchTenantServiceExpireAt,
+  fetchTenantSubscriptionSnapshot,
   insertMerchantPaymentOrder,
 } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
@@ -83,9 +83,30 @@ export default function SettingsPage() {
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
   const [officialExpireAtIso, setOfficialExpireAtIso] = useState<string | null | undefined>(undefined)
-  /** undefined：未拉取；null：无记录 */
+  /** undefined：未拉取；null：无到期记录 */
+  const [officialCumulativeDays, setOfficialCumulativeDays] = useState<number | null | undefined>(undefined)
+  /** undefined：未拉取；null：无累计天数 */
 
-  const closeSubModal = () => setSubModalOpen(false)
+  const loadOfficialBilling = useCallback(async () => {
+    if (!supabaseConfigured || !supabase) {
+      setOfficialExpireAtIso(undefined)
+      setOfficialCumulativeDays(undefined)
+      return
+    }
+    try {
+      const snap = await fetchTenantSubscriptionSnapshot(supabase)
+      setOfficialExpireAtIso(snap.serviceExpireAt)
+      setOfficialCumulativeDays(snap.officialDays)
+    } catch {
+      setOfficialExpireAtIso(null)
+      setOfficialCumulativeDays(null)
+    }
+  }, [supabaseConfigured, supabase])
+
+  const closeSubModal = () => {
+    setSubModalOpen(false)
+    void loadOfficialBilling()
+  }
 
   const openSubModal = () => setSubModalOpen(true)
 
@@ -104,6 +125,7 @@ export default function SettingsPage() {
       payChannel: payload.payChannel,
     })
     window.alert('已提交支付申报，请等待运营在「订单管理」核对确认。')
+    void loadOfficialBilling()
   }
 
   const trialStart = useMemo(() => {
@@ -133,21 +155,34 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!supabaseConfigured || !supabase) {
       setOfficialExpireAtIso(undefined)
+      setOfficialCumulativeDays(undefined)
       return
     }
     let cancelled = false
-    ;(async () => {
+    const run = async () => {
       try {
-        const { serviceExpireAt } = await fetchTenantServiceExpireAt(supabase)
-        if (!cancelled) setOfficialExpireAtIso(serviceExpireAt)
+        const snap = await fetchTenantSubscriptionSnapshot(supabase)
+        if (cancelled) return
+        setOfficialExpireAtIso(snap.serviceExpireAt)
+        setOfficialCumulativeDays(snap.officialDays)
       } catch {
-        if (!cancelled) setOfficialExpireAtIso(null)
+        if (!cancelled) {
+          setOfficialExpireAtIso(null)
+          setOfficialCumulativeDays(null)
+        }
       }
-    })()
+    }
+    void run()
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void run()
+    })
     return () => {
       cancelled = true
+      subscription.unsubscribe()
     }
-  }, [supabaseConfigured])
+  }, [supabaseConfigured, supabase, tab])
 
   useEffect(() => {
     try {
@@ -271,7 +306,9 @@ export default function SettingsPage() {
               <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 商家显示名等资料在
                 <strong className="font-medium text-gray-800"> 运营管控台 → 客户管理 </strong>
-                维护；右侧「正式版到期」来自租户服务有效期（运营确认到账后自动延长）。
+                维护；右侧展示当前租户在云端记录的<strong className="font-medium text-gray-800"> 正式版到期日 </strong>
+                与<strong className="font-medium text-gray-800"> 累计已确认权益天数 </strong>
+                （运营在「订单管理」确认到账后写入）。
               </p>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
@@ -305,7 +342,7 @@ export default function SettingsPage() {
                     {!supabaseConfigured || !supabase ? (
                       <p className="text-gray-600">接入 Supabase 登录后可查看当前租户正式版服务有效期。</p>
                     ) : officialExpireAtIso === undefined ? (
-                      <p className="text-gray-500">正在加载服务有效期…</p>
+                      <p className="text-gray-500">正在加载订阅信息…</p>
                     ) : officialExpireAtIso ? (
                       <>
                         <p>
@@ -315,7 +352,7 @@ export default function SettingsPage() {
                         <p className="pt-1 font-medium text-gray-900">
                           {officialLeftDays != null && officialLeftDays > 0 ? (
                             <>
-                              剩余服务：<span className="tabular-nums">{officialLeftDays}</span> 天
+                              剩余可用：<span className="tabular-nums">{officialLeftDays}</span> 天
                             </>
                           ) : officialLeftDays != null && officialLeftDays === 0 ? (
                             <>今日到期，请尽快续费</>
@@ -325,10 +362,26 @@ export default function SettingsPage() {
                             </span>
                           ) : null}
                         </p>
+                        {officialCumulativeDays != null && officialCumulativeDays > 0 ? (
+                          <p className="pt-1 text-gray-600">
+                            <span className="text-gray-500">累计已确认权益：</span>
+                            <span className="tabular-nums font-medium text-gray-900">{officialCumulativeDays}</span> 天
+                          </p>
+                        ) : null}
+                      </>
+                    ) : officialCumulativeDays != null && officialCumulativeDays > 0 ? (
+                      <>
+                        <p>
+                          <span className="text-gray-500">累计已确认正式版权益：</span>
+                          <span className="tabular-nums font-semibold text-gray-900">{officialCumulativeDays}</span> 天
+                        </p>
+                        <p className="pt-2 text-xs leading-relaxed text-gray-500">
+                          云端尚未写入「服务截止日期」字段时，仅显示累计天数。请稍后刷新本页；若长期无到期日，请联系客户经理在运营台核对租户信息。
+                        </p>
                       </>
                     ) : (
                       <p className="text-gray-600">
-                        当前未记录正式版到期时间。完成订阅并由运营确认到账后，将在此显示服务截止日期。
+                        当前未查询到正式版到期日与累计权益。完成订阅并由运营确认到账后，将在此显示；您也可稍后重新进入本页签刷新。
                       </p>
                     )}
                   </div>

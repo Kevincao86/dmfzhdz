@@ -5,6 +5,30 @@ function isMissingDbObjectError(message: string): boolean {
   return /does not exist|Could not find|schema cache/i.test(message)
 }
 
+/** 将 tenants.service_expire_at 的各类 JSON 形态规范为 ISO 字符串，便于 Date 解析 */
+function parseServiceExpireAtRaw(raw: unknown): string | null {
+  if (raw == null) return null
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    if (!t) return null
+    const d = new Date(t)
+    return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const d = new Date(raw)
+    return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  }
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw.toISOString()
+  return null
+}
+
+function readOfficialDays(raw: unknown): number | null {
+  if (raw == null) return null
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n)) return null
+  return Math.max(0, Math.floor(n))
+}
+
 /** tenants.name，用于在线客服等展示「企业名称」 */
 export async function fetchTenantEnterpriseName(
   supabase: SupabaseClient,
@@ -32,27 +56,47 @@ export async function fetchPrimaryTenantId(supabase: SupabaseClient): Promise<st
   return data.tenant_id as string
 }
 
-/** 正式版服务到期（运营确认到账后写入 tenants.service_expire_at） */
-export async function fetchTenantServiceExpireAt(
+export type TenantSubscriptionSnapshot = {
+  tenantId: string | null
+  /** 运营确认订阅后写入的正式版服务截止时刻（ISO） */
+  serviceExpireAt: string | null
+  /** 累计已确认的正式版权益天数（与运营端订单确认逻辑一致） */
+  officialDays: number | null
+}
+
+/** 正式版订阅展示：到期日 + 累计权益天数（同一查询，避免字段类型或会话时机导致漏显） */
+export async function fetchTenantSubscriptionSnapshot(
   supabase: SupabaseClient,
-): Promise<{ tenantId: string | null; serviceExpireAt: string | null }> {
+): Promise<TenantSubscriptionSnapshot> {
   const tenantId = await fetchPrimaryTenantId(supabase)
-  if (!tenantId) return { tenantId: null, serviceExpireAt: null }
+  if (!tenantId) return { tenantId: null, serviceExpireAt: null, officialDays: null }
 
   const { data, error } = await supabase
     .from('tenants')
-    .select('service_expire_at')
+    .select('service_expire_at, official_days')
     .eq('id', tenantId)
     .maybeSingle()
 
   if (error) {
-    if (isMissingDbObjectError(error.message)) return { tenantId, serviceExpireAt: null }
+    if (isMissingDbObjectError(error.message)) {
+      return { tenantId, serviceExpireAt: null, officialDays: null }
+    }
     throw error
   }
 
-  const raw = data?.service_expire_at
-  const serviceExpireAt = typeof raw === 'string' && raw.trim() ? raw.trim() : null
-  return { tenantId, serviceExpireAt }
+  return {
+    tenantId,
+    serviceExpireAt: parseServiceExpireAtRaw(data?.service_expire_at),
+    officialDays: readOfficialDays(data?.official_days),
+  }
+}
+
+/** @deprecated 请使用 fetchTenantSubscriptionSnapshot */
+export async function fetchTenantServiceExpireAt(
+  supabase: SupabaseClient,
+): Promise<{ tenantId: string | null; serviceExpireAt: string | null }> {
+  const s = await fetchTenantSubscriptionSnapshot(supabase)
+  return { tenantId: s.tenantId, serviceExpireAt: s.serviceExpireAt }
 }
 
 export async function fetchTenantWalletSummary(supabase: SupabaseClient, tenantId: string) {
