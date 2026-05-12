@@ -1259,10 +1259,15 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
   }
   const ec = typeof inner.error_code === 'number' ? inner.error_code : 0
   if (ec !== 0) {
+    const rootExtra = data.extra as Record<string, unknown> | undefined
+    const sub =
+      rootExtra && typeof rootExtra.sub_description === 'string' && rootExtra.sub_description.trim()
+        ? `（${rootExtra.sub_description.trim()}）`
+        : ''
     return {
       ok: false,
       message:
-        (typeof inner?.description === 'string' && inner.description) || `抖音 error_code=${ec}`,
+        ((typeof inner?.description === 'string' && inner.description) || `抖音 error_code=${ec}`) + sub,
     }
   }
   const pidRaw = inner?.product_id

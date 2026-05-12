@@ -13,8 +13,14 @@ import type { RegistryFile } from '../lib/opsRegistryTypes'
 import { patchVendorKeyMap } from '../services/merchantAiVendorKeysStorage'
 import { applyAiVendorCatalogFromRegistry } from '../services/merchantAiVendorCatalogClient'
 import {
-  readStoredAiModel,
-  readStoredImageAiModel,
+  MEOO_IMAGE_AI_AUTO_EVENT,
+  MEOO_IMAGE_AI_MANUAL_EVENT,
+  MEOO_TEXT_AI_AUTO_EVENT,
+  MEOO_TEXT_AI_MANUAL_EVENT,
+  readImageAiAuto,
+  readImageAiManualModel,
+  readTextAiAuto,
+  readTextAiManualModel,
   subscribeStoredAiModel,
   subscribeStoredImageAiModel,
   writeStoredAiModel,
@@ -38,10 +44,10 @@ function applyAiFromRegistry(reg: RegistryFile) {
     remote.updatedAt > lastApplied && (writerSaysOps || !sessionBootDone)
   if (!shouldApply) return
 
-  const tm = remote.textModel
-  const im = remote.imageModel
-  if (vendorIdSyncedFromOps(reg, tm)) writeStoredAiModel(tm.trim().toLowerCase())
-  if (vendorIdSyncedFromOps(reg, im)) writeStoredImageAiModel(im.trim().toLowerCase())
+  const tm = remote.textModel.trim().toLowerCase()
+  const im = remote.imageModel.trim().toLowerCase()
+  if (tm && tm !== 'auto' && vendorIdSyncedFromOps(reg, tm)) writeStoredAiModel(tm)
+  if (im && im !== 'auto' && vendorIdSyncedFromOps(reg, im)) writeStoredImageAiModel(im)
   sessionStorage.setItem(MEOO_REGISTRY_AI_APPLIED_AT_KEY, remote.updatedAt)
   sessionStorage.setItem(MEOO_REGISTRY_AI_SESSION_BOOTSTRAP_KEY, '1')
 }
@@ -112,8 +118,8 @@ export default function OpsRegistryBridge() {
       if (applyingRemoteAi.current || controlledByOpsRef.current) return
       try {
         await pushAiModels({
-          textModel: readStoredAiModel(),
-          imageModel: readStoredImageAiModel(),
+          textModel: readTextAiAuto() ? 'auto' : readTextAiManualModel(),
+          imageModel: readImageAiAuto() ? 'auto' : readImageAiManualModel(),
           lastWriter: 'erp',
           controlledByOps: false,
         })
@@ -146,6 +152,15 @@ export default function OpsRegistryBridge() {
       void pushAi()
     })
 
+    const autoManualEvents = [
+      MEOO_TEXT_AI_AUTO_EVENT,
+      MEOO_IMAGE_AI_AUTO_EVENT,
+      MEOO_TEXT_AI_MANUAL_EVENT,
+      MEOO_IMAGE_AI_MANUAL_EVENT,
+    ] as const
+    const onAutoManual = () => void pushAi()
+    for (const ev of autoManualEvents) window.addEventListener(ev, onAutoManual)
+
     return () => {
       cancelled = true
       window.clearInterval(interval)
@@ -153,6 +168,7 @@ export default function OpsRegistryBridge() {
       window.removeEventListener('meoo-subaccounts-changed', tick)
       unsubText()
       unsubImg()
+      for (const ev of autoManualEvents) window.removeEventListener(ev, onAutoManual)
     }
   }, [])
 

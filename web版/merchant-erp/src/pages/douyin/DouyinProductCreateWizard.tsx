@@ -1370,7 +1370,7 @@ export default function DouyinProductCreateWizard({
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  左侧「自动」与系统设置默认一致；关闭后可指定模型。当前请求：文案{' '}
+                  左侧「自动」按已配置 Key 与供应商目录顺序选用厂商；关闭后可指定模型。当前请求：文案{' '}
                   <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>
                   ，生图 <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>。
                 </p>

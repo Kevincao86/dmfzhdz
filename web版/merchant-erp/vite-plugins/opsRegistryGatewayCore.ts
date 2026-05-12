@@ -36,8 +36,9 @@ function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVend
 }
 
 export const DEFAULT_AI: RegistryAiModels = {
-  textModel: 'qwen',
-  imageModel: 'qwen',
+  /** 不固定运营侧「默认厂商」；ERP 在自动模式下按目录与已配置 Key 动态选择 */
+  textModel: 'auto',
+  imageModel: 'auto',
   updatedAt: new Date(0).toISOString(),
   lastWriter: 'erp',
   controlledByOps: false,

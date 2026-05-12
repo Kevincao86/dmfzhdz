@@ -8,7 +8,6 @@ import type {
   RegistryVendorKeys,
   RegistryVideoAi,
 } from '../meooRegistryShared/opsRegistryTypes.js'
-import { DEFAULT_AI } from '../meooRegistryShared/opsRegistryGatewayCore.js'
 import { normalizeRegistryVideoAi } from '../meooRegistryShared/registryVideoAiNormalize.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
@@ -79,8 +78,10 @@ export async function opsRegistrySupabaseSaveAiModels(
   } catch {
     return { status: 400, body: { ok: false, error: 'invalid_json' } }
   }
-  const textModel = (body.textModel ?? '').trim() || DEFAULT_AI.textModel
-  const imageModel = (body.imageModel ?? '').trim() || DEFAULT_AI.imageModel
+  const rawT = (body.textModel ?? '').trim().toLowerCase()
+  const rawI = (body.imageModel ?? '').trim().toLowerCase()
+  const textModel = !rawT || rawT === 'auto' ? 'auto' : rawT
+  const imageModel = !rawI || rawI === 'auto' ? 'auto' : rawI
   const lastWriter = body.lastWriter === 'ops' ? 'ops' : 'erp'
   const data = await io.load()
   const controlledByOps = lastWriter === 'ops' ? true : data.aiModels.controlledByOps

@@ -8,12 +8,10 @@ import {
   MEOO_IMAGE_AI_MANUAL_EVENT,
   MEOO_TEXT_AI_AUTO_EVENT,
   MEOO_TEXT_AI_MANUAL_EVENT,
-} from '../services/merchantAiModelStorage'
-import {
+  pickAutoResolvedImageModel,
+  pickAutoResolvedTextModel,
   readImageAiAuto,
   readImageAiManualModel,
-  readStoredAiModel,
-  readStoredImageAiModel,
   readTextAiAuto,
   readTextAiManualModel,
   resolveImageAiModelForRequest,
@@ -100,11 +98,6 @@ export default function AiModelAutoPicker({
     return kind === 'text' ? resolveTextAiModelForRequest() : resolveImageAiModelForRequest()
   }, [kind, tick])
 
-  const defaultStoredId = useMemo(() => {
-    void tick
-    return kind === 'text' ? readStoredAiModel() : readStoredImageAiModel()
-  }, [kind, tick])
-
   const manualId = useMemo(() => {
     void tick
     return kind === 'text' ? readTextAiManualModel() : readImageAiManualModel()
@@ -112,10 +105,10 @@ export default function AiModelAutoPicker({
 
   const triggerLabel = showInlineAutoToggle
     ? auto
-      ? labelForId(options, defaultStoredId)
+      ? '自动'
       : `指定：${labelForId(options, manualId)}`
     : auto
-      ? `自动 · ${labelForId(options, defaultStoredId)}`
+      ? `自动 · ${labelForId(options, effectiveId)}`
       : labelForId(options, manualId)
 
   const filteredOptions = useMemo(() => {
@@ -129,12 +122,12 @@ export default function AiModelAutoPicker({
     if (kind === 'text') {
       writeTextAiAuto(next)
       if (!next) {
-        writeTextAiManualModel(readTextAiManualModel())
+        writeTextAiManualModel(pickAutoResolvedTextModel())
       }
     } else {
       writeImageAiAuto(next)
       if (!next) {
-        writeImageAiManualModel(readImageAiManualModel())
+        writeImageAiManualModel(pickAutoResolvedImageModel())
       }
     }
     bump()
@@ -223,7 +216,7 @@ export default function AiModelAutoPicker({
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-900">自动</p>
                   <p className="mt-0.5 text-[11px] leading-snug text-gray-500">
-                    跟随系统设置中的默认模型；运营侧更新后约 2.5 秒内生效。
+                    按目录与已配置 Key 自动选择；运营侧更新 Key 后约 2.5 秒内生效。
                   </p>
                 </div>
                 <button
@@ -247,7 +240,8 @@ export default function AiModelAutoPicker({
             </div>
           ) : auto ? (
             <p className="border-b border-gray-100 px-3 pb-2 text-[11px] leading-snug text-gray-500">
-              已开启自动：与系统设置中的默认模型一致（约 2.5 秒与运营下发同步）。关闭「自动」后可搜索并指定模型。
+              已开启自动：按目录顺序优先使用<strong className="font-medium text-gray-700"> 已配置 API Key</strong>
+              的厂商；关闭「自动」后可搜索并指定模型。
             </p>
           ) : null}
 
