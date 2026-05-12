@@ -334,6 +334,8 @@ export default function FloatingOnlineSupport({
 
         pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
         runPollMerge()
+        /** 生产上 Realtime 常因 RLS/未放行 publication 等长期不进入 SUBSCRIBED；轮询已可收发，不应阻塞会话 */
+        setRelayReady(true)
 
         const { data } = client.auth.onAuthStateChange(async (_event, session) => {
           await client.realtime.setAuth(session?.access_token ?? '')
@@ -361,15 +363,7 @@ export default function FloatingOnlineSupport({
               })
             },
           )
-          .subscribe((status) => {
-            if (
-              status === 'SUBSCRIBED' ||
-              status === 'CHANNEL_ERROR' ||
-              status === 'TIMED_OUT'
-            ) {
-              setRelayReady(true)
-            }
-          })
+          .subscribe()
       } catch {
         if (!cancelled) {
           pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
