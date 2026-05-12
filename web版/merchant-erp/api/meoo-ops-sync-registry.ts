@@ -6,7 +6,7 @@
  * VITE_SUPABASE_URL 或 SUPABASE_URL，以及 SUPABASE_SERVICE_ROLE_KEY。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from './registrySnapshotIoFetch.js'
+import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
 
