@@ -3,9 +3,11 @@
  *
  * - **DOUYIN_OPENAPI_BASE_URL**：本地生活等路径（如 `/goodlife/*`）基址；不设则 `https://open.douyin.com`。
  * - **DOUYIN_OPENAPI_OAUTH_BASE_URL**：OAuth（`/oauth/*`，含 `client_token`）基址。
- *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：先走同一中继；若中继对 `client_token` 仍返回 HTML（常见 Nginx 未透传 POST JSON），**自动再请求官方** `https://open.douyin.com/oauth/client_token/`。goodlife 仍只走中继，满足 IP 白名单。
+ *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：先走同一中继；若中继对 `client_token` 仍返回 HTML（常见 Nginx 未透传 POST JSON），**自动再请求官方** `https://open.douyin.com/oauth/client_token/`。
  *   **不设且未配置中继**：默认 `https://open.douyin.com`。
  *   可显式设 `DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com` 跳过中继上的 OAuth（与自动回落等价，仅少一次无效请求）。
+ *
+ * **goodlife（`/goodlife/*`）**：优先走 `DOUYIN_OPENAPI_BASE_URL` 中继；若中继返回 HTML、5xx 或非 JSON，**再请求一次官方**（便于拿到抖音 JSON 错误如 IP 白名单，或在官方可达时直接成功）。中继 Nginx 须对 **GET 保留完整 query**。
  *
  * Vercel：Environment Variables 中配置上述变量（勿以 / 结尾）。
  */
@@ -105,8 +107,9 @@ export function officialGoodlifeUrlFromRelayRequest(relayFullUrl: string): strin
 }
 
 /**
- * goodlife GET/POST：**未配置** `DOUYIN_OPENAPI_BASE_URL`（直连官方）时单次请求即可。
- * 已配置中继（固定 EIP 出口）：**不回退官方**，否则会走云主机随机出口触发抖音「IP 不在白名单」。
+ * goodlife GET/POST：先走 `DOUYIN_OPENAPI_BASE_URL` 中继；若响应为 5xx、HTML 或 2xx 但非 JSON，
+ * 再请求同源路径的 `https://open.douyin.com`（保留 query），便于在 Nginx 未透传 GET 时仍能拿到抖音 JSON
+ *（含「IP 不在白名单」等业务错误）。中继正常时不会触发第二次请求。
  */
 export async function fetchGoodlifeWithOfficialFallback(
   fetchFn: DouyinFetchFn,
@@ -119,8 +122,23 @@ export async function fetchGoodlifeWithOfficialFallback(
   if (relay === DEFAULT_BASE) {
     return { status: r1.status, raw: raw1, usedOfficialFallback: false }
   }
-  // 已配置固定出口（DOUYIN_OPENAPI_BASE_URL）：禁止回退 open.douyin.com，否则走的是云函数/容器出口 IP，
-  // 与控制台「服务器 IP 白名单」（常见为 EIP + Nginx 反代）不一致，抖音返回「IP 不在白名单」。
+  const tryFallback =
+    r1.status >= 500 ||
+    responseLooksLikeHtml(raw1) ||
+    (r1.ok && !looksLikeJsonObject(raw1))
+  if (!tryFallback) {
+    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
+  }
+  const official = officialGoodlifeUrlFromRelayRequest(relayUrl)
+  if (!official) {
+    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
+  }
+  const r2 = await fetchFn(official, init)
+  const raw2 = await r2.text()
+  const officialLooksJson = looksLikeJsonObject(raw2) && !responseLooksLikeHtml(raw2)
+  if (officialLooksJson) {
+    return { status: r2.status, raw: raw2, usedOfficialFallback: true }
+  }
   return { status: r1.status, raw: raw1, usedOfficialFallback: false }
 }
 
