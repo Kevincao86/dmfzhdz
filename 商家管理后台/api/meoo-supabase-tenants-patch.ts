@@ -110,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const built = buildPatchBody(body)
-    if (!built.ok) {
+    if (built.ok === false) {
       jsonSend(res, 400, { ok: false, error: built.error })
       return
     }

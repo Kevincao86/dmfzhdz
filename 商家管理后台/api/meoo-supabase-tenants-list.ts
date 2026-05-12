@@ -222,6 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         jsonSend(res, 200, { ok: true, rows: lr.rows })
         return
       }
+      const listErr = lr
       if (anon && secret) {
         const er = await edgePost(supabaseUrl, anon, secret, {})
         if (er.ok && er.data.ok !== false) {
@@ -229,7 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           jsonSend(res, 200, { ok: true, rows })
           return
         }
-        const detail = [lr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
+        const detail = [listErr.detail, JSON.stringify(er.data).slice(0, 400)].filter(Boolean).join(' | ')
         jsonSend(res, er.status >= 400 ? er.status : 502, {
           ok: false,
           error: 'list_failed',
@@ -241,8 +242,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       jsonSend(res, 502, {
         ok: false,
-        error: lr.message,
-        detail: lr.detail,
+        error: listErr.message,
+        detail: listErr.detail,
         hint: '请核对 SUPABASE_SERVICE_ROLE_KEY 与数据库 tenants / tenant_members 表。',
       })
       return
