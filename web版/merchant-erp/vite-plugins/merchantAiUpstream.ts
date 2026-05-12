@@ -7,6 +7,7 @@
 import type { ServerResponse } from 'node:http'
 
 import { isBuiltinAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
+import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
 export type MerchantAiEnv = Record<string, string>
 
@@ -183,8 +184,7 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(env: MerchantAiEnv)
   const hasMinimax = Boolean((e.MERCHANT_AI_MINIMAX_KEY ?? e.MINIMAX_API_KEY)?.trim())
   if (hasDoubao && hasQwen && hasMinimax) return env
 
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
-  const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE ?? '').trim()
+  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
   if (!supabaseUrl || !serviceRole) return env
 
   try {
