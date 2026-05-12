@@ -307,7 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         wallet_credit_cents_applied: null,
         updated_at: nowIso,
       })
-      if (!fin.ok) {
+      if (fin.ok === false) {
         jsonSend(res, fin.status, fin.body)
         return
       }
@@ -397,7 +397,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         wallet_credit_cents_applied: credit,
         updated_at: nowIso,
       })
-      if (!fin.ok) {
+      if (fin.ok === false) {
         jsonSend(res, fin.status, fin.body)
         return
       }
@@ -487,7 +487,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         wallet_credit_cents_applied: null,
         updated_at: nowIso,
       })
-      if (!fin.ok) {
+      if (fin.ok === false) {
         jsonSend(res, fin.status, fin.body)
         return
       }
