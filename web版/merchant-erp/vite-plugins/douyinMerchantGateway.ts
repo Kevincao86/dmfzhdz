@@ -36,7 +36,7 @@
  * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { douyinOpenApiUrl, extractClientTokenPayload, parseDouyinJson } from '../api/douyinOpenApiBase.js'
+import { douyinOpenApiUrl, exchangeDouyinClientToken, parseDouyinJson } from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
@@ -145,44 +145,7 @@ async function fetchDouyinClientToken(
   clientKey: string,
   clientSecret: string,
 ): Promise<{ token: string; expiresIn: number }> {
-  const res = await douyinFetch(douyinOpenApiUrl('/oauth/client_token/'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_key: clientKey,
-      client_secret: clientSecret,
-      grant_type: 'client_credential',
-    }),
-  })
-  const raw = await res.text()
-  if (!res.ok) {
-    throw new Error(`client_token HTTP ${res.status}：${raw.slice(0, 300)}`)
-  }
-  const trimmed = (raw ?? '').replace(/^\uFEFF/, '').trim()
-  let j: Record<string, unknown>
-  try {
-    const v = JSON.parse(trimmed || '{}') as unknown
-    if (!v || typeof v !== 'object' || Array.isArray(v)) {
-      throw new Error(`client_token 期望 JSON 对象，实际：${trimmed.slice(0, 280)}`)
-    }
-    j = v as Record<string, unknown>
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith('client_token')) throw e
-    throw new Error(`client_token 返回非 JSON（请核对 DOUYIN_OPENAPI_BASE_URL 反代是否透传 body）：${trimmed.slice(0, 280)}`)
-  }
-  const err = getDataError(j)
-  if (!err.ok) {
-    throw new Error(err.msg ?? `client_token 业务错误`)
-  }
-  const extracted = extractClientTokenPayload(j)
-  if (!extracted) {
-    const rootK = Object.keys(j).join(',')
-    const d = j.data
-    const dk =
-      d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d as object).join(',') : typeof d
-    throw new Error(`client_token 响应缺少 access_token（根字段: ${rootK}；data: ${dk}）`)
-  }
-  return { token: extracted.token, expiresIn: extracted.expiresIn }
+  return exchangeDouyinClientToken(clientKey, clientSecret, douyinFetch)
 }
 
 async function ensureDouyinToken(s: DouyinMerchantSession): Promise<string> {
