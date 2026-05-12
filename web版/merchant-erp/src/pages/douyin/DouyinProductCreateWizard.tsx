@@ -13,6 +13,7 @@ import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/prod
 import { Link, useNavigate } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
+import AiModelAutoPicker from '../../components/AiModelAutoPicker'
 import { readMerchantSession } from '../../lib/merchantSession'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
@@ -42,19 +43,15 @@ import {
   listAiUiModelOptions,
   type AiAssistRequest,
   type AiModelId,
-  type ImageAiModelId,
   postDouyinGoodsAiAssist,
 } from '../../services/douyinAiAssistApi'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../../services/merchantAiVendorCatalogClient'
 import {
   MERCHANT_AI_MODEL_STORAGE_KEY,
   MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY,
-  readStoredAiModel,
-  readStoredImageAiModel,
-  subscribeStoredAiModel,
-  subscribeStoredImageAiModel,
-  writeStoredAiModel,
-  writeStoredImageAiModel,
+  resolveImageAiModelForRequest,
+  resolveModelForAssistAction,
+  resolveTextAiModelForRequest,
 } from '../../services/merchantAiModelStorage'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../../lib/opsRegistryConstants'
 
@@ -157,10 +154,7 @@ export default function DouyinProductCreateWizard({
     () => variant === 'edit' && Boolean(editProductId?.trim()),
   )
 
-  /** 文案：标题优化、商品说明（四选一） */
-  const [textAiModel, setTextAiModel] = useState<AiModelId>(() => readStoredAiModel())
-  /** 生图：头图 / 辅助图 / 环境图 */
-  const [imageAiModel, setImageAiModel] = useState<ImageAiModelId>(() => readStoredImageAiModel())
+  const [aiModelUiTick, setAiModelUiTick] = useState(0)
   const [aiOptionsReload, setAiOptionsReload] = useState(0)
 
   const aiModelPickOptions = useMemo(() => listAiUiModelOptions(), [aiOptionsReload])
@@ -175,56 +169,36 @@ export default function DouyinProductCreateWizard({
     }
   }, [])
 
-  const postAssistWithKeys = useCallback(
-    async (body: Omit<AiAssistRequest, 'model'>, model: AiModelId) => {
-      const r = await postDouyinGoodsAiAssist({ ...body, model })
-      if (r.ok || !r.needVendorKey) return r
-      return {
-        ok: false as const,
-        message: `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`,
-      }
-    },
-    [],
-  )
+  const selectedTextAiLabel = useMemo(() => {
+    void aiModelUiTick
+    const id = resolveTextAiModelForRequest()
+    return aiModelPickOptions.find((m) => m.id === id)?.label ?? id
+  }, [aiModelUiTick, aiModelPickOptions])
 
-  useEffect(() => {
-    return subscribeStoredAiModel((id) => setTextAiModel(id))
-  }, [])
+  const selectedImageAiLabel = useMemo(() => {
+    void aiModelUiTick
+    const id = resolveImageAiModelForRequest()
+    return aiModelPickOptions.find((m) => m.id === id)?.label ?? id
+  }, [aiModelUiTick, aiModelPickOptions])
 
-  useEffect(() => {
-    return subscribeStoredImageAiModel((id) => setImageAiModel(id))
+  const postAssistWithKeys = useCallback(async (body: Omit<AiAssistRequest, 'model'>) => {
+    const model = resolveModelForAssistAction(body.action) as AiModelId
+    const r = await postDouyinGoodsAiAssist({ ...body, model })
+    if (r.ok || !r.needVendorKey) return r
+    return {
+      ok: false as const,
+      message: `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`,
+    }
   }, [])
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== MERCHANT_AI_MODEL_STORAGE_KEY || !e.newValue?.trim()) return
-      const v = e.newValue.trim().toLowerCase()
-      const allowed = new Set(aiModelPickOptions.map((o) => o.id))
-      if (allowed.has(v)) setTextAiModel(v)
+      if (e.key !== MERCHANT_AI_MODEL_STORAGE_KEY && e.key !== MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY) return
+      setAiModelUiTick((n) => n + 1)
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  }, [aiModelPickOptions])
-
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY || !e.newValue?.trim()) return
-      const v = e.newValue.trim().toLowerCase()
-      const allowed = new Set(aiModelPickOptions.map((o) => o.id))
-      if (allowed.has(v)) setImageAiModel(v)
-    }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [aiModelPickOptions])
-
-  const selectedTextAiLabel = useMemo(
-    () => aiModelPickOptions.find((m) => m.id === textAiModel)?.label ?? textAiModel,
-    [textAiModel, aiModelPickOptions],
-  )
-  const selectedImageAiLabel = useMemo(
-    () => aiModelPickOptions.find((m) => m.id === imageAiModel)?.label ?? imageAiModel,
-    [imageAiModel, aiModelPickOptions],
-  )
+  }, [])
   const [paymentCollectMode, setPaymentCollectMode] = useState<
     'per_poi' | 'merchant_unified' | 'platform_agent'
   >('per_poi')
@@ -786,14 +760,11 @@ export default function DouyinProductCreateWizard({
       return
     }
     setAiBusy('title')
-    const r = await postAssistWithKeys(
-      {
-        action: 'optimize_title',
-        product_name: draft,
-        title_draft: draft,
-      },
-      textAiModel,
-    )
+    const r = await postAssistWithKeys({
+      action: 'optimize_title',
+      product_name: draft,
+      title_draft: draft,
+    })
     setAiBusy(null)
     if (!r.ok) {
       window.alert(r.message)
@@ -801,17 +772,14 @@ export default function DouyinProductCreateWizard({
     }
     if (r.title) setProductName(r.title.slice(0, 40))
     setAiBusy('desc')
-    const d = await postAssistWithKeys(
-      {
-        action: 'generate_desc',
-        product_name: (r.title ?? draft).slice(0, 40),
-      },
-      textAiModel,
-    )
+    const d = await postAssistWithKeys({
+      action: 'generate_desc',
+      product_name: (r.title ?? draft).slice(0, 40),
+    })
     setAiBusy(null)
     if (d.ok && d.description) setProductDesc(d.description)
     else if (!d.ok) window.alert(d.message)
-  }, [postAssistWithKeys, productName, textAiModel])
+  }, [postAssistWithKeys, productName])
 
   const generateDescOnly = useCallback(async () => {
     const name = productName.trim()
@@ -820,28 +788,25 @@ export default function DouyinProductCreateWizard({
       return
     }
     setAiBusy('desc')
-    const d = await postAssistWithKeys({ action: 'generate_desc', product_name: name }, textAiModel)
+    const d = await postAssistWithKeys({ action: 'generate_desc', product_name: name })
     setAiBusy(null)
     if (!d.ok) {
       window.alert(d.message)
       return
     }
     if (d.description) setProductDesc(d.description)
-  }, [postAssistWithKeys, productName, textAiModel])
+  }, [postAssistWithKeys, productName])
 
   const aiOptimizeHeadImage = useCallback(async () => {
     setAiBusy('img-head')
     try {
       if (headUrl.trim()) {
-        const r = await postAssistWithKeys(
-          {
-            action: 'image_enhance',
-            product_name: productName.trim() || '商品',
-            image_urls: [headUrl.trim()],
-            image_role: 'head',
-          },
-          imageAiModel,
-        )
+        const r = await postAssistWithKeys({
+          action: 'image_enhance',
+          product_name: productName.trim() || '商品',
+          image_urls: [headUrl.trim()],
+          image_role: 'head',
+        })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
       } else {
@@ -850,31 +815,25 @@ export default function DouyinProductCreateWizard({
           window.alert('请先填写商品名称，以便 AI 生成头图')
           return
         }
-        const r = await postAssistWithKeys(
-          { action: 'image_generate', product_name: n, image_role: 'head' },
-          imageAiModel,
-        )
+        const r = await postAssistWithKeys({ action: 'image_generate', product_name: n, image_role: 'head' })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
       }
     } finally {
       setAiBusy(null)
     }
-  }, [postAssistWithKeys, headUrl, productName, imageAiModel])
+  }, [postAssistWithKeys, headUrl, productName])
 
   const aiOptimizeAuxImages = useCallback(async () => {
     setAiBusy('img-aux')
     try {
       if (auxUrlsList.length > 0) {
-        const r = await postAssistWithKeys(
-          {
-            action: 'image_enhance',
-            product_name: productName.trim() || '商品',
-            image_urls: [...auxUrlsList],
-            image_role: 'aux',
-          },
-          imageAiModel,
-        )
+        const r = await postAssistWithKeys({
+          action: 'image_enhance',
+          product_name: productName.trim() || '商品',
+          image_urls: [...auxUrlsList],
+          image_role: 'aux',
+        })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.length) setAuxUrlsList(r.image_urls.slice(0, 4))
       } else {
@@ -884,10 +843,7 @@ export default function DouyinProductCreateWizard({
           return
         }
         if (auxUrlsList.length >= 4) return
-        const r = await postAssistWithKeys(
-          { action: 'image_generate', product_name: n, image_role: 'aux' },
-          imageAiModel,
-        )
+        const r = await postAssistWithKeys({ action: 'image_generate', product_name: n, image_role: 'aux' })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0])
           setAuxUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 4))
@@ -895,21 +851,18 @@ export default function DouyinProductCreateWizard({
     } finally {
       setAiBusy(null)
     }
-  }, [postAssistWithKeys, auxUrlsList, productName, imageAiModel])
+  }, [postAssistWithKeys, auxUrlsList, productName])
 
   const aiOptimizeEnvImages = useCallback(async () => {
     setAiBusy('img-env')
     try {
       if (envUrlsList.length > 0) {
-        const r = await postAssistWithKeys(
-          {
-            action: 'image_enhance',
-            product_name: productName.trim() || '商品',
-            image_urls: [...envUrlsList],
-            image_role: 'env',
-          },
-          imageAiModel,
-        )
+        const r = await postAssistWithKeys({
+          action: 'image_enhance',
+          product_name: productName.trim() || '商品',
+          image_urls: [...envUrlsList],
+          image_role: 'env',
+        })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.length) setEnvUrlsList(r.image_urls.slice(0, 10))
       } else {
@@ -919,10 +872,7 @@ export default function DouyinProductCreateWizard({
           return
         }
         if (envUrlsList.length >= 10) return
-        const r = await postAssistWithKeys(
-          { action: 'image_generate', product_name: n, image_role: 'env' },
-          imageAiModel,
-        )
+        const r = await postAssistWithKeys({ action: 'image_generate', product_name: n, image_role: 'env' })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0])
           setEnvUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 10))
@@ -930,7 +880,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       setAiBusy(null)
     }
-  }, [postAssistWithKeys, envUrlsList, productName, imageAiModel])
+  }, [postAssistWithKeys, envUrlsList, productName])
 
   const buildDetailPayload = (): DouyinProductDetailPayload | null => {
     const price = Number.parseFloat(priceYuan)
@@ -955,9 +905,18 @@ export default function DouyinProductCreateWizard({
             })),
           }
         : undefined
+    const extOut = externalGoodsId.trim()
+    let stable = (stableOutIdRef.current ?? '').trim()
+    if (!stable && !extOut) {
+      stableOutIdRef.current = `erp-${Date.now()}`
+      stable = stableOutIdRef.current.trim()
+    }
+    const out_id = extOut || stable
+    if (extOut) stableOutIdRef.current = extOut
+
     return {
       ...(persistedProductIdRef.current ? { product_id: persistedProductIdRef.current } : {}),
-      out_id: stableOutIdRef.current ?? `erp-${Date.now()}`,
+      out_id,
       category_id: cat3,
       product_type: productType!,
       merchant_display_name: merchantName,
@@ -1409,46 +1368,46 @@ export default function DouyinProductCreateWizard({
               </section>
 
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-gray-900">文案用 AI 模型</h3>
-                </div>
-                <p className="mt-1 text-xs text-gray-600">
-                  仅作用于下方「商品名称」的智能优化与「商品说明」的 AI
-                  生成；使用您在系统设置或弹窗中配置的模型与密钥。
+                <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  文案与生图可分别设置；左侧「自动 / 手动」为当前模式，点开可切换或搜索模型。
                 </p>
-                <div
-                  className="mt-3 flex flex-wrap gap-2"
-                  role="radiogroup"
-                  aria-label="选择文案用 AI 模型"
-                >
-                  {aiModelPickOptions.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={textAiModel === m.id}
-                      onClick={() => {
-                        setTextAiModel(m.id)
-                        writeStoredAiModel(m.id)
-                      }}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                        textAiModel === m.id
-                          ? 'border-indigo-600 bg-indigo-600 text-white'
-                          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-                      )}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
+                <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-8">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-800">文案</span>
+                      <AiModelAutoPicker
+                        kind="text"
+                        options={aiModelPickOptions}
+                        onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-gray-600">
+                      当前请求：
+                      <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>
+                    </p>
+                    <p id="douyin-ai-text-model-active" className="mt-1 text-xs text-gray-500">
+                      「AI 智能优化」「根据商品名称 AI 生成说明」使用上述模型。
+                    </p>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-800">生图</span>
+                      <AiModelAutoPicker
+                        kind="image"
+                        options={aiModelPickOptions}
+                        onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-gray-600">
+                      当前请求：
+                      <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>
+                    </p>
+                    <p id="douyin-ai-image-model-active" className="mt-1 text-xs text-gray-500">
+                      头图、辅助图、环境图的 AI 生成与美化。
+                    </p>
+                  </div>
                 </div>
-                <p id="douyin-ai-text-model-active" className="mt-2 text-xs text-gray-800">
-                  <span className="font-semibold text-indigo-900">当前文案模型：</span>
-                  {selectedTextAiLabel}
-                  <span className="ui-hint-block text-gray-600">
-                    （「AI 智能优化」「根据商品名称 AI 生成说明」使用此项）
-                  </span>
-                </p>
               </section>
 
               <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -1822,42 +1781,6 @@ export default function DouyinProductCreateWizard({
 
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900">售价与图片</h3>
-            <div className="mt-3 rounded-lg border border-violet-100 bg-violet-50/60 p-4">
-              <h4 className="text-xs font-semibold text-gray-900">生图用 AI 模型</h4>
-              <p className="mt-1 text-xs text-gray-600">
-                MiniMax / 通义千问 / 豆包 支持文生图与美化。影响头图、辅助图、环境图的 AI 生成与美化。
-              </p>
-              <div
-                className="mt-2 flex flex-wrap gap-2"
-                role="radiogroup"
-                aria-label="选择生图用 AI 模型"
-              >
-                {aiModelPickOptions.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={imageAiModel === m.id}
-                    onClick={() => {
-                      setImageAiModel(m.id)
-                      writeStoredImageAiModel(m.id)
-                    }}
-                    className={cn(
-                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                      imageAiModel === m.id
-                        ? 'border-violet-600 bg-violet-600 text-white'
-                        : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-                    )}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              <p id="douyin-ai-image-model-active" className="mt-2 text-xs text-gray-800">
-                <span className="font-semibold text-violet-900">当前生图模型：</span>
-                {selectedImageAiLabel}
-              </p>
-            </div>
             <p className="mt-3 text-xs text-blue-600">服务费以平台结算为准，此处仅采集标价</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
@@ -1881,9 +1804,6 @@ export default function DouyinProductCreateWizard({
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
-            </div>
-            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-xs text-gray-700">
-              图片须符合抖音来客规范。上传后将用于商品素材；若在体验环境中未接通正式上传通道，则可能显示示意图地址。
             </div>
             <input
               ref={headFileRef}
@@ -1921,7 +1841,7 @@ export default function DouyinProductCreateWizard({
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                已上传则批量美化当前头图；未上传则按商品名称与上方「生图用模型」生成一张。
+                已上传则批量美化当前头图；未上传则按商品名称与上方「生图」绑定模型生成一张。
               </p>
               <div className="mt-2 flex flex-wrap items-start gap-3">
                 <button
@@ -2409,7 +2329,7 @@ export default function DouyinProductCreateWizard({
                     onChange={(e) => setExternalGoodsId(e.target.value)}
                     maxLength={100}
                     className="mt-1 w-full rounded border px-2 py-1"
-                    placeholder="out_id 映射用"
+                    placeholder="与开放平台 product.out_id 一致；三方码场景必填，可填贵司侧商品编码"
                   />
                   <p className="text-right text-xs text-gray-400">{externalGoodsId.length} / 100</p>
                 </div>

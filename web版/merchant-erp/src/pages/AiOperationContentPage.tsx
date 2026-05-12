@@ -1,5 +1,6 @@
 import { Copy, Loader2, Sparkles, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import AiModelAutoPicker from '../components/AiModelAutoPicker'
 import DouyinStorePickerModal from '../components/store/DouyinStorePickerModal'
 import { cn } from '../cn'
 import { readMerchantSession } from '../lib/merchantSession'
@@ -11,7 +12,7 @@ import {
   type AiModelId,
 } from '../services/douyinAiAssistApi'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalogClient'
-import { readStoredAiModel, writeStoredAiModel } from '../services/merchantAiModelStorage'
+import { resolveTextAiModelForRequest } from '../services/merchantAiModelStorage'
 
 type MainTab = 'article' | 'topic'
 type PlatformId = 'douyin' | 'meituan' | 'xhs'
@@ -57,7 +58,7 @@ export default function AiOperationContentPage() {
   const [selectedStoreRows, setSelectedStoreRows] = useState<{ id: string; name: string }[]>([])
   const [storePickerOpen, setStorePickerOpen] = useState(false)
 
-  const [textAiModel, setTextAiModel] = useState<AiModelId>(() => readStoredAiModel())
+  const [aiModelUiTick, setAiModelUiTick] = useState(0)
 
   const [aiOptsReload, setAiOptsReload] = useState(0)
 
@@ -73,6 +74,11 @@ export default function AiOperationContentPage() {
 
   const aiModelPickOptions = useMemo(() => listAiUiModelOptions(), [aiOptsReload])
 
+  const effectiveTextAiModel = useMemo(
+    () => resolveTextAiModelForRequest() as AiModelId,
+    [aiModelUiTick, aiOptsReload],
+  )
+
   const [articleBrief, setArticleBrief] = useState('')
   const [articleOut, setArticleOut] = useState('')
   const [articleBusy, setArticleBusy] = useState(false)
@@ -84,11 +90,6 @@ export default function AiOperationContentPage() {
   const [topicBusy, setTopicBusy] = useState(false)
   const [topicErr, setTopicErr] = useState<string | null>(null)
   const [topicCopyTip, setTopicCopyTip] = useState<string | null>(null)
-
-  const selectModel = useCallback((id: AiModelId) => {
-    setTextAiModel(id)
-    writeStoredAiModel(id)
-  }, [])
 
   const buildContextProductName = useCallback((): string => {
     const plat = PLATFORM_OPTIONS.find((x) => x.id === platformId)?.label ?? '抖音来客'
@@ -120,13 +121,13 @@ export default function AiOperationContentPage() {
         }
       }
       return postDouyinGoodsAiAssist({
-        model: textAiModel,
+        model: resolveTextAiModelForRequest() as AiModelId,
         action,
         product_name: buildContextProductName(),
         title_draft: title_draft.trim(),
       })
     },
-    [textAiModel, platformId, buildContextProductName],
+    [platformId, buildContextProductName],
   )
 
   const onGenerateArticle = async () => {
@@ -313,30 +314,21 @@ export default function AiOperationContentPage() {
         </div>
 
         <div className="mt-6 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            <span className="text-sm font-semibold text-gray-900">文案用 AI 模型</span>
+            <span className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型（文案）</span>
+            <AiModelAutoPicker
+              kind="text"
+              options={aiModelPickOptions}
+              onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
+            />
           </div>
-          <p className="mt-1 text-xs text-gray-600">生成文章 / 生成选题均使用当前所选模型。</p>
-          <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="文案模型">
-            {aiModelPickOptions.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                role="radio"
-                aria-checked={textAiModel === m.id}
-                onClick={() => selectModel(m.id)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  textAiModel === m.id
-                    ? 'border-indigo-600 bg-indigo-600 text-white'
-                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
-                )}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <p className="mt-2 text-xs text-gray-600">
+            按钮左侧「自动 / 手动」为当前模式；自动时与系统设置默认一致。当前请求使用：
+            <span className="font-medium text-gray-800">
+              {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
+            </span>
+          </p>
         </div>
 
         {mainTab === 'article' ? (
