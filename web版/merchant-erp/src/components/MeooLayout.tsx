@@ -18,6 +18,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { childActive, NAV_ITEMS, pathActive } from '../config/nav'
 import { cn } from '../cn'
 import FloatingOnlineSupport from './FloatingOnlineSupport'
+import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
 import { clearDouyinMerchantBindingLocal } from '../lib/merchantSession'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
@@ -468,6 +469,7 @@ export default function MeooLayout() {
         </div>
       ) : null}
 
+      <OpsRegistryBridge />
       <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
     </div>
   )
