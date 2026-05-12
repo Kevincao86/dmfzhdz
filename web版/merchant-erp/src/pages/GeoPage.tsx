@@ -845,7 +845,7 @@ export default function GeoPage() {
                 />
               </div>
               <p className="mt-1.5 text-xs text-gray-500">
-                自动模式与系统设置默认一致；关闭后可指定通义或豆包。本页请求前会将模型规范为 GEO 支持的通义/豆包。
+                自动模式按已配置 Key 与目录顺序选用模型；关闭后可指定通义或豆包。本页请求前会将模型规范为 GEO 支持的通义/豆包。
               </p>
             </div>
 

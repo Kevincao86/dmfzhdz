@@ -43,6 +43,14 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
     lower.includes('insufficient_quota') ||
     (lower.includes('billing') &&
       (lower.includes('exhaust') || lower.includes('debt') || lower.includes('unpaid')))
+  if (
+    /\b2061\b/.test(raw) ||
+    /plan not support|not support model|current token plan|token plan/i.test(lower) ||
+    /套餐.*不支持|模型.*不支持|权益.*不包含/i.test(raw)
+  ) {
+    const who = vendorBillingHintForModel(model)
+    return `当前 API 权益或套餐不包含本次请求的模型（上游常见 2061 / plan not support model）。请到 ${who} 控制台核对已开通的模型与计费方案；若已配置通义千问或豆包 Key，系统将自动尝试切换。`
+  }
   if (billing) {
     const who = vendorBillingHintForModel(model)
     return `模型账户可用余额或套餐额度不足（上游返回 insufficient balance / 1008 等）。请到 ${who} 控制台充值、开通按量计费或更换有效 API Key 后重试。`
@@ -67,6 +75,154 @@ function formatAssistUpstreamCatchMessage(err: unknown, model: string): string {
   const friendly = humanizeUpstreamModelErrorMessage(raw, model)
   if (friendly !== raw) return friendly
   return `上游模型调用失败：${raw}`
+}
+
+/** 余额/套餐/限流/网关类错误：可改试其他已配置厂商；解析类错误不重试以免浪费配额 */
+function isVendorHopableError(e: unknown): boolean {
+  const raw = e instanceof Error ? e.message : String(e)
+  const lower = raw.toLowerCase()
+  if (!raw.trim()) return false
+  if (lower.includes('无法解析模型输出')) return false
+  if (typeof e === 'object' && e !== null && 'name' in e && (e as { name: string }).name === 'AbortError')
+    return false
+  if (/\b1008\b/.test(raw) || lower.includes('insufficient balance') || lower.includes('insufficient_quota'))
+    return true
+  if (
+    /\b2061\b/.test(raw) ||
+    /plan not support|not support model|current token plan|token plan/i.test(lower)
+  )
+    return true
+  if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) return true
+  if (lower.includes('quota') && (lower.includes('exceed') || lower.includes('用'))) return true
+  if (lower.includes('503') || lower.includes('502 bad gateway')) return true
+  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout')) return true
+  if (lower.includes('fetch failed') || lower.includes('econnreset') || lower.includes('socket')) return true
+  if (lower.includes('invalid_api_key') || (lower.includes('401') && lower.includes('unauthor'))) return true
+  if (lower.includes('image_generation')) return true
+  if (lower.includes('minimax') && (lower.includes('图像') || lower.includes('image')))
+    return true
+  if (lower.includes('不支持') && (lower.includes('图') || lower.includes('image'))) return true
+  if (lower.includes('not support') && lower.includes('image')) return true
+  return false
+}
+
+const BUILTIN_TEXT_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
+
+function builtinTextFailoverOthers(
+  primary: string,
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+): string[] {
+  if (!isBuiltinAiVendorId(primary)) return []
+  const out: string[] = []
+  for (const id of BUILTIN_TEXT_VENDOR_ORDER) {
+    if (id === primary) continue
+    if (pickEffectiveKey(env, id, body).key) out.push(id)
+  }
+  return out
+}
+
+async function callModelTextWithBuiltinFailover(
+  primary: string,
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  system: string,
+  user: string,
+): Promise<{ text: string; modelUsed: string }> {
+  const primaryNorm = normalizeAiModelPreserveCustom(primary)
+  const pk = pickEffectiveKey(env, primaryNorm, body).key
+  if (!pk) throw new Error(`缺少 ${primaryNorm} 的 API Key`)
+  let lastErr: unknown = null
+  try {
+    const text = await callModelText(primaryNorm, pk, env, system, user)
+    return { text, modelUsed: primaryNorm }
+  } catch (e) {
+    lastErr = e
+    if (!isBuiltinAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+  }
+  for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
+    const { key } = pickEffectiveKey(env, alt, body)
+    if (!key) continue
+    try {
+      const text = await callModelText(alt, key, env, system, user)
+      return { text, modelUsed: alt }
+    } catch (e) {
+      lastErr = e
+      if (!isVendorHopableError(e)) throw e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+}
+
+async function runImageGenerateWithBuiltinFailover(
+  primary: string,
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  keyFirst: string,
+  productName: string,
+  titleDraft: string,
+  imageRole: string,
+): Promise<{ urls: string[]; modelUsed: string }> {
+  const primaryNorm = normalizeAiModelPreserveCustom(primary)
+  let lastErr: unknown = null
+  try {
+    const urls = await runImageGenerate(primaryNorm, keyFirst, env, productName, titleDraft, imageRole)
+    return { urls, modelUsed: primaryNorm }
+  } catch (e) {
+    lastErr = e
+    if (!isBuiltinAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+  }
+  for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
+    const { key } = pickEffectiveKey(env, alt, body)
+    if (!key) continue
+    try {
+      const urls = await runImageGenerate(alt, key, env, productName, titleDraft, imageRole)
+      return { urls, modelUsed: alt }
+    } catch (e) {
+      lastErr = e
+      if (!isVendorHopableError(e)) throw e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+}
+
+async function runImageEnhanceWithBuiltinFailover(
+  primary: string,
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  keyFirst: string,
+  productName: string,
+  titleDraft: string,
+  imageRole: string,
+  imageUrls: string[],
+): Promise<{ urls: string[]; modelUsed: string }> {
+  const primaryNorm = normalizeAiModelPreserveCustom(primary)
+  let lastErr: unknown = null
+  try {
+    const enhanced: string[] = []
+    for (const u of imageUrls) {
+      enhanced.push(await runImageEnhanceOne(primaryNorm, keyFirst, env, productName, titleDraft, imageRole, u))
+    }
+    return { urls: enhanced, modelUsed: primaryNorm }
+  } catch (e) {
+    lastErr = e
+    if (!isBuiltinAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+  }
+  for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
+    const { key } = pickEffectiveKey(env, alt, body)
+    if (!key) continue
+    try {
+      const enhanced: string[] = []
+      for (const u of imageUrls) {
+        enhanced.push(await runImageEnhanceOne(alt, key, env, productName, titleDraft, imageRole, u))
+      }
+      return { urls: enhanced, modelUsed: alt }
+    } catch (e) {
+      lastErr = e
+      if (!isVendorHopableError(e)) throw e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
 /**
@@ -236,6 +392,8 @@ function messageContentToText(msg: Record<string, unknown> | undefined): string 
       if (typeof p === 'string' && p.trim()) parts.push(p.trim())
       else if (p && typeof p === 'object') {
         const o = p as Record<string, unknown>
+        const typ = String(o.type ?? '').toLowerCase()
+        if (typ === 'reasoning' || typ === 'thinking' || typ === 'chain_of_thought') continue
         if (typeof o.text === 'string' && o.text.trim()) parts.push(o.text.trim())
       }
     }
@@ -244,10 +402,26 @@ function messageContentToText(msg: Record<string, unknown> | undefined): string 
   return null
 }
 
-/** MiniMax 等厂商在 message.content 中夹带 <think>…</think>，需去掉再作为标题/说明 */
+/**
+ * MiniMax / 推理模型常在 content 中夹带思考块；只保留对用户可见的正文。
+ * 覆盖 redacted_thinking、think、reasoning 等（含未闭合时截断尾部）。
+ */
 function polishVisibleAssistantText(s: string): string {
   let t = s.trim()
-  t = t.replace(/<think>[\s\S]*?<\/redacted_thinking>/gi, '').trim()
+  for (let i = 0; i < 12; i++) {
+    const prev = t
+    t = t
+      .replace(/<redacted_thinking>[\s\S]*?<\/redacted_thinking>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<analysis>[\s\S]*?<\/analysis>/gi, '')
+      .trim()
+    if (t === prev) break
+  }
+  t = t.replace(/<think>[\s\S]*$/gi, '').trim()
+  t = t.replace(/<redacted_thinking>[\s\S]*$/gi, '').trim()
+
+
   return t
 }
 
@@ -266,10 +440,10 @@ function extractChatCompletionText(data: Record<string, unknown>): string {
   if (c0) {
     const msg = c0.message as Record<string, unknown> | undefined
     const fromMsg = messageContentToText(msg)
-    if (fromMsg) return polishVisibleAssistantText(fromMsg)
-    const reasoning =
-      msg && typeof msg.reasoning_content === 'string' ? msg.reasoning_content.trim() : ''
-    if (reasoning) return polishVisibleAssistantText(reasoning)
+    if (fromMsg) {
+      const polished = polishVisibleAssistantText(fromMsg)
+      if (polished) return polished
+    }
     if (typeof c0.text === 'string' && c0.text.trim())
       return polishVisibleAssistantText(c0.text.trim())
   }
@@ -371,11 +545,16 @@ async function callMinimaxChat(
     throw lastErr ?? new Error('MiniMax 文案请求失败')
   }
 
+  /** 国际站先试 M 系列；国内 api.minimaxi.com 在 abab6.5s-chat 前先试更常见的 abab6.5-chat，减少 2061「套餐不含该模型」 */
   const pairs: Array<[string, string]> = [
     ['https://api.minimax.io/v1/chat/completions', 'MiniMax-M2.7'],
     ['https://api.minimax.io/v1/chat/completions', 'MiniMax-M2.5'],
     ['https://api.minimax.io/v1/chat/completions', 'MiniMax-M2.1'],
+    ['https://api.minimaxi.com/v1/chat/completions', 'MiniMax-M2.1'],
+    ['https://api.minimaxi.com/v1/chat/completions', 'abab6.5-chat'],
+    ['https://api.minimaxi.com/v1/chat/completions', 'abab6.5t-chat'],
     ['https://api.minimaxi.com/v1/chat/completions', 'abab6.5s-chat'],
+    ['https://api.minimaxi.com/v1/chat/completions', 'abab5.5s-chat'],
   ]
   let lastErr: Error | null = null
   for (const [url, mmModel] of pairs) {
@@ -453,16 +632,16 @@ function buildImagePrompt(
   const name = productName.trim() || '本地生活服务'
   const base =
     mode === 'i2i'
-      ? `在保留原图主体与构图的前提下，提升清晰度与色彩层次，适合抖音来客团购展示；商品/服务：${name}。`
-      : `为抖音来客团购设计一张高质量商品图，主体清晰、光线自然、无牛皮癣文字；商品/服务：${name}。`
+      ? `在保留原图主体与构图的前提下，提升清晰度与色彩层次，适合抖音来客团购主图/辅图展示；商品或服务场景：${name}；须符合本地生活广告与平台素材规范。`
+      : `为抖音来客「本地生活」团购设计一张高质量商品图：主体清晰、光线自然、无牛皮癣文字与违规水印；商品或服务：${name}；构图适合手机端列表与详情首屏。`
   if (imageRole === 'aux') {
-    return `${base}侧重细节特写、套餐搭配或卖点展示，竖版或方图均可。`
+    return `${base}侧重套餐细节、食材/服务特写或卖点展示，可略偏竖构图。`
   }
   if (imageRole === 'env') {
-    return `${base}侧重门店环境、氛围与信任感，干净明亮。`
+    return `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感。`
   }
   if (titleDraft && titleDraft !== productName) {
-    return `${base}标题参考：${titleDraft.slice(0, 80)}。`
+    return `${base}可参考标题/卖点摘要：${titleDraft.slice(0, 80)}。`
   }
   return `${base}主图风格，构图留白适中。`
 }
@@ -735,14 +914,14 @@ function missingVendorKeyBody(env: MerchantAiEnv, model: string) {
   }
 }
 
-const TITLE_SYSTEM = `你是抖音来客「本地生活」商品标题专家。请只输出一条商品标题正文：
-- 更吸睛、适合团购场景，合规、无违禁承诺；
-- 不超过 40 个字符（按 Unicode 字符计）；
-- 不要引号、不要前缀说明、不要换行。`
+const TITLE_SYSTEM = `你是抖音来客「本地生活」团购商品标题专家。用户会给出「候选标题」与「商品背景名」：请把两者合并理解，抓住到店核销、团购券适用场景、门店品类与人群等本地生活要素，把候选里的有效信息写进标题，不要生硬堆砌关键词或复述无关提示语。
+- 只输出一条标题正文；不超过 40 个 Unicode 字符；
+- 合规、无绝对化承诺、无违禁医疗或金融表述；
+- 不要引号、不要换行、不要「标题：」等前缀。`
 
-const DESC_SYSTEM = `你是抖音来客商品详情文案专家。请输出一段商品说明（纯文本）：
-- 根据用户给出的商品名称，写清服务亮点、适用场景、规格或套餐提示（可适度虚构合理细节）；
-- 约 150～320 字，口语自然；
+const DESC_SYSTEM = `你是抖音来客「本地生活」商品说明文案专家。用户给出「商品名称」；若名称框内混有额外说明或操作提示，请甄别：与团购相关的融入正文，明显为系统/调试语句的忽略。
+- 约 150～320 字，突出到店流程、适用人群、预约与核销提示、套餐规格等；
+- 语气像真实门店导购，贴合抖音来客团购页阅读习惯；
 - 不要 Markdown、不要小标题、不要「商品说明：」这类前缀。`
 
 const OPERATION_ARTICLE_SYSTEM = `你是本地生活门店的内容运营作者。请根据用户给出的门店名与写作要点，输出一篇可发布在公众号、小红书或抖音图文的中文稿件。
@@ -1241,15 +1420,37 @@ export async function handleDouyinGoodsAiAssist(
 
     try {
       if (action === 'image_generate') {
-        const urls = await runImageGenerate(model, key, env, productName, titleDraft, imageRole)
-        json(res, 200, { ok: true, image_urls: urls })
+        const { urls, modelUsed } = await runImageGenerateWithBuiltinFailover(
+          model,
+          env,
+          body,
+          key,
+          productName,
+          titleDraft,
+          imageRole,
+        )
+        json(res, 200, {
+          ok: true,
+          image_urls: urls,
+          ...(modelUsed !== model ? { ai_vendor_used: modelUsed } : {}),
+        })
         return
       }
-      const enhanced: string[] = []
-      for (const u of imageUrls) {
-        enhanced.push(await runImageEnhanceOne(model, key, env, productName, titleDraft, imageRole, u))
-      }
-      json(res, 200, { ok: true, image_urls: enhanced })
+      const { urls: enhanced, modelUsed } = await runImageEnhanceWithBuiltinFailover(
+        model,
+        env,
+        body,
+        key,
+        productName,
+        titleDraft,
+        imageRole,
+        imageUrls,
+      )
+      json(res, 200, {
+        ok: true,
+        image_urls: enhanced,
+        ...(modelUsed !== model ? { ai_vendor_used: modelUsed } : {}),
+      })
       return
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -1281,7 +1482,14 @@ export async function handleDouyinGoodsAiAssist(
       }
       const payloadSlice = ctxRaw.length > 38000 ? `${ctxRaw.slice(0, 38000)}\n…（上下文已截断）` : ctxRaw
       const user = `以下为抖音来客门店事实 JSON（仅用于 GEO 评分，勿外泄）：\n${payloadSlice}`
-      const text = (await callModelText(model, key!, env, GEO_AI_SCORE_SYSTEM, user)).trim()
+      const { text: rawScore, modelUsed: scoreVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        body,
+        GEO_AI_SCORE_SYSTEM,
+        user,
+      )
+      const text = rawScore.trim()
       const parsed = parseGeoAiScoreFromModelText(text)
       if (!parsed) {
         json(res, 200, {
@@ -1292,7 +1500,11 @@ export async function handleDouyinGoodsAiAssist(
         })
         return
       }
-      json(res, 200, { ok: true, geo_ai_score: parsed })
+      json(res, 200, {
+        ok: true,
+        geo_ai_score: parsed,
+        ...(scoreVendor !== model ? { ai_vendor_used: scoreVendor } : {}),
+      })
       return
     }
     if (action === 'geo_ai_consult') {
@@ -1309,21 +1521,53 @@ export async function handleDouyinGoodsAiAssist(
         return
       }
       const user = `门店名称（上下文）：${productName}\n\n【门店 GEO 知识包】\n${geoPack}\n\n【当前用户咨询】\n${titleDraft}`
-      const description = (await callModelText(model, key!, env, GEO_AI_CONSULT_SYSTEM, user)).trim()
-      json(res, 200, { ok: true, description })
+      const { text: consultRaw, modelUsed: consultVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        body,
+        GEO_AI_CONSULT_SYSTEM,
+        user,
+      )
+      const description = consultRaw.trim()
+      json(res, 200, {
+        ok: true,
+        description,
+        ...(consultVendor !== model ? { ai_vendor_used: consultVendor } : {}),
+      })
       return
     }
     if (action === 'optimize_title') {
       const user = `候选标题：${titleDraft}\n商品背景名：${productName}`
-      const raw = await callModelText(model, key!, env, TITLE_SYSTEM, user)
-      const title = sliceTitle(raw.replace(/^["'「]|["'」]$/g, '').trim(), 40)
-      json(res, 200, { ok: true, title: title || titleDraft.slice(0, 40) })
+      const { text: titleRaw, modelUsed: titleVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        body,
+        TITLE_SYSTEM,
+        user,
+      )
+      const title = sliceTitle(titleRaw.replace(/^["'「]|["'」]$/g, '').trim(), 40)
+      json(res, 200, {
+        ok: true,
+        title: title || titleDraft.slice(0, 40),
+        ...(titleVendor !== model ? { ai_vendor_used: titleVendor } : {}),
+      })
       return
     }
     if (action === 'generate_desc') {
       const user = `商品名称：${productName}`
-      const description = (await callModelText(model, key!, env, DESC_SYSTEM, user)).trim()
-      json(res, 200, { ok: true, description })
+      const { text: descRaw, modelUsed: descVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        body,
+        DESC_SYSTEM,
+        user,
+      )
+      const description = descRaw.trim()
+      json(res, 200, {
+        ok: true,
+        description,
+        ...(descVendor !== model ? { ai_vendor_used: descVendor } : {}),
+      })
       return
     }
     if (action === 'operation_article') {
@@ -1332,8 +1576,19 @@ export async function handleDouyinGoodsAiAssist(
         return
       }
       const user = `门店名称：${productName}\n写作要点与活动信息：\n${titleDraft}`
-      const description = (await callModelText(model, key!, env, OPERATION_ARTICLE_SYSTEM, user)).trim()
-      json(res, 200, { ok: true, description })
+      const { text: articleRaw, modelUsed: articleVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        body,
+        OPERATION_ARTICLE_SYSTEM,
+        user,
+      )
+      const description = articleRaw.trim()
+      json(res, 200, {
+        ok: true,
+        description,
+        ...(articleVendor !== model ? { ai_vendor_used: articleVendor } : {}),
+      })
       return
     }
     if (action === 'operation_topic') {
@@ -1342,8 +1597,19 @@ export async function handleDouyinGoodsAiAssist(
         return
       }
       const user = `门店名称：${productName}\n品类与客群/经营重点：\n${titleDraft}`
-      const description = (await callModelText(model, key!, env, OPERATION_TOPIC_SYSTEM, user)).trim()
-      json(res, 200, { ok: true, description })
+      const { text: topicRaw, modelUsed: topicVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        body,
+        OPERATION_TOPIC_SYSTEM,
+        user,
+      )
+      const description = topicRaw.trim()
+      json(res, 200, {
+        ok: true,
+        description,
+        ...(topicVendor !== model ? { ai_vendor_used: topicVendor } : {}),
+      })
       return
     }
     json(res, 400, { ok: false, message: `未知 action：${action}` })

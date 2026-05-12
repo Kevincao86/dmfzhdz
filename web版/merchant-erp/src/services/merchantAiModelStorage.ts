@@ -1,6 +1,7 @@
 import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
 import { listAiUiModelOptions, MEOO_AI_VENDOR_CATALOG_EVENT } from './merchantAiVendorCatalogClient'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
+import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
 
 export const MERCHANT_AI_MODEL_STORAGE_KEY = 'meoo_merchant_default_ai_model'
 const CHANGE_EVENT = 'meoo-merchant-ai-model'
@@ -22,17 +23,59 @@ function selectableAiIds(): Set<string> {
   return new Set(listAiUiModelOptions().map((o) => o.id))
 }
 
-function normalizeTextModelStored(raw: string | null | undefined): string {
-  const s = raw?.trim().toLowerCase() ?? ''
-  if (s === 'deepseek') return 'minimax'
-  if (!s) return 'qwen'
-  if (selectableAiIds().has(s)) return s
-  if (isValidAiVendorSlug(s)) return s
+/** 按目录顺序，选用第一个已配置浏览器端 Key 的厂商；均无 Key 时退回目录首项（通常为 MiniMax）。 */
+/** 网关 runImageGenerate 仅支持这三家；自动生图勿选仅文案的自定义厂商 slug */
+const BUILTIN_IMAGE_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
+
+export function pickAutoResolvedTextModel(): string {
+  const opts = listAiUiModelOptions()
+  const keys = readVendorKeyMap()
+  for (const o of opts) {
+    if (keys[o.id]?.trim()) return o.id
+  }
+  return opts[0]?.id ?? 'qwen'
+}
+
+export function pickAutoResolvedImageModel(): string {
+  const keys = readVendorKeyMap()
+  for (const id of BUILTIN_IMAGE_VENDOR_ORDER) {
+    if (keys[id]?.trim()) return id
+  }
+  const opts = listAiUiModelOptions()
+  for (const o of opts) {
+    if (BUILTIN_IMAGE_VENDOR_ORDER.includes(o.id as (typeof BUILTIN_IMAGE_VENDOR_ORDER)[number])) {
+      if (keys[o.id]?.trim()) return o.id
+    }
+  }
   return 'qwen'
 }
 
+function normalizeTextModelStored(raw: string | null | undefined): string {
+  const s = raw?.trim().toLowerCase() ?? ''
+  if (s === 'deepseek') return 'minimax'
+  if (s === 'auto' || !s) return pickAutoResolvedTextModel()
+  if (selectableAiIds().has(s)) return s
+  if (isValidAiVendorSlug(s)) return s
+  return pickAutoResolvedTextModel()
+}
+
+function isBuiltinImageVendorId(id: string): boolean {
+  return (BUILTIN_IMAGE_VENDOR_ORDER as readonly string[]).includes(id)
+}
+
 function normalizeImageModelStored(raw: string | null | undefined): string {
-  return normalizeTextModelStored(raw)
+  const s = raw?.trim().toLowerCase() ?? ''
+  if (s === 'deepseek') return 'minimax'
+  if (s === 'auto' || !s) return pickAutoResolvedImageModel()
+  if (selectableAiIds().has(s)) {
+    if (isBuiltinImageVendorId(s)) return s
+    return pickAutoResolvedImageModel()
+  }
+  if (isValidAiVendorSlug(s)) {
+    if (isBuiltinImageVendorId(s)) return s
+    return pickAutoResolvedImageModel()
+  }
+  return pickAutoResolvedImageModel()
 }
 
 export function readStoredAiModel(): string {
@@ -42,7 +85,7 @@ export function readStoredAiModel(): string {
   } catch {
     /* ignore */
   }
-  return 'qwen'
+  return pickAutoResolvedTextModel()
 }
 
 export function writeStoredAiModel(id: string): void {
@@ -83,7 +126,7 @@ export function readStoredImageAiModel(): string {
   } catch {
     /* ignore */
   }
-  return 'qwen'
+  return pickAutoResolvedImageModel()
 }
 
 export function writeStoredImageAiModel(id: string): void {
@@ -137,7 +180,7 @@ function writeBoolStorage(key: string, on: boolean, eventName: string): void {
   }
 }
 
-/** 为 true 时文案类 AI 请求跟随「系统设置 / 运营下发」的默认模型（{@link readStoredAiModel}） */
+/** 为 true 时文案类 AI 按目录与已配置 Key 自动选厂商（{@link pickAutoResolvedTextModel}） */
 export function readTextAiAuto(): boolean {
   return readBoolStorage(TEXT_AUTO_KEY, true)
 }
@@ -146,7 +189,7 @@ export function writeTextAiAuto(on: boolean): void {
   writeBoolStorage(TEXT_AUTO_KEY, on, MEOO_TEXT_AI_AUTO_EVENT)
 }
 
-/** 为 true 时生图类 AI 请求跟随默认生图模型（{@link readStoredImageAiModel}） */
+/** 为 true 时生图类 AI 按目录与已配置 Key 自动选厂商（{@link pickAutoResolvedImageModel}） */
 export function readImageAiAuto(): boolean {
   return readBoolStorage(IMAGE_AUTO_KEY, true)
 }
@@ -162,7 +205,7 @@ export function readTextAiManualModel(): string {
   } catch {
     /* ignore */
   }
-  return readStoredAiModel()
+  return pickAutoResolvedTextModel()
 }
 
 export function writeTextAiManualModel(id: string): void {
@@ -182,7 +225,7 @@ export function readImageAiManualModel(): string {
   } catch {
     /* ignore */
   }
-  return readStoredImageAiModel()
+  return pickAutoResolvedImageModel()
 }
 
 export function writeImageAiManualModel(id: string): void {
@@ -195,13 +238,13 @@ export function writeImageAiManualModel(id: string): void {
   }
 }
 
-/** 自动：与系统默认一致；手动：仅本机记住的指定模型（不覆盖运营台同步的默认项） */
+/** 自动：按目录顺序与已配置 Key 动态选择；手动：本机指定的模型 */
 export function resolveTextAiModelForRequest(): string {
-  return readTextAiAuto() ? readStoredAiModel() : readTextAiManualModel()
+  return readTextAiAuto() ? pickAutoResolvedTextModel() : readTextAiManualModel()
 }
 
 export function resolveImageAiModelForRequest(): string {
-  return readImageAiAuto() ? readStoredImageAiModel() : readImageAiManualModel()
+  return readImageAiAuto() ? pickAutoResolvedImageModel() : readImageAiManualModel()
 }
 
 /**

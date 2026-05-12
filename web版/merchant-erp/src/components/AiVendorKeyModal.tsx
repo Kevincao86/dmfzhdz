@@ -1,5 +1,6 @@
 import { KeyRound, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import AiVendorCatalogAvatar from './AiVendorCatalogAvatar'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import type { AiModelId } from '../services/douyinAiAssistApi'
@@ -104,12 +105,13 @@ export default function AiVendorKeyModal({
                 type="button"
                 onClick={() => setTab(m.id)}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                   tab === m.id
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
                 )}
               >
+                <AiVendorCatalogAvatar id={m.id} label={m.label} logoUrl={m.logoUrl} size="xs" />
                 {m.label}
               </button>
             ))}
@@ -117,7 +119,10 @@ export default function AiVendorKeyModal({
 
           {current ? (
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-800">{current.label} API Key</label>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                <AiVendorCatalogAvatar id={current.id} label={current.label} logoUrl={current.logoUrl} size="sm" />
+                {current.label} API Key
+              </label>
               <input
                 type="password"
                 autoComplete="off"

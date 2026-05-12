@@ -5,6 +5,7 @@
 import {
   catalogCustomEntriesOnly,
   mergeBuiltinAiVendorCatalog,
+  normalizeCatalogLogoUrl,
   normalizeVendorKeysFromDisk,
 } from './aiVendorCatalogShared.js'
 import type {
@@ -30,14 +31,16 @@ function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVend
     if (!id) continue
     const label = typeof r.label === 'string' && r.label.trim() ? r.label.trim() : id
     const hint = typeof r.hint === 'string' && r.hint.trim() ? r.hint.trim().slice(0, 280) : undefined
-    out.push({ id, label: label.slice(0, 64), hint })
+    const logoUrl = normalizeCatalogLogoUrl(r.logoUrl)
+    out.push({ id, label: label.slice(0, 64), hint, ...(logoUrl ? { logoUrl } : {}) })
   }
   return catalogCustomEntriesOnly(out)
 }
 
 export const DEFAULT_AI: RegistryAiModels = {
-  textModel: 'qwen',
-  imageModel: 'qwen',
+  /** 不固定运营侧「默认厂商」；ERP 在自动模式下按目录与已配置 Key 动态选择 */
+  textModel: 'auto',
+  imageModel: 'auto',
   updatedAt: new Date(0).toISOString(),
   lastWriter: 'erp',
   controlledByOps: false,

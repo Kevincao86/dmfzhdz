@@ -14,6 +14,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
 import AiModelAutoPicker from '../../components/AiModelAutoPicker'
+import AiVendorCatalogAvatar from '../../components/AiVendorCatalogAvatar'
+import AiVendorDirectoryChips from '../../components/AiVendorDirectoryChips'
 import { readMerchantSession } from '../../lib/merchantSession'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
@@ -46,9 +48,15 @@ import {
   postDouyinGoodsAiAssist,
 } from '../../services/douyinAiAssistApi'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../../services/merchantAiVendorCatalogClient'
+import { readVendorKeyMap } from '../../services/merchantAiVendorKeysStorage'
 import {
   MERCHANT_AI_MODEL_STORAGE_KEY,
   MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY,
+  MEOO_IMAGE_AI_AUTO_EVENT,
+  MEOO_IMAGE_AI_MANUAL_EVENT,
+  MEOO_TEXT_AI_AUTO_EVENT,
+  MEOO_TEXT_AI_MANUAL_EVENT,
+  readImageAiAuto,
   resolveImageAiModelForRequest,
   resolveModelForAssistAction,
   resolveTextAiModelForRequest,
@@ -181,6 +189,62 @@ export default function DouyinProductCreateWizard({
     return aiModelPickOptions.find((m) => m.id === id)?.label ?? id
   }, [aiModelUiTick, aiModelPickOptions])
 
+  const selectedImageAiOption = useMemo(() => {
+    void aiModelUiTick
+    const id = resolveImageAiModelForRequest()
+    return aiModelPickOptions.find((m) => m.id === id) ?? aiModelPickOptions[0]
+  }, [aiModelUiTick, aiModelPickOptions])
+
+  /** 售价与图片区三颗「生图」按钮：开启自动时展示「自动」+ 当前解析厂商 */
+  const imageAiHeadline = useMemo(() => {
+    void aiModelUiTick
+    const auto = readImageAiAuto()
+    const id = resolveImageAiModelForRequest()
+    const opt = aiModelPickOptions.find((m) => m.id === id)
+    return { auto, id, opt }
+  }, [aiModelUiTick, aiModelPickOptions])
+
+  const renderImageGenTriggerContent = (isBusy: boolean) => {
+    if (isBusy) return <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+    if (imageAiHeadline.auto) {
+      return (
+        <>
+          <span className="shrink-0 rounded bg-violet-700 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            自动
+          </span>
+          {imageAiHeadline.opt ? (
+            <AiVendorCatalogAvatar
+              id={imageAiHeadline.opt.id}
+              label={imageAiHeadline.opt.label}
+              logoUrl={imageAiHeadline.opt.logoUrl}
+              size="xs"
+            />
+          ) : null}
+          <span className="min-w-0 truncate text-xs">{imageAiHeadline.opt?.label ?? imageAiHeadline.id}</span>
+        </>
+      )
+    }
+    return (
+      <>
+        <AiVendorCatalogAvatar
+          id={selectedImageAiOption?.id ?? 'minimax'}
+          label={selectedImageAiOption?.label ?? selectedImageAiLabel}
+          logoUrl={selectedImageAiOption?.logoUrl}
+          size="xs"
+        />
+        <span className="min-w-0 truncate">{selectedImageAiOption?.label ?? selectedImageAiLabel}</span>
+      </>
+    )
+  }
+
+  /** 与设置页一致：优先展示已配置浏览器 Key 的厂商 */
+  const aiVendorChipsForDisplay = useMemo(() => {
+    const all = listAiUiModelOptions()
+    const keys = readVendorKeyMap()
+    const withKey = all.filter((m) => Boolean(keys[m.id]?.trim()))
+    return withKey.length > 0 ? withKey : all
+  }, [aiOptionsReload])
+
   const postAssistWithKeys = useCallback(async (body: Omit<AiAssistRequest, 'model'>) => {
     const model = resolveModelForAssistAction(body.action) as AiModelId
     const r = await postDouyinGoodsAiAssist({ ...body, model })
@@ -199,12 +263,49 @@ export default function DouyinProductCreateWizard({
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
+
+  useEffect(() => {
+    const bump = () => setAiModelUiTick((n) => n + 1)
+    const evs = [
+      MEOO_TEXT_AI_AUTO_EVENT,
+      MEOO_IMAGE_AI_AUTO_EVENT,
+      MEOO_TEXT_AI_MANUAL_EVENT,
+      MEOO_IMAGE_AI_MANUAL_EVENT,
+    ] as const
+    for (const e of evs) window.addEventListener(e, bump)
+    return () => {
+      for (const e of evs) window.removeEventListener(e, bump)
+    }
+  }, [])
+
   const [paymentCollectMode, setPaymentCollectMode] = useState<
     'per_poi' | 'merchant_unified' | 'platform_agent'
   >('per_poi')
-  const [aiBusy, setAiBusy] = useState<string | null>(null)
+  type AiBusySlot = 'title' | 'desc' | 'img-head' | 'img-aux' | 'img-env'
+  const [aiBusySlots, setAiBusySlots] = useState<Partial<Record<AiBusySlot, boolean>>>({})
+  const beginAi = useCallback((k: AiBusySlot) => {
+    setAiBusySlots((s) => ({ ...s, [k]: true }))
+  }, [])
+  const endAi = useCallback((k: AiBusySlot) => {
+    setAiBusySlots((s) => {
+      const n = { ...s }
+      delete n[k]
+      return n
+    })
+  }, [])
+  const aiOn = useCallback((k: AiBusySlot) => !!aiBusySlots[k], [aiBusySlots])
   const [floatPreviewOpen, setFloatPreviewOpen] = useState(false)
   const [floatPos, setFloatPos] = useState({ x: 24, y: 96 })
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!imagePreviewUrl) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setImagePreviewUrl(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [imagePreviewUrl])
 
   const [productName, setProductName] = useState('')
   const [productDesc, setProductDesc] = useState('')
@@ -759,27 +860,31 @@ export default function DouyinProductCreateWizard({
       window.alert('请先在商品名称框内输入标题，再点击「AI 智能优化」')
       return
     }
-    setAiBusy('title')
-    const r = await postAssistWithKeys({
-      action: 'optimize_title',
-      product_name: draft,
-      title_draft: draft,
-    })
-    setAiBusy(null)
-    if (!r.ok) {
-      window.alert(r.message)
-      return
+    beginAi('title')
+    beginAi('desc')
+    try {
+      const [r, d] = await Promise.all([
+        postAssistWithKeys({
+          action: 'optimize_title',
+          product_name: draft,
+          title_draft: draft,
+        }),
+        postAssistWithKeys({
+          action: 'generate_desc',
+          product_name: draft,
+          title_draft: draft,
+        }),
+      ])
+      if (!r.ok) window.alert(r.message)
+      else if (r.title) setProductName(r.title.slice(0, 40))
+      if (!d.ok) {
+        if (r.ok) window.alert(d.message)
+      } else if (d.description) setProductDesc(d.description)
+    } finally {
+      endAi('title')
+      endAi('desc')
     }
-    if (r.title) setProductName(r.title.slice(0, 40))
-    setAiBusy('desc')
-    const d = await postAssistWithKeys({
-      action: 'generate_desc',
-      product_name: (r.title ?? draft).slice(0, 40),
-    })
-    setAiBusy(null)
-    if (d.ok && d.description) setProductDesc(d.description)
-    else if (!d.ok) window.alert(d.message)
-  }, [postAssistWithKeys, productName])
+  }, [postAssistWithKeys, productName, beginAi, endAi])
 
   const generateDescOnly = useCallback(async () => {
     const name = productName.trim()
@@ -787,18 +892,21 @@ export default function DouyinProductCreateWizard({
       window.alert('请先填写商品名称')
       return
     }
-    setAiBusy('desc')
-    const d = await postAssistWithKeys({ action: 'generate_desc', product_name: name })
-    setAiBusy(null)
-    if (!d.ok) {
-      window.alert(d.message)
-      return
+    beginAi('desc')
+    try {
+      const d = await postAssistWithKeys({ action: 'generate_desc', product_name: name })
+      if (!d.ok) {
+        window.alert(d.message)
+        return
+      }
+      if (d.description) setProductDesc(d.description)
+    } finally {
+      endAi('desc')
     }
-    if (d.description) setProductDesc(d.description)
-  }, [postAssistWithKeys, productName])
+  }, [postAssistWithKeys, productName, beginAi, endAi])
 
   const aiOptimizeHeadImage = useCallback(async () => {
-    setAiBusy('img-head')
+    beginAi('img-head')
     try {
       if (headUrl.trim()) {
         const r = await postAssistWithKeys({
@@ -820,12 +928,12 @@ export default function DouyinProductCreateWizard({
         else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
       }
     } finally {
-      setAiBusy(null)
+      endAi('img-head')
     }
-  }, [postAssistWithKeys, headUrl, productName])
+  }, [postAssistWithKeys, headUrl, productName, beginAi, endAi])
 
   const aiOptimizeAuxImages = useCallback(async () => {
-    setAiBusy('img-aux')
+    beginAi('img-aux')
     try {
       if (auxUrlsList.length > 0) {
         const r = await postAssistWithKeys({
@@ -849,12 +957,12 @@ export default function DouyinProductCreateWizard({
           setAuxUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 4))
       }
     } finally {
-      setAiBusy(null)
+      endAi('img-aux')
     }
-  }, [postAssistWithKeys, auxUrlsList, productName])
+  }, [postAssistWithKeys, auxUrlsList, productName, beginAi, endAi])
 
   const aiOptimizeEnvImages = useCallback(async () => {
-    setAiBusy('img-env')
+    beginAi('img-env')
     try {
       if (envUrlsList.length > 0) {
         const r = await postAssistWithKeys({
@@ -878,9 +986,9 @@ export default function DouyinProductCreateWizard({
           setEnvUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 10))
       }
     } finally {
-      setAiBusy(null)
+      endAi('img-env')
     }
-  }, [postAssistWithKeys, envUrlsList, productName])
+  }, [postAssistWithKeys, envUrlsList, productName, beginAi, endAi])
 
   const buildDetailPayload = (): DouyinProductDetailPayload | null => {
     const price = Number.parseFloat(priceYuan)
@@ -914,11 +1022,13 @@ export default function DouyinProductCreateWizard({
     const out_id = extOut || stable
     if (extOut) stableOutIdRef.current = extOut
 
+    const sessionAccountName = readAccountName()?.trim()
     return {
       ...(persistedProductIdRef.current ? { product_id: persistedProductIdRef.current } : {}),
       out_id,
       category_id: cat3,
       product_type: productType!,
+      ...(sessionAccountName ? { account_name: sessionAccountName } : {}),
       merchant_display_name: merchantName,
       payment_collect_mode: paymentCollectMode,
       product_name: productName.trim(),
@@ -1370,13 +1480,16 @@ export default function DouyinProductCreateWizard({
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  左侧「自动」与系统设置默认一致；关闭后可指定模型。当前请求：文案{' '}
-                  <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>
-                  ，生图 <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>。
+                  下方为当前目录中的模型（logo + 名称）。开关与下拉仍可按「自动 / 指定」分别设置<strong className="font-medium text-gray-700"> 文案</strong>与
+                  <strong className="font-medium text-gray-700"> 生图</strong>；当前生效：文案{' '}
+                  <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>，生图{' '}
+                  <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>。
                 </p>
+                <div className="mt-3">
+                  <AiVendorDirectoryChips options={aiVendorChipsForDisplay} />
+                </div>
                 <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-800">文案</p>
                     <div className="mt-2">
                       <AiModelAutoPicker
                         kind="text"
@@ -1386,7 +1499,6 @@ export default function DouyinProductCreateWizard({
                     </div>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-800">生图</p>
                     <div className="mt-2">
                       <AiModelAutoPicker
                         kind="image"
@@ -1397,7 +1509,7 @@ export default function DouyinProductCreateWizard({
                   </div>
                 </div>
                 <p id="douyin-ai-text-model-active" className="mt-3 text-xs text-gray-500">
-                  「AI 智能优化」「根据商品名称 AI 生成说明」使用文案模型；头图 / 辅助图 / 环境图使用生图模型。
+                  「AI 智能优化」「根据商品名称 AI 生成说明」走文案模型；头图 / 辅助图 / 环境图走生图模型；各任务可同时进行。
                 </p>
               </section>
 
@@ -1411,13 +1523,13 @@ export default function DouyinProductCreateWizard({
                       </label>
                       <button
                         type="button"
-                        disabled={!!aiBusy}
+                        disabled={aiOn('title') || aiOn('desc')}
                         aria-describedby="douyin-ai-text-model-active"
                         title={`文案模型：${selectedTextAiLabel}`}
                         onClick={() => void optimizeProductTitle()}
                         className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
                       >
-                        {aiBusy === 'title' || aiBusy === 'desc' ? (
+                        {aiOn('title') || aiOn('desc') ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : (
                           <Sparkles className="h-3.5 w-3.5" />
@@ -1750,13 +1862,13 @@ export default function DouyinProductCreateWizard({
                       <label className="text-sm font-medium text-gray-800">商品说明</label>
                       <button
                         type="button"
-                        disabled={!!aiBusy}
+                        disabled={aiOn('desc')}
                         aria-describedby="douyin-ai-text-model-active"
                         title={`文案模型：${selectedTextAiLabel}`}
                         onClick={() => void generateDescOnly()}
                         className="text-xs font-medium text-violet-700 underline decoration-violet-300 hover:text-violet-900 disabled:opacity-50"
                       >
-                        {aiBusy === 'desc' ? '生成中…' : '根据商品名称 AI 生成说明'}
+                        {aiOn('desc') ? '生成中…' : '根据商品名称 AI 生成说明'}
                       </button>
                     </div>
                     <textarea
@@ -1823,18 +1935,17 @@ export default function DouyinProductCreateWizard({
                 </label>
                 <button
                   type="button"
-                  disabled={!!uploadingSlot || !!aiBusy}
+                  disabled={!!uploadingSlot || aiOn('img-head')}
                   aria-describedby="douyin-ai-image-model-active"
-                  title={`生图模型：${selectedImageAiLabel}`}
+                  title={
+                    imageAiHeadline.auto
+                      ? `生图：自动（当前 ${imageAiHeadline.opt?.label ?? imageAiHeadline.id}）`
+                      : `生图：${selectedImageAiLabel}`
+                  }
                   onClick={() => void aiOptimizeHeadImage()}
-                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50 sm:max-w-[14rem]"
                 >
-                  {aiBusy === 'img-head' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  {headUrl.trim() ? 'AI 美化' : 'AI 生成'}
+                  {renderImageGenTriggerContent(aiOn('img-head'))}
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
@@ -1843,7 +1954,7 @@ export default function DouyinProductCreateWizard({
               <div className="mt-2 flex flex-wrap items-start gap-3">
                 <button
                   type="button"
-                  disabled={uploadingSlot === 'head' || !!aiBusy}
+                  disabled={uploadingSlot === 'head' || aiOn('img-head')}
                   onClick={() => headFileRef.current?.click()}
                   className="inline-flex items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                 >
@@ -1856,10 +1967,20 @@ export default function DouyinProductCreateWizard({
                 </button>
                 {headUrl && (
                   <div className="relative">
-                    <img src={headUrl} alt="" className="h-20 w-20 rounded-lg border object-cover" />
                     <button
                       type="button"
-                      onClick={() => setHeadUrl('')}
+                      className="block cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      onClick={() => setImagePreviewUrl(headUrl)}
+                      title="点击查看大图"
+                    >
+                      <img src={headUrl} alt="" className="h-20 w-20 rounded-lg border object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setHeadUrl('')
+                      }}
                       className="absolute -right-2 -top-2 rounded-full bg-gray-800 p-1 text-white hover:bg-gray-900"
                       aria-label="移除"
                     >
@@ -1889,18 +2010,17 @@ export default function DouyinProductCreateWizard({
                 </label>
                 <button
                   type="button"
-                  disabled={!!uploadingSlot || !!aiBusy}
+                  disabled={!!uploadingSlot || aiOn('img-aux')}
                   aria-describedby="douyin-ai-image-model-active"
-                  title={`生图模型：${selectedImageAiLabel}`}
+                  title={
+                    imageAiHeadline.auto
+                      ? `生图：自动（当前 ${imageAiHeadline.opt?.label ?? imageAiHeadline.id}）`
+                      : `生图：${selectedImageAiLabel}`
+                  }
                   onClick={() => void aiOptimizeAuxImages()}
-                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50 sm:max-w-[14rem]"
                 >
-                  {aiBusy === 'img-aux' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  {auxUrlsList.length ? 'AI 批量美化' : 'AI 生成一张'}
+                  {renderImageGenTriggerContent(aiOn('img-aux'))}
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
@@ -1909,10 +2029,20 @@ export default function DouyinProductCreateWizard({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {auxUrlsList.map((u, i) => (
                   <div key={`${u}-${i}`} className="relative">
-                    <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
                     <button
                       type="button"
-                      onClick={() => setAuxUrlsList((prev) => prev.filter((_, j) => j !== i))}
+                      className="block cursor-zoom-in rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      onClick={() => setImagePreviewUrl(u)}
+                      title="点击查看大图"
+                    >
+                      <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setAuxUrlsList((prev) => prev.filter((_, j) => j !== i))
+                      }}
                       className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white"
                       aria-label="移除"
                     >
@@ -1923,7 +2053,7 @@ export default function DouyinProductCreateWizard({
                 {auxUrlsList.length < 4 && (
                   <button
                     type="button"
-                    disabled={uploadingSlot === 'aux' || !!aiBusy}
+                    disabled={uploadingSlot === 'aux' || aiOn('img-aux')}
                     onClick={() => auxFileRef.current?.click()}
                     className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
@@ -1956,18 +2086,17 @@ export default function DouyinProductCreateWizard({
                 </label>
                 <button
                   type="button"
-                  disabled={!!uploadingSlot || !!aiBusy}
+                  disabled={!!uploadingSlot || aiOn('img-env')}
                   aria-describedby="douyin-ai-image-model-active"
-                  title={`生图模型：${selectedImageAiLabel}`}
+                  title={
+                    imageAiHeadline.auto
+                      ? `生图：自动（当前 ${imageAiHeadline.opt?.label ?? imageAiHeadline.id}）`
+                      : `生图：${selectedImageAiLabel}`
+                  }
                   onClick={() => void aiOptimizeEnvImages()}
-                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50 sm:max-w-[14rem]"
                 >
-                  {aiBusy === 'img-env' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3.5 w-3.5" />
-                  )}
-                  {envUrlsList.length ? 'AI 批量美化' : 'AI 生成一张'}
+                  {renderImageGenTriggerContent(aiOn('img-env'))}
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
@@ -1976,10 +2105,20 @@ export default function DouyinProductCreateWizard({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {envUrlsList.map((u, i) => (
                   <div key={`${u}-${i}`} className="relative">
-                    <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
                     <button
                       type="button"
-                      onClick={() => setEnvUrlsList((prev) => prev.filter((_, j) => j !== i))}
+                      className="block cursor-zoom-in rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      onClick={() => setImagePreviewUrl(u)}
+                      title="点击查看大图"
+                    >
+                      <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEnvUrlsList((prev) => prev.filter((_, j) => j !== i))
+                      }}
                       className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white"
                       aria-label="移除"
                     >
@@ -1990,7 +2129,7 @@ export default function DouyinProductCreateWizard({
                 {envUrlsList.length < 10 && (
                   <button
                     type="button"
-                    disabled={uploadingSlot === 'env' || !!aiBusy}
+                    disabled={uploadingSlot === 'env' || aiOn('img-env')}
                     onClick={() => envFileRef.current?.click()}
                     className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
@@ -2641,6 +2780,32 @@ export default function DouyinProductCreateWizard({
           )}
         </>
       )}
+
+      {imagePreviewUrl ? (
+        <div
+          className="fixed inset-0 z-[280] flex items-center justify-center bg-black/80 p-4"
+          role="presentation"
+          onClick={() => setImagePreviewUrl(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full bg-white/95 p-2 text-gray-800 shadow-lg hover:bg-white"
+            onClick={(e) => {
+              e.stopPropagation()
+              setImagePreviewUrl(null)
+            }}
+            aria-label="关闭预览"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={imagePreviewUrl}
+            alt=""
+            className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
 
       {storeModalOpen && (
         <div
