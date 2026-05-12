@@ -56,8 +56,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       io,
     })
 
-    const payload = typeof out.body === 'string' ? out.body : JSON.stringify(out.body)
-    res.status(out.status).send(payload)
+    const status = typeof out.status === 'number' && Number.isFinite(out.status) ? out.status : 500
+    let payload: string
+    try {
+      payload = typeof out.body === 'string' ? out.body : JSON.stringify(out.body)
+    } catch (stringifyErr) {
+      const hint = stringifyErr instanceof Error ? stringifyErr.message : String(stringifyErr)
+      sendOpsJson(res, 500, {
+        ok: false,
+        error: 'registry_response_not_serializable',
+        detail: hint.slice(0, 400),
+      })
+      return
+    }
+    res.status(status).send(payload)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
