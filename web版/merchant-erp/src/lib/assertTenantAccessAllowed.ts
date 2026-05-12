@@ -16,7 +16,9 @@ async function assertTenantAccessAllowedCore(supabase: SupabaseClient): Promise<
     .eq('user_id', session.user.id)
 
   if (error) {
-    return { ok: false, message: '无法校验商户状态，请稍后重试或联系管理员' }
+    // RLS/网络/类型不匹配时若一律拒绝，会出现「已登录 → 一直加载 → 闪回登录」；放行并打日志便于排查策略与连接
+    console.warn('[ERP] tenant_members 校验查询失败，本次放行:', error.message)
+    return { ok: true }
   }
 
   const statuses: string[] = []

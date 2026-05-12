@@ -1,4 +1,4 @@
-import type { RegistryRecruitmentOrder } from './opsRegistryTypes'
+import type { RegistryRecruitmentOrder } from './opsRegistryTypes.js'
 
 /** 旧版 mockData 写入注册表时的规范单号 */
 const LEGACY_CANONICAL_IDS = new Set(['RO20260501001', 'RO20260428003', 'RO20260415002'])
