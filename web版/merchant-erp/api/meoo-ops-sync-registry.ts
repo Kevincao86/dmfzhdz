@@ -6,6 +6,10 @@
  * VITE_SUPABASE_URL 或 SUPABASE_URL，以及 SUPABASE_SERVICE_ROLE_KEY。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  merchantSupabaseAdminEnvConfigureHint,
+  readMerchantSupabaseAdminEnv,
+} from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -44,20 +48,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
-    const serviceRole = (
-      process.env.SUPABASE_SERVICE_ROLE_KEY ??
-      process.env.SUPABASE_SERVICE_ROLE ??
-      ''
-    ).trim()
+    const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
 
-    if (!supabaseUrl || !serviceRole) {
+    if (missingParts.length > 0) {
       res.status(503).send(
         JSON.stringify({
           ok: false,
           error: 'supabase_admin_not_configured',
-          hint:
-            '注册表快照需要 VITE_SUPABASE_URL（或 SUPABASE_URL）与 SUPABASE_SERVICE_ROLE_KEY；与运营台共用同一 Supabase 实例。',
+          missing: missingParts,
+          hint: merchantSupabaseAdminEnvConfigureHint(missingParts),
         }),
       )
       return
