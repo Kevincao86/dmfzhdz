@@ -26,6 +26,35 @@ const META_ACCOUNT_NAME = 'meoo_douyin_account_name'
 
 type PageSize = 10 | 50 | 100
 
+/** 门店列表失败但绑定/会话未必失效：反代 HTML、5xx、超时等 */
+function listErrorIndicatesInfrastructure(msg: string): boolean {
+  const c = msg ?? ''
+  const m = c.toLowerCase()
+  if (/<!doctype|<\s*html[\s>]|<html[\s>]/.test(m.slice(0, 400))) return true
+  if (/返回.*html|非\s*json|开放平台网页|抖音开放平台/.test(c)) return true
+  if (/nginx|反代|proxy_pass|自建反代|502|503|504|网关|fetch failed|econnreset|aborted|中止/i.test(m))
+    return true
+  if (c.includes('DOUYIN_OPENAPI_BASE_URL') || m.includes('/douyin/')) return true
+  if (/超时|timed?\s*out|timeout/i.test(m)) return true
+  if (/relation_type.*均失败|三种 relation_type/.test(c)) return true
+  return false
+}
+
+/** 开放平台明确拒绝或本地解密失败 — 才提示「连接异常」需重绑 */
+function listErrorIndicatesInvalidSession(msg: string): boolean {
+  if (listErrorIndicatesInfrastructure(msg)) return false
+  const c = msg ?? ''
+  const m = c.toLowerCase()
+  if (/\b401\b|\b403\b/.test(c)) return true
+  if (
+    /未授权|无权|拒绝访问|token无效|access[_-]?token|会话|解密失败|凭证无效|授权失效|已过期|expired|invalid.*token|鉴权失败/.test(
+      m,
+    )
+  )
+    return true
+  return false
+}
+
 export default function DouyinMerchantSection() {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     readMerchantSession(TOKEN_KEY),
@@ -234,10 +263,17 @@ export default function DouyinMerchantSection() {
     [total, pageSize],
   )
 
-  /** 绑定卡片：接口拉通为绿；会话失效等为红；首屏校验中为琥珀 */
-  const bindCardTone = useMemo((): 'ok' | 'error' | 'pending' => {
+  /**
+   * 绑定卡片：绿=门店接口正常；琥珀 pending=首屏校验中；琥珀 degraded=网络/反代等门店拉取失败但凭据仍保留；
+   * 红 error=疑似会话/鉴权失效（非基础设施类错误）。
+   */
+  const bindCardTone = useMemo((): 'ok' | 'error' | 'pending' | 'degraded' => {
     if (!accessToken) return 'pending'
-    if (listError) return 'error'
+    if (listError) {
+      if (listErrorIndicatesInfrastructure(listError)) return 'degraded'
+      if (listErrorIndicatesInvalidSession(listError)) return 'error'
+      return 'degraded'
+    }
     if (listLoading && rows.length === 0 && total === 0) return 'pending'
     return 'ok'
   }, [accessToken, listError, listLoading, rows.length, total])
@@ -248,7 +284,17 @@ export default function DouyinMerchantSection() {
         box: 'border-red-200 bg-red-50',
         icon: 'bg-red-100 text-red-600',
         title: '抖音来客连接异常',
-        subtitle: '本地已保存绑定信息，但当前无法通过开放平台拉取门店，请重新绑定或检查会话。',
+        subtitle:
+          '开放平台拒绝了当前会话或本地凭证无法解密。请重新绑定；若刚调整过服务端密钥，也需重新绑定。',
+      }
+    }
+    if (bindCardTone === 'degraded') {
+      return {
+        box: 'border-amber-200 bg-amber-50',
+        icon: 'bg-amber-100 text-amber-600',
+        title: '抖音来客已绑定（门店同步受阻）',
+        subtitle:
+          '绑定凭据仍保留，但当前无法稳定拉取门店列表（常见于反代未透传 GET、超时或上游返回网页而非 JSON）。可稍后重试；运维请检查 DOUYIN_OPENAPI_BASE_URL / Nginx。',
       }
     }
     if (bindCardTone === 'pending') {
@@ -406,11 +452,17 @@ export default function DouyinMerchantSection() {
                 <div>
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                     <h4 className="font-medium text-gray-900">{bindCardShell.title}</h4>
-                    {bindCardTone === 'ok' && boundAccountName ? (
-                      <span className="text-sm font-medium text-emerald-900">
+                    {(bindCardTone === 'ok' || bindCardTone === 'degraded') && boundAccountName ? (
+                      <span
+                        className={
+                          bindCardTone === 'ok'
+                            ? 'text-sm font-medium text-emerald-900'
+                            : 'text-sm font-medium text-amber-950'
+                        }
+                      >
                         {boundAccountName}
                       </span>
-                    ) : bindCardTone === 'ok' ? null : boundAccountName ? (
+                    ) : bindCardTone === 'pending' ? null : boundAccountName ? (
                       <span className="text-sm font-medium text-gray-800">{boundAccountName}</span>
                     ) : null}
                   </div>
@@ -478,7 +530,15 @@ export default function DouyinMerchantSection() {
             </div>
 
             {listError && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              <div
+                className={cn(
+                  'mb-3 rounded-lg border px-3 py-2 text-sm whitespace-pre-wrap',
+                  listErrorIndicatesInvalidSession(listError) &&
+                    !listErrorIndicatesInfrastructure(listError)
+                    ? 'border-red-200 bg-red-50 text-red-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-950',
+                )}
+              >
                 {listError}
               </div>
             )}

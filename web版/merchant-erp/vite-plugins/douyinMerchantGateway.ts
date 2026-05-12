@@ -40,6 +40,7 @@ import {
   douyinOpenApiUrl,
   exchangeDouyinClientToken,
   extractPoisFromShopQueryData,
+  fetchGoodlifeWithOfficialFallback,
   parseDouyinJson,
   parseDouyinOpenApiEnvelope,
 } from '../api/douyinOpenApiBase.js'
@@ -181,7 +182,7 @@ async function shopPoiQueryPage(
     u.searchParams.set('relation_type', String(relationType))
   }
 
-  const res = await douyinFetch(u.toString(), {
+  const { status, raw } = await fetchGoodlifeWithOfficialFallback(douyinFetch, u.toString(), {
     method: 'GET',
     headers: {
       'access-token': accessToken,
@@ -189,9 +190,8 @@ async function shopPoiQueryPage(
       'Rpc-Transit-Life-Account': accountId,
     },
   })
-  const raw = await res.text()
-  if (!res.ok) {
-    throw new Error(`shop/query HTTP ${res.status}：${raw.slice(0, 400)}`)
+  if (status < 200 || status >= 300) {
+    throw new Error(`shop/query HTTP ${status}：${raw.slice(0, 400)}`)
   }
   const j = parseDouyinOpenApiEnvelope(raw, 'shop/query')
   const err = getDataError(j)
@@ -209,7 +209,7 @@ async function shopPoiQuerySinglePoi(
   u.searchParams.set('poi_id', poiId.trim())
   u.searchParams.set('page', '1')
   u.searchParams.set('size', '20')
-  const res = await fetch(u.toString(), {
+  const { status, raw } = await fetchGoodlifeWithOfficialFallback(douyinFetch, u.toString(), {
     method: 'GET',
     headers: {
       'access-token': accessToken,
@@ -217,9 +217,8 @@ async function shopPoiQuerySinglePoi(
       'Rpc-Transit-Life-Account': accountId,
     },
   })
-  const raw = await res.text()
-  if (!res.ok) {
-    throw new Error(`shop/query(poi_id) HTTP ${res.status}：${raw.slice(0, 400)}`)
+  if (status < 200 || status >= 300) {
+    throw new Error(`shop/query(poi_id) HTTP ${status}：${raw.slice(0, 400)}`)
   }
   const j = parseDouyinOpenApiEnvelope(raw, 'shop/query(poi_id)')
   const err = getDataError(j)
