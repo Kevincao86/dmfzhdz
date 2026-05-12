@@ -16,16 +16,7 @@ async function assertTenantAccessAllowedCore(supabase: SupabaseClient): Promise<
     .eq('user_id', session.user.id)
 
   if (error) {
-    /**
-     * 与下方 Promise.race 超时策略一致：RLS、PostgREST 配置或瞬时网络错误时，
-     * 若直接拒绝登录会导致「全员无法进入 ERP」；先放行并打日志，便于线上恢复业务后再修策略。
-     */
-    console.warn(
-      '[ERP] tenant_members 查询失败，为保证可登录暂时放行。请检查 RLS 与 anon 角色对 tenant_members/tenants 的 select 权限。详情:',
-      error.message,
-      error,
-    )
-    return { ok: true }
+    return { ok: false, message: '无法校验商户状态，请稍后重试或联系管理员' }
   }
 
   const statuses: string[] = []
@@ -76,8 +67,7 @@ export async function assertTenantAccessAllowed(
   const timeoutPromise = new Promise<TenantGateResult>((resolve) => {
     timeoutId = setTimeout(() => {
       console.warn(
-        '[ERP] 校验租户状态超时：对 PostgREST `GET …/rest/v1/tenant_members`（与 `auth.getSession`）的等待已超过',
-        `${timeoutMs}ms。多为到 Supabase 的 HTTPS 慢或被拦截。本次暂时允许进入；若需严格校验请检查网络与 VITE_SUPABASE_URL。`,
+        '[ERP] 校验租户状态超时（网络或 Supabase 不可达）。本次暂时允许进入；请检查 VITE_SUPABASE_URL 与网络。',
       )
       resolve({ ok: true })
     }, timeoutMs)
