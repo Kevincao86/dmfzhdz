@@ -122,7 +122,14 @@ export type AiAssistRequest = {
 
 export type AiAssistResult =
   | { ok: false; message: string; needVendorKey?: string }
-  | { ok: true; title?: string; description?: string; image_urls?: string[] }
+  | {
+      ok: true
+      title?: string
+      description?: string
+      image_urls?: string[]
+      /** 网关因上游失败自动改用的内置厂商 id（minimax / qwen / doubao） */
+      ai_vendor_used?: string
+    }
 
 function parseNeedVendorKey(data: Record<string, unknown>): string | undefined {
   if (data.code !== 'NEED_VENDOR_KEY') return undefined
@@ -193,7 +200,18 @@ export async function postDouyinGoodsAiAssist(body: AiAssistRequest): Promise<Ai
   const image_urls = Array.isArray(rawUrls)
     ? rawUrls.map((x) => String(x)).filter((u) => u.length > 0)
     : undefined
-  return { ok: true, title, description, image_urls }
+  const ai_vendor_used_raw = data.ai_vendor_used
+  const ai_vendor_used =
+    typeof ai_vendor_used_raw === 'string' && ai_vendor_used_raw.trim()
+      ? ai_vendor_used_raw.trim().toLowerCase()
+      : undefined
+  return {
+    ok: true,
+    title,
+    description,
+    image_urls,
+    ...(ai_vendor_used ? { ai_vendor_used } : {}),
+  }
 }
 
 /** GEO 页：用当前知识包 + 用户原问调用与商品 AI 同源网关（需抖音 Bearer + 已配置模型 Key） */

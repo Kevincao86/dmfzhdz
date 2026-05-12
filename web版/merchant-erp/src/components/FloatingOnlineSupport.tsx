@@ -314,16 +314,66 @@ export default function FloatingOnlineSupport({
     let authSub: { unsubscribe: () => void } | null = null
 
     const bindRealtimeJwt = async () => {
-      const {
-        data: { session },
-      } = await client.auth.getSession()
-      await client.realtime.setAuth(session?.access_token ?? '')
+      const race = await Promise.race([
+        client.auth.getSession(),
+        new Promise<Awaited<ReturnType<typeof client.auth.getSession>>>((resolve) => {
+          window.setTimeout(() => resolve({ data: { session: null }, error: null }), 8000)
+        }),
+      ])
+      await client.realtime.setAuth(race.data.session?.access_token ?? '')
+    }
+
+    const attachAuthListener = () => {
+      if (authSub) return
+      const { data } = client.auth.onAuthStateChange(async (_event, session) => {
+        try {
+          await client.realtime.setAuth(session?.access_token ?? '')
+        } catch {
+          /* ignore */
+        }
+        runPollMerge()
+      })
+      authSub = data.subscription
+    }
+
+    const startPollingAndReady = () => {
+      if (cancelled) return
+      if (!pollTimer) {
+        pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
+        runPollMerge()
+      }
+      setRelayReady(true)
     }
 
     void (async () => {
+      let bootWatch: ReturnType<typeof setTimeout> | undefined
+      const clearBootWatch = () => {
+        if (bootWatch !== undefined) {
+          clearTimeout(bootWatch)
+          bootWatch = undefined
+        }
+      }
+
+      bootWatch = window.setTimeout(() => {
+        if (cancelled) return
+        console.warn(
+          '[support] Supabase 会话/Realtime 初始化超过 10s，先开放面板并启用轮询（与登录页共用网络，若仍失败请检查 Supabase 可达性）。',
+        )
+        attachAuthListener()
+        startPollingAndReady()
+        void client.realtime.setAuth('').catch(() => {})
+      }, 10_000)
+
       try {
-        await client.auth.getSession()
-        await bindRealtimeJwt()
+        await Promise.race([
+          (async () => {
+            await client.auth.getSession()
+            await bindRealtimeJwt()
+          })(),
+          new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 9000)
+          }),
+        ])
 
         const rows = await fetchSessionRows()
         if (cancelled) return
@@ -332,16 +382,10 @@ export default function FloatingOnlineSupport({
           setMessages(rows.map((r) => rowToChatMessage(r)))
         }
 
-        pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
-        runPollMerge()
-        /** 生产上 Realtime 常因 RLS/未放行 publication 等长期不进入 SUBSCRIBED；轮询已可收发，不应阻塞会话 */
-        setRelayReady(true)
+        startPollingAndReady()
+        clearBootWatch()
 
-        const { data } = client.auth.onAuthStateChange(async (_event, session) => {
-          await client.realtime.setAuth(session?.access_token ?? '')
-          runPollMerge()
-        })
-        authSub = data.subscription
+        attachAuthListener()
 
         ch = client
           .channel(`meoo-support:${sid}`)
@@ -366,15 +410,11 @@ export default function FloatingOnlineSupport({
           .subscribe()
       } catch {
         if (!cancelled) {
-          pollTimer = window.setInterval(runPollMerge, SUPPORT_RELAY_POLL_MS)
-          runPollMerge()
-          const { data } = client.auth.onAuthStateChange(async (_event, session) => {
-            await client.realtime.setAuth(session?.access_token ?? '')
-            runPollMerge()
-          })
-          authSub = data.subscription
-          setRelayReady(true)
+          attachAuthListener()
+          startPollingAndReady()
         }
+      } finally {
+        clearBootWatch()
       }
     })()
 

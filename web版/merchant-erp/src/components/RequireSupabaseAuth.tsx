@@ -4,11 +4,28 @@ import type { Session } from '@supabase/supabase-js'
 import { assertTenantAccessAllowed } from '../lib/assertTenantAccessAllowed'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
-/** 首几秒内的「无会话」可能是 getSession 与 SIGNED_IN 顺序问题，防抖后再判定 */
+/** 单次 getSession 竞态上限：避免对 Supabase 请求挂起时整页永久「正在加载会话」 */
+const GET_SESSION_RACE_MS = 10_000
+/** 首几秒内的「无会话」信号可能是 Auth 初始化顺序问题，合并后再判定 */
 const NO_SESSION_DEBOUNCE_MS = 600
+/** 首屏仅在此窗口内对「无会话」做防抖；之后无会话视为真实登出 */
 const NO_SESSION_DEBOUNCE_BOOT_MS = 4_500
-/** 应大于 assertTenantAccessAllowed 内超时 + getSession 余量，避免误杀仍在校验中的会话 */
-const AUTH_BOOTSTRAP_MAX_WAIT_MS = 20_000
+/** 应大于 assertTenantAccessAllowed 内超时 + getSession 余量 */
+const AUTH_BOOTSTRAP_MAX_WAIT_MS = 28_000
+
+type SessionRaceOk = { kind: 'ok'; session: Session | null }
+type SessionRaceTimeout = { kind: 'timeout' }
+
+function raceGetSession(
+  getSession: () => ReturnType<NonNullable<typeof supabase>['auth']['getSession']>,
+): Promise<SessionRaceOk | SessionRaceTimeout> {
+  return Promise.race([
+    getSession().then((r): SessionRaceOk => ({ kind: 'ok', session: r.data.session })),
+    new Promise<SessionRaceTimeout>((resolve) => {
+      window.setTimeout(() => resolve({ kind: 'timeout' }), GET_SESSION_RACE_MS)
+    }),
+  ])
+}
 
 export default function RequireSupabaseAuth({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
@@ -28,7 +45,7 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     let bootResolved = false
     const bootStartedAt = Date.now()
     let noSessionTimer: ReturnType<typeof setTimeout> | undefined
-    /** 已见过非空 session 时，忽略 getSession/可见性里偶发 null（除非 SIGNED_OUT） */
+    /** 已在本次挂载中见过非空 session 时，忽略 getSession/可见性/Auth 管道里偶发 null（除非 SIGNED_OUT），避免误踢回登录 */
     const sessionEverSeenRef = { current: false }
 
     const markBootResolved = () => {
@@ -99,10 +116,15 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       scheduleNoSession()
     }
 
-    // 不单独依赖 INITIAL_SESSION：部分环境下事件顺序晚于首屏，会导致 ready 一直为 false（表现为白屏/一直转圈）
-    void sb.auth.getSession().then(({ data }) => {
+    void raceGetSession(() => sb.auth.getSession()).then((r) => {
       if (cancelled) return
-      handleHasSession(data.session, { fromAuth: false })
+      if (r.kind === 'timeout') {
+        console.warn(
+          `[ERP] getSession 超过 ${GET_SESSION_RACE_MS / 1000}s 仍未返回，可能无法访问 Supabase。将等待 Auth 状态回调；请检查网络与 VITE_SUPABASE_URL。`,
+        )
+        return
+      }
+      handleHasSession(r.session, { fromAuth: false })
     })
 
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
@@ -115,9 +137,10 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       if (document.visibilityState !== 'visible') return
       clearTimeout(visTimer)
       visTimer = setTimeout(() => {
-        void sb.auth.getSession().then(({ data }) => {
+        void raceGetSession(() => sb.auth.getSession()).then((r) => {
           if (cancelled) return
-          handleHasSession(data.session, { fromAuth: false })
+          if (r.kind === 'timeout') return
+          handleHasSession(r.session, { fromAuth: false })
         })
       }, 400)
     }
@@ -127,7 +150,9 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
       if (cancelled || bootResolved) return
       bootResolved = true
       clearNoSessionDebounce()
-      console.warn('[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及本地 Supabase 是否已启动。')
+      console.warn(
+        '[ERP] 会话初始化超时，将跳转登录页。请检查网络、VITE_SUPABASE_URL 及 Supabase 项目是否可达。',
+      )
       setAllowed(false)
       setReady(true)
       navigate('/login', {

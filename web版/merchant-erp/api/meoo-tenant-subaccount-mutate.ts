@@ -40,6 +40,9 @@ function loginNameToEmail(loginName: string, domain: string): string {
   return `${slug || 'user'}@${domain}`
 }
 
+/** GoTrue listUsers 在部分 TS/客户端版本下元素会被推成 never，显式收窄避免误报 */
+type ListedAuthUser = { id: string; email?: string | null }
+
 function tenantEmailDomain(): string {
   const d = (
     process.env.VITE_SUPABASE_TENANT_EMAIL_DOMAIN ??
@@ -196,7 +199,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-      uid = list?.users?.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())?.id ?? ''
+      const users = (list?.users ?? []) as ListedAuthUser[]
+      uid = users.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())?.id ?? ''
     }
     if (!uid) {
       sendJson(res, 404, { ok: false, message: '未找到该子账号的云端登录，请重新创建子账号后再试' })
@@ -227,7 +231,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let uid = cloudUserId
     if (!uid && email) {
       const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
-      uid = list?.users?.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())?.id ?? ''
+      const users = (list?.users ?? []) as ListedAuthUser[]
+      uid = users.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase())?.id ?? ''
     }
     if (!uid) {
       sendJson(res, 200, { ok: true, skipped: true })

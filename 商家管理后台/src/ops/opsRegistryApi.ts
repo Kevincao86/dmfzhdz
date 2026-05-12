@@ -27,6 +27,7 @@ export type AiVendorCatalogEntry = {
   id: string
   label: string
   hint?: string
+  logoUrl?: string
 }
 
 export type VendorKeyModelId = 'minimax' | 'qwen' | 'doubao'

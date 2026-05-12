@@ -333,6 +333,8 @@ export type DouyinProductDetailPayload = {
   out_id: string
   category_id: string
   product_type: number
+  /** 来客根账户昵称，写入 goodlife product.save 的 `product.account_name` */
+  account_name?: string
   merchant_display_name?: string
   /**
    * 收款方式：网关映射 goodlife 商品 save 中与结算/分账相关字段（如总店统一收款、门店独立收款等）。
@@ -1259,10 +1261,15 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
   }
   const ec = typeof inner.error_code === 'number' ? inner.error_code : 0
   if (ec !== 0) {
+    const rootExtra = data.extra as Record<string, unknown> | undefined
+    const sub =
+      rootExtra && typeof rootExtra.sub_description === 'string' && rootExtra.sub_description.trim()
+        ? `（${rootExtra.sub_description.trim()}）`
+        : ''
     return {
       ok: false,
       message:
-        (typeof inner?.description === 'string' && inner.description) || `抖音 error_code=${ec}`,
+        ((typeof inner?.description === 'string' && inner.description) || `抖音 error_code=${ec}`) + sub,
     }
   }
   const pidRaw = inner?.product_id

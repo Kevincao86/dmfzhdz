@@ -235,8 +235,10 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               imageModel?: string
               lastWriter?: 'erp' | 'ops'
             }
-            const textModel = (body.textModel ?? '').trim() || DEFAULT_AI.textModel
-            const imageModel = (body.imageModel ?? '').trim() || DEFAULT_AI.imageModel
+            const rawT = (body.textModel ?? '').trim().toLowerCase()
+            const rawI = (body.imageModel ?? '').trim().toLowerCase()
+            const textModel = !rawT || rawT === 'auto' ? 'auto' : rawT
+            const imageModel = !rawI || rawI === 'auto' ? 'auto' : rawI
             const lastWriter = body.lastWriter === 'ops' ? 'ops' : 'erp'
             const data = ensureRegistry(viteRoot)
             const controlledByOps = lastWriter === 'ops' ? true : data.aiModels.controlledByOps
