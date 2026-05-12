@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/productDraftSnapshot'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
 import { readMerchantSession } from '../../lib/merchantSession'
@@ -117,6 +117,7 @@ export default function DouyinProductCreateWizard({
   variant = 'create',
   editProductId,
 }: DouyinProductWizardProps = {}) {
+  const navigate = useNavigate()
   const [step, setStep] = useState<Step>('category')
   const [loading, setLoading] = useState(true)
   const [loadErr, setLoadErr] = useState<string | null>(null)
@@ -1038,21 +1039,22 @@ export default function DouyinProductCreateWizard({
     const r = await postDouyinGoodsProductSave({ mode, detail })
     setSaving(false)
     if (r.ok) {
+      const pid = (r.product_id && String(r.product_id).trim()) || detail.out_id
+      const names = selectedPoiIds
+        .map((id) => modalStores.find((s) => s.id === id)?.name)
+        .filter(Boolean) as string[]
+      let storeLabel = '—'
+      if (selectedPoiIds.length === 0) storeLabel = '—'
+      else if (names.length === selectedPoiIds.length && selectedPoiIds.length <= 2)
+        storeLabel = names.join('、')
+      else if (names.length > 0)
+        storeLabel =
+          selectedPoiIds.length > 2
+            ? `${names.slice(0, 2).join('、')}等${selectedPoiIds.length}店`
+            : names.join('、')
+      else storeLabel = `${selectedPoiIds.length} 家门店`
+
       if (mode === 'draft') {
-        const pid = (r.product_id && String(r.product_id).trim()) || detail.out_id
-        const names = selectedPoiIds
-          .map((id) => modalStores.find((s) => s.id === id)?.name)
-          .filter(Boolean) as string[]
-        let storeLabel = '—'
-        if (selectedPoiIds.length === 0) storeLabel = '—'
-        else if (names.length === selectedPoiIds.length && selectedPoiIds.length <= 2)
-          storeLabel = names.join('、')
-        else if (names.length > 0)
-          storeLabel =
-            selectedPoiIds.length > 2
-              ? `${names.slice(0, 2).join('、')}等${selectedPoiIds.length}店`
-              : names.join('、')
-        else storeLabel = `${selectedPoiIds.length} 家门店`
         upsertProductEditLibraryDraft({
           id: pid,
           name: detail.product_name,
@@ -1062,12 +1064,22 @@ export default function DouyinProductCreateWizard({
           price: detail.price_yuan,
           platformApi: 'douyin',
         })
-        saveDraftDetailSnapshot(pid, {
-          ...detail,
-          product_id: pid,
-          out_id: detail.out_id,
+      } else {
+        upsertProductEditLibraryDraft({
+          id: pid,
+          name: detail.product_name,
+          platform: '抖音来客',
+          store: storeLabel,
+          status: '审核中',
+          price: detail.price_yuan,
+          platformApi: 'douyin',
         })
       }
+      saveDraftDetailSnapshot(pid, {
+        ...detail,
+        product_id: pid,
+        out_id: detail.out_id,
+      })
       if (r.product_id?.trim()) persistedProductIdRef.current = r.product_id.trim()
       setActionMsg({
         text:
@@ -1077,6 +1089,7 @@ export default function DouyinProductCreateWizard({
             : `草稿已保存。平台商品编号：${r.product_id ?? '-'}，已同步至商品编辑库。`),
         ok: true,
       })
+      if (mode === 'submit') navigate('/products/list')
     } else {
       setActionMsg({ text: r.message, ok: false })
     }
