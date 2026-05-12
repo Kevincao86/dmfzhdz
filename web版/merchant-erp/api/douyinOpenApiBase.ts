@@ -2,8 +2,10 @@
  * 抖音开放平台 HTTP 基址（仅服务端 / Vite 网关；勿暴露给浏览器 bundle）。
  *
  * - **DOUYIN_OPENAPI_BASE_URL**：本地生活等路径（如 `/goodlife/*`）基址；不设则 `https://open.douyin.com`。
- * - **DOUYIN_OPENAPI_OAUTH_BASE_URL**：OAuth（`/oauth/*`，含 `client_token`）基址。**不设时默认直连官方**，
- *   避免自建反代对 POST JSON 处理不当返回 HTML 页面。若 OAuth 也必须走固定 IP，请显式设为与 BASE 相同的中继根。
+ * - **DOUYIN_OPENAPI_OAUTH_BASE_URL**：OAuth（`/oauth/*`，含 `client_token`）基址。
+ *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：OAuth 与同一条固定出口中继，避免只有 goodlife 走 EIP、client_token 仍走云函数出口触发「IP 不在白名单」。
+ *   **不设且未配置中继**：默认 `https://open.douyin.com`。
+ *   若中继对 POST OAuth 有问题，仍可显式设 `DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com`，仅 OAuth 直连。
  *
  * Vercel：Environment Variables 中配置上述变量（勿以 / 结尾）。
  */
@@ -15,10 +17,12 @@ function normalizedGoodlifeBase(): string {
   return raw.replace(/\/+$/, '')
 }
 
-/** 未单独配置 OAuth 时固定为官方域名，与 goodlife 中继解耦 */
+/** OAuth 基址：显式 OAUTH_URL >（已配 goodlife 中继则与其同源）> 官方 */
 function normalizedOauthBase(): string {
-  const raw = process.env.DOUYIN_OPENAPI_OAUTH_BASE_URL?.trim()
-  if (raw) return raw.replace(/\/+$/, '')
+  const oauthRaw = process.env.DOUYIN_OPENAPI_OAUTH_BASE_URL?.trim()
+  if (oauthRaw) return oauthRaw.replace(/\/+$/, '')
+  const goodlife = normalizedGoodlifeBase()
+  if (goodlife !== DEFAULT_BASE) return goodlife
   return DEFAULT_BASE
 }
 
@@ -101,8 +105,8 @@ export function officialGoodlifeUrlFromRelayRequest(relayFullUrl: string): strin
 }
 
 /**
- * goodlife GET/POST：中继返回 HTML、5xx 或非 JSON 时自动再请求一次官方域名（不改动 OAuth 策略）。
- * 用于反代未配好 GET 时仍能拉门店，避免前端误判「连接异常」。
+ * goodlife GET/POST：**未配置** `DOUYIN_OPENAPI_BASE_URL`（直连官方）时单次请求即可。
+ * 已配置中继（固定 EIP 出口）：**不回退官方**，否则会走云主机随机出口触发抖音「IP 不在白名单」。
  */
 export async function fetchGoodlifeWithOfficialFallback(
   fetchFn: DouyinFetchFn,
@@ -115,25 +119,14 @@ export async function fetchGoodlifeWithOfficialFallback(
   if (relay === DEFAULT_BASE) {
     return { status: r1.status, raw: raw1, usedOfficialFallback: false }
   }
-  const tryFallback =
-    r1.status >= 500 ||
-    responseLooksLikeHtml(raw1) ||
-    (r1.ok && !looksLikeJsonObject(raw1))
-  if (!tryFallback) {
-    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
-  }
-  const official = officialGoodlifeUrlFromRelayRequest(relayUrl)
-  if (!official) {
-    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
-  }
-  const r2 = await fetchFn(official, init)
-  const raw2 = await r2.text()
-  return { status: r2.status, raw: raw2, usedOfficialFallback: true }
+  // 已配置固定出口（DOUYIN_OPENAPI_BASE_URL）：禁止回退 open.douyin.com，否则走的是云函数/容器出口 IP，
+  // 与控制台「服务器 IP 白名单」（常见为 EIP + Nginx 反代）不一致，抖音返回「IP 不在白名单」。
+  return { status: r1.status, raw: raw1, usedOfficialFallback: false }
 }
 
 /**
  * 申请 client_token：先 JSON POST，若 200 但返回 HTML（反代未透传 body 等）再尝试 x-www-form-urlencoded。
- * OAuth 请求走 `douyinOpenApiUrl('/oauth/...')`（默认官方，与 goodlife 中继分离）。
+ * OAuth URL 走 `douyinOpenApiUrl('/oauth/...')`：已配固定出口中继时与同基址同源；否则直连官方。
  */
 export async function exchangeDouyinClientToken(
   clientKey: string,
