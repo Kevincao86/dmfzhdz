@@ -4,7 +4,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../meooRegistrySnapshotIo'
 import { sendOpsJson } from '../safeOpsJson'
-import { dispatchOpsRegistrySupabase } from '../../src/ops/opsRegistrySupabaseDispatch'
 
 export const config = { maxDuration: 60 }
 
@@ -99,6 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    /** 动态加载：避免 GET /registry 冷启动拖入整份 dispatch（含 node:crypto 等）→ FUNCTION_INVOCATION_FAILED / OOM */
+    const { dispatchOpsRegistrySupabase } = await import('../../src/ops/opsRegistrySupabaseDispatch.js')
     const out = await dispatchOpsRegistrySupabase({
       method,
       urlPath,
