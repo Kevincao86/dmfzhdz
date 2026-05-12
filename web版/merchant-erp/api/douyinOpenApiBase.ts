@@ -187,6 +187,79 @@ export function parseDouyinJson(raw: string): Record<string, unknown> {
   }
 }
 
+/** 反代不当时常返回抖音开放平台 HTML；若当 JSON 解析会得到「假空」门店列表 */
+export function assertDouyinOpenApiJsonBody(raw: string, apiLabel: string): void {
+  const t = (raw ?? '').replace(/^\uFEFF/, '').trim()
+  if (!t) {
+    throw new Error(
+      `${apiLabel} 响应体为空。请检查 DOUYIN_OPENAPI_BASE_URL 反代是否截断 GET、或上游未返回 body。`,
+    )
+  }
+  const head = t.slice(0, 800).toLowerCase()
+  if (
+    head.startsWith('<!') ||
+    head.startsWith('<html') ||
+    head.includes('<!doctype') ||
+    head.includes('抖音开放平台') ||
+    (head.includes('<title>') && head.includes('</title>'))
+  ) {
+    throw new Error(
+      `${apiLabel} 返回 HTML 而非 JSON：经自建反代访问 goodlife 失败（常见：proxy_pass 未保留查询串、location 只配了 POST、把 GET 落到站点首页）。请修正 Nginx 的 /douyin/ 规则，或暂时移除 DOUYIN_OPENAPI_BASE_URL 验证。摘要：${t.slice(0, 280)}`,
+    )
+  }
+}
+
+export function parseDouyinOpenApiEnvelope(raw: string, apiLabel: string): Record<string, unknown> {
+  assertDouyinOpenApiJsonBody(raw, apiLabel)
+  try {
+    const v = JSON.parse((raw ?? '').replace(/^\uFEFF/, '').trim()) as unknown
+    if (!v || typeof v !== 'object' || Array.isArray(v)) {
+      throw new Error(`${apiLabel} 根 JSON 须为对象`)
+    }
+    return v as Record<string, unknown>
+  } catch (e) {
+    if (e instanceof Error && (e.message.startsWith(apiLabel) || e.message.includes('根 JSON'))) throw e
+    const snippet = (raw ?? '').replace(/^\uFEFF/, '').trim().slice(0, 280)
+    throw new Error(`${apiLabel} JSON 解析失败：${snippet}`)
+  }
+}
+
+function pickPoiArrayFromRecord(d: Record<string, unknown>, depth = 0): unknown[] {
+  if (depth > 5) return []
+  const direct = d.pois
+  if (Array.isArray(direct)) return direct
+  const alt =
+    d.list ??
+    d.poi_list ??
+    d.shop_list ??
+    d.shops ??
+    d.records ??
+    d.poi_info_list ??
+    d.poi_infos ??
+    d.shop_poi_list ??
+    d.poi_data_list
+  if (Array.isArray(alt)) return alt
+  const res = d.result
+  if (res && typeof res === 'object' && !Array.isArray(res)) {
+    const nested = pickPoiArrayFromRecord(res as Record<string, unknown>, depth + 1)
+    if (nested.length > 0) return nested
+  }
+  return []
+}
+
+/** 从 shop.query 的 data 节点提取门店列表（兼容嵌套 data、多字段名） */
+export function extractPoisFromShopQueryData(data: Record<string, unknown> | undefined): unknown[] {
+  if (!data || typeof data !== 'object') return []
+  const first = pickPoiArrayFromRecord(data)
+  if (first.length > 0) return first
+  const inner = data.data
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+    const second = pickPoiArrayFromRecord(inner as Record<string, unknown>)
+    if (second.length > 0) return second
+  }
+  return []
+}
+
 function asRecord(v: unknown): Record<string, unknown> | undefined {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined
   return v as Record<string, unknown>

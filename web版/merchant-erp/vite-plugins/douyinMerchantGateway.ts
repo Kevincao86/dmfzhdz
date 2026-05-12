@@ -36,7 +36,13 @@
  * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { douyinOpenApiUrl, exchangeDouyinClientToken, parseDouyinJson } from '../api/douyinOpenApiBase.js'
+import {
+  douyinOpenApiUrl,
+  exchangeDouyinClientToken,
+  extractPoisFromShopQueryData,
+  parseDouyinJson,
+  parseDouyinOpenApiEnvelope,
+} from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
@@ -187,7 +193,7 @@ async function shopPoiQueryPage(
   if (!res.ok) {
     throw new Error(`shop/query HTTP ${res.status}：${raw.slice(0, 400)}`)
   }
-  const j = parseDouyinJson(raw)
+  const j = parseDouyinOpenApiEnvelope(raw, 'shop/query')
   const err = getDataError(j)
   if (!err.ok) throw new Error(err.msg ?? 'shop/query 业务错误')
   return j
@@ -215,7 +221,7 @@ async function shopPoiQuerySinglePoi(
   if (!res.ok) {
     throw new Error(`shop/query(poi_id) HTTP ${res.status}：${raw.slice(0, 400)}`)
   }
-  const j = parseDouyinJson(raw)
+  const j = parseDouyinOpenApiEnvelope(raw, 'shop/query(poi_id)')
   const err = getDataError(j)
   if (!err.ok) throw new Error(err.msg ?? 'shop/query(poi_id) 业务错误')
   return j
@@ -355,16 +361,6 @@ function stableFallbackPoiKey(row: unknown): string {
   const addr = String(poi.address ?? o.address ?? poi.address_detail ?? o.address_detail ?? '').trim()
   const tail = `${name}|${addr}`.trim()
   return tail ? `fb:${tail.slice(0, 240)}` : ''
-}
-
-/** 兼容部分响应把列表放在 list / poi_list 或扁平数组 */
-function extractPoisFromShopQueryData(data: Record<string, unknown> | undefined): unknown[] {
-  if (!data || typeof data !== 'object') return []
-  const direct = data.pois
-  if (Array.isArray(direct)) return direct
-  const alt = data.list ?? data.poi_list ?? data.shop_list ?? data.shops ?? data.records
-  if (Array.isArray(alt)) return alt
-  return []
 }
 
 /** 抖音 shop.query 易返回「请求太过频繁」：翻页与多种 relation 之间稍作间隔 */
