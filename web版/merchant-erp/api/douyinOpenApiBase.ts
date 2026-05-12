@@ -391,3 +391,23 @@ export function extractClientTokenPayload(j: Record<string, unknown>): { token: 
 
   return null
 }
+
+/**
+ * goodlife 等接口业务错误里常见的「client_token / access-token 失效」文案（与 HTTP 状态码区分）。
+ * 命中时通常应清空会话缓存后重新 `client_token` 再重试一次请求。
+ */
+export function isLikelyDouyinClientTokenExpiredBizError(msg: string): boolean {
+  if (!msg || typeof msg !== 'string') return false
+  return /access[_ ]?token过期|access_token过期|token过期|请刷新或重新授权|请重新授权|access[_-]?token无效|凭证已过期|client_token过期/i.test(
+    msg,
+  )
+}
+
+/** 清空会话中的 client_token 缓存，迫使下次 ensure 重新 exchange。 */
+export function invalidateDouyinMerchantClientTokenCache(s: {
+  douyinToken: string
+  douyinExpiresAtMs: number
+}): void {
+  s.douyinToken = ''
+  s.douyinExpiresAtMs = 0
+}

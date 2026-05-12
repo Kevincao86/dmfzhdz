@@ -36,7 +36,11 @@ function listErrorIndicatesInfrastructure(msg: string): boolean {
     return true
   if (c.includes('DOUYIN_OPENAPI_BASE_URL') || m.includes('/douyin/')) return true
   if (/超时|timed?\s*out|timeout/i.test(m)) return true
-  if (/relation_type.*均失败|三种 relation_type/.test(c)) return true
+  /** 三种 relation 均失败常见于 token/权限；仅当不像鉴权问题时再归为「基础设施/反代」类 */
+  if (/relation_type.*均失败|三种 relation_type/.test(c)) {
+    if (/access_token过期|token过期|请刷新或重新授权|请重新授权|鉴权|未授权|invalid.*access/i.test(c)) return false
+    return true
+  }
   return false
 }
 
@@ -47,7 +51,7 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
   const m = c.toLowerCase()
   if (/\b401\b|\b403\b/.test(c)) return true
   if (
-    /未授权|无权|拒绝访问|token无效|access[_-]?token|会话|解密失败|凭证无效|授权失效|已过期|expired|invalid.*token|鉴权失败/.test(
+    /未授权|无权|拒绝访问|token无效|access[_-]?token过期|access_token过期|token过期|请刷新或重新授权|请重新授权|会话|解密失败|凭证无效|授权失效|已过期|expired|invalid.*token|鉴权失败/.test(
       m,
     )
   )

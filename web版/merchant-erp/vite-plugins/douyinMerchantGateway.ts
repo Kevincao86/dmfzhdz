@@ -36,11 +36,14 @@
  * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { randomUUID } from 'node:crypto'
 import {
   douyinOpenApiUrl,
   exchangeDouyinClientToken,
   extractPoisFromShopQueryData,
   fetchGoodlifeWithOfficialFallback,
+  invalidateDouyinMerchantClientTokenCache,
+  isLikelyDouyinClientTokenExpiredBizError,
   parseDouyinJson,
   parseDouyinOpenApiEnvelope,
 } from '../api/douyinOpenApiBase.js'
@@ -164,6 +167,29 @@ async function ensureDouyinToken(s: DouyinMerchantSession): Promise<string> {
   s.douyinToken = token
   s.douyinExpiresAtMs = Date.now() + Math.max(300, expiresIn) * 1000
   return token
+}
+
+/** 抖音侧偶发提前失效 client_token：清空缓存、重领 token 后重试一次 goodlife 请求 */
+async function withDouyinClientTokenRetry<T>(
+  session: DouyinMerchantSession,
+  opts: { sessionKey?: string },
+  op: (accessToken: string) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = await ensureDouyinToken(session)
+    try {
+      return await op(token)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (attempt === 0 && isLikelyDouyinClientTokenExpiredBizError(msg)) {
+        invalidateDouyinMerchantClientTokenCache(session)
+        if (opts.sessionKey) clearSessionPoiCache(opts.sessionKey)
+        continue
+      }
+      throw e
+    }
+  }
+  throw new Error('withDouyinClientTokenRetry: exhausted retries')
 }
 
 async function shopPoiQueryPage(
@@ -372,15 +398,20 @@ function sleep(ms: number): Promise<void> {
 
 /** 按 relation_type 翻页拉全量（最多 200 页），供认领拆分、tabCounts、装修列表复用 */
 async function fetchAllPoiPages(
+  sessionKey: string,
+  session: DouyinMerchantSession,
   accountId: string,
-  accessToken: string,
   relationType?: 0 | 1 | 2,
 ): Promise<{ pois: unknown[]; total: number }> {
   const all: unknown[] = []
   let reportedTotal = 0
   for (let page = 1; page <= 200; page++) {
     if (page > 1) await sleep(SHOP_QUERY_PAGE_DELAY_MS)
-    const j = await shopPoiQueryPage(accountId, accessToken, page, 50, relationType)
+    const j = await withDouyinClientTokenRetry(
+      session,
+      { sessionKey },
+      (token) => shopPoiQueryPage(accountId, token, page, 50, relationType),
+    )
     const data = j.data as Record<string, unknown> | undefined
     if (!data) break
     if (page === 1) reportedTotal = Number(data.total) || 0
@@ -410,8 +441,9 @@ function mergePoiPacksInto(
 }
 
 async function fetchMergedAllPois(
+  sessionKey: string,
+  session: DouyinMerchantSession,
   accountId: string,
-  accessToken: string,
 ): Promise<{ pois: unknown[]; total: number; relationWarnings: string[] }> {
   /** 串行降低瞬时 QPS；原先 Promise.all + 全程静默失败会导致线上「永远 0 条」 */
   const packs: { pois: unknown[]; total: number }[] = []
@@ -419,7 +451,7 @@ async function fetchMergedAllPois(
   for (const rt of [0, 1, 2] as const) {
     if (packs.length > 0) await sleep(SHOP_QUERY_RELATION_SWITCH_DELAY_MS)
     try {
-      packs.push(await fetchAllPoiPages(accountId, accessToken, rt))
+      packs.push(await fetchAllPoiPages(sessionKey, session, accountId, rt))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       errors.push(`relation_type=${rt}：${msg.slice(0, 320)}`)
@@ -435,7 +467,7 @@ async function fetchMergedAllPois(
   if (merged.length === 0 && errors.length === 0) {
     try {
       await sleep(SHOP_QUERY_RELATION_SWITCH_DELAY_MS)
-      const omitPack = await fetchAllPoiPages(accountId, accessToken, undefined)
+      const omitPack = await fetchAllPoiPages(sessionKey, session, accountId, undefined)
       mergePoiPacksInto([omitPack], seen, merged)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -464,8 +496,8 @@ type RelationSpec = 'all' | 0 | 1 | 2
 
 async function getCachedPoiList(
   sessionKey: string,
+  session: DouyinMerchantSession,
   accountId: string,
-  accessToken: string,
   relationSpec: RelationSpec,
   forceRefresh: boolean,
 ): Promise<{ pois: unknown[]; total: number; relationWarnings?: string[] }> {
@@ -479,8 +511,8 @@ async function getCachedPoiList(
   }
   const pack =
     relationSpec === 'all'
-      ? await fetchMergedAllPois(accountId, accessToken)
-      : { ...(await fetchAllPoiPages(accountId, accessToken, relationSpec)), relationWarnings: [] }
+      ? await fetchMergedAllPois(sessionKey, session, accountId)
+      : { ...(await fetchAllPoiPages(sessionKey, session, accountId, relationSpec)), relationWarnings: [] }
   /** 勿缓存「空列表」：避免首次瞬时失败/权限抖动导致长时间空白 */
   if (pack.pois.length > 0) {
     poiListCache.set(cacheKey, { ts: now, pois: pack.pois, total: pack.total })
@@ -1120,7 +1152,6 @@ export async function handleDouyinStoresGet(
     url.searchParams.get('force') === '1'
 
   try {
-    const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
 
     if (forceRefresh) {
@@ -1129,8 +1160,8 @@ export async function handleDouyinStoresGet(
 
     const { pois: allPois, relationWarnings } = await getCachedPoiList(
       auth,
+      session,
       accountId,
-      token,
       relationSpec,
       forceRefresh,
     )
@@ -1304,14 +1335,13 @@ export async function handleDouyinStoreDecorationGet(
     url.searchParams.get('force') === '1'
 
   try {
-    const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
 
     if (forceRefresh) {
       clearSessionPoiCache(auth)
     }
 
-    const { pois: allPois } = await getCachedPoiList(auth, accountId, token, relationSpec, forceRefresh)
+    const { pois: allPois } = await getCachedPoiList(auth, session, accountId, relationSpec, forceRefresh)
     let filtered = allPois
     if (keyword) {
       filtered = allPois.filter((row) => poiSearchHay(row).includes(keyword))
@@ -1363,9 +1393,10 @@ export async function handleDouyinStoreDetailGet(
         .filter(Boolean)
     : []
   try {
-    const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    const j = await shopPoiQuerySinglePoi(poiId, accountId, token)
+    const j = await withDouyinClientTokenRetry(session, { sessionKey: auth }, (token) =>
+      shopPoiQuerySinglePoi(poiId, accountId, token),
+    )
     const data = j.data as Record<string, unknown> | undefined
     const pois = (data?.pois as unknown[]) ?? []
     if (!Array.isArray(pois) || pois.length === 0) {
@@ -1373,11 +1404,15 @@ export async function handleDouyinStoreDetailGet(
       return
     }
 
-    const cert = await poiCertInfoGet(poiId, accountId, token, accountId)
+    const cert = await withDouyinClientTokenRetry(session, { sessionKey: auth }, (token) =>
+      poiCertInfoGet(poiId, accountId, token, accountId),
+    )
     let taskBody: Record<string, unknown> | undefined
     let taskQueryError: string | undefined
     if (taskIdList.length > 0) {
-      const tq = await poiTaskQueryGet(taskIdList, token, accountId)
+      const tq = await withDouyinClientTokenRetry(session, { sessionKey: auth }, (token) =>
+        poiTaskQueryGet(taskIdList, token, accountId),
+      )
       if (tq.ok === true) {
         taskBody = tq.body
       } else {
@@ -1520,6 +1555,20 @@ async function fetchTemplateProductAttrs(
 }
 
 /**
+ * 开放平台：同一服务商下 out_id 标识商品；「三方码」等场景 out_id 不可为空串。
+ * 前端「商家平台商品ID」落在 trade_rules.external_goods_id，须合并进 product.out_id。
+ */
+function resolveProductOutIdForSave(erp: Record<string, unknown>): string {
+  const top = String(erp.out_id ?? '').trim()
+  if (top) return top.slice(0, 128)
+  const trade =
+    erp.trade_rules && typeof erp.trade_rules === 'object' ? (erp.trade_rules as Record<string, unknown>) : {}
+  const ext = String(trade.external_goods_id ?? '').trim()
+  if (ext) return ext.slice(0, 128)
+  return `erp-${randomUUID()}`.slice(0, 128)
+}
+
+/**
  * 将 ERP 聚合表单映射为 goodlife/v1/goods/product/save 的 Body（含单 SKU）。
  * 头图写入 template/get 返回的 IMAGE 类 attr（按名称/类型启发式匹配）。
  */
@@ -1533,7 +1582,7 @@ async function buildGoodlifeProductSaveBody(
   const desc = String(erp.product_desc ?? product_name).trim()
   const category_id = String(erp.category_id ?? '').trim()
   const product_type = Number(erp.product_type) || 1
-  const out_id = String(erp.out_id ?? '').trim()
+  const out_id = resolveProductOutIdForSave(erp)
   const product_id_existing =
     typeof erp.product_id === 'string' && erp.product_id.trim() ? erp.product_id.trim() : ''
 
