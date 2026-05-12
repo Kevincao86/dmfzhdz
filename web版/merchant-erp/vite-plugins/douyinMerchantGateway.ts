@@ -1562,6 +1562,43 @@ function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
 
+/** 团购 product_type=1 时 goodlife 侧常要求非空的 combo_rule（与 package_combo 同源） */
+function buildDouyinProductComboRule(
+  erp: Record<string, unknown>,
+  productNameFallback: string,
+): Record<string, unknown> | null {
+  const product_type = Number(erp.product_type) || 1
+  if (product_type !== 1) return null
+  const raw = erp.package_combo
+  if (!raw || typeof raw !== 'object') return null
+  const o = raw as { groups?: unknown[] }
+  const groupsIn = Array.isArray(o.groups) ? o.groups : []
+  if (groupsIn.length === 0) return null
+  const fb = productNameFallback.trim().slice(0, 120) || '单品'
+  const groups = groupsIn.map((g) => {
+    const gr = g as Record<string, unknown>
+    const itemsIn = Array.isArray(gr.items) ? gr.items : []
+    const items = itemsIn.map((it) => {
+      const row = it as Record<string, unknown>
+      const name = String(row.name ?? '').trim() || fb
+      const quantity = Math.max(1, Math.floor(Number(row.quantity ?? row.qty ?? 1) || 1))
+      const item: Record<string, unknown> = { name, quantity }
+      const op = row.origin_price_yuan
+      if (op != null && Number.isFinite(Number(op))) item.origin_price_yuan = Number(op)
+      const pid = String(row.product_id ?? '').trim()
+      if (pid) item.product_id = pid
+      const sid = String(row.sku_id ?? '').trim()
+      if (sid) item.sku_id = sid
+      return item
+    })
+    return {
+      pick_rule: String(gr.pick_rule ?? gr.pickRule ?? '全部必选').trim() || '全部必选',
+      items,
+    }
+  })
+  return { groups }
+}
+
 function mergeGoodlifeProductAttrMapFromErp(
   attrs: Record<string, unknown>[],
   erp: Record<string, unknown>,
@@ -1651,7 +1688,14 @@ function mergeGoodlifeProductAttrMapFromErp(
     const vt = String(a.value_type ?? '').toUpperCase()
     const req = Boolean(a.is_required)
 
-    if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || /套餐|搭配|组合/.test(name)) {
+    if (
+      vt === 'STRUCT' ||
+      vt === 'OBJECT' ||
+      vt === 'JSON' ||
+      /套餐|搭配|组合/.test(name) ||
+      /^combo_rule$/i.test(key) ||
+      /套餐规则|搭配规则|组合规则/.test(name)
+    ) {
       if (pkgJson) {
         out[key] = pkgJson
         continue
@@ -1659,6 +1703,10 @@ function mergeGoodlifeProductAttrMapFromErp(
     }
 
     if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
+      if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson) {
+        out[key] = pkgJson
+        continue
+      }
       if (/标题|商品名称|名称(?!规范)/.test(name) && productName) {
         out[key] = productName.slice(0, 2000)
         continue
@@ -1868,6 +1916,8 @@ async function buildGoodlifeProductSaveBody(
   const nowMs = Date.now()
   const oneYearMs = nowMs + 366 * 86400000
 
+  const comboRule = buildDouyinProductComboRule(erp, product_name)
+
   const product: Record<string, unknown> = {
     product_name,
     desc,
@@ -1880,6 +1930,9 @@ async function buildGoodlifeProductSaveBody(
     sold_start_time: nowMs,
     sold_end_time: oneYearMs,
     pois: poi_ids.map((poi_id) => ({ poi_id })),
+  }
+  if (comboRule) {
+    product.combo_rule = comboRule
   }
   if (Object.keys(mergedProductAttrs).length > 0) {
     product.attr_key_value_map = mergedProductAttrs
