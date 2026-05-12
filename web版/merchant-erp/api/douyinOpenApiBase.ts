@@ -92,6 +92,45 @@ function looksLikeJsonObject(raw: string): boolean {
 
 export type DouyinFetchFn = (input: string | URL, init?: RequestInit) => Promise<Response>
 
+/** 将经 DOUYIN_OPENAPI_BASE_URL 拼出的 goodlife 完整 URL 换为官方同源路径（保留 path+query） */
+export function officialGoodlifeUrlFromRelayRequest(relayFullUrl: string): string | null {
+  const relay = normalizedGoodlifeBase()
+  if (relay === DEFAULT_BASE) return null
+  if (!relayFullUrl.startsWith(relay)) return null
+  return DEFAULT_BASE + relayFullUrl.slice(relay.length)
+}
+
+/**
+ * goodlife GET/POST：中继返回 HTML、5xx 或非 JSON 时自动再请求一次官方域名（不改动 OAuth 策略）。
+ * 用于反代未配好 GET 时仍能拉门店，避免前端误判「连接异常」。
+ */
+export async function fetchGoodlifeWithOfficialFallback(
+  fetchFn: DouyinFetchFn,
+  relayUrl: string,
+  init: RequestInit,
+): Promise<{ status: number; raw: string; usedOfficialFallback: boolean }> {
+  const r1 = await fetchFn(relayUrl, init)
+  const raw1 = await r1.text()
+  const relay = normalizedGoodlifeBase()
+  if (relay === DEFAULT_BASE) {
+    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
+  }
+  const tryFallback =
+    r1.status >= 500 ||
+    responseLooksLikeHtml(raw1) ||
+    (r1.ok && !looksLikeJsonObject(raw1))
+  if (!tryFallback) {
+    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
+  }
+  const official = officialGoodlifeUrlFromRelayRequest(relayUrl)
+  if (!official) {
+    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
+  }
+  const r2 = await fetchFn(official, init)
+  const raw2 = await r2.text()
+  return { status: r2.status, raw: raw2, usedOfficialFallback: true }
+}
+
 /**
  * 申请 client_token：先 JSON POST，若 200 但返回 HTML（反代未透传 body 等）再尝试 x-www-form-urlencoded。
  * OAuth 请求走 `douyinOpenApiUrl('/oauth/...')`（默认官方，与 goodlife 中继分离）。

@@ -10,6 +10,7 @@ import {
   douyinOpenApiUrl,
   exchangeDouyinClientToken,
   extractPoisFromShopQueryData,
+  fetchGoodlifeWithOfficialFallback,
   parseDouyinOpenApiEnvelope,
 } from './douyinOpenApiBase.js'
 
@@ -169,7 +170,7 @@ async function shopPoiQueryPage(
   u.searchParams.set('page', String(Math.max(1, page)))
   u.searchParams.set('size', String(Math.min(50, Math.max(1, size))))
 
-  const res = await douyinFetch(u.toString(), {
+  const { status, raw } = await fetchGoodlifeWithOfficialFallback(douyinFetch, u.toString(), {
     method: 'GET',
     headers: {
       'access-token': accessToken,
@@ -177,9 +178,8 @@ async function shopPoiQueryPage(
       'Rpc-Transit-Life-Account': accountId,
     },
   })
-  const raw = await res.text()
-  if (!res.ok) {
-    throw new Error(`shop/query HTTP ${res.status}：${raw.slice(0, 400)}`)
+  if (status < 200 || status >= 300) {
+    throw new Error(`shop/query HTTP ${status}：${raw.slice(0, 400)}`)
   }
   const j = parseDouyinOpenApiEnvelope(raw, 'shop/query')
   const err = getDataError(j)
