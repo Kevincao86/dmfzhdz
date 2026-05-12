@@ -11,6 +11,8 @@ import {
   exchangeDouyinClientToken,
   extractPoisFromShopQueryData,
   fetchGoodlifeWithOfficialFallback,
+  invalidateDouyinMerchantClientTokenCache,
+  isLikelyDouyinClientTokenExpiredBizError,
   parseDouyinOpenApiEnvelope,
 } from './douyinOpenApiBase.js'
 
@@ -261,7 +263,19 @@ export async function runDouyinMerchantBind(
       douyinExpiresAtMs: 0,
     }
     const token = await ensureDouyinToken(session)
-    const first = await shopPoiQueryPage(merchantId, token, 1, 1)
+    let first: Record<string, unknown>
+    try {
+      first = await shopPoiQueryPage(merchantId, token, 1, 1)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (isLikelyDouyinClientTokenExpiredBizError(msg)) {
+        invalidateDouyinMerchantClientTokenCache(session)
+        const token2 = await ensureDouyinToken(session)
+        first = await shopPoiQueryPage(merchantId, token2, 1, 1)
+      } else {
+        throw e
+      }
+    }
     const d = first.data as Record<string, unknown> | undefined
     const pois = extractPoisFromShopQueryData(d)
     const accountName = accountNameFromPois(pois)
