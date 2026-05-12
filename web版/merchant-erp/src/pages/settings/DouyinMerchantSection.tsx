@@ -274,9 +274,9 @@ export default function DouyinMerchantSection() {
       if (listErrorIndicatesInvalidSession(listError)) return 'error'
       return 'degraded'
     }
-    if (listLoading && rows.length === 0 && total === 0) return 'pending'
+    // 有凭证即视为已绑定；切页/首屏拉门店时不在顶部卡片显示「正在验证」，避免误以为需重新绑定（加载态见下方表格）
     return 'ok'
-  }, [accessToken, listError, listLoading, rows.length, total])
+  }, [accessToken, listError])
 
   const bindCardShell = useMemo(() => {
     if (bindCardTone === 'error') {
