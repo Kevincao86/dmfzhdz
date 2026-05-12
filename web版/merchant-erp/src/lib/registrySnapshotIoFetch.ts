@@ -1,9 +1,9 @@
 /**
  * 与运营台 `meooRegistrySnapshotIo` 同源：从 Supabase `ops_registry_snapshot` 读注册表。
- * 供 ERP 同源 `/api/meoo-ops-sync-registry` 使用，使浏览器在未配置 VITE_MERCHANT_ADMIN_ORIGIN 时仍能拉取 vendorKeys。
+ * 放在 `src/lib` 供 Vite 网关与 `/api/meoo-ops-sync-registry` 共用，确保 Vercel includeFiles 能打进函数包。
  */
-import { filterLegacyDemoRecruitmentOrders } from '../src/lib/recruitmentLegacyDemoOrders.js'
-import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
+import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
+import type { RegistryFile } from './opsRegistryTypes.js'
 
 const SNAPSHOT_FETCH_TIMEOUT_MS = 22_000
 
@@ -50,12 +50,12 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
         throw new Error(`registry_snapshot_parse_failed: ${t.slice(0, 200)}`)
       }
       const parsed = (rows[0]?.registry ?? null) as Partial<RegistryFile> | null
-      const { normalizeRegistryFile } = await import('../vite-plugins/opsRegistryGatewayCore.js')
+      const { normalizeRegistryFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
       return normalizeRegistryFile(parsed)
     },
 
     async save(data: RegistryFile): Promise<void> {
-      const { registryForPersistentFile } = await import('../vite-plugins/opsRegistryGatewayCore.js')
+      const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
       const persist = registryForPersistentFile(data)
       const nowIso = new Date().toISOString()
       const body = JSON.stringify({

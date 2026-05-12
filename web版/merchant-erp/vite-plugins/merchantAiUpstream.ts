@@ -172,6 +172,47 @@ function pickKey(
   }
 }
 
+/**
+ * 将 Supabase `ops_registry_snapshot` 中的 vendorKeys 合入 env（仅补缺，不覆盖已有非空服务端变量）。
+ * 与运营台共库时，商品 AI / 评价话术等无需依赖浏览器 localStorage 或单独再配 MERCHANT_AI_*。
+ */
+export async function mergeMerchantAiEnvWithRegistrySnapshot(env: MerchantAiEnv): Promise<MerchantAiEnv> {
+  const e = env as Record<string, string | undefined>
+  const hasDoubao = Boolean((e.MERCHANT_AI_DOUBAO_KEY ?? e.ARK_API_KEY)?.trim())
+  const hasQwen = Boolean((e.MERCHANT_AI_QWEN_KEY ?? e.DASHSCOPE_API_KEY)?.trim())
+  const hasMinimax = Boolean((e.MERCHANT_AI_MINIMAX_KEY ?? e.MINIMAX_API_KEY)?.trim())
+  if (hasDoubao && hasQwen && hasMinimax) return env
+
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+  const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE ?? '').trim()
+  if (!supabaseUrl || !serviceRole) return env
+
+  try {
+    const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    const vkRaw = data.vendorKeys
+    const vk =
+      vkRaw && typeof vkRaw === 'object' && !Array.isArray(vkRaw) ? (vkRaw as Record<string, unknown>) : {}
+    const out: MerchantAiEnv = { ...env }
+    if (!hasDoubao) {
+      const d = typeof vk.doubao === 'string' ? vk.doubao.trim() : ''
+      if (d) (out as Record<string, string>).MERCHANT_AI_DOUBAO_KEY = d
+    }
+    if (!hasQwen) {
+      const q = typeof vk.qwen === 'string' ? vk.qwen.trim() : ''
+      if (q) (out as Record<string, string>).MERCHANT_AI_QWEN_KEY = q
+    }
+    if (!hasMinimax) {
+      const m = typeof vk.minimax === 'string' ? vk.minimax.trim() : ''
+      if (m) (out as Record<string, string>).MERCHANT_AI_MINIMAX_KEY = m
+    }
+    return out
+  } catch {
+    return env
+  }
+}
+
 function sliceTitle(s: string, maxChars: number): string {
   const arr = [...s]
   return arr.length <= maxChars ? s : arr.slice(0, maxChars).join('')
@@ -962,6 +1003,7 @@ export async function generateGrossMarginSuggestionByAi(
   env: MerchantAiEnv,
   ctx: { industryPath: string; industryName?: string },
 ): Promise<GrossMarginAiPack | null> {
+  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
   const path = (ctx.industryPath || ctx.industryName || '').trim()
   if (!path) return null
   const system = `你是本地生活到店团购的经营分析助手。用户会给出「经营类目路径」（如 餐饮 > 自助餐）。请仅输出一段合法 JSON 对象，不要 Markdown、不要代码围栏、不要任何前缀或后缀说明。JSON 字段必须为：
@@ -971,13 +1013,13 @@ export async function generateGrossMarginSuggestionByAi(
 三者均在 28～92 之间；可轻微体现各平台佣金与流量成本差异。
 - note_zh: 字符串，80 字以内中文，客观说明这是粗粒度参考而非审计结论。禁止出现：mock、占位、假数据 等措辞。`
   const user = `经营类目路径：${path}`
-  const doubaoK = pickKey(env, 'doubao').key
-  const qwenK = pickKey(env, 'qwen').key
+  const doubaoK = pickKey(envM, 'doubao').key
+  const qwenK = pickKey(envM, 'qwen').key
   let raw: string | null = null
   let vendor: 'doubao' | 'qwen' | '' = ''
   if (doubaoK) {
     try {
-      raw = await callModelText('doubao', doubaoK, env, system, user)
+      raw = await callModelText('doubao', doubaoK, envM, system, user)
       vendor = 'doubao'
     } catch {
       raw = null
@@ -985,7 +1027,7 @@ export async function generateGrossMarginSuggestionByAi(
   }
   if (!raw && qwenK) {
     try {
-      raw = await callModelText('qwen', qwenK, env, system, user)
+      raw = await callModelText('qwen', qwenK, envM, system, user)
       vendor = 'qwen'
     } catch {
       raw = null
@@ -1010,7 +1052,8 @@ export async function generateReviewReplyByDoubao(
     sentiment: MerchantReviewReplySentiment
   },
 ): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
-  const { key, label } = pickKey(env, 'doubao')
+  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
+  const { key, label } = pickKey(envM, 'doubao')
   if (!key) {
     return {
       ok: false,
@@ -1036,7 +1079,7 @@ ${task}
 格式要求：不要 Markdown、不要编号列表；全文不超过 220 字；只输出回复正文一段。`
   const user = `顾客昵称：${ctx.userName}\n评价原文（你必须逐句阅读并据此写回复）：\n${ctx.reviewText}`
   try {
-    const text = (await callDoubaoChat(key, env, system, user)).trim()
+    const text = (await callDoubaoChat(key, envM, system, user)).trim()
     if (!text) return { ok: false, message: '豆包未返回有效回复' }
     return { ok: true, text }
   } catch (e) {
@@ -1061,8 +1104,9 @@ export async function generateNegativeReviewReplyByDoubao(
 export async function handleDouyinGoodsAiAssist(
   res: ServerResponse,
   body: Record<string, unknown>,
-  env: MerchantAiEnv,
+  envIn: MerchantAiEnv,
 ): Promise<void> {
+  const env = await mergeMerchantAiEnvWithRegistrySnapshot(envIn)
   const model = normalizeAiModelPreserveCustom(body.model)
   if (!isBuiltinAiVendorId(model)) {
     json(res, 200, {
@@ -1316,7 +1360,8 @@ export async function merchantChatCompletion(
   system: string,
   user: string,
 ): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
-  const { key, label } = pickEffectiveKey(env, model, body)
+  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
+  const { key, label } = pickEffectiveKey(envM, model, body)
   if (!key) {
     return {
       ok: false,
@@ -1324,7 +1369,7 @@ export async function merchantChatCompletion(
     }
   }
   try {
-    const raw = await callModelText(model, key, env, system, user)
+    const raw = await callModelText(model, key, envM, system, user)
     return { ok: true, text: polishVisibleAssistantText(raw) }
   } catch (e) {
     return { ok: false, message: formatAssistUpstreamCatchMessage(e, model) }
