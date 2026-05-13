@@ -358,6 +358,8 @@ export type DouyinProductDetailPayload = {
    * 返回的 attr `key` 直填 `attr_key_value_map`（opaque key、combo_rule 类字段等），由网关合并进 [product.save](https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save)。
    */
   template_attr_overrides?: Record<string, string>
+  /** SKU 模板 attr（如 actual_amount）直填 sku.attr_key_value_map，网关在与启发式合并后覆盖 */
+  template_sku_attr_overrides?: Record<string, string>
   /** 售卖、库存、交易、消费等扩展块（JSON 透传网关拼装 attr_key_value_map） */
   sales_info: Record<string, unknown>
   trade_rules: Record<string, unknown>

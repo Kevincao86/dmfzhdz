@@ -14,7 +14,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
 import AiVendorCatalogAvatar from '../../components/AiVendorCatalogAvatar'
-import AiVendorDirectoryChips from '../../components/AiVendorDirectoryChips'
 import { readMerchantSession } from '../../lib/merchantSession'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
@@ -46,7 +45,6 @@ import {
   postDouyinGoodsAiAssist,
 } from '../../services/douyinAiAssistApi'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../../services/merchantAiVendorCatalogClient'
-import { readVendorKeyMap } from '../../services/merchantAiVendorKeysStorage'
 import {
   MERCHANT_AI_MODEL_STORAGE_KEY,
   MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY,
@@ -55,9 +53,16 @@ import {
   MEOO_TEXT_AI_AUTO_EVENT,
   MEOO_TEXT_AI_MANUAL_EVENT,
   readImageAiAuto,
+  readImageAiManualModel,
+  readTextAiAuto,
+  readTextAiManualModel,
   resolveImageAiModelForRequest,
   resolveModelForAssistAction,
   resolveTextAiModelForRequest,
+  writeImageAiAuto,
+  writeImageAiManualModel,
+  writeTextAiAuto,
+  writeTextAiManualModel,
 } from '../../services/merchantAiModelStorage'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../../lib/opsRegistryConstants'
 
@@ -95,6 +100,53 @@ function templateAttrWizardCovered(a: TemplateAttr): boolean {
   if (/有效|天数|天/.test(n) && /消费|券/.test(n)) return true
   if (/库存|数量/.test(n)) return true
   return false
+}
+
+type SkuAttrCoverCtx = {
+  priceYuan: string
+  originYuan: string
+  stockQty: string
+  stockLimited: boolean
+  productName: string
+}
+
+/** 与网关 mergeGoodlifeSkuAttrMapFromTemplate 对齐：可自动从售价/名称/库存推断的 SKU 模板项 */
+function templateSkuAttrWizardCovered(a: TemplateAttr, ctx: SkuAttrCoverCtx): boolean {
+  const key = (a.key ?? '').trim().toLowerCase()
+  const name = (a.name ?? '').toLowerCase()
+  const vt = (a.value_type ?? '').toUpperCase()
+  const price = Number.parseFloat(String(ctx.priceYuan).replace(/,/g, ''))
+  const hasPrice = Number.isFinite(price) && price > 0
+  const pn = ctx.productName.trim()
+  const stockN = Number.parseInt(String(ctx.stockQty), 10)
+  if (
+    (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') &&
+    (/^actual_amount$/i.test(key) || /售价|实付|现价|团购/.test(name))
+  ) {
+    return hasPrice
+  }
+  if ((vt === 'INT' || vt === 'LONG') && (/^origin_amount$/i.test(key) || /原价|划线/.test(name))) {
+    return hasPrice
+  }
+  if ((vt === 'INT' || vt === 'LONG') && (/^stock_qty$/i.test(key) || /库存/.test(name))) {
+    return ctx.stockLimited ? Number.isFinite(stockN) && stockN >= 0 : true
+  }
+  if ((vt === 'STRING' || vt === 'TEXT') && (/^sku_name$/i.test(key) || /名称|规格/.test(name))) {
+    return pn.length > 0
+  }
+  return false
+}
+
+function templateAttrValueLooksNumeric(a: TemplateAttr): boolean {
+  const vt = (a.value_type ?? '').toUpperCase()
+  return (
+    vt === 'INT' ||
+    vt === 'LONG' ||
+    vt === 'NUMBER' ||
+    vt === 'INTEGER' ||
+    vt === 'FLOAT' ||
+    vt === 'DOUBLE'
+  )
 }
 
 type Step = 'category' | 'productType' | 'detail'
@@ -240,14 +292,6 @@ export default function DouyinProductCreateWizard({
     )
   }
 
-  /** 与设置页一致：优先展示已配置浏览器 Key 的厂商 */
-  const aiVendorChipsForDisplay = useMemo(() => {
-    const all = listAiUiModelOptions()
-    const keys = readVendorKeyMap()
-    const withKey = all.filter((m) => Boolean(keys[m.id]?.trim()))
-    return withKey.length > 0 ? withKey : all
-  }, [aiOptionsReload])
-
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== MERCHANT_AI_MODEL_STORAGE_KEY && e.key !== MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY) return
@@ -338,6 +382,7 @@ export default function DouyinProductCreateWizard({
   const [templateProductAttrs, setTemplateProductAttrs] = useState<TemplateAttr[]>([])
   const [templateSkuAttrs, setTemplateSkuAttrs] = useState<TemplateAttr[]>([])
   const [templateAttrOverrides, setTemplateAttrOverrides] = useState<Record<string, string>>({})
+  const [templateSkuAttrOverrides, setTemplateSkuAttrOverrides] = useState<Record<string, string>>({})
   const [staffSales, setStaffSales] = useState('allow')
   const [consumeDateMode, setConsumeDateMode] = useState<'days' | 'calendar'>('days')
   const [nonConsumeDateMode, setNonConsumeDateMode] = useState<'all_dates' | 'partial_dates'>('all_dates')
@@ -574,6 +619,42 @@ export default function DouyinProductCreateWizard({
     [templateSkuAttrs],
   )
 
+  const skuTemplateCoverCtx = useMemo(
+    () => ({
+      priceYuan,
+      originYuan,
+      stockQty,
+      stockLimited,
+      productName,
+    }),
+    [priceYuan, originYuan, stockQty, stockLimited, productName],
+  )
+
+  const textAiAutoOn = useMemo(() => {
+    void aiModelUiTick
+    return readTextAiAuto()
+  }, [aiModelUiTick])
+
+  const imageAiAutoOn = useMemo(() => {
+    void aiModelUiTick
+    return readImageAiAuto()
+  }, [aiModelUiTick])
+
+  const manualTextAiId = useMemo(() => {
+    void aiModelUiTick
+    return readTextAiManualModel()
+  }, [aiModelUiTick])
+
+  const manualImageAiId = useMemo(() => {
+    void aiModelUiTick
+    return readImageAiManualModel()
+  }, [aiModelUiTick])
+
+  const imageVendorManualOptions = useMemo(() => {
+    const allow = new Set(['minimax', 'qwen', 'doubao'])
+    return aiModelPickOptions.filter((o) => allow.has(o.id))
+  }, [aiModelPickOptions])
+
   const openStoreModal = () => {
     setModalDraftIds([...selectedPoiIds])
     setModalPage(1)
@@ -618,6 +699,7 @@ export default function DouyinProductCreateWizard({
       setTemplateProductAttrs(tpl.product_attrs)
       setTemplateSkuAttrs(tpl.sku_attrs)
       setTemplateAttrOverrides({})
+      setTemplateSkuAttrOverrides({})
       setSalesChannel((prev) =>
         tpl.sales_channels.some((x) => x.value === prev)
           ? prev
@@ -765,6 +847,7 @@ export default function DouyinProductCreateWizard({
         setTemplateProductAttrs(tpl.product_attrs)
         setTemplateSkuAttrs(tpl.sku_attrs)
         setTemplateAttrOverrides({})
+      setTemplateSkuAttrOverrides({})
         const ch = si && typeof si.channel === 'string' ? si.channel : null
         setSalesChannel(
           ch && tpl.sales_channels.some((x) => x.value === ch)
@@ -1093,6 +1176,26 @@ export default function DouyinProductCreateWizard({
       }
     }
 
+    const skuCoverCtx: SkuAttrCoverCtx = {
+      priceYuan,
+      originYuan,
+      stockQty,
+      stockLimited,
+      productName,
+    }
+    for (const a of templateSkuAttrs) {
+      if (!a.is_required) continue
+      if (templateSkuAttrWizardCovered(a, skuCoverCtx)) continue
+      const v = templateSkuAttrOverrides[a.key]?.trim()
+      if (!v) {
+        setActionMsg({
+          text: `开放平台 SKU 模板必填「${a.name}」（key: ${a.key}）尚未填写，请在本页「开放平台类目必填」内 SKU 区域填写`,
+          ok: false,
+        })
+        return
+      }
+    }
+
     const pkg = detail.package_combo
     const comboJson =
       pkg?.groups && pkg.groups.length > 0
@@ -1108,6 +1211,15 @@ export default function DouyinProductCreateWizard({
     )
     if (Object.keys(cleaned).length > 0) {
       detail.template_attr_overrides = cleaned
+    }
+
+    const skuCleaned = Object.fromEntries(
+      Object.entries(templateSkuAttrOverrides)
+        .map(([k, v]) => [k, (v ?? '').trim()])
+        .filter(([, v]) => v.length > 0),
+    )
+    if (Object.keys(skuCleaned).length > 0) {
+      detail.template_sku_attr_overrides = skuCleaned
     }
 
     setSaving(true)
@@ -1485,18 +1597,123 @@ export default function DouyinProductCreateWizard({
               </section>
 
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
+                <h3 className="text-sm font-semibold text-gray-900">AI 模型（可选）</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  下方为当前目录中的模型（logo + 名称）。当前生效：文案{' '}
-                  <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>，生图{' '}
-                  <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>
-                  （由系统设置、运营注册表与浏览器侧各模型 Key 自动解析；不在此页展示切换控件）。
+                  不使用「AI 智能优化 / 生图」时可忽略本节。使用 AI 时需在系统设置或本机为各厂商配置浏览器端 API
+                  Key；可选择由系统按已配置 Key 自动挑选厂商，或手选固定模型（仅本机生效）。
                 </p>
-                <div className="mt-3">
-                  <AiVendorDirectoryChips options={aiVendorChipsForDisplay} />
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">文案类（标题优化、说明生成）</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-4">
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
+                        <input
+                          type="radio"
+                          name="douyin-wizard-text-ai-mode"
+                          checked={textAiAutoOn}
+                          onChange={() => {
+                            writeTextAiAuto(true)
+                            setAiModelUiTick((n) => n + 1)
+                          }}
+                        />
+                        自动（当前 {selectedTextAiLabel}）
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
+                        <input
+                          type="radio"
+                          name="douyin-wizard-text-ai-mode"
+                          checked={!textAiAutoOn}
+                          onChange={() => {
+                            writeTextAiAuto(false)
+                            setAiModelUiTick((n) => n + 1)
+                          }}
+                        />
+                        手选
+                      </label>
+                    </div>
+                    {!textAiAutoOn ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {aiModelPickOptions.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            title={m.label}
+                            onClick={() => {
+                              writeTextAiAuto(false)
+                              writeTextAiManualModel(m.id)
+                              setAiModelUiTick((n) => n + 1)
+                            }}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs transition',
+                              manualTextAiId === m.id
+                                ? 'border-indigo-500 bg-white shadow-sm'
+                                : 'border-indigo-100 bg-white/70 hover:bg-white',
+                            )}
+                          >
+                            <AiVendorCatalogAvatar id={m.id} label={m.label} logoUrl={m.logoUrl} size="xs" />
+                            <span className="max-w-[9rem] truncate">{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">生图类（头图 / 辅助图 / 环境图）</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-4">
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
+                        <input
+                          type="radio"
+                          name="douyin-wizard-image-ai-mode"
+                          checked={imageAiAutoOn}
+                          onChange={() => {
+                            writeImageAiAuto(true)
+                            setAiModelUiTick((n) => n + 1)
+                          }}
+                        />
+                        自动（当前 {selectedImageAiLabel}）
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-800">
+                        <input
+                          type="radio"
+                          name="douyin-wizard-image-ai-mode"
+                          checked={!imageAiAutoOn}
+                          onChange={() => {
+                            writeImageAiAuto(false)
+                            setAiModelUiTick((n) => n + 1)
+                          }}
+                        />
+                        手选
+                      </label>
+                    </div>
+                    {!imageAiAutoOn ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {imageVendorManualOptions.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            title={m.label}
+                            onClick={() => {
+                              writeImageAiAuto(false)
+                              writeImageAiManualModel(m.id)
+                              setAiModelUiTick((n) => n + 1)
+                            }}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs transition',
+                              manualImageAiId === m.id
+                                ? 'border-indigo-500 bg-white shadow-sm'
+                                : 'border-indigo-100 bg-white/70 hover:bg-white',
+                            )}
+                          >
+                            <AiVendorCatalogAvatar id={m.id} label={m.label} logoUrl={m.logoUrl} size="xs" />
+                            <span className="max-w-[9rem] truncate">{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <p id="douyin-ai-text-model-active" className="mt-3 text-xs text-gray-500">
-                  「AI 智能优化」「根据商品名称 AI 生成说明」走文案模型；头图 / 辅助图 / 环境图走生图模型；各任务可同时进行。
+                  「AI 智能优化」「根据商品名称 AI 生成说明」走文案设置；头图 / 辅助图 / 环境图走生图设置；各任务可并行。
                 </p>
               </section>
 
@@ -1562,7 +1779,7 @@ export default function DouyinProductCreateWizard({
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900">售价与图片</h3>
             <p id="douyin-ai-image-model-active" className="mt-2 text-xs text-gray-500">
-              头图、辅助图、环境图的 AI 生成与美化使用上方「目前绑定的 AI 模型」中的生图设置。
+              头图、辅助图、环境图的 AI 生成与美化使用上文「AI 模型（可选）」中的生图设置。
             </p>
             <p className="mt-3 text-xs text-blue-600">服务费以平台结算为准，此处仅采集标价</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -1626,7 +1843,7 @@ export default function DouyinProductCreateWizard({
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                已上传则批量美化当前头图；未上传则按商品名称与上方「目前绑定的 AI 模型」中的生图设置生成一张。
+                已上传则批量美化当前头图；未上传则按商品名称与上文「AI 模型（可选）」中的生图设置生成一张。
               </p>
               <div className="mt-2 flex flex-wrap items-start gap-3">
                 <button
@@ -2312,15 +2529,28 @@ export default function DouyinProductCreateWizard({
                         </p>
                       ) : null}
                       {!covered ? (
-                        <textarea
-                          value={templateAttrOverrides[a.key] ?? ''}
-                          onChange={(e) =>
-                            setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
-                          }
-                          rows={comboLike || String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
-                          placeholder="填写该 key 对应的字符串值（JSON 须为单行或可解析文本）"
-                          className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-                        />
+                        templateAttrValueLooksNumeric(a) ? (
+                          <input
+                            type="number"
+                            step="any"
+                            value={templateAttrOverrides[a.key] ?? ''}
+                            onChange={(e) =>
+                              setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                            }
+                            placeholder="填写数值（将按字符串提交至 attr_key_value_map）"
+                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                          />
+                        ) : (
+                          <textarea
+                            value={templateAttrOverrides[a.key] ?? ''}
+                            onChange={(e) =>
+                              setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                            }
+                            rows={comboLike || String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
+                            placeholder="填写该 key 对应的字符串值（JSON 须为单行或可解析文本）"
+                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                          />
+                        )
                       ) : null}
                     </li>
                   )
@@ -2331,15 +2561,63 @@ export default function DouyinProductCreateWizard({
               <div className="mt-5 border-t border-blue-100 pt-4">
                 <h4 className="text-sm font-semibold text-gray-900">SKU 模板必填（sku_attrs）</h4>
                 <p className="mt-1 text-xs text-gray-600">
-                  单 SKU 场景下售价/库存等由本页「售价」「库存」自动映射至 SKU；若保存仍报 SKU 属性错误，请把完整报错发给技术对照模板 key。
+                  与售价、库存、商品名称可对齐的字段由网关自动写入 SKU；其余须在本区域填写后才会随保存请求提交。
                 </p>
-                <ul className="mt-2 space-y-1 text-xs text-gray-700">
-                  {requiredSkuTemplateAttrs.map((a) => (
-                    <li key={`sku-${a.key}`}>
-                      <span className="font-medium">{a.name}</span>
-                      <span className="ml-2 font-mono text-gray-500">{a.key}</span>
-                    </li>
-                  ))}
+                <ul className="mt-3 space-y-3">
+                  {requiredSkuTemplateAttrs.map((a) => {
+                    const skuCovered = templateSkuAttrWizardCovered(a, skuTemplateCoverCtx)
+                    return (
+                      <li
+                        key={`sku-${a.key}`}
+                        className="rounded-lg border border-blue-100 bg-white/90 px-3 py-2 text-sm text-gray-800"
+                      >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="font-medium text-gray-900">
+                            {a.name} <span className="text-red-500">*</span>
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded px-2 py-0.5 text-xs',
+                              skuCovered ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950',
+                            )}
+                          >
+                            {skuCovered ? '自动映射' : '须填写'}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-mono text-[11px] text-gray-500">
+                          key: {a.key || '—'} · value_type: {a.value_type}
+                          {a.is_multi ? ' · multi' : ''}
+                        </p>
+                        {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
+                        {skuCovered ? (
+                          <p className="mt-2 text-xs text-emerald-900">
+                            已由本页「售价 / 划线价 / 库存 / 商品名称」与网关逻辑自动映射，无需再填。
+                          </p>
+                        ) : templateAttrValueLooksNumeric(a) ? (
+                          <input
+                            type="number"
+                            step="any"
+                            value={templateSkuAttrOverrides[a.key] ?? ''}
+                            onChange={(e) =>
+                              setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                            }
+                            placeholder="填写数值（将写入 sku.attr_key_value_map）"
+                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                          />
+                        ) : (
+                          <textarea
+                            value={templateSkuAttrOverrides[a.key] ?? ''}
+                            onChange={(e) =>
+                              setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                            }
+                            rows={String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
+                            placeholder="填写该 SKU 模板 key 的字符串值（JSON 须可解析）"
+                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                          />
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             ) : null}

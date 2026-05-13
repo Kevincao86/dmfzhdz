@@ -1789,19 +1789,22 @@ function mergeGoodlifeSkuAttrMapFromTemplate(
     const name = String(a.name ?? '')
     const vt = String(a.value_type ?? '').toUpperCase()
     const req = Boolean(a.is_required)
-    if ((vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') && /售价|实付|现价|团购/.test(name)) {
+    if (
+      (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') &&
+      (/^actual_amount$/i.test(key) || /售价|实付|现价|团购/.test(name))
+    ) {
       out[key] = String(actualFen)
       continue
     }
-    if ((vt === 'INT' || vt === 'LONG') && /原价|划线/.test(name)) {
+    if ((vt === 'INT' || vt === 'LONG') && (/^origin_amount$/i.test(key) || /原价|划线/.test(name))) {
       out[key] = String(originFen)
       continue
     }
-    if ((vt === 'INT' || vt === 'LONG') && /库存/.test(name)) {
+    if ((vt === 'INT' || vt === 'LONG') && (/^stock_qty$/i.test(key) || /库存/.test(name))) {
       out[key] = String(stockQty)
       continue
     }
-    if ((vt === 'STRING' || vt === 'TEXT') && /名称|规格/.test(name)) {
+    if ((vt === 'STRING' || vt === 'TEXT') && (/^sku_name$/i.test(key) || /名称|规格/.test(name))) {
       out[key] = productName.slice(0, 120)
       continue
     }
@@ -2012,6 +2015,15 @@ async function buildGoodlifeProductSaveBody(
   }
 
   const skuAttrMap = mergeGoodlifeSkuAttrMapFromTemplate(skuAttrs, product_name, actualFen, originFen, stockQty)
+  const skuTplOverrides = erp.template_sku_attr_overrides
+  if (skuTplOverrides && typeof skuTplOverrides === 'object' && !Array.isArray(skuTplOverrides)) {
+    for (const [k, val] of Object.entries(skuTplOverrides as Record<string, unknown>)) {
+      const key = String(k).trim()
+      if (!key) continue
+      const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
+      if (s) skuAttrMap[key] = s.slice(0, 120_000)
+    }
+  }
   const sku: Record<string, unknown> = {
     sku_name: product_name.slice(0, 120),
     actual_amount: actualFen,
