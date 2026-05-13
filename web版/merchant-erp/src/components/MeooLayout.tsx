@@ -483,9 +483,13 @@ export default function MeooLayout() {
       ) : null}
 
       <AiAgentDrawer />
-      <AiAgentFloatingButton />
+      <div className="pointer-events-none fixed bottom-0 right-0 z-[60] flex flex-col items-center gap-3 p-4 sm:bottom-2 sm:right-2 sm:p-5">
+        <div className="pointer-events-auto flex flex-col items-center gap-3">
+          <AiAgentFloatingButton />
+          <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
+        </div>
+      </div>
       <OpsRegistryBridge />
-      <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
     </div>
   )
 }

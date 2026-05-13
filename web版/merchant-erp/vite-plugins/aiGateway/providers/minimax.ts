@@ -1,15 +1,7 @@
 import OpenAI from 'openai'
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
 import { registryEntry } from '../../../src/services/ai/modelRegistry.js'
-
-function toMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatCompletionMessageParam[] {
-  return messages.map((m) => {
-    if (m.role === 'tool') return { role: 'user', content: `[tool]\n${m.content}` }
-    if (m.role === 'system') return { role: 'system', content: m.content }
-    if (m.role === 'assistant') return { role: 'assistant', content: m.content }
-    return { role: 'user', content: m.content }
-  })
-}
+import { toOpenAiChatCompletionMessages } from '../openAiChatMessages.js'
 
 /**
  * MiniMax OpenAI 兼容 Chat Completions。
@@ -25,7 +17,7 @@ export async function chatMinimax(req: AIChatRequest, env: Record<string, string
   try {
     const completion = await client.chat.completions.create({
       model,
-      messages: toMessages(req.messages),
+      messages: toOpenAiChatCompletionMessages(req),
       temperature: req.temperature ?? 0.6,
     })
     const msg = completion.choices[0]?.message?.content

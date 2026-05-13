@@ -60,6 +60,8 @@ export type AiAgentMessage = {
   role: AiAgentMessageRole
   content: string
   createdAt: number
+  /** 用户消息附带的截图预览（data URL） */
+  imageUrls?: string[]
   /** 待确认的执行预览（仅 task_preview 使用） */
   preview?: AiTaskPreviewPayload
   /** 任务完成摘要（仅 task_result） */
@@ -85,7 +87,7 @@ function newId(): string {
 export function createAgentMessage(
   role: AiAgentMessageRole,
   content: string,
-  extra?: Partial<Pick<AiAgentMessage, 'preview' | 'resultSummary'>>,
+  extra?: Partial<Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'imageUrls'>>,
 ): AiAgentMessage {
   return {
     id: newId(),

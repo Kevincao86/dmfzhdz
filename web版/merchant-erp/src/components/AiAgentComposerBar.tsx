@@ -1,0 +1,235 @@
+import { ChevronDown, ImagePlus, Loader2, Mic, Send, Volume2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAiAgent } from '../context/AiAgentContext'
+import { cn } from '../cn'
+
+type Layout = 'centered' | 'dock'
+
+function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognition
+    webkitSpeechRecognition?: new () => SpeechRecognition
+  }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
+
+export function AiAgentComposerBar({
+  layout,
+  /** 居中模式下的辅助说明（客户可读） */
+  footHint,
+}: {
+  layout: Layout
+  footHint?: string
+}) {
+  const {
+    inputDraft,
+    setInputDraft,
+    sendUserText,
+    modelPickerKey,
+    setModelPickerKey,
+    modelPickerOptions,
+    aiSending,
+    pendingPreviewId,
+    pendingComposerImages,
+    addComposerImages,
+    removeComposerImage,
+    messages,
+  } = useAiAgent()
+
+  const fileRef = useRef<HTMLInputElement>(null)
+  const recRef = useRef<SpeechRecognition | null>(null)
+  const [listening, setListening] = useState(false)
+
+  const stopListening = useCallback(() => {
+    try {
+      recRef.current?.stop()
+    } catch {
+      /* noop */
+    }
+    recRef.current = null
+    setListening(false)
+  }, [])
+
+  useEffect(() => {
+    return () => stopListening()
+  }, [stopListening])
+
+  const startListening = useCallback(() => {
+    const Ctor = getSpeechRecognitionCtor()
+    if (!Ctor) {
+      window.alert('当前浏览器不支持语音输入，请使用 Chrome 或 Edge 桌面版，并允许麦克风权限。')
+      return
+    }
+    if (listening) {
+      stopListening()
+      return
+    }
+    const r = new Ctor()
+    r.lang = 'zh-CN'
+    r.interimResults = false
+    r.continuous = false
+    r.onresult = (ev: SpeechRecognitionEvent) => {
+      const t = ev.results[0]?.[0]?.transcript?.trim()
+      if (t) setInputDraft((prev) => (prev.trim() ? `${prev.trim()} ${t}` : t))
+    }
+    r.onerror = () => stopListening()
+    r.onend = () => stopListening()
+    recRef.current = r
+    try {
+      r.start()
+      setListening(true)
+    } catch {
+      window.alert('无法启动语音识别，请检查麦克风权限。')
+    }
+  }, [listening, setInputDraft, stopListening])
+
+  const speakLastReply = useCallback(() => {
+    const last = [...messages].reverse().find((m) => m.role === 'assistant' && m.content.trim())
+    if (!last?.content.trim()) {
+      window.alert('暂无可朗读的助手回复，请先对话一轮。')
+      return
+    }
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(last.content)
+    u.lang = 'zh-CN'
+    window.speechSynthesis.speak(u)
+  }, [messages])
+
+  const rows = layout === 'centered' ? 5 : 2
+  const disabled = Boolean(pendingPreviewId)
+
+  return (
+    <div className="w-full">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void addComposerImages(e.target.files).finally(() => {
+            if (fileRef.current) fileRef.current.value = ''
+          })
+        }}
+      />
+
+      {pendingComposerImages.length > 0 ? (
+        <div className="mb-2 flex flex-wrap gap-2 px-1">
+          {pendingComposerImages.map((src, i) => (
+            <div key={i} className="group relative">
+              <img src={src} alt="" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
+              <button
+                type="button"
+                onClick={() => removeComposerImage(i)}
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white opacity-0 shadow group-hover:opacity-100"
+                aria-label="移除图片"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          'flex gap-2',
+          layout === 'centered' ? 'rounded-t-3xl px-2 pt-2 sm:px-3' : 'items-end px-1',
+        )}
+      >
+        <button
+          type="button"
+          disabled={disabled || aiSending || pendingComposerImages.length >= 4}
+          onClick={() => fileRef.current?.click()}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+          title="上传截图（最多 4 张）"
+          aria-label="上传图片"
+        >
+          <ImagePlus className="h-4 w-4" />
+        </button>
+        <textarea
+          value={inputDraft}
+          onChange={(e) => setInputDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              sendUserText(inputDraft)
+            }
+          }}
+          rows={rows}
+          disabled={disabled}
+          placeholder="描述你想完成的任务，或输入 @ 提及页面要点…"
+          className={cn(
+            'min-w-0 flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50',
+            layout === 'dock' && 'max-h-40 min-h-[2.75rem]',
+          )}
+        />
+      </div>
+
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-2 border-slate-100 pt-2',
+          layout === 'centered' ? 'border-t px-3 pb-2.5 sm:px-4' : 'px-1 pb-1',
+        )}
+      >
+        {footHint && layout === 'centered' ? (
+          <p className="order-last w-full pt-1 text-[11px] leading-snug text-slate-500 sm:order-first sm:mr-auto sm:w-auto sm:flex-1 sm:pt-0">
+            {footHint}
+          </p>
+        ) : null}
+        <div className="relative min-w-0 flex-1 sm:max-w-[12rem] sm:flex-none">
+          <select
+            aria-label="选择助手风格"
+            value={modelPickerKey}
+            disabled={aiSending || disabled}
+            onChange={(e) => setModelPickerKey(e.target.value)}
+            className={cn(
+              'h-10 w-full min-w-0 cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 py-0 pl-3 pr-9',
+              'text-xs font-medium text-slate-800 hover:bg-white',
+              'focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100',
+              (aiSending || disabled) && 'cursor-not-allowed opacity-60',
+            )}
+          >
+            {modelPickerOptions.map((o) => (
+              <option key={o.key} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        </div>
+        <button
+          type="button"
+          className={cn(
+            'ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 sm:ml-0',
+            listening && 'border-indigo-300 bg-indigo-50 text-indigo-700',
+          )}
+          title={listening ? '点击停止听写' : '语音转文字'}
+          aria-label="语音输入"
+          onClick={startListening}
+        >
+          {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+        </button>
+        <button
+          type="button"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+          title="朗读最近一条助手回复"
+          aria-label="语音朗读"
+          onClick={speakLastReply}
+        >
+          <Volume2 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => sendUserText(inputDraft)}
+          disabled={(!inputDraft.trim() && pendingComposerImages.length === 0) || aiSending || disabled}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="发送"
+        >
+          {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  )
+}

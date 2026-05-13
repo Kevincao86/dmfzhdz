@@ -18,9 +18,18 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
   const model = (req.model ?? env.DEEPSEEK_MODEL ?? reg?.defaultModel ?? 'deepseek-chat').trim()
   const base = (env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com').trim().replace(/\/$/, '')
 
+  let msgs = toMessages(req.messages)
+  const nImg = (req.imageDataUrls ?? []).filter((u) => typeof u === 'string' && u.startsWith('data:image/')).length
+  if (nImg > 0 && msgs.length > 0) {
+    const last = msgs[msgs.length - 1]
+    if (last.role === 'user') {
+      last.content = `【用户随消息附了 ${nImg} 张截图；当前 DeepSeek 直连暂只支持文字。请结合用户文字说明协助；若需读图可请用户改选支持截图的助手。】\n\n${String(last.content)}`
+    }
+  }
+
   const body: Record<string, unknown> = {
     model,
-    messages: toMessages(req.messages),
+    messages: msgs,
     temperature: req.temperature ?? 0.6,
     thinking: { type: 'enabled' },
     reasoning_effort: 'high',

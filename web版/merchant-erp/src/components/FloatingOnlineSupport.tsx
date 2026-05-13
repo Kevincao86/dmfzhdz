@@ -538,10 +538,10 @@ export default function FloatingOnlineSupport({
 
   return (
     <>
-      <div className="pointer-events-none fixed bottom-0 right-0 z-[60] flex flex-col items-end p-4 sm:p-6">
+      <div className="flex flex-col items-center gap-3">
         {open ? (
           <div
-            className="pointer-events-auto mb-3 flex max-h-[min(32rem,calc(100vh-8rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+            className="pointer-events-auto flex max-h-[min(32rem,calc(100vh-8rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby={panelId}
