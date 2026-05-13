@@ -30,7 +30,13 @@ export async function runMeooAiChatCore(
     return { status: 501, body: { ok: false, error: 'stream_not_implemented' } }
   }
 
-  const user = await verifyBearerJwt(authHeader, env)
+  let user: Awaited<ReturnType<typeof verifyBearerJwt>>
+  try {
+    user = await verifyBearerJwt(authHeader, env)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { status: 503, body: { ok: false, error: 'auth_lookup_failed', detail: msg.slice(0, 400) } }
+  }
   if (!user) {
     return { status: 401, body: { ok: false, error: 'unauthorized' } }
   }
@@ -67,7 +73,16 @@ export async function runMeooAiChatCore(
 
   try {
     const res = await routeAiChat(req, env)
-    const okBody = { ok: true as const, ...res }
+    /** 勿把 SDK 完整 raw 对象写入 HTTP 响应：常含循环引用，JSON.stringify 会抛错导致 Vercel 500 */
+    const okBody: Record<string, unknown> = {
+      ok: true,
+      provider: res.provider,
+      model: res.model,
+      content: res.content,
+    }
+    if (res.usage && typeof res.usage === 'object') {
+      okBody.usage = res.usage as Record<string, unknown>
+    }
     void forwardAuditToMerchantAdmin({
       env,
       body: buildAuditPayload({ user, req, res, status: 'ok' }),
@@ -82,7 +97,7 @@ export async function runMeooAiChatCore(
       tokenUsage: res.usage ?? null,
       status: 'ok',
     })
-    return { status: 200, body: okBody as unknown as Record<string, unknown> }
+    return { status: 200, body: okBody }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     void forwardAuditToMerchantAdmin({

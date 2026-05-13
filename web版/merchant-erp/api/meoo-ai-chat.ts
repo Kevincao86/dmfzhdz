@@ -18,8 +18,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 405, { ok: false, error: 'method_not_allowed' })
     return
   }
-  const bodyRaw = rawBody(req)
-  const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
-  const out = await runMeooAiChatCore(bodyRaw, auth, process.env as Record<string, string>)
-  sendMerchantJson(res, out.status, out.body)
+  try {
+    const bodyRaw = rawBody(req)
+    const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+    const out = await runMeooAiChatCore(bodyRaw, auth, process.env as Record<string, string>)
+    sendMerchantJson(res, out.status, out.body)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[meoo-ai-chat] fatal', msg)
+    sendMerchantJson(res, 500, { ok: false, error: 'internal_error', detail: msg.slice(0, 600) })
+  }
 }
