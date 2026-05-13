@@ -10,6 +10,7 @@ function toMessages(messages: AIChatRequest['messages']): { role: string; conten
 
 /**
  * DeepSeek Chat Completions（OpenAI 兼容）；按需附加 thinking / reasoning_effort（见官方文档）。
+ * 与历史稳定版本一致；截图等多模态仅走 TokenMix。
  */
 export async function chatDeepseek(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
   const apiKey = (env.DEEPSEEK_API_KEY ?? '').trim()
@@ -18,18 +19,9 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
   const model = (req.model ?? env.DEEPSEEK_MODEL ?? reg?.defaultModel ?? 'deepseek-chat').trim()
   const base = (env.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com').trim().replace(/\/$/, '')
 
-  let msgs = toMessages(req.messages)
-  const nImg = (req.imageDataUrls ?? []).filter((u) => typeof u === 'string' && u.startsWith('data:image/')).length
-  if (nImg > 0 && msgs.length > 0) {
-    const last = msgs[msgs.length - 1]
-    if (last.role === 'user') {
-      last.content = `【用户随消息附了 ${nImg} 张截图；当前 DeepSeek 直连暂只支持文字。请结合用户文字说明协助；若需读图可请用户改选支持截图的助手。】\n\n${String(last.content)}`
-    }
-  }
-
   const body: Record<string, unknown> = {
     model,
-    messages: msgs,
+    messages: toMessages(req.messages),
     temperature: req.temperature ?? 0.6,
     thinking: { type: 'enabled' },
     reasoning_effort: 'high',

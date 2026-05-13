@@ -1,8 +1,9 @@
 import type { AIChatRequest } from '../../src/services/ai/types.js'
 
 /**
- * OpenAI Chat Completions 形态（与 openai SDK 兼容），不依赖 `openai/resources/...` 子路径：
- * Vercel 打包时深层子路径偶发解析异常会导致整条 `/api/meoo-ai-chat` 模块加载失败（全模型 500）。
+ * 供 TokenMix（四大家族）网关将 AIMessage 转为 Chat Completions 形态，并合并附图至多模态。
+ * 不依赖 `openai/resources/...` 子路径，避免 Vercel 打包解析异常。
+ * 直连 Kimi/MiniMax 不使用本模块。
  */
 type OpenAiChatPart =
   | { type: 'text'; text: string }
