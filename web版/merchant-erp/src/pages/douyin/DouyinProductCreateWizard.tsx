@@ -383,6 +383,7 @@ export default function DouyinProductCreateWizard({
   const [templateSkuAttrs, setTemplateSkuAttrs] = useState<TemplateAttr[]>([])
   const [templateAttrOverrides, setTemplateAttrOverrides] = useState<Record<string, string>>({})
   const [templateSkuAttrOverrides, setTemplateSkuAttrOverrides] = useState<Record<string, string>>({})
+  const [skuAttrExtraRows, setSkuAttrExtraRows] = useState<{ id: string; key: string; value: string }[]>([])
   const [staffSales, setStaffSales] = useState('allow')
   const [consumeDateMode, setConsumeDateMode] = useState<'days' | 'calendar'>('days')
   const [nonConsumeDateMode, setNonConsumeDateMode] = useState<'all_dates' | 'partial_dates'>('all_dates')
@@ -614,8 +615,14 @@ export default function DouyinProductCreateWizard({
     () => templateProductAttrs.filter((x) => x.is_required),
     [templateProductAttrs],
   )
-  const requiredSkuTemplateAttrs = useMemo(
-    () => templateSkuAttrs.filter((x) => x.is_required),
+
+  const sortedTemplateSkuAttrs = useMemo(
+    () =>
+      [...templateSkuAttrs].sort(
+        (a, b) =>
+          Number(!!b.is_required) - Number(!!a.is_required) ||
+          (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN'),
+      ),
     [templateSkuAttrs],
   )
 
@@ -651,7 +658,7 @@ export default function DouyinProductCreateWizard({
   }, [aiModelUiTick])
 
   const imageVendorManualOptions = useMemo(() => {
-    const allow = new Set(['minimax', 'qwen', 'doubao'])
+    const allow = new Set(['qwen', 'doubao'])
     return aiModelPickOptions.filter((o) => allow.has(o.id))
   }, [aiModelPickOptions])
 
@@ -700,6 +707,7 @@ export default function DouyinProductCreateWizard({
       setTemplateSkuAttrs(tpl.sku_attrs)
       setTemplateAttrOverrides({})
       setTemplateSkuAttrOverrides({})
+      setSkuAttrExtraRows([])
       setSalesChannel((prev) =>
         tpl.sales_channels.some((x) => x.value === prev)
           ? prev
@@ -847,7 +855,8 @@ export default function DouyinProductCreateWizard({
         setTemplateProductAttrs(tpl.product_attrs)
         setTemplateSkuAttrs(tpl.sku_attrs)
         setTemplateAttrOverrides({})
-      setTemplateSkuAttrOverrides({})
+        setTemplateSkuAttrOverrides({})
+        setSkuAttrExtraRows([])
         const ch = si && typeof si.channel === 'string' ? si.channel : null
         setSalesChannel(
           ch && tpl.sales_channels.some((x) => x.value === ch)
@@ -1189,9 +1198,18 @@ export default function DouyinProductCreateWizard({
       const v = templateSkuAttrOverrides[a.key]?.trim()
       if (!v) {
         setActionMsg({
-          text: `开放平台 SKU 模板必填「${a.name}」（key: ${a.key}）尚未填写，请在本页「开放平台类目必填」内 SKU 区域填写`,
+          text: `开放平台 SKU 模板必填「${a.name}」（key: ${a.key}）尚未填写，请在「商品信息」内「SKU 属性」区域填写`,
           ok: false,
         })
+        return
+      }
+    }
+
+    for (const r of skuAttrExtraRows) {
+      const ek = r.key.trim()
+      const ev = r.value.trim()
+      if ((ek && !ev) || (!ek && ev)) {
+        setActionMsg({ text: '自定义 SKU 属性：请同时填写属性 key 与值，或删除该行', ok: false })
         return
       }
     }
@@ -1213,11 +1231,17 @@ export default function DouyinProductCreateWizard({
       detail.template_attr_overrides = cleaned
     }
 
-    const skuCleaned = Object.fromEntries(
+    const skuFromMap = Object.fromEntries(
       Object.entries(templateSkuAttrOverrides)
         .map(([k, v]) => [k, (v ?? '').trim()])
         .filter(([, v]) => v.length > 0),
     )
+    const skuFromExtra = Object.fromEntries(
+      skuAttrExtraRows
+        .map((r) => [r.key.trim(), r.value.trim()])
+        .filter(([k, v]) => k.length > 0 && v.length > 0),
+    )
+    const skuCleaned = { ...skuFromMap, ...skuFromExtra }
     if (Object.keys(skuCleaned).length > 0) {
       detail.template_sku_attr_overrides = skuCleaned
     }
@@ -1749,6 +1773,132 @@ export default function DouyinProductCreateWizard({
                       className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     />
                     <p className="mt-1 text-xs text-gray-500">{productName.length} / 40</p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
+                    <h4 className="text-sm font-semibold text-gray-900">SKU 属性（template.get · sku_attrs）</h4>
+                    <p className="mt-1 text-xs text-gray-600">
+                      字段由已选末级类目与商品类型对应的开放平台{' '}
+                      <code className="rounded bg-white px-1 text-[11px]">goods/template/get</code> 返回；保存时与下方自定义
+                      key 一并写入 <code className="rounded bg-white px-1 text-[11px]">sku.attr_key_value_map</code> 提交至抖音来客。
+                    </p>
+                    {sortedTemplateSkuAttrs.length === 0 && skuAttrExtraRows.length === 0 ? (
+                      <p className="mt-2 text-xs text-amber-800">
+                        当前模板未返回 sku_attrs。若开放平台仍要求补充 SKU 维度字段，可点击下方「新增自定义 SKU 属性」自行添加
+                        key/value。
+                      </p>
+                    ) : (
+                      <ul className="mt-3 space-y-3">
+                        {sortedTemplateSkuAttrs.map((a) => {
+                          const skuCovered = templateSkuAttrWizardCovered(a, skuTemplateCoverCtx)
+                          return (
+                            <li
+                              key={`sku-info-${a.key}`}
+                              className="rounded-lg border border-slate-200 bg-white/90 px-3 py-2 text-sm text-gray-800"
+                            >
+                              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                <span className="font-medium text-gray-900">
+                                  {a.name}
+                                  {a.is_required ? <span className="text-red-500"> *</span> : null}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'rounded px-2 py-0.5 text-xs',
+                                    skuCovered
+                                      ? 'bg-emerald-100 text-emerald-900'
+                                      : a.is_required
+                                        ? 'bg-amber-100 text-amber-950'
+                                        : 'bg-slate-100 text-slate-700',
+                                  )}
+                                >
+                                  {skuCovered ? '自动映射' : a.is_required ? '须填写' : '选填'}
+                                </span>
+                              </div>
+                              <p className="mt-1 font-mono text-[11px] text-gray-500">
+                                key: {a.key || '—'} · value_type: {a.value_type}
+                                {a.is_multi ? ' · multi' : ''}
+                              </p>
+                              {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
+                              {skuCovered ? (
+                                <p className="mt-2 text-xs text-emerald-900">
+                                  已由本页「售价 / 划线价 / 库存 / 商品名称」与网关逻辑自动映射，无需再填。
+                                </p>
+                              ) : templateAttrValueLooksNumeric(a) ? (
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={templateSkuAttrOverrides[a.key] ?? ''}
+                                  onChange={(e) =>
+                                    setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                                  }
+                                  placeholder="填写数值（将写入 sku.attr_key_value_map）"
+                                  className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                                />
+                              ) : (
+                                <textarea
+                                  value={templateSkuAttrOverrides[a.key] ?? ''}
+                                  onChange={(e) =>
+                                    setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                                  }
+                                  rows={String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
+                                  placeholder="填写该 SKU 模板 key 的字符串值（JSON 须可解析）"
+                                  className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                                />
+                              )}
+                            </li>
+                          )
+                        })}
+                        {skuAttrExtraRows.map((r) => (
+                          <li
+                            key={r.id}
+                            className="rounded-lg border border-dashed border-indigo-200 bg-white/90 px-3 py-2 text-sm text-gray-800"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-xs font-medium text-indigo-900">自定义 SKU 属性</span>
+                              <button
+                                type="button"
+                                title="删除此行"
+                                onClick={() => setSkuAttrExtraRows((prev) => prev.filter((x) => x.id !== r.id))}
+                                className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <input
+                                value={r.key}
+                                onChange={(e) =>
+                                  setSkuAttrExtraRows((prev) =>
+                                    prev.map((x) => (x.id === r.id ? { ...x, key: e.target.value } : x)),
+                                  )
+                                }
+                                placeholder="attr key（与开放平台字段名一致）"
+                                className="w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                              />
+                              <input
+                                value={r.value}
+                                onChange={(e) =>
+                                  setSkuAttrExtraRows((prev) =>
+                                    prev.map((x) => (x.id === r.id ? { ...x, value: e.target.value } : x)),
+                                  )
+                                }
+                                placeholder="值（将写入 sku.attr_key_value_map）"
+                                className="w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                              />
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSkuAttrExtraRows((prev) => [...prev, { id: newId('sku-x'), key: '', value: '' }])
+                      }
+                      className="mt-3 rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-medium text-indigo-800 hover:bg-indigo-50"
+                    >
+                      新增自定义 SKU 属性
+                    </button>
                   </div>
 
                   <div>
@@ -2557,68 +2707,13 @@ export default function DouyinProductCreateWizard({
                 })}
               </ul>
             )}
-            {requiredSkuTemplateAttrs.length > 0 ? (
+            {templateSkuAttrs.length > 0 ? (
               <div className="mt-5 border-t border-blue-100 pt-4">
-                <h4 className="text-sm font-semibold text-gray-900">SKU 模板必填（sku_attrs）</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  与售价、库存、商品名称可对齐的字段由网关自动写入 SKU；其余须在本区域填写后才会随保存请求提交。
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-800">SKU 属性（sku_attrs）</span>
+                  已与类目、商品类型对齐的表单项已上移至「商品信息」区块；保存时同样经网关合并写入{' '}
+                  <code className="rounded bg-white/80 px-1 text-[11px]">sku.attr_key_value_map</code>。
                 </p>
-                <ul className="mt-3 space-y-3">
-                  {requiredSkuTemplateAttrs.map((a) => {
-                    const skuCovered = templateSkuAttrWizardCovered(a, skuTemplateCoverCtx)
-                    return (
-                      <li
-                        key={`sku-${a.key}`}
-                        className="rounded-lg border border-blue-100 bg-white/90 px-3 py-2 text-sm text-gray-800"
-                      >
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-medium text-gray-900">
-                            {a.name} <span className="text-red-500">*</span>
-                          </span>
-                          <span
-                            className={cn(
-                              'rounded px-2 py-0.5 text-xs',
-                              skuCovered ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950',
-                            )}
-                          >
-                            {skuCovered ? '自动映射' : '须填写'}
-                          </span>
-                        </div>
-                        <p className="mt-1 font-mono text-[11px] text-gray-500">
-                          key: {a.key || '—'} · value_type: {a.value_type}
-                          {a.is_multi ? ' · multi' : ''}
-                        </p>
-                        {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
-                        {skuCovered ? (
-                          <p className="mt-2 text-xs text-emerald-900">
-                            已由本页「售价 / 划线价 / 库存 / 商品名称」与网关逻辑自动映射，无需再填。
-                          </p>
-                        ) : templateAttrValueLooksNumeric(a) ? (
-                          <input
-                            type="number"
-                            step="any"
-                            value={templateSkuAttrOverrides[a.key] ?? ''}
-                            onChange={(e) =>
-                              setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
-                            }
-                            placeholder="填写数值（将写入 sku.attr_key_value_map）"
-                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-                          />
-                        ) : (
-                          <textarea
-                            value={templateSkuAttrOverrides[a.key] ?? ''}
-                            onChange={(e) =>
-                              setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
-                            }
-                            rows={String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
-                            placeholder="填写该 SKU 模板 key 的字符串值（JSON 须可解析）"
-                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-                          />
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
               </div>
             ) : null}
           </section>

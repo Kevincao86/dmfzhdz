@@ -99,14 +99,6 @@ export default function ProductCreateFlowPage() {
           <p className="mt-1 text-sm text-gray-500">
             按「类目 → 商品类型 → 商品信息」顺序填写，内容与抖音来客上架要求一致。
           </p>
-          {__ERP_BUILD_REF__ ? (
-            <p className="mt-1 text-[11px] text-gray-400">
-              前端构建 <span className="font-mono">{__ERP_BUILD_REF__}</span>
-              {' · '}
-              若界面仍无「AI 模型（可选）」或 SKU 输入框，多为缓存：请强制刷新（Ctrl+Shift+R / Cmd+Shift+R），或检查
-              www 域名前是否还有 CDN（需在 CDN 控制台刷新 HTML/整站缓存）。
-            </p>
-          ) : null}
         </div>
         {platforms.length > 1 && (
           <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
