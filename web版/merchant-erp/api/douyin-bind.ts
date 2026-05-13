@@ -8,12 +8,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
 import {
   douyinOpenApiUrl,
+  douyinServerFetch,
   exchangeDouyinClientToken,
   extractPoisFromShopQueryData,
   fetchGoodlifeWithOfficialFallback,
   invalidateDouyinMerchantClientTokenCache,
   isLikelyDouyinClientTokenExpiredBizError,
   parseDouyinOpenApiEnvelope,
+  relayTlsInsecureEnvEnabled,
 } from './douyinOpenApiBase.js'
 
 export type DouyinMerchantSession = {
@@ -96,7 +98,7 @@ function fetchTimeoutSignal(ms: number): AbortSignal {
 }
 
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
-  return fetch(input, {
+  return douyinServerFetch(input, {
     ...init,
     signal: fetchTimeoutSignal(DOUYIN_FETCH_TIMEOUT_MS),
   })
@@ -317,9 +319,16 @@ export async function runDouyinMerchantBind(
       process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
         ? ' 根因多为 Nginx 未把 GET /douyin/goodlife/... 转到 open.douyin.com（须 proxy_pass https://open.douyin.com/; 且勿只配 POST）。部署本版本后若中继仍返回 HTML，会再试官方一次；官方若报 IP 白名单，请先修好中继使 goodlife 从 EIP 出站。'
         : ''
+    const relayTlsHint =
+      !aborted &&
+      process.env.DOUYIN_OPENAPI_BASE_URL?.trim() &&
+      /fetch failed|certificate|certificates|ssl|tls|UNABLE_TO_VERIFY|self[- ]signed/i.test(detail) &&
+      !relayTlsInsecureEnvEnabled()
+        ? ' 若中继 HTTPS 为自签或 IP 证书，Vercel 上 Node 校验会失败并表现为 fetch failed：在环境变量增加 DOUYIN_OPENAPI_RELAY_TLS_INSECURE=1（仅用于可信自建中继）；或为中继配置域名与受信任证书后可删除该变量。'
+        : ''
     return {
       statusCode: 502,
-      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}${relayHtmlHint}` },
+      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}${relayHtmlHint}${relayTlsHint}` },
     }
   }
 }

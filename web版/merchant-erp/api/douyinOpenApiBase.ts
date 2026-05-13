@@ -1,3 +1,5 @@
+import { Agent, fetch as undiciFetch } from 'undici'
+
 /**
  * 抖音开放平台 HTTP 基址（仅服务端 / Vite 网关；勿暴露给浏览器 bundle）。
  *
@@ -8,6 +10,8 @@
  *   可显式设 `DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com` 跳过中继上的 OAuth（与自动回落等价，仅少一次无效请求）。
  *
  * **goodlife（`/goodlife/*`）**：优先走 `DOUYIN_OPENAPI_BASE_URL` 中继；若中继返回 HTML、5xx 或非 JSON，**再请求一次官方**（便于拿到抖音 JSON 错误如 IP 白名单，或在官方可达时直接成功）。中继 Nginx 须对 **GET 保留完整 query**。
+ *
+ * - **DOUYIN_OPENAPI_RELAY_TLS_INSECURE**：设为 `1` / `true` 时，对「指向自建中继的 HTTPS 请求」**不校验中继 TLS 证书**（典型：反代使用自签或 IP 证书；Vercel 上否则会 `fetch failed`）。**直连 `https://open.douyin.com` 仍严格校验**。生产推荐为中继配置域名 + 受信任证书，勿长期依赖本开关。
  *
  * Vercel：Environment Variables 中配置上述变量（勿以 / 结尾）。
  */
@@ -97,6 +101,54 @@ function looksLikeJsonObject(raw: string): boolean {
 }
 
 export type DouyinFetchFn = (input: string | URL, init?: RequestInit) => Promise<Response>
+
+let relayTlsInsecureAgent: Agent | undefined
+
+function getRelayTlsInsecureAgent(): Agent {
+  if (!relayTlsInsecureAgent) {
+    relayTlsInsecureAgent = new Agent({
+      connect: { rejectUnauthorized: false },
+    })
+  }
+  return relayTlsInsecureAgent
+}
+
+export function relayTlsInsecureEnvEnabled(): boolean {
+  const v = process.env.DOUYIN_OPENAPI_RELAY_TLS_INSECURE?.trim().toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
+function requestUrlString(input: string | URL): string {
+  return typeof input === 'string' ? input : input.href
+}
+
+/**
+ * 服务端统一出口：默认 `fetch`；若开启 `DOUYIN_OPENAPI_RELAY_TLS_INSECURE` 且 URL 落在自建中继（非 open.douyin.com），
+ * 使用 undici 不校验中继证书，避免自签/IP 证书在 Vercel 上表现为 `fetch failed`。
+ */
+export async function douyinServerFetch(input: string | URL, init?: RequestInit): Promise<Response> {
+  const urlStr = requestUrlString(input)
+  if (!relayTlsInsecureEnvEnabled()) {
+    return fetch(input, init)
+  }
+  if (urlStr.startsWith(DEFAULT_BASE)) {
+    return fetch(input, init)
+  }
+  const relay = normalizedGoodlifeBase()
+  const oauth = normalizedOauthBase()
+  if (relay === DEFAULT_BASE) {
+    return fetch(input, init)
+  }
+  const hitRelay = urlStr.startsWith(relay)
+  const hitCustomOauth = oauth !== DEFAULT_BASE && urlStr.startsWith(oauth)
+  if (!hitRelay && !hitCustomOauth) {
+    return fetch(input, init)
+  }
+  return undiciFetch(input, {
+    ...(init ?? {}),
+    dispatcher: getRelayTlsInsecureAgent(),
+  } as never) as Promise<Response>
+}
 
 /** 将经 DOUYIN_OPENAPI_BASE_URL 拼出的 goodlife 完整 URL 换为官方同源路径（保留 path+query） */
 export function officialGoodlifeUrlFromRelayRequest(relayFullUrl: string): string | null {

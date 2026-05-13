@@ -39,6 +39,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
 import {
   douyinOpenApiUrl,
+  douyinServerFetch,
   exchangeDouyinClientToken,
   extractPoisFromShopQueryData,
   fetchGoodlifeWithOfficialFallback,
@@ -62,7 +63,7 @@ export { runDouyinMerchantBind }
 const DOUYIN_FETCH_TIMEOUT_MS = 25_000
 
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
-  return fetch(input, {
+  return douyinServerFetch(input, {
     ...init,
     signal: AbortSignal.timeout(DOUYIN_FETCH_TIMEOUT_MS),
   })
