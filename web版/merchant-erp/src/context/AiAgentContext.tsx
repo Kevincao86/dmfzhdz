@@ -11,13 +11,14 @@ import {
   type SetStateAction,
 } from 'react'
 import type {
+  AiAgentArchivedSession,
   AiAgentMessage,
   AiAgentOpenContext,
   AiPermissionId,
   AiTaskPreviewPayload,
   AiTaskType,
 } from '../lib/aiAgentTypes'
-import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
+import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
 import { postAiChat } from '../services/ai/aiClient'
@@ -64,6 +65,19 @@ function agentMessagesToChatMessages(msgs: AiAgentMessage[]): AIMessage[] {
   return out.slice(-24)
 }
 
+const MAX_ARCHIVED_SESSIONS = 10
+
+function cloneAgentMessages(msgs: AiAgentMessage[]): AiAgentMessage[] {
+  return structuredClone(msgs) as AiAgentMessage[]
+}
+
+function sessionTitleFromMessages(msgs: AiAgentMessage[]): string {
+  const u = msgs.find((m) => m.role === 'user')
+  const raw = (u?.content ?? '对话').trim().replace(/\s+/g, ' ')
+  if (!raw) return '对话'
+  return raw.length <= 32 ? raw : `${raw.slice(0, 31)}…`
+}
+
 type AiAgentContextValue = {
   drawerOpen: boolean
   openDrawer: (ctx?: AiAgentOpenContext) => void
@@ -90,6 +104,14 @@ type AiAgentContextValue = {
   addComposerImages: (files: FileList | null) => Promise<void>
   removeComposerImage: (index: number) => void
   clearComposerImages: () => void
+  /** 有用户发言后的侧边栏：历史对话快照，最多 10 条 */
+  archivedSessions: AiAgentArchivedSession[]
+  /** 将当前对话存档并回到欢迎空态 */
+  startNewChat: () => void
+  /** 从历史恢复一条对话到主区域（当前有内容会先被存档） */
+  resumeArchivedSession: (sessionId: string) => void
+  /** 侧边栏当前高亮的历史项（从 resume 进入时） */
+  sidebarActiveArchiveId: string | null
 }
 
 const AiAgentContext = createContext<AiAgentContextValue | null>(null)
@@ -167,11 +189,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pageContext, setPageContext] = useState<AiAgentOpenContext | null>(null)
   const [messages, setMessages] = useState<AiAgentMessage[]>(() => [
-    createAgentMessage(
-      'assistant',
-      '你好，我是店魔方 AI 助手。选好助手风格后，直接描述你想做的事；需要改商品、发消息等操作时，我会先给你看步骤说明，你确认后再继续。',
-    ),
+    createAgentMessage('assistant', AI_AGENT_WELCOME_CONTENT),
   ])
+  const [archivedSessions, setArchivedSessions] = useState<AiAgentArchivedSession[]>([])
+  const [sidebarActiveArchiveId, setSidebarActiveArchiveId] = useState<string | null>(null)
   const [inputDraft, setInputDraft] = useState('')
   const [pendingComposerImages, setPendingComposerImages] = useState<string[]>([])
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
@@ -180,6 +201,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+
+  const archivedRef = useRef(archivedSessions)
+  archivedRef.current = archivedSessions
 
   useEffect(() => {
     setModelPickerKeyState(loadPickerKey())
@@ -234,6 +258,54 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const clearComposerImages = useCallback(() => {
     setPendingComposerImages([])
   }, [])
+
+  const pushCurrentToArchiveIfHasUser = useCallback(() => {
+    const cur = messagesRef.current
+    if (!cur.some((m) => m.role === 'user')) return
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `sess-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const entry: AiAgentArchivedSession = {
+      id,
+      title: sessionTitleFromMessages(cur),
+      messages: cloneAgentMessages(cur),
+      updatedAt: Date.now(),
+    }
+    setArchivedSessions((prev) => [entry, ...prev].slice(0, MAX_ARCHIVED_SESSIONS))
+  }, [])
+
+  const resetToWelcome = useCallback(() => {
+    const fresh = [createAgentMessage('assistant', AI_AGENT_WELCOME_CONTENT)]
+    setMessages(fresh)
+    messagesRef.current = fresh
+    setPendingPreviewId(null)
+    setInputDraft('')
+    setPendingComposerImages([])
+  }, [])
+
+  const startNewChat = useCallback(() => {
+    pushCurrentToArchiveIfHasUser()
+    resetToWelcome()
+    setSidebarActiveArchiveId(null)
+  }, [pushCurrentToArchiveIfHasUser, resetToWelcome])
+
+  const resumeArchivedSession = useCallback(
+    (sessionId: string) => {
+      if (sessionId === sidebarActiveArchiveId) return
+      const hit = archivedRef.current.find((s) => s.id === sessionId)
+      if (!hit) return
+      pushCurrentToArchiveIfHasUser()
+      const next = cloneAgentMessages(hit.messages)
+      setMessages(next)
+      messagesRef.current = next
+      setPendingPreviewId(null)
+      setInputDraft('')
+      setPendingComposerImages([])
+      setSidebarActiveArchiveId(sessionId)
+    },
+    [pushCurrentToArchiveIfHasUser, sidebarActiveArchiveId],
+  )
 
   const pushPreview = useCallback((taskType: AiTaskType, intro: string, pageLabelOverride?: string) => {
     const preview = buildPreviewForTask(taskType, pageLabelOverride ?? pageContext?.pageLabel)
@@ -319,6 +391,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const imgs = [...pendingComposerImages]
       if ((!trimmed && imgs.length === 0) || aiSending || pendingPreviewId) return
       const line = trimmed || '请结合附图说明你的需求。'
+      setSidebarActiveArchiveId(null)
       setPendingComposerImages([])
       const userMsg = createAgentMessage('user', line, { imageUrls: imgs.length ? imgs : undefined })
       setMessages((prev) => {
@@ -337,6 +410,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const applyShortcut = useCallback(
     (taskType: AiTaskType) => {
       if (aiSending || pendingPreviewId) return
+      setSidebarActiveArchiveId(null)
       setPendingComposerImages([])
       const label = AI_TASK_TYPE_LABELS[taskType]
       const line = `使用快捷任务：${label}`
@@ -445,6 +519,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       addComposerImages,
       removeComposerImage,
       clearComposerImages,
+      archivedSessions,
+      startNewChat,
+      resumeArchivedSession,
+      sidebarActiveArchiveId,
     }),
     [
       drawerOpen,
@@ -469,6 +547,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       addComposerImages,
       removeComposerImage,
       clearComposerImages,
+      archivedSessions,
+      startNewChat,
+      resumeArchivedSession,
+      sidebarActiveArchiveId,
     ],
   )
 
