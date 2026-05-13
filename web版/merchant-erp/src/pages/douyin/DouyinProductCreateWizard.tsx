@@ -79,22 +79,24 @@ type ComboItemRow = {
 }
 type ComboGroupRow = { id: string; pickRule: string; items: ComboItemRow[] }
 
-/** 与来客后台「几选几」下拉常见取值对齐，随 package_combo.groups[].pick_rule 提交 */
-const DOUYIN_PICK_RULE_PRESET_OPTIONS: { value: string; label: string }[] = (() => {
-  const o: { value: string; label: string }[] = [
-    { value: '', label: '请确认几选几' },
-    { value: '全部必选', label: '全部必选' },
-  ]
-  for (let m = 2; m <= 12; m++) {
-    for (let n = 1; n < m; n++) {
-      o.push({ value: `${m}选${n}`, label: `${m}选${n}` })
-    }
-  }
-  for (let k = 1; k <= 8; k++) {
-    o.push({ value: `任选${k}份`, label: `任选${k}份` })
+/** 按当前组内有效单品数生成「几选几」：1 个仅全部必选；2 个为二选一/二选二；n 个为 n 选 1…n 选 n（与来客常见规则一致） */
+function pickRuleSelectOptionsForItemCount(itemCount: number): { value: string; label: string }[] {
+  const o: { value: string; label: string }[] = [{ value: '', label: '请确认几选几' }]
+  o.push({ value: '全部必选', label: '全部必选' })
+  if (itemCount <= 1) return o
+  for (let k = 1; k <= itemCount; k++) {
+    o.push({ value: `${itemCount}选${k}`, label: `${itemCount}选${k}` })
   }
   return o
-})()
+}
+
+function normalizePickRuleForSave(pickRule: string, itemCount: number): string {
+  const opts = pickRuleSelectOptionsForItemCount(itemCount)
+  const allowed = new Set(opts.map((x) => x.value))
+  const p = pickRule.trim()
+  if (p && allowed.has(p)) return p
+  return '全部必选'
+}
 
 function mergeComboItemDisplayName(d: {
   name: string
@@ -728,6 +730,35 @@ export default function DouyinProductCreateWizard({
     [comboGroups],
   )
 
+  const comboPickSanitizeSig = useMemo(
+    () =>
+      productType === 1
+        ? comboGroups
+            .map(
+              (g) =>
+                `${g.id}:${g.items.filter((it) => it.name.trim()).length}:${g.pickRule.trim()}`,
+            )
+            .join('|')
+        : '',
+    [productType, comboGroups],
+  )
+
+  useEffect(() => {
+    if (productType !== 1) return
+    setComboGroups((prev) => {
+      let changed = false
+      const next = prev.map((g) => {
+        const n = g.items.filter((it) => it.name.trim()).length
+        const allowed = new Set(pickRuleSelectOptionsForItemCount(n).map((o) => o.value))
+        const pr = g.pickRule.trim()
+        if (!pr || allowed.has(pr)) return g
+        changed = true
+        return { ...g, pickRule: n <= 1 ? '全部必选' : '' }
+      })
+      return changed ? next : prev
+    })
+  }, [productType, comboPickSanitizeSig])
+
   const skuTemplateCoverCtx = useMemo(
     () => ({
       priceYuan,
@@ -1137,6 +1168,14 @@ export default function DouyinProductCreateWizard({
     }
   }, [variant, editProductId, tree])
 
+  /** 生图/修图：把商品说明片段并入 title_draft，便于网关 prompt 与标题、卖点一致 */
+  const imageAssistTitleDraft = useMemo(() => {
+    const name = productName.trim()
+    if (!name) return ''
+    const desc = productDesc.trim().slice(0, 400)
+    return desc ? `${name}。${desc}` : name
+  }, [productName, productDesc])
+
   const optimizeProductTitle = useCallback(async () => {
     const draft = productName.trim()
     if (!draft) {
@@ -1195,6 +1234,7 @@ export default function DouyinProductCreateWizard({
         const r = await postAssistWithKeys({
           action: 'image_enhance',
           product_name: productName.trim() || '商品',
+          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
           image_urls: [headUrl.trim()],
           image_role: 'head',
         })
@@ -1206,14 +1246,19 @@ export default function DouyinProductCreateWizard({
           window.alert('请先填写商品名称，以便 AI 生成头图')
           return
         }
-        const r = await postAssistWithKeys({ action: 'image_generate', product_name: n, image_role: 'head' })
+        const r = await postAssistWithKeys({
+          action: 'image_generate',
+          product_name: n,
+          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          image_role: 'head',
+        })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
       }
     } finally {
       endAi('img-head')
     }
-  }, [postAssistWithKeys, headUrl, productName, beginAi, endAi])
+  }, [postAssistWithKeys, headUrl, productName, imageAssistTitleDraft, beginAi, endAi])
 
   const aiOptimizeAuxImages = useCallback(async () => {
     beginAi('img-aux')
@@ -1222,6 +1267,7 @@ export default function DouyinProductCreateWizard({
         const r = await postAssistWithKeys({
           action: 'image_enhance',
           product_name: productName.trim() || '商品',
+          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
           image_urls: [...auxUrlsList],
           image_role: 'aux',
         })
@@ -1234,7 +1280,12 @@ export default function DouyinProductCreateWizard({
           return
         }
         if (auxUrlsList.length >= 4) return
-        const r = await postAssistWithKeys({ action: 'image_generate', product_name: n, image_role: 'aux' })
+        const r = await postAssistWithKeys({
+          action: 'image_generate',
+          product_name: n,
+          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          image_role: 'aux',
+        })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0])
           setAuxUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 4))
@@ -1242,7 +1293,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-aux')
     }
-  }, [postAssistWithKeys, auxUrlsList, productName, beginAi, endAi])
+  }, [postAssistWithKeys, auxUrlsList, productName, imageAssistTitleDraft, beginAi, endAi])
 
   const aiOptimizeEnvImages = useCallback(async () => {
     beginAi('img-env')
@@ -1251,6 +1302,7 @@ export default function DouyinProductCreateWizard({
         const r = await postAssistWithKeys({
           action: 'image_enhance',
           product_name: productName.trim() || '商品',
+          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
           image_urls: [...envUrlsList],
           image_role: 'env',
         })
@@ -1263,7 +1315,12 @@ export default function DouyinProductCreateWizard({
           return
         }
         if (envUrlsList.length >= 10) return
-        const r = await postAssistWithKeys({ action: 'image_generate', product_name: n, image_role: 'env' })
+        const r = await postAssistWithKeys({
+          action: 'image_generate',
+          product_name: n,
+          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          image_role: 'env',
+        })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0])
           setEnvUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 10))
@@ -1271,7 +1328,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-env')
     }
-  }, [postAssistWithKeys, envUrlsList, productName, beginAi, endAi])
+  }, [postAssistWithKeys, envUrlsList, productName, imageAssistTitleDraft, beginAi, endAi])
 
   const buildDetailPayload = (): DouyinProductDetailPayload | null => {
     const price = Number.parseFloat(priceYuan)
@@ -1287,18 +1344,19 @@ export default function DouyinProductCreateWizard({
         : productType === 1
           ? (() => {
               const groupsFromUi = comboGroups
-                .map((g) => ({
-                  pick_rule: g.pickRule.trim() || '全部必选',
-                  items: g.items
-                    .filter((it) => it.name.trim())
-                    .map((it) => ({
+                .map((g) => {
+                  const items = g.items.filter((it) => it.name.trim())
+                  return {
+                    pick_rule: normalizePickRuleForSave(g.pickRule, items.length),
+                    items: items.map((it) => ({
                       name: it.name.trim(),
                       quantity: Math.max(1, Number.parseInt(it.qty, 10) || 1),
                       origin_price_yuan: Math.max(0, Number.parseFloat(it.price) || 0),
                       ...(it.product_id ? { product_id: it.product_id } : {}),
                       ...(it.sku_id ? { sku_id: it.sku_id } : {}),
                     })),
-                }))
+                  }
+                })
                 .filter((g) => g.items.length > 0)
               if (groupsFromUi.length > 0) return { groups: groupsFromUi }
               const nm = productName.trim().slice(0, 120) || '团购套餐'
@@ -2075,7 +2133,9 @@ export default function DouyinProductCreateWizard({
                                 className="max-w-[12rem] rounded border border-gray-300 bg-white px-2 py-1 text-xs"
                                 aria-label="几选几"
                               >
-                                {DOUYIN_PICK_RULE_PRESET_OPTIONS.map((o) => (
+                                {pickRuleSelectOptionsForItemCount(
+                                  g.items.filter((it) => it.name.trim()).length,
+                                ).map((o) => (
                                   <option key={o.value || 'empty'} value={o.value}>
                                     {o.label}
                                   </option>

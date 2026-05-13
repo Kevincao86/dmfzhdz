@@ -1563,6 +1563,47 @@ function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
 
+/** 与来客常见规则一致：单组内 n 个单品时 pick_rule 须为「全部必选」或「n选1」…「n选n」 */
+function normalizePickRuleForComboGroup(itemCount: number, pickRule: string): string {
+  const raw = pickRule.trim() || '全部必选'
+  if (itemCount <= 1) return '全部必选'
+  if (raw === '全部必选') return raw
+  const m = /^(\d+)选(\d+)$/.exec(raw)
+  if (m) {
+    const n = Number.parseInt(m[1]!, 10)
+    const k = Number.parseInt(m[2]!, 10)
+    if (n === itemCount && k >= 1 && k <= itemCount) return raw
+  }
+  return `${itemCount}选${itemCount}`
+}
+
+function comboRuleJsonPayloadValid(s: string): boolean {
+  try {
+    const o = JSON.parse(s) as { groups?: unknown }
+    if (!o || typeof o !== 'object' || !Array.isArray(o.groups) || o.groups.length === 0) return false
+    for (const g of o.groups) {
+      const gr = g as Record<string, unknown>
+      if (!Array.isArray(gr.items) || gr.items.length === 0) return false
+      const pr = String(gr.pick_rule ?? '').trim()
+      if (!pr) return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 模板 attr：套餐 / combo_rule 类（与 merge + 强制回填逻辑一致） */
+function attrTemplateLooksComboLike(key: string, name: string, vtRaw: string): boolean {
+  const vt = vtRaw.toUpperCase()
+  const nm = name.toLowerCase()
+  if (/^combo_rule$/i.test(key)) return true
+  if (nm.includes('combo_rule')) return true
+  if (/套餐规则|搭配规则|组合规则|套餐数据|搭配数据|商品搭配/.test(name)) return true
+  if ((vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON') && /套餐|搭配|组合/.test(name)) return true
+  return false
+}
+
 /** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；团购/代金券等多类型均可能校验非空 */
 function buildDouyinProductComboRule(
   erp: Record<string, unknown>,
@@ -1590,8 +1631,9 @@ function buildDouyinProductComboRule(
       if (sid) item.sku_id = sid
       return item
     })
+    const prRaw = String(gr.pick_rule ?? gr.pickRule ?? '全部必选').trim() || '全部必选'
     return {
-      pick_rule: String(gr.pick_rule ?? gr.pickRule ?? '全部必选').trim() || '全部必选',
+      pick_rule: normalizePickRuleForComboGroup(items.length, prRaw),
       items,
     }
   })
@@ -1949,37 +1991,6 @@ async function buildGoodlifeProductSaveBody(
 
   const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map)
 
-  if (comboRule) {
-    const comboJson = JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
-    for (const a of attrs) {
-      const key = String(a.key ?? '').trim()
-      if (!key || mergedProductAttrs[key]) continue
-      const name = String(a.name ?? '')
-      const vt = String(a.value_type ?? '').toUpperCase()
-      const looksCombo =
-        /^combo_rule$/i.test(key) ||
-        name.toLowerCase().includes('combo_rule') ||
-        /套餐规则|搭配规则|组合规则/.test(name)
-      if (!looksCombo) continue
-      if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || vt === 'STRING' || vt === 'TEXT' || !vt) {
-        mergedProductAttrs[key] = comboJson
-      }
-    }
-    /** 类目模板里「必填 + 套餐/搭配」类字段命名各异，再扫一遍避免抖音报 combo_rule 类空 */
-    for (const a of attrs) {
-      const key = String(a.key ?? '').trim()
-      if (!key || mergedProductAttrs[key]) continue
-      if (!Boolean(a.is_required)) continue
-      const name = String(a.name ?? '')
-      const hint = /combo|套餐|搭配|组合|套系|group/i.test(key) || /combo|套餐|搭配|组合|套系/i.test(name)
-      if (!hint) continue
-      const vt = String(a.value_type ?? '').toUpperCase()
-      if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || vt === 'STRING' || vt === 'TEXT' || !vt) {
-        mergedProductAttrs[key] = comboJson
-      }
-    }
-  }
-
   const tplOverrides = erp.template_attr_overrides
   if (tplOverrides && typeof tplOverrides === 'object' && !Array.isArray(tplOverrides)) {
     for (const [k, val] of Object.entries(tplOverrides as Record<string, unknown>)) {
@@ -1990,7 +2001,10 @@ async function buildGoodlifeProductSaveBody(
     }
   }
 
-  /** 抖音常校验 attr_key_value_map 内 combo_rule 类字段非空；模板 key 命名不一，兜底写入标准 combo_rule */
+  /**
+   * 抖音会校验 attr_key_value_map 中套餐/搭配类字段为合法 JSON；前端 overrides 或历史草稿可能写入坏串。
+   * 在合并 template_attr_overrides 之后，强制与 package_combo 推导结果一致，并避免重复写入冲突的裸 combo_rule。
+   */
   const comboJsonMandatory = comboRule
     ? JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
     : ''
@@ -1999,14 +2013,8 @@ async function buildGoodlifeProductSaveBody(
       const key = String(a.key ?? '').trim()
       if (!key) continue
       const name = String(a.name ?? '')
-      const looksComboAttrKey =
-        /^combo_rule$/i.test(key) ||
-        name.toLowerCase().includes('combo_rule') ||
-        /套餐规则|搭配规则|组合规则|套餐数据|搭配数据|商品搭配/.test(name)
-      if (!looksComboAttrKey) continue
-      const cur = (mergedProductAttrs[key] ?? '').trim()
-      if (cur) continue
       const vt = String(a.value_type ?? '').toUpperCase()
+      if (!attrTemplateLooksComboLike(key, name, vt)) continue
       if (
         vt === 'STRUCT' ||
         vt === 'OBJECT' ||
@@ -2019,7 +2027,11 @@ async function buildGoodlifeProductSaveBody(
         mergedProductAttrs[key] = comboJsonMandatory
       }
     }
-    if (!Object.keys(mergedProductAttrs).some((k) => /^combo_rule$/i.test(k))) {
+    const hasLiteralComboRuleKey = Object.keys(mergedProductAttrs).some((k) => /^combo_rule$/i.test(k))
+    const hasOtherValidComboPayload = Object.entries(mergedProductAttrs).some(
+      ([k, v]) => !/^combo_rule$/i.test(k) && comboRuleJsonPayloadValid(String(v ?? '').trim()),
+    )
+    if (!hasLiteralComboRuleKey && !hasOtherValidComboPayload) {
       mergedProductAttrs.combo_rule = comboJsonMandatory
     }
   }

@@ -635,17 +635,19 @@ function buildImagePrompt(
   lockSuffix = '',
 ): string {
   const name = productName.trim() || '本地生活服务'
+  const extraHint = titleDraft.trim() && titleDraft.trim() !== name ? titleDraft.trim().slice(0, 200) : ''
+  const bind = `【画面必须与商品标题一致】标题原文：「${name}」。${extraHint ? `补充说明（须与标题同一商品/服务，不得偏题）：${extraHint}。` : ''}禁止出现与标题无关的手机、电脑、平板等数码产品占位图、无关餐饮或其它品类；画面主体须为标题所指的实物商品、包装、使用场景或服务过程的真实呈现。`
   const base =
     mode === 'i2i'
-      ? `在保留原图主体与构图的前提下，提升清晰度与色彩层次，适合抖音来客团购主图/辅图展示；商品或服务场景：${name}；须符合本地生活广告与平台素材规范。`
-      : `为抖音来客「本地生活」团购设计一张高质量商品图：主体清晰、光线自然、无牛皮癣文字与违规水印；商品或服务：${name}；构图适合手机端列表与详情首屏。`
+      ? `在保留原图主体与构图的前提下，提升清晰度与色彩层次，适合抖音来客团购主图/辅图展示。${bind}须符合本地生活广告与平台素材规范。`
+      : `为抖音来客「本地生活」团购设计一张高质量商品图：主体清晰、光线自然、无牛皮癣文字与违规水印；构图适合手机端列表与详情首屏。${bind}`
   let out = base
   if (imageRole === 'aux') {
     out = `${base}侧重套餐细节、食材/服务特写或卖点展示，可略偏竖构图。`
   } else if (imageRole === 'env') {
     out = `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感。`
   } else if (titleDraft && titleDraft !== productName) {
-    out = `${base}可参考标题/卖点摘要：${titleDraft.slice(0, 80)}。`
+    out = `${base}主图风格，构图留白适中；再次强调标题：「${name.slice(0, 40)}」。`
   } else {
     out = `${base}主图风格，构图留白适中。`
   }
@@ -768,6 +770,11 @@ async function qwenWanxOneImage(
     input.ref_image = refImageUrl
     input.negative_prompt = '模糊, 低质量, 畸形文字, 水印'
     parameterExtras = { ref_strength: 0.75, ref_mode: 'repaint' }
+  } else {
+    parameterExtras = {
+      negative_prompt:
+        '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印',
+    }
   }
   const taskId = await qwenWanxCreateTask(apiKey, env, input, parameterExtras)
   const urls = await qwenWanxPollUrls(apiKey, taskId)

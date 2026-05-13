@@ -20,6 +20,15 @@ function url(path: string) {
   return `${b}${path}`
 }
 
+/** 线上 ERP 与 Vercel 扁平 `/api/meoo-*` 对齐；未部署时回退旧路径（运营台域名）。 */
+async function postRegistrySync(pathMeoo: string, pathLegacy: string, jsonBody: unknown): Promise<Response> {
+  const payload = JSON.stringify(jsonBody)
+  const headers = { 'Content-Type': 'application/json' }
+  const r1 = await fetch(url(pathMeoo), { method: 'POST', headers, body: payload })
+  if (r1.ok) return r1
+  return fetch(url(pathLegacy), { method: 'POST', headers, body: payload })
+}
+
 async function fetchRegistryAt(path: string): Promise<RegistryFile> {
   const res = await fetch(url(path))
   const text = await res.text()
@@ -41,23 +50,15 @@ export async function fetchOpsRegistry(): Promise<RegistryFile> {
 }
 
 export async function pushErpTenant(tenant: RegistryTenant): Promise<void> {
-  const res = await fetch(url('/api/ops-sync/tenants/erp'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenant }),
-  })
+  const res = await postRegistrySync('/api/meoo-ops-sync-tenants-erp', '/api/ops-sync/tenants/erp', { tenant })
   if (!res.ok) throw new Error(`push erp tenant ${res.status}`)
 }
 
 export async function pushAiModels(models: Omit<RegistryAiModels, 'updatedAt'> & { updatedAt?: string }): Promise<void> {
-  const res = await fetch(url('/api/ops-sync/ai'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      textModel: models.textModel,
-      imageModel: models.imageModel,
-      lastWriter: models.lastWriter,
-    }),
+  const res = await postRegistrySync('/api/meoo-ops-sync-ai', '/api/ops-sync/ai', {
+    textModel: models.textModel,
+    imageModel: models.imageModel,
+    lastWriter: models.lastWriter,
   })
   if (!res.ok) throw new Error(`push ai ${res.status}`)
 }
