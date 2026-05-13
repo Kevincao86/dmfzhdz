@@ -19,7 +19,6 @@ import {
   insertMerchantPaymentOrder,
 } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-import AiModelBindingSection from './settings/AiModelBindingSection'
 import DouyinMerchantSection from './settings/DouyinMerchantSection'
 import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
@@ -318,7 +317,10 @@ export default function SettingsPage() {
                 ))}
               </div>
 
-              <AiModelBindingSection />
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-sm text-gray-700">
+                <strong className="text-gray-900">AI 模型</strong>
+                ：文案 / 生图使用的厂商与「自动 / 指定」由运营注册表、浏览器侧各模型 Key 与内置策略共同决定；创建商品时可在商品页查看当前生效的模型标签。
+              </div>
             </div>
           )}
 

@@ -1911,11 +1911,6 @@ async function buildGoodlifeProductSaveBody(
     attr_key_value_map[imageKey] = jsonImageUrlList(carouselUrls)
   }
 
-  const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erp, attr_key_value_map)
-
-  const nowMs = Date.now()
-  const oneYearMs = nowMs + 366 * 86400000
-
   let comboRule = buildDouyinProductComboRule(erp, product_name)
   if (product_type === 1 && !comboRule) {
     const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
@@ -1934,6 +1929,55 @@ async function buildGoodlifeProductSaveBody(
       ],
     }
   }
+
+  /** template 的 attr_key_value_map 常要求 combo_rule 为 JSON 字符串；须与 package_combo 同源，否则报「combo_rule不能为空」 */
+  const erpForAttrMerge: Record<string, unknown> =
+    product_type === 1 && comboRule
+      ? (() => {
+          const raw = erp.package_combo
+          if (raw && typeof raw === 'object') {
+            const g = (raw as { groups?: unknown[] }).groups
+            if (Array.isArray(g) && g.length > 0) return { ...erp, package_combo: raw }
+          }
+          return { ...erp, package_combo: { groups: (comboRule as { groups: unknown[] }).groups } }
+        })()
+      : erp
+
+  const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map)
+
+  if (product_type === 1 && comboRule) {
+    const comboJson = JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
+    for (const a of attrs) {
+      const key = String(a.key ?? '').trim()
+      if (!key || mergedProductAttrs[key]) continue
+      const name = String(a.name ?? '')
+      const vt = String(a.value_type ?? '').toUpperCase()
+      const looksCombo =
+        /^combo_rule$/i.test(key) ||
+        name.toLowerCase().includes('combo_rule') ||
+        /套餐规则|搭配规则|组合规则/.test(name)
+      if (!looksCombo) continue
+      if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || vt === 'STRING' || vt === 'TEXT' || !vt) {
+        mergedProductAttrs[key] = comboJson
+      }
+    }
+    /** 类目模板里「必填 + 套餐/搭配」类字段命名各异，再扫一遍避免抖音报 combo_rule 类空 */
+    for (const a of attrs) {
+      const key = String(a.key ?? '').trim()
+      if (!key || mergedProductAttrs[key]) continue
+      if (!Boolean(a.is_required)) continue
+      const name = String(a.name ?? '')
+      const hint = /combo|套餐|搭配|组合|套系|group/i.test(key) || /combo|套餐|搭配|组合|套系/i.test(name)
+      if (!hint) continue
+      const vt = String(a.value_type ?? '').toUpperCase()
+      if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || vt === 'STRING' || vt === 'TEXT' || !vt) {
+        mergedProductAttrs[key] = comboJson
+      }
+    }
+  }
+
+  const nowMs = Date.now()
+  const oneYearMs = nowMs + 366 * 86400000
 
   const product: Record<string, unknown> = {
     product_name,

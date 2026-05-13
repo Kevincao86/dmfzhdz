@@ -14,6 +14,8 @@ type Props = {
   onAutoRefresh?: () => void | Promise<void>
   autoRefreshEnabled: boolean
   onAutoRefreshEnabledChange: (enabled: boolean) => void
+  /** 为 false 时隐藏「手动刷新」按钮（仍保留自动刷新开关） */
+  showManualRefresh?: boolean
 }
 
 /**
@@ -27,6 +29,7 @@ export function MerchantSyncControls({
   onAutoRefresh,
   autoRefreshEnabled,
   onAutoRefreshEnabledChange,
+  showManualRefresh = true,
 }: Props) {
   const onManualRef = useRef(onManualRefresh)
   onManualRef.current = onManualRefresh
@@ -50,17 +53,19 @@ export function MerchantSyncControls({
       </p>
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={isRefreshing}
-            onClick={() => void onManualRefresh()}
-            className="inline-flex items-center rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-900 shadow-sm hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <RefreshCw
-              className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')}
-            />
-            {isRefreshing ? '刷新中…' : '手动刷新'}
-          </button>
+          {showManualRefresh ? (
+            <button
+              type="button"
+              disabled={isRefreshing}
+              onClick={() => void onManualRefresh()}
+              className="inline-flex items-center rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-900 shadow-sm hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw
+                className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')}
+              />
+              {isRefreshing ? '刷新中…' : '手动刷新'}
+            </button>
+          ) : null}
           <p className="text-xs text-green-800/90">
             上次同步：{lastSyncAt ?? '—'}
           </p>

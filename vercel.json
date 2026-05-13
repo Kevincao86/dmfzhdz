@@ -9,6 +9,10 @@
       "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
       "maxDuration": 30
     },
+    "api/meoo-douyin-goods-ai-assist.ts": {
+      "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
+      "maxDuration": 300
+    },
     "api/**/*.ts": {
       "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
       "maxDuration": 60

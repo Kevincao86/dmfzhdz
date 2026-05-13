@@ -64,7 +64,8 @@ export default function DouyinMerchantSection() {
     readMerchantSession(TOKEN_KEY),
   )
   const [bindOpen, setBindOpen] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(() => readMerchantSession(AUTO_KEY) !== '0')
+  /** 默认关闭：避免切页/刷新时定时静默拉取与 TOKEN 刷新叠加重试，误判为断连 */
+  const [autoRefresh, setAutoRefresh] = useState(() => readMerchantSession(AUTO_KEY) === '1')
   const [manualRefreshing, setManualRefreshing] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
@@ -109,6 +110,7 @@ export default function DouyinMerchantSection() {
   useEffect(() => {
     if (!supabaseConfigured || !supabase) return
     const sb = supabase
+    let debTimer: ReturnType<typeof setTimeout> | null = null
 
     const hydrate = async () => {
       const {
@@ -147,11 +149,27 @@ export default function DouyinMerchantSection() {
       }
     }
 
+    const scheduleHydrate = () => {
+      if (debTimer) clearTimeout(debTimer)
+      debTimer = window.setTimeout(() => {
+        debTimer = null
+        void hydrate()
+      }, 450)
+    }
+
     void hydrate()
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange(() => void hydrate())
-    return () => subscription.unsubscribe()
+    } = sb.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') return
+      if (event === 'INITIAL_SESSION') return
+      if (bindOpenRef.current) return
+      scheduleHydrate()
+    })
+    return () => {
+      subscription.unsubscribe()
+      if (debTimer) clearTimeout(debTimer)
+    }
   }, [])
 
   useEffect(() => {
@@ -496,6 +514,7 @@ export default function DouyinMerchantSection() {
               onAutoRefresh={autoRefreshRun}
               autoRefreshEnabled={autoRefresh}
               onAutoRefreshEnabledChange={persistAuto}
+              showManualRefresh={false}
             />
             <p className="mt-3 text-xs text-gray-600">
               绑定凭证保存在本机浏览器（跨标签页共享）；自动刷新仅重新拉取门店列表，不会因接口失败而解除绑定。只有点击「断开连接」才会清除绑定。

@@ -13,7 +13,6 @@ import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/prod
 import { Link, useNavigate } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
-import AiModelAutoPicker from '../../components/AiModelAutoPicker'
 import AiVendorCatalogAvatar from '../../components/AiVendorCatalogAvatar'
 import AiVendorDirectoryChips from '../../components/AiVendorDirectoryChips'
 import { readMerchantSession } from '../../lib/merchantSession'
@@ -1398,33 +1397,13 @@ export default function DouyinProductCreateWizard({
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  下方为当前目录中的模型（logo + 名称）。开关与下拉可按「自动 / 指定」分别设置<strong className="font-medium text-gray-700"> 文案</strong>与
-                  <strong className="font-medium text-gray-700"> 生图</strong>；当前生效：文案{' '}
+                  下方为当前目录中的模型（logo + 名称）。当前生效：文案{' '}
                   <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>，生图{' '}
-                  <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>。
+                  <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>
+                  （由系统设置、运营注册表与浏览器侧各模型 Key 自动解析；不在此页展示切换控件）。
                 </p>
                 <div className="mt-3">
                   <AiVendorDirectoryChips options={aiVendorChipsForDisplay} />
-                </div>
-                <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-8">
-                  <div className="min-w-0 flex-1">
-                    <div className="mt-2">
-                      <AiModelAutoPicker
-                        kind="text"
-                        options={aiModelPickOptions}
-                        onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
-                      />
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mt-2">
-                      <AiModelAutoPicker
-                        kind="image"
-                        options={aiModelPickOptions}
-                        onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
-                      />
-                    </div>
-                  </div>
                 </div>
                 <p id="douyin-ai-text-model-active" className="mt-3 text-xs text-gray-500">
                   「AI 智能优化」「根据商品名称 AI 生成说明」走文案模型；头图 / 辅助图 / 环境图走生图模型；各任务可同时进行。
