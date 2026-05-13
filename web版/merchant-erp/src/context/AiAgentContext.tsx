@@ -6,7 +6,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from 'react'
 import type {
   AiAgentMessage,
@@ -16,6 +18,7 @@ import type {
   AiTaskType,
 } from '../lib/aiAgentTypes'
 import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
+import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
 import { postAiChat } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
@@ -69,7 +72,7 @@ type AiAgentContextValue = {
   permissions: Record<AiPermissionId, boolean>
   messages: AiAgentMessage[]
   inputDraft: string
-  setInputDraft: (v: string) => void
+  setInputDraft: Dispatch<SetStateAction<string>>
   sendUserText: (text: string) => void
   applyShortcut: (taskType: AiTaskType) => void
   pendingPreviewId: string | null
@@ -82,6 +85,11 @@ type AiAgentContextValue = {
   setModelPickerKey: (key: string) => void
   modelPickerOptions: ReturnType<typeof listAiModelPickerOptions>
   aiSending: boolean
+  /** 主输入区待发送的截图（最多 4 张） */
+  pendingComposerImages: string[]
+  addComposerImages: (files: FileList | null) => Promise<void>
+  removeComposerImage: (index: number) => void
+  clearComposerImages: () => void
 }
 
 const AiAgentContext = createContext<AiAgentContextValue | null>(null)
@@ -161,10 +169,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<AiAgentMessage[]>(() => [
     createAgentMessage(
       'assistant',
-      '你好，我是店魔方 AI 智能体。在下方选择模型后输入问题或任务；写操作前我会展示执行预览，需你确认后再走业务接口。',
+      '你好，我是店魔方 AI 助手。选好助手风格后，直接描述你想做的事；需要改商品、发消息等操作时，我会先给你看步骤说明，你确认后再继续。',
     ),
   ])
   const [inputDraft, setInputDraft] = useState('')
+  const [pendingComposerImages, setPendingComposerImages] = useState<string[]>([])
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
   const [modelPickerKey, setModelPickerKeyState] = useState('tokenmix::openai::__default__')
   const [aiSending, setAiSending] = useState(false)
@@ -204,6 +213,28 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     setDrawerOpen(false)
   }, [])
 
+  const addComposerImages = useCallback(async (files: FileList | null) => {
+    if (!files?.length) return
+    const urls: string[] = []
+    for (let i = 0; i < files.length && urls.length < 4; i++) {
+      try {
+        urls.push(await compressImageFileToDataUrl(files[i]))
+      } catch {
+        /* 跳过无法解析的文件 */
+      }
+    }
+    if (!urls.length) return
+    setPendingComposerImages((prev) => [...prev, ...urls].slice(0, 4))
+  }, [])
+
+  const removeComposerImage = useCallback((index: number) => {
+    setPendingComposerImages((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const clearComposerImages = useCallback(() => {
+    setPendingComposerImages([])
+  }, [])
+
   const pushPreview = useCallback((taskType: AiTaskType, intro: string, pageLabelOverride?: string) => {
     const preview = buildPreviewForTask(taskType, pageLabelOverride ?? pageContext?.pageLabel)
     const msg = createAgentMessage('task_preview', intro, { preview })
@@ -235,7 +266,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
 
   const runGatewayForSnapshot = useCallback(
-    async (snapshot: AiAgentMessage[], trimmed: string, taskType: AiTaskType | undefined, previewPage?: string) => {
+    async (
+      snapshot: AiAgentMessage[],
+      trimmed: string,
+      taskType: AiTaskType | undefined,
+      previewPage?: string,
+      imageDataUrls: string[] = [],
+    ) => {
       const parsed = parseAiModelPickerKey(modelPickerKey)
       if (!parsed) return
       setAiSending(true)
@@ -246,6 +283,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           model: parsed.model || undefined,
           ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
           messages: history,
+          ...(imageDataUrls.length ? { imageDataUrls } : {}),
           taskType,
         })
         const assistantMsg = createAgentMessage('assistant', res.content)
@@ -258,7 +296,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setMessages((prev) => {
-          const next = [...prev, createAgentMessage('assistant', `请求失败（请检查是否已登录及 Vercel 是否已配置 TOKENMIX_API_KEY 或 DeepSeek/Kimi/MiniMax 对应 Key）：${msg}`)]
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'assistant',
+              `暂时连不上助手服务。请确认已登录；若仍失败，请联系管理员检查智能助手配置。详情：${msg}`,
+            ),
+          ]
           messagesRef.current = next
           return next
         })
@@ -272,8 +316,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const sendUserText = useCallback(
     (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed || aiSending || pendingPreviewId) return
-      const userMsg = createAgentMessage('user', trimmed)
+      const imgs = [...pendingComposerImages]
+      if ((!trimmed && imgs.length === 0) || aiSending || pendingPreviewId) return
+      const line = trimmed || '请结合附图说明你的需求。'
+      setPendingComposerImages([])
+      const userMsg = createAgentMessage('user', line, { imageUrls: imgs.length ? imgs : undefined })
       setMessages((prev) => {
         const next = [...prev, userMsg]
         messagesRef.current = next
@@ -281,15 +328,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       setInputDraft('')
       queueMicrotask(() => {
-        void runGatewayForSnapshot(messagesRef.current, trimmed, inferTaskType(trimmed), pageContext?.pageLabel)
+        void runGatewayForSnapshot(messagesRef.current, line, inferTaskType(line), pageContext?.pageLabel, imgs)
       })
     },
-    [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
+    [aiSending, pendingComposerImages, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
   )
 
   const applyShortcut = useCallback(
     (taskType: AiTaskType) => {
       if (aiSending || pendingPreviewId) return
+      setPendingComposerImages([])
       const label = AI_TASK_TYPE_LABELS[taskType]
       const line = `使用快捷任务：${label}`
       const userMsg = createAgentMessage('user', line)
@@ -299,7 +347,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
       queueMicrotask(() => {
-        void runGatewayForSnapshot(messagesRef.current, line, taskType, pageContext?.pageLabel)
+        void runGatewayForSnapshot(messagesRef.current, line, taskType, pageContext?.pageLabel, [])
       })
     },
     [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
@@ -354,6 +402,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (query: string) => {
       const q = query.trim()
       if (!q || aiSending) return
+      setPendingComposerImages([])
       const pl = '顶部搜索 / AI 指令'
       setPageContext({ pageLabel: pl })
       setDrawerOpen(true)
@@ -365,7 +414,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
       queueMicrotask(() => {
-        void runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl)
+        void runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl, [])
       })
     },
     [aiSending, runGatewayForSnapshot],
@@ -392,6 +441,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setModelPickerKey,
       modelPickerOptions,
       aiSending,
+      pendingComposerImages,
+      addComposerImages,
+      removeComposerImage,
+      clearComposerImages,
     }),
     [
       drawerOpen,
@@ -412,6 +465,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setModelPickerKey,
       modelPickerOptions,
       aiSending,
+      pendingComposerImages,
+      addComposerImages,
+      removeComposerImage,
+      clearComposerImages,
     ],
   )
 

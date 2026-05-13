@@ -24,6 +24,8 @@ export type AIChatRequest = {
   /** 仅 provider=tokenmix 时有效 */
   modelFamily?: AIModelFamily
   messages: AIMessage[]
+  /** 本回合用户随附截图（data URL，最多 4 张）；由网关拼进多模态消息 */
+  imageDataUrls?: string[]
   temperature?: number
   /** 预留：当前网关实现为非流式；stream=true 时返回 501 */
   stream?: boolean

@@ -1,17 +1,7 @@
 import OpenAI from 'openai'
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
 import { resolveTokenMixModelId } from '../../../src/services/ai/tokenmixClient.js'
-
-function toOpenAiMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatCompletionMessageParam[] {
-  return messages.map((m) => {
-    if (m.role === 'tool') {
-      return { role: 'user', content: `[tool 输出]\n${m.content}` } satisfies OpenAI.Chat.ChatCompletionMessageParam
-    }
-    if (m.role === 'system') return { role: 'system', content: m.content }
-    if (m.role === 'assistant') return { role: 'assistant', content: m.content }
-    return { role: 'user', content: m.content }
-  })
-}
+import { toOpenAiChatCompletionMessages } from '../openAiChatMessages.js'
 
 /**
  * OpenAI/Claude/Gemini/Grok 经 TokenMix OpenAI-compatible relay。
@@ -32,7 +22,7 @@ export async function chatTokenMix(req: AIChatRequest, env: Record<string, strin
   try {
     const completion = await client.chat.completions.create({
       model,
-      messages: toOpenAiMessages(req.messages),
+      messages: toOpenAiChatCompletionMessages(req),
       temperature: req.temperature ?? 0.7,
     })
     const msg = completion.choices[0]?.message?.content

@@ -50,11 +50,18 @@ export async function runMeooAiChatCore(
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined
 
+  const imageDataUrls = Array.isArray(parsed.imageDataUrls)
+    ? parsed.imageDataUrls
+        .filter((x): x is string => typeof x === 'string' && x.startsWith('data:image/'))
+        .slice(0, 4)
+    : undefined
+
   const req: AIChatRequest = {
     provider,
     model: rawModel ? rawModel : undefined,
     ...(provider === 'tokenmix' ? { modelFamily } : {}),
     messages: mergeSystemPrompt(parsed.messages),
+    ...(imageDataUrls?.length ? { imageDataUrls } : {}),
     temperature: parsed.temperature,
     stream: false,
     taskType: parsed.taskType,
