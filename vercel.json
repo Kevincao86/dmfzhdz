@@ -14,7 +14,7 @@
       "maxDuration": 300
     },
     "api/meoo-ai-chat.ts": {
-      "includeFiles": "web版/merchant-erp/{vite-plugins/**,src/lib/**,src/services/ai/**}",
+      "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib,src/services/ai}/**",
       "maxDuration": 120
     },
     "api/**/*.ts": {

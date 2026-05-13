@@ -1,19 +1,26 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
-import { chatDeepseek } from './providers/deepseek.js'
-import { chatKimi } from './providers/kimi.js'
-import { chatMinimax } from './providers/minimax.js'
-import { chatTokenMix } from './providers/tokenmix.js'
 
+/**
+ * 按 provider 动态 import，避免「为跑 DeepSeek 却先加载 Kimi/TokenMix/OpenAI 依赖」在 Vercel 冷启动上偶发整路由不可用。
+ */
 export async function routeAiChat(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
   switch (req.provider) {
-    case 'tokenmix':
+    case 'tokenmix': {
+      const { chatTokenMix } = await import('./providers/tokenmix.js')
       return chatTokenMix(req, env)
-    case 'deepseek':
+    }
+    case 'deepseek': {
+      const { chatDeepseek } = await import('./providers/deepseek.js')
       return chatDeepseek(req, env)
-    case 'kimi':
+    }
+    case 'kimi': {
+      const { chatKimi } = await import('./providers/kimi.js')
       return chatKimi(req, env)
-    case 'minimax':
+    }
+    case 'minimax': {
+      const { chatMinimax } = await import('./providers/minimax.js')
       return chatMinimax(req, env)
+    }
     default:
       throw new Error(`unknown provider: ${String((req as AIChatRequest).provider)}`)
   }
