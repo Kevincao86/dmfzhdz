@@ -1595,7 +1595,9 @@ function buildDouyinProductComboRule(
       items,
     }
   })
-  return { groups }
+  const groupsWithItems = groups.filter((g) => Array.isArray(g.items) && g.items.length > 0)
+  if (groupsWithItems.length === 0) return null
+  return { groups: groupsWithItems }
 }
 
 function mergeGoodlifeProductAttrMapFromErp(
@@ -1985,6 +1987,40 @@ async function buildGoodlifeProductSaveBody(
       if (!key) continue
       const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
       if (s) mergedProductAttrs[key] = s.slice(0, 120_000)
+    }
+  }
+
+  /** 抖音常校验 attr_key_value_map 内 combo_rule 类字段非空；模板 key 命名不一，兜底写入标准 combo_rule */
+  const comboJsonMandatory = comboRule
+    ? JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
+    : ''
+  if (comboJsonMandatory) {
+    for (const a of attrs) {
+      const key = String(a.key ?? '').trim()
+      if (!key) continue
+      const name = String(a.name ?? '')
+      const looksComboAttrKey =
+        /^combo_rule$/i.test(key) ||
+        name.toLowerCase().includes('combo_rule') ||
+        /套餐规则|搭配规则|组合规则|套餐数据|搭配数据|商品搭配/.test(name)
+      if (!looksComboAttrKey) continue
+      const cur = (mergedProductAttrs[key] ?? '').trim()
+      if (cur) continue
+      const vt = String(a.value_type ?? '').toUpperCase()
+      if (
+        vt === 'STRUCT' ||
+        vt === 'OBJECT' ||
+        vt === 'JSON' ||
+        vt === 'STRING' ||
+        vt === 'TEXT' ||
+        vt === 'ENUM' ||
+        !vt
+      ) {
+        mergedProductAttrs[key] = comboJsonMandatory
+      }
+    }
+    if (!Object.keys(mergedProductAttrs).some((k) => /^combo_rule$/i.test(k))) {
+      mergedProductAttrs.combo_rule = comboJsonMandatory
     }
   }
 
