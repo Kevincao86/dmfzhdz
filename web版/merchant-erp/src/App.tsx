@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AiAgentProvider } from './context/AiAgentContext'
 import MeooLayout from './components/MeooLayout'
 import RequireSupabaseAuth from './components/RequireSupabaseAuth'
+import AiAgentPage from './pages/AiAgentPage'
 import AiOperationContentPage from './pages/AiOperationContentPage'
 import ShortVideoOptimizationPage from './pages/ShortVideoOptimizationPage'
 import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
@@ -23,7 +25,8 @@ import LoginPage from './pages/LoginPage'
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <AiAgentProvider>
+        <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/"
@@ -34,6 +37,7 @@ export default function App() {
           }
         >
           <Route index element={<HomeDashboard />} />
+          <Route path="ai-agent" element={<AiAgentPage />} />
           <Route path="store" element={<Navigate to="/store/info" replace />} />
           <Route path="store/info" element={<StoreInfoPage />} />
           <Route path="store/detail/:platform/:poiId" element={<StoreDetailPage />} />
@@ -89,6 +93,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </AiAgentProvider>
     </BrowserRouter>
   )
 }

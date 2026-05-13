@@ -17,9 +17,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { childActive, NAV_ITEMS, pathActive } from '../config/nav'
 import { cn } from '../cn'
+import AiAgentDrawer, { AiAgentFloatingButton } from './AiAgentDrawer'
 import FloatingOnlineSupport from './FloatingOnlineSupport'
 import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
+import { useAiAgent } from '../context/AiAgentContext'
 import { clearDouyinMerchantBindingLocal } from '../lib/merchantSession'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
@@ -36,6 +38,8 @@ export default function MeooLayout() {
   const [userOpen, setUserOpen] = useState(false)
   const [personalSettingsOpen, setPersonalSettingsOpen] = useState(false)
   const [personalSettingsFormKey, setPersonalSettingsFormKey] = useState(0)
+  const [headerSearchQuery, setHeaderSearchQuery] = useState('')
+  const { submitTopSearchQuery } = useAiAgent()
   const [adminName, setAdminName] = useState('管理员')
   const [enterpriseName, setEnterpriseName] = useState('')
   const [accountType] = useState('主账号')
@@ -296,7 +300,16 @@ export default function MeooLayout() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="搜索功能、数据..."
+                value={headerSearchQuery}
+                onChange={(e) => setHeaderSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    submitTopSearchQuery(headerSearchQuery)
+                    setHeaderSearchQuery('')
+                  }
+                }}
+                placeholder="搜索功能、数据，或输入 AI 指令..."
                 className="w-full rounded-xl border border-slate-200/90 bg-slate-50/90 py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cyan-400/60 focus:outline-none focus:ring-4 focus:ring-cyan-500/15"
               />
             </div>
@@ -469,6 +482,8 @@ export default function MeooLayout() {
         </div>
       ) : null}
 
+      <AiAgentDrawer />
+      <AiAgentFloatingButton />
       <OpsRegistryBridge />
       <FloatingOnlineSupport customerId={adminName} enterpriseName={enterpriseName} />
     </div>

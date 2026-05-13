@@ -1,0 +1,75 @@
+import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
+import { AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
+
+export type AuditStatus = 'ok' | 'error'
+
+export function summarizeText(s: string, max = 400): string {
+  const t = s.replace(/\s+/g, ' ').trim()
+  return t.length <= max ? t : `${t.slice(0, max)}…`
+}
+
+export function logAiChatServerLine(payload: Record<string, unknown>): void {
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      channel: 'meoo_ai_chat',
+      ...payload,
+    }),
+  )
+}
+
+export function mergeSystemPrompt(messages: AIChatRequest['messages']): AIChatRequest['messages'] {
+  const first = messages[0]
+  if (first?.role === 'system') {
+    return [
+      { role: 'system', content: `${AI_AGENT_SYSTEM_PROMPT}\n\n${first.content}` },
+      ...messages.slice(1),
+    ]
+  }
+  return [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }, ...messages]
+}
+
+export async function forwardAuditToMerchantAdmin(opts: {
+  env: Record<string, string>
+  body: Record<string, unknown>
+}): Promise<void> {
+  const base = (opts.env.MERCHANT_ADMIN_AI_AUDIT_URL ?? opts.env.VITE_MERCHANT_ADMIN_ORIGIN ?? '')
+    .trim()
+    .replace(/\/$/, '')
+  const secret = (opts.env.MEOO_AI_AGENT_AUDIT_SECRET ?? '').trim()
+  if (!base || !secret) return
+  const url = `${base}/api/meoo-ai-agent-audit`
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-meoo-ai-audit-secret': secret,
+      },
+      body: JSON.stringify(opts.body),
+    })
+  } catch {
+    /* 审计失败不影响主链路 */
+  }
+}
+
+export function buildAuditPayload(parts: {
+  user: { id: string; email?: string }
+  req: AIChatRequest
+  res?: AIChatResponse
+  status: AuditStatus
+  error?: string
+}): Record<string, unknown> {
+  const lastUser = [...parts.req.messages].reverse().find((m) => m.role === 'user')
+  return {
+    userId: parts.user.id,
+    userLabel: parts.user.email ?? parts.user.id,
+    taskType: parts.req.taskType ?? null,
+    provider: parts.req.provider,
+    model: parts.res?.model ?? parts.req.model ?? null,
+    inputSummary: summarizeText(lastUser?.content ?? ''),
+    outputSummary: parts.res ? summarizeText(parts.res.content) : '',
+    executionStatus: parts.status,
+    error: parts.error ?? null,
+  }
+}

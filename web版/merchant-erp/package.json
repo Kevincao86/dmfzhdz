@@ -12,14 +12,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vercel/node": "^5.5.16",
+    "@anthropic-ai/sdk": "^0.95.2",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "@supabase/supabase-js": "^2.49.1",
+    "@vercel/node": "^5.5.16",
     "clsx": "^2.1.1",
-    "node-mocks-http": "^1.17.2",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
+    "node-mocks-http": "^1.17.2",
+    "openai": "^6.37.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.14.2",

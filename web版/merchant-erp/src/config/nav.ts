@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  Bot,
   Briefcase,
   Home,
   Megaphone,
@@ -22,6 +23,7 @@ export type NavItem = {
 /** 与 https://ldjrg1ypt9x4.meoo.zone/ 前端 bundle 中菜单配置一致 */
 export const NAV_ITEMS: NavItem[] = [
   { path: '/', label: '首页', icon: Home },
+  { path: '/ai-agent', label: 'AI 智能体', icon: Bot },
   {
     path: '/store',
     label: '店铺',

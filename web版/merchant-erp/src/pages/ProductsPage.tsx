@@ -38,6 +38,7 @@ import {
   probeMerchantPlatforms,
 } from '../services/platformConnectivityProbe'
 import StoreGrossMarginConfigCard from '../components/StoreGrossMarginConfigCard'
+import { useAiAgent } from '../context/AiAgentContext'
 
 type Conn = 'connected' | 'error' | 'pending' | 'opening'
 
@@ -371,6 +372,7 @@ export default function ProductsPage() {
   const [apiProbing, setApiProbing] = useState(false)
   const [storeMarginOpen, setStoreMarginOpen] = useState(false)
   const platformProbeLockRef = useRef(false)
+  const { openDrawer: openAiAgentDrawer } = useAiAgent()
 
   const runPlatformProbe = useCallback(async (opts?: { feedback?: boolean }) => {
     const feedback = opts?.feedback === true
@@ -817,6 +819,20 @@ export default function ProductsPage() {
           <h1 className="erp-page-title">商品管理</h1>
           <p className="mt-1 text-sm text-gray-500">商品资料建档、平台同步与智能体检测</p>
         </div>
+        <button
+          type="button"
+          onClick={() =>
+            openAiAgentDrawer({
+              pageLabel: '商品管理',
+              pagePath: '/products',
+              suggestedTasks: ['创建商品', '商品检测', '平台同步', '商品优化'],
+            })
+          }
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-2 text-sm font-medium text-indigo-800 shadow-sm transition-colors hover:border-indigo-300 hover:from-indigo-100/80 hover:to-violet-100/80"
+        >
+          <Sparkles className="h-4 w-4 text-indigo-600" aria-hidden />
+          让 AI 处理商品
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
