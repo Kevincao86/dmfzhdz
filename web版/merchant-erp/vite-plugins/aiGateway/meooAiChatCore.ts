@@ -8,6 +8,7 @@ import {
   summarizeText,
 } from './auditLog.js'
 import { verifyBearerJwt } from './authSupabase.js'
+import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChat } from './chatRouter.js'
 
 const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax'])
@@ -87,9 +88,8 @@ export async function runMeooAiChatCore(
       model: res.model,
       content: res.content,
     }
-    if (res.usage && typeof res.usage === 'object') {
-      okBody.usage = res.usage as Record<string, unknown>
-    }
+    const usageSafe = sanitizeTokenUsage(res.usage)
+    if (usageSafe) okBody.usage = usageSafe
     void forwardAuditToMerchantAdmin({
       env,
       body: buildAuditPayload({ user, req, res, status: 'ok' }),
@@ -101,7 +101,7 @@ export async function runMeooAiChatCore(
       modelFamily: req.modelFamily ?? null,
       model: res.model,
       outputSummary: summarizeText(res.content),
-      tokenUsage: res.usage ?? null,
+      tokenUsage: usageSafe ?? null,
       status: 'ok',
     })
     return { status: 200, body: okBody }
