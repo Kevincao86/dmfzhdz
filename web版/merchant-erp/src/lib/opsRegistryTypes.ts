@@ -16,7 +16,7 @@ export type RegistryVideoAi = {
   arkVideoApiKey?: string
 }
 
-/** 运营台可扩展的 AI 供应商目录项（磁盘仅存非内置条目，GET 网关会合并内置三项后再返回）。 */
+/** 运营台可扩展的 AI 供应商目录项（磁盘仅存非内置条目，GET 网关会合并内置目录后再返回）。 */
 export type AiVendorCatalogEntry = {
   id: string
   label: string
@@ -41,9 +41,16 @@ export type RegistryTenant = {
   updatedAt: string
 }
 
-export type VendorKeyModelId = 'minimax' | 'qwen' | 'doubao'
+export type VendorKeyModelId =
+  | 'minimax'
+  | 'qwen'
+  | 'doubao'
+  | 'openai'
+  | 'claude'
+  | 'deepseek'
+  | 'kimi'
 
-/** 各厂商 Key；含内置三项及自定义 slug */
+/** 各厂商 Key；含内置目录及自定义 slug */
 export type RegistryVendorKeys = Partial<Record<string, string>>
 
 export type RegistryAiModels = {
@@ -120,7 +127,7 @@ export type RegistryFile = {
   vendorKeys: RegistryVendorKeys
   vendorKeysUpdatedAt: string
   vendorKeysWriter: 'erp' | 'ops'
-  /** 磁盘：仅追加型自定义厂商列表；网关 GET 会与内置三项合并写入此字段再给前端 */
+  /** 磁盘：仅追加型自定义厂商列表；网关 GET 会与内置目录合并写入此字段再给前端 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
   /** 短视频/视频模型网关（运营台「AI模型」专区） */
   videoAi?: RegistryVideoAi

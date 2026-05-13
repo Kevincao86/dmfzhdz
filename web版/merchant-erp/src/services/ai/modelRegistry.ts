@@ -50,6 +50,14 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     primaryEndpoint: 'POST /chat/completions',
     defaultModel: 'kimi-k2.6',
   },
+  {
+    provider: 'minimax',
+    label: 'MiniMax',
+    defaultBaseUrl: 'https://api.minimax.io/v1',
+    primaryEndpoint: 'POST /chat/completions（OpenAI 兼容）',
+    defaultModel: 'MiniMax-M2.7',
+    fallbackModel: 'MiniMax-M2.5',
+  },
 ]
 
 export function registryEntry(provider: AIProvider): ModelRegistryEntry | undefined {
@@ -92,7 +100,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
   return out
 }
 
-const PICKER_PROVIDERS: AIProvider[] = ['openai', 'anthropic', 'xai', 'deepseek', 'kimi']
+const PICKER_PROVIDERS: AIProvider[] = ['openai', 'anthropic', 'xai', 'deepseek', 'kimi', 'minimax']
 
 export function parseAiModelPickerKey(key: string): { provider: AIProvider; model: string } | null {
   const idx = key.indexOf('::')

@@ -1,4 +1,4 @@
-import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
+import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
 import { listAiUiModelOptions, MEOO_AI_VENDOR_CATALOG_EVENT } from './merchantAiVendorCatalogClient'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
@@ -31,9 +31,10 @@ export function pickAutoResolvedTextModel(): string {
   const opts = listAiUiModelOptions()
   const keys = readVendorKeyMap()
   for (const o of opts) {
-    if (keys[o.id]?.trim()) return o.id
+    if (!keys[o.id]?.trim()) continue
+    if (isDouyinAssistAiVendorId(o.id)) return o.id
   }
-  return opts[0]?.id ?? 'qwen'
+  return 'qwen'
 }
 
 export function pickAutoResolvedImageModel(): string {

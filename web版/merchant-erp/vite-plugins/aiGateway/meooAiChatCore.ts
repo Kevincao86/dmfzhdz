@@ -3,7 +3,7 @@ import { mergeSystemPrompt, logAiChatServerLine, forwardAuditToMerchantAdmin, bu
 import { verifyBearerJwt } from './authSupabase.js'
 import { routeAiChat } from './chatRouter.js'
 
-const ALLOWED = new Set<string>(['openai', 'anthropic', 'xai', 'deepseek', 'kimi'])
+const ALLOWED = new Set<string>(['openai', 'anthropic', 'xai', 'deepseek', 'kimi', 'minimax'])
 
 export async function runMeooAiChatCore(
   bodyRaw: string,

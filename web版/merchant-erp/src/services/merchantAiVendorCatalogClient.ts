@@ -36,7 +36,7 @@ function readCachedCustomEntries(): AiVendorCatalogEntry[] {
   }
 }
 
-/** 内置 + 同步自定义（用于下拉、系统设置 pills）；首屏无缓存时仍为内置三项。 */
+/** 内置 + 同步自定义（用于下拉、系统设置 pills）；首屏无缓存时为完整内置目录。 */
 export function listAiUiModelOptions(): { id: string; label: string; hint?: string; logoUrl?: string }[] {
   return mergeBuiltinAiVendorCatalog(readCachedCustomEntries()).map((e) => ({
     id: e.id,

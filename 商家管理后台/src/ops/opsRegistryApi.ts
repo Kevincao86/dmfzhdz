@@ -30,7 +30,14 @@ export type AiVendorCatalogEntry = {
   logoUrl?: string
 }
 
-export type VendorKeyModelId = 'minimax' | 'qwen' | 'doubao'
+export type VendorKeyModelId =
+  | 'minimax'
+  | 'qwen'
+  | 'doubao'
+  | 'openai'
+  | 'claude'
+  | 'deepseek'
+  | 'kimi'
 
 export type RegistryVendorKeys = Partial<Record<string, string>>
 
@@ -108,7 +115,7 @@ export type RegistryFile = {
   vendorKeys: RegistryVendorKeys
   vendorKeysUpdatedAt: string
   vendorKeysWriter: 'erp' | 'ops'
-  /** 网关 GET 会与内置三项合并后再返回 */
+  /** 网关 GET 会与内置目录合并后再返回 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
   videoAi?: RegistryVideoAi
   videoAiUpdatedAt?: string
@@ -229,7 +236,7 @@ export async function postAiModels(body: {
 
 export async function postVendorKeys(body: {
   keys: RegistryVendorKeys
-  /** 仅存自定义条目；网关会与内置三项合并后再落盘 */
+  /** 仅存自定义条目；网关会与内置目录合并后再落盘 */
   aiVendorCatalog?: AiVendorCatalogEntry[]
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
