@@ -52,8 +52,14 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
       }
     }
     if (res.status !== 404) {
-      const err = json && typeof json === 'object' ? String((json as { error?: string }).error ?? text) : text
-      throw new Error(err || `HTTP ${res.status}`)
+      if (json && typeof json === 'object') {
+        const o = json as { error?: string; detail?: string }
+        const code = typeof o.error === 'string' ? o.error.trim() : ''
+        const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
+        const parts = [code, detail].filter(Boolean)
+        if (parts.length) throw new Error(parts.join(' — '))
+      }
+      throw new Error(text?.trim() || `HTTP ${res.status}`)
     }
     lastErr = text.slice(0, 200)
   }

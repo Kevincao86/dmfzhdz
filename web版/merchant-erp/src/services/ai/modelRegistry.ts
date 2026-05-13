@@ -17,8 +17,9 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     label: 'OpenAI / GPT',
     defaultBaseUrl: 'https://api.openai.com/v1',
     primaryEndpoint: 'POST /responses（可选）或 POST /chat/completions',
-    defaultModel: 'gpt-5.5',
-    fallbackModel: 'gpt-5.4-mini',
+    /** 须与当前账号在控制台可见的模型 id 一致；也可用环境变量 OPENAI_MODEL 覆盖 */
+    defaultModel: 'gpt-4o',
+    fallbackModel: 'gpt-4o-mini',
   },
   {
     provider: 'anthropic',

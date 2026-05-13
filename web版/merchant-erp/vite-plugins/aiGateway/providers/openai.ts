@@ -53,18 +53,23 @@ export async function chatOpenAI(req: AIChatRequest, env: Record<string, string>
     }
   }
 
-  const completion = await client.chat.completions.create({
-    model,
-    messages: toOpenAiMessages(req.messages),
-    temperature: req.temperature ?? 0.7,
-  })
-  const msg = completion.choices[0]?.message?.content
-  const content = typeof msg === 'string' ? msg : ''
-  return {
-    provider: 'openai',
-    model: completion.model ?? model,
-    content,
-    raw: completion as unknown as Record<string, unknown>,
-    usage: completion.usage as unknown as Record<string, unknown>,
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages: toOpenAiMessages(req.messages),
+      temperature: req.temperature ?? 0.7,
+    })
+    const msg = completion.choices[0]?.message?.content
+    const content = typeof msg === 'string' ? msg : ''
+    return {
+      provider: 'openai',
+      model: completion.model ?? model,
+      content,
+      raw: completion as unknown as Record<string, unknown>,
+      usage: completion.usage as unknown as Record<string, unknown>,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`OpenAI chat.completions: ${msg}`)
   }
 }
