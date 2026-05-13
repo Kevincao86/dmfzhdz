@@ -53,11 +53,20 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
     }
     if (res.status !== 404) {
       if (json && typeof json === 'object') {
-        const o = json as { ok?: boolean; error?: string; detail?: string }
+        const o = json as { ok?: boolean; error?: unknown; detail?: string }
         const code = typeof o.error === 'string' ? o.error.trim() : ''
         const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
         const parts = [code, detail].filter(Boolean)
         if (parts.length) throw new Error(parts.join(' — '))
+        if (o.error && typeof o.error === 'object' && o.error !== null) {
+          const nest = o.error as { message?: string; code?: string | number }
+          const nm = typeof nest.message === 'string' ? nest.message.trim() : ''
+          if (nm) {
+            throw new Error(
+              `网关返回异常（HTTP ${res.status}）。多为服务端未正确部署或函数崩溃；请查看 Vercel 该次部署日志。平台信息：${nm}`,
+            )
+          }
+        }
       }
       throw new Error(text?.trim() || `HTTP ${res.status}`)
     }

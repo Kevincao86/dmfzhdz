@@ -1,5 +1,6 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
 import { AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
+import { sanitizeTokenUsage } from './aiJsonSafe.js'
 
 export type AuditStatus = 'ok' | 'error'
 
@@ -9,13 +10,26 @@ export function summarizeText(s: string, max = 400): string {
 }
 
 export function logAiChatServerLine(payload: Record<string, unknown>): void {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      channel: 'meoo_ai_chat',
-      ...payload,
-    }),
-  )
+  try {
+    const safe = { ...payload }
+    if ('tokenUsage' in safe) safe.tokenUsage = sanitizeTokenUsage(safe.tokenUsage) ?? null
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        channel: 'meoo_ai_chat',
+        ...safe,
+      }),
+    )
+  } catch {
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        channel: 'meoo_ai_chat',
+        phase: String(payload.phase ?? ''),
+        status: 'log_serialize_skipped',
+      }),
+    )
+  }
 }
 
 export function mergeSystemPrompt(messages: AIChatRequest['messages']): AIChatRequest['messages'] {
@@ -70,7 +84,7 @@ export function buildAuditPayload(parts: {
     model: parts.res?.model ?? parts.req.model ?? null,
     inputSummary: summarizeText(lastUser?.content ?? ''),
     outputSummary: parts.res ? summarizeText(parts.res.content) : '',
-    tokenUsage: parts.res?.usage ?? null,
+    tokenUsage: sanitizeTokenUsage(parts.res?.usage) ?? null,
     executionStatus: parts.status,
     error: parts.error ?? null,
   }
