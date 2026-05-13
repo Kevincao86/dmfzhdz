@@ -71,6 +71,8 @@ type ComboItemRow = {
   name: string
   qty: string
   price: string
+  /** 团购：开放平台 sku 模板「售价(分)/actual_amount」，与单品门店售价对应（分） */
+  price_cents?: string
   /** 来客线上商品匹配（online.query） */
   product_id?: string
   sku_id?: string
@@ -114,6 +116,21 @@ function displaySkuAttrTitle(a: TemplateAttr): string {
   const nm = (a.name ?? '').trim()
   if (/^actual_amount$/i.test(key) || nm.includes('售价(分)')) return '单名'
   return nm || a.key
+}
+
+/** 团购下「单名」与单品售价绑定：actual_amount 或名称含「售价(分)」的 sku 模板项 */
+function isSkuPriceCentsTemplateAttr(a: TemplateAttr): boolean {
+  const key = (a.key ?? '').trim().toLowerCase()
+  const nm = (a.name ?? '').trim()
+  return /^actual_amount$/i.test(key) || nm.includes('售价(分)')
+}
+
+function resolveComboItemPriceCents(it: ComboItemRow): string {
+  const c = it.price_cents?.trim()
+  if (c) return c
+  const py = Number.parseFloat(String(it.price).replace(/,/g, ''))
+  if (Number.isFinite(py) && py >= 0) return String(Math.round(py * 100))
+  return ''
 }
 
 function looksComboTemplateAttr(a: TemplateAttr): boolean {
@@ -426,7 +443,15 @@ export default function DouyinProductCreateWizard({
   const [comboItemModal, setComboItemModal] = useState<{
     groupId: string
     itemId: string | null
-    draft: { name: string; qty: string; price: string; spec: string; brand: string; barcode: string }
+    draft: {
+      name: string
+      qty: string
+      price: string
+      spec: string
+      brand: string
+      barcode: string
+      price_cents: string
+    }
   } | null>(null)
   const [staffSales, setStaffSales] = useState('allow')
   const [consumeDateMode, setConsumeDateMode] = useState<'days' | 'calendar'>('days')
@@ -670,6 +695,18 @@ export default function DouyinProductCreateWizard({
     [templateSkuAttrs],
   )
 
+  const skuPriceCentsAttr = useMemo(
+    () => templateSkuAttrs.find((a) => isSkuPriceCentsTemplateAttr(a)) ?? null,
+    [templateSkuAttrs],
+  )
+
+  const productGroupSkuAttrsList = useMemo(() => {
+    if (productType === 1 && skuPriceCentsAttr) {
+      return sortedTemplateSkuAttrs.filter((a) => !isSkuPriceCentsTemplateAttr(a))
+    }
+    return sortedTemplateSkuAttrs
+  }, [sortedTemplateSkuAttrs, productType, skuPriceCentsAttr])
+
   const goodsCategoryPathZh = useMemo(() => {
     const n1 = l1Options.find((x) => x.category_id === cat1)?.name
     const n2 = l2Options.find((x) => x.category_id === cat2)?.name
@@ -802,6 +839,7 @@ export default function DouyinProductCreateWizard({
           spec: '',
           brand: '',
           barcode: '',
+          price_cents: skuPriceCentsAttr ? resolveComboItemPriceCents(it) : '',
         },
       })
       return
@@ -809,7 +847,20 @@ export default function DouyinProductCreateWizard({
     setComboItemModal({
       groupId,
       itemId: null,
-      draft: { name: '', qty: '1', price: '', spec: '', brand: '', barcode: '' },
+      draft: {
+        name: '',
+        qty: '1',
+        price: '',
+        spec: '',
+        brand: '',
+        barcode: '',
+        price_cents:
+          skuPriceCentsAttr &&
+          Number.isFinite(Number.parseFloat(priceYuan)) &&
+          Number.parseFloat(priceYuan) > 0
+            ? String(Math.round(Number.parseFloat(priceYuan) * 100))
+            : '',
+      },
     })
   }
 
@@ -829,6 +880,10 @@ export default function DouyinProductCreateWizard({
     const merged = mergeComboItemDisplayName(draft).trim() || '单品'
     const qty = String(Math.max(1, Number.parseInt(draft.qty, 10) || 1))
     const price = String(py)
+    const centsFromDraft = draft.price_cents.trim()
+    const centsFromYuan = Number.isFinite(py) ? String(Math.round(py * 100)) : ''
+    const price_cents =
+      skuPriceCentsAttr && (centsFromDraft || centsFromYuan) ? centsFromDraft || centsFromYuan : undefined
     setComboGroups((prev) =>
       prev.map((g) => {
         if (g.id !== groupId) return g
@@ -836,23 +891,33 @@ export default function DouyinProductCreateWizard({
           const prevIt = g.items.find((x) => x.id === itemId)
           return {
             ...g,
-            items: g.items.map((it) =>
-              it.id === itemId
-                ? {
-                    ...it,
-                    name: merged,
-                    qty,
-                    price,
-                    product_id: prevIt?.product_id,
-                    sku_id: prevIt?.sku_id,
-                  }
-                : it,
-            ),
+            items: g.items.map((it) => {
+              if (it.id !== itemId) return it
+              const { price_cents: _oldCents, ...rest } = it
+              return {
+                ...rest,
+                name: merged,
+                qty,
+                price,
+                ...(skuPriceCentsAttr && price_cents ? { price_cents } : {}),
+                product_id: prevIt?.product_id,
+                sku_id: prevIt?.sku_id,
+              }
+            }),
           }
         }
         return {
           ...g,
-          items: [...g.items, { id: newId('ci'), name: merged, qty, price }],
+          items: [
+            ...g.items,
+            {
+              id: newId('ci'),
+              name: merged,
+              qty,
+              price,
+              ...(skuPriceCentsAttr && price_cents ? { price_cents } : {}),
+            },
+          ],
         }
       }),
     )
@@ -1366,11 +1431,28 @@ export default function DouyinProductCreateWizard({
     }
     for (const a of templateSkuAttrs) {
       if (!a.is_required) continue
+      if (productType === 1 && isSkuPriceCentsTemplateAttr(a)) {
+        const listed = comboGroups.flatMap((gr) => gr.items).filter((it) => it.name.trim())
+        const cents = listed.length > 0 ? resolveComboItemPriceCents(listed[0]!) : ''
+        const fromGlobal =
+          Number.isFinite(Number.parseFloat(priceYuan)) && Number.parseFloat(priceYuan) > 0
+            ? String(Math.round(Number.parseFloat(priceYuan) * 100))
+            : ''
+        const fromOverride = templateSkuAttrOverrides[a.key]?.trim() ?? ''
+        if (!cents && !fromGlobal && !fromOverride) {
+          setActionMsg({
+            text: `开放平台 SKU 必填「${displaySkuAttrTitle(a)}」（key: ${a.key}）请在「商品组」内添加单品并填写单名（售价·分），或填写下方商品售价（元）以供换算`,
+            ok: false,
+          })
+          return
+        }
+        continue
+      }
       if (templateSkuAttrWizardCovered(a, skuCoverCtx)) continue
       const v = templateSkuAttrOverrides[a.key]?.trim()
       if (!v) {
         setActionMsg({
-          text: `开放平台 SKU 模板必填「${a.name}」（key: ${a.key}）尚未填写，请在「商品信息」内「SKU 属性」区域填写`,
+          text: `开放平台 SKU 模板必填「${a.name}」（key: ${a.key}）尚未填写，请在「商品信息」内「商品组」区域填写`,
           ok: false,
         })
         return
@@ -1413,7 +1495,18 @@ export default function DouyinProductCreateWizard({
         .map((r) => [r.key.trim(), r.value.trim()])
         .filter(([k, v]) => k.length > 0 && v.length > 0),
     )
-    const skuCleaned = { ...skuFromMap, ...skuFromExtra }
+    let skuCleaned: Record<string, string> = { ...skuFromMap, ...skuFromExtra }
+    if (productType === 1 && skuPriceCentsAttr) {
+      const k = skuPriceCentsAttr.key
+      const listed = comboGroups.flatMap((gr) => gr.items).filter((it) => it.name.trim())
+      const fromItem = listed.length > 0 ? resolveComboItemPriceCents(listed[0]!) : ''
+      const fromGlobal =
+        Number.isFinite(Number.parseFloat(priceYuan)) && Number.parseFloat(priceYuan) > 0
+          ? String(Math.round(Number.parseFloat(priceYuan) * 100))
+          : ''
+      const v = fromItem || fromGlobal
+      if (v) skuCleaned = { ...skuCleaned, [k]: v }
+    }
     if (Object.keys(skuCleaned).length > 0) {
       detail.template_sku_attr_overrides = skuCleaned
     }
@@ -1962,7 +2055,8 @@ export default function DouyinProductCreateWizard({
                         <p className="text-xs font-medium text-gray-800">团购搭配 · 几选几</p>
                         <p className="text-xs text-gray-600">
                           当前类目路径：<span className="font-medium text-gray-800">{goodsCategoryPathZh || '—'}</span>
-                          。添加单品弹窗中的扩展字段会按类目关键词切换；若与贵司类目模板不一致，请以 template.get / product.get 为准并在保存前核对。
+                          。模板中的「单名 / 售价(分)」已并入下方「添加单品」弹窗；添加单品弹窗中的扩展字段会按类目关键词切换；若与贵司类目模板不一致，请以
+                          template.get / product.get 为准并在保存前核对。
                         </p>
                         {comboGroups.map((g, gi) => (
                           <div
@@ -2007,6 +2101,11 @@ export default function DouyinProductCreateWizard({
                                       <span className="min-w-0 flex-1 truncate font-medium">{it.name}</span>
                                       <span className="shrink-0 text-gray-600">
                                         ×{it.qty} · ¥{it.price}
+                                        {skuPriceCentsAttr ? (
+                                          <span className="ml-1 font-mono text-[10px] text-indigo-800">
+                                            · 单名 {resolveComboItemPriceCents(it) || '—'} 分
+                                          </span>
+                                        ) : null}
                                       </span>
                                       <span className="flex shrink-0 gap-1">
                                         <button
@@ -2072,12 +2171,12 @@ export default function DouyinProductCreateWizard({
                       </div>
                     ) : null}
 
-                    {sortedTemplateSkuAttrs.length === 0 && skuAttrExtraRows.length === 0 && productType !== 1 ? (
+                    {productGroupSkuAttrsList.length === 0 && skuAttrExtraRows.length === 0 && productType !== 1 ? (
                       <p className="mt-2 text-xs text-amber-800">
                         当前模板未返回 sku_attrs。若开放平台仍要求补充 SKU 维度字段，可点击下方「新增自定义 SKU 属性」自行添加
                         key/value。
                       </p>
-                    ) : sortedTemplateSkuAttrs.length === 0 &&
+                    ) : productGroupSkuAttrsList.length === 0 &&
                       skuAttrExtraRows.length === 0 &&
                       productType === 1 ? (
                       <p className="mt-2 text-xs text-gray-600">
@@ -2085,7 +2184,7 @@ export default function DouyinProductCreateWizard({
                       </p>
                     ) : (
                       <ul className="mt-3 space-y-3">
-                        {sortedTemplateSkuAttrs.map((a) => {
+                        {productGroupSkuAttrsList.map((a) => {
                           const skuCovered = templateSkuAttrWizardCovered(a, skuTemplateCoverCtx)
                           const title = displaySkuAttrTitle(a)
                           return (
@@ -3347,6 +3446,33 @@ export default function DouyinProductCreateWizard({
                   />
                 </div>
               </div>
+              {skuPriceCentsAttr ? (
+                <div>
+                  <label className="text-xs font-medium text-gray-700">
+                    单名（售价·分）
+                    {skuPriceCentsAttr.is_required ? <span className="text-red-500"> *</span> : null}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={comboItemModal.draft.price_cents}
+                    onChange={(e) =>
+                      setComboItemModal({
+                        ...comboItemModal,
+                        draft: { ...comboItemModal.draft, price_cents: e.target.value },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                    placeholder="不填则按门店售价×100 自动换算"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    开放平台字段：{skuPriceCentsAttr.name || skuPriceCentsAttr.key} · key{' '}
+                    <span className="font-mono">{skuPriceCentsAttr.key}</span> →{' '}
+                    <code className="rounded bg-gray-100 px-1">sku.attr_key_value_map</code>
+                  </p>
+                </div>
+              ) : null}
               <div>
                 <label className="text-xs font-medium text-gray-700">规格描述</label>
                 <input
