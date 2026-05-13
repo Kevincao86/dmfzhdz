@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import type {
   AiAgentMessage,
   AiAgentOpenContext,
@@ -7,6 +16,50 @@ import type {
   AiTaskType,
 } from '../lib/aiAgentTypes'
 import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
+import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
+import { postAiChat } from '../services/ai/aiClient'
+import type { AIMessage } from '../services/ai/types'
+
+const PREFS_KEY = 'meoo_ai_model_picker_key'
+
+function loadPickerKey(): string {
+  const fallback = listAiModelPickerOptions()[0]?.key ?? 'openai::__default__'
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    if (!raw) return fallback
+    const opts = listAiModelPickerOptions()
+    return opts.some((o) => o.key === raw) ? raw : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function savePickerKey(key: string): void {
+  try {
+    localStorage.setItem(PREFS_KEY, key)
+  } catch {
+    /* ignore */
+  }
+}
+
+function inferTaskType(t: string): AiTaskType | undefined {
+  if (/创建|商品|套餐|上架|双人|单人/.test(t)) return 'create_product'
+  if (/达人|招募|探店/.test(t)) return 'recruit_influencer'
+  if (/差评|评价|评论/.test(t)) return 'handle_review'
+  if (/分析|原因|异常/.test(t)) return 'analyze_exception'
+  if (/同步|失败/.test(t)) return 'sync_platform'
+  return undefined
+}
+
+function agentMessagesToChatMessages(msgs: AiAgentMessage[]): AIMessage[] {
+  const out: AIMessage[] = []
+  for (const m of msgs) {
+    if (m.role === 'user' || m.role === 'assistant') {
+      out.push({ role: m.role, content: m.content })
+    }
+  }
+  return out.slice(-24)
+}
 
 type AiAgentContextValue = {
   drawerOpen: boolean
@@ -19,13 +72,16 @@ type AiAgentContextValue = {
   setInputDraft: (v: string) => void
   sendUserText: (text: string) => void
   applyShortcut: (taskType: AiTaskType) => void
-  /** 当前待确认的任务预览消息 id */
   pendingPreviewId: string | null
   confirmPendingTask: () => void
   cancelPendingTask: () => void
   modifyPendingTask: () => void
-  /** 顶部搜索框提交：带入抽屉并作为用户意图 */
   submitTopSearchQuery: (query: string) => void
+  /** 多模型：下拉 key，与 modelRegistry 中 listAiModelPickerOptions 一致 */
+  modelPickerKey: string
+  setModelPickerKey: (key: string) => void
+  modelPickerOptions: ReturnType<typeof listAiModelPickerOptions>
+  aiSending: boolean
 }
 
 const AiAgentContext = createContext<AiAgentContextValue | null>(null)
@@ -99,33 +155,34 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
   }
 }
 
-function mockAssistantReply(userText: string, pageLabel?: string): string {
-  const t = userText.trim()
-  if (!t) return '请描述你想完成的任务，或点击下方快捷任务。'
-  if (/创建|商品|套餐|上架/.test(t))
-    return `已理解你的意图：「${t.slice(0, 80)}」。${pageLabel ? `结合当前页面「${pageLabel}」，` : ''}我将先整理可执行步骤，请在下方预览中确认后再真正创建或修改数据。`
-  if (/达人|招募|探店/.test(t))
-    return `已理解：「${t.slice(0, 80)}」。我会按你的门店与类目生成招募方案，确认后再发起邀约。`
-  if (/差评|评价|评论/.test(t))
-    return `已理解：「${t.slice(0, 80)}」。我会先拉取待处理评价并生成回复草稿，确认后再提交。`
-  if (/同步|失败|异常|分析/.test(t))
-    return `已理解：「${t.slice(0, 80)}」。我会汇总同步与接口状态并给出原因假设，确认后再执行修复类操作。`
-  return `已收到：「${t.slice(0, 120)}」。当前为智能体工作台演示模式；接入后端后，将分解为可执行任务并逐步执行。涉及创建、修改、删除、发布等操作前，均会请你确认。`
-}
-
 export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pageContext, setPageContext] = useState<AiAgentOpenContext | null>(null)
   const [messages, setMessages] = useState<AiAgentMessage[]>(() => [
     createAgentMessage(
       'assistant',
-      '你好，我是店魔方 AI 智能体。你可以用自然语言描述任务，或使用快捷按钮；涉及写操作前我会展示执行预览，需你确认后再执行。',
+      '你好，我是店魔方 AI 智能体。在下方选择模型后输入问题或任务；写操作前我会展示执行预览，需你确认后再走业务接口。',
     ),
   ])
   const [inputDraft, setInputDraft] = useState('')
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
+  const [modelPickerKey, setModelPickerKeyState] = useState('openai::__default__')
+  const [aiSending, setAiSending] = useState(false)
 
-  /** 演示：默认已接入各能力；后续与租户权限接口对齐 */
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+
+  useEffect(() => {
+    setModelPickerKeyState(loadPickerKey())
+  }, [])
+
+  const modelPickerOptions = useMemo(() => listAiModelPickerOptions(), [])
+
+  const setModelPickerKey = useCallback((key: string) => {
+    setModelPickerKeyState(key)
+    savePickerKey(key)
+  }, [])
+
   const permissions = useMemo<Record<AiPermissionId, boolean>>(
     () => ({
       product: true,
@@ -151,66 +208,100 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const preview = buildPreviewForTask(taskType, pageLabelOverride ?? pageContext?.pageLabel)
     const msg = createAgentMessage('task_preview', intro, { preview })
     setPendingPreviewId(msg.id)
-    setMessages((prev) => [...prev, msg])
+    setMessages((prev) => {
+      const next = [...prev, msg]
+      messagesRef.current = next
+      return next
+    })
   }, [pageContext?.pageLabel])
+
+  const scheduleKeywordPreview = useCallback(
+    (trimmed: string, pageLabel?: string) => {
+      const intro = '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。'
+      if (/创建|商品|套餐|上架|双人|单人/.test(trimmed)) {
+        setTimeout(() => pushPreview('create_product', intro, pageLabel), 200)
+      } else if (/达人|招募|探店/.test(trimmed)) {
+        setTimeout(() => pushPreview('recruit_influencer', intro, pageLabel), 200)
+      } else if (/差评|评价|评论/.test(trimmed)) {
+        setTimeout(() => pushPreview('handle_review', intro, pageLabel), 200)
+      } else if (/同步|失败|异常|分析/.test(trimmed)) {
+        setTimeout(
+          () => pushPreview(/分析|原因|异常/.test(trimmed) ? 'analyze_exception' : 'sync_platform', intro, pageLabel),
+          200,
+        )
+      }
+    },
+    [pushPreview],
+  )
+
+  const runGatewayForSnapshot = useCallback(
+    async (snapshot: AiAgentMessage[], trimmed: string, taskType: AiTaskType | undefined, previewPage?: string) => {
+      const parsed = parseAiModelPickerKey(modelPickerKey)
+      if (!parsed) return
+      setAiSending(true)
+      try {
+        const history = agentMessagesToChatMessages(snapshot)
+        const res = await postAiChat({
+          provider: parsed.provider,
+          model: parsed.model || undefined,
+          messages: history,
+          taskType,
+        })
+        const assistantMsg = createAgentMessage('assistant', res.content)
+        setMessages((prev) => {
+          const next = [...prev, assistantMsg]
+          messagesRef.current = next
+          return next
+        })
+        scheduleKeywordPreview(trimmed, previewPage ?? pageContext?.pageLabel)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        setMessages((prev) => {
+          const next = [...prev, createAgentMessage('assistant', `请求失败（请检查是否已登录及 Vercel 是否已配置对应模型 Key）：${msg}`)]
+          messagesRef.current = next
+          return next
+        })
+      } finally {
+        setAiSending(false)
+      }
+    },
+    [modelPickerKey, pageContext?.pageLabel, scheduleKeywordPreview],
+  )
 
   const sendUserText = useCallback(
     (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed) return
-      setMessages((prev) => [...prev, createAgentMessage('user', trimmed)])
+      if (!trimmed || aiSending || pendingPreviewId) return
+      const userMsg = createAgentMessage('user', trimmed)
+      setMessages((prev) => {
+        const next = [...prev, userMsg]
+        messagesRef.current = next
+        return next
+      })
       setInputDraft('')
-      const reply = mockAssistantReply(trimmed, pageContext?.pageLabel)
-      setMessages((prev) => [...prev, createAgentMessage('assistant', reply)])
-
-      if (/创建|商品|套餐|上架|双人|单人/.test(trimmed)) {
-        setTimeout(() => {
-          pushPreview(
-            'create_product',
-            '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。',
-            pageContext?.pageLabel,
-          )
-        }, 200)
-      } else if (/达人|招募|探店/.test(trimmed)) {
-        setTimeout(() => {
-          pushPreview(
-            'recruit_influencer',
-            '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。',
-            pageContext?.pageLabel,
-          )
-        }, 200)
-      } else if (/差评|评价|评论/.test(trimmed)) {
-        setTimeout(() => {
-          pushPreview(
-            'handle_review',
-            '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。',
-            pageContext?.pageLabel,
-          )
-        }, 200)
-      } else if (/同步|失败|异常|分析/.test(trimmed)) {
-        setTimeout(() => {
-          pushPreview(
-            /分析|原因|异常/.test(trimmed) ? 'analyze_exception' : 'sync_platform',
-            '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。',
-            pageContext?.pageLabel,
-          )
-        }, 200)
-      }
+      queueMicrotask(() => {
+        void runGatewayForSnapshot(messagesRef.current, trimmed, inferTaskType(trimmed), pageContext?.pageLabel)
+      })
     },
-    [pageContext?.pageLabel, pushPreview],
+    [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
   )
 
   const applyShortcut = useCallback(
     (taskType: AiTaskType) => {
+      if (aiSending || pendingPreviewId) return
       const label = AI_TASK_TYPE_LABELS[taskType]
-      setMessages((prev) => [...prev, createAgentMessage('user', `使用快捷任务：${label}`)])
-      const assistantLine = `好的，已选择「${label}」。以下为拟执行步骤，请确认；确认后将在对接后端后调用真实接口（当前为演示）。`
-      setMessages((prev) => [...prev, createAgentMessage('assistant', assistantLine)])
-      setTimeout(() => {
-        pushPreview(taskType, `即将执行：${label}。请核对以下步骤：`, pageContext?.pageLabel)
-      }, 150)
+      const line = `使用快捷任务：${label}`
+      const userMsg = createAgentMessage('user', line)
+      setMessages((prev) => {
+        const next = [...prev, userMsg]
+        messagesRef.current = next
+        return next
+      })
+      queueMicrotask(() => {
+        void runGatewayForSnapshot(messagesRef.current, line, taskType, pageContext?.pageLabel)
+      })
     },
-    [pageContext?.pageLabel, pushPreview],
+    [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
   )
 
   const confirmPendingTask = useCallback(() => {
@@ -218,64 +309,65 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     setMessages((prev) => {
       const p = prev.find((m) => m.id === pendingPreviewId)?.preview
       const title = p?.title ?? '任务'
-      return [
+      const next = [
         ...prev,
         createAgentMessage(
           'task_result',
-          `「${title}」已确认。演示模式下未调用真实接口；后续将按步骤调用开放平台并回写结果。`,
+          `「${title}」已确认。后续将按步骤调用业务接口；若接口未就绪，请稍后在对应模块查看执行结果。`,
           { resultSummary: 'confirmed' },
         ),
       ]
+      messagesRef.current = next
+      return next
     })
     setPendingPreviewId(null)
   }, [pendingPreviewId])
 
   const cancelPendingTask = useCallback(() => {
     if (!pendingPreviewId) return
-    setMessages((prev) => [...prev, createAgentMessage('system', '已取消本次待执行操作。')])
+    setMessages((prev) => {
+      const next = [...prev, createAgentMessage('system', '已取消本次待执行操作。')]
+      messagesRef.current = next
+      return next
+    })
     setPendingPreviewId(null)
   }, [pendingPreviewId])
 
   const modifyPendingTask = useCallback(() => {
     if (!pendingPreviewId) return
-    setMessages((prev) => [
-      ...prev,
-      createAgentMessage(
-        'assistant',
-        '请直接在输入框中说明需要调整的部分（例如：只要同步抖音、先不要发布等）。我会根据你的补充重新生成方案。',
-      ),
-    ])
+    setMessages((prev) => {
+      const next = [
+        ...prev,
+        createAgentMessage(
+          'assistant',
+          '请直接在输入框中说明需要调整的部分（例如：只要同步抖音、先不要发布等）。我会根据你的补充重新生成方案。',
+        ),
+      ]
+      messagesRef.current = next
+      return next
+    })
     setPendingPreviewId(null)
   }, [pendingPreviewId])
 
   const submitTopSearchQuery = useCallback(
     (query: string) => {
       const q = query.trim()
-      if (!q) return
+      if (!q || aiSending) return
       const pl = '顶部搜索 / AI 指令'
-      setPageContext({ pageLabel: pl, draftInput: q })
+      setPageContext({ pageLabel: pl })
       setDrawerOpen(true)
       setInputDraft('')
-      setMessages((prev) => [
-        ...prev,
-        createAgentMessage('user', q),
-        createAgentMessage('assistant', mockAssistantReply(q, pl)),
-      ])
-      const intro = '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。'
-      if (/创建|商品|套餐|上架|双人|单人/.test(q)) {
-        setTimeout(() => pushPreview('create_product', intro, pl), 200)
-      } else if (/达人|招募|探店/.test(q)) {
-        setTimeout(() => pushPreview('recruit_influencer', intro, pl), 200)
-      } else if (/差评|评价|评论/.test(q)) {
-        setTimeout(() => pushPreview('handle_review', intro, pl), 200)
-      } else if (/同步|失败|异常|分析/.test(q)) {
-        setTimeout(
-          () => pushPreview(/分析|原因|异常/.test(q) ? 'analyze_exception' : 'sync_platform', intro, pl),
-          200,
-        )
-      }
+      const userMsg = createAgentMessage('user', q)
+      setMessages((prev) => {
+        const next = [...prev, userMsg]
+        messagesRef.current = next
+        return next
+      })
+      queueMicrotask(() => {
+        void runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl)
+      })
     },
-    [pushPreview],
+    [aiSending, runGatewayForSnapshot],
   )
 
   const value = useMemo<AiAgentContextValue>(
@@ -295,6 +387,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       cancelPendingTask,
       modifyPendingTask,
       submitTopSearchQuery,
+      modelPickerKey,
+      setModelPickerKey,
+      modelPickerOptions,
+      aiSending,
     }),
     [
       drawerOpen,
@@ -311,6 +407,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       cancelPendingTask,
       modifyPendingTask,
       submitTopSearchQuery,
+      modelPickerKey,
+      setModelPickerKey,
+      modelPickerOptions,
+      aiSending,
     ],
   )
 

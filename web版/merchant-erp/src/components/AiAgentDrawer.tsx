@@ -2,7 +2,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Bot,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
+  Loader2,
   Mic,
   Paperclip,
   Send,
@@ -13,16 +15,8 @@ import {
 import { useEffect, useRef } from 'react'
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
-import type { AiAgentMessage, AiPermissionId, AiTaskType } from '../lib/aiAgentTypes'
-
-const SHORTCUTS: { type: AiTaskType; label: string }[] = [
-  { type: 'create_product', label: '创建商品' },
-  { type: 'recruit_influencer', label: '招募达人' },
-  { type: 'handle_review', label: '处理评价' },
-  { type: 'sync_platform', label: '同步平台' },
-  { type: 'analyze_exception', label: '分析异常' },
-  { type: 'generate_copywriting', label: '生成推广文案' },
-]
+import type { AiAgentMessage, AiPermissionId } from '../lib/aiAgentTypes'
+import { AI_AGENT_SHORTCUTS } from '../lib/aiAgentTypes'
 
 const PERMISSION_ORDER: AiPermissionId[] = ['product', 'store', 'influencer', 'review', 'sync']
 
@@ -106,6 +100,10 @@ export default function AiAgentDrawer() {
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
+    modelPickerKey,
+    setModelPickerKey,
+    modelPickerOptions,
+    aiSending,
   } = useAiAgent()
 
   const listRef = useRef<HTMLDivElement>(null)
@@ -203,11 +201,11 @@ export default function AiAgentDrawer() {
             <div className="shrink-0 border-b border-slate-100 px-4 py-3">
               <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">快捷任务</p>
               <div className="flex flex-wrap gap-2">
-                {SHORTCUTS.map((s) => (
+                {AI_AGENT_SHORTCUTS.map((s) => (
                   <button
                     key={s.type}
                     type="button"
-                    disabled={Boolean(pendingPreviewId)}
+                    disabled={Boolean(pendingPreviewId) || aiSending}
                     onClick={() => applyShortcut(s.type)}
                     className={cn(
                       'rounded-xl border border-indigo-200/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition-colors',
@@ -255,6 +253,28 @@ export default function AiAgentDrawer() {
             </div>
 
             <footer className="shrink-0 border-t border-slate-100 bg-white p-4">
+              <div className="mb-2 flex items-center justify-end gap-2">
+                <div className="relative max-w-[min(100%,12rem)] flex-1">
+                  <select
+                    aria-label="选择 AI 模型"
+                    value={modelPickerKey}
+                    disabled={aiSending}
+                    onChange={(e) => setModelPickerKey(e.target.value)}
+                    className={cn(
+                      'h-9 w-full cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 py-0 pl-2.5 pr-8',
+                      'text-[11px] font-medium text-slate-800 hover:bg-white',
+                      aiSending && 'cursor-not-allowed opacity-60',
+                    )}
+                  >
+                    {modelPickerOptions.map((o) => (
+                      <option key={o.key} value={o.key}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+                </div>
+              </div>
               <div className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 ring-1 ring-slate-100">
                 <button
                   type="button"
@@ -291,11 +311,11 @@ export default function AiAgentDrawer() {
                 <button
                   type="button"
                   onClick={() => sendUserText(inputDraft)}
-                  disabled={!inputDraft.trim() || Boolean(pendingPreviewId)}
+                  disabled={!inputDraft.trim() || Boolean(pendingPreviewId) || aiSending}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                   aria-label="发送"
                 >
-                  <Send className="h-4 w-4" />
+                  {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </button>
               </div>
               <p className="mt-2 text-center text-[10px] text-slate-400">

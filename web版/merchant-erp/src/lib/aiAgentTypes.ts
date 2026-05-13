@@ -36,6 +36,16 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   generate_copywriting: '生成推广文案',
 }
 
+/** 智能体首页与抽屉共用的快捷任务 */
+export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
+  { type: 'create_product', label: '创建商品' },
+  { type: 'recruit_influencer', label: '招募达人' },
+  { type: 'handle_review', label: '处理评价' },
+  { type: 'sync_platform', label: '同步平台' },
+  { type: 'analyze_exception', label: '分析异常' },
+  { type: 'generate_copywriting', label: '生成推广文案' },
+]
+
 /** 对话与任务流消息角色 */
 export type AiAgentMessageRole = 'user' | 'assistant' | 'system' | 'task_preview' | 'task_result'
 
