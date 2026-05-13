@@ -22,7 +22,7 @@ function useAiCatalogTick() {
   return tick
 }
 
-/** 仅展示已配置 API Key 的厂商；无本地 Key 且运营托管时，用当前下发的默认模型兜底（Key 可能仅在服务端合并）。 */
+/** 用于 chips：优先展示已配置 API Key 的厂商；无 Key 且运营托管时用默认模型；否则仍展示内置目录（避免整块区域空白）。 */
 function useDisplayedAiModelOptions(
   opsLocked: boolean,
   textModel: string,
@@ -40,9 +40,10 @@ function useDisplayedAiModelOptions(
           .map((x) => String(x ?? '').trim().toLowerCase())
           .filter(Boolean),
       )
-      return all.filter((m) => sel.has(m.id))
+      const locked = all.filter((m) => sel.has(m.id))
+      if (locked.length > 0) return locked
     }
-    return []
+    return all
   }, [catalogTick, opsLocked, textModel, imageModel])
 }
 
@@ -65,10 +66,6 @@ export default function AiModelBindingSection() {
     return () => window.removeEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync as EventListener)
   }, [])
 
-  if (displayedOptions.length === 0) {
-    return null
-  }
-
   return (
     <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-5">
       <div className="mb-3 flex items-center gap-2">
@@ -77,7 +74,8 @@ export default function AiModelBindingSection() {
       </div>
       <p className="text-sm font-medium text-gray-900">目前绑定的 AI 模型</p>
       <p className="mt-1 text-xs text-gray-500">
-        下方为当前目录中的模型（logo + 名称）。文案 / 生图路由由运营注册表、浏览器侧各模型 Key 与内置策略自动解析；本页<strong className="font-medium text-gray-700">不提供</strong>
+        下方为当前目录中的模型（logo + 名称）。已填写本地 API Key 的厂商会优先列出；未配置时展示内置目录供对照。文案 / 生图路由由运营注册表、Key 与内置策略自动解析；本页
+        <strong className="font-medium text-gray-700">不提供</strong>
         模型切换下拉。
       </p>
       <div className="mt-3">
