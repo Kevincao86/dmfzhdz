@@ -1,19 +1,13 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
-import { chatAnthropic } from './providers/anthropic.js'
 import { chatDeepseek } from './providers/deepseek.js'
 import { chatKimi } from './providers/kimi.js'
 import { chatMinimax } from './providers/minimax.js'
-import { chatOpenAI } from './providers/openai.js'
-import { chatXai } from './providers/xai.js'
+import { chatTokenMix } from './providers/tokenmix.js'
 
 export async function routeAiChat(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
   switch (req.provider) {
-    case 'openai':
-      return chatOpenAI(req, env)
-    case 'anthropic':
-      return chatAnthropic(req, env)
-    case 'xai':
-      return chatXai(req, env)
+    case 'tokenmix':
+      return chatTokenMix(req, env)
     case 'deepseek':
       return chatDeepseek(req, env)
     case 'kimi':

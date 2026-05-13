@@ -23,7 +23,7 @@ import type { AIMessage } from '../services/ai/types'
 const PREFS_KEY = 'meoo_ai_model_picker_key'
 
 function loadPickerKey(): string {
-  const fallback = listAiModelPickerOptions()[0]?.key ?? 'openai::__default__'
+  const fallback = listAiModelPickerOptions()[0]?.key ?? 'tokenmix::openai::__default__'
   try {
     const raw = localStorage.getItem(PREFS_KEY)
     if (!raw) return fallback
@@ -166,7 +166,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   ])
   const [inputDraft, setInputDraft] = useState('')
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
-  const [modelPickerKey, setModelPickerKeyState] = useState('openai::__default__')
+  const [modelPickerKey, setModelPickerKeyState] = useState('tokenmix::openai::__default__')
   const [aiSending, setAiSending] = useState(false)
 
   const messagesRef = useRef(messages)
@@ -244,6 +244,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         const res = await postAiChat({
           provider: parsed.provider,
           model: parsed.model || undefined,
+          ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
           messages: history,
           taskType,
         })
@@ -257,7 +258,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setMessages((prev) => {
-          const next = [...prev, createAgentMessage('assistant', `请求失败（请检查是否已登录及 Vercel 是否已配置对应模型 Key）：${msg}`)]
+          const next = [...prev, createAgentMessage('assistant', `请求失败（请检查是否已登录及 Vercel 是否已配置 TOKENMIX_API_KEY 或 DeepSeek/Kimi/MiniMax 对应 Key）：${msg}`)]
           messagesRef.current = next
           return next
         })

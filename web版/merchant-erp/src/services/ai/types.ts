@@ -1,11 +1,14 @@
 import type { AiTaskType } from '../../lib/aiAgentTypes'
 
 /**
- * 多模型 AI 网关 — 类型契约（前端与 /api/meoo-ai-chat 共用）。
- * API Key 仅允许出现在服务端环境变量；浏览器只调用同源代理接口。
+ * AI 网关 — OpenAI/Claude/Gemini/Grok 经 [TokenMix](https://tokenmix.ai/docs)；
+ * DeepSeek / Kimi / MiniMax 仍直连各厂商 API。密钥仅服务端。
  */
 
-export type AIProvider = 'openai' | 'anthropic' | 'xai' | 'deepseek' | 'kimi' | 'minimax'
+/** TokenMix 侧「模型家族」分组 */
+export type AIModelFamily = 'openai' | 'claude' | 'gemini' | 'grok'
+
+export type AIProvider = 'tokenmix' | 'deepseek' | 'kimi' | 'minimax'
 
 export type AIMessageRole = 'system' | 'user' | 'assistant' | 'tool'
 
@@ -16,7 +19,10 @@ export type AIMessage = {
 
 export type AIChatRequest = {
   provider: AIProvider
+  /** 直连厂商或 TokenMix 的模型 id；TokenMix 下空串由服务端按 modelFamily 解析 */
   model?: string
+  /** 仅 provider=tokenmix 时有效 */
+  modelFamily?: AIModelFamily
   messages: AIMessage[]
   temperature?: number
   /** 预留：当前网关实现为非流式；stream=true 时返回 501 */

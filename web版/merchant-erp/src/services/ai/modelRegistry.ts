@@ -1,50 +1,39 @@
-import type { AIProvider } from './types'
+import type { AIProvider, AIModelFamily } from './types'
+import {
+  TOKENMIX_FAMILY_CATALOG,
+  normalizeAiModelFamily,
+  type TokenMixFamilyDef,
+} from './tokenmixClient'
 
-/** 无密钥的默认路由与模型（可被请求体 model / 环境变量覆盖） */
-export type ModelRegistryEntry = {
-  provider: AIProvider
+export {
+  TOKENMIX_FAMILY_CATALOG,
+  defaultModelIdForFamily,
+  modelsForTokenMixFamily,
+  normalizeAiModelFamily,
+  resolveTokenMixModelId,
+  tokenMixFamilyById,
+  type TokenMixFamilyDef,
+  type TokenMixModelOption,
+} from './tokenmixClient'
+
+/** 仍直连厂商的注册项（非 TokenMix） */
+export type DirectModelRegistryEntry = {
+  provider: Exclude<AIProvider, 'tokenmix'>
   label: string
   defaultBaseUrl: string
-  /** 说明性：主要 HTTP 路径 */
   primaryEndpoint: string
   defaultModel: string
   fallbackModel?: string
 }
 
-export const MODEL_REGISTRY: ModelRegistryEntry[] = [
-  {
-    provider: 'openai',
-    label: 'OpenAI / GPT',
-    defaultBaseUrl: 'https://api.openai.com/v1',
-    primaryEndpoint: 'POST /responses（可选）或 POST /chat/completions',
-    /** 须与当前账号在控制台可见的模型 id 一致；也可用环境变量 OPENAI_MODEL 覆盖 */
-    defaultModel: 'gpt-4o',
-    fallbackModel: 'gpt-4o-mini',
-  },
-  {
-    provider: 'anthropic',
-    label: 'Anthropic / Claude',
-    defaultBaseUrl: 'https://api.anthropic.com',
-    primaryEndpoint: 'POST /v1/messages',
-    /** 与 Anthropic 控制台可见模型 id 一致；可用 ANTHROPIC_MODEL 覆盖 */
-    defaultModel: 'claude-3-5-sonnet-20241022',
-    fallbackModel: 'claude-3-5-haiku-20241022',
-  },
-  {
-    provider: 'xai',
-    label: 'xAI / Grok',
-    defaultBaseUrl: 'https://api.x.ai/v1',
-    primaryEndpoint: 'POST /responses 或 POST /chat/completions',
-    defaultModel: 'grok-2-latest',
-    fallbackModel: 'grok-beta',
-  },
+export const DIRECT_MODEL_REGISTRY: readonly DirectModelRegistryEntry[] = [
   {
     provider: 'deepseek',
     label: 'DeepSeek',
     defaultBaseUrl: 'https://api.deepseek.com',
     primaryEndpoint: 'POST /chat/completions',
-    defaultModel: 'deepseek-v4-pro',
-    fallbackModel: 'deepseek-v4-flash',
+    defaultModel: 'deepseek-chat',
+    fallbackModel: 'deepseek-reasoner',
   },
   {
     provider: 'kimi',
@@ -62,24 +51,45 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     defaultModel: 'MiniMax-M2',
     fallbackModel: 'MiniMax-M2.1',
   },
-]
+] as const
 
-export function registryEntry(provider: AIProvider): ModelRegistryEntry | undefined {
-  return MODEL_REGISTRY.find((x) => x.provider === provider)
+export function registryEntry(provider: Exclude<AIProvider, 'tokenmix'>): DirectModelRegistryEntry | undefined {
+  return DIRECT_MODEL_REGISTRY.find((x) => x.provider === provider)
 }
 
-/** 智能体页 / 抽屉：模型下拉（不含密钥，仅 provider + 模型名） */
+/** 智能体页下拉：TokenMix 四家族 + 直连三家 */
 export type AiModelPickerOption = {
   key: string
   provider: AIProvider
-  /** 空串表示请求体不传 model，由服务端环境变量默认 */
+  /** 仅 TokenMix 选项有值 */
+  modelFamily?: AIModelFamily
   model: string
   label: string
 }
 
 export function listAiModelPickerOptions(): AiModelPickerOption[] {
   const out: AiModelPickerOption[] = []
-  for (const r of MODEL_REGISTRY) {
+
+  for (const fam of TOKENMIX_FAMILY_CATALOG as readonly TokenMixFamilyDef[]) {
+    out.push({
+      key: `tokenmix::${fam.id}::__default__`,
+      provider: 'tokenmix',
+      modelFamily: fam.id,
+      model: '',
+      label: `${fam.label}（TokenMix）· 默认`,
+    })
+    for (const m of fam.models) {
+      out.push({
+        key: `tokenmix::${fam.id}::${m.id}`,
+        provider: 'tokenmix',
+        modelFamily: fam.id,
+        model: m.id,
+        label: `${fam.label}（TokenMix）· ${m.label}`,
+      })
+    }
+  }
+
+  for (const r of DIRECT_MODEL_REGISTRY) {
     out.push({
       key: `${r.provider}::__default__`,
       provider: r.provider,
@@ -101,17 +111,28 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
       })
     }
   }
+
   return out
 }
 
-const PICKER_PROVIDERS: AIProvider[] = ['openai', 'anthropic', 'xai', 'deepseek', 'kimi', 'minimax']
+export type ParsedModelPicker =
+  | { provider: 'tokenmix'; modelFamily: AIModelFamily; model: string }
+  | { provider: 'deepseek' | 'kimi' | 'minimax'; model: string }
 
-export function parseAiModelPickerKey(key: string): { provider: AIProvider; model: string } | null {
-  const idx = key.indexOf('::')
-  if (idx <= 0) return null
-  const provider = key.slice(0, idx) as AIProvider
-  if (!PICKER_PROVIDERS.includes(provider)) return null
-  const rest = key.slice(idx + 2)
-  const model = rest === '__default__' ? '' : rest
-  return { provider, model }
+export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
+  const parts = key.split('::')
+  if (parts[0] === 'tokenmix' && parts.length >= 3) {
+    const family = normalizeAiModelFamily(parts[1])
+    const rest = parts.slice(2).join('::')
+    const model = rest === '__default__' ? '' : rest
+    return { provider: 'tokenmix', modelFamily: family, model }
+  }
+  if (parts.length >= 2) {
+    const p = parts[0] as AIProvider
+    if (p !== 'deepseek' && p !== 'kimi' && p !== 'minimax') return null
+    const rest = parts.slice(1).join('::')
+    const model = rest === '__default__' ? '' : rest
+    return { provider: p, model }
+  }
+  return null
 }
