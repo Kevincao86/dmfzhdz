@@ -1562,13 +1562,11 @@ function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
 
-/** 团购 product_type=1 时 goodlife 侧常要求非空的 combo_rule（与 package_combo 同源） */
+/** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；团购/代金券等多类型均可能校验非空 */
 function buildDouyinProductComboRule(
   erp: Record<string, unknown>,
   productNameFallback: string,
 ): Record<string, unknown> | null {
-  const product_type = Number(erp.product_type) || 1
-  if (product_type !== 1) return null
   const raw = erp.package_combo
   if (!raw || typeof raw !== 'object') return null
   const o = raw as { groups?: unknown[] }
@@ -1912,7 +1910,7 @@ async function buildGoodlifeProductSaveBody(
   }
 
   let comboRule = buildDouyinProductComboRule(erp, product_name)
-  if (product_type === 1 && !comboRule) {
+  if (!comboRule) {
     const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
     comboRule = {
       groups: [
@@ -1932,7 +1930,7 @@ async function buildGoodlifeProductSaveBody(
 
   /** template 的 attr_key_value_map 常要求 combo_rule 为 JSON 字符串；须与 package_combo 同源，否则报「combo_rule不能为空」 */
   const erpForAttrMerge: Record<string, unknown> =
-    product_type === 1 && comboRule
+    comboRule
       ? (() => {
           const raw = erp.package_combo
           if (raw && typeof raw === 'object') {
@@ -1945,7 +1943,7 @@ async function buildGoodlifeProductSaveBody(
 
   const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map)
 
-  if (product_type === 1 && comboRule) {
+  if (comboRule) {
     const comboJson = JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
     for (const a of attrs) {
       const key = String(a.key ?? '').trim()
