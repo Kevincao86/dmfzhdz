@@ -264,7 +264,7 @@ async function poiCertInfoGet(
   u.searchParams.set('merchant_life_account_id', merchantLifeAccountId.trim())
   u.searchParams.set('poi_id', poiId.trim())
   try {
-    const res = await fetch(u.toString(), {
+    const res = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': accessToken,
@@ -297,7 +297,7 @@ async function poiTaskQueryGet(
   const u = new URL(douyinOpenApiUrl('/goodlife/v1/poi/task/query/'))
   u.searchParams.set('task_ids', JSON.stringify(ids))
   try {
-    const res = await fetch(u.toString(), {
+    const res = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': accessToken,
@@ -924,7 +924,7 @@ export async function handleDouyinGoodsCategoryGet(
     const cid = (url.searchParams.get('category_id') ?? '').trim()
     if (cid) u.searchParams.set('category_id', cid)
 
-    const dr = await fetch(u.toString(), {
+    const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': token,
@@ -992,7 +992,7 @@ export async function handleDouyinGoodsProductOnlineQueryGet(
     const status = (url.searchParams.get('status') ?? '').trim()
     if (status) u.searchParams.set('status', status)
 
-    const dr = await fetch(u.toString(), {
+    const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': token,
@@ -1039,7 +1039,7 @@ export async function handleDouyinGoodsProductDraftQueryGet(
     const status = (url.searchParams.get('status') ?? '').trim()
     if (status) u.searchParams.set('status', status)
 
-    const dr = await fetch(u.toString(), {
+    const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': token,
@@ -1082,7 +1082,7 @@ export async function handleDouyinGoodsIndustryScopeGet(
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('query_category_type', '1')
 
-    const dr = await fetch(u.toString(), {
+    const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': token,
@@ -1274,7 +1274,7 @@ export async function handleDouyinBrandsGet(
       u.searchParams.set('brand_name', keyword)
     }
 
-    const dr = await fetch(u.toString(), {
+    const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
       headers: {
         'access-token': token,
@@ -1484,7 +1484,7 @@ export async function handleDouyinPoiClaimPost(
       typeof b.target_type === 'number' || typeof b.target_type === 'string'
         ? body
         : { ...b, target_type: 100 }
-    const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/poi/poi/claim/'), {
+    const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/poi/poi/claim/'), {
       method: 'POST',
       headers: {
         'access-token': token,
@@ -1539,7 +1539,7 @@ async function fetchTemplateAttrsBundle(
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
   u.searchParams.set('product_type', String(productType))
-  const dr = await fetch(u.toString(), {
+  const dr = await douyinServerFetch(u.toString(), {
     method: 'GET',
     headers: {
       'access-token': token,
@@ -2088,7 +2088,7 @@ export async function handleDouyinGoodsProductSavePost(
     }
     const saveBody = await buildGoodlifeProductSaveBody(accountId, token, erp, mode, accountName)
 
-    const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
+    const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
       method: 'POST',
       headers: {
         'access-token': token,
@@ -2232,7 +2232,7 @@ export async function fetchDouyinFinanceReconcileRows(
       u.searchParams.set('create_order_end_time', String(rng.endSec))
       u.searchParams.set('get_secret_number', 'false')
 
-      const dr = await fetch(u.toString(), {
+      const dr = await douyinServerFetch(u.toString(), {
         method: 'GET',
         headers: {
           'access-token': token,
@@ -2372,7 +2372,7 @@ export async function fetchDouyinAkteReviews(
       u.searchParams.set('cursor', cursor)
       u.searchParams.set('count', '100')
 
-      const dr = await fetch(u.toString(), {
+      const dr = await douyinServerFetch(u.toString(), {
         method: 'GET',
         headers: {
           'access-token': accessToken,
@@ -2472,7 +2472,7 @@ export async function postDouyinAkteCommentReply(
   if (!body.text) return { ok: false, message: '回复内容不能为空' }
   try {
     const accessToken = await ensureDouyinToken(session)
-    const dr = await fetch(douyinOpenApiUrl('/goodlife/v1/akte/comment/reply/'), {
+    const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/akte/comment/reply/'), {
       method: 'POST',
       headers: {
         'access-token': accessToken,
