@@ -35,11 +35,9 @@ import {
   type TemplateSelectOption,
   getDouyinGoodsTemplate,
   getDouyinGoodsProductGet,
-  getDouyinGoodsProductOnlineQuery,
   getDouyinProductTypesForCategory,
   postDouyinGoodsProductSave,
   uploadDouyinProductImage,
-  type DouyinOnlineProductHit,
 } from '../../services/douyinProductApi'
 import {
   listAiUiModelOptions,
@@ -78,26 +76,6 @@ type Step = 'category' | 'productType' | 'detail'
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-/** 几选几选项随组内单品行数变化；与 goods/save 的 package_combo.pick_rule 对齐 */
-function buildComboPickRuleSelectOptions(itemCount: number): { value: string; label: string }[] {
-  if (itemCount < 1) return [{ value: '全部必选', label: '全部必选' }]
-  const opts: { value: string; label: string }[] = [{ value: '全部必选', label: '全部必选' }]
-  if (itemCount >= 2) {
-    opts.push({ value: '全部可选', label: '全部可选' })
-    for (let m = 1; m < itemCount; m += 1) {
-      opts.push({ value: `${itemCount}选${m}`, label: `${itemCount}选${m}` })
-    }
-    opts.push({ value: '任选其一', label: '任选其一' })
-  }
-  return opts
-}
-
-function normalizePickRule(rule: string, itemCount: number): string {
-  const allowed = new Set(buildComboPickRuleSelectOptions(itemCount).map((o) => o.value))
-  if (allowed.has(rule)) return rule
-  return '全部必选'
 }
 
 function readToken() {
@@ -245,16 +223,6 @@ export default function DouyinProductCreateWizard({
     return withKey.length > 0 ? withKey : all
   }, [aiOptionsReload])
 
-  const postAssistWithKeys = useCallback(async (body: Omit<AiAssistRequest, 'model'>) => {
-    const model = resolveModelForAssistAction(body.action) as AiModelId
-    const r = await postDouyinGoodsAiAssist({ ...body, model })
-    if (r.ok || !r.needVendorKey) return r
-    return {
-      ok: false as const,
-      message: `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`,
-    }
-  }, [])
-
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== MERCHANT_AI_MODEL_STORAGE_KEY && e.key !== MERCHANT_IMAGE_AI_MODEL_STORAGE_KEY) return
@@ -337,12 +305,8 @@ export default function DouyinProductCreateWizard({
   const [externalGoodsId, setExternalGoodsId] = useState('')
   const [otherRules, setOtherRules] = useState('')
 
+  /** 编辑已有商品时保留服务端 package_combo；新建团购由表单自动合成单品，不再展示「商品搭配」区块 */
   const [comboGroups, setComboGroups] = useState<ComboGroupRow[]>([])
-  /** 团购单品：online.query 联想下拉 key = `${groupId}:${itemId}` */
-  const [comboMatch, setComboMatch] = useState<
-    Record<string, { open: boolean; loading: boolean; hits: DouyinOnlineProductHit[]; err?: string }>
-  >({})
-  const comboSearchTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const [salesChannelOptions, setSalesChannelOptions] = useState<TemplateSelectOption[]>([])
   const [staffSalesOptions, setStaffSalesOptions] = useState<TemplateSelectOption[]>([])
   const [afterSalePolicyOptions, setAfterSalePolicyOptions] = useState<TemplateSelectOption[]>([])
@@ -371,99 +335,60 @@ export default function DouyinProductCreateWizard({
     [uploadableLeaves],
   )
 
-  const comboSanitizeSig = useMemo(
-    () => comboGroups.map((g) => `${g.id}:${g.items.length}:${g.pickRule}`).join('|'),
-    [comboGroups],
+  const lockedAiGoodsContext = useMemo(():
+    | Pick<
+        AiAssistRequest,
+        | 'goods_category_id'
+        | 'goods_product_type'
+        | 'goods_category_path_zh'
+        | 'goods_product_type_label'
+      >
+    | undefined => {
+    if (!cat3.trim() || productType == null) return undefined
+    const n1 = l1Options.find((x) => x.category_id === cat1)?.name
+    const n2 = l2Options.find((x) => x.category_id === cat2)?.name
+    const n3 = l3Options.find((x) => x.category_id === cat3)?.name
+    const path = [n1, n2, n3].filter(Boolean).join(' › ')
+    const typeLabel = productTypes.find((t) => t.product_type === productType)?.label
+    return {
+      goods_category_id: cat3.trim(),
+      goods_product_type: productType,
+      ...(path ? { goods_category_path_zh: path } : {}),
+      ...(typeLabel ? { goods_product_type_label: typeLabel } : {}),
+    }
+  }, [cat1, cat2, cat3, productType, productTypes, l1Options, l2Options, l3Options])
+
+  const postAssistWithKeys = useCallback(
+    async (body: Omit<AiAssistRequest, 'model'>) => {
+      const model = resolveModelForAssistAction(body.action) as AiModelId
+      const lock = lockedAiGoodsContext
+      const r = await postDouyinGoodsAiAssist({ ...body, model, ...(lock ?? {}) })
+      if (r.ok || !r.needVendorKey) return r
+      return {
+        ok: false as const,
+        message: `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`,
+      }
+    },
+    [lockedAiGoodsContext],
   )
 
-  useEffect(() => {
-    setComboGroups((rows) => {
-      let changed = false
-      const next = rows.map((g) => {
-        const pr = normalizePickRule(g.pickRule, g.items.length)
-        if (pr !== g.pickRule) {
-          changed = true
-          return { ...g, pickRule: pr }
-        }
-        return g
-      })
-      return changed ? next : rows
-    })
-  }, [comboSanitizeSig])
-
-  useEffect(() => {
-    return () => {
-      for (const t of comboSearchTimers.current.values()) window.clearTimeout(t)
-      comboSearchTimers.current.clear()
-    }
-  }, [])
-
-  const comboRowKey = (groupId: string, itemId: string) => `${groupId}:${itemId}`
-
-  const scheduleComboItemOnlineSearch = useCallback((groupId: string, itemId: string, keyword: string) => {
-    const key = comboRowKey(groupId, itemId)
-    const prevT = comboSearchTimers.current.get(key)
-    if (prevT) window.clearTimeout(prevT)
-    const t = window.setTimeout(() => {
-      comboSearchTimers.current.delete(key)
-      void (async () => {
-        const q = keyword.trim()
-        if (q.length < 1) {
-          setComboMatch((m) => ({ ...m, [key]: { open: false, loading: false, hits: [] } }))
-          return
-        }
-        setComboMatch((m) => ({
-          ...m,
-          [key]: { open: true, loading: true, hits: m[key]?.hits ?? [], err: undefined },
-        }))
-        const r = await getDouyinGoodsProductOnlineQuery({ product_name: q, count: 10 })
-        if (!r.ok) {
-          setComboMatch((m) => ({ ...m, [key]: { open: false, loading: false, hits: [], err: r.message } }))
-          return
-        }
-        setComboMatch((m) => ({
-          ...m,
-          [key]: {
-            open: r.hits.length > 0,
-            loading: false,
-            hits: r.hits,
-            err: r.hits.length
-              ? undefined
-              : '未命中：已按抖音 online.query 尝试自研/服务商口径及商家与服务商创建来源；若账号下确无已审核上架商品，接口本身也会为空，可直接手填名称继续保存',
-          },
-        }))
-      })()
-    }, 450)
-    comboSearchTimers.current.set(key, t)
-  }, [])
-
-  const applyComboOnlineHit = useCallback((groupId: string, itemId: string, hit: DouyinOnlineProductHit) => {
-    const key = comboRowKey(groupId, itemId)
-    setComboMatch((m) => ({ ...m, [key]: { open: false, loading: false, hits: [], err: undefined } }))
-    setComboGroups((rows) =>
-      rows.map((r) =>
-        r.id !== groupId
-          ? r
-          : {
-              ...r,
-              items: r.items.map((x) =>
-                x.id !== itemId
-                  ? x
-                  : {
-                      ...x,
-                      name: hit.product_name,
-                      price:
-                        hit.price_yuan != null && Number.isFinite(hit.price_yuan)
-                          ? String(hit.price_yuan)
-                          : x.price,
-                      product_id: hit.product_id,
-                      sku_id: hit.sku_id,
-                    },
-              ),
-            },
-      ),
+  const previewComboLines = useMemo(() => {
+    if (productType !== 1) return [] as { name: string; qty: string; price: string }[]
+    const fromUi = comboGroups.flatMap((g) =>
+      g.items
+        .filter((it) => it.name.trim())
+        .map((it) => ({
+          name: it.name.trim(),
+          qty: String(it.qty || '1'),
+          price: String(it.price || ''),
+        })),
     )
-  }, [])
+    if (fromUi.length > 0) return fromUi
+    const n = productName.trim()
+    if (!n) return []
+    const py = Number.parseFloat(originYuan) || Number.parseFloat(priceYuan) || 0
+    return [{ name: n, qty: '1', price: Number.isFinite(py) && py > 0 ? String(py) : '' }]
+  }, [productType, comboGroups, productName, originYuan, priceYuan])
 
   useEffect(() => {
     let cancelled = false
@@ -674,21 +599,7 @@ export default function DouyinProductCreateWizard({
       setReserveMode(d.reserve_mode)
       setReserveAdvance(String(d.reserve_advance_value))
       setReserveUnit(d.reserve_advance_unit)
-      if (productType === 1) {
-        setComboGroups((prev) =>
-          prev.length > 0
-            ? prev
-            : [
-                {
-                  id: newId('g'),
-                  pickRule: '全部必选',
-                  items: [{ id: newId('i'), name: '', qty: '1', price: '' }],
-                },
-              ],
-        )
-      } else {
-        setComboGroups([])
-      }
+      setComboGroups([])
       setStep('detail')
       setActionMsg(null)
     } catch (e) {
@@ -996,22 +907,41 @@ export default function DouyinProductCreateWizard({
     const head = headUrl.trim() ? [headUrl.trim()] : []
     const aux = auxUrlsList.filter(Boolean).slice(0, 4)
     const env = envUrlsList.filter(Boolean).slice(0, 10)
+    const originNum = Number.parseFloat(originYuan) || 0
     const package_combo =
       productType === 1
-        ? {
-            groups: comboGroups.map((g) => ({
-              pick_rule: g.pickRule.trim() || '全部必选',
-              items: g.items
-                .filter((it) => it.name.trim())
-                .map((it) => ({
-                  name: it.name.trim(),
-                  quantity: Math.max(1, Number.parseInt(it.qty, 10) || 1),
-                  origin_price_yuan: Math.max(0, Number.parseFloat(it.price) || 0),
-                  ...(it.product_id ? { product_id: it.product_id } : {}),
-                  ...(it.sku_id ? { sku_id: it.sku_id } : {}),
-                })),
-            })),
-          }
+        ? (() => {
+            const groupsFromUi = comboGroups
+              .map((g) => ({
+                pick_rule: g.pickRule.trim() || '全部必选',
+                items: g.items
+                  .filter((it) => it.name.trim())
+                  .map((it) => ({
+                    name: it.name.trim(),
+                    quantity: Math.max(1, Number.parseInt(it.qty, 10) || 1),
+                    origin_price_yuan: Math.max(0, Number.parseFloat(it.price) || 0),
+                    ...(it.product_id ? { product_id: it.product_id } : {}),
+                    ...(it.sku_id ? { sku_id: it.sku_id } : {}),
+                  })),
+              }))
+              .filter((g) => g.items.length > 0)
+            if (groupsFromUi.length > 0) return { groups: groupsFromUi }
+            const nm = productName.trim().slice(0, 120) || '团购套餐'
+            return {
+              groups: [
+                {
+                  pick_rule: '全部必选',
+                  items: [
+                    {
+                      name: nm,
+                      quantity: 1,
+                      origin_price_yuan: Math.max(0, originNum || price),
+                    },
+                  ],
+                },
+              ],
+            }
+          })()
         : undefined
     const extOut = externalGoodsId.trim()
     let stable = (stableOutIdRef.current ?? '').trim()
@@ -1082,18 +1012,6 @@ export default function DouyinProductCreateWizard({
   }
 
   const handleSave = async (mode: 'draft' | 'submit') => {
-    if (productType === 1) {
-      for (const g of comboGroups) {
-        const okItems = g.items.filter((it) => it.name.trim() && (Number.parseInt(it.qty, 10) || 0) > 0)
-        if (okItems.length === 0) {
-          setActionMsg({
-            text: '团购商品搭配：每个商品组至少添加 1 个单品并填写名称与数量',
-            ok: false,
-          })
-          return
-        }
-      }
-    }
     const detail = buildDetailPayload()
     if (!detail) {
       setActionMsg({ text: '请完善必填：商品名称、售价、商品头图（上传）', ok: false })
@@ -1480,7 +1398,7 @@ export default function DouyinProductCreateWizard({
               <section className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">目前绑定的 AI 模型</h3>
                 <p className="mt-1 text-xs text-gray-600">
-                  下方为当前目录中的模型（logo + 名称）。开关与下拉仍可按「自动 / 指定」分别设置<strong className="font-medium text-gray-700"> 文案</strong>与
+                  下方为当前目录中的模型（logo + 名称）。开关与下拉可按「自动 / 指定」分别设置<strong className="font-medium text-gray-700"> 文案</strong>与
                   <strong className="font-medium text-gray-700"> 生图</strong>；当前生效：文案{' '}
                   <span className="font-medium text-gray-800">{selectedTextAiLabel}</span>，生图{' '}
                   <span className="font-medium text-gray-800">{selectedImageAiLabel}</span>。
@@ -1546,316 +1464,6 @@ export default function DouyinProductCreateWizard({
                     />
                     <p className="mt-1 text-xs text-gray-500">{productName.length} / 40</p>
                   </div>
-
-                  {productType === 1 && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <label className="text-sm font-semibold text-gray-900">
-                          商品搭配 <span className="text-red-500">*</span>
-                        </label>
-                        <span className="text-xs text-blue-700">查看示例：按组配置单品、数量与原价</span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-600">
-                        随团购套餐一并提交至抖音来客。单品名称支持调用「
-                        <a
-                          className="text-blue-600 underline"
-                          href="https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/online.query"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          查询商品线上数据列表
-                        </a>
-                        」模糊匹配已上线商品；右上角「几选几」随组内单品行数自动生成（如 3选2）。
-                      </p>
-                      <div className="mt-3 space-y-4">
-                        {comboGroups.map((g, gi) => (
-                          <div
-                            key={g.id}
-                            className="group rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-all duration-200 hover:border-transparent hover:bg-gradient-to-r hover:from-indigo-500 hover:to-indigo-600 hover:shadow-md"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2 group-hover:border-white/20">
-                              <span className="text-sm font-medium text-gray-800 group-hover:text-white">
-                                商品组 {gi + 1}
-                              </span>
-                              <select
-                                title="可选数量规则随当前组单品行数变化"
-                                value={g.pickRule}
-                                onChange={(e) =>
-                                  setComboGroups((rows) =>
-                                    rows.map((r) =>
-                                      r.id === g.id ? { ...r, pickRule: e.target.value } : r,
-                                    ),
-                                  )
-                                }
-                                className="max-w-[220px] rounded border border-gray-300 px-2 py-1 text-xs group-hover:border-white/40 group-hover:bg-white/10 group-hover:text-white"
-                              >
-                                {buildComboPickRuleSelectOptions(g.items.length).map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="mt-2 space-y-2">
-                              {g.items.map((it) => (
-                                <div
-                                  key={it.id}
-                                  className="flex flex-col gap-1 rounded border border-dashed border-gray-200 p-2 group-hover:border-white/30"
-                                >
-                                  <div className="flex flex-wrap items-start gap-2">
-                                    <div className="relative min-w-[140px] flex-1">
-                                    <label className="text-[10px] text-gray-500 group-hover:text-white/80">
-                                      单品名称（线上匹配）
-                                    </label>
-                                    <div className="mt-0.5 flex gap-1">
-                                      <input
-                                        value={it.name}
-                                        onChange={(e) => {
-                                          const v = e.target.value
-                                          setComboGroups((rows) =>
-                                            rows.map((r) =>
-                                              r.id === g.id
-                                                ? {
-                                                    ...r,
-                                                    items: r.items.map((x) =>
-                                                      x.id === it.id
-                                                        ? {
-                                                            ...x,
-                                                            name: v,
-                                                            product_id: undefined,
-                                                            sku_id: undefined,
-                                                          }
-                                                        : x,
-                                                    ),
-                                                  }
-                                                : r,
-                                            ),
-                                          )
-                                          scheduleComboItemOnlineSearch(g.id, it.id, v)
-                                        }}
-                                        placeholder="输入名称，自动搜线上商品"
-                                        className="w-full min-w-0 rounded border border-gray-300 px-2 py-1 text-xs group-hover:border-white/40 group-hover:bg-white/10 group-hover:text-white group-hover:placeholder:text-white/60"
-                                      />
-                                      <button
-                                        type="button"
-                                        title="立即搜索抖音线上商品"
-                                        className="mt-0.5 shrink-0 rounded border border-gray-300 p-1 text-gray-600 hover:bg-gray-50 group-hover:border-white/40 group-hover:text-white"
-                                        onClick={() => {
-                                          const q = it.name.trim()
-                                          if (q.length < 1) {
-                                            window.alert('请先输入单品名称再搜索')
-                                            return
-                                          }
-                                          const key = comboRowKey(g.id, it.id)
-                                          setComboMatch((m) => ({
-                                            ...m,
-                                            [key]: { open: true, loading: true, hits: [], err: undefined },
-                                          }))
-                                          void (async () => {
-                                            const r = await getDouyinGoodsProductOnlineQuery({
-                                              product_name: q,
-                                              count: 10,
-                                            })
-                                            if (!r.ok) {
-                                              setComboMatch((m) => ({
-                                                ...m,
-                                                [key]: { open: false, loading: false, hits: [], err: r.message },
-                                              }))
-                                              return
-                                            }
-                                            setComboMatch((m) => ({
-                                              ...m,
-                                              [key]: {
-                                                open: r.hits.length > 0,
-                                                loading: false,
-                                                hits: r.hits,
-                                                err: r.hits.length
-                                                  ? undefined
-                                                  : '未命中：已按 online.query 多策略检索；无上架商品时为空属正常，可手填名称',
-                                              },
-                                            }))
-                                          })()
-                                        }}
-                                      >
-                                        <Search className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                    {comboMatch[comboRowKey(g.id, it.id)]?.open &&
-                                    (comboMatch[comboRowKey(g.id, it.id)]?.hits.length ?? 0) > 0 ? (
-                                      <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-auto rounded-md border border-gray-200 bg-white text-xs shadow-lg">
-                                        {(comboMatch[comboRowKey(g.id, it.id)]?.hits ?? []).map((h) => (
-                                          <li key={`${h.product_id}-${h.sku_id ?? ''}`} className="border-b border-gray-50 last:border-0">
-                                            <button
-                                              type="button"
-                                              className="w-full px-2 py-2 text-left hover:bg-indigo-50"
-                                              onClick={() => applyComboOnlineHit(g.id, it.id, h)}
-                                            >
-                                              <div className="font-medium text-gray-900">{h.product_name}</div>
-                                              <div className="text-[10px] text-gray-500">
-                                                {h.source === 'draft'
-                                                  ? '草稿 '
-                                                  : h.source === 'local'
-                                                    ? '本店已存 '
-                                                    : '已上线 '}
-                                                {h.price_yuan != null ? `参考价 ¥${h.price_yuan}` : ''}
-                                                {h.sku_id ? ` · sku ${h.sku_id}` : ''}
-                                              </div>
-                                            </button>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                    </div>
-                                  <div className="w-16 shrink-0">
-                                    <label className="text-[10px] text-gray-500 group-hover:text-white/80">
-                                      数量
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      value={it.qty}
-                                      onChange={(e) =>
-                                        setComboGroups((rows) =>
-                                          rows.map((r) =>
-                                            r.id === g.id
-                                              ? {
-                                                  ...r,
-                                                  items: r.items.map((x) =>
-                                                    x.id === it.id ? { ...x, qty: e.target.value } : x,
-                                                  ),
-                                                }
-                                              : r,
-                                          ),
-                                        )
-                                      }
-                                      className="mt-0.5 w-full rounded border border-gray-300 px-1 py-1 text-xs group-hover:border-white/40 group-hover:bg-white/10 group-hover:text-white"
-                                    />
-                                  </div>
-                                  <div className="w-24 shrink-0">
-                                    <label className="text-[10px] text-gray-500 group-hover:text-white/80">
-                                      原价(元)
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      step="0.01"
-                                      value={it.price}
-                                      onChange={(e) =>
-                                        setComboGroups((rows) =>
-                                          rows.map((r) =>
-                                            r.id === g.id
-                                              ? {
-                                                  ...r,
-                                                  items: r.items.map((x) =>
-                                                    x.id === it.id ? { ...x, price: e.target.value } : x,
-                                                  ),
-                                                }
-                                              : r,
-                                          ),
-                                        )
-                                      }
-                                      className="mt-0.5 w-full rounded border border-gray-300 px-1 py-1 text-xs group-hover:border-white/40 group-hover:bg-white/10 group-hover:text-white"
-                                    />
-                                  </div>
-                                  </div>
-                                  <div className="min-h-[14px] space-y-0.5 text-[10px] leading-snug">
-                                    {it.product_id ? (
-                                      <p className="text-emerald-700 group-hover:text-emerald-100">
-                                        已关联线上 product_id
-                                      </p>
-                                    ) : null}
-                                    {comboMatch[comboRowKey(g.id, it.id)]?.err ? (
-                                      <p className="text-rose-600 group-hover:text-amber-100">
-                                        {comboMatch[comboRowKey(g.id, it.id)]?.err}
-                                      </p>
-                                    ) : null}
-                                    {comboMatch[comboRowKey(g.id, it.id)]?.loading ? (
-                                      <p className="text-gray-500 group-hover:text-white/80">匹配中…</p>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ))}
-                              <button
-                                type="button"
-                                className="text-xs font-medium text-blue-600 group-hover:text-white"
-                                onClick={() =>
-                                  setComboGroups((rows) =>
-                                    rows.map((r) => {
-                                      if (r.id !== g.id) return r
-                                      const nextItems = [
-                                        ...r.items,
-                                        { id: newId('i'), name: '', qty: '1', price: '' },
-                                      ]
-                                      return {
-                                        ...r,
-                                        items: nextItems,
-                                        pickRule: normalizePickRule(r.pickRule, nextItems.length),
-                                      }
-                                    }),
-                                  )
-                                }
-                              >
-                                + 添加单品
-                              </button>
-                            </div>
-                            <div className="mt-2 flex flex-wrap justify-end gap-2 text-xs">
-                              <button
-                                type="button"
-                                className="text-blue-600 group-hover:text-white"
-                                disabled={gi === 0}
-                                onClick={() =>
-                                  setComboGroups((rows) => {
-                                    const next = [...rows]
-                                    ;[next[gi - 1], next[gi]] = [next[gi], next[gi - 1]]
-                                    return next
-                                  })
-                                }
-                              >
-                                上移
-                              </button>
-                              <button
-                                type="button"
-                                className="text-blue-600 group-hover:text-white"
-                                disabled={gi >= comboGroups.length - 1}
-                                onClick={() =>
-                                  setComboGroups((rows) => {
-                                    const next = [...rows]
-                                    ;[next[gi], next[gi + 1]] = [next[gi + 1], next[gi]]
-                                    return next
-                                  })
-                                }
-                              >
-                                下移
-                              </button>
-                              <button
-                                type="button"
-                                className="text-rose-600 group-hover:text-amber-200"
-                                onClick={() => setComboGroups((rows) => rows.filter((r) => r.id !== g.id))}
-                              >
-                                删除组
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
-                          onClick={() =>
-                            setComboGroups((rows) => [
-                              ...rows,
-                              {
-                                id: newId('g'),
-                                pickRule: '全部必选',
-                                items: [{ id: newId('i'), name: '', qty: '1', price: '' }],
-                              },
-                            ])
-                          }
-                        >
-                          + 添加商品组
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   <div>
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2643,24 +2251,18 @@ export default function DouyinProductCreateWizard({
                       <span className="rounded bg-gray-100 px-1.5 py-0.5">过期自动退</span>
                       <span className="rounded bg-gray-100 px-1.5 py-0.5">免预约</span>
                     </div>
-                    {productType === 1 && comboGroups.some((g) => g.items.some((it) => it.name.trim())) ? (
+                    {productType === 1 && previewComboLines.length > 0 ? (
                       <div className="border-t border-gray-100 pt-2">
                         <p className="text-xs font-semibold text-gray-800">团购详情</p>
                         <ul className="mt-1 space-y-1 text-[11px] text-gray-700">
-                          {comboGroups.flatMap((g) =>
-                            g.items
-                              .filter((it) => it.name.trim())
-                              .map((it) => (
-                                <li key={it.id} className="flex justify-between gap-2">
-                                  <span className="truncate">
-                                    {it.name}（{it.qty || 1} 份）
-                                  </span>
-                                  <span className="shrink-0 text-gray-500">
-                                    ¥{it.price || '0'}
-                                  </span>
-                                </li>
-                              )),
-                          )}
+                          {previewComboLines.map((it, idx) => (
+                            <li key={`${it.name}-${idx}`} className="flex justify-between gap-2">
+                              <span className="truncate">
+                                {it.name}（{it.qty || 1} 份）
+                              </span>
+                              <span className="shrink-0 text-gray-500">¥{it.price || '0'}</span>
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     ) : null}
@@ -2753,19 +2355,15 @@ export default function DouyinProductCreateWizard({
                     <p className="line-clamp-2 text-[11px] font-bold leading-tight text-gray-900">
                       {productName.trim() || '商品名称'}
                     </p>
-                    {productType === 1 && comboGroups.some((g) => g.items.some((it) => it.name.trim())) ? (
+                    {productType === 1 && previewComboLines.length > 0 ? (
                       <div>
                         <p className="text-[10px] font-semibold text-gray-800">团购详情</p>
                         <ul className="text-[9px] text-gray-700">
-                          {comboGroups.flatMap((g) =>
-                            g.items
-                              .filter((it) => it.name.trim())
-                              .map((it) => (
-                                <li key={`f-${it.id}`}>
-                                  {it.name} ×{it.qty || 1} ¥{it.price || '0'}
-                                </li>
-                              )),
-                          )}
+                          {previewComboLines.map((it, idx) => (
+                            <li key={`f-${it.name}-${idx}`}>
+                              {it.name} ×{it.qty || 1} ¥{it.price || '0'}
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     ) : null}

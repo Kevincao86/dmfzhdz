@@ -1916,7 +1916,24 @@ async function buildGoodlifeProductSaveBody(
   const nowMs = Date.now()
   const oneYearMs = nowMs + 366 * 86400000
 
-  const comboRule = buildDouyinProductComboRule(erp, product_name)
+  let comboRule = buildDouyinProductComboRule(erp, product_name)
+  if (product_type === 1 && !comboRule) {
+    const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
+    comboRule = {
+      groups: [
+        {
+          pick_rule: '全部必选',
+          items: [
+            {
+              name: product_name.slice(0, 120) || '团购套餐',
+              quantity: 1,
+              ...(Number.isFinite(oy) && oy > 0 ? { origin_price_yuan: oy } : {}),
+            },
+          ],
+        },
+      ],
+    }
+  }
 
   const product: Record<string, unknown> = {
     product_name,
