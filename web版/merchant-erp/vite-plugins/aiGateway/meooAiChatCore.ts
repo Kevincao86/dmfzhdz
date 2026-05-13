@@ -34,9 +34,10 @@ export async function runMeooAiChatCore(
     return { status: 400, body: { ok: false, error: 'invalid_provider' } }
   }
 
+  const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const req: AIChatRequest = {
     provider,
-    model: parsed.model,
+    model: rawModel ? rawModel : undefined,
     messages: mergeSystemPrompt(parsed.messages),
     temperature: parsed.temperature,
     stream: false,

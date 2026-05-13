@@ -27,24 +27,29 @@ export async function chatAnthropic(req: AIChatRequest, env: Record<string, stri
   }
 
   const client = new Anthropic({ apiKey })
-  const res = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    system: systemParts.length ? systemParts.join('\n\n') : undefined,
-    messages: msgs,
-    temperature: req.temperature ?? 0.6,
-  })
+  try {
+    const res = await client.messages.create({
+      model,
+      max_tokens: 4096,
+      system: systemParts.length ? systemParts.join('\n\n') : undefined,
+      messages: msgs,
+      temperature: req.temperature ?? 0.6,
+    })
 
-  let text = ''
-  for (const b of res.content) {
-    if (b.type === 'text') text += b.text
-  }
+    let text = ''
+    for (const b of res.content) {
+      if (b.type === 'text') text += b.text
+    }
 
-  return {
-    provider: 'anthropic',
-    model: res.model,
-    content: text,
-    raw: res as unknown as Record<string, unknown>,
-    usage: res.usage as unknown as Record<string, unknown>,
+    return {
+      provider: 'anthropic',
+      model: res.model,
+      content: text,
+      raw: res as unknown as Record<string, unknown>,
+      usage: res.usage as unknown as Record<string, unknown>,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`Anthropic: ${msg}`)
   }
 }
