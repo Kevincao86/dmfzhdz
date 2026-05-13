@@ -13,7 +13,13 @@ export default defineConfig(({ mode }) => {
   const adminOrigin =
     (env.VITE_MERCHANT_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:5174'
 
+  const vercelSha = (process.env.VERCEL_GIT_COMMIT_SHA ?? '').trim()
+
   return {
+    define: {
+      /** 生产构建写入，便于核对域名/CDN 是否仍缓存旧包（见「抖音来客 · 创建商品」页脚） */
+      __ERP_BUILD_REF__: JSON.stringify(vercelSha ? vercelSha.slice(0, 7) : ''),
+    },
     plugins: [
       react(),
       tailwindcss(),

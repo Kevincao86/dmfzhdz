@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** Vite `define`：Vercel 构建时为 7 位 commit，本地 dev 多为空串 */
+declare const __ERP_BUILD_REF__: string
+
 interface ImportMetaEnv {
   /** 商家管理后台源地址：dev 客服转发；线上用于 ERP 拉取 /api/ops-sync/*（注册表）跨域请求 */
   readonly VITE_MERCHANT_ADMIN_ORIGIN?: string
