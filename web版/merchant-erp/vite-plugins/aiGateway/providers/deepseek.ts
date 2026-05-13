@@ -42,9 +42,10 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
     throw new Error(rawText.slice(0, 400) || `DeepSeek HTTP ${r.status}`)
   }
   if (!r.ok) {
-    const msg = typeof raw.error === 'object' && raw.error && typeof (raw.error as { message?: string }).message === 'string'
-      ? (raw.error as { message: string }).message
-      : rawText.slice(0, 400)
+    const msg =
+      typeof raw.error === 'object' && raw.error && typeof (raw.error as { message?: string }).message === 'string'
+        ? (raw.error as { message: string }).message
+        : rawText.slice(0, 400)
     throw new Error(msg || `DeepSeek HTTP ${r.status}`)
   }
   const choices = raw.choices as Array<{ message?: { content?: string } }> | undefined

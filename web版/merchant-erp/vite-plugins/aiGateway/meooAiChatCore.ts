@@ -1,9 +1,16 @@
 import type { AIChatRequest, AIProvider } from '../../src/services/ai/types.js'
-import { mergeSystemPrompt, logAiChatServerLine, forwardAuditToMerchantAdmin, buildAuditPayload } from './auditLog.js'
+import { normalizeAiModelFamily } from '../../src/services/ai/tokenmixClient.js'
+import {
+  mergeSystemPrompt,
+  logAiChatServerLine,
+  forwardAuditToMerchantAdmin,
+  buildAuditPayload,
+  summarizeText,
+} from './auditLog.js'
 import { verifyBearerJwt } from './authSupabase.js'
 import { routeAiChat } from './chatRouter.js'
 
-const ALLOWED = new Set<string>(['openai', 'anthropic', 'xai', 'deepseek', 'kimi', 'minimax'])
+const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax'])
 
 export async function runMeooAiChatCore(
   bodyRaw: string,
@@ -28,26 +35,33 @@ export async function runMeooAiChatCore(
     return { status: 401, body: { ok: false, error: 'unauthorized' } }
   }
 
-  const defProvider = (env.DEFAULT_AI_PROVIDER ?? 'openai').trim() as AIProvider
+  const defProvider = (env.DEFAULT_AI_PROVIDER ?? 'tokenmix').trim() as AIProvider
   const provider = (parsed.provider ?? defProvider) as AIProvider
   if (!ALLOWED.has(provider)) {
     return { status: 400, body: { ok: false, error: 'invalid_provider' } }
   }
 
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
+  const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined
+
   const req: AIChatRequest = {
     provider,
     model: rawModel ? rawModel : undefined,
+    ...(provider === 'tokenmix' ? { modelFamily } : {}),
     messages: mergeSystemPrompt(parsed.messages),
     temperature: parsed.temperature,
     stream: false,
     taskType: parsed.taskType,
   }
 
+  const lastUser = [...req.messages].reverse().find((m) => m.role === 'user')
   logAiChatServerLine({
     phase: 'request',
     userId: user.id,
     provider: req.provider,
+    modelFamily: req.modelFamily ?? null,
+    model: req.model ?? null,
+    inputSummary: summarizeText(lastUser?.content ?? ''),
     taskType: req.taskType ?? null,
   })
 
@@ -62,7 +76,10 @@ export async function runMeooAiChatCore(
       phase: 'response',
       userId: user.id,
       provider: res.provider,
+      modelFamily: req.modelFamily ?? null,
       model: res.model,
+      outputSummary: summarizeText(res.content),
+      tokenUsage: res.usage ?? null,
       status: 'ok',
     })
     return { status: 200, body: okBody as unknown as Record<string, unknown> }
@@ -81,6 +98,9 @@ export async function runMeooAiChatCore(
       phase: 'error',
       userId: user.id,
       provider: req.provider,
+      modelFamily: req.modelFamily ?? null,
+      model: req.model ?? null,
+      inputSummary: summarizeText(lastUser?.content ?? ''),
       status: 'error',
       detail: msg.slice(0, 500),
     })

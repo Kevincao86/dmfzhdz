@@ -66,9 +66,11 @@ export function buildAuditPayload(parts: {
     userLabel: parts.user.email ?? parts.user.id,
     taskType: parts.req.taskType ?? null,
     provider: parts.req.provider,
+    modelFamily: parts.req.provider === 'tokenmix' ? (parts.req.modelFamily ?? null) : null,
     model: parts.res?.model ?? parts.req.model ?? null,
     inputSummary: summarizeText(lastUser?.content ?? ''),
     outputSummary: parts.res ? summarizeText(parts.res.content) : '',
+    tokenUsage: parts.res?.usage ?? null,
     executionStatus: parts.status,
     error: parts.error ?? null,
   }

@@ -68,7 +68,7 @@ export default function AiAgentPage() {
         />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-3 py-2.5 sm:px-4">
           <p className="hidden min-w-0 flex-1 text-[11px] text-slate-400 sm:block">
-            模型由运营在服务端配置；此处仅选择厂商与模型名。
+            OpenAI/Claude/Gemini/Grok 经 TokenMix；DeepSeek、Kimi、MiniMax 直连；Key 在服务端配置。
           </p>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <div className="relative">
@@ -153,7 +153,7 @@ export default function AiAgentPage() {
             <p className="font-medium text-slate-800">店魔方 AI 智能体</p>
             <p className="mt-1 leading-relaxed">
               对话经同源网关 <span className="font-mono text-xs text-slate-500">/api/meoo-ai-chat</span>{' '}
-              转发至所选厂商；API Key 仅保存在服务端环境变量，不会出现在浏览器。
+              转发（四大家族群走 TokenMix，DeepSeek/Kimi/MiniMax 直连）；API Key 仅保存在服务端环境变量。
             </p>
             <ul className="mt-3 space-y-1.5 text-xs text-slate-500">
               <li className="flex items-center gap-1.5">
