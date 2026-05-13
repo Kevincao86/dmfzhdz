@@ -1,13 +1,10 @@
-import { Bot, CalendarDays, ChevronDown, ChevronRight, FileText, Sparkles } from 'lucide-react'
+import { Bot, CalendarDays, ChevronDown, ChevronRight, FileText, MessageSquarePlus, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AiAgentComposerBar } from '../components/AiAgentComposerBar'
 import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
 import { useAiAgent } from '../context/AiAgentContext'
 import { AI_AGENT_SHORTCUTS } from '../lib/aiAgentTypes'
 import { cn } from '../cn'
-
-const FOOT_HINT =
-  '选好助手风格后，直接输入您的问题即可；需要改商品、发消息等操作时，我们会先给您看说明，由您确认后再继续。'
 
 const INFO_COPY = {
   title: '店魔方 AI 助手',
@@ -16,7 +13,7 @@ const INFO_COPY = {
 }
 
 /**
- * 智能体主页：未对话时居中输入（Codex 空态）；有用户发言后上方为对话区，底部为固定输入条。
+ * 智能体主页：未对话时居中输入（Codex 空态）；有用户发言后左侧历史 + 上方对话区 + 底部固定输入条。
  */
 export default function AiAgentPage() {
   const {
@@ -28,6 +25,10 @@ export default function AiAgentPage() {
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
+    archivedSessions,
+    startNewChat,
+    resumeArchivedSession,
+    sidebarActiveArchiveId,
   } = useAiAgent()
 
   const hasChat = useMemo(() => messages.some((m) => m.role === 'user'), [messages])
@@ -46,7 +47,7 @@ export default function AiAgentPage() {
     <div
       className={cn(
         hasChat
-          ? 'flex h-[calc(100dvh-7.5rem)] max-h-[calc(100dvh-7.5rem)] flex-col -mx-6 -mb-6 lg:-mx-8'
+          ? 'flex h-[calc(100dvh-7.5rem)] max-h-[calc(100dvh-7.5rem)] w-full min-h-0 flex-1 flex-col gap-0 -mx-6 -mb-6 lg:-mx-8 lg:flex-row'
           : 'mx-auto flex min-h-[calc(100vh-8rem)] max-w-2xl flex-col px-4 py-8 sm:py-12',
       )}
     >
@@ -73,7 +74,7 @@ export default function AiAgentPage() {
           </div>
 
           <div className="rounded-3xl border border-slate-200/90 bg-white shadow-sm shadow-slate-900/5 ring-1 ring-slate-100">
-            <AiAgentComposerBar layout="centered" footHint={FOOT_HINT} />
+            <AiAgentComposerBar layout="centered" />
           </div>
 
           <div className="mt-4">
@@ -133,46 +134,97 @@ export default function AiAgentPage() {
         </>
       ) : (
         <>
-          <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-5">
-            {messages.map((m) => (
-              <div key={m.id}>
-                <AiAgentMessageBubble m={m} />
-                {m.role === 'task_preview' && m.id === pendingPreviewId ? (
-                  <div className="mt-3 flex flex-wrap gap-2 border-t border-violet-100 pt-3">
-                    <button
-                      type="button"
-                      onClick={confirmPendingTask}
-                      className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110"
-                    >
-                      确认执行
-                    </button>
-                    <button
-                      type="button"
-                      onClick={modifyPendingTask}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      修改方案
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelPendingTask}
-                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
-                    >
-                      取消
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-
-          <div className="shrink-0 border-t border-slate-200/90 bg-white/95 px-2 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-4">
-            <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-              <AiAgentComposerBar layout="dock" />
+          <aside className="flex shrink-0 flex-col border-b border-slate-200/90 bg-gradient-to-b from-slate-50 to-white lg:w-[12rem] lg:border-b-0 lg:border-r lg:border-slate-200/90">
+            <div className="p-2 lg:p-3">
+              <button
+                type="button"
+                disabled={aiSending}
+                onClick={() => startNewChat()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white px-2 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50/60 hover:text-indigo-900 disabled:cursor-not-allowed disabled:opacity-50 lg:justify-start lg:px-3"
+              >
+                <MessageSquarePlus className="h-4 w-4 shrink-0 text-indigo-600" aria-hidden />
+                <span className="truncate">返回新建对话</span>
+              </button>
             </div>
-            <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-slate-400">
-              涉及创建、修改、删除、发布等操作前将展示预览并由您确认
-            </p>
+
+            <div className="min-h-0 flex-1 border-t border-slate-200/70 lg:border-t-0">
+              <p className="hidden px-3 pt-2 text-[10px] font-medium uppercase tracking-wider text-slate-400 lg:block">
+                本次对话
+              </p>
+              {archivedSessions.length === 0 ? (
+                <p className="hidden px-3 py-2 text-[11px] leading-snug text-slate-400 lg:block">
+                  开始新对话时，当前主题会自动存档，最多保留 10 条。
+                </p>
+              ) : (
+                <div className="flex gap-1.5 overflow-x-auto px-2 py-2 lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:px-2 lg:pb-3">
+                  {archivedSessions.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={aiSending}
+                      onClick={() => resumeArchivedSession(s.id)}
+                      title={s.title}
+                      className={cn(
+                        'shrink-0 rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-medium transition lg:w-full lg:truncate',
+                        sidebarActiveArchiveId === s.id
+                          ? 'border-indigo-300 bg-indigo-50 text-indigo-900'
+                          : 'border-transparent bg-slate-100/90 text-slate-600 hover:border-slate-200 hover:bg-white',
+                        aiSending && 'cursor-not-allowed opacity-50',
+                      )}
+                    >
+                      <span className="line-clamp-2 lg:line-clamp-3">{s.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div
+              ref={scrollRef}
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pt-2 pb-2 sm:space-y-4 sm:px-5 sm:pt-2 sm:pb-3"
+            >
+              {messages.map((m) => (
+                <div key={m.id}>
+                  <AiAgentMessageBubble m={m} />
+                  {m.role === 'task_preview' && m.id === pendingPreviewId ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-violet-100 pt-3">
+                      <button
+                        type="button"
+                        onClick={confirmPendingTask}
+                        className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110"
+                      >
+                        确认执行
+                      </button>
+                      <button
+                        type="button"
+                        onClick={modifyPendingTask}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        修改方案
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelPendingTask}
+                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+
+            <div className="shrink-0 border-t border-slate-200/90 bg-white/95 px-2 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-4">
+              <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+                <AiAgentComposerBar layout="dock" />
+              </div>
+              <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-slate-400">
+                涉及创建、修改、删除、发布等操作前将展示预览并由您确认
+              </p>
+            </div>
           </div>
         </>
       )}

@@ -14,14 +14,7 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
-export function AiAgentComposerBar({
-  layout,
-  /** 居中模式下的辅助说明（客户可读） */
-  footHint,
-}: {
-  layout: Layout
-  footHint?: string
-}) {
+export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const {
     inputDraft,
     setInputDraft,
@@ -134,20 +127,9 @@ export function AiAgentComposerBar({
 
       <div
         className={cn(
-          'flex gap-2',
-          layout === 'centered' ? 'rounded-t-3xl px-2 pt-2 sm:px-3' : 'items-end px-1',
+          layout === 'centered' ? 'rounded-t-3xl px-2 pt-2 sm:px-3' : 'px-1 pt-1',
         )}
       >
-        <button
-          type="button"
-          disabled={disabled || aiSending || pendingComposerImages.length >= 4}
-          onClick={() => fileRef.current?.click()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
-          title="上传截图（最多 4 张）"
-          aria-label="上传图片"
-        >
-          <ImagePlus className="h-4 w-4" />
-        </button>
         <textarea
           value={inputDraft}
           onChange={(e) => setInputDraft(e.target.value)}
@@ -161,7 +143,7 @@ export function AiAgentComposerBar({
           disabled={disabled}
           placeholder="描述你想完成的任务，或输入 @ 提及页面要点…"
           className={cn(
-            'min-w-0 flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50',
+            'w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50',
             layout === 'dock' && 'max-h-40 min-h-[2.75rem]',
           )}
         />
@@ -173,12 +155,7 @@ export function AiAgentComposerBar({
           layout === 'centered' ? 'border-t px-3 pb-2.5 sm:px-4' : 'px-1 pb-1',
         )}
       >
-        {footHint && layout === 'centered' ? (
-          <p className="order-last w-full pt-1 text-[11px] leading-snug text-slate-500 sm:order-first sm:mr-auto sm:w-auto sm:flex-1 sm:pt-0">
-            {footHint}
-          </p>
-        ) : null}
-        <div className="relative min-w-0 flex-1 sm:max-w-[12rem] sm:flex-none">
+        <div className="relative min-w-0 flex-1 basis-[10rem] sm:max-w-[min(100%,14rem)]">
           <select
             aria-label="选择助手风格"
             value={modelPickerKey}
@@ -199,36 +176,49 @@ export function AiAgentComposerBar({
           </select>
           <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         </div>
-        <button
-          type="button"
-          className={cn(
-            'ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 sm:ml-0',
-            listening && 'border-indigo-300 bg-indigo-50 text-indigo-700',
-          )}
-          title={listening ? '点击停止听写' : '语音转文字'}
-          aria-label="语音输入"
-          onClick={startListening}
-        >
-          {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-        </button>
-        <button
-          type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
-          title="朗读最近一条助手回复"
-          aria-label="语音朗读"
-          onClick={speakLastReply}
-        >
-          <Volume2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => sendUserText(inputDraft)}
-          disabled={(!inputDraft.trim() && pendingComposerImages.length === 0) || aiSending || disabled}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="发送"
-        >
-          {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
+
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            className={cn(
+              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50',
+              listening && 'border-indigo-300 bg-indigo-50 text-indigo-700',
+            )}
+            title={listening ? '点击停止听写' : '语音转文字'}
+            aria-label="语音输入"
+            onClick={startListening}
+          >
+            {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+            title="朗读最近一条助手回复"
+            aria-label="语音朗读"
+            onClick={speakLastReply}
+          >
+            <Volume2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            disabled={disabled || aiSending || pendingComposerImages.length >= 4}
+            onClick={() => fileRef.current?.click()}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+            title="上传截图（最多 4 张）"
+            aria-label="上传图片"
+          >
+            <ImagePlus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => sendUserText(inputDraft)}
+            disabled={(!inputDraft.trim() && pendingComposerImages.length === 0) || aiSending || disabled}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="发送"
+          >
+            {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
     </div>
   )

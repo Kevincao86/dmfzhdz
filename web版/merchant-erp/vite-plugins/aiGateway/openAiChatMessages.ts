@@ -1,15 +1,27 @@
-import type { ChatCompletionContentPart, ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 import type { AIChatRequest } from '../../src/services/ai/types.js'
 
+/**
+ * OpenAI Chat Completions 形态（与 openai SDK 兼容），不依赖 `openai/resources/...` 子路径：
+ * Vercel 打包时深层子路径偶发解析异常会导致整条 `/api/meoo-ai-chat` 模块加载失败（全模型 500）。
+ */
+type OpenAiChatPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } }
+
+type OpenAiChatMessage =
+  | { role: 'system'; content: string }
+  | { role: 'assistant'; content: string }
+  | { role: 'user'; content: string | OpenAiChatPart[] }
+
 /** 将 AIMessage 转为 OpenAI Chat Completions 消息；若有 imageDataUrls，则合并进「最后一条 user」为多模态 */
-export function toOpenAiChatCompletionMessages(req: AIChatRequest): ChatCompletionMessageParam[] {
+export function toOpenAiChatCompletionMessages(req: AIChatRequest): OpenAiChatMessage[] {
   const imgs = (req.imageDataUrls ?? [])
     .filter((u) => typeof u === 'string' && u.startsWith('data:image/'))
     .slice(0, 4)
 
-  const rows: ChatCompletionMessageParam[] = req.messages.map((m) => {
+  const rows: OpenAiChatMessage[] = req.messages.map((m) => {
     if (m.role === 'tool') {
-      return { role: 'user', content: `[tool 输出]\n${m.content}` } satisfies ChatCompletionMessageParam
+      return { role: 'user', content: `[tool 输出]\n${m.content}` }
     }
     if (m.role === 'system') return { role: 'system', content: m.content }
     if (m.role === 'assistant') return { role: 'assistant', content: m.content }
@@ -33,7 +45,7 @@ export function toOpenAiChatCompletionMessages(req: AIChatRequest): ChatCompleti
       ? ((cur as { content: string }).content ?? '')
       : ''
 
-  const parts: ChatCompletionContentPart[] = []
+  const parts: OpenAiChatPart[] = []
   if (text.trim()) parts.push({ type: 'text', text })
   for (const url of imgs) {
     parts.push({ type: 'image_url', image_url: { url } })

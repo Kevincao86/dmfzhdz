@@ -389,12 +389,17 @@ function stableFallbackPoiKey(row: unknown): string {
   return tail ? `fb:${tail.slice(0, 240)}` : ''
 }
 
-/** 抖音 shop.query 易返回「请求太过频繁」：翻页与多种 relation 之间稍作间隔 */
-const SHOP_QUERY_PAGE_DELAY_MS = 140
-const SHOP_QUERY_RELATION_SWITCH_DELAY_MS = 320
+/** 抖音 shop.query 易返回「请求太过频繁」：翻页与多种 relation 之间拉长间隔 + 失败退避重试 */
+const SHOP_QUERY_PAGE_DELAY_MS = 380
+const SHOP_QUERY_RELATION_SWITCH_DELAY_MS = 900
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+function isShopQueryRateLimited(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /太过频繁|请稍后再试|rate limit|429|限流|频率过高|too many requests/i.test(msg)
 }
 
 /** 按 relation_type 翻页拉全量（最多 200 页），供认领拆分、tabCounts、装修列表复用 */
@@ -408,11 +413,28 @@ async function fetchAllPoiPages(
   let reportedTotal = 0
   for (let page = 1; page <= 200; page++) {
     if (page > 1) await sleep(SHOP_QUERY_PAGE_DELAY_MS)
-    const j = await withDouyinClientTokenRetry(
-      session,
-      { sessionKey },
-      (token) => shopPoiQueryPage(accountId, token, page, 50, relationType),
-    )
+    let j: Record<string, unknown> | undefined
+    let lastErr: unknown
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) {
+        const backoff = 700 * attempt * attempt
+        await sleep(backoff)
+      }
+      try {
+        j = await withDouyinClientTokenRetry(
+          session,
+          { sessionKey },
+          (token) => shopPoiQueryPage(accountId, token, page, 50, relationType),
+        )
+        lastErr = undefined
+        break
+      } catch (e) {
+        lastErr = e
+        if (attempt < 4 && isShopQueryRateLimited(e)) continue
+        throw e
+      }
+    }
+    if (!j) throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? 'shop/query 无响应'))
     const data = j.data as Record<string, unknown> | undefined
     if (!data) break
     if (page === 1) reportedTotal = Number(data.total) || 0
