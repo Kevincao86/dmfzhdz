@@ -1,4 +1,5 @@
 import { Sparkles } from 'lucide-react'
+/** 系统设置「平台连接」：仅展示厂商 chips，勿再挂载 AiModelAutoPicker（文案/生图指定已下线）。 */
 import { useEffect, useMemo, useState } from 'react'
 import AiVendorDirectoryChips from '../../components/AiVendorDirectoryChips'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../../lib/opsRegistryConstants'
@@ -76,7 +77,8 @@ export default function AiModelBindingSection() {
       </div>
       <p className="text-sm font-medium text-gray-900">目前绑定的 AI 模型</p>
       <p className="mt-1 text-xs text-gray-500">
-        下方为当前目录中的模型（logo + 名称）。文案 / 生图的「自动」与「指定」请在创建商品页的 AI 区域调整。
+        下方为当前目录中的模型（logo + 名称）。文案 / 生图路由由运营注册表、浏览器侧各模型 Key 与内置策略自动解析；本页<strong className="font-medium text-gray-700">不提供</strong>
+        模型切换下拉。
       </p>
       <div className="mt-3">
         <AiVendorDirectoryChips options={displayedOptions} />
