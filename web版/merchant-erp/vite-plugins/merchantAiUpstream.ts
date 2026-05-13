@@ -6,7 +6,7 @@
  */
 import type { ServerResponse } from 'node:http'
 
-import { isBuiltinAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
+import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
 export type MerchantAiEnv = Record<string, string>
@@ -113,7 +113,7 @@ function builtinTextFailoverOthers(
   env: MerchantAiEnv,
   body: Record<string, unknown>,
 ): string[] {
-  if (!isBuiltinAiVendorId(primary)) return []
+  if (!isDouyinAssistAiVendorId(primary)) return []
   const out: string[] = []
   for (const id of BUILTIN_TEXT_VENDOR_ORDER) {
     if (id === primary) continue
@@ -138,7 +138,7 @@ async function callModelTextWithBuiltinFailover(
     return { text, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
-    if (!isBuiltinAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+    if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
   }
   for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
     const { key } = pickEffectiveKey(env, alt, body)
@@ -171,7 +171,7 @@ async function runImageGenerateWithBuiltinFailover(
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
-    if (!isBuiltinAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+    if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
   }
   for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
     const { key } = pickEffectiveKey(env, alt, body)
@@ -210,7 +210,7 @@ async function runImageEnhanceWithBuiltinFailover(
     return { urls: enhanced, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
-    if (!isBuiltinAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+    if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
   }
   for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
     const { key } = pickEffectiveKey(env, alt, body)
@@ -938,7 +938,7 @@ function normalizeAiModelPreserveCustom(raw: unknown): string {
   const s = String(raw ?? 'qwen').trim().toLowerCase()
   if (s === 'deepseek') return 'qwen'
   if (!s) return 'qwen'
-  if (isBuiltinAiVendorId(s)) return s
+  if (isDouyinAssistAiVendorId(s)) return s
   if (isValidAiVendorSlug(s)) return s
   return 'qwen'
 }
@@ -1327,7 +1327,7 @@ export async function handleDouyinGoodsAiAssist(
 ): Promise<void> {
   const env = await mergeMerchantAiEnvWithRegistrySnapshot(envIn)
   const model = normalizeAiModelPreserveCustom(body.model)
-  if (!isBuiltinAiVendorId(model)) {
+  if (!isDouyinAssistAiVendorId(model)) {
     json(res, 200, {
       ok: false,
       code: 'UNSUPPORTED_AI_VENDOR',

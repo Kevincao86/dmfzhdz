@@ -5,7 +5,7 @@ import type { AiTaskType } from '../../lib/aiAgentTypes'
  * API Key 仅允许出现在服务端环境变量；浏览器只调用同源代理接口。
  */
 
-export type AIProvider = 'openai' | 'anthropic' | 'xai' | 'deepseek' | 'kimi'
+export type AIProvider = 'openai' | 'anthropic' | 'xai' | 'deepseek' | 'kimi' | 'minimax'
 
 export type AIMessageRole = 'system' | 'user' | 'assistant' | 'tool'
 

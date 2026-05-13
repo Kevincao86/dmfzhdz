@@ -1,6 +1,25 @@
 import type { AiVendorCatalogEntry } from './opsRegistryTypes.js'
 
-export const BUILTIN_AI_VENDOR_IDS = ['minimax', 'qwen', 'doubao'] as const
+/** 抖音商品 AI assist 等本地网关已接上游的厂商（与展示目录区分） */
+export const DOUYIN_ASSIST_AI_VENDOR_IDS = ['minimax', 'qwen', 'doubao'] as const
+export type DouyinAssistAiVendorId = (typeof DOUYIN_ASSIST_AI_VENDOR_IDS)[number]
+
+const DOUYIN_ASSIST_ID_SET = new Set<string>(DOUYIN_ASSIST_AI_VENDOR_IDS as unknown as string[])
+
+export function isDouyinAssistAiVendorId(id: string): boolean {
+  return DOUYIN_ASSIST_ID_SET.has(id.trim().toLowerCase())
+}
+
+/** 系统设置 / 目录展示内置项（含仅走 ERP 智能体网关的厂商） */
+export const BUILTIN_AI_VENDOR_IDS = [
+  'minimax',
+  'qwen',
+  'doubao',
+  'openai',
+  'claude',
+  'deepseek',
+  'kimi',
+] as const
 export type BuiltinAiVendorId = (typeof BUILTIN_AI_VENDOR_IDS)[number]
 
 /** 磁盘 / 前端展示：合法的厂商 ID slug（ASCII，小写字母开头） */
@@ -46,6 +65,30 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
     hint: '火山引擎方舟 Ark',
     logoUrl: '/ai-vendors/doubao.png',
   },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    hint: 'ChatGPT / OpenAI API（智能体网关 /api/meoo-ai-chat）',
+    logoUrl: '/ai-vendors/openai.png',
+  },
+  {
+    id: 'claude',
+    label: 'Claude',
+    hint: 'Anthropic Messages API（智能体网关）',
+    logoUrl: '/ai-vendors/claude.png',
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    hint: 'platform.deepseek.com（智能体网关）',
+    logoUrl: '/ai-vendors/deepseek.png',
+  },
+  {
+    id: 'kimi',
+    label: 'Kimi',
+    hint: 'Moonshot · OpenAI 兼容（智能体网关）',
+    logoUrl: '/ai-vendors/kimi.png',
+  },
 ]
 
 const BUILTIN_ID_SET = new Set<string>(BUILTIN_AI_VENDOR_IDS)
@@ -54,7 +97,7 @@ export function isBuiltinAiVendorId(id: string): boolean {
   return BUILTIN_ID_SET.has(id)
 }
 
-/** 磁盘仅保存非内置条目；normalize 后与内置三项合并输出给客户端 */
+/** 磁盘仅保存非内置条目；normalize 后与内置目录合并输出给客户端 */
 export function mergeBuiltinAiVendorCatalog(custom: AiVendorCatalogEntry[] | undefined | null): AiVendorCatalogEntry[] {
   const out: AiVendorCatalogEntry[] = BUILTIN_AI_VENDOR_ENTRIES.map((b) => ({ ...b }))
   const seen = new Set<string>(BUILTIN_AI_VENDOR_IDS as unknown as string[])
