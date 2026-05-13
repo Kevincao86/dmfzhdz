@@ -77,6 +77,45 @@ type ComboItemRow = {
 }
 type ComboGroupRow = { id: string; pickRule: string; items: ComboItemRow[] }
 
+/** 与来客后台「几选几」下拉常见取值对齐，随 package_combo.groups[].pick_rule 提交 */
+const DOUYIN_PICK_RULE_PRESET_OPTIONS: { value: string; label: string }[] = (() => {
+  const o: { value: string; label: string }[] = [
+    { value: '', label: '请确认几选几' },
+    { value: '全部必选', label: '全部必选' },
+  ]
+  for (let m = 2; m <= 12; m++) {
+    for (let n = 1; n < m; n++) {
+      o.push({ value: `${m}选${n}`, label: `${m}选${n}` })
+    }
+  }
+  for (let k = 1; k <= 8; k++) {
+    o.push({ value: `任选${k}份`, label: `任选${k}份` })
+  }
+  return o
+})()
+
+function mergeComboItemDisplayName(d: {
+  name: string
+  spec: string
+  brand: string
+  barcode: string
+}): string {
+  const base = d.name.trim()
+  const parts: string[] = [base]
+  if (d.spec.trim()) parts.push(d.spec.trim())
+  if (d.brand.trim()) parts.push(`品牌：${d.brand.trim()}`)
+  if (d.barcode.trim()) parts.push(`条形码：${d.barcode.trim()}`)
+  return parts.filter((p) => p.length > 0).join(' ').slice(0, 120) || '单品'
+}
+
+/** 来客侧「商品组」内 sku 模板展示名：售价(分)/actual_amount 在界面中称为「单名」（与运营口径对齐） */
+function displaySkuAttrTitle(a: TemplateAttr): string {
+  const key = (a.key ?? '').trim().toLowerCase()
+  const nm = (a.name ?? '').trim()
+  if (/^actual_amount$/i.test(key) || nm.includes('售价(分)')) return '单名'
+  return nm || a.key
+}
+
 function looksComboTemplateAttr(a: TemplateAttr): boolean {
   const key = (a.key ?? '').trim().toLowerCase()
   const name = (a.name ?? '').toLowerCase()
@@ -282,7 +321,7 @@ export default function DouyinProductCreateWizard({
     return (
       <>
         <AiVendorCatalogAvatar
-          id={selectedImageAiOption?.id ?? 'minimax'}
+          id={selectedImageAiOption?.id ?? 'qwen'}
           label={selectedImageAiOption?.label ?? selectedImageAiLabel}
           logoUrl={selectedImageAiOption?.logoUrl}
           size="xs"
@@ -384,6 +423,11 @@ export default function DouyinProductCreateWizard({
   const [templateAttrOverrides, setTemplateAttrOverrides] = useState<Record<string, string>>({})
   const [templateSkuAttrOverrides, setTemplateSkuAttrOverrides] = useState<Record<string, string>>({})
   const [skuAttrExtraRows, setSkuAttrExtraRows] = useState<{ id: string; key: string; value: string }[]>([])
+  const [comboItemModal, setComboItemModal] = useState<{
+    groupId: string
+    itemId: string | null
+    draft: { name: string; qty: string; price: string; spec: string; brand: string; barcode: string }
+  } | null>(null)
   const [staffSales, setStaffSales] = useState('allow')
   const [consumeDateMode, setConsumeDateMode] = useState<'days' | 'calendar'>('days')
   const [nonConsumeDateMode, setNonConsumeDateMode] = useState<'all_dates' | 'partial_dates'>('all_dates')
@@ -626,6 +670,27 @@ export default function DouyinProductCreateWizard({
     [templateSkuAttrs],
   )
 
+  const goodsCategoryPathZh = useMemo(() => {
+    const n1 = l1Options.find((x) => x.category_id === cat1)?.name
+    const n2 = l2Options.find((x) => x.category_id === cat2)?.name
+    const n3 = l3Options.find((x) => x.category_id === cat3)?.name
+    return [n1, n2, n3].filter(Boolean).join(' › ')
+  }, [cat1, cat2, cat3, l1Options, l2Options, l3Options])
+
+  const comboModalFieldFlags = useMemo(() => {
+    const p = goodsCategoryPathZh
+    const blob = templateProductAttrs.map((a) => `${a.name} ${a.key}`).join(' ')
+    return {
+      brand: /餐|饮|食|锅|烤|甜|茶|酒|咖啡|超|美|容|发|甲|丽人|美妆/.test(p) || /品牌/.test(blob),
+      barcode: /餐|饮|食|甜|茶|酒|咖啡|超|零/.test(p) || /条码|条形码/.test(blob),
+    }
+  }, [goodsCategoryPathZh, templateProductAttrs])
+
+  const comboListedItemCount = useMemo(
+    () => comboGroups.reduce((s, g) => s + g.items.filter((it) => it.name.trim()).length, 0),
+    [comboGroups],
+  )
+
   const skuTemplateCoverCtx = useMemo(
     () => ({
       priceYuan,
@@ -690,6 +755,110 @@ export default function DouyinProductCreateWizard({
     return r.url
   }
 
+  const addComboGroupRow = () => {
+    setComboGroups((prev) => [...prev, { id: newId('cg'), pickRule: '', items: [] }])
+  }
+
+  const removeComboGroupRow = (gid: string) => {
+    setComboGroups((prev) => {
+      const next = prev.filter((g) => g.id !== gid)
+      if (productType === 1 && next.length === 0)
+        return [{ id: newId('cg'), pickRule: '', items: [] }]
+      return next
+    })
+  }
+
+  const moveComboGroupRow = (idx: number, dir: -1 | 1) => {
+    setComboGroups((prev) => {
+      const j = idx + dir
+      if (j < 0 || j >= prev.length) return prev
+      const cp = [...prev]
+      const a = cp[idx]!
+      cp[idx] = cp[j]!
+      cp[j] = a
+      return cp
+    })
+  }
+
+  const removeComboItem = (gid: string, iid: string) => {
+    setComboGroups((prev) =>
+      prev.map((g) => (g.id === gid ? { ...g, items: g.items.filter((it) => it.id !== iid) } : g)),
+    )
+  }
+
+  const openComboItemModal = (groupId: string, itemId: string | null) => {
+    const g = comboGroups.find((x) => x.id === groupId)
+    if (!g) return
+    if (itemId) {
+      const it = g.items.find((i) => i.id === itemId)
+      if (!it) return
+      setComboItemModal({
+        groupId,
+        itemId,
+        draft: {
+          name: it.name,
+          qty: it.qty,
+          price: it.price,
+          spec: '',
+          brand: '',
+          barcode: '',
+        },
+      })
+      return
+    }
+    setComboItemModal({
+      groupId,
+      itemId: null,
+      draft: { name: '', qty: '1', price: '', spec: '', brand: '', barcode: '' },
+    })
+  }
+
+  const confirmComboItemModal = () => {
+    const m = comboItemModal
+    if (!m) return
+    const { draft, groupId, itemId } = m
+    if (!draft.name.trim()) {
+      window.alert('请填写单品名称')
+      return
+    }
+    const py = Number.parseFloat(draft.price)
+    if (!Number.isFinite(py) || py < 0) {
+      window.alert('请填写门店售价（元），可为 0')
+      return
+    }
+    const merged = mergeComboItemDisplayName(draft).trim() || '单品'
+    const qty = String(Math.max(1, Number.parseInt(draft.qty, 10) || 1))
+    const price = String(py)
+    setComboGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g
+        if (itemId) {
+          const prevIt = g.items.find((x) => x.id === itemId)
+          return {
+            ...g,
+            items: g.items.map((it) =>
+              it.id === itemId
+                ? {
+                    ...it,
+                    name: merged,
+                    qty,
+                    price,
+                    product_id: prevIt?.product_id,
+                    sku_id: prevIt?.sku_id,
+                  }
+                : it,
+            ),
+          }
+        }
+        return {
+          ...g,
+          items: [...g.items, { id: newId('ci'), name: merged, qty, price }],
+        }
+      }),
+    )
+    setComboItemModal(null)
+  }
+
   const goDetail = async () => {
     if (!cat3 || productType == null) return
     setDetailPrepLoading(true)
@@ -729,7 +898,10 @@ export default function DouyinProductCreateWizard({
       setReserveMode(d.reserve_mode)
       setReserveAdvance(String(d.reserve_advance_value))
       setReserveUnit(d.reserve_advance_unit)
-      setComboGroups([])
+      setComboGroups(
+        productType === 1 ? [{ id: newId('cg'), pickRule: '', items: [] }] : [],
+      )
+      setComboItemModal(null)
       setStep('detail')
       setActionMsg(null)
     } catch (e) {
@@ -1776,21 +1948,146 @@ export default function DouyinProductCreateWizard({
                   </div>
 
                   <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-4">
-                    <h4 className="text-sm font-semibold text-gray-900">SKU 属性（template.get · sku_attrs）</h4>
+                    <h4 className="text-sm font-semibold text-gray-900">商品组</h4>
+                    <p className="mt-0.5 text-[11px] text-gray-500">template.get · sku_attrs；团购时含 package_combo 搭配</p>
                     <p className="mt-1 text-xs text-gray-600">
-                      字段由已选末级类目与商品类型对应的开放平台{' '}
-                      <code className="rounded bg-white px-1 text-[11px]">goods/template/get</code> 返回；保存时与下方自定义
-                      key 一并写入 <code className="rounded bg-white px-1 text-[11px]">sku.attr_key_value_map</code> 提交至抖音来客。
+                      与抖音来客「商品组」口径一致：<code className="rounded bg-white px-1 text-[11px]">goods/template/get</code>{' '}
+                      返回的 sku 模板写入 <code className="rounded bg-white px-1 text-[11px]">sku.attr_key_value_map</code>；
+                      商品类型为「团购」时，下方搭配组与 <code className="rounded bg-white px-1 text-[11px]">package_combo</code>{' '}
+                      的 <code className="rounded bg-white px-1 text-[11px]">pick_rule</code>、单品列表一并提交（与开放平台商品 save 文档一致）。
                     </p>
-                    {sortedTemplateSkuAttrs.length === 0 && skuAttrExtraRows.length === 0 ? (
+
+                    {productType === 1 ? (
+                      <div className="mt-4 space-y-3 border-t border-slate-200 pt-3">
+                        <p className="text-xs font-medium text-gray-800">团购搭配 · 几选几</p>
+                        <p className="text-xs text-gray-600">
+                          当前类目路径：<span className="font-medium text-gray-800">{goodsCategoryPathZh || '—'}</span>
+                          。添加单品弹窗中的扩展字段会按类目关键词切换；若与贵司类目模板不一致，请以 template.get / product.get 为准并在保存前核对。
+                        </p>
+                        {comboGroups.map((g, gi) => (
+                          <div
+                            key={g.id}
+                            className="rounded-lg border border-indigo-100 bg-white/95 p-3 shadow-sm"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <span className="text-sm font-semibold text-gray-900">商品组</span>
+                              <select
+                                value={g.pickRule}
+                                onChange={(e) =>
+                                  setComboGroups((prev) =>
+                                    prev.map((x) => (x.id === g.id ? { ...x, pickRule: e.target.value } : x)),
+                                  )
+                                }
+                                className="max-w-[12rem] rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                                aria-label="几选几"
+                              >
+                                {DOUYIN_PICK_RULE_PRESET_OPTIONS.map((o) => (
+                                  <option key={o.value || 'empty'} value={o.value}>
+                                    {o.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => openComboItemModal(g.id, null)}
+                              className="mt-2 text-xs font-medium text-indigo-700 hover:text-indigo-900 hover:underline"
+                            >
+                              添加单品
+                            </button>
+                            {g.items.some((it) => it.name.trim()) ? (
+                              <ul className="mt-2 divide-y divide-gray-100 rounded border border-gray-100 bg-gray-50/50">
+                                {g.items
+                                  .filter((it) => it.name.trim())
+                                  .map((it) => (
+                                    <li
+                                      key={it.id}
+                                      className="flex flex-wrap items-center justify-between gap-2 px-2 py-1.5 text-xs text-gray-800"
+                                    >
+                                      <span className="min-w-0 flex-1 truncate font-medium">{it.name}</span>
+                                      <span className="shrink-0 text-gray-600">
+                                        ×{it.qty} · ¥{it.price}
+                                      </span>
+                                      <span className="flex shrink-0 gap-1">
+                                        <button
+                                          type="button"
+                                          className="text-indigo-700 hover:underline"
+                                          onClick={() => openComboItemModal(g.id, it.id)}
+                                        >
+                                          编辑
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="text-red-600 hover:underline"
+                                          onClick={() => removeComboItem(g.id, it.id)}
+                                        >
+                                          删除
+                                        </button>
+                                      </span>
+                                    </li>
+                                  ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-2 text-xs text-gray-500">尚未添加单品；也可留空，保存时按商品名称自动生成一条单品。</p>
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
+                              <button
+                                type="button"
+                                disabled={gi === 0}
+                                onClick={() => moveComboGroupRow(gi, -1)}
+                                className="hover:text-gray-900 disabled:opacity-30"
+                              >
+                                上移
+                              </button>
+                              <button
+                                type="button"
+                                disabled={gi >= comboGroups.length - 1}
+                                onClick={() => moveComboGroupRow(gi, 1)}
+                                className="hover:text-gray-900 disabled:opacity-30"
+                              >
+                                下移
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeComboGroupRow(g.id)}
+                                className="text-red-700 hover:underline"
+                              >
+                                删除组
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={addComboGroupRow}
+                            className="text-sm font-medium text-indigo-700 hover:underline"
+                          >
+                            添加商品组
+                          </button>
+                          <span className="text-xs text-gray-500">
+                            共 {comboListedItemCount} 个单品 · {comboGroups.length} 个组
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {sortedTemplateSkuAttrs.length === 0 && skuAttrExtraRows.length === 0 && productType !== 1 ? (
                       <p className="mt-2 text-xs text-amber-800">
                         当前模板未返回 sku_attrs。若开放平台仍要求补充 SKU 维度字段，可点击下方「新增自定义 SKU 属性」自行添加
                         key/value。
+                      </p>
+                    ) : sortedTemplateSkuAttrs.length === 0 &&
+                      skuAttrExtraRows.length === 0 &&
+                      productType === 1 ? (
+                      <p className="mt-2 text-xs text-gray-600">
+                        当前模板未返回 sku_attrs，可直接用上方「团购搭配」维护单品；如需补充 SKU 维度字段，可点下方「新增自定义 SKU 属性」。
                       </p>
                     ) : (
                       <ul className="mt-3 space-y-3">
                         {sortedTemplateSkuAttrs.map((a) => {
                           const skuCovered = templateSkuAttrWizardCovered(a, skuTemplateCoverCtx)
+                          const title = displaySkuAttrTitle(a)
                           return (
                             <li
                               key={`sku-info-${a.key}`}
@@ -1798,7 +2095,7 @@ export default function DouyinProductCreateWizard({
                             >
                               <div className="flex flex-wrap items-baseline justify-between gap-2">
                                 <span className="font-medium text-gray-900">
-                                  {a.name}
+                                  {title}
                                   {a.is_required ? <span className="text-red-500"> *</span> : null}
                                 </span>
                                 <span
@@ -1814,6 +2111,9 @@ export default function DouyinProductCreateWizard({
                                   {skuCovered ? '自动映射' : a.is_required ? '须填写' : '选填'}
                                 </span>
                               </div>
+                              {title !== (a.name || '').trim() ? (
+                                <p className="mt-0.5 text-[11px] text-gray-500">开放平台字段名：{a.name || a.key}</p>
+                              ) : null}
                               <p className="mt-1 font-mono text-[11px] text-gray-500">
                                 key: {a.key || '—'} · value_type: {a.value_type}
                                 {a.is_multi ? ' · multi' : ''}
@@ -2710,9 +3010,10 @@ export default function DouyinProductCreateWizard({
             {templateSkuAttrs.length > 0 ? (
               <div className="mt-5 border-t border-blue-100 pt-4">
                 <p className="text-xs text-gray-600">
-                  <span className="font-medium text-gray-800">SKU 属性（sku_attrs）</span>
-                  已与类目、商品类型对齐的表单项已上移至「商品信息」区块；保存时同样经网关合并写入{' '}
-                  <code className="rounded bg-white/80 px-1 text-[11px]">sku.attr_key_value_map</code>。
+                  <span className="font-medium text-gray-800">商品组（sku_attrs）</span>
+                  已与类目、商品类型对齐的表单项已上移至「商品信息」；保存时经网关合并写入{' '}
+                  <code className="rounded bg-white/80 px-1 text-[11px]">sku.attr_key_value_map</code>；团购搭配见同区块「几选几」与{' '}
+                  <code className="rounded bg-white/80 px-1 text-[11px]">package_combo</code>。
                 </p>
               </div>
             ) : null}
@@ -2940,6 +3241,176 @@ export default function DouyinProductCreateWizard({
             className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      ) : null}
+
+      {comboItemModal ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+          role="presentation"
+          onClick={() => setComboItemModal(null)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="combo-item-modal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h2 id="combo-item-modal-title" className="text-base font-semibold text-gray-900">
+                {comboItemModal.itemId ? '编辑单品' : '添加单品'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setComboItemModal(null)}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+                aria-label="关闭"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 px-4 py-3 text-sm">
+              <p className="text-xs text-gray-500">
+                单品会写入 <code className="rounded bg-gray-100 px-1">package_combo.groups[].items</code>；扩展字段按类目折叠进单品名称。字段全集以{' '}
+                <a
+                  className="text-indigo-600 hover:underline"
+                  href="https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  商品 save
+                </a>
+                、
+                <a
+                  className="text-indigo-600 hover:underline"
+                  href="https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  template.get
+                </a>
+                为准。
+              </p>
+              <div>
+                <label className="text-xs font-medium text-gray-700">
+                  单品名称 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={comboItemModal.draft.name}
+                  onChange={(e) =>
+                    setComboItemModal({
+                      ...comboItemModal,
+                      draft: { ...comboItemModal.draft, name: e.target.value },
+                    })
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="请输入单品名称"
+                  maxLength={120}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-gray-700">
+                    单品数量 <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={comboItemModal.draft.qty}
+                    onChange={(e) =>
+                      setComboItemModal({
+                        ...comboItemModal,
+                        draft: { ...comboItemModal.draft, qty: e.target.value },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700">
+                    门店售价（元） <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={comboItemModal.draft.price}
+                    onChange={(e) =>
+                      setComboItemModal({
+                        ...comboItemModal,
+                        draft: { ...comboItemModal.draft, price: e.target.value },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">规格描述</label>
+                <input
+                  value={comboItemModal.draft.spec}
+                  onChange={(e) =>
+                    setComboItemModal({
+                      ...comboItemModal,
+                      draft: { ...comboItemModal.draft, spec: e.target.value },
+                    })
+                  }
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="可选，会附在单品名称后提交"
+                />
+              </div>
+              {comboModalFieldFlags.brand ? (
+                <div>
+                  <label className="text-xs font-medium text-gray-700">品牌（当前类目展示）</label>
+                  <input
+                    value={comboItemModal.draft.brand}
+                    onChange={(e) =>
+                      setComboItemModal({
+                        ...comboItemModal,
+                        draft: { ...comboItemModal.draft, brand: e.target.value },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="餐饮 / 丽人等类目常见项"
+                  />
+                </div>
+              ) : null}
+              {comboModalFieldFlags.barcode ? (
+                <div>
+                  <label className="text-xs font-medium text-gray-700">条形码（当前类目展示）</label>
+                  <input
+                    value={comboItemModal.draft.barcode}
+                    onChange={(e) =>
+                      setComboItemModal({
+                        ...comboItemModal,
+                        draft: { ...comboItemModal.draft, barcode: e.target.value },
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="可选"
+                  />
+                </div>
+              ) : null}
+            </div>
+            <div className="flex justify-end gap-2 border-t bg-gray-50 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setComboItemModal(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-white"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={confirmComboItemModal}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                确定
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
