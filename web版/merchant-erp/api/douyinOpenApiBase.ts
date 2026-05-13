@@ -107,19 +107,41 @@ export function officialGoodlifeUrlFromRelayRequest(relayFullUrl: string): strin
 }
 
 /**
- * goodlife GET/POST：先走 `DOUYIN_OPENAPI_BASE_URL` 中继；若响应为 5xx、HTML 或 2xx 但非 JSON，
- * 再请求同源路径的 `https://open.douyin.com`（保留 query），便于在 Nginx 未透传 GET 时仍能拿到抖音 JSON
- *（含「IP 不在白名单」等业务错误）。中继正常时不会触发第二次请求。
+ * goodlife GET/POST：先走 `DOUYIN_OPENAPI_BASE_URL` 中继；若**网络层失败**（反代不可达、TLS、超时等）或响应为 5xx、HTML、2xx 但非 JSON，
+ * 再请求同源路径的 `https://open.douyin.com`（保留 query），便于反代宕机时仍能拉门店/发品。
  */
 export async function fetchGoodlifeWithOfficialFallback(
   fetchFn: DouyinFetchFn,
   relayUrl: string,
   init: RequestInit,
 ): Promise<{ status: number; raw: string; usedOfficialFallback: boolean }> {
-  const r1 = await fetchFn(relayUrl, init)
-  const raw1 = await r1.text()
-  const relay = normalizedGoodlifeBase()
-  if (relay === DEFAULT_BASE) {
+  const relayBase = normalizedGoodlifeBase()
+  const officialUrl = (): string | null => officialGoodlifeUrlFromRelayRequest(relayUrl)
+
+  let r1: Response
+  let raw1: string
+  try {
+    r1 = await fetchFn(relayUrl, init)
+    raw1 = await r1.text()
+  } catch (e1) {
+    const msg1 = e1 instanceof Error ? e1.message : String(e1)
+    const official = officialUrl()
+    if (relayBase !== DEFAULT_BASE && official) {
+      try {
+        const r2 = await fetchFn(official, init)
+        const raw2 = await r2.text()
+        return { status: r2.status, raw: raw2, usedOfficialFallback: true }
+      } catch (e2) {
+        const msg2 = e2 instanceof Error ? e2.message : String(e2)
+        throw new Error(
+          `goodlife 经 DOUYIN_OPENAPI_BASE_URL 失败（${msg1}）；直连 open.douyin.com 仍失败（${msg2}）。请检查反代可从部署环境访问，或暂时移除 DOUYIN_OPENAPI_BASE_URL 仅用官方域名。`,
+        )
+      }
+    }
+    throw e1 instanceof Error ? e1 : new Error(msg1)
+  }
+
+  if (relayBase === DEFAULT_BASE) {
     return { status: r1.status, raw: raw1, usedOfficialFallback: false }
   }
   const tryFallback =
@@ -129,15 +151,19 @@ export async function fetchGoodlifeWithOfficialFallback(
   if (!tryFallback) {
     return { status: r1.status, raw: raw1, usedOfficialFallback: false }
   }
-  const official = officialGoodlifeUrlFromRelayRequest(relayUrl)
+  const official = officialUrl()
   if (!official) {
     return { status: r1.status, raw: raw1, usedOfficialFallback: false }
   }
-  const r2 = await fetchFn(official, init)
-  const raw2 = await r2.text()
-  const officialLooksJson = looksLikeJsonObject(raw2) && !responseLooksLikeHtml(raw2)
-  if (officialLooksJson) {
-    return { status: r2.status, raw: raw2, usedOfficialFallback: true }
+  try {
+    const r2 = await fetchFn(official, init)
+    const raw2 = await r2.text()
+    const officialLooksJson = looksLikeJsonObject(raw2) && !responseLooksLikeHtml(raw2)
+    if (officialLooksJson) {
+      return { status: r2.status, raw: raw2, usedOfficialFallback: true }
+    }
+  } catch {
+    /* 直连也失败时仍返回中继体，便于排障 */
   }
   return { status: r1.status, raw: raw1, usedOfficialFallback: false }
 }
