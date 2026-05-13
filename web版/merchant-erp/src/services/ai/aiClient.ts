@@ -53,7 +53,7 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
     }
     if (res.status !== 404) {
       if (json && typeof json === 'object') {
-        const o = json as { error?: string; detail?: string }
+        const o = json as { ok?: boolean; error?: string; detail?: string }
         const code = typeof o.error === 'string' ? o.error.trim() : ''
         const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
         const parts = [code, detail].filter(Boolean)
