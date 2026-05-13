@@ -157,6 +157,25 @@ function buildAssistPayload(body: AiAssistRequest): Record<string, unknown> {
   return base
 }
 
+function assistFetchTimeoutMs(action: AiAssistAction): number {
+  if (action === 'image_generate' || action === 'image_enhance') return 170_000
+  if (action === 'analyze_product_quality') return 120_000
+  return 90_000
+}
+
+function abortSignalForAssist(action: AiAssistAction): AbortSignal | undefined {
+  const ms = assistFetchTimeoutMs(action)
+  const AS = AbortSignal as unknown as { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') {
+    try {
+      return AS.timeout(ms)
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
 const AI_ASSIST_PATHS = ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist'] as const
 
 /** 与类目/线上搜品同源：优先顶层 meoo，避开生产环境深层 /api/merchant/* 404 */
@@ -183,7 +202,17 @@ async function postAiAssistFetch(
 }
 
 export async function postDouyinGoodsAiAssist(body: AiAssistRequest): Promise<AiAssistResult> {
-  const res = await postAiAssistFetch(buildAssistPayload(body))
+  const signal = abortSignalForAssist(body.action)
+  let res: Response
+  try {
+    res = await postAiAssistFetch(buildAssistPayload(body), signal)
+  } catch (e) {
+    const name = e instanceof Error ? e.name : ''
+    if (name === 'AbortError' || name === 'TimeoutError') {
+      return { ok: false, message: '请求超时，生图仍在排队或上游较慢，请稍后重试或减少并发' }
+    }
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
   const data = await parseJson(res)
   if (!res.ok) {
     return {
