@@ -82,6 +82,10 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-ai-chat.ts": {
+      "includeFiles": "{vite-plugins,src/lib,src/services/ai}/**",
+      "maxDuration": 120
+    },
     "api/**/*.ts": {
       "maxDuration": 60
     }
