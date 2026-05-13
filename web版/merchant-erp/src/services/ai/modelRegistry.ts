@@ -3,7 +3,7 @@ import {
   TOKENMIX_FAMILY_CATALOG,
   normalizeAiModelFamily,
   type TokenMixFamilyDef,
-} from './tokenmixClient'
+} from './tokenmixClient.js'
 
 export {
   TOKENMIX_FAMILY_CATALOG,
@@ -14,7 +14,7 @@ export {
   tokenMixFamilyById,
   type TokenMixFamilyDef,
   type TokenMixModelOption,
-} from './tokenmixClient'
+} from './tokenmixClient.js'
 
 /** 仍直连厂商的注册项（非 TokenMix） */
 export type DirectModelRegistryEntry = {
