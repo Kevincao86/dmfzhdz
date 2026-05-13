@@ -162,11 +162,12 @@ async function runImageGenerateWithBuiltinFailover(
   productName: string,
   titleDraft: string,
   imageRole: string,
+  lockSuffix: string,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
   try {
-    const urls = await runImageGenerate(primaryNorm, keyFirst, env, productName, titleDraft, imageRole)
+    const urls = await runImageGenerate(primaryNorm, keyFirst, env, productName, titleDraft, imageRole, lockSuffix)
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
@@ -176,7 +177,7 @@ async function runImageGenerateWithBuiltinFailover(
     const { key } = pickEffectiveKey(env, alt, body)
     if (!key) continue
     try {
-      const urls = await runImageGenerate(alt, key, env, productName, titleDraft, imageRole)
+      const urls = await runImageGenerate(alt, key, env, productName, titleDraft, imageRole, lockSuffix)
       return { urls, modelUsed: alt }
     } catch (e) {
       lastErr = e
@@ -195,13 +196,16 @@ async function runImageEnhanceWithBuiltinFailover(
   titleDraft: string,
   imageRole: string,
   imageUrls: string[],
+  lockSuffix: string,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
   try {
     const enhanced: string[] = []
     for (const u of imageUrls) {
-      enhanced.push(await runImageEnhanceOne(primaryNorm, keyFirst, env, productName, titleDraft, imageRole, u))
+      enhanced.push(
+        await runImageEnhanceOne(primaryNorm, keyFirst, env, productName, titleDraft, imageRole, u, lockSuffix),
+      )
     }
     return { urls: enhanced, modelUsed: primaryNorm }
   } catch (e) {
@@ -214,7 +218,7 @@ async function runImageEnhanceWithBuiltinFailover(
     try {
       const enhanced: string[] = []
       for (const u of imageUrls) {
-        enhanced.push(await runImageEnhanceOne(alt, key, env, productName, titleDraft, imageRole, u))
+        enhanced.push(await runImageEnhanceOne(alt, key, env, productName, titleDraft, imageRole, u, lockSuffix))
       }
       return { urls: enhanced, modelUsed: alt }
     } catch (e) {
@@ -628,22 +632,48 @@ function buildImagePrompt(
   titleDraft: string,
   imageRole: string,
   mode: 't2i' | 'i2i',
+  lockSuffix = '',
 ): string {
   const name = productName.trim() || '本地生活服务'
   const base =
     mode === 'i2i'
       ? `在保留原图主体与构图的前提下，提升清晰度与色彩层次，适合抖音来客团购主图/辅图展示；商品或服务场景：${name}；须符合本地生活广告与平台素材规范。`
       : `为抖音来客「本地生活」团购设计一张高质量商品图：主体清晰、光线自然、无牛皮癣文字与违规水印；商品或服务：${name}；构图适合手机端列表与详情首屏。`
+  let out = base
   if (imageRole === 'aux') {
-    return `${base}侧重套餐细节、食材/服务特写或卖点展示，可略偏竖构图。`
+    out = `${base}侧重套餐细节、食材/服务特写或卖点展示，可略偏竖构图。`
+  } else if (imageRole === 'env') {
+    out = `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感。`
+  } else if (titleDraft && titleDraft !== productName) {
+    out = `${base}可参考标题/卖点摘要：${titleDraft.slice(0, 80)}。`
+  } else {
+    out = `${base}主图风格，构图留白适中。`
   }
-  if (imageRole === 'env') {
-    return `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感。`
+  return lockSuffix ? `${out}${lockSuffix}` : out
+}
+
+/** 从商品创建向导传入：锁死前两步的类目与商品类型，避免模型幻觉改业态 */
+function goodsAiLockSuffixFromBody(body: Record<string, unknown>): string {
+  const pathZh = String(body.goods_category_path_zh ?? '').trim()
+  const typeLabel = String(body.goods_product_type_label ?? '').trim()
+  const catId = String(body.goods_category_id ?? '').trim()
+  const ptRaw = body.goods_product_type
+  const pt =
+    typeof ptRaw === 'number' && Number.isFinite(ptRaw)
+      ? ptRaw
+      : typeof ptRaw === 'string' && String(ptRaw).trim()
+        ? Number(String(ptRaw).trim())
+        : NaN
+  if (!pathZh && !catId && !typeLabel && !Number.isFinite(pt)) return ''
+  const bits: string[] = []
+  if (pathZh) bits.push(`商品类目路径：${pathZh}`)
+  else if (catId) bits.push(`商品类目 ID：${catId}`)
+  if (typeLabel || Number.isFinite(pt)) {
+    bits.push(
+      `商品类型：${typeLabel || '（见 product_type）'}（product_type=${Number.isFinite(pt) ? pt : '—'}）`,
+    )
   }
-  if (titleDraft && titleDraft !== productName) {
-    return `${base}可参考标题/卖点摘要：${titleDraft.slice(0, 80)}。`
-  }
-  return `${base}主图风格，构图留白适中。`
+  return `\n\n【创建商品时已选定以下类目与类型，须严格遵守，禁止擅自改成其他类目、其他团购类型或无关业态】\n${bits.join('；')}。`
 }
 
 async function qwenWanxCreateTask(
@@ -689,7 +719,8 @@ async function qwenWanxCreateTask(
 
 async function qwenWanxPollUrls(apiKey: string, taskId: string): Promise<string[]> {
   const url = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
-  for (let i = 0; i < 45; i++) {
+  /** 前期更密轮询，任务就绪后尽快返回，降低卡在 Serverless 上限的概率 */
+  for (let i = 0; i < 80; i++) {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
     })
@@ -720,7 +751,7 @@ async function qwenWanxPollUrls(apiKey: string, taskId: string): Promise<string[
         '万相任务失败'
       throw new Error(msg)
     }
-    await sleep(2000)
+    await sleep(i < 18 ? 800 : 1500)
   }
   throw new Error('万相任务排队超时，请稍后重试')
 }
@@ -819,8 +850,9 @@ async function runImageGenerate(
   productName: string,
   titleDraft: string,
   imageRole: string,
+  lockSuffix = '',
 ): Promise<string[]> {
-  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 't2i')
+  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 't2i', lockSuffix)
   if (model === 'qwen') {
     const u = await qwenWanxOneImage(key, env, prompt)
     return [u]
@@ -856,8 +888,9 @@ async function runImageEnhanceOne(
   titleDraft: string,
   imageRole: string,
   sourceUrl: string,
+  lockSuffix = '',
 ): Promise<string> {
-  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 'i2i')
+  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 'i2i', lockSuffix)
   if (model === 'qwen') {
     return qwenWanxOneImage(key, env, prompt, sourceUrl)
   }
@@ -1303,6 +1336,7 @@ export async function handleDouyinGoodsAiAssist(
     ? (body.image_urls as unknown[]).map((x) => String(x)).filter(Boolean)
     : []
   const imageRole = String(body.image_role ?? 'head').trim() || 'head'
+  const goodsLock = goodsAiLockSuffixFromBody(body)
 
   if (action === 'analyze_product_quality') {
     const rawList = body.products
@@ -1428,6 +1462,7 @@ export async function handleDouyinGoodsAiAssist(
           productName,
           titleDraft,
           imageRole,
+          goodsLock,
         )
         json(res, 200, {
           ok: true,
@@ -1445,6 +1480,7 @@ export async function handleDouyinGoodsAiAssist(
         titleDraft,
         imageRole,
         imageUrls,
+        goodsLock,
       )
       json(res, 200, {
         ok: true,
@@ -1537,7 +1573,7 @@ export async function handleDouyinGoodsAiAssist(
       return
     }
     if (action === 'optimize_title') {
-      const user = `候选标题：${titleDraft}\n商品背景名：${productName}`
+      const user = `候选标题：${titleDraft}\n商品背景名：${productName}${goodsLock}`
       const { text: titleRaw, modelUsed: titleVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
@@ -1554,7 +1590,7 @@ export async function handleDouyinGoodsAiAssist(
       return
     }
     if (action === 'generate_desc') {
-      const user = `商品名称：${productName}`
+      const user = `商品名称：${productName}${goodsLock}`
       const { text: descRaw, modelUsed: descVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,

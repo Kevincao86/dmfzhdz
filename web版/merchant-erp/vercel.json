@@ -48,7 +48,7 @@
     },
     "api/meoo-douyin-goods-ai-assist.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
+      "maxDuration": 180
     },
     "api/meoo-ops-sync-registry.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",

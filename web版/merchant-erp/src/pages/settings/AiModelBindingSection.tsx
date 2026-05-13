@@ -1,6 +1,5 @@
 import { Sparkles } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import AiModelAutoPicker from '../../components/AiModelAutoPicker'
+import { useEffect, useMemo, useState } from 'react'
 import AiVendorDirectoryChips from '../../components/AiVendorDirectoryChips'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../../lib/opsRegistryConstants'
 import { listAiUiModelOptions } from '../../services/douyinAiAssistApi'
@@ -65,11 +64,6 @@ export default function AiModelBindingSection() {
     return () => window.removeEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync as EventListener)
   }, [])
 
-  const bumpPickers = useCallback(() => {
-    setTextModel(readStoredAiModel())
-    setImageModel(readStoredImageAiModel())
-  }, [])
-
   if (displayedOptions.length === 0) {
     return null
   }
@@ -82,32 +76,10 @@ export default function AiModelBindingSection() {
       </div>
       <p className="text-sm font-medium text-gray-900">目前绑定的 AI 模型</p>
       <p className="mt-1 text-xs text-gray-500">
-        下方为当前目录中的模型（logo + 名称）。仍可按「自动 / 指定」分别设置文案与生图；展开下拉可搜索。
+        下方为当前目录中的模型（logo + 名称）。文案 / 生图的「自动」与「指定」请在创建商品页的 AI 区域调整。
       </p>
       <div className="mt-3">
         <AiVendorDirectoryChips options={displayedOptions} />
-      </div>
-      <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-10">
-        <div className="min-w-0 flex-1">
-          <div className="mt-0">
-            <AiModelAutoPicker
-              kind="text"
-              options={displayedOptions}
-              disabled={opsLocked}
-              onResolutionChange={bumpPickers}
-            />
-          </div>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="mt-0">
-            <AiModelAutoPicker
-              kind="image"
-              options={displayedOptions}
-              disabled={opsLocked}
-              onResolutionChange={bumpPickers}
-            />
-          </div>
-        </div>
       </div>
     </div>
   )

@@ -118,6 +118,11 @@ export type AiAssistRequest = {
   geo_knowledge_pack?: string
   /** 与 geo_ai_score 联用：抖音门店事实等 JSON 字符串 */
   geo_score_context?: string
+  /** 商品创建向导：已选三级类目与商品类型，锁入文案/生图上下文 */
+  goods_category_id?: string
+  goods_product_type?: number
+  goods_category_path_zh?: string
+  goods_product_type_label?: string
 }
 
 export type AiAssistResult =

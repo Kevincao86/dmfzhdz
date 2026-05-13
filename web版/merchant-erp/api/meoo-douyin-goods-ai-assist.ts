@@ -8,7 +8,8 @@ import {
   runMerchantApiGatewayFromPath,
 } from './merchant/merchantGatewayShared.js'
 
-export const config = { maxDuration: 60 }
+/** 通义万相等异步生图 + 冷启动可能超过 60s，避免首点辅助图即 504 */
+export const config = { maxDuration: 180 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
