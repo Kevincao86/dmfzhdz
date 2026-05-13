@@ -1974,6 +1974,16 @@ async function buildGoodlifeProductSaveBody(
     }
   }
 
+  const tplOverrides = erp.template_attr_overrides
+  if (tplOverrides && typeof tplOverrides === 'object' && !Array.isArray(tplOverrides)) {
+    for (const [k, val] of Object.entries(tplOverrides as Record<string, unknown>)) {
+      const key = String(k).trim()
+      if (!key) continue
+      const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
+      if (s) mergedProductAttrs[key] = s.slice(0, 120_000)
+    }
+  }
+
   const nowMs = Date.now()
   const oneYearMs = nowMs + 366 * 86400000
 

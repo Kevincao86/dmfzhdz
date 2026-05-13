@@ -31,6 +31,7 @@ import {
   type DouyinCategoryTreeNode,
   type DouyinProductDetailPayload,
   type ProductTypeOption,
+  type TemplateAttr,
   type TemplateSelectOption,
   getDouyinGoodsTemplate,
   getDouyinGoodsProductGet,
@@ -70,6 +71,31 @@ type ComboItemRow = {
   sku_id?: string
 }
 type ComboGroupRow = { id: string; pickRule: string; items: ComboItemRow[] }
+
+function looksComboTemplateAttr(a: TemplateAttr): boolean {
+  const key = (a.key ?? '').trim().toLowerCase()
+  const name = (a.name ?? '').toLowerCase()
+  if (/^combo_rule$/i.test(key)) return true
+  if (name.includes('combo_rule')) return true
+  if (/套餐规则|搭配规则|组合规则|商品搭配/.test(a.name)) return true
+  const vt = (a.value_type ?? '').toUpperCase()
+  if ((vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON') && /套餐|搭配|组合/.test(a.name)) return true
+  return false
+}
+
+function templateAttrWizardCovered(a: TemplateAttr): boolean {
+  if (looksComboTemplateAttr(a)) return true
+  const n = a.name
+  const vt = (a.value_type ?? '').toUpperCase()
+  if (vt.includes('IMAGE') || vt === 'PIC') return true
+  if (/标题|商品名称/.test(n) && !/规范/.test(n)) return true
+  if (/详情|图文|介绍|卖点|描述/.test(n)) return true
+  if (/券|码类型|平台券|三方券/.test(n)) return true
+  if (/购买须知|使用说明|温馨提示|使用规则|注意事项|其他说明/.test(n)) return true
+  if (/有效|天数|天/.test(n) && /消费|券/.test(n)) return true
+  if (/库存|数量/.test(n)) return true
+  return false
+}
 
 type Step = 'category' | 'productType' | 'detail'
 
@@ -309,6 +335,9 @@ export default function DouyinProductCreateWizard({
   const [salesChannelOptions, setSalesChannelOptions] = useState<TemplateSelectOption[]>([])
   const [staffSalesOptions, setStaffSalesOptions] = useState<TemplateSelectOption[]>([])
   const [afterSalePolicyOptions, setAfterSalePolicyOptions] = useState<TemplateSelectOption[]>([])
+  const [templateProductAttrs, setTemplateProductAttrs] = useState<TemplateAttr[]>([])
+  const [templateSkuAttrs, setTemplateSkuAttrs] = useState<TemplateAttr[]>([])
+  const [templateAttrOverrides, setTemplateAttrOverrides] = useState<Record<string, string>>({})
   const [staffSales, setStaffSales] = useState('allow')
   const [consumeDateMode, setConsumeDateMode] = useState<'days' | 'calendar'>('days')
   const [nonConsumeDateMode, setNonConsumeDateMode] = useState<'all_dates' | 'partial_dates'>('all_dates')
@@ -536,6 +565,15 @@ export default function DouyinProductCreateWizard({
     return bump > 0 ? bump.toFixed(2) : '0.00'
   }, [priceYuan])
 
+  const requiredTemplateAttrs = useMemo(
+    () => templateProductAttrs.filter((x) => x.is_required),
+    [templateProductAttrs],
+  )
+  const requiredSkuTemplateAttrs = useMemo(
+    () => templateSkuAttrs.filter((x) => x.is_required),
+    [templateSkuAttrs],
+  )
+
   const openStoreModal = () => {
     setModalDraftIds([...selectedPoiIds])
     setModalPage(1)
@@ -577,6 +615,9 @@ export default function DouyinProductCreateWizard({
       setSalesChannelOptions(tpl.sales_channels)
       setStaffSalesOptions(tpl.staff_sales_options)
       setAfterSalePolicyOptions(tpl.after_sale_policies)
+      setTemplateProductAttrs(tpl.product_attrs)
+      setTemplateSkuAttrs(tpl.sku_attrs)
+      setTemplateAttrOverrides({})
       setSalesChannel((prev) =>
         tpl.sales_channels.some((x) => x.value === prev)
           ? prev
@@ -721,6 +762,9 @@ export default function DouyinProductCreateWizard({
         setSalesChannelOptions(tpl.sales_channels)
         setStaffSalesOptions(tpl.staff_sales_options)
         setAfterSalePolicyOptions(tpl.after_sale_policies)
+        setTemplateProductAttrs(tpl.product_attrs)
+        setTemplateSkuAttrs(tpl.sku_attrs)
+        setTemplateAttrOverrides({})
         const ch = si && typeof si.channel === 'string' ? si.channel : null
         setSalesChannel(
           ch && tpl.sales_channels.some((x) => x.value === ch)
@@ -1036,6 +1080,36 @@ export default function DouyinProductCreateWizard({
       setActionMsg({ text: '请至少选择一个适用门店', ok: false })
       return
     }
+    for (const a of templateProductAttrs) {
+      if (!a.is_required) continue
+      if (templateAttrWizardCovered(a)) continue
+      const v = templateAttrOverrides[a.key]?.trim()
+      if (!v) {
+        setActionMsg({
+          text: `开放平台模板必填项「${a.name}」（key: ${a.key}）尚未填写，请在本页下方「开放平台类目必填」中补充`,
+          ok: false,
+        })
+        return
+      }
+    }
+
+    const pkg = detail.package_combo
+    const comboJson =
+      pkg?.groups && pkg.groups.length > 0
+        ? JSON.stringify({ groups: pkg.groups }).slice(0, 120_000)
+        : ''
+    const overrides: Record<string, string> = { ...templateAttrOverrides }
+    for (const a of templateProductAttrs) {
+      if (!looksComboTemplateAttr(a)) continue
+      if (comboJson) overrides[a.key] = comboJson
+    }
+    const cleaned = Object.fromEntries(
+      Object.entries(overrides).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v.length > 0),
+    )
+    if (Object.keys(cleaned).length > 0) {
+      detail.template_attr_overrides = cleaned
+    }
+
     setSaving(true)
     setActionMsg(null)
     const r = await postDouyinGoodsProductSave({ mode, detail })
@@ -2173,6 +2247,102 @@ export default function DouyinProductCreateWizard({
                 <p className="text-right text-xs text-gray-400">{otherRules.length} / 500</p>
               </div>
             </div>
+          </section>
+
+          <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-6 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900">开放平台类目必填（template.get）</h3>
+            <p className="mt-1 text-xs leading-relaxed text-gray-700">
+              依据抖音
+              <a
+                href="https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-700 underline"
+              >
+                查询商品模板
+              </a>
+              与
+              <a
+                href="https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save"
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-700 underline"
+              >
+                创建/更新商品
+              </a>
+              ：下列为当前类目下 <span className="font-medium">is_required=true</span> 的商品属性。标注「自动映射」的由本页表单 + 网关写入{' '}
+              <code className="rounded bg-white/80 px-1 text-[11px]">attr_key_value_map</code>；其余请填写 JSON 字符串（结构体须序列化）。
+            </p>
+            {requiredTemplateAttrs.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-600">
+                当前模板未返回必填项，或 template 接口异常；请确认第二步「下一步」已正常加载模板。
+              </p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {requiredTemplateAttrs.map((a) => {
+                  const covered = templateAttrWizardCovered(a)
+                  const comboLike = looksComboTemplateAttr(a)
+                  return (
+                    <li
+                      key={a.key || a.name}
+                      className="rounded-lg border border-blue-100 bg-white/90 px-3 py-2 text-sm text-gray-800"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="font-medium text-gray-900">
+                          {a.name} <span className="text-red-500">*</span>
+                        </span>
+                        <span
+                          className={cn(
+                            'rounded px-2 py-0.5 text-xs',
+                            covered ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950',
+                          )}
+                        >
+                          {covered ? '自动映射' : '须填写'}
+                        </span>
+                      </div>
+                      <p className="mt-1 font-mono text-[11px] text-gray-500">
+                        key: {a.key || '—'} · value_type: {a.value_type}
+                        {a.is_multi ? ' · multi' : ''}
+                      </p>
+                      {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
+                      {comboLike && covered ? (
+                        <p className="mt-2 text-xs text-emerald-900">
+                          与「商品名称 / 售价 / 套餐数据」生成的 <code className="rounded bg-emerald-50 px-1">package_combo</code>{' '}
+                          同源；保存时将按本属性 key 写入 <code className="rounded bg-emerald-50 px-1">combo_rule</code> JSON。
+                        </p>
+                      ) : null}
+                      {!covered ? (
+                        <textarea
+                          value={templateAttrOverrides[a.key] ?? ''}
+                          onChange={(e) =>
+                            setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                          }
+                          rows={comboLike || String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
+                          placeholder="填写该 key 对应的字符串值（JSON 须为单行或可解析文本）"
+                          className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                        />
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            {requiredSkuTemplateAttrs.length > 0 ? (
+              <div className="mt-5 border-t border-blue-100 pt-4">
+                <h4 className="text-sm font-semibold text-gray-900">SKU 模板必填（sku_attrs）</h4>
+                <p className="mt-1 text-xs text-gray-600">
+                  单 SKU 场景下售价/库存等由本页「售价」「库存」自动映射至 SKU；若保存仍报 SKU 属性错误，请把完整报错发给技术对照模板 key。
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-gray-700">
+                  {requiredSkuTemplateAttrs.map((a) => (
+                    <li key={`sku-${a.key}`}>
+                      <span className="font-medium">{a.name}</span>
+                      <span className="ml-2 font-mono text-gray-500">{a.key}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </section>
 
           {actionMsg && (
