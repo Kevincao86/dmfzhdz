@@ -26,15 +26,17 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     label: 'Anthropic / Claude',
     defaultBaseUrl: 'https://api.anthropic.com',
     primaryEndpoint: 'POST /v1/messages',
-    defaultModel: 'claude-sonnet-4-6',
-    fallbackModel: 'claude-haiku-4-5',
+    /** 与 Anthropic 控制台可见模型 id 一致；可用 ANTHROPIC_MODEL 覆盖 */
+    defaultModel: 'claude-3-5-sonnet-20241022',
+    fallbackModel: 'claude-3-5-haiku-20241022',
   },
   {
     provider: 'xai',
     label: 'xAI / Grok',
     defaultBaseUrl: 'https://api.x.ai/v1',
     primaryEndpoint: 'POST /responses 或 POST /chat/completions',
-    defaultModel: 'grok-4.20-reasoning',
+    defaultModel: 'grok-2-latest',
+    fallbackModel: 'grok-beta',
   },
   {
     provider: 'deepseek',
@@ -49,15 +51,16 @@ export const MODEL_REGISTRY: ModelRegistryEntry[] = [
     label: 'Kimi / Moonshot',
     defaultBaseUrl: 'https://api.moonshot.ai/v1',
     primaryEndpoint: 'POST /chat/completions',
-    defaultModel: 'kimi-k2.6',
+    defaultModel: 'moonshot-v1-8k',
+    fallbackModel: 'moonshot-v1-32k',
   },
   {
     provider: 'minimax',
     label: 'MiniMax',
     defaultBaseUrl: 'https://api.minimax.io/v1',
     primaryEndpoint: 'POST /chat/completions（OpenAI 兼容）',
-    defaultModel: 'MiniMax-M2.7',
-    fallbackModel: 'MiniMax-M2.5',
+    defaultModel: 'MiniMax-M2',
+    fallbackModel: 'MiniMax-M2.1',
   },
 ]
 

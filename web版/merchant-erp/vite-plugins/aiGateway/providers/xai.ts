@@ -20,17 +20,22 @@ export async function chatXai(req: AIChatRequest, env: Record<string, string>): 
     apiKey,
     baseURL: 'https://api.x.ai/v1',
   })
-  const completion = await client.chat.completions.create({
-    model,
-    messages: toMessages(req.messages),
-    temperature: req.temperature ?? 0.7,
-  })
-  const msg = completion.choices[0]?.message?.content
-  return {
-    provider: 'xai',
-    model: completion.model ?? model,
-    content: typeof msg === 'string' ? msg : '',
-    raw: completion as unknown as Record<string, unknown>,
-    usage: completion.usage as unknown as Record<string, unknown>,
+  try {
+    const completion = await client.chat.completions.create({
+      model,
+      messages: toMessages(req.messages),
+      temperature: req.temperature ?? 0.7,
+    })
+    const msg = completion.choices[0]?.message?.content
+    return {
+      provider: 'xai',
+      model: completion.model ?? model,
+      content: typeof msg === 'string' ? msg : '',
+      raw: completion as unknown as Record<string, unknown>,
+      usage: completion.usage as unknown as Record<string, unknown>,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`xAI: ${msg}`)
   }
 }
