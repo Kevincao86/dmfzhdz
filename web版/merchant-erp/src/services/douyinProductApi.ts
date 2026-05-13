@@ -353,6 +353,11 @@ export type DouyinProductDetailPayload = {
   poi_ids: string[]
   /** 套餐结构：团购 product_type=1 为搭配组；代金券等类型亦传单品组，供网关映射 goodlife `product.combo_rule`（见开放平台商品 save 文档） */
   package_combo?: { groups: ComboPackageGroup[] }
+  /**
+   * 按 [template.get](https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get)
+   * 返回的 attr `key` 直填 `attr_key_value_map`（opaque key、combo_rule 类字段等），由网关合并进 [product.save](https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save)。
+   */
+  template_attr_overrides?: Record<string, string>
   /** 售卖、库存、交易、消费等扩展块（JSON 透传网关拼装 attr_key_value_map） */
   sales_info: Record<string, unknown>
   trade_rules: Record<string, unknown>
