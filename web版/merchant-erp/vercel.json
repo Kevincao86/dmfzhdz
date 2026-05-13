@@ -54,6 +54,14 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-ops-sync-tenants-erp.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-ops-sync-ai.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-store-gross-margin-advisor.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
