@@ -907,32 +907,50 @@ export default function DouyinProductCreateWizard({
     const aux = auxUrlsList.filter(Boolean).slice(0, 4)
     const env = envUrlsList.filter(Boolean).slice(0, 10)
     const originNum = Number.parseFloat(originYuan) || 0
+    /** 团购(1)走搭配组；代金券等其它类型抖音仍常要求 combo_rule，与 package_combo 同源补单品组 */
     const package_combo =
-      productType === 1
-        ? (() => {
-            const groupsFromUi = comboGroups
-              .map((g) => ({
-                pick_rule: g.pickRule.trim() || '全部必选',
-                items: g.items
-                  .filter((it) => it.name.trim())
-                  .map((it) => ({
-                    name: it.name.trim(),
-                    quantity: Math.max(1, Number.parseInt(it.qty, 10) || 1),
-                    origin_price_yuan: Math.max(0, Number.parseFloat(it.price) || 0),
-                    ...(it.product_id ? { product_id: it.product_id } : {}),
-                    ...(it.sku_id ? { sku_id: it.sku_id } : {}),
-                  })),
-              }))
-              .filter((g) => g.items.length > 0)
-            if (groupsFromUi.length > 0) return { groups: groupsFromUi }
-            const nm = productName.trim().slice(0, 120) || '团购套餐'
-            return {
+      productType == null
+        ? undefined
+        : productType === 1
+          ? (() => {
+              const groupsFromUi = comboGroups
+                .map((g) => ({
+                  pick_rule: g.pickRule.trim() || '全部必选',
+                  items: g.items
+                    .filter((it) => it.name.trim())
+                    .map((it) => ({
+                      name: it.name.trim(),
+                      quantity: Math.max(1, Number.parseInt(it.qty, 10) || 1),
+                      origin_price_yuan: Math.max(0, Number.parseFloat(it.price) || 0),
+                      ...(it.product_id ? { product_id: it.product_id } : {}),
+                      ...(it.sku_id ? { sku_id: it.sku_id } : {}),
+                    })),
+                }))
+                .filter((g) => g.items.length > 0)
+              if (groupsFromUi.length > 0) return { groups: groupsFromUi }
+              const nm = productName.trim().slice(0, 120) || '团购套餐'
+              return {
+                groups: [
+                  {
+                    pick_rule: '全部必选',
+                    items: [
+                      {
+                        name: nm,
+                        quantity: 1,
+                        origin_price_yuan: Math.max(0, originNum || price),
+                      },
+                    ],
+                  },
+                ],
+              }
+            })()
+          : {
               groups: [
                 {
                   pick_rule: '全部必选',
                   items: [
                     {
-                      name: nm,
+                      name: productName.trim().slice(0, 120) || '商品',
                       quantity: 1,
                       origin_price_yuan: Math.max(0, originNum || price),
                     },
@@ -940,8 +958,6 @@ export default function DouyinProductCreateWizard({
                 },
               ],
             }
-          })()
-        : undefined
     const extOut = externalGoodsId.trim()
     let stable = (stableOutIdRef.current ?? '').trim()
     if (!stable && !extOut) {

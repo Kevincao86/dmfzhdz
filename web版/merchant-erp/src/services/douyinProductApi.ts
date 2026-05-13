@@ -351,7 +351,7 @@ export type DouyinProductDetailPayload = {
   env_image_urls: string[]
   /** 适用门店 poi_id 列表 */
   poi_ids: string[]
-  /** 团购（product_type=1）套餐搭配，网关映射 goodlife 套餐/商品组结构 */
+  /** 套餐结构：团购 product_type=1 为搭配组；代金券等类型亦传单品组，供网关映射 goodlife `product.combo_rule`（见开放平台商品 save 文档） */
   package_combo?: { groups: ComboPackageGroup[] }
   /** 售卖、库存、交易、消费等扩展块（JSON 透传网关拼装 attr_key_value_map） */
   sales_info: Record<string, unknown>
