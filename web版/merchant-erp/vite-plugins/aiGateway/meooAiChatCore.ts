@@ -51,11 +51,13 @@ export async function runMeooAiChatCore(
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined
 
-  const imageDataUrls = Array.isArray(parsed.imageDataUrls)
-    ? parsed.imageDataUrls
-        .filter((x): x is string => typeof x === 'string' && x.startsWith('data:image/'))
-        .slice(0, 4)
-    : undefined
+  /** 附图仅 TokenMix（四大家族）路径消费；直连 Kimi/MiniMax/DeepSeek 保持纯文本，与历史行为一致 */
+  const imageDataUrls =
+    provider === 'tokenmix' && Array.isArray(parsed.imageDataUrls)
+      ? parsed.imageDataUrls
+          .filter((x): x is string => typeof x === 'string' && x.startsWith('data:image/'))
+          .slice(0, 4)
+      : undefined
 
   const req: AIChatRequest = {
     provider,

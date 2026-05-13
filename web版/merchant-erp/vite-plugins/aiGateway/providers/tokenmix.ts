@@ -4,7 +4,7 @@ import { resolveTokenMixModelId } from '../../../src/services/ai/tokenmixClient.
 import { toOpenAiChatCompletionMessages } from '../openAiChatMessages.js'
 
 /**
- * OpenAI/Claude/Gemini/Grok 经 TokenMix OpenAI-compatible relay。
+ * 四大家族（OpenAI/Claude/Gemini/Grok）经 TokenMix OpenAI-compatible relay；多模态（附图）仅在此路径拼装。
  * @see https://tokenmix.ai/docs
  */
 export async function chatTokenMix(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
