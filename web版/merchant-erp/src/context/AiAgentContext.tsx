@@ -20,6 +20,7 @@ import type {
 } from '../lib/aiAgentTypes'
 import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
+import { resolveModelPickerKeyForImageIntent } from '../services/ai/aiImageIntentRouting'
 import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
 import { postAiChat } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
@@ -344,8 +345,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       taskType: AiTaskType | undefined,
       previewPage?: string,
       imageDataUrls: string[] = [],
+      pickerKeyOverride?: string,
     ) => {
-      const parsed = parseAiModelPickerKey(modelPickerKey)
+      const key = pickerKeyOverride ?? modelPickerKey
+      const parsed = parseAiModelPickerKey(key)
       if (!parsed) return
       setAiSending(true)
       try {
@@ -393,6 +396,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const line = trimmed || '请结合附图说明你的需求。'
       setSidebarActiveArchiveId(null)
       setPendingComposerImages([])
+      const nextPickerKey = resolveModelPickerKeyForImageIntent(
+        modelPickerKey,
+        modelPickerOptions,
+        line,
+        imgs.length > 0,
+      )
+      if (nextPickerKey !== modelPickerKey) {
+        setModelPickerKeyState(nextPickerKey)
+        savePickerKey(nextPickerKey)
+      }
       const userMsg = createAgentMessage('user', line, { imageUrls: imgs.length ? imgs : undefined })
       setMessages((prev) => {
         const next = [...prev, userMsg]
@@ -401,10 +414,25 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       setInputDraft('')
       queueMicrotask(() => {
-        void runGatewayForSnapshot(messagesRef.current, line, inferTaskType(line), pageContext?.pageLabel, imgs)
+        void runGatewayForSnapshot(
+          messagesRef.current,
+          line,
+          inferTaskType(line),
+          pageContext?.pageLabel,
+          imgs,
+          nextPickerKey,
+        )
       })
     },
-    [aiSending, pendingComposerImages, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
+    [
+      aiSending,
+      pendingComposerImages,
+      pendingPreviewId,
+      pageContext?.pageLabel,
+      runGatewayForSnapshot,
+      modelPickerKey,
+      modelPickerOptions,
+    ],
   )
 
   const applyShortcut = useCallback(
@@ -477,6 +505,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const q = query.trim()
       if (!q || aiSending) return
       setPendingComposerImages([])
+      const nextPickerKey = resolveModelPickerKeyForImageIntent(
+        modelPickerKey,
+        modelPickerOptions,
+        q,
+        false,
+      )
+      if (nextPickerKey !== modelPickerKey) {
+        setModelPickerKeyState(nextPickerKey)
+        savePickerKey(nextPickerKey)
+      }
       const pl = '顶部搜索 / AI 指令'
       setPageContext({ pageLabel: pl })
       setDrawerOpen(true)
@@ -488,10 +526,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
       queueMicrotask(() => {
-        void runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl, [])
+        void runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl, [], nextPickerKey)
       })
     },
-    [aiSending, runGatewayForSnapshot],
+    [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions],
   )
 
   const value = useMemo<AiAgentContextValue>(
