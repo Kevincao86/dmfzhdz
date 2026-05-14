@@ -21,6 +21,14 @@ export async function routeAiChat(req: AIChatRequest, env: Record<string, string
       const { chatMinimax } = await import('./providers/minimax.js')
       return chatMinimax(req, env)
     }
+    case 'qwen': {
+      const { chatQwenAgent } = await import('./providers/merchantLlmChat.js')
+      return chatQwenAgent(req, env)
+    }
+    case 'doubao': {
+      const { chatDoubaoAgent } = await import('./providers/merchantLlmChat.js')
+      return chatDoubaoAgent(req, env)
+    }
     default:
       throw new Error(`unknown provider: ${String((req as AIChatRequest).provider)}`)
   }

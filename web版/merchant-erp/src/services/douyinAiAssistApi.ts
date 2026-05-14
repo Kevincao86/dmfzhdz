@@ -13,6 +13,27 @@ export { listAiUiModelOptions } from './merchantAiVendorCatalogClient'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
+function assistFetchUrlCandidates(path: string): string[] {
+  const out: string[] = []
+  const add = (u: string) => {
+    const t = u.trim()
+    if (!t || out.includes(t)) return
+    out.push(t)
+  }
+  const p = path.startsWith('/') ? path : `/${path}`
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    try {
+      add(new URL(p, window.location.origin).href)
+    } catch {
+      /* ignore */
+    }
+  }
+  const b = apiBase().replace(/\/$/, '')
+  if (b) add(`${b}${p}`)
+  if (out.length === 0) add(p)
+  return out
+}
+
 function url(path: string) {
   const b = apiBase().replace(/\/$/, '')
   return `${b}${path}`
@@ -186,19 +207,22 @@ async function postAiAssistFetch(
   const bodyStr = JSON.stringify(bodyObj)
   const headers = authHeaders()
   for (const p of AI_ASSIST_PATHS) {
-    const res = await fetch(url(p), { method: 'POST', headers, body: bodyStr, signal })
-    const text = await res.text()
-    const trim = text.trimStart()
-    const ct = res.headers.get('content-type') ?? ''
-    if (res.status === 404) continue
-    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
-    return new Response(text, {
-      status: res.status,
-      statusText: res.statusText,
-      headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
-    })
+    for (const target of assistFetchUrlCandidates(p)) {
+      const res = await fetch(target, { method: 'POST', headers, body: bodyStr, signal })
+      const text = await res.text()
+      const trim = text.trimStart()
+      const ct = res.headers.get('content-type') ?? ''
+      if (res.status === 404) continue
+      if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+      return new Response(text, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
+      })
+    }
   }
-  return fetch(url(AI_ASSIST_PATHS[1]), { method: 'POST', headers, body: bodyStr, signal })
+  const fallback = assistFetchUrlCandidates(AI_ASSIST_PATHS[1])[0] ?? url(AI_ASSIST_PATHS[1])
+  return fetch(fallback, { method: 'POST', headers, body: bodyStr, signal })
 }
 
 export async function postDouyinGoodsAiAssist(body: AiAssistRequest): Promise<AiAssistResult> {

@@ -57,7 +57,7 @@ export function registryEntry(provider: Exclude<AIProvider, 'tokenmix'>): Direct
   return DIRECT_MODEL_REGISTRY.find((x) => x.provider === provider)
 }
 
-/** 智能体页下拉：TokenMix 四家族 + 直连三家 */
+/** 智能体页下拉：TokenMix 四家族、通义/豆包（Vercel 服务端密钥）、直连 DeepSeek/Kimi/MiniMax */
 export type AiModelPickerOption = {
   key: string
   provider: AIProvider
@@ -76,7 +76,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
       provider: 'tokenmix',
       modelFamily: fam.id,
       model: '',
-      label: `${fam.label}（TokenMix）· 默认`,
+      label: `${fam.label} · 默认`,
     })
     for (const m of fam.models) {
       out.push({
@@ -84,7 +84,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
         provider: 'tokenmix',
         modelFamily: fam.id,
         model: m.id,
-        label: `${fam.label}（TokenMix）· ${m.label}`,
+        label: `${fam.label} · ${m.label}`,
       })
     }
   }
@@ -112,12 +112,52 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     }
   }
 
+  /** 通义 / 豆包：走 Vercel /api/meoo-ai-chat → 服务端 DashScope / 火山方舟（密钥仅环境变量或运营注册表） */
+  const qwenModels = [
+    { id: 'qwen-turbo', label: 'qwen-turbo' },
+    { id: 'qwen-plus', label: 'qwen-plus' },
+    { id: 'qwen-max', label: 'qwen-max' },
+  ] as const
+  out.push({
+    key: 'qwen::__default__',
+    provider: 'qwen',
+    model: '',
+    label: '通义千问 · 默认',
+  })
+  for (const m of qwenModels) {
+    out.push({
+      key: `qwen::${m.id}`,
+      provider: 'qwen',
+      model: m.id,
+      label: `通义千问 · ${m.label}`,
+    })
+  }
+
+  const doubaoModels = [
+    { id: 'doubao-pro-32k', label: 'doubao-pro-32k' },
+    { id: 'doubao-seed-1-6-251015', label: 'doubao-seed-1-6' },
+  ] as const
+  out.push({
+    key: 'doubao::__default__',
+    provider: 'doubao',
+    model: '',
+    label: '豆包 · 默认',
+  })
+  for (const m of doubaoModels) {
+    out.push({
+      key: `doubao::${m.id}`,
+      provider: 'doubao',
+      model: m.id,
+      label: `豆包 · ${m.label}`,
+    })
+  }
+
   return out
 }
 
 export type ParsedModelPicker =
   | { provider: 'tokenmix'; modelFamily: AIModelFamily; model: string }
-  | { provider: 'deepseek' | 'kimi' | 'minimax'; model: string }
+  | { provider: 'deepseek' | 'kimi' | 'minimax' | 'qwen' | 'doubao'; model: string }
 
 export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
   const parts = key.split('::')
@@ -129,7 +169,7 @@ export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
   }
   if (parts.length >= 2) {
     const p = parts[0] as AIProvider
-    if (p !== 'deepseek' && p !== 'kimi' && p !== 'minimax') return null
+    if (p !== 'deepseek' && p !== 'kimi' && p !== 'minimax' && p !== 'qwen' && p !== 'doubao') return null
     const rest = parts.slice(1).join('::')
     const model = rest === '__default__' ? '' : rest
     return { provider: p, model }

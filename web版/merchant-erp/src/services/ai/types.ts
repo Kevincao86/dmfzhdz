@@ -8,7 +8,7 @@ import type { AiTaskType } from '../../lib/aiAgentTypes'
 /** TokenMix 侧「模型家族」分组 */
 export type AIModelFamily = 'openai' | 'claude' | 'gemini' | 'grok'
 
-export type AIProvider = 'tokenmix' | 'deepseek' | 'kimi' | 'minimax'
+export type AIProvider = 'tokenmix' | 'deepseek' | 'kimi' | 'minimax' | 'qwen' | 'doubao'
 
 export type AIMessageRole = 'system' | 'user' | 'assistant' | 'tool'
 

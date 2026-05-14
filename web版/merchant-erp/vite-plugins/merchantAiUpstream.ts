@@ -1684,3 +1684,33 @@ export async function merchantChatCompletion(
     return { ok: false, message: formatAssistUpstreamCatchMessage(e, model) }
   }
 }
+
+/**
+ * 智能体网关（/api/meoo-ai-chat）：多轮对话压平为 system + user，可选覆盖模型 id（否则读 env 默认）。
+ */
+export async function merchantAgentChatFromMessages(
+  env: MerchantAiEnv,
+  vendor: 'doubao' | 'qwen',
+  modelOverride: string | undefined,
+  system: string,
+  user: string,
+): Promise<{ text: string; modelUsed: string }> {
+  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
+  const { key, label } = pickEffectiveKey(envM, vendor, {})
+  if (!key) {
+    throw new Error(
+      `未配置 ${vendor === 'doubao' ? '豆包' : '通义千问'} API Key（${label}）。请在 Vercel 环境变量中设置 MERCHANT_AI_DOUBAO_KEY / MERCHANT_AI_QWEN_KEY（或 ARK_API_KEY / DASHSCOPE_API_KEY）。`,
+    )
+  }
+  const mo = modelOverride?.trim()
+  let eff: MerchantAiEnv = envM
+  if (mo) {
+    eff =
+      vendor === 'doubao'
+        ? { ...envM, MERCHANT_AI_DOUBAO_CHAT_MODEL: mo }
+        : { ...envM, MERCHANT_AI_QWEN_CHAT_MODEL: mo }
+  }
+  const raw = await callModelText(vendor, key, eff, system, user)
+  const modelUsed = vendor === 'doubao' ? doubaoChatModelId(eff) : qwenChatModelId(eff)
+  return { text: polishVisibleAssistantText(raw), modelUsed }
+}
