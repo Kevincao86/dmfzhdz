@@ -1320,6 +1320,17 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
     }
   }
   if (!res.ok) {
+    if (res.status === 504) {
+      const fromBody =
+        (typeof data.message === 'string' && data.message.trim()) ||
+        (typeof data.description === 'string' && data.description.trim())
+      return {
+        ok: false,
+        message:
+          fromBody ||
+          '网关超时（504）：多为 Vercel 函数执行超过上限，或抖音/自建中继未及时返回。请稍后重试；可先点「保存草稿」写入本机。请在 Vercel → Logs / Functions 查看；若用自建 DOUYIN_OPENAPI_BASE_URL，请检查中继延迟。可在环境变量调大 DOUYIN_GOODS_HTTP_TIMEOUT_MS，并把该 API 的 maxDuration 提到 120s（Pro 及以上）。',
+      }
+    }
     const msg =
       (typeof data.message === 'string' && data.message) ||
       (typeof data.description === 'string' && data.description) ||
