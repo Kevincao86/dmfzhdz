@@ -33,9 +33,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { prompt?: unknown }
+  let body: { prompt?: unknown; preferred_vendor?: unknown }
   try {
-    body = JSON.parse(rawBody(req) || '{}') as { prompt?: unknown }
+    body = JSON.parse(rawBody(req) || '{}') as { prompt?: unknown; preferred_vendor?: unknown }
   } catch {
     sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
     return
@@ -45,9 +45,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 400, { ok: false, error: 'prompt_required' })
     return
   }
+  const pvRaw = typeof body.preferred_vendor === 'string' ? body.preferred_vendor.trim().toLowerCase() : ''
+  const preferredVendor =
+    pvRaw === 'qwen' || pvRaw === 'doubao' || pvRaw === 'minimax' ? (pvRaw as 'qwen' | 'doubao' | 'minimax') : undefined
 
   try {
-    const out = await runAgentFreeformTextToImage(process.env as Record<string, string>, prompt)
+    const out = await runAgentFreeformTextToImage(process.env as Record<string, string>, prompt, preferredVendor)
     if (out.ok) {
       sendMerchantJson(res, 200, {
         ok: true,

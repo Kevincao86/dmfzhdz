@@ -25,6 +25,11 @@ import {
   modelPickerKeyForNativeImageVendor,
   resolveModelPickerKeyForImageIntent,
 } from '../services/ai/aiImageIntentRouting'
+import {
+  effectiveChatPickerKey,
+  isAgentImagePickerKey,
+  nativeImagePreferredVendorFromPicker,
+} from '../services/ai/agentImageModelKeys'
 import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
 import { postAiAgentNativeImage, postAiChat } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
@@ -351,7 +356,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       imageDataUrls: string[] = [],
       pickerKeyOverride?: string,
     ) => {
-      const key = pickerKeyOverride ?? modelPickerKey
+      const rawKey = pickerKeyOverride ?? modelPickerKey
+      const key = effectiveChatPickerKey(rawKey)
       const parsed = parseAiModelPickerKey(key)
       if (!parsed) return
       setAiSending(true)
@@ -420,11 +426,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       queueMicrotask(() => {
         void (async () => {
           const tryNativePixel =
-            detectImageGenerationIntent(line) && imgs.length === 0
+            (detectImageGenerationIntent(line) && imgs.length === 0) ||
+            (isAgentImagePickerKey(nextPickerKey) && imgs.length === 0 && trimmed.length > 0)
           if (tryNativePixel) {
             setAiSending(true)
             try {
-              const imgRes = await postAiAgentNativeImage(line)
+              const pref = nativeImagePreferredVendorFromPicker(nextPickerKey)
+              const imgRes = await postAiAgentNativeImage(line, pref ? { preferredVendor: pref } : undefined)
               if (imgRes.ok) {
                 const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
                 if (vk) {
@@ -459,7 +467,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             inferTaskType(line),
             pageContext?.pageLabel,
             imgs,
-            nextPickerKey,
+            effectiveChatPickerKey(nextPickerKey),
           )
         })()
       })
@@ -568,10 +576,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       queueMicrotask(() => {
         void (async () => {
-          if (detectImageGenerationIntent(q)) {
+          if (detectImageGenerationIntent(q) || isAgentImagePickerKey(nextPickerKey)) {
             setAiSending(true)
             try {
-              const imgRes = await postAiAgentNativeImage(q)
+              const pref = nativeImagePreferredVendorFromPicker(nextPickerKey)
+              const imgRes = await postAiAgentNativeImage(q, pref ? { preferredVendor: pref } : undefined)
               if (imgRes.ok) {
                 const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
                 if (vk) {
@@ -600,7 +609,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               setAiSending(false)
             }
           }
-          await runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl, [], nextPickerKey)
+          await runGatewayForSnapshot(
+            messagesRef.current,
+            q,
+            inferTaskType(q),
+            pl,
+            [],
+            effectiveChatPickerKey(nextPickerKey),
+          )
         })()
       })
     },

@@ -105,7 +105,10 @@ export type AiAgentNativeImageErr = { ok: false; message: string }
 /**
  * 智能体文生图：POST /api/meoo-ai-agent-image（服务端通义万相 / 豆包 Seedream / MiniMax，与商品 AI 共用环境变量）。
  */
-export async function postAiAgentNativeImage(prompt: string): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
+export async function postAiAgentNativeImage(
+  prompt: string,
+  opts?: { preferredVendor?: 'qwen' | 'doubao' | 'minimax' },
+): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
   const token = await bearer()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -115,13 +118,15 @@ export async function postAiAgentNativeImage(prompt: string): Promise<AiAgentNat
 
   const tryPaths = ['/api/meoo-ai-agent-image']
   let lastErr = 'no_response'
+  const body: Record<string, unknown> = { prompt }
+  if (opts?.preferredVendor) body.preferred_vendor = opts.preferredVendor
   for (const p of tryPaths) {
     const targets = aiChatFetchUrlCandidates(p)
     for (const target of targets) {
       const res = await fetch(target, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify(body),
       })
       const text = await res.text()
       let json: unknown = null

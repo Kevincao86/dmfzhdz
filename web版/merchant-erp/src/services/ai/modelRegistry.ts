@@ -58,6 +58,8 @@ export function registryEntry(provider: Exclude<AIProvider, 'tokenmix'>): Direct
 }
 
 /** 智能体页下拉：TokenMix 四家族、通义/豆包（Vercel 服务端密钥）、直连 DeepSeek/Kimi/MiniMax */
+export type AiModelCapability = 'chat' | 'image'
+
 export type AiModelPickerOption = {
   key: string
   provider: AIProvider
@@ -65,6 +67,22 @@ export type AiModelPickerOption = {
   modelFamily?: AIModelFamily
   model: string
   label: string
+  /** 默认 chat；image 为文生图（走服务端万相/豆包/MiniMax） */
+  capability?: AiModelCapability
+}
+
+/** TokenMix 各家族下展示的「文生图」模型名（与 chat id 独立；出图仍由店魔方服务端引擎执行） */
+const AGENT_TOKENMIX_T2I_BY_FAMILY: Partial<Record<AIModelFamily, readonly { id: string; label: string }[]>> = {
+  openai: [
+    { id: 'gpt-image-1', label: 'GPT Image 1' },
+    { id: 'dall-e-3', label: 'DALL·E 3' },
+  ],
+  claude: [{ id: 'claude-image-gen', label: 'Claude 图像生成' }],
+  gemini: [
+    { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash（图像）' },
+    { id: 'imagen-3', label: 'Imagen 3' },
+  ],
+  grok: [{ id: 'grok-image', label: 'Grok 图像' }],
 }
 
 export function listAiModelPickerOptions(): AiModelPickerOption[] {
@@ -77,6 +95,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
       modelFamily: fam.id,
       model: '',
       label: `${fam.label} · 默认`,
+      capability: 'chat',
     })
     for (const m of fam.models) {
       out.push({
@@ -85,7 +104,21 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
         modelFamily: fam.id,
         model: m.id,
         label: `${fam.label} · ${m.label}`,
+        capability: 'chat',
       })
+    }
+    const t2iList = AGENT_TOKENMIX_T2I_BY_FAMILY[fam.id]
+    if (t2iList) {
+      for (const m of t2iList) {
+        out.push({
+          key: `img::m::${fam.id}::${m.id}`,
+          provider: 'tokenmix',
+          modelFamily: fam.id,
+          model: m.id,
+          label: `${fam.label} · ${m.label}（文生图 · 店魔方引擎）`,
+          capability: 'image',
+        })
+      }
     }
   }
 
@@ -95,12 +128,14 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
       provider: r.provider,
       model: '',
       label: `${r.label} · 默认`,
+      capability: 'chat',
     })
     out.push({
       key: `${r.provider}::${r.defaultModel}`,
       provider: r.provider,
       model: r.defaultModel,
       label: `${r.label} · ${r.defaultModel}`,
+      capability: 'chat',
     })
     if (r.fallbackModel) {
       out.push({
@@ -108,6 +143,34 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
         provider: r.provider,
         model: r.fallbackModel,
         label: `${r.label} · ${r.fallbackModel}`,
+        capability: 'chat',
+      })
+    }
+    if (r.provider === 'deepseek') {
+      out.push({
+        key: 'img::b::deepseek::t2i',
+        provider: 'deepseek',
+        model: '',
+        label: `${r.label} · 文生图（店魔方引擎）`,
+        capability: 'image',
+      })
+    }
+    if (r.provider === 'kimi') {
+      out.push({
+        key: 'img::b::kimi::t2i',
+        provider: 'kimi',
+        model: '',
+        label: `${r.label} · 文生图（店魔方引擎）`,
+        capability: 'image',
+      })
+    }
+    if (r.provider === 'minimax') {
+      out.push({
+        key: 'img::v::minimax',
+        provider: 'minimax',
+        model: 'image-01',
+        label: `${r.label} · 文生图（image-01 · 首选 MiniMax）`,
+        capability: 'image',
       })
     }
   }
@@ -123,6 +186,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     provider: 'qwen',
     model: '',
     label: '通义千问 · 默认',
+    capability: 'chat',
   })
   for (const m of qwenModels) {
     out.push({
@@ -130,8 +194,16 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
       provider: 'qwen',
       model: m.id,
       label: `通义千问 · ${m.label}`,
+      capability: 'chat',
     })
   }
+  out.push({
+    key: 'img::v::qwen',
+    provider: 'qwen',
+    model: 'wanx',
+    label: '通义千问 · 文生图（万相 · 首选通义）',
+    capability: 'image',
+  })
 
   const doubaoModels = [
     { id: 'doubao-pro-32k', label: 'doubao-pro-32k' },
@@ -142,6 +214,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     provider: 'doubao',
     model: '',
     label: '豆包 · 默认',
+    capability: 'chat',
   })
   for (const m of doubaoModels) {
     out.push({
@@ -149,8 +222,24 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
       provider: 'doubao',
       model: m.id,
       label: `豆包 · ${m.label}`,
+      capability: 'chat',
     })
   }
+  out.push({
+    key: 'img::v::doubao',
+    provider: 'doubao',
+    model: 'seedream',
+    label: '豆包 · 文生图（Seedream · 首选豆包）',
+    capability: 'image',
+  })
+
+  out.push({
+    key: 'img::v::auto',
+    provider: 'qwen',
+    model: '',
+    label: '文生图 · 自动（按环境变量轮询万相/豆包/MiniMax）',
+    capability: 'image',
+  })
 
   return out
 }

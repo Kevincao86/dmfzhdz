@@ -72,7 +72,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         const bodyRaw = await readBody(req as IncomingMessage)
         const auth = req.headers['authorization']
         const { runAgentFreeformTextToImage } = await import('./merchantAiUpstream.js')
-        const parsed = JSON.parse(bodyRaw || '{}') as { prompt?: string }
+        const parsed = JSON.parse(bodyRaw || '{}') as { prompt?: string; preferred_vendor?: string }
         const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
         if (!prompt) {
           res.statusCode = 400
@@ -81,6 +81,9 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           res.end(JSON.stringify({ ok: false, error: 'prompt_required' }))
           return
         }
+        const pv = typeof parsed.preferred_vendor === 'string' ? parsed.preferred_vendor.trim().toLowerCase() : ''
+        const preferredVendor =
+          pv === 'qwen' || pv === 'doubao' || pv === 'minimax' ? (pv as 'qwen' | 'doubao' | 'minimax') : undefined
         const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
         const user = await verifyBearerJwt(typeof auth === 'string' ? auth : undefined, env)
         if (!user) {
@@ -90,7 +93,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
           return
         }
-        const out = await runAgentFreeformTextToImage(env, prompt)
+        const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor)
         res.statusCode = out.ok ? 200 : 502
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.setHeader('Access-Control-Allow-Origin', '*')
