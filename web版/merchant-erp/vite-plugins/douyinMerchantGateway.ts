@@ -2316,14 +2316,13 @@ async function buildGoodlifeProductSaveBody(
     delete skuAttrMap.commodity
   }
 
-  const prodComboTplKeys = templateComboAttrKeysFromAttrs(attrs)
-  const skuComboTplKeys = templateComboAttrKeysFromAttrs(skuAttrs)
-  const filledProdCombo = prodComboTplKeys.filter((k) => (mergedProductAttrs[k] ?? '').trim()).length
-  const filledSkuCombo = skuComboTplKeys.filter((k) => (skuAttrMap[k] ?? '').trim()).length
-
+  /**
+   * 顶层 product.combo_rule：团购必带；代金券即便已在 attr_key_value_map 写入 opaque 搭配槽，
+   * 抖音侧仍常校验顶层 combo_rule 非空（否则「combo_rule不能为空」），故代金券只要已组装 comboRule 一律写入。
+   */
   if (comboRule && isGroupBuy) {
     product.combo_rule = comboRule
-  } else if (comboRule && product_type === 2 && filledProdCombo === 0 && filledSkuCombo === 0) {
+  } else if (comboRule && product_type === 2) {
     product.combo_rule = comboRule
   }
 
@@ -2896,6 +2895,27 @@ export async function handleDouyinGoodsProductSavePost(
     }
     clearTimeout(saveTimer)
     const raw = await dr.text()
+    let upstreamBizHint = ''
+    try {
+      const peek = raw.replace(/^\uFEFF/, '').trim()
+      if (peek.startsWith('{')) {
+        const jpeek = parseDouyinJson(peek)
+        const ge = getDataError(jpeek)
+        upstreamBizHint = ge.ok ? 'biz_ok' : String(ge.msg ?? 'biz_err').slice(0, 240)
+      }
+    } catch {
+      upstreamBizHint = 'parse_skip'
+    }
+    console.info(
+      '[meoo douyin goods/save] posted',
+      JSON.stringify({
+        phase: 'after_product_save_post',
+        mode,
+        http_status: dr.status,
+        upstream_biz: upstreamBizHint,
+        save_body_bytes: bodyBytes,
+      }),
+    )
     const trimmed = raw.replace(/^\uFEFF/, '').trim()
     if (trimmed.startsWith('<')) {
       json(res, 502, {

@@ -3402,9 +3402,9 @@ export default function DouyinProductCreateWizard({
                           与「商品名称 / 售价 / 套餐数据」生成的{' '}
                           <code className="rounded bg-emerald-50 px-1">package_combo</code> 同源；
                           {productType === 1
-                            ? ' 保存时由网关写入抖音请求体顶层 product.combo_rule，并同步填充模板 attr_key_value_map 的 combo_rule。'
+                            ? ' 保存时由网关将「商品组」规范化后写入顶层 product.combo_rule，并同步填充模板搭配类 attr。'
                             : productType === 2
-                              ? ' 代金券：若模板有搭配类 opaque key，网关写入 groups 数组 JSON；若无搭配槽位则传顶层 product.combo_rule。单品标价取 max(实付, 划线) 分与来客一致。'
+                              ? ' 代金券：网关生成单组单品结构；写入模板搭配槽（若有）且始终附带顶层 product.combo_rule，避免「combo_rule不能为空」。单品标价取 max(实付, 划线) 分。'
                               : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
                         </p>
                       ) : null}
