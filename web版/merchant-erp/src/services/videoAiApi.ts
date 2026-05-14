@@ -1,7 +1,4 @@
-/** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，浏览器不接触密钥 */
-
-import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
-import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
+/** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
 export type VideoAiBackendConfig = {
   klingConfigured: boolean
@@ -26,16 +23,7 @@ function responseLooksLikeHtml(text: string, contentType: string): boolean {
 }
 
 function buildVideoPostBody(body: Record<string, unknown>): Record<string, unknown> {
-  const keys = readVendorKeyMap()
-  const vendor_keys: Record<string, string> = {}
-  for (const [id, raw] of Object.entries(keys)) {
-    if (!isValidAiVendorSlug(id)) continue
-    const t = raw?.trim()
-    if (t) vendor_keys[id] = t
-  }
-  const out: Record<string, unknown> = { ...body }
-  if (Object.keys(vendor_keys).length > 0) out.vendor_keys = vendor_keys
-  return out
+  return { ...body }
 }
 
 export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {

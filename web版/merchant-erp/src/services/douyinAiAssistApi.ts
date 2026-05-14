@@ -1,13 +1,12 @@
 /**
  * 抖音来客商品创建 — AI 辅助（标题 / 说明 / 图片 / 豆包质检）。
  * 优先 `POST /api/meoo-douyin-goods-ai-assist`，回退 `POST /api/merchant/douyin/goods/ai/assist`。
- * 本地 dev：Vite 网关按 `model` 调用上游；Key 来自 .env 或请求体 `vendor_keys`（由本模块合并 localStorage）。
- * 文案：MiniMax、通义千问、豆包；生图：MiniMax、通义万相（wanx）、豆包（Seedream）；质检：仅豆包对话。
+ * 本地 dev：Vite 网关按 `model` 调用上游；密钥仅来自 Vercel / 服务端环境变量（MERCHANT_AI_*），不再随请求附带浏览器 vendor_keys。
+ * 文案：MiniMax、通义千问、豆包；生图：通义万相（wanx）、豆包（Seedream）、MiniMax（自动优先通义/豆包）；质检：仅豆包对话。
  */
 
 import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
 import { readMerchantSession } from '../lib/merchantSession'
-import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
 
 export { listAiUiModelOptions } from './merchantAiVendorCatalogClient'
 
@@ -166,16 +165,7 @@ function parseNeedVendorKey(data: Record<string, unknown>): string | undefined {
 }
 
 function buildAssistPayload(body: AiAssistRequest): Record<string, unknown> {
-  const keys = readVendorKeyMap()
-  const vendor_keys: Record<string, string> = {}
-  for (const [id, raw] of Object.entries(keys)) {
-    if (!isValidAiVendorSlug(id)) continue
-    const t = raw?.trim()
-    if (t) vendor_keys[id] = t
-  }
-  const base: Record<string, unknown> = { ...body }
-  if (Object.keys(vendor_keys).length > 0) base.vendor_keys = vendor_keys
-  return base
+  return { ...body }
 }
 
 function assistFetchTimeoutMs(action: AiAssistAction): number {
@@ -456,7 +446,7 @@ const DEFAULT_QUALITY_TIMEOUT_MS = 90_000
 
 /**
  * 使用豆包（火山方舟）对话模型，对已上传/已同步商品做多维度质量评分。
- * 经 `POST /api/merchant/douyin/goods/ai/assist` + action `analyze_product_quality`，Key 同其它 AI：`.env` 或浏览器 vendor_keys。
+ * 经 `POST /api/merchant/douyin/goods/ai/assist` + action `analyze_product_quality`，密钥仅服务端 MERCHANT_AI_DOUBAO_KEY / ARK_API_KEY。
  */
 export async function postDouyinProductQualityAnalysis(
   products: QualityProductPayload[],
