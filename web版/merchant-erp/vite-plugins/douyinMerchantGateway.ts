@@ -57,6 +57,11 @@ import {
   openDouyinSessionCredentials,
 } from '../api/merchant/douyin/bindShared.js'
 import { mockDouyinProductStore } from './mockDouyinProductStore.js'
+import { createClient } from '@supabase/supabase-js'
+import {
+  merchantSupabaseAdminEnvConfigureHint,
+  readMerchantSupabaseAdminEnv,
+} from './merchantSupabaseAdminEnv.js'
 
 export { runDouyinMerchantBind }
 
@@ -2419,52 +2424,12 @@ function douyinGoodsSaveUpstreamHint(status: number, raw: string): string {
   return ''
 }
 
-const DOUYIN_IMAGEX_UPLOAD_TIMEOUT_MS = 55_000
+const MERCHANT_PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
-/** 递归收集 JSON 内可公网访问的 https 图链（排除 OAuth 等无关链接） */
-function collectHttpsUrlsFromDouyinJson(node: unknown, out: string[], max = 16): void {
-  if (out.length >= max) return
-  if (typeof node === 'string') {
-    const s = node.trim()
-    if (/^https:\/\/.+/i.test(s) && s.length < 4096 && !/^https:\/\/open\.douyin\.com\/oauth/i.test(s)) {
-      out.push(s)
-    }
-    return
-  }
-  if (!node || typeof node !== 'object') return
-  if (Array.isArray(node)) {
-    for (const x of node) collectHttpsUrlsFromDouyinJson(x, out, max)
-    return
-  }
-  for (const v of Object.values(node as Record<string, unknown>)) {
-    collectHttpsUrlsFromDouyinJson(v, out, max)
-  }
-}
-
-function firstDouyinImagexImageId(node: unknown): string | undefined {
-  if (!node || typeof node !== 'object') return undefined
-  if (Array.isArray(node)) {
-    for (const x of node) {
-      const f = firstDouyinImagexImageId(x)
-      if (f) return f
-    }
-    return undefined
-  }
-  const o = node as Record<string, unknown>
-  for (const [k, v] of Object.entries(o)) {
-    if ((k === 'image_id' || k === 'ImageId') && typeof v === 'string' && v.trim()) return v.trim()
-    const inner = firstDouyinImagexImageId(v)
-    if (inner) return inner
-  }
-  return undefined
-}
-
-function douyinImagexUrlFromTemplate(imageId: string): string | undefined {
-  const tpl = process.env.DOUYIN_GOODS_IMAGEX_URL_TEMPLATE?.trim()
-  if (!tpl) return undefined
-  if (tpl.includes('{id}')) return tpl.split('{id}').join(encodeURIComponent(imageId))
-  if (tpl.includes('{raw}')) return tpl.split('{raw}').join(imageId)
-  return undefined
+function productImageDemoFallbackAllowed(): boolean {
+  const a = process.env.MERCHANT_PRODUCT_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase()
+  const b = process.env.MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase()
+  return a === '1' || a === 'true' || b === '1' || b === 'true'
 }
 
 function demoImageUploadFallback(
@@ -2483,7 +2448,7 @@ function demoImageUploadFallback(
       url: `data:${safeMime};base64,${contentBase64}`,
       mimeType: safeMime,
       message:
-        '演示回退（MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK）：内联 data URL。生产请关闭该变量并确保 imagex 返回 https 图链。',
+        '演示回退（MERCHANT_PRODUCT_IMAGE_UPLOAD_DEMO_FALLBACK）：内联 data URL。生产请配置 Supabase Storage 并关闭演示变量。',
     })
     return
   }
@@ -2495,9 +2460,68 @@ function demoImageUploadFallback(
   })
 }
 
+function merchantProductImageSupabaseBucket(): string {
+  return (process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET ?? '').trim()
+}
+
+function merchantProductImageStoragePrefix(): string {
+  const p = (process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_PREFIX ?? 'douyin-goods').trim().replace(/^\/+|\/+$/g, '')
+  return p || 'douyin-goods'
+}
+
+function extFromMimeAndName(mime: string, name: string): string {
+  const m = mime.toLowerCase()
+  if (m.includes('png')) return 'png'
+  if (m.includes('webp')) return 'webp'
+  if (m.includes('gif')) return 'gif'
+  if (m.includes('bmp')) return 'bmp'
+  if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'
+  const base = name.split(/[/\\]/).pop() ?? ''
+  const hit = /\.([a-z0-9]{1,8})$/i.exec(base)
+  if (hit && /^[a-z0-9]+$/i.test(hit[1]!)) return hit[1]!.toLowerCase()
+  return 'jpg'
+}
+
+async function uploadMerchantProductImageToSupabase(params: {
+  merchantId: string
+  buf: Buffer
+  safeMime: string
+  originalName: string
+}): Promise<{ publicUrl: string; objectPath: string }> {
+  const bucket = merchantProductImageSupabaseBucket()
+  if (!bucket) throw new Error('MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET 未配置')
+
+  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length > 0) {
+    throw new Error(`Supabase 服务端密钥不齐：${missingParts.join(', ')}`)
+  }
+
+  const admin = createClient(supabaseUrl, serviceRole, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  const safeMid = params.merchantId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'merchant'
+  const ext = extFromMimeAndName(params.safeMime, params.originalName)
+  const objectPath = `${merchantProductImageStoragePrefix()}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
+
+  const { error } = await admin.storage.from(bucket).upload(objectPath, params.buf, {
+    contentType: params.safeMime,
+    upsert: false,
+  })
+  if (error) {
+    throw new Error(error.message || 'storage.upload 失败')
+  }
+
+  const { data: pub } = admin.storage.from(bucket).getPublicUrl(objectPath)
+  const publicUrl = pub.publicUrl?.trim() ?? ''
+  if (!/^https:\/\//i.test(publicUrl)) {
+    throw new Error('getPublicUrl 未返回 https：请将桶设为 Public bucket，或为 storage.objects 配置匿名可读策略')
+  }
+  return { publicUrl, objectPath }
+}
+
 /**
- * 商品图上传：经抖音开放平台 `POST /tool/imagex/client_upload/` 写入抖音侧，返回 **https** 图链供 goods/save。
- * @see https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/search-management/business-tool/image-upload
+ * 商品图上传：写入 **Supabase Storage** 公开桶，返回 **https** 直链供 goods/save（需 Vercel 配置 MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET + SUPABASE_SERVICE_ROLE_KEY）。
  */
 export async function handleDouyinGoodsImageUploadPost(
   req: IncomingMessage,
@@ -2537,14 +2561,10 @@ export async function handleDouyinGoodsImageUploadPost(
     return
   }
   const approxBytes = Math.ceil((contentBase64.length * 3) / 4)
-  if (approxBytes > 10 * 1024 * 1024) {
-    json(res, 400, { message: '单张图片不超过 10MB（抖音 tool/imagex 限制）' })
+  if (approxBytes > MERCHANT_PRODUCT_IMAGE_MAX_BYTES) {
+    json(res, 400, { message: `单张图片不超过 ${Math.floor(MERCHANT_PRODUCT_IMAGE_MAX_BYTES / (1024 * 1024))}MB` })
     return
   }
-
-  const allowDemo =
-    process.env.MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase() === '1' ||
-    process.env.MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase() === 'true'
 
   let buf: Buffer
   try {
@@ -2557,86 +2577,57 @@ export async function handleDouyinGoodsImageUploadPost(
     json(res, 400, { message: '图片内容为空' })
     return
   }
-  if (buf.length > 10 * 1024 * 1024) {
-    json(res, 400, { message: '单张图片不超过 10MB' })
+  if (buf.length > MERCHANT_PRODUCT_IMAGE_MAX_BYTES) {
+    json(res, 400, { message: `单张图片不超过 ${Math.floor(MERCHANT_PRODUCT_IMAGE_MAX_BYTES / (1024 * 1024))}MB` })
+    return
+  }
+
+  const safeMime =
+    typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
+      ? mimeType.trim().toLowerCase()
+      : 'image/jpeg'
+
+  const bucket = merchantProductImageSupabaseBucket()
+  const adminParts = readMerchantSupabaseAdminEnv()
+  const missingSupabase = !bucket || adminParts.missingParts.length > 0
+
+  if (missingSupabase) {
+    if (productImageDemoFallbackAllowed()) {
+      demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
+      return
+    }
+    const lines: string[] = [
+      '商品图上传已改为 Supabase Storage：请在 Vercel 配置 MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET（公开桶名），并确保已配置 VITE_SUPABASE_URL 或 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY；桶须对公网可读以便抖音拉取图片。',
+    ]
+    if (!bucket) lines.push('· 缺少 MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET')
+    if (adminParts.missingParts.length) lines.push(merchantSupabaseAdminEnvConfigureHint(adminParts.missingParts))
+    json(res, 503, { message: lines.join('\n') })
     return
   }
 
   try {
-    const safeMime =
-      typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
-        ? mimeType.trim().toLowerCase()
-        : 'image/jpeg'
-    const blob = new Blob([buf], { type: safeMime })
-    const fd = new FormData()
-    fd.append('image', blob, fileName || 'image.jpg')
-
-    const uploadUrl = douyinOpenApiUrl('/tool/imagex/client_upload/')
-    const dr = await withDouyinClientTokenRetry(session, {}, async (token) =>
-      douyinServerFetch(uploadUrl, {
-        method: 'POST',
-        headers: { 'access-token': token },
-        body: fd,
-        signal: AbortSignal.timeout(DOUYIN_IMAGEX_UPLOAD_TIMEOUT_MS),
-      }),
-    )
-
-    const raw = await dr.text()
-    let parsed: Record<string, unknown> = {}
-    try {
-      parsed = JSON.parse(raw || '{}') as Record<string, unknown>
-    } catch {
-      if (allowDemo) {
-        demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
-        return
-      }
-      json(res, 502, { message: `抖音图片上传返回非 JSON（HTTP ${dr.status}）：${raw.slice(0, 280)}` })
-      return
-    }
-
-    if (!dr.ok) {
-      if (allowDemo) {
-        demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
-        return
-      }
-      json(res, 502, { message: `抖音图片上传失败 HTTP ${dr.status}：${raw.slice(0, 700)}` })
-      return
-    }
-
-    const urls: string[] = []
-    collectHttpsUrlsFromDouyinJson(parsed, urls)
-    const chosen = [...new Set(urls)].find((u) => !/^data:/i.test(u))
-
-    if (chosen && /^https:\/\//i.test(chosen)) {
-      json(res, 200, { url: chosen, mimeType: safeMime })
-      return
-    }
-
-    const imageId = firstDouyinImagexImageId(parsed)
-    const fromTpl = imageId ? douyinImagexUrlFromTemplate(imageId) : undefined
-    if (fromTpl && /^https:\/\//i.test(fromTpl)) {
-      json(res, 200, { url: fromTpl, mimeType: safeMime, image_id: imageId })
-      return
-    }
-
-    if (allowDemo) {
-      demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
-      return
-    }
-
-    json(res, 502, {
-      message:
-        '抖音 tool/imagex/client_upload 未解析到可用的 https 图链。请确认应用已开通 tool.image.upload；自建中继须透传 /tool/imagex/client_upload/。若平台仅返回 image_id，请配置 DOUYIN_GOODS_IMAGEX_URL_TEMPLATE（{id} 或 {raw}）。本地联调可设 MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK=1。',
-      image_id: imageId ?? '',
-      response_sample: raw.slice(0, 800),
+    const { publicUrl, objectPath } = await uploadMerchantProductImageToSupabase({
+      merchantId: session.merchantId,
+      buf,
+      safeMime,
+      originalName: fileName,
+    })
+    json(res, 200, {
+      url: publicUrl,
+      mimeType: safeMime,
+      storage: 'supabase',
+      bucket,
+      object_path: objectPath,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (allowDemo) {
-      demoImageUploadFallback(res, mimeType, contentBase64, approxBytes)
+    if (productImageDemoFallbackAllowed()) {
+      demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
       return
     }
-    json(res, 502, { message: `抖音图片上传异常：${msg.slice(0, 800)}` })
+    json(res, 502, {
+      message: `Supabase Storage 上传失败：${msg.slice(0, 900)}。请检查桶策略（INSERT 允许 service_role）、对象大小与 MIME；公开读可参考 Dashboard → Storage → 桶 → Public bucket。`,
+    })
   }
 }
 
