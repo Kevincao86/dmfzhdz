@@ -1594,9 +1594,20 @@ export default function DouyinProductCreateWizard({
         ? JSON.stringify({ groups: pkg.groups }).slice(0, 120_000)
         : ''
     const overrides: Record<string, string> = { ...templateAttrOverrides }
-    for (const a of templateProductAttrs) {
-      if (!looksComboTemplateAttr(a)) continue
-      if (comboJson) overrides[a.key] = comboJson
+    if (productType === 1) {
+      /** 团购：套餐仅 package_combo → 网关 buildDouyinProductComboRule → 顶层 product.combo_rule，勿写入 template_attr_overrides（避免与抖音校验冲突） */
+      for (const a of templateProductAttrs) {
+        if (!looksComboTemplateAttr(a)) continue
+        delete overrides[a.key]
+      }
+      for (const k of Object.keys(overrides)) {
+        if (/^combo_rule$/i.test(k)) delete overrides[k]
+      }
+    } else {
+      for (const a of templateProductAttrs) {
+        if (!looksComboTemplateAttr(a)) continue
+        if (comboJson) overrides[a.key] = comboJson
+      }
     }
     const cleaned = Object.fromEntries(
       Object.entries(overrides).map(([k, v]) => [k, (v ?? '').trim()]).filter(([, v]) => v.length > 0),
@@ -3314,8 +3325,11 @@ export default function DouyinProductCreateWizard({
                       {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
                       {comboLike && covered ? (
                         <p className="mt-2 text-xs text-emerald-900">
-                          与「商品名称 / 售价 / 套餐数据」生成的 <code className="rounded bg-emerald-50 px-1">package_combo</code>{' '}
-                          同源；保存时将按本属性 key 写入 <code className="rounded bg-emerald-50 px-1">combo_rule</code> JSON。
+                          与「商品名称 / 售价 / 套餐数据」生成的{' '}
+                          <code className="rounded bg-emerald-50 px-1">package_combo</code> 同源；
+                          {productType === 1
+                            ? ' 保存时由网关写入抖音请求体顶层 product.combo_rule（不再写入 attr_key_value_map 的套餐类字段）。'
+                            : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
                         </p>
                       ) : null}
                       {!covered ? (
