@@ -1803,14 +1803,16 @@ function buildDouyinProductComboRule(
   return { groups: groupsWithItems }
 }
 
+/** 与 SKU `commodity`、开放平台「商品搭配」一致：attr 值为 **ItemGroupStruct 数组** 的 JSON 字符串，勿用 `{groups:…}` 包一层 */
+function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): string {
+  const groups = (comboRule as { groups?: unknown }).groups
+  const arr = Array.isArray(groups) ? groups : []
+  return JSON.stringify(arr).slice(0, 120_000)
+}
+
 /** 无 package_combo 或解析失败时：单组单品 ItemGroupStruct，供团购兜底与代金券等 template 仍要求 combo 的场景 */
-function buildDouyinComboRuleSingleGroupDefault(
-  productNameFallback: string,
-  originFenFallback: number,
-  priceYuanNum: number,
-): Record<string, unknown> {
-  const py = Number.isFinite(priceYuanNum) && priceYuanNum > 0 ? priceYuanNum : 0
-  const onePrice = Math.max(1, originFenFallback > 0 ? originFenFallback : yuanToFen(py))
+function buildDouyinComboRuleSingleGroupDefault(productNameFallback: string, itemPriceFen: number): Record<string, unknown> {
+  const onePrice = Math.max(1, Math.floor(Number(itemPriceFen)) || 1)
   return {
     groups: [
       {
@@ -1831,17 +1833,15 @@ function buildDouyinComboRuleSingleGroupDefault(
 }
 
 /**
- * 将 combo_rule 写入商品模板 attr_key_value_map（与抖音 template 槽位对齐）。
- * 若无任何 combo 类模板 key（含 template 拉取失败），回退写入 `combo_rule`。
+ * 将 combo_rule 写入商品模板 attr_key_value_map（与抖音「商品搭配」一致：值为 **groups 数组** 的 JSON 字符串）。
+ * 勿写入 `{"groups":[…]}` 形态，否则易触发「请传入合法的 combo_rule」。
  */
 function applyComboRuleToMergedProductAttrs(
   attrs: Record<string, unknown>[],
   mergedProductAttrs: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const comboRuleJsonWrapped = JSON.stringify(comboRule).slice(0, 120_000)
-  const groupsOnly = (comboRule as { groups?: unknown }).groups
-  const comboRuleJsonGroupsArray = JSON.stringify(Array.isArray(groupsOnly) ? groupsOnly : []).slice(0, 120_000)
+  const groupsPayload = comboRuleGroupsArrayJsonString(comboRule)
   let filled = 0
   for (const a of attrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -1850,12 +1850,11 @@ function applyComboRuleToMergedProductAttrs(
     const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
     if (!attrTemplateLooksComboLike(key, name, vt)) continue
     if ((mergedProductAttrs[key] ?? '').trim()) continue
-    const useGroupsArrayJson = vt === 'COMMODITY' || /^commodity$/i.test(key)
-    mergedProductAttrs[key] = useGroupsArrayJson ? comboRuleJsonGroupsArray : comboRuleJsonWrapped
+    mergedProductAttrs[key] = groupsPayload
     filled += 1
   }
   if (filled === 0 && !(mergedProductAttrs.combo_rule ?? '').trim()) {
-    mergedProductAttrs.combo_rule = comboRuleJsonWrapped
+    mergedProductAttrs.combo_rule = groupsPayload
   }
 }
 
@@ -1865,9 +1864,8 @@ function applyComboRuleToSkuAttrMap(
   skuAttrMap: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const groupsArr = (comboRule as { groups?: unknown[] }).groups
-  if (!Array.isArray(groupsArr) || groupsArr.length === 0) return
-  const commodityPayload = JSON.stringify(groupsArr).slice(0, 120_000)
+  const commodityPayload = comboRuleGroupsArrayJsonString(comboRule)
+  if (commodityPayload === '[]') return
   let filled = 0
   for (const a of skuAttrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -2217,19 +2215,14 @@ async function buildGoodlifeProductSaveBody(
   if (isGroupBuy) {
     comboRule = buildDouyinProductComboRule(erp, product_name, originFen)
     if (!comboRule) {
-      const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
-      comboRule = buildDouyinComboRuleSingleGroupDefault(
-        product_name,
-        Math.max(1, yuanToFen(Number.isFinite(oy) && oy > 0 ? oy : priceYuan)),
-        priceYuan,
-      )
+      comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen)
     }
   } else if (product_type === 2) {
     /**
      * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。
-     * 用单组单品结构对齐 ItemGroupStruct，避免「combo_rule不能为空」。
+     * 单组单品标价用实付（分）与 sku.actual_amount 对齐。
      */
-    comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, originFen, priceYuan)
+    comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen)
   }
 
   const erpForAttrMerge: Record<string, unknown> =
@@ -2287,7 +2280,11 @@ async function buildGoodlifeProductSaveBody(
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
 
-  if (comboRule) {
+  /**
+   * 团购：抖音校验 `product.combo_rule` 对象（含 groups）。
+   * 代金券：仅写入 attr_key_value_map / sku.commodity（数组 JSON），勿再传顶层 combo_rule，避免与模板双重形态触发上游异常。
+   */
+  if (comboRule && isGroupBuy) {
     product.combo_rule = comboRule
   }
 

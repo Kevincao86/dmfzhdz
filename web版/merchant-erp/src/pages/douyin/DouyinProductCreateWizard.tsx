@@ -3404,7 +3404,7 @@ export default function DouyinProductCreateWizard({
                           {productType === 1
                             ? ' 保存时由网关写入抖音请求体顶层 product.combo_rule，并同步填充模板 attr_key_value_map 的 combo_rule。'
                             : productType === 2
-                              ? ' 代金券：网关会按商品名称与售价生成最小套餐结构写入 combo_rule，避免抖音报「combo_rule不能为空」。'
+                              ? ' 代金券：网关将套餐结构以「groups 数组」JSON 写入模板 attr / sku.commodity（与抖音商品搭配控件一致），单品标价与实付（分）对齐；不传顶层 product.combo_rule。'
                               : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
                         </p>
                       ) : null}
