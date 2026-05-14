@@ -251,36 +251,52 @@ function buildAgentFreeformImagePrompt(userRequest: string): string {
   return `根据下列中文描述生成一张高质量图片：画面清晰、光线自然、构图均衡，适合用作宣传配图或示意图。须紧扣描述主体；避免违规内容、乱码水印、明显畸形肢体与低分辨率。用户描述：「${core}」。`
 }
 
+function buildAgentFreeformImageI2iPrompt(userRequest: string): string {
+  const core = userRequest.trim().replace(/\s+/g, ' ').slice(0, 900)
+  const desc =
+    core ||
+    '在保留参考图整体氛围、色调与构图的基础上优化细节与清晰度，使画面更适合作电商/本地生活宣传配图。'
+  return `图生图任务：用户已提供参考图。请在参考图基础上按下列文字说明调整或重绘——若文字与参考图主体冲突，以文字为准。输出须高清、光线自然、构图专业；避免违规、畸形肢体与牛皮癣水印。用户说明：「${desc}」。`
+}
+
 async function runAgentT2iSingleVendor(
   model: string,
   key: string,
   env: MerchantAiEnv,
   prompt: string,
+  refImage?: string,
 ): Promise<string[]> {
   const primaryNorm = normalizeAiModelPreserveCustom(model)
+  const ref = refImage?.trim() || undefined
   if (primaryNorm === 'qwen') {
-    const u = await qwenWanxOneImage(key, env, prompt)
+    const u = await qwenWanxOneImage(key, env, prompt, ref)
     return [u]
   }
   if (primaryNorm === 'minimax') {
     const mmModel = minimaxImageModelId(env)
+    /**
+     * MiniMax subject_reference 面向人像一致性；商品/场景参考图不传参，由上文 prompt 吸收用户意图，
+     * 与商品主图「优化」链路一致，避免错误强绑参考主体。
+     */
     return minimaxImageUrls(key, {
       model: mmModel,
-      prompt,
+      prompt: ref ? `${prompt}\n\n（用户已上传参考图；请在构图与色调上隐性呼应参考，勿生成无关品类场景。）` : prompt,
       aspect_ratio: '1:1',
       response_format: 'url',
       n: 1,
-      prompt_optimizer: true,
+      prompt_optimizer: !ref,
     })
   }
   if (primaryNorm === 'doubao') {
     const imgModel = doubaoImageModelId(env)
-    return doubaoSeedreamUrls(env, key, {
+    const payload: Record<string, unknown> = {
       model: imgModel,
       prompt,
       size: '2K',
       response_format: 'url',
-    })
+    }
+    if (ref) payload.image = ref
+    return doubaoSeedreamUrls(env, key, payload)
   }
   throw new Error(`不支持的智能体生图 model：${primaryNorm}`)
 }
@@ -290,11 +306,12 @@ async function runAgentImageGenerateWithBuiltinFailover(
   env: MerchantAiEnv,
   keyFirst: string,
   prompt: string,
+  refImage?: string,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
   try {
-    const urls = await runAgentT2iSingleVendor(primaryNorm, keyFirst, env, prompt)
+    const urls = await runAgentT2iSingleVendor(primaryNorm, keyFirst, env, prompt, refImage)
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
@@ -304,7 +321,7 @@ async function runAgentImageGenerateWithBuiltinFailover(
     const { key } = pickKey(env, alt)
     if (!key) continue
     try {
-      const urls = await runAgentT2iSingleVendor(alt, key, env, prompt)
+      const urls = await runAgentT2iSingleVendor(alt, key, env, prompt, refImage)
       return { urls, modelUsed: alt }
     } catch (e) {
       lastErr = e
@@ -315,18 +332,21 @@ async function runAgentImageGenerateWithBuiltinFailover(
 }
 
 /**
- * 智能体「文生图」：走服务端真实像素出图（与商品 AI 相同 Key 与厂商轮询），非 chat/completions。
+ * 智能体「文生图 / 图生图」：走服务端真实像素出图（与商品 AI 相同 Key 与厂商轮询），非 chat/completions。
+ * `opts.referenceImage` 为 data URL 或公网 URL 时走图生图（万相 ref_image、豆包 image；MiniMax 以提示词吸收参考意图）。
  * @returns vendorUsed 为 qwen | doubao | minimax，供前端同步模型下拉展示。
  */
 export async function runAgentFreeformTextToImage(
   env: MerchantAiEnv,
   userLine: string,
   preferredVendor?: 'qwen' | 'doubao' | 'minimax',
+  opts?: { referenceImage?: string },
 ): Promise<
   | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
   | { ok: false; message: string }
 > {
-  const prompt = buildAgentFreeformImagePrompt(userLine)
+  const ref = opts?.referenceImage?.trim()
+  const prompt = ref ? buildAgentFreeformImageI2iPrompt(userLine) : buildAgentFreeformImagePrompt(userLine)
   const order = imageVendorOrderPreferring(env, preferredVendor)
   const primary = pickPrimaryVendorWithKey(env, order)
   const { key, label } = pickKey(env, primary)
@@ -337,7 +357,13 @@ export async function runAgentFreeformTextToImage(
     }
   }
   try {
-    const { urls, modelUsed } = await runAgentImageGenerateWithBuiltinFailover(primary, env, key, prompt)
+    const { urls, modelUsed } = await runAgentImageGenerateWithBuiltinFailover(
+      primary,
+      env,
+      key,
+      prompt,
+      ref,
+    )
     const u = urls[0]?.trim()
     if (!u) return { ok: false, message: '生图完成但未拿到有效图片地址，请稍后重试。' }
     if (modelUsed !== 'qwen' && modelUsed !== 'doubao' && modelUsed !== 'minimax') {

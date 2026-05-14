@@ -72,7 +72,11 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         const bodyRaw = await readBody(req as IncomingMessage)
         const auth = req.headers['authorization']
         const { runAgentFreeformTextToImage } = await import('./merchantAiUpstream.js')
-        const parsed = JSON.parse(bodyRaw || '{}') as { prompt?: string; preferred_vendor?: string }
+        const parsed = JSON.parse(bodyRaw || '{}') as {
+          prompt?: string
+          preferred_vendor?: string
+          reference_image?: string
+        }
         const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
         if (!prompt) {
           res.statusCode = 400
@@ -81,6 +85,15 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           res.end(JSON.stringify({ ok: false, error: 'prompt_required' }))
           return
         }
+        const refRaw = typeof parsed.reference_image === 'string' ? parsed.reference_image.trim() : ''
+        if (refRaw.length > 2_800_000) {
+          res.statusCode = 400
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.end(JSON.stringify({ ok: false, error: 'reference_image_too_large' }))
+          return
+        }
+        const referenceImage = refRaw.length > 0 ? refRaw : undefined
         const pv = typeof parsed.preferred_vendor === 'string' ? parsed.preferred_vendor.trim().toLowerCase() : ''
         const preferredVendor =
           pv === 'qwen' || pv === 'doubao' || pv === 'minimax' ? (pv as 'qwen' | 'doubao' | 'minimax') : undefined
@@ -93,7 +106,9 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
           return
         }
-        const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor)
+        const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, {
+          referenceImage,
+        })
         res.statusCode = out.ok ? 200 : 502
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.setHeader('Access-Control-Allow-Origin', '*')

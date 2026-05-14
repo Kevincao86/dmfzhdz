@@ -145,7 +145,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     const storeName = city.trim()
     const storeAddress = `${city.trim()} · ${industry}`
     const id = `RO-NV${Date.now()}`
-    const tierLine = `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5+:${allocation.v5plus}`
+    const tierLine = `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5以上:${allocation.v5plus}`
     const order: RegistryRecruitmentOrder = {
       id,
       customerName,
@@ -175,8 +175,13 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       }
       window.alert('新手版需求已推送至运营管控台「达人招募订单」，状态：待接单。')
       onBack()
-    } catch {
-      setPushErr('推送失败：请确认网络正常，且运营侧服务与数据同步已就绪。')
+    } catch (e) {
+      const detail = e instanceof Error ? e.message.trim() : String(e)
+      setPushErr(
+        detail
+          ? `推送失败：${detail.length > 280 ? `${detail.slice(0, 280)}…` : detail}`
+          : '推送失败：请确认网络正常，且运营侧服务与数据同步已就绪。',
+      )
     } finally {
       setSubmitting(false)
     }
@@ -392,13 +397,13 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                     ['V3', allocation.v3],
                     ['V4', allocation.v4],
                     ['V5', allocation.v5],
-                    ['V5+', allocation.v5plus],
+                    ['V5以上', allocation.v5plus],
                   ] as const
                 ).map(([label, n]) => (
                   <div key={label} className="rounded-lg bg-white/80 px-3 py-2 text-center shadow-sm ring-1 ring-black/5">
-                    <p className="text-xs text-gray-500">{label}</p>
-                    <p className="text-lg font-bold tabular-nums text-gray-900">{n}</p>
-                    <p className="text-[10px] text-gray-400">人</p>
+                    <p className="text-sm font-semibold tracking-wide text-gray-800">{label}</p>
+                    <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{n}</p>
+                    <p className="text-[10px] text-gray-500">人</p>
                   </div>
                 ))}
               </div>

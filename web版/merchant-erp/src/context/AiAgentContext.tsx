@@ -425,14 +425,25 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setInputDraft('')
       queueMicrotask(() => {
         void (async () => {
+          const refImg = imgs[0]?.trim()
           const tryNativePixel =
             (detectImageGenerationIntent(line) && imgs.length === 0) ||
-            (isAgentImagePickerKey(nextPickerKey) && imgs.length === 0 && trimmed.length > 0)
+            (isAgentImagePickerKey(nextPickerKey) && imgs.length === 0 && trimmed.length > 0) ||
+            (Boolean(refImg) &&
+              (isAgentImagePickerKey(nextPickerKey) || detectImageGenerationIntent(line)))
           if (tryNativePixel) {
             setAiSending(true)
             try {
               const pref = nativeImagePreferredVendorFromPicker(nextPickerKey)
-              const imgRes = await postAiAgentNativeImage(line, pref ? { preferredVendor: pref } : undefined)
+              const imgRes = await postAiAgentNativeImage(
+                line,
+                pref || refImg
+                  ? {
+                      ...(pref ? { preferredVendor: pref } : {}),
+                      ...(refImg ? { referenceImageDataUrl: refImg } : {}),
+                    }
+                  : undefined,
+              )
               if (imgRes.ok) {
                 const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
                 if (vk) {
@@ -445,9 +456,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                     : imgRes.vendorUsed === 'doubao'
                       ? '豆包 Seedream'
                       : 'MiniMax'
+                const isI2i = Boolean(refImg)
                 const assistantMsg = createAgentMessage(
                   'assistant',
-                  `已使用 **${vendorZh}** 服务端文生图通道生成图片（与商品 AI 共用 DashScope / 火山方舟 / MiniMax 配置）。\n\n![生成图](${imgRes.imageUrl})\n\n如需改风格、主体或构图，请直接说明。`,
+                  isI2i
+                    ? `已使用 **${vendorZh}** 图生图（已参考你上传的图片）。下方为生成结果。`
+                    : `已使用 **${vendorZh}** 文生图生成下方结果（与商品 AI 共用服务端配置）。如需改风格、主体或构图，请直接说明。`,
+                  { imageUrls: [imgRes.imageUrl] },
                 )
                 setMessages((prev) => {
                   const next = [...prev, assistantMsg]
@@ -595,7 +610,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                       : 'MiniMax'
                 const assistantMsg = createAgentMessage(
                   'assistant',
-                  `已使用 **${vendorZh}** 服务端文生图通道生成图片。\n\n![生成图](${imgRes.imageUrl})\n\n如需调整，请继续说明。`,
+                  `已使用 **${vendorZh}** 文生图生成下方结果。如需调整，请继续说明。`,
+                  { imageUrls: [imgRes.imageUrl] },
                 )
                 setMessages((prev) => {
                   const next = [...prev, assistantMsg]

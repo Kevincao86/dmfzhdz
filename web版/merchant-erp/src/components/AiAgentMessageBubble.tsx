@@ -101,7 +101,11 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
                   key={i}
                   src={src}
                   alt=""
-                  className="max-h-40 max-w-[min(100%,14rem)] rounded-lg border border-slate-200/80 object-contain"
+                  className={
+                    m.role === 'assistant' && imgs.length === 1
+                      ? 'max-h-[min(70vh,28rem)] w-full max-w-full rounded-lg border border-slate-200/80 object-contain shadow-sm'
+                      : 'max-h-40 max-w-[min(100%,14rem)] rounded-lg border border-slate-200/80 object-contain'
+                  }
                 />
               ))}
             </div>

@@ -390,7 +390,7 @@ export default function ProductsPage() {
       ),
     )
     try {
-      const rows = await probeMerchantPlatforms()
+      const rows = await probeMerchantPlatforms({ force: feedback })
       setApiRows(rows)
       if (feedback) setToast('已刷新平台连通状态')
     } catch {

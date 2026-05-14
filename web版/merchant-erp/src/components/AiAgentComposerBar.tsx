@@ -154,7 +154,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           }}
           rows={rows}
           disabled={disabled}
-          placeholder="描述你想完成的任务，或输入 @ 提及页面要点…"
+          placeholder={
+            modelFilter === 'image'
+              ? '文生图：直接描述画面；图生图：先点右侧上传参考图，再写希望保留或修改的内容。'
+              : '描述你想完成的任务，或输入 @ 提及页面要点…'
+          }
           className={cn(
             'w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50',
             layout === 'dock' && 'max-h-40 min-h-[2.75rem]',
@@ -174,7 +178,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
               [
                 { id: 'all' as const, label: '全部' },
                 { id: 'chat' as const, label: '对话' },
-                { id: 'image' as const, label: '文生图' },
+                { id: 'image' as const, label: '文生图 / 图生图' },
               ] satisfies { id: ModelFilterTab; label: string }[]
             ).map((tab) => (
               <button

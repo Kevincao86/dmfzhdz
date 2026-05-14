@@ -64,12 +64,20 @@ export async function pushAiModels(models: Omit<RegistryAiModels, 'updatedAt'> &
 }
 
 export async function appendRecruitmentOrderToOps(order: RegistryRecruitmentOrder): Promise<void> {
-  const res = await fetch(url('/api/ops-sync/recruitment-orders/append'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order }),
-  })
-  if (!res.ok) throw new Error(`append recruitment order ${res.status}`)
+  const res = await postRegistrySync(
+    '/api/meoo-ops-recruitment-orders-append',
+    '/api/ops-sync/recruitment-orders/append',
+    { order },
+  )
+  if (!res.ok) {
+    let detail = ''
+    try {
+      detail = (await res.text()).trim()
+    } catch {
+      /* noop */
+    }
+    throw new Error(detail ? `HTTP ${res.status}: ${detail.slice(0, 400)}` : `HTTP ${res.status}`)
+  }
 }
 
 export async function setTalentPoolCandidatesOnOps(candidates: RegistryTalentPoolRow[]): Promise<void> {

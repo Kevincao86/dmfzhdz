@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-ai-agent-image — 智能体文生图（服务端 wanx / Seedream / MiniMax，与商品 AI 共用 MERCHANT_AI_*）。
+ * POST /api/meoo-ai-agent-image — 智能体文生图 / 图生图（服务端 wanx / Seedream / MiniMax，与商品 AI 共用 MERCHANT_AI_*）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -33,9 +33,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { prompt?: unknown; preferred_vendor?: unknown }
+  let body: { prompt?: unknown; preferred_vendor?: unknown; reference_image?: unknown }
   try {
-    body = JSON.parse(rawBody(req) || '{}') as { prompt?: unknown; preferred_vendor?: unknown }
+    body = JSON.parse(rawBody(req) || '{}') as {
+      prompt?: unknown
+      preferred_vendor?: unknown
+      reference_image?: unknown
+    }
   } catch {
     sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
     return
@@ -45,12 +49,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMerchantJson(res, 400, { ok: false, error: 'prompt_required' })
     return
   }
+  const refRaw = typeof body.reference_image === 'string' ? body.reference_image.trim() : ''
+  /** 控制请求体大小，避免超大 Base64 拖垮函数 */
+  if (refRaw.length > 2_800_000) {
+    sendMerchantJson(res, 400, { ok: false, error: 'reference_image_too_large' })
+    return
+  }
+  const referenceImage = refRaw.length > 0 ? refRaw : undefined
   const pvRaw = typeof body.preferred_vendor === 'string' ? body.preferred_vendor.trim().toLowerCase() : ''
   const preferredVendor =
     pvRaw === 'qwen' || pvRaw === 'doubao' || pvRaw === 'minimax' ? (pvRaw as 'qwen' | 'doubao' | 'minimax') : undefined
 
   try {
-    const out = await runAgentFreeformTextToImage(process.env as Record<string, string>, prompt, preferredVendor)
+    const out = await runAgentFreeformTextToImage(process.env as Record<string, string>, prompt, preferredVendor, {
+      referenceImage,
+    })
     if (out.ok) {
       sendMerchantJson(res, 200, {
         ok: true,
