@@ -115,7 +115,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
           provider: 'tokenmix',
           modelFamily: fam.id,
           model: m.id,
-          label: `${fam.label} · ${m.label}（文生图 · 店魔方引擎）`,
+          label: `${fam.label} · ${m.label}（文生图 · TokenMix 图像）`,
           capability: 'image',
         })
       }
