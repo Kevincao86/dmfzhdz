@@ -60,22 +60,12 @@ function normalizeTextModelStored(raw: string | null | undefined): string {
   return pickAutoResolvedTextModel()
 }
 
-function isBuiltinImageVendorId(id: string): boolean {
-  return (BUILTIN_IMAGE_VENDOR_ORDER as readonly string[]).includes(id)
-}
-
 function normalizeImageModelStored(raw: string | null | undefined): string {
   const s = raw?.trim().toLowerCase() ?? ''
-  if (s === 'deepseek') return pickAutoResolvedImageModel()
   if (s === 'auto' || !s) return pickAutoResolvedImageModel()
-  if (selectableAiIds().has(s)) {
-    if (isBuiltinImageVendorId(s)) return s
-    return pickAutoResolvedImageModel()
-  }
-  if (isValidAiVendorSlug(s)) {
-    if (isBuiltinImageVendorId(s)) return s
-    return pickAutoResolvedImageModel()
-  }
+  /** 手选可与文案类目录一致（含 OpenAI 等）；网关对生图/美化会将非直连厂商映射至 MiniMax/通义/豆包 */
+  if (selectableAiIds().has(s)) return s
+  if (isValidAiVendorSlug(s)) return s
   return pickAutoResolvedImageModel()
 }
 
