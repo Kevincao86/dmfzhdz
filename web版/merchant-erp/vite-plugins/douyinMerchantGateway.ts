@@ -34,6 +34,7 @@
  * 能力授权与门店绑定：见抖音「auth_with_bind」文档（生产网关实现）。
  *
  * 出口 IP 需固定时：在部署环境设置 `DOUYIN_OPENAPI_BASE_URL` 为自建反代根（如 `http://<EIP>/douyin`），路径仍与官方一致。
+ * 配置非官方基址后，goodlife 与 OAuth（未单独设 DOUYIN_OPENAPI_OAUTH_BASE_URL 时）**默认不再回落** open.douyin.com，避免出口 IP 与白名单不一致；排障可临时设 `DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK=1`。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -1599,22 +1600,6 @@ function normalizePickRuleForComboGroup(itemCount: number, pickRule: string): st
   return `${itemCount}选${itemCount}`
 }
 
-function comboRuleJsonPayloadValid(s: string): boolean {
-  try {
-    const o = JSON.parse(s) as { groups?: unknown }
-    if (!o || typeof o !== 'object' || !Array.isArray(o.groups) || o.groups.length === 0) return false
-    for (const g of o.groups) {
-      const gr = g as Record<string, unknown>
-      if (!Array.isArray(gr.items) || gr.items.length === 0) return false
-      const pr = String(gr.pick_rule ?? '').trim()
-      if (!pr) return false
-    }
-    return true
-  } catch {
-    return false
-  }
-}
-
 /** 模板 attr：套餐 / combo_rule 类（与 merge + 强制回填逻辑一致） */
 function attrTemplateLooksComboLike(key: string, name: string, vtRaw: string): boolean {
   const vt = vtRaw.toUpperCase()
@@ -1626,10 +1611,12 @@ function attrTemplateLooksComboLike(key: string, name: string, vtRaw: string): b
   return false
 }
 
-/** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；团购/代金券等多类型均可能校验非空 */
+/** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；仅团购 product_type=1 使用 */
 function buildDouyinProductComboRule(
   erp: Record<string, unknown>,
   productNameFallback: string,
+  /** SKU 原价（分）：组内单品未填原价时用于兜底 */
+  originFenFallback: number,
 ): Record<string, unknown> | null {
   const raw = erp.package_combo
   if (!raw || typeof raw !== 'object') return null
@@ -1640,13 +1627,29 @@ function buildDouyinProductComboRule(
   const groups = groupsIn.map((g) => {
     const gr = g as Record<string, unknown>
     const itemsIn = Array.isArray(gr.items) ? gr.items : []
+    const groupName = String(gr.group_name ?? gr.groupName ?? '').trim() || '商品组'
     const items = itemsIn.map((it) => {
       const row = it as Record<string, unknown>
       const name = String(row.name ?? '').trim() || fb
       const quantity = Math.max(1, Math.floor(Number(row.quantity ?? row.qty ?? 1) || 1))
-      const item: Record<string, unknown> = { name, quantity }
-      const op = row.origin_price_yuan
-      if (op != null && Number.isFinite(Number(op))) item.origin_price_yuan = Number(op)
+      const unit = String(row.unit ?? '份').trim() || '份'
+      const opYuan = row.origin_price_yuan
+      const opFenDirect = row.origin_price
+      let originFen = originFenFallback
+      if (opFenDirect != null && Number.isFinite(Number(opFenDirect))) {
+        const n = Math.floor(Number(opFenDirect))
+        if (n > 0) originFen = n
+      } else if (opYuan != null && Number.isFinite(Number(opYuan))) {
+        originFen = yuanToFen(Number(opYuan))
+      }
+      originFen = Math.max(1, Math.min(originFen, Number.MAX_SAFE_INTEGER))
+      const item: Record<string, unknown> = {
+        name,
+        quantity,
+        unit,
+        /** 单品原价（分），与 SKU origin_amount 口径一致 */
+        origin_price: originFen,
+      }
       const pid = String(row.product_id ?? '').trim()
       if (pid) item.product_id = pid
       const sid = String(row.sku_id ?? '').trim()
@@ -1655,6 +1658,7 @@ function buildDouyinProductComboRule(
     })
     const prRaw = String(gr.pick_rule ?? gr.pickRule ?? '全部必选').trim() || '全部必选'
     return {
+      group_name: groupName,
       pick_rule: normalizePickRuleForComboGroup(items.length, prRaw),
       items,
     }
@@ -1668,7 +1672,9 @@ function mergeGoodlifeProductAttrMapFromErp(
   attrs: Record<string, unknown>[],
   erp: Record<string, unknown>,
   base: Record<string, string>,
+  opts?: { omitComboTemplateAttrs?: boolean },
 ): Record<string, string> {
+  const omitCombo = Boolean(opts?.omitComboTemplateAttrs)
   const out: Record<string, string> = { ...base }
   const trade =
     erp.trade_rules && typeof erp.trade_rules === 'object' ? (erp.trade_rules as Record<string, unknown>) : {}
@@ -1752,6 +1758,7 @@ function mergeGoodlifeProductAttrMapFromErp(
     const name = String(a.name ?? '')
     const vt = String(a.value_type ?? '').toUpperCase()
     const req = Boolean(a.is_required)
+    if (omitCombo && attrTemplateLooksComboLike(key, name, vt)) continue
 
     if (
       vt === 'STRUCT' ||
@@ -1768,7 +1775,7 @@ function mergeGoodlifeProductAttrMapFromErp(
     }
 
     if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
-      if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson) {
+      if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson && !omitCombo) {
         out[key] = pkgJson
         continue
       }
@@ -1941,6 +1948,7 @@ async function buildGoodlifeProductSaveBody(
   const desc = String(erp.product_desc ?? product_name).trim()
   const category_id = String(erp.category_id ?? '').trim()
   const product_type = Number(erp.product_type) || 1
+  const isGroupBuy = product_type === 1
   const out_id = resolveProductOutIdForSave(erp)
   const product_id_existing =
     typeof erp.product_id === 'string' && erp.product_id.trim() ? erp.product_id.trim() : ''
@@ -1979,39 +1987,38 @@ async function buildGoodlifeProductSaveBody(
     attr_key_value_map[imageKey] = jsonImageUrlList(carouselUrls)
   }
 
-  let comboRule = buildDouyinProductComboRule(erp, product_name)
-  if (!comboRule) {
-    const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
-    comboRule = {
-      groups: [
-        {
-          pick_rule: '全部必选',
-          items: [
-            {
-              name: product_name.slice(0, 120) || '团购套餐',
-              quantity: 1,
-              ...(Number.isFinite(oy) && oy > 0 ? { origin_price_yuan: oy } : {}),
-            },
-          ],
-        },
-      ],
+  let comboRule: Record<string, unknown> | null = null
+  if (isGroupBuy) {
+    comboRule = buildDouyinProductComboRule(erp, product_name, originFen)
+    if (!comboRule) {
+      const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
+      comboRule = {
+        groups: [
+          {
+            group_name: '商品组',
+            pick_rule: '全部必选',
+            items: [
+              {
+                name: product_name.slice(0, 120) || '团购套餐',
+                quantity: 1,
+                unit: '份',
+                origin_price: Math.max(1, yuanToFen(Number.isFinite(oy) && oy > 0 ? oy : priceYuan)),
+              },
+            ],
+          },
+        ],
+      }
     }
   }
 
-  /** template 的 attr_key_value_map 常要求 combo_rule 为 JSON 字符串；须与 package_combo 同源，否则报「combo_rule不能为空」 */
   const erpForAttrMerge: Record<string, unknown> =
-    comboRule
-      ? (() => {
-          const raw = erp.package_combo
-          if (raw && typeof raw === 'object') {
-            const g = (raw as { groups?: unknown[] }).groups
-            if (Array.isArray(g) && g.length > 0) return { ...erp, package_combo: raw }
-          }
-          return { ...erp, package_combo: { groups: (comboRule as { groups: unknown[] }).groups } }
-        })()
+    isGroupBuy && comboRule && (!erp.package_combo || typeof erp.package_combo !== 'object')
+      ? { ...erp, package_combo: { groups: (comboRule as { groups: unknown[] }).groups } }
       : erp
 
-  const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map)
+  const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map, {
+    omitComboTemplateAttrs: true,
+  })
 
   const tplOverrides = erp.template_attr_overrides
   if (tplOverrides && typeof tplOverrides === 'object' && !Array.isArray(tplOverrides)) {
@@ -2023,13 +2030,12 @@ async function buildGoodlifeProductSaveBody(
     }
   }
 
-  /**
-   * 抖音会校验 attr_key_value_map 中套餐/搭配类字段为合法 JSON；前端 overrides 或历史草稿可能写入坏串。
-   * 在合并 template_attr_overrides 之后，强制与 package_combo 推导结果一致，并避免重复写入冲突的裸 combo_rule。
-   */
-  const comboJsonMandatory = comboRule
-    ? JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
-    : ''
+  const comboJsonMandatory =
+    isGroupBuy && comboRule
+      ? JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
+      : ''
+
+  let comboAttrWrites = 0
   if (comboJsonMandatory) {
     for (const a of attrs) {
       const key = String(a.key ?? '').trim()
@@ -2047,14 +2053,8 @@ async function buildGoodlifeProductSaveBody(
         !vt
       ) {
         mergedProductAttrs[key] = comboJsonMandatory
+        comboAttrWrites += 1
       }
-    }
-    const hasLiteralComboRuleKey = Object.keys(mergedProductAttrs).some((k) => /^combo_rule$/i.test(k))
-    const hasOtherValidComboPayload = Object.entries(mergedProductAttrs).some(
-      ([k, v]) => !/^combo_rule$/i.test(k) && comboRuleJsonPayloadValid(String(v ?? '').trim()),
-    )
-    if (!hasLiteralComboRuleKey && !hasOtherValidComboPayload) {
-      mergedProductAttrs.combo_rule = comboJsonMandatory
     }
   }
 
@@ -2074,9 +2074,24 @@ async function buildGoodlifeProductSaveBody(
     sold_end_time: oneYearMs,
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
-  if (comboRule) {
+
+  if (isGroupBuy && comboRule && comboAttrWrites === 0) {
     product.combo_rule = comboRule
+    for (const a of attrs) {
+      const key = String(a.key ?? '').trim()
+      if (!key) continue
+      const name = String(a.name ?? '')
+      const vt = String(a.value_type ?? '').toUpperCase()
+      if (attrTemplateLooksComboLike(key, name, vt)) delete mergedProductAttrs[key]
+    }
+    delete mergedProductAttrs.combo_rule
   }
+
+  const extIn = erp.product_ext
+  if (extIn && typeof extIn === 'object' && !Array.isArray(extIn)) {
+    product.product_ext = { ...(extIn as Record<string, unknown>) }
+  }
+
   if (Object.keys(mergedProductAttrs).length > 0) {
     product.attr_key_value_map = mergedProductAttrs
   }
@@ -2118,6 +2133,53 @@ async function buildGoodlifeProductSaveBody(
     product,
     sku,
   }
+}
+
+function summarizeDouyinProductSaveForLog(saveBody: Record<string, unknown>, mode: string): Record<string, unknown> {
+  const product = saveBody.product as Record<string, unknown> | undefined
+  const sku = saveBody.sku as Record<string, unknown> | undefined
+  const ak = product?.attr_key_value_map as Record<string, string> | undefined
+  const sk = sku?.attr_key_value_map as Record<string, string> | undefined
+  const relay = process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
+  return {
+    mode,
+    relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
+    goodlife_official_fallback: process.env.DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK?.trim() === '1',
+    account_id: saveBody.account_id,
+    product_type: product?.product_type,
+    category_id: product?.category_id,
+    combo_in_product_body: Boolean(product?.combo_rule),
+    combo_like_attr_keys:
+      ak == null ? [] : Object.keys(ak).filter((k) => /combo|套餐|搭配|组合|rule/i.test(k)),
+    attr_key_count: ak ? Object.keys(ak).length : 0,
+    attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
+    sku_attr_keys: sk ? Object.keys(sk) : [],
+    poi_count: Array.isArray(product?.pois) ? (product!.pois as unknown[]).length : 0,
+  }
+}
+
+function extractProductIdFromSaveEnvelope(j: Record<string, unknown>): string {
+  const data = j.data as Record<string, unknown> | undefined
+  if (data && typeof data === 'object') {
+    const p = data.product_id ?? data.productId
+    if (typeof p === 'string' && p.trim()) return p.trim()
+    if (typeof p === 'number' && Number.isFinite(p)) return String(Math.trunc(p))
+  }
+  const root = j.product_id ?? j.productId
+  if (typeof root === 'string' && root.trim()) return root.trim()
+  if (typeof root === 'number' && Number.isFinite(root)) return String(Math.trunc(root))
+  return ''
+}
+
+function douyinGoodsSaveUpstreamHint(status: number, raw: string): string {
+  const t = raw.replace(/^\uFEFF/, '').trim()
+  if ([403, 404, 405].includes(status)) {
+    return `HTTP ${status}，多为 DOUYIN_OPENAPI_BASE_URL 反代未匹配该 POST 路径或方法错误，请求未正确到达抖音 OpenAPI。`
+  }
+  if (t.startsWith('<') || /^<!doctype/i.test(t.slice(0, 120))) {
+    return '上游返回 HTML/WAF 页面而非 JSON：请检查自建反代 Host、路径前缀与 body 透传。'
+  }
+  return ''
 }
 
 /** 代理 goodlife/v1/goods/product/save/（创建/更新商品，草稿与提交审核均走此接口） */
@@ -2169,6 +2231,7 @@ export async function handleDouyinGoodsProductSavePost(
       return
     }
     const saveBody = await buildGoodlifeProductSaveBody(accountId, token, erp, mode, accountName)
+    console.info('[meoo douyin goods/save]', JSON.stringify(summarizeDouyinProductSaveForLog(saveBody, mode)))
 
     const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
       method: 'POST',
@@ -2180,10 +2243,50 @@ export async function handleDouyinGoodsProductSavePost(
       body: JSON.stringify(saveBody),
     })
     const raw = await dr.text()
+    const trimmed = raw.replace(/^\uFEFF/, '').trim()
+    if (trimmed.startsWith('<')) {
+      json(res, 502, {
+        message: `抖音 goods/save 经自建出口返回 HTML：${douyinGoodsSaveUpstreamHint(dr.status, raw)}`,
+        douyin_raw_preview: trimmed.slice(0, 800),
+      })
+      return
+    }
+    if (!trimmed) {
+      json(res, 502, {
+        message: '抖音 goods/save 响应体为空，请检查 DOUYIN_OPENAPI_BASE_URL 反代与网络连通性。',
+      })
+      return
+    }
+    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+      json(res, 502, {
+        message: `抖音 goods/save 返回非 JSON：${douyinGoodsSaveUpstreamHint(dr.status, raw) || `HTTP ${dr.status}`}`,
+        douyin_raw_preview: trimmed.slice(0, 800),
+      })
+      return
+    }
+    if (!dr.ok && trimmed.startsWith('{')) {
+      const hint = douyinGoodsSaveUpstreamHint(dr.status, raw)
+      if (hint) {
+        json(res, 502, {
+          message: `抖音 goods/save HTTP ${dr.status}。${hint}`,
+          douyin_raw_preview: trimmed.slice(0, 1200),
+        })
+        return
+      }
+    }
+
     const j = parseDouyinJson(raw)
     const bizOk = getDataError(j).ok
-    const data = j.data as Record<string, unknown> | undefined
-    const pid = typeof data?.product_id === 'string' ? data.product_id.trim() : ''
+    const pid = extractProductIdFromSaveEnvelope(j)
+    const ambiguousSuccess = dr.ok && bizOk && !pid
+    if (ambiguousSuccess) {
+      json(res, 502, {
+        message:
+          '抖音 JSON 未包含可识别的 product_id（无法确认已写入来客草稿）。请查看服务端 [meoo douyin goods/save] 脱敏日志与抖音开放平台 logid。',
+        douyin_response: j,
+      })
+      return
+    }
     if (dr.ok && bizOk && pid) {
       mockDouyinProductStore.set(pid, {
         ...erp,

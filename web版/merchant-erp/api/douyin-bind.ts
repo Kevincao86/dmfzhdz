@@ -121,7 +121,7 @@ function whitelistDeployHint(detail: string): string {
     return ' 开放平台白名单对应「请求抖音时的来源 IP」：Vercel/Serverless 出口与控制台报备 EIP 不一致。请在部署环境设置 DOUYIN_OPENAPI_BASE_URL 为 EIP 上反代 https://open.douyin.com 的根路径（与同机「服务器 IP 白名单」一致）；配置后 OAuth 与同出口同源，无需单独设 OAUTH_URL。'
   }
   if (relay && isLikelyWhitelistIpReject(detail)) {
-    return ' 已配置 EIP 中继仍出现 IP 白名单时：多为 goodlife 经中继返回了 HTML，请求回落到官方域名后出口变为 Vercel。请修正 Nginx：`location /douyin/` 使用 `proxy_pass https://open.douyin.com/;`，且 GET 必须保留查询串；或为开放平台白名单补充 Vercel 出口网段。'
+    return ' 已配置 EIP 中继仍出现 IP 白名单时：请确认 goodlife 与 OAuth 均走 DOUYIN_OPENAPI_BASE_URL（默认不再回落 open.douyin.com）；修正 Nginx：`location /douyin/` 使用 `proxy_pass https://open.douyin.com/;`，且 GET 保留查询串、POST 透传 JSON body。排障可临时设 DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK=1（勿长期用于生产）。'
   }
   return ''
 }

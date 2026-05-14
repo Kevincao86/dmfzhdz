@@ -1337,7 +1337,7 @@ export default function DouyinProductCreateWizard({
     const aux = auxUrlsList.filter(Boolean).slice(0, 4)
     const env = envUrlsList.filter(Boolean).slice(0, 10)
     const originNum = Number.parseFloat(originYuan) || 0
-    /** 团购(1)走搭配组；代金券等其它类型抖音仍常要求 combo_rule，与 package_combo 同源补单品组 */
+    /** 仅团购 product_type=1 传 package_combo；代金券等由 template/get 必填项与 attr 组装，勿传 combo_rule */
     const package_combo =
       productType == null
         ? undefined
@@ -1375,20 +1375,7 @@ export default function DouyinProductCreateWizard({
                 ],
               }
             })()
-          : {
-              groups: [
-                {
-                  pick_rule: '全部必选',
-                  items: [
-                    {
-                      name: productName.trim().slice(0, 120) || '商品',
-                      quantity: 1,
-                      origin_price_yuan: Math.max(0, originNum || price),
-                    },
-                  ],
-                },
-              ],
-            }
+          : undefined
     const extOut = externalGoodsId.trim()
     let stable = (stableOutIdRef.current ?? '').trim()
     if (!stable && !extOut) {
