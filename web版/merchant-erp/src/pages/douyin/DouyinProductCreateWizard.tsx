@@ -1227,104 +1227,173 @@ export default function DouyinProductCreateWizard({
     }
   }, [postAssistWithKeys, productName, beginAi, endAi])
 
-  const aiOptimizeHeadImage = useCallback(async () => {
+  const aiGenerateHeadImage = useCallback(async () => {
+    if (headUrl.trim()) return
+    const n = productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称，以便 AI 生成头图')
+      return
+    }
     beginAi('img-head')
     try {
-      if (headUrl.trim()) {
-        const r = await postAssistWithKeys({
-          action: 'image_enhance',
-          product_name: productName.trim() || '商品',
-          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
-          image_urls: [headUrl.trim()],
-          image_role: 'head',
-        })
-        if (!r.ok) window.alert(r.message)
-        else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
-      } else {
-        const n = productName.trim()
-        if (!n) {
-          window.alert('请先填写商品名称，以便 AI 生成头图')
-          return
-        }
-        const r = await postAssistWithKeys({
-          action: 'image_generate',
-          product_name: n,
-          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
-          image_role: 'head',
-        })
-        if (!r.ok) window.alert(r.message)
-        else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
-      }
+      const r = await postAssistWithKeys({
+        action: 'image_generate',
+        product_name: n,
+        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        image_role: 'head',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
     } finally {
       endAi('img-head')
     }
   }, [postAssistWithKeys, headUrl, productName, imageAssistTitleDraft, beginAi, endAi])
 
-  const aiOptimizeAuxImages = useCallback(async () => {
+  const aiEnhanceHeadImage = useCallback(async () => {
+    const h = headUrl.trim()
+    if (!h) {
+      window.alert('请先上传头图后再优化')
+      return
+    }
+    beginAi('img-head')
+    try {
+      const r = await postAssistWithKeys({
+        action: 'image_enhance',
+        product_name: productName.trim() || '商品',
+        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        image_urls: [h],
+        image_role: 'head',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) setHeadUrl(r.image_urls[0])
+    } finally {
+      endAi('img-head')
+    }
+  }, [postAssistWithKeys, headUrl, productName, imageAssistTitleDraft, beginAi, endAi])
+
+  const aiGenerateOneAuxImage = useCallback(async () => {
+    if (auxUrlsList.length >= 4) return
+    const n = productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称')
+      return
+    }
     beginAi('img-aux')
     try {
-      if (auxUrlsList.length > 0) {
+      const r = await postAssistWithKeys({
+        action: 'image_generate',
+        product_name: n,
+        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        image_role: 'aux',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0])
+        setAuxUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 4))
+    } finally {
+      endAi('img-aux')
+    }
+  }, [postAssistWithKeys, auxUrlsList.length, productName, imageAssistTitleDraft, beginAi, endAi])
+
+  const aiEnhanceAuxOne = useCallback(
+    async (index: number) => {
+      const u = auxUrlsList[index]?.trim()
+      if (!u) return
+      beginAi('img-aux')
+      try {
         const r = await postAssistWithKeys({
           action: 'image_enhance',
           product_name: productName.trim() || '商品',
           ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
-          image_urls: [...auxUrlsList],
-          image_role: 'aux',
-        })
-        if (!r.ok) window.alert(r.message)
-        else if (r.image_urls?.length) setAuxUrlsList(r.image_urls.slice(0, 4))
-      } else {
-        const n = productName.trim()
-        if (!n) {
-          window.alert('请先填写商品名称')
-          return
-        }
-        if (auxUrlsList.length >= 4) return
-        const r = await postAssistWithKeys({
-          action: 'image_generate',
-          product_name: n,
-          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          image_urls: [u],
           image_role: 'aux',
         })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0])
-          setAuxUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 4))
+          setAuxUrlsList((prev) => prev.map((x, j) => (j === index ? r.image_urls![0]! : x)))
+      } finally {
+        endAi('img-aux')
       }
+    },
+    [postAssistWithKeys, auxUrlsList, productName, imageAssistTitleDraft, beginAi, endAi],
+  )
+
+  const aiEnhanceAllAux = useCallback(async () => {
+    if (auxUrlsList.length === 0) return
+    beginAi('img-aux')
+    try {
+      const r = await postAssistWithKeys({
+        action: 'image_enhance',
+        product_name: productName.trim() || '商品',
+        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        image_urls: [...auxUrlsList],
+        image_role: 'aux',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.length) setAuxUrlsList(r.image_urls.slice(0, 4))
     } finally {
       endAi('img-aux')
     }
   }, [postAssistWithKeys, auxUrlsList, productName, imageAssistTitleDraft, beginAi, endAi])
 
-  const aiOptimizeEnvImages = useCallback(async () => {
+  const aiGenerateOneEnvImage = useCallback(async () => {
+    if (envUrlsList.length >= 10) return
+    const n = productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称')
+      return
+    }
     beginAi('img-env')
     try {
-      if (envUrlsList.length > 0) {
+      const r = await postAssistWithKeys({
+        action: 'image_generate',
+        product_name: n,
+        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        image_role: 'env',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0])
+        setEnvUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 10))
+    } finally {
+      endAi('img-env')
+    }
+  }, [postAssistWithKeys, envUrlsList.length, productName, imageAssistTitleDraft, beginAi, endAi])
+
+  const aiEnhanceEnvOne = useCallback(
+    async (index: number) => {
+      const u = envUrlsList[index]?.trim()
+      if (!u) return
+      beginAi('img-env')
+      try {
         const r = await postAssistWithKeys({
           action: 'image_enhance',
           product_name: productName.trim() || '商品',
           ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
-          image_urls: [...envUrlsList],
-          image_role: 'env',
-        })
-        if (!r.ok) window.alert(r.message)
-        else if (r.image_urls?.length) setEnvUrlsList(r.image_urls.slice(0, 10))
-      } else {
-        const n = productName.trim()
-        if (!n) {
-          window.alert('请先填写商品名称')
-          return
-        }
-        if (envUrlsList.length >= 10) return
-        const r = await postAssistWithKeys({
-          action: 'image_generate',
-          product_name: n,
-          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          image_urls: [u],
           image_role: 'env',
         })
         if (!r.ok) window.alert(r.message)
         else if (r.image_urls?.[0])
-          setEnvUrlsList((prev) => [...prev, r.image_urls![0]].slice(0, 10))
+          setEnvUrlsList((prev) => prev.map((x, j) => (j === index ? r.image_urls![0]! : x)))
+      } finally {
+        endAi('img-env')
       }
+    },
+    [postAssistWithKeys, envUrlsList, productName, imageAssistTitleDraft, beginAi, endAi],
+  )
+
+  const aiEnhanceAllEnv = useCallback(async () => {
+    if (envUrlsList.length === 0) return
+    beginAi('img-env')
+    try {
+      const r = await postAssistWithKeys({
+        action: 'image_enhance',
+        product_name: productName.trim() || '商品',
+        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        image_urls: [...envUrlsList],
+        image_role: 'env',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.length) setEnvUrlsList(r.image_urls.slice(0, 10))
     } finally {
       endAi('img-env')
     }
@@ -2375,7 +2444,7 @@ export default function DouyinProductCreateWizard({
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900">售价与图片</h3>
             <p id="douyin-ai-image-model-active" className="mt-2 text-xs text-gray-500">
-              头图、辅助图、环境图的 AI 生成与美化使用上文「AI 模型（可选）」中的生图设置。
+              头图、辅助图、环境图的 AI 使用上文「AI 模型（可选）」中的生图设置；生图每次只生成一张，辅助图与环境图可对单张「优化此图」或「批量优化全部」。
             </p>
             <p className="mt-3 text-xs text-blue-600">服务费以平台结算为准，此处仅采集标价</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -2423,23 +2492,39 @@ export default function DouyinProductCreateWizard({
                   商品头图 <span className="text-red-500">*</span>
                   <span className="font-normal text-gray-500">（{headUrl ? 1 : 0}/1）</span>
                 </label>
-                <button
-                  type="button"
-                  disabled={!!uploadingSlot || aiOn('img-head')}
+                <div
+                  className="inline-flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-violet-100 bg-violet-50/80 px-2 py-1 text-xs text-violet-900"
                   aria-describedby="douyin-ai-image-model-active"
                   title={
                     imageAiHeadline.auto
                       ? `生图：自动（当前 ${imageAiHeadline.opt?.label ?? imageAiHeadline.id}）`
                       : `生图：${selectedImageAiLabel}`
                   }
-                  onClick={() => void aiOptimizeHeadImage()}
-                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50 sm:max-w-[14rem]"
                 >
-                  {renderImageGenTriggerContent(aiOn('img-head'))}
+                  {renderImageGenTriggerContent(false)}
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={Boolean(headUrl.trim()) || !!uploadingSlot || aiOn('img-head')}
+                  onClick={() => void aiGenerateHeadImage()}
+                  className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  AI 生成一张头图
                 </button>
+                <button
+                  type="button"
+                  disabled={!headUrl.trim() || !!uploadingSlot || aiOn('img-head')}
+                  onClick={() => void aiEnhanceHeadImage()}
+                  className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  AI 优化当前头图
+                </button>
+                {aiOn('img-head') ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-600" /> : null}
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                已上传则批量美化当前头图；未上传则按商品名称与上文「AI 模型（可选）」中的生图设置生成一张。
+                生图每次只生成一张；已有头图时请点「优化」或先移除再生成。模型取自上文「AI 模型（可选）」中的生图设置。
               </p>
               <div className="mt-2 flex flex-wrap items-start gap-3">
                 <button
@@ -2498,45 +2583,71 @@ export default function DouyinProductCreateWizard({
                 <label className="text-sm font-medium text-gray-800">
                   辅助图 <span className="font-normal text-gray-500">（{auxUrlsList.length}/4）</span>
                 </label>
-                <button
-                  type="button"
-                  disabled={!!uploadingSlot || aiOn('img-aux')}
+                <div
+                  className="inline-flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-violet-100 bg-violet-50/80 px-2 py-1 text-xs text-violet-900"
                   aria-describedby="douyin-ai-image-model-active"
                   title={
                     imageAiHeadline.auto
                       ? `生图：自动（当前 ${imageAiHeadline.opt?.label ?? imageAiHeadline.id}）`
                       : `生图：${selectedImageAiLabel}`
                   }
-                  onClick={() => void aiOptimizeAuxImages()}
-                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50 sm:max-w-[14rem]"
                 >
-                  {renderImageGenTriggerContent(aiOn('img-aux'))}
+                  {renderImageGenTriggerContent(false)}
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={auxUrlsList.length >= 4 || !!uploadingSlot || aiOn('img-aux')}
+                  onClick={() => void aiGenerateOneAuxImage()}
+                  className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  AI 生成一张
                 </button>
+                <button
+                  type="button"
+                  disabled={auxUrlsList.length === 0 || !!uploadingSlot || aiOn('img-aux')}
+                  onClick={() => void aiEnhanceAllAux()}
+                  className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  批量优化全部
+                </button>
+                {aiOn('img-aux') ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-600" /> : null}
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                无图时每点一次生成一张（最多 4 张）；已有多张则一次美化全部已上传图。
+                生图每点一次只增加一张（最多 4 张）；缩略图下可「AI 优化此图」单张处理，或用「批量优化全部」一次处理本节已上传的全部图。
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {auxUrlsList.map((u, i) => (
-                  <div key={`${u}-${i}`} className="relative">
+                  <div key={`${u}-${i}`} className="flex flex-col items-center gap-1">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="block cursor-zoom-in rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        onClick={() => setImagePreviewUrl(u)}
+                        title="点击查看大图"
+                      >
+                        <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setAuxUrlsList((prev) => prev.filter((_, j) => j !== i))
+                        }}
+                        className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white"
+                        aria-label="移除"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      className="block cursor-zoom-in rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                      onClick={() => setImagePreviewUrl(u)}
-                      title="点击查看大图"
+                      disabled={uploadingSlot === 'aux' || aiOn('img-aux')}
+                      onClick={() => void aiEnhanceAuxOne(i)}
+                      className="text-[10px] font-medium text-violet-700 underline decoration-violet-200 hover:text-violet-900 disabled:opacity-40"
                     >
-                      <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setAuxUrlsList((prev) => prev.filter((_, j) => j !== i))
-                      }}
-                      className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white"
-                      aria-label="移除"
-                    >
-                      <X className="h-3 w-3" />
+                      AI 优化此图
                     </button>
                   </div>
                 ))}
@@ -2574,45 +2685,71 @@ export default function DouyinProductCreateWizard({
                 <label className="text-sm font-medium text-gray-800">
                   环境图 <span className="font-normal text-gray-500">（{envUrlsList.length}/10）</span>
                 </label>
-                <button
-                  type="button"
-                  disabled={!!uploadingSlot || aiOn('img-env')}
+                <div
+                  className="inline-flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-violet-100 bg-violet-50/80 px-2 py-1 text-xs text-violet-900"
                   aria-describedby="douyin-ai-image-model-active"
                   title={
                     imageAiHeadline.auto
                       ? `生图：自动（当前 ${imageAiHeadline.opt?.label ?? imageAiHeadline.id}）`
                       : `生图：${selectedImageAiLabel}`
                   }
-                  onClick={() => void aiOptimizeEnvImages()}
-                  className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50 sm:max-w-[14rem]"
                 >
-                  {renderImageGenTriggerContent(aiOn('img-env'))}
+                  {renderImageGenTriggerContent(false)}
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={envUrlsList.length >= 10 || !!uploadingSlot || aiOn('img-env')}
+                  onClick={() => void aiGenerateOneEnvImage()}
+                  className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  AI 生成一张
                 </button>
+                <button
+                  type="button"
+                  disabled={envUrlsList.length === 0 || !!uploadingSlot || aiOn('img-env')}
+                  onClick={() => void aiEnhanceAllEnv()}
+                  className="rounded-lg border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  批量优化全部
+                </button>
+                {aiOn('img-env') ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-600" /> : null}
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                无图时每点一次生成一张（最多 10 张）；已有多张则一次美化全部已上传图。
+                生图每点一次只增加一张（最多 10 张）；缩略图下可「AI 优化此图」单张处理，或用「批量优化全部」一次处理本节已上传的全部图。
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {envUrlsList.map((u, i) => (
-                  <div key={`${u}-${i}`} className="relative">
+                  <div key={`${u}-${i}`} className="flex flex-col items-center gap-1">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="block cursor-zoom-in rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        onClick={() => setImagePreviewUrl(u)}
+                        title="点击查看大图"
+                      >
+                        <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEnvUrlsList((prev) => prev.filter((_, j) => j !== i))
+                        }}
+                        className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white"
+                        aria-label="移除"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      className="block cursor-zoom-in rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                      onClick={() => setImagePreviewUrl(u)}
-                      title="点击查看大图"
+                      disabled={uploadingSlot === 'env' || aiOn('img-env')}
+                      onClick={() => void aiEnhanceEnvOne(i)}
+                      className="text-[10px] font-medium text-violet-700 underline decoration-violet-200 hover:text-violet-900 disabled:opacity-40"
                     >
-                      <img src={u} alt="" className="h-16 w-16 rounded border object-cover" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEnvUrlsList((prev) => prev.filter((_, j) => j !== i))
-                      }}
-                      className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white"
-                      aria-label="移除"
-                    >
-                      <X className="h-3 w-3" />
+                      AI 优化此图
                     </button>
                   </div>
                 ))}

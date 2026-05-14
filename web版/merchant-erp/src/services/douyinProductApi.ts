@@ -205,25 +205,49 @@ export async function uploadDouyinProductImage(file: File): Promise<ImageUploadR
   } catch {
     return { ok: false, message: '读取文件失败' }
   }
-  const res = await fetch(url('/api/merchant/douyin/goods/image/upload'), {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      fileName: file.name,
-      mimeType: file.type || 'image/jpeg',
-      contentBase64,
-    }),
+  const bodyStr = JSON.stringify({
+    fileName: file.name,
+    mimeType: file.type || 'image/jpeg',
+    contentBase64,
   })
-  const data = await parseJson(res)
-  if (!res.ok) {
-    return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+  const headers = authHeaders()
+  const paths = ['/api/meoo-douyin-goods-image-upload', '/api/merchant/douyin/goods/image/upload'] as const
+  const targets = merchantApiFetchUrlCandidates(paths)
+  let lastStatus = 0
+  for (const target of targets) {
+    const res = await fetch(target, { method: 'POST', headers, body: bodyStr })
+    lastStatus = res.status
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (isLikelyRouteMiss404(res, trim, ct)) continue
+    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
     }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message:
+          (typeof data.message === 'string' && data.message) ||
+          (typeof data.description === 'string' && data.description) ||
+          `HTTP ${res.status}`,
+      }
+    }
+    const u = typeof data.url === 'string' ? data.url : ''
+    if (!u) return { ok: false, message: '上传接口未返回 url' }
+    return { ok: true, url: u }
   }
-  const u = typeof data.url === 'string' ? data.url : ''
-  if (!u) return { ok: false, message: '上传接口未返回 url' }
-  return { ok: true, url: u }
+  return {
+    ok: false,
+    message:
+      lastStatus === 404
+        ? '图片上传接口返回 404：请部署含 /api/meoo-douyin-goods-image-upload 的版本，或检查 VITE_MERCHANT_API_BASE_URL。'
+        : `HTTP ${lastStatus || 404}`,
+  }
 }
 
 export type IndustryScopeResult =
