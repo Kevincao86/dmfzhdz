@@ -794,12 +794,6 @@ export default function DouyinProductCreateWizard({
     return readImageAiManualModel()
   }, [aiModelUiTick])
 
-  /** 商品 AI 生图 / 美化上游仅接 MiniMax、通义、豆包（与网关 runImageGenerate 一致） */
-  const imageVendorManualOptions = useMemo(() => {
-    const allow = new Set(['minimax', 'qwen', 'doubao'])
-    return aiModelPickOptions.filter((o) => allow.has(o.id))
-  }, [aiModelPickOptions])
-
   const openStoreModal = () => {
     setModalDraftIds([...selectedPoiIds])
     setModalPage(1)
@@ -2149,11 +2143,11 @@ export default function DouyinProductCreateWizard({
                       </label>
                     </div>
                     <p className="mt-1 text-[11px] text-gray-500">
-                      商品生图与美化仅走 MiniMax、通义千问、豆包（与网关一致）；OpenAI / Claude / DeepSeek / Kimi 等用于上文「文案类」与智能体。
+                      手选可与上文「文案类」相同目录；像素级生图/美化由 MiniMax、通义、豆包上游执行，若选手选为其它厂商，网关将按已配置 Key 自动映射至上述三者之一。
                     </p>
                     {!imageAiAutoOn ? (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {imageVendorManualOptions.map((m) => (
+                        {aiModelPickOptions.map((m) => (
                           <button
                             key={m.id}
                             type="button"
@@ -2507,7 +2501,7 @@ export default function DouyinProductCreateWizard({
           <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900">售价与图片</h3>
             <p id="douyin-ai-image-model-active" className="mt-2 text-xs text-gray-500">
-              头图、辅助图、环境图的 AI 使用上文「AI 模型（可选）」中的生图设置；生图每次只生成一张，辅助图与环境图可对单张「优化此图」或「批量优化全部」。
+              头图、辅助图、环境图的 AI 使用上文「AI 模型（可选）」中的生图设置；生图每次只生成一张。「AI 优化」基于**当前上传图**与商品标题，并按抖音来客**本地生活场景**做美化（图生图提示词由网关下发）；辅助图与环境图可对单张「优化此图」或「批量优化全部」。
             </p>
             <p className="mt-3 text-xs text-blue-600">服务费以平台结算为准，此处仅采集标价</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
