@@ -10,6 +10,18 @@ import {
 import { loadProductEditLibraryDraftBriefPicks } from '../../lib/productEditLibrary'
 import { getDouyinGoodsProductOnlineQuery } from '../../services/douyinProductApi'
 
+function briefProductSourceLabel(source?: BriefProductPick['source']): string {
+  if (source === 'douyin_online') return '抖音线上'
+  if (source === 'erp_draftbox') return '草稿箱'
+  return '—'
+}
+
+function briefProductSourceBadgeClass(source?: BriefProductPick['source']): string {
+  if (source === 'douyin_online')
+    return 'rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-900'
+  return 'rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900'
+}
+
 const PLATFORMS: { id: string; label: string }[] = [
   { id: 'douyin_life', label: '抖音来客' },
   { id: 'meituan', label: '美团点评' },
@@ -40,7 +52,7 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
   const [briefs, setBriefs] = useState<[string, string, string] | null>(null)
   const [genBusy, setGenBusy] = useState(false)
   const [copyTip, setCopyTip] = useState<string | null>(null)
-  const [productSearchKw, setProductSearchKw] = useState('套餐')
+  const [productSearchKw, setProductSearchKw] = useState('')
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncErr, setSyncErr] = useState<string | null>(null)
   const [catalogHits, setCatalogHits] = useState<BriefProductPick[]>([])
@@ -59,7 +71,7 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
     setGenBusy(false)
     setTagsBusy(false)
     setCopyTip(null)
-    setProductSearchKw('套餐')
+    setProductSearchKw('')
     setSyncBusy(false)
     setSyncErr(null)
     setCatalogHits([])
@@ -218,7 +230,8 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                   <div>
                     <p className="text-sm font-medium text-blue-900">商品库同步</p>
                     <p className="mt-1 text-xs text-blue-800/90">
-                      拉取时合并：① 抖音来客商品查询（与商品创建页同源）；② ERP 商品模块本地草稿箱（创建商品「保存草稿」写入的商品库）。来客需已绑定；草稿仅在本机浏览器。
+                      拉取时合并：① 抖音来客线上商品（关键词仅用于此项模糊查询）；② ERP
+                      商品列表中的本地草稿箱（与「创建商品」保存草稿同源，**不受关键词过滤**，与列表一致）。来客需已绑定；草稿仅在本机浏览器。每条展示来源标签。
                     </p>
                   </div>
                   <button
@@ -236,7 +249,7 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                       <input
                         value={productSearchKw}
                         onChange={(e) => setProductSearchKw(e.target.value)}
-                        placeholder="留空仅拉 ERP 草稿箱；填写则合并来客 + 草稿（按名称过滤）"
+                        placeholder="可选：输入关键词后点击拉取，将额外合并抖音线上搜索结果；留空则仅展示草稿箱"
                         className="min-w-[12rem] flex-1 rounded border border-gray-200 px-2 py-2 text-sm"
                       />
                       <button
@@ -245,21 +258,28 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                         onClick={async () => {
                           setSyncErr(null)
                           const kw = productSearchKw.trim()
-                          const erpDrafts = loadProductEditLibraryDraftBriefPicks(kw.length ? kw : undefined, 48)
+                          const erpDrafts = loadProductEditLibraryDraftBriefPicks(80)
+                          const mergedById = new Map<string, BriefProductPick>()
+                          for (const p of erpDrafts) {
+                            mergedById.set(p.id, {
+                              id: p.id,
+                              name: p.name,
+                              priceYuan: p.priceYuan,
+                              source: 'erp_draftbox',
+                            })
+                          }
                           setSyncBusy(true)
                           try {
-                            const mergedById = new Map<string, BriefProductPick>()
-                            for (const p of erpDrafts) mergedById.set(p.id, p)
-
                             if (kw.length >= 1) {
                               const r = await getDouyinGoodsProductOnlineQuery({ product_name: kw, count: 24 })
                               if (r.ok) {
                                 for (const h of r.hits) {
-                                  const id = h.product_id || `dy-${h.product_name}`
+                                  const id = (h.product_id && String(h.product_id).trim()) || `dy-${h.product_name}`
                                   mergedById.set(id, {
                                     id,
                                     name: h.product_name,
                                     priceYuan: Math.round(h.price_yuan ?? 0),
+                                    source: 'douyin_online',
                                   })
                                 }
                               } else if (erpDrafts.length === 0) {
@@ -267,15 +287,22 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                                 setCatalogHits([])
                                 return
                               } else {
-                                setSyncErr(`${r.message}（已仅展示 ERP 草稿箱商品）`)
+                                setSyncErr(`${r.message}（已展示草稿箱商品，可继续勾选）`)
                               }
-                            } else if (erpDrafts.length === 0) {
-                              setSyncErr('ERP 草稿箱暂无草稿。请输入关键词以拉取来客商品，或先在「商品创建」保存草稿。')
+                            }
+
+                            if (mergedById.size === 0) {
+                              setSyncErr(
+                                '暂无商品：草稿箱为空。请先在「商品创建」保存草稿，或在上方输入关键词拉取抖音线上商品。',
+                              )
                               setCatalogHits([])
                               return
                             }
 
-                            const rows = [...mergedById.values()]
+                            const rows = [...mergedById.values()].sort((a, b) => {
+                              const rank = (s?: BriefProductPick['source']) => (s === 'erp_draftbox' ? 0 : 1)
+                              return rank(a.source) - rank(b.source) || a.name.localeCompare(b.name, 'zh-CN')
+                            })
                             setCatalogHits(rows)
                             setPickIds(rows.map((x) => x.id))
                           } finally {
@@ -316,13 +343,20 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                             )}
                           >
                             <span className="font-medium text-gray-900">{p.name}</span>
-                            <span className="text-xs text-gray-500">¥{p.priceYuan}</span>
+                            <span className="mt-1 inline-flex flex-wrap items-center gap-1.5">
+                              <span className={briefProductSourceBadgeClass(p.source)}>
+                                {briefProductSourceLabel(p.source)}
+                              </span>
+                              <span className="text-xs text-gray-500">¥{p.priceYuan}</span>
+                            </span>
                           </button>
                         )
                       })}
                     </div>
                     {catalogHits.length === 0 ? (
-                      <p className="mt-2 text-xs text-gray-500">点击「拉取商品」：可仅同步 ERP 草稿，或输入关键词后合并来客商品。</p>
+                      <p className="mt-2 text-xs text-gray-500">
+                        点击「拉取商品」：默认列出草稿箱全部（最多 80 条）；填写关键词后会合并抖音线上搜索结果，来源见标签。
+                      </p>
                     ) : null}
                     <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                       <button
@@ -356,7 +390,7 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                 </p>
                 {effectiveSynced.length === 0 ? (
                   <p className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    请先完成「商品库同步」：拉取来客商品与/或 ERP 商品草稿箱。
+                    请先点击「同步商品」→「拉取商品」：将列出草稿箱与（可选）抖音线上结果，再点「确认同步」。
                   </p>
                 ) : null}
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -371,7 +405,12 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                       )}
                     >
                       <div className="font-medium">{p.name}</div>
-                      <div className="text-xs text-gray-500">¥{p.priceYuan}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                        <span className={briefProductSourceBadgeClass(p.source)}>
+                          {briefProductSourceLabel(p.source)}
+                        </span>
+                        <span>¥{p.priceYuan}</span>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -391,7 +430,12 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                       )}
                     >
                       <div className="font-medium">{p.name}</div>
-                      <div className="text-xs text-gray-500">¥{p.priceYuan}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                        <span className={briefProductSourceBadgeClass(p.source)}>
+                          {briefProductSourceLabel(p.source)}
+                        </span>
+                        <span>¥{p.priceYuan}</span>
+                      </div>
                     </button>
                   ))}
                 </div>

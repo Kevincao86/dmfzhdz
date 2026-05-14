@@ -61,7 +61,13 @@ export async function fetchIndustryProductTagsAi(industry: string): Promise<stri
   return [...FALLBACK_TAGS]
 }
 
-export type BriefProductPick = { id: string; name: string; priceYuan: number }
+export type BriefProductPick = {
+  id: string
+  name: string
+  priceYuan: number
+  /** 商品来源：与商品列表「本地草稿 / 来客线上」对应，便于达人 Brief 勾选时区分 */
+  source?: 'erp_draftbox' | 'douyin_online'
+}
 
 function splitThreeBriefs(description: string): [string, string, string] {
   const parts = description
