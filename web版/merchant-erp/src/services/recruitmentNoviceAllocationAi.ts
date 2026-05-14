@@ -1,5 +1,6 @@
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
 import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
+import { formatCityTierBandsSummary, resolveCityKolTierBands } from '../lib/recruitmentCityTierPricing'
 
 /** 达人档位分配策略（影响 AI / 离线估算权重） */
 export type KolTierStrategy = 'more_v3' | 'more_v4' | 'more_v5'
@@ -25,7 +26,11 @@ function clampInt(n: number, lo: number, hi: number): number {
 }
 
 /** 离线估算：按预算与策略拆分档位人数（AI 不可用时使用） */
-export function fallbackNoviceKolAllocation(budgetYuan: number, strategy: KolTierStrategy): NoviceAllocation {
+export function fallbackNoviceKolAllocation(
+  budgetYuan: number,
+  strategy: KolTierStrategy,
+  cityForHint?: string,
+): NoviceAllocation {
   const b = Number.isFinite(budgetYuan) && budgetYuan > 0 ? budgetYuan : 0
   const totalPeople = clampInt(b / 1200, 3, 36)
   const w =
@@ -60,13 +65,15 @@ export function fallbackNoviceKolAllocation(budgetYuan: number, strategy: KolTie
       break
     }
   }
+  const bands = cityForHint ? resolveCityKolTierBands(cityForHint) : null
+  const tierHint = bands ? formatCityTierBandsSummary(bands) : ''
   return {
     v3: Math.max(0, v3),
     v4: Math.max(0, v4),
     v5: Math.max(0, v5),
     v5plus: Math.max(0, v5plus),
     notes: '当前为离线规则估算；连接 AI 成功后将结合城市行情优化。',
-    costHint: `按总预算约 ¥${b.toLocaleString('zh-CN')}、合计约 ${v3 + v4 + v5 + v5plus} 人次档位建议（仅供参考）。`,
+    costHint: `${tierHint ? `${tierHint} ` : ''}按总预算约 ¥${b.toLocaleString('zh-CN')}、合计约 ${v3 + v4 + v5 + v5plus} 人次档位建议（仅供参考）。`,
     source: 'fallback',
   }
 }
@@ -124,16 +131,24 @@ export async function requestNoviceKolAllocationAi(params: {
   packageNote: string
   budgetYuan: number
   strategy: KolTierStrategy
+  kolCommissionPct: number
 }): Promise<NoviceAllocation | null> {
   const model = resolveTextAiModelForRequest() as AiModelId
   const stratZh = kolTierStrategyLabel(params.strategy)
-  const titleDraft = `你是本地生活达人招募成本顾问。根据城市达人撮合的行情（可合理假设），为商家做一次「档位人数」分配建议。
+  const bands = resolveCityKolTierBands(params.city)
+  const tierDoc = formatCityTierBandsSummary(bands)
+  const comm = Math.max(0, Math.min(80, Math.round(Number(params.kolCommissionPct) || 0)))
+  const titleDraft = `你是本地生活达人招募成本顾问。根据城市达人撮合的行情，为商家做一次「档位人数」分配建议。
 
 硬性要求：
 1. 仅输出一个 JSON 对象，不要 Markdown、不要代码围栏、不要解释正文外的文字。
 2. 字段必须为：v3、v4、v5、v5plus（均为非负整数），可选 notes（一句话）、cost_hint（一句话说明成本假设）。
-3. 总人数应与总预算量级相符；档位越高通常单人成本越高。
+3. 总人数应与总预算量级相符；档位越高通常单人成本越高；须参考下列同城档位成本带，人数分配与预算不要明显违背该成本结构。
 4. 策略偏好：${stratZh}
+5. 商家填写的达人佣金（占售价/结算口径的百分比，仅作理解，勿写入 JSON）：${comm}%
+
+同城档位单人参考成本带（元/人次，非承诺报价）：
+${tierDoc}
 
 输入：
 - 城市：${params.city.trim() || '未填'}
@@ -164,12 +179,23 @@ export async function generateNoviceKolAllocation(params: {
   packageNote: string
   budgetYuan: number
   strategy: KolTierStrategy
+  kolCommissionPct: number
 }): Promise<NoviceAllocation> {
   try {
     const ai = await requestNoviceKolAllocationAi(params)
-    if (ai) return ai
+    if (ai) {
+      const bands = resolveCityKolTierBands(params.city)
+      const tierLine = formatCityTierBandsSummary(bands)
+      if (!ai.costHint?.includes('参考城市')) {
+        return {
+          ...ai,
+          costHint: [tierLine, ai.costHint].filter(Boolean).join(' '),
+        }
+      }
+      return ai
+    }
   } catch {
     /* ignore */
   }
-  return fallbackNoviceKolAllocation(params.budgetYuan, params.strategy)
+  return fallbackNoviceKolAllocation(params.budgetYuan, params.strategy, params.city)
 }
