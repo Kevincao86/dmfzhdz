@@ -142,10 +142,12 @@ function resolveComboItemPriceCents(it: ComboItemRow): string {
 function looksComboTemplateAttr(a: TemplateAttr): boolean {
   const key = (a.key ?? '').trim().toLowerCase()
   const name = (a.name ?? '').toLowerCase()
-  if (/^combo_rule$/i.test(key)) return true
-  if (name.includes('combo_rule')) return true
-  if (/套餐规则|搭配规则|组合规则|商品搭配/.test(a.name)) return true
   const vt = (a.value_type ?? '').toUpperCase()
+  if (vt === 'COMMODITY') return true
+  if (/^combo_rule$/i.test(key)) return true
+  if (/^commodity$/i.test(key)) return true
+  if (name.includes('combo_rule')) return true
+  if (/套餐规则|搭配规则|组合规则|商品搭配|菜品搭配/.test(a.name)) return true
   if ((vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON') && /套餐|搭配|组合/.test(a.name)) return true
   return false
 }
@@ -1094,19 +1096,43 @@ export default function DouyinProductCreateWizard({
           setComboGroups(
             pc.groups.map((g) => {
               const gr = g as Record<string, unknown>
+              const itemsRaw = Array.isArray(gr.items)
+                ? gr.items
+                : Array.isArray(gr.item_list)
+                  ? gr.item_list
+                  : []
+              const n = itemsRaw.length
+              const pickRule = (() => {
+                const pr = String(gr.pick_rule ?? '').trim()
+                if (pr) return pr
+                const tc = Math.floor(Number(gr.total_count))
+                const oc = Math.floor(Number(gr.option_count))
+                if (Number.isFinite(tc) && Number.isFinite(oc) && n > 0 && tc === n && oc === n) return '全部必选'
+                if (Number.isFinite(tc) && Number.isFinite(oc) && tc === n && oc === 1 && n > 1) return `${tc}选1`
+                if (Number.isFinite(tc) && Number.isFinite(oc) && tc === n && oc >= 1 && oc <= tc)
+                  return `${tc}选${oc}`
+                return '全部必选'
+              })()
               return {
                 id: newId('g'),
-                pickRule: String(gr.pick_rule ?? '全部必选'),
-                items: (Array.isArray(gr.items) ? gr.items : []).map((it) => {
+                pickRule,
+                items: itemsRaw.map((it) => {
                   const row = it as Record<string, unknown>
-                return {
-                id: newId('i'),
-                name: String(row.name ?? ''),
-                qty: String(row.quantity ?? 1),
-                price: String(row.origin_price_yuan ?? ''),
-                product_id: typeof row.product_id === 'string' ? row.product_id : undefined,
-                sku_id: typeof row.sku_id === 'string' ? row.sku_id : undefined,
-              }
+                  const qty = Math.max(1, Math.floor(Number(row.quantity ?? row.count ?? 1) || 1))
+                  let priceStr = ''
+                  if (row.origin_price_yuan != null && Number.isFinite(Number(row.origin_price_yuan))) {
+                    priceStr = String(row.origin_price_yuan)
+                  } else if (row.price != null && Number.isFinite(Number(row.price))) {
+                    priceStr = String(Number(row.price) / 100)
+                  }
+                  return {
+                    id: newId('i'),
+                    name: String(row.name ?? ''),
+                    qty: String(qty),
+                    price: priceStr,
+                    product_id: typeof row.product_id === 'string' ? row.product_id : undefined,
+                    sku_id: typeof row.sku_id === 'string' ? row.sku_id : undefined,
+                  }
                 }),
               }
             }),
