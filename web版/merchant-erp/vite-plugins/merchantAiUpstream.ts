@@ -108,6 +108,17 @@ function isVendorHopableError(e: unknown): boolean {
 
 const BUILTIN_TEXT_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
 
+/** 前端可选 Kimi/OpenAI 等，但商品 AI 仅接 minimax/qwen/doubao：映射为首个已配置 Key 的厂商 */
+function pickFirstAssistVendorWithKey(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+): (typeof BUILTIN_TEXT_VENDOR_ORDER)[number] {
+  for (const id of BUILTIN_TEXT_VENDOR_ORDER) {
+    if (pickEffectiveKey(env, id, body).key) return id
+  }
+  return 'qwen'
+}
+
 function builtinTextFailoverOthers(
   primary: string,
   env: MerchantAiEnv,
@@ -1326,16 +1337,10 @@ export async function handleDouyinGoodsAiAssist(
   envIn: MerchantAiEnv,
 ): Promise<void> {
   const env = await mergeMerchantAiEnvWithRegistrySnapshot(envIn)
-  const model = normalizeAiModelPreserveCustom(body.model)
-  if (!isDouyinAssistAiVendorId(model)) {
-    json(res, 200, {
-      ok: false,
-      code: 'UNSUPPORTED_AI_VENDOR',
-      vendor: model,
-      message: `本地网关尚未接入「${model}」的文案 / 生图能力，请改用 MiniMax、通义千问或豆包。（新增供应商已同步至 ERP 后，仍须在本项目扩展上游路由方可实际调用。）`,
-    })
-    return
-  }
+  const requestedVendor = normalizeAiModelPreserveCustom(body.model)
+  const model = isDouyinAssistAiVendorId(requestedVendor)
+    ? requestedVendor
+    : pickFirstAssistVendorWithKey(env, body)
   const action = String(body.action ?? '')
   const productName = String(body.product_name ?? '').trim() || '本店服务'
   const titleDraft = String(body.title_draft ?? '').trim() || productName
@@ -1474,7 +1479,7 @@ export async function handleDouyinGoodsAiAssist(
         json(res, 200, {
           ok: true,
           image_urls: urls,
-          ...(modelUsed !== model ? { ai_vendor_used: modelUsed } : {}),
+          ...(modelUsed !== requestedVendor ? { ai_vendor_used: modelUsed } : {}),
         })
         return
       }
@@ -1492,7 +1497,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         image_urls: enhanced,
-        ...(modelUsed !== model ? { ai_vendor_used: modelUsed } : {}),
+        ...(modelUsed !== requestedVendor ? { ai_vendor_used: modelUsed } : {}),
       })
       return
     } catch (e) {
@@ -1546,7 +1551,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         geo_ai_score: parsed,
-        ...(scoreVendor !== model ? { ai_vendor_used: scoreVendor } : {}),
+        ...(scoreVendor !== requestedVendor ? { ai_vendor_used: scoreVendor } : {}),
       })
       return
     }
@@ -1575,7 +1580,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         description,
-        ...(consultVendor !== model ? { ai_vendor_used: consultVendor } : {}),
+        ...(consultVendor !== requestedVendor ? { ai_vendor_used: consultVendor } : {}),
       })
       return
     }
@@ -1592,7 +1597,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         title: title || titleDraft.slice(0, 40),
-        ...(titleVendor !== model ? { ai_vendor_used: titleVendor } : {}),
+        ...(titleVendor !== requestedVendor ? { ai_vendor_used: titleVendor } : {}),
       })
       return
     }
@@ -1609,7 +1614,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         description,
-        ...(descVendor !== model ? { ai_vendor_used: descVendor } : {}),
+        ...(descVendor !== requestedVendor ? { ai_vendor_used: descVendor } : {}),
       })
       return
     }
@@ -1630,7 +1635,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         description,
-        ...(articleVendor !== model ? { ai_vendor_used: articleVendor } : {}),
+        ...(articleVendor !== requestedVendor ? { ai_vendor_used: articleVendor } : {}),
       })
       return
     }
@@ -1651,7 +1656,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         description,
-        ...(topicVendor !== model ? { ai_vendor_used: topicVendor } : {}),
+        ...(topicVendor !== requestedVendor ? { ai_vendor_used: topicVendor } : {}),
       })
       return
     }
