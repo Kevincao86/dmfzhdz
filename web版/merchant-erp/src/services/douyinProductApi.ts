@@ -184,7 +184,7 @@ export type ImageUploadResult =
   | { ok: false; message: string }
   | { ok: true; url: string }
 
-/** 经商户网关 POST /api/merchant/douyin/goods/image/upload：服务端调抖音 tool/imagex/client_upload，返回 https 图链 */
+/** 经商户网关上传至 Supabase Storage 公开桶，返回 https 直链（供 goods/save） */
 export async function uploadDouyinProductImage(file: File): Promise<ImageUploadResult> {
   const max = 10 * 1024 * 1024
   if (file.size > max) {
