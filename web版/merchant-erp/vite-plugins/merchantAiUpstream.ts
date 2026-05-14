@@ -1,12 +1,14 @@
 /**
  * 抖音商品创建 — AI 网关（仅跑在 Vite Node 端，密钥与厂商顺序仅来自 Vercel / 进程环境变量，勿写入前端包）。
- * 文案：MiniMax / 通义千问 / 豆包 对话 API（与各厂商 OpenAI 兼容或官方路径对齐）。
+ * 文案：MiniMax / 通义千问 / 豆包 对话 API（与各厂商 OpenAI 兼容或官方路径对齐）；手选 Gemini 时走 TokenMix（`TOKENMIX_API_KEY`）。
  * 生图：通义万相 wanx-v1（异步）、豆包 Seedream（Ark images/generations）、MiniMax image_generation。
  * 厂商尝试顺序：`MERCHANT_AI_GOODS_TEXT_FAILOVER`、`MERCHANT_AI_GOODS_IMAGE_FAILOVER`（逗号分隔 minimax,qwen,doubao），未设时与历史默认一致；见 .env.example。
  */
 import type { ServerResponse } from 'node:http'
 
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
+import { defaultModelIdForFamily } from '../src/services/ai/tokenmixClient.js'
+import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
 
 export type MerchantAiEnv = Record<string, string>
 
@@ -28,6 +30,8 @@ function vendorBillingHintForModel(model: string): string {
       return '阿里云 DashScope（通义）'
     case 'minimax':
       return 'MiniMax'
+    case 'gemini':
+      return 'TokenMix / Google Gemini'
     default:
       return '模型服务商'
   }
@@ -171,8 +175,8 @@ async function callModelTextWithBuiltinFailover(
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
-  const pk = pickKey(env, primaryNorm).key
-  if (!pk) throw new Error(`缺少 ${primaryNorm} 的 API Key`)
+  const { key: pk, label: pkLabel } = textVendorKeyInfo(env, primaryNorm)
+  if (!pk) throw new Error(`缺少 ${primaryNorm} 凭据：请配置 ${pkLabel}`)
   let lastErr: unknown = null
   try {
     const text = await callModelText(primaryNorm, pk, env, system, user)
@@ -344,6 +348,16 @@ function pickKey(
     default:
       return { key: null, label: 'MERCHANT_AI_*' }
   }
+}
+
+/** 商品文案类：直连厂商 Key 或 Gemini（TokenMix） */
+function textVendorKeyInfo(env: MerchantAiEnv, vendor: string): { key: string | null; label: string } {
+  if (vendor === 'gemini') {
+    const e = env as Record<string, string | undefined>
+    const key = (e.TOKENMIX_API_KEY ?? '').trim() || null
+    return { key, label: 'TOKENMIX_API_KEY' }
+  }
+  return pickKey(env, vendor)
 }
 
 function sliceTitle(s: string, maxChars: number): string {
@@ -595,6 +609,26 @@ async function callModelText(
       return callDoubaoChat(apiKey, env, system, user)
     case 'minimax':
       return callMinimaxChat(apiKey, env, system, user)
+    case 'gemini': {
+      const e = env as Record<string, string | undefined>
+      const explicit = (e.MERCHANT_AI_GOODS_GEMINI_MODEL ?? '').trim()
+      const modelId = explicit || defaultModelIdForFamily('gemini')
+      const envOut: MerchantAiEnv = { ...env, TOKENMIX_API_KEY: apiKey }
+      const res = await chatTokenMix(
+        {
+          provider: 'tokenmix',
+          modelFamily: 'gemini',
+          model: modelId,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          temperature: 0.55,
+        },
+        envOut,
+      )
+      return polishVisibleAssistantText(res.content)
+    }
     default:
       throw new Error(`不支持的 model：${model}`)
   }
@@ -931,6 +965,7 @@ const VENDOR_LABEL: Record<string, string> = {
   minimax: 'MiniMax',
   qwen: '通义千问（DashScope）',
   doubao: '豆包（火山 Ark）',
+  gemini: 'Gemini（TokenMix）',
 }
 
 function normalizeAiModelPreserveCustom(raw: unknown): string {
@@ -943,13 +978,17 @@ function normalizeAiModelPreserveCustom(raw: unknown): string {
 }
 
 function missingVendorKeyBody(env: MerchantAiEnv, model: string) {
-  const { label } = pickKey(env, model)
+  const { label } = textVendorKeyInfo(env, model)
   const name = VENDOR_LABEL[model] ?? model
+  const suffix =
+    model === 'gemini'
+      ? '可选 MERCHANT_AI_GOODS_GEMINI_MODEL（如 gemini-2.5-flash）。'
+      : ''
   return {
     ok: false as const,
     code: 'NEED_VENDOR_KEY',
     vendor: model,
-    message: `缺少「${name}」的有效 API Key。请在 Vercel / 服务端环境变量中配置：${label}。`,
+    message: `缺少「${name}」的有效凭据。请在 Vercel / 服务端环境变量中配置：${label}。${suffix}`,
   }
 }
 
@@ -1332,9 +1371,11 @@ export async function handleDouyinGoodsAiAssist(
     ? isDouyinAssistAiVendorId(requestedVendor)
       ? requestedVendor
       : pickPrimaryVendorWithKey(env, imageVendorOrder(env))
-    : isDouyinAssistAiVendorId(requestedVendor)
-      ? requestedVendor
-      : pickPrimaryVendorWithKey(env, textVendorOrder(env))
+    : requestedVendor === 'gemini'
+      ? 'gemini'
+      : isDouyinAssistAiVendorId(requestedVendor)
+        ? requestedVendor
+        : pickPrimaryVendorWithKey(env, textVendorOrder(env))
   const productName = String(body.product_name ?? '').trim() || '本店服务'
   const titleDraft = String(body.title_draft ?? '').trim() || productName
   const imageUrls = Array.isArray(body.image_urls)
@@ -1498,7 +1539,7 @@ export async function handleDouyinGoodsAiAssist(
     }
   }
 
-  const { key } = pickKey(env, model)
+  const { key } = textVendorKeyInfo(env, model)
   if (
     !key &&
     (action === 'optimize_title' ||

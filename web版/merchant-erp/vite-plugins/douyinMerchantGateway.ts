@@ -1803,6 +1803,87 @@ function buildDouyinProductComboRule(
   return { groups: groupsWithItems }
 }
 
+/** 无 package_combo 或解析失败时：单组单品 ItemGroupStruct，供团购兜底与代金券等 template 仍要求 combo 的场景 */
+function buildDouyinComboRuleSingleGroupDefault(
+  productNameFallback: string,
+  originFenFallback: number,
+  priceYuanNum: number,
+): Record<string, unknown> {
+  const py = Number.isFinite(priceYuanNum) && priceYuanNum > 0 ? priceYuanNum : 0
+  const onePrice = Math.max(1, originFenFallback > 0 ? originFenFallback : yuanToFen(py))
+  return {
+    groups: [
+      {
+        group_name: '商品组',
+        total_count: 1,
+        option_count: 1,
+        item_list: [
+          {
+            name: productNameFallback.slice(0, 120) || '团购套餐',
+            count: 1,
+            unit: '份',
+            price: onePrice,
+          },
+        ],
+      },
+    ],
+  }
+}
+
+/**
+ * 将 combo_rule 写入商品模板 attr_key_value_map（与抖音 template 槽位对齐）。
+ * 若无任何 combo 类模板 key（含 template 拉取失败），回退写入 `combo_rule`。
+ */
+function applyComboRuleToMergedProductAttrs(
+  attrs: Record<string, unknown>[],
+  mergedProductAttrs: Record<string, string>,
+  comboRule: Record<string, unknown>,
+): void {
+  const comboRuleJsonWrapped = JSON.stringify(comboRule).slice(0, 120_000)
+  const groupsOnly = (comboRule as { groups?: unknown }).groups
+  const comboRuleJsonGroupsArray = JSON.stringify(Array.isArray(groupsOnly) ? groupsOnly : []).slice(0, 120_000)
+  let filled = 0
+  for (const a of attrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key) continue
+    const name = String((a as Record<string, unknown>).name ?? '')
+    const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+    if (!attrTemplateLooksComboLike(key, name, vt)) continue
+    if ((mergedProductAttrs[key] ?? '').trim()) continue
+    const useGroupsArrayJson = vt === 'COMMODITY' || /^commodity$/i.test(key)
+    mergedProductAttrs[key] = useGroupsArrayJson ? comboRuleJsonGroupsArray : comboRuleJsonWrapped
+    filled += 1
+  }
+  if (filled === 0 && !(mergedProductAttrs.combo_rule ?? '').trim()) {
+    mergedProductAttrs.combo_rule = comboRuleJsonWrapped
+  }
+}
+
+/** SKU 模板中 COMMODITY/commodity 槽位写入搭配组数组 JSON；无匹配 key 时回退 `commodity` */
+function applyComboRuleToSkuAttrMap(
+  skuAttrs: Record<string, unknown>[],
+  skuAttrMap: Record<string, string>,
+  comboRule: Record<string, unknown>,
+): void {
+  const groupsArr = (comboRule as { groups?: unknown[] }).groups
+  if (!Array.isArray(groupsArr) || groupsArr.length === 0) return
+  const commodityPayload = JSON.stringify(groupsArr).slice(0, 120_000)
+  let filled = 0
+  for (const a of skuAttrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key) continue
+    const name = String((a as Record<string, unknown>).name ?? '')
+    const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+    if (!(vt === 'COMMODITY' || /^commodity$/i.test(key) || /菜品搭配|商品搭配/.test(name))) continue
+    if ((skuAttrMap[key] ?? '').trim()) continue
+    skuAttrMap[key] = commodityPayload
+    filled += 1
+  }
+  if (filled === 0 && !(skuAttrMap.commodity ?? '').trim()) {
+    skuAttrMap.commodity = commodityPayload
+  }
+}
+
 function mergeGoodlifeProductAttrMapFromErp(
   attrs: Record<string, unknown>[],
   erp: Record<string, unknown>,
@@ -2137,25 +2218,18 @@ async function buildGoodlifeProductSaveBody(
     comboRule = buildDouyinProductComboRule(erp, product_name, originFen)
     if (!comboRule) {
       const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
-      const onePrice = Math.max(1, yuanToFen(Number.isFinite(oy) && oy > 0 ? oy : priceYuan))
-      comboRule = {
-        groups: [
-          {
-            group_name: '商品组',
-            total_count: 1,
-            option_count: 1,
-            item_list: [
-              {
-                name: product_name.slice(0, 120) || '团购套餐',
-                count: 1,
-                unit: '份',
-                price: onePrice,
-              },
-            ],
-          },
-        ],
-      }
+      comboRule = buildDouyinComboRuleSingleGroupDefault(
+        product_name,
+        Math.max(1, yuanToFen(Number.isFinite(oy) && oy > 0 ? oy : priceYuan)),
+        priceYuan,
+      )
     }
+  } else if (product_type === 2) {
+    /**
+     * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。
+     * 用单组单品结构对齐 ItemGroupStruct，避免「combo_rule不能为空」。
+     */
+    comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, originFen, priceYuan)
   }
 
   const erpForAttrMerge: Record<string, unknown> =
@@ -2189,23 +2263,11 @@ async function buildGoodlifeProductSaveBody(
   }
 
   /**
-   * 团购：抖音会按 template/get 返回的 attr_key_value_map 校验 combo_rule 是否非空。
-   * 顶层 product.combo_rule 保留，同时把同一份规范化结构写回 combo 类模板字段，避免必填属性被判空。
+   * 抖音会校验 combo_rule / 模板 combo 槽位非空。团购与代金券均写入 attr_key_value_map；
+   * template/get 失败（attrs 空）时用回退 key `combo_rule`。
    */
-  if (isGroupBuy && comboRule) {
-    const comboRuleJsonWrapped = JSON.stringify(comboRule).slice(0, 120_000)
-    const groupsOnly = (comboRule as { groups?: unknown }).groups
-    const comboRuleJsonGroupsArray = JSON.stringify(Array.isArray(groupsOnly) ? groupsOnly : []).slice(0, 120_000)
-    for (const a of attrs) {
-      const key = String((a as Record<string, unknown>).key ?? '').trim()
-      if (!key) continue
-      const name = String((a as Record<string, unknown>).name ?? '')
-      const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
-      if (!attrTemplateLooksComboLike(key, name, vt)) continue
-      /** COMMODITY / commodity 与历史 life 接口一致：值为「搭配组数组」的 JSON 字符串，而非 { groups: [...] } */
-      const useGroupsArrayJson = vt === 'COMMODITY' || /^commodity$/i.test(key)
-      mergedProductAttrs[key] = useGroupsArrayJson ? comboRuleJsonGroupsArray : comboRuleJsonWrapped
-    }
+  if (comboRule) {
+    applyComboRuleToMergedProductAttrs(attrs, mergedProductAttrs, comboRule)
   }
 
   const nowMs = Date.now()
@@ -2225,7 +2287,7 @@ async function buildGoodlifeProductSaveBody(
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
 
-  if (isGroupBuy && comboRule) {
+  if (comboRule) {
     product.combo_rule = comboRule
   }
 
@@ -2251,21 +2313,8 @@ async function buildGoodlifeProductSaveBody(
       if (s) skuAttrMap[key] = s.slice(0, 120_000)
     }
   }
-  /** 团购：template/get 常在 sku_attrs 要求 COMMODITY/commodity，值为搭配组 JSON 数组字符串（与历史 life 接口一致） */
-  if (isGroupBuy && comboRule) {
-    const groupsArr = (comboRule as { groups?: unknown[] }).groups
-    if (Array.isArray(groupsArr) && groupsArr.length > 0) {
-      const commodityPayload = JSON.stringify(groupsArr).slice(0, 120_000)
-      for (const a of skuAttrs) {
-        const key = String((a as Record<string, unknown>).key ?? '').trim()
-        if (!key) continue
-        const name = String((a as Record<string, unknown>).name ?? '')
-        const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
-        if (vt === 'COMMODITY' || /^commodity$/i.test(key) || /菜品搭配|商品搭配/.test(name)) {
-          skuAttrMap[key] = commodityPayload
-        }
-      }
-    }
+  if (comboRule) {
+    applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRule)
   }
   const sku: Record<string, unknown> = {
     sku_name: product_name.slice(0, 120),

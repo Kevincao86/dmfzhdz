@@ -19,6 +19,7 @@ export const BUILTIN_AI_VENDOR_IDS = [
   'claude',
   'deepseek',
   'kimi',
+  'gemini',
 ] as const
 export type BuiltinAiVendorId = (typeof BUILTIN_AI_VENDOR_IDS)[number]
 
@@ -88,6 +89,12 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
     label: 'Kimi',
     hint: 'Moonshot · OpenAI 兼容（智能体网关）',
     logoUrl: '/ai-vendors/kimi.png',
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    hint: '经 TokenMix 调用 Google Gemini：Vercel 配置 TOKENMIX_API_KEY；可选 MERCHANT_AI_GOODS_GEMINI_MODEL（默认 gemini-2.5-flash）。生图仍走通义/豆包/MiniMax。',
+    logoUrl: '/ai-vendors/gemini.png',
   },
 ]
 

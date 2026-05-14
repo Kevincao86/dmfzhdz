@@ -546,6 +546,7 @@ export default function DouyinProductCreateWizard({
       const lock = lockedAiGoodsContext
       const r = await postDouyinGoodsAiAssist({ ...body, model, ...(lock ?? {}) })
       if (r.ok || !r.needVendorKey) return r
+      if (model === 'gemini') return { ok: false as const, message: r.message }
       return {
         ok: false as const,
         message: `${r.message} 请在 Vercel / 部署环境配置 MERCHANT_AI_QWEN_KEY、MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_MINIMAX_KEY（或 DASHSCOPE_API_KEY / ARK_API_KEY / MINIMAX_API_KEY）。`,
@@ -1473,7 +1474,7 @@ export default function DouyinProductCreateWizard({
     const aux = auxUrlsList.filter(Boolean).slice(0, 4)
     const env = envUrlsList.filter(Boolean).slice(0, 10)
     const originNum = Number.parseFloat(originYuan) || 0
-    /** 仅团购 product_type=1 传 package_combo；代金券等由 template/get 必填项与 attr 组装，勿传 combo_rule */
+    /** 仅团购 product_type=1 传 package_combo；代金券（product_type=2）由网关生成最小 combo_rule，勿传 package_combo */
     const package_combo =
       productType == null
         ? undefined
@@ -3402,7 +3403,9 @@ export default function DouyinProductCreateWizard({
                           <code className="rounded bg-emerald-50 px-1">package_combo</code> 同源；
                           {productType === 1
                             ? ' 保存时由网关写入抖音请求体顶层 product.combo_rule，并同步填充模板 attr_key_value_map 的 combo_rule。'
-                            : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
+                            : productType === 2
+                              ? ' 代金券：网关会按商品名称与售价生成最小套餐结构写入 combo_rule，避免抖音报「combo_rule不能为空」。'
+                              : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
                         </p>
                       ) : null}
                       {!covered ? (
