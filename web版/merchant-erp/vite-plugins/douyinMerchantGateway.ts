@@ -63,12 +63,23 @@ export { runDouyinMerchantBind }
 /** 绑定链路若 hang 住，Vercel 会以 FUNCTION_INVOCATION_FAILED 结束；对抖音出口强制限时 */
 const DOUYIN_FETCH_TIMEOUT_MS = 25_000
 
-/** 商品保存链路内 template/get + product/save：默认 55s，须小于 Vercel 该函数的 maxDuration，避免平台先返回 504 */
-function douyinGoodsSaveHttpTimeoutMs(): number {
-  const raw = process.env.DOUYIN_GOODS_HTTP_TIMEOUT_MS?.trim()
+/** 商品保存：template/get + 组装 与 product/save 分阶段限时，避免共用一个 55s 导致 save 未发出、Vercel 无完整日志 */
+function douyinGoodsSaveBuildBudgetMs(): number {
+  const raw = process.env.DOUYIN_GOODS_BUILD_TIMEOUT_MS?.trim()
   const n = raw ? Number.parseInt(raw, 10) : Number.NaN
-  if (Number.isFinite(n) && n >= 8000 && n <= 240_000) return n
-  return 55_000
+  if (Number.isFinite(n) && n >= 8000 && n <= 90_000) return n
+  return 38_000
+}
+
+/** POST goodlife/v1/goods/product/save/ 单独预算（与中继「是否收到 save」对照） */
+function douyinGoodsSavePostBudgetMs(): number {
+  const raw = process.env.DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS?.trim()
+  const n = raw ? Number.parseInt(raw, 10) : Number.NaN
+  if (Number.isFinite(n) && n >= 12_000 && n <= 180_000) return n
+  const legacy = process.env.DOUYIN_GOODS_HTTP_TIMEOUT_MS?.trim()
+  const leg = legacy ? Number.parseInt(legacy, 10) : Number.NaN
+  if (Number.isFinite(leg) && leg >= 12_000 && leg <= 180_000) return leg
+  return 75_000
 }
 
 /** 同一实例内缓存 template/get，减少保存草稿/提交审核连续点击时的串行耗时 */
@@ -2411,9 +2422,27 @@ export async function handleDouyinGoodsProductSavePost(
       return
     }
 
-    const budgetMs = Math.max(8000, douyinGoodsSaveHttpTimeoutMs())
-    const goodsAbort = new AbortController()
-    const goodsTimer = setTimeout(() => goodsAbort.abort(), budgetMs)
+    const relay = process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
+    const relayBase = relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com'
+    const buildBudgetMs = douyinGoodsSaveBuildBudgetMs()
+    const savePostBudgetMs = douyinGoodsSavePostBudgetMs()
+    console.info(
+      '[meoo douyin goods/save] start',
+      JSON.stringify({
+        phase: 'before_build',
+        mode,
+        account_id: accountId,
+        product_type: Number(erp.product_type) || 1,
+        category_id: String(erp.category_id ?? '').trim().slice(0, 32),
+        name_len: String(erp.product_name ?? '').trim().length,
+        relay_base: relayBase,
+        build_budget_s: Math.round(buildBudgetMs / 1000),
+        save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+      }),
+    )
+
+    const buildAbort = new AbortController()
+    const buildTimer = setTimeout(() => buildAbort.abort(), buildBudgetMs)
 
     let built: Awaited<ReturnType<typeof buildGoodlifeProductSaveBody>>
     try {
@@ -2423,34 +2452,60 @@ export async function handleDouyinGoodsProductSavePost(
         erp,
         mode,
         accountName,
-        goodsAbort.signal,
+        buildAbort.signal,
       )
     } catch (e) {
-      clearTimeout(goodsTimer)
+      clearTimeout(buildTimer)
       const msg = e instanceof Error ? e.message : String(e)
       const isAbort =
         (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
         /aborted|AbortError/i.test(msg)
+      console.warn(
+        '[meoo douyin goods/save] phase_fail',
+        JSON.stringify({
+          phase: 'build',
+          mode,
+          is_abort: isAbort,
+          build_budget_s: Math.round(buildBudgetMs / 1000),
+          message: msg.slice(0, 400),
+        }),
+      )
       json(res, isAbort ? 504 : 502, {
         message: isAbort
-          ? `抖音商品保存请求超时（累计约 ${Math.round(budgetMs / 1000)}s）：template/get 或组装请求未及时完成。请稍后重试；若自建 DOUYIN_OPENAPI_BASE_URL 中继过慢，请检查中继。可在 Vercel 设置 DOUYIN_GOODS_HTTP_TIMEOUT_MS（须小于该函数 maxDuration）。`
+          ? `抖音商品保存「模板/组装」阶段超时（约 ${Math.round(buildBudgetMs / 1000)}s）：template/get 或组装未及时完成。请稍后重试或检查 DOUYIN_OPENAPI_BASE_URL 中继。可调环境变量 DOUYIN_GOODS_BUILD_TIMEOUT_MS（默认 38s）。`
           : `组装商品保存请求失败：${msg}`,
       })
       return
     }
+    clearTimeout(buildTimer)
+
     const saveBody = built.body
+    const bodyBytes = JSON.stringify(saveBody).length
     console.info(
-      '[meoo douyin goods/save]',
-      JSON.stringify(
-        summarizeDouyinProductSaveForLog(saveBody, mode, {
+      '[meoo douyin goods/save] built',
+      JSON.stringify({
+        ...summarizeDouyinProductSaveForLog(saveBody, mode, {
           templateProductAttrs: built.templateProductAttrs,
           templateSkuAttrs: built.templateSkuAttrs,
         }),
-      ),
+        save_body_bytes: bodyBytes,
+      }),
     )
+
+    const saveAbort = new AbortController()
+    const saveTimer = setTimeout(() => saveAbort.abort(), savePostBudgetMs)
 
     let dr: Response
     try {
+      console.info(
+        '[meoo douyin goods/save] posting_save',
+        JSON.stringify({
+          phase: 'before_product_save_post',
+          mode,
+          save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+          save_body_bytes: bodyBytes,
+        }),
+      )
       dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
         method: 'POST',
         headers: {
@@ -2459,22 +2514,33 @@ export async function handleDouyinGoodsProductSavePost(
           'Rpc-Transit-Life-Account': accountId,
         },
         body: JSON.stringify(saveBody),
-        signal: goodsAbort.signal,
+        signal: saveAbort.signal,
       })
     } catch (e) {
-      clearTimeout(goodsTimer)
+      clearTimeout(saveTimer)
       const msg = e instanceof Error ? e.message : String(e)
       const isAbort =
         (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
         /aborted|AbortError/i.test(msg)
+      console.warn(
+        '[meoo douyin goods/save] phase_fail',
+        JSON.stringify({
+          phase: 'product_save_fetch',
+          mode,
+          is_abort: isAbort,
+          save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+          save_body_bytes: bodyBytes,
+          message: msg.slice(0, 400),
+        }),
+      )
       json(res, isAbort ? 504 : 502, {
         message: isAbort
-          ? `抖音 goods/save 请求超时（累计预算约 ${Math.round(budgetMs / 1000)}s）。请稍后重试或检查 DOUYIN_OPENAPI_BASE_URL 中继。`
+          ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
           : `抖音 goods/save 网络失败：${msg}`,
       })
       return
     }
-    clearTimeout(goodsTimer)
+    clearTimeout(saveTimer)
     const raw = await dr.text()
     const trimmed = raw.replace(/^\uFEFF/, '').trim()
     if (trimmed.startsWith('<')) {
