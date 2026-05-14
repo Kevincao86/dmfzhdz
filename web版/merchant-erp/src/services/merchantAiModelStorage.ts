@@ -24,8 +24,8 @@ function selectableAiIds(): Set<string> {
 }
 
 /** 按目录顺序，选用第一个已配置浏览器端 Key 的厂商；均无 Key 时退回 qwen。 */
-/** 网关生图支持 qwen / doubao；MiniMax 等仅文案厂商不参与生图自动选择。 */
-const BUILTIN_IMAGE_VENDOR_ORDER = ['qwen', 'doubao'] as const
+/** 商品 AI 生图 / 美化网关支持 minimax / qwen / doubao。 */
+const BUILTIN_IMAGE_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
 
 export function pickAutoResolvedTextModel(): string {
   const opts = listAiUiModelOptions()
@@ -66,7 +66,7 @@ function isBuiltinImageVendorId(id: string): boolean {
 
 function normalizeImageModelStored(raw: string | null | undefined): string {
   const s = raw?.trim().toLowerCase() ?? ''
-  if (s === 'minimax' || s === 'deepseek') return pickAutoResolvedImageModel()
+  if (s === 'deepseek') return pickAutoResolvedImageModel()
   if (s === 'auto' || !s) return pickAutoResolvedImageModel()
   if (selectableAiIds().has(s)) {
     if (isBuiltinImageVendorId(s)) return s
