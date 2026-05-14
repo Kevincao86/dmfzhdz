@@ -1,9 +1,10 @@
 import { ChevronDown, ImagePlus, Loader2, Mic, Send, Volume2 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 
 type Layout = 'centered' | 'dock'
+type ModelFilterTab = 'all' | 'chat' | 'image'
 
 function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
   if (typeof window === 'undefined') return null
@@ -33,6 +34,18 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const recRef = useRef<SpeechRecognition | null>(null)
   const [listening, setListening] = useState(false)
+  const [modelFilter, setModelFilter] = useState<ModelFilterTab>('all')
+
+  const filteredModelOptions = useMemo(() => {
+    if (modelFilter === 'all') return modelPickerOptions
+    return modelPickerOptions.filter((o) => (o.capability ?? 'chat') === modelFilter)
+  }, [modelPickerOptions, modelFilter])
+
+  useEffect(() => {
+    if (filteredModelOptions.some((o) => o.key === modelPickerKey)) return
+    const first = filteredModelOptions[0]?.key
+    if (first) setModelPickerKey(first)
+  }, [filteredModelOptions, modelPickerKey, setModelPickerKey])
 
   const stopListening = useCallback(() => {
     try {
@@ -156,6 +169,31 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
         )}
       >
         <div className="relative min-w-0 flex-1 basis-[10rem] sm:max-w-[min(100%,14rem)]">
+          <div className="mb-1 flex flex-wrap gap-1">
+            {(
+              [
+                { id: 'all' as const, label: '全部' },
+                { id: 'chat' as const, label: '对话' },
+                { id: 'image' as const, label: '文生图' },
+              ] satisfies { id: ModelFilterTab; label: string }[]
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                disabled={aiSending || disabled}
+                onClick={() => setModelFilter(tab.id)}
+                className={cn(
+                  'rounded-lg px-2 py-0.5 text-[11px] font-medium transition',
+                  modelFilter === tab.id
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                  (aiSending || disabled) && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <select
             aria-label="选择助手风格"
             value={modelPickerKey}
@@ -168,7 +206,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
               (aiSending || disabled) && 'cursor-not-allowed opacity-60',
             )}
           >
-            {modelPickerOptions.map((o) => (
+            {filteredModelOptions.map((o) => (
               <option key={o.key} value={o.key}>
                 {o.label}
               </option>

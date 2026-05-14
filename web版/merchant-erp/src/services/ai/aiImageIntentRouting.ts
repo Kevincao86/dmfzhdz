@@ -1,5 +1,6 @@
 import type { AiModelPickerOption } from './modelRegistry'
 import { parseAiModelPickerKey } from './modelRegistry'
+import { isAgentImagePickerKey } from './agentImageModelKeys'
 
 /**
  * 附图理解 / 创意说明：仍走 chat 多模态（非像素级文生图）。
@@ -15,6 +16,7 @@ const PREFERRED_MULTIMODAL_CHAT_KEYS = [
  * 避免误选仅 chat 的 GPT-4o 却期待像素图。
  */
 const PREFERRED_PIXEL_GEN_PICKER_KEYS = [
+  'img::v::auto',
   'qwen::__default__',
   'doubao::__default__',
   'minimax::__default__',
@@ -64,6 +66,7 @@ export function resolveModelPickerKeyForImageIntent(
   userLine: string,
   hasComposerImages: boolean,
 ): string {
+  if (isAgentImagePickerKey(currentKey)) return currentKey
   const wantPixelGen = detectImageGenerationIntent(userLine)
   const needMultimodalChat = hasComposerImages || wantPixelGen
   if (!needMultimodalChat) return currentKey

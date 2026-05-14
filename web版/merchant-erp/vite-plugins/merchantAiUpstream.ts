@@ -141,6 +141,19 @@ function imageVendorOrder(env: MerchantAiEnv): AssistVendorId[] {
   return parseDouyinAssistVendorOrder(env, 'MERCHANT_AI_GOODS_IMAGE_FAILOVER', [...DEFAULT_IMAGE_FAILOVER])
 }
 
+/** 将首选厂商置于轮询首位（须已配置 Key），其余顺序不变 */
+function imageVendorOrderPreferring(
+  env: MerchantAiEnv,
+  preferred?: 'qwen' | 'doubao' | 'minimax',
+): AssistVendorId[] {
+  const base = imageVendorOrder(env)
+  if (!preferred) return base
+  if (!isDouyinAssistAiVendorId(preferred)) return base
+  if (!pickKey(env, preferred).key) return base
+  const rest = base.filter((x) => x !== preferred)
+  return [preferred, ...rest]
+}
+
 function pickPrimaryVendorWithKey(env: MerchantAiEnv, order: readonly AssistVendorId[]): AssistVendorId {
   for (const id of order) {
     if (pickKey(env, id).key) return id
@@ -308,12 +321,13 @@ async function runAgentImageGenerateWithBuiltinFailover(
 export async function runAgentFreeformTextToImage(
   env: MerchantAiEnv,
   userLine: string,
+  preferredVendor?: 'qwen' | 'doubao' | 'minimax',
 ): Promise<
   | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
   | { ok: false; message: string }
 > {
   const prompt = buildAgentFreeformImagePrompt(userLine)
-  const order = imageVendorOrder(env)
+  const order = imageVendorOrderPreferring(env, preferredVendor)
   const primary = pickPrimaryVendorWithKey(env, order)
   const { key, label } = pickKey(env, primary)
   if (!key) {
