@@ -213,6 +213,35 @@ async function shopPoiQueryPage(
   return j
 }
 
+function isShopQueryRateLimitedMessage(msg: string): boolean {
+  return /太过频繁|请稍后再试|rate limit|429|限流|频率过高|too many requests/i.test(msg)
+}
+
+/** 绑定页单次 shop/query：与 goodlife 网关一致做退避，缓解抖音「请求太过频繁」 */
+async function shopPoiQueryPageWithRetry(
+  accountId: string,
+  accessToken: string,
+  page: number,
+  size: number,
+): Promise<Record<string, unknown>> {
+  let lastErr: unknown
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) {
+      const backoff = 700 * attempt * attempt
+      await new Promise<void>((r) => setTimeout(r, backoff))
+    }
+    try {
+      return await shopPoiQueryPage(accountId, accessToken, page, size)
+    } catch (e) {
+      lastErr = e
+      const msg = e instanceof Error ? e.message : String(e)
+      if (attempt < 4 && isShopQueryRateLimitedMessage(msg)) continue
+      throw e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? 'shop/query 无响应'))
+}
+
 function accountNameFromPois(pois: unknown[]): string | undefined {
   for (const row of pois) {
     if (!row || typeof row !== 'object') continue
@@ -267,13 +296,13 @@ export async function runDouyinMerchantBind(
     const token = await ensureDouyinToken(session)
     let first: Record<string, unknown>
     try {
-      first = await shopPoiQueryPage(merchantId, token, 1, 1)
+      first = await shopPoiQueryPageWithRetry(merchantId, token, 1, 1)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       if (isLikelyDouyinClientTokenExpiredBizError(msg)) {
         invalidateDouyinMerchantClientTokenCache(session)
         const token2 = await ensureDouyinToken(session)
-        first = await shopPoiQueryPage(merchantId, token2, 1, 1)
+        first = await shopPoiQueryPageWithRetry(merchantId, token2, 1, 1)
       } else {
         throw e
       }
@@ -312,6 +341,10 @@ export async function runDouyinMerchantBind(
         : String(e)
     const whitelistHint =
       detail && !aborted && isLikelyWhitelistIpReject(detail) ? whitelistDeployHint(detail) : ''
+    const rateLimitHint =
+      !aborted && isShopQueryRateLimitedMessage(detail)
+        ? ' 此为抖音开放平台对接口 QPS/频控的限制（与白名单是否为 60.204.* 无直接关系）。请间隔 1～3 分钟再点「确认绑定」、避免连续重试；若需固定出口 IP，仍须在 Vercel 配置 DOUYIN_OPENAPI_BASE_URL 指向华为云 EIP 上的反代，使请求经白名单 IP 访问抖音。'
+        : ''
     const relayHtmlHint =
       detail &&
       !aborted &&
@@ -328,7 +361,7 @@ export async function runDouyinMerchantBind(
         : ''
     return {
       statusCode: 502,
-      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}${relayHtmlHint}${relayTlsHint}` },
+      body: { message: `抖音鉴权或门店查询失败：${detail}${whitelistHint}${rateLimitHint}${relayHtmlHint}${relayTlsHint}` },
     }
   }
 }
