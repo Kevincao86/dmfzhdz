@@ -37,7 +37,7 @@
  * 配置非官方基址后，goodlife 与 OAuth（未单独设 DOUYIN_OPENAPI_OAUTH_BASE_URL 时）**默认不再回落** open.douyin.com，避免出口 IP 与白名单不一致；排障可临时设 `DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK=1`。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   douyinOpenApiUrl,
   douyinServerFetch,
@@ -2417,6 +2417,227 @@ function douyinGoodsSaveUpstreamHint(status: number, raw: string): string {
     return '上游返回 HTML/WAF 页面而非 JSON：请检查自建反代 Host、路径前缀与 body 透传。'
   }
   return ''
+}
+
+const DOUYIN_IMAGEX_UPLOAD_TIMEOUT_MS = 55_000
+
+/** 递归收集 JSON 内可公网访问的 https 图链（排除 OAuth 等无关链接） */
+function collectHttpsUrlsFromDouyinJson(node: unknown, out: string[], max = 16): void {
+  if (out.length >= max) return
+  if (typeof node === 'string') {
+    const s = node.trim()
+    if (/^https:\/\/.+/i.test(s) && s.length < 4096 && !/^https:\/\/open\.douyin\.com\/oauth/i.test(s)) {
+      out.push(s)
+    }
+    return
+  }
+  if (!node || typeof node !== 'object') return
+  if (Array.isArray(node)) {
+    for (const x of node) collectHttpsUrlsFromDouyinJson(x, out, max)
+    return
+  }
+  for (const v of Object.values(node as Record<string, unknown>)) {
+    collectHttpsUrlsFromDouyinJson(v, out, max)
+  }
+}
+
+function firstDouyinImagexImageId(node: unknown): string | undefined {
+  if (!node || typeof node !== 'object') return undefined
+  if (Array.isArray(node)) {
+    for (const x of node) {
+      const f = firstDouyinImagexImageId(x)
+      if (f) return f
+    }
+    return undefined
+  }
+  const o = node as Record<string, unknown>
+  for (const [k, v] of Object.entries(o)) {
+    if ((k === 'image_id' || k === 'ImageId') && typeof v === 'string' && v.trim()) return v.trim()
+    const inner = firstDouyinImagexImageId(v)
+    if (inner) return inner
+  }
+  return undefined
+}
+
+function douyinImagexUrlFromTemplate(imageId: string): string | undefined {
+  const tpl = process.env.DOUYIN_GOODS_IMAGEX_URL_TEMPLATE?.trim()
+  if (!tpl) return undefined
+  if (tpl.includes('{id}')) return tpl.split('{id}').join(encodeURIComponent(imageId))
+  if (tpl.includes('{raw}')) return tpl.split('{raw}').join(imageId)
+  return undefined
+}
+
+function demoImageUploadFallback(
+  res: ServerResponse,
+  mimeType: string,
+  contentBase64: string,
+  approxBytes: number,
+) {
+  const maxInlineBytes = Math.floor(2.5 * 1024 * 1024)
+  if (approxBytes <= maxInlineBytes) {
+    const safeMime =
+      typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
+        ? mimeType.trim().toLowerCase()
+        : 'image/jpeg'
+    json(res, 200, {
+      url: `data:${safeMime};base64,${contentBase64}`,
+      mimeType: safeMime,
+      message:
+        '演示回退（MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK）：内联 data URL。生产请关闭该变量并确保 imagex 返回 https 图链。',
+    })
+    return
+  }
+  const seed = createHash('sha256').update(contentBase64).digest('hex').slice(0, 40)
+  json(res, 200, {
+    url: `https://picsum.photos/seed/v${seed}/800/800`,
+    mimeType,
+    message: '演示回退：大图返回占位外链。',
+  })
+}
+
+/**
+ * 商品图上传：经抖音开放平台 `POST /tool/imagex/client_upload/` 写入抖音侧，返回 **https** 图链供 goods/save。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/search-management/business-tool/image-upload
+ */
+export async function handleDouyinGoodsImageUploadPost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
+    return
+  }
+  const session = resolveSession(auth)
+  if (!session) {
+    json(res, 401, { message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+
+  let fileName = 'image.jpg'
+  let mimeType = 'image/jpeg'
+  let contentBase64 = ''
+  try {
+    const j = JSON.parse(bodyRaw || '{}') as {
+      fileName?: string
+      mimeType?: string
+      contentBase64?: string
+    }
+    fileName = typeof j.fileName === 'string' ? j.fileName : fileName
+    mimeType = typeof j.mimeType === 'string' ? j.mimeType : mimeType
+    contentBase64 = typeof j.contentBase64 === 'string' ? j.contentBase64 : ''
+  } catch {
+    json(res, 400, { message: '请求体须为 JSON：{ fileName, mimeType, contentBase64 }' })
+    return
+  }
+
+  if (!contentBase64) {
+    json(res, 400, { message: '缺少 contentBase64' })
+    return
+  }
+  const approxBytes = Math.ceil((contentBase64.length * 3) / 4)
+  if (approxBytes > 10 * 1024 * 1024) {
+    json(res, 400, { message: '单张图片不超过 10MB（抖音 tool/imagex 限制）' })
+    return
+  }
+
+  const allowDemo =
+    process.env.MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase() === '1' ||
+    process.env.MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase() === 'true'
+
+  let buf: Buffer
+  try {
+    buf = Buffer.from(contentBase64, 'base64')
+  } catch {
+    json(res, 400, { message: 'contentBase64 非法' })
+    return
+  }
+  if (buf.length === 0) {
+    json(res, 400, { message: '图片内容为空' })
+    return
+  }
+  if (buf.length > 10 * 1024 * 1024) {
+    json(res, 400, { message: '单张图片不超过 10MB' })
+    return
+  }
+
+  try {
+    const safeMime =
+      typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
+        ? mimeType.trim().toLowerCase()
+        : 'image/jpeg'
+    const blob = new Blob([buf], { type: safeMime })
+    const fd = new FormData()
+    fd.append('image', blob, fileName || 'image.jpg')
+
+    const uploadUrl = douyinOpenApiUrl('/tool/imagex/client_upload/')
+    const dr = await withDouyinClientTokenRetry(session, {}, async (token) =>
+      douyinServerFetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'access-token': token },
+        body: fd,
+        signal: AbortSignal.timeout(DOUYIN_IMAGEX_UPLOAD_TIMEOUT_MS),
+      }),
+    )
+
+    const raw = await dr.text()
+    let parsed: Record<string, unknown> = {}
+    try {
+      parsed = JSON.parse(raw || '{}') as Record<string, unknown>
+    } catch {
+      if (allowDemo) {
+        demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
+        return
+      }
+      json(res, 502, { message: `抖音图片上传返回非 JSON（HTTP ${dr.status}）：${raw.slice(0, 280)}` })
+      return
+    }
+
+    if (!dr.ok) {
+      if (allowDemo) {
+        demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
+        return
+      }
+      json(res, 502, { message: `抖音图片上传失败 HTTP ${dr.status}：${raw.slice(0, 700)}` })
+      return
+    }
+
+    const urls: string[] = []
+    collectHttpsUrlsFromDouyinJson(parsed, urls)
+    const chosen = [...new Set(urls)].find((u) => !/^data:/i.test(u))
+
+    if (chosen && /^https:\/\//i.test(chosen)) {
+      json(res, 200, { url: chosen, mimeType: safeMime })
+      return
+    }
+
+    const imageId = firstDouyinImagexImageId(parsed)
+    const fromTpl = imageId ? douyinImagexUrlFromTemplate(imageId) : undefined
+    if (fromTpl && /^https:\/\//i.test(fromTpl)) {
+      json(res, 200, { url: fromTpl, mimeType: safeMime, image_id: imageId })
+      return
+    }
+
+    if (allowDemo) {
+      demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
+      return
+    }
+
+    json(res, 502, {
+      message:
+        '抖音 tool/imagex/client_upload 未解析到可用的 https 图链。请确认应用已开通 tool.image.upload；自建中继须透传 /tool/imagex/client_upload/。若平台仅返回 image_id，请配置 DOUYIN_GOODS_IMAGEX_URL_TEMPLATE（{id} 或 {raw}）。本地联调可设 MERCHANT_DOUYIN_IMAGE_UPLOAD_DEMO_FALLBACK=1。',
+      image_id: imageId ?? '',
+      response_sample: raw.slice(0, 800),
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (allowDemo) {
+      demoImageUploadFallback(res, mimeType, contentBase64, approxBytes)
+      return
+    }
+    json(res, 502, { message: `抖音图片上传异常：${msg.slice(0, 800)}` })
+  }
 }
 
 /** 代理 goodlife/v1/goods/product/save/（创建/更新商品，草稿与提交审核均走此接口） */
