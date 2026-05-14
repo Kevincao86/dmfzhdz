@@ -351,8 +351,13 @@ function CreateForm({ onBack }: { onBack: () => void }) {
       }
       window.alert('需求已打包推送至运营管控台「达人招募订单」，状态：待接单。')
       onBack()
-    } catch {
-      setPushErr('推送失败：请确认网络正常，且运营侧服务与数据同步已就绪。若多次失败请联系管理员。')
+    } catch (e) {
+      const detail = e instanceof Error ? e.message.trim() : String(e)
+      setPushErr(
+        detail
+          ? `推送失败：${detail.length > 280 ? `${detail.slice(0, 280)}…` : detail}`
+          : '推送失败：请确认网络正常，且运营侧服务与数据同步已就绪。若多次失败请联系管理员。',
+      )
     } finally {
       setSubmitting(false)
     }

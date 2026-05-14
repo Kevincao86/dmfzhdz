@@ -107,7 +107,11 @@ export type AiAgentNativeImageErr = { ok: false; message: string }
  */
 export async function postAiAgentNativeImage(
   prompt: string,
-  opts?: { preferredVendor?: 'qwen' | 'doubao' | 'minimax' },
+  opts?: {
+    preferredVendor?: 'qwen' | 'doubao' | 'minimax'
+    /** data URL 或厂商可接受的图片 URL，走图生图时传入 */
+    referenceImageDataUrl?: string
+  },
 ): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
   const token = await bearer()
   const headers: Record<string, string> = {
@@ -120,6 +124,8 @@ export async function postAiAgentNativeImage(
   let lastErr = 'no_response'
   const body: Record<string, unknown> = { prompt }
   if (opts?.preferredVendor) body.preferred_vendor = opts.preferredVendor
+  const ref = opts?.referenceImageDataUrl?.trim()
+  if (ref) body.reference_image = ref
   for (const p of tryPaths) {
     const targets = aiChatFetchUrlCandidates(p)
     for (const target of targets) {

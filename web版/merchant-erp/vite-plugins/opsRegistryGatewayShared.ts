@@ -120,7 +120,12 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = (req.url ?? '').split('?')[0]
-        if (!url.startsWith('/api/ops-sync') && url !== '/api/meoo-ops-sync-registry') return next()
+        if (
+          !url.startsWith('/api/ops-sync') &&
+          url !== '/api/meoo-ops-sync-registry' &&
+          url !== '/api/meoo-ops-recruitment-orders-append'
+        )
+          return next()
 
         const viteRoot = server.config.root
         const method = req.method ?? 'GET'
@@ -378,7 +383,10 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/recruitment-orders/append') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/recruitment-orders/append' || url === '/api/meoo-ops-recruitment-orders-append')
+          ) {
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as { order?: RegistryRecruitmentOrder }
             const order = body.order
