@@ -63,6 +63,32 @@ export { runDouyinMerchantBind }
 /** 绑定链路若 hang 住，Vercel 会以 FUNCTION_INVOCATION_FAILED 结束；对抖音出口强制限时 */
 const DOUYIN_FETCH_TIMEOUT_MS = 25_000
 
+/** 商品保存链路内 template/get + product/save：默认 55s，须小于 Vercel 该函数的 maxDuration，避免平台先返回 504 */
+function douyinGoodsSaveHttpTimeoutMs(): number {
+  const raw = process.env.DOUYIN_GOODS_HTTP_TIMEOUT_MS?.trim()
+  const n = raw ? Number.parseInt(raw, 10) : Number.NaN
+  if (Number.isFinite(n) && n >= 8000 && n <= 240_000) return n
+  return 55_000
+}
+
+/** 同一实例内缓存 template/get，减少保存草稿/提交审核连续点击时的串行耗时 */
+const templateAttrsBundleCache = new Map<
+  string,
+  { expiresAt: number; bundle: { productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] } }
+>()
+
+function templateAttrsBundleCacheTtlMs(): number {
+  const raw = process.env.MERCHANT_DOUYIN_TEMPLATE_CACHE_MS?.trim()
+  if (raw === '0') return 0
+  const n = raw ? Number.parseInt(raw, 10) : Number.NaN
+  if (Number.isFinite(n) && n >= 0 && n <= 3_600_000) return n
+  return 600_000
+}
+
+function templateAttrsBundleCacheKey(accountId: string, categoryId: string, productType: number): string {
+  return `${accountId}\t${categoryId}\t${productType}`
+}
+
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
   return douyinServerFetch(input, {
     ...init,
@@ -1556,8 +1582,15 @@ async function fetchTemplateAttrsBundle(
   token: string,
   categoryId: string,
   productType: number,
+  signal?: AbortSignal,
 ): Promise<{ productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] }> {
   if (!categoryId) return { productAttrs: [], skuAttrs: [] }
+  const ttl = templateAttrsBundleCacheTtlMs()
+  const ck = templateAttrsBundleCacheKey(accountId, categoryId, productType)
+  if (ttl > 0) {
+    const hit = templateAttrsBundleCache.get(ck)
+    if (hit && Date.now() < hit.expiresAt) return hit.bundle
+  }
   const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
@@ -1569,6 +1602,7 @@ async function fetchTemplateAttrsBundle(
       'content-type': 'application/json',
       'Rpc-Transit-Life-Account': accountId,
     },
+    signal,
   })
   const raw = await dr.text()
   const j = parseDouyinJson(raw)
@@ -1576,10 +1610,14 @@ async function fetchTemplateAttrsBundle(
   const data = j.data as Record<string, unknown> | undefined
   const pa = data?.product_attrs
   const sa = data?.sku_attrs
-  return {
+  const bundle = {
     productAttrs: Array.isArray(pa) ? (pa as Record<string, unknown>[]) : [],
     skuAttrs: Array.isArray(sa) ? (sa as Record<string, unknown>[]) : [],
   }
+  if (ttl > 0 && (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0)) {
+    templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+  }
+  return bundle
 }
 
 function jsonImageUrlList(urls: string[]): string {
@@ -1982,6 +2020,7 @@ async function buildGoodlifeProductSaveBody(
   erp: Record<string, unknown>,
   _mode: 'draft' | 'submit',
   account_name: string,
+  douyinHttpSignal?: AbortSignal,
 ): Promise<{
   body: Record<string, unknown>
   templateProductAttrs: Record<string, unknown>[]
@@ -2018,6 +2057,7 @@ async function buildGoodlifeProductSaveBody(
     token,
     category_id,
     product_type,
+    douyinHttpSignal,
   )
   const auxUrls = Array.isArray(erp.aux_image_urls)
     ? (erp.aux_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
@@ -2370,7 +2410,34 @@ export async function handleDouyinGoodsProductSavePost(
       })
       return
     }
-    const built = await buildGoodlifeProductSaveBody(accountId, token, erp, mode, accountName)
+
+    const budgetMs = Math.max(8000, douyinGoodsSaveHttpTimeoutMs())
+    const goodsAbort = new AbortController()
+    const goodsTimer = setTimeout(() => goodsAbort.abort(), budgetMs)
+
+    let built: Awaited<ReturnType<typeof buildGoodlifeProductSaveBody>>
+    try {
+      built = await buildGoodlifeProductSaveBody(
+        accountId,
+        token,
+        erp,
+        mode,
+        accountName,
+        goodsAbort.signal,
+      )
+    } catch (e) {
+      clearTimeout(goodsTimer)
+      const msg = e instanceof Error ? e.message : String(e)
+      const isAbort =
+        (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
+        /aborted|AbortError/i.test(msg)
+      json(res, isAbort ? 504 : 502, {
+        message: isAbort
+          ? `抖音商品保存请求超时（累计约 ${Math.round(budgetMs / 1000)}s）：template/get 或组装请求未及时完成。请稍后重试；若自建 DOUYIN_OPENAPI_BASE_URL 中继过慢，请检查中继。可在 Vercel 设置 DOUYIN_GOODS_HTTP_TIMEOUT_MS（须小于该函数 maxDuration）。`
+          : `组装商品保存请求失败：${msg}`,
+      })
+      return
+    }
     const saveBody = built.body
     console.info(
       '[meoo douyin goods/save]',
@@ -2382,15 +2449,32 @@ export async function handleDouyinGoodsProductSavePost(
       ),
     )
 
-    const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
-      method: 'POST',
-      headers: {
-        'access-token': token,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
-      body: JSON.stringify(saveBody),
-    })
+    let dr: Response
+    try {
+      dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
+        method: 'POST',
+        headers: {
+          'access-token': token,
+          'content-type': 'application/json',
+          'Rpc-Transit-Life-Account': accountId,
+        },
+        body: JSON.stringify(saveBody),
+        signal: goodsAbort.signal,
+      })
+    } catch (e) {
+      clearTimeout(goodsTimer)
+      const msg = e instanceof Error ? e.message : String(e)
+      const isAbort =
+        (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
+        /aborted|AbortError/i.test(msg)
+      json(res, isAbort ? 504 : 502, {
+        message: isAbort
+          ? `抖音 goods/save 请求超时（累计预算约 ${Math.round(budgetMs / 1000)}s）。请稍后重试或检查 DOUYIN_OPENAPI_BASE_URL 中继。`
+          : `抖音 goods/save 网络失败：${msg}`,
+      })
+      return
+    }
+    clearTimeout(goodsTimer)
     const raw = await dr.text()
     const trimmed = raw.replace(/^\uFEFF/, '').trim()
     if (trimmed.startsWith('<')) {

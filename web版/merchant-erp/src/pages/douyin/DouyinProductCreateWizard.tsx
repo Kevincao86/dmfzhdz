@@ -1773,7 +1773,13 @@ export default function DouyinProductCreateWizard({
           ok: false,
         })
       } else {
-        setActionMsg({ text: r.message, ok: false })
+        const is504 = /504|超时|timeout|未及时完成|超过上限/i.test(r.message)
+        setActionMsg({
+          text: is504
+            ? `${r.message} 可先「保存草稿」保留本机，稍后在网络较好时重试提交。`
+            : r.message,
+          ok: false,
+        })
       }
     }
   }
