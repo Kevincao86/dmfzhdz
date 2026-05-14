@@ -209,8 +209,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           json(res, 400, { message: '单张图片不超过 5MB' })
           return true
         }
-        /** 小图直接内联回传，避免占位图与上传内容不一致；大图仍用外链占位（前端会用本地 blob 预览原图） */
-        const maxInlineBytes = 512 * 1024
+        /** 尽量以内联 data URL 回传，避免占位图与上传内容不一致；超大图仍用外链占位（前端会用本地 blob 预览原图） */
+        const maxInlineBytes = Math.floor(2.5 * 1024 * 1024)
         if (approxBytes <= maxInlineBytes) {
           const safeMime =
             typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
