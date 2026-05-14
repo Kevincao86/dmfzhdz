@@ -7,16 +7,20 @@ import { parseAiModelPickerKey } from './modelRegistry'
  */
 const PREFERRED_VISUAL_TASK_KEYS = [
   'tokenmix::openai::gpt-4o',
-  'tokenmix::gemini::gemini-2.0-flash',
-  'tokenmix::claude::claude-3-5-sonnet-20241022',
+  'tokenmix::gemini::gemini-2.5-flash',
+  'tokenmix::claude::claude-sonnet-4.6',
 ] as const
 
 const STRONG_MULTIMODAL_MODEL_IDS = new Set([
   'gpt-4o',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro',
-  'claude-3-5-sonnet-20241022',
-  'claude-3-opus-20240229',
+  'o4-mini',
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'claude-sonnet-4.6',
+  'claude-haiku-4.5',
+  'claude-opus-4.7',
+  'grok-4.1-fast-non-reasoning',
+  'grok-4.1-fast-reasoning',
 ])
 
 /** 用户是否在描述「要生成/设计画面」类需求（非仅含「图片」二字） */
