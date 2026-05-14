@@ -600,6 +600,18 @@ async function callModelText(
   }
 }
 
+/** 合并「商品名称」与 title_draft（常含说明），作为生图唯一商品语义锚，避免只认名称短串而丢说明里的品类信息 */
+function mergeProductSellingAnchor(productName: string, titleDraft: string): string {
+  const n = productName.trim()
+  const t = titleDraft.trim()
+  if (!n && !t) return '本地生活服务'
+  if (!t) return n
+  if (!n) return t.slice(0, 600)
+  if (t.startsWith(n) || t.includes(n)) return t.slice(0, 600)
+  if (n.includes(t)) return n.slice(0, 600)
+  return `${n}。${t}`.slice(0, 600)
+}
+
 function buildImagePrompt(
   productName: string,
   titleDraft: string,
@@ -608,22 +620,24 @@ function buildImagePrompt(
   lockSuffix = '',
 ): string {
   const name = productName.trim() || '本地生活服务'
-  const extraHint = titleDraft.trim() && titleDraft.trim() !== name ? titleDraft.trim().slice(0, 200) : ''
-  const bind = `【画面必须与商品标题一致】标题原文：「${name}」。${extraHint ? `补充说明（须与标题同一商品/服务，不得偏题）：${extraHint}。` : ''}禁止出现与标题无关的手机、电脑、平板等数码产品占位图、无关餐饮或其它品类；画面主体须为标题所指的实物商品、包装、使用场景或服务过程的真实呈现。`
-  const i2iLocalLife = `【图生图·美化】严格以用户上传的这张图为唯一基准：保留原图主体商品/服务、核心构图、镜头角度与场景类型，禁止替换为无关品类、无关店面或与团购标题不符的画面。在「仍是同一张图」的视觉延续下，提升清晰度、色彩层次、光影自然度与质感；适度强化抖音来客「本地生活」到店氛围（干净明亮、可信的团购展示、贴近真实消费场景），避免牛皮癣贴纸、乱码水印与违规元素。`
+  const anchor = mergeProductSellingAnchor(productName, titleDraft)
+  const extraTail =
+    anchor !== name && anchor.length > name.length
+      ? `全文商品语义锚（名称+说明合一，生图须与此一致）：「${anchor.slice(0, 420)}」。`
+      : ''
+  const bind = `【硬性锚定·最高优先级】成片必须与下列商品语义完全一致，不得偷换为其它商品、其它品类、无关品牌或无关场景：「${anchor.slice(0, 480)}」。${extraTail}禁止：手机/电脑/平板等数码特写、无关餐饮、卖场展厅样板间、奢侈品店橱窗、办公室工位、空镜建筑走廊等占位画面；允许且鼓励：与上述语义一致的实物商品、包装、成分特写、家庭/门店使用场景、到店服务过程等。`
+  const i2iLocalLife = `【图生图·主图纠偏】用户上传图仅作构图、色调或清晰度参考。若原图主体、场景或品类与上文「硬性锚定」明显不符（例如无关展厅、卖场、数码、办公、与商品无关的室内空景），须视为错误底图：必须丢弃原图错误主体，按文字锚定重绘正确商品/包装/服务画面，禁止把错误场景「美化延续」成片。若原图与商品语义大致一致，可在不偏离锚定前提下提升清晰度、色彩与质感。`
   const base =
     mode === 'i2i'
-      ? `${i2iLocalLife}${bind}须符合本地生活广告与平台素材规范。`
+      ? `${i2iLocalLife}${bind}须符合本地生活广告与平台素材规范；成片第一眼须能识别为上述同一商品/服务。`
       : `为抖音来客「本地生活」团购设计一张高质量商品图：主体清晰、光线自然、无牛皮癣文字与违规水印；构图适合手机端列表与详情首屏。${bind}`
   let out = base
   if (imageRole === 'aux') {
     out = `${base}侧重套餐细节、食材/服务特写或卖点展示，可略偏竖构图。`
   } else if (imageRole === 'env') {
-    out = `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感。`
-  } else if (titleDraft && titleDraft !== productName) {
-    out = `${base}主图风格，构图留白适中；再次强调标题：「${name.slice(0, 40)}」。`
+    out = `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感；环境须与商品类目及门店业态相符，不得生成与锚定商品无关的其它业态场景。`
   } else {
-    out = `${base}主图风格，构图留白适中。`
+    out = `${base}主图/头图风格，构图留白适中；再次强调商品语义锚：「${anchor.slice(0, 80)}${anchor.length > 80 ? '…' : ''}」。`
   }
   return lockSuffix ? `${out}${lockSuffix}` : out
 }
@@ -732,6 +746,13 @@ async function qwenWanxPollUrls(apiKey: string, taskId: string): Promise<string[
   throw new Error('万相任务排队超时，请稍后重试')
 }
 
+function qwenI2iRefStrength(env: MerchantAiEnv): number {
+  const raw = Number(String(env.MERCHANT_AI_QWEN_I2I_REF_STRENGTH ?? '').trim())
+  if (Number.isFinite(raw) && raw >= 0 && raw <= 1) return raw
+  /** 默认偏低：底图常为占位/错误时，避免 ref 压过「商品名称+说明」文字锚 */
+  return 0.38
+}
+
 async function qwenWanxOneImage(
   apiKey: string,
   env: MerchantAiEnv,
@@ -742,12 +763,13 @@ async function qwenWanxOneImage(
   let parameterExtras: Record<string, unknown> | undefined
   if (refImageUrl) {
     input.ref_image = refImageUrl
-    input.negative_prompt = '模糊, 低质量, 畸形文字, 水印'
-    parameterExtras = { ref_strength: 0.75, ref_mode: 'repaint' }
+    input.negative_prompt =
+      '模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮'
+    parameterExtras = { ref_strength: qwenI2iRefStrength(env), ref_mode: 'repaint' }
   } else {
     parameterExtras = {
       negative_prompt:
-        '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印',
+        '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位',
     }
   }
   const taskId = await qwenWanxCreateTask(apiKey, env, input, parameterExtras)
@@ -868,23 +890,26 @@ async function runImageEnhanceOne(
   productName: string,
   titleDraft: string,
   imageRole: string,
-  sourceUrl: string,
+  _sourceUrl: string,
   lockSuffix = '',
 ): Promise<string> {
   const prompt = buildImagePrompt(productName, titleDraft, imageRole, 'i2i', lockSuffix)
   if (model === 'qwen') {
-    return qwenWanxOneImage(key, env, prompt, sourceUrl)
+    return qwenWanxOneImage(key, env, prompt, _sourceUrl)
   }
   if (model === 'minimax') {
     const mmModel = minimaxImageModelId(env)
+    /**
+     * MiniMax subject_reference 仅支持 type=character（肖像一致性），用于商品/场景图会严重误导成片。
+     * 图生图「优化」此处改为纯文生图：强依赖上方 prompt 中的商品语义锚；勿传 subject_reference。
+     */
     const urls = await minimaxImageUrls(key, {
       model: mmModel,
       prompt,
       aspect_ratio: '1:1',
       response_format: 'url',
       n: 1,
-      prompt_optimizer: true,
-      subject_reference: [{ type: 'character', image_file: sourceUrl }],
+      prompt_optimizer: false,
     })
     return urls[0]!
   }
@@ -893,7 +918,7 @@ async function runImageEnhanceOne(
     const urls = await doubaoSeedreamUrls(env, key, {
       model: imgModel,
       prompt,
-      image: sourceUrl,
+      image: _sourceUrl,
       size: '2K',
       response_format: 'url',
     })
