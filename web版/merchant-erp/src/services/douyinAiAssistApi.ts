@@ -1,8 +1,8 @@
 /**
  * 抖音来客商品创建 — AI 辅助（标题 / 说明 / 图片 / 豆包质检）。
  * 优先 `POST /api/meoo-douyin-goods-ai-assist`，回退 `POST /api/merchant/douyin/goods/ai/assist`。
- * 本地 dev：Vite 网关按 `model` 调用上游；密钥仅来自 Vercel / 服务端环境变量（MERCHANT_AI_*），不再随请求附带浏览器 vendor_keys。
- * 文案：MiniMax、通义千问、豆包；生图：通义万相（wanx）、豆包（Seedream）、MiniMax（自动优先通义/豆包）；质检：仅豆包对话。
+ * 本地 dev：Vite 网关按 `model` 调用上游；密钥仅来自 Vercel / 服务端环境变量（MERCHANT_AI_*、手选 Gemini 时为 TOKENMIX_API_KEY），不再随请求附带浏览器 vendor_keys。
+ * 文案：MiniMax、通义千问、豆包；手选 Gemini 走 TokenMix；生图：通义万相（wanx）、豆包（Seedream）、MiniMax（自动优先通义/豆包）；质检：仅豆包对话。
  */
 
 import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'

@@ -375,7 +375,7 @@ export type DouyinProductDetailPayload = {
   env_image_urls: string[]
   /** 适用门店 poi_id 列表 */
   poi_ids: string[]
-  /** 套餐结构：仅团购 product_type=1 传 package_combo；代金券等勿传，由网关按 template/get 组装 attr */
+  /** 套餐结构：仅团购 product_type=1 传 package_combo；代金券（2）由网关生成最小 combo_rule，勿传 package_combo */
   package_combo?: { groups: ComboPackageGroup[] }
   /**
    * 按 [template.get](https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get)
