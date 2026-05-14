@@ -9,7 +9,11 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/productDraftSnapshot'
+import {
+  loadDraftDetailSnapshot,
+  renameDraftDetailSnapshotKey,
+  saveDraftDetailSnapshot,
+} from '../../lib/productDraftSnapshot'
 import { Link, useNavigate } from 'react-router-dom'
 import { type DouyinCategoryNode, findNodeById } from '../../data/douyinCategoryMock'
 import { cn } from '../../cn'
@@ -21,7 +25,7 @@ import {
   pickerLeafSelectable,
   pickerPathIdsToLeaf,
 } from '../../lib/douyinGoodsCategoryPicker'
-import { upsertProductEditLibraryDraft } from '../../lib/productEditLibrary'
+import { replaceProductEditLibraryRowId, upsertProductEditLibraryDraft } from '../../lib/productEditLibrary'
 import { getDouyinStores } from '../../services/douyinMerchantApi'
 import {
   collectUploadableLeafCategoryIdsFromTree,
@@ -822,15 +826,13 @@ export default function DouyinProductCreateWizard({
       return
     }
     const u = (r.url ?? '').trim()
-    /** 演示网关大图仍可能返回 picsum，与上传文件无关；用本机 blob 预览真实所选图 */
-    if (/^https?:\/\/picsum\.photos\//i.test(u)) {
-      try {
-        return URL.createObjectURL(file)
-      } catch {
-        return u
-      }
+    /** 服务端内联 data URL 与上传一致；其它外链（如 picsum 占位）一律用本机 blob 预览真实所选图 */
+    if (u.startsWith('data:image/')) return u
+    try {
+      return URL.createObjectURL(file)
+    } catch {
+      return u
     }
-    return u
   }
 
   const addComboGroupRow = () => {
@@ -1635,29 +1637,70 @@ export default function DouyinProductCreateWizard({
       detail.template_sku_attr_overrides = skuCleaned
     }
 
+    const names = selectedPoiIds
+      .map((id) => modalStores.find((s) => s.id === id)?.name)
+      .filter(Boolean) as string[]
+    let storeLabel = '—'
+    if (selectedPoiIds.length === 0) storeLabel = '—'
+    else if (names.length === selectedPoiIds.length && selectedPoiIds.length <= 2)
+      storeLabel = names.join('、')
+    else if (names.length > 0)
+      storeLabel =
+        selectedPoiIds.length > 2
+          ? `${names.slice(0, 2).join('、')}等${selectedPoiIds.length}店`
+          : names.join('、')
+    else storeLabel = `${selectedPoiIds.length} 家门店`
+
+    let draftRowId = ''
+    if (mode === 'draft') {
+      draftRowId =
+        (persistedProductIdRef.current && persistedProductIdRef.current.trim()) ||
+        String(detail.out_id ?? '').trim() ||
+        newId('meoo-draft')
+    }
+
     setSaving(true)
     setActionMsg(null)
+
+    if (mode === 'draft') {
+      upsertProductEditLibraryDraft({
+        id: draftRowId,
+        name: detail.product_name,
+        platform: '抖音来客',
+        store: storeLabel,
+        status: '草稿',
+        price: detail.price_yuan,
+        platformApi: 'douyin',
+      })
+      saveDraftDetailSnapshot(draftRowId, {
+        ...detail,
+        product_id: draftRowId,
+        out_id: detail.out_id,
+      })
+    }
+
     const r = await postDouyinGoodsProductSave({ mode, detail })
     setSaving(false)
     if (r.ok) {
-      const pid = (r.product_id && String(r.product_id).trim()) || detail.out_id
-      const names = selectedPoiIds
-        .map((id) => modalStores.find((s) => s.id === id)?.name)
-        .filter(Boolean) as string[]
-      let storeLabel = '—'
-      if (selectedPoiIds.length === 0) storeLabel = '—'
-      else if (names.length === selectedPoiIds.length && selectedPoiIds.length <= 2)
-        storeLabel = names.join('、')
-      else if (names.length > 0)
-        storeLabel =
-          selectedPoiIds.length > 2
-            ? `${names.slice(0, 2).join('、')}等${selectedPoiIds.length}店`
-            : names.join('、')
-      else storeLabel = `${selectedPoiIds.length} 家门店`
+      const finalPid =
+        (r.product_id && String(r.product_id).trim()) ||
+        (mode === 'draft' ? draftRowId : String(detail.out_id ?? '').trim())
 
       if (mode === 'draft') {
+        if (finalPid !== draftRowId) {
+          replaceProductEditLibraryRowId(draftRowId, {
+            id: finalPid,
+            name: detail.product_name,
+            platform: '抖音来客',
+            store: storeLabel,
+            status: '草稿',
+            price: detail.price_yuan,
+            platformApi: 'douyin',
+          })
+          renameDraftDetailSnapshotKey(draftRowId, finalPid)
+        }
         upsertProductEditLibraryDraft({
-          id: pid,
+          id: finalPid,
           name: detail.product_name,
           platform: '抖音来客',
           store: storeLabel,
@@ -1667,7 +1710,7 @@ export default function DouyinProductCreateWizard({
         })
       } else {
         upsertProductEditLibraryDraft({
-          id: pid,
+          id: finalPid,
           name: detail.product_name,
           platform: '抖音来客',
           store: storeLabel,
@@ -1676,9 +1719,9 @@ export default function DouyinProductCreateWizard({
           platformApi: 'douyin',
         })
       }
-      saveDraftDetailSnapshot(pid, {
+      saveDraftDetailSnapshot(finalPid, {
         ...detail,
-        product_id: pid,
+        product_id: finalPid,
         out_id: detail.out_id,
       })
       if (r.product_id?.trim()) persistedProductIdRef.current = r.product_id.trim()
@@ -1692,7 +1735,14 @@ export default function DouyinProductCreateWizard({
       })
       if (mode === 'submit') navigate('/products/list')
     } else {
-      setActionMsg({ text: r.message, ok: false })
+      if (mode === 'draft') {
+        setActionMsg({
+          text: `${r.message}。本机「商品列表」草稿箱已写入当前表单（含图片快照），可前往商品列表继续编辑。`,
+          ok: false,
+        })
+      } else {
+        setActionMsg({ text: r.message, ok: false })
+      }
     }
   }
 

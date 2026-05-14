@@ -123,7 +123,13 @@ export async function fetchMerchantProductList(
   }
   const token = readToken(platform)
   if (!token) {
-    return { ok: false, message: '未找到平台授权，请先在系统设置中完成绑定' }
+    return {
+      ok: true,
+      items: [],
+      total: 0,
+      message:
+        '未检测到平台授权，无法拉取线上商品；下方仍会展示本机在「创建商品」中「保存草稿」写入的条目。绑定后可刷新获取来客侧列表。',
+    }
   }
   const seg = createPlatformApiSegment(platform)
   const page = Math.max(1, opts?.page ?? 1)
