@@ -1,13 +1,12 @@
 /**
- * 抖音商品创建 — AI 网关（仅跑在 Vite Node 端，密钥来自环境变量，勿写入前端包）。
+ * 抖音商品创建 — AI 网关（仅跑在 Vite Node 端，密钥与厂商顺序仅来自 Vercel / 进程环境变量，勿写入前端包）。
  * 文案：MiniMax / 通义千问 / 豆包 对话 API（与各厂商 OpenAI 兼容或官方路径对齐）。
- * 生图：通义万相 wanx-v1（异步）、MiniMax image_generation、豆包 Seedream（Ark images/generations）。
- * 可选环境变量：MERCHANT_AI_QWEN_CHAT_MODEL、MERCHANT_AI_MINIMAX_CHAT_* 等见 .env.example。
+ * 生图：通义万相 wanx-v1（异步）、豆包 Seedream（Ark images/generations）、MiniMax image_generation。
+ * 厂商尝试顺序：`MERCHANT_AI_GOODS_TEXT_FAILOVER`、`MERCHANT_AI_GOODS_IMAGE_FAILOVER`（逗号分隔 minimax,qwen,doubao），未设时与历史默认一致；见 .env.example。
  */
 import type { ServerResponse } from 'node:http'
 
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
-import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
 export type MerchantAiEnv = Record<string, string>
 
@@ -97,7 +96,8 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('503') || lower.includes('502 bad gateway')) return true
   if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout')) return true
   if (lower.includes('fetch failed') || lower.includes('econnreset') || lower.includes('socket')) return true
-  if (lower.includes('invalid_api_key') || (lower.includes('401') && lower.includes('unauthor'))) return true
+  if (lower.includes('invalid') && lower.includes('api') && lower.includes('key')) return true
+  if (lower.includes('401') && lower.includes('unauthor')) return true
   if (lower.includes('image_generation')) return true
   if (lower.includes('minimax') && (lower.includes('图像') || lower.includes('image')))
     return true
@@ -106,29 +106,60 @@ function isVendorHopableError(e: unknown): boolean {
   return false
 }
 
-const BUILTIN_TEXT_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
+const DEFAULT_TEXT_FAILOVER = ['minimax', 'qwen', 'doubao'] as const
+const DEFAULT_IMAGE_FAILOVER = ['qwen', 'doubao', 'minimax'] as const
+type AssistVendorId = (typeof DEFAULT_TEXT_FAILOVER)[number]
 
-/** 前端可选 Kimi/OpenAI 等，但商品 AI 仅接 minimax/qwen/doubao：映射为首个已配置 Key 的厂商 */
-function pickFirstAssistVendorWithKey(
+function parseDouyinAssistVendorOrder(
   env: MerchantAiEnv,
-  body: Record<string, unknown>,
-): (typeof BUILTIN_TEXT_VENDOR_ORDER)[number] {
-  for (const id of BUILTIN_TEXT_VENDOR_ORDER) {
-    if (pickEffectiveKey(env, id, body).key) return id
+  envKey: string,
+  fallback: readonly AssistVendorId[],
+): AssistVendorId[] {
+  const raw = String((env as Record<string, string | undefined>)[envKey] ?? '').trim()
+  if (!raw) return [...fallback]
+  const allow = new Set<string>(['minimax', 'qwen', 'doubao'])
+  const out: AssistVendorId[] = []
+  const seen = new Set<string>()
+  for (const part of raw.split(/[,;\s]+/)) {
+    const id = part.trim().toLowerCase()
+    if (!allow.has(id) || seen.has(id)) continue
+    seen.add(id)
+    out.push(id as AssistVendorId)
   }
-  return 'qwen'
+  return out.length > 0 ? out : [...fallback]
 }
 
-function builtinTextFailoverOthers(
-  primary: string,
-  env: MerchantAiEnv,
-  body: Record<string, unknown>,
-): string[] {
+function textVendorOrder(env: MerchantAiEnv): AssistVendorId[] {
+  return parseDouyinAssistVendorOrder(env, 'MERCHANT_AI_GOODS_TEXT_FAILOVER', [...DEFAULT_TEXT_FAILOVER])
+}
+
+function imageVendorOrder(env: MerchantAiEnv): AssistVendorId[] {
+  return parseDouyinAssistVendorOrder(env, 'MERCHANT_AI_GOODS_IMAGE_FAILOVER', [...DEFAULT_IMAGE_FAILOVER])
+}
+
+function pickPrimaryVendorWithKey(env: MerchantAiEnv, order: readonly AssistVendorId[]): AssistVendorId {
+  for (const id of order) {
+    if (pickKey(env, id).key) return id
+  }
+  return order[0] ?? 'qwen'
+}
+
+function builtinTextFailoverOthers(primary: string, env: MerchantAiEnv): string[] {
   if (!isDouyinAssistAiVendorId(primary)) return []
   const out: string[] = []
-  for (const id of BUILTIN_TEXT_VENDOR_ORDER) {
+  for (const id of textVendorOrder(env)) {
     if (id === primary) continue
-    if (pickEffectiveKey(env, id, body).key) out.push(id)
+    if (pickKey(env, id).key) out.push(id)
+  }
+  return out
+}
+
+function builtinImageFailoverOthers(primary: string, env: MerchantAiEnv): string[] {
+  if (!isDouyinAssistAiVendorId(primary)) return []
+  const out: string[] = []
+  for (const id of imageVendorOrder(env)) {
+    if (id === primary) continue
+    if (pickKey(env, id).key) out.push(id)
   }
   return out
 }
@@ -136,12 +167,11 @@ function builtinTextFailoverOthers(
 async function callModelTextWithBuiltinFailover(
   primary: string,
   env: MerchantAiEnv,
-  body: Record<string, unknown>,
   system: string,
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
-  const pk = pickEffectiveKey(env, primaryNorm, body).key
+  const pk = pickKey(env, primaryNorm).key
   if (!pk) throw new Error(`缺少 ${primaryNorm} 的 API Key`)
   let lastErr: unknown = null
   try {
@@ -151,8 +181,8 @@ async function callModelTextWithBuiltinFailover(
     lastErr = e
     if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
   }
-  for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
-    const { key } = pickEffectiveKey(env, alt, body)
+  for (const alt of builtinTextFailoverOthers(primaryNorm, env)) {
+    const { key } = pickKey(env, alt)
     if (!key) continue
     try {
       const text = await callModelText(alt, key, env, system, user)
@@ -168,7 +198,6 @@ async function callModelTextWithBuiltinFailover(
 async function runImageGenerateWithBuiltinFailover(
   primary: string,
   env: MerchantAiEnv,
-  body: Record<string, unknown>,
   keyFirst: string,
   productName: string,
   titleDraft: string,
@@ -184,8 +213,8 @@ async function runImageGenerateWithBuiltinFailover(
     lastErr = e
     if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
   }
-  for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
-    const { key } = pickEffectiveKey(env, alt, body)
+  for (const alt of builtinImageFailoverOthers(primaryNorm, env)) {
+    const { key } = pickKey(env, alt)
     if (!key) continue
     try {
       const urls = await runImageGenerate(alt, key, env, productName, titleDraft, imageRole, lockSuffix)
@@ -201,7 +230,6 @@ async function runImageGenerateWithBuiltinFailover(
 async function runImageEnhanceWithBuiltinFailover(
   primary: string,
   env: MerchantAiEnv,
-  body: Record<string, unknown>,
   keyFirst: string,
   productName: string,
   titleDraft: string,
@@ -223,8 +251,8 @@ async function runImageEnhanceWithBuiltinFailover(
     lastErr = e
     if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
   }
-  for (const alt of builtinTextFailoverOthers(primaryNorm, env, body)) {
-    const { key } = pickEffectiveKey(env, alt, body)
+  for (const alt of builtinImageFailoverOthers(primaryNorm, env)) {
+    const { key } = pickKey(env, alt)
     if (!key) continue
     try {
       const enhanced: string[] = []
@@ -292,32 +320,6 @@ function minimaxChatCompletionUrls(env: MerchantAiEnv): string[] {
   ]
 }
 
-function extractVendorKeyFromBody(body: Record<string, unknown>, model: string): string | null {
-  const raw = body.vendor_keys
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
-  const o = raw as Record<string, unknown>
-  const v = o[model]
-  if (typeof v !== 'string') return null
-  const t = v.trim()
-  return t || null
-}
-
-/**
- * 优先使用服务端 .env 中的 Key；仅当环境变量未配置时才用请求体 vendor_keys（浏览器弹窗）。
- * 避免 localStorage 里曾保存的错误/过期 Key 覆盖 .env 里已配置的正确密钥（此前会导致「只有通义能用」）。
- */
-function pickEffectiveKey(
-  env: MerchantAiEnv,
-  model: string,
-  body: Record<string, unknown>,
-): { key: string | null; label: string } {
-  const fromEnv = pickKey(env, model)
-  const fromBody = extractVendorKeyFromBody(body, model)
-  if (fromEnv.key) return fromEnv
-  if (fromBody) return { key: fromBody, label: '浏览器补充 Key' }
-  return fromEnv
-}
-
 function pickKey(
   env: MerchantAiEnv,
   model: string,
@@ -341,46 +343,6 @@ function pickKey(
       }
     default:
       return { key: null, label: 'MERCHANT_AI_*' }
-  }
-}
-
-/**
- * 将 Supabase `ops_registry_snapshot` 中的 vendorKeys 合入 env（仅补缺，不覆盖已有非空服务端变量）。
- * 与运营台共库时，商品 AI / 评价话术等无需依赖浏览器 localStorage 或单独再配 MERCHANT_AI_*。
- */
-export async function mergeMerchantAiEnvWithRegistrySnapshot(env: MerchantAiEnv): Promise<MerchantAiEnv> {
-  const e = env as Record<string, string | undefined>
-  const hasDoubao = Boolean((e.MERCHANT_AI_DOUBAO_KEY ?? e.ARK_API_KEY)?.trim())
-  const hasQwen = Boolean((e.MERCHANT_AI_QWEN_KEY ?? e.DASHSCOPE_API_KEY)?.trim())
-  const hasMinimax = Boolean((e.MERCHANT_AI_MINIMAX_KEY ?? e.MINIMAX_API_KEY)?.trim())
-  if (hasDoubao && hasQwen && hasMinimax) return env
-
-  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
-  if (!supabaseUrl || !serviceRole) return env
-
-  try {
-    const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
-    const vkRaw = data.vendorKeys
-    const vk =
-      vkRaw && typeof vkRaw === 'object' && !Array.isArray(vkRaw) ? (vkRaw as Record<string, unknown>) : {}
-    const out: MerchantAiEnv = { ...env }
-    if (!hasDoubao) {
-      const d = typeof vk.doubao === 'string' ? vk.doubao.trim() : ''
-      if (d) (out as Record<string, string>).MERCHANT_AI_DOUBAO_KEY = d
-    }
-    if (!hasQwen) {
-      const q = typeof vk.qwen === 'string' ? vk.qwen.trim() : ''
-      if (q) (out as Record<string, string>).MERCHANT_AI_QWEN_KEY = q
-    }
-    if (!hasMinimax) {
-      const m = typeof vk.minimax === 'string' ? vk.minimax.trim() : ''
-      if (m) (out as Record<string, string>).MERCHANT_AI_MINIMAX_KEY = m
-    }
-    return out
-  } catch {
-    return env
   }
 }
 
@@ -962,7 +924,7 @@ function missingVendorKeyBody(env: MerchantAiEnv, model: string) {
     ok: false as const,
     code: 'NEED_VENDOR_KEY',
     vendor: model,
-    message: `缺少「${name}」的有效 API Key。请在弹窗中粘贴 Key（仅存本机浏览器）或在服务端配置：${label}。`,
+    message: `缺少「${name}」的有效 API Key。请在 Vercel / 服务端环境变量中配置：${label}。`,
   }
 }
 
@@ -1234,7 +1196,7 @@ export async function generateGrossMarginSuggestionByAi(
   env: MerchantAiEnv,
   ctx: { industryPath: string; industryName?: string },
 ): Promise<GrossMarginAiPack | null> {
-  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
+  const envM = env
   const path = (ctx.industryPath || ctx.industryName || '').trim()
   if (!path) return null
   const system = `你是本地生活到店团购的经营分析助手。用户会给出「经营类目路径」（如 餐饮 > 自助餐）。请仅输出一段合法 JSON 对象，不要 Markdown、不要代码围栏、不要任何前缀或后缀说明。JSON 字段必须为：
@@ -1283,7 +1245,7 @@ export async function generateReviewReplyByDoubao(
     sentiment: MerchantReviewReplySentiment
   },
 ): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
-  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
+  const envM = env
   const { key, label } = pickKey(envM, 'doubao')
   if (!key) {
     return {
@@ -1337,12 +1299,17 @@ export async function handleDouyinGoodsAiAssist(
   body: Record<string, unknown>,
   envIn: MerchantAiEnv,
 ): Promise<void> {
-  const env = await mergeMerchantAiEnvWithRegistrySnapshot(envIn)
-  const requestedVendor = normalizeAiModelPreserveCustom(body.model)
-  const model = isDouyinAssistAiVendorId(requestedVendor)
-    ? requestedVendor
-    : pickFirstAssistVendorWithKey(env, body)
+  const env = envIn
   const action = String(body.action ?? '')
+  const requestedVendor = normalizeAiModelPreserveCustom(body.model)
+  const isImageAction = action === 'image_generate' || action === 'image_enhance'
+  const model = isImageAction
+    ? isDouyinAssistAiVendorId(requestedVendor)
+      ? requestedVendor
+      : pickPrimaryVendorWithKey(env, imageVendorOrder(env))
+    : isDouyinAssistAiVendorId(requestedVendor)
+      ? requestedVendor
+      : pickPrimaryVendorWithKey(env, textVendorOrder(env))
   const productName = String(body.product_name ?? '').trim() || '本店服务'
   const titleDraft = String(body.title_draft ?? '').trim() || productName
   const imageUrls = Array.isArray(body.image_urls)
@@ -1357,7 +1324,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 400, { ok: false, message: '缺少 products 数组或为空' })
       return
     }
-    const { key } = pickEffectiveKey(env, 'doubao', body)
+    const { key } = pickKey(env, 'doubao')
     if (!key) {
       json(res, 200, missingVendorKeyBody(env, 'doubao'))
       return
@@ -1459,7 +1426,7 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 400, { ok: false, message: '请先上传图片后再进行美化' })
       return
     }
-    const { key } = pickEffectiveKey(env, model, body)
+    const { key } = pickKey(env, model)
     if (!key) {
       json(res, 200, missingVendorKeyBody(env, model))
       return
@@ -1470,7 +1437,6 @@ export async function handleDouyinGoodsAiAssist(
         const { urls, modelUsed } = await runImageGenerateWithBuiltinFailover(
           model,
           env,
-          body,
           key,
           productName,
           titleDraft,
@@ -1487,7 +1453,6 @@ export async function handleDouyinGoodsAiAssist(
       const { urls: enhanced, modelUsed } = await runImageEnhanceWithBuiltinFailover(
         model,
         env,
-        body,
         key,
         productName,
         titleDraft,
@@ -1508,7 +1473,7 @@ export async function handleDouyinGoodsAiAssist(
     }
   }
 
-  const { key } = pickEffectiveKey(env, model, body)
+  const { key } = pickKey(env, model)
   if (
     !key &&
     (action === 'optimize_title' ||
@@ -1534,7 +1499,6 @@ export async function handleDouyinGoodsAiAssist(
       const { text: rawScore, modelUsed: scoreVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
-        body,
         GEO_AI_SCORE_SYSTEM,
         user,
       )
@@ -1573,7 +1537,6 @@ export async function handleDouyinGoodsAiAssist(
       const { text: consultRaw, modelUsed: consultVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
-        body,
         GEO_AI_CONSULT_SYSTEM,
         user,
       )
@@ -1590,7 +1553,6 @@ export async function handleDouyinGoodsAiAssist(
       const { text: titleRaw, modelUsed: titleVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
-        body,
         TITLE_SYSTEM,
         user,
       )
@@ -1607,7 +1569,6 @@ export async function handleDouyinGoodsAiAssist(
       const { text: descRaw, modelUsed: descVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
-        body,
         DESC_SYSTEM,
         user,
       )
@@ -1628,7 +1589,6 @@ export async function handleDouyinGoodsAiAssist(
       const { text: articleRaw, modelUsed: articleVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
-        body,
         OPERATION_ARTICLE_SYSTEM,
         user,
       )
@@ -1649,7 +1609,6 @@ export async function handleDouyinGoodsAiAssist(
       const { text: topicRaw, modelUsed: topicVendor } = await callModelTextWithBuiltinFailover(
         model,
         env,
-        body,
         OPERATION_TOPIC_SYSTEM,
         user,
       )
@@ -1667,20 +1626,20 @@ export async function handleDouyinGoodsAiAssist(
   }
 }
 
-/** 短视频长片策划等：走豆包 / 通义对话，Key 与商品 AI 相同（.env、注册表或请求体 vendor_keys）。 */
+/** 短视频长片策划等：走豆包 / 通义对话，Key 与商品 AI 相同（仅 Vercel 环境变量 MERCHANT_AI_*）。 */
 export async function merchantChatCompletion(
   env: MerchantAiEnv,
-  body: Record<string, unknown>,
+  _body: Record<string, unknown>,
   model: 'doubao' | 'qwen',
   system: string,
   user: string,
 ): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
-  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
-  const { key, label } = pickEffectiveKey(envM, model, body)
+  const envM = env
+  const { key, label } = pickKey(envM, model)
   if (!key) {
     return {
       ok: false,
-      message: `未配置 ${model === 'doubao' ? '豆包' : '通义千问'} API Key（${label}）。可在「系统设置 → AI 模型绑定」填写，或由服务端环境变量配置。`,
+      message: `未配置 ${model === 'doubao' ? '豆包' : '通义千问'} API Key（${label}）。请在 Vercel 环境变量中设置 MERCHANT_AI_DOUBAO_KEY / MERCHANT_AI_QWEN_KEY（或 ARK_API_KEY / DASHSCOPE_API_KEY）。`,
     }
   }
   try {
@@ -1701,8 +1660,8 @@ export async function merchantAgentChatFromMessages(
   system: string,
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
-  const envM = await mergeMerchantAiEnvWithRegistrySnapshot(env)
-  const { key, label } = pickEffectiveKey(envM, vendor, {})
+  const envM = env
+  const { key, label } = pickKey(envM, vendor)
   if (!key) {
     throw new Error(
       `未配置 ${vendor === 'doubao' ? '豆包' : '通义千问'} API Key（${label}）。请在 Vercel 环境变量中设置 MERCHANT_AI_DOUBAO_KEY / MERCHANT_AI_QWEN_KEY（或 ARK_API_KEY / DASHSCOPE_API_KEY）。`,

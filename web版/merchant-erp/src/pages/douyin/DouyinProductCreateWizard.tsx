@@ -515,7 +515,7 @@ export default function DouyinProductCreateWizard({
       if (r.ok || !r.needVendorKey) return r
       return {
         ok: false as const,
-        message: `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`,
+        message: `${r.message} 请在 Vercel / 部署环境配置 MERCHANT_AI_QWEN_KEY、MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_MINIMAX_KEY（或 DASHSCOPE_API_KEY / ARK_API_KEY / MINIMAX_API_KEY）。`,
       }
     },
     [lockedAiGoodsContext],
@@ -1595,7 +1595,7 @@ export default function DouyinProductCreateWizard({
         : ''
     const overrides: Record<string, string> = { ...templateAttrOverrides }
     if (productType === 1) {
-      /** 团购：套餐仅 package_combo → 网关 buildDouyinProductComboRule → 顶层 product.combo_rule，勿写入 template_attr_overrides（避免与抖音校验冲突） */
+      /** 团购：套餐仅从 package_combo 生成；网关会规范化后同步写入 product.combo_rule 与模板 combo_rule attr */
       for (const a of templateProductAttrs) {
         if (!looksComboTemplateAttr(a)) continue
         delete overrides[a.key]
@@ -2154,7 +2154,7 @@ export default function DouyinProductCreateWizard({
                       </label>
                     </div>
                     <p className="mt-1 text-[11px] text-gray-500">
-                      手选可与上文「文案类」相同目录；像素级生图/美化由 MiniMax、通义、豆包上游执行，若选手选为其它厂商，网关将按已配置 Key 自动映射至上述三者之一。
+                      手选可与上文「文案类」相同目录；像素级生图/美化由通义万相、豆包 Seedream、MiniMax 上游执行（自动时优先通义/豆包）。若手选为 OpenAI、Kimi、Claude 等，本网关暂无对应生图 API，将按已配置 Key 自动选用上述三者之一。
                     </p>
                     {!imageAiAutoOn ? (
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -3328,7 +3328,7 @@ export default function DouyinProductCreateWizard({
                           与「商品名称 / 售价 / 套餐数据」生成的{' '}
                           <code className="rounded bg-emerald-50 px-1">package_combo</code> 同源；
                           {productType === 1
-                            ? ' 保存时由网关写入抖音请求体顶层 product.combo_rule（不再写入 attr_key_value_map 的套餐类字段）。'
+                            ? ' 保存时由网关写入抖音请求体顶层 product.combo_rule，并同步填充模板 attr_key_value_map 的 combo_rule。'
                             : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
                         </p>
                       ) : null}

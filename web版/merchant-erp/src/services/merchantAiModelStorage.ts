@@ -24,8 +24,8 @@ function selectableAiIds(): Set<string> {
 }
 
 /** 按目录顺序，选用第一个已配置浏览器端 Key 的厂商；均无 Key 时退回 qwen。 */
-/** 商品 AI 生图 / 美化网关支持 minimax / qwen / doubao。 */
-const BUILTIN_IMAGE_VENDOR_ORDER = ['minimax', 'qwen', 'doubao'] as const
+/** 商品 AI 生图 / 美化：与 Vercel MERCHANT_AI_GOODS_IMAGE_FAILOVER 默认顺序一致（未设时为 qwen,doubao,minimax）。 */
+const BUILTIN_IMAGE_VENDOR_ORDER = ['qwen', 'doubao', 'minimax'] as const
 
 export function pickAutoResolvedTextModel(): string {
   const opts = listAiUiModelOptions()

@@ -2021,7 +2021,7 @@ async function buildGoodlifeProductSaveBody(
       : erp
 
   const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map, {
-    /** 仅团购：套餐 JSON 只进顶层 product.combo_rule，不从 attr 回填 combo 类槽位 */
+    /** 团购先避开原始 package_combo，后面统一用规范化后的 comboRule 回填模板槽位 */
     omitComboTemplateAttrs: isGroupBuy,
   })
 
@@ -2045,16 +2045,19 @@ async function buildGoodlifeProductSaveBody(
     }
   }
 
-  /** 团购：combo_rule 仅顶层 product.combo_rule，不从 template 覆盖或 attr 携带套餐 JSON */
-  if (isGroupBuy) {
+  /**
+   * 团购：抖音会按 template/get 返回的 attr_key_value_map 校验 combo_rule 是否非空。
+   * 顶层 product.combo_rule 保留，同时把同一份规范化结构写回 combo 类模板字段，避免必填属性被判空。
+   */
+  if (isGroupBuy && comboRule) {
+    const comboRuleJson = JSON.stringify(comboRule).slice(0, 120_000)
     for (const a of attrs) {
       const key = String((a as Record<string, unknown>).key ?? '').trim()
       if (!key) continue
       const name = String((a as Record<string, unknown>).name ?? '')
       const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
-      if (attrTemplateLooksComboLike(key, name, vt)) delete mergedProductAttrs[key]
+      if (attrTemplateLooksComboLike(key, name, vt)) mergedProductAttrs[key] = comboRuleJson
     }
-    delete mergedProductAttrs.combo_rule
   }
 
   const nowMs = Date.now()
@@ -2700,4 +2703,3 @@ export async function postDouyinAkteCommentReply(
     return { ok: false, message: `回复评价失败：${msg}` }
   }
 }
-
