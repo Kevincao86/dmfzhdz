@@ -1586,32 +1586,63 @@ function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
 
-/** 与来客常见规则一致：单组内 n 个单品时 pick_rule 须为「全部必选」或「n选1」…「n选n」 */
-function normalizePickRuleForComboGroup(itemCount: number, pickRule: string): string {
-  const raw = pickRule.trim() || '全部必选'
-  if (itemCount <= 1) return '全部必选'
-  if (raw === '全部必选') return raw
-  const m = /^(\d+)选(\d+)$/.exec(raw)
+/**
+ * 抖音「商品搭配 / COMMODITY」控件：ItemGroupStruct（见开放平台商品搭配控件文档）
+ * total_count + option_count 表达 n 选 k；「全部必选」= n==k==单品数。
+ * 不使用中文 pick_rule、不使用 items/quantity/origin_price 等自创字段名，避免 goodlife 反序列化后判空。
+ */
+function pickRuleToTotalAndOptionCount(itemCount: number, pickRule: string): { total_count: number; option_count: number } {
+  if (itemCount <= 0) return { total_count: 0, option_count: 0 }
+  const pr = (pickRule.trim() || '全部必选') === '全部必选' ? '全部必选' : pickRule.trim()
+  if (itemCount === 1 || pr === '全部必选') {
+    return { total_count: itemCount, option_count: itemCount }
+  }
+  const m = /^(\d+)选(\d+)$/.exec(pr)
   if (m) {
     const n = Number.parseInt(m[1]!, 10)
     const k = Number.parseInt(m[2]!, 10)
-    if (n === itemCount && k >= 1 && k <= itemCount) return raw
+    if (n === itemCount && k >= 1 && k <= n) return { total_count: n, option_count: k }
   }
-  return `${itemCount}选${itemCount}`
+  return { total_count: itemCount, option_count: itemCount }
 }
 
-/** 模板 attr：套餐 / combo_rule 类（与 merge + 强制回填逻辑一致） */
+/** 模板 attr：套餐 / combo_rule / COMMODITY 类（与 merge + 强制回填逻辑一致） */
 function attrTemplateLooksComboLike(key: string, name: string, vtRaw: string): boolean {
   const vt = vtRaw.toUpperCase()
   const nm = name.toLowerCase()
+  if (vt === 'COMMODITY') return true
   if (/^combo_rule$/i.test(key)) return true
+  if (/^commodity$/i.test(key)) return true
   if (nm.includes('combo_rule')) return true
-  if (/套餐规则|搭配规则|组合规则|套餐数据|搭配数据|商品搭配/.test(name)) return true
+  if (/套餐规则|搭配规则|组合规则|套餐数据|搭配数据|商品搭配|菜品搭配/.test(name)) return true
   if ((vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON') && /套餐|搭配|组合/.test(name)) return true
   return false
 }
 
-/** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；仅团购 product_type=1 使用 */
+function comboItemPriceFenFromRow(row: Record<string, unknown>, originFenFallback: number): number {
+  const opFenDirect = row.origin_price
+  if (opFenDirect != null && Number.isFinite(Number(opFenDirect))) {
+    const n = Math.floor(Number(opFenDirect))
+    if (n > 0) return Math.max(1, Math.min(n, Number.MAX_SAFE_INTEGER))
+  }
+  const priceFen = row.price
+  if (priceFen != null && Number.isFinite(Number(priceFen))) {
+    const n = Math.floor(Number(priceFen))
+    if (n > 0) return Math.max(1, Math.min(n, Number.MAX_SAFE_INTEGER))
+  }
+  const opYuan = row.origin_price_yuan
+  if (opYuan != null && Number.isFinite(Number(opYuan))) {
+    const n = yuanToFen(Number(opYuan))
+    return Math.max(1, Math.min(n, Number.MAX_SAFE_INTEGER))
+  }
+  return Math.max(1, Math.min(originFenFallback, Number.MAX_SAFE_INTEGER))
+}
+
+function comboItemCountFromRow(row: Record<string, unknown>): number {
+  return Math.max(1, Math.floor(Number(row.quantity ?? row.count ?? row.qty ?? 1) || 1))
+}
+
+/** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；仅团购 product_type=1 使用；出站对齐 ItemGroupStruct */
 function buildDouyinProductComboRule(
   erp: Record<string, unknown>,
   productNameFallback: string,
@@ -1626,29 +1657,24 @@ function buildDouyinProductComboRule(
   const fb = productNameFallback.trim().slice(0, 120) || '单品'
   const groups = groupsIn.map((g) => {
     const gr = g as Record<string, unknown>
-    const itemsIn = Array.isArray(gr.items) ? gr.items : []
+    const itemsIn = Array.isArray(gr.items)
+      ? gr.items
+      : Array.isArray(gr.item_list)
+        ? gr.item_list
+        : []
     const groupName = String(gr.group_name ?? gr.groupName ?? '').trim() || '商品组'
-    const items = itemsIn.map((it) => {
+    const item_list = itemsIn.map((it) => {
       const row = it as Record<string, unknown>
       const name = String(row.name ?? '').trim() || fb
-      const quantity = Math.max(1, Math.floor(Number(row.quantity ?? row.qty ?? 1) || 1))
+      const count = comboItemCountFromRow(row)
       const unit = String(row.unit ?? '份').trim() || '份'
-      const opYuan = row.origin_price_yuan
-      const opFenDirect = row.origin_price
-      let originFen = originFenFallback
-      if (opFenDirect != null && Number.isFinite(Number(opFenDirect))) {
-        const n = Math.floor(Number(opFenDirect))
-        if (n > 0) originFen = n
-      } else if (opYuan != null && Number.isFinite(Number(opYuan))) {
-        originFen = yuanToFen(Number(opYuan))
-      }
-      originFen = Math.max(1, Math.min(originFen, Number.MAX_SAFE_INTEGER))
+      const price = comboItemPriceFenFromRow(row, originFenFallback)
       const item: Record<string, unknown> = {
         name,
-        quantity,
+        /** 单品价（分），与历史 commodity 示例字段名一致 */
+        price,
+        count,
         unit,
-        /** 单品原价（分），与 SKU origin_amount 口径一致 */
-        origin_price: originFen,
       }
       const pid = String(row.product_id ?? '').trim()
       if (pid) item.product_id = pid
@@ -1656,14 +1682,23 @@ function buildDouyinProductComboRule(
       if (sid) item.sku_id = sid
       return item
     })
-    const prRaw = String(gr.pick_rule ?? gr.pickRule ?? '全部必选').trim() || '全部必选'
+    const prRaw = String(gr.pick_rule ?? gr.pickRule ?? '').trim()
+    const inferred = (() => {
+      const tc = Number(gr.total_count)
+      const oc = Number(gr.option_count)
+      if (Number.isFinite(tc) && Number.isFinite(oc) && tc > 0 && oc > 0 && item_list.length > 0) {
+        return { total_count: Math.floor(tc), option_count: Math.floor(oc) }
+      }
+      return pickRuleToTotalAndOptionCount(item_list.length, prRaw || '全部必选')
+    })()
     return {
       group_name: groupName,
-      pick_rule: normalizePickRuleForComboGroup(items.length, prRaw),
-      items,
+      total_count: inferred.total_count,
+      option_count: inferred.option_count,
+      item_list,
     }
   })
-  const groupsWithItems = groups.filter((g) => Array.isArray(g.items) && g.items.length > 0)
+  const groupsWithItems = groups.filter((g) => Array.isArray(g.item_list) && g.item_list.length > 0)
   if (groupsWithItems.length === 0) return null
   return { groups: groupsWithItems }
 }
@@ -1947,7 +1982,11 @@ async function buildGoodlifeProductSaveBody(
   erp: Record<string, unknown>,
   _mode: 'draft' | 'submit',
   account_name: string,
-): Promise<Record<string, unknown>> {
+): Promise<{
+  body: Record<string, unknown>
+  templateProductAttrs: Record<string, unknown>[]
+  templateSkuAttrs: Record<string, unknown>[]
+}> {
   const product_name = String(erp.product_name ?? '').trim()
   const desc = String(erp.product_desc ?? product_name).trim()
   const category_id = String(erp.category_id ?? '').trim()
@@ -1996,17 +2035,19 @@ async function buildGoodlifeProductSaveBody(
     comboRule = buildDouyinProductComboRule(erp, product_name, originFen)
     if (!comboRule) {
       const oy = Number(erp.origin_price_yuan ?? erp.price_yuan)
+      const onePrice = Math.max(1, yuanToFen(Number.isFinite(oy) && oy > 0 ? oy : priceYuan))
       comboRule = {
         groups: [
           {
             group_name: '商品组',
-            pick_rule: '全部必选',
-            items: [
+            total_count: 1,
+            option_count: 1,
+            item_list: [
               {
                 name: product_name.slice(0, 120) || '团购套餐',
-                quantity: 1,
+                count: 1,
                 unit: '份',
-                origin_price: Math.max(1, yuanToFen(Number.isFinite(oy) && oy > 0 ? oy : priceYuan)),
+                price: onePrice,
               },
             ],
           },
@@ -2050,13 +2091,18 @@ async function buildGoodlifeProductSaveBody(
    * 顶层 product.combo_rule 保留，同时把同一份规范化结构写回 combo 类模板字段，避免必填属性被判空。
    */
   if (isGroupBuy && comboRule) {
-    const comboRuleJson = JSON.stringify(comboRule).slice(0, 120_000)
+    const comboRuleJsonWrapped = JSON.stringify(comboRule).slice(0, 120_000)
+    const groupsOnly = (comboRule as { groups?: unknown }).groups
+    const comboRuleJsonGroupsArray = JSON.stringify(Array.isArray(groupsOnly) ? groupsOnly : []).slice(0, 120_000)
     for (const a of attrs) {
       const key = String((a as Record<string, unknown>).key ?? '').trim()
       if (!key) continue
       const name = String((a as Record<string, unknown>).name ?? '')
       const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
-      if (attrTemplateLooksComboLike(key, name, vt)) mergedProductAttrs[key] = comboRuleJson
+      if (!attrTemplateLooksComboLike(key, name, vt)) continue
+      /** COMMODITY / commodity 与历史 life 接口一致：值为「搭配组数组」的 JSON 字符串，而非 { groups: [...] } */
+      const useGroupsArrayJson = vt === 'COMMODITY' || /^commodity$/i.test(key)
+      mergedProductAttrs[key] = useGroupsArrayJson ? comboRuleJsonGroupsArray : comboRuleJsonWrapped
     }
   }
 
@@ -2103,6 +2149,22 @@ async function buildGoodlifeProductSaveBody(
       if (s) skuAttrMap[key] = s.slice(0, 120_000)
     }
   }
+  /** 团购：template/get 常在 sku_attrs 要求 COMMODITY/commodity，值为搭配组 JSON 数组字符串（与历史 life 接口一致） */
+  if (isGroupBuy && comboRule) {
+    const groupsArr = (comboRule as { groups?: unknown[] }).groups
+    if (Array.isArray(groupsArr) && groupsArr.length > 0) {
+      const commodityPayload = JSON.stringify(groupsArr).slice(0, 120_000)
+      for (const a of skuAttrs) {
+        const key = String((a as Record<string, unknown>).key ?? '').trim()
+        if (!key) continue
+        const name = String((a as Record<string, unknown>).name ?? '')
+        const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+        if (vt === 'COMMODITY' || /^commodity$/i.test(key) || /菜品搭配|商品搭配/.test(name)) {
+          skuAttrMap[key] = commodityPayload
+        }
+      }
+    }
+  }
   const sku: Record<string, unknown> = {
     sku_name: product_name.slice(0, 120),
     actual_amount: actualFen,
@@ -2122,11 +2184,49 @@ async function buildGoodlifeProductSaveBody(
   }
 
   return {
-    ability: { ignore_inapplicable_poi: true },
-    account_id: accountId,
-    product,
-    sku,
+    body: {
+      ability: { ignore_inapplicable_poi: true },
+      account_id: accountId,
+      product,
+      sku,
+    },
+    templateProductAttrs: attrs,
+    templateSkuAttrs: skuAttrs,
   }
+}
+
+function templateComboAttrKeysFromAttrs(attrs: Record<string, unknown>[]): string[] {
+  const out: string[] = []
+  for (const a of attrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key) continue
+    const name = String((a as Record<string, unknown>).name ?? '')
+    const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+    if (attrTemplateLooksComboLike(key, name, vt)) out.push(key)
+  }
+  return out
+}
+
+/** 日志：保留字段名与结构，仅打码 name / group_name 文案 */
+function maskDouyinComboRuleForLog(combo: unknown): unknown {
+  const mask = (s: string) => {
+    const t = s.trim()
+    if (!t) return s
+    if (t.length <= 1) return '〈已脱敏〉'
+    return `〈已脱敏·${t.length}字〉`
+  }
+  const walk = (x: unknown): unknown => {
+    if (x === null || typeof x !== 'object') return x
+    if (Array.isArray(x)) return x.map(walk)
+    const o = x as Record<string, unknown>
+    const next: Record<string, unknown> = {}
+    for (const [k, val] of Object.entries(o)) {
+      if ((k === 'name' || k === 'group_name') && typeof val === 'string') next[k] = mask(val)
+      else next[k] = walk(val)
+    }
+    return next
+  }
+  return walk(combo)
 }
 
 function summarizeComboRuleForLog(combo: unknown): Record<string, unknown> {
@@ -2134,30 +2234,46 @@ function summarizeComboRuleForLog(combo: unknown): Record<string, unknown> {
     return { present: false }
   }
   const groups = (combo as { groups?: unknown }).groups
-  if (!Array.isArray(groups)) return { present: true, groups: 0, items: 0, pick_rules: [] as string[] }
-  const pickRules: string[] = []
+  if (!Array.isArray(groups)) return { present: true, groups: 0, items: 0, combo_mode: [] as string[] }
+  const modes: string[] = []
   let items = 0
   for (const g of groups) {
     if (!g || typeof g !== 'object') continue
     const o = g as Record<string, unknown>
-    pickRules.push(String(o.pick_rule ?? '').slice(0, 48))
-    const arr = o.items
-    if (Array.isArray(arr)) items += arr.length
+    const pr = o.pick_rule
+    const tc = o.total_count
+    const oc = o.option_count
+    if (typeof pr === 'string' && pr.trim()) modes.push(String(pr).slice(0, 48))
+    else if (typeof tc === 'number' || typeof oc === 'number')
+      modes.push(`total=${String(tc ?? '?')},opt=${String(oc ?? '?')}`)
+    else modes.push('')
+    const arr = Array.isArray(o.item_list) ? o.item_list : Array.isArray(o.items) ? o.items : []
+    items += arr.length
   }
   return {
     present: true,
     groups: groups.length,
     items,
-    pick_rules: pickRules.slice(0, 10),
+    combo_mode: modes.slice(0, 10),
   }
 }
 
-function summarizeDouyinProductSaveForLog(saveBody: Record<string, unknown>, mode: string): Record<string, unknown> {
+function summarizeDouyinProductSaveForLog(
+  saveBody: Record<string, unknown>,
+  mode: string,
+  meta: {
+    templateProductAttrs: Record<string, unknown>[]
+    templateSkuAttrs: Record<string, unknown>[]
+  },
+): Record<string, unknown> {
   const product = saveBody.product as Record<string, unknown> | undefined
   const sku = saveBody.sku as Record<string, unknown> | undefined
   const ak = product?.attr_key_value_map as Record<string, string> | undefined
   const sk = sku?.attr_key_value_map as Record<string, string> | undefined
   const relay = process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
+  const tplComboKeys = templateComboAttrKeysFromAttrs(meta.templateProductAttrs)
+  const tplSkuComboKeys = templateComboAttrKeysFromAttrs(meta.templateSkuAttrs)
+  const comboRuleRaw = product?.combo_rule
   return {
     mode,
     relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
@@ -2167,8 +2283,14 @@ function summarizeDouyinProductSaveForLog(saveBody: Record<string, unknown>, mod
     category_id: product?.category_id,
     combo_in_product_body: Boolean(product?.combo_rule),
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
+    combo_rule_debug: maskDouyinComboRuleForLog(comboRuleRaw),
+    template_combo_attr_keys: tplComboKeys,
+    template_sku_combo_attr_keys: tplSkuComboKeys,
+    combo_filled_product_attr_keys: ak ? tplComboKeys.filter((k) => k in ak) : [],
+    combo_filled_sku_attr_keys: sk ? tplSkuComboKeys.filter((k) => k in sk) : [],
+    /** @deprecated 仅用 key 子串匹配 opaque key 不准，请看 template_*_combo_attr_keys */
     combo_like_attr_keys:
-      ak == null ? [] : Object.keys(ak).filter((k) => /combo|套餐|搭配|组合|rule/i.test(k)),
+      ak == null ? [] : Object.keys(ak).filter((k) => /combo|套餐|搭配|组合|rule|commodity/i.test(k)),
     attr_key_count: ak ? Object.keys(ak).length : 0,
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
@@ -2248,8 +2370,17 @@ export async function handleDouyinGoodsProductSavePost(
       })
       return
     }
-    const saveBody = await buildGoodlifeProductSaveBody(accountId, token, erp, mode, accountName)
-    console.info('[meoo douyin goods/save]', JSON.stringify(summarizeDouyinProductSaveForLog(saveBody, mode)))
+    const built = await buildGoodlifeProductSaveBody(accountId, token, erp, mode, accountName)
+    const saveBody = built.body
+    console.info(
+      '[meoo douyin goods/save]',
+      JSON.stringify(
+        summarizeDouyinProductSaveForLog(saveBody, mode, {
+          templateProductAttrs: built.templateProductAttrs,
+          templateSkuAttrs: built.templateSkuAttrs,
+        }),
+      ),
+    )
 
     const dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
       method: 'POST',
