@@ -14,7 +14,6 @@ import {
   Video,
 } from 'lucide-react'
 import MeooPayQrModal from '../components/MeooPayQrModal'
-import { MeooAgentMascot } from '../components/MeooAgentMascot'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import RecruitmentBriefWizard from '../components/recruitment/RecruitmentBriefWizard'
 import { cn } from '../cn'
@@ -1108,13 +1107,6 @@ export default function RecruitmentPage() {
     }
   }, [screen, hubOrderFetchNonce])
 
-  const hubMascotInputDraft = useMemo(() => {
-    const bits: string[] = []
-    if (briefOpen) bits.push('brief')
-    if (briefDetail) bits.push('detail')
-    return bits.join(' ')
-  }, [briefDetail, briefOpen])
-
   if (screen === 'createPick')
     return (
       <div className="mx-auto max-w-4xl space-y-8 px-4 py-6">
@@ -1418,9 +1410,6 @@ export default function RecruitmentPage() {
               </div>
             </div>
           )}
-          <div className="mt-6 flex justify-end border-t border-gray-100 pt-3">
-            <MeooAgentMascot aiSending={hubOrderLoading} inputDraft={hubMascotInputDraft} className="opacity-95" />
-          </div>
         </motion.div>
       </div>
 
