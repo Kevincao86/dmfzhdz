@@ -2507,6 +2507,7 @@ async function uploadMerchantProductImageToSupabase(params: {
   const { error } = await admin.storage.from(bucket).upload(objectPath, params.buf, {
     contentType: params.safeMime,
     upsert: false,
+    cacheControl: 'public, max-age=604800',
   })
   if (error) {
     throw new Error(error.message || 'storage.upload 失败')
