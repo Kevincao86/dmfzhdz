@@ -1635,6 +1635,52 @@ function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
 
+function productImageUrlsFromErp(erp: Record<string, unknown>): string[] {
+  const fields = ['head_image_urls', 'aux_image_urls', 'env_image_urls']
+  const out: string[] = []
+  for (const field of fields) {
+    const raw = erp[field]
+    if (!Array.isArray(raw)) continue
+    for (const x of raw) {
+      const u = String(x ?? '').trim()
+      if (u) out.push(u)
+    }
+  }
+  return out
+}
+
+function findUnpublishableImageUrls(erp: Record<string, unknown>): string[] {
+  return productImageUrlsFromErp(erp).filter((u) => {
+    if (/^https?:\/\//i.test(u)) return false
+    return /^data:image\//i.test(u) || /^blob:/i.test(u) || u.length > 2000
+  })
+}
+
+/** 模板手填 JSON / 文本中夹带本机预览图 */
+function findUnpublishableImageInTemplateOverrides(erp: Record<string, unknown>): string[] {
+  const paths: string[] = []
+  for (const top of ['template_attr_overrides', 'template_sku_attr_overrides'] as const) {
+    const o = erp[top]
+    if (!o || typeof o !== 'object' || Array.isArray(o)) continue
+    for (const [k, v] of Object.entries(o as Record<string, unknown>)) {
+      if (typeof v !== 'string' || !v.trim()) continue
+      if (/data:image\//i.test(v) || /^blob:/i.test(v)) paths.push(`${top}.${k}`)
+    }
+  }
+  return paths
+}
+
+/** 组装后的 attr 值中仍含内联图（兜底） */
+function findAttrMapDataUrlOrBlobKeys(m: unknown): string[] {
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return []
+  const out: string[] = []
+  for (const [k, v] of Object.entries(m as Record<string, unknown>)) {
+    if (typeof v !== 'string') continue
+    if (/data:image\//i.test(v) || /^blob:/i.test(v)) out.push(k)
+  }
+  return out
+}
+
 /**
  * 抖音「商品搭配 / COMMODITY」控件：ItemGroupStruct（见开放平台商品搭配控件文档）
  * total_count + option_count 表达 n 选 k；「全部必选」= n==k==单品数。
@@ -2409,6 +2455,17 @@ export async function handleDouyinGoodsProductSavePost(
     json(res, 400, { message: '缺少 product.product_name' })
     return
   }
+  const badUrls = findUnpublishableImageUrls(erp)
+  const badOverridePaths = findUnpublishableImageInTemplateOverrides(erp)
+  if (badUrls.length > 0 || badOverridePaths.length > 0) {
+    json(res, 400, {
+      message:
+        '商品含不可发布的本机图片：头图/辅图/环境图须为 https 公网 URL；开放平台模板属性中不得粘贴 data:image 或 blob: 整段，否则 goods/save 请求体过大并在中继/抖音侧超时。请先完成图片上传拿到可访问 URL 后再提交。',
+      invalid_image_urls_count: badUrls.length,
+      invalid_template_override_paths: badOverridePaths.slice(0, 32),
+    })
+    return
+  }
 
   try {
     const token = await ensureDouyinToken(session)
@@ -2481,6 +2538,26 @@ export async function handleDouyinGoodsProductSavePost(
 
     const saveBody = built.body
     const bodyBytes = JSON.stringify(saveBody).length
+    const prod = saveBody.product as Record<string, unknown>
+    const badAk = findAttrMapDataUrlOrBlobKeys(prod.attr_key_value_map)
+    const skuObj = saveBody.sku as Record<string, unknown> | undefined
+    const badSk = findAttrMapDataUrlOrBlobKeys(skuObj?.attr_key_value_map)
+    if (badAk.length > 0 || badSk.length > 0) {
+      json(res, 400, {
+        message:
+          '组装后的 attr_key_value_map 仍含有 data:image/blob: 内联图，抖音无法接受且易导致超时。请检查开放平台类目手填项与图片来源。',
+        bad_product_attr_keys: badAk.slice(0, 40),
+        bad_sku_attr_keys: badSk.slice(0, 40),
+      })
+      return
+    }
+    if (bodyBytes > 2_400_000) {
+      json(res, 400, {
+        message: `商品保存请求体约 ${Math.round(bodyBytes / 1_000_000)}MB，过大（常见原因：图片仍为 base64 内联）。请改为 https 图片 URL 后再试。`,
+        save_body_bytes: bodyBytes,
+      })
+      return
+    }
     console.info(
       '[meoo douyin goods/save] built',
       JSON.stringify({
