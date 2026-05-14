@@ -853,8 +853,11 @@ export default function DouyinProductCreateWizard({
       return
     }
     const u = (r.url ?? '').trim()
-    /** 服务端内联 data URL 与上传一致；其它外链（如 picsum 占位）一律用本机 blob 预览真实所选图 */
+    /** 公网 https/http 直链（如 Supabase Storage）：须原样写入 detail，供 goods/save 与提交前校验 */
+    if (/^https?:\/\//i.test(u)) return u
+    /** 演示用内联图 */
     if (u.startsWith('data:image/')) return u
+    /** 非直链占位（如历史 picsum）：用本机 blob 仅作预览，不可提交抖音 */
     try {
       return URL.createObjectURL(file)
     } catch {
