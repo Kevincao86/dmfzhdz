@@ -71,11 +71,12 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       try {
         const bodyRaw = await readBody(req as IncomingMessage)
         const auth = req.headers['authorization']
-        const { runAgentFreeformTextToImage } = await import('./merchantAiUpstream.js')
         const parsed = JSON.parse(bodyRaw || '{}') as {
           prompt?: string
           preferred_vendor?: string
           reference_image?: string
+          image_route?: string
+          tokenmix_image_model?: string
         }
         const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
         if (!prompt) {
@@ -97,6 +98,10 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         const pv = typeof parsed.preferred_vendor === 'string' ? parsed.preferred_vendor.trim().toLowerCase() : ''
         const preferredVendor =
           pv === 'qwen' || pv === 'doubao' || pv === 'minimax' ? (pv as 'qwen' | 'doubao' | 'minimax') : undefined
+        const routeRaw = typeof parsed.image_route === 'string' ? parsed.image_route.trim().toLowerCase() : ''
+        const imageRoute = routeRaw === 'tokenmix' ? 'tokenmix' : 'builtin'
+        const tokenmixImageModel =
+          typeof parsed.tokenmix_image_model === 'string' ? parsed.tokenmix_image_model.trim() : undefined
         const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
         const user = await verifyBearerJwt(typeof auth === 'string' ? auth : undefined, env)
         if (!user) {
@@ -106,17 +111,20 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
           return
         }
-        const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, {
+        const { runMeooAgentImageRequest } = await import('./meooAgentImageCore.js')
+        const out = await runMeooAgentImageRequest(env, {
+          prompt,
           referenceImage,
+          preferredVendor,
+          imageRoute,
+          tokenmixImageModel,
         })
         res.statusCode = out.ok ? 200 : 502
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.setHeader('Access-Control-Allow-Origin', '*')
         res.end(
           JSON.stringify(
-            out.ok
-              ? { ok: true, imageUrl: out.imageUrl, vendorUsed: out.vendorUsed }
-              : { ok: false, error: 'image_generation_failed', detail: out.message },
+            out.ok ? out : { ok: false, error: 'image_generation_failed', detail: out.message },
           ),
         )
       } catch (e) {

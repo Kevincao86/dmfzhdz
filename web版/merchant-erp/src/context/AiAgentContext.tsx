@@ -26,13 +26,47 @@ import {
   resolveModelPickerKeyForImageIntent,
 } from '../services/ai/aiImageIntentRouting'
 import {
+  agentNativeImageRouteFromPickerKey,
   effectiveChatPickerKey,
   isAgentImagePickerKey,
-  nativeImagePreferredVendorFromPicker,
 } from '../services/ai/agentImageModelKeys'
 import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
-import { postAiAgentNativeImage, postAiChat } from '../services/ai/aiClient'
+import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
+import { postAiAgentNativeImage, postAiChat, type AiAgentNativeImageOk } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
+
+function buildAgentImagePostOpts(
+  pickerKey: string,
+  referenceImageDataUrl?: string,
+): Parameters<typeof postAiAgentNativeImage>[1] | undefined {
+  const r = agentNativeImageRouteFromPickerKey(pickerKey)
+  const o: NonNullable<Parameters<typeof postAiAgentNativeImage>[1]> = {}
+  const ref = referenceImageDataUrl?.trim()
+  if (ref) o.referenceImageDataUrl = ref
+  if (r.route === 'tokenmix') {
+    o.imageRoute = 'tokenmix'
+    o.tokenmixImageModel = r.tokenmixImageModel
+  } else if (r.preferredVendor) {
+    o.preferredVendor = r.preferredVendor
+  }
+  if (Object.keys(o).length === 0) return undefined
+  return o
+}
+
+function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): string {
+  if (img.channel === 'tokenmix') {
+    let s = `已使用 **TokenMix · ${img.displayModel ?? '图像模型'}** 生成下方结果。`
+    if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
+    return s
+  }
+  const vendorZh =
+    img.vendorUsed === 'qwen' ? '通义万相' : img.vendorUsed === 'doubao' ? '豆包 Seedream' : 'MiniMax'
+  let s = isI2i
+    ? `已使用 **${vendorZh}** 图生图（已参考你上传的图片）。下方为生成结果。`
+    : `已使用 **${vendorZh}** 文生图生成下方结果（与商品 AI 共用服务端配置）。如需改风格、主体或构图，请直接说明。`
+  if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
+  return s
+}
 
 const PREFS_KEY = 'meoo_ai_model_picker_key'
 
@@ -363,9 +397,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setAiSending(true)
       try {
         const history = agentMessagesToChatMessages(snapshot)
+        let chatModel = parsed.model
+        if (parsed.provider === 'tokenmix' && !chatModel) {
+          chatModel = defaultModelIdForFamily(parsed.modelFamily)
+        }
         const res = await postAiChat({
           provider: parsed.provider,
-          model: parsed.model || undefined,
+          model: chatModel || undefined,
           ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
           messages: history,
           ...(imageDataUrls.length ? { imageDataUrls } : {}),
@@ -434,34 +472,20 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           if (tryNativePixel) {
             setAiSending(true)
             try {
-              const pref = nativeImagePreferredVendorFromPicker(nextPickerKey)
-              const imgRes = await postAiAgentNativeImage(
-                line,
-                pref || refImg
-                  ? {
-                      ...(pref ? { preferredVendor: pref } : {}),
-                      ...(refImg ? { referenceImageDataUrl: refImg } : {}),
-                    }
-                  : undefined,
-              )
+              const imgOpts = buildAgentImagePostOpts(nextPickerKey, refImg)
+              const imgRes = await postAiAgentNativeImage(line, imgOpts)
               if (imgRes.ok) {
-                const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
-                if (vk) {
-                  setModelPickerKeyState(vk)
-                  savePickerKey(vk)
+                if (imgRes.channel === 'builtin') {
+                  const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
+                  if (vk) {
+                    setModelPickerKeyState(vk)
+                    savePickerKey(vk)
+                  }
                 }
-                const vendorZh =
-                  imgRes.vendorUsed === 'qwen'
-                    ? '通义万相'
-                    : imgRes.vendorUsed === 'doubao'
-                      ? '豆包 Seedream'
-                      : 'MiniMax'
                 const isI2i = Boolean(refImg)
                 const assistantMsg = createAgentMessage(
                   'assistant',
-                  isI2i
-                    ? `已使用 **${vendorZh}** 图生图（已参考你上传的图片）。下方为生成结果。`
-                    : `已使用 **${vendorZh}** 文生图生成下方结果（与商品 AI 共用服务端配置）。如需改风格、主体或构图，请直接说明。`,
+                  captionForAgentImageResult(imgRes, isI2i),
                   { imageUrls: [imgRes.imageUrl] },
                 )
                 setMessages((prev) => {
@@ -594,23 +618,19 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           if (detectImageGenerationIntent(q) || isAgentImagePickerKey(nextPickerKey)) {
             setAiSending(true)
             try {
-              const pref = nativeImagePreferredVendorFromPicker(nextPickerKey)
-              const imgRes = await postAiAgentNativeImage(q, pref ? { preferredVendor: pref } : undefined)
+              const imgOpts = buildAgentImagePostOpts(nextPickerKey)
+              const imgRes = await postAiAgentNativeImage(q, imgOpts)
               if (imgRes.ok) {
-                const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
-                if (vk) {
-                  setModelPickerKeyState(vk)
-                  savePickerKey(vk)
+                if (imgRes.channel === 'builtin') {
+                  const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
+                  if (vk) {
+                    setModelPickerKeyState(vk)
+                    savePickerKey(vk)
+                  }
                 }
-                const vendorZh =
-                  imgRes.vendorUsed === 'qwen'
-                    ? '通义万相'
-                    : imgRes.vendorUsed === 'doubao'
-                      ? '豆包 Seedream'
-                      : 'MiniMax'
                 const assistantMsg = createAgentMessage(
                   'assistant',
-                  `已使用 **${vendorZh}** 文生图生成下方结果。如需调整，请继续说明。`,
+                  captionForAgentImageResult(imgRes, false),
                   { imageUrls: [imgRes.imageUrl] },
                 )
                 setMessages((prev) => {

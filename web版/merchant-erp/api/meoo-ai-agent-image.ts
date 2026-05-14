@@ -1,5 +1,7 @@
 /**
- * POST /api/meoo-ai-agent-image — 智能体文生图 / 图生图（服务端 wanx / Seedream / MiniMax，与商品 AI 共用 MERCHANT_AI_*）。
+ * POST /api/meoo-ai-agent-image — 智能体文生图 / 图生图。
+ * - builtin：万相 / 豆包 / MiniMax（MERCHANT_AI_*）。
+ * - tokenmix：TokenMix OpenAI 兼容 images/generations（须 TOKENMIX_API_KEY）；有参考图时走内置图生图。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -8,7 +10,7 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayShared.js'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
-import { runAgentFreeformTextToImage } from '../vite-plugins/merchantAiUpstream.js'
+import { runMeooAgentImageRequest } from '../vite-plugins/meooAgentImageCore.js'
 
 export const config = { maxDuration: 300 }
 
@@ -33,13 +35,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { prompt?: unknown; preferred_vendor?: unknown; reference_image?: unknown }
+  let body: {
+    prompt?: unknown
+    preferred_vendor?: unknown
+    reference_image?: unknown
+    image_route?: unknown
+    tokenmix_image_model?: unknown
+  }
   try {
-    body = JSON.parse(rawBody(req) || '{}') as {
-      prompt?: unknown
-      preferred_vendor?: unknown
-      reference_image?: unknown
-    }
+    body = JSON.parse(rawBody(req) || '{}') as typeof body
   } catch {
     sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
     return
@@ -50,7 +54,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   const refRaw = typeof body.reference_image === 'string' ? body.reference_image.trim() : ''
-  /** 控制请求体大小，避免超大 Base64 拖垮函数 */
   if (refRaw.length > 2_800_000) {
     sendMerchantJson(res, 400, { ok: false, error: 'reference_image_too_large' })
     return
@@ -60,16 +63,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const preferredVendor =
     pvRaw === 'qwen' || pvRaw === 'doubao' || pvRaw === 'minimax' ? (pvRaw as 'qwen' | 'doubao' | 'minimax') : undefined
 
+  const routeRaw = typeof body.image_route === 'string' ? body.image_route.trim().toLowerCase() : ''
+  const imageRoute = routeRaw === 'tokenmix' ? 'tokenmix' : 'builtin'
+  const tokenmixImageModel =
+    typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
+
   try {
-    const out = await runAgentFreeformTextToImage(process.env as Record<string, string>, prompt, preferredVendor, {
+    const out = await runMeooAgentImageRequest(process.env as Record<string, string>, {
+      prompt,
       referenceImage,
+      preferredVendor,
+      imageRoute,
+      tokenmixImageModel,
     })
     if (out.ok) {
-      sendMerchantJson(res, 200, {
-        ok: true,
-        imageUrl: out.imageUrl,
-        vendorUsed: out.vendorUsed,
-      })
+      sendMerchantJson(res, 200, out)
     } else {
       sendMerchantJson(res, 502, { ok: false, error: 'image_generation_failed', detail: out.message })
     }

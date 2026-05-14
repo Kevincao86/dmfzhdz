@@ -94,16 +94,26 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
   throw new Error(lastErr || 'ai_chat_unavailable')
 }
 
-export type AiAgentNativeImageOk = {
-  ok: true
-  imageUrl: string
-  vendorUsed: 'qwen' | 'doubao' | 'minimax'
-}
+export type AiAgentNativeImageOk =
+  | {
+      ok: true
+      imageUrl: string
+      channel: 'tokenmix'
+      displayModel?: string
+      fallbackNote?: string
+    }
+  | {
+      ok: true
+      imageUrl: string
+      channel: 'builtin'
+      vendorUsed: 'qwen' | 'doubao' | 'minimax'
+      fallbackNote?: string
+    }
 
 export type AiAgentNativeImageErr = { ok: false; message: string }
 
 /**
- * 智能体文生图：POST /api/meoo-ai-agent-image（服务端通义万相 / 豆包 Seedream / MiniMax，与商品 AI 共用环境变量）。
+ * 智能体文生图：POST /api/meoo-ai-agent-image（builtin：万相/豆包/MiniMax；TokenMix：OpenAI 兼容 images/generations）。
  */
 export async function postAiAgentNativeImage(
   prompt: string,
@@ -111,6 +121,8 @@ export async function postAiAgentNativeImage(
     preferredVendor?: 'qwen' | 'doubao' | 'minimax'
     /** data URL 或厂商可接受的图片 URL，走图生图时传入 */
     referenceImageDataUrl?: string
+    imageRoute?: 'builtin' | 'tokenmix'
+    tokenmixImageModel?: string
   },
 ): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
   const token = await bearer()
@@ -126,6 +138,9 @@ export async function postAiAgentNativeImage(
   if (opts?.preferredVendor) body.preferred_vendor = opts.preferredVendor
   const ref = opts?.referenceImageDataUrl?.trim()
   if (ref) body.reference_image = ref
+  if (opts?.imageRoute === 'tokenmix') body.image_route = 'tokenmix'
+  const tim = opts?.tokenmixImageModel?.trim()
+  if (tim) body.tokenmix_image_model = tim
   for (const p of tryPaths) {
     const targets = aiChatFetchUrlCandidates(p)
     for (const target of targets) {
@@ -142,16 +157,37 @@ export async function postAiAgentNativeImage(
         json = null
       }
       if (res.ok && json && typeof json === 'object' && (json as { ok?: boolean }).ok === true) {
-        const b = json as { imageUrl?: unknown; vendorUsed?: unknown }
-        const imageUrl = typeof b.imageUrl === 'string' ? b.imageUrl.trim() : ''
-        const vu = typeof b.vendorUsed === 'string' ? b.vendorUsed.trim() : ''
-        if (
-          imageUrl &&
-          (vu === 'qwen' || vu === 'doubao' || vu === 'minimax')
-        ) {
-          return { ok: true, imageUrl, vendorUsed: vu }
+        const b = json as {
+          imageUrl?: unknown
+          vendorUsed?: unknown
+          channel?: unknown
+          displayModel?: unknown
+          fallbackNote?: unknown
         }
-        return { ok: false, message: '生图接口返回格式异常' }
+        const imageUrl = typeof b.imageUrl === 'string' ? b.imageUrl.trim() : ''
+        const ch = b.channel === 'tokenmix' ? 'tokenmix' : 'builtin'
+        const displayModel = typeof b.displayModel === 'string' ? b.displayModel.trim() : undefined
+        const fallbackNote = typeof b.fallbackNote === 'string' ? b.fallbackNote.trim() : undefined
+        if (!imageUrl) return { ok: false, message: '生图接口返回格式异常' }
+        if (ch === 'tokenmix') {
+          return {
+            ok: true,
+            imageUrl,
+            channel: 'tokenmix',
+            ...(displayModel ? { displayModel } : {}),
+            ...(fallbackNote ? { fallbackNote } : {}),
+          }
+        }
+        const vuRaw = typeof b.vendorUsed === 'string' ? b.vendorUsed.trim() : ''
+        const vuOk = vuRaw === 'qwen' || vuRaw === 'doubao' || vuRaw === 'minimax'
+        if (!vuOk) return { ok: false, message: '生图接口返回格式异常' }
+        return {
+          ok: true,
+          imageUrl,
+          channel: 'builtin',
+          vendorUsed: vuRaw as 'qwen' | 'doubao' | 'minimax',
+          ...(fallbackNote ? { fallbackNote } : {}),
+        }
       }
       if (res.status !== 404) {
         if (json && typeof json === 'object') {

@@ -2,8 +2,9 @@ import type { AIModelFamily } from './types'
 import { normalizeAiModelFamily } from './tokenmixClient.js'
 
 /**
- * 智能体模型下拉：文生图专用 key（`img::…`），出图走 /api/meoo-ai-agent-image；
- * TokenMix 家族下的项为「展示分组」，底层仍由店魔方服务端万相/豆包/MiniMax 按环境变量出图。
+ * 智能体模型下拉：文生图专用 key（`img::…`）。
+ * - `img::v::…`：店魔方内置万相 / 豆包 / MiniMax（`/api/meoo-ai-agent-image`）。
+ * - `img::m::家族::模型 id`：TokenMix 中继「图像生成」接口（须配置 TOKENMIX_API_KEY）。
  */
 export type ParsedAgentImagePicker =
   | { kind: 'vendor'; vendor: 'qwen' | 'doubao' | 'minimax' | 'auto' }
@@ -32,6 +33,22 @@ export function parseAgentImagePickerKey(key: string): ParsedAgentImagePicker | 
 
 export function isAgentImagePickerKey(key: string): boolean {
   return parseAgentImagePickerKey(key) != null
+}
+
+/** 内置生图路由（万相/豆包/MiniMax）或 TokenMix 图像模型 */
+export type AgentNativeImageRoute =
+  | { route: 'builtin'; preferredVendor?: 'qwen' | 'doubao' | 'minimax' }
+  | { route: 'tokenmix'; tokenmixImageModel: string }
+
+export function agentNativeImageRouteFromPickerKey(key: string): AgentNativeImageRoute {
+  const p = parseAgentImagePickerKey(key)
+  if (p?.kind === 'style') return { route: 'tokenmix', tokenmixImageModel: p.modelId }
+  if (p?.kind === 'vendor') {
+    if (p.vendor === 'auto') return { route: 'builtin' }
+    return { route: 'builtin', preferredVendor: p.vendor }
+  }
+  if (p?.kind === 'brand-direct') return { route: 'builtin' }
+  return { route: 'builtin' }
 }
 
 /** 文生图 API 首选厂商；auto / 展示类不传，由服务端 MERCHANT_AI_GOODS_IMAGE_FAILOVER 决定 */

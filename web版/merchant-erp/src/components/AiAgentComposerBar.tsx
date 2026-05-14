@@ -1,5 +1,6 @@
 import { ChevronDown, ImagePlus, Loader2, Mic, Send, Volume2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MeooAgentMascot } from './MeooAgentMascot'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 
@@ -120,6 +121,13 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
         }}
       />
 
+      <div className="flex items-end gap-1.5 sm:gap-2">
+        <MeooAgentMascot
+          aiSending={aiSending}
+          inputDraft={inputDraft}
+          className="shrink-0 scale-[0.92] pb-0.5 sm:scale-100"
+        />
+        <div className="min-w-0 flex-1">
       {pendingComposerImages.length > 0 ? (
         <div className="mb-2 flex flex-wrap gap-2 px-1">
           {pendingComposerImages.map((src, i) => (
@@ -260,6 +268,8 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           >
             {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
+        </div>
+      </div>
         </div>
       </div>
     </div>
