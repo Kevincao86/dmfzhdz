@@ -18,7 +18,7 @@ function url(path: string) {
  * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
  * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
  */
-function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
+export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
   const add = (u: string) => {
     const t = u.trim()
@@ -44,7 +44,7 @@ function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
 /**
  * 未部署的 /api 常落到 SPA（HTML）或纯 404 页；JSON 多为网关或抖音上游业务响应，不应再换 URL 重试。
  */
-function isLikelyRouteMiss404(res: Response, trimBody: string, contentType: string): boolean {
+export function isLikelyRouteMiss404(res: Response, trimBody: string, contentType: string): boolean {
   if (res.status !== 404) return false
   const t = trimBody
   if (/application\/json/i.test(contentType) || t.startsWith('{') || t.startsWith('[')) return false
@@ -684,11 +684,28 @@ async function fetchLocalSavedGoodsHits(keyword: string): Promise<DouyinOnlinePr
     keyword: keyword.slice(0, 40),
   })
   appendDouyinAccountIdToQuery(q)
-  const res = await fetch(url(`/api/merchant/douyin/goods/products?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
-  const data = await parseJson(res)
+  const qs = `?${q}`
+  const paths = [`/api/meoo-douyin-goods-products${qs}`, `/api/merchant/douyin/goods/products${qs}`] as const
+  const targets = merchantApiFetchUrlCandidates(paths)
+  let res: Response | undefined
+  let bodyText = ''
+  for (const target of targets) {
+    const r = await fetch(target, { method: 'GET', headers: authHeaders() })
+    const text = await r.text()
+    const trim = text.trimStart()
+    const ct = r.headers.get('content-type') ?? ''
+    if (isLikelyRouteMiss404(r, trim, ct)) continue
+    res = r
+    bodyText = text
+    break
+  }
+  if (!res) return []
+  let data: Record<string, unknown> = {}
+  try {
+    data = (JSON.parse(bodyText || '{}') || {}) as Record<string, unknown>
+  } catch {
+    data = {}
+  }
   if (!res.ok) return []
   const inner = data.data as Record<string, unknown> | undefined
   const items = (inner?.items ?? data.items) as unknown
