@@ -5,6 +5,7 @@
 
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 import { createPlatformApiSegment, createPlatformLabel } from '../constants/productCreatePlatforms'
+import { readMerchantSession } from '../lib/merchantSession'
 import {
   loadDraftDetailSnapshot,
   renameDraftDetailSnapshotKey,
@@ -30,14 +31,10 @@ const TOKEN_KEYS: Record<CreatePlatformId, string> = {
   jd: 'meoo_jd_merchant_token',
 }
 
+/** 与 `readMerchantSession` 一致：抖音来客 token 在 localStorage，其它平台多在 sessionStorage */
 function readToken(platform: CreatePlatformId): string | null {
-  try {
-    const key = TOKEN_KEYS[platform]
-    const v = sessionStorage.getItem(key)
-    return typeof v === 'string' && v.trim() !== '' ? v.trim() : null
-  } catch {
-    return null
-  }
+  const key = TOKEN_KEYS[platform]
+  return readMerchantSession(key)
 }
 
 export type ProductDraftPayload = {
