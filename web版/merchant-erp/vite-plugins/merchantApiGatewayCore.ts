@@ -1,12 +1,12 @@
 /**
  * /api/merchant/* 路由核心：供 Vite 中间件与 Vercel Serverless 共用。
  */
-import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   handleDouyinBindPost,
   handleDouyinBrandsGet,
   handleDouyinGoodsCategoryGet,
+  handleDouyinGoodsImageUploadPost,
   handleDouyinGoodsIndustryScopeGet,
   handleDouyinGoodsProductDraftQueryGet,
   handleDouyinGoodsProductOnlineQueryGet,
@@ -184,53 +184,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
 
       if (method === 'POST' && pathname === '/api/merchant/douyin/goods/image/upload') {
         const bodyRaw = await bodyReader()
-        let fileName = 'image.jpg'
-        let mimeType = 'image/jpeg'
-        let contentBase64 = ''
-        try {
-          const j = JSON.parse(bodyRaw || '{}') as {
-            fileName?: string
-            mimeType?: string
-            contentBase64?: string
-          }
-          fileName = typeof j.fileName === 'string' ? j.fileName : fileName
-          mimeType = typeof j.mimeType === 'string' ? j.mimeType : mimeType
-          contentBase64 = typeof j.contentBase64 === 'string' ? j.contentBase64 : ''
-        } catch {
-          json(res, 400, { message: '请求体须为 JSON：{ fileName, mimeType, contentBase64 }' })
-          return true
-        }
-        const approxBytes = Math.ceil((contentBase64.length * 3) / 4)
-        if (!contentBase64) {
-          json(res, 400, { message: '缺少 contentBase64' })
-          return true
-        }
-        if (approxBytes > 5 * 1024 * 1024) {
-          json(res, 400, { message: '单张图片不超过 5MB' })
-          return true
-        }
-        /** 尽量以内联 data URL 回传，避免占位图与上传内容不一致；超大图仍用外链占位（前端会用本地 blob 预览原图） */
-        const maxInlineBytes = Math.floor(2.5 * 1024 * 1024)
-        if (approxBytes <= maxInlineBytes) {
-          const safeMime =
-            typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
-              ? mimeType.trim().toLowerCase()
-              : 'image/jpeg'
-          json(res, 200, {
-            url: `data:${safeMime};base64,${contentBase64}`,
-            mimeType: safeMime,
-            message:
-              '演示环境：小图以内联 data URL 回传，与上传内容一致。生产请接抖音素材上传接口返回可公网访问地址。',
-          })
-          return true
-        }
-        const seed = createHash('sha256').update(contentBase64).digest('hex').slice(0, 40)
-        json(res, 200, {
-          url: `https://picsum.photos/seed/v${seed}/800/800`,
-          mimeType,
-          message:
-            '演示环境：大图返回占位外链；前端将用本机预览原图。生产请接抖音素材上传接口，将返回的可访问地址写入 goods/save 图片字段。',
-        })
+        await handleDouyinGoodsImageUploadPost(req, res, bodyRaw)
         return true
       }
 

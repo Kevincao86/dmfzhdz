@@ -184,11 +184,11 @@ export type ImageUploadResult =
   | { ok: false; message: string }
   | { ok: true; url: string }
 
-/** 本地走 JSON 上传；生产请换抖音素材能力返回可公网访问的 URL */
+/** 经商户网关 POST /api/merchant/douyin/goods/image/upload：服务端调抖音 tool/imagex/client_upload，返回 https 图链 */
 export async function uploadDouyinProductImage(file: File): Promise<ImageUploadResult> {
-  const max = 5 * 1024 * 1024
+  const max = 10 * 1024 * 1024
   if (file.size > max) {
-    return { ok: false, message: '单张图片不超过 5MB' }
+    return { ok: false, message: '单张图片不超过 10MB' }
   }
   let contentBase64: string
   try {
