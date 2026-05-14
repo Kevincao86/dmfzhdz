@@ -5,11 +5,12 @@ import { Agent, fetch as undiciFetch } from 'undici'
  *
  * - **DOUYIN_OPENAPI_BASE_URL**：本地生活等路径（如 `/goodlife/*`）基址；不设则 `https://open.douyin.com`。
  * - **DOUYIN_OPENAPI_OAUTH_BASE_URL**：OAuth（`/oauth/*`，含 `client_token`）基址。
- *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：先走同一中继；若中继对 `client_token` 仍返回 HTML（常见 Nginx 未透传 POST JSON），**自动再请求官方** `https://open.douyin.com/oauth/client_token/`。
+ *   **不设且已配置 `DOUYIN_OPENAPI_BASE_URL`（非官方）**：OAuth 与中继同源；中继返回 HTML/非 JSON 时**不再自动改打官方**（避免 OAuth 出口 IP 与白名单不一致）。请修正反代或显式设置 `DOUYIN_OPENAPI_OAUTH_BASE_URL`（仍不推荐生产指向官方）。
  *   **不设且未配置中继**：默认 `https://open.douyin.com`。
  *   可显式设 `DOUYIN_OPENAPI_OAUTH_BASE_URL=https://open.douyin.com` 跳过中继上的 OAuth（与自动回落等价，仅少一次无效请求）。
  *
- * **goodlife（`/goodlife/*`）**：优先走 `DOUYIN_OPENAPI_BASE_URL` 中继；若中继返回 HTML、5xx 或非 JSON，**再请求一次官方**（便于拿到抖音 JSON 错误如 IP 白名单，或在官方可达时直接成功）。中继 Nginx 须对 **GET 保留完整 query**。
+ * **goodlife（`/goodlife/*`）**：配置了非官方的 `DOUYIN_OPENAPI_BASE_URL` 时**仅走中继**，不再回落 `open.douyin.com`（避免出口 IP 变为 Vercel 导致开放平台白名单失效）。中继须正确透传 GET query、POST body 与 JSON 响应。
+ * 若确需恢复旧「中继失败则打官方」排障行为，可设置 `DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK=1`（不推荐生产）。
  *
  * - **DOUYIN_OPENAPI_RELAY_TLS_INSECURE**：设为 `1` / `true` 时，对「指向自建中继的 HTTPS 请求」**不校验中继 TLS 证书**（典型：反代使用自签或 IP 证书；Vercel 上否则会 `fetch failed`）。**直连 `https://open.douyin.com` 仍严格校验**。生产推荐为中继配置域名 + 受信任证书，勿长期依赖本开关。
  *
@@ -21,6 +22,12 @@ function normalizedGoodlifeBase(): string {
   const raw = process.env.DOUYIN_OPENAPI_BASE_URL?.trim()
   if (!raw) return DEFAULT_BASE
   return raw.replace(/\/+$/, '')
+}
+
+/** 生产默认关闭：自建 goodlife 中继失败时不再回落官方，避免出口 IP 漂移出白名单。 */
+function goodlifeOfficialFallbackAllowed(): boolean {
+  const v = process.env.DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK?.trim().toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
 }
 
 /** OAuth 基址：显式 OAUTH_URL >（已配 goodlife 中继则与其同源）> 官方 */
@@ -178,7 +185,7 @@ export async function fetchGoodlifeWithOfficialFallback(
   } catch (e1) {
     const msg1 = e1 instanceof Error ? e1.message : String(e1)
     const official = officialUrl()
-    if (relayBase !== DEFAULT_BASE && official) {
+    if (relayBase !== DEFAULT_BASE && official && goodlifeOfficialFallbackAllowed()) {
       try {
         const r2 = await fetchFn(official, init)
         const raw2 = await r2.text()
@@ -194,6 +201,9 @@ export async function fetchGoodlifeWithOfficialFallback(
   }
 
   if (relayBase === DEFAULT_BASE) {
+    return { status: r1.status, raw: raw1, usedOfficialFallback: false }
+  }
+  if (!goodlifeOfficialFallbackAllowed()) {
     return { status: r1.status, raw: raw1, usedOfficialFallback: false }
   }
   const tryFallback =
@@ -307,9 +317,9 @@ export async function exchangeDouyinClientToken(
     status >= 200 &&
     status < 300 &&
     (responseLooksLikeHtml(raw) || !looksLikeJsonObject(raw))
-  if (relayLooksBroken) {
-    const officialUrl = `${DEFAULT_BASE}/oauth/client_token/`
-    const second = await fetchClientTokenJsonThenForm(fetchFn, officialUrl, jsonBody, formBody)
+  if (relayLooksBroken && goodlifeOfficialFallbackAllowed()) {
+    const officialOauthUrl = `${DEFAULT_BASE}/oauth/client_token/`
+    const second = await fetchClientTokenJsonThenForm(fetchFn, officialOauthUrl, jsonBody, formBody)
     if (second.status >= 200 && second.status < 300) {
       status = second.status
       raw = second.raw
@@ -327,7 +337,9 @@ export async function exchangeDouyinClientToken(
   }
 
   const via =
-    relayLooksBroken && oauthBase !== DEFAULT_BASE ? '官方 OAuth 回落（中继曾返回 HTML）' : 'JSON 或 form 重试'
+    relayLooksBroken && oauthBase !== DEFAULT_BASE && goodlifeOfficialFallbackAllowed()
+      ? '官方 OAuth 回落（中继曾返回 HTML）'
+      : 'JSON 或 form 重试'
   return parseSuccess(raw, via)
 }
 

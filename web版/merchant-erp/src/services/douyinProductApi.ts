@@ -351,7 +351,7 @@ export type DouyinProductDetailPayload = {
   env_image_urls: string[]
   /** 适用门店 poi_id 列表 */
   poi_ids: string[]
-  /** 套餐结构：团购 product_type=1 为搭配组；代金券等类型亦传单品组，供网关映射 goodlife `product.combo_rule`（见开放平台商品 save 文档） */
+  /** 套餐结构：仅团购 product_type=1 传 package_combo；代金券等勿传，由网关按 template/get 组装 attr */
   package_combo?: { groups: ComboPackageGroup[] }
   /**
    * 按 [template.get](https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get)
@@ -1254,6 +1254,30 @@ function mapDouyinGoodsTemplatePayload(
 }
 
 function parseProductSaveResponse(res: Response, data: Record<string, unknown>): ProductSaveResult {
+  const numericEc = (v: unknown): number | undefined => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v)
+    return undefined
+  }
+  const rootEc = numericEc(data.error_code)
+  if (rootEc !== undefined && rootEc !== 0) {
+    return {
+      ok: false,
+      message: String(data.description ?? data.msg ?? `抖音根级 error_code=${rootEc}`),
+    }
+  }
+  const extra = data.extra as Record<string, unknown> | undefined
+  const extraEc = extra ? numericEc(extra.error_code) : undefined
+  if (extraEc !== undefined && extraEc !== 0) {
+    return {
+      ok: false,
+      message: String(
+        (typeof extra?.description === 'string' && extra.description) ||
+          data.description ||
+          `抖音 extra error_code=${extraEc}`,
+      ),
+    }
+  }
   if (!res.ok) {
     const msg =
       (typeof data.message === 'string' && data.message) ||
@@ -1264,10 +1288,14 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
   }
   const inner = data.data as Record<string, unknown> | undefined
   if (!inner || typeof inner !== 'object') {
+    const fallback =
+      (typeof data.message === 'string' && data.message) ||
+      (typeof data.description === 'string' && data.description)
+    if (fallback) return { ok: false, message: fallback }
     return { ok: false, message: '保存响应异常：缺少 data' }
   }
-  const ec = typeof inner.error_code === 'number' ? inner.error_code : 0
-  if (ec !== 0) {
+  const innerEc = numericEc(inner.error_code)
+  if (innerEc !== undefined && innerEc !== 0) {
     const rootExtra = data.extra as Record<string, unknown> | undefined
     const sub =
       rootExtra && typeof rootExtra.sub_description === 'string' && rootExtra.sub_description.trim()
@@ -1276,16 +1304,23 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
     return {
       ok: false,
       message:
-        ((typeof inner?.description === 'string' && inner.description) || `抖音 error_code=${ec}`) + sub,
+        ((typeof inner.description === 'string' && inner.description) || `抖音 data.error_code=${innerEc}`) + sub,
     }
   }
-  const pidRaw = inner?.product_id
+  const pidRaw = inner.product_id ?? inner.productId ?? data.product_id
   const product_id =
     typeof pidRaw === 'string'
       ? pidRaw.trim()
       : typeof pidRaw === 'number' && Number.isFinite(pidRaw)
         ? String(Math.trunc(pidRaw))
         : undefined
+  if (!product_id) {
+    return {
+      ok: false,
+      message:
+        '抖音返回未包含 product_id，无法确认保存成功；若网关返回 502 请检查自建 DOUYIN_OPENAPI_BASE_URL 与抖音开放平台 logid。',
+    }
+  }
   const message = typeof data.message === 'string' ? data.message : undefined
   return {
     ok: true,
