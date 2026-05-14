@@ -12,6 +12,8 @@ import {
 } from '../lib/productDraftSnapshot'
 import { loadProductEditLibrary, replaceProductEditLibraryRowId } from '../lib/productEditLibrary'
 import {
+  isLikelyRouteMiss404,
+  merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
   postDouyinGoodsProductSync,
   type DouyinProductDetailPayload,
@@ -135,16 +137,43 @@ export async function fetchMerchantProductList(
     page: String(page),
     page_size: String(pageSize),
   })
-  const res = await fetch(url(`/api/merchant/${seg}/goods/products?${q}`), {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  })
+  const qs = `?${q}`
+  const paths =
+    platform === 'douyin'
+      ? ([`/api/meoo-douyin-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
+      : ([`/api/merchant/${seg}/goods/products${qs}`] as const)
+  const targets = platform === 'douyin' ? merchantApiFetchUrlCandidates(paths) : [url(paths[0]!)]
+
+  let res: Response | null = null
+  let bodyText = ''
+  let lastStatus = 0
+  for (const target of targets) {
+    const r = await fetch(target, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    lastStatus = r.status
+    const text = await r.text()
+    const trim = text.trimStart()
+    const ct = r.headers.get('content-type') ?? ''
+    if (platform === 'douyin' && isLikelyRouteMiss404(r, trim, ct)) continue
+    res = r
+    bodyText = text
+    break
+  }
+  if (!res) {
+    return {
+      ok: false,
+      message: `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请部署含 /api/meoo-douyin-goods-products 的版本，或检查 VITE_MERCHANT_API_BASE_URL 是否指向含该路由的站点。`,
+    }
+  }
+
   let data: Record<string, unknown> = {}
   try {
-    data = (await res.json()) as Record<string, unknown>
+    data = (JSON.parse(bodyText || '{}') || {}) as Record<string, unknown>
   } catch {
     /* ignore */
   }
