@@ -21,19 +21,20 @@ function isDraftBoxStatus(status: string): boolean {
 
 /**
  * 从 ERP 商品草稿库（创建商品保存草稿写入的本地库）生成 Brief 可选商品。
- * @param keyword 可选；为空则返回全部草稿（最多 limit 条）
+ * 草稿箱**不按**「线上搜索关键词」过滤，避免与商品列表不一致；关键词仅用于向导内抖音线上查询。
  */
-export function loadProductEditLibraryDraftBriefPicks(keyword?: string, limit = 48): { id: string; name: string; priceYuan: number }[] {
-  const kw = keyword?.trim().toLowerCase() ?? ''
-  const rows = loadProductEditLibrary().filter((r) => {
-    if (!isDraftBoxStatus(r.status)) return false
-    if (!kw) return true
-    return r.name.toLowerCase().includes(kw) || r.store.toLowerCase().includes(kw) || r.platform.toLowerCase().includes(kw)
-  })
+export function loadProductEditLibraryDraftBriefPicks(limit = 48): {
+  id: string
+  name: string
+  priceYuan: number
+  source: 'erp_draftbox'
+}[] {
+  const rows = loadProductEditLibrary().filter((r) => isDraftBoxStatus(r.status))
   return rows.slice(0, limit).map((r) => ({
     id: `erp-draft:${r.id}`,
-    name: `${r.name}（ERP草稿）`,
+    name: r.name,
     priceYuan: Math.max(0, Math.round(Number(r.price) || 0)),
+    source: 'erp_draftbox' as const,
   }))
 }
 
