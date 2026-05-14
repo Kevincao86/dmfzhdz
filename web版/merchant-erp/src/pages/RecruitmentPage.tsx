@@ -11,10 +11,10 @@ import {
   Target,
   Trash2,
   UserCheck,
-  Users,
   Video,
 } from 'lucide-react'
 import MeooPayQrModal from '../components/MeooPayQrModal'
+import { MeooAgentMascot } from '../components/MeooAgentMascot'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import RecruitmentBriefWizard from '../components/recruitment/RecruitmentBriefWizard'
 import { cn } from '../cn'
@@ -29,8 +29,9 @@ import {
 } from '../lib/kolBriefStorage'
 import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaErrorHint'
 import { loadRecruitmentIndustryL1Labels } from '../lib/recruitmentIndustryOptions'
+import { buildRecruitmentProgressSteps, recruitmentOrderStatusLabel } from '../lib/recruitmentOrderProgress'
 import { readMerchantSession } from '../lib/merchantSession'
-import { appendRecruitmentOrderToOps } from '../lib/opsRegistryClient'
+import { appendRecruitmentOrderToOps, fetchOpsRegistry } from '../lib/opsRegistryClient'
 import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../lib/tenantBilling'
@@ -1032,6 +1033,52 @@ export default function RecruitmentPage() {
   const [briefIndustryOptions, setBriefIndustryOptions] = useState<string[]>(['餐饮'])
   const [briefDetail, setBriefDetail] = useState<KolBriefRecord | null>(null)
   const [briefDetailVariant, setBriefDetailVariant] = useState<0 | 1 | 2>(0)
+  const [hubOrder, setHubOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [hubOrderLoading, setHubOrderLoading] = useState(false)
+  const [hubOrderErr, setHubOrderErr] = useState<string | null>(null)
+  const [hubOrderFetchNonce, setHubOrderFetchNonce] = useState(0)
+
+  const refreshHubOrder = useCallback(() => setHubOrderFetchNonce((n) => n + 1), [])
+
+  useEffect(() => {
+    if (screen !== 'hub') return
+    let cancelled = false
+    setHubOrderLoading(true)
+    setHubOrderErr(null)
+    void (async () => {
+      try {
+        let lastId = ''
+        try {
+          lastId = window.localStorage.getItem('meoo_last_recruitment_order_id')?.trim() ?? ''
+        } catch {
+          lastId = ''
+        }
+        if (!lastId) {
+          if (!cancelled) {
+            setHubOrder(null)
+            setHubOrderLoading(false)
+          }
+          return
+        }
+        const reg = await fetchOpsRegistry()
+        if (cancelled) return
+        const orders = reg.recruitmentOrders ?? []
+        const found = orders.find((o) => o.id === lastId) ?? null
+        setHubOrder(found)
+        setHubOrderLoading(false)
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : String(e)
+          setHubOrderErr(msg.length > 220 ? `${msg.slice(0, 220)}…` : msg)
+          setHubOrder(null)
+          setHubOrderLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [screen, hubOrderFetchNonce])
 
   useEffect(() => {
     let on = true
@@ -1051,6 +1098,22 @@ export default function RecruitmentPage() {
     void briefTick
     return readKolBriefRecords()
   }, [briefTick])
+
+  const hubStoredOrderId = useMemo(() => {
+    if (screen !== 'hub') return ''
+    try {
+      return window.localStorage.getItem('meoo_last_recruitment_order_id')?.trim() ?? ''
+    } catch {
+      return ''
+    }
+  }, [screen, hubOrderFetchNonce])
+
+  const hubMascotInputDraft = useMemo(() => {
+    const bits: string[] = []
+    if (briefOpen) bits.push('brief')
+    if (briefDetail) bits.push('detail')
+    return bits.join(' ')
+  }, [briefDetail, briefOpen])
 
   if (screen === 'createPick')
     return (
@@ -1273,18 +1336,91 @@ export default function RecruitmentPage() {
           transition={{ delay: 0.6 }}
           className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
         >
-          <div className="mb-3 flex items-center justify-between">
-            <h4 className="font-semibold text-gray-900">历史合作沉淀</h4>
-            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">数据资产</span>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="font-semibold text-gray-900">查看订单</h4>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">招募进度</span>
+              <button
+                type="button"
+                onClick={() => refreshHubOrder()}
+                disabled={hubOrderLoading}
+                className="inline-flex items-center rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('mr-1 h-3.5 w-3.5', hubOrderLoading && 'animate-spin')} />
+                刷新
+              </button>
+            </div>
           </div>
-          <p className="mb-4 text-sm text-gray-500">查看历史合作达人档案与沉淀数据。</p>
-          <button
-            type="button"
-            className="flex w-full items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
-          >
-            <Users className="mr-2 h-4 w-4" />
-            查看合作历史
-          </button>
+          <p className="mb-4 text-sm text-gray-500">
+            展示本机最近一次提交的招募订单在运营侧的状态，并与主流程环节对齐（数据来自运营注册表同步，可点刷新更新）。
+          </p>
+          {hubOrderLoading ? (
+            <p className="text-sm text-gray-500">正在加载订单…</p>
+          ) : hubOrderErr ? (
+            <div className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2 text-sm text-red-700">
+              <p>{hubOrderErr}</p>
+              <button type="button" className="mt-2 text-xs font-medium text-red-800 underline" onClick={() => refreshHubOrder()}>
+                重试
+              </button>
+            </div>
+          ) : !hubStoredOrderId ? (
+            <p className="text-sm text-gray-500">
+              提交招募需求后，将在此显示订单号与各环节进度。请先通过「发布招募需求」完成一次新手版或专业版提单。
+            </p>
+          ) : !hubOrder ? (
+            <p className="text-sm text-amber-800">
+              已记录本机最近订单号，但在运营注册表中未找到对应条目（可能尚未同步或订单已清理）。可稍后点击「刷新」重试。
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 pb-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">订单号</p>
+                  <p className="mt-0.5 truncate font-mono text-sm font-semibold text-gray-900">{hubOrder.id}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800">
+                  {recruitmentOrderStatusLabel(hubOrder.status)}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-gray-500">招募预算</p>
+                  <p className="font-medium text-gray-900">¥{Number(hubOrder.serviceAmount).toLocaleString('zh-CN')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">达人佣金</p>
+                  <p className="font-medium text-gray-900">{hubOrder.commissionPct}%</p>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <p className="text-xs text-gray-500">预估结算净值</p>
+                  <p className="font-medium text-gray-900">¥{Number(hubOrder.netAmount).toLocaleString('zh-CN')}</p>
+                </div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-600">环节进度</p>
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {buildRecruitmentProgressSteps(hubOrder.status).map((step, idx) => (
+                    <div
+                      key={`${step.title}-${idx}`}
+                      className={cn(
+                        'min-w-[5.5rem] flex-1 rounded-lg border px-2 py-2 text-center',
+                        step.done && 'border-emerald-200 bg-emerald-50/80',
+                        step.current && !step.done && 'border-blue-400 bg-blue-50 ring-1 ring-blue-200',
+                        !step.done && !step.current && 'border-gray-100 bg-gray-50/80',
+                      )}
+                    >
+                      <p className="text-[10px] font-medium text-gray-500">第 {idx + 1} 步</p>
+                      <p className="mt-0.5 text-xs font-semibold leading-tight text-gray-900">{step.title}</p>
+                      <p className="mt-1 line-clamp-2 text-[10px] text-gray-500">{step.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="mt-6 flex justify-end border-t border-gray-100 pt-3">
+            <MeooAgentMascot aiSending={hubOrderLoading} inputDraft={hubMascotInputDraft} className="opacity-95" />
+          </div>
         </motion.div>
       </div>
 

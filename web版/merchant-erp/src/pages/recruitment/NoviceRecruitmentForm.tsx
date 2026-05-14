@@ -1,9 +1,11 @@
 import { ChevronLeft, RefreshCw, Sparkles } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MeooPayQrModal from '../../components/MeooPayQrModal'
+import { MeooAgentMascot } from '../../components/MeooAgentMascot'
 import { cn } from '../../cn'
 import { buildErpRegistryTenant } from '../../lib/buildErpRegistryTenant'
 import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../../lib/dbSchemaErrorHint'
+import { formatCityTierBandsLines, resolveCityKolTierBands } from '../../lib/recruitmentCityTierPricing'
 import { loadRecruitmentIndustryL1Labels } from '../../lib/recruitmentIndustryOptions'
 import { appendRecruitmentOrderToOps } from '../../lib/opsRegistryClient'
 import type { RegistryRecruitmentOrder } from '../../lib/opsRegistryTypes'
@@ -22,6 +24,18 @@ function formatBudgetYuanForPrefill(yuan: number): string {
   return String(cents / 100)
 }
 
+function filterKolCommissionInputDigits(raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, 3)
+}
+
+function parseKolCommissionPctFromDraft(draft: string): number {
+  const d = draft.replace(/\D/g, '')
+  if (!d) return 0
+  const n = parseInt(d, 10)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(80, n))
+}
+
 type Props = {
   onBack: () => void
 }
@@ -37,6 +51,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [visitStart, setVisitStart] = useState('')
   const [visitEnd, setVisitEnd] = useState('')
   const [strategy, setStrategy] = useState<KolTierStrategy>('more_v4')
+  const [kolCommissionInput, setKolCommissionInput] = useState('15')
 
   const [allocation, setAllocation] = useState<NoviceAllocation | null>(null)
   const [allocationFresh, setAllocationFresh] = useState(false)
@@ -64,7 +79,19 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
 
   useEffect(() => {
     setAllocationFresh(false)
-  }, [city, industry, packageNote, budget, strategy, recruitStart, recruitEnd, visitStart, visitEnd])
+  }, [city, industry, packageNote, budget, strategy, recruitStart, recruitEnd, visitStart, visitEnd, kolCommissionInput])
+
+  const cityTierBands = useMemo(() => (city.trim() ? resolveCityKolTierBands(city) : null), [city])
+  const tierBandLines = useMemo(() => (cityTierBands ? formatCityTierBandsLines(cityTierBands) : []), [cityTierBands])
+
+  const mascotInputDraft = useMemo(
+    () =>
+      [city, packageNote, budget ? String(budget) : '', kolCommissionInput, recruitStart, recruitEnd, visitStart, visitEnd]
+        .map((s) => String(s).trim())
+        .filter(Boolean)
+        .join(' '),
+    [budget, city, kolCommissionInput, packageNote, recruitEnd, recruitStart, visitEnd, visitStart],
+  )
 
   const runAllocation = useCallback(async () => {
     setAiErr(null)
@@ -84,6 +111,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
         packageNote,
         budgetYuan: budget,
         strategy,
+        kolCommissionPct: parseKolCommissionPctFromDraft(kolCommissionInput),
       })
       setAllocation(res)
       setAllocationFresh(true)
@@ -92,7 +120,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     } finally {
       setAiLoading(false)
     }
-  }, [budget, city, industry, packageNote, strategy])
+  }, [budget, city, industry, kolCommissionInput, packageNote, strategy])
 
   const submit = async () => {
     setPushErr(null)
@@ -140,12 +168,14 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       skipRecruitmentWalletCheckRef.current = false
     }
 
+    const kolPct = parseKolCommissionPctFromDraft(kolCommissionInput)
     const tenant = buildErpRegistryTenant()
     const customerName = tenant?.merchantName ?? '店魔方 ERP 商户'
     const storeName = city.trim()
     const storeAddress = `${city.trim()} · ${industry}`
     const id = `RO-NV${Date.now()}`
     const tierLine = `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5以上:${allocation.v5plus}`
+    const tierPriceRef = cityTierBands ? formatCityTierBandsLines(cityTierBands).join('；') : ''
     const order: RegistryRecruitmentOrder = {
       id,
       customerName,
@@ -158,11 +188,11 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       status: 'pending',
       serviceAmount: budget,
-      commissionPct: 15,
-      netAmount: Math.round(Math.max(0, budget) * 0.85),
+      commissionPct: kolPct,
+      netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】城市:${city.trim()}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；策略:${kolTierStrategyLabel(strategy)}；档位:${tierLine}；来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】城市:${city.trim()}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；达人佣金:${kolPct}%；同城档位参考:${tierPriceRef || '—'}；招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；策略:${kolTierStrategyLabel(strategy)}；档位:${tierLine}；来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     setSubmitting(true)
@@ -223,7 +253,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">新手版 · AI 纯智能处理</h1>
             <p className="mt-1 text-sm text-gray-500">
-              仅需填写城市、行业、套餐说明、总预算与时间段；AI 结合同城达人撮合成本习惯，给出 V3–V5+ 档位人数建议（支持三种偏好策略）。
+              仅需填写城市、行业、套餐说明、总预算、达人佣金与时间段；AI 结合同城达人撮合成本习惯，给出 V3–V5+ 档位人数建议（支持三种偏好策略）。
             </p>
           </div>
         </div>
@@ -239,6 +269,16 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               placeholder="例如：成都"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
+            {tierBandLines.length ? (
+              <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-xs text-indigo-900">
+                <p className="mb-1 font-medium text-indigo-950">同城达人档位参考成本（元/人次，估算）</p>
+                <ul className="list-inside list-disc space-y-0.5 text-indigo-900/90">
+                  {tierBandLines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           <div>
@@ -280,6 +320,21 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               placeholder="¥"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              达人佣金（%） <span className="text-red-500">*</span>
+            </label>
+            <input
+              inputMode="numeric"
+              value={kolCommissionInput}
+              onChange={(e) => setKolCommissionInput(filterKolCommissionInputDigits(e.target.value))}
+              onBlur={() => setKolCommissionInput(String(parseKolCommissionPctFromDraft(kolCommissionInput)))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="例如：15"
+            />
+            <p className="mt-1 text-xs text-gray-500">当前有效：{parseKolCommissionPctFromDraft(kolCommissionInput)}%（0～80，整数）</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -356,19 +411,22 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
-            <button
-              type="button"
-              disabled={aiLoading}
-              onClick={() => void runAllocation()}
-              className="inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-105 disabled:opacity-50"
-            >
-              {aiLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              AI 智能分配达人档位
-            </button>
-            {!allocationFresh && allocation ? (
-              <span className="text-xs text-amber-600">表单已变更，请重新分配</span>
-            ) : null}
+          <div className="flex flex-wrap items-start justify-between gap-4 border-t border-gray-100 pt-4">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={aiLoading}
+                onClick={() => void runAllocation()}
+                className="inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-105 disabled:opacity-50"
+              >
+                {aiLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                AI 智能分配达人档位
+              </button>
+              {!allocationFresh && allocation ? (
+                <span className="text-xs text-amber-600">表单已变更，请重新分配</span>
+              ) : null}
+            </div>
+            <MeooAgentMascot aiSending={aiLoading} inputDraft={mascotInputDraft} className="shrink-0 opacity-95" />
           </div>
 
           {aiErr ? <p className="text-sm text-red-600">{aiErr}</p> : null}
@@ -394,16 +452,21 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {(
                   [
-                    ['V3', allocation.v3],
-                    ['V4', allocation.v4],
-                    ['V5', allocation.v5],
-                    ['V5以上', allocation.v5plus],
+                    ['V3', allocation.v3, cityTierBands?.v3],
+                    ['V4', allocation.v4, cityTierBands?.v4],
+                    ['V5', allocation.v5, cityTierBands?.v5],
+                    ['V5以上', allocation.v5plus, cityTierBands?.v5plus],
                   ] as const
-                ).map(([label, n]) => (
+                ).map(([label, n, band]) => (
                   <div key={label} className="rounded-lg bg-white/80 px-3 py-2 text-center shadow-sm ring-1 ring-black/5">
                     <p className="text-sm font-semibold tracking-wide text-gray-800">{label}</p>
                     <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{n}</p>
                     <p className="text-[10px] text-gray-500">人</p>
+                    {band ? (
+                      <p className="mt-1 text-[10px] leading-tight text-gray-500">
+                        参考 {band.max == null ? `${band.min}+` : `${band.min}–${band.max}`} 元/人次
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>
