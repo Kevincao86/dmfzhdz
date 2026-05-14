@@ -139,6 +139,37 @@ function resolveComboItemPriceCents(it: ComboItemRow): string {
   return ''
 }
 
+function imageUrlCannotPublishToDouyin(u: string): boolean {
+  const s = u.trim()
+  if (!s) return false
+  if (/^https?:\/\//i.test(s)) return false
+  return /^data:image\//i.test(s) || /^blob:/i.test(s) || s.length > 2000
+}
+
+/** 提交前拦截：本机预览图或模板里粘贴的 data URL 会导致 goods/save 体积极大、超时 */
+function collectUnpublishableImageProblems(detail: DouyinProductDetailPayload): string | null {
+  const urls = [...detail.head_image_urls, ...detail.aux_image_urls, ...detail.env_image_urls]
+  for (let i = 0; i < urls.length; i++) {
+    if (imageUrlCannotPublishToDouyin(urls[i]!)) {
+      return `第 ${i + 1} 张商品图仍为浏览器本机预览（data:/blob: 或非 http 地址），无法提交抖音。请先使用「图片上传」或素材接口得到以 https:// 开头的公网 URL 后再保存/提交。`
+    }
+  }
+  const scan = (m: Record<string, string> | undefined, label: string) => {
+    if (!m) return null as string | null
+    for (const [k, v] of Object.entries(m)) {
+      if (!v.trim()) continue
+      if (/data:image\//i.test(v) || /^blob:/i.test(v)) {
+        return `${label}（key: ${k}）含有本机预览图整段数据，请删除或改为 https 图片 JSON/URL，否则会触发保存超时。`
+      }
+    }
+    return null
+  }
+  return (
+    scan(detail.template_attr_overrides, '开放平台类目必填') ||
+    scan(detail.template_sku_attr_overrides, '开放平台 SKU 模板')
+  )
+}
+
 function looksComboTemplateAttr(a: TemplateAttr): boolean {
   const key = (a.key ?? '').trim().toLowerCase()
   const name = (a.name ?? '').toLowerCase()
@@ -1667,6 +1698,12 @@ export default function DouyinProductCreateWizard({
     }
     if (Object.keys(skuCleaned).length > 0) {
       detail.template_sku_attr_overrides = skuCleaned
+    }
+
+    const imageBlock = collectUnpublishableImageProblems(detail)
+    if (imageBlock) {
+      setActionMsg({ text: imageBlock, ok: false })
+      return
     }
 
     const names = selectedPoiIds
