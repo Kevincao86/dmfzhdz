@@ -1,7 +1,6 @@
 import { ChevronLeft, RefreshCw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MeooPayQrModal from '../../components/MeooPayQrModal'
-import { MeooAgentMascot } from '../../components/MeooAgentMascot'
 import { cn } from '../../cn'
 import { buildErpRegistryTenant } from '../../lib/buildErpRegistryTenant'
 import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../../lib/dbSchemaErrorHint'
@@ -83,15 +82,6 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
 
   const cityTierBands = useMemo(() => (city.trim() ? resolveCityKolTierBands(city) : null), [city])
   const tierBandLines = useMemo(() => (cityTierBands ? formatCityTierBandsLines(cityTierBands) : []), [cityTierBands])
-
-  const mascotInputDraft = useMemo(
-    () =>
-      [city, packageNote, budget ? String(budget) : '', kolCommissionInput, recruitStart, recruitEnd, visitStart, visitEnd]
-        .map((s) => String(s).trim())
-        .filter(Boolean)
-        .join(' '),
-    [budget, city, kolCommissionInput, packageNote, recruitEnd, recruitStart, visitEnd, visitStart],
-  )
 
   const runAllocation = useCallback(async () => {
     setAiErr(null)
@@ -411,22 +401,19 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-start justify-between gap-4 border-t border-gray-100 pt-4">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={aiLoading}
-                onClick={() => void runAllocation()}
-                className="inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-105 disabled:opacity-50"
-              >
-                {aiLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                AI 智能分配达人档位
-              </button>
-              {!allocationFresh && allocation ? (
-                <span className="text-xs text-amber-600">表单已变更，请重新分配</span>
-              ) : null}
-            </div>
-            <MeooAgentMascot aiSending={aiLoading} inputDraft={mascotInputDraft} className="shrink-0 opacity-95" />
+          <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
+            <button
+              type="button"
+              disabled={aiLoading}
+              onClick={() => void runAllocation()}
+              className="inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-105 disabled:opacity-50"
+            >
+              {aiLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              AI 智能分配达人档位
+            </button>
+            {!allocationFresh && allocation ? (
+              <span className="text-xs text-amber-600">表单已变更，请重新分配</span>
+            ) : null}
           </div>
 
           {aiErr ? <p className="text-sm text-red-600">{aiErr}</p> : null}
