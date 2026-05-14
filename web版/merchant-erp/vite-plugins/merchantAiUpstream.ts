@@ -231,6 +231,110 @@ async function runImageGenerateWithBuiltinFailover(
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
+/** 智能体自由文生图：与商品生图共用 wanx / Seedream / MiniMax 与 MERCHANT_AI_GOODS_IMAGE_FAILOVER 顺序 */
+function buildAgentFreeformImagePrompt(userRequest: string): string {
+  const core = userRequest.trim().replace(/\s+/g, ' ').slice(0, 900)
+  if (!core) return '生成一张简洁明快、构图均衡的本地生活场景示意图，光线自然、画质清晰。'
+  return `根据下列中文描述生成一张高质量图片：画面清晰、光线自然、构图均衡，适合用作宣传配图或示意图。须紧扣描述主体；避免违规内容、乱码水印、明显畸形肢体与低分辨率。用户描述：「${core}」。`
+}
+
+async function runAgentT2iSingleVendor(
+  model: string,
+  key: string,
+  env: MerchantAiEnv,
+  prompt: string,
+): Promise<string[]> {
+  const primaryNorm = normalizeAiModelPreserveCustom(model)
+  if (primaryNorm === 'qwen') {
+    const u = await qwenWanxOneImage(key, env, prompt)
+    return [u]
+  }
+  if (primaryNorm === 'minimax') {
+    const mmModel = minimaxImageModelId(env)
+    return minimaxImageUrls(key, {
+      model: mmModel,
+      prompt,
+      aspect_ratio: '1:1',
+      response_format: 'url',
+      n: 1,
+      prompt_optimizer: true,
+    })
+  }
+  if (primaryNorm === 'doubao') {
+    const imgModel = doubaoImageModelId(env)
+    return doubaoSeedreamUrls(env, key, {
+      model: imgModel,
+      prompt,
+      size: '2K',
+      response_format: 'url',
+    })
+  }
+  throw new Error(`不支持的智能体生图 model：${primaryNorm}`)
+}
+
+async function runAgentImageGenerateWithBuiltinFailover(
+  primary: string,
+  env: MerchantAiEnv,
+  keyFirst: string,
+  prompt: string,
+): Promise<{ urls: string[]; modelUsed: string }> {
+  const primaryNorm = normalizeAiModelPreserveCustom(primary)
+  let lastErr: unknown = null
+  try {
+    const urls = await runAgentT2iSingleVendor(primaryNorm, keyFirst, env, prompt)
+    return { urls, modelUsed: primaryNorm }
+  } catch (e) {
+    lastErr = e
+    if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+  }
+  for (const alt of builtinImageFailoverOthers(primaryNorm, env)) {
+    const { key } = pickKey(env, alt)
+    if (!key) continue
+    try {
+      const urls = await runAgentT2iSingleVendor(alt, key, env, prompt)
+      return { urls, modelUsed: alt }
+    } catch (e) {
+      lastErr = e
+      if (!isVendorHopableError(e)) throw e
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+}
+
+/**
+ * 智能体「文生图」：走服务端真实像素出图（与商品 AI 相同 Key 与厂商轮询），非 chat/completions。
+ * @returns vendorUsed 为 qwen | doubao | minimax，供前端同步模型下拉展示。
+ */
+export async function runAgentFreeformTextToImage(
+  env: MerchantAiEnv,
+  userLine: string,
+): Promise<
+  | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
+  | { ok: false; message: string }
+> {
+  const prompt = buildAgentFreeformImagePrompt(userLine)
+  const order = imageVendorOrder(env)
+  const primary = pickPrimaryVendorWithKey(env, order)
+  const { key, label } = pickKey(env, primary)
+  if (!key) {
+    return {
+      ok: false,
+      message: `未配置任一文生图服务 API Key。请在服务端环境变量中至少配置 MERCHANT_AI_QWEN_KEY（或 DASHSCOPE_API_KEY）、MERCHANT_AI_DOUBAO_KEY（或 ARK_API_KEY）或 MERCHANT_AI_MINIMAX_KEY（或 MINIMAX_API_KEY）之一；多厂商轮询顺序见 MERCHANT_AI_GOODS_IMAGE_FAILOVER。当前首选厂商缺少凭据：${label}。`,
+    }
+  }
+  try {
+    const { urls, modelUsed } = await runAgentImageGenerateWithBuiltinFailover(primary, env, key, prompt)
+    const u = urls[0]?.trim()
+    if (!u) return { ok: false, message: '生图完成但未拿到有效图片地址，请稍后重试。' }
+    if (modelUsed !== 'qwen' && modelUsed !== 'doubao' && modelUsed !== 'minimax') {
+      return { ok: false, message: `内部错误：未知生图厂商 ${modelUsed}` }
+    }
+    return { ok: true, imageUrl: u, vendorUsed: modelUsed }
+  } catch (e) {
+    return { ok: false, message: formatAssistUpstreamCatchMessage(e, primary) }
+  }
+}
+
 async function runImageEnhanceWithBuiltinFailover(
   primary: string,
   env: MerchantAiEnv,

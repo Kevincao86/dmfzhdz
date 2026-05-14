@@ -93,3 +93,67 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
   }
   throw new Error(lastErr || 'ai_chat_unavailable')
 }
+
+export type AiAgentNativeImageOk = {
+  ok: true
+  imageUrl: string
+  vendorUsed: 'qwen' | 'doubao' | 'minimax'
+}
+
+export type AiAgentNativeImageErr = { ok: false; message: string }
+
+/**
+ * 智能体文生图：POST /api/meoo-ai-agent-image（服务端通义万相 / 豆包 Seedream / MiniMax，与商品 AI 共用环境变量）。
+ */
+export async function postAiAgentNativeImage(prompt: string): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
+  const token = await bearer()
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const tryPaths = ['/api/meoo-ai-agent-image']
+  let lastErr = 'no_response'
+  for (const p of tryPaths) {
+    const targets = aiChatFetchUrlCandidates(p)
+    for (const target of targets) {
+      const res = await fetch(target, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prompt }),
+      })
+      const text = await res.text()
+      let json: unknown = null
+      try {
+        json = text ? JSON.parse(text) : null
+      } catch {
+        json = null
+      }
+      if (res.ok && json && typeof json === 'object' && (json as { ok?: boolean }).ok === true) {
+        const b = json as { imageUrl?: unknown; vendorUsed?: unknown }
+        const imageUrl = typeof b.imageUrl === 'string' ? b.imageUrl.trim() : ''
+        const vu = typeof b.vendorUsed === 'string' ? b.vendorUsed.trim() : ''
+        if (
+          imageUrl &&
+          (vu === 'qwen' || vu === 'doubao' || vu === 'minimax')
+        ) {
+          return { ok: true, imageUrl, vendorUsed: vu }
+        }
+        return { ok: false, message: '生图接口返回格式异常' }
+      }
+      if (res.status !== 404) {
+        if (json && typeof json === 'object') {
+          const o = json as { ok?: boolean; error?: unknown; detail?: string }
+          const code = typeof o.error === 'string' ? o.error.trim() : ''
+          const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
+          const parts = [code, detail].filter(Boolean)
+          if (parts.length) return { ok: false, message: parts.join(' — ') }
+        }
+        return { ok: false, message: text?.trim() || `HTTP ${res.status}` }
+      }
+      lastErr = text.slice(0, 200)
+    }
+  }
+  return { ok: false, message: lastErr || 'ai_agent_image_unavailable' }
+}
