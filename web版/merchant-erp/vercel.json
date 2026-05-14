@@ -94,6 +94,10 @@
       "includeFiles": "{vite-plugins,src/lib,src/services/ai}/**",
       "maxDuration": 120
     },
+    "api/meoo-ai-agent-image.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 300
+    },
     "api/**/*.ts": {
       "maxDuration": 60
     }

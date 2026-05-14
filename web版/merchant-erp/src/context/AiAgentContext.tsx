@@ -20,9 +20,13 @@ import type {
 } from '../lib/aiAgentTypes'
 import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
-import { resolveModelPickerKeyForImageIntent } from '../services/ai/aiImageIntentRouting'
+import {
+  detectImageGenerationIntent,
+  modelPickerKeyForNativeImageVendor,
+  resolveModelPickerKeyForImageIntent,
+} from '../services/ai/aiImageIntentRouting'
 import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
-import { postAiChat } from '../services/ai/aiClient'
+import { postAiAgentNativeImage, postAiChat } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
 
 const PREFS_KEY = 'meoo_ai_model_picker_key'
@@ -414,14 +418,50 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       setInputDraft('')
       queueMicrotask(() => {
-        void runGatewayForSnapshot(
-          messagesRef.current,
-          line,
-          inferTaskType(line),
-          pageContext?.pageLabel,
-          imgs,
-          nextPickerKey,
-        )
+        void (async () => {
+          const tryNativePixel =
+            detectImageGenerationIntent(line) && imgs.length === 0
+          if (tryNativePixel) {
+            setAiSending(true)
+            try {
+              const imgRes = await postAiAgentNativeImage(line)
+              if (imgRes.ok) {
+                const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
+                if (vk) {
+                  setModelPickerKeyState(vk)
+                  savePickerKey(vk)
+                }
+                const vendorZh =
+                  imgRes.vendorUsed === 'qwen'
+                    ? '通义万相'
+                    : imgRes.vendorUsed === 'doubao'
+                      ? '豆包 Seedream'
+                      : 'MiniMax'
+                const assistantMsg = createAgentMessage(
+                  'assistant',
+                  `已使用 **${vendorZh}** 服务端文生图通道生成图片（与商品 AI 共用 DashScope / 火山方舟 / MiniMax 配置）。\n\n![生成图](${imgRes.imageUrl})\n\n如需改风格、主体或构图，请直接说明。`,
+                )
+                setMessages((prev) => {
+                  const next = [...prev, assistantMsg]
+                  messagesRef.current = next
+                  return next
+                })
+                scheduleKeywordPreview(trimmed, pageContext?.pageLabel)
+                return
+              }
+            } finally {
+              setAiSending(false)
+            }
+          }
+          await runGatewayForSnapshot(
+            messagesRef.current,
+            line,
+            inferTaskType(line),
+            pageContext?.pageLabel,
+            imgs,
+            nextPickerKey,
+          )
+        })()
       })
     },
     [
@@ -430,6 +470,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       pendingPreviewId,
       pageContext?.pageLabel,
       runGatewayForSnapshot,
+      scheduleKeywordPreview,
       modelPickerKey,
       modelPickerOptions,
     ],
@@ -526,10 +567,44 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
       queueMicrotask(() => {
-        void runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl, [], nextPickerKey)
+        void (async () => {
+          if (detectImageGenerationIntent(q)) {
+            setAiSending(true)
+            try {
+              const imgRes = await postAiAgentNativeImage(q)
+              if (imgRes.ok) {
+                const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
+                if (vk) {
+                  setModelPickerKeyState(vk)
+                  savePickerKey(vk)
+                }
+                const vendorZh =
+                  imgRes.vendorUsed === 'qwen'
+                    ? '通义万相'
+                    : imgRes.vendorUsed === 'doubao'
+                      ? '豆包 Seedream'
+                      : 'MiniMax'
+                const assistantMsg = createAgentMessage(
+                  'assistant',
+                  `已使用 **${vendorZh}** 服务端文生图通道生成图片。\n\n![生成图](${imgRes.imageUrl})\n\n如需调整，请继续说明。`,
+                )
+                setMessages((prev) => {
+                  const next = [...prev, assistantMsg]
+                  messagesRef.current = next
+                  return next
+                })
+                scheduleKeywordPreview(q, pl)
+                return
+              }
+            } finally {
+              setAiSending(false)
+            }
+          }
+          await runGatewayForSnapshot(messagesRef.current, q, inferTaskType(q), pl, [], nextPickerKey)
+        })()
       })
     },
-    [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions],
+    [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions, scheduleKeywordPreview],
   )
 
   const value = useMemo<AiAgentContextValue>(

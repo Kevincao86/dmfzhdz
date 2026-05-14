@@ -52,6 +52,65 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       return
     }
 
+    if (loc.pathname === '/api/meoo-ai-agent-image') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const auth = req.headers['authorization']
+        const { runAgentFreeformTextToImage } = await import('./merchantAiUpstream.js')
+        const parsed = JSON.parse(bodyRaw || '{}') as { prompt?: string }
+        const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
+        if (!prompt) {
+          res.statusCode = 400
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.end(JSON.stringify({ ok: false, error: 'prompt_required' }))
+          return
+        }
+        const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
+        const user = await verifyBearerJwt(typeof auth === 'string' ? auth : undefined, env)
+        if (!user) {
+          res.statusCode = 401
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
+          return
+        }
+        const out = await runAgentFreeformTextToImage(env, prompt)
+        res.statusCode = out.ok ? 200 : 502
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(
+          JSON.stringify(
+            out.ok
+              ? { ok: true, imageUrl: out.imageUrl, vendorUsed: out.vendorUsed }
+              : { ok: false, error: 'image_generation_failed', detail: out.message },
+          ),
+        )
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify({ ok: false, error: 'meoo_ai_agent_image_failed', detail: msg.slice(0, 800) }))
+      }
+      return
+    }
+
     if (loc.pathname === '/api/meoo-ai-chat') {
       const method = req.method ?? 'GET'
       if (method === 'OPTIONS') {
