@@ -1768,6 +1768,10 @@ function mergeGoodlifeProductAttrMapFromErp(
       /^combo_rule$/i.test(key) ||
       /套餐规则|搭配规则|组合规则/.test(name)
     ) {
+      if (omitCombo && pkgJson && attrTemplateLooksComboLike(key, name, vt)) {
+        /* 团购：套餐 JSON 仅走顶层 product.combo_rule，不写入 combo 类 attr */
+        continue
+      }
       if (pkgJson) {
         out[key] = pkgJson
         continue
@@ -2017,7 +2021,8 @@ async function buildGoodlifeProductSaveBody(
       : erp
 
   const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map, {
-    omitComboTemplateAttrs: true,
+    /** 仅团购：套餐 JSON 只进顶层 product.combo_rule，不从 attr 回填 combo 类槽位 */
+    omitComboTemplateAttrs: isGroupBuy,
   })
 
   const tplOverrides = erp.template_attr_overrides
@@ -2025,37 +2030,31 @@ async function buildGoodlifeProductSaveBody(
     for (const [k, val] of Object.entries(tplOverrides as Record<string, unknown>)) {
       const key = String(k).trim()
       if (!key) continue
+      if (isGroupBuy) {
+        if (/^combo_rule$/i.test(key)) continue
+        const a = attrs.find((x) => String((x as Record<string, unknown>).key ?? '').trim() === key)
+        if (a && typeof a === 'object') {
+          const ar = a as Record<string, unknown>
+          const name = String(ar.name ?? '')
+          const vt = String(ar.value_type ?? '').toUpperCase()
+          if (attrTemplateLooksComboLike(key, name, vt)) continue
+        }
+      }
       const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
       if (s) mergedProductAttrs[key] = s.slice(0, 120_000)
     }
   }
 
-  const comboJsonMandatory =
-    isGroupBuy && comboRule
-      ? JSON.stringify({ groups: (comboRule as { groups: unknown[] }).groups }).slice(0, 120_000)
-      : ''
-
-  let comboAttrWrites = 0
-  if (comboJsonMandatory) {
+  /** 团购：combo_rule 仅顶层 product.combo_rule，不从 template 覆盖或 attr 携带套餐 JSON */
+  if (isGroupBuy) {
     for (const a of attrs) {
-      const key = String(a.key ?? '').trim()
+      const key = String((a as Record<string, unknown>).key ?? '').trim()
       if (!key) continue
-      const name = String(a.name ?? '')
-      const vt = String(a.value_type ?? '').toUpperCase()
-      if (!attrTemplateLooksComboLike(key, name, vt)) continue
-      if (
-        vt === 'STRUCT' ||
-        vt === 'OBJECT' ||
-        vt === 'JSON' ||
-        vt === 'STRING' ||
-        vt === 'TEXT' ||
-        vt === 'ENUM' ||
-        !vt
-      ) {
-        mergedProductAttrs[key] = comboJsonMandatory
-        comboAttrWrites += 1
-      }
+      const name = String((a as Record<string, unknown>).name ?? '')
+      const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+      if (attrTemplateLooksComboLike(key, name, vt)) delete mergedProductAttrs[key]
     }
+    delete mergedProductAttrs.combo_rule
   }
 
   const nowMs = Date.now()
@@ -2075,16 +2074,8 @@ async function buildGoodlifeProductSaveBody(
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
 
-  if (isGroupBuy && comboRule && comboAttrWrites === 0) {
+  if (isGroupBuy && comboRule) {
     product.combo_rule = comboRule
-    for (const a of attrs) {
-      const key = String(a.key ?? '').trim()
-      if (!key) continue
-      const name = String(a.name ?? '')
-      const vt = String(a.value_type ?? '').toUpperCase()
-      if (attrTemplateLooksComboLike(key, name, vt)) delete mergedProductAttrs[key]
-    }
-    delete mergedProductAttrs.combo_rule
   }
 
   const extIn = erp.product_ext
@@ -2135,6 +2126,29 @@ async function buildGoodlifeProductSaveBody(
   }
 }
 
+function summarizeComboRuleForLog(combo: unknown): Record<string, unknown> {
+  if (!combo || typeof combo !== 'object' || Array.isArray(combo)) {
+    return { present: false }
+  }
+  const groups = (combo as { groups?: unknown }).groups
+  if (!Array.isArray(groups)) return { present: true, groups: 0, items: 0, pick_rules: [] as string[] }
+  const pickRules: string[] = []
+  let items = 0
+  for (const g of groups) {
+    if (!g || typeof g !== 'object') continue
+    const o = g as Record<string, unknown>
+    pickRules.push(String(o.pick_rule ?? '').slice(0, 48))
+    const arr = o.items
+    if (Array.isArray(arr)) items += arr.length
+  }
+  return {
+    present: true,
+    groups: groups.length,
+    items,
+    pick_rules: pickRules.slice(0, 10),
+  }
+}
+
 function summarizeDouyinProductSaveForLog(saveBody: Record<string, unknown>, mode: string): Record<string, unknown> {
   const product = saveBody.product as Record<string, unknown> | undefined
   const sku = saveBody.sku as Record<string, unknown> | undefined
@@ -2149,6 +2163,7 @@ function summarizeDouyinProductSaveForLog(saveBody: Record<string, unknown>, mod
     product_type: product?.product_type,
     category_id: product?.category_id,
     combo_in_product_body: Boolean(product?.combo_rule),
+    combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
     combo_like_attr_keys:
       ak == null ? [] : Object.keys(ak).filter((k) => /combo|套餐|搭配|组合|rule/i.test(k)),
     attr_key_count: ak ? Object.keys(ak).length : 0,
