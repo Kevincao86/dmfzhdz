@@ -23,32 +23,32 @@ export const TOKENMIX_FAMILY_CATALOG: readonly TokenMixFamilyDef[] = [
     models: [
       { id: 'gpt-4o', label: 'GPT-4o' },
       { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
-      { id: 'o3-mini', label: 'o3-mini' },
+      { id: 'o4-mini', label: 'o4-mini' },
     ],
   },
   {
     id: 'claude',
     label: 'Claude',
     models: [
-      { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-      { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku' },
-      { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+      { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
+      { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
+      { id: 'claude-opus-4.7', label: 'Claude Opus 4.7' },
     ],
   },
   {
     id: 'gemini',
     label: 'Gemini',
     models: [
-      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-      { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
     ],
   },
   {
     id: 'grok',
     label: 'Grok',
     models: [
-      { id: 'grok-3', label: 'Grok 3' },
-      { id: 'grok-2', label: 'Grok 2' },
+      { id: 'grok-4.1-fast-non-reasoning', label: 'Grok 4.1 Fast' },
+      { id: 'grok-4.1-fast-reasoning', label: 'Grok 4.1 Fast（推理）' },
     ],
   },
 ] as const
@@ -71,6 +71,18 @@ export function normalizeAiModelFamily(raw: unknown): AIModelFamily {
   return 'openai'
 }
 
+/** TokenMix 目录迭代后已下线的 id → 当前等价物（含本地持久化的旧 picker key） */
+const LEGACY_TOKENMIX_MODEL_ID: Readonly<Record<string, string>> = {
+  'o3-mini': 'o4-mini',
+  'claude-3-5-sonnet-20241022': 'claude-sonnet-4.6',
+  'claude-3-5-haiku-20241022': 'claude-haiku-4.5',
+  'claude-3-opus-20240229': 'claude-opus-4.7',
+  'gemini-2.0-flash': 'gemini-2.5-flash',
+  'gemini-1.5-pro': 'gemini-2.5-pro',
+  'grok-3': 'grok-4.1-fast-non-reasoning',
+  'grok-2': 'grok-4.1-fast-non-reasoning',
+}
+
 /**
  * 解析发给 TokenMix `chat/completions` 的最终 `model` id。
  */
@@ -79,9 +91,13 @@ export function resolveTokenMixModelId(
   env: Record<string, string>,
 ): string {
   const explicit = (parts.model ?? '').trim()
-  if (explicit) return explicit
   const fromEnv = (env.DEFAULT_AI_MODEL ?? '').trim()
-  if (fromEnv) return fromEnv
   const fam = parts.modelFamily ?? normalizeAiModelFamily(env.TOKENMIX_DEFAULT_FAMILY)
-  return defaultModelIdForFamily(fam)
+
+  let resolved: string
+  if (explicit) resolved = explicit
+  else if (fromEnv) resolved = fromEnv
+  else resolved = defaultModelIdForFamily(fam)
+
+  return LEGACY_TOKENMIX_MODEL_ID[resolved] ?? resolved
 }
