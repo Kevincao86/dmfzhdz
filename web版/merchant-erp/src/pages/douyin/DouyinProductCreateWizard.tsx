@@ -1182,6 +1182,15 @@ export default function DouyinProductCreateWizard({
     return desc ? `${name}。${desc}` : name
   }, [productName, productDesc])
 
+  /** 生图/修图：始终传 title_draft（名称+说明），网关与上游仅认此锚，避免缺字段时只靠短名称 */
+  const imageAssistGoodsText = useMemo(() => {
+    const product_name = productName.trim() || '商品'
+    return {
+      product_name,
+      title_draft: imageAssistTitleDraft.trim() || product_name,
+    }
+  }, [productName, imageAssistTitleDraft])
+
   const optimizeProductTitle = useCallback(async () => {
     const draft = productName.trim()
     if (!draft) {
@@ -1244,8 +1253,7 @@ export default function DouyinProductCreateWizard({
     try {
       const r = await postAssistWithKeys({
         action: 'image_generate',
-        product_name: n,
-        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        ...imageAssistGoodsText,
         image_role: 'head',
       })
       if (!r.ok) window.alert(r.message)
@@ -1253,7 +1261,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-head')
     }
-  }, [postAssistWithKeys, headUrl, productName, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssistWithKeys, headUrl, imageAssistGoodsText, beginAi, endAi])
 
   const aiEnhanceHeadImage = useCallback(async () => {
     const h = headUrl.trim()
@@ -1265,8 +1273,7 @@ export default function DouyinProductCreateWizard({
     try {
       const r = await postAssistWithKeys({
         action: 'image_enhance',
-        product_name: productName.trim() || '商品',
-        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        ...imageAssistGoodsText,
         image_urls: [h],
         image_role: 'head',
       })
@@ -1275,7 +1282,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-head')
     }
-  }, [postAssistWithKeys, headUrl, productName, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssistWithKeys, headUrl, imageAssistGoodsText, beginAi, endAi])
 
   const aiGenerateOneAuxImage = useCallback(async () => {
     if (auxUrlsList.length >= 4) return
@@ -1288,8 +1295,7 @@ export default function DouyinProductCreateWizard({
     try {
       const r = await postAssistWithKeys({
         action: 'image_generate',
-        product_name: n,
-        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        ...imageAssistGoodsText,
         image_role: 'aux',
       })
       if (!r.ok) window.alert(r.message)
@@ -1298,7 +1304,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-aux')
     }
-  }, [postAssistWithKeys, auxUrlsList.length, productName, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssistWithKeys, auxUrlsList.length, imageAssistGoodsText, beginAi, endAi])
 
   const aiEnhanceAuxOne = useCallback(
     async (index: number) => {
@@ -1308,8 +1314,7 @@ export default function DouyinProductCreateWizard({
       try {
         const r = await postAssistWithKeys({
           action: 'image_enhance',
-          product_name: productName.trim() || '商品',
-          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          ...imageAssistGoodsText,
           image_urls: [u],
           image_role: 'aux',
         })
@@ -1320,7 +1325,7 @@ export default function DouyinProductCreateWizard({
         endAi('img-aux')
       }
     },
-    [postAssistWithKeys, auxUrlsList, productName, imageAssistTitleDraft, beginAi, endAi],
+    [postAssistWithKeys, auxUrlsList, imageAssistGoodsText, beginAi, endAi],
   )
 
   const aiEnhanceAllAux = useCallback(async () => {
@@ -1329,8 +1334,7 @@ export default function DouyinProductCreateWizard({
     try {
       const r = await postAssistWithKeys({
         action: 'image_enhance',
-        product_name: productName.trim() || '商品',
-        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        ...imageAssistGoodsText,
         image_urls: [...auxUrlsList],
         image_role: 'aux',
       })
@@ -1339,7 +1343,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-aux')
     }
-  }, [postAssistWithKeys, auxUrlsList, productName, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssistWithKeys, auxUrlsList, imageAssistGoodsText, beginAi, endAi])
 
   const aiGenerateOneEnvImage = useCallback(async () => {
     if (envUrlsList.length >= 10) return
@@ -1352,8 +1356,7 @@ export default function DouyinProductCreateWizard({
     try {
       const r = await postAssistWithKeys({
         action: 'image_generate',
-        product_name: n,
-        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        ...imageAssistGoodsText,
         image_role: 'env',
       })
       if (!r.ok) window.alert(r.message)
@@ -1362,7 +1365,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-env')
     }
-  }, [postAssistWithKeys, envUrlsList.length, productName, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssistWithKeys, envUrlsList.length, imageAssistGoodsText, beginAi, endAi])
 
   const aiEnhanceEnvOne = useCallback(
     async (index: number) => {
@@ -1372,8 +1375,7 @@ export default function DouyinProductCreateWizard({
       try {
         const r = await postAssistWithKeys({
           action: 'image_enhance',
-          product_name: productName.trim() || '商品',
-          ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+          ...imageAssistGoodsText,
           image_urls: [u],
           image_role: 'env',
         })
@@ -1384,7 +1386,7 @@ export default function DouyinProductCreateWizard({
         endAi('img-env')
       }
     },
-    [postAssistWithKeys, envUrlsList, productName, imageAssistTitleDraft, beginAi, endAi],
+    [postAssistWithKeys, envUrlsList, imageAssistGoodsText, beginAi, endAi],
   )
 
   const aiEnhanceAllEnv = useCallback(async () => {
@@ -1393,8 +1395,7 @@ export default function DouyinProductCreateWizard({
     try {
       const r = await postAssistWithKeys({
         action: 'image_enhance',
-        product_name: productName.trim() || '商品',
-        ...(imageAssistTitleDraft ? { title_draft: imageAssistTitleDraft } : {}),
+        ...imageAssistGoodsText,
         image_urls: [...envUrlsList],
         image_role: 'env',
       })
@@ -1403,7 +1404,7 @@ export default function DouyinProductCreateWizard({
     } finally {
       endAi('img-env')
     }
-  }, [postAssistWithKeys, envUrlsList, productName, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssistWithKeys, envUrlsList, imageAssistGoodsText, beginAi, endAi])
 
   const buildDetailPayload = (): DouyinProductDetailPayload | null => {
     const price = Number.parseFloat(priceYuan)
