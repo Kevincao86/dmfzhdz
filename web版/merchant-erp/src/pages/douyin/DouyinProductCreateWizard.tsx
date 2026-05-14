@@ -790,8 +790,9 @@ export default function DouyinProductCreateWizard({
     return readImageAiManualModel()
   }, [aiModelUiTick])
 
+  /** 商品 AI 生图 / 美化上游仅接 MiniMax、通义、豆包（与网关 runImageGenerate 一致） */
   const imageVendorManualOptions = useMemo(() => {
-    const allow = new Set(['qwen', 'doubao'])
+    const allow = new Set(['minimax', 'qwen', 'doubao'])
     return aiModelPickOptions.filter((o) => allow.has(o.id))
   }, [aiModelPickOptions])
 
@@ -820,7 +821,16 @@ export default function DouyinProductCreateWizard({
       window.alert(r.message)
       return
     }
-    return r.url
+    const u = (r.url ?? '').trim()
+    /** 演示网关大图仍可能返回 picsum，与上传文件无关；用本机 blob 预览真实所选图 */
+    if (/^https?:\/\/picsum\.photos\//i.test(u)) {
+      try {
+        return URL.createObjectURL(file)
+      } catch {
+        return u
+      }
+    }
+    return u
   }
 
   const addComboGroupRow = () => {
@@ -2088,6 +2098,9 @@ export default function DouyinProductCreateWizard({
                         手选
                       </label>
                     </div>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      商品生图与美化仅走 MiniMax、通义千问、豆包（与网关一致）；OpenAI / Claude / DeepSeek / Kimi 等用于上文「文案类」与智能体。
+                    </p>
                     {!imageAiAutoOn ? (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {imageVendorManualOptions.map((m) => (

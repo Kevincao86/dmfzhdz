@@ -1,6 +1,7 @@
 /**
  * /api/merchant/* 路由核心：供 Vite 中间件与 Vercel Serverless 共用。
  */
+import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   handleDouyinBindPost,
@@ -208,13 +209,27 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           json(res, 400, { message: '单张图片不超过 5MB' })
           return true
         }
-        const safeName = fileName.replace(/[^\w.\-]+/g, '_').slice(0, 120)
-        const seed = encodeURIComponent(`upload-${Date.now()}-${safeName}`)
+        /** 小图直接内联回传，避免占位图与上传内容不一致；大图仍用外链占位（前端会用本地 blob 预览原图） */
+        const maxInlineBytes = 512 * 1024
+        if (approxBytes <= maxInlineBytes) {
+          const safeMime =
+            typeof mimeType === 'string' && /^image\/[a-z0-9.+-]+$/i.test(mimeType.trim())
+              ? mimeType.trim().toLowerCase()
+              : 'image/jpeg'
+          json(res, 200, {
+            url: `data:${safeMime};base64,${contentBase64}`,
+            mimeType: safeMime,
+            message:
+              '演示环境：小图以内联 data URL 回传，与上传内容一致。生产请接抖音素材上传接口返回可公网访问地址。',
+          })
+          return true
+        }
+        const seed = createHash('sha256').update(contentBase64).digest('hex').slice(0, 40)
         json(res, 200, {
-          url: `https://picsum.photos/seed/${seed}/800/800`,
+          url: `https://picsum.photos/seed/v${seed}/800/800`,
           mimeType,
           message:
-            '本地演示：返回可访问占位图 URL。生产请接抖音素材上传接口，将返回的可访问地址写入 goods/save 图片字段。',
+            '演示环境：大图返回占位外链；前端将用本机预览原图。生产请接抖音素材上传接口，将返回的可访问地址写入 goods/save 图片字段。',
         })
         return true
       }
