@@ -56,13 +56,13 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
   {
     id: 'qwen',
     label: '通义千问',
-    hint: '阿里云 DashScope / 通义',
+    hint: 'DashScope 兼容 OpenAI；密钥在 Vercel 设 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY',
     logoUrl: '/ai-vendors/qwen.png',
   },
   {
     id: 'doubao',
     label: '豆包',
-    hint: '火山引擎方舟 Ark',
+    hint: '火山方舟 Ark；密钥在 Vercel 设 MERCHANT_AI_DOUBAO_KEY 或 ARK_API_KEY',
     logoUrl: '/ai-vendors/doubao.png',
   },
   {

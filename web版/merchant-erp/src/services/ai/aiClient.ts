@@ -1,14 +1,30 @@
 /**
- * 浏览器侧唯一入口：调用同源 /api/meoo-ai-chat，不在此文件内引用任何厂商 SDK 或直连厂商域名。
+ * 浏览器侧：优先当前站点同源（Vercel /api/meoo-ai-chat），再尝试 VITE_MERCHANT_API_BASE_URL，避免误指商家管理后台旧网关。
  */
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import type { AIChatOkBody, AIChatRequest, AIChatResponse } from './types'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
-function url(path: string) {
+function aiChatFetchUrlCandidates(path: string): string[] {
+  const out: string[] = []
+  const add = (u: string) => {
+    const t = u.trim()
+    if (!t || out.includes(t)) return
+    out.push(t)
+  }
+  const p = path.startsWith('/') ? path : `/${path}`
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    try {
+      add(new URL(p, window.location.origin).href)
+    } catch {
+      /* ignore */
+    }
+  }
   const b = apiBase().replace(/\/$/, '')
-  return `${b}${path}`
+  if (b) add(`${b}${p}`)
+  if (out.length === 0) add(p)
+  return out
 }
 
 async function bearer(): Promise<string | null> {
@@ -17,7 +33,7 @@ async function bearer(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
-/** 优先扁平路由，避免生产环境深层路径落到 SPA */
+/** 优先扁平路由 + 同源，避免生产环境深层路径或旧 API 基址落到 SPA */
 export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
   const token = await bearer()
   const headers: Record<string, string> = {
@@ -29,48 +45,51 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
   const tryPaths = ['/api/meoo-ai-chat', '/api/ai/chat']
   let lastErr = 'no_response'
   for (const p of tryPaths) {
-    const res = await fetch(url(p), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(req),
-    })
-    const text = await res.text()
-    let json: unknown = null
-    try {
-      json = text ? JSON.parse(text) : null
-    } catch {
-      json = null
-    }
-    if (res.ok && json && typeof json === 'object' && (json as { ok?: boolean }).ok === true) {
-      const b = json as AIChatOkBody
-      return {
-        provider: b.provider,
-        model: b.model,
-        content: b.content,
-        raw: b.raw,
-        usage: b.usage,
+    const targets = aiChatFetchUrlCandidates(p)
+    for (const target of targets) {
+      const res = await fetch(target, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(req),
+      })
+      const text = await res.text()
+      let json: unknown = null
+      try {
+        json = text ? JSON.parse(text) : null
+      } catch {
+        json = null
       }
-    }
-    if (res.status !== 404) {
-      if (json && typeof json === 'object') {
-        const o = json as { ok?: boolean; error?: unknown; detail?: string }
-        const code = typeof o.error === 'string' ? o.error.trim() : ''
-        const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
-        const parts = [code, detail].filter(Boolean)
-        if (parts.length) throw new Error(parts.join(' — '))
-        if (o.error && typeof o.error === 'object' && o.error !== null) {
-          const nest = o.error as { message?: string; code?: string | number }
-          const nm = typeof nest.message === 'string' ? nest.message.trim() : ''
-          if (nm) {
-            throw new Error(
-              `网关返回异常（HTTP ${res.status}）。多为服务端未正确部署或函数崩溃；请查看 Vercel 该次部署日志。平台信息：${nm}`,
-            )
-          }
+      if (res.ok && json && typeof json === 'object' && (json as { ok?: boolean }).ok === true) {
+        const b = json as AIChatOkBody
+        return {
+          provider: b.provider,
+          model: b.model,
+          content: b.content,
+          raw: b.raw,
+          usage: b.usage,
         }
       }
-      throw new Error(text?.trim() || `HTTP ${res.status}`)
+      if (res.status !== 404) {
+        if (json && typeof json === 'object') {
+          const o = json as { ok?: boolean; error?: unknown; detail?: string }
+          const code = typeof o.error === 'string' ? o.error.trim() : ''
+          const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
+          const parts = [code, detail].filter(Boolean)
+          if (parts.length) throw new Error(parts.join(' — '))
+          if (o.error && typeof o.error === 'object' && o.error !== null) {
+            const nest = o.error as { message?: string; code?: string | number }
+            const nm = typeof nest.message === 'string' ? nest.message.trim() : ''
+            if (nm) {
+              throw new Error(
+                `网关返回异常（HTTP ${res.status}）。多为服务端未正确部署或函数崩溃；请查看 Vercel 该次部署日志。平台信息：${nm}`,
+              )
+            }
+          }
+        }
+        throw new Error(text?.trim() || `HTTP ${res.status}`)
+      }
+      lastErr = text.slice(0, 200)
     }
-    lastErr = text.slice(0, 200)
   }
   throw new Error(lastErr || 'ai_chat_unavailable')
 }

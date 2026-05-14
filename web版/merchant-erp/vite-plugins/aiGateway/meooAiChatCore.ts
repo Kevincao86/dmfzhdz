@@ -11,7 +11,7 @@ import { verifyBearerJwt } from './authSupabase.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChat } from './chatRouter.js'
 
-const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax'])
+const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
 
 export async function runMeooAiChatCore(
   bodyRaw: string,
