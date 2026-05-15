@@ -1987,18 +1987,18 @@ function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): str
 }
 
 /**
- * `attr_key_value_map` 内 combo_rule / commodity 控件：部分综合零售类目要求 **`{"groups":[...]}` 对象字符串**；
- * 纯数组 `[...]` 会校验失败（报「数量必须大于0且单位必须为份」等）。
- * 设 `DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE=array`（或 `legacy`）则仍输出数组形态。
+ * `attr_key_value_map` 内 combo_rule / commodity：开放平台示例为 **ItemGroupStruct 数组** JSON 字符串 `[{group_name,…,item_list}]`。
+ * 包一层 `{"groups":[…]}` 会触发「请传入合法的 combo_rule」。
+ * 仅当环境变量 `DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE=wrapped`（或 `object` / `groups`）时才输出对象包装（少数类目排障用）。
  */
 function comboRuleJsonForAttrKeyValueMap(comboRule: Record<string, unknown>): string {
   const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
-  if (shape === 'array' || shape === '1' || shape === 'legacy') {
-    return comboRuleGroupsArrayJsonString(comboRule)
+  if (shape === 'wrapped' || shape === 'object' || shape === 'groups') {
+    const groups = (comboRule as { groups?: unknown }).groups
+    const arr = Array.isArray(groups) ? groups : []
+    return JSON.stringify({ groups: arr }).slice(0, 120_000)
   }
-  const groups = (comboRule as { groups?: unknown }).groups
-  const arr = Array.isArray(groups) ? groups : []
-  return JSON.stringify({ groups: arr }).slice(0, 120_000)
+  return comboRuleGroupsArrayJsonString(comboRule)
 }
 
 /** attr 侧序列化结果是否无有效组（`[]` 或 `{"groups":[]}`） */
@@ -2723,6 +2723,9 @@ function summarizeDouyinProductSaveForLog(
   const tplComboKeys = templateComboAttrKeysFromAttrs(meta.templateProductAttrs)
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(meta.templateSkuAttrs)
   const comboRuleRaw = product?.combo_rule
+  const attrComboPeek = (ak?.combo_rule ?? sk?.commodity ?? '').trim().slice(0, 1)
+  const combo_attr_json_shape =
+    attrComboPeek === '[' ? 'array' : attrComboPeek === '{' ? 'object' : attrComboPeek ? 'other' : 'none'
   return {
     mode,
     relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
@@ -2732,6 +2735,7 @@ function summarizeDouyinProductSaveForLog(
     category_id: product?.category_id,
     open_biz_type: product?.open_biz_type,
     combo_in_product_body: Boolean(product?.combo_rule),
+    combo_attr_json_shape,
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
     combo_rule_debug: maskDouyinComboRuleForLog(comboRuleRaw),
     template_combo_attr_keys: tplComboKeys,
