@@ -1986,11 +1986,54 @@ function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): str
   return JSON.stringify(arr).slice(0, 120_000)
 }
 
+/** 将各组 item_list 摊平为 ItemStruct[]（字面量 attr `combo_rule` 在部分零售类目按单品数组校验 count/unit）。 */
+function comboRuleFlattenedItemsJsonString(
+  comboRule: Record<string, unknown>,
+  originFenFallback: number,
+): string {
+  const groups = (comboRule as { groups?: unknown[] }).groups
+  const items: Record<string, unknown>[] = []
+  if (!Array.isArray(groups)) return '[]'
+  for (const g of groups) {
+    if (!g || typeof g !== 'object') continue
+    const gr = g as Record<string, unknown>
+    const list = Array.isArray(gr.item_list)
+      ? gr.item_list
+      : Array.isArray(gr.items)
+        ? gr.items
+        : []
+    for (const it of list) {
+      if (!it || typeof it !== 'object') continue
+      const row = it as Record<string, unknown>
+      const count = comboItemCountFromRow(row)
+      const price = comboItemPriceFenFromRow(row, originFenFallback)
+      items.push({
+        name: String(row.name ?? '').trim() || '单品',
+        price,
+        count,
+        unit: '份',
+      })
+    }
+  }
+  return JSON.stringify(items).slice(0, 120_000)
+}
+
 /**
- * `attr_key_value_map` 内 combo_rule / commodity：开放平台示例为 **ItemGroupStruct 数组** JSON 字符串 `[{group_name,…,item_list}]`。
- * 包一层 `{"groups":[…]}` 会触发「请传入合法的 combo_rule」。
- * 仅当环境变量 `DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE=wrapped`（或 `object` / `groups`）时才输出对象包装（少数类目排障用）。
+ * 字面量 `product.attr_key_value_map.combo_rule`（无 template opaque 槽时的兜底 key）。
+ * 默认 **扁平 ItemStruct[]**；`DOUYIN_GOODS_COMBO_ATTR_LITERAL_SHAPE=groups` 时改与 commodity 相同的组数组。
  */
+function comboRuleLiteralProductAttrJsonString(
+  comboRule: Record<string, unknown>,
+  originFenFallback: number,
+): string {
+  const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_LITERAL_SHAPE?.trim().toLowerCase()
+  if (shape === 'groups' || shape === 'group_array' || shape === 'legacy') {
+    return comboRuleJsonForAttrKeyValueMap(comboRule)
+  }
+  return comboRuleFlattenedItemsJsonString(comboRule, originFenFallback)
+}
+
+/** attr 内 opaque 套餐槽 / SKU `commodity`：ItemGroupStruct 数组 JSON。 */
 function comboRuleJsonForAttrKeyValueMap(comboRule: Record<string, unknown>): string {
   const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
   if (shape === 'wrapped' || shape === 'object' || shape === 'groups') {
@@ -2001,7 +2044,7 @@ function comboRuleJsonForAttrKeyValueMap(comboRule: Record<string, unknown>): st
   return comboRuleGroupsArrayJsonString(comboRule)
 }
 
-/** attr 侧序列化结果是否无有效组（`[]` 或 `{"groups":[]}`） */
+/** attr 侧序列化结果是否无有效组/单品（`[]` 或 `{"groups":[]}`） */
 function comboRuleAttrJsonIsEffectivelyEmpty(s: string): boolean {
   const t = (s ?? '').trim()
   if (!t) return true
@@ -2057,7 +2100,7 @@ function applyComboRuleToMergedProductAttrs(
   mergedProductAttrs: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const groupsPayload = comboRuleJsonForAttrKeyValueMap(comboRule)
+  const groupsPayload = comboRuleGroupsArrayJsonString(comboRule)
   if (comboRuleAttrJsonIsEffectivelyEmpty(groupsPayload)) return
   for (const a of attrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -2077,7 +2120,7 @@ function applyComboRuleToSkuAttrMap(
   skuAttrMap: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const commodityPayload = comboRuleJsonForAttrKeyValueMap(comboRule)
+  const commodityPayload = comboRuleGroupsArrayJsonString(comboRule)
   if (comboRuleAttrJsonIsEffectivelyEmpty(commodityPayload)) return
   for (const a of skuAttrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -2518,13 +2561,13 @@ async function buildGoodlifeProductSaveBody(
    */
   const tplProductComboKeys = templateComboAttrKeysFromAttrs(attrs)
   /**
-   * 无 opaque 套餐槽时：将「groups 数组」JSON 写入字面量 `combo_rule`（与 SKU commodity 同源、规范化后的 item_list）。
-   * 部分类目（如零售团购）会校验 attr 中该项非空；勿写入原始 package_combo（items/quantity），否则会报数量/单位错误。
+   * 无 opaque 套餐槽时：字面量 `combo_rule` 默认写 **扁平 ItemStruct[]**（零售类目常按单品校验 count/unit）；
+   * SKU `commodity` 仍写 ItemGroupStruct 组数组。
    */
   if (comboRule && tplProductComboKeys.length === 0) {
-    const groupsStr = comboRuleJsonForAttrKeyValueMap(comboRule)
-    if (!comboRuleAttrJsonIsEffectivelyEmpty(groupsStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
-      mergedProductAttrs.combo_rule = groupsStr
+    const literalStr = comboRuleLiteralProductAttrJsonString(comboRule, originFen)
+    if (!comboRuleAttrJsonIsEffectivelyEmpty(literalStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
+      mergedProductAttrs.combo_rule = literalStr
     }
   }
 
@@ -2570,7 +2613,7 @@ async function buildGoodlifeProductSaveBody(
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
   if (comboRule && tplSkuComboKeys.length === 0) {
-    const groupsStr = comboRuleJsonForAttrKeyValueMap(comboRule)
+    const groupsStr = comboRuleGroupsArrayJsonString(comboRule)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(groupsStr) && !(skuAttrMap.commodity ?? '').trim()) {
       skuAttrMap.commodity = groupsStr
     }
@@ -2726,6 +2769,11 @@ function summarizeDouyinProductSaveForLog(
   const attrComboPeek = (ak?.combo_rule ?? sk?.commodity ?? '').trim().slice(0, 1)
   const combo_attr_json_shape =
     attrComboPeek === '[' ? 'array' : attrComboPeek === '{' ? 'object' : attrComboPeek ? 'other' : 'none'
+  const literalShape = process.env.DOUYIN_GOODS_COMBO_ATTR_LITERAL_SHAPE?.trim().toLowerCase()
+  const combo_attr_literal_shape =
+    literalShape === 'groups' || literalShape === 'group_array' || literalShape === 'legacy'
+      ? 'groups'
+      : 'flattened_items'
   return {
     mode,
     relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
@@ -2736,6 +2784,7 @@ function summarizeDouyinProductSaveForLog(
     open_biz_type: product?.open_biz_type,
     combo_in_product_body: Boolean(product?.combo_rule),
     combo_attr_json_shape,
+    combo_attr_literal_shape,
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
     combo_rule_debug: maskDouyinComboRuleForLog(comboRuleRaw),
     template_combo_attr_keys: tplComboKeys,
