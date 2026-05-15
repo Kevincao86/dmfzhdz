@@ -1955,6 +1955,30 @@ function buildDouyinProductComboRule(
   return { groups: groupsWithItems }
 }
 
+/**
+ * 部分类目下 goodlife 要求团购 `combo_rule` 至少 2 个商品组；仅 1 组时拆成 A/B（内容同源）。
+ * 与来客里手动复制第二组等价。`DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP=0|false|off` 关闭。
+ */
+function expandGroupBuyComboRuleMinTwoGroups(comboRule: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!comboRule) return null
+  const groupsIn = (comboRule as { groups?: unknown[] }).groups
+  if (!Array.isArray(groupsIn) || groupsIn.length === 0) return comboRule
+  const withItems = groupsIn.filter((g) => {
+    const gr = g as Record<string, unknown>
+    return Array.isArray(gr.item_list) && gr.item_list.length > 0
+  }) as Record<string, unknown>[]
+  if (withItems.length !== 1) return comboRule
+  const dupOff = process.env.DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP?.trim().toLowerCase()
+  const autoDup = dupOff !== '0' && dupOff !== 'false' && dupOff !== 'off'
+  if (!autoDup) return comboRule
+  const g0 = withItems[0]
+  const clone = JSON.parse(JSON.stringify(g0)) as Record<string, unknown>
+  const base = String(g0.group_name ?? '商品组').trim().slice(0, 60) || '商品组'
+  g0.group_name = `${base}-A`
+  clone.group_name = `${base}-B`
+  return { groups: [g0, clone] }
+}
+
 /** 与 SKU `commodity`、开放平台「商品搭配」一致：attr 值为 **ItemGroupStruct 数组** 的 JSON 字符串，勿用 `{groups:…}` 包一层 */
 function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): string {
   const groups = (comboRule as { groups?: unknown }).groups
@@ -2396,6 +2420,7 @@ async function buildGoodlifeProductSaveBody(
     if (!comboRule) {
       comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
     }
+    comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule)
   } else if (product_type === 2) {
     /**
      * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。
@@ -2727,6 +2752,22 @@ function isDouyinProductSaveResponseRetryable(j: Record<string, unknown>, raw: s
   return /打瞌睡|打盹|系统繁忙|稍后再试|服务器.*试|请稍后|timeout|timed out|Too many requests|rate limit/i.test(
     blob,
   )
+}
+
+/** goods/save JSON 内 access_token 失效（2190008 或文案命中） */
+function isDouyinSaveResponseTokenExpired(j: Record<string, unknown>): boolean {
+  const data = j.data as Record<string, unknown> | undefined
+  const extra = j.extra as Record<string, unknown> | undefined
+  const inner = data ? numericErrorCode(data.error_code) : undefined
+  if (inner === 2190008) return true
+  const exEc = extra ? numericErrorCode(extra.error_code) : undefined
+  if (exEc === 2190008) return true
+  const blob = [
+    typeof data?.description === 'string' ? data.description : '',
+    typeof extra?.description === 'string' ? extra.description : '',
+    typeof j.description === 'string' ? String(j.description) : '',
+  ].join(' ')
+  return isLikelyDouyinClientTokenExpiredBizError(blob)
 }
 
 function douyinGoodsSaveRetryMaxAttempts(): number {
@@ -3126,13 +3167,14 @@ export async function handleDouyinGoodsProductSavePost(
           save_body_bytes: bodyBytes,
         }),
       )
+      const accessToken = await ensureDouyinToken(session)
       const attemptAbort = new AbortController()
       const attemptTimer = setTimeout(() => attemptAbort.abort(), savePostBudgetMs)
       try {
         dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
           method: 'POST',
           headers: {
-            'access-token': token,
+            'access-token': accessToken,
             'content-type': 'application/json',
             'Rpc-Transit-Life-Account': accountId,
           },
@@ -3186,22 +3228,32 @@ export async function handleDouyinGoodsProductSavePost(
         break
       }
       const jAttempt = parseDouyinJson(trimmed)
-      if (
-        dr.ok &&
-        !getDataError(jAttempt).ok &&
-        isDouyinProductSaveResponseRetryable(jAttempt, raw) &&
-        attempt < maxAttempts - 1
-      ) {
-        console.warn(
-          '[meoo douyin goods/save] upstream_transient_retry',
-          JSON.stringify({
-            mode,
-            attempt,
-            logid: extractDouyinLogidFromEnvelope(jAttempt),
-            hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
-          }),
-        )
-        continue
+      if (dr.ok && !getDataError(jAttempt).ok) {
+        if (isDouyinSaveResponseTokenExpired(jAttempt) && attempt < maxAttempts - 1) {
+          invalidateDouyinMerchantClientTokenCache(session)
+          console.warn(
+            '[meoo douyin goods/save] access_token_stale_retry',
+            JSON.stringify({
+              mode,
+              attempt,
+              logid: extractDouyinLogidFromEnvelope(jAttempt),
+              hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+            }),
+          )
+          continue
+        }
+        if (isDouyinProductSaveResponseRetryable(jAttempt, raw) && attempt < maxAttempts - 1) {
+          console.warn(
+            '[meoo douyin goods/save] upstream_transient_retry',
+            JSON.stringify({
+              mode,
+              attempt,
+              logid: extractDouyinLogidFromEnvelope(jAttempt),
+              hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+            }),
+          )
+          continue
+        }
       }
       break
     }
