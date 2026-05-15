@@ -1402,11 +1402,15 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const comboQtyHint =
       /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
-        ? ' 说明：多为套餐 attr 未填或 JSON 非规范化 item_list（须 count/quantity、unit=份）；或曾误删 attr 内 combo_rule 导致「不能为空」。请部署最新网关并勿在模板手填里粘贴原始 package_combo。'
+        ? ' 说明：多为 attr 内套餐 JSON 与 item_list（count、unit=份）不一致，或手填了原始 package_combo。请部署最新网关；单品项仅需 name/price/count/unit。'
+        : ''
+    const comboIllegalHint =
+      /合法的combo|合法.*combo_rule/i.test(base) || /合法的combo|合法.*combo_rule/i.test(sub)
+        ? ' 说明：attr 内 combo_rule/commodity 须为 ItemGroupStruct **数组** JSON（非 `{"groups":[]}` 包装）。若仍失败请查 Vercel 日志 combo_attr_json_shape。'
         : ''
     return {
       ok: false,
-      message: base + logHint + sub + tplHint + comboHint + comboQtyHint,
+      message: base + logHint + sub + tplHint + comboHint + comboQtyHint + comboIllegalHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id
