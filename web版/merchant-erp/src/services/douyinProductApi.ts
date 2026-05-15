@@ -1396,6 +1396,10 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
       /模板不存在|无对应模板|模板不匹配|类目.*模板/i.test(base) || /模板不存在|无对应模板/i.test(sub)
         ? ' 建议：在抖音来客核对「三级类目」与「团购/代金券」是否与当前选择一致，或在来客内试发同款确认类目是否支持 OpenAPI 发品。'
         : ''
+    const comboEmptyHint =
+      /combo_rule.*不能为空|combo_rule.*为空/i.test(base) || /combo_rule.*不能为空|combo_rule.*为空/i.test(sub)
+        ? ' 说明：团购须同时写入顶层 product.combo_rule 与 attr_key_value_map.combo_rule（ItemGroupStruct 组数组 JSON）。请部署最新网关；勿手删套餐数据。'
+        : ''
     const comboHint =
       /商品组.*不能少于|商品组数量/i.test(base) || /商品组.*不能少于|商品组数量/i.test(sub)
         ? ' 说明：部分类目要求「商品组」至少 2 组；网关默认会把仅 1 组自动拆成两组（名称加 -A/-B，内容相同）。若需关闭该行为，部署环境变量 DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP=0 后请手动配两组。'
@@ -1410,7 +1414,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     return {
       ok: false,
-      message: base + logHint + sub + tplHint + comboHint + comboQtyHint + comboIllegalHint,
+      message: base + logHint + sub + tplHint + comboEmptyHint + comboHint + comboQtyHint + comboIllegalHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id
