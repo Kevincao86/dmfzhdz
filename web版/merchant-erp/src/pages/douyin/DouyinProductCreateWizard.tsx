@@ -816,6 +816,26 @@ export default function DouyinProductCreateWizard({
     })
   }, [productType, comboPickSanitizeSig])
 
+  const sortedTemplateProductAttrs = useMemo(
+    () =>
+      [...templateProductAttrs].sort(
+        (a, b) =>
+          Number(!!b.is_required) - Number(!!a.is_required) ||
+          (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN'),
+      ),
+    [templateProductAttrs],
+  )
+
+  const optionalProductTemplateAttrs = useMemo(
+    () => sortedTemplateProductAttrs.filter((a) => !a.is_required),
+    [sortedTemplateProductAttrs],
+  )
+
+  const optionalSkuTemplateAttrs = useMemo(
+    () => sortedTemplateSkuAttrs.filter((a) => !a.is_required),
+    [sortedTemplateSkuAttrs],
+  )
+
   const skuTemplateCoverCtx = useMemo(
     () => ({
       priceYuan,
@@ -1677,13 +1697,17 @@ export default function DouyinProductCreateWizard({
         : ''
     const overrides: Record<string, string> = { ...templateAttrOverrides }
     if (productType === 1) {
-      /** 团购：套餐仅从 package_combo 生成；网关会规范化后同步写入 product.combo_rule 与模板 combo_rule attr */
+      /** 团购：套餐默认由 package_combo 生成；仅当用户未手填对应 key 时才移除 override，避免清空「字面量 JSON 覆盖」 */
       for (const a of templateProductAttrs) {
         if (!looksComboTemplateAttr(a)) continue
-        delete overrides[a.key]
+        const vk = (templateAttrOverrides[a.key] ?? '').trim()
+        if (!vk) delete overrides[a.key]
       }
-      for (const k of Object.keys(overrides)) {
-        if (/^combo_rule$/i.test(k)) delete overrides[k]
+      for (const k of [...Object.keys(overrides)]) {
+        if (/^combo_rule$/i.test(k)) {
+          const vk = (templateAttrOverrides[k] ?? '').trim()
+          if (!vk) delete overrides[k]
+        }
       }
     } else {
       for (const a of templateProductAttrs) {
@@ -3371,7 +3395,7 @@ export default function DouyinProductCreateWizard({
           </section>
 
           <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-6 shadow-sm">
-            <h3 className="text-base font-semibold text-gray-900">开放平台类目必填（template.get）</h3>
+            <h3 className="text-base font-semibold text-gray-900">开放平台模板（template.get）</h3>
             <p className="mt-1 text-xs leading-relaxed text-gray-700">
               依据抖音
               <a
@@ -3391,8 +3415,11 @@ export default function DouyinProductCreateWizard({
               >
                 创建/更新商品
               </a>
-              ：下列为当前类目下 <span className="font-medium">is_required=true</span> 的商品属性。标注「自动映射」的由本页表单 + 网关写入{' '}
-              <code className="rounded bg-white/80 px-1 text-[11px]">attr_key_value_map</code>；其余请填写 JSON 字符串（结构体须序列化）。
+              ：下方列出当前类目返回的 <span className="font-medium">product_attrs</span> /{' '}
+              <span className="font-medium">sku_attrs</span> 中所有 <span className="font-medium">is_required=true</span>{' '}
+              的字段，且<strong>均可编辑</strong>。标注「自动映射」表示<strong>留空</strong>时由本页表单与网关合并写入{' '}
+              <code className="rounded bg-white/80 px-1 text-[11px]">attr_key_value_map</code> /{' '}
+              <code className="rounded bg-white/80 px-1 text-[11px]">sku.attr_key_value_map</code>；<strong>填写任意内容则按原样覆盖提交</strong>。
             </p>
             {templateProductAttrs.length === 0 && templateSkuAttrs.length === 0 ? (
               <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
@@ -3400,17 +3427,44 @@ export default function DouyinProductCreateWizard({
                 <code className="rounded bg-white px-1 text-[11px]">sku_attrs</code>。若在来客用同一类目可发品，请核对是否为**三级类目 ID**；否则请更换类目或商品类型（团购=1 / 代金券=2）。保存时抖音可能提示「商品模板不存在」。
               </div>
             ) : null}
-            {requiredTemplateAttrs.length === 0 && requiredSkuTemplateAttrs.length === 0 ? (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm text-gray-600">
-                  当前模板未在 product_attrs 中标记必填项；团购保存时网关仍会写入{' '}
-                  <code className="rounded bg-white/80 px-1 text-[11px]">product.combo_rule</code>、
-                  <code className="rounded bg-white/80 px-1 text-[11px]">attr.combo_rule</code> 与{' '}
-                  <code className="rounded bg-white/80 px-1 text-[11px]">sku.commodity</code>（由商品组数据自动生成）。
+            {productType === 1 && (templateProductAttrs.length > 0 || templateSkuAttrs.length > 0) ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-3 text-sm text-gray-900">
+                <h4 className="font-semibold text-amber-950">团购：字面量 JSON 覆盖（可选）</h4>
+                <p className="mt-1 text-xs text-amber-900/90">
+                  与开放平台文档中 <code className="rounded bg-white px-1 text-[11px]">attr_key_value_map</code> 的字面量 key{' '}
+                  <code className="rounded bg-white px-1 text-[11px]">combo_rule</code>、以及 SKU 侧{' '}
+                  <code className="rounded bg-white px-1 text-[11px]">commodity</code> 一致（ItemGroupStruct 组数组 JSON）。留空则继续使用「商品组」与网关自动生成。
                 </p>
-                {productType === 1 ? (
+                <label className="mt-2 block text-xs font-medium text-gray-800">combo_rule（商品 attr）</label>
+                <textarea
+                  rows={4}
+                  value={templateAttrOverrides.combo_rule ?? ''}
+                  onChange={(e) =>
+                    setTemplateAttrOverrides((prev) => ({ ...prev, combo_rule: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-[11px]"
+                  placeholder='例如：[{"group_name":"A","total_count":1,"option_count":1,"item_list":[{"name":"单品","price":2000,"count":1,"unit":"份"}]}]'
+                />
+                <label className="mt-2 block text-xs font-medium text-gray-800">commodity（SKU attr）</label>
+                <textarea
+                  rows={4}
+                  value={templateSkuAttrOverrides.commodity ?? ''}
+                  onChange={(e) =>
+                    setTemplateSkuAttrOverrides((prev) => ({ ...prev, commodity: e.target.value }))
+                  }
+                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-[11px]"
+                  placeholder="与开放平台 sku_attrs 中 COMMODITY 控件 JSON 一致；单品须 count 为正整数且 unit 为「份」"
+                />
+              </div>
+            ) : null}
+            {requiredTemplateAttrs.length === 0 && requiredSkuTemplateAttrs.length === 0 ? (
+              <div className="mt-3 space-y-2 rounded-lg border border-gray-200 bg-white/70 px-3 py-2 text-sm text-gray-700">
+                <p>
+                  当前模板未将任何 product_attrs / sku_attrs 标为必填（is_required=false）。若保存仍报套餐类错误，请使用上方「字面量 JSON 覆盖」或展开下方「选填」逐字段填写。
+                </p>
+                {productType !== 1 ? (
                   <p className="text-xs text-gray-500">
-                    请在「商品信息」填写商品名称、售价与头图；套餐由系统自动从售价合成（或编辑态保留原 package_combo）。
+                    非团购类型请根据开放平台提示在「选填」区补齐字段，或在自定义 SKU 属性行添加 key/value。
                   </p>
                 ) : null}
               </div>
@@ -3419,6 +3473,9 @@ export default function DouyinProductCreateWizard({
                 {requiredTemplateAttrs.map((a) => {
                   const covered = templateAttrWizardCovered(a)
                   const comboLike = looksComboTemplateAttr(a)
+                  const ph = covered
+                    ? '留空则由本页/网关自动映射；填写则覆盖提交至 attr_key_value_map'
+                    : '填写该 key 对应的字符串值（JSON 须为可解析文本）'
                   return (
                     <li
                       key={a.key || a.name}
@@ -3434,7 +3491,7 @@ export default function DouyinProductCreateWizard({
                             covered ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950',
                           )}
                         >
-                          {covered ? '自动映射' : '须填写'}
+                          {covered ? '自动映射（可覆盖）' : '须填写'}
                         </span>
                       </div>
                       <p className="mt-1 font-mono text-[11px] text-gray-500">
@@ -3453,36 +3510,37 @@ export default function DouyinProductCreateWizard({
                               : ' 保存时将按本属性 key 写入 combo_rule JSON。'}
                         </p>
                       ) : null}
-                      {!covered ? (
-                        templateAttrValueLooksNumeric(a) ? (
-                          <input
-                            type="number"
-                            step="any"
-                            value={templateAttrOverrides[a.key] ?? ''}
-                            onChange={(e) =>
-                              setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
-                            }
-                            placeholder="填写数值（将按字符串提交至 attr_key_value_map）"
-                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-                          />
-                        ) : (
-                          <textarea
-                            value={templateAttrOverrides[a.key] ?? ''}
-                            onChange={(e) =>
-                              setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
-                            }
-                            rows={comboLike || String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
-                            placeholder="填写该 key 对应的字符串值（JSON 须为单行或可解析文本）"
-                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-                          />
-                        )
-                      ) : null}
+                      {templateAttrValueLooksNumeric(a) && !comboLike ? (
+                        <input
+                          type="number"
+                          step="any"
+                          value={templateAttrOverrides[a.key] ?? ''}
+                          onChange={(e) =>
+                            setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                          }
+                          placeholder={ph}
+                          className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                        />
+                      ) : (
+                        <textarea
+                          value={templateAttrOverrides[a.key] ?? ''}
+                          onChange={(e) =>
+                            setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                          }
+                          rows={comboLike || String(a.value_type).toUpperCase().includes('STRUCT') ? 5 : 2}
+                          placeholder={ph}
+                          className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                        />
+                      )}
                     </li>
                   )
                 })}
                 {requiredSkuTemplateAttrs.map((a) => {
                   const covered = templateSkuAttrWizardCoveredExtended(a, skuTemplateCoverCtx, productType)
                   const comboLike = looksComboTemplateAttr(a)
+                  const ph = covered
+                    ? '留空则由本页/网关自动映射；填写则覆盖提交至 sku.attr_key_value_map'
+                    : '填写 SKU attr_key_value_map 字符串值'
                   return (
                     <li
                       key={`sku-${a.key || a.name}`}
@@ -3498,7 +3556,7 @@ export default function DouyinProductCreateWizard({
                             covered ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950',
                           )}
                         >
-                          {covered ? '自动映射' : '须填写'}
+                          {covered ? '自动映射（可覆盖）' : '须填写'}
                         </span>
                       </div>
                       <p className="mt-1 font-mono text-[11px] text-gray-500">
@@ -3512,22 +3570,93 @@ export default function DouyinProductCreateWizard({
                           product.combo_rule 同源）。
                         </p>
                       ) : null}
-                      {!covered ? (
-                        <textarea
-                          value={templateSkuAttrOverrides[a.key] ?? ''}
-                          onChange={(e) =>
-                            setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
-                          }
-                          rows={comboLike ? 5 : 2}
-                          placeholder="填写 SKU attr_key_value_map 字符串值"
-                          className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
-                        />
-                      ) : null}
+                      <textarea
+                        value={templateSkuAttrOverrides[a.key] ?? ''}
+                        onChange={(e) =>
+                          setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                        }
+                        rows={comboLike ? 5 : 2}
+                        placeholder={ph}
+                        className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                      />
                     </li>
                   )
                 })}
               </ul>
             )}
+            {optionalProductTemplateAttrs.length > 0 || optionalSkuTemplateAttrs.length > 0 ? (
+              <details className="mt-5 rounded-lg border border-blue-100 bg-white/60 px-3 py-2 text-sm text-gray-800">
+                <summary className="cursor-pointer select-none font-medium text-gray-900">
+                  选填：其余模板字段（product {optionalProductTemplateAttrs.length} · sku{' '}
+                  {optionalSkuTemplateAttrs.length}）
+                </summary>
+                <ul className="mt-3 max-h-[min(70vh,520px)] space-y-3 overflow-y-auto pr-1">
+                  {optionalProductTemplateAttrs.map((a) => {
+                    const comboLike = looksComboTemplateAttr(a)
+                    return (
+                      <li
+                        key={`opt-p-${a.key || a.name}`}
+                        className="rounded-lg border border-blue-50 bg-white/90 px-3 py-2 text-sm"
+                      >
+                        <div className="font-medium text-gray-900">{a.name}</div>
+                        <p className="mt-1 font-mono text-[11px] text-gray-500">
+                          key: {a.key || '—'} · value_type: {a.value_type}
+                          {a.is_multi ? ' · multi' : ''}
+                        </p>
+                        {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
+                        {templateAttrValueLooksNumeric(a) && !comboLike ? (
+                          <input
+                            type="number"
+                            step="any"
+                            value={templateAttrOverrides[a.key] ?? ''}
+                            onChange={(e) =>
+                              setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                            }
+                            placeholder="选填；有值则写入 attr_key_value_map"
+                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                          />
+                        ) : (
+                          <textarea
+                            value={templateAttrOverrides[a.key] ?? ''}
+                            onChange={(e) =>
+                              setTemplateAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                            }
+                            rows={comboLike || String(a.value_type).toUpperCase().includes('STRUCT') ? 4 : 2}
+                            placeholder="选填；有值则写入 attr_key_value_map"
+                            className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                          />
+                        )}
+                      </li>
+                    )
+                  })}
+                  {optionalSkuTemplateAttrs.map((a) => {
+                    const comboLike = looksComboTemplateAttr(a)
+                    return (
+                      <li
+                        key={`opt-sku-${a.key || a.name}`}
+                        className="rounded-lg border border-violet-50 bg-white/90 px-3 py-2 text-sm"
+                      >
+                        <div className="font-medium text-gray-900">[SKU] {a.name}</div>
+                        <p className="mt-1 font-mono text-[11px] text-gray-500">
+                          key: {a.key || '—'} · value_type: {a.value_type}
+                          {a.is_multi ? ' · multi' : ''}
+                        </p>
+                        {a.desc ? <p className="mt-1 text-xs text-gray-600">{a.desc}</p> : null}
+                        <textarea
+                          value={templateSkuAttrOverrides[a.key] ?? ''}
+                          onChange={(e) =>
+                            setTemplateSkuAttrOverrides((prev) => ({ ...prev, [a.key]: e.target.value }))
+                          }
+                          rows={comboLike ? 4 : 2}
+                          placeholder="选填；有值则写入 sku.attr_key_value_map"
+                          className="mt-2 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-xs"
+                        />
+                      </li>
+                    )
+                  })}
+                </ul>
+              </details>
+            ) : null}
             {templateSkuAttrs.length > 0 ? (
               <div className="mt-5 border-t border-blue-100 pt-4">
                 <p className="text-xs text-gray-600">
