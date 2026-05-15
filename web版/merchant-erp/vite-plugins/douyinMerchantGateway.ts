@@ -2572,10 +2572,10 @@ async function buildGoodlifeProductSaveBody(
    */
   const tplProductComboKeys = templateComboAttrKeysFromAttrs(attrs)
   /**
-   * 团购：顶层 `product.combo_rule` 已带完整 ItemGroupStruct；勿再写 attr 字面量 `combo_rule`（扁平/组数组均易与 COMMODITY 校验冲突）。
-   * 代金券等无顶层套餐时：无 opaque 槽则写入组数组 JSON 兜底。
+   * 无 opaque 套餐槽时：字面量 `combo_rule` 写 ItemGroupStruct[] 组数组（与 sku.commodity 同源）。
+   * 团购类目常同时校验顶层 product.combo_rule 与 attr combo_rule，缺一不可。
    */
-  if (comboRule && tplProductComboKeys.length === 0 && !isGroupBuy) {
+  if (comboRule && tplProductComboKeys.length === 0) {
     const literalStr = comboRuleProductLiteralAttrJsonString(comboRule)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(literalStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = literalStr
@@ -2698,6 +2698,21 @@ async function buildGoodlifeProductSaveBody(
   }
 }
 
+function listUnfilledRequiredTemplateAttrs(
+  attrs: Record<string, unknown>[],
+  merged: Record<string, string> | undefined,
+): string[] {
+  const out: string[] = []
+  const map = merged ?? {}
+  for (const a of attrs) {
+    if (!Boolean((a as Record<string, unknown>).is_required)) continue
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key) continue
+    if (!(map[key] ?? '').trim()) out.push(key)
+  }
+  return out
+}
+
 function templateComboAttrKeysFromAttrs(attrs: Record<string, unknown>[]): string[] {
   const out: string[] = []
   for (const a of attrs) {
@@ -2791,6 +2806,15 @@ function summarizeDouyinProductSaveForLog(
       ? 'flattened_items'
       : 'groups'
   const combo_attr_literal_in_body = Boolean((ak?.combo_rule ?? '').trim())
+  const missing_required_product_attr_keys = listUnfilledRequiredTemplateAttrs(
+    meta.templateProductAttrs,
+    ak,
+  )
+  const missing_required_sku_attr_keys = listUnfilledRequiredTemplateAttrs(meta.templateSkuAttrs, sk)
+  const implicit_missing_combo_rule_attr =
+    product?.product_type === 1 && product?.combo_rule && !combo_attr_literal_in_body
+      ? ['combo_rule']
+      : []
   return {
     mode,
     relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
@@ -2816,6 +2840,9 @@ function summarizeDouyinProductSaveForLog(
     attr_key_count: ak ? Object.keys(ak).length : 0,
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
+    missing_required_product_attr_keys,
+    missing_required_sku_attr_keys,
+    implicit_missing_combo_rule_attr,
     poi_count: Array.isArray(product?.pois) ? (product!.pois as unknown[]).length : 0,
   }
 }
