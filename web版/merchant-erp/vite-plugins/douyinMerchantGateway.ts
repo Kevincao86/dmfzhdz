@@ -1979,48 +1979,57 @@ function expandGroupBuyComboRuleMinTwoGroups(comboRule: Record<string, unknown> 
   return { groups: [g0, clone] }
 }
 
-/** 与 SKU `commodity`、开放平台示例一致：值为 **ItemGroupStruct[]** 的 JSON 数组字符串。 */
-function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): string {
-  const groups = (comboRule as { groups?: unknown }).groups
-  const arr = Array.isArray(groups) ? groups : []
-  return JSON.stringify(arr).slice(0, 120_000)
+function categoryUsesStringifiedComboItemNumbers(categoryId: string): boolean {
+  const raw = process.env.DOUYIN_GOODS_COMBO_ATTR_ITEM_NUMBERS_AS_STRING_CATEGORY_IDS
+  const cid = String(categoryId ?? '').trim()
+  if (raw === undefined) return cid === '5003003'
+  const t = raw.trim()
+  if (t === '' || t === '0' || t === 'false' || t === 'off') return false
+  return new Set(t.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)).has(cid)
 }
 
 /**
- * 部分零售类目（如 5003003）对 sku `commodity` / attr `combo_rule` 按「单组券明细」校验；
- * 网关为「至少两组」在顶层 product.combo_rule 上扩成 A/B 两组时，若把两组原样写入 COMMODITY，上游易误报「数量必须大于0且单位必须为份」。
- * 此类目下 attr/sku 套餐 JSON 仅取第一组；顶层 product.combo_rule 仍为完整 groups。
- * 关闭：`DOUYIN_GOODS_COMMODITY_ATTR_USE_FIRST_GROUP_ONLY_CATEGORY_IDS=` 设空；或从列表中移除类目 ID。
+ * 写入 attr_key_value_map / sku commodity 的 ItemGroupStruct[] JSON。
+ * 指定类目下将 item_list 内 count、price 转为字符串，避免「数量必须大于0且单位必须为份」误报（仍保留完整组数，满足「商品组不能少于2个」）。
  */
-function comboRuleForSkuCommodityAndAttrLiteral(
-  fullComboRule: Record<string, unknown>,
+function comboRuleGroupsArrayJsonStringForAttrMaps(
+  comboRule: Record<string, unknown>,
   categoryId: string,
-  isGroupBuy: boolean,
-): Record<string, unknown> {
-  if (!isGroupBuy) return fullComboRule
-  const raw =
-    process.env.DOUYIN_GOODS_COMMODITY_ATTR_USE_FIRST_GROUP_ONLY_CATEGORY_IDS?.trim() ?? '5003003'
-  if (raw === '' || raw === '0' || raw === 'false' || raw === 'off') return fullComboRule
-  const set = new Set(
-    raw
-      .split(/[,;\s]+/)
-      .map((s) => s.trim())
-      .filter(Boolean),
-  )
-  const cid = String(categoryId ?? '').trim()
-  if (!set.has(cid)) return fullComboRule
-  const groups = (fullComboRule as { groups?: unknown[] }).groups
-  if (!Array.isArray(groups) || groups.length === 0) return fullComboRule
-  const g0 = groups[0]
-  if (!g0 || typeof g0 !== 'object') return fullComboRule
-  const cloned = JSON.parse(JSON.stringify(g0)) as Record<string, unknown>
-  const list = Array.isArray(cloned.item_list)
-    ? cloned.item_list
-    : Array.isArray(cloned.items)
-      ? cloned.items
-      : []
-  if (list.length === 0) return fullComboRule
-  return { groups: [cloned] }
+  originFenFallback: number,
+): string {
+  const groups = (comboRule as { groups?: unknown[] }).groups
+  if (!Array.isArray(groups)) return '[]'
+  const stringifyNums = categoryUsesStringifiedComboItemNumbers(categoryId)
+  const arr = JSON.parse(JSON.stringify(groups)) as Record<string, unknown>[]
+  if (!stringifyNums) return JSON.stringify(arr).slice(0, 120_000)
+  for (const g of arr) {
+    if (!g || typeof g !== 'object') continue
+    const listKey = Array.isArray(g.item_list)
+      ? 'item_list'
+      : Array.isArray(g.items)
+        ? 'items'
+        : null
+    if (!listKey) continue
+    const list = g[listKey] as Record<string, unknown>[]
+    if (!Array.isArray(list)) continue
+    g[listKey] = list.map((row) => {
+      if (!row || typeof row !== 'object') return row
+      const count = comboItemCountFromRow(row)
+      const price = comboItemPriceFenFromRow(row, originFenFallback)
+      const item: Record<string, unknown> = {
+        name: String(row.name ?? '').trim() || '单品',
+        price: String(price),
+        count: String(count),
+        unit: '份',
+      }
+      const pid = String(row.product_id ?? '').trim()
+      if (pid) item.product_id = pid
+      const sid = String(row.sku_id ?? '').trim()
+      if (sid) item.sku_id = sid
+      return item
+    })
+  }
+  return JSON.stringify(arr).slice(0, 120_000)
 }
 
 /** 将各组 item_list 摊平为 ItemStruct[]（字面量 attr `combo_rule` 在部分零售类目按单品数组校验 count/unit）。 */
@@ -2062,6 +2071,7 @@ function comboRuleFlattenedItemsJsonString(
 function comboRuleSkuCommodityAttrJsonString(
   comboRule: Record<string, unknown>,
   originFenFallback: number,
+  categoryId: string,
 ): string {
   const shape =
     process.env.DOUYIN_GOODS_COMBO_COMMODITY_JSON_SHAPE?.trim().toLowerCase() ||
@@ -2069,26 +2079,35 @@ function comboRuleSkuCommodityAttrJsonString(
   if (shape === 'flattened' || shape === 'flat' || shape === 'items') {
     return comboRuleFlattenedItemsJsonString(comboRule, originFenFallback)
   }
-  return comboRuleGroupsArrayJsonString(comboRule)
+  return comboRuleGroupsArrayJsonStringForAttrMaps(comboRule, categoryId, originFenFallback)
 }
 
 /**
  * product.attr 字面量 `combo_rule`（无 opaque 槽、且非团购顶层已带 combo_rule 时）。
  * 形态与 commodity 一致：ItemGroupStruct[] 组数组。
  */
-function comboRuleProductLiteralAttrJsonString(comboRule: Record<string, unknown>): string {
-  return comboRuleGroupsArrayJsonString(comboRule)
+function comboRuleProductLiteralAttrJsonString(
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+): string {
+  return comboRuleGroupsArrayJsonStringForAttrMaps(comboRule, categoryId, originFenFallback)
 }
 
 /** attr 内 opaque 套餐槽：ItemGroupStruct 数组或 wrapped `{"groups":[]}`（由 DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE 控制）。 */
-function comboRuleJsonForAttrKeyValueMap(comboRule: Record<string, unknown>): string {
+function comboRuleJsonForAttrKeyValueMap(
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+): string {
   const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
+  const normalizedArr = JSON.parse(
+    comboRuleGroupsArrayJsonStringForAttrMaps(comboRule, categoryId, originFenFallback),
+  ) as unknown[]
   if (shape === 'wrapped' || shape === 'object' || shape === 'groups') {
-    const groups = (comboRule as { groups?: unknown }).groups
-    const arr = Array.isArray(groups) ? groups : []
-    return JSON.stringify({ groups: arr }).slice(0, 120_000)
+    return JSON.stringify({ groups: normalizedArr }).slice(0, 120_000)
   }
-  return comboRuleGroupsArrayJsonString(comboRule)
+  return JSON.stringify(normalizedArr).slice(0, 120_000)
 }
 
 /** attr 侧序列化结果是否无有效组/单品（`[]` 或 `{"groups":[]}`） */
@@ -2146,8 +2165,10 @@ function applyComboRuleToMergedProductAttrs(
   attrs: Record<string, unknown>[],
   mergedProductAttrs: Record<string, string>,
   comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
 ): void {
-  const groupsPayload = comboRuleJsonForAttrKeyValueMap(comboRule)
+  const groupsPayload = comboRuleJsonForAttrKeyValueMap(comboRule, categoryId, originFenFallback)
   if (comboRuleAttrJsonIsEffectivelyEmpty(groupsPayload)) return
   for (const a of attrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -2167,8 +2188,9 @@ function applyComboRuleToSkuAttrMap(
   skuAttrMap: Record<string, string>,
   comboRule: Record<string, unknown>,
   originFenFallback: number,
+  categoryId: string,
 ): void {
-  const commodityPayload = comboRuleSkuCommodityAttrJsonString(comboRule, originFenFallback)
+  const commodityPayload = comboRuleSkuCommodityAttrJsonString(comboRule, originFenFallback, categoryId)
   if (comboRuleAttrJsonIsEffectivelyEmpty(commodityPayload)) return
   for (const a of skuAttrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -2597,12 +2619,6 @@ async function buildGoodlifeProductSaveBody(
     comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
   }
 
-  /** attr `combo_rule` / sku `commodity` 用（部分类目仅取第一组，见 comboRuleForSkuCommodityAndAttrLiteral） */
-  const comboRuleForAttrSku: Record<string, unknown> | null =
-    comboRule && isGroupBuy
-      ? comboRuleForSkuCommodityAndAttrLiteral(comboRule, category_id, true)
-      : comboRule
-
   const erpForAttrMerge: Record<string, unknown> =
     isGroupBuy && comboRule && (!erp.package_combo || typeof erp.package_combo !== 'object')
       ? { ...erp, package_combo: { groups: (comboRule as { groups: unknown[] }).groups } }
@@ -2640,7 +2656,7 @@ async function buildGoodlifeProductSaveBody(
    * 代金券若模板未返回任何搭配槽位，则改传顶层 product.combo_rule（与团购 body 形态一致）。
    */
   if (comboRule) {
-    applyComboRuleToMergedProductAttrs(attrs, mergedProductAttrs, comboRule)
+    applyComboRuleToMergedProductAttrs(attrs, mergedProductAttrs, comboRule, category_id, originFen)
   }
 
   /**
@@ -2652,8 +2668,8 @@ async function buildGoodlifeProductSaveBody(
    * 无 opaque 套餐槽时：字面量 `combo_rule` 写 ItemGroupStruct[] 组数组（与 sku.commodity 同源）。
    * 团购类目常同时校验顶层 product.combo_rule 与 attr combo_rule，缺一不可。
    */
-  if (comboRuleForAttrSku && tplProductComboKeys.length === 0) {
-    const literalStr = comboRuleProductLiteralAttrJsonString(comboRuleForAttrSku)
+  if (comboRule && tplProductComboKeys.length === 0) {
+    const literalStr = comboRuleProductLiteralAttrJsonString(comboRule, category_id, originFen)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(literalStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = literalStr
     }
@@ -2695,13 +2711,13 @@ async function buildGoodlifeProductSaveBody(
       if (s) skuAttrMap[key] = s.slice(0, 120_000)
     }
   }
-  if (comboRuleForAttrSku) {
-    applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRuleForAttrSku, originFen)
+  if (comboRule) {
+    applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRule, originFen, category_id)
   }
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
-  if (comboRuleForAttrSku && tplSkuComboKeys.length === 0) {
-    const commodityStr = comboRuleSkuCommodityAttrJsonString(comboRuleForAttrSku, originFen)
+  if (comboRule && tplSkuComboKeys.length === 0) {
+    const commodityStr = comboRuleSkuCommodityAttrJsonString(comboRule, originFen, category_id)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(commodityStr) && !(skuAttrMap.commodity ?? '').trim()) {
       skuAttrMap.commodity = commodityStr
     }
@@ -2885,6 +2901,9 @@ function summarizeDouyinProductSaveForLog(
       ? 'flattened_items'
       : 'groups'
   const combo_attr_literal_in_body = Boolean((ak?.combo_rule ?? '').trim())
+  const combo_attr_item_numbers_stringified = categoryUsesStringifiedComboItemNumbers(
+    String(product?.category_id ?? ''),
+  )
   const missing_required_product_attr_keys = listUnfilledRequiredTemplateAttrs(
     meta.templateProductAttrs,
     ak,
@@ -2927,6 +2946,7 @@ function summarizeDouyinProductSaveForLog(
     combo_sku_commodity_shape,
     combo_sku_commodity_items_shape,
     combo_attr_literal_in_body,
+    combo_attr_item_numbers_stringified,
     combo_sku_commodity_json_groups,
     combo_attr_combo_rule_json_groups,
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
