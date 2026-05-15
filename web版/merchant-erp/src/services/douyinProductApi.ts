@@ -1400,9 +1400,13 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
       /商品组.*不能少于|商品组数量/i.test(base) || /商品组.*不能少于|商品组数量/i.test(sub)
         ? ' 说明：部分类目要求「商品组」至少 2 组；网关默认会把仅 1 组自动拆成两组（名称加 -A/-B，内容相同）。若需关闭该行为，部署环境变量 DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP=0 后请手动配两组。'
         : ''
+    const comboQtyHint =
+      /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
+        ? ' 说明：多为套餐 JSON 与抖音 ItemStruct 不一致（须含 item_list、count、unit=份）。请更新至含网关修复的版本后重试；勿在模板手填里粘贴未规范化的 package_combo。'
+        : ''
     return {
       ok: false,
-      message: base + logHint + sub + tplHint + comboHint,
+      message: base + logHint + sub + tplHint + comboHint + comboQtyHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id
