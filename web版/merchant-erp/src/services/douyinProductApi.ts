@@ -1219,6 +1219,11 @@ function parseTradeRuleDefaults(raw: unknown, productType: number): TradeRuleDef
 export async function getDouyinGoodsTemplate(params: {
   category_id: string
   product_type: number
+  /**
+   * 为 true 时：即使 product_attrs/sku_attrs 均为空也返回 ok（用于「编辑已有商品」等场景，避免抖音未下发模板时整页无法打开）。
+   * 新建商品走第二步「下一步」时不要传，空模板将直接失败并提示更换类目/类型。
+   */
+  allowEmptyTemplate?: boolean
 }): Promise<GoodsTemplateResult> {
   const qs = new URLSearchParams({
     category_id: params.category_id,
@@ -1245,7 +1250,7 @@ export async function getDouyinGoodsTemplate(params: {
         message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
       }
     }
-    return mapDouyinGoodsTemplatePayload(data, params.product_type)
+    return mapDouyinGoodsTemplatePayload(data, params.product_type, params.category_id, params.allowEmptyTemplate)
   }
   const res = await fetch(url(`${paths[1]}?${qs}`), { method: 'GET', headers })
   const data = await parseJson(res)
@@ -1255,12 +1260,14 @@ export async function getDouyinGoodsTemplate(params: {
       message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
     }
   }
-  return mapDouyinGoodsTemplatePayload(data, params.product_type)
+  return mapDouyinGoodsTemplatePayload(data, params.product_type, params.category_id, params.allowEmptyTemplate)
 }
 
 function mapDouyinGoodsTemplatePayload(
   data: Record<string, unknown>,
   productType: number,
+  categoryId: string,
+  allowEmptyTemplate?: boolean,
 ): GoodsTemplateResult {
   const d = data.data as Record<string, unknown> | undefined
   const mapAttrs = (arr: unknown): TemplateAttr[] =>
@@ -1274,6 +1281,17 @@ function mapDouyinGoodsTemplatePayload(
           desc: typeof a.desc === 'string' ? a.desc : undefined,
         }))
       : []
+  const innerEcRaw = d?.error_code ?? (d as Record<string, unknown> | undefined)?.errorCode
+  const innerEc =
+    typeof innerEcRaw === 'number' && Number.isFinite(innerEcRaw)
+      ? innerEcRaw
+      : typeof innerEcRaw === 'string' && innerEcRaw.trim() !== '' && !Number.isNaN(Number(innerEcRaw))
+        ? Number(innerEcRaw)
+        : undefined
+  if (innerEc !== undefined && innerEc !== 0) {
+    const desc = typeof d?.description === 'string' ? d.description : ''
+    return { ok: false, message: desc || `抖音查询商品模板失败（error_code=${innerEc}）` }
+  }
   const sales_channels =
     mapSelectOptions(d?.sales_channels).length > 0
       ? mapSelectOptions(d?.sales_channels)
@@ -1287,10 +1305,23 @@ function mapDouyinGoodsTemplatePayload(
       ? mapSelectOptions(d?.after_sale_policies)
       : DEFAULT_AFTER_SALE_POLICIES
   const trade_rule_defaults = parseTradeRuleDefaults(d?.trade_rule_defaults, productType)
+  let product_attrs = mapAttrs(d?.product_attrs)
+  let sku_attrs = mapAttrs(d?.sku_attrs)
+  if (product_attrs.length === 0) {
+    const spu = mapAttrs(d?.spu_attrs ?? (d as Record<string, unknown> | undefined)?.spuAttrs)
+    if (spu.length > 0) product_attrs = spu
+  }
+  if (!allowEmptyTemplate && product_attrs.length === 0 && sku_attrs.length === 0) {
+    const ptLabel = productType === 1 ? '团购(1)' : productType === 2 ? '代金券(2)' : `类型(${productType})`
+    return {
+      ok: false,
+      message: `「查询商品模板」未返回任何属性（category_id=${categoryId}，${ptLabel}）。该类目与商品类型在抖音侧可能没有可发模板，保存时也会提示「商品模板不存在」。请在来客后台核对**三级类目**与**团购/代金券**是否与开放平台一致，或更换类目后再试。`,
+    }
+  }
   return {
     ok: true,
-    product_attrs: mapAttrs(d?.product_attrs),
-    sku_attrs: mapAttrs(d?.sku_attrs),
+    product_attrs,
+    sku_attrs,
     sales_channels,
     staff_sales_options,
     after_sale_policies,
@@ -1361,9 +1392,13 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
     const base =
       (typeof inner.description === 'string' && inner.description) || `抖音 data.error_code=${innerEc}`
     const logHint = logid ? ` [logid:${logid}]` : ''
+    const tplHint =
+      /模板不存在|无对应模板|模板不匹配|类目.*模板/i.test(base) || /模板不存在|无对应模板/i.test(sub)
+        ? ' 建议：在抖音来客核对「三级类目」与「团购/代金券」是否与当前选择一致，或在来客内试发同款确认类目是否支持 OpenAPI 发品。'
+        : ''
     return {
       ok: false,
-      message: base + logHint + sub,
+      message: base + logHint + sub + tplHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id

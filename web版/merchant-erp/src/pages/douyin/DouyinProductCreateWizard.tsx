@@ -1177,6 +1177,7 @@ export default function DouyinProductCreateWizard({
         const tpl = await getDouyinGoodsTemplate({
           category_id: detail.category_id,
           product_type: detail.product_type ?? 1,
+          allowEmptyTemplate: true,
         })
         if (cancelled) return
         if (!tpl.ok) {
@@ -3374,6 +3375,12 @@ export default function DouyinProductCreateWizard({
               ：下列为当前类目下 <span className="font-medium">is_required=true</span> 的商品属性。标注「自动映射」的由本页表单 + 网关写入{' '}
               <code className="rounded bg-white/80 px-1 text-[11px]">attr_key_value_map</code>；其余请填写 JSON 字符串（结构体须序列化）。
             </p>
+            {templateProductAttrs.length === 0 && templateSkuAttrs.length === 0 ? (
+              <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                抖音未返回该类目下的 <code className="rounded bg-white px-1 text-[11px]">product_attrs</code> /{' '}
+                <code className="rounded bg-white px-1 text-[11px]">sku_attrs</code>。若在来客用同一类目可发品，请核对是否为**三级类目 ID**；否则请更换类目或商品类型（团购=1 / 代金券=2）。保存时抖音可能提示「商品模板不存在」。
+              </div>
+            ) : null}
             {requiredTemplateAttrs.length === 0 ? (
               <p className="mt-3 text-sm text-gray-600">
                 当前模板未返回必填项，或 template 接口异常；请确认第二步「下一步」已正常加载模板。
