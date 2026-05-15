@@ -102,7 +102,8 @@ function templateAttrsBundleCacheTtlMs(): number {
 }
 
 function templateAttrsBundleCacheKey(accountId: string, categoryId: string, productType: number): string {
-  return `${accountId}\t${categoryId}\t${productType}`
+  /** v2：template/get 增加 open_biz_type=1 后 bump，避免命中旧的无 attrs 缓存 */
+  return `${accountId}\t${categoryId}\t${productType}\tv2ob1`
 }
 
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
@@ -1611,6 +1612,11 @@ async function fetchTemplateAttrsBundle(
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
   u.searchParams.set('product_type', String(productType))
+  /**
+   * 与 product/save 中 open_biz_type、biz_line 对齐；缺省时部分类目 template/get 只回 error_code/extra、不回 product_attrs，
+   * 网关会误判为空模板并触发后续 combo_rule 等问题。
+   */
+  u.searchParams.set('open_biz_type', '1')
   const dr = await douyinServerFetch(u.toString(), {
     method: 'GET',
     headers: {
@@ -1624,16 +1630,43 @@ async function fetchTemplateAttrsBundle(
   const j = parseDouyinJson(raw)
   if (!getDataError(j).ok) return { productAttrs: [], skuAttrs: [] }
   const data = j.data as Record<string, unknown> | undefined
-  const pa = data?.product_attrs
-  const sa = data?.sku_attrs
+  const { pa, sa } = extractProductSkuAttrsFromTemplateEnvelope(data, j)
   const bundle = {
-    productAttrs: Array.isArray(pa) ? (pa as Record<string, unknown>[]) : [],
-    skuAttrs: Array.isArray(sa) ? (sa as Record<string, unknown>[]) : [],
+    productAttrs: pa,
+    skuAttrs: sa,
   }
   if (ttl > 0 && (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0)) {
     templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
   }
   return bundle
+}
+
+/** 从 template/get 的 data（或少数变体的根对象）解析 product_attrs / sku_attrs */
+function extractProductSkuAttrsFromTemplateEnvelope(
+  data: Record<string, unknown> | undefined,
+  root: Record<string, unknown>,
+): { pa: Record<string, unknown>[]; sa: Record<string, unknown>[] } {
+  const arr = (v: unknown): Record<string, unknown>[] =>
+    Array.isArray(v) ? (v as Record<string, unknown>[]) : []
+  const pick = (src: Record<string, unknown> | undefined) => {
+    if (!src) return { pa: [] as Record<string, unknown>[], sa: [] as Record<string, unknown>[] }
+    return {
+      pa: arr(src.product_attrs ?? (src as Record<string, unknown>).productAttrs),
+      sa: arr(src.sku_attrs ?? (src as Record<string, unknown>).skuAttrs),
+    }
+  }
+  let { pa, sa } = pick(data)
+  if (pa.length === 0 && sa.length === 0 && data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+    const inner = pick(data.data as Record<string, unknown>)
+    pa = inner.pa
+    sa = inner.sa
+  }
+  if (pa.length === 0 && sa.length === 0) {
+    const r = pick(root)
+    pa = r.pa
+    sa = r.sa
+  }
+  return { pa, sa }
 }
 
 function jsonImageUrlList(urls: string[]): string {
