@@ -14,6 +14,7 @@ import type {
   AiAgentArchivedSession,
   AiAgentMessage,
   AiAgentOpenContext,
+  AiAgentPendingQuote,
   AiPermissionId,
   AiTaskPreviewPayload,
   AiTaskType,
@@ -146,8 +147,14 @@ type AiAgentContextValue = {
   /** 主输入区待发送的截图（最多 4 张） */
   pendingComposerImages: string[]
   addComposerImages: (files: FileList | null) => Promise<void>
+  /** 从剪贴板等多处收集的 File 数组（与 addComposerImages 共用压缩与 4 张上限） */
+  addComposerImageFiles: (files: File[]) => Promise<void>
   removeComposerImage: (index: number) => void
   clearComposerImages: () => void
+  /** 发送下一条用户消息时，将附在正文前的「引用」片段 */
+  pendingQuote: AiAgentPendingQuote | null
+  quoteMessage: (m: AiAgentMessage) => void
+  clearPendingQuote: () => void
   /** 有用户发言后的侧边栏：历史对话快照，最多 10 条 */
   archivedSessions: AiAgentArchivedSession[]
   /** 将当前对话存档并回到欢迎空态 */
@@ -240,6 +247,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [inputDraft, setInputDraft] = useState('')
   const [pendingComposerImages, setPendingComposerImages] = useState<string[]>([])
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
+  const [pendingQuote, setPendingQuote] = useState<AiAgentPendingQuote | null>(null)
+  const pendingQuoteRef = useRef<AiAgentPendingQuote | null>(null)
   const [modelPickerKey, setModelPickerKeyState] = useState('tokenmix::openai::__default__')
   const [aiSending, setAiSending] = useState(false)
 
@@ -248,6 +257,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const archivedRef = useRef(archivedSessions)
   archivedRef.current = archivedSessions
+
+  useEffect(() => {
+    pendingQuoteRef.current = pendingQuote
+  }, [pendingQuote])
 
   useEffect(() => {
     setModelPickerKeyState(loadPickerKey())
@@ -295,6 +308,33 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     setPendingComposerImages((prev) => [...prev, ...urls].slice(0, 4))
   }, [])
 
+  const addComposerImageFiles = useCallback(
+    async (files: File[]) => {
+      const imgs = files.filter((f) => /^image\//i.test(f.type))
+      if (!imgs.length) return
+      const dt = new DataTransfer()
+      for (const f of imgs) dt.items.add(f)
+      await addComposerImages(dt.files)
+    },
+    [addComposerImages],
+  )
+
+  const clearPendingQuote = useCallback(() => setPendingQuote(null), [])
+
+  const quoteMessage = useCallback((m: AiAgentMessage) => {
+    if (m.role !== 'user' && m.role !== 'assistant') return
+    const text = (m.content ?? '').trim()
+    const hasImg = Boolean(m.imageUrls?.some((u) => u?.trim()))
+    let excerpt = text.slice(0, 500)
+    if (!excerpt) excerpt = hasImg ? '［附图，无文字］' : '（空消息）'
+    else if (hasImg) excerpt = `［附图］ ${excerpt}`.slice(0, 500)
+    setPendingQuote({
+      quotedMessageId: m.id,
+      role: m.role,
+      excerpt,
+    })
+  }, [])
+
   const removeComposerImage = useCallback((index: number) => {
     setPendingComposerImages((prev) => prev.filter((_, i) => i !== index))
   }, [])
@@ -326,6 +366,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     setPendingPreviewId(null)
     setInputDraft('')
     setPendingComposerImages([])
+    setPendingQuote(null)
   }, [])
 
   const startNewChat = useCallback(() => {
@@ -346,6 +387,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setPendingPreviewId(null)
       setInputDraft('')
       setPendingComposerImages([])
+      setPendingQuote(null)
       setSidebarActiveArchiveId(sessionId)
     },
     [pushCurrentToArchiveIfHasUser, sidebarActiveArchiveId],
@@ -440,8 +482,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (text: string) => {
       const trimmed = text.trim()
       const imgs = [...pendingComposerImages]
-      if ((!trimmed && imgs.length === 0) || aiSending || pendingPreviewId) return
-      const line = trimmed || '请结合附图说明你的需求。'
+      const pq = pendingQuoteRef.current
+      if ((!trimmed && imgs.length === 0 && !pq) || aiSending || pendingPreviewId) return
+      let line = trimmed || (imgs.length ? '请结合附图说明你的需求。' : '')
+      if (pq) {
+        const who = pq.role === 'user' ? '我' : '助手'
+        const shortId = pq.quotedMessageId.slice(0, 8)
+        const quotedBlock = `[引用${who} #${shortId}]\n> ${pq.excerpt.split('\n').join('\n> ')}\n\n`
+        line = quotedBlock + line
+        setPendingQuote(null)
+      }
       setSidebarActiveArchiveId(null)
       setPendingComposerImages([])
       const nextPickerKey = resolveModelPickerKeyForImageIntent(
@@ -682,8 +732,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       aiSending,
       pendingComposerImages,
       addComposerImages,
+      addComposerImageFiles,
       removeComposerImage,
       clearComposerImages,
+      pendingQuote,
+      quoteMessage,
+      clearPendingQuote,
       archivedSessions,
       startNewChat,
       resumeArchivedSession,
@@ -710,8 +764,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       aiSending,
       pendingComposerImages,
       addComposerImages,
+      addComposerImageFiles,
       removeComposerImage,
       clearComposerImages,
+      pendingQuote,
+      quoteMessage,
+      clearPendingQuote,
       archivedSessions,
       startNewChat,
       resumeArchivedSession,

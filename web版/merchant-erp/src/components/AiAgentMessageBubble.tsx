@@ -1,4 +1,5 @@
 import { CheckCircle2, ClipboardList } from 'lucide-react'
+import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
 
@@ -11,6 +12,7 @@ function formatBubbleTime(ts: number): string {
 }
 
 export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
+  const { quoteMessage } = useAiAgent()
   if (m.role === 'task_preview' && m.preview) {
     return (
       <div className="max-w-[min(100%,42rem)] rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50/95 to-indigo-50/90 p-4 shadow-sm ring-1 ring-violet-100/60">
@@ -72,7 +74,16 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             ) : null}
             {m.content ? <p className="whitespace-pre-wrap">{m.content}</p> : null}
           </div>
-          {timeStr ? <p className="mt-1 text-right text-[10px] text-slate-400">{timeStr}</p> : null}
+          <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => quoteMessage(m)}
+              className="text-[10px] font-medium text-indigo-200/95 underline-offset-2 hover:text-white hover:underline"
+            >
+              引用此条
+            </button>
+            {timeStr ? <p className="text-[10px] text-slate-400">{timeStr}</p> : null}
+          </div>
         </div>
       </div>
     )
@@ -112,8 +123,17 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           ) : null}
           {m.content ? <p className="whitespace-pre-wrap">{m.content}</p> : null}
         </div>
-        {m.role === 'assistant' && timeStr ? (
-          <p className="mt-1.5 text-[10px] text-slate-400">{timeStr}</p>
+        {m.role === 'assistant' ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => quoteMessage(m)}
+              className="text-[10px] font-medium text-indigo-600 hover:underline"
+            >
+              引用此条
+            </button>
+            {timeStr ? <p className="text-[10px] text-slate-400">{timeStr}</p> : null}
+          </div>
         ) : null}
       </div>
     </div>
