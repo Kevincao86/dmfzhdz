@@ -1406,7 +1406,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const comboQtyHint =
       /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
-        ? ' 说明：网关 retail 类目（如 5003003）在 attr.combo_rule / sku.commodity 内将 count、price 以字符串写入；须保证两组商品组与顶层 product.combo_rule 一致。仍报错请查日志 combo_attr_item_numbers_stringified 与 DOUYIN_GOODS_COMBO_ATTR_ITEM_NUMBERS_AS_STRING_CATEGORY_IDS。'
+        ? ' 说明：零售类目（如 5003003）网关会将「单组多品」拆成多组（每组 1 个单品），并在套餐 JSON 中写入 quantity 与数值 count/price。仍失败可在环境变量中尝试 DOUYIN_GOODS_COMBO_ATTR_WRAPPED_GROUPS_CATEGORY_IDS=5003003；查日志 combo_rule_shape.one_item_per_group。'
         : ''
     const comboIllegalHint =
       /合法的combo|合法.*combo_rule/i.test(base) || /合法的combo|合法.*combo_rule/i.test(sub)
