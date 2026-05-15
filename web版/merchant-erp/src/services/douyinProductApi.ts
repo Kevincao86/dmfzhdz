@@ -1402,7 +1402,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const comboQtyHint =
       /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
-        ? ' 说明：多为套餐 JSON 与抖音 ItemStruct 不一致（须含 item_list、count、unit=份）。请更新至含网关修复的版本后重试；勿在模板手填里粘贴未规范化的 package_combo。'
+        ? ' 说明：多为套餐 JSON 与抖音 ItemStruct 不一致，或团购时 attr 与顶层 combo_rule 重复校验。请部署最新网关；单品项须含 count/quantity、unit=份。'
         : ''
     return {
       ok: false,

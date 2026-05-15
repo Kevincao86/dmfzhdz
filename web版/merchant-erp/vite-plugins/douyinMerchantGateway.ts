@@ -1926,8 +1926,9 @@ function buildDouyinProductComboRule(
         /** 单品价（分），与历史 commodity 示例字段名一致 */
         price,
         count,
-        /** 部分网关/类目校验「数量」与 count 同源，双写避免反序列化缺省为 0 */
+        /** 部分类目校验「数量」字段名用 qty / quantity，与 count 同源 */
         qty: count,
+        quantity: count,
         unit,
       }
       const pid = String(row.product_id ?? '').trim()
@@ -2008,6 +2009,7 @@ function buildDouyinComboRuleSingleGroupDefault(
             name: productNameFallback.slice(0, 120) || '团购套餐',
             count: 1,
             qty: 1,
+            quantity: 1,
             unit: '份',
             /** 与来客「划线价 ≥ 售价」一致：取 max(实付分, 原价分)，避免套餐标价低于 SKU 划线 */
             price: itemLineFen,
@@ -2487,7 +2489,11 @@ async function buildGoodlifeProductSaveBody(
    * 此时将「groups 数组」JSON 字符串写入字面量 key `combo_rule`（与 applyComboRuleToMergedProductAttrs 写入形态一致）。
    */
   const tplProductComboKeys = templateComboAttrKeysFromAttrs(attrs)
-  if (comboRule && tplProductComboKeys.length === 0) {
+  /**
+   * 团购：顶层 `product.combo_rule` + SKU `commodity` 已携带套餐；再往 attr 写字面量 `combo_rule` 时，
+   * 部分类目会对字符串体做二次校验并报「数量必须大于0且单位必须为份」。非团购仍保留兜底字符串。
+   */
+  if (comboRule && tplProductComboKeys.length === 0 && !isGroupBuy) {
     const groupsStr = comboRuleGroupsArrayJsonString(comboRule)
     if (groupsStr !== '[]' && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = groupsStr
@@ -2574,6 +2580,11 @@ async function buildGoodlifeProductSaveBody(
    */
   if (comboRule) {
     product.combo_rule = comboRule
+  }
+
+  /** 团购套餐以顶层 combo_rule + SKU commodity 为准，去掉 attr 中同名手填/兜底，避免与结构化体重复校验 */
+  if (isGroupBuy) {
+    delete mergedProductAttrs.combo_rule
   }
 
   if (Object.keys(mergedProductAttrs).length > 0) {
