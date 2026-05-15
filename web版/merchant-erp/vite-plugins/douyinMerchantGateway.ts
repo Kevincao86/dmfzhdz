@@ -2705,7 +2705,9 @@ function isDouyinProductSaveResponseRetryable(j: Record<string, unknown>, raw: s
   if (code === 2100001 || code === 2100004 || code === 2100005) return true
   const desc = typeof data?.description === 'string' ? data.description : ''
   const blob = `${desc}${raw}`.slice(0, 4000)
-  return /打瞌睡|系统繁忙|稍后再试|服务器.*试|请稍后|timeout|timed out|Too many requests|rate limit/i.test(blob)
+  return /打瞌睡|打盹|系统繁忙|稍后再试|服务器.*试|请稍后|timeout|timed out|Too many requests|rate limit/i.test(
+    blob,
+  )
 }
 
 function douyinGoodsSaveRetryMaxAttempts(): number {
@@ -2924,11 +2926,18 @@ export async function handleDouyinGoodsImageUploadPost(
 }
 
 /** 代理 goodlife/v1/goods/product/save/（创建/更新商品，草稿与提交审核均走此接口） */
+function readClientTraceHeader(req: IncomingMessage): string {
+  const h = req.headers['x-meoo-client-trace']
+  const s = Array.isArray(h) ? h[0] : h
+  return typeof s === 'string' ? s.trim().slice(0, 80) : ''
+}
+
 export async function handleDouyinGoodsProductSavePost(
   _req: IncomingMessage,
   res: ServerResponse,
   bodyRaw: string,
 ): Promise<void> {
+  const clientTrace = readClientTraceHeader(_req)
   const auth = _req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
   if (!auth) {
     json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
@@ -2992,6 +3001,7 @@ export async function handleDouyinGoodsProductSavePost(
       JSON.stringify({
         phase: 'before_build',
         mode,
+        client_trace: clientTrace || undefined,
         account_id: accountId,
         product_type: Number(erp.product_type) || 1,
         category_id: String(erp.category_id ?? '').trim().slice(0, 32),
@@ -3193,6 +3203,7 @@ export async function handleDouyinGoodsProductSavePost(
       JSON.stringify({
         phase: 'after_product_save_post',
         mode,
+        client_trace: clientTrace || undefined,
         http_status: dr.status,
         upstream_biz: upstreamBizHint,
         logid: extractDouyinLogidFromEnvelope(jPosted),

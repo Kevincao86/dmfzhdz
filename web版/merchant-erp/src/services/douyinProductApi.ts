@@ -1393,12 +1393,31 @@ export async function postDouyinGoodsProductSave(params: {
     mode: params.mode,
     product: params.detail,
   })
-  const headers = authHeaders()
+  const clientTrace =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `t-${Date.now()}`
+  const baseHeaders = authHeaders() as Record<string, string>
+  const headers: Record<string, string> = {
+    ...baseHeaders,
+    'X-Meoo-Client-Trace': clientTrace,
+  }
   const paths = ['/api/meoo-douyin-goods-product-save', '/api/merchant/douyin/goods/product/save'] as const
   const targets = merchantApiFetchUrlCandidates(paths)
   let lastStatus = 0
+  let lastTarget = ''
   for (const target of targets) {
-    const res = await fetch(target, { method: 'POST', headers, body: bodyStr })
+    lastTarget = target
+    let res: Response
+    try {
+      res = await fetch(target, { method: 'POST', headers, body: bodyStr })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return {
+        ok: false,
+        message: `保存请求未到达服务器（${msg}）。请检查网络；并在开发者工具 Network 中确认 POST 的 URL 是否为本站的 /api/meoo-douyin-goods-product-save（勿把 VITE_MERCHANT_API_BASE_URL 指到旧域名）。客户端 trace：${clientTrace}`,
+      }
+    }
     lastStatus = res.status
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
@@ -1411,13 +1430,20 @@ export async function postDouyinGoodsProductSave(params: {
     } catch {
       data = {}
     }
-    return parseProductSaveResponse(res, data)
+    const out = parseProductSaveResponse(res, data)
+    if (!out.ok && out.message) {
+      return {
+        ...out,
+        message: `${out.message}（POST ${target} HTTP ${res.status}，trace:${clientTrace}）`,
+      }
+    }
+    return out
   }
   return {
     ok: false,
     message:
-      lastStatus === 404
+      (lastStatus === 404
         ? '保存接口返回 404：请确认商户 ERP 已部署含「/api/meoo-douyin-goods-product-save」的版本并已 Redeploy；若配置了 VITE_MERCHANT_API_BASE_URL，请改为当前站点或留空，以免请求打到不含该接口的旧网关。'
-        : `HTTP ${lastStatus || 404}`,
+        : `HTTP ${lastStatus || 404}`) + `（最后尝试：${lastTarget || targets[0] || '—'}，trace:${clientTrace}）`,
   }
 }
