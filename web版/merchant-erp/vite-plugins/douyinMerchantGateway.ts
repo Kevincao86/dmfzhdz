@@ -2035,14 +2035,6 @@ function comboRuleItemAttrsJsonString(
   return comboRuleFlattenedItemsJsonString(comboRule, originFenFallback)
 }
 
-/** @deprecated 使用 comboRuleItemAttrsJsonString */
-function comboRuleLiteralProductAttrJsonString(
-  comboRule: Record<string, unknown>,
-  originFenFallback: number,
-): string {
-  return comboRuleItemAttrsJsonString(comboRule, originFenFallback)
-}
-
 /** attr 内 opaque 套餐槽：ItemGroupStruct 数组或 wrapped `{"groups":[]}`（由 DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE 控制）。 */
 function comboRuleJsonForAttrKeyValueMap(comboRule: Record<string, unknown>): string {
   const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
@@ -2110,7 +2102,7 @@ function applyComboRuleToMergedProductAttrs(
   mergedProductAttrs: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const groupsPayload = comboRuleGroupsArrayJsonString(comboRule)
+  const groupsPayload = comboRuleJsonForAttrKeyValueMap(comboRule)
   if (comboRuleAttrJsonIsEffectivelyEmpty(groupsPayload)) return
   for (const a of attrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
