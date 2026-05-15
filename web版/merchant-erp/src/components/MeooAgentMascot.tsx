@@ -9,8 +9,10 @@ function resolveState(aiSending: boolean, inputDraft: string): MascotState {
 }
 
 /**
- * 墨典智能体输入区旁吉祥物：与原先一致展示「待机 / 在看输入 / 生成中」，
- * 生成中保留轻微摆动，呼应原键盘动效。
+ * 墨典智能体输入区旁吉祥物（透明底 PNG）：
+ * - 待机：轻微浮动
+ * - 正在输入：毛笔在书上书写的往复摆动
+ * - 生成中：轻微摆动（呼应「工作中」）
  */
 export function MeooAgentMascot({
   aiSending,
@@ -32,23 +34,23 @@ export function MeooAgentMascot({
       <div
         className={cn(
           'relative h-[5.25rem] w-[4.25rem] overflow-visible',
-          state === 'outputting' && 'meoo-mascot-typing',
-          state === 'userTyping' && 'translate-x-0.5 transition-transform duration-300',
+          state === 'outputting' && 'meoo-mascot-output',
+          state === 'userTyping' && 'meoo-mascot-writing',
           state === 'idle' && 'meoo-mascot-idle',
         )}
       >
         <img
           src="/meoo-agent-mascot.png"
           alt=""
-          className="h-full w-full object-contain object-bottom drop-shadow-md"
+          className="relative z-0 h-full w-full object-contain object-bottom [filter:drop-shadow(0_6px_10px_rgba(15,23,42,0.18))]"
           draggable={false}
         />
       </div>
       <span className="mt-0.5 max-w-[4.5rem] truncate text-center text-[9px] font-medium text-indigo-600/90">
-        {state === 'outputting' ? '生成中…' : state === 'userTyping' ? '在看输入' : '待机'}
+        {state === 'outputting' ? '生成中…' : state === 'userTyping' ? '在书写…' : '待机'}
       </span>
       <style>{`
-        @keyframes meooMascotType {
+        @keyframes meooMascotOutput {
           0%, 100% { transform: rotate(-2deg) translateY(0); }
           50% { transform: rotate(3deg) translateY(-1px); }
         }
@@ -56,12 +58,25 @@ export function MeooAgentMascot({
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-2px); }
         }
-        .meoo-mascot-typing {
-          animation: meooMascotType 0.55s ease-in-out infinite;
-          transform-origin: 50% 85%;
+        /** 输入框有内容：模拟拿毛笔在书上落笔、提笔的往复（transform-origin 约在角色足部偏中） */
+        @keyframes meooMascotWriting {
+          0%, 100% { transform: rotate(-5deg) translate(0, 0); }
+          22% { transform: rotate(-11deg) translate(3px, 1px); }
+          45% { transform: rotate(-6deg) translate(5px, 0); }
+          68% { transform: rotate(-12deg) translate(2px, 2px); }
+          85% { transform: rotate(-7deg) translate(4px, 0); }
+        }
+        .meoo-mascot-output {
+          animation: meooMascotOutput 0.55s ease-in-out infinite;
+          transform-origin: 50% 88%;
         }
         .meoo-mascot-idle {
           animation: meooMascotIdle 2.4s ease-in-out infinite;
+          transform-origin: 50% 88%;
+        }
+        .meoo-mascot-writing {
+          animation: meooMascotWriting 0.42s ease-in-out infinite;
+          transform-origin: 52% 90%;
         }
       `}</style>
     </div>
