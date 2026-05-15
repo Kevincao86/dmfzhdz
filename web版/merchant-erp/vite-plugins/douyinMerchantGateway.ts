@@ -102,8 +102,8 @@ function templateAttrsBundleCacheTtlMs(): number {
 }
 
 function templateAttrsBundleCacheKey(accountId: string, categoryId: string, productType: number): string {
-  /** v4：撤回 template/get 上误传的 open_biz_type=1（该枚举 1 表示「组合券包」，非通用代金券模板） */
-  return `${accountId}\t${categoryId}\t${productType}\tv4tpl`
+  /** v5：template/get 仅返回 spu_attrs 时合并进 product；空模板时用文档标准 key 合成 */
+  return `${accountId}\t${categoryId}\t${productType}\tv5tpl`
 }
 
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
@@ -1644,6 +1644,8 @@ function extractProductSkuAttrsFromTemplateEnvelope(
 ): { pa: Record<string, unknown>[]; sa: Record<string, unknown>[] } {
   const arr = (v: unknown): Record<string, unknown>[] =>
     Array.isArray(v) ? (v as Record<string, unknown>[]) : []
+  const spuFrom = (src: Record<string, unknown> | undefined) =>
+    arr(src?.spu_attrs ?? (src as Record<string, unknown> | undefined)?.spuAttrs)
   const pick = (src: Record<string, unknown> | undefined) => {
     if (!src) return { pa: [] as Record<string, unknown>[], sa: [] as Record<string, unknown>[] }
     return {
@@ -1662,7 +1664,128 @@ function extractProductSkuAttrsFromTemplateEnvelope(
     pa = r.pa
     sa = r.sa
   }
+  if (pa.length === 0 && data && typeof data === 'object') {
+    const spu = spuFrom(data)
+    if (spu.length > 0) pa = spu
+  }
+  if (pa.length === 0 && root && typeof root === 'object') {
+    const d = root.data as Record<string, unknown> | undefined
+    if (d && typeof d === 'object' && !Array.isArray(d)) {
+      const spu = spuFrom(d)
+      if (spu.length > 0) pa = spu
+    }
+  }
   return { pa, sa }
+}
+
+/**
+ * template/get 仅返回 error_code/description、无属性列表时：按开放平台「商品发布」文档中的**字面 key**
+ * 构造最小模板，供 merge 写入 image_list / commodity / 售价等（opaque key 无法猜测，标准 key 可兜底）。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/capability/basic/goods-introduce
+ */
+function syntheticGoodlifeTemplateAttrsBundle(_productType: number): {
+  productAttrs: Record<string, unknown>[]
+  skuAttrs: Record<string, unknown>[]
+} {
+  const productAttrs: Record<string, unknown>[] = [
+    {
+      key: 'image_list',
+      name: '封面图',
+      value_type: 'IMAGE',
+      is_multi: true,
+      is_required: true,
+    },
+    {
+      key: 'environment_image_list',
+      name: '环境图',
+      value_type: 'IMAGE',
+      is_multi: true,
+      is_required: false,
+    },
+    {
+      key: 'Notification',
+      name: '使用规则',
+      value_type: 'TEXT',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'description_rich_text',
+      name: '商品描述',
+      value_type: 'TEXT',
+      is_multi: false,
+      is_required: false,
+    },
+  ]
+  const skuAttrs: Record<string, unknown>[] = [
+    {
+      key: 'commodity',
+      name: '菜品搭配',
+      value_type: 'COMMODITY',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'actual_amount',
+      name: '售价(分)',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'origin_amount',
+      name: '原价(分)',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: false,
+    },
+    {
+      key: 'stock_qty',
+      name: '库存',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: false,
+    },
+  ]
+  return { productAttrs, skuAttrs }
+}
+
+/** ERP 投放渠道选项 → 文档 show_channel（INT） */
+const ERP_SALES_CHANNEL_TO_SHOW_CHANNEL: Record<string, number> = {
+  unlimited: 1,
+  live_only: 2,
+  offline_only: 5,
+  newcomer_only: 7,
+  online_only: 8,
+  free_trial_only: 18,
+  group_mall_only: 22,
+  live_and_acquisition: 23,
+  event_only: 25,
+}
+
+/** 在 merge 之后补齐开放平台文档级字面 key（模板未返回 opaque 槽时仍常必填） */
+function injectDocKeyedProductAttrsFromErp(
+  mergedProductAttrs: Record<string, string>,
+  erp: Record<string, unknown>,
+): void {
+  const sales =
+    erp.sales_info && typeof erp.sales_info === 'object' ? (erp.sales_info as Record<string, unknown>) : {}
+  const trade =
+    erp.trade_rules && typeof erp.trade_rules === 'object' ? (erp.trade_rules as Record<string, unknown>) : {}
+  const ch = typeof sales.channel === 'string' ? sales.channel.trim() : ''
+  if (!(mergedProductAttrs.show_channel ?? '').trim()) {
+    if (ch) {
+      const n = ERP_SALES_CHANNEL_TO_SHOW_CHANNEL[ch]
+      mergedProductAttrs.show_channel = String(n != null ? n : 1)
+    } else {
+      mergedProductAttrs.show_channel = '1'
+    }
+  }
+  const asp = typeof trade.after_sale_policy === 'string' ? trade.after_sale_policy.trim() : ''
+  if (asp && !(mergedProductAttrs.RefundPolicy ?? '').trim()) {
+    const rp = asp === 'no_refund' ? 2 : asp === 'refund_auto_expire' ? 3 : 1
+    mergedProductAttrs.RefundPolicy = String(rp)
+  }
 }
 
 function jsonImageUrlList(urls: string[]): string {
@@ -2222,13 +2345,22 @@ async function buildGoodlifeProductSaveBody(
   const stockQty =
     Number.isFinite(stockQtyRaw) && stockQtyRaw > 0 ? Math.min(Math.floor(stockQtyRaw), 99_999_999) : 999_999
 
-  const { productAttrs: attrs, skuAttrs } = await fetchTemplateAttrsBundle(
+  let { productAttrs: attrs, skuAttrs } = await fetchTemplateAttrsBundle(
     accountId,
     token,
     category_id,
     product_type,
     douyinHttpSignal,
   )
+  if (attrs.length === 0 && skuAttrs.length === 0 && category_id) {
+    const syn = syntheticGoodlifeTemplateAttrsBundle(product_type)
+    attrs = syn.productAttrs
+    skuAttrs = syn.skuAttrs
+    console.warn(
+      '[meoo douyin goods/save] template_get_empty_using_doc_fallback',
+      JSON.stringify({ category_id, product_type }),
+    )
+  }
   const auxUrls = Array.isArray(erp.aux_image_urls)
     ? (erp.aux_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
     : []
@@ -2289,6 +2421,8 @@ async function buildGoodlifeProductSaveBody(
       if (s) mergedProductAttrs[key] = s.slice(0, 120_000)
     }
   }
+
+  injectDocKeyedProductAttrsFromErp(mergedProductAttrs, erp)
 
   /**
    * 仅向 template.get 声明的 opaque key 写入「groups 数组」JSON；勿自创字面量 combo_rule/commodity。
