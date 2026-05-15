@@ -1919,14 +1919,14 @@ function buildDouyinProductComboRule(
       const row = it as Record<string, unknown>
       const name = String(row.name ?? '').trim() || fb
       const count = comboItemCountFromRow(row)
-      const unit = String(row.unit ?? '份').trim() || '份'
       const price = comboItemPriceFenFromRow(row, originFenFallback)
       const item: Record<string, unknown> = {
         name,
         /** 单品价（分），与开放平台团购示例字段一致（勿加 qty/quantity，部分类目反序列化会判失败） */
         price,
         count,
-        unit,
+        /** 类目 5003003 等常强校验「单位必须为份」；勿传「个/件」等以免误判 */
+        unit: '份',
       }
       const pid = String(row.product_id ?? '').trim()
       if (pid) item.product_id = pid
@@ -2332,6 +2332,40 @@ function mergeGoodlifeProductAttrMapFromErp(
   return out
 }
 
+/**
+ * template.get 标记 is_required 但 merge 未自动识别的 SKU 槽位补默认值，避免上游泛化错误（如缺券码来源仍报套餐数量/单位）。
+ * - code_source_type：券码来源；优先 trade_rules.code_source_type，否则 DOUYIN_GOODS_SKU_CODE_SOURCE_TYPE_DEFAULT 或 "1"（平台发码）。
+ */
+function applyMissingRequiredSkuAttrDefaults(
+  skuAttrs: Record<string, unknown>[],
+  skuAttrMap: Record<string, string>,
+  erp: Record<string, unknown>,
+): void {
+  const trade =
+    erp.trade_rules && typeof erp.trade_rules === 'object'
+      ? (erp.trade_rules as Record<string, unknown>)
+      : {}
+  const pickCodeSource = (): string => {
+    for (const k of ['code_source_type', 'coupon_code_source_type', 'codeSourceType'] as const) {
+      const v = trade[k]
+      if (v != null && String(v).trim()) return String(v).trim().slice(0, 32)
+    }
+    const d = process.env.DOUYIN_GOODS_SKU_CODE_SOURCE_TYPE_DEFAULT?.trim()
+    if (d) return d.slice(0, 32)
+    return '1'
+  }
+  for (const a of skuAttrs) {
+    if (!Boolean((a as Record<string, unknown>).is_required)) continue
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key || (skuAttrMap[key] ?? '').trim()) continue
+    const name = String((a as Record<string, unknown>).name ?? '')
+    const lk = key.toLowerCase()
+    if (lk === 'code_source_type' || /code_source|券码来源/.test(`${lk} ${name}`)) {
+      skuAttrMap[key] = pickCodeSource()
+    }
+  }
+}
+
 function mergeGoodlifeSkuAttrMapFromTemplate(
   skuAttrs: Record<string, unknown>[],
   productName: string,
@@ -2655,6 +2689,8 @@ async function buildGoodlifeProductSaveBody(
   if (skuAttrMap.commodity != null && filledOpaqueSkuCombo && !skuTplKeySet.has('commodity')) {
     delete skuAttrMap.commodity
   }
+
+  applyMissingRequiredSkuAttrDefaults(skuAttrs, skuAttrMap, erp)
 
   /**
    * 顶层 product.combo_rule：goodlife product/save 在多数类目下会校验非空（含团购、代金券及次卡等）。

@@ -1406,7 +1406,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const comboQtyHint =
       /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
-        ? ' 说明：多为 sku.commodity 或 attr 套餐 JSON 形态不符（须 ItemGroupStruct 组数组，组内 item_list 含 count>0、unit=份）。请部署最新网关；勿手填原始 package_combo。'
+        ? ' 说明：多为套餐单品 count≤0、unit≠份，或必填 SKU（如 code_source_type 券码来源）未写入导致上游误报。网关已对券码来源默认「1」、套餐单位强制「份」；三方发码请在交易规则中传 code_source_type 或环境变量 DOUYIN_GOODS_SKU_CODE_SOURCE_TYPE_DEFAULT。'
         : ''
     const comboIllegalHint =
       /合法的combo|合法.*combo_rule/i.test(base) || /合法的combo|合法.*combo_rule/i.test(sub)

@@ -238,6 +238,11 @@ function templateSkuAttrWizardCoveredExtended(
   productType: number | null,
 ): boolean {
   if (productType === 1 && looksComboTemplateAttr(a)) return true
+  const key = (a.key ?? '').trim().toLowerCase()
+  const name = (a.name ?? '').toLowerCase()
+  if (productType === 1 && (key === 'code_source_type' || /券码来源/.test(name) || key.includes('code_source'))) {
+    return true
+  }
   return templateSkuAttrWizardCovered(a, ctx)
 }
 
