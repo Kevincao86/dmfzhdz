@@ -344,11 +344,97 @@ function validateDouyinComboAttrOverrideJson(raw: string, fieldLabel: string): s
   return null
 }
 
-type Step = 'category' | 'productType' | 'detail'
+/** 团购 sku.commodity 字面量覆盖：表格式拆分（避免手写 JSON 数量/单位错误） */
+type SkuCommodityFormItem = { id: string; name: string; priceCents: string; count: string }
+type SkuCommodityFormGroup = {
+  id: string
+  groupName: string
+  totalCount: string
+  optionCount: string
+  items: SkuCommodityFormItem[]
+}
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
+
+function emptySkuCommodityForm(): SkuCommodityFormGroup[] {
+  const mkItem = (): SkuCommodityFormItem => ({ id: newId('sci'), name: '', priceCents: '', count: '1' })
+  return [
+    { id: newId('scg'), groupName: '', totalCount: '1', optionCount: '1', items: [mkItem()] },
+    { id: newId('scg'), groupName: '', totalCount: '1', optionCount: '1', items: [mkItem()] },
+  ]
+}
+
+function parseSkuCommodityFormFromJson(raw: string): SkuCommodityFormGroup[] | null {
+  const s = raw.trim()
+  if (!s) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(s) as unknown
+  } catch {
+    return null
+  }
+  const groups = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object' && Array.isArray((parsed as { groups?: unknown }).groups)
+      ? (parsed as { groups: unknown[] }).groups
+      : null
+  if (!Array.isArray(groups) || groups.length === 0) return null
+  const out: SkuCommodityFormGroup[] = []
+  for (const g of groups) {
+    if (!g || typeof g !== 'object') return null
+    const gr = g as Record<string, unknown>
+    const itemList = Array.isArray(gr.item_list) ? gr.item_list : []
+    if (itemList.length === 0) return null
+    const items: SkuCommodityFormItem[] = itemList.map((it) => {
+      const r = it as Record<string, unknown>
+      const priceRaw = r.price
+      const priceCents =
+        typeof priceRaw === 'number' && Number.isFinite(priceRaw)
+          ? String(Math.floor(priceRaw))
+          : String(priceRaw ?? '').trim()
+      const qty = Math.max(1, Math.floor(Number(r.count ?? r.quantity ?? 1) || 1))
+      return {
+        id: newId('sci'),
+        name: String(r.name ?? '').trim(),
+        priceCents,
+        count: String(qty),
+      }
+    })
+    out.push({
+      id: newId('scg'),
+      groupName: String(gr.group_name ?? '').trim(),
+      totalCount: String(Math.max(1, Math.floor(Number(gr.total_count) || 1))),
+      optionCount: String(Math.max(1, Math.floor(Number(gr.option_count) || 1))),
+      items,
+    })
+  }
+  return out
+}
+
+/** 生成开放平台要求的 ItemGroupStruct[] JSON；price/count 为数字，unit 固定「份」 */
+function skuCommodityFormToJson(groups: SkuCommodityFormGroup[]): string {
+  const arr = groups.map((g) => ({
+    group_name: (g.groupName.trim() || '商品组').slice(0, 80),
+    total_count: Math.max(1, parseInt(String(g.totalCount).replace(/\D/g, ''), 10) || 1),
+    option_count: Math.max(1, parseInt(String(g.optionCount).replace(/\D/g, ''), 10) || 1),
+    item_list: g.items.map((it) => {
+      const pc = parseInt(String(it.priceCents).replace(/\D/g, ''), 10)
+      const price = Number.isFinite(pc) && pc > 0 ? pc : 1
+      const c = Math.max(1, parseInt(String(it.count).replace(/\D/g, ''), 10) || 1)
+      return {
+        name: (it.name.trim() || '单品').slice(0, 120),
+        price,
+        count: c,
+        unit: '份',
+      }
+    }),
+  }))
+  return JSON.stringify(arr)
+}
+
+type Step = 'category' | 'productType' | 'detail'
 
 function readToken() {
   return readMerchantSession('meoo_douyin_merchant_token')
@@ -578,6 +664,60 @@ export default function DouyinProductCreateWizard({
   const [templateSkuAttrs, setTemplateSkuAttrs] = useState<TemplateAttr[]>([])
   const [templateAttrOverrides, setTemplateAttrOverrides] = useState<Record<string, string>>({})
   const [templateSkuAttrOverrides, setTemplateSkuAttrOverrides] = useState<Record<string, string>>({})
+  const [skuCommodityGroupsForm, setSkuCommodityGroupsForm] = useState<SkuCommodityFormGroup[]>(() =>
+    emptySkuCommodityForm(),
+  )
+
+  const applySkuCommodityForm = useCallback((next: SkuCommodityFormGroup[]) => {
+    setSkuCommodityGroupsForm(next)
+    const empty = next.every((g) =>
+      g.items.every((it) => !it.name.trim() && !String(it.priceCents).trim()),
+    )
+    setTemplateSkuAttrOverrides((prev) => {
+      const o = { ...prev }
+      if (empty) delete o.commodity
+      else o.commodity = skuCommodityFormToJson(next)
+      return o
+    })
+  }, [])
+
+  const fillSkuCommodityFromCombo = useCallback(() => {
+    if (productType !== 1) return
+    const rows: SkuCommodityFormGroup[] = comboGroups
+      .map((g, gi) => {
+        const items: SkuCommodityFormItem[] = g.items
+          .filter((it) => it.name.trim())
+          .map((it) => ({
+            id: newId('sci'),
+            name: mergeComboItemDisplayName({
+              name: it.name,
+              spec: '',
+              brand: '',
+              barcode: '',
+            }),
+            priceCents:
+              resolveComboItemPriceCents(it) ||
+              (Number.isFinite(Number.parseFloat(priceYuan)) && Number.parseFloat(priceYuan) > 0
+                ? String(Math.round(Number.parseFloat(priceYuan) * 100))
+                : ''),
+            count: (it.qty || '1').trim() || '1',
+          }))
+        if (items.length === 0) return null
+        return {
+          id: newId('scg'),
+          groupName: `商品组${gi + 1}`,
+          totalCount: '1',
+          optionCount: '1',
+          items,
+        }
+      })
+      .filter((x): x is SkuCommodityFormGroup => x != null)
+    if (rows.length === 0) {
+      window.alert('请先在上方「商品组」添加带名称的单品，再同步。')
+      return
+    }
+    applySkuCommodityForm(rows)
+  }, [productType, comboGroups, applySkuCommodityForm, priceYuan])
   const [skuAttrExtraRows, setSkuAttrExtraRows] = useState<{ id: string; key: string; value: string }[]>([])
   const [comboItemModal, setComboItemModal] = useState<{
     groupId: string
@@ -828,6 +968,15 @@ export default function DouyinProductCreateWizard({
           (a.name || '').localeCompare(b.name || '', 'zh-Hans-CN'),
       ),
     [templateSkuAttrs],
+  )
+
+  /** 团购 commodity 在下方「表格覆盖」编辑，避免与开放平台列表重复两轨 */
+  const openPlatformSkuAttrsSansCommodity = useMemo(
+    () =>
+      productType === 1
+        ? sortedTemplateSkuAttrs.filter((a) => !/^commodity$/i.test((a.key ?? '').trim()))
+        : sortedTemplateSkuAttrs,
+    [sortedTemplateSkuAttrs, productType],
   )
 
   const skuPriceCentsAttr = useMemo(
@@ -1120,6 +1269,7 @@ export default function DouyinProductCreateWizard({
       setTemplateSkuAttrs(tpl.sku_attrs)
       setTemplateAttrOverrides({})
       setTemplateSkuAttrOverrides({})
+      setSkuCommodityGroupsForm(emptySkuCommodityForm())
       setSkuAttrExtraRows([])
       setSalesChannel((prev) =>
         tpl.sales_channels.some((x) => x.value === prev)
@@ -1297,6 +1447,7 @@ export default function DouyinProductCreateWizard({
         setTemplateSkuAttrs(tpl.sku_attrs)
         setTemplateAttrOverrides({})
         setTemplateSkuAttrOverrides({})
+        setSkuCommodityGroupsForm(emptySkuCommodityForm())
         setSkuAttrExtraRows([])
         const ch = si && typeof si.channel === 'string' ? si.channel : null
         setSalesChannel(
@@ -3550,31 +3701,267 @@ export default function DouyinProductCreateWizard({
                   className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-[11px]"
                   placeholder='合法示例：[{"group_name":"A","total_count":1,"option_count":1,"item_list":[{"name":"单品","price":2000,"count":1,"unit":"份"}]}]'
                 />
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                  <label className="text-xs font-medium text-gray-800">commodity（SKU attr）</label>
-                  <button
-                    type="button"
-                    className="rounded border border-gray-300 bg-white px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
-                    onClick={() =>
-                      setTemplateSkuAttrOverrides((prev) => {
-                        const next = { ...prev }
-                        delete next.commodity
-                        return next
-                      })
-                    }
-                  >
-                    清空
-                  </button>
+                <div className="mt-3 rounded-lg border border-amber-300/90 bg-white/95 px-3 py-3 shadow-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-900">
+                        sku.commodity（套餐 JSON）
+                        <span className="ml-1 text-red-600">*</span>
+                      </label>
+                      <p className="mt-0.5 max-w-xl text-[11px] leading-relaxed text-gray-600">
+                        按组填写单品<strong>名称</strong>、<strong>售价·分</strong>、<strong>数量</strong>；单位固定为「份」，与来客报错「数量必须大于0且单位必须为份」一致。留空全部单品名与售价则<strong>不覆盖</strong>，走网关自动生成。
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                      <button
+                        type="button"
+                        className="rounded border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-900 hover:bg-indigo-100"
+                        onClick={fillSkuCommodityFromCombo}
+                      >
+                        从商品组同步
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-800 hover:bg-gray-50"
+                        onClick={() =>
+                          applySkuCommodityForm([
+                            ...skuCommodityGroupsForm,
+                            {
+                              id: newId('scg'),
+                              groupName: `商品组${skuCommodityGroupsForm.length + 1}`,
+                              totalCount: '1',
+                              optionCount: '1',
+                              items: [
+                                { id: newId('sci'), name: '', priceCents: '', count: '1' },
+                              ],
+                            },
+                          ])
+                        }
+                      >
+                        添加一组
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded border border-gray-300 bg-white px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-50"
+                        onClick={() => applySkuCommodityForm(emptySkuCommodityForm())}
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-4">
+                    {skuCommodityGroupsForm.map((g, gi) => (
+                      <div key={g.id} className="rounded-lg border border-amber-200/80 bg-amber-50/50 px-2 py-2">
+                        <div className="mb-2 flex flex-wrap items-end gap-2">
+                          <div className="min-w-[6rem] flex-1">
+                            <label className="block text-[10px] font-medium text-gray-600">组名 group_name</label>
+                            <input
+                              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                              value={g.groupName}
+                              onChange={(e) => {
+                                const v = e.target.value
+                                applySkuCommodityForm(
+                                  skuCommodityGroupsForm.map((row, i) =>
+                                    i === gi ? { ...row, groupName: v } : row,
+                                  ),
+                                )
+                              }}
+                              placeholder="例如：套餐组 A"
+                            />
+                          </div>
+                          <div className="w-20">
+                            <label className="block text-[10px] font-medium text-gray-600">total_count</label>
+                            <input
+                              type="number"
+                              min={1}
+                              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                              value={g.totalCount}
+                              onChange={(e) => {
+                                const v = e.target.value
+                                applySkuCommodityForm(
+                                  skuCommodityGroupsForm.map((row, i) =>
+                                    i === gi ? { ...row, totalCount: v } : row,
+                                  ),
+                                )
+                              }}
+                            />
+                          </div>
+                          <div className="w-20">
+                            <label className="block text-[10px] font-medium text-gray-600">option_count</label>
+                            <input
+                              type="number"
+                              min={1}
+                              className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                              value={g.optionCount}
+                              onChange={(e) => {
+                                const v = e.target.value
+                                applySkuCommodityForm(
+                                  skuCommodityGroupsForm.map((row, i) =>
+                                    i === gi ? { ...row, optionCount: v } : row,
+                                  ),
+                                )
+                              }}
+                            />
+                          </div>
+                          {skuCommodityGroupsForm.length > 1 ? (
+                            <button
+                              type="button"
+                              className="mb-0.5 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] text-red-800 hover:bg-red-100"
+                              onClick={() =>
+                                applySkuCommodityForm(
+                                  skuCommodityGroupsForm.filter((_, i) => i !== gi),
+                                )
+                              }
+                            >
+                              删除本组
+                            </button>
+                          ) : null}
+                        </div>
+                        <p className="mb-1 text-[10px] font-medium text-gray-700">单品 item_list</p>
+                        <div className="space-y-2">
+                          {g.items.map((it, ii) => (
+                            <div
+                              key={it.id}
+                              className="flex flex-wrap items-end gap-2 rounded border border-white/80 bg-white/90 px-2 py-2"
+                            >
+                              <div className="min-w-[8rem] flex-[2]">
+                                <label className="block text-[10px] text-gray-600">名称 name</label>
+                                <input
+                                  className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                  value={it.name}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    applySkuCommodityForm(
+                                      skuCommodityGroupsForm.map((row, i) =>
+                                        i !== gi
+                                          ? row
+                                          : {
+                                              ...row,
+                                              items: row.items.map((x, j) =>
+                                                j === ii ? { ...x, name: v } : x,
+                                              ),
+                                            },
+                                      ),
+                                    )
+                                  }}
+                                  placeholder="单品名称"
+                                />
+                              </div>
+                              <div className="w-24">
+                                <label className="block text-[10px] text-gray-600">售价·分 price</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                  value={it.priceCents}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    applySkuCommodityForm(
+                                      skuCommodityGroupsForm.map((row, i) =>
+                                        i !== gi
+                                          ? row
+                                          : {
+                                              ...row,
+                                              items: row.items.map((x, j) =>
+                                                j === ii ? { ...x, priceCents: v } : x,
+                                              ),
+                                            },
+                                      ),
+                                    )
+                                  }}
+                                  placeholder="如 2000"
+                                />
+                              </div>
+                              <div className="w-20">
+                                <label className="block text-[10px] text-gray-600">数量 count</label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                  value={it.count}
+                                  onChange={(e) => {
+                                    const v = e.target.value
+                                    applySkuCommodityForm(
+                                      skuCommodityGroupsForm.map((row, i) =>
+                                        i !== gi
+                                          ? row
+                                          : {
+                                              ...row,
+                                              items: row.items.map((x, j) =>
+                                                j === ii ? { ...x, count: v } : x,
+                                              ),
+                                            },
+                                      ),
+                                    )
+                                  }}
+                                />
+                              </div>
+                              <div className="w-14 pb-1 text-center text-[10px] text-gray-500">单位：份</div>
+                              {g.items.length > 1 ? (
+                                <button
+                                  type="button"
+                                  className="mb-0.5 rounded border border-gray-300 bg-white px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
+                                  onClick={() =>
+                                    applySkuCommodityForm(
+                                      skuCommodityGroupsForm.map((row, i) =>
+                                        i !== gi
+                                          ? row
+                                          : { ...row, items: row.items.filter((_, j) => j !== ii) },
+                                      ),
+                                    )
+                                  }
+                                >
+                                  删单品
+                                </button>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="mt-2 rounded border border-gray-300 bg-white px-2 py-1 text-[11px] text-gray-800 hover:bg-gray-50"
+                          onClick={() =>
+                            applySkuCommodityForm(
+                              skuCommodityGroupsForm.map((row, i) =>
+                                i !== gi
+                                  ? row
+                                  : {
+                                      ...row,
+                                      items: [
+                                        ...row.items,
+                                        { id: newId('sci'), name: '', priceCents: '', count: '1' },
+                                      ],
+                                    },
+                              ),
+                            )
+                          }
+                        >
+                          本组添加单品
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <details className="mt-2 text-[11px] text-gray-600">
+                    <summary className="cursor-pointer select-none font-medium text-gray-700">查看将提交的 commodity JSON</summary>
+                    <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded border border-gray-200 bg-gray-50 p-2 font-mono text-[10px] text-gray-800">
+                      {templateSkuAttrOverrides.commodity?.trim()
+                        ? templateSkuAttrOverrides.commodity
+                        : '（当前无覆盖：网关将按商品组自动生成）'}
+                    </pre>
+                    <button
+                      type="button"
+                      className="mt-2 rounded border border-gray-300 bg-white px-2 py-1 text-[11px] text-gray-800 hover:bg-gray-50"
+                      onClick={() => {
+                        const raw = (templateSkuAttrOverrides.commodity ?? '').trim()
+                        const p = parseSkuCommodityFormFromJson(raw)
+                        if (p) applySkuCommodityForm(p)
+                        else window.alert('当前无 commodity 或 JSON 无法解析为组结构，无法回填表格。')
+                      }}
+                    >
+                      将当前 JSON 解析回表格
+                    </button>
+                  </details>
                 </div>
-                <textarea
-                  rows={4}
-                  value={templateSkuAttrOverrides.commodity ?? ''}
-                  onChange={(e) =>
-                    setTemplateSkuAttrOverrides((prev) => ({ ...prev, commodity: e.target.value }))
-                  }
-                  className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5 font-mono text-[11px]"
-                  placeholder="与上同结构的 JSON；单品 price 为分、count 为正整数、unit 为「份」。不需要请清空。"
-                />
               </div>
             ) : null}
             {templateProductAttrs.length > 0 || templateSkuAttrs.length > 0 ? (
@@ -3673,12 +4060,20 @@ export default function DouyinProductCreateWizard({
                 )}
                 <h4 className="mt-6 text-sm font-semibold text-gray-900">
                   SKU 属性（sku_attrs）· 共 {sortedTemplateSkuAttrs.length} 项
+                  {productType === 1 &&
+                  sortedTemplateSkuAttrs.some((a) => /^commodity$/i.test((a.key ?? '').trim())) ? (
+                    <span className="ml-1 text-xs font-normal text-gray-500">（commodity 见上方表格）</span>
+                  ) : null}
                 </h4>
                 {sortedTemplateSkuAttrs.length === 0 ? (
                   <p className="mt-1 text-xs text-gray-500">当前类目无 sku_attrs 返回。</p>
+                ) : openPlatformSkuAttrsSansCommodity.length === 0 ? (
+                  <p className="mt-1 text-xs text-gray-500">
+                    模板中仅含 commodity 控件；请在上方「sku.commodity」表格填写（团购覆盖）。
+                  </p>
                 ) : (
                   <ul className="mt-2 space-y-3">
-                    {sortedTemplateSkuAttrs.map((a) => {
+                    {openPlatformSkuAttrsSansCommodity.map((a) => {
                       const covered = templateSkuAttrWizardCoveredExtended(a, skuTemplateCoverCtx, productType)
                       const comboLike = looksComboTemplateAttr(a)
                       const how = douyinTemplateFieldHowToFillZh(a, { isSku: true, productType })

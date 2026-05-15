@@ -7,6 +7,20 @@ import { cn } from '../cn'
 type Layout = 'centered' | 'dock'
 type ModelFilterTab = 'all' | 'chat' | 'image'
 
+function readImageFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
+  const out: File[] = []
+  const items = ev.clipboardData?.items
+  if (!items) return out
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]
+    if (it?.kind === 'file') {
+      const f = it.getAsFile()
+      if (f && /^image\//i.test(f.type)) out.push(f)
+    }
+  }
+  return out
+}
+
 function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
   if (typeof window === 'undefined') return null
   const w = window as unknown as {
@@ -28,8 +42,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     pendingPreviewId,
     pendingComposerImages,
     addComposerImages,
+    addComposerImageFiles,
     removeComposerImage,
     messages,
+    pendingQuote,
+    clearPendingQuote,
   } = useAiAgent()
 
   const fileRef = useRef<HTMLInputElement>(null)
@@ -128,6 +145,23 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           className="shrink-0 scale-[0.92] pb-0.5 sm:scale-100"
         />
         <div className="min-w-0 flex-1">
+      {pendingQuote ? (
+        <div className="mb-2 flex items-start gap-2 rounded-xl border border-indigo-200/90 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-950">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-indigo-900">引用对话</p>
+            <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-[11px] text-indigo-900/90">
+              {pendingQuote.role === 'user' ? '我' : '助手'}：{pendingQuote.excerpt}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={clearPendingQuote}
+            className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100/80"
+          >
+            移除
+          </button>
+        </div>
+      ) : null}
       {pendingComposerImages.length > 0 ? (
         <div className="mb-2 flex flex-wrap gap-2 px-1">
           {pendingComposerImages.map((src, i) => (
@@ -154,6 +188,12 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
         <textarea
           value={inputDraft}
           onChange={(e) => setInputDraft(e.target.value)}
+          onPaste={(e) => {
+            const files = readImageFilesFromClipboard(e)
+            if (!files.length) return
+            e.preventDefault()
+            void addComposerImageFiles(files)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
@@ -165,7 +205,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           placeholder={
             modelFilter === 'image'
               ? '文生图：直接描述画面；图生图：先点右侧上传参考图，再写希望保留或修改的内容。'
-              : '描述你想完成的任务，或输入 @ 提及页面要点…'
+              : '描述你想完成的任务，或输入 @ 提及页面要点；可直接粘贴多张截图（Ctrl+V）…'
           }
           className={cn(
             'w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50',
@@ -254,7 +294,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
             disabled={disabled || aiSending || pendingComposerImages.length >= 4}
             onClick={() => fileRef.current?.click()}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
-            title="上传截图（最多 4 张）"
+            title="上传或粘贴截图（最多 4 张；输入框内 Ctrl+V 可一次粘贴多张）"
             aria-label="上传图片"
           >
             <ImagePlus className="h-4 w-4" />
@@ -262,7 +302,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           <button
             type="button"
             onClick={() => sendUserText(inputDraft)}
-            disabled={(!inputDraft.trim() && pendingComposerImages.length === 0) || aiSending || disabled}
+            disabled={
+              (!inputDraft.trim() && pendingComposerImages.length === 0 && !pendingQuote) ||
+              aiSending ||
+              disabled
+            }
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="发送"
           >

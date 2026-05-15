@@ -59,6 +59,13 @@ export type AiTaskPreviewPayload = {
   taskType: AiTaskType
 }
 
+/** 输入框中待发送的「引用某条对话」片段（发送后写入用户消息正文前缀） */
+export type AiAgentPendingQuote = {
+  quotedMessageId: string
+  role: 'user' | 'assistant'
+  excerpt: string
+}
+
 export type AiAgentMessage = {
   id: string
   role: AiAgentMessageRole
