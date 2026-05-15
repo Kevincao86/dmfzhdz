@@ -2019,20 +2019,28 @@ function comboRuleFlattenedItemsJsonString(
 }
 
 /**
- * product.attr `combo_rule` 与 sku `commodity` 共用的套餐 JSON（默认扁平 ItemStruct[]）。
- * `DOUYIN_GOODS_COMBO_ATTR_ITEMS_SHAPE=groups`（或旧名 LITERAL_SHAPE=groups）时改 ItemGroupStruct 组数组。
+ * SKU `commodity`（COMMODITY 控件）：默认 ItemGroupStruct[] 组数组 JSON。
+ * 排障：`DOUYIN_GOODS_COMBO_COMMODITY_JSON_SHAPE=flattened` 可试扁平 ItemStruct[]（多数类目不适用）。
  */
-function comboRuleItemAttrsJsonString(
+function comboRuleSkuCommodityAttrJsonString(
   comboRule: Record<string, unknown>,
   originFenFallback: number,
 ): string {
   const shape =
-    process.env.DOUYIN_GOODS_COMBO_ATTR_ITEMS_SHAPE?.trim().toLowerCase() ||
-    process.env.DOUYIN_GOODS_COMBO_ATTR_LITERAL_SHAPE?.trim().toLowerCase()
-  if (shape === 'groups' || shape === 'group_array' || shape === 'legacy') {
-    return comboRuleGroupsArrayJsonString(comboRule)
+    process.env.DOUYIN_GOODS_COMBO_COMMODITY_JSON_SHAPE?.trim().toLowerCase() ||
+    process.env.DOUYIN_GOODS_COMBO_ATTR_ITEMS_SHAPE?.trim().toLowerCase()
+  if (shape === 'flattened' || shape === 'flat' || shape === 'items') {
+    return comboRuleFlattenedItemsJsonString(comboRule, originFenFallback)
   }
-  return comboRuleFlattenedItemsJsonString(comboRule, originFenFallback)
+  return comboRuleGroupsArrayJsonString(comboRule)
+}
+
+/**
+ * product.attr 字面量 `combo_rule`（无 opaque 槽、且非团购顶层已带 combo_rule 时）。
+ * 形态与 commodity 一致：ItemGroupStruct[] 组数组。
+ */
+function comboRuleProductLiteralAttrJsonString(comboRule: Record<string, unknown>): string {
+  return comboRuleGroupsArrayJsonString(comboRule)
 }
 
 /** attr 内 opaque 套餐槽：ItemGroupStruct 数组或 wrapped `{"groups":[]}`（由 DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE 控制）。 */
@@ -2116,14 +2124,14 @@ function applyComboRuleToMergedProductAttrs(
   /** 勿写入字面量 key「combo_rule」：模板多为不透明 key，乱写会触发上游异常 */
 }
 
-/** SKU 模板 COMMODITY/commodity：零售类目与字面量 combo_rule 同源（默认扁平 ItemStruct[]）。 */
+/** SKU 模板 COMMODITY/commodity：ItemGroupStruct[] 组数组（与开放平台 COMMODITY 控件一致）。 */
 function applyComboRuleToSkuAttrMap(
   skuAttrs: Record<string, unknown>[],
   skuAttrMap: Record<string, string>,
   comboRule: Record<string, unknown>,
   originFenFallback: number,
 ): void {
-  const commodityPayload = comboRuleItemAttrsJsonString(comboRule, originFenFallback)
+  const commodityPayload = comboRuleSkuCommodityAttrJsonString(comboRule, originFenFallback)
   if (comboRuleAttrJsonIsEffectivelyEmpty(commodityPayload)) return
   for (const a of skuAttrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
@@ -2564,10 +2572,11 @@ async function buildGoodlifeProductSaveBody(
    */
   const tplProductComboKeys = templateComboAttrKeysFromAttrs(attrs)
   /**
-   * 无 opaque 套餐槽时：字面量 `combo_rule` 与 SKU `commodity` 默认均为扁平 ItemStruct[]（与顶层 combo_rule 对象并存）。
+   * 团购：顶层 `product.combo_rule` 已带完整 ItemGroupStruct；勿再写 attr 字面量 `combo_rule`（扁平/组数组均易与 COMMODITY 校验冲突）。
+   * 代金券等无顶层套餐时：无 opaque 槽则写入组数组 JSON 兜底。
    */
-  if (comboRule && tplProductComboKeys.length === 0) {
-    const literalStr = comboRuleItemAttrsJsonString(comboRule, originFen)
+  if (comboRule && tplProductComboKeys.length === 0 && !isGroupBuy) {
+    const literalStr = comboRuleProductLiteralAttrJsonString(comboRule)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(literalStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = literalStr
     }
@@ -2615,9 +2624,9 @@ async function buildGoodlifeProductSaveBody(
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
   if (comboRule && tplSkuComboKeys.length === 0) {
-    const flatStr = comboRuleItemAttrsJsonString(comboRule, originFen)
-    if (!comboRuleAttrJsonIsEffectivelyEmpty(flatStr) && !(skuAttrMap.commodity ?? '').trim()) {
-      skuAttrMap.commodity = flatStr
+    const commodityStr = comboRuleSkuCommodityAttrJsonString(comboRule, originFen)
+    if (!comboRuleAttrJsonIsEffectivelyEmpty(commodityStr) && !(skuAttrMap.commodity ?? '').trim()) {
+      skuAttrMap.commodity = commodityStr
     }
   }
 
@@ -2775,12 +2784,13 @@ function summarizeDouyinProductSaveForLog(
   const combo_sku_commodity_shape =
     skuCommodityPeek === '[' ? 'array' : skuCommodityPeek === '{' ? 'object' : skuCommodityPeek ? 'other' : 'none'
   const itemsShapeEnv =
-    process.env.DOUYIN_GOODS_COMBO_ATTR_ITEMS_SHAPE?.trim().toLowerCase() ||
-    process.env.DOUYIN_GOODS_COMBO_ATTR_LITERAL_SHAPE?.trim().toLowerCase()
-  const combo_attr_items_shape =
-    itemsShapeEnv === 'groups' || itemsShapeEnv === 'group_array' || itemsShapeEnv === 'legacy'
-      ? 'groups'
-      : 'flattened_items'
+    process.env.DOUYIN_GOODS_COMBO_COMMODITY_JSON_SHAPE?.trim().toLowerCase() ||
+    process.env.DOUYIN_GOODS_COMBO_ATTR_ITEMS_SHAPE?.trim().toLowerCase()
+  const combo_sku_commodity_items_shape =
+    itemsShapeEnv === 'flattened' || itemsShapeEnv === 'flat' || itemsShapeEnv === 'items'
+      ? 'flattened_items'
+      : 'groups'
+  const combo_attr_literal_in_body = Boolean((ak?.combo_rule ?? '').trim())
   return {
     mode,
     relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
@@ -2792,7 +2802,8 @@ function summarizeDouyinProductSaveForLog(
     combo_in_product_body: Boolean(product?.combo_rule),
     combo_attr_json_shape,
     combo_sku_commodity_shape,
-    combo_attr_items_shape,
+    combo_sku_commodity_items_shape,
+    combo_attr_literal_in_body,
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
     combo_rule_debug: maskDouyinComboRuleForLog(comboRuleRaw),
     template_combo_attr_keys: tplComboKeys,
