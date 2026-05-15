@@ -2275,6 +2275,103 @@ function applyComboRuleToSkuAttrMap(
   /** 勿写入字面量「commodity」：须与 template.get 的 sku_attrs.key 一致 */
 }
 
+function countComboGroupsInCommodityAttrJson(s: string): number {
+  const t = (s ?? '').trim()
+  if (!t.startsWith('[') && !t.startsWith('{')) return -1
+  try {
+    const j = JSON.parse(t) as unknown
+    if (Array.isArray(j)) return j.length
+    if (j && typeof j === 'object' && Array.isArray((j as { groups?: unknown[] }).groups)) {
+      return (j as { groups: unknown[] }).groups.length
+    }
+  } catch {
+    return -1
+  }
+  return -1
+}
+
+/**
+ * 用户手填的 sku.commodity 常只有 1 组，而网关已对 `product.combo_rule` 做「≥2 组」扩展或零售拆组，
+ * 二者组数不一致时抖音常误报「数量必须大于0且单位必须为份」。按 `combo_rule` 组数补齐/截断并保留用户已填组的单品。
+ */
+function alignSkuCommodityJsonToComboRuleGroups(
+  existingJson: string,
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+): string {
+  const shape =
+    process.env.DOUYIN_GOODS_COMBO_COMMODITY_JSON_SHAPE?.trim().toLowerCase() ||
+    process.env.DOUYIN_GOODS_COMBO_ATTR_ITEMS_SHAPE?.trim().toLowerCase()
+  if (shape === 'flattened' || shape === 'flat' || shape === 'items') return existingJson
+
+  const expArr = normalizeComboGroupsArrayForAttrMaps(comboRule, categoryId, originFenFallback)
+  if (expArr.length === 0) return existingJson
+
+  const curLen = countComboGroupsInCommodityAttrJson(existingJson)
+  if (curLen < 0) return existingJson
+  if (curLen === expArr.length) return existingJson
+
+  let userGroups: Record<string, unknown>[]
+  try {
+    const parsed = JSON.parse((existingJson ?? '').trim()) as unknown
+    if (Array.isArray(parsed)) userGroups = parsed as Record<string, unknown>[]
+    else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { groups?: unknown[] }).groups)) {
+      userGroups = (parsed as { groups: Record<string, unknown>[] }).groups
+    } else {
+      return comboRuleSkuCommodityAttrJsonString(comboRule, originFenFallback, categoryId)
+    }
+  } catch {
+    return comboRuleSkuCommodityAttrJsonString(comboRule, originFenFallback, categoryId)
+  }
+
+  const out: Record<string, unknown>[] = []
+  for (let i = 0; i < expArr.length; i++) {
+    const expG = expArr[i] as Record<string, unknown>
+    if (i < userGroups.length && userGroups[i] && typeof userGroups[i] === 'object') {
+      const uG = userGroups[i] as Record<string, unknown>
+      const uItemList = Array.isArray(uG.item_list)
+        ? uG.item_list
+        : Array.isArray(uG.items)
+          ? uG.items
+          : null
+      const base = JSON.parse(JSON.stringify(expG)) as Record<string, unknown>
+      const listKey = Array.isArray(base.item_list)
+        ? 'item_list'
+        : Array.isArray(base.items)
+          ? 'items'
+          : 'item_list'
+      if (Array.isArray(uItemList) && uItemList.length > 0) {
+        base[listKey] = uItemList
+      }
+      out.push(base)
+    } else {
+      out.push(JSON.parse(JSON.stringify(expG)) as Record<string, unknown>)
+    }
+  }
+  return serializeComboGroupsAttrPayload({ groups: out } as Record<string, unknown>, categoryId, originFenFallback)
+}
+
+function alignAllSkuCommodityAttrsToComboRule(
+  skuAttrs: Record<string, unknown>[],
+  skuAttrMap: Record<string, string>,
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+): void {
+  for (const a of skuAttrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key) continue
+    const name = String((a as Record<string, unknown>).name ?? '')
+    const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+    if (!(vt === 'COMMODITY' || /^commodity$/i.test(key) || /菜品搭配|商品搭配/.test(name))) continue
+    const cur = (skuAttrMap[key] ?? '').trim()
+    if (!cur) continue
+    const next = alignSkuCommodityJsonToComboRuleGroups(cur, comboRule, categoryId, originFenFallback)
+    if (next !== cur) skuAttrMap[key] = next.slice(0, 120_000)
+  }
+}
+
 function mergeGoodlifeProductAttrMapFromErp(
   attrs: Record<string, unknown>[],
   erp: Record<string, unknown>,
@@ -2799,6 +2896,9 @@ async function buildGoodlifeProductSaveBody(
   }
   if (comboRule) {
     applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRule, originFen, category_id)
+    if (isGroupBuy) {
+      alignAllSkuCommodityAttrsToComboRule(skuAttrs, skuAttrMap, comboRule, category_id, originFen)
+    }
   }
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
