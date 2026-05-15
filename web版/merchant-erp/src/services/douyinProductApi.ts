@@ -1402,7 +1402,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const comboQtyHint =
       /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
-        ? ' 说明：多为 attr 内套餐 JSON 与 item_list（count、unit=份）不一致，或手填了原始 package_combo。请部署最新网关；单品项仅需 name/price/count/unit。'
+        ? ' 说明：多为 sku.commodity 或 attr 套餐 JSON 形态不符（须 ItemGroupStruct 组数组，组内 item_list 含 count>0、unit=份）。请部署最新网关；勿手填原始 package_combo。'
         : ''
     const comboIllegalHint =
       /合法的combo|合法.*combo_rule/i.test(base) || /合法的combo|合法.*combo_rule/i.test(sub)
