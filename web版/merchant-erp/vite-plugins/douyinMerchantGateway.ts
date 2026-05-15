@@ -1979,8 +1979,9 @@ function expandGroupBuyComboRuleMinTwoGroups(comboRule: Record<string, unknown> 
   return { groups: [g0, clone] }
 }
 
-function categoryUsesStringifiedComboItemNumbers(categoryId: string): boolean {
-  const raw = process.env.DOUYIN_GOODS_COMBO_ATTR_ITEM_NUMBERS_AS_STRING_CATEGORY_IDS
+/** 零售等类目：用户只有 1 个商品组但组内多个单品时，拆成「每组 1 个单品」的多组（满足「商品组≥2」且避免 A/B 克隆同源误校验）。未设置 env 时默认含 5003003；关闭设空。 */
+function categoryRetailSplitItemsToSeparateGroups(categoryId: string): boolean {
+  const raw = process.env.DOUYIN_GOODS_RETAIL_SPLIT_ITEMS_TO_GROUPS_CATEGORY_IDS
   const cid = String(categoryId ?? '').trim()
   if (raw === undefined) return cid === '5003003'
   const t = raw.trim()
@@ -1989,19 +1990,94 @@ function categoryUsesStringifiedComboItemNumbers(categoryId: string): boolean {
 }
 
 /**
- * 写入 attr_key_value_map / sku commodity 的 ItemGroupStruct[] JSON。
- * 指定类目下将 item_list 内 count、price 转为字符串，避免「数量必须大于0且单位必须为份」误报（仍保留完整组数，满足「商品组不能少于2个」）。
+ * 单组且 item_list≥2 → 每组只保留 1 个单品；组名带序号。
  */
-function comboRuleGroupsArrayJsonStringForAttrMaps(
+function retailSplitSingleGroupIntoOneGroupPerItem(
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+): Record<string, unknown> | null {
+  if (!categoryRetailSplitItemsToSeparateGroups(categoryId)) return null
+  const groups = (comboRule as { groups?: unknown[] }).groups
+  if (!Array.isArray(groups) || groups.length !== 1) return null
+  const g0 = groups[0] as Record<string, unknown>
+  const list = Array.isArray(g0.item_list)
+    ? g0.item_list
+    : Array.isArray(g0.items)
+      ? g0.items
+      : []
+  if (!Array.isArray(list) || list.length < 2) return null
+  const base = String(g0.group_name ?? '商品组').trim().slice(0, 36) || '商品组'
+  const newGroups = list.map((it, idx) => ({
+    group_name: `${base}-${idx + 1}`.slice(0, 60),
+    total_count: 1,
+    option_count: 1,
+    item_list: [it],
+  }))
+  return { groups: newGroups }
+}
+
+function categoryUsesStringifiedComboItemNumbers(categoryId: string): boolean {
+  const raw = process.env.DOUYIN_GOODS_COMBO_ATTR_ITEM_NUMBERS_AS_STRING_CATEGORY_IDS
+  const cid = String(categoryId ?? '').trim()
+  /** 默认关闭：字符串化曾仍触发误报，改为零售规范化数值 + quantity + wrapped */
+  if (raw === undefined) return false
+  const t = raw.trim()
+  if (t === '' || t === '0' || t === 'false' || t === 'off') return false
+  return new Set(t.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)).has(cid)
+}
+
+/** 写入 attr/sku 套餐 JSON 前规范化单品字段（数值 count/price/unit=份，并带 quantity 兼容字段）。默认类目 5003003。 */
+function categoryRetailComboAttrNormalize(categoryId: string): boolean {
+  const raw = process.env.DOUYIN_GOODS_COMBO_ATTR_RETAIL_NORMALIZE_CATEGORY_IDS
+  const cid = String(categoryId ?? '').trim()
+  if (raw === undefined) return cid === '5003003'
+  const t = raw.trim()
+  if (t === '' || t === '0' || t === 'false' || t === 'off') return false
+  return new Set(t.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)).has(cid)
+}
+
+/** attr.combo_rule / sku.commodity 使用 `{"groups":[...]}` 包裹。默认关闭（数组更安全）；排障可设 DOUYIN_GOODS_COMBO_ATTR_WRAPPED_GROUPS_CATEGORY_IDS=5003003 */
+function categoryUsesWrappedGroupsAttrCombo(categoryId: string): boolean {
+  const raw = process.env.DOUYIN_GOODS_COMBO_ATTR_WRAPPED_GROUPS_CATEGORY_IDS
+  const cid = String(categoryId ?? '').trim()
+  if (raw === undefined || raw.trim() === '') return false
+  const t = raw.trim()
+  if (t === '' || t === '0' || t === 'false' || t === 'off') return false
+  return new Set(t.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)).has(cid)
+}
+
+function normalizeComboItemRowForAttrJson(
+  row: Record<string, unknown>,
+  originFenFallback: number,
+  mode: 'retail' | 'stringify',
+): Record<string, unknown> {
+  const count = comboItemCountFromRow(row)
+  const price = comboItemPriceFenFromRow(row, originFenFallback)
+  const name = String(row.name ?? '').trim() || '单品'
+  const item: Record<string, unknown> =
+    mode === 'stringify'
+      ? { name, price: String(price), count: String(count), unit: '份' }
+      : { name, price, count, quantity: count, unit: '份' }
+  const pid = String(row.product_id ?? '').trim()
+  if (pid) item.product_id = pid
+  const sid = String(row.sku_id ?? '').trim()
+  if (sid) item.sku_id = sid
+  return item
+}
+
+function normalizeComboGroupsArrayForAttrMaps(
   comboRule: Record<string, unknown>,
   categoryId: string,
   originFenFallback: number,
-): string {
+): Record<string, unknown>[] {
   const groups = (comboRule as { groups?: unknown[] }).groups
-  if (!Array.isArray(groups)) return '[]'
-  const stringifyNums = categoryUsesStringifiedComboItemNumbers(categoryId)
+  if (!Array.isArray(groups)) return []
   const arr = JSON.parse(JSON.stringify(groups)) as Record<string, unknown>[]
-  if (!stringifyNums) return JSON.stringify(arr).slice(0, 120_000)
+  const cid = String(categoryId ?? '').trim()
+  const stringifyNums = categoryUsesStringifiedComboItemNumbers(cid)
+  const retailNorm = categoryRetailComboAttrNormalize(cid)
+  if (!stringifyNums && !retailNorm) return arr
+  const mode = stringifyNums ? 'stringify' : 'retail'
   for (const g of arr) {
     if (!g || typeof g !== 'object') continue
     const listKey = Array.isArray(g.item_list)
@@ -2012,27 +2088,29 @@ function comboRuleGroupsArrayJsonStringForAttrMaps(
     if (!listKey) continue
     const list = g[listKey] as Record<string, unknown>[]
     if (!Array.isArray(list)) continue
-    g[listKey] = list.map((row) => {
-      if (!row || typeof row !== 'object') return row
-      const count = comboItemCountFromRow(row)
-      const price = comboItemPriceFenFromRow(row, originFenFallback)
-      const item: Record<string, unknown> = {
-        name: String(row.name ?? '').trim() || '单品',
-        price: String(price),
-        count: String(count),
-        unit: '份',
-      }
-      const pid = String(row.product_id ?? '').trim()
-      if (pid) item.product_id = pid
-      const sid = String(row.sku_id ?? '').trim()
-      if (sid) item.sku_id = sid
-      return item
-    })
+    g[listKey] = list.map((row) =>
+      row && typeof row === 'object'
+        ? normalizeComboItemRowForAttrJson(row as Record<string, unknown>, originFenFallback, mode)
+        : row,
+    )
   }
-  return JSON.stringify(arr).slice(0, 120_000)
+  return arr
 }
 
-/** 将各组 item_list 摊平为 ItemStruct[]（字面量 attr `combo_rule` 在部分零售类目按单品数组校验 count/unit）。 */
+/** attr_key_value_map / sku commodity 最终 JSON 字符串（数组或 {"groups":[]}）。 */
+function serializeComboGroupsAttrPayload(
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+): string {
+  const arr = normalizeComboGroupsArrayForAttrMaps(comboRule, categoryId, originFenFallback)
+  const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
+  const envWrapped = shape === 'wrapped' || shape === 'object' || shape === 'groups'
+  const catWrapped = categoryUsesWrappedGroupsAttrCombo(categoryId)
+  const wrapped = envWrapped || catWrapped
+  return JSON.stringify(wrapped ? { groups: arr } : arr).slice(0, 120_000)
+}
+
 function comboRuleFlattenedItemsJsonString(
   comboRule: Record<string, unknown>,
   originFenFallback: number,
@@ -2079,7 +2157,7 @@ function comboRuleSkuCommodityAttrJsonString(
   if (shape === 'flattened' || shape === 'flat' || shape === 'items') {
     return comboRuleFlattenedItemsJsonString(comboRule, originFenFallback)
   }
-  return comboRuleGroupsArrayJsonStringForAttrMaps(comboRule, categoryId, originFenFallback)
+  return serializeComboGroupsAttrPayload(comboRule, categoryId, originFenFallback)
 }
 
 /**
@@ -2091,23 +2169,16 @@ function comboRuleProductLiteralAttrJsonString(
   categoryId: string,
   originFenFallback: number,
 ): string {
-  return comboRuleGroupsArrayJsonStringForAttrMaps(comboRule, categoryId, originFenFallback)
+  return serializeComboGroupsAttrPayload(comboRule, categoryId, originFenFallback)
 }
 
-/** attr 内 opaque 套餐槽：ItemGroupStruct 数组或 wrapped `{"groups":[]}`（由 DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE 控制）。 */
+/** attr 内 opaque 套餐槽：与字面量 commodity 同源，见 serializeComboGroupsAttrPayload。 */
 function comboRuleJsonForAttrKeyValueMap(
   comboRule: Record<string, unknown>,
   categoryId: string,
   originFenFallback: number,
 ): string {
-  const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
-  const normalizedArr = JSON.parse(
-    comboRuleGroupsArrayJsonStringForAttrMaps(comboRule, categoryId, originFenFallback),
-  ) as unknown[]
-  if (shape === 'wrapped' || shape === 'object' || shape === 'groups') {
-    return JSON.stringify({ groups: normalizedArr }).slice(0, 120_000)
-  }
-  return JSON.stringify(normalizedArr).slice(0, 120_000)
+  return serializeComboGroupsAttrPayload(comboRule, categoryId, originFenFallback)
 }
 
 /** attr 侧序列化结果是否无有效组/单品（`[]` 或 `{"groups":[]}`） */
@@ -2604,6 +2675,8 @@ async function buildGoodlifeProductSaveBody(
     if (!comboRule) {
       comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
     }
+    const splitRule = retailSplitSingleGroupIntoOneGroupPerItem(comboRule, category_id)
+    if (splitRule) comboRule = splitRule
     comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule)
   } else if (product_type === 2) {
     /**
@@ -2850,6 +2923,7 @@ function summarizeComboRuleForLog(combo: unknown): Record<string, unknown> {
   if (!Array.isArray(groups)) return { present: true, groups: 0, items: 0, combo_mode: [] as string[] }
   const modes: string[] = []
   let items = 0
+  let one_item_per_group = groups.length > 0
   for (const g of groups) {
     if (!g || typeof g !== 'object') continue
     const o = g as Record<string, unknown>
@@ -2861,12 +2935,14 @@ function summarizeComboRuleForLog(combo: unknown): Record<string, unknown> {
       modes.push(`total=${String(tc ?? '?')},opt=${String(oc ?? '?')}`)
     else modes.push('')
     const arr = Array.isArray(o.item_list) ? o.item_list : Array.isArray(o.items) ? o.items : []
+    if (arr.length !== 1) one_item_per_group = false
     items += arr.length
   }
   return {
     present: true,
     groups: groups.length,
     items,
+    one_item_per_group,
     combo_mode: modes.slice(0, 10),
   }
 }
@@ -2915,11 +2991,16 @@ function summarizeDouyinProductSaveForLog(
       : []
   let combo_sku_commodity_json_groups = 0
   let combo_attr_combo_rule_json_groups = 0
+  const cidLog = String(product?.category_id ?? '')
+  const combo_attr_payload_wrapped = categoryUsesWrappedGroupsAttrCombo(cidLog)
   try {
     const c = (sk?.commodity ?? '').trim()
     if (c.startsWith('[')) {
       const j = JSON.parse(c) as unknown
       if (Array.isArray(j)) combo_sku_commodity_json_groups = j.length
+    } else if (c.startsWith('{')) {
+      const j = JSON.parse(c) as { groups?: unknown[] }
+      if (Array.isArray(j.groups)) combo_sku_commodity_json_groups = j.groups.length
     }
   } catch {
     /* ignore */
@@ -2929,6 +3010,9 @@ function summarizeDouyinProductSaveForLog(
     if (cr.startsWith('[')) {
       const j = JSON.parse(cr) as unknown
       if (Array.isArray(j)) combo_attr_combo_rule_json_groups = j.length
+    } else if (cr.startsWith('{')) {
+      const j = JSON.parse(cr) as { groups?: unknown[] }
+      if (Array.isArray(j.groups)) combo_attr_combo_rule_json_groups = j.groups.length
     }
   } catch {
     /* ignore */
@@ -2947,6 +3031,7 @@ function summarizeDouyinProductSaveForLog(
     combo_sku_commodity_items_shape,
     combo_attr_literal_in_body,
     combo_attr_item_numbers_stringified,
+    combo_attr_payload_wrapped,
     combo_sku_commodity_json_groups,
     combo_attr_combo_rule_json_groups,
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
