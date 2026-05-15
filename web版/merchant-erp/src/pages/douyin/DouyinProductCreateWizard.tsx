@@ -1752,8 +1752,17 @@ export default function DouyinProductCreateWizard({
       })
     }
 
-    const r = await postDouyinGoodsProductSave({ mode, detail })
-    setSaving(false)
+    let r: Awaited<ReturnType<typeof postDouyinGoodsProductSave>>
+    try {
+      r = await postDouyinGoodsProductSave({ mode, detail })
+    } catch (e) {
+      r = {
+        ok: false,
+        message: `保存请求异常：${e instanceof Error ? e.message : String(e)}。请打开浏览器开发者工具 → Network，确认 POST 是否发往当前站点 /api/meoo-douyin-goods-product-save。`,
+      }
+    } finally {
+      setSaving(false)
+    }
     if (r.ok) {
       const finalPid =
         (r.product_id && String(r.product_id).trim()) ||
