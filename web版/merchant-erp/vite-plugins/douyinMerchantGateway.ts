@@ -102,8 +102,8 @@ function templateAttrsBundleCacheTtlMs(): number {
 }
 
 function templateAttrsBundleCacheKey(accountId: string, categoryId: string, productType: number): string {
-  /** v2：template/get 增加 open_biz_type=1 后 bump，避免命中旧的无 attrs 缓存 */
-  return `${accountId}\t${categoryId}\t${productType}\tv2ob1`
+  /** v4：撤回 template/get 上误传的 open_biz_type=1（该枚举 1 表示「组合券包」，非通用代金券模板） */
+  return `${accountId}\t${categoryId}\t${productType}\tv4tpl`
 }
 
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
@@ -1612,11 +1612,7 @@ async function fetchTemplateAttrsBundle(
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
   u.searchParams.set('product_type', String(productType))
-  /**
-   * 与 product/save 中 open_biz_type、biz_line 对齐；缺省时部分类目 template/get 只回 error_code/extra、不回 product_attrs，
-   * 网关会误判为空模板并触发后续 combo_rule 等问题。
-   */
-  u.searchParams.set('open_biz_type', '1')
+  /** 勿默认传 open_biz_type：文档枚举中 1 为「组合券包类型」，普通代金券/团购误传会导致 data 仅含错误信息、无 product_attrs。 */
   const dr = await douyinServerFetch(u.toString(), {
     method: 'GET',
     headers: {
