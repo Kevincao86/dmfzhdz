@@ -2304,6 +2304,24 @@ async function resolveProductAccountNameForSave(
 }
 
 /**
+ * goodlife product/save 的 `open_biz_type`：与 template.get 文档一致，**1 = 组合券包**。
+ * 代金券/次卡等若误传 1，抖音常返回泛化「服务器打瞌睡」类错误。团购（product_type=1）与官方示例对齐默认 1。
+ */
+function resolveOpenBizTypeForGoodlifeSave(erp: Record<string, unknown>, productType: number): number {
+  const forced = process.env.DOUYIN_GOODS_SAVE_OPEN_BIZ_TYPE?.trim()
+  if (forced !== undefined && forced !== '') {
+    const n = Number(forced)
+    if (Number.isFinite(n) && n >= 0 && n <= 99) return Math.floor(n)
+  }
+  const raw = erp.open_biz_type ?? (erp as Record<string, unknown>).openBizType
+  if (raw != null && String(raw).trim() !== '') {
+    const n = Number(raw)
+    if (Number.isFinite(n) && n >= 0 && n <= 99) return Math.floor(n)
+  }
+  return productType === 1 ? 1 : 0
+}
+
+/**
  * 将 ERP 聚合表单映射为 goodlife/v1/goods/product/save 的 Body（含单 SKU）。
  * 头图写入 template/get 返回的 IMAGE 类 attr（按名称/类型启发式匹配）。
  */
@@ -2453,7 +2471,7 @@ async function buildGoodlifeProductSaveBody(
     category_id,
     product_type,
     biz_line: 1,
-    open_biz_type: 1,
+    open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, product_type),
     out_id,
     account_name,
     sold_start_time: nowMs,
@@ -2646,6 +2664,7 @@ function summarizeDouyinProductSaveForLog(
     account_id: saveBody.account_id,
     product_type: product?.product_type,
     category_id: product?.category_id,
+    open_biz_type: product?.open_biz_type,
     combo_in_product_body: Boolean(product?.combo_rule),
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
     combo_rule_debug: maskDouyinComboRuleForLog(comboRuleRaw),
