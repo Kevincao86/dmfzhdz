@@ -2269,6 +2269,18 @@ async function buildGoodlifeProductSaveBody(
     applyComboRuleToMergedProductAttrs(attrs, mergedProductAttrs, comboRule)
   }
 
+  /**
+   * template.get 经中继失败或返回空 attrs 时，没有 opaque 搭配槽可写；开放平台仍常从 attr_key_value_map 校验套餐。
+   * 此时将「groups 数组」JSON 字符串写入字面量 key `combo_rule`（与 applyComboRuleToMergedProductAttrs 写入形态一致）。
+   */
+  const tplProductComboKeys = templateComboAttrKeysFromAttrs(attrs)
+  if (comboRule && tplProductComboKeys.length === 0) {
+    const groupsStr = comboRuleGroupsArrayJsonString(comboRule)
+    if (groupsStr !== '[]' && !(mergedProductAttrs.combo_rule ?? '').trim()) {
+      mergedProductAttrs.combo_rule = groupsStr
+    }
+  }
+
   const nowMs = Date.now()
   const oneYearMs = nowMs + 366 * 86400000
 
@@ -2309,16 +2321,37 @@ async function buildGoodlifeProductSaveBody(
     applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRule)
   }
 
+  const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
+  if (comboRule && tplSkuComboKeys.length === 0) {
+    const groupsStr = comboRuleGroupsArrayJsonString(comboRule)
+    if (groupsStr !== '[]' && !(skuAttrMap.commodity ?? '').trim()) {
+      skuAttrMap.commodity = groupsStr
+    }
+  }
+
   const productTplKeySet = new Set(
     attrs.map((a) => String((a as Record<string, unknown>).key ?? '').trim()).filter(Boolean),
   )
   const skuTplKeySet = new Set(
     skuAttrs.map((a) => String((a as Record<string, unknown>).key ?? '').trim()).filter(Boolean),
   )
-  if (mergedProductAttrs.combo_rule != null && !productTplKeySet.has('combo_rule')) {
+  /**
+   * 若已通过模板 opaque 搭配槽写入套餐，则去掉可能冲突的字面量 `combo_rule`（除非模板本身声明 key 即为 combo_rule）。
+   * 若模板无任何搭配槽（含 template 拉取失败），保留字面量兜底。
+   */
+  const filledOpaqueProductCombo =
+    tplProductComboKeys.length > 0 &&
+    tplProductComboKeys.some((k) => (mergedProductAttrs[k] ?? '').trim().length > 0)
+  if (
+    mergedProductAttrs.combo_rule != null &&
+    filledOpaqueProductCombo &&
+    !productTplKeySet.has('combo_rule')
+  ) {
     delete mergedProductAttrs.combo_rule
   }
-  if (skuAttrMap.commodity != null && !skuTplKeySet.has('commodity')) {
+  const filledOpaqueSkuCombo =
+    tplSkuComboKeys.length > 0 && tplSkuComboKeys.some((k) => (skuAttrMap[k] ?? '').trim().length > 0)
+  if (skuAttrMap.commodity != null && filledOpaqueSkuCombo && !skuTplKeySet.has('commodity')) {
     delete skuAttrMap.commodity
   }
 
