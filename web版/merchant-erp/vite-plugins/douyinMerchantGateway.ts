@@ -1926,6 +1926,8 @@ function buildDouyinProductComboRule(
         /** 单品价（分），与历史 commodity 示例字段名一致 */
         price,
         count,
+        /** 部分网关/类目校验「数量」与 count 同源，双写避免反序列化缺省为 0 */
+        qty: count,
         unit,
       }
       const pid = String(row.product_id ?? '').trim()
@@ -2005,6 +2007,7 @@ function buildDouyinComboRuleSingleGroupDefault(
           {
             name: productNameFallback.slice(0, 120) || '团购套餐',
             count: 1,
+            qty: 1,
             unit: '份',
             /** 与来客「划线价 ≥ 售价」一致：取 max(实付分, 原价分)，避免套餐标价低于 SKU 划线 */
             price: itemLineFen,
@@ -2162,7 +2165,11 @@ function mergeGoodlifeProductAttrMapFromErp(
         /* 团购：套餐 JSON 仅走顶层 product.combo_rule，不写入 combo 类 attr */
         continue
       }
-      if (pkgJson) {
+      /**
+       * 团购 omitCombo 时：原始 package_combo 为 `{ groups: [{ items, quantity }] }`，与 goodlife ItemStruct（item_list、count、unit）不一致。
+       * 若写入任意 STRUCT/JSON 模板槽位，抖音常报「数量必须大于0且单位必须为份」。套餐数据仅由 applyComboRule* + product.combo_rule 写入。
+       */
+      if (pkgJson && !omitCombo) {
         out[key] = pkgJson
         continue
       }
