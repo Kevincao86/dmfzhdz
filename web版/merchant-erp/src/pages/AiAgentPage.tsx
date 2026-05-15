@@ -7,7 +7,7 @@ import { AI_AGENT_SHORTCUTS } from '../lib/aiAgentTypes'
 import { cn } from '../cn'
 
 const INFO_COPY = {
-  title: '店魔方 AI 助手',
+  title: '墨典 AI 助手',
   body: '我会协助您处理门店经营里的咨询和任务草稿。涉及改价、上架、发消息等操作时，会先给您看执行说明，由您确认后再提交，避免误操作。',
   bullet: '您也可以从顶部搜索框发起指令，在右侧抽屉里继续同一段对话。',
 }

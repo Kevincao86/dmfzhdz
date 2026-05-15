@@ -1,5 +1,5 @@
 /**
- * 店魔方 AI 智能体 / 运营助理 — 前端状态与后续接入真实 API 的契约（预留）。
+ * 墨典 AI 智能体 / 运营助理 — 前端状态与后续接入真实 API 的契约（预留）。
  */
 
 /** 系统侧能力授权（后续与租户权限、OAuth 范围对齐） */
@@ -38,7 +38,7 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
 
 /** 新对话 / 重置时的首条助手问候（与上下文初始态一致） */
 export const AI_AGENT_WELCOME_CONTENT =
-  '你好，我是店魔方 AI 助手。选好助手风格后，直接描述你想做的事；需要改商品、发消息等操作时，我会先给你看步骤说明，你确认后再继续。'
+  '你好，我是墨典 AI 助手。选好助手风格后，直接描述你想做的事；需要改商品、发消息等操作时，我会先给你看步骤说明，你确认后再继续。'
 
 /** 智能体首页与抽屉共用的快捷任务 */
 export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [

@@ -79,7 +79,7 @@ export default function AiAgentDrawer() {
                   </div>
                   <div className="min-w-0">
                     <h2 id="meoo-ai-agent-title" className="truncate text-base font-semibold tracking-tight">
-                      店魔方 AI 助手
+                      墨典 AI 助手
                     </h2>
                     <p className="text-xs text-indigo-100/95">可咨询问题，也可生成任务方案</p>
                   </div>
@@ -212,7 +212,7 @@ export function AiAgentFloatingButton() {
       type="button"
       onClick={() => openDrawer()}
       className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-900/25 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
-      aria-label="打开店魔方 AI 助手"
+      aria-label="打开墨典 AI 助手"
       title="AI 助手"
     >
       <span className="sr-only">AI</span>

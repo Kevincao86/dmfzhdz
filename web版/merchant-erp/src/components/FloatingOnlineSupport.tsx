@@ -20,7 +20,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 const DEFAULT_BOT: ChatMessage = {
   id: 'm0',
   role: 'bot',
-  text: '您好，我是店魔方智能助手，可解答常见问题。如需人工协助，请点击下方「转人工服务」。',
+  text: '您好，我是墨典智能助手，可解答常见问题。如需人工协助，请点击下方「转人工服务」。',
   at: '',
   ts: 0,
 }
@@ -472,7 +472,7 @@ export default function FloatingOnlineSupport({
     if (humanMode || connecting) return
     setConnecting(true)
     const sysText =
-      '已为您接入店魔方人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
+      '已为您接入墨典人工客服，请在下方直接描述问题，客服同事将在此会话中回复'
     const bid = pushMessage('system', sysText)
     void emitRelayLine('system', sysText, bid).then((r) => {
       setConnecting(false)
