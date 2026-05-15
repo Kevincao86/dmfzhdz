@@ -1,4 +1,4 @@
-# 店魔方 · 商家微信小程序
+# 墨典 · 商家微信小程序
 
 与 **Web 版 merchant-erp** 共用 **同一 Supabase 项目**：租户（Auth + `public.tenants`）、业务表与 **Storage 桶策略需一致**，通过 RLS 按 `tenant_id` 隔离。
 

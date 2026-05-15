@@ -1,4 +1,4 @@
 {
-  "desc": "店魔方商家小程序",
+  "desc": "墨典商家小程序",
   "rules": [{ "action": "allow", "page": "*" }]
 }

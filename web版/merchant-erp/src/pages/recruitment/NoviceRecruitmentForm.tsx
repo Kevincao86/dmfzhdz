@@ -160,7 +160,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
 
     const kolPct = parseKolCommissionPctFromDraft(kolCommissionInput)
     const tenant = buildErpRegistryTenant()
-    const customerName = tenant?.merchantName ?? '店魔方 ERP 商户'
+    const customerName = tenant?.merchantName ?? '墨典 ERP 商户'
     const storeName = city.trim()
     const storeAddress = `${city.trim()} · ${industry}`
     const id = `RO-NV${Date.now()}`

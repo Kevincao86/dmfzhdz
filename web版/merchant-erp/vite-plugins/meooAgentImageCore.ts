@@ -47,7 +47,7 @@ export async function runMeooAgentImageRequest(
           imageUrl: out.imageUrl,
           channel: 'builtin',
           vendorUsed: out.vendorUsed,
-          fallbackNote: `TokenMix 生图不可用（${msg.slice(0, 200)}），已改用店魔方内置引擎。`,
+          fallbackNote: `TokenMix 生图不可用（${msg.slice(0, 200)}），已改用墨典内置引擎。`,
         }
       }
       return { ok: false, message: `${msg}；回退内置：${out.message}` }
@@ -59,7 +59,7 @@ export async function runMeooAgentImageRequest(
   const extra: { fallbackNote?: string } = {}
   if (imageRoute === 'tokenmix' && tm && referenceImage) {
     extra.fallbackNote =
-      '已上传参考图时使用店魔方内置图生图；TokenMix 图像接口暂不接参考图，可在纯文生图时选用 OpenAI 图像模型。'
+      '已上传参考图时使用墨典内置图生图；TokenMix 图像接口暂不接参考图，可在纯文生图时选用 OpenAI 图像模型。'
   }
   return { ok: true, imageUrl: out.imageUrl, channel: 'builtin', vendorUsed: out.vendorUsed, ...extra }
 }

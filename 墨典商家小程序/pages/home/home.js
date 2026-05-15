@@ -15,7 +15,7 @@ const DEFAULT_METRICS = [
 
 Page({
   data: {
-    storeName: '店魔方商家',
+    storeName: '墨典商家',
     statusText: '正常经营',
     balanceLoaded: false,
     erpLinked: false,

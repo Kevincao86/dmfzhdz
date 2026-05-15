@@ -305,7 +305,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
     try {
       const merchantCommissionPct = parseCommissionPctFromDraft(commissionInput)
       const tenant = buildErpRegistryTenant()
-      const customerName = tenant?.merchantName ?? '店魔方 ERP 商户'
+      const customerName = tenant?.merchantName ?? '墨典 ERP 商户'
       const validStores = stores.filter((s) => s.name.trim())
       const storeName = validStores[0]?.name.trim() || '—'
       const storeAddress = validStores[0]?.address.trim() || '—'

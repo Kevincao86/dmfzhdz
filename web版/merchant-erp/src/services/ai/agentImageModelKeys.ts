@@ -3,7 +3,7 @@ import { normalizeAiModelFamily } from './tokenmixClient.js'
 
 /**
  * 智能体模型下拉：文生图专用 key（`img::…`）。
- * - `img::v::…`：店魔方内置万相 / 豆包 / MiniMax（`/api/meoo-ai-agent-image`）。
+ * - `img::v::…`：墨典内置万相 / 豆包 / MiniMax（`/api/meoo-ai-agent-image`）。
  * - `img::m::家族::模型 id`：TokenMix 中继「图像生成」接口（须配置 TOKENMIX_API_KEY）。
  */
 export type ParsedAgentImagePicker =

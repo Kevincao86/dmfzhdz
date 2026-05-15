@@ -2,7 +2,7 @@
   <view class="hero-bg">
     <view class="meoo-card hero">
       <view class="hero-top">
-        <text class="hero-kicker">店魔方 · 商家</text>
+        <text class="hero-kicker">墨典 · 商家</text>
         <text class="hero-tag">与电脑端一致</text>
       </view>
       <text class="hero-title">{{navTitle}}</text>
