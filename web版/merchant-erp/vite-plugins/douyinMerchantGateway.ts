@@ -1923,12 +1923,9 @@ function buildDouyinProductComboRule(
       const price = comboItemPriceFenFromRow(row, originFenFallback)
       const item: Record<string, unknown> = {
         name,
-        /** 单品价（分），与历史 commodity 示例字段名一致 */
+        /** 单品价（分），与开放平台团购示例字段一致（勿加 qty/quantity，部分类目反序列化会判失败） */
         price,
         count,
-        /** 部分类目校验「数量」字段名用 qty / quantity，与 count 同源 */
-        qty: count,
-        quantity: count,
         unit,
       }
       const pid = String(row.product_id ?? '').trim()
@@ -1982,11 +1979,44 @@ function expandGroupBuyComboRuleMinTwoGroups(comboRule: Record<string, unknown> 
   return { groups: [g0, clone] }
 }
 
-/** 与 SKU `commodity`、开放平台「商品搭配」一致：attr 值为 **ItemGroupStruct 数组** 的 JSON 字符串，勿用 `{groups:…}` 包一层 */
+/** 与 SKU `commodity`、开放平台示例一致：值为 **ItemGroupStruct[]** 的 JSON 数组字符串。 */
 function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): string {
   const groups = (comboRule as { groups?: unknown }).groups
   const arr = Array.isArray(groups) ? groups : []
   return JSON.stringify(arr).slice(0, 120_000)
+}
+
+/**
+ * `attr_key_value_map` 内 combo_rule / commodity 控件：部分综合零售类目要求 **`{"groups":[...]}` 对象字符串**；
+ * 纯数组 `[...]` 会校验失败（报「数量必须大于0且单位必须为份」等）。
+ * 设 `DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE=array`（或 `legacy`）则仍输出数组形态。
+ */
+function comboRuleJsonForAttrKeyValueMap(comboRule: Record<string, unknown>): string {
+  const shape = process.env.DOUYIN_GOODS_COMBO_ATTR_JSON_SHAPE?.trim().toLowerCase()
+  if (shape === 'array' || shape === '1' || shape === 'legacy') {
+    return comboRuleGroupsArrayJsonString(comboRule)
+  }
+  const groups = (comboRule as { groups?: unknown }).groups
+  const arr = Array.isArray(groups) ? groups : []
+  return JSON.stringify({ groups: arr }).slice(0, 120_000)
+}
+
+/** attr 侧序列化结果是否无有效组（`[]` 或 `{"groups":[]}`） */
+function comboRuleAttrJsonIsEffectivelyEmpty(s: string): boolean {
+  const t = (s ?? '').trim()
+  if (!t) return true
+  if (t === '[]') return true
+  try {
+    const j = JSON.parse(t) as unknown
+    if (Array.isArray(j)) return j.length === 0
+    if (j && typeof j === 'object' && !Array.isArray(j)) {
+      const g = (j as { groups?: unknown }).groups
+      return !Array.isArray(g) || g.length === 0
+    }
+  } catch {
+    return true
+  }
+  return false
 }
 
 /** 无 package_combo 或解析失败时：单组单品 ItemGroupStruct，供团购兜底与代金券等 template 仍要求 combo 的场景 */
@@ -2008,8 +2038,6 @@ function buildDouyinComboRuleSingleGroupDefault(
           {
             name: productNameFallback.slice(0, 120) || '团购套餐',
             count: 1,
-            qty: 1,
-            quantity: 1,
             unit: '份',
             /** 与来客「划线价 ≥ 售价」一致：取 max(实付分, 原价分)，避免套餐标价低于 SKU 划线 */
             price: itemLineFen,
@@ -2029,8 +2057,8 @@ function applyComboRuleToMergedProductAttrs(
   mergedProductAttrs: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const groupsPayload = comboRuleGroupsArrayJsonString(comboRule)
-  if (groupsPayload === '[]') return
+  const groupsPayload = comboRuleJsonForAttrKeyValueMap(comboRule)
+  if (comboRuleAttrJsonIsEffectivelyEmpty(groupsPayload)) return
   for (const a of attrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
     if (!key) continue
@@ -2049,8 +2077,8 @@ function applyComboRuleToSkuAttrMap(
   skuAttrMap: Record<string, string>,
   comboRule: Record<string, unknown>,
 ): void {
-  const commodityPayload = comboRuleGroupsArrayJsonString(comboRule)
-  if (commodityPayload === '[]') return
+  const commodityPayload = comboRuleJsonForAttrKeyValueMap(comboRule)
+  if (comboRuleAttrJsonIsEffectivelyEmpty(commodityPayload)) return
   for (const a of skuAttrs) {
     const key = String((a as Record<string, unknown>).key ?? '').trim()
     if (!key) continue
@@ -2494,8 +2522,8 @@ async function buildGoodlifeProductSaveBody(
    * 部分类目（如零售团购）会校验 attr 中该项非空；勿写入原始 package_combo（items/quantity），否则会报数量/单位错误。
    */
   if (comboRule && tplProductComboKeys.length === 0) {
-    const groupsStr = comboRuleGroupsArrayJsonString(comboRule)
-    if (groupsStr !== '[]' && !(mergedProductAttrs.combo_rule ?? '').trim()) {
+    const groupsStr = comboRuleJsonForAttrKeyValueMap(comboRule)
+    if (!comboRuleAttrJsonIsEffectivelyEmpty(groupsStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = groupsStr
     }
   }
@@ -2542,8 +2570,8 @@ async function buildGoodlifeProductSaveBody(
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
   if (comboRule && tplSkuComboKeys.length === 0) {
-    const groupsStr = comboRuleGroupsArrayJsonString(comboRule)
-    if (groupsStr !== '[]' && !(skuAttrMap.commodity ?? '').trim()) {
+    const groupsStr = comboRuleJsonForAttrKeyValueMap(comboRule)
+    if (!comboRuleAttrJsonIsEffectivelyEmpty(groupsStr) && !(skuAttrMap.commodity ?? '').trim()) {
       skuAttrMap.commodity = groupsStr
     }
   }
