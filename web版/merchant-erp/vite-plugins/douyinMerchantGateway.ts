@@ -2223,6 +2223,12 @@ async function buildGoodlifeProductSaveBody(
      * 单组单品标价用实付（分）与 sku.actual_amount 对齐。
      */
     comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
+  } else {
+    /**
+     * 次卡、预售、预约等类目（product_type≥3）：部分类目/审核链路仍强校验顶层 `product.combo_rule` 非空，
+     * 否则会直接报「combo_rule不能为空」。与代金券一致使用单组单品占位结构（标价与 SKU 对齐）。
+     */
+    comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
   }
 
   const erpForAttrMerge: Record<string, unknown> =
@@ -2317,12 +2323,10 @@ async function buildGoodlifeProductSaveBody(
   }
 
   /**
-   * 顶层 product.combo_rule：团购必带；代金券即便已在 attr_key_value_map 写入 opaque 搭配槽，
-   * 抖音侧仍常校验顶层 combo_rule 非空（否则「combo_rule不能为空」），故代金券只要已组装 comboRule 一律写入。
+   * 顶层 product.combo_rule：goodlife product/save 在多数类目下会校验非空（含团购、代金券及次卡等）。
+   * 团购为结构化套餐；其余类型使用单组单品占位，与 sku 售价/划线价一致。
    */
-  if (comboRule && isGroupBuy) {
-    product.combo_rule = comboRule
-  } else if (comboRule && product_type === 2) {
+  if (comboRule) {
     product.combo_rule = comboRule
   }
 
