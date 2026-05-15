@@ -1349,14 +1349,17 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
   const innerEc = numericEc(inner.error_code)
   if (innerEc !== undefined && innerEc !== 0) {
     const rootExtra = data.extra as Record<string, unknown> | undefined
+    const logid = rootExtra && typeof rootExtra.logid === 'string' ? rootExtra.logid.trim() : ''
     const sub =
       rootExtra && typeof rootExtra.sub_description === 'string' && rootExtra.sub_description.trim()
         ? `（${rootExtra.sub_description.trim()}）`
         : ''
+    const base =
+      (typeof inner.description === 'string' && inner.description) || `抖音 data.error_code=${innerEc}`
+    const logHint = logid ? ` [logid:${logid}]` : ''
     return {
       ok: false,
-      message:
-        ((typeof inner.description === 'string' && inner.description) || `抖音 data.error_code=${innerEc}`) + sub,
+      message: base + logHint + sub,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id

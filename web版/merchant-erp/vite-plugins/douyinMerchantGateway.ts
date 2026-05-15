@@ -2687,6 +2687,34 @@ function douyinGoodsSaveUpstreamHint(status: number, raw: string): string {
   return ''
 }
 
+function sleepMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function extractDouyinLogidFromEnvelope(j: Record<string, unknown>): string {
+  const ex = j.extra as Record<string, unknown> | undefined
+  return ex && typeof ex.logid === 'string' ? ex.logid.trim() : ''
+}
+
+/**
+ * 抖音 goods/save 文档中「系统繁忙 / 稍后重试」类错误，适合短退避重试（仍失败则把 logid 交给开放平台排查）。
+ */
+function isDouyinProductSaveResponseRetryable(j: Record<string, unknown>, raw: string): boolean {
+  const data = j.data as Record<string, unknown> | undefined
+  const code = data ? numericErrorCode(data.error_code) : undefined
+  if (code === 2100001 || code === 2100004 || code === 2100005) return true
+  const desc = typeof data?.description === 'string' ? data.description : ''
+  const blob = `${desc}${raw}`.slice(0, 4000)
+  return /打瞌睡|系统繁忙|稍后再试|服务器.*试|请稍后|timeout|timed out|Too many requests|rate limit/i.test(blob)
+}
+
+function douyinGoodsSaveRetryMaxAttempts(): number {
+  const raw = process.env.DOUYIN_GOODS_SAVE_RETRY_MAX?.trim()
+  const n = raw ? Number.parseInt(raw, 10) : Number.NaN
+  if (Number.isFinite(n) && n >= 1 && n <= 6) return n
+  return 3
+}
+
 const MERCHANT_PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 function productImageDemoFallbackAllowed(): boolean {
@@ -3045,59 +3073,112 @@ export async function handleDouyinGoodsProductSavePost(
       }),
     )
 
-    const saveAbort = new AbortController()
-    const saveTimer = setTimeout(() => saveAbort.abort(), savePostBudgetMs)
-
-    let dr: Response
-    try {
+    const maxAttempts = douyinGoodsSaveRetryMaxAttempts()
+    let dr!: Response
+    let raw = ''
+    let trimmed = ''
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        const backoff = 500 + attempt * 450
+        console.info(
+          '[meoo douyin goods/save] retry_backoff',
+          JSON.stringify({ phase: 'before_product_save_retry', mode, attempt, backoff_ms: backoff }),
+        )
+        await sleepMs(backoff)
+      }
       console.info(
         '[meoo douyin goods/save] posting_save',
         JSON.stringify({
           phase: 'before_product_save_post',
           mode,
+          attempt,
+          max_attempts: maxAttempts,
           save_post_budget_s: Math.round(savePostBudgetMs / 1000),
           save_body_bytes: bodyBytes,
         }),
       )
-      dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
-        method: 'POST',
-        headers: {
-          'access-token': token,
-          'content-type': 'application/json',
-          'Rpc-Transit-Life-Account': accountId,
-        },
-        body: JSON.stringify(saveBody),
-        signal: saveAbort.signal,
-      })
-    } catch (e) {
-      clearTimeout(saveTimer)
-      const msg = e instanceof Error ? e.message : String(e)
-      const isAbort =
-        (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
-        /aborted|AbortError/i.test(msg)
-      console.warn(
-        '[meoo douyin goods/save] phase_fail',
-        JSON.stringify({
-          phase: 'product_save_fetch',
-          mode,
-          is_abort: isAbort,
-          save_post_budget_s: Math.round(savePostBudgetMs / 1000),
-          save_body_bytes: bodyBytes,
-          message: msg.slice(0, 400),
-        }),
-      )
-      json(res, isAbort ? 504 : 502, {
-        message: isAbort
-          ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
-          : `抖音 goods/save 网络失败：${msg}`,
-      })
-      return
+      const attemptAbort = new AbortController()
+      const attemptTimer = setTimeout(() => attemptAbort.abort(), savePostBudgetMs)
+      try {
+        dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
+          method: 'POST',
+          headers: {
+            'access-token': token,
+            'content-type': 'application/json',
+            'Rpc-Transit-Life-Account': accountId,
+          },
+          body: JSON.stringify(saveBody),
+          signal: attemptAbort.signal,
+        })
+        raw = await dr.text()
+      } catch (e) {
+        clearTimeout(attemptTimer)
+        const msg = e instanceof Error ? e.message : String(e)
+        const isAbort =
+          (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
+          /aborted|AbortError/i.test(msg)
+        const canNetRetry = attempt < maxAttempts - 1 && /aborted|AbortError|timeout|fetch failed|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket/i.test(msg)
+        if (canNetRetry) {
+          console.warn(
+            '[meoo douyin goods/save] phase_fail_retry',
+            JSON.stringify({
+              phase: 'product_save_fetch',
+              mode,
+              attempt,
+              is_abort: isAbort,
+              save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+              message: msg.slice(0, 400),
+            }),
+          )
+          continue
+        }
+        console.warn(
+          '[meoo douyin goods/save] phase_fail',
+          JSON.stringify({
+            phase: 'product_save_fetch',
+            mode,
+            attempt,
+            is_abort: isAbort,
+            save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+            save_body_bytes: bodyBytes,
+            message: msg.slice(0, 400),
+          }),
+        )
+        json(res, isAbort ? 504 : 502, {
+          message: isAbort
+            ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
+            : `抖音 goods/save 网络失败：${msg}`,
+        })
+        return
+      }
+      clearTimeout(attemptTimer)
+      trimmed = raw.replace(/^\uFEFF/, '').trim()
+      if (trimmed.startsWith('<') || !trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+        break
+      }
+      const jAttempt = parseDouyinJson(trimmed)
+      if (
+        dr.ok &&
+        !getDataError(jAttempt).ok &&
+        isDouyinProductSaveResponseRetryable(jAttempt, raw) &&
+        attempt < maxAttempts - 1
+      ) {
+        console.warn(
+          '[meoo douyin goods/save] upstream_transient_retry',
+          JSON.stringify({
+            mode,
+            attempt,
+            logid: extractDouyinLogidFromEnvelope(jAttempt),
+            hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+          }),
+        )
+        continue
+      }
+      break
     }
-    clearTimeout(saveTimer)
-    const raw = await dr.text()
     let upstreamBizHint = ''
     try {
-      const peek = raw.replace(/^\uFEFF/, '').trim()
+      const peek = trimmed.replace(/^\uFEFF/, '').trim()
       if (peek.startsWith('{')) {
         const jpeek = parseDouyinJson(peek)
         const ge = getDataError(jpeek)
@@ -3106,6 +3187,7 @@ export async function handleDouyinGoodsProductSavePost(
     } catch {
       upstreamBizHint = 'parse_skip'
     }
+    const jPosted = trimmed.startsWith('{') ? parseDouyinJson(trimmed) : ({} as Record<string, unknown>)
     console.info(
       '[meoo douyin goods/save] posted',
       JSON.stringify({
@@ -3113,10 +3195,10 @@ export async function handleDouyinGoodsProductSavePost(
         mode,
         http_status: dr.status,
         upstream_biz: upstreamBizHint,
+        logid: extractDouyinLogidFromEnvelope(jPosted),
         save_body_bytes: bodyBytes,
       }),
     )
-    const trimmed = raw.replace(/^\uFEFF/, '').trim()
     if (trimmed.startsWith('<')) {
       json(res, 502, {
         message: `抖音 goods/save 经自建出口返回 HTML：${douyinGoodsSaveUpstreamHint(dr.status, raw)}`,
