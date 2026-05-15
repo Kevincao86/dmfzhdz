@@ -2702,23 +2702,32 @@ async function buildGoodlifeProductSaveBody(
     omitComboTemplateAttrs: isGroupBuy,
   })
 
+  let explicitLiteralComboRuleOverride = false
   const tplOverrides = erp.template_attr_overrides
   if (tplOverrides && typeof tplOverrides === 'object' && !Array.isArray(tplOverrides)) {
     for (const [k, val] of Object.entries(tplOverrides as Record<string, unknown>)) {
       const key = String(k).trim()
       if (!key) continue
+      const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
+      if (!s) continue
       if (isGroupBuy) {
-        if (/^combo_rule$/i.test(key)) continue
+        if (/^combo_rule$/i.test(key)) {
+          mergedProductAttrs[key] = s.slice(0, 120_000)
+          explicitLiteralComboRuleOverride = true
+          continue
+        }
         const a = attrs.find((x) => String((x as Record<string, unknown>).key ?? '').trim() === key)
         if (a && typeof a === 'object') {
           const ar = a as Record<string, unknown>
           const name = String(ar.name ?? '')
           const vt = String(ar.value_type ?? '').toUpperCase()
-          if (attrTemplateLooksComboLike(key, name, vt)) continue
+          if (attrTemplateLooksComboLike(key, name, vt)) {
+            mergedProductAttrs[key] = s.slice(0, 120_000)
+            continue
+          }
         }
       }
-      const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
-      if (s) mergedProductAttrs[key] = s.slice(0, 120_000)
+      mergedProductAttrs[key] = s.slice(0, 120_000)
     }
   }
 
@@ -2775,13 +2784,17 @@ async function buildGoodlifeProductSaveBody(
   }
 
   const skuAttrMap = mergeGoodlifeSkuAttrMapFromTemplate(skuAttrs, product_name, actualFen, originFen, stockQty)
+  let explicitLiteralCommodityOverride = false
   const skuTplOverrides = erp.template_sku_attr_overrides
   if (skuTplOverrides && typeof skuTplOverrides === 'object' && !Array.isArray(skuTplOverrides)) {
     for (const [k, val] of Object.entries(skuTplOverrides as Record<string, unknown>)) {
       const key = String(k).trim()
       if (!key) continue
       const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
-      if (s) skuAttrMap[key] = s.slice(0, 120_000)
+      if (s) {
+        skuAttrMap[key] = s.slice(0, 120_000)
+        if (isGroupBuy && /^commodity$/i.test(key)) explicitLiteralCommodityOverride = true
+      }
     }
   }
   if (comboRule) {
@@ -2812,13 +2825,19 @@ async function buildGoodlifeProductSaveBody(
   if (
     mergedProductAttrs.combo_rule != null &&
     filledOpaqueProductCombo &&
-    !productTplKeySet.has('combo_rule')
+    !productTplKeySet.has('combo_rule') &&
+    !explicitLiteralComboRuleOverride
   ) {
     delete mergedProductAttrs.combo_rule
   }
   const filledOpaqueSkuCombo =
     tplSkuComboKeys.length > 0 && tplSkuComboKeys.some((k) => (skuAttrMap[k] ?? '').trim().length > 0)
-  if (skuAttrMap.commodity != null && filledOpaqueSkuCombo && !skuTplKeySet.has('commodity')) {
+  if (
+    skuAttrMap.commodity != null &&
+    filledOpaqueSkuCombo &&
+    !skuTplKeySet.has('commodity') &&
+    !explicitLiteralCommodityOverride
+  ) {
     delete skuAttrMap.commodity
   }
 
