@@ -1986,6 +1986,43 @@ function comboRuleGroupsArrayJsonString(comboRule: Record<string, unknown>): str
   return JSON.stringify(arr).slice(0, 120_000)
 }
 
+/**
+ * 部分零售类目（如 5003003）对 sku `commodity` / attr `combo_rule` 按「单组券明细」校验；
+ * 网关为「至少两组」在顶层 product.combo_rule 上扩成 A/B 两组时，若把两组原样写入 COMMODITY，上游易误报「数量必须大于0且单位必须为份」。
+ * 此类目下 attr/sku 套餐 JSON 仅取第一组；顶层 product.combo_rule 仍为完整 groups。
+ * 关闭：`DOUYIN_GOODS_COMMODITY_ATTR_USE_FIRST_GROUP_ONLY_CATEGORY_IDS=` 设空；或从列表中移除类目 ID。
+ */
+function comboRuleForSkuCommodityAndAttrLiteral(
+  fullComboRule: Record<string, unknown>,
+  categoryId: string,
+  isGroupBuy: boolean,
+): Record<string, unknown> {
+  if (!isGroupBuy) return fullComboRule
+  const raw =
+    process.env.DOUYIN_GOODS_COMMODITY_ATTR_USE_FIRST_GROUP_ONLY_CATEGORY_IDS?.trim() ?? '5003003'
+  if (raw === '' || raw === '0' || raw === 'false' || raw === 'off') return fullComboRule
+  const set = new Set(
+    raw
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+  )
+  const cid = String(categoryId ?? '').trim()
+  if (!set.has(cid)) return fullComboRule
+  const groups = (fullComboRule as { groups?: unknown[] }).groups
+  if (!Array.isArray(groups) || groups.length === 0) return fullComboRule
+  const g0 = groups[0]
+  if (!g0 || typeof g0 !== 'object') return fullComboRule
+  const cloned = JSON.parse(JSON.stringify(g0)) as Record<string, unknown>
+  const list = Array.isArray(cloned.item_list)
+    ? cloned.item_list
+    : Array.isArray(cloned.items)
+      ? cloned.items
+      : []
+  if (list.length === 0) return fullComboRule
+  return { groups: [cloned] }
+}
+
 /** 将各组 item_list 摊平为 ItemStruct[]（字面量 attr `combo_rule` 在部分零售类目按单品数组校验 count/unit）。 */
 function comboRuleFlattenedItemsJsonString(
   comboRule: Record<string, unknown>,
@@ -2560,6 +2597,12 @@ async function buildGoodlifeProductSaveBody(
     comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
   }
 
+  /** attr `combo_rule` / sku `commodity` 用（部分类目仅取第一组，见 comboRuleForSkuCommodityAndAttrLiteral） */
+  const comboRuleForAttrSku: Record<string, unknown> | null =
+    comboRule && isGroupBuy
+      ? comboRuleForSkuCommodityAndAttrLiteral(comboRule, category_id, true)
+      : comboRule
+
   const erpForAttrMerge: Record<string, unknown> =
     isGroupBuy && comboRule && (!erp.package_combo || typeof erp.package_combo !== 'object')
       ? { ...erp, package_combo: { groups: (comboRule as { groups: unknown[] }).groups } }
@@ -2609,8 +2652,8 @@ async function buildGoodlifeProductSaveBody(
    * 无 opaque 套餐槽时：字面量 `combo_rule` 写 ItemGroupStruct[] 组数组（与 sku.commodity 同源）。
    * 团购类目常同时校验顶层 product.combo_rule 与 attr combo_rule，缺一不可。
    */
-  if (comboRule && tplProductComboKeys.length === 0) {
-    const literalStr = comboRuleProductLiteralAttrJsonString(comboRule)
+  if (comboRuleForAttrSku && tplProductComboKeys.length === 0) {
+    const literalStr = comboRuleProductLiteralAttrJsonString(comboRuleForAttrSku)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(literalStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = literalStr
     }
@@ -2652,13 +2695,13 @@ async function buildGoodlifeProductSaveBody(
       if (s) skuAttrMap[key] = s.slice(0, 120_000)
     }
   }
-  if (comboRule) {
-    applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRule, originFen)
+  if (comboRuleForAttrSku) {
+    applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRuleForAttrSku, originFen)
   }
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
-  if (comboRule && tplSkuComboKeys.length === 0) {
-    const commodityStr = comboRuleSkuCommodityAttrJsonString(comboRule, originFen)
+  if (comboRuleForAttrSku && tplSkuComboKeys.length === 0) {
+    const commodityStr = comboRuleSkuCommodityAttrJsonString(comboRuleForAttrSku, originFen)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(commodityStr) && !(skuAttrMap.commodity ?? '').trim()) {
       skuAttrMap.commodity = commodityStr
     }
@@ -2851,6 +2894,26 @@ function summarizeDouyinProductSaveForLog(
     product?.product_type === 1 && product?.combo_rule && !combo_attr_literal_in_body
       ? ['combo_rule']
       : []
+  let combo_sku_commodity_json_groups = 0
+  let combo_attr_combo_rule_json_groups = 0
+  try {
+    const c = (sk?.commodity ?? '').trim()
+    if (c.startsWith('[')) {
+      const j = JSON.parse(c) as unknown
+      if (Array.isArray(j)) combo_sku_commodity_json_groups = j.length
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const cr = (ak?.combo_rule ?? '').trim()
+    if (cr.startsWith('[')) {
+      const j = JSON.parse(cr) as unknown
+      if (Array.isArray(j)) combo_attr_combo_rule_json_groups = j.length
+    }
+  } catch {
+    /* ignore */
+  }
   return {
     mode,
     relay_base: relay && relay.length ? relay.replace(/\/+$/, '') : 'https://open.douyin.com',
@@ -2864,6 +2927,8 @@ function summarizeDouyinProductSaveForLog(
     combo_sku_commodity_shape,
     combo_sku_commodity_items_shape,
     combo_attr_literal_in_body,
+    combo_sku_commodity_json_groups,
+    combo_attr_combo_rule_json_groups,
     combo_rule_shape: summarizeComboRuleForLog(product?.combo_rule),
     combo_rule_debug: maskDouyinComboRuleForLog(comboRuleRaw),
     template_combo_attr_keys: tplComboKeys,
