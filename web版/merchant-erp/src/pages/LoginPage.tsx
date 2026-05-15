@@ -181,7 +181,7 @@ export default function LoginPage() {
               Local Life OS
             </div>
             <h1 className="mt-3 text-[clamp(1.6rem,4vw+0.75rem,2.35rem)] font-bold leading-tight tracking-tight text-white">
-              店魔方
+              墨典
               <span className="bg-gradient-to-r from-cyan-300 via-white to-orange-200 bg-clip-text text-transparent">
                 AI 智能 ERP
               </span>

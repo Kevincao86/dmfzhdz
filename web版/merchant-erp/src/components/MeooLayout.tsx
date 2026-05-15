@@ -26,8 +26,7 @@ import { clearDouyinMerchantBindingLocal } from '../lib/merchantSession'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
-const LOGO_URL =
-  'https://conversation.cdn.meoo.host/conversations/303854542116876288/image/2026-04-19/1776572864869-QQ20260411-182006.png?auth_key=8a7202e5357981fdf3188b7876e08124302b12ef0775b8202ba2d0f06cd31d49'
+const LOGO_URL = '/favicon.png'
 
 export default function MeooLayout() {
   const location = useLocation()
@@ -133,21 +132,21 @@ export default function MeooLayout() {
             <>
               <img
                 src={LOGO_URL}
-                alt="店魔方AI智能ERP"
+                alt="墨典AI智能ERP"
                 className="mr-2 h-10 w-auto"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                 }}
               />
               <span className="text-lg font-semibold tracking-tight text-white">
-                店魔方AI智能ERP
+                墨典AI智能ERP
               </span>
             </>
           )}
           {collapsed && (
             <img
               src={LOGO_URL}
-              alt="店魔方AI智能ERP"
+              alt="墨典AI智能ERP"
               className="mx-auto h-8 w-auto"
               onError={(e) => {
                 e.currentTarget.style.display = 'none'
