@@ -388,6 +388,10 @@ export type DouyinProductDetailPayload = {
   sales_info: Record<string, unknown>
   trade_rules: Record<string, unknown>
   consume_rules: Record<string, unknown>
+  /**
+   * goodlife `product.open_biz_type`；不设时网关默认 **团购 product_type=1 → 1**，其余类型 **→ 0**（开放平台枚举里 **1 为「组合券包」**，代金券勿误用 1，否则易触发抖音泛化「服务器打瞌睡」类错误）。
+   */
+  open_biz_type?: number
 }
 
 export type ProductSaveResult =
