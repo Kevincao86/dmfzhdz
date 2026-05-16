@@ -34,7 +34,7 @@ export function MeooAgentMascot({
       aria-hidden
       title="墨典小助手"
     >
-      <MascotFigure isWriting={isWriting} state={state} />
+      <MascotFigure isWriting={isWriting} />
       <span className="mt-0.5 max-w-[4.75rem] truncate text-center text-[9px] font-medium text-indigo-600/90">
         {state === 'outputting' ? '生成中…' : state === 'userTyping' ? '在书写…' : '待机'}
       </span>
@@ -42,21 +42,10 @@ export function MeooAgentMascot({
   )
 }
 
-function MascotFigure({
-  isWriting,
-  state,
-}: {
-  isWriting: boolean
-  state: MascotState
-}) {
+function MascotFigure({ isWriting }: { isWriting: boolean }) {
   return (
     <>
-      <div
-        className={cn(
-          'relative h-[5.5rem] w-[4.5rem] overflow-hidden',
-          state === 'outputting' && 'meoo-mascot-output',
-        )}
-      >
+      <div className="relative h-[5.5rem] w-[4.5rem] overflow-hidden">
         <img
           src={isWriting ? WRITING_SRC : IDLE_SRC}
           alt=""
@@ -64,15 +53,6 @@ function MascotFigure({
           draggable={false}
         />
       </div>
-      <style>{`
-        @keyframes meooMascotOutput {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-2px); }
-        }
-        .meoo-mascot-output {
-          animation: meooMascotOutput 0.7s ease-in-out infinite;
-        }
-      `}</style>
     </>
   )
 }
