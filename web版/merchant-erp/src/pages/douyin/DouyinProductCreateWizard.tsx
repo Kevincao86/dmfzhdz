@@ -53,6 +53,7 @@ import {
   buildSkuCommodityGroupsForAutoFill,
   type DouyinTemplateAutoFillInput,
 } from '../../lib/douyinTemplateAutoFill'
+import { normalizeDouyinDescription } from '../../lib/douyinDescriptionNormalize'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../../services/merchantAiVendorCatalogClient'
 import {
   MERCHANT_AI_MODEL_STORAGE_KEY,
@@ -189,12 +190,15 @@ function looksComboTemplateAttr(a: TemplateAttr): boolean {
 }
 
 function templateAttrWizardCovered(a: TemplateAttr): boolean {
+  const key = (a.key ?? '').trim()
+  if (/^description$/i.test(key) || /^subtitle$/i.test(key)) return false
   if (looksComboTemplateAttr(a)) return true
   const n = a.name
   const vt = (a.value_type ?? '').toUpperCase()
   if (vt.includes('IMAGE') || vt === 'PIC') return true
   if (/标题|商品名称/.test(n) && !/规范/.test(n)) return true
-  if (/详情|图文|介绍|卖点|描述/.test(n)) return true
+  if (/详情|图文|介绍|卖点/.test(n) && !/^description$/i.test(key)) return true
+  if (/描述/.test(n) && !/^description$/i.test(key)) return true
   if (/券|码类型|平台券|三方券/.test(n)) return true
   if (/购买须知|使用说明|温馨提示|使用规则|注意事项|其他说明/.test(n)) return true
   if (/有效|天数|天/.test(n) && /消费|券/.test(n)) return true
@@ -438,6 +442,7 @@ function skuCommodityFormToJson(groups: SkuCommodityFormGroup[]): string {
 }
 
 type Step = 'category' | 'productType' | 'detail'
+type DetailSection = 'basic' | 'openplatform'
 
 function readToken() {
   return readMerchantSession('meoo_douyin_merchant_token')
@@ -463,6 +468,7 @@ export default function DouyinProductCreateWizard({
 }: DouyinProductWizardProps = {}) {
   const navigate = useNavigate()
   const [step, setStep] = useState<Step>('category')
+  const [detailSection, setDetailSection] = useState<DetailSection>('basic')
   const [loading, setLoading] = useState(true)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [tree, setTree] = useState<DouyinCategoryTreeNode[]>([])
@@ -1054,6 +1060,16 @@ export default function DouyinProductCreateWizard({
     [templateProductAttrs],
   )
 
+  const requiredTemplateProductAttrs = useMemo(
+    () => sortedTemplateProductAttrs.filter((a) => a.is_required),
+    [sortedTemplateProductAttrs],
+  )
+
+  const requiredTemplateSkuAttrs = useMemo(
+    () => openPlatformSkuAttrsSansCommodity.filter((a) => a.is_required),
+    [openPlatformSkuAttrsSansCommodity],
+  )
+
   const skuTemplateCoverCtx = useMemo(
     () => ({
       priceYuan,
@@ -1165,6 +1181,13 @@ export default function DouyinProductCreateWizard({
     templateAutoFilledRef.current = true
     runTemplateAutoFill({ silent: true })
   }, [step, templateProductAttrs.length, templateSkuAttrs.length, runTemplateAutoFill])
+
+  useEffect(() => {
+    const descKey = templateProductAttrs.find((a) => /^description$/i.test((a.key ?? '').trim()))?.key
+    if (!descKey) return
+    const v = normalizeDouyinDescription(productDesc, productName)
+    setTemplateAttrOverrides((prev) => ({ ...prev, [descKey]: v }))
+  }, [productDesc, productName, templateProductAttrs])
 
   const textAiAutoOn = useMemo(() => {
     void aiModelUiTick
@@ -1967,8 +1990,9 @@ export default function DouyinProductCreateWizard({
       if (templateAttrWizardCovered(a)) continue
       const v = templateAttrOverrides[a.key]?.trim()
       if (!v) {
+        setDetailSection('openplatform')
         setActionMsg({
-          text: `开放平台模板必填项「${a.name}」（key: ${a.key}）尚未填写，请在本页下方「开放平台模板」区域补充`,
+          text: `开放平台模板必填项「${a.name}」（key: ${a.key}）尚未填写，请切换到「② 开放平台 API 字段」补充`,
           ok: false,
         })
         return
@@ -2489,8 +2513,41 @@ export default function DouyinProductCreateWizard({
 
       {step === 'detail' && (
         <>
+          <div className="mb-4 flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-2 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setDetailSection('basic')}
+              className={cn(
+                'rounded-lg px-4 py-2 text-sm font-medium transition',
+                detailSection === 'basic'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100',
+              )}
+            >
+              ① 商品基础信息
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailSection('openplatform')}
+              className={cn(
+                'rounded-lg px-4 py-2 text-sm font-medium transition',
+                detailSection === 'openplatform'
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100',
+              )}
+            >
+              ② 开放平台 API 字段
+              {requiredTemplateProductAttrs.length + requiredTemplateSkuAttrs.length > 0 ? (
+                <span className="ml-1.5 rounded-full bg-white/25 px-1.5 text-[10px]">
+                  必填 {requiredTemplateProductAttrs.length + requiredTemplateSkuAttrs.length}
+                </span>
+              ) : null}
+            </button>
+          </div>
           <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_280px] xl:items-start xl:gap-8">
             <div className="min-w-0 space-y-6">
+              {detailSection === 'basic' ? (
+                <>
               <section className="rounded-xl border border-gray-200 bg-gray-50/80 p-6">
                 <h3 className="text-base font-semibold text-gray-900">商家信息</h3>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -3751,6 +3808,11 @@ export default function DouyinProductCreateWizard({
             </div>
           </section>
 
+                </>
+              ) : null}
+              {detailSection === 'openplatform' ? (
+                <>
+
           <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-6 shadow-sm">
             <h3 className="text-base font-semibold text-gray-900">来客 / 开放平台：类目模板全量字段（不折叠）</h3>
             <p className="mt-1 text-xs leading-relaxed text-gray-700">
@@ -3779,6 +3841,22 @@ export default function DouyinProductCreateWizard({
               <code className="rounded bg-white/80 px-1 text-[11px]">attr_key_value_map</code> /{' '}
               <code className="rounded bg-white/80 px-1 text-[11px]">sku.attr_key_value_map</code>；<strong>有内容则覆盖提交</strong>。
             </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => runTemplateAutoFill()} className="rounded-lg border border-indigo-400 bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">一键填满全部开放平台字段</button>
+              <button type="button" onClick={() => setDetailSection('basic')} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-800 hover:bg-gray-50">去①补全商品名/图/售价</button>
+            </div>
+            <div className="mt-4 rounded-lg border border-indigo-200 bg-white p-4 shadow-sm">
+              <h4 className="text-sm font-semibold text-indigo-950">goodlife 顶层字段</h4>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div><label className="text-xs font-medium text-gray-700">product_name *</label><input readOnly value={productName} className="mt-1 w-full rounded border bg-gray-50 px-2 py-1.5 text-xs" /></div>
+                <div><label className="text-xs font-medium text-gray-700">category · type</label><input readOnly value={`${cat3||'—'} · ${productType??'—'}`} className="mt-1 w-full rounded border bg-gray-50 px-2 py-1.5 text-xs" /></div>
+                <div className="sm:col-span-2"><label className="text-xs font-medium text-gray-700">Description 短描述</label><textarea rows={2} value={templateAttrOverrides.Description ?? templateAttrOverrides.description ?? normalizeDouyinDescription(productDesc, productName)} onChange={(e)=>{const v=e.target.value;setProductDesc(v);const k=templateProductAttrs.find(a=>/^description$/i.test((a.key??'').trim()))?.key??'Description';setTemplateAttrOverrides(p=>({...p,[k]:v}))}} className="mt-1 w-full rounded border px-2 py-1.5 text-xs" /></div>
+                <div><label className="text-xs font-medium text-gray-700">actual_amount（分）</label><input readOnly value={templateSkuAttrOverrides.actual_amount ?? ''} className="mt-1 w-full rounded border bg-gray-50 px-2 py-1.5 text-xs" /></div>
+              </div>
+            </div>
+            {(requiredTemplateProductAttrs.length > 0 || requiredTemplateSkuAttrs.length > 0) && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50/60 p-4"><h4 className="text-sm font-semibold text-red-950">模板必填 {requiredTemplateProductAttrs.length + requiredTemplateSkuAttrs.length} 项</h4><p className="mt-1 text-xs text-red-900">请确认下方带 * 的输入框均有值。</p></div>
+            )}
             {templateProductAttrs.length === 0 && templateSkuAttrs.length === 0 ? (
               <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                 抖音未返回该类目下的 <code className="rounded bg-white px-1 text-[11px]">product_attrs</code> /{' '}
@@ -4295,6 +4373,8 @@ export default function DouyinProductCreateWizard({
             ) : null}
           </section>
 
+                </>
+              ) : null}
           {actionMsg && (
             <div
               className={cn(

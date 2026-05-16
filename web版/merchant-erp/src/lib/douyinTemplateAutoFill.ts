@@ -4,6 +4,7 @@ import {
   attrKeyIsDouyinSubTitle,
   normalizeDouyinSubTitle,
 } from './douyinSubTitleNormalize'
+import { normalizeDouyinDescription } from './douyinDescriptionNormalize'
 import {
   douyinAppointmentJson,
   douyinCanNoUseDateJson,
@@ -165,7 +166,8 @@ export function buildDouyinTemplateAutoFillMaps(
   const sku: Record<string, string> = {}
 
   const name = input.productName.trim()
-  const desc = (input.productDesc.trim() || name).slice(0, 12000)
+  const descLong = (input.productDesc.trim() || name).slice(0, 12000)
+  const descAttr = normalizeDouyinDescription(input.productDesc, name)
   const subtitle = normalizeDouyinSubTitle(name, name)
   const head = input.headUrl.trim()
   const aux = input.auxUrls.map((u) => u.trim()).filter(Boolean)
@@ -214,7 +216,7 @@ export function buildDouyinTemplateAutoFillMaps(
     }
 
     if (lk === 'description' || /^description$/i.test(key)) {
-      product[key] = desc
+      product[key] = descAttr
       continue
     }
     if (attrKeyIsDouyinSubTitle(key)) {
@@ -275,7 +277,7 @@ export function buildDouyinTemplateAutoFillMaps(
       product[key] = name.slice(0, 50)
       continue
     }
-    product[key] = desc.slice(0, 2000) || name.slice(0, 2000) || '-'
+    product[key] = descLong.slice(0, 2000) || name.slice(0, 2000) || '-'
   }
 
   for (const a of skuAttrs) {

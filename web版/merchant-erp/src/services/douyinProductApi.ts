@@ -1425,6 +1425,10 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
       /appointment|use_time|use_date|can_no_use_date|预约|使用时间/i.test(sub)
         ? ' 说明：预约/使用日期/使用时间/不可使用日期须为开放平台规定 JSON 结构；请部署最新网关或清空对应字段后一键填满。'
         : ''
+    const descriptionHint =
+      /description|商品描述/i.test(base) || /description|商品描述/i.test(sub)
+        ? ' 说明：Description 为短商品描述（约 200 字内纯文本），与详情长图文不同；请用「一键填满」或填写「商品说明」。'
+        : ''
     return {
       ok: false,
       message:
@@ -1438,7 +1442,8 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         comboIllegalHint +
         subTitleHint +
         showChannelHint +
-        tradeRuleHint,
+        tradeRuleHint +
+        descriptionHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id
