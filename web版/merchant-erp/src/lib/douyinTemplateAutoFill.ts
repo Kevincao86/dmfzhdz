@@ -1,4 +1,9 @@
 import type { TemplateAttr } from '../services/douyinProductApi'
+import {
+  attrKeyIsDouyinProductNameHint,
+  attrKeyIsDouyinSubTitle,
+  normalizeDouyinSubTitle,
+} from './douyinSubTitleNormalize'
 
 export type SkuCommodityFormItem = { id: string; name: string; priceCents: string; count: string }
 export type SkuCommodityFormGroup = {
@@ -184,7 +189,7 @@ export function buildDouyinTemplateAutoFillMaps(
 
   const name = input.productName.trim()
   const desc = (input.productDesc.trim() || name).slice(0, 12000)
-  const subtitle = name.slice(0, 60)
+  const subtitle = normalizeDouyinSubTitle(name, name)
   const head = input.headUrl.trim()
   const aux = input.auxUrls.map((u) => u.trim()).filter(Boolean)
   const env = input.envUrls.map((u) => u.trim()).filter(Boolean)
@@ -231,8 +236,12 @@ export function buildDouyinTemplateAutoFillMaps(
       product[key] = desc
       continue
     }
-    if (lk === 'subtitle' || /^subtitle$/i.test(key)) {
+    if (attrKeyIsDouyinSubTitle(key)) {
       product[key] = subtitle
+      continue
+    }
+    if (attrKeyIsDouyinProductNameHint(key)) {
+      product[key] = ''
       continue
     }
     if (lk === 'show_channel') {
@@ -281,6 +290,10 @@ export function buildDouyinTemplateAutoFillMaps(
       continue
     }
 
+    if (/hint|规范|提示/.test(lk) || /规范|提示|名称规范/.test(nm)) {
+      product[key] = name.slice(0, 50)
+      continue
+    }
     product[key] = desc.slice(0, 2000) || name.slice(0, 2000) || '-'
   }
 
