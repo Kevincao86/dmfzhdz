@@ -1416,10 +1416,29 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
       /subtitle|副标题/i.test(base) || /subtitle|副标题/i.test(sub)
         ? ' 说明：SubTitle 为短卖点（约 12 字），勿填长段详情；「商品名称规范」可留空。部署最新版后会自动截断。'
         : ''
+    const showChannelHint =
+      /show_channel/i.test(base) || /show_channel|投放渠道/i.test(sub)
+        ? ' 说明：零售类目投放渠道通常仅支持 1（不限制）或 2（仅直播间）；若选了仅线下等选项，网关会自动改回 1。'
+        : ''
+    const tradeRuleHint =
+      /appointment|use_time|use_date|can_no_use_date/i.test(base) ||
+      /appointment|use_time|use_date|can_no_use_date|预约|使用时间/i.test(sub)
+        ? ' 说明：预约/使用日期/使用时间/不可使用日期须为开放平台规定 JSON 结构；请部署最新网关或清空对应字段后一键填满。'
+        : ''
     return {
       ok: false,
       message:
-        base + logHint + sub + tplHint + comboEmptyHint + comboHint + comboQtyHint + comboIllegalHint + subTitleHint,
+        base +
+        logHint +
+        sub +
+        tplHint +
+        comboEmptyHint +
+        comboHint +
+        comboQtyHint +
+        comboIllegalHint +
+        subTitleHint +
+        showChannelHint +
+        tradeRuleHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id
