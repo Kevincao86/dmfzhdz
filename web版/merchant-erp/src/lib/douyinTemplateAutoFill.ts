@@ -4,6 +4,13 @@ import {
   attrKeyIsDouyinSubTitle,
   normalizeDouyinSubTitle,
 } from './douyinSubTitleNormalize'
+import {
+  douyinAppointmentJson,
+  douyinCanNoUseDateJson,
+  douyinUseDateJson,
+  douyinUseTimeJson,
+  normalizeDouyinShowChannelValue,
+} from './douyinTradeRuleAttrNormalize'
 
 export type SkuCommodityFormItem = { id: string; name: string; priceCents: string; count: string }
 export type SkuCommodityFormGroup = {
@@ -39,18 +46,6 @@ export type DouyinTemplateAutoFillInput = {
   }>
 }
 
-const ERP_SALES_CHANNEL_TO_SHOW_CHANNEL: Record<string, number> = {
-  unlimited: 1,
-  live_only: 2,
-  offline_only: 5,
-  newcomer_only: 7,
-  online_only: 8,
-  free_trial_only: 18,
-  group_mall_only: 22,
-  live_and_acquisition: 23,
-  event_only: 25,
-}
-
 function jsonImageUrlList(urls: string[]): string {
   const list = urls.map((u) => u.trim()).filter(Boolean).slice(0, 30)
   if (list.length === 0) return ''
@@ -69,32 +64,14 @@ function afterSaleToRefundPolicy(policy: string): string {
   return '1'
 }
 
-/** 来客常见结构化 attr 默认值（与主表单售卖/消费规则对齐） */
 function defaultUseDateJson(input: DouyinTemplateAutoFillInput): string {
   const days = Math.max(1, Math.floor(Number(input.consumeValidDays) || 360))
-  if (input.consumeDateMode === 'calendar') {
-    const start = input.saleStart.trim() || new Date().toISOString().slice(0, 10)
-    const end =
-      input.saleEnd.trim() ||
-      new Date(Date.now() + days * 86400000).toISOString().slice(0, 10)
-    return JSON.stringify({ use_date_type: 1, use_start_date: start, use_end_date: end })
-  }
-  return JSON.stringify({ use_date_type: 2, day_duration: days })
-}
-
-function defaultUseTimeJson(): string {
-  return JSON.stringify({ use_time_type: 1 })
-}
-
-function defaultCanNoUseDateJson(): string {
-  return JSON.stringify({ can_no_use_holiday: false, can_no_use_date_list: [] })
-}
-
-function defaultAppointmentJson(input: DouyinTemplateAutoFillInput): string {
-  if (input.reserveMode === 'required') {
-    return JSON.stringify({ need_appointment: true, ahead_time_type: 1, ahead_day_num: 1 })
-  }
-  return JSON.stringify({ need_appointment: false })
+  return douyinUseDateJson(
+    days,
+    input.consumeDateMode,
+    input.saleStart.trim(),
+    input.saleEnd.trim(),
+  )
 }
 
 export function buildSkuCommodityGroupsForAutoFill(
@@ -200,7 +177,11 @@ export function buildDouyinTemplateAutoFillMaps(
     ? String(Math.max(0, Math.floor(Number(input.stockQty) || 0)))
     : '999999'
 
-  const showCh = ERP_SALES_CHANNEL_TO_SHOW_CHANNEL[input.salesChannel.trim()] ?? 1
+  const showCh = normalizeDouyinShowChannelValue(
+    '',
+    input.salesChannel.trim(),
+    input.categoryId.trim(),
+  )
   const refund = afterSaleToRefundPolicy(input.afterSalePolicy.trim())
 
   for (const a of productAttrs) {
@@ -245,7 +226,7 @@ export function buildDouyinTemplateAutoFillMaps(
       continue
     }
     if (lk === 'show_channel') {
-      product[key] = String(showCh)
+      product[key] = showCh
       continue
     }
     if (lk === 'refundpolicy' || key === 'RefundPolicy') {
@@ -253,7 +234,7 @@ export function buildDouyinTemplateAutoFillMaps(
       continue
     }
     if (lk === 'appointment') {
-      product[key] = defaultAppointmentJson(input)
+      product[key] = douyinAppointmentJson(input.reserveMode === 'required')
       continue
     }
     if (lk === 'use_date') {
@@ -261,11 +242,11 @@ export function buildDouyinTemplateAutoFillMaps(
       continue
     }
     if (lk === 'use_time') {
-      product[key] = defaultUseTimeJson()
+      product[key] = douyinUseTimeJson()
       continue
     }
     if (lk === 'can_no_use_date') {
-      product[key] = defaultCanNoUseDateJson()
+      product[key] = douyinCanNoUseDateJson(false)
       continue
     }
 
@@ -284,8 +265,8 @@ export function buildDouyinTemplateAutoFillMaps(
 
     if (vt === 'STRUCT' || vt === 'OBJECT' || vt === 'JSON' || vt === 'ARRAY') {
       if (/日期|use_date|有效期/.test(nm)) product[key] = defaultUseDateJson(input)
-      else if (/时间|use_time|时段/.test(nm)) product[key] = defaultUseTimeJson()
-      else if (/预约|appointment/.test(nm)) product[key] = defaultAppointmentJson(input)
+      else if (/时间|use_time|时段/.test(nm)) product[key] = douyinUseTimeJson()
+      else if (/预约|appointment/.test(nm)) product[key] = douyinAppointmentJson(input.reserveMode === 'required')
       else product[key] = '{}'
       continue
     }

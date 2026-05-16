@@ -57,6 +57,14 @@ import {
   sanitizeDouyinProductAttrSubTitleFields,
 } from '../src/lib/douyinSubTitleNormalize.js'
 import {
+  douyinAppointmentJson,
+  douyinCanNoUseDateJson,
+  douyinUseDateJson,
+  douyinUseTimeJson,
+  normalizeDouyinShowChannelValue,
+  sanitizeDouyinTradeRuleProductAttrs,
+} from '../src/lib/douyinTradeRuleAttrNormalize.js'
+import {
   type DouyinMerchantSession,
   douyinMerchantDevSessions,
   openDouyinSessionCredentials,
@@ -1755,23 +1763,11 @@ function syntheticGoodlifeTemplateAttrsBundle(_productType: number): {
   return { productAttrs, skuAttrs }
 }
 
-/** ERP 投放渠道选项 → 文档 show_channel（INT） */
-const ERP_SALES_CHANNEL_TO_SHOW_CHANNEL: Record<string, number> = {
-  unlimited: 1,
-  live_only: 2,
-  offline_only: 5,
-  newcomer_only: 7,
-  online_only: 8,
-  free_trial_only: 18,
-  group_mall_only: 22,
-  live_and_acquisition: 23,
-  event_only: 25,
-}
-
 /** 在 merge 之后补齐开放平台文档级字面 key（模板未返回 opaque 槽时仍常必填） */
 function injectDocKeyedProductAttrsFromErp(
   mergedProductAttrs: Record<string, string>,
   erp: Record<string, unknown>,
+  categoryId: string,
 ): void {
   const sales =
     erp.sales_info && typeof erp.sales_info === 'object' ? (erp.sales_info as Record<string, unknown>) : {}
@@ -1779,12 +1775,7 @@ function injectDocKeyedProductAttrsFromErp(
     erp.trade_rules && typeof erp.trade_rules === 'object' ? (erp.trade_rules as Record<string, unknown>) : {}
   const ch = typeof sales.channel === 'string' ? sales.channel.trim() : ''
   if (!(mergedProductAttrs.show_channel ?? '').trim()) {
-    if (ch) {
-      const n = ERP_SALES_CHANNEL_TO_SHOW_CHANNEL[ch]
-      mergedProductAttrs.show_channel = String(n != null ? n : 1)
-    } else {
-      mergedProductAttrs.show_channel = '1'
-    }
+    mergedProductAttrs.show_channel = normalizeDouyinShowChannelValue('', ch, categoryId)
   }
   const asp = typeof trade.after_sale_policy === 'string' ? trade.after_sale_policy.trim() : ''
   if (asp && !(mergedProductAttrs.RefundPolicy ?? '').trim()) {
@@ -1792,23 +1783,20 @@ function injectDocKeyedProductAttrsFromErp(
     mergedProductAttrs.RefundPolicy = String(rp)
   }
   const validDays = Math.max(1, Math.floor(Number(trade.consume_valid_days) || 360))
+  const consumeMode = trade.consume_date_mode === 'calendar' ? 'calendar' : 'days'
   if (!(mergedProductAttrs.use_date ?? '').trim()) {
-    mergedProductAttrs.use_date = JSON.stringify({ use_date_type: 2, day_duration: validDays })
+    mergedProductAttrs.use_date = douyinUseDateJson(validDays, consumeMode)
   }
   if (!(mergedProductAttrs.use_time ?? '').trim()) {
-    mergedProductAttrs.use_time = JSON.stringify({ use_time_type: 1 })
+    mergedProductAttrs.use_time = douyinUseTimeJson()
   }
   if (!(mergedProductAttrs.can_no_use_date ?? '').trim()) {
-    mergedProductAttrs.can_no_use_date = JSON.stringify({
-      can_no_use_holiday: false,
-      can_no_use_date_list: [],
-    })
+    mergedProductAttrs.can_no_use_date = douyinCanNoUseDateJson(false)
   }
   const reserveMode = typeof trade.reserve_mode === 'string' ? trade.reserve_mode.trim() : ''
+  const reserveAdvance = Math.max(1, Math.floor(Number(trade.reserve_advance_value) || 1))
   if (!(mergedProductAttrs.appointment ?? '').trim()) {
-    mergedProductAttrs.appointment = JSON.stringify({
-      need_appointment: reserveMode === 'required',
-    })
+    mergedProductAttrs.appointment = douyinAppointmentJson(reserveMode === 'required', reserveAdvance)
   }
 }
 
@@ -3086,7 +3074,7 @@ async function buildGoodlifeProductSaveBody(
     }
   }
 
-  injectDocKeyedProductAttrsFromErp(mergedProductAttrs, erp)
+  injectDocKeyedProductAttrsFromErp(mergedProductAttrs, erp, category_id)
 
   /**
    * 仅向 template.get 声明的 opaque key 写入「groups 数组」JSON；勿自创字面量 combo_rule/commodity。
@@ -3227,6 +3215,7 @@ async function buildGoodlifeProductSaveBody(
     return Number.isFinite(n) ? n : undefined
   })()
   sanitizeDouyinProductAttrSubTitleFields(mergedProductAttrs, product_name, subtitleMax)
+  sanitizeDouyinTradeRuleProductAttrs(mergedProductAttrs, erp, category_id, attrs)
 
   if (Object.keys(mergedProductAttrs).length > 0) {
     product.attr_key_value_map = mergedProductAttrs
@@ -3453,6 +3442,7 @@ function summarizeDouyinProductSaveForLog(
       }
       return 0
     })(),
+    show_channel: ak?.show_channel ?? null,
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
     missing_required_product_attr_keys,
