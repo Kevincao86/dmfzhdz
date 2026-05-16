@@ -1913,6 +1913,48 @@ function comboItemCountFromRow(row: Record<string, unknown>): number {
   return Math.max(1, Math.floor(Number(row.quantity ?? row.count ?? row.qty ?? 1) || 1))
 }
 
+/** 解析用户/前端手填的 commodity 或 combo_rule JSON → `{ groups: ItemGroupStruct[] }` */
+function parseComboRuleJsonToGroupsObject(raw: string): Record<string, unknown> | null {
+  const t = (raw ?? '').trim()
+  if (!t) return null
+  try {
+    const j = JSON.parse(t) as unknown
+    if (Array.isArray(j) && j.length > 0) return { groups: j }
+    if (j && typeof j === 'object' && !Array.isArray(j)) {
+      const g = (j as { groups?: unknown[] }).groups
+      if (Array.isArray(g) && g.length > 0) return { groups: g }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+/**
+ * 手填 `template_sku_attr_overrides.commodity` / `template_attr_overrides.combo_rule` 优先于 package_combo，
+ * 避免「页面 JSON 已填对、顶层 product.combo_rule 仍来自旧 package_combo」导致抖音校验失败。
+ */
+function resolveComboRuleFromErpOverrides(
+  erp: Record<string, unknown>,
+  fallback: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const tryField = (raw: unknown): Record<string, unknown> | null => {
+    if (typeof raw !== 'string') return null
+    return parseComboRuleJsonToGroupsObject(raw)
+  }
+  const skuO = erp.template_sku_attr_overrides
+  if (skuO && typeof skuO === 'object' && !Array.isArray(skuO)) {
+    const parsed = tryField((skuO as Record<string, unknown>).commodity)
+    if (parsed) return parsed
+  }
+  const tplO = erp.template_attr_overrides
+  if (tplO && typeof tplO === 'object' && !Array.isArray(tplO)) {
+    const parsed = tryField((tplO as Record<string, unknown>).combo_rule)
+    if (parsed) return parsed
+  }
+  return fallback
+}
+
 /** goodlife 侧 combo_rule 与 ERP `package_combo` 同源；仅团购 product_type=1 使用；出站对齐 ItemGroupStruct */
 function buildDouyinProductComboRule(
   erp: Record<string, unknown>,
@@ -1946,6 +1988,7 @@ function buildDouyinProductComboRule(
         count,
         /** 类目 5003003 等常强校验「单位必须为份」；勿传「个/件」等以免误判 */
         unit: '份',
+        count_unit: '份',
       }
       const pid = String(row.product_id ?? '').trim()
       if (pid) item.product_id = pid
@@ -2082,11 +2125,17 @@ function normalizeComboItemRowForAttrJson(
   const count = comboItemCountFromRow(row)
   const price = comboItemPriceFenFromRow(row, originFenFallback)
   const name = String(row.name ?? '').trim() || '单品'
-  /** 与顶层 product.combo_rule 一致：仅 count/price/unit，勿加 quantity（部分类目反序列化会判失败） */
+  /** 与开放平台团购示例一致：count + unit + count_unit（份数单位，见 goods/save 文档 commodity 示例） */
   const item: Record<string, unknown> =
     mode === 'stringify'
-      ? { name, price: String(price), count: String(count), unit: '份' }
-      : { name, price, count, unit: '份' }
+      ? {
+          name,
+          price: String(price),
+          count: String(count),
+          unit: '份',
+          count_unit: '份',
+        }
+      : { name, price, count, unit: '份', count_unit: '份' }
   const pid = String(row.product_id ?? '').trim()
   if (pid) item.product_id = pid
   const sid = String(row.sku_id ?? '').trim()
@@ -2408,14 +2457,35 @@ function normalizeComboGroupsForProductBody(
     const inferred = pickRuleToTotalAndOptionCount(item_list.length, '')
     const tc = Math.max(1, Math.floor(Number(gr.total_count) || inferred.total_count))
     const oc = Math.max(1, Math.floor(Number(gr.option_count) || inferred.option_count))
+    const normItems = item_list.map((row) =>
+      row && typeof row === 'object'
+        ? normalizeComboItemRowForProductBody(
+            row as Record<string, unknown>,
+            originFenFallback,
+            categoryId,
+          )
+        : row,
+    )
     return {
       group_name: String(gr.group_name ?? '商品组').trim().slice(0, 80) || '商品组',
       total_count: tc,
       option_count: oc,
-      item_list,
+      item_list: normItems,
     }
   })
   return { groups }
+}
+
+/** 顶层 product.combo_rule 对象内单品：attr 为 JSON 字符串，body 内可同时带 quantity 兼容字段 */
+function normalizeComboItemRowForProductBody(
+  row: Record<string, unknown>,
+  originFenFallback: number,
+  categoryId: string,
+): Record<string, unknown> {
+  const retail = categoryRetailComboAttrNormalize(categoryId)
+  const item = normalizeComboItemRowForAttrJson(row, originFenFallback, retail ? 'retail' : 'retail')
+  const count = comboItemCountFromRow(item)
+  return { ...item, count, quantity: count, unit: '份', count_unit: '份' }
 }
 
 /**
@@ -2669,6 +2739,27 @@ function mergeGoodlifeProductAttrMapFromErp(
  * template.get 标记 is_required 但 merge 未自动识别的 SKU 槽位补默认值，避免上游泛化错误（如缺券码来源仍报套餐数量/单位）。
  * - code_source_type：券码来源；优先 trade_rules.code_source_type，否则 DOUYIN_GOODS_SKU_CODE_SOURCE_TYPE_DEFAULT 或 "1"（平台发码）。
  */
+/**
+ * 按 template.get 返回的 sku_attrs.key 写入开放平台文档常见默认值（仅填空项）。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/server/locallife/old-versions-warning/goods-repo/goods-save
+ */
+function applySkuTemplateAttrLiteralsFromTemplate(
+  skuAttrs: Record<string, unknown>[],
+  skuAttrMap: Record<string, string>,
+): void {
+  const defaults: Record<string, string> = {
+    limit_rule: '{"is_limit":false}',
+    settle_type: '1',
+    use_type: '1',
+  }
+  for (const a of skuAttrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key || (skuAttrMap[key] ?? '').trim()) continue
+    const lk = key.toLowerCase()
+    if (defaults[lk]) skuAttrMap[key] = defaults[lk]!
+  }
+}
+
 function applyMissingRequiredSkuAttrDefaults(
   skuAttrs: Record<string, unknown>[],
   skuAttrMap: Record<string, string>,
@@ -2881,6 +2972,7 @@ async function buildGoodlifeProductSaveBody(
     const splitRule = retailSplitSingleGroupIntoOneGroupPerItem(comboRule, category_id)
     if (splitRule) comboRule = splitRule
     comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule, category_id)
+    comboRule = resolveComboRuleFromErpOverrides(erp, comboRule)
   } else if (product_type === 2) {
     /**
      * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。
@@ -3048,6 +3140,7 @@ async function buildGoodlifeProductSaveBody(
   }
 
   applyMissingRequiredSkuAttrDefaults(skuAttrs, skuAttrMap, erp)
+  applySkuTemplateAttrLiteralsFromTemplate(skuAttrs, skuAttrMap)
 
   if (isGroupBuy && comboRule) {
     comboRule = finalizeGroupBuyComboPayloads(
