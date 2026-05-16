@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""从 meoo-agent-idle.png 生成书写动图：仅笔刷区域沿书面轨迹运动，身体静止。"""
+"""可选：从 meoo-agent-idle.png 程序化生成书写动图。
+
+线上默认使用设计师提供的 `public/meoo-agent-writing.gif`（图1），
+仅在需要替换动图且没有新 GIF 时运行本脚本。
+"""
 from __future__ import annotations
 
 from pathlib import Path

@@ -365,10 +365,7 @@ function newId(prefix: string) {
 
 function emptySkuCommodityForm(): SkuCommodityFormGroup[] {
   const mkItem = (): SkuCommodityFormItem => ({ id: newId('sci'), name: '', priceCents: '', count: '1' })
-  return [
-    { id: newId('scg'), groupName: '', totalCount: '1', optionCount: '1', items: [mkItem()] },
-    { id: newId('scg'), groupName: '', totalCount: '1', optionCount: '1', items: [mkItem()] },
-  ]
+  return [{ id: newId('scg'), groupName: '', totalCount: '1', optionCount: '1', items: [mkItem()] }]
 }
 
 function parseSkuCommodityFormFromJson(raw: string): SkuCommodityFormGroup[] | null {

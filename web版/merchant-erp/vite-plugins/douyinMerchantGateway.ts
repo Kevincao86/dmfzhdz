@@ -2021,6 +2021,39 @@ function buildDouyinProductComboRule(
  * 部分类目下 goodlife 要求团购 `combo_rule` 至少 2 个商品组；仅 1 组时拆成 A/B（内容同源）。
  * 与来客里手动复制第二组等价。`DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP=0|false|off` 关闭。
  */
+/**
+ * 零售类目：多组内容完全一致时压成 1 组（自动填满曾默认 2 组同源）。
+ */
+function collapseRetailDuplicateComboGroups(
+  comboRule: Record<string, unknown> | null,
+  categoryId: string,
+): Record<string, unknown> | null {
+  if (!comboRule || !categoryRetailComboAttrNormalize(categoryId)) return comboRule
+  const groups = (comboRule as { groups?: unknown[] }).groups
+  if (!Array.isArray(groups) || groups.length <= 1) return comboRule
+  const sig = (g: Record<string, unknown>) => {
+    const list = Array.isArray(g.item_list) ? g.item_list : Array.isArray(g.items) ? g.items : []
+    return JSON.stringify(
+      list.map((it) => {
+        const r = it as Record<string, unknown>
+        return {
+          n: String(r.name ?? ''),
+          p: comboItemPriceFenFromRow(r, 0),
+          c: comboItemCountFromRow(r),
+          u: String(r.unit ?? ''),
+        }
+      }),
+    )
+  }
+  const first = groups[0] as Record<string, unknown>
+  if (!first || typeof first !== 'object') return comboRule
+  const s0 = sig(first)
+  if (groups.every((g) => g && typeof g === 'object' && sig(g as Record<string, unknown>) === s0)) {
+    return { groups: [JSON.parse(JSON.stringify(first))] }
+  }
+  return comboRule
+}
+
 function categoryComboSingleGroupAutoDup(categoryId: string): boolean {
   const cid = String(categoryId ?? '').trim()
   /** 零售 5003003 等：单组自动克隆 A/B 易触发「数量/单位」误报，默认关闭；其它团购类目仍默认开启 */
@@ -2135,7 +2168,7 @@ function normalizeComboItemRowForAttrJson(
           unit: '份',
           count_unit: '份',
         }
-      : { name, price, count, unit: '份', count_unit: '份' }
+      : { name, price, count, quantity: count, unit: '份', count_unit: '份' }
   const pid = String(row.product_id ?? '').trim()
   if (pid) item.product_id = pid
   const sid = String(row.sku_id ?? '').trim()
@@ -2466,10 +2499,12 @@ function normalizeComboGroupsForProductBody(
           )
         : row,
     )
+    const pr = String(gr.pick_rule ?? gr.pickRule ?? '').trim()
     return {
       group_name: String(gr.group_name ?? '商品组').trim().slice(0, 80) || '商品组',
       total_count: tc,
       option_count: oc,
+      ...(pr ? { pick_rule: pr } : {}),
       item_list: normItems,
     }
   })
@@ -2523,6 +2558,15 @@ function finalizeGroupBuyComboPayloads(
         skuAttrMap[key] = commodityJson
       }
     }
+  }
+
+  /** 零售：commodity 已填时不再重复写 attr.combo_rule，避免双份校验不一致 */
+  if (
+    categoryRetailComboAttrNormalize(categoryId) &&
+    !comboRuleAttrJsonIsEffectivelyEmpty(commodityJson) &&
+    (mergedProductAttrs.combo_rule ?? '').trim() === commodityJson.trim()
+  ) {
+    delete mergedProductAttrs.combo_rule
   }
 
   return normalized
@@ -2880,7 +2924,11 @@ async function resolveProductAccountNameForSave(
  * goodlife product/save 的 `open_biz_type`：与 template.get 文档一致，**1 = 组合券包**。
  * 代金券/次卡等若误传 1，抖音常返回泛化「服务器打瞌睡」类错误。团购（product_type=1）与官方示例对齐默认 1。
  */
-function resolveOpenBizTypeForGoodlifeSave(erp: Record<string, unknown>, productType: number): number {
+function resolveOpenBizTypeForGoodlifeSave(
+  erp: Record<string, unknown>,
+  productType: number,
+  categoryId: string,
+): number {
   const forced = process.env.DOUYIN_GOODS_SAVE_OPEN_BIZ_TYPE?.trim()
   if (forced !== undefined && forced !== '') {
     const n = Number(forced)
@@ -2891,6 +2939,8 @@ function resolveOpenBizTypeForGoodlifeSave(erp: Record<string, unknown>, product
     const n = Number(raw)
     if (Number.isFinite(n) && n >= 0 && n <= 99) return Math.floor(n)
   }
+  /** 零售团购 5003003：open_biz_type=1 为「组合券包」，误传易触发业务规则/套餐数量类误报 */
+  if (productType === 1 && categoryRetailComboAttrNormalize(categoryId)) return 0
   return productType === 1 ? 1 : 0
 }
 
@@ -2973,6 +3023,7 @@ async function buildGoodlifeProductSaveBody(
     if (splitRule) comboRule = splitRule
     comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule, category_id)
     comboRule = resolveComboRuleFromErpOverrides(erp, comboRule)
+    comboRule = collapseRetailDuplicateComboGroups(comboRule, category_id)
   } else if (product_type === 2) {
     /**
      * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。
@@ -3061,7 +3112,7 @@ async function buildGoodlifeProductSaveBody(
     category_id,
     product_type,
     biz_line: 1,
-    open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, product_type),
+    open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, product_type, category_id),
     out_id,
     account_name,
     sold_start_time: nowMs,
@@ -3355,6 +3406,12 @@ function summarizeDouyinProductSaveForLog(
     product_type: product?.product_type,
     category_id: product?.category_id,
     open_biz_type: product?.open_biz_type,
+    open_biz_type_note:
+      product?.open_biz_type === 0
+        ? 'retail_default_0'
+        : product?.open_biz_type === 1
+          ? 'combo_coupon_1'
+          : 'other',
     combo_in_product_body: Boolean(product?.combo_rule),
     combo_attr_json_shape,
     combo_sku_commodity_shape,
