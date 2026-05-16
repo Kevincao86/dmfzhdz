@@ -1412,9 +1412,14 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
       /合法的combo|合法.*combo_rule/i.test(base) || /合法的combo|合法.*combo_rule/i.test(sub)
         ? ' 说明：attr 内 combo_rule/commodity 须为 ItemGroupStruct **数组** JSON（非 `{"groups":[]}` 包装）。若仍失败请查 Vercel 日志 combo_attr_json_shape。'
         : ''
+    const subTitleHint =
+      /subtitle|副标题/i.test(base) || /subtitle|副标题/i.test(sub)
+        ? ' 说明：SubTitle 为短卖点（约 12 字），勿填长段详情；「商品名称规范」可留空。部署最新版后会自动截断。'
+        : ''
     return {
       ok: false,
-      message: base + logHint + sub + tplHint + comboEmptyHint + comboHint + comboQtyHint + comboIllegalHint,
+      message:
+        base + logHint + sub + tplHint + comboEmptyHint + comboHint + comboQtyHint + comboIllegalHint + subTitleHint,
     }
   }
   const pidRaw = inner.product_id ?? inner.productId ?? data.product_id

@@ -52,6 +52,11 @@ import {
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
+  attrKeyIsDouyinSubTitle,
+  normalizeDouyinSubTitle,
+  sanitizeDouyinProductAttrSubTitleFields,
+} from '../src/lib/douyinSubTitleNormalize.js'
+import {
   type DouyinMerchantSession,
   douyinMerchantDevSessions,
   openDouyinSessionCredentials,
@@ -2711,11 +2716,15 @@ function mergeGoodlifeProductAttrMapFromErp(
         out[key] = pkgJson
         continue
       }
-      if (/标题|商品名称|名称(?!规范)/.test(name) && productName) {
+      if (attrKeyIsDouyinSubTitle(key) || /副标题/.test(name)) {
+        out[key] = normalizeDouyinSubTitle(productDesc || productName, productName)
+        continue
+      }
+      if (/标题|商品名称|名称(?!规范)/.test(name) && productName && !/副标题/.test(name)) {
         out[key] = productName.slice(0, 2000)
         continue
       }
-      if (/详情|图文|介绍|卖点|描述/.test(name)) {
+      if (/详情|图文|介绍|描述/.test(name) || (/卖点/.test(name) && !attrKeyIsDouyinSubTitle(key))) {
         const v = (productDesc || productName).slice(0, 12000)
         if (v) {
           out[key] = v
@@ -3213,6 +3222,12 @@ async function buildGoodlifeProductSaveBody(
     product.combo_rule = comboRule
   }
 
+  const subtitleMax = (() => {
+    const n = Number(process.env.DOUYIN_GOODS_SUBTITLE_MAX_LEN)
+    return Number.isFinite(n) ? n : undefined
+  })()
+  sanitizeDouyinProductAttrSubTitleFields(mergedProductAttrs, product_name, subtitleMax)
+
   if (Object.keys(mergedProductAttrs).length > 0) {
     product.attr_key_value_map = mergedProductAttrs
   }
@@ -3431,6 +3446,13 @@ function summarizeDouyinProductSaveForLog(
     combo_like_attr_keys:
       ak == null ? [] : Object.keys(ak).filter((k) => /combo|套餐|搭配|组合|rule|commodity/i.test(k)),
     attr_key_count: ak ? Object.keys(ak).length : 0,
+    subtitle_len: (() => {
+      if (!ak) return 0
+      for (const [k, v] of Object.entries(ak)) {
+        if (attrKeyIsDouyinSubTitle(k)) return String(v ?? '').length
+      }
+      return 0
+    })(),
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
     missing_required_product_attr_keys,
