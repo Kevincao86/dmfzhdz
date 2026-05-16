@@ -8,10 +8,15 @@ function resolveState(aiSending: boolean, inputDraft: string): MascotState {
   return 'idle'
 }
 
-const MASCOT_SRC = '/meoo-agent-mascot.png'
+/** 待机：2D 卡通静态图 */
+const IDLE_SRC = '/meoo-agent-idle.png'
+/** 输入中 / 生成中：笔刷书写动图 */
+const WRITING_SRC = '/meoo-agent-writing.gif'
 
 /**
- * 墨典智能体输入区旁吉祥物（最初版）：单图 + CSS 待机动效 / 生成中摆动。
+ * 墨典智能体输入区旁吉祥物：
+ * - idle：静态卡通
+ * - userTyping / outputting：书写 GIF 动图
  */
 export function MeooAgentMascot({
   aiSending,
@@ -23,48 +28,25 @@ export function MeooAgentMascot({
   className?: string
 }) {
   const state = resolveState(aiSending, inputDraft)
+  const isWriting = state === 'userTyping' || state === 'outputting'
 
   return (
     <div
-      className={cn('relative flex w-[4.5rem] flex-col items-center select-none', className)}
+      className={cn('relative flex w-[4.75rem] flex-col items-center select-none', className)}
       aria-hidden
       title="墨典小助手"
     >
-      <div
-        className={cn(
-          'relative h-[5.25rem] w-[4.25rem] overflow-visible',
-          state === 'outputting' && 'meoo-mascot-typing',
-          state === 'userTyping' && 'translate-x-0.5 transition-transform duration-300',
-          state === 'idle' && 'meoo-mascot-idle',
-        )}
-      >
+      <div className="relative h-[5.5rem] w-[4.5rem] overflow-hidden">
         <img
-          src={MASCOT_SRC}
+          src={isWriting ? WRITING_SRC : IDLE_SRC}
           alt=""
-          className="h-full w-full object-contain object-bottom drop-shadow-md"
+          className="h-full w-full object-contain object-bottom [filter:drop-shadow(0_6px_10px_rgba(15,23,42,0.16))]"
           draggable={false}
         />
       </div>
-      <span className="mt-0.5 max-w-[4.5rem] truncate text-center text-[9px] font-medium text-indigo-600/90">
-        {state === 'outputting' ? '生成中…' : state === 'userTyping' ? '在看输入' : '待机'}
+      <span className="mt-0.5 max-w-[4.75rem] truncate text-center text-[9px] font-medium text-indigo-600/90">
+        {state === 'outputting' ? '生成中…' : state === 'userTyping' ? '在书写…' : '待机'}
       </span>
-      <style>{`
-        @keyframes meooMascotType {
-          0%, 100% { transform: rotate(-2deg) translateY(0); }
-          50% { transform: rotate(3deg) translateY(-1px); }
-        }
-        @keyframes meooMascotIdle {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-2px); }
-        }
-        .meoo-mascot-typing {
-          animation: meooMascotType 0.55s ease-in-out infinite;
-          transform-origin: 50% 85%;
-        }
-        .meoo-mascot-idle {
-          animation: meooMascotIdle 2.4s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }
