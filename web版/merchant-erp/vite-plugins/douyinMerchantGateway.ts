@@ -1786,6 +1786,25 @@ function injectDocKeyedProductAttrsFromErp(
     const rp = asp === 'no_refund' ? 2 : asp === 'refund_auto_expire' ? 3 : 1
     mergedProductAttrs.RefundPolicy = String(rp)
   }
+  const validDays = Math.max(1, Math.floor(Number(trade.consume_valid_days) || 360))
+  if (!(mergedProductAttrs.use_date ?? '').trim()) {
+    mergedProductAttrs.use_date = JSON.stringify({ use_date_type: 2, day_duration: validDays })
+  }
+  if (!(mergedProductAttrs.use_time ?? '').trim()) {
+    mergedProductAttrs.use_time = JSON.stringify({ use_time_type: 1 })
+  }
+  if (!(mergedProductAttrs.can_no_use_date ?? '').trim()) {
+    mergedProductAttrs.can_no_use_date = JSON.stringify({
+      can_no_use_holiday: false,
+      can_no_use_date_list: [],
+    })
+  }
+  const reserveMode = typeof trade.reserve_mode === 'string' ? trade.reserve_mode.trim() : ''
+  if (!(mergedProductAttrs.appointment ?? '').trim()) {
+    mergedProductAttrs.appointment = JSON.stringify({
+      need_appointment: reserveMode === 'required',
+    })
+  }
 }
 
 function jsonImageUrlList(urls: string[]): string {
@@ -1959,7 +1978,18 @@ function buildDouyinProductComboRule(
  * 部分类目下 goodlife 要求团购 `combo_rule` 至少 2 个商品组；仅 1 组时拆成 A/B（内容同源）。
  * 与来客里手动复制第二组等价。`DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP=0|false|off` 关闭。
  */
-function expandGroupBuyComboRuleMinTwoGroups(comboRule: Record<string, unknown> | null): Record<string, unknown> | null {
+function categoryComboSingleGroupAutoDup(categoryId: string): boolean {
+  const cid = String(categoryId ?? '').trim()
+  /** 零售 5003003 等：单组自动克隆 A/B 易触发「数量/单位」误报，默认关闭；其它团购类目仍默认开启 */
+  if (categoryRetailSplitItemsToSeparateGroups(cid)) return false
+  const dupOff = process.env.DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP?.trim().toLowerCase()
+  return dupOff !== '0' && dupOff !== 'false' && dupOff !== 'off'
+}
+
+function expandGroupBuyComboRuleMinTwoGroups(
+  comboRule: Record<string, unknown> | null,
+  categoryId: string,
+): Record<string, unknown> | null {
   if (!comboRule) return null
   const groupsIn = (comboRule as { groups?: unknown[] }).groups
   if (!Array.isArray(groupsIn) || groupsIn.length === 0) return comboRule
@@ -1968,9 +1998,7 @@ function expandGroupBuyComboRuleMinTwoGroups(comboRule: Record<string, unknown> 
     return Array.isArray(gr.item_list) && gr.item_list.length > 0
   }) as Record<string, unknown>[]
   if (withItems.length !== 1) return comboRule
-  const dupOff = process.env.DOUYIN_GOODS_COMBO_SINGLE_GROUP_AUTO_DUP?.trim().toLowerCase()
-  const autoDup = dupOff !== '0' && dupOff !== 'false' && dupOff !== 'off'
-  if (!autoDup) return comboRule
+  if (!categoryComboSingleGroupAutoDup(categoryId)) return comboRule
   const g0 = withItems[0]
   const clone = JSON.parse(JSON.stringify(g0)) as Record<string, unknown>
   const base = String(g0.group_name ?? '商品组').trim().slice(0, 60) || '商品组'
@@ -2852,7 +2880,7 @@ async function buildGoodlifeProductSaveBody(
     }
     const splitRule = retailSplitSingleGroupIntoOneGroupPerItem(comboRule, category_id)
     if (splitRule) comboRule = splitRule
-    comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule)
+    comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule, category_id)
   } else if (product_type === 2) {
     /**
      * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。

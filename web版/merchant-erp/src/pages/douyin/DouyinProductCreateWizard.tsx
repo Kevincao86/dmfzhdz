@@ -48,6 +48,11 @@ import {
   type AiModelId,
   postDouyinGoodsAiAssist,
 } from '../../services/douyinAiAssistApi'
+import {
+  buildDouyinTemplateAutoFillMaps,
+  buildSkuCommodityGroupsForAutoFill,
+  type DouyinTemplateAutoFillInput,
+} from '../../lib/douyinTemplateAutoFill'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../../services/merchantAiVendorCatalogClient'
 import {
   MERCHANT_AI_MODEL_STORAGE_KEY,
@@ -1062,6 +1067,107 @@ export default function DouyinProductCreateWizard({
     [priceYuan, originYuan, stockQty, stockLimited, productName],
   )
 
+  const templateAutoFillInput = useMemo(
+    (): DouyinTemplateAutoFillInput => ({
+      productType,
+      categoryId: cat3,
+      productName,
+      productDesc,
+      priceYuan,
+      originYuan,
+      headUrl,
+      auxUrls: auxUrlsList,
+      envUrls: envUrlsList,
+      salesChannel,
+      afterSalePolicy,
+      consumeDateMode,
+      consumeValidDays,
+      saleStart,
+      saleEnd,
+      stockQty,
+      stockLimited,
+      reserveMode,
+      comboGroups: comboGroups.map((g) => ({
+        pickRule: g.pickRule,
+        items: g.items.map((it) => ({ name: it.name, qty: it.qty, price: it.price })),
+      })),
+    }),
+    [
+      productType,
+      cat3,
+      productName,
+      productDesc,
+      priceYuan,
+      originYuan,
+      headUrl,
+      auxUrlsList,
+      envUrlsList,
+      salesChannel,
+      afterSalePolicy,
+      consumeDateMode,
+      consumeValidDays,
+      saleStart,
+      saleEnd,
+      stockQty,
+      stockLimited,
+      reserveMode,
+      comboGroups,
+    ],
+  )
+
+  const computeTemplateAutoFillSnapshot = useCallback(() => {
+    const groups = buildSkuCommodityGroupsForAutoFill(templateAutoFillInput, newId)
+    const commodityJson = skuCommodityFormToJson(groups)
+    const maps = buildDouyinTemplateAutoFillMaps(
+      templateProductAttrs,
+      templateSkuAttrs,
+      templateAutoFillInput,
+      commodityJson,
+    )
+    return { groups, commodityJson, product: maps.product, sku: maps.sku }
+  }, [templateAutoFillInput, templateProductAttrs, templateSkuAttrs])
+
+  const runTemplateAutoFill = useCallback(
+    (opts?: { silent?: boolean }) => {
+      if (templateProductAttrs.length === 0 && templateSkuAttrs.length === 0) {
+        if (!opts?.silent) {
+          setActionMsg({ text: '请先选择类目并进入商品信息页，待模板加载后再一键填满', ok: false })
+        }
+        return null
+      }
+      const snap = computeTemplateAutoFillSnapshot()
+      applySkuCommodityForm(snap.groups)
+      setTemplateAttrOverrides(snap.product)
+      setTemplateSkuAttrOverrides(snap.sku)
+      if (!opts?.silent) {
+        setActionMsg({
+          text: `已填满开放平台字段：商品 ${Object.keys(snap.product).length} 项、SKU ${Object.keys(snap.sku).length} 项（含 commodity / 售价分 / 券码来源等）。请核对后提交。`,
+          ok: true,
+        })
+      }
+      return snap
+    },
+    [
+      templateProductAttrs.length,
+      templateSkuAttrs.length,
+      computeTemplateAutoFillSnapshot,
+      applySkuCommodityForm,
+    ],
+  )
+
+  const templateAutoFilledRef = useRef(false)
+  useEffect(() => {
+    templateAutoFilledRef.current = false
+  }, [cat3, productType])
+
+  useEffect(() => {
+    if (step !== 'detail') return
+    if (templateProductAttrs.length === 0 && templateSkuAttrs.length === 0) return
+    if (templateAutoFilledRef.current) return
+    templateAutoFilledRef.current = true
+    runTemplateAutoFill({ silent: true })
+  }, [step, templateProductAttrs.length, templateSkuAttrs.length, runTemplateAutoFill])
+
   const textAiAutoOn = useMemo(() => {
     void aiModelUiTick
     return readTextAiAuto()
@@ -1839,6 +1945,16 @@ export default function DouyinProductCreateWizard({
   }
 
   const handleSave = async (mode: 'draft' | 'submit') => {
+    const autoSnap =
+      templateProductAttrs.length > 0 || templateSkuAttrs.length > 0
+        ? computeTemplateAutoFillSnapshot()
+        : null
+    if (autoSnap) {
+      applySkuCommodityForm(autoSnap.groups)
+      setTemplateAttrOverrides(autoSnap.product)
+      setTemplateSkuAttrOverrides(autoSnap.sku)
+    }
+
     const detail = buildDetailPayload()
     if (!detail) {
       setActionMsg({ text: '请完善必填：商品名称、售价、商品头图（上传）', ok: false })
@@ -1931,7 +2047,10 @@ export default function DouyinProductCreateWizard({
       pkg?.groups && pkg.groups.length > 0
         ? JSON.stringify({ groups: pkg.groups }).slice(0, 120_000)
         : ''
-    const overrides: Record<string, string> = { ...templateAttrOverrides }
+    const overrides: Record<string, string> = {
+      ...(autoSnap?.product ?? {}),
+      ...templateAttrOverrides,
+    }
     if (productType === 1) {
       /** 团购：套餐默认由 package_combo 生成；仅当用户未手填对应 key 时才移除 override，避免清空「字面量 JSON 覆盖」 */
       for (const a of templateProductAttrs) {
@@ -1968,7 +2087,11 @@ export default function DouyinProductCreateWizard({
         .map((r) => [r.key.trim(), r.value.trim()])
         .filter(([k, v]) => k.length > 0 && v.length > 0),
     )
-    let skuCleaned: Record<string, string> = { ...skuFromMap, ...skuFromExtra }
+    let skuCleaned: Record<string, string> = {
+      ...(autoSnap?.sku ?? {}),
+      ...skuFromMap,
+      ...skuFromExtra,
+    }
     if (productType === 1 && skuPriceCentsAttr) {
       const k = skuPriceCentsAttr.key
       const listed = comboGroups.flatMap((gr) => gr.items).filter((it) => it.name.trim())
@@ -3972,6 +4095,18 @@ export default function DouyinProductCreateWizard({
                     提示：当前模板未将任何字段标为 is_required，但来客侧仍可能校验部分属性。请仍逐项核对下方**全部**字段；套餐相关请优先使用上方「商品组」。
                   </div>
                 ) : null}
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => runTemplateAutoFill()}
+                    className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-900 hover:bg-indigo-100"
+                  >
+                    一键填满开放平台字段
+                  </button>
+                  <span className="text-[11px] text-gray-600">
+                    进入本页已自动预填；提交前会再次按当前表单同步。请核对 commodity、售价(分)、use_date 等 JSON 后点提交。
+                  </span>
+                </div>
                 <h4 className="mt-5 text-sm font-semibold text-gray-900">
                   商品属性（product_attrs）· 共 {sortedTemplateProductAttrs.length} 项
                 </h4>
