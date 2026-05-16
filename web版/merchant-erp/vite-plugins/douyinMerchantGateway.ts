@@ -2054,10 +2054,11 @@ function normalizeComboItemRowForAttrJson(
   const count = comboItemCountFromRow(row)
   const price = comboItemPriceFenFromRow(row, originFenFallback)
   const name = String(row.name ?? '').trim() || '单品'
+  /** 与顶层 product.combo_rule 一致：仅 count/price/unit，勿加 quantity（部分类目反序列化会判失败） */
   const item: Record<string, unknown> =
     mode === 'stringify'
       ? { name, price: String(price), count: String(count), unit: '份' }
-      : { name, price, count, quantity: count, unit: '份' }
+      : { name, price, count, unit: '份' }
   const pid = String(row.product_id ?? '').trim()
   if (pid) item.product_id = pid
   const sid = String(row.sku_id ?? '').trim()
@@ -2310,7 +2311,6 @@ function alignSkuCommodityJsonToComboRuleGroups(
 
   const curLen = countComboGroupsInCommodityAttrJson(existingJson)
   if (curLen < 0) return existingJson
-  if (curLen === expArr.length) return existingJson
 
   let userGroups: Record<string, unknown>[]
   try {
@@ -2342,7 +2342,18 @@ function alignSkuCommodityJsonToComboRuleGroups(
           ? 'items'
           : 'item_list'
       if (Array.isArray(uItemList) && uItemList.length > 0) {
-        base[listKey] = uItemList
+        const cid = String(categoryId ?? '').trim()
+        const stringifyNums = categoryUsesStringifiedComboItemNumbers(cid)
+        const retailNorm = categoryRetailComboAttrNormalize(cid)
+        const mode = stringifyNums ? 'stringify' : retailNorm ? 'retail' : null
+        base[listKey] =
+          mode == null
+            ? uItemList
+            : uItemList.map((row) =>
+                row && typeof row === 'object'
+                  ? normalizeComboItemRowForAttrJson(row as Record<string, unknown>, originFenFallback, mode)
+                  : row,
+              )
       }
       out.push(base)
     } else {
@@ -2350,6 +2361,73 @@ function alignSkuCommodityJsonToComboRuleGroups(
     }
   }
   return serializeComboGroupsAttrPayload({ groups: out } as Record<string, unknown>, categoryId, originFenFallback)
+}
+
+/** 将套餐组数组规范为 goodlife ItemGroupStruct（组级 total_count/option_count + 单品 count/unit=份） */
+function normalizeComboGroupsForProductBody(
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+): Record<string, unknown> {
+  const arr = normalizeComboGroupsArrayForAttrMaps(comboRule, categoryId, originFenFallback)
+  const groups = arr.map((g) => {
+    const gr = g as Record<string, unknown>
+    const item_list = (Array.isArray(gr.item_list)
+      ? gr.item_list
+      : Array.isArray(gr.items)
+        ? gr.items
+        : []) as Record<string, unknown>[]
+    const inferred = pickRuleToTotalAndOptionCount(item_list.length, '')
+    const tc = Math.max(1, Math.floor(Number(gr.total_count) || inferred.total_count))
+    const oc = Math.max(1, Math.floor(Number(gr.option_count) || inferred.option_count))
+    return {
+      group_name: String(gr.group_name ?? '商品组').trim().slice(0, 80) || '商品组',
+      total_count: tc,
+      option_count: oc,
+      item_list,
+    }
+  })
+  return { groups }
+}
+
+/**
+ * 团购保存前：顶层 combo_rule、attr.combo_rule、sku.commodity 同源且全部规范化。
+ * 组数已对齐仍可能因手填 JSON 缺 unit/count 或 attr 含 quantity 字段触发误报。
+ */
+function finalizeGroupBuyComboPayloads(
+  comboRule: Record<string, unknown>,
+  categoryId: string,
+  originFenFallback: number,
+  mergedProductAttrs: Record<string, string>,
+  skuAttrs: Record<string, unknown>[],
+  skuAttrMap: Record<string, string>,
+  tplProductComboKeys: string[],
+): Record<string, unknown> {
+  const normalized = normalizeComboGroupsForProductBody(comboRule, categoryId, originFenFallback)
+  const attrJson = comboRuleProductLiteralAttrJsonString(normalized, categoryId, originFenFallback)
+  const commodityJson = comboRuleSkuCommodityAttrJsonString(normalized, originFenFallback, categoryId)
+
+  if (!comboRuleAttrJsonIsEffectivelyEmpty(attrJson)) {
+    mergedProductAttrs.combo_rule = attrJson
+    for (const key of tplProductComboKeys) {
+      if (key && key !== 'combo_rule') mergedProductAttrs[key] = attrJson
+    }
+  }
+
+  if (!comboRuleAttrJsonIsEffectivelyEmpty(commodityJson)) {
+    skuAttrMap.commodity = commodityJson
+    for (const a of skuAttrs) {
+      const key = String((a as Record<string, unknown>).key ?? '').trim()
+      if (!key) continue
+      const name = String((a as Record<string, unknown>).name ?? '')
+      const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+      if (vt === 'COMMODITY' || /^commodity$/i.test(key) || /菜品搭配|商品搭配/.test(name)) {
+        skuAttrMap[key] = commodityJson
+      }
+    }
+  }
+
+  return normalized
 }
 
 function alignAllSkuCommodityAttrsToComboRule(
@@ -2942,6 +3020,18 @@ async function buildGoodlifeProductSaveBody(
   }
 
   applyMissingRequiredSkuAttrDefaults(skuAttrs, skuAttrMap, erp)
+
+  if (isGroupBuy && comboRule) {
+    comboRule = finalizeGroupBuyComboPayloads(
+      comboRule,
+      category_id,
+      originFen,
+      mergedProductAttrs,
+      skuAttrs,
+      skuAttrMap,
+      tplProductComboKeys,
+    )
+  }
 
   /**
    * 顶层 product.combo_rule：goodlife product/save 在多数类目下会校验非空（含团购、代金券及次卡等）。
