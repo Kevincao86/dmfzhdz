@@ -52,6 +52,11 @@ import {
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
+  attrKeyIsDouyinDescription,
+  normalizeDouyinDescription,
+  sanitizeDouyinDescriptionInProductAttrs,
+} from '../src/lib/douyinDescriptionNormalize.js'
+import {
   attrKeyIsDouyinSubTitle,
   normalizeDouyinSubTitle,
   sanitizeDouyinProductAttrSubTitleFields,
@@ -2704,6 +2709,10 @@ function mergeGoodlifeProductAttrMapFromErp(
         out[key] = pkgJson
         continue
       }
+      if (attrKeyIsDouyinDescription(key)) {
+        out[key] = normalizeDouyinDescription(productDesc, productName)
+        continue
+      }
       if (attrKeyIsDouyinSubTitle(key) || /副标题/.test(name)) {
         out[key] = normalizeDouyinSubTitle(productDesc || productName, productName)
         continue
@@ -2712,12 +2721,19 @@ function mergeGoodlifeProductAttrMapFromErp(
         out[key] = productName.slice(0, 2000)
         continue
       }
-      if (/详情|图文|介绍|描述/.test(name) || (/卖点/.test(name) && !attrKeyIsDouyinSubTitle(key))) {
+      if (
+        (/详情|图文|介绍/.test(name) || (/描述/.test(name) && !attrKeyIsDouyinDescription(key))) &&
+        !/副标题/.test(name)
+      ) {
         const v = (productDesc || productName).slice(0, 12000)
         if (v) {
           out[key] = v
           continue
         }
+      }
+      if (/卖点/.test(name) && !attrKeyIsDouyinSubTitle(key)) {
+        out[key] = normalizeDouyinSubTitle(productDesc || productName, productName)
+        continue
       }
       if (/购买须知|使用说明|温馨提示|使用规则|注意事项|其他说明/.test(name)) {
         const v = (usageBlob || productDesc || productName).slice(0, 12000)
@@ -2958,7 +2974,10 @@ async function buildGoodlifeProductSaveBody(
   templateSkuAttrs: Record<string, unknown>[]
 }> {
   const product_name = String(erp.product_name ?? '').trim()
-  const desc = String(erp.product_desc ?? product_name).trim()
+  const desc = normalizeDouyinDescription(
+    String(erp.product_desc ?? product_name).trim(),
+    product_name,
+  )
   const category_id = String(erp.category_id ?? '').trim()
   const product_type = Number(erp.product_type) || 1
   const isGroupBuy = product_type === 1
@@ -3216,6 +3235,7 @@ async function buildGoodlifeProductSaveBody(
   })()
   sanitizeDouyinProductAttrSubTitleFields(mergedProductAttrs, product_name, subtitleMax)
   sanitizeDouyinTradeRuleProductAttrs(mergedProductAttrs, erp, category_id, attrs)
+  sanitizeDouyinDescriptionInProductAttrs(mergedProductAttrs, product_name)
 
   if (Object.keys(mergedProductAttrs).length > 0) {
     product.attr_key_value_map = mergedProductAttrs
@@ -3443,6 +3463,13 @@ function summarizeDouyinProductSaveForLog(
       return 0
     })(),
     show_channel: ak?.show_channel ?? null,
+    description_len: (() => {
+      if (!ak) return 0
+      for (const [k, v] of Object.entries(ak)) {
+        if (attrKeyIsDouyinDescription(k)) return String(v ?? '').length
+      }
+      return 0
+    })(),
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
     missing_required_product_attr_keys,
