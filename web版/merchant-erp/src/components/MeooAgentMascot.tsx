@@ -8,13 +8,15 @@ function resolveState(aiSending: boolean, inputDraft: string): MascotState {
   return 'idle'
 }
 
+/** 图2：待机静态（3D 卡通，透明底 PNG） */
 const IDLE_SRC = '/meoo-agent-idle.png'
+/** 图1：输入/生成中动图（2D 书写 GIF，笔刷已在动图内） */
 const WRITING_SRC = '/meoo-agent-writing.gif'
 
 /**
  * 墨典智能体输入区旁吉祥物：
- * - 未输入：图2 静态卡通（透明底，仅中间形象）
- * - 输入中 / 生成中：书写动图
+ * - idle：图2 待机静态
+ * - userTyping / outputting：图1 书写动图
  */
 export function MeooAgentMascot({
   aiSending,

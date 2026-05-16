@@ -133,7 +133,8 @@ export function buildSkuCommodityGroupsForAutoFill(
     optionCount: '1',
     items: [{ id: newId('sci'), name: nm, priceCents: price, count: '1' }],
   })
-  return [mk(), mk()]
+  /** 零售类目默认单组即可；双组同源易触发抖音「数量/单位」误报 */
+  return [mk()]
 }
 
 export function skuCommodityFormToJson(groups: SkuCommodityFormGroup[]): string {
