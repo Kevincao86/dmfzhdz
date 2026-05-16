@@ -1406,7 +1406,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const comboQtyHint =
       /数量必须大于0|单位必须为份/i.test(base) || /数量必须大于0|单位必须为份/i.test(sub)
-        ? ' 说明：请核对 sku.commodity 与 attr.combo_rule 每组单品是否含 count>0、unit=份；网关会在保存前统一规范化。仍失败可查日志 combo_sku_commodity_json_groups 是否与 combo_attr_combo_rule_json_groups 一致。'
+        ? ' 说明：请核对 sku.commodity 与 attr.combo_rule 每组 item_list 是否含 count>0、unit=份、count_unit=份（见开放平台 goods/save 文档）。若手填了「字面量 JSON 覆盖」，保存时会优先采用 commodity/combo_rule 覆盖并同步顶层 product.combo_rule。模板若含 limit_rule/settle_type/use_type 须一并填写。文档：developer.open-douyin.com → 生活服务 → goods/save、template.get。'
         : ''
     const comboIllegalHint =
       /合法的combo|合法.*combo_rule/i.test(base) || /合法的combo|合法.*combo_rule/i.test(sub)

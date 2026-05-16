@@ -310,6 +310,18 @@ export function buildDouyinTemplateAutoFillMaps(
       sku[key] = '1'
       continue
     }
+    if (lk === 'limit_rule') {
+      sku[key] = '{"is_limit":false}'
+      continue
+    }
+    if (lk === 'settle_type') {
+      sku[key] = '1'
+      continue
+    }
+    if (lk === 'use_type') {
+      sku[key] = '1'
+      continue
+    }
     if (lk === 'sku_name' || /名称|规格/.test(nm)) {
       sku[key] = name.slice(0, 120) || 'SKU'
       continue

@@ -433,6 +433,7 @@ function skuCommodityFormToJson(groups: SkuCommodityFormGroup[]): string {
         price,
         count: c,
         unit: '份',
+        count_unit: '份',
       }
     }),
   }))
