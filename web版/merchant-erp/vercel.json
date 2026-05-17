@@ -14,6 +14,18 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-merchant-ai-video-kling-start.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 120
+    },
+    "api/meoo-merchant-ai-video-kling-status.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-marketing-activities.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-tenant-subaccount-mutate.ts": {
       "includeFiles": "vite-plugins/merchantSupabaseAdminEnv.ts",
       "maxDuration": 30

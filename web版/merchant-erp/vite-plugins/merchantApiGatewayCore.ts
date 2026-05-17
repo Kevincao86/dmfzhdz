@@ -28,6 +28,7 @@ import {
   type MerchantAiEnv,
 } from './merchantAiUpstream.js'
 import { handleMerchantAiVideoRoutes } from './merchantVideoAiGateway.js'
+import { handleMarketingActivitiesListGet } from './marketingActivitiesGateway.js'
 
 type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs'
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
@@ -128,6 +129,11 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           env: env as MerchantAiEnv,
         })
         if (videoDone) return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/marketing/activities') {
+        await handleMarketingActivitiesListGet(req, res, url)
+        return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/douyin/bind') {

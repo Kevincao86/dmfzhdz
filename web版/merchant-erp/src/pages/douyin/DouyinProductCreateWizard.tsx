@@ -53,7 +53,10 @@ import {
   buildSkuCommodityGroupsForAutoFill,
   type DouyinTemplateAutoFillInput,
 } from '../../lib/douyinTemplateAutoFill'
-import { normalizeDouyinDescription } from '../../lib/douyinDescriptionNormalize'
+import {
+  douyinDescriptionMinLen,
+  normalizeDouyinDescription,
+} from '../../lib/douyinDescriptionNormalize'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../../services/merchantAiVendorCatalogClient'
 import {
   MERCHANT_AI_MODEL_STORAGE_KEY,
@@ -1984,6 +1987,36 @@ export default function DouyinProductCreateWizard({
     if (detail.poi_ids.length === 0) {
       setActionMsg({ text: '请至少选择一个适用门店', ok: false })
       return
+    }
+    if (mode === 'submit') {
+      const nameLen = productName.trim().length
+      if (nameLen < 4) {
+        setActionMsg({ text: '提交审核：商品名称建议至少 4 个字', ok: false })
+        return
+      }
+      const headOk = /^https?:\/\//i.test(headUrl.trim())
+      if (!headOk) {
+        setActionMsg({
+          text: '提交审核：请上传商品头图（须为 https 公网地址，勿仅用本机预览图）',
+          ok: false,
+        })
+        return
+      }
+      const descMin = douyinDescriptionMinLen()
+      const descNorm = normalizeDouyinDescription(
+        templateAttrOverrides.Description ??
+          templateAttrOverrides.description ??
+          productDesc,
+        productName,
+      )
+      if (descNorm.length < descMin) {
+        setDetailSection('openplatform')
+        setActionMsg({
+          text: `提交审核：Description 短描述至少 ${descMin} 字（当前 ${descNorm.length} 字），请在「② 开放平台 API 字段」补充`,
+          ok: false,
+        })
+        return
+      }
     }
     for (const a of templateProductAttrs) {
       if (!a.is_required) continue
