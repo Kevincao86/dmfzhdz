@@ -1,3 +1,15 @@
+import {
+  encodeDouyinNotificationJson,
+  normalizeDouyinNotificationValue,
+  notificationContentFromErp,
+} from './douyinNotificationFormat.js'
+
+export {
+  encodeDouyinNotificationJson,
+  isDouyinNotificationAttrJson,
+  normalizeDouyinNotificationValue,
+} from './douyinNotificationFormat.js'
+
 /** ERP 投放渠道 → 来客 show_channel（INT 字符串写入 attr_key_value_map） */
 export const ERP_SALES_CHANNEL_TO_SHOW_CHANNEL: Record<string, number> = {
   unlimited: 1,
@@ -158,6 +170,9 @@ export function sanitizeDouyinTradeRuleProductAttrs(
   categoryId: string,
   templateProductAttrs: Array<Record<string, unknown>> = [],
 ): void {
+  const productName = String(erp.product_name ?? '').trim()
+  const productDesc = String(erp.product_desc ?? '').trim()
+  const notificationBody = notificationContentFromErp(erp, productDesc, productName)
   const sales =
     erp.sales_info && typeof erp.sales_info === 'object' ? (erp.sales_info as Record<string, unknown>) : {}
   const trade =
@@ -223,6 +238,14 @@ export function sanitizeDouyinTradeRuleProductAttrs(
       merged[key] = normalizeDouyinLimitUseRuleValue(merged[key] ?? '')
       continue
     }
+    if (attrKeyEq(key, 'Notification')) {
+      merged[key] = normalizeDouyinNotificationValue(
+        merged[key] ?? '',
+        '使用规则',
+        notificationBody,
+      )
+      continue
+    }
     if (lk === 'refundpolicy' || key === 'RefundPolicy') {
       const v = Number.parseInt(String(merged[key] ?? '').trim(), 10)
       if (!Number.isFinite(v) || v < 1 || v > 3) {
@@ -253,5 +276,11 @@ export function sanitizeDouyinTradeRuleProductAttrs(
   )
   if (tplNeedsLimitUseRule && !Object.keys(merged).some((k) => attrKeyEq(k, 'limit_use_rule'))) {
     merged.limit_use_rule = douyinLimitUseRuleJson(false)
+  }
+  const tplNeedsNotification = templateProductAttrs.some((a) =>
+    attrKeyEq(String(a.key ?? ''), 'Notification'),
+  )
+  if (tplNeedsNotification && !Object.keys(merged).some((k) => attrKeyEq(k, 'Notification'))) {
+    merged.Notification = encodeDouyinNotificationJson('使用规则', notificationBody)
   }
 }
