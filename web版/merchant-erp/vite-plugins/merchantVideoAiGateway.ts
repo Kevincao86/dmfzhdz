@@ -140,7 +140,7 @@ function parseLongformSegments(text: string, n: number): string[] | null {
 
 function klingBase(env: MerchantAiEnv): string {
   const b = (env.KLING_API_BASE ?? '').trim().replace(/\/$/, '')
-  return b || 'https://api.klingai.com'
+  return b || 'https://api-beijing.klingai.com'
 }
 
 function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
@@ -188,22 +188,71 @@ function signKlingJwt(accessKey: string, secretKey: string): string {
   return `${signingInput}.${sig}`
 }
 
-function klingAuthFailureMessage(j: Record<string, unknown>, status: number): string {
-  const code = j.code ?? j.error_code ?? j.status
-  const msg =
-    (typeof j.message === 'string' && j.message) ||
-    (typeof j.msg === 'string' && j.msg) ||
-    (typeof j.error === 'string' && j.error) ||
-    (typeof j.error_message === 'string' && j.error_message) ||
-    ''
-  if (status === 401 || /auth/i.test(msg)) {
-    return (
-      `可灵鉴权失败（HTTP ${status}${msg ? `：${msg}` : ''}${code != null ? `，code=${code}` : ''}）。` +
-      '请到运营管控台「AI模型 → 短视频 / 视频模型 API」核对 Access Key 与 Secret Key 是否来自 app.klingai.com 开发者控制台（勿填反、勿含空格）；' +
-      '若使用国内节点可设置 KLING_API_BASE=https://api-beijing.klingai.com。'
-    )
+function extractKlingApiMessage(j: Record<string, unknown>): string {
+  const data = j.data
+  const dataObj =
+    data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, unknown>) : null
+  const candidates = [
+    j.message,
+    j.msg,
+    j.error,
+    j.error_message,
+    dataObj?.message,
+    dataObj?.msg,
+  ]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim()
   }
-  return msg || `可灵接口错误 HTTP ${status}`
+  return ''
+}
+
+function orderedKlingApiBases(env: MerchantAiEnv): string[] {
+  const custom = (env.KLING_API_BASE ?? '').trim().replace(/\/$/, '')
+  const pool = custom
+    ? [custom, 'https://api-beijing.klingai.com', 'https://api.klingai.com']
+    : ['https://api-beijing.klingai.com', 'https://api.klingai.com']
+  const out: string[] = []
+  for (const b of pool) {
+    if (b && !out.includes(b)) out.push(b)
+  }
+  return out
+}
+
+function klingUpstreamUserMessage(
+  status: number,
+  j: Record<string, unknown>,
+  apiBase: string,
+): { message: string; httpStatus: number } {
+  const code = j.code ?? j.error_code
+  const msg = extractKlingApiMessage(j)
+  const baseHint = apiBase.includes('beijing') ? '国内节点' : '国际节点'
+
+  if (
+    status === 429 ||
+    status === 402 ||
+    /balance|额度|余额|不足|quota|rate limit|resource exhausted/i.test(msg)
+  ) {
+    return {
+      httpStatus: 402,
+      message:
+        `可灵账户余额或套餐额度不足（${baseHint}，HTTP ${status}${msg ? `：${msg}` : ''}）。` +
+        '密钥已生效，请到 app.klingai.com 控制台为对应 Access Key 充值/开通视频额度后重试。',
+    }
+  }
+
+  if (status === 401 || /auth|unauthorized|invalid token/i.test(msg)) {
+    return {
+      httpStatus: 401,
+      message:
+        `可灵鉴权失败（${baseHint}，HTTP ${status}${msg ? `：${msg}` : ''}${code != null ? `，code=${code}` : ''}）。` +
+        '国内账号请设置 KLING_API_BASE=https://api-beijing.klingai.com；核对 AK/SK 勿填反、勿含空格。',
+    }
+  }
+
+  return {
+    httpStatus: status >= 400 && status < 600 ? status : 502,
+    message: msg ? `${msg}（${baseHint} HTTP ${status}）` : `可灵接口错误 HTTP ${status}（${baseHint}）`,
+  }
 }
 
 function pickKlingCreds(env: MerchantAiEnv): { ok: false; msg: string } | { ok: true; jwt: string } {
@@ -653,15 +702,13 @@ export async function handleMerchantAiVideoRoutes(input: {
       }
     }
 
-    const klingBases = [
-      klingBase(env),
-      'https://api-beijing.klingai.com',
-      'https://api.klingai.com',
-    ].filter((b, i, arr) => b && arr.indexOf(b) === i)
+    const klingBases = orderedKlingApiBases(env)
 
     let upstream: globalThis.Response | null = null
     let j: Record<string, unknown> = {}
+    let usedBase = klingBases[0] ?? 'https://api-beijing.klingai.com'
     for (const base of klingBases) {
+      usedBase = base
       const tryUrl = `${base.replace(/\/$/, '')}/v1/videos/${kind}`
       const r = await fetch(tryUrl, {
         method: 'POST',
@@ -679,11 +726,18 @@ export async function handleMerchantAiVideoRoutes(input: {
       }
       j = body
       upstream = r
-      if (r.status !== 401) break
+      /** 401 换节点；429/402 余额不足不再换节点（避免误报 502） */
+      if (r.status === 401) continue
+      break
     }
     if (!upstream || !upstream.ok) {
-      const msg = klingAuthFailureMessage(j, upstream?.status ?? 502)
-      json(res, upstream?.status === 401 ? 401 : 502, { ok: false, message: msg, upstream: j })
+      const { message, httpStatus } = klingUpstreamUserMessage(upstream?.status ?? 502, j, usedBase)
+      json(res, httpStatus, {
+        ok: false,
+        message,
+        upstream: j,
+        kling_api_base: usedBase,
+      })
       return true
     }
     const { taskId } = unwrapKlingTask(j)
