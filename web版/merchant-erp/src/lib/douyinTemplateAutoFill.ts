@@ -2,7 +2,7 @@ import type { TemplateAttr } from '../services/douyinProductApi'
 import {
   attrKeyIsDouyinProductNameHint,
   attrKeyIsDouyinSubTitle,
-  normalizeDouyinSubTitle,
+  deriveDistinctDouyinSubTitle,
 } from './douyinSubTitleNormalize'
 import { normalizeDouyinDescription } from './douyinDescriptionNormalize'
 import {
@@ -179,7 +179,12 @@ export function buildDouyinTemplateAutoFillMaps(
     undefined,
     input.categoryId.trim(),
   )
-  const subtitle = normalizeDouyinSubTitle(name, name)
+  const subtitle = deriveDistinctDouyinSubTitle(
+    name,
+    input.productDesc.trim() || name,
+    descAttr,
+    input.categoryId.trim(),
+  )
   const head = input.headUrl.trim()
   const aux = input.auxUrls.map((u) => u.trim()).filter(Boolean)
   const env = input.envUrls.map((u) => u.trim()).filter(Boolean)
