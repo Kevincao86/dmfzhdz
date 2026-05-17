@@ -409,26 +409,51 @@ export async function getDouyinGoodsProductGet(productId: string): Promise<Douyi
   const id = productId.trim()
   if (!id) return { ok: false, message: '缺少 product_id' }
   const q = new URLSearchParams({ product_id: id })
-  const res = await fetch(url(`/api/merchant/douyin/goods/product/get?${q}`), {
-    method: 'GET',
-    headers: authHeaders(),
-  })
-  const data = await parseJson(res)
-  if (!res.ok) {
-    return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+  appendDouyinAccountIdToQuery(q)
+  const qs = `?${q}`
+  const paths = [
+    `/api/meoo-douyin-goods-product-get${qs}`,
+    `/api/merchant/douyin/goods/product/get${qs}`,
+  ] as const
+  const headers = authHeaders()
+  let lastStatus = 0
+  for (const p of paths) {
+    const target = merchantApiFetchUrlCandidates([p])[0] ?? url(p)
+    const res = await fetch(target, { method: 'GET', headers })
+    lastStatus = res.status
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    const trim = text.trimStart()
+    if (isLikelyRouteMiss404(res, trim, ct)) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
     }
+    if (!res.ok) {
+      return {
+        ok: false,
+        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+      }
+    }
+    const d = data.data as Record<string, unknown> | undefined
+    if (!d || typeof d !== 'object') {
+      return { ok: false, message: '响应缺少 data' }
+    }
+    const detail = d.detail as DouyinProductDetailPayload | undefined
+    if (!detail || typeof detail !== 'object') {
+      return { ok: false, message: '响应缺少 data.detail' }
+    }
+    return { ok: true, detail }
   }
-  const d = data.data as Record<string, unknown> | undefined
-  if (!d || typeof d !== 'object') {
-    return { ok: false, message: '响应缺少 data' }
+  return {
+    ok: false,
+    message:
+      lastStatus === 404
+        ? '商品详情接口返回 404：请部署含 /api/meoo-douyin-goods-product-get 的版本，或检查 VITE_MERCHANT_API_BASE_URL。'
+        : `HTTP ${lastStatus || 404}`,
   }
-  const detail = d.detail as DouyinProductDetailPayload | undefined
-  if (!detail || typeof detail !== 'object') {
-    return { ok: false, message: '响应缺少 data.detail' }
-  }
-  return { ok: true, detail }
 }
 
 export type ProductSyncResult = { ok: true; message?: string } | { ok: false; message: string }

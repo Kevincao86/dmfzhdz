@@ -62,6 +62,10 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-douyin-goods-product-get.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-douyin-goods-product-save.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 120

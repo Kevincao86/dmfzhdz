@@ -1152,6 +1152,143 @@ export async function handleDouyinGoodsProductDraftQueryGet(
   }
 }
 
+/** 代理 goodlife template/get（与 save 链路同源，勿用本地 mock 模板） */
+export async function handleDouyinGoodsTemplateGetGet(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+  const categoryId = (url.searchParams.get('category_id') ?? '').trim()
+  const productType = Number(url.searchParams.get('product_type') ?? '1') || 1
+  if (!categoryId) {
+    json(res, 400, { message: '缺少 category_id' })
+    return
+  }
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
+    u.searchParams.set('account_id', accountId)
+    u.searchParams.set('category_id', categoryId)
+    u.searchParams.set('product_type', String(productType))
+    const dr = await douyinServerFetch(u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const raw = await dr.text()
+    res.statusCode = dr.status
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.end(raw)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { message: `抖音商品模板查询失败：${msg}` })
+  }
+}
+
+/** 按类目探测 template/get，仅返回抖音侧确有模板的商品类型 */
+export async function handleDouyinGoodsProductTypesGet(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+  const categoryId = (url.searchParams.get('category_id') ?? '').trim()
+  const base = [
+    { product_type: 1, label: '团购' },
+    { product_type: 2, label: '代金券' },
+    { product_type: 3, label: '次卡' },
+    { product_type: 4, label: '预约品' },
+  ]
+  if (!categoryId) {
+    json(res, 200, {
+      types: base.map((t) => ({ ...t, eligible: t.product_type <= 2 })),
+    })
+    return
+  }
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
+    const types: { product_type: number; label: string; eligible: boolean }[] = []
+    for (const t of base) {
+      const bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, t.product_type)
+      const hasTpl = bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0
+      types.push({ ...t, eligible: hasTpl })
+    }
+    json(res, 200, { types })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { message: `查询类目可用商品类型失败：${msg}` })
+  }
+}
+
+/** 商品详情：草稿/线上 get + 本地 save 缓存，供编辑页回显 */
+export async function handleDouyinGoodsProductGetGet(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+  const pid = (url.searchParams.get('product_id') ?? '').trim()
+  if (!pid) {
+    json(res, 400, { ok: false, message: '缺少 product_id' })
+    return
+  }
+  const cached = mockDouyinProductStore.get(pid)
+  if (cached) {
+    json(res, 200, { ok: true, data: { detail: cached } })
+    return
+  }
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
+    const detail = await fetchGoodlifeProductDetailById(accountId, token, pid)
+    if (!detail) {
+      json(res, 404, {
+        ok: false,
+        message:
+          '未在抖音来客找到该商品（已尝试草稿与线上查询）。请确认商品 ID、账户授权，或在本页曾「保存草稿」后从列表进入编辑。',
+      })
+      return
+    }
+    json(res, 200, { ok: true, data: { detail } })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `查询商品详情失败：${msg}` })
+  }
+}
+
 /** 基于 category/get 结果解析可创建商品的末级类目（enable 且非 is_publish_block） */
 export async function handleDouyinGoodsIndustryScopeGet(
   req: IncomingMessage,
@@ -1603,6 +1740,269 @@ function yuanToFen(yuan: number): number {
   if (!Number.isFinite(yuan) || yuan <= 0) return 1
   const n = Math.round(yuan * 100)
   return Math.min(Math.max(1, n), Number.MAX_SAFE_INTEGER)
+}
+
+function fenToYuan(fen: number): number {
+  if (!Number.isFinite(fen) || fen <= 0) return 0
+  return Math.round(fen) / 100
+}
+
+function parseImageListAttrJson(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  try {
+    const j = JSON.parse(raw) as unknown
+    if (!Array.isArray(j)) return []
+    const out: string[] = []
+    for (const x of j) {
+      if (typeof x === 'string' && /^https?:\/\//i.test(x)) {
+        out.push(x)
+        continue
+      }
+      if (x && typeof x === 'object') {
+        const u = String((x as Record<string, unknown>).url ?? '').trim()
+        if (/^https?:\/\//i.test(u)) out.push(u)
+      }
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function extractGoodlifeProductFromGetEnvelope(
+  root: Record<string, unknown>,
+): { product: Record<string, unknown>; skus: Record<string, unknown>[] } | null {
+  const data = root.data as Record<string, unknown> | undefined
+  const pickProduct = (src: Record<string, unknown> | undefined): Record<string, unknown> | null => {
+    if (!src) return null
+    if (src.product && typeof src.product === 'object' && !Array.isArray(src.product)) {
+      return src.product as Record<string, unknown>
+    }
+    const list = src.products ?? src.product_list
+    if (Array.isArray(list) && list[0] && typeof list[0] === 'object') {
+      return list[0] as Record<string, unknown>
+    }
+    if (src.product_id || src.product_name || src.category_id) return src
+    return null
+  }
+  const pickSkus = (src: Record<string, unknown> | undefined, product: Record<string, unknown>): Record<string, unknown>[] => {
+    if (!src) {
+      const s = product.sku
+      if (s && typeof s === 'object' && !Array.isArray(s)) return [s as Record<string, unknown>]
+      if (Array.isArray(product.skus)) return product.skus as Record<string, unknown>[]
+      return []
+    }
+    if (Array.isArray(src.skus)) return src.skus as Record<string, unknown>[]
+    if (src.sku && typeof src.sku === 'object' && !Array.isArray(src.sku)) return [src.sku as Record<string, unknown>]
+    const s = product.sku
+    if (s && typeof s === 'object' && !Array.isArray(s)) return [s as Record<string, unknown>]
+    if (Array.isArray(product.skus)) return product.skus as Record<string, unknown>[]
+    return []
+  }
+  let product = pickProduct(data) ?? pickProduct(root)
+  if (!product) return null
+  const skus = pickSkus(data, product)
+  return { product, skus }
+}
+
+function comboGroupsFromGoodlifeProduct(
+  product: Record<string, unknown>,
+  attrMap: Record<string, string>,
+): { groups: Record<string, unknown>[] } | undefined {
+  const tryParse = (raw: unknown): { groups: Record<string, unknown>[] } | undefined => {
+    if (typeof raw !== 'string' || !raw.trim()) return undefined
+    const parsed = parseComboRuleJsonToGroupsObject(raw)
+    if (!parsed || !Array.isArray(parsed.groups)) return undefined
+    return { groups: parsed.groups as Record<string, unknown>[] }
+  }
+  const top = product.combo_rule
+  if (top && typeof top === 'object' && !Array.isArray(top)) {
+    const g = (top as { groups?: unknown[] }).groups
+    if (Array.isArray(g) && g.length > 0) return { groups: g as Record<string, unknown>[] }
+  }
+  if (typeof top === 'string') {
+    const p = tryParse(top)
+    if (p) return p
+  }
+  for (const [k, v] of Object.entries(attrMap)) {
+    if (/combo_rule|commodity|搭配|套餐/i.test(k) || /combo|commodity/i.test(k)) {
+      const p = tryParse(v)
+      if (p) return p
+    }
+  }
+  return undefined
+}
+
+function mapGoodlifeProductToErpDetail(
+  product: Record<string, unknown>,
+  skus: Record<string, unknown>[],
+): Record<string, unknown> {
+  const product_id = String(product.product_id ?? product.id ?? '').trim()
+  const out_id = String(product.out_id ?? product.outId ?? '').trim() || `erp-${product_id || randomUUID()}`
+  const category_id = String(product.category_id ?? product.categoryId ?? '').trim()
+  const product_type = Number(product.product_type ?? product.productType) || 1
+  const product_name = String(product.product_name ?? product.name ?? '').trim()
+  const attrMap =
+    product.attr_key_value_map && typeof product.attr_key_value_map === 'object' && !Array.isArray(product.attr_key_value_map)
+      ? (product.attr_key_value_map as Record<string, string>)
+      : {}
+  const sku0 = skus[0] ?? {}
+  const skuAttrMap =
+    sku0.attr_key_value_map && typeof sku0.attr_key_value_map === 'object' && !Array.isArray(sku0.attr_key_value_map)
+      ? (sku0.attr_key_value_map as Record<string, string>)
+      : {}
+  const actualFen = Number(sku0.actual_amount ?? skuAttrMap.actual_amount)
+  const originFen = Number(sku0.origin_amount ?? skuAttrMap.origin_amount ?? actualFen)
+  const price_yuan = fenToYuan(Number.isFinite(actualFen) ? actualFen : 0)
+  const origin_price_yuan = fenToYuan(Number.isFinite(originFen) ? originFen : actualFen)
+
+  const imageUrls = [
+    ...parseImageListAttrJson(attrMap.image_list),
+    ...parseImageListAttrJson(attrMap.image_1v1_list),
+    ...parseImageListAttrJson(attrMap.detail_image_list),
+  ]
+  const head_image_urls = imageUrls.length > 0 ? [imageUrls[0]!] : []
+  const aux_image_urls = imageUrls.length > 1 ? imageUrls.slice(1) : []
+  const env_image_urls = parseImageListAttrJson(attrMap.environment_image_list)
+
+  const poisRaw = product.pois
+  const poi_ids = Array.isArray(poisRaw)
+    ? poisRaw
+        .map((p) => {
+          if (typeof p === 'string') return p.trim()
+          if (p && typeof p === 'object') return String((p as Record<string, unknown>).poi_id ?? '').trim()
+          return ''
+        })
+        .filter(Boolean)
+    : []
+
+  const combo = comboGroupsFromGoodlifeProduct(product, { ...attrMap, ...skuAttrMap })
+  let package_combo: Record<string, unknown> | undefined
+  if (product_type === 1 && combo?.groups?.length) {
+    package_combo = {
+      groups: combo.groups.map((g) => {
+        const gr = g as Record<string, unknown>
+        const itemsIn = Array.isArray(gr.item_list)
+          ? gr.item_list
+          : Array.isArray(gr.items)
+            ? gr.items
+            : []
+        const tc = Number(gr.total_count)
+        const oc = Number(gr.option_count)
+        const n = itemsIn.length
+        let pick_rule = String(gr.pick_rule ?? gr.pickRule ?? '').trim()
+        if (!pick_rule && Number.isFinite(tc) && Number.isFinite(oc) && n > 0) {
+          if (tc === n && oc === n) pick_rule = '全部必选'
+          else if (tc === n && oc === 1) pick_rule = `${tc}选1`
+          else if (tc > 0 && oc > 0) pick_rule = `${tc}选${oc}`
+        }
+        if (!pick_rule) pick_rule = '全部必选'
+        return {
+          pick_rule,
+          items: itemsIn.map((it) => {
+            const row = it as Record<string, unknown>
+            const priceFen = comboItemPriceFenFromRow(row, originFen)
+            return {
+              name: String(row.name ?? product_name).trim() || product_name,
+              quantity: comboItemCountFromRow(row),
+              origin_price_yuan: fenToYuan(priceFen),
+            }
+          }),
+        }
+      }),
+    }
+  }
+
+  const rp = Number(attrMap.RefundPolicy)
+  let after_sale_policy = 'refund_anytime'
+  if (rp === 2) after_sale_policy = 'no_refund'
+  else if (rp === 3) after_sale_policy = 'refund_auto_expire'
+
+  let reserve_mode: 'none' | 'required' = 'none'
+  try {
+    const ap = attrMap.appointment ? (JSON.parse(attrMap.appointment) as Record<string, unknown>) : null
+    if (ap && Number(ap.need_appointment) === 1) reserve_mode = 'required'
+  } catch {
+    /* ignore */
+  }
+
+  let consume_valid_days = 360
+  try {
+    const ud = attrMap.use_date ? (JSON.parse(attrMap.use_date) as Record<string, unknown>) : null
+    const d = Number(ud?.use_day ?? ud?.day ?? ud?.valid_days)
+    if (Number.isFinite(d) && d > 0) consume_valid_days = Math.floor(d)
+  } catch {
+    /* ignore */
+  }
+
+  const product_desc =
+    (typeof attrMap.description_rich_text === 'string' && attrMap.description_rich_text.trim()) ||
+    (typeof product.desc === 'string' && product.desc.trim()) ||
+    undefined
+
+  return {
+    ...(product_id ? { product_id } : {}),
+    out_id,
+    category_id,
+    product_type,
+    product_name,
+    product_desc,
+    price_yuan,
+    origin_price_yuan,
+    head_image_urls,
+    aux_image_urls,
+    env_image_urls,
+    poi_ids,
+    ...(package_combo ? { package_combo } : {}),
+    sales_info: {
+      channel: 'unlimited',
+      stock_qty: Number(skuAttrMap.stock_qty ?? sku0.stock_qty) || 999,
+    },
+    trade_rules: {
+      consume_date_mode: 'days',
+      consume_valid_days,
+      after_sale_policy,
+      reserve_mode,
+    },
+    consume_rules: {
+      in_store_discount: false,
+      extra_fee: false,
+      voucher_limit: product_type === 2,
+      voucher_max: 1,
+      people_limit: false,
+    },
+  }
+}
+
+async function fetchGoodlifeProductDetailById(
+  accountId: string,
+  token: string,
+  productId: string,
+): Promise<Record<string, unknown> | null> {
+  const paths = [
+    '/goodlife/v1/goods/product/draft/get/',
+    '/goodlife/v1/goods/product/online/get/',
+  ] as const
+  for (const path of paths) {
+    const u = new URL(douyinOpenApiUrl(path))
+    u.searchParams.set('account_id', accountId)
+    u.searchParams.set('product_id', productId)
+    const dr = await douyinServerFetch(u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw)
+    if (!getDataError(j).ok) continue
+    const extracted = extractGoodlifeProductFromGetEnvelope(j)
+    if (!extracted) continue
+    return mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
+  }
+  return null
 }
 
 function pickProductImageAttrKey(attrs: Record<string, unknown>[]): string | null {
@@ -3063,12 +3463,23 @@ async function buildGoodlifeProductSaveBody(
     douyinHttpSignal,
   )
   if (attrs.length === 0 && skuAttrs.length === 0 && category_id) {
+    const typeLabel =
+      product_type === 2 ? '代金券' : product_type === 1 ? '团购' : `商品类型${product_type}`
+    const hint =
+      product_type === 2
+        ? '该类目在抖音侧未配置代金券模板，请改选「团购」或更换支持代金券的三级类目后再提交。'
+        : '请更换三级类目或联系来客运营配置该类目商品模板后再提交。'
+    if (_mode === 'submit' || product_type === 2) {
+      throw new Error(
+        `抖音未返回「${typeLabel}」商品模板（category_id=${category_id}）。${hint}`,
+      )
+    }
     const syn = syntheticGoodlifeTemplateAttrsBundle(product_type)
     attrs = syn.productAttrs
     skuAttrs = syn.skuAttrs
     console.warn(
       '[meoo douyin goods/save] template_get_empty_using_doc_fallback',
-      JSON.stringify({ category_id, product_type }),
+      JSON.stringify({ category_id, product_type, mode: _mode }),
     )
   }
   const auxUrls = Array.isArray(erp.aux_image_urls)

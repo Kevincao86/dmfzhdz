@@ -16,6 +16,7 @@ import {
   pickerPathIdsToLeaf,
 } from '../../lib/douyinGoodsCategoryPicker'
 import { normalizeDouyinDescription } from '../../lib/douyinDescriptionNormalize'
+import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/productDraftSnapshot'
 import {
   fetchDouyinGoodsCategoryChildren,
   getDouyinGoodsProductGet,
@@ -129,14 +130,21 @@ export default function DouyinProductCreateWizard({
     let cancelled = false
     void (async () => {
       setLoading(true)
-      const r = await getDouyinGoodsProductGet(editProductId.trim())
+      const key = editProductId.trim()
+      let detail = loadDraftDetailSnapshot(key)
+      if (!detail) {
+        const r = await getDouyinGoodsProductGet(key)
+        if (cancelled) return
+        if (!r.ok) {
+          setLoading(false)
+          setLoadErr(r.message)
+          return
+        }
+        detail = r.detail
+      }
       if (cancelled) return
       setLoading(false)
-      if (!r.ok) {
-        setLoadErr(r.message)
-        return
-      }
-      const d = r.detail
+      const d = detail
       persistedProductIdRef.current = d.product_id ?? editProductId.trim()
       stableOutIdRef.current = d.out_id ?? null
       setCat3(d.category_id)
@@ -240,7 +248,7 @@ export default function DouyinProductCreateWizard({
     const head = headUrl.trim()
     if (!/^https?:\/\//i.test(head)) return null
 
-    const comboName = itemName.trim() || name.slice(0, 30)
+    const comboName = (itemName.trim() || name).slice(0, 30)
     const comboPrice = Number.parseFloat(itemPriceYuan) || price
     const origin = Number.parseFloat(originYuan) || comboPrice
 
@@ -368,7 +376,11 @@ export default function DouyinProductCreateWizard({
       setActionMsg({ text: r.message, ok: false })
       return
     }
-    if (r.product_id) persistedProductIdRef.current = r.product_id
+    const finalPid = r.product_id?.trim() || persistedProductIdRef.current?.trim()
+    if (finalPid) {
+      persistedProductIdRef.current = finalPid
+      saveDraftDetailSnapshot(finalPid, { ...detail, product_id: finalPid })
+    }
     setActionMsg({
       text: mode === 'submit' ? '已提交审核，请到来客后台查看审核状态' : '草稿已保存',
       ok: true,

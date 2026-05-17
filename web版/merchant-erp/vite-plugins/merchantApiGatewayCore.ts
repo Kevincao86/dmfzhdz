@@ -9,8 +9,11 @@ import {
   handleDouyinGoodsImageUploadPost,
   handleDouyinGoodsIndustryScopeGet,
   handleDouyinGoodsProductDraftQueryGet,
+  handleDouyinGoodsProductGetGet,
   handleDouyinGoodsProductOnlineQueryGet,
   handleDouyinGoodsProductSavePost,
+  handleDouyinGoodsProductTypesGet,
+  handleDouyinGoodsTemplateGetGet,
   handleDouyinPoiClaimPost,
   handleDouyinStoreDecorationGet,
   handleDouyinStoreDetailGet,
@@ -195,90 +198,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       }
 
       if (method === 'GET' && pathname === '/api/merchant/douyin/goods/product-types') {
-        const cid = (url.searchParams.get('category_id') ?? '').trim()
-        const base = [
-          { product_type: 1, label: '团购', eligible: true },
-          { product_type: 2, label: '代金券', eligible: true },
-          { product_type: 3, label: '次卡', eligible: false },
-          { product_type: 4, label: '预约品', eligible: false },
-        ]
-        const types =
-          cid === 'l2_hotpot_tuan' || cid === 'l2bm_0_tuan'
-            ? base.map((t) => ({
-                ...t,
-                eligible: t.product_type === 1 || t.product_type === 4,
-              }))
-            : base.map((t) => ({
-                ...t,
-                eligible: t.product_type <= 2,
-              }))
-        json(res, 200, { types })
+        await handleDouyinGoodsProductTypesGet(req, res, url)
         return true
       }
 
       if (method === 'GET' && pathname === '/api/merchant/douyin/goods/template/get') {
-        const pt = Number(url.searchParams.get('product_type') ?? '1')
-        const isTuan = pt === 1
-        const isVoucher = pt === 2
-        json(res, 200, {
-          data: {
-            error_code: 0,
-            description: '',
-            product_attrs: [
-              {
-                key: 'product_name_hint',
-                name: '商品名称规范',
-                is_required: false,
-                is_multi: false,
-                value_type: 'STRING',
-                desc: '须与 goodlife/v1/goods/product/save 中 product_name、desc 等一致',
-              },
-            ],
-            sku_attrs: [
-              {
-                key: 'actual_amount',
-                name: '售价(分)',
-                is_required: true,
-                is_multi: false,
-                value_type: 'INT',
-                desc: '网关将把 price_yuan 转为平台分值',
-              },
-            ],
-            sales_channels: [
-              { value: 'unlimited', label: '不限制' },
-              { value: 'live_only', label: '仅直播间' },
-              { value: 'offline_only', label: '仅线下' },
-              { value: 'newcomer_only', label: '仅新人频道' },
-              { value: 'online_only', label: '仅线上' },
-              { value: 'free_trial_only', label: '仅免费试' },
-              { value: 'group_mall_only', label: '仅团购商城' },
-              { value: 'live_and_acquisition', label: '直播间+获客卡' },
-              { value: 'event_only', label: '仅活动报名' },
-            ],
-            staff_sales_options: [
-              { value: 'allow', label: '允许' },
-              { value: 'deny', label: '不允许' },
-            ],
-            after_sale_policies: [
-              { value: 'refund_anytime', label: '随时退' },
-              { value: 'refund_auto_expire', label: '过期自动退' },
-              { value: 'no_refund', label: '不可退' },
-            ],
-            trade_rule_defaults: {
-              consume_date_mode: 'days',
-              consume_valid_days: isTuan ? 90 : isVoucher ? 365 : 90,
-              non_consume_date_mode: 'all_dates',
-              daily_consume_mode: 'all_day',
-              purchase_limit_mode: 'none',
-              purchase_limit_max: 6,
-              after_sale_policy: 'refund_anytime',
-              reserve_mode: isTuan ? 'required' : 'none',
-              reserve_advance_value: 1,
-              reserve_advance_unit: 'day',
-              reserve_channel: 'phone',
-            },
-          },
-        })
+        await handleDouyinGoodsTemplateGetGet(req, res, url)
         return true
       }
 
@@ -330,28 +255,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       }
 
       if (method === 'GET' && pathname === '/api/merchant/douyin/goods/product/get') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
-          return true
-        }
-        const pid = (url.searchParams.get('product_id') ?? '').trim()
-        if (!pid) {
-          json(res, 400, { ok: false, message: '缺少 product_id' })
-          return true
-        }
-        const row = mockDouyinProductStore.get(pid)
-        if (!row) {
-          json(res, 404, {
-            ok: false,
-            message: '未找到该商品。请先在创建页「保存草稿」，或从列表进入「编辑」后重试。',
-          })
-          return true
-        }
-        json(res, 200, {
-          ok: true,
-          data: { detail: row },
-        })
+        await handleDouyinGoodsProductGetGet(req, res, url)
         return true
       }
 
