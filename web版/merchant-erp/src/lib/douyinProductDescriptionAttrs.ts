@@ -1,8 +1,11 @@
 /**
- * 抖音来客 product.save 商品描述字段（template.get 官方语义）：
- * - `Description`：商品描述；不需要时传 "[]"
- * - `description_rich_text`：其他说明（NOTE 富文本 JSON 列表）
- * - `product.desc`：顶层短文案（与 Description attr 可分离）
+ * 抖音来客 product.save — Description / description_rich_text（按 template.get 官方语义）
+ *
+ * - `description_rich_text`（NOTE）：长说明 → `[{ note_type: 1, content: "..." }]`
+ * - `Description`（NOTE 类目）：短说明 → 同上 JSON，禁止纯文本
+ * - `Description`（STRING 类目）：有富文本时传官方空值 `"[]"`，否则短纯文本
+ * - `product.desc`：顶层展示短文案（可与 attr Description 分离）
+ *
  * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get
  */
 import {
@@ -18,7 +21,7 @@ import {
   type DouyinTemplateAttrMeta,
 } from './douyinNoteRichTextFormat.js'
 
-/** 官方：Description 不需要时传 "[]" */
+/** 官方：STRING 型 Description 不需要时传 "[]" */
 export const DOUYIN_DESCRIPTION_ATTR_UNUSED = '[]'
 
 export function isDouyinDescriptionAttrUnused(val: string): boolean {
@@ -42,7 +45,44 @@ export function findDouyinDescriptionRichTextKey(
   return 'description_rich_text'
 }
 
-/** 写入 NOTE 富文本；有富文本时 Description attr 置为 "[]" */
+function descriptionMetaFromTemplate(
+  templateProductAttrs: Record<string, unknown>[],
+): DouyinTemplateAttrMeta | null {
+  for (const raw of templateProductAttrs) {
+    const meta = parseDouyinTemplateAttrMeta(raw)
+    if (attrKeyIsDouyinDescription(meta.key)) return meta
+  }
+  return null
+}
+
+/** 纠正 merge 阶段误写入的纯文本 NOTE 字段 */
+export function coerceDouyinNoteFieldsToJson(
+  templateProductAttrs: Record<string, unknown>[],
+  merged: Record<string, string>,
+): void {
+  const metas = templateProductAttrs.map((a) => parseDouyinTemplateAttrMeta(a))
+  for (const meta of metas) {
+    const key = meta.key
+    if (!key) continue
+    const isDesc = attrKeyIsDouyinDescription(key)
+    const isRich = attrTemplateIsNoteRichText(meta) && !isDesc
+    if (!isDesc && !isRich) continue
+    const val = (merged[key] ?? '').trim()
+    if (!val || isDouyinDescriptionAttrUnused(val) || isDouyinNoteRichTextJsonString(val)) continue
+    merged[key] = encodeDouyinNoteRichTextFromPlain(val)
+  }
+  for (const [key, val] of Object.entries(merged)) {
+    if (!/^description_rich/i.test(key) || attrKeyIsDouyinDescription(key)) continue
+    const t = val.trim()
+    if (t && !isDouyinNoteRichTextJsonString(t) && !isDouyinDescriptionAttrUnused(t)) {
+      merged[key] = encodeDouyinNoteRichTextFromPlain(t)
+    }
+  }
+}
+
+/**
+ * 按模板写入 Description / description_rich_text，返回 product.desc 短文案。
+ */
 export function applyDouyinProductDescriptionAttrs(
   templateProductAttrs: Record<string, unknown>[],
   merged: Record<string, string>,
@@ -52,62 +92,46 @@ export function applyDouyinProductDescriptionAttrs(
     categoryId?: string
   },
 ): string {
+  coerceDouyinNoteFieldsToJson(templateProductAttrs, merged)
+
   const name = ctx.productName.trim()
   const descRaw = String(ctx.productDesc ?? '').trim()
   const short = normalizeDouyinDescription(descRaw || name, name, undefined, undefined, ctx.categoryId)
   const longPlain = stripDouyinDescriptionUnsafeChars(descRaw || short).slice(0, 8000) || short
-  const noteJson = encodeDouyinNoteRichTextFromPlain(longPlain)
+  const longNote = encodeDouyinNoteRichTextFromPlain(longPlain)
+  const shortNote = encodeDouyinNoteRichTextFromPlain(short)
 
   const richKey = findDouyinDescriptionRichTextKey(merged, templateProductAttrs)
-  const richCur = (merged[richKey] ?? '').trim()
-  if (!richCur || !isDouyinNoteRichTextJsonString(richCur)) {
-    merged[richKey] = noteJson
-  }
+  merged[richKey] = longNote
 
-  const hasRich = isDouyinNoteRichTextJsonString(String(merged[richKey] ?? ''))
+  const descMeta = descriptionMetaFromTemplate(templateProductAttrs)
+  const descKey = descMeta?.key ?? 'Description'
+  const descVt = (descMeta?.value_type ?? 'STRING').toUpperCase()
 
-  const metas = templateProductAttrs.map((a) => parseDouyinTemplateAttrMeta(a))
-  const metaByKey = new Map(metas.map((m) => [m.key, m]))
-
-  for (const meta of metas) {
-    const key = meta.key
-    if (!key || !attrKeyIsDouyinDescription(key)) continue
-    merged[key] = resolveDescriptionAttrValue(meta, short, hasRich)
-  }
-
-  for (const key of Object.keys(merged)) {
-    if (!attrKeyIsDouyinDescription(key)) continue
-    if (metaByKey.has(key)) continue
-    merged[key] = hasRich ? DOUYIN_DESCRIPTION_ATTR_UNUSED : short
-  }
-
-  if (!Object.keys(merged).some(attrKeyIsDouyinDescription) && name) {
-    merged.Description = hasRich ? DOUYIN_DESCRIPTION_ATTR_UNUSED : short
-  }
-
-  for (const [key, val] of Object.entries(merged)) {
-    if (metaByKey.has(key)) continue
-    if (/^description_rich/i.test(key) && val.trim() && !isDouyinNoteRichTextJsonString(val)) {
-      merged[key] = noteJson
+  const setDescription = (value: string) => {
+    merged[descKey] = value
+    for (const k of Object.keys(merged)) {
+      if (attrKeyIsDouyinDescription(k) && k !== descKey) merged[k] = value
     }
   }
 
+  if (descVt === 'NOTE') {
+    /** 零售等类目 template 中 Description 为 NOTE：必须传 JSON，纯文本必报「Description参数不合法」 */
+    setDescription(shortNote)
+  } else {
+    /** STRING/TEXT：长说明在 description_rich_text，Description 传官方空值 */
+    setDescription(DOUYIN_DESCRIPTION_ATTR_UNUSED)
+  }
+
+  if (!merged[descKey] && name) {
+    setDescription(descVt === 'NOTE' ? shortNote : DOUYIN_DESCRIPTION_ATTR_UNUSED)
+  }
+
+  coerceDouyinNoteFieldsToJson(templateProductAttrs, merged)
   return short
 }
 
-function resolveDescriptionAttrValue(
-  meta: DouyinTemplateAttrMeta,
-  shortPlain: string,
-  hasRichNote: boolean,
-): string {
-  if (hasRichNote) return DOUYIN_DESCRIPTION_ATTR_UNUSED
-  if (meta.value_type === 'NOTE') {
-    return encodeDouyinNoteRichTextFromPlain(shortPlain)
-  }
-  return shortPlain
-}
-
-/** 网关提交前校验 Description attr（非 product.desc） */
+/** 网关提交前校验 Description attr */
 export function validateDouyinDescriptionAttrForSave(
   descVal: string,
   categoryId?: string,
@@ -121,8 +145,7 @@ export function validateDouyinDescriptionAttrForSave(
   if (v.startsWith('[') || v.startsWith('{')) {
     return {
       ok: false,
-      message:
-        'Description 格式不正确：有 description_rich_text 时应传 "[]"，或为 NOTE 类型时传合法 JSON 列表。',
+      message: 'Description 须为 NOTE 控件 JSON 列表，或不需要时传 "[]"。',
       description_len: v.length,
     }
   }
@@ -131,16 +154,35 @@ export function validateDouyinDescriptionAttrForSave(
   if (v.length < min) {
     return {
       ok: false,
-      message: `Description 过短（${v.length} 字）。请填写商品说明，或确保 description_rich_text 已生成 NOTE JSON。`,
+      message: `Description 过短（${v.length} 字）。请填写商品说明。`,
       description_len: v.length,
     }
   }
   if (v.length > max) {
     return {
       ok: false,
-      message: `Description 过长（${v.length} 字，建议 ≤${max}）。长文案请写在商品说明（富文本）。`,
+      message: `Description 过长（${v.length} 字）。长文案请写在商品说明。`,
       description_len: v.length,
     }
   }
   return { ok: true }
+}
+
+export function describeDouyinDescriptionAttrForLog(
+  templateProductAttrs: Record<string, unknown>[],
+  merged: Record<string, string>,
+): Record<string, unknown> {
+  const descMeta = descriptionMetaFromTemplate(templateProductAttrs)
+  const descKey = descMeta?.key ?? 'Description'
+  const val = String(merged[descKey] ?? merged.Description ?? '').trim()
+  return {
+    description_key: descKey,
+    description_value_type: descMeta?.value_type ?? null,
+    description_len: val.length,
+    description_is_unused_array: isDouyinDescriptionAttrUnused(val),
+    description_is_note_json: isDouyinNoteRichTextJsonString(val),
+    description_rich_is_note_json: isDouyinNoteRichTextJsonString(
+      String(merged.description_rich_text ?? ''),
+    ),
+  }
 }

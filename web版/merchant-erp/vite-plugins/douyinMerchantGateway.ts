@@ -57,6 +57,7 @@ import {
 } from '../src/lib/douyinDescriptionNormalize.js'
 import {
   applyDouyinProductDescriptionAttrs,
+  describeDouyinDescriptionAttrForLog,
   isDouyinDescriptionAttrUnused,
   validateDouyinDescriptionAttrForSave,
 } from '../src/lib/douyinProductDescriptionAttrs.js'
@@ -2772,7 +2773,10 @@ function mergeGoodlifeProductAttrMapFromErp(
         continue
       }
       if (
-        (/详情|图文|介绍/.test(name) || (/描述/.test(name) && !attrKeyIsDouyinDescription(key))) &&
+        (/详情|图文|介绍/.test(name) ||
+          (/描述/.test(name) &&
+            !attrKeyIsDouyinDescription(key) &&
+            !/^description_rich/i.test(key))) &&
         !/副标题/.test(name)
       ) {
         const v = (productDesc || productName).slice(0, 12000)
@@ -3288,6 +3292,7 @@ async function buildGoodlifeProductSaveBody(
     productDesc: productDescRaw,
     categoryId: category_id,
   })
+  /** 必须在 finalize 之后：按 template value_type 写入 NOTE JSON / "[]"，避免被 merge 纯文本覆盖 */
   const descShort = applyDouyinProductDescriptionAttrs(attrs, mergedProductAttrs, {
     productName: product_name,
     productDesc: productDescRaw,
@@ -3532,25 +3537,13 @@ function summarizeDouyinProductSaveForLog(
       return null
     })(),
     show_channel: ak?.show_channel ?? null,
-    description_len: (() => {
-      if (!ak) return 0
-      for (const [k, v] of Object.entries(ak)) {
-        if (attrKeyIsDouyinDescription(k)) return String(v ?? '').length
-      }
-      return 0
-    })(),
-    description_attr_unused: (() => {
-      if (!ak) return false
-      for (const [k, v] of Object.entries(ak)) {
-        if (attrKeyIsDouyinDescription(k)) return isDouyinDescriptionAttrUnused(String(v ?? ''))
-      }
-      return false
-    })(),
-    description_rich_is_note_json: (() => {
-      if (!ak) return false
-      const v = ak.description_rich_text ?? ''
-      return isDouyinNoteRichTextJsonString(String(v))
-    })(),
+    ...(ak && meta.templateProductAttrs
+      ? describeDouyinDescriptionAttrForLog(meta.templateProductAttrs, ak)
+      : {
+          description_len: 0,
+          description_is_note_json: false,
+          description_rich_is_note_json: false,
+        }),
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
     missing_required_product_attr_keys,
