@@ -73,6 +73,7 @@ import {
 import {
   douyinAppointmentJson,
   douyinCanNoUseDateJson,
+  douyinLimitUseRuleJson,
   douyinUseDateJson,
   douyinUseTimeJson,
   normalizeDouyinShowChannelValue,
@@ -3553,6 +3554,11 @@ function mergeGoodlifeProductAttrMapFromErp(
       continue
     }
 
+    if (/^limit_use_rule$/i.test(key) || vt === 'LIMIT_USE_RULE') {
+      out[key] = douyinLimitUseRuleJson(false)
+      continue
+    }
+
     if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
       if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson && !omitCombo) {
         out[key] = pkgJson
@@ -3629,6 +3635,10 @@ function mergeGoodlifeProductAttrMapFromErp(
     if (!key || out[key]) continue
     if (!Boolean(a.is_required)) continue
     const vt = String(a.value_type ?? '').toUpperCase()
+    if (/^limit_use_rule$/i.test(key) || vt === 'LIMIT_USE_RULE') {
+      out[key] = douyinLimitUseRuleJson(false)
+      continue
+    }
     if (vt.includes('IMAGE') || vt === 'PIC') {
       if (headUrls[0]) out[key] = jsonImageUrlList([headUrls[0]!])
     } else if (vt === 'INT' || vt === 'LONG' || vt === 'NUMBER' || vt === 'INTEGER') {

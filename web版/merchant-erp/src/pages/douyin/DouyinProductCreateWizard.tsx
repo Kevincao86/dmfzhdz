@@ -13,8 +13,11 @@ import {
   pickerChildrenOf,
   pickerLeafSelectable,
   pickerLabelsForPath,
+  pickerLevel3Options,
   pickerPathIdsToLeaf,
+  pickerUploadableLeafIdsFromTree,
 } from '../../lib/douyinGoodsCategoryPicker'
+import { findNodeById } from '../../data/douyinCategoryMock'
 import { normalizeDouyinDescription } from '../../lib/douyinDescriptionNormalize'
 import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../../lib/productDraftSnapshot'
 import {
@@ -52,11 +55,13 @@ export default function DouyinProductCreateWizard({
   const [loading, setLoading] = useState(true)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [tree, setTree] = useState<DouyinCategoryTreeNode[]>([])
-  const [uploadableLeaves, setUploadableLeaves] = useState<Set<string>>(new Set())
+  /** 随 mergeDouyinCategoryChildrenIntoTree 更新，避免懒加载三级后 uploadableLeaves 仍为首包快照 */
+  const uploadableLeaves = useMemo(() => pickerUploadableLeafIdsFromTree(tree), [tree])
 
   const [cat1, setCat1] = useState('')
   const [cat2, setCat2] = useState('')
   const [cat3, setCat3] = useState('')
+  const [catSubtreeLoading, setCatSubtreeLoading] = useState<string | null>(null)
 
   const [productTypes, setProductTypes] = useState<ProductTypeOption[]>([])
   const [productType, setProductType] = useState<number | null>(null)
@@ -92,15 +97,13 @@ export default function DouyinProductCreateWizard({
 
   const cat3Node = useMemo(() => {
     if (!cat3) return null
-    const path = pickerPathIdsToLeaf(tree, cat3)
-    let nodes = tree
-    let node: DouyinCategoryTreeNode | undefined
-    for (const id of path) {
-      node = nodes.find((n) => n.category_id === id)
-      nodes = node?.sub_tree_infos ?? []
-    }
-    return node ?? null
+    return findNodeById(tree, cat3)
   }, [tree, cat3])
+
+  const l3Options = useMemo(
+    () => (cat2 ? pickerLevel3Options(tree, cat2, uploadableLeaves) : []),
+    [tree, cat2, uploadableLeaves],
+  )
 
   const categoryPathLabel = useMemo(() => {
     if (!cat3) return ''
@@ -119,7 +122,6 @@ export default function DouyinProductCreateWizard({
         return
       }
       setTree(r.tree)
-      setUploadableLeaves(r.uploadableLeafIds)
     })()
     return () => {
       cancelled = true
@@ -193,14 +195,28 @@ export default function DouyinProductCreateWizard({
   useEffect(() => {
     if (!cat2 || loading) return
     let cancelled = false
+    setCatSubtreeLoading(cat2)
     void fetchDouyinGoodsCategoryChildren(cat2).then((kids) => {
-      if (cancelled || kids.length === 0) return
-      setTree((prev) => mergeDouyinCategoryChildrenIntoTree(prev, cat2, kids))
+      if (cancelled) return
+      setCatSubtreeLoading(null)
+      if (kids.length > 0) {
+        setTree((prev) => mergeDouyinCategoryChildrenIntoTree(prev, cat2, kids))
+      }
     })
     return () => {
       cancelled = true
+      setCatSubtreeLoading(null)
     }
   }, [cat2, loading])
+
+  /** 部分行业仅两级类目：二级即为末级时自动选中 */
+  useEffect(() => {
+    if (!cat2 || loading || catSubtreeLoading === cat2) return
+    const opts = pickerLevel3Options(tree, cat2, uploadableLeaves)
+    if (opts.length === 1 && opts[0]?.category_id === cat2) {
+      setCat3(cat2)
+    }
+  }, [cat2, tree, uploadableLeaves, loading, catSubtreeLoading])
 
   useEffect(() => {
     if (!cat3) return
@@ -474,7 +490,11 @@ export default function DouyinProductCreateWizard({
 
       {step === 'category' && (
         <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold">选择三级类目</h2>
+          <h2 className="text-lg font-semibold">选择发品类目</h2>
+          <p className="text-sm text-gray-500">
+            须选至末级类目（部分行业仅两级，选完二级后会自动带出末级）。数据来自抖音{' '}
+            <code className="text-xs">goodlife/v1/goods/category/get</code>。
+          </p>
           <div className="grid gap-3 sm:grid-cols-3">
             <select
               className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -514,12 +534,15 @@ export default function DouyinProductCreateWizard({
               disabled={!cat2}
               onChange={(e) => setCat3(e.target.value)}
             >
-              <option value="">三级类目（末级）</option>
-              {pickerChildrenOf(tree, cat2 || null).map((n) => {
+              <option value="">
+                {catSubtreeLoading === cat2 ? '加载末级类目…' : '末级类目'}
+              </option>
+              {l3Options.map((n) => {
                 const ok = pickerLeafSelectable(n.category_id, n, uploadableLeaves)
                 return (
                   <option key={n.category_id} value={n.category_id} disabled={!ok}>
                     {n.name}
+                    {n.category_id === cat2 && l3Options.length === 1 ? '（本级为末级）' : ''}
                     {!ok ? '（不可发品）' : ''}
                   </option>
                 )
