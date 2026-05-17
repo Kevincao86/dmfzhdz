@@ -210,9 +210,12 @@ export default function DouyinProductCreateWizard({
       setTypesLoading(false)
       if (r.ok) {
         setProductTypes(r.types)
-        if (productType == null) {
+        const curOk =
+          productType != null &&
+          r.types.some((t) => t.product_type === productType && t.eligible)
+        if (!curOk) {
           const first = r.types.find((t) => t.eligible)
-          if (first) setProductType(first.product_type)
+          setProductType(first ? first.product_type : null)
         }
       }
     })

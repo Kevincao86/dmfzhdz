@@ -1234,8 +1234,13 @@ export async function handleDouyinGoodsProductTypesGet(
     const types: { product_type: number; label: string; eligible: boolean }[] = []
     for (const t of base) {
       const bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, t.product_type)
-      const hasTpl = bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0
-      types.push({ ...t, eligible: hasTpl })
+      const eligible = inferProductTypeEligibleFromTemplate(
+        t.product_type,
+        bundle.productAttrs,
+        bundle.skuAttrs,
+        categoryId,
+      )
+      types.push({ ...t, eligible })
     }
     json(res, 200, { types })
   } catch (e) {
@@ -2023,25 +2028,100 @@ function pickProductImageAttrKey(attrs: Record<string, unknown>[]): string | nul
   return scored[0] && scored[0].score > 0 ? scored[0].key : null
 }
 
-async function fetchTemplateAttrsBundle(
+function templateAttrKeyNames(
+  productAttrs: Record<string, unknown>[],
+  skuAttrs: Record<string, unknown>[],
+): string[] {
+  const out: string[] = []
+  for (const a of [...productAttrs, ...skuAttrs]) {
+    const k = String((a as Record<string, unknown>).key ?? '').trim().toLowerCase()
+    const n = String((a as Record<string, unknown>).name ?? '').trim().toLowerCase()
+    if (k) out.push(k)
+    if (n) out.push(n)
+  }
+  return out
+}
+
+/** 模板含代金券专有字段（voucher_type / 适用品牌品类等） */
+function templateLooksLikeVoucher(keys: string[]): boolean {
+  const hay = keys.join(' ')
+  return /voucher_type|applicable_brand|applicable_category|代金券类型|适用品牌|适用品类/.test(hay)
+}
+
+/** 模板含团购/套餐搭配字段 */
+function templateLooksLikeGroupBuy(keys: string[]): boolean {
+  const hay = keys.join(' ')
+  return /^commodity$|combo_rule|菜品搭配|套餐|团购/.test(hay)
+}
+
+/** 模板含次卡专有字段（勿与「仅返回团购模板」混淆） */
+function templateLooksLikeTimesCard(keys: string[]): boolean {
+  const hay = keys.join(' ')
+  return /次卡|times.?card|multi.?pass|use_times|核销次数|card_times/.test(hay)
+}
+
+/**
+ * 零售日用百货等（如 5003003）：来客后台通常为「团购 + 代金券」，不含次卡/预约品。
+ * 与 template.get 空返回时的 UI 兜底一致。
+ */
+function categoryRetailGroupAndVoucherLikely(categoryId: string): boolean {
+  return categoryRetailComboAttrNormalize(categoryId)
+}
+
+/**
+ * 按 template.get 返回的 attr 形态判断某 product_type 是否可选（避免「有次卡模板字段却实为团购模板」误开次卡）。
+ */
+function inferProductTypeEligibleFromTemplate(
+  productType: number,
+  productAttrs: Record<string, unknown>[],
+  skuAttrs: Record<string, unknown>[],
+  categoryId: string,
+): boolean {
+  const keys = templateAttrKeyNames(productAttrs, skuAttrs)
+  const hasAttrs = keys.length > 0
+  const voucher = templateLooksLikeVoucher(keys)
+  const groupBuy = templateLooksLikeGroupBuy(keys)
+  const timesCard = templateLooksLikeTimesCard(keys)
+
+  if (productType === 1) {
+    if (!hasAttrs) return categoryRetailGroupAndVoucherLikely(categoryId)
+    if (voucher && !groupBuy) return false
+    if (timesCard && !groupBuy) return false
+    return groupBuy || !voucher
+  }
+  if (productType === 2) {
+    if (!hasAttrs) return categoryRetailGroupAndVoucherLikely(categoryId)
+    if (timesCard && !voucher) return false
+    if (groupBuy && !voucher) return false
+    return voucher || !groupBuy
+  }
+  if (productType === 3) {
+    if (!hasAttrs) return false
+    return timesCard && !voucher
+  }
+  if (productType === 4) {
+    if (!hasAttrs) return false
+    const hay = keys.join(' ')
+    return /预约|appointment|calendar|预售预约/.test(hay) && !voucher && !timesCard
+  }
+  return hasAttrs
+}
+
+async function fetchTemplateAttrsBundleOnce(
   accountId: string,
   token: string,
   categoryId: string,
   productType: number,
+  openBizType: number | undefined,
   signal?: AbortSignal,
 ): Promise<{ productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] }> {
-  if (!categoryId) return { productAttrs: [], skuAttrs: [] }
-  const ttl = templateAttrsBundleCacheTtlMs()
-  const ck = templateAttrsBundleCacheKey(accountId, categoryId, productType)
-  if (ttl > 0) {
-    const hit = templateAttrsBundleCache.get(ck)
-    if (hit && Date.now() < hit.expiresAt) return hit.bundle
-  }
   const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
   u.searchParams.set('account_id', accountId)
   u.searchParams.set('category_id', categoryId)
   u.searchParams.set('product_type', String(productType))
-  /** 勿默认传 open_biz_type：文档枚举中 1 为「组合券包类型」，普通代金券/团购误传会导致 data 仅含错误信息、无 product_attrs。 */
+  if (openBizType !== undefined && Number.isFinite(openBizType)) {
+    u.searchParams.set('open_biz_type', String(Math.floor(openBizType)))
+  }
   const dr = await douyinServerFetch(u.toString(), {
     method: 'GET',
     headers: {
@@ -2056,14 +2136,45 @@ async function fetchTemplateAttrsBundle(
   if (!getDataError(j).ok) return { productAttrs: [], skuAttrs: [] }
   const data = j.data as Record<string, unknown> | undefined
   const { pa, sa } = extractProductSkuAttrsFromTemplateEnvelope(data, j)
-  const bundle = {
-    productAttrs: pa,
-    skuAttrs: sa,
+  return { productAttrs: pa, skuAttrs: sa }
+}
+
+async function fetchTemplateAttrsBundle(
+  accountId: string,
+  token: string,
+  categoryId: string,
+  productType: number,
+  signal?: AbortSignal,
+): Promise<{ productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] }> {
+  if (!categoryId) return { productAttrs: [], skuAttrs: [] }
+  const openBizAttempts: Array<number | undefined> = [undefined]
+  /** 代金券：部分零售类目需 open_biz_type=0 才返回模板（勿传 1=组合券包） */
+  if (productType === 2) openBizAttempts.push(0)
+  const ttl = templateAttrsBundleCacheTtlMs()
+  const ck = templateAttrsBundleCacheKey(accountId, categoryId, productType)
+  if (ttl > 0) {
+    const hit = templateAttrsBundleCache.get(ck)
+    if (hit && Date.now() < hit.expiresAt) return hit.bundle
   }
-  if (ttl > 0 && (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0)) {
-    templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+  let last = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
+  for (const obt of openBizAttempts) {
+    const bundle = await fetchTemplateAttrsBundleOnce(
+      accountId,
+      token,
+      categoryId,
+      productType,
+      obt,
+      signal,
+    )
+    last = bundle
+    if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
+      if (ttl > 0) {
+        templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+      }
+      return bundle
+    }
   }
-  return bundle
+  return last
 }
 
 /** 从 template/get 的 data（或少数变体的根对象）解析 product_attrs / sku_attrs */
@@ -3469,7 +3580,14 @@ async function buildGoodlifeProductSaveBody(
       product_type === 2
         ? '该类目在抖音侧未配置代金券模板，请改选「团购」或更换支持代金券的三级类目后再提交。'
         : '请更换三级类目或联系来客运营配置该类目商品模板后再提交。'
-    if (_mode === 'submit' || product_type === 2) {
+    const retailVoucherFallback =
+      product_type === 2 && categoryRetailGroupAndVoucherLikely(category_id)
+    if (_mode === 'submit' && !retailVoucherFallback) {
+      throw new Error(
+        `抖音未返回「${typeLabel}」商品模板（category_id=${category_id}）。${hint}`,
+      )
+    }
+    if (product_type >= 3 && _mode === 'submit') {
       throw new Error(
         `抖音未返回「${typeLabel}」商品模板（category_id=${category_id}）。${hint}`,
       )
