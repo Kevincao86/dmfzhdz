@@ -9,6 +9,12 @@ import crypto from 'node:crypto'
 
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
+import {
+  describeArkVideoSetupIssue,
+  listValidArkVideoModels,
+  looksLikeArkPlaceholderEndpointId,
+  pickMergedArkEndpointsField,
+} from '../src/lib/arkVideoEndpointsConfig.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
@@ -32,7 +38,18 @@ function applyRegistrySliceToVideoAiEnv(
   fill('KLING_ACCESS_KEY', vx.klingAccessKey)
   fill('KLING_SECRET_KEY', vx.klingSecretKey)
   fill('KLING_API_BASE', vx.klingApiBase)
-  fill('MERCHANT_AI_ARK_VIDEO_ENDPOINTS', vx.arkVideoEndpoints)
+
+  const envEp = String(
+    out.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ?? out.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ?? '',
+  ).trim()
+  const regEp = vx.arkVideoEndpoints?.trim() ?? ''
+  const mergedEp = pickMergedArkEndpointsField(envEp, regEp)
+  if (mergedEp) {
+    out.MERCHANT_AI_ARK_VIDEO_ENDPOINTS = mergedEp
+  } else {
+    const preserve = envEp || regEp
+    if (preserve) out.MERCHANT_AI_ARK_VIDEO_ENDPOINTS = preserve
+  }
 
   const arkFromEnv = String(out.MERCHANT_AI_DOUBAO_KEY ?? out.ARK_API_KEY ?? '').trim()
   if (!arkFromEnv) {
@@ -116,14 +133,6 @@ function doubaoBearerKey(env: MerchantAiEnv): string | null {
   return t || null
 }
 
-function looksLikeArkPlaceholderEndpointId(endpointId: string): boolean {
-  const ep = endpointId.trim()
-  if (!/^ep-/i.test(ep)) return false
-  if (/^ep-(123456|789012|000000|111111|999999)(?:\b|$)/i.test(ep)) return true
-  if (/xxxx|placeholder|示例|demo|test/i.test(ep)) return true
-  return false
-}
-
 function arkCreateTaskHttpStatus(upstreamStatus?: number): number {
   if (upstreamStatus === 404) return 400
   if (upstreamStatus != null && upstreamStatus >= 400 && upstreamStatus < 600) return upstreamStatus
@@ -173,26 +182,8 @@ function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
     env.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ??
     ''
   ).trim()
-  const out: ArkVideoModelOption[] = []
-  if (raw) {
-    for (const part of raw.split(',')) {
-      const seg = part.trim()
-      if (!seg) continue
-      const pipes = seg.split('|').map((s) => s.trim())
-      if (pipes.length >= 2 && pipes[1]) {
-        out.push({ label: pipes[0] || pipes[1], endpointId: pipes[1] })
-      } else if (pipes.length === 1 && pipes[0]) {
-        out.push({ label: pipes[0], endpointId: pipes[0] })
-      }
-    }
-  }
-  if (out.length === 0) {
-    const fb = String((env as Record<string, string>).MERCHANT_AI_ARK_VIDEO_FALLBACK_ENDPOINT ?? '').trim()
-    if (fb && /^ep-[a-z0-9_-]+$/i.test(fb)) {
-      out.push({ label: '默认视频接入点', endpointId: fb })
-    }
-  }
-  return out.filter((m) => !looksLikeArkPlaceholderEndpointId(m.endpointId))
+  const fb = String((env as Record<string, string>).MERCHANT_AI_ARK_VIDEO_FALLBACK_ENDPOINT ?? '').trim()
+  return listValidArkVideoModels(raw, fb)
 }
 
 function signKlingJwt(accessKey: string, secretKey: string): string {
@@ -545,19 +536,22 @@ export async function handleMerchantAiVideoRoutes(input: {
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/config') {
     const kCfg = pickKlingCreds(env)
+    const endpointsRaw = (
+      env.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ??
+      env.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ??
+      ''
+    ).trim()
     const arkOpts = parseArkVideoModelList(env)
     const arkKeyOk = !!doubaoBearerKey(env)
     const qwenOk = !!(env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
-    let credentialNote =
+    const arkVideoSetupIssue = describeArkVideoSetupIssue(arkKeyOk, endpointsRaw)
+    const credentialNote =
       '商户端仅可选择模型能力与参数；可灵密钥、方舟 Key / 视频推理接入点由运营人员在「管控台 · AI模型」中维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。'
-    if (arkKeyOk && arkOpts.length === 0) {
-      credentialNote +=
-        ' 当前方舟 Key 已配置，但视频接入点列表为空或仍为示例 ep-123456，请在管控台「短视频 API」填写火山方舟控制台真实的 ep- 推理接入点。'
-    }
     json(res, 200, {
       klingConfigured: kCfg.ok,
       arkVideoModels: arkOpts,
       arkKeyConfigured: arkKeyOk,
+      arkVideoSetupIssue,
       longformPlanner: {
         doubao: arkKeyOk,
         qwen: qwenOk,

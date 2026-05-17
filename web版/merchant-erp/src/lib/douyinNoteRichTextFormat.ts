@@ -96,30 +96,8 @@ export function finalizeDouyinProductAttrsByTemplate(
       continue
     }
 
-    if (attrKeyIsDouyinDescription(key)) {
-      if (meta.value_type === 'NOTE') {
-        const short = normalizeDouyinDescription(
-          cur || ctx.productName,
-          ctx.productName,
-          undefined,
-          undefined,
-          ctx.categoryId,
-        )
-        merged[key] = encodeDouyinNoteRichTextFromPlain(short)
-        if (!shortPlain) shortPlain = short
-      } else {
-        const short = normalizeDouyinDescription(
-          cur || ctx.productDesc || ctx.productName,
-          ctx.productName,
-          undefined,
-          undefined,
-          ctx.categoryId,
-        )
-        merged[key] = short
-        if (!shortPlain) shortPlain = short
-      }
-      continue
-    }
+    /** Description / description_rich_text 由 applyDouyinProductDescriptionAttrs 统一处理 */
+    if (attrKeyIsDouyinDescription(key)) continue
   }
 
   for (const [key, val] of Object.entries(merged)) {
@@ -137,9 +115,6 @@ export function finalizeDouyinProductAttrsByTemplate(
       undefined,
       ctx.categoryId,
     )
-    if (!Object.keys(merged).some(attrKeyIsDouyinDescription)) {
-      merged.Description = shortPlain
-    }
   }
 
   return shortPlain

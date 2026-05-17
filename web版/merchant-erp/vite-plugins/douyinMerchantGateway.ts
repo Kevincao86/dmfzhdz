@@ -52,12 +52,14 @@ import {
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
-  applyDouyinDescriptionRichTextSplit,
   attrKeyIsDouyinDescription,
-  douyinDescriptionMinLen,
-  douyinDescriptionMaxLen,
   normalizeDouyinDescription,
 } from '../src/lib/douyinDescriptionNormalize.js'
+import {
+  applyDouyinProductDescriptionAttrs,
+  isDouyinDescriptionAttrUnused,
+  validateDouyinDescriptionAttrForSave,
+} from '../src/lib/douyinProductDescriptionAttrs.js'
 import {
   finalizeDouyinProductAttrsByTemplate,
   isDouyinNoteRichTextJsonString,
@@ -2752,23 +2754,13 @@ function mergeGoodlifeProductAttrMapFromErp(
       }
     }
 
-    if (vt === 'NOTE' || /^description_rich/i.test(key)) {
+    if (vt === 'NOTE' || /^description_rich/i.test(key) || attrKeyIsDouyinDescription(key)) {
       continue
     }
 
     if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
       if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson && !omitCombo) {
         out[key] = pkgJson
-        continue
-      }
-      if (attrKeyIsDouyinDescription(key)) {
-        out[key] = normalizeDouyinDescription(
-          productDesc,
-          productName,
-          undefined,
-          undefined,
-          String(erp.category_id ?? '').trim(),
-        )
         continue
       }
       if (attrKeyIsDouyinSubTitle(key) || /副标题/.test(name)) {
@@ -3291,8 +3283,12 @@ async function buildGoodlifeProductSaveBody(
   }
 
   sanitizeDouyinTradeRuleProductAttrs(mergedProductAttrs, erp, category_id, attrs)
-  applyDouyinDescriptionRichTextSplit(mergedProductAttrs, product_name, productDescRaw, category_id)
-  const descShort = finalizeDouyinProductAttrsByTemplate(attrs, mergedProductAttrs, {
+  finalizeDouyinProductAttrsByTemplate(attrs, mergedProductAttrs, {
+    productName: product_name,
+    productDesc: productDescRaw,
+    categoryId: category_id,
+  })
+  const descShort = applyDouyinProductDescriptionAttrs(attrs, mergedProductAttrs, {
     productName: product_name,
     productDesc: productDescRaw,
     categoryId: category_id,
@@ -3542,6 +3538,13 @@ function summarizeDouyinProductSaveForLog(
         if (attrKeyIsDouyinDescription(k)) return String(v ?? '').length
       }
       return 0
+    })(),
+    description_attr_unused: (() => {
+      if (!ak) return false
+      for (const [k, v] of Object.entries(ak)) {
+        if (attrKeyIsDouyinDescription(k)) return isDouyinDescriptionAttrUnused(String(v ?? ''))
+      }
+      return false
     })(),
     description_rich_is_note_json: (() => {
       if (!ak) return false
@@ -4012,35 +4015,30 @@ export async function handleDouyinGoodsProductSavePost(
       return
     }
     const categoryIdSave = String(erp.category_id ?? '').trim()
-    const descMin = douyinDescriptionMinLen()
-    const descMax = douyinDescriptionMaxLen(undefined, categoryIdSave)
     const descKey =
       Object.keys(attrMap).find((k) => attrKeyIsDouyinDescription(k)) ?? 'Description'
     const descVal = String(attrMap[descKey] ?? '').trim()
     const topDesc = String(prod.desc ?? '').trim()
-    if (topDesc && descVal && topDesc !== descVal) {
+    if (
+      topDesc &&
+      descVal &&
+      !isDouyinDescriptionAttrUnused(descVal) &&
+      !isDouyinNoteRichTextJsonString(descVal) &&
+      topDesc !== descVal
+    ) {
       json(res, 400, {
         message:
-          '商品顶层 desc 与开放平台 Description 不一致，已中止提交。请刷新页面后重试或清空「② 开放平台 API 字段」中的 Description 覆盖项。',
+          '商品顶层 desc 与开放平台 Description 不一致。有富文本时 Description 应为 "[]"，短描述写在 product.desc / 商品说明。',
         product_desc_len: topDesc.length,
         description_attr_len: descVal.length,
       })
       return
     }
-    if (descVal.length < descMin) {
+    const descCheck = validateDouyinDescriptionAttrForSave(descVal, categoryIdSave)
+    if (!descCheck.ok) {
       json(res, 400, {
-        message: `Description 过短（当前 ${descVal.length} 字）。请在「② 开放平台 API 字段」填写至少 ${descMin} 字的商品短描述，勿仅用 2～3 字商品名充当 Description。`,
-        description_len: descVal.length,
-        description_min: descMin,
-        description_max: descMax,
-      })
-      return
-    }
-    if (descVal.length > descMax) {
-      json(res, 400, {
-        message: `Description 过长（当前 ${descVal.length} 字，类目 ${categoryIdSave || '—'} 建议不超过 ${descMax} 字）。长文案请写在商品说明，短描述写在 Description。`,
-        description_len: descVal.length,
-        description_max: descMax,
+        message: descCheck.message,
+        description_len: descCheck.description_len,
       })
       return
     }

@@ -7,6 +7,10 @@ export type VideoAiBackendConfig = {
   longformPlanner?: { doubao: boolean; qwen: boolean }
   /** 后端返回的商户端说明（不在此页绑 Key） */
   credentialNote?: string
+  /** 方舟 Key 已有但无可用 ep 时的具体原因 */
+  arkVideoSetupIssue?: string | null
+  /** 配置接口网络失败（如 fetch failed） */
+  configLoadError?: string
 }
 
 async function parseJsonSafe<T>(res: Response): Promise<T | null> {
@@ -43,19 +47,32 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
 
 export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
   const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
+  let lastNetworkErr = ''
   for (const p of paths) {
-    const res = await fetch(p)
-    const text = await res.text()
-    const ct = res.headers.get('content-type') ?? ''
-    if (res.status === 404) continue
-    if (res.ok && responseLooksLikeHtml(text, ct)) continue
-    let j: VideoAiBackendConfig | null = null
     try {
-      j = JSON.parse(text) as VideoAiBackendConfig
-    } catch {
-      j = null
+      const res = await fetch(p)
+      const text = await res.text()
+      const ct = res.headers.get('content-type') ?? ''
+      if (res.status === 404) continue
+      if (res.ok && responseLooksLikeHtml(text, ct)) continue
+      let j: VideoAiBackendConfig | null = null
+      try {
+        j = JSON.parse(text) as VideoAiBackendConfig
+      } catch {
+        j = null
+      }
+      if (res.ok && j && typeof j.klingConfigured === 'boolean') return j
+    } catch (e) {
+      lastNetworkErr = e instanceof Error ? e.message : String(e)
     }
-    if (res.ok && j && typeof j.klingConfigured === 'boolean') return j
+  }
+  if (lastNetworkErr) {
+    return {
+      klingConfigured: false,
+      arkKeyConfigured: false,
+      arkVideoModels: [],
+      configLoadError: lastNetworkErr,
+    }
   }
   return null
 }

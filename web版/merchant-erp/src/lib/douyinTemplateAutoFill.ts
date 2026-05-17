@@ -4,7 +4,7 @@ import {
   attrKeyIsDouyinSubTitle,
   buildDouyinSubTitleFromTradeRules,
 } from './douyinSubTitleNormalize'
-import { normalizeDouyinDescription } from './douyinDescriptionNormalize'
+import { DOUYIN_DESCRIPTION_ATTR_UNUSED } from './douyinProductDescriptionAttrs'
 import {
   attrTemplateIsNoteRichText,
   encodeDouyinNoteRichTextFromPlain,
@@ -172,13 +172,6 @@ export function buildDouyinTemplateAutoFillMaps(
 
   const name = input.productName.trim()
   const descLong = (input.productDesc.trim() || name).slice(0, 12000)
-  const descAttr = normalizeDouyinDescription(
-    input.productDesc,
-    name,
-    undefined,
-    undefined,
-    input.categoryId.trim(),
-  )
   const subtitle = buildDouyinSubTitleFromTradeRules({
     afterSalePolicy: input.afterSalePolicy.trim(),
     reserveMode: input.reserveMode,
@@ -232,7 +225,7 @@ export function buildDouyinTemplateAutoFillMaps(
     }
 
     if (lk === 'description' || /^description$/i.test(key)) {
-      product[key] = descAttr
+      product[key] = DOUYIN_DESCRIPTION_ATTR_UNUSED
       continue
     }
     if (attrTemplateIsNoteRichText(parseDouyinTemplateAttrMeta(a as unknown as Record<string, unknown>))) {
