@@ -284,3 +284,93 @@ export function sanitizeDouyinTradeRuleProductAttrs(
     merged.Notification = encodeDouyinNotificationJson('使用规则', notificationBody)
   }
 }
+
+/** 将 ERP 扩展售卖/交易规则写入 product 顶层时间与 attr / sku */
+export function applyErpExtendedRulesToGoodlifeSave(
+  product: Record<string, unknown>,
+  mergedProductAttrs: Record<string, string>,
+  skuAttrMap: Record<string, string>,
+  erp: Record<string, unknown>,
+): void {
+  const sales =
+    erp.sales_info && typeof erp.sales_info === 'object' ? (erp.sales_info as Record<string, unknown>) : {}
+  const trade =
+    erp.trade_rules && typeof erp.trade_rules === 'object' ? (erp.trade_rules as Record<string, unknown>) : {}
+  const consume =
+    erp.consume_rules && typeof erp.consume_rules === 'object'
+      ? (erp.consume_rules as Record<string, unknown>)
+      : {}
+
+  if (sales.sale_time_limited === true) {
+    const st = sales.sale_start
+    const en = sales.sale_end
+    if (st != null && String(st).trim()) {
+      product.sold_start_time = toDouyinUnixSeconds(st)
+    }
+    if (en != null && String(en).trim()) {
+      product.sold_end_time = toDouyinUnixSeconds(en)
+    }
+  }
+
+  if (trade.daily_consume_mode === 'time_slots' && Array.isArray(trade.daily_time_periods)) {
+    const periods = (trade.daily_time_periods as { start?: string; end?: string }[]).filter(
+      (p) => p && String(p.start ?? '').trim() && String(p.end ?? '').trim(),
+    )
+    if (periods.length > 0) {
+      for (const key of Object.keys(mergedProductAttrs)) {
+        if (attrKeyEq(key, 'use_time')) {
+          mergedProductAttrs[key] = JSON.stringify({
+            use_time_type: 2,
+            time_period_list: periods.map((p) => ({
+              start_time: String(p.start).trim(),
+              end_time: String(p.end).trim(),
+            })),
+          })
+        }
+      }
+      if (!Object.keys(mergedProductAttrs).some((k) => attrKeyEq(k, 'use_time'))) {
+        mergedProductAttrs.use_time = JSON.stringify({
+          use_time_type: 2,
+          time_period_list: periods.map((p) => ({
+            start_time: String(p.start).trim(),
+            end_time: String(p.end).trim(),
+          })),
+        })
+      }
+    }
+  }
+
+  if (trade.non_consume_date_mode === 'partial_dates') {
+    const block: Record<string, unknown> = { enable: true }
+    if (Array.isArray(trade.non_consume_holidays) && trade.non_consume_holidays.length) {
+      block.can_no_use_holiday = true
+    }
+    for (const key of Object.keys(mergedProductAttrs)) {
+      if (attrKeyEq(key, 'can_no_use_date')) {
+        mergedProductAttrs[key] = JSON.stringify(block)
+      }
+    }
+    if (!Object.keys(mergedProductAttrs).some((k) => attrKeyEq(k, 'can_no_use_date'))) {
+      mergedProductAttrs.can_no_use_date = JSON.stringify(block)
+    }
+  }
+
+  if (consume.voucher_limit === true) {
+    const max = Math.max(1, Math.floor(Number(consume.voucher_max) || 1))
+    for (const key of Object.keys(mergedProductAttrs)) {
+      if (attrKeyEq(key, 'limit_use_rule')) {
+        mergedProductAttrs[key] = douyinLimitUseRuleJson(true, max)
+      }
+    }
+    if (!Object.keys(mergedProductAttrs).some((k) => attrKeyEq(k, 'limit_use_rule'))) {
+      mergedProductAttrs.limit_use_rule = douyinLimitUseRuleJson(true, max)
+    }
+  }
+
+  if (trade.customer_purchase_limit_mode === 'limited') {
+    const perPerson = Math.max(0, Math.floor(Number(trade.customer_purchase_limit_max) || 0))
+    const perDay = Math.max(0, Math.floor(Number(trade.customer_purchase_limit_per_day) || 0))
+    const limitNum = perPerson || perDay || 1
+    skuAttrMap.limit_rule = JSON.stringify({ is_limit: true, limit_num: limitNum })
+  }
+}

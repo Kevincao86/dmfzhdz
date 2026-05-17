@@ -89,6 +89,7 @@ import {
   douyinUseTimeJson,
   normalizeDouyinShowChannelValue,
   normalizeGoodlifeProductTopLevelTimes,
+  applyErpExtendedRulesToGoodlifeSave,
   sanitizeDouyinTradeRuleProductAttrs,
   toDouyinUnixSeconds,
 } from '../src/lib/douyinTradeRuleAttrNormalize.js'
@@ -4172,6 +4173,7 @@ async function buildGoodlifeProductSaveBody(
   }
 
   sanitizeDouyinTradeRuleProductAttrs(mergedProductAttrs, erp, category_id, attrs)
+  applyErpExtendedRulesToGoodlifeSave(product, mergedProductAttrs, skuAttrMap, erp)
   finalizeDouyinProductAttrsByTemplate(attrs, mergedProductAttrs, {
     productName: product_name,
     productDesc: productDescRaw,

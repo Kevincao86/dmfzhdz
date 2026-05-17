@@ -96,6 +96,20 @@ export function upsertProductEditLibraryDraft(row: ProductEditLibraryRow): void 
 }
 
 /** 将列表中的旧 id 换为平台 product_id（去重后置顶） */
+export function updateProductEditLibraryRow(
+  id: string,
+  patch: Partial<ProductEditLibraryRow>,
+): void {
+  const key = id.trim()
+  if (!key) return
+  const prev = loadProductEditLibrary()
+  const idx = prev.findIndex((p) => p.id === key)
+  if (idx < 0) return
+  const next = [...prev]
+  next[idx] = { ...next[idx]!, ...patch, id: key }
+  persist(next)
+}
+
 export function replaceProductEditLibraryRowId(oldId: string, row: ProductEditLibraryRow): void {
   const o = oldId.trim()
   if (!o) return
