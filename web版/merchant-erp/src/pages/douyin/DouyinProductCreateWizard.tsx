@@ -401,18 +401,42 @@ export default function DouyinProductCreateWizard({
     const typeEligible = productTypes.some(
       (t) => t.product_type === productType && t.eligible,
     )
-    const tpl = await getDouyinGoodsTemplate({
-      category_id: cat3,
-      product_type: productType,
-      /** 来客侧可选但 template.get 常无 attrs（零售代金券）；保存由网关按 template/synthetic 组装 */
-      allowEmptyTemplate: typeEligible,
-    })
-    setDetailPrepLoading(false)
-    if (!tpl.ok) {
-      setActionMsg({ text: tpl.message, ok: false })
-      return
+    try {
+      const tpl = await getDouyinGoodsTemplate({
+        category_id: cat3,
+        product_type: productType,
+        /** 来客侧可选但 template.get 常无 attrs（零售代金券）；保存由网关按 template/synthetic 组装 */
+        allowEmptyTemplate: typeEligible,
+      })
+      setDetailPrepLoading(false)
+      if (!tpl.ok) {
+        if (typeEligible) {
+          setStep('detail')
+          setActionMsg({
+            text: '模板预检未通过，仍可填写商品；提交时由服务端按来客规则组装字段。',
+            ok: true,
+          })
+          return
+        }
+        setActionMsg({ text: tpl.message, ok: false })
+        return
+      }
+      setStep('detail')
+    } catch (e) {
+      setDetailPrepLoading(false)
+      if (typeEligible) {
+        setStep('detail')
+        setActionMsg({
+          text: '模板接口暂不可用，已允许继续填写；提交时由服务端组装。',
+          ok: true,
+        })
+        return
+      }
+      setActionMsg({
+        text: e instanceof Error ? e.message : String(e),
+        ok: false,
+      })
     }
-    setStep('detail')
   }
 
   if (loading) {
