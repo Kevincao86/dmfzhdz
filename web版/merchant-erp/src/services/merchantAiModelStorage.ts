@@ -1,4 +1,8 @@
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
+import {
+  nativeImagePreferredVendorFromPicker,
+  parseAgentImagePickerKey,
+} from './ai/agentImageModelKeys'
 import { listAiUiModelOptions, MEOO_AI_VENDOR_CATALOG_EVENT } from './merchantAiVendorCatalogClient'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
@@ -60,11 +64,29 @@ function normalizeTextModelStored(raw: string | null | undefined): string {
 }
 
 function normalizeImageModelStored(raw: string | null | undefined): string {
-  const s = raw?.trim().toLowerCase() ?? ''
-  if (s === 'auto' || !s) return pickAutoResolvedImageModel()
+  const s = raw?.trim() ?? ''
+  if (s.startsWith('img::')) return s
+  const lower = s.toLowerCase()
+  if (lower === 'auto' || !lower) return pickAutoResolvedImageModel()
   /** 手选可与文案类目录一致（含 OpenAI 等）；网关对生图/美化会将非直连厂商映射至 MiniMax/通义/豆包 */
-  if (selectableAiIds().has(s)) return s
-  if (isValidAiVendorSlug(s)) return s
+  if (selectableAiIds().has(lower)) return lower
+  if (isValidAiVendorSlug(lower)) return lower
+  return pickAutoResolvedImageModel()
+}
+
+/** 商品 AI assist：将智能体 img:: 手选 key 解析为网关 model 字段 */
+export function resolveImageAssistModelId(): string {
+  const id = resolveImageAiModelForRequest()
+  if (!id.startsWith('img::')) return id
+  const vendor = nativeImagePreferredVendorFromPicker(id)
+  if (vendor) return vendor
+  const p = parseAgentImagePickerKey(id)
+  if (p?.kind === 'style') {
+    if (p.family === 'gemini') return 'gemini'
+    if (p.family === 'openai' || p.family === 'grok') return 'openai'
+    if (p.family === 'claude') return 'claude'
+  }
+  if (p?.kind === 'brand-direct') return p.slug
   return pickAutoResolvedImageModel()
 }
 
@@ -242,7 +264,7 @@ export function resolveImageAiModelForRequest(): string {
  */
 export function resolveModelForAssistAction(action: string): string {
   if (action === 'image_generate' || action === 'image_enhance') {
-    return resolveImageAiModelForRequest()
+    return resolveImageAssistModelId()
   }
   return resolveTextAiModelForRequest()
 }

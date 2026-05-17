@@ -855,7 +855,15 @@ export default function DouyinProductCreateWizard({
           originYuan={originYuan}
           setOriginYuan={setOriginYuan}
           headUrl={headUrl}
+          setHeadUrl={setHeadUrl}
           auxUrls={auxUrls}
+          goodsContext={{
+            goods_category_id: cat3.trim() || undefined,
+            goods_product_type: productType ?? undefined,
+            goods_category_path_zh: categoryPathLabel || undefined,
+            goods_product_type_label:
+              productTypes.find((t) => t.product_type === productType)?.label ?? undefined,
+          }}
           setAuxUrls={setAuxUrls}
           envUrls={envUrls}
           setEnvUrls={setEnvUrls}

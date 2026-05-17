@@ -40,6 +40,8 @@ type AiModelAutoPickerProps = {
    * @default true
    */
   showInlineAutoToggle?: boolean
+  /** 手选时触发器仅展示 logo + 名称（无「指定：」前缀） */
+  compactManualTrigger?: boolean
 }
 
 function labelForId(options: readonly AiModelAutoPickerOption[], id: string): string {
@@ -57,6 +59,7 @@ export default function AiModelAutoPicker({
   className,
   onResolutionChange,
   showInlineAutoToggle = true,
+  compactManualTrigger = false,
 }: AiModelAutoPickerProps) {
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -111,7 +114,9 @@ export default function AiModelAutoPicker({
   const triggerLabel = showInlineAutoToggle
     ? auto
       ? '自动'
-      : `指定：${labelForId(options, manualId)}`
+      : compactManualTrigger
+        ? labelForId(options, manualId)
+        : `指定：${labelForId(options, manualId)}`
     : auto
       ? `自动 · ${labelForId(options, effectiveId)}`
       : labelForId(options, manualId)
