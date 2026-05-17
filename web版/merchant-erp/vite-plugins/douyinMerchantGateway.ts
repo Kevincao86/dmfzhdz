@@ -53,7 +53,6 @@ import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
   attrKeyIsDouyinDescription,
-  normalizeDouyinDescription,
 } from '../src/lib/douyinDescriptionNormalize.js'
 import {
   applyDouyinProductDescriptionAttrs,
