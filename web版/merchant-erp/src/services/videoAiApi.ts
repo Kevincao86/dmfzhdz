@@ -22,6 +22,21 @@ function responseLooksLikeHtml(text: string, contentType: string): boolean {
   return t.startsWith('<') || /text\/html/i.test(contentType)
 }
 
+/** 404 且为 JSON 业务错误时勿换路径（方舟无效 ep 也会 404，易被误判为「未部署」） */
+function isLikelyVercelApiRouteMiss(text: string, contentType: string, status: number): boolean {
+  if (status !== 404) return false
+  if (responseLooksLikeHtml(text, contentType)) return true
+  const t = text.trim()
+  if (!t || !t.startsWith('{')) return true
+  try {
+    const j = JSON.parse(t) as Record<string, unknown>
+    if (j.ok === false && typeof j.message === 'string' && j.message.trim()) return false
+  } catch {
+    return true
+  }
+  return true
+}
+
 function buildVideoPostBody(body: Record<string, unknown>): Record<string, unknown> {
   return { ...body }
 }
@@ -111,7 +126,7 @@ export async function postKlingVideoStart(body: {
     })
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
-    if (res.status === 404) continue
+    if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
     if (res.ok && responseLooksLikeHtml(text, ct)) continue
     let j: Record<string, unknown> = {}
     try {
@@ -214,7 +229,7 @@ export async function postSeedanceVideoStart(body: {
     })
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
-    if (res.status === 404) continue
+    if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
     if (res.ok && responseLooksLikeHtml(text, ct)) continue
     let j: Record<string, unknown> = {}
     try {
@@ -264,7 +279,7 @@ export async function fetchSeedanceVideoStatus(
     const res = await fetch(p)
     const text = await res.text()
     const ct = res.headers.get('content-type') ?? ''
-    if (res.status === 404) continue
+    if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
     if (res.ok && responseLooksLikeHtml(text, ct)) continue
     let j: Record<string, unknown> = {}
     try {

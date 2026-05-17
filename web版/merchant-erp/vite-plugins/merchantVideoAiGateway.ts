@@ -116,6 +116,30 @@ function doubaoBearerKey(env: MerchantAiEnv): string | null {
   return t || null
 }
 
+function looksLikeArkPlaceholderEndpointId(endpointId: string): boolean {
+  const ep = endpointId.trim()
+  if (!/^ep-/i.test(ep)) return false
+  if (/^ep-(123456|789012|000000|111111|999999)(?:\b|$)/i.test(ep)) return true
+  if (/xxxx|placeholder|示例|demo|test/i.test(ep)) return true
+  return false
+}
+
+function arkCreateTaskHttpStatus(upstreamStatus?: number): number {
+  if (upstreamStatus === 404) return 400
+  if (upstreamStatus != null && upstreamStatus >= 400 && upstreamStatus < 600) return upstreamStatus
+  return 400
+}
+
+function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatus?: number): string {
+  if (looksLikeArkPlaceholderEndpointId(endpointId)) {
+    return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
+  }
+  if (upstreamStatus === 404 || /does not exist|not have access/i.test(msg)) {
+    return `方舟视频接入点无效或无权访问（${endpointId}）：${msg}。请在火山方舟控制台确认该 ep 已开通 Seedance 视频推理且与当前 API Key 同账号。`
+  }
+  return msg
+}
+
 const LONGFORM_PLAN_SYSTEM = `你是短视频编导。回答必须且仅为一个 JSON 对象，格式：{"segments":[{"prompt":"第1段..."},...]}。不要 Markdown、代码围栏或其它说明文字。`
 
 function parseLongformSegments(text: string, n: number): string[] | null {
@@ -168,7 +192,7 @@ function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
       out.push({ label: '默认视频接入点', endpointId: fb })
     }
   }
-  return out
+  return out.filter((m) => !looksLikeArkPlaceholderEndpointId(m.endpointId))
 }
 
 function signKlingJwt(accessKey: string, secretKey: string): string {
@@ -363,6 +387,13 @@ async function arkCreateVideoTask(
       msg:
         '请选择视频推理接入点，或由运营在管控台「短视频 API」录入接入点清单；也可在服务环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 提供别名|ep-xxxx。',
     }
+  if (looksLikeArkPlaceholderEndpointId(modelEp)) {
+    return {
+      ok: false,
+      msg: arkCreateTaskUserMessage('', modelEp),
+      status: 400,
+    }
+  }
 
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const imagesUnknown = body.images_base64
@@ -411,14 +442,18 @@ async function arkCreateVideoTask(
   const j = await readJsonResponse(res)
   const idRaw = typeof j.id === 'string' ? j.id : null
   if (!res.ok) {
-    const msg =
+    const rawMsg =
       (typeof j.error === 'object' &&
         j.error &&
         typeof (j.error as { message?: unknown }).message === 'string' &&
         (j.error as { message: string }).message) ||
       (typeof j.message === 'string' && j.message) ||
       `方舟创建视频任务失败（HTTP ${res.status}）。`
-    return { ok: false, msg, status: res.status }
+    return {
+      ok: false,
+      msg: arkCreateTaskUserMessage(rawMsg, modelEp, res.status),
+      status: arkCreateTaskHttpStatus(res.status),
+    }
   }
   if (!idRaw) return { ok: false, msg: '方舟未返回任务 id。', status: res.status }
   return { ok: true, taskId: idRaw, raw: j }
@@ -513,6 +548,12 @@ export async function handleMerchantAiVideoRoutes(input: {
     const arkOpts = parseArkVideoModelList(env)
     const arkKeyOk = !!doubaoBearerKey(env)
     const qwenOk = !!(env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
+    let credentialNote =
+      '商户端仅可选择模型能力与参数；可灵密钥、方舟 Key / 视频推理接入点由运营人员在「管控台 · AI模型」中维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。'
+    if (arkKeyOk && arkOpts.length === 0) {
+      credentialNote +=
+        ' 当前方舟 Key 已配置，但视频接入点列表为空或仍为示例 ep-123456，请在管控台「短视频 API」填写火山方舟控制台真实的 ep- 推理接入点。'
+    }
     json(res, 200, {
       klingConfigured: kCfg.ok,
       arkVideoModels: arkOpts,
@@ -521,8 +562,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         doubao: arkKeyOk,
         qwen: qwenOk,
       },
-      credentialNote:
-        '商户端仅可选择模型能力与参数；可灵密钥、方舟 Key / 视频推理接入点由运营人员在「管控台 · AI模型」中维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。',
+      credentialNote,
     })
     return true
   }
@@ -808,7 +848,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 200, { ok: true, taskId: r.taskId })
       return true
     }
-    json(res, r.status && r.status >= 400 ? r.status : 400, { ok: false, message: r.msg })
+    json(res, arkCreateTaskHttpStatus(r.status), { ok: false, message: r.msg })
     return true
   }
 
