@@ -1427,7 +1427,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const descriptionHint =
       /description|商品描述/i.test(base) || /description|商品描述/i.test(sub)
-        ? ' 说明：Description 为短商品描述（约 200 字内纯文本），与详情长图文不同；请用「一键填满」或填写「商品说明」。'
+        ? ' 说明：Description 为短描述（纯文本）；description_rich_text 等为 NOTE 富文本须 JSON 列表。请用「一键填满」。'
         : ''
     return {
       ok: false,
