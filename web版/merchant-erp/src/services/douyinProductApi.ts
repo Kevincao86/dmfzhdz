@@ -1245,15 +1245,17 @@ export async function getDouyinGoodsTemplate(params: {
   category_id: string
   product_type: number
   /**
-   * 为 true 时：即使 product_attrs/sku_attrs 均为空也返回 ok（用于「编辑已有商品」等场景，避免抖音未下发模板时整页无法打开）。
-   * 新建商品走第二步「下一步」时不要传，空模板将直接失败并提示更换类目/类型。
+   * 为 true 时：即使 product_attrs/sku_attrs 均为空也返回 ok。
+   * 用于编辑页、或 product-types 已判定 eligible 但 template.get 无 attrs（零售代金券等）。
    */
   allowEmptyTemplate?: boolean
 }): Promise<GoodsTemplateResult> {
-  const qs = new URLSearchParams({
+  const q = new URLSearchParams({
     category_id: params.category_id,
     product_type: String(params.product_type),
-  }).toString()
+  })
+  appendDouyinAccountIdToQuery(q)
+  const qs = q.toString()
   const paths = ['/api/meoo-douyin-goods-template-get', '/api/merchant/douyin/goods/template/get'] as const
   const headers = authHeaders()
   for (const p of paths) {
@@ -1329,7 +1331,6 @@ function mapDouyinGoodsTemplatePayload(
     mapSelectOptions(d?.after_sale_policies).length > 0
       ? mapSelectOptions(d?.after_sale_policies)
       : DEFAULT_AFTER_SALE_POLICIES
-  const trade_rule_defaults = parseTradeRuleDefaults(d?.trade_rule_defaults, productType)
   let product_attrs = mapAttrs(d?.product_attrs)
   let sku_attrs = mapAttrs(d?.sku_attrs)
   if (product_attrs.length === 0) {
@@ -1343,6 +1344,10 @@ function mapDouyinGoodsTemplatePayload(
       message: `「查询商品模板」未返回任何属性（category_id=${categoryId}，${ptLabel}）。该类目与商品类型在抖音侧可能没有可发模板，保存时也会提示「商品模板不存在」。请在来客后台核对**三级类目**与**团购/代金券**是否与开放平台一致，或更换类目后再试。`,
     }
   }
+  const trade_rule_defaults =
+    product_attrs.length === 0 && sku_attrs.length === 0
+      ? defaultTradeRuleDefaults(productType)
+      : parseTradeRuleDefaults(d?.trade_rule_defaults, productType)
   return {
     ok: true,
     product_attrs,
