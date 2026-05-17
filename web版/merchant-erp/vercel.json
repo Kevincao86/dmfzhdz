@@ -22,6 +22,14 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-merchant-ai-video-seedance-start.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 120
+    },
+    "api/meoo-merchant-ai-video-seedance-status.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-marketing-activities.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60

@@ -202,22 +202,42 @@ export async function postSeedanceVideoStart(body: {
   flags?: string
   images_base64?: string[]
 }): Promise<{ ok: true; taskId: string } | { ok: false; message: string }> {
-  const res = await fetch('/api/merchant/ai/video/seedance/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body),
-  })
-  const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
-  if (!res.ok || !j.ok) {
-    const msg =
-      typeof j.message === 'string'
-        ? j.message
-        : `Seedance/方舟发起失败 HTTP ${res.status}`
-    return { ok: false, message: msg }
+  const paths = [
+    '/api/meoo-merchant-ai-video-seedance-start',
+    '/api/merchant/ai/video/seedance/start',
+  ] as const
+  for (const p of paths) {
+    const res = await fetch(p, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(body),
+    })
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    if (res.status === 404) continue
+    if (res.ok && responseLooksLikeHtml(text, ct)) continue
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    if (!res.ok || !j.ok) {
+      const msg =
+        typeof j.message === 'string'
+          ? j.message
+          : `Seedance/方舟发起失败 HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const tid = typeof j.taskId === 'string' ? j.taskId : ''
+    if (!tid) return { ok: false, message: '服务端未返回 task id' }
+    return { ok: true, taskId: tid }
   }
-  const tid = typeof j.taskId === 'string' ? j.taskId : ''
-  if (!tid) return { ok: false, message: '服务端未返回 task id' }
-  return { ok: true, taskId: tid }
+  return {
+    ok: false,
+    message:
+      'Seedance/方舟发起失败 HTTP 404（已尝试 meoo 顶路径与 merchant 路径）。请部署 api/meoo-merchant-ai-video-seedance-start.ts。',
+  }
 }
 
 export type SeedancePollPhase = 'queued' | 'running' | 'succeeded' | 'failed'
@@ -235,22 +255,39 @@ export async function fetchSeedanceVideoStatus(
   | { ok: false; message: string }
 > {
   const sp = new URLSearchParams({ taskId })
-  const res = await fetch(`/api/merchant/ai/video/seedance/status?${sp}`)
-  const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
-  if (!res.ok || !j.ok) {
-    const msg =
-      typeof j.message === 'string'
-        ? j.message
-        : `Seedance/方舟查询失败 HTTP ${res.status}`
-    return { ok: false, message: msg }
+  const qs = `?${sp}`
+  const paths = [
+    `/api/meoo-merchant-ai-video-seedance-status${qs}`,
+    `/api/merchant/ai/video/seedance/status${qs}`,
+  ] as const
+  for (const p of paths) {
+    const res = await fetch(p)
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    if (res.status === 404) continue
+    if (res.ok && responseLooksLikeHtml(text, ct)) continue
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    if (!res.ok || !j.ok) {
+      const msg =
+        typeof j.message === 'string'
+          ? j.message
+          : `Seedance/方舟查询失败 HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const phase = typeof j.phase === 'string' ? j.phase : 'running'
+    const safePhase: SeedancePollPhase =
+      phase === 'queued' || phase === 'running' || phase === 'succeeded' || phase === 'failed'
+        ? phase
+        : 'running'
+    const statusLabel = typeof j.statusLabel === 'string' ? j.statusLabel : safePhase
+    const videoUrl = typeof j.videoUrl === 'string' ? j.videoUrl : undefined
+    const failReason = typeof j.failReason === 'string' ? j.failReason : undefined
+    return { ok: true, phase: safePhase, statusLabel, videoUrl, failReason }
   }
-  const phase = typeof j.phase === 'string' ? j.phase : 'running'
-  const safePhase: SeedancePollPhase =
-    phase === 'queued' || phase === 'running' || phase === 'succeeded' || phase === 'failed'
-      ? phase
-      : 'running'
-  const statusLabel = typeof j.statusLabel === 'string' ? j.statusLabel : safePhase
-  const videoUrl = typeof j.videoUrl === 'string' ? j.videoUrl : undefined
-  const failReason = typeof j.failReason === 'string' ? j.failReason : undefined
-  return { ok: true, phase: safePhase, statusLabel, videoUrl, failReason }
+  return { ok: false, message: 'Seedance/方舟查询失败 HTTP 404' }
 }
