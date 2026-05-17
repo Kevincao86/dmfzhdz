@@ -102,24 +102,41 @@ export async function postKlingVideoStart(body: {
   | { ok: true; taskId: string; pollKind: KlingStartKind }
   | { ok: false; message: string; upstream?: unknown }
 > {
-  const res = await fetch('/api/merchant/ai/video/kling/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body),
-  })
-  const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
-  const okFlag = Boolean(j.ok)
-  if (!res.ok || !okFlag) {
-    const msg =
-      typeof j.message === 'string' ? j.message : `可灵发起失败 HTTP ${res.status}`
-    return { ok: false, message: msg, upstream: j.upstream }
+  const paths = ['/api/meoo-merchant-ai-video-kling-start', '/api/merchant/ai/video/kling/start'] as const
+  for (const p of paths) {
+    const res = await fetch(p, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(body),
+    })
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    if (res.status === 404) continue
+    if (res.ok && responseLooksLikeHtml(text, ct)) continue
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    const okFlag = Boolean(j.ok)
+    if (!res.ok || !okFlag) {
+      const msg =
+        typeof j.message === 'string' ? j.message : `可灵发起失败 HTTP ${res.status}`
+      return { ok: false, message: msg, upstream: j.upstream }
+    }
+    const tid = typeof j.taskId === 'string' ? j.taskId : ''
+    const pollKindRaw = typeof j.pollKind === 'string' ? j.pollKind : body.kind
+    const pollKind: KlingStartKind =
+      pollKindRaw === 'image2video' ? 'image2video' : 'text2video'
+    if (!tid) return { ok: false, message: '服务端未返回 taskId' }
+    return { ok: true, taskId: tid, pollKind }
   }
-  const tid = typeof j.taskId === 'string' ? j.taskId : ''
-  const pollKindRaw = typeof j.pollKind === 'string' ? j.pollKind : body.kind
-  const pollKind: KlingStartKind =
-    pollKindRaw === 'image2video' ? 'image2video' : 'text2video'
-  if (!tid) return { ok: false, message: '服务端未返回 taskId' }
-  return { ok: true, taskId: tid, pollKind }
+  return {
+    ok: false,
+    message:
+      '可灵发起失败 HTTP 404（已尝试 meoo 顶路径与 merchant 路径）。请部署 api/meoo-merchant-ai-video-kling-start.ts。',
+  }
 }
 
 export type KlingPollPhase = 'queued' | 'running' | 'succeeded' | 'failed'
@@ -140,26 +157,43 @@ export async function fetchKlingVideoStatus(
     taskId,
     kind,
   })
-  const res = await fetch(`/api/merchant/ai/video/kling/status?${sp}`)
-  const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
-  if (!res.ok || !j.ok) {
-    const msg =
-      typeof j.message === 'string' ? j.message : `可灵查询失败 HTTP ${res.status}`
-    return { ok: false, message: msg }
+  const qs = `?${sp}`
+  const paths = [
+    `/api/meoo-merchant-ai-video-kling-status${qs}`,
+    `/api/merchant/ai/video/kling/status${qs}`,
+  ] as const
+  for (const p of paths) {
+    const res = await fetch(p)
+    const text = await res.text()
+    const ct = res.headers.get('content-type') ?? ''
+    if (res.status === 404) continue
+    if (res.ok && responseLooksLikeHtml(text, ct)) continue
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(text) as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    if (!res.ok || !j.ok) {
+      const msg =
+        typeof j.message === 'string' ? j.message : `可灵查询失败 HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const phase = typeof j.phase === 'string' ? j.phase : 'running'
+    const safePhase: KlingPollPhase =
+      phase === 'queued' || phase === 'running' || phase === 'succeeded' || phase === 'failed'
+        ? phase
+        : 'running'
+    const videoUrl = typeof j.videoUrl === 'string' ? j.videoUrl : null
+    const taskStatus = typeof j.taskStatus === 'string' ? j.taskStatus : null
+    return {
+      ok: true,
+      phase: safePhase,
+      videoUrl,
+      taskStatus,
+    }
   }
-  const phase = typeof j.phase === 'string' ? j.phase : 'running'
-  const safePhase: KlingPollPhase =
-    phase === 'queued' || phase === 'running' || phase === 'succeeded' || phase === 'failed'
-      ? phase
-      : 'running'
-  const videoUrl = typeof j.videoUrl === 'string' ? j.videoUrl : null
-  const taskStatus = typeof j.taskStatus === 'string' ? j.taskStatus : null
-  return {
-    ok: true,
-    phase: safePhase,
-    videoUrl,
-    taskStatus,
-  }
+  return { ok: false, message: '可灵查询失败 HTTP 404' }
 }
 
 export async function postSeedanceVideoStart(body: {

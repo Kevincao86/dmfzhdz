@@ -53,6 +53,7 @@ import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
   attrKeyIsDouyinDescription,
+  douyinDescriptionMinLen,
   normalizeDouyinDescription,
   sanitizeDouyinDescriptionInProductAttrs,
 } from '../src/lib/douyinDescriptionNormalize.js'
@@ -1805,6 +1806,30 @@ function injectDocKeyedProductAttrsFromErp(
   }
 }
 
+/** template.get 有 image_list 必填但 value_type 未标 IMAGE 时，仍写入轮播图 JSON */
+function ensureProductImageAttrsInMap(
+  mergedProductAttrs: Record<string, string>,
+  templateAttrs: Record<string, unknown>[],
+  carouselUrls: string[],
+): void {
+  const urls = carouselUrls.map((u) => String(u).trim()).filter((u) => /^https?:\/\//i.test(u))
+  if (urls.length === 0) return
+  const payload = jsonImageUrlList(urls)
+  const keys = new Set<string>(['image_list', 'image_1v1_list', 'detail_image_list', 'environment_image_list'])
+  for (const a of templateAttrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key) continue
+    const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+    const name = String((a as Record<string, unknown>).name ?? '')
+    if (vt === 'IMAGE_LIST' || vt === 'IMAGE' || /image|img|carousel|banner|pic|photo|图|相册|头图|主图|轮播|封面/i.test(key + name)) {
+      keys.add(key)
+    }
+  }
+  for (const key of keys) {
+    if (!(mergedProductAttrs[key] ?? '').trim()) mergedProductAttrs[key] = payload
+  }
+}
+
 function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
@@ -3094,6 +3119,7 @@ async function buildGoodlifeProductSaveBody(
   }
 
   injectDocKeyedProductAttrsFromErp(mergedProductAttrs, erp, category_id)
+  ensureProductImageAttrsInMap(mergedProductAttrs, attrs, carouselUrls)
 
   /**
    * 仅向 template.get 声明的 opaque key 写入「groups 数组」JSON；勿自创字面量 combo_rule/commodity。
@@ -3904,16 +3930,55 @@ export async function handleDouyinGoodsProductSavePost(
       })
       return
     }
+    const saveLogSummary = summarizeDouyinProductSaveForLog(saveBody, mode, {
+      templateProductAttrs: built.templateProductAttrs,
+      templateSkuAttrs: built.templateSkuAttrs,
+    })
     console.info(
       '[meoo douyin goods/save] built',
       JSON.stringify({
-        ...summarizeDouyinProductSaveForLog(saveBody, mode, {
-          templateProductAttrs: built.templateProductAttrs,
-          templateSkuAttrs: built.templateSkuAttrs,
-        }),
+        ...saveLogSummary,
         save_body_bytes: bodyBytes,
       }),
     )
+
+    const attrMap =
+      prod.attr_key_value_map && typeof prod.attr_key_value_map === 'object' && !Array.isArray(prod.attr_key_value_map)
+        ? (prod.attr_key_value_map as Record<string, string>)
+        : {}
+    const missProd = listUnfilledRequiredTemplateAttrs(built.templateProductAttrs, attrMap)
+    const publishableImages = productImageUrlsFromErp(erp).filter((u) => /^https?:\/\//i.test(u))
+    if (
+      missProd.some((k) => /^image_list$/i.test(k) || /image|img|carousel|头图|主图|轮播|封面/i.test(k)) &&
+      publishableImages.length === 0
+    ) {
+      json(res, 400, {
+        message:
+          '缺少商品头图/轮播图（image_list 等）。请在「① 商品基础信息」上传头图并取得 https 公网地址后再提交；data/blob 预览图无法用于 goods/save。',
+        missing_required_product_attr_keys: missProd.filter((k) => /image|img/i.test(k)).slice(0, 12),
+      })
+      return
+    }
+    const descMin = douyinDescriptionMinLen()
+    const descKey =
+      Object.keys(attrMap).find((k) => attrKeyIsDouyinDescription(k)) ?? 'Description'
+    const descVal = String(attrMap[descKey] ?? '').trim()
+    if (descVal.length < descMin) {
+      json(res, 400, {
+        message: `Description 过短（当前 ${descVal.length} 字）。请在「② 开放平台 API 字段」填写至少 ${descMin} 字的商品短描述，勿仅用 2～3 字商品名充当 Description。`,
+        description_len: descVal.length,
+        description_min: descMin,
+      })
+      return
+    }
+    const nameLen = String(erp.product_name ?? '').trim().length
+    if (nameLen < 4) {
+      json(res, 400, {
+        message: '商品名称过短（建议至少 4 个字），抖音审核与 Description/SubTitle 校验易失败。',
+        name_len: nameLen,
+      })
+      return
+    }
 
     const maxAttempts = douyinGoodsSaveRetryMaxAttempts()
     let dr!: Response
@@ -4492,5 +4557,206 @@ export async function postDouyinAkteCommentReply(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `回复评价失败：${msg}` }
+  }
+}
+
+/** 平台营销活动列表（招商/报名类）— 代理 goodlife marketing activity query */
+export async function handleDouyinMarketingActivityQueryGet(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { ok: false, message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
+    const page = Math.max(1, Number(url.searchParams.get('page')) || 1)
+    const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get('page_size')) || 20))
+    const statusFilter = (url.searchParams.get('status') ?? 'all').trim()
+
+    const customPath = process.env.DOUYIN_MARKETING_ACTIVITY_QUERY_PATH?.trim()
+    const paths = customPath
+      ? [customPath]
+      : [
+          '/goodlife/v1/marketing/activity/query/',
+          '/goodlife/v1/marketing/platform_activity/query/',
+          '/goodlife/v1/akte/marketing/activity/query/',
+        ]
+
+    let lastErr = ''
+    for (const path of paths) {
+      const u = new URL(douyinOpenApiUrl(path.startsWith('/') ? path : `/${path}`))
+      u.searchParams.set('account_id', accountId)
+      u.searchParams.set('page', String(page))
+      u.searchParams.set('page_size', String(pageSize))
+      if (statusFilter && statusFilter !== 'all') {
+        u.searchParams.set('activity_status', statusFilter)
+      }
+
+      const dr = await douyinServerFetch(u.toString(), {
+        method: 'GET',
+        headers: {
+          'access-token': token,
+          'content-type': 'application/json',
+          'Rpc-Transit-Life-Account': accountId,
+        },
+      })
+      const raw = await dr.text()
+      let j: Record<string, unknown> = {}
+      try {
+        j = JSON.parse(raw || '{}') as Record<string, unknown>
+      } catch {
+        j = {}
+      }
+      if (!dr.ok) {
+        lastErr = raw.slice(0, 400) || `HTTP ${dr.status}`
+        continue
+      }
+      const biz = getDataError(j)
+      if (!biz.ok) {
+        lastErr = biz.msg || '抖音业务错误'
+        if (/not found|404|不存在|无权限|scope/i.test(lastErr)) continue
+        json(res, 200, {
+          ok: false,
+          platform: 'douyin',
+          message: lastErr,
+          upstream: j,
+        })
+        return
+      }
+      const data = (j.data ?? j) as Record<string, unknown>
+      const listRaw =
+        data.activity_list ??
+        data.activities ??
+        data.list ??
+        data.items ??
+        (Array.isArray(data) ? data : [])
+      const items = normalizeDouyinMarketingActivities(listRaw)
+      const total =
+        Number(data.total) ||
+        Number(data.total_count) ||
+        (Array.isArray(listRaw) ? listRaw.length : items.length)
+      json(res, 200, {
+        ok: true,
+        platform: 'douyin',
+        items,
+        total,
+        page,
+        page_size: pageSize,
+        syncedAt: new Date().toISOString(),
+        upstream_path: path,
+        doc: 'https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/marketing/activity-query',
+      })
+      return
+    }
+
+    json(res, 502, {
+      ok: false,
+      platform: 'douyin',
+      message:
+        lastErr ||
+        '未能拉取抖音营销活动（已尝试 marketing/activity/query 等路径）。请在开放平台确认「营销活动查询」能力已开通，或设置环境变量 DOUYIN_MARKETING_ACTIVITY_QUERY_PATH。',
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, platform: 'douyin', message: `抖音营销活动查询失败：${msg}` })
+  }
+}
+
+function normalizeDouyinMarketingActivities(listRaw: unknown): {
+  id: string
+  platform: 'douyin'
+  title: string
+  summary?: string
+  uiStatus: 'ongoing' | 'enrollable' | 'ended' | 'unknown'
+  startAt?: string
+  endAt?: string
+  enrollDeadline?: string
+  enrollUrl?: string
+  rawStatus?: string | number
+}[] {
+  if (!Array.isArray(listRaw)) return []
+  const out: ReturnType<typeof normalizeDouyinMarketingActivities> = []
+  for (const row of listRaw) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const id = String(r.activity_id ?? r.id ?? r.campaign_id ?? '').trim()
+    if (!id) continue
+    const title = String(r.activity_name ?? r.title ?? r.name ?? '平台活动').trim()
+    const summary = String(r.description ?? r.desc ?? r.summary ?? '').trim() || undefined
+    const rawStatus = r.status ?? r.activity_status ?? r.state
+    out.push({
+      id,
+      platform: 'douyin',
+      title,
+      summary,
+      uiStatus: mapMarketingUiStatus(rawStatus, r.start_time ?? r.start_at, r.end_time ?? r.end_at),
+      startAt: isoFromMarketingTime(r.start_time ?? r.start_at),
+      endAt: isoFromMarketingTime(r.end_time ?? r.end_at),
+      enrollDeadline: isoFromMarketingTime(
+        r.enroll_end_time ?? r.register_end_time ?? r.signup_end_time,
+      ),
+      enrollUrl: typeof r.enroll_url === 'string' ? r.enroll_url : undefined,
+      rawStatus: typeof rawStatus === 'string' || typeof rawStatus === 'number' ? rawStatus : undefined,
+    })
+  }
+  return out
+}
+
+function mapMarketingUiStatus(
+  rawStatus: unknown,
+  startRaw: unknown,
+  endRaw: unknown,
+): 'ongoing' | 'enrollable' | 'ended' | 'unknown' {
+  const now = Date.now()
+  const endMs = parseMarketingTimeMs(endRaw)
+  const startMs = parseMarketingTimeMs(startRaw)
+  if (endMs != null && endMs < now) return 'ended'
+  const s = String(rawStatus ?? '').toLowerCase()
+  if (/end|close|finish|已结束|结束|失效/.test(s) || rawStatus === 3 || rawStatus === '3') return 'ended'
+  if (/enroll|register|sign|报名|可报|招募|待报名/.test(s) || rawStatus === 1 || rawStatus === '1') {
+    return 'enrollable'
+  }
+  if (/run|ing|open|进行|生效|上线/.test(s) || rawStatus === 2 || rawStatus === '2') return 'ongoing'
+  if (startMs != null && endMs != null) {
+    if (now < startMs) return 'enrollable'
+    if (now >= startMs && now <= endMs) return 'ongoing'
+    return 'ended'
+  }
+  return 'unknown'
+}
+
+function parseMarketingTimeMs(v: unknown): number | null {
+  if (v == null || v === '') return null
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    return v < 1e12 ? v * 1000 : v
+  }
+  const s = String(v).trim()
+  if (!s) return null
+  if (/^\d+$/.test(s)) {
+    const n = Number(s)
+    return n < 1e12 ? n * 1000 : n
+  }
+  const t = Date.parse(s)
+  return Number.isFinite(t) ? t : null
+}
+
+function isoFromMarketingTime(v: unknown): string | undefined {
+  const ms = parseMarketingTimeMs(v)
+  if (ms == null) return undefined
+  try {
+    return new Date(ms).toISOString()
+  } catch {
+    return undefined
   }
 }

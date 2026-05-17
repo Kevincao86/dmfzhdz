@@ -8,6 +8,7 @@ import ShortVideoOptimizationPage from './pages/ShortVideoOptimizationPage'
 import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
 import GeoPage from './pages/GeoPage'
 import HomeDashboard from './pages/HomeDashboard'
+import ActivityCenterPage from './pages/ActivityCenterPage'
 import ModulePage from './pages/ModulePage'
 import ReviewsManagementPage from './pages/ReviewsManagementPage'
 import StoreDecorationPage from './pages/StoreDecorationPage'
@@ -49,12 +50,7 @@ export default function App() {
           <Route path="products/view" element={<Navigate to="/products/list" replace />} />
           <Route path="operation" element={<Navigate to="/reviews" replace />} />
           <Route path="recruitment" element={<RecruitmentPage />} />
-          <Route
-            path="activity"
-            element={
-              <ModulePage title="活动中心" subtitle="创建活动、活动排期与效果数据" />
-            }
-          />
+          <Route path="activity" element={<ActivityCenterPage />} />
           <Route path="reviews" element={<ReviewsManagementPage />} />
           <Route path="geo" element={<GeoPage />} />
           <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />
