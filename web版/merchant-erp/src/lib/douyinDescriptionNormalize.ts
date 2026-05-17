@@ -1,3 +1,5 @@
+import { encodeDouyinNoteRichTextFromPlain } from './douyinNoteRichTextFormat.js'
+
 /** 来客 attr `Description`（商品短描述）：过长、含链接/emoji 或与 product.desc 不一致会报「Description参数不合法」 */
 const DEFAULT_DESCRIPTION_MAX_LEN = 200
 const DEFAULT_DESCRIPTION_MIN_LEN = 10
@@ -95,7 +97,7 @@ export function sanitizeDouyinDescriptionInProductAttrs(
   return norm
 }
 
-/** 长图文详情写入 description_rich_text；短 Description 与 product.desc 对齐 */
+/** 长图文写入 NOTE 型 attr（JSON）；短 Description 与 product.desc 对齐 */
 export function applyDouyinDescriptionRichTextSplit(
   merged: Record<string, string>,
   productName: string,
@@ -105,12 +107,14 @@ export function applyDouyinDescriptionRichTextSplit(
   const short = sanitizeDouyinDescriptionInProductAttrs(merged, productName, undefined, categoryId)
   const long = stripDouyinDescriptionUnsafeChars(longDetail).slice(0, 8000)
   if (long.length > short.length + 20) {
+    const noteJson = encodeDouyinNoteRichTextFromPlain(long)
     if (!merged.description_rich_text?.trim()) {
-      merged.description_rich_text = long
+      merged.description_rich_text = noteJson
     }
     for (const key of Object.keys(merged)) {
       if (/^description_rich/i.test(key) && !attrKeyIsDouyinDescription(key)) {
-        if (!(merged[key] ?? '').trim()) merged[key] = long
+        const cur = (merged[key] ?? '').trim()
+        if (!cur || !cur.startsWith('[')) merged[key] = noteJson
       }
     }
   }

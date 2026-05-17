@@ -59,6 +59,10 @@ import {
   normalizeDouyinDescription,
 } from '../src/lib/douyinDescriptionNormalize.js'
 import {
+  finalizeDouyinProductAttrsByTemplate,
+  isDouyinNoteRichTextJsonString,
+} from '../src/lib/douyinNoteRichTextFormat.js'
+import {
   attrKeyIsDouyinSubTitle,
   normalizeDouyinSubTitle,
   sanitizeDouyinProductAttrSubTitleFields,
@@ -2747,6 +2751,10 @@ function mergeGoodlifeProductAttrMapFromErp(
       }
     }
 
+    if (vt === 'NOTE' || /^description_rich/i.test(key)) {
+      continue
+    }
+
     if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
       if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson && !omitCombo) {
         out[key] = pkgJson
@@ -3282,12 +3290,12 @@ async function buildGoodlifeProductSaveBody(
   })()
   sanitizeDouyinProductAttrSubTitleFields(mergedProductAttrs, product_name, subtitleMax)
   sanitizeDouyinTradeRuleProductAttrs(mergedProductAttrs, erp, category_id, attrs)
-  const descShort = applyDouyinDescriptionRichTextSplit(
-    mergedProductAttrs,
-    product_name,
-    productDescRaw,
-    category_id,
-  )
+  applyDouyinDescriptionRichTextSplit(mergedProductAttrs, product_name, productDescRaw, category_id)
+  const descShort = finalizeDouyinProductAttrsByTemplate(attrs, mergedProductAttrs, {
+    productName: product_name,
+    productDesc: productDescRaw,
+    categoryId: category_id,
+  })
   product.desc = descShort
   pruneEmptyNonRequiredImageAttrs(attrs, mergedProductAttrs)
 
@@ -3523,6 +3531,11 @@ function summarizeDouyinProductSaveForLog(
         if (attrKeyIsDouyinDescription(k)) return String(v ?? '').length
       }
       return 0
+    })(),
+    description_rich_is_note_json: (() => {
+      if (!ak) return false
+      const v = ak.description_rich_text ?? ''
+      return isDouyinNoteRichTextJsonString(String(v))
     })(),
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
@@ -4017,6 +4030,15 @@ export async function handleDouyinGoodsProductSavePost(
         message: `Description 过长（当前 ${descVal.length} 字，类目 ${categoryIdSave || '—'} 建议不超过 ${descMax} 字）。长文案请写在商品说明，短描述写在 Description。`,
         description_len: descVal.length,
         description_max: descMax,
+      })
+      return
+    }
+    const richRaw = String(attrMap.description_rich_text ?? '').trim()
+    if (richRaw && !isDouyinNoteRichTextJsonString(richRaw)) {
+      json(res, 400, {
+        message:
+          'description_rich_text（其他说明/富文本）须为 NOTE 控件 JSON 列表，不能为纯文本。请点「一键填满」或清空该字段后重试。',
+        description_rich_text_preview: richRaw.slice(0, 120),
       })
       return
     }

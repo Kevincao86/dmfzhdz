@@ -6,6 +6,11 @@ import {
 } from './douyinSubTitleNormalize'
 import { normalizeDouyinDescription } from './douyinDescriptionNormalize'
 import {
+  attrTemplateIsNoteRichText,
+  encodeDouyinNoteRichTextFromPlain,
+  parseDouyinTemplateAttrMeta,
+} from './douyinNoteRichTextFormat.js'
+import {
   douyinAppointmentJson,
   douyinCanNoUseDateJson,
   douyinUseDateJson,
@@ -225,6 +230,10 @@ export function buildDouyinTemplateAutoFillMaps(
       product[key] = descAttr
       continue
     }
+    if (attrTemplateIsNoteRichText(parseDouyinTemplateAttrMeta(a as unknown as Record<string, unknown>))) {
+      product[key] = encodeDouyinNoteRichTextFromPlain(descLong || name)
+      continue
+    }
     if (attrKeyIsDouyinSubTitle(key)) {
       product[key] = subtitle
       continue
@@ -281,6 +290,10 @@ export function buildDouyinTemplateAutoFillMaps(
 
     if (/hint|规范|提示/.test(lk) || /规范|提示|名称规范/.test(nm)) {
       product[key] = name.slice(0, 50)
+      continue
+    }
+    if (vt === 'NOTE') {
+      product[key] = encodeDouyinNoteRichTextFromPlain(descLong || name)
       continue
     }
     product[key] = descLong.slice(0, 2000) || name.slice(0, 2000) || '-'
