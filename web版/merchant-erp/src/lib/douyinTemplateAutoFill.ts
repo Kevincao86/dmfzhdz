@@ -167,7 +167,13 @@ export function buildDouyinTemplateAutoFillMaps(
 
   const name = input.productName.trim()
   const descLong = (input.productDesc.trim() || name).slice(0, 12000)
-  const descAttr = normalizeDouyinDescription(input.productDesc, name)
+  const descAttr = normalizeDouyinDescription(
+    input.productDesc,
+    name,
+    undefined,
+    undefined,
+    input.categoryId.trim(),
+  )
   const subtitle = normalizeDouyinSubTitle(name, name)
   const head = input.headUrl.trim()
   const aux = input.auxUrls.map((u) => u.trim()).filter(Boolean)
