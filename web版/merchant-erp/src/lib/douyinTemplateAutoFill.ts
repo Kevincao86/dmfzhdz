@@ -1,5 +1,9 @@
 import type { TemplateAttr } from '../services/douyinProductApi'
 import {
+  attrKeyIsDouyinPlatformUnifiedDescription,
+  attrKeyIsDouyinProductDiyName,
+} from './douyinProductDiyNameFormat'
+import {
   attrKeyIsDouyinProductNameHint,
   attrKeyIsDouyinSubTitle,
   buildDouyinSubTitleFromTradeRules,
@@ -238,6 +242,9 @@ export function buildDouyinTemplateAutoFillMaps(
     }
     if (attrKeyIsDouyinProductNameHint(key)) {
       product[key] = ''
+      continue
+    }
+    if (attrKeyIsDouyinProductDiyName(key) || attrKeyIsDouyinPlatformUnifiedDescription(key)) {
       continue
     }
     if (lk === 'show_channel') {

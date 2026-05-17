@@ -71,6 +71,12 @@ import {
   finalizeDouyinSubTitleInProductAttrs,
 } from '../src/lib/douyinSubTitleNormalize.js'
 import {
+  attrKeyIsDouyinPlatformUnifiedDescription,
+  attrKeyIsDouyinProductDiyName,
+  describeDouyinProductDiyNameForLog,
+  finalizeDouyinVoucherNameAttrsInProductMap,
+} from '../src/lib/douyinProductDiyNameFormat.js'
+import {
   douyinAppointmentJson,
   douyinCanNoUseDateJson,
   douyinLimitUseRuleJson,
@@ -2520,6 +2526,20 @@ function syntheticGoodlifeVoucherTemplateAttrsBundle(): {
       is_multi: false,
       is_required: false,
     },
+    {
+      key: 'product_diy_name',
+      name: '代金券展示名',
+      value_type: 'STRING',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'platform_unified_description',
+      name: '平台统一说明',
+      value_type: 'BOOL',
+      is_multi: false,
+      is_required: false,
+    },
   ]
   const skuAttrs: Record<string, unknown>[] = [
     {
@@ -3564,6 +3584,11 @@ function mergeGoodlifeProductAttrMapFromErp(
       continue
     }
 
+    /** 零售代金券：勿用营销标题填充 product_diy_name / platform_unified_description */
+    if (attrKeyIsDouyinProductDiyName(key) || attrKeyIsDouyinPlatformUnifiedDescription(key)) {
+      continue
+    }
+
     if (vt === 'STRING' || vt === 'TEXT' || vt === 'URL' || vt === '' || vt === 'ENUM') {
       if ((/^combo_rule$/i.test(key) || name.toLowerCase().includes('combo_rule')) && pkgJson && !omitCombo) {
         out[key] = pkgJson
@@ -3573,7 +3598,12 @@ function mergeGoodlifeProductAttrMapFromErp(
         out[key] = buildDouyinSubTitleFromTradeRules(extractDouyinSubTitleTradeContextFromErp(erp))
         continue
       }
-      if (/标题|商品名称|名称(?!规范)/.test(name) && productName && !/副标题/.test(name)) {
+      if (
+        /标题|商品名称|名称(?!规范)/.test(name) &&
+        productName &&
+        !/副标题/.test(name) &&
+        !attrKeyIsDouyinProductDiyName(key)
+      ) {
         out[key] = productName.slice(0, 2000)
         continue
       }
@@ -3645,6 +3675,9 @@ function mergeGoodlifeProductAttrMapFromErp(
       continue
     }
     if (/^notification$/i.test(key) || vt === 'NOTIFICATION') {
+      continue
+    }
+    if (attrKeyIsDouyinProductDiyName(key) || attrKeyIsDouyinPlatformUnifiedDescription(key)) {
       continue
     }
     if (vt.includes('IMAGE') || vt === 'PIC') {
@@ -4145,6 +4178,12 @@ async function buildGoodlifeProductSaveBody(
   finalizeDouyinSubTitleInProductAttrs(attrs, mergedProductAttrs, {
     tradeRules: extractDouyinSubTitleTradeContextFromErp(erp),
   })
+  finalizeDouyinVoucherNameAttrsInProductMap(attrs, mergedProductAttrs, {
+    productName: product_name,
+    actualAmountFen: actualFen,
+    originAmountFen: originFen,
+    isVoucher,
+  })
   product.desc = descShort
   pruneEmptyNonRequiredImageAttrs(attrs, mergedProductAttrs)
 
@@ -4394,6 +4433,7 @@ function summarizeDouyinProductSaveForLog(
           description_is_note_json: false,
           description_rich_is_note_json: false,
         }),
+    ...(ak ? describeDouyinProductDiyNameForLog(ak) : {}),
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
     missing_required_product_attr_keys,
