@@ -106,6 +106,34 @@ export function douyinAppointmentJson(
   })
 }
 
+/**
+ * 限制使用规则 LimitUseRuleStruct（与 sku.limit_rule 的 is_limit 不同）。
+ * @see template.get limit_use_rule — is_limit_use + use_num_per_consume
+ */
+export function douyinLimitUseRuleJson(limitUse = false, useNumPerConsume = 1): string {
+  if (!limitUse) {
+    return JSON.stringify({ is_limit_use: false })
+  }
+  return JSON.stringify({
+    is_limit_use: true,
+    use_num_per_consume: Math.max(1, Math.floor(useNumPerConsume) || 1),
+  })
+}
+
+export function normalizeDouyinLimitUseRuleValue(raw: string): string {
+  const cur = tryParseJsonObject(raw)
+  if (!cur) return douyinLimitUseRuleJson(false)
+  if (typeof cur.is_limit_use === 'boolean') {
+    if (!cur.is_limit_use) return douyinLimitUseRuleJson(false)
+    const n = Number(cur.use_num_per_consume)
+    return douyinLimitUseRuleJson(true, Number.isFinite(n) && n > 0 ? n : 1)
+  }
+  if (typeof cur.is_limit === 'boolean') {
+    return douyinLimitUseRuleJson(false)
+  }
+  return douyinLimitUseRuleJson(false)
+}
+
 function tryParseJsonObject(raw: string): Record<string, unknown> | null {
   const s = raw.trim()
   if (!s.startsWith('{')) return null
@@ -191,6 +219,10 @@ export function sanitizeDouyinTradeRuleProductAttrs(
       }
       continue
     }
+    if (attrKeyEq(key, 'limit_use_rule')) {
+      merged[key] = normalizeDouyinLimitUseRuleValue(merged[key] ?? '')
+      continue
+    }
     if (lk === 'refundpolicy' || key === 'RefundPolicy') {
       const v = Number.parseInt(String(merged[key] ?? '').trim(), 10)
       if (!Number.isFinite(v) || v < 1 || v > 3) {
@@ -215,5 +247,11 @@ export function sanitizeDouyinTradeRuleProductAttrs(
   }
   if (!Object.keys(merged).some((k) => attrKeyEq(k, 'appointment'))) {
     merged.appointment = douyinAppointmentJson(reserveMode === 'required', reserveAdvance)
+  }
+  const tplNeedsLimitUseRule = templateProductAttrs.some((a) =>
+    attrKeyEq(String(a.key ?? ''), 'limit_use_rule'),
+  )
+  if (tplNeedsLimitUseRule && !Object.keys(merged).some((k) => attrKeyEq(k, 'limit_use_rule'))) {
+    merged.limit_use_rule = douyinLimitUseRuleJson(false)
   }
 }

@@ -39,6 +39,26 @@ export function pickerChildrenOf(
   return (p?.sub_tree_infos as DouyinCategoryTreeNode[] | undefined) ?? []
 }
 
+/**
+ * 三级下拉候选：优先二级下的子节点；若该行业仅两级（二级即为末级），则二级本身作为唯一末级选项。
+ * @see category.get — category_id 返回直系子类目；部分类目无第三级
+ */
+export function pickerLevel3Options(
+  tree: DouyinCategoryTreeNode[],
+  cat2Id: string,
+  uploadableLeafIds: Set<string>,
+): DouyinCategoryTreeNode[] {
+  const id = cat2Id.trim()
+  if (!id) return []
+  const children = pickerChildrenOf(tree, id)
+  if (children.length > 0) return children
+  const cat2Node = findNodeById(tree as DouyinCategoryNode[], id)
+  if (cat2Node && pickerLeafSelectable(id, cat2Node, uploadableLeafIds)) {
+    return [cat2Node]
+  }
+  return []
+}
+
 /** 根 → 末级 category_id 路径（与创建商品页 pathIdsToLeaf 一致） */
 export function pickerPathIdsToLeaf(tree: DouyinCategoryTreeNode[], leafId: string): string[] {
   const out: string[] = []
@@ -65,16 +85,17 @@ export function pickerLabelsForPath(
   return { path: names.join(' > '), name: names[0] ?? '' }
 }
 
-/** 与创建商品页 leafSelectable 一致：末级须在 uploadableLeafIds 中 */
+/** 与 category/get 一致：末级 + enable + 非封禁；懒加载补树后 uploadableLeafIds 可能滞后，以节点字段为准 */
 export function pickerLeafSelectable(
   leafId: string,
   node: DouyinCategoryTreeNode,
   uploadableLeafIds: Set<string>,
 ): boolean {
-  return (
-    node.is_leaf &&
-    node.enable !== false &&
-    !node.is_publish_block &&
-    uploadableLeafIds.has(leafId)
-  )
+  const platformOk =
+    node.is_leaf && node.enable !== false && !node.is_publish_block && Boolean(leafId)
+  if (!platformOk) return false
+  if (uploadableLeafIds.size === 0) return true
+  if (uploadableLeafIds.has(leafId)) return true
+  /** 已按需拉取进树的末级，首包全树未枚举到其 id 时仍可选 */
+  return platformOk
 }

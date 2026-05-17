@@ -82,7 +82,11 @@ function quoteInt64CategoryIdFieldsInJson(raw: string): string {
 
 function pickSubTreeArray(raw: Record<string, unknown>): Record<string, unknown>[] | undefined {
   const a = raw.sub_tree_infos ?? raw.sub_tree_info ?? raw.children ?? raw.category_list
-  return Array.isArray(a) ? (a as Record<string, unknown>[]) : undefined
+  if (!Array.isArray(a)) return undefined
+  const filtered = (a as Record<string, unknown>[]).filter(
+    (x) => x && typeof x === 'object' && pickCategoryId(x).length > 0,
+  )
+  return filtered.length > 0 ? filtered : undefined
 }
 
 function pickCategoryId(raw: Record<string, unknown>): string {
@@ -979,7 +983,18 @@ function categoryNodeNeedsSubtreeFetch(n: DouyinCategoryTreeNode): boolean {
   if (n.is_leaf || !n.category_id) return false
   const subs = n.sub_tree_infos
   if (!subs || subs.length === 0) return true
-  return subs.every((s) => !s.category_id)
+  if (subs.every((s) => !s.category_id)) return true
+  /** 仅有占位子节点、尚未展开真实三级 */
+  if (
+    subs.every(
+      (s) =>
+        !s.is_leaf &&
+        (!s.sub_tree_infos || s.sub_tree_infos.length === 0 || s.sub_tree_infos.every((c) => !c.category_id)),
+    )
+  ) {
+    return true
+  }
+  return false
 }
 
 function extractChildrenFromCategoryGetPayload(
@@ -1015,15 +1030,34 @@ function extractChildrenFromCategoryGetPayload(
 
 async function fetchCategorySubtreeByParentId(parentCategoryId: string): Promise<DouyinCategoryTreeNode[]> {
   const accountId = readMerchantSession('meoo_douyin_merchant_id')
-  const q = new URLSearchParams()
-  q.set('query_category_type', '1')
-  q.set('category_id', parentCategoryId)
-  if (accountId) q.set('account_id', accountId)
-  const { res, parsed } = await fetchCategoryGetPreferFlatPath(q)
-  const { root: data } = parsed
-  if (!res.ok) return []
-  const d = pickCategoryGetInnerData(data)
-  return extractChildrenFromCategoryGetPayload(d, parentCategoryId)
+  const parentStr = parentCategoryId.trim()
+  if (!parentStr) return []
+
+  const runQuery = async (queryCategoryType: '0' | '1'): Promise<DouyinCategoryTreeNode[]> => {
+    const q = new URLSearchParams()
+    q.set('query_category_type', queryCategoryType)
+    q.set('category_id', parentStr)
+    if (accountId) q.set('account_id', accountId)
+    const { res, parsed } = await fetchCategoryGetPreferFlatPath(q)
+    const { root: data } = parsed
+    if (!res.ok) return []
+    const d = pickCategoryGetInnerData(data)
+    if (!d || (typeof d.error_code === 'number' && d.error_code !== 0)) return []
+
+    if (queryCategoryType === '0') {
+      const infos = d.category_infos
+      if (Array.isArray(infos) && infos.length > 0) {
+        const norm = normalizeCategoryTree(infos as Record<string, unknown>[])
+        const byParent = norm.filter((n) => n.parent_id === parentStr)
+        return byParent.length > 0 ? byParent : norm
+      }
+    }
+    return extractChildrenFromCategoryGetPayload(d, parentStr)
+  }
+
+  const flat = await runQuery('0')
+  if (flat.length > 0) return flat
+  return runQuery('1')
 }
 
 function cloneCategoryTree(nodes: DouyinCategoryTreeNode[]): DouyinCategoryTreeNode[] {
