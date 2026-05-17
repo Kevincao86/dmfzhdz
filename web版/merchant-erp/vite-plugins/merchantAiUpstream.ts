@@ -196,7 +196,14 @@ async function callModelTextWithBuiltinFailover(
     return { text, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
-    if (!isDouyinAssistAiVendorId(primaryNorm) || !isVendorHopableError(e)) throw e
+    const allowFailover =
+      isDouyinAssistAiVendorId(primaryNorm) ||
+      primaryNorm === 'deepseek' ||
+      primaryNorm === 'kimi' ||
+      primaryNorm === 'openai' ||
+      primaryNorm === 'claude' ||
+      primaryNorm === 'gemini'
+    if (!allowFailover || !isVendorHopableError(e)) throw e
   }
   for (const alt of builtinTextFailoverOthers(primaryNorm, env)) {
     const { key } = pickKey(env, alt)
@@ -489,17 +496,27 @@ function pickKey(
         key: (e.MERCHANT_AI_MINIMAX_KEY ?? e.MINIMAX_API_KEY ?? '').trim() || null,
         label: 'MERCHANT_AI_MINIMAX_KEY（或 MINIMAX_API_KEY）',
       }
+    case 'deepseek':
+      return {
+        key: (e.DEEPSEEK_API_KEY ?? '').trim() || null,
+        label: 'DEEPSEEK_API_KEY',
+      }
+    case 'kimi':
+      return {
+        key: (e.MOONSHOT_API_KEY ?? '').trim() || null,
+        label: 'MOONSHOT_API_KEY',
+      }
     default:
       return { key: null, label: 'MERCHANT_AI_*' }
   }
 }
 
-/** 商品文案类：直连厂商 Key 或 Gemini（TokenMix） */
+/** 商品文案类：直连厂商 Key；openai/claude 经 TOKENMIX；gemini 同 TokenMix */
 function textVendorKeyInfo(env: MerchantAiEnv, vendor: string): { key: string | null; label: string } {
-  if (vendor === 'gemini') {
-    const e = env as Record<string, string | undefined>
-    const key = (e.TOKENMIX_API_KEY ?? '').trim() || null
-    return { key, label: 'TOKENMIX_API_KEY' }
+  const e = env as Record<string, string | undefined>
+  const tokenmix = (e.TOKENMIX_API_KEY ?? '').trim() || null
+  if (vendor === 'gemini' || vendor === 'openai' || vendor === 'claude') {
+    return { key: tokenmix, label: 'TOKENMIX_API_KEY' }
   }
   return pickKey(env, vendor)
 }
@@ -753,29 +770,56 @@ async function callModelText(
       return callDoubaoChat(apiKey, env, system, user)
     case 'minimax':
       return callMinimaxChat(apiKey, env, system, user)
-    case 'gemini': {
+    case 'gemini':
+      return callTokenMixAssistText(apiKey, env, 'gemini', '', system, user)
+    case 'openai':
+      return callTokenMixAssistText(apiKey, env, 'openai', '', system, user)
+    case 'claude':
+      return callTokenMixAssistText(apiKey, env, 'claude', '', system, user)
+    case 'deepseek': {
       const e = env as Record<string, string | undefined>
-      const explicit = (e.MERCHANT_AI_GOODS_GEMINI_MODEL ?? '').trim()
-      const modelId = explicit || defaultModelIdForFamily('gemini')
-      const envOut: MerchantAiEnv = { ...env, TOKENMIX_API_KEY: apiKey }
-      const res = await chatTokenMix(
-        {
-          provider: 'tokenmix',
-          modelFamily: 'gemini',
-          model: modelId,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-          temperature: 0.55,
-        },
-        envOut,
-      )
-      return polishVisibleAssistantText(res.content)
+      const base = (e.DEEPSEEK_BASE_URL ?? 'https://api.deepseek.com').trim().replace(/\/$/, '')
+      const mid = (e.DEEPSEEK_MODEL ?? 'deepseek-chat').trim()
+      return openAiStyleChat(`${base}/chat/completions`, apiKey, mid, system, user)
+    }
+    case 'kimi': {
+      const e = env as Record<string, string | undefined>
+      const base = (e.KIMI_BASE_URL ?? 'https://api.moonshot.ai/v1').trim().replace(/\/$/, '')
+      const mid = (e.KIMI_MODEL ?? 'moonshot-v1-8k').trim()
+      return openAiStyleChat(`${base}/chat/completions`, apiKey, mid, system, user)
     }
     default:
       throw new Error(`不支持的 model：${model}`)
   }
+}
+
+async function callTokenMixAssistText(
+  apiKey: string,
+  env: MerchantAiEnv,
+  family: 'gemini' | 'openai' | 'claude' | 'grok',
+  modelId: string,
+  system: string,
+  user: string,
+): Promise<string> {
+  const e = env as Record<string, string | undefined>
+  const explicit =
+    family === 'gemini' ? (e.MERCHANT_AI_GOODS_GEMINI_MODEL ?? '').trim() : ''
+  const resolved = modelId.trim() || explicit || defaultModelIdForFamily(family)
+  const envOut: MerchantAiEnv = { ...env, TOKENMIX_API_KEY: apiKey }
+  const res = await chatTokenMix(
+    {
+      provider: 'tokenmix',
+      modelFamily: family,
+      model: resolved,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.55,
+    },
+    envOut,
+  )
+  return polishVisibleAssistantText(res.content)
 }
 
 /** 合并「商品名称」与 title_draft（常含说明），作为生图唯一商品语义锚，避免只认名称短串而丢说明里的品类信息 */
@@ -1109,16 +1153,32 @@ const VENDOR_LABEL: Record<string, string> = {
   minimax: 'MiniMax',
   qwen: '通义千问（DashScope）',
   doubao: '豆包（火山 Ark）',
-  gemini: 'Gemini（TokenMix）',
+  gemini: 'Gemini',
+  deepseek: 'DeepSeek',
+  kimi: 'Kimi / Moonshot',
+  openai: 'OpenAI',
+  claude: 'Claude',
 }
 
 function normalizeAiModelPreserveCustom(raw: unknown): string {
   const s = String(raw ?? 'qwen').trim().toLowerCase()
-  if (s === 'deepseek') return 'qwen'
   if (!s) return 'qwen'
+  if (s === 'gemini') return 'gemini'
   if (isDouyinAssistAiVendorId(s)) return s
+  if (s === 'deepseek' || s === 'kimi' || s === 'openai' || s === 'claude') return s
   if (isValidAiVendorSlug(s)) return s
   return 'qwen'
+}
+
+/** 商品 AI 文案：尊重手选 deepseek/kimi/openai/claude（须已配置对应 Key） */
+function resolveGoodsAssistTextModel(requestedVendor: string, env: MerchantAiEnv): string {
+  const s = normalizeAiModelPreserveCustom(requestedVendor)
+  if (s === 'gemini') return 'gemini'
+  if (isDouyinAssistAiVendorId(s)) return s
+  if ((s === 'deepseek' || s === 'kimi' || s === 'openai' || s === 'claude') && textVendorKeyInfo(env, s).key) {
+    return s
+  }
+  return pickPrimaryVendorWithKey(env, textVendorOrder(env))
 }
 
 function missingVendorKeyBody(env: MerchantAiEnv, model: string) {
@@ -1515,11 +1575,7 @@ export async function handleDouyinGoodsAiAssist(
     ? isDouyinAssistAiVendorId(requestedVendor)
       ? requestedVendor
       : pickPrimaryVendorWithKey(env, imageVendorOrder(env))
-    : requestedVendor === 'gemini'
-      ? 'gemini'
-      : isDouyinAssistAiVendorId(requestedVendor)
-        ? requestedVendor
-        : pickPrimaryVendorWithKey(env, textVendorOrder(env))
+    : resolveGoodsAssistTextModel(requestedVendor, env)
   const productName = String(body.product_name ?? '').trim() || '本店服务'
   const titleDraft = String(body.title_draft ?? '').trim() || productName
   const imageUrls = Array.isArray(body.image_urls)

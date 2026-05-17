@@ -56,7 +56,7 @@ function buildAgentImagePostOpts(
 
 function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): string {
   if (img.channel === 'tokenmix') {
-    let s = `已使用 **TokenMix · ${img.displayModel ?? '图像模型'}** 生成下方结果。`
+    let s = `已使用 **${img.displayModel ?? '图像模型'}** 生成下方结果。`
     if (img.fallbackNote) s += `\n\n${img.fallbackNote}`
     return s
   }

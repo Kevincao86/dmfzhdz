@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MeooAgentMascot } from './MeooAgentMascot'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
+import { shouldSubmitComposerOnEnter } from '../lib/composerEnterKey'
 
 type Layout = 'centered' | 'dock'
 type ModelFilterTab = 'all' | 'chat' | 'image'
@@ -51,6 +52,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
 
   const fileRef = useRef<HTMLInputElement>(null)
   const recRef = useRef<SpeechRecognition | null>(null)
+  const imeComposingRef = useRef(false)
   const [listening, setListening] = useState(false)
   const [modelFilter, setModelFilter] = useState<ModelFilterTab>('all')
 
@@ -194,11 +196,17 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
             e.preventDefault()
             void addComposerImageFiles(files)
           }}
+          onCompositionStart={() => {
+            imeComposingRef.current = true
+          }}
+          onCompositionEnd={() => {
+            imeComposingRef.current = false
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              sendUserText(inputDraft)
-            }
+            if (imeComposingRef.current && e.key === 'Enter') return
+            if (!shouldSubmitComposerOnEnter(e)) return
+            e.preventDefault()
+            sendUserText(inputDraft)
           }}
           rows={rows}
           disabled={disabled}

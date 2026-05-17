@@ -118,6 +118,7 @@ export default function AiModelAutoPicker({
 
   const manualOpt = optionById(options, manualId)
   const effectiveOpt = optionById(options, effectiveId)
+  const pickerHighlightId = auto ? effectiveId : manualId
 
   const filteredOptions = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -317,7 +318,7 @@ export default function AiModelAutoPicker({
                     onClick={() => pickModel(m.id)}
                     className={cn(
                       'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-gray-800 hover:bg-gray-50',
-                      effectiveId === m.id &&
+                      pickerHighlightId === m.id &&
                         (kind === 'text' ? 'bg-indigo-50 text-indigo-900' : 'bg-violet-50 text-violet-900'),
                     )}
                   >
