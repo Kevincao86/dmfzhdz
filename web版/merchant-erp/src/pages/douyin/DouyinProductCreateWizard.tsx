@@ -83,6 +83,7 @@ export default function DouyinProductCreateWizard({
 
   const [saving, setSaving] = useState(false)
   const [actionMsg, setActionMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [detailPrepLoading, setDetailPrepLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
 
   const persistedProductIdRef = useRef<string | null>(editProductId?.trim() ?? null)
@@ -396,7 +397,17 @@ export default function DouyinProductCreateWizard({
   const goDetail = async () => {
     if (!cat3 || productType == null) return
     setActionMsg(null)
-    const tpl = await getDouyinGoodsTemplate({ category_id: cat3, product_type: productType })
+    setDetailPrepLoading(true)
+    const typeEligible = productTypes.some(
+      (t) => t.product_type === productType && t.eligible,
+    )
+    const tpl = await getDouyinGoodsTemplate({
+      category_id: cat3,
+      product_type: productType,
+      /** 来客侧可选但 template.get 常无 attrs（零售代金券）；保存由网关按 template/synthetic 组装 */
+      allowEmptyTemplate: typeEligible,
+    })
+    setDetailPrepLoading(false)
     if (!tpl.ok) {
       setActionMsg({ text: tpl.message, ok: false })
       return
@@ -537,12 +548,18 @@ export default function DouyinProductCreateWizard({
               ))}
             </div>
           )}
+          {actionMsg && !actionMsg.ok && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {actionMsg.text}
+            </p>
+          )}
           <button
             type="button"
-            disabled={productType == null}
+            disabled={productType == null || detailPrepLoading}
             onClick={() => void goDetail()}
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white disabled:bg-gray-300"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white disabled:bg-gray-300"
           >
+            {detailPrepLoading && <Loader2 className="h-4 w-4 animate-spin" />}
             下一步：填写商品
           </button>
         </section>
