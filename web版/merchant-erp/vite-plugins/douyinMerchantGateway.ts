@@ -2150,6 +2150,21 @@ async function fetchTemplateAttrsBundle(
   const openBizAttempts: Array<number | undefined> = [undefined]
   /** 代金券：部分零售类目需 open_biz_type=0 才返回模板（勿传 1=组合券包） */
   if (productType === 2) openBizAttempts.push(0)
+  const productTypeAttempts: number[] =
+    productType === 2
+      ? Array.from(
+          new Set(
+            [
+              productType,
+              ...[11, 15],
+              ...(process.env.DOUYIN_GOODS_VOUCHER_TEMPLATE_PRODUCT_TYPE_ALT?.trim() ?? '')
+                .split(/[,;\s]+/)
+                .map((s) => Number(s.trim()))
+                .filter((n) => Number.isFinite(n) && n > 0),
+            ].filter((n) => Number.isFinite(n) && n > 0),
+          ),
+        )
+      : [productType]
   const ttl = templateAttrsBundleCacheTtlMs()
   const ck = templateAttrsBundleCacheKey(accountId, categoryId, productType)
   if (ttl > 0) {
@@ -2157,21 +2172,23 @@ async function fetchTemplateAttrsBundle(
     if (hit && Date.now() < hit.expiresAt) return hit.bundle
   }
   let last = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
-  for (const obt of openBizAttempts) {
-    const bundle = await fetchTemplateAttrsBundleOnce(
-      accountId,
-      token,
-      categoryId,
-      productType,
-      obt,
-      signal,
-    )
-    last = bundle
-    if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
-      if (ttl > 0) {
-        templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+  for (const pt of productTypeAttempts) {
+    for (const obt of openBizAttempts) {
+      const bundle = await fetchTemplateAttrsBundleOnce(
+        accountId,
+        token,
+        categoryId,
+        pt,
+        obt,
+        signal,
+      )
+      last = bundle
+      if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
+        if (ttl > 0) {
+          templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+        }
+        return bundle
       }
-      return bundle
     }
   }
   return last
@@ -2218,12 +2235,8 @@ function extractProductSkuAttrsFromTemplateEnvelope(
   return { pa, sa }
 }
 
-/**
- * template/get 仅返回 error_code/description、无属性列表时：按开放平台「商品发布」文档中的**字面 key**
- * 构造最小模板，供 merge 写入 image_list / commodity / 售价等（opaque key 无法猜测，标准 key 可兜底）。
- * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/capability/basic/goods-introduce
- */
-function syntheticGoodlifeTemplateAttrsBundle(_productType: number): {
+/** 团购 template/get 为空时的文档级兜底（含 commodity / 套餐搭配） */
+function syntheticGoodlifeGroupBuyTemplateAttrsBundle(): {
   productAttrs: Record<string, unknown>[]
   skuAttrs: Record<string, unknown>[]
 } {
@@ -2288,6 +2301,117 @@ function syntheticGoodlifeTemplateAttrsBundle(_productType: number): {
     },
   ]
   return { productAttrs, skuAttrs }
+}
+
+/**
+ * 代金券 template/get 为空时的兜底（勿含 commodity/combo_rule，否则易报「商品类型和类目对应的商品模板不存在」）。
+ * @see template.get 文档 voucher_type / applicable_category / applicable_brands
+ */
+function syntheticGoodlifeVoucherTemplateAttrsBundle(): {
+  productAttrs: Record<string, unknown>[]
+  skuAttrs: Record<string, unknown>[]
+} {
+  const productAttrs: Record<string, unknown>[] = [
+    {
+      key: 'image_list',
+      name: '封面图',
+      value_type: 'IMAGE',
+      is_multi: true,
+      is_required: true,
+    },
+    {
+      key: 'environment_image_list',
+      name: '环境图',
+      value_type: 'IMAGE',
+      is_multi: true,
+      is_required: false,
+    },
+    {
+      key: 'Notification',
+      name: '使用规则',
+      value_type: 'TEXT',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'description_rich_text',
+      name: '商品描述',
+      value_type: 'TEXT',
+      is_multi: false,
+      is_required: false,
+    },
+    {
+      key: 'voucher_type',
+      name: '代金券类型',
+      value_type: 'COMMON_ENUM',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'applicable_category',
+      name: '适用品类',
+      value_type: 'APPLICABLE_CATEGORY',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'applicable_brands',
+      name: '适用品牌',
+      value_type: 'APPLICABLE_BRANDS',
+      is_multi: false,
+      is_required: false,
+    },
+  ]
+  const skuAttrs: Record<string, unknown>[] = [
+    {
+      key: 'actual_amount',
+      name: '售价(分)',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'origin_amount',
+      name: '原价(分)',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: false,
+    },
+    {
+      key: 'stock_qty',
+      name: '库存',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: false,
+    },
+  ]
+  return { productAttrs, skuAttrs }
+}
+
+function syntheticGoodlifeTemplateAttrsBundle(productType: number): {
+  productAttrs: Record<string, unknown>[]
+  skuAttrs: Record<string, unknown>[]
+} {
+  return productType === 2
+    ? syntheticGoodlifeVoucherTemplateAttrsBundle()
+    : syntheticGoodlifeGroupBuyTemplateAttrsBundle()
+}
+
+/** 代金券 attr：适用品类/类型等（template.get 未返回时由网关写入最小合法 JSON） */
+function injectVoucherTemplateAttrsFromErp(mergedProductAttrs: Record<string, string>): void {
+  if (!(mergedProductAttrs.voucher_type ?? '').trim()) {
+    mergedProductAttrs.voucher_type = JSON.stringify({ key: 3, value: '通用券' })
+  }
+  if (!(mergedProductAttrs.applicable_category ?? '').trim()) {
+    mergedProductAttrs.applicable_category = JSON.stringify({
+      applicable_category_type: { key: 1, value: '全部品类适用' },
+    })
+  }
+  if (!(mergedProductAttrs.applicable_brands ?? '').trim()) {
+    mergedProductAttrs.applicable_brands = JSON.stringify({
+      applicable_brand_type: { key: 1, value: '全部品牌适用' },
+    })
+  }
 }
 
 /** 在 merge 之后补齐开放平台文档级字面 key（模板未返回 opaque 槽时仍常必填） */
@@ -3545,6 +3669,7 @@ async function buildGoodlifeProductSaveBody(
   const productDescRaw = String(erp.product_desc ?? product_name).trim()
   const product_type = Number(erp.product_type) || 1
   const isGroupBuy = product_type === 1
+  const isVoucher = product_type === 2
   const out_id = resolveProductOutIdForSave(erp)
   const product_id_existing =
     typeof erp.product_id === 'string' && erp.product_id.trim() ? erp.product_id.trim() : ''
@@ -3597,9 +3722,16 @@ async function buildGoodlifeProductSaveBody(
     skuAttrs = syn.skuAttrs
     console.warn(
       '[meoo douyin goods/save] template_get_empty_using_doc_fallback',
-      JSON.stringify({ category_id, product_type, mode: _mode }),
+      JSON.stringify({
+        category_id,
+        product_type,
+        mode: _mode,
+        voucher_shaped: isVoucher,
+      }),
     )
   }
+  const tplProductComboKeysEarly = templateComboAttrKeysFromAttrs(attrs)
+  const tplHasComboSlotsEarly = tplProductComboKeysEarly.length > 0
   const auxUrls = Array.isArray(erp.aux_image_urls)
     ? (erp.aux_image_urls as unknown[]).map((x) => String(x).trim()).filter(Boolean)
     : []
@@ -3622,12 +3754,12 @@ async function buildGoodlifeProductSaveBody(
     comboRule = expandGroupBuyComboRuleMinTwoGroups(comboRule, category_id)
     comboRule = resolveComboRuleFromErpOverrides(erp, comboRule)
     comboRule = collapseRetailDuplicateComboGroups(comboRule, category_id)
-  } else if (product_type === 2) {
+  } else if (isVoucher) {
     /**
-     * 代金券（product_type=2）：前端不传 package_combo；抖音仍常校验 `combo_rule` / 模板槽位非空。
-     * 单组单品标价用实付（分）与 sku.actual_amount 对齐。
+     * 代金券：勿写入团购 combo_rule/commodity（零售类目会报「商品类型和类目对应的商品模板不存在」）。
+     * 有真实 template 且声明了搭配槽时再按模板写入。
      */
-    comboRule = buildDouyinComboRuleSingleGroupDefault(product_name, actualFen, originFen)
+    comboRule = null
   } else {
     /**
      * 次卡、预售、预约等类目（product_type≥3）：部分类目/审核链路仍强校验顶层 `product.combo_rule` 非空，
@@ -3643,7 +3775,7 @@ async function buildGoodlifeProductSaveBody(
 
   const mergedProductAttrs = mergeGoodlifeProductAttrMapFromErp(attrs, erpForAttrMerge, attr_key_value_map, {
     /** 团购先避开原始 package_combo，后面统一用规范化后的 comboRule 回填模板槽位 */
-    omitComboTemplateAttrs: isGroupBuy,
+    omitComboTemplateAttrs: isGroupBuy || isVoucher,
   })
 
   let explicitLiteralComboRuleOverride = false
@@ -3680,26 +3812,19 @@ async function buildGoodlifeProductSaveBody(
   }
 
   injectDocKeyedProductAttrsFromErp(mergedProductAttrs, erp, category_id)
+  if (isVoucher) {
+    injectVoucherTemplateAttrsFromErp(mergedProductAttrs)
+  }
   ensureProductImageAttrsInMap(mergedProductAttrs, attrs, carouselUrls)
 
   /**
-   * 仅向 template.get 声明的 opaque key 写入「groups 数组」JSON；勿自创字面量 combo_rule/commodity。
-   * 代金券若模板未返回任何搭配槽位，则改传顶层 product.combo_rule（与团购 body 形态一致）。
+   * 仅向 template.get 声明的 opaque 搭配槽写入套餐 JSON；代金券无搭配槽时不写 combo_rule/commodity。
    */
-  if (comboRule) {
+  if (comboRule && (!isVoucher || tplHasComboSlotsEarly)) {
     applyComboRuleToMergedProductAttrs(attrs, mergedProductAttrs, comboRule, category_id, originFen)
   }
 
-  /**
-   * template.get 经中继失败或返回空 attrs 时，没有 opaque 搭配槽可写；开放平台仍常从 attr_key_value_map 校验套餐。
-   * 此时将「groups 数组」JSON 字符串写入字面量 key `combo_rule`（与 applyComboRuleToMergedProductAttrs 写入形态一致）。
-   */
-  const tplProductComboKeys = templateComboAttrKeysFromAttrs(attrs)
-  /**
-   * 无 opaque 套餐槽时：字面量 `combo_rule` 写 ItemGroupStruct[] 组数组（与 sku.commodity 同源）。
-   * 团购类目常同时校验顶层 product.combo_rule 与 attr combo_rule，缺一不可。
-   */
-  if (comboRule && tplProductComboKeys.length === 0) {
+  if (comboRule && tplProductComboKeysEarly.length === 0 && !isVoucher) {
     const literalStr = comboRuleProductLiteralAttrJsonString(comboRule, category_id, originFen)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(literalStr) && !(mergedProductAttrs.combo_rule ?? '').trim()) {
       mergedProductAttrs.combo_rule = literalStr
@@ -3747,7 +3872,7 @@ async function buildGoodlifeProductSaveBody(
       }
     }
   }
-  if (comboRule) {
+  if (comboRule && (!isVoucher || tplHasComboSlotsEarly)) {
     applyComboRuleToSkuAttrMap(skuAttrs, skuAttrMap, comboRule, originFen, category_id)
     if (isGroupBuy) {
       alignAllSkuCommodityAttrsToComboRule(skuAttrs, skuAttrMap, comboRule, category_id, originFen)
@@ -3755,11 +3880,15 @@ async function buildGoodlifeProductSaveBody(
   }
 
   const tplSkuComboKeys = templateComboAttrKeysFromAttrs(skuAttrs)
-  if (comboRule && tplSkuComboKeys.length === 0) {
+  if (comboRule && tplSkuComboKeys.length === 0 && !isVoucher) {
     const commodityStr = comboRuleSkuCommodityAttrJsonString(comboRule, originFen, category_id)
     if (!comboRuleAttrJsonIsEffectivelyEmpty(commodityStr) && !(skuAttrMap.commodity ?? '').trim()) {
       skuAttrMap.commodity = commodityStr
     }
+  }
+  if (isVoucher && !tplHasComboSlotsEarly) {
+    delete skuAttrMap.commodity
+    delete mergedProductAttrs.combo_rule
   }
 
   const productTplKeySet = new Set(
@@ -3773,8 +3902,8 @@ async function buildGoodlifeProductSaveBody(
    * 若模板无任何搭配槽（含 template 拉取失败），保留字面量兜底。
    */
   const filledOpaqueProductCombo =
-    tplProductComboKeys.length > 0 &&
-    tplProductComboKeys.some((k) => (mergedProductAttrs[k] ?? '').trim().length > 0)
+    tplProductComboKeysEarly.length > 0 &&
+    tplProductComboKeysEarly.some((k) => (mergedProductAttrs[k] ?? '').trim().length > 0)
   if (
     mergedProductAttrs.combo_rule != null &&
     filledOpaqueProductCombo &&
@@ -3805,15 +3934,12 @@ async function buildGoodlifeProductSaveBody(
       mergedProductAttrs,
       skuAttrs,
       skuAttrMap,
-      tplProductComboKeys,
+      tplProductComboKeysEarly,
     )
   }
 
-  /**
-   * 顶层 product.combo_rule：goodlife product/save 在多数类目下会校验非空（含团购、代金券及次卡等）。
-   * 团购为结构化套餐；其余类型使用单组单品占位，与 sku 售价/划线价一致。
-   */
-  if (comboRule) {
+  /** 顶层 product.combo_rule：团购/次卡等需要；零售代金券勿带团购套餐结构 */
+  if (comboRule && (!isVoucher || tplHasComboSlotsEarly)) {
     product.combo_rule = comboRule
   }
 
