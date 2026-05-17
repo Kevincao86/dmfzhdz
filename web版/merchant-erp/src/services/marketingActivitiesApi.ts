@@ -120,11 +120,15 @@ export async function fetchMarketingActivities(params: {
     data = {}
   }
 
-  if (!res.ok || data.ok === false) {
+  if (!res.ok) {
     const msg =
       typeof data.message === 'string'
         ? data.message
         : `拉取失败 HTTP ${res.status}`
+    return { ok: false, platform: params.platform, message: msg }
+  }
+  if (data.ok === false) {
+    const msg = typeof data.message === 'string' ? data.message : '拉取失败'
     return { ok: false, platform: params.platform, message: msg }
   }
 

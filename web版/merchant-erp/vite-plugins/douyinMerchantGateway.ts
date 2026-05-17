@@ -52,10 +52,11 @@ import {
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
+  applyDouyinDescriptionRichTextSplit,
   attrKeyIsDouyinDescription,
   douyinDescriptionMinLen,
+  douyinDescriptionMaxLen,
   normalizeDouyinDescription,
-  sanitizeDouyinDescriptionInProductAttrs,
 } from '../src/lib/douyinDescriptionNormalize.js'
 import {
   attrKeyIsDouyinSubTitle,
@@ -1830,6 +1831,23 @@ function ensureProductImageAttrsInMap(
   }
 }
 
+/** 去掉空 IMAGE 槽（如 atmosphere_image），避免 goodlife 报参数不合法 */
+function pruneEmptyNonRequiredImageAttrs(
+  templateAttrs: Record<string, unknown>[],
+  merged: Record<string, string>,
+): void {
+  for (const a of templateAttrs) {
+    const key = String((a as Record<string, unknown>).key ?? '').trim()
+    if (!key || (merged[key] ?? '').trim()) continue
+    if (Boolean((a as Record<string, unknown>).is_required)) continue
+    const vt = String((a as Record<string, unknown>).value_type ?? '').toUpperCase()
+    const name = String((a as Record<string, unknown>).name ?? '')
+    if (vt.includes('IMAGE') || /image|img|图|氛围|atmosphere/i.test(key + name)) {
+      delete merged[key]
+    }
+  }
+}
+
 function jsonImageUrlList(urls: string[]): string {
   return JSON.stringify(urls.slice(0, 30).map((url) => ({ url })))
 }
@@ -2735,7 +2753,13 @@ function mergeGoodlifeProductAttrMapFromErp(
         continue
       }
       if (attrKeyIsDouyinDescription(key)) {
-        out[key] = normalizeDouyinDescription(productDesc, productName)
+        out[key] = normalizeDouyinDescription(
+          productDesc,
+          productName,
+          undefined,
+          undefined,
+          String(erp.category_id ?? '').trim(),
+        )
         continue
       }
       if (attrKeyIsDouyinSubTitle(key) || /副标题/.test(name)) {
@@ -2999,11 +3023,8 @@ async function buildGoodlifeProductSaveBody(
   templateSkuAttrs: Record<string, unknown>[]
 }> {
   const product_name = String(erp.product_name ?? '').trim()
-  const desc = normalizeDouyinDescription(
-    String(erp.product_desc ?? product_name).trim(),
-    product_name,
-  )
   const category_id = String(erp.category_id ?? '').trim()
+  const productDescRaw = String(erp.product_desc ?? product_name).trim()
   const product_type = Number(erp.product_type) || 1
   const isGroupBuy = product_type === 1
   const out_id = resolveProductOutIdForSave(erp)
@@ -3150,7 +3171,7 @@ async function buildGoodlifeProductSaveBody(
 
   const product: Record<string, unknown> = {
     product_name,
-    desc,
+    desc: product_name,
     category_id,
     product_type,
     biz_line: 1,
@@ -3261,7 +3282,14 @@ async function buildGoodlifeProductSaveBody(
   })()
   sanitizeDouyinProductAttrSubTitleFields(mergedProductAttrs, product_name, subtitleMax)
   sanitizeDouyinTradeRuleProductAttrs(mergedProductAttrs, erp, category_id, attrs)
-  sanitizeDouyinDescriptionInProductAttrs(mergedProductAttrs, product_name)
+  const descShort = applyDouyinDescriptionRichTextSplit(
+    mergedProductAttrs,
+    product_name,
+    productDescRaw,
+    category_id,
+  )
+  product.desc = descShort
+  pruneEmptyNonRequiredImageAttrs(attrs, mergedProductAttrs)
 
   if (Object.keys(mergedProductAttrs).length > 0) {
     product.attr_key_value_map = mergedProductAttrs
@@ -3959,15 +3987,36 @@ export async function handleDouyinGoodsProductSavePost(
       })
       return
     }
+    const categoryIdSave = String(erp.category_id ?? '').trim()
     const descMin = douyinDescriptionMinLen()
+    const descMax = douyinDescriptionMaxLen(undefined, categoryIdSave)
     const descKey =
       Object.keys(attrMap).find((k) => attrKeyIsDouyinDescription(k)) ?? 'Description'
     const descVal = String(attrMap[descKey] ?? '').trim()
+    const topDesc = String(prod.desc ?? '').trim()
+    if (topDesc && descVal && topDesc !== descVal) {
+      json(res, 400, {
+        message:
+          '商品顶层 desc 与开放平台 Description 不一致，已中止提交。请刷新页面后重试或清空「② 开放平台 API 字段」中的 Description 覆盖项。',
+        product_desc_len: topDesc.length,
+        description_attr_len: descVal.length,
+      })
+      return
+    }
     if (descVal.length < descMin) {
       json(res, 400, {
         message: `Description 过短（当前 ${descVal.length} 字）。请在「② 开放平台 API 字段」填写至少 ${descMin} 字的商品短描述，勿仅用 2～3 字商品名充当 Description。`,
         description_len: descVal.length,
         description_min: descMin,
+        description_max: descMax,
+      })
+      return
+    }
+    if (descVal.length > descMax) {
+      json(res, 400, {
+        message: `Description 过长（当前 ${descVal.length} 字，类目 ${categoryIdSave || '—'} 建议不超过 ${descMax} 字）。长文案请写在商品说明，短描述写在 Description。`,
+        description_len: descVal.length,
+        description_max: descMax,
       })
       return
     }
@@ -4588,9 +4637,10 @@ export async function handleDouyinMarketingActivityQueryGet(
     const paths = customPath
       ? [customPath]
       : [
+          '/goodlife/v1/cps/common_plan/list/',
+          '/goodlife/v1/cps/oriented_plan/list/',
           '/goodlife/v1/marketing/activity/query/',
           '/goodlife/v1/marketing/platform_activity/query/',
-          '/goodlife/v1/akte/marketing/activity/query/',
         ]
 
     let lastErr = ''
@@ -4625,7 +4675,11 @@ export async function handleDouyinMarketingActivityQueryGet(
       const biz = getDataError(j)
       if (!biz.ok) {
         lastErr = biz.msg || '抖音业务错误'
-        if (/not found|404|不存在|无权限|scope/i.test(lastErr)) continue
+        if (
+          /not found|404|不存在|无权限|scope|unsupported path|janus|不支持的路径/i.test(lastErr)
+        ) {
+          continue
+        }
         json(res, 200, {
           ok: false,
           platform: 'douyin',
@@ -4638,6 +4692,9 @@ export async function handleDouyinMarketingActivityQueryGet(
       const listRaw =
         data.activity_list ??
         data.activities ??
+        data.common_plan_list ??
+        data.plan_list ??
+        data.oriented_plan_list ??
         data.list ??
         data.items ??
         (Array.isArray(data) ? data : [])
@@ -4660,12 +4717,27 @@ export async function handleDouyinMarketingActivityQueryGet(
       return
     }
 
+    if (/unsupported path|janus|不支持的路径/i.test(lastErr)) {
+      json(res, 200, {
+        ok: true,
+        platform: 'douyin',
+        items: [],
+        total: 0,
+        page,
+        page_size: pageSize,
+        syncedAt: new Date().toISOString(),
+        upstreamNote:
+          '当前抖音中继未开放「平台营销活动查询」路径（Unsupported path/Janus）。请在来客开放平台开通营销/招商能力，并由运维配置 DOUYIN_MARKETING_ACTIVITY_QUERY_PATH 或在中继上透传官方 goodlife 路径。',
+      })
+      return
+    }
+
     json(res, 502, {
       ok: false,
       platform: 'douyin',
       message:
         lastErr ||
-        '未能拉取抖音营销活动（已尝试 marketing/activity/query 等路径）。请在开放平台确认「营销活动查询」能力已开通，或设置环境变量 DOUYIN_MARKETING_ACTIVITY_QUERY_PATH。',
+        '未能拉取抖音营销活动。请在开放平台确认能力已开通，或设置 DOUYIN_MARKETING_ACTIVITY_QUERY_PATH。',
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -4690,9 +4762,13 @@ function normalizeDouyinMarketingActivities(listRaw: unknown): {
   for (const row of listRaw) {
     if (!row || typeof row !== 'object') continue
     const r = row as Record<string, unknown>
-    const id = String(r.activity_id ?? r.id ?? r.campaign_id ?? '').trim()
+    const id = String(
+      r.activity_id ?? r.id ?? r.campaign_id ?? r.plan_id ?? r.common_plan_id ?? '',
+    ).trim()
     if (!id) continue
-    const title = String(r.activity_name ?? r.title ?? r.name ?? '平台活动').trim()
+    const title = String(
+      r.activity_name ?? r.plan_name ?? r.title ?? r.name ?? '平台活动',
+    ).trim()
     const summary = String(r.description ?? r.desc ?? r.summary ?? '').trim() || undefined
     const rawStatus = r.status ?? r.activity_status ?? r.state
     out.push({

@@ -177,6 +177,8 @@ function signKlingJwt(accessKey: string, secretKey: string): string {
   const payload = Buffer.from(
     JSON.stringify({
       iss: accessKey,
+      sub: accessKey,
+      iat: now,
       exp: now + 1800,
       nbf: now - 5,
     }),
@@ -186,9 +188,27 @@ function signKlingJwt(accessKey: string, secretKey: string): string {
   return `${signingInput}.${sig}`
 }
 
+function klingAuthFailureMessage(j: Record<string, unknown>, status: number): string {
+  const code = j.code ?? j.error_code ?? j.status
+  const msg =
+    (typeof j.message === 'string' && j.message) ||
+    (typeof j.msg === 'string' && j.msg) ||
+    (typeof j.error === 'string' && j.error) ||
+    (typeof j.error_message === 'string' && j.error_message) ||
+    ''
+  if (status === 401 || /auth/i.test(msg)) {
+    return (
+      `可灵鉴权失败（HTTP ${status}${msg ? `：${msg}` : ''}${code != null ? `，code=${code}` : ''}）。` +
+      '请到运营管控台「AI模型 → 短视频 / 视频模型 API」核对 Access Key 与 Secret Key 是否来自 app.klingai.com 开发者控制台（勿填反、勿含空格）；' +
+      '若使用国内节点可设置 KLING_API_BASE=https://api-beijing.klingai.com。'
+    )
+  }
+  return msg || `可灵接口错误 HTTP ${status}`
+}
+
 function pickKlingCreds(env: MerchantAiEnv): { ok: false; msg: string } | { ok: true; jwt: string } {
-  const ak = (env.KLING_ACCESS_KEY ?? '').trim()
-  const sk = (env.KLING_SECRET_KEY ?? '').trim()
+  const ak = (env.KLING_ACCESS_KEY ?? '').trim().replace(/\s+/g, '')
+  const sk = (env.KLING_SECRET_KEY ?? '').trim().replace(/\s+/g, '')
   if (!ak || !sk) {
     return {
       ok: false,
@@ -591,7 +611,6 @@ export async function handleMerchantAiVideoRoutes(input: {
         ? parsed.negative_prompt
         : 'blur, distortion, low quality'
 
-    const baseUrl = `${klingBase(env)}/v1/videos/${kind}`
     let reqBody: Record<string, unknown>
     if (kind === 'text2video') {
       if (!prompt) {
@@ -634,21 +653,37 @@ export async function handleMerchantAiVideoRoutes(input: {
       }
     }
 
-    const upstream = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cred.jwt}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(reqBody),
-    })
-    const j = await readJsonResponse(upstream)
-    if (!upstream.ok) {
-      const msg =
-        typeof j.message === 'string'
-          ? j.message
-          : `可灵接口错误 HTTP ${upstream.status}`
-      json(res, 502, { ok: false, message: msg, upstream: j })
+    const klingBases = [
+      klingBase(env),
+      'https://api-beijing.klingai.com',
+      'https://api.klingai.com',
+    ].filter((b, i, arr) => b && arr.indexOf(b) === i)
+
+    let upstream: globalThis.Response | null = null
+    let j: Record<string, unknown> = {}
+    for (const base of klingBases) {
+      const tryUrl = `${base.replace(/\/$/, '')}/v1/videos/${kind}`
+      const r = await fetch(tryUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cred.jwt}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reqBody),
+      })
+      const body = await readJsonResponse(r)
+      if (r.ok) {
+        upstream = r
+        j = body
+        break
+      }
+      j = body
+      upstream = r
+      if (r.status !== 401) break
+    }
+    if (!upstream || !upstream.ok) {
+      const msg = klingAuthFailureMessage(j, upstream?.status ?? 502)
+      json(res, upstream?.status === 401 ? 401 : 502, { ok: false, message: msg, upstream: j })
       return true
     }
     const { taskId } = unwrapKlingTask(j)
