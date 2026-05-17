@@ -1,4 +1,4 @@
-import { ArrowLeft, Filter, Loader2, Pencil, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, ExternalLink, Filter, Loader2, Pencil, RefreshCw, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -7,7 +7,12 @@ import {
   createPlatformLabel,
 } from '../constants/productCreatePlatforms'
 import { cn } from '../cn'
-import { loadProductEditLibrary, type ProductEditLibraryRow } from '../lib/productEditLibrary'
+import {
+  loadProductEditLibrary,
+  updateProductEditLibraryRow,
+  type ProductEditLibraryRow,
+} from '../lib/productEditLibrary'
+import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
 import {
   type MerchantProductListItem,
   fetchMerchantProductList,
@@ -44,6 +49,8 @@ export default function ProductsViewPage() {
 
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [syncToast, setSyncToast] = useState<string | null>(null)
+  const [priceEditId, setPriceEditId] = useState<string | null>(null)
+  const [priceEditValue, setPriceEditValue] = useState('')
 
   const refreshLibrary = useCallback(() => setLibraryTick((n) => n + 1), [])
 
@@ -107,6 +114,27 @@ export default function ProductsViewPage() {
   const resetFilters = () => {
     setStatus('全部')
     setKeyword('')
+  }
+
+  const applyLocalPrice = (id: string, price: number) => {
+    if (!Number.isFinite(price) || price <= 0) return
+    updateProductEditLibraryRow(id, { price: Math.round(price) })
+    const snap = loadDraftDetailSnapshot(id)
+    if (snap) {
+      saveDraftDetailSnapshot(id, { ...snap, price_yuan: price })
+    }
+    refreshLibrary()
+    setSyncToast(`已更新价格为 ¥${Math.round(price)}，可点「同步」推送到抖音来客`)
+    window.setTimeout(() => setSyncToast(null), 4200)
+  }
+
+  const toggleShelfLocal = (id: string, currentStatus: string) => {
+    const onShelf = currentStatus.includes('上架') || currentStatus === '在售'
+    const next = onShelf ? '已下架' : '已上架'
+    updateProductEditLibraryRow(id, { status: next })
+    refreshLibrary()
+    setSyncToast(onShelf ? '已标记为下架（本地），请同步至平台' : '已标记为上架（本地），请同步至平台')
+    window.setTimeout(() => setSyncToast(null), 4200)
   }
 
   const runSync = async (id: string) => {
@@ -295,9 +323,51 @@ export default function ProductsViewPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-700">{r.store}</td>
                   <td className="px-4 py-3 text-gray-700">{r.status}</td>
-                  <td className="px-4 py-3 text-gray-900">¥{r.price}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    {priceEditId === r.id ? (
+                      <form
+                        className="flex items-center gap-1"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          applyLocalPrice(r.id, Number.parseFloat(priceEditValue))
+                          setPriceEditId(null)
+                        }}
+                      >
+                        <input
+                          type="number"
+                          className="w-20 rounded border border-gray-300 px-2 py-1 text-sm"
+                          value={priceEditValue}
+                          onChange={(e) => setPriceEditValue(e.target.value)}
+                          autoFocus
+                        />
+                        <button type="submit" className="text-xs text-indigo-600">
+                          确定
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-gray-500"
+                          onClick={() => setPriceEditId(null)}
+                        >
+                          取消
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 hover:text-indigo-700"
+                        title="简易修改价格"
+                        onClick={() => {
+                          setPriceEditId(r.id)
+                          setPriceEditValue(String(r.price))
+                        }}
+                      >
+                        ¥{r.price}
+                        <Pencil className="h-3 w-3 text-gray-400" />
+                      </button>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       {activePlat === 'douyin' ? (
                         <Link
                           to={`/products/edit/douyin/${encodeURIComponent(r.id)}`}
@@ -316,6 +386,27 @@ export default function ProductsViewPage() {
                           <Pencil className="mr-1 h-3.5 w-3.5" />
                           编辑
                         </button>
+                      )}
+                      {activePlat === 'douyin' && (
+                        <>
+                          <Link
+                            to={`/products/edit/douyin/${encodeURIComponent(r.id)}`}
+                            className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                            title="编辑平台商品（来客字段）"
+                          >
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                            平台商品
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => toggleShelfLocal(r.id, r.status)}
+                            className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                            title="上下架（先更新本地状态，再点同步推送）"
+                          >
+                            <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
+                            {r.status.includes('上架') || r.status === '在售' ? '下架' : '上架'}
+                          </button>
+                        </>
                       )}
                       <button
                         type="button"
