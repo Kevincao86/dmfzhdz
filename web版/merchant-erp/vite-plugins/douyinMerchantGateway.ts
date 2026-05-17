@@ -117,10 +117,15 @@ function douyinGoodsSavePostBudgetMs(): number {
 }
 
 /** 同一实例内缓存 template/get，减少保存草稿/提交审核连续点击时的串行耗时 */
-const templateAttrsBundleCache = new Map<
-  string,
-  { expiresAt: number; bundle: { productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] } }
->()
+type TemplateAttrsBundle = {
+  productAttrs: Record<string, unknown>[]
+  skuAttrs: Record<string, unknown>[]
+  /** template.get 实际命中的 goodlife product_type（代金券常为 11，ERP UI 为 2） */
+  resolvedProductType?: number
+  resolvedOpenBizType?: number
+}
+
+const templateAttrsBundleCache = new Map<string, { expiresAt: number; bundle: TemplateAttrsBundle }>()
 
 function templateAttrsBundleCacheTtlMs(): number {
   const raw = process.env.MERCHANT_DOUYIN_TEMPLATE_CACHE_MS?.trim()
@@ -132,7 +137,7 @@ function templateAttrsBundleCacheTtlMs(): number {
 
 function templateAttrsBundleCacheKey(accountId: string, categoryId: string, productType: number): string {
   /** v5：template/get 仅返回 spu_attrs 时合并进 product；空模板时用文档标准 key 合成 */
-  return `${accountId}\t${categoryId}\t${productType}\tv5tpl`
+  return `${accountId}\t${categoryId}\t${productType}\tv6tpl`
 }
 
 function douyinFetch(input: string | URL, init?: RequestInit): Promise<Response> {
@@ -1153,8 +1158,10 @@ export async function handleDouyinGoodsProductDraftQueryGet(
 }
 
 /** template/get 上游失败或空 attrs 时返回与 save 兜底一致的结构（避免前端「fetch failed」卡死） */
-function buildSyntheticTemplateGetEnvelope(productType: number): Record<string, unknown> {
-  const syn = syntheticGoodlifeTemplateAttrsBundle(productType)
+function buildSyntheticTemplateGetEnvelope(erpUiProductType: number): Record<string, unknown> {
+  const syn = syntheticGoodlifeTemplateAttrsBundle(
+    isErpUiVoucherProductType(erpUiProductType) ? ERP_UI_PRODUCT_TYPE_VOUCHER : erpUiProductType,
+  )
   return {
     data: {
       error_code: 0,
@@ -1182,7 +1189,7 @@ export async function handleDouyinGoodsTemplateGetGet(
     return
   }
   const categoryId = (url.searchParams.get('category_id') ?? '').trim()
-  const productType = Number(url.searchParams.get('product_type') ?? '1') || 1
+  const erpUiProductType = Number(url.searchParams.get('product_type') ?? '1') || 1
   if (!categoryId) {
     json(res, 400, { message: '缺少 category_id' })
     return
@@ -1190,21 +1197,26 @@ export async function handleDouyinGoodsTemplateGetGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    let bundle = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
+    let bundle: TemplateAttrsBundle = { productAttrs: [], skuAttrs: [] }
     try {
-      bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, productType)
+      bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, erpUiProductType)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.warn(
         '[meoo douyin template/get] upstream_fetch_failed',
-        JSON.stringify({ category_id: categoryId, product_type: productType, message: msg.slice(0, 200) }),
+        JSON.stringify({
+          category_id: categoryId,
+          erp_ui_product_type: erpUiProductType,
+          message: msg.slice(0, 200),
+        }),
       )
     }
+    const templateGetApiType = bundle.resolvedProductType ?? goodlifeApiProductTypesForErpUi(erpUiProductType)[0]!
     if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
       const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
       u.searchParams.set('account_id', accountId)
       u.searchParams.set('category_id', categoryId)
-      u.searchParams.set('product_type', String(productType))
+      u.searchParams.set('product_type', String(templateGetApiType))
       try {
         const dr = await douyinServerFetch(u.toString(), {
           method: 'GET',
@@ -1240,32 +1252,45 @@ export async function handleDouyinGoodsTemplateGetGet(
       return
     }
     const useSynthetic =
-      productType === 2 ||
-      (productType === 1 && categoryRetailGroupAndVoucherLikely(categoryId)) ||
-      inferProductTypeEligibleFromTemplate(productType, bundle.productAttrs, bundle.skuAttrs, categoryId)
+      isErpUiVoucherProductType(erpUiProductType) ||
+      (erpUiProductType === 1 && categoryRetailGroupAndVoucherLikely(categoryId)) ||
+      inferProductTypeEligibleFromTemplate(
+        erpUiProductType,
+        bundle.productAttrs,
+        bundle.skuAttrs,
+        categoryId,
+      )
     if (useSynthetic) {
       console.warn(
         '[meoo douyin template/get] synthetic_fallback',
-        JSON.stringify({ category_id: categoryId, product_type: productType }),
+        JSON.stringify({
+          category_id: categoryId,
+          erp_ui_product_type: erpUiProductType,
+          goodlife_api_product_type: templateGetApiType,
+        }),
       )
-      json(res, 200, buildSyntheticTemplateGetEnvelope(productType))
+      json(res, 200, buildSyntheticTemplateGetEnvelope(erpUiProductType))
       return
     }
     json(res, 502, {
-      message: `抖音未返回类目 ${categoryId}、商品类型 ${productType} 的模板，且当前类目不支持本地兜底。请检查 DOUYIN_OPENAPI_BASE_URL 中继或更换类目。`,
+      message: `抖音未返回类目 ${categoryId}、商品类型 ${erpUiProductType} 的模板，且当前类目不支持本地兜底。请检查 DOUYIN_OPENAPI_BASE_URL 中继或更换类目。`,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (
-      productType === 2 ||
+      isErpUiVoucherProductType(erpUiProductType) ||
       categoryRetailGroupAndVoucherLikely(categoryId) ||
-      productType === 1
+      erpUiProductType === 1
     ) {
       console.warn(
         '[meoo douyin template/get] error_synthetic_fallback',
-        JSON.stringify({ category_id: categoryId, product_type: productType, message: msg.slice(0, 200) }),
+        JSON.stringify({
+          category_id: categoryId,
+          erp_ui_product_type: erpUiProductType,
+          message: msg.slice(0, 200),
+        }),
       )
-      json(res, 200, buildSyntheticTemplateGetEnvelope(productType))
+      json(res, 200, buildSyntheticTemplateGetEnvelope(erpUiProductType))
       return
     }
     json(res, 502, { message: `抖音商品模板查询失败：${msg}` })
@@ -1932,7 +1957,9 @@ function mapGoodlifeProductToErpDetail(
   const product_id = String(product.product_id ?? product.id ?? '').trim()
   const out_id = String(product.out_id ?? product.outId ?? '').trim() || `erp-${product_id || randomUUID()}`
   const category_id = String(product.category_id ?? product.categoryId ?? '').trim()
-  const product_type = Number(product.product_type ?? product.productType) || 1
+  const product_type = erpUiProductTypeFromGoodlifeApi(
+    Number(product.product_type ?? product.productType) || 1,
+  )
   const product_name = String(product.product_name ?? product.name ?? '').trim()
   const attrMap =
     product.attr_key_value_map && typeof product.attr_key_value_map === 'object' && !Array.isArray(product.attr_key_value_map)
@@ -2155,6 +2182,43 @@ function categoryRetailGroupAndVoucherLikely(categoryId: string): boolean {
   return categoryRetailComboAttrNormalize(categoryId)
 }
 
+/** ERP/来客 UI：代金券 */
+const ERP_UI_PRODUCT_TYPE_VOUCHER = 2
+
+/** goodlife OpenAPI 常见代金券 product_type（文档/餐饮旧版为 11；部分链路仍认 2） */
+const GOODLIFE_API_PRODUCT_TYPE_VOUCHER_PRIMARY = 11
+
+function isErpUiVoucherProductType(t: number): boolean {
+  return t === ERP_UI_PRODUCT_TYPE_VOUCHER
+}
+
+function isGoodlifeVoucherApiProductType(t: number): boolean {
+  return t === ERP_UI_PRODUCT_TYPE_VOUCHER || t === GOODLIFE_API_PRODUCT_TYPE_VOUCHER_PRIMARY || t === 15
+}
+
+/** 抖音详情/保存返回的 API 类型 → ERP 向导展示类型 */
+function erpUiProductTypeFromGoodlifeApi(apiType: number): number {
+  if (apiType === GOODLIFE_API_PRODUCT_TYPE_VOUCHER_PRIMARY || apiType === 15) return ERP_UI_PRODUCT_TYPE_VOUCHER
+  return apiType
+}
+
+/** ERP UI 类型 → goodlife template/save 应尝试的 product_type 顺序（代金券优先 11） */
+function goodlifeApiProductTypesForErpUi(uiProductType: number): number[] {
+  if (!isErpUiVoucherProductType(uiProductType)) return [uiProductType || 1]
+  const envAlt = process.env.DOUYIN_GOODS_VOUCHER_TEMPLATE_PRODUCT_TYPE_ALT?.trim() ?? ''
+  const alts = envAlt
+    .split(/[,;\s]+/)
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0)
+  return Array.from(
+    new Set(
+      [GOODLIFE_API_PRODUCT_TYPE_VOUCHER_PRIMARY, ERP_UI_PRODUCT_TYPE_VOUCHER, 15, ...alts].filter(
+        (n) => Number.isFinite(n) && n > 0,
+      ),
+    ),
+  )
+}
+
 /**
  * 按 template.get 返回的 attr 形态判断某 product_type 是否可选（避免「有次卡模板字段却实为团购模板」误开次卡）。
  */
@@ -2230,35 +2294,27 @@ async function fetchTemplateAttrsBundle(
   accountId: string,
   token: string,
   categoryId: string,
-  productType: number,
+  erpUiProductType: number,
   signal?: AbortSignal,
-): Promise<{ productAttrs: Record<string, unknown>[]; skuAttrs: Record<string, unknown>[] }> {
+  opts?: { apiProductTypeOnly?: number },
+): Promise<TemplateAttrsBundle> {
   if (!categoryId) return { productAttrs: [], skuAttrs: [] }
   const openBizAttempts: Array<number | undefined> = [undefined]
   /** 代金券：部分零售类目需 open_biz_type=0 才返回模板（勿传 1=组合券包） */
-  if (productType === 2) openBizAttempts.push(0)
+  if (isErpUiVoucherProductType(erpUiProductType) || opts?.apiProductTypeOnly != null) {
+    openBizAttempts.push(0)
+  }
   const productTypeAttempts: number[] =
-    productType === 2
-      ? Array.from(
-          new Set(
-            [
-              productType,
-              ...[11, 15],
-              ...(process.env.DOUYIN_GOODS_VOUCHER_TEMPLATE_PRODUCT_TYPE_ALT?.trim() ?? '')
-                .split(/[,;\s]+/)
-                .map((s) => Number(s.trim()))
-                .filter((n) => Number.isFinite(n) && n > 0),
-            ].filter((n) => Number.isFinite(n) && n > 0),
-          ),
-        )
-      : [productType]
+    opts?.apiProductTypeOnly != null
+      ? [opts.apiProductTypeOnly]
+      : goodlifeApiProductTypesForErpUi(erpUiProductType)
   const ttl = templateAttrsBundleCacheTtlMs()
-  const ck = templateAttrsBundleCacheKey(accountId, categoryId, productType)
-  if (ttl > 0) {
+  const ck = templateAttrsBundleCacheKey(accountId, categoryId, erpUiProductType)
+  if (ttl > 0 && opts?.apiProductTypeOnly == null) {
     const hit = templateAttrsBundleCache.get(ck)
     if (hit && Date.now() < hit.expiresAt) return hit.bundle
   }
-  let last = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
+  let last: TemplateAttrsBundle = { productAttrs: [], skuAttrs: [] }
   for (const pt of productTypeAttempts) {
     for (const obt of openBizAttempts) {
       try {
@@ -2270,12 +2326,13 @@ async function fetchTemplateAttrsBundle(
           obt,
           signal,
         )
-        last = bundle
+        last = { ...bundle, resolvedProductType: pt, resolvedOpenBizType: obt }
         if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
-          if (ttl > 0) {
-            templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+          const resolved: TemplateAttrsBundle = { ...bundle, resolvedProductType: pt, resolvedOpenBizType: obt }
+          if (ttl > 0 && opts?.apiProductTypeOnly == null) {
+            templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle: resolved })
           }
-          return bundle
+          return resolved
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
@@ -2283,6 +2340,7 @@ async function fetchTemplateAttrsBundle(
           '[meoo douyin template/get] bundle_attempt_failed',
           JSON.stringify({
             category_id: categoryId,
+            erp_ui_product_type: erpUiProductType,
             product_type: pt,
             open_biz_type: obt ?? null,
             message: msg.slice(0, 200),
@@ -3745,6 +3803,7 @@ function resolveOpenBizTypeForGoodlifeSave(
   }
   /** 零售团购 5003003：open_biz_type=1 为「组合券包」，误传易触发业务规则/套餐数量类误报 */
   if (productType === 1 && categoryRetailComboAttrNormalize(categoryId)) return 0
+  if (isGoodlifeVoucherApiProductType(productType)) return 0
   return productType === 1 ? 1 : 0
 }
 
@@ -3759,17 +3818,20 @@ async function buildGoodlifeProductSaveBody(
   _mode: 'draft' | 'submit',
   account_name: string,
   douyinHttpSignal?: AbortSignal,
+  opts?: { goodlifeProductTypeOverride?: number },
 ): Promise<{
   body: Record<string, unknown>
   templateProductAttrs: Record<string, unknown>[]
   templateSkuAttrs: Record<string, unknown>[]
+  erpUiProductType: number
+  goodlifeApiProductType: number
 }> {
   const product_name = String(erp.product_name ?? '').trim()
   const category_id = String(erp.category_id ?? '').trim()
   const productDescRaw = String(erp.product_desc ?? product_name).trim()
-  const product_type = Number(erp.product_type) || 1
-  const isGroupBuy = product_type === 1
-  const isVoucher = product_type === 2
+  const erpUiProductType = Number(erp.product_type) || 1
+  const isGroupBuy = erpUiProductType === 1
+  const isVoucher = isErpUiVoucherProductType(erpUiProductType)
   const out_id = resolveProductOutIdForSave(erp)
   const product_id_existing =
     typeof erp.product_id === 'string' && erp.product_id.trim() ? erp.product_id.trim() : ''
@@ -3791,40 +3853,47 @@ async function buildGoodlifeProductSaveBody(
   const stockQty =
     Number.isFinite(stockQtyRaw) && stockQtyRaw > 0 ? Math.min(Math.floor(stockQtyRaw), 99_999_999) : 999_999
 
-  let { productAttrs: attrs, skuAttrs } = await fetchTemplateAttrsBundle(
+  const templateBundle = await fetchTemplateAttrsBundle(
     accountId,
     token,
     category_id,
-    product_type,
+    erpUiProductType,
     douyinHttpSignal,
+    opts?.goodlifeProductTypeOverride != null
+      ? { apiProductTypeOnly: opts.goodlifeProductTypeOverride }
+      : undefined,
   )
+  let { productAttrs: attrs, skuAttrs } = templateBundle
+  const goodlifeApiProductType =
+    opts?.goodlifeProductTypeOverride ??
+    templateBundle.resolvedProductType ??
+    goodlifeApiProductTypesForErpUi(erpUiProductType)[0] ??
+    erpUiProductType
   if (attrs.length === 0 && skuAttrs.length === 0 && category_id) {
-    const typeLabel =
-      product_type === 2 ? '代金券' : product_type === 1 ? '团购' : `商品类型${product_type}`
-    const hint =
-      product_type === 2
-        ? '该类目在抖音侧未配置代金券模板，请改选「团购」或更换支持代金券的三级类目后再提交。'
-        : '请更换三级类目或联系来客运营配置该类目商品模板后再提交。'
-    const retailVoucherFallback =
-      product_type === 2 && categoryRetailGroupAndVoucherLikely(category_id)
+    const typeLabel = isVoucher ? '代金券' : erpUiProductType === 1 ? '团购' : `商品类型${erpUiProductType}`
+    const hint = isVoucher
+      ? '该类目在抖音侧未配置代金券模板，请改选「团购」或更换支持代金券的三级类目后再提交。'
+      : '请更换三级类目或联系来客运营配置该类目商品模板后再提交。'
+    const retailVoucherFallback = isVoucher && categoryRetailGroupAndVoucherLikely(category_id)
     if (_mode === 'submit' && !retailVoucherFallback) {
       throw new Error(
         `抖音未返回「${typeLabel}」商品模板（category_id=${category_id}）。${hint}`,
       )
     }
-    if (product_type >= 3 && _mode === 'submit') {
+    if (erpUiProductType >= 3 && _mode === 'submit') {
       throw new Error(
         `抖音未返回「${typeLabel}」商品模板（category_id=${category_id}）。${hint}`,
       )
     }
-    const syn = syntheticGoodlifeTemplateAttrsBundle(product_type)
+    const syn = syntheticGoodlifeTemplateAttrsBundle(ERP_UI_PRODUCT_TYPE_VOUCHER)
     attrs = syn.productAttrs
     skuAttrs = syn.skuAttrs
     console.warn(
       '[meoo douyin goods/save] template_get_empty_using_doc_fallback',
       JSON.stringify({
         category_id,
-        product_type,
+        erp_ui_product_type: erpUiProductType,
+        goodlife_api_product_type: goodlifeApiProductType,
         mode: _mode,
         voucher_shaped: isVoucher,
       }),
@@ -3938,9 +4007,9 @@ async function buildGoodlifeProductSaveBody(
     product_name,
     desc: product_name,
     category_id,
-    product_type,
+    product_type: goodlifeApiProductType,
     biz_line: 1,
-    open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, product_type, category_id),
+    open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, goodlifeApiProductType, category_id),
     out_id,
     account_name,
     sold_start_time: nowSec,
@@ -4092,6 +4161,8 @@ async function buildGoodlifeProductSaveBody(
     },
     templateProductAttrs: attrs,
     templateSkuAttrs: skuAttrs,
+    erpUiProductType,
+    goodlifeApiProductType,
   }
 }
 
@@ -4182,6 +4253,8 @@ function summarizeDouyinProductSaveForLog(
   meta: {
     templateProductAttrs: Record<string, unknown>[]
     templateSkuAttrs: Record<string, unknown>[]
+    erpUiProductType?: number
+    goodlifeApiProductType?: number
   },
 ): Record<string, unknown> {
   const product = saveBody.product as Record<string, unknown> | undefined
@@ -4252,6 +4325,8 @@ function summarizeDouyinProductSaveForLog(
     goodlife_official_fallback: process.env.DOUYIN_OPENAPI_GOODLIFE_OFFICIAL_FALLBACK?.trim() === '1',
     account_id: saveBody.account_id,
     product_type: product?.product_type,
+    erp_ui_product_type: meta.erpUiProductType,
+    goodlife_api_product_type: meta.goodlifeApiProductType,
     category_id: product?.category_id,
     open_biz_type: product?.open_biz_type,
     open_biz_type_note:
@@ -4350,6 +4425,14 @@ function extractDouyinLogidFromEnvelope(j: Record<string, unknown>): string {
 /**
  * 抖音 goods/save 文档中「系统繁忙 / 稍后重试」类错误，适合短退避重试（仍失败则把 logid 交给开放平台排查）。
  */
+/** goods/save 业务错误：类目与 product_type 在抖音侧无注册模板（常见于 UI 代金券=2 但 API 须用 11） */
+function isDouyinSaveTemplateMismatchError(j: Record<string, unknown>, raw: string): boolean {
+  const data = j.data as Record<string, unknown> | undefined
+  const desc = typeof data?.description === 'string' ? data.description : ''
+  const blob = `${desc}${raw}`.slice(0, 4000)
+  return /商品类型和类目对应的商品模板不存在|模板不存在|无对应模板|模板不匹配/.test(blob)
+}
+
 function isDouyinProductSaveResponseRetryable(j: Record<string, unknown>, raw: string): boolean {
   const data = j.data as Record<string, unknown> | undefined
   const code = data ? numericErrorCode(data.error_code) : undefined
@@ -4681,277 +4764,328 @@ export async function handleDouyinGoodsProductSavePost(
 
     const buildAbort = new AbortController()
     const buildTimer = setTimeout(() => buildAbort.abort(), buildBudgetMs)
+    const erpUiProductType = Number(erp.product_type) || 1
+    const goodlifeApiAttempts = isErpUiVoucherProductType(erpUiProductType)
+      ? goodlifeApiProductTypesForErpUi(erpUiProductType)
+      : [erpUiProductType]
 
-    let built: Awaited<ReturnType<typeof buildGoodlifeProductSaveBody>>
-    try {
-      built = await buildGoodlifeProductSaveBody(
-        accountId,
-        token,
-        erp,
-        mode,
-        accountName,
-        buildAbort.signal,
-      )
-    } catch (e) {
-      clearTimeout(buildTimer)
-      const msg = e instanceof Error ? e.message : String(e)
-      const isAbort =
-        (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
-        /aborted|AbortError/i.test(msg)
-      console.warn(
-        '[meoo douyin goods/save] phase_fail',
-        JSON.stringify({
-          phase: 'build',
-          mode,
-          is_abort: isAbort,
-          build_budget_s: Math.round(buildBudgetMs / 1000),
-          message: msg.slice(0, 400),
-        }),
-      )
-      json(res, isAbort ? 504 : 502, {
-        message: isAbort
-          ? `抖音商品保存「模板/组装」阶段超时（约 ${Math.round(buildBudgetMs / 1000)}s）：template/get 或组装未及时完成。请稍后重试或检查 DOUYIN_OPENAPI_BASE_URL 中继。可调环境变量 DOUYIN_GOODS_BUILD_TIMEOUT_MS（默认 38s）。`
-          : `组装商品保存请求失败：${msg}`,
-      })
-      return
-    }
-    clearTimeout(buildTimer)
-
-    const saveBody = built.body
-    const prod = saveBody.product as Record<string, unknown>
-    if (prod && typeof prod === 'object') normalizeGoodlifeProductTopLevelTimes(prod)
-    const bodyBytes = JSON.stringify(saveBody).length
-    const badAk = findAttrMapDataUrlOrBlobKeys(prod.attr_key_value_map)
-    const skuObj = saveBody.sku as Record<string, unknown> | undefined
-    const badSk = findAttrMapDataUrlOrBlobKeys(skuObj?.attr_key_value_map)
-    if (badAk.length > 0 || badSk.length > 0) {
-      json(res, 400, {
-        message:
-          '组装后的 attr_key_value_map 仍含有 data:image/blob: 内联图，抖音无法接受且易导致超时。请检查开放平台类目手填项与图片来源。',
-        bad_product_attr_keys: badAk.slice(0, 40),
-        bad_sku_attr_keys: badSk.slice(0, 40),
-      })
-      return
-    }
-    if (bodyBytes > 2_400_000) {
-      json(res, 400, {
-        message: `商品保存请求体约 ${Math.round(bodyBytes / 1_000_000)}MB，过大（常见原因：图片仍为 base64 内联）。请改为 https 图片 URL 后再试。`,
-        save_body_bytes: bodyBytes,
-      })
-      return
-    }
-    const saveLogSummary = summarizeDouyinProductSaveForLog(saveBody, mode, {
-      templateProductAttrs: built.templateProductAttrs,
-      templateSkuAttrs: built.templateSkuAttrs,
-    })
-    console.info(
-      '[meoo douyin goods/save] built',
-      JSON.stringify({
-        ...saveLogSummary,
-        save_body_bytes: bodyBytes,
-      }),
-    )
-
-    const attrMap =
-      prod.attr_key_value_map && typeof prod.attr_key_value_map === 'object' && !Array.isArray(prod.attr_key_value_map)
-        ? (prod.attr_key_value_map as Record<string, string>)
-        : {}
-    const missProd = listUnfilledRequiredTemplateAttrs(built.templateProductAttrs, attrMap)
-    const publishableImages = productImageUrlsFromErp(erp).filter((u) => /^https?:\/\//i.test(u))
-    if (
-      missProd.some((k) => /^image_list$/i.test(k) || /image|img|carousel|头图|主图|轮播|封面/i.test(k)) &&
-      publishableImages.length === 0
-    ) {
-      json(res, 400, {
-        message:
-          '缺少商品头图/轮播图（image_list 等）。请在「① 商品基础信息」上传头图并取得 https 公网地址后再提交；data/blob 预览图无法用于 goods/save。',
-        missing_required_product_attr_keys: missProd.filter((k) => /image|img/i.test(k)).slice(0, 12),
-      })
-      return
-    }
-    const categoryIdSave = String(erp.category_id ?? '').trim()
-    const descKey =
-      Object.keys(attrMap).find((k) => attrKeyIsDouyinDescription(k)) ?? 'Description'
-    const descVal = String(attrMap[descKey] ?? '').trim()
-    const topDesc = String(prod.desc ?? '').trim()
-    if (
-      topDesc &&
-      descVal &&
-      !isDouyinDescriptionAttrUnused(descVal) &&
-      !isDouyinNoteRichTextJsonString(descVal) &&
-      topDesc !== descVal
-    ) {
-      json(res, 400, {
-        message:
-          '商品顶层 desc 与开放平台 Description 不一致。有富文本时 Description 应为 "[]"，短描述写在 product.desc / 商品说明。',
-        product_desc_len: topDesc.length,
-        description_attr_len: descVal.length,
-      })
-      return
-    }
-    const descCheck = validateDouyinDescriptionAttrForSave(descVal, categoryIdSave)
-    if (!descCheck.ok) {
-      json(res, 400, {
-        message: descCheck.message,
-        description_len: descCheck.description_len,
-      })
-      return
-    }
-    const richRaw = String(attrMap.description_rich_text ?? '').trim()
-    if (richRaw && !isDouyinNoteRichTextJsonString(richRaw)) {
-      json(res, 400, {
-        message:
-          'description_rich_text（其他说明/富文本）须为 NOTE 控件 JSON 列表，不能为纯文本。请点「一键填满」或清空该字段后重试。',
-        description_rich_text_preview: richRaw.slice(0, 120),
-      })
-      return
-    }
-    const nameLen = String(erp.product_name ?? '').trim().length
-    if (nameLen < 4) {
-      json(res, 400, {
-        message: '商品名称过短（建议至少 4 个字），抖音审核与 Description/SubTitle 校验易失败。',
-        name_len: nameLen,
-      })
-      return
-    }
-    const maxAttempts = douyinGoodsSaveRetryMaxAttempts()
+    let built!: Awaited<ReturnType<typeof buildGoodlifeProductSaveBody>>
+    let saveBody!: Record<string, unknown>
+    let bodyBytes = 0
     let dr!: Response
     let raw = ''
     let trimmed = ''
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0) {
-        const backoff = 500 + attempt * 450
-        console.info(
-          '[meoo douyin goods/save] retry_backoff',
-          JSON.stringify({ phase: 'before_product_save_retry', mode, attempt, backoff_ms: backoff }),
-        )
-        await sleepMs(backoff)
-      }
-      console.info(
-        '[meoo douyin goods/save] posting_save',
-        JSON.stringify({
-          phase: 'before_product_save_post',
-          mode,
-          attempt,
-          max_attempts: maxAttempts,
-          save_post_budget_s: Math.round(savePostBudgetMs / 1000),
-          save_body_bytes: bodyBytes,
-        }),
-      )
-      const accessToken = await ensureDouyinToken(session)
-      const attemptAbort = new AbortController()
-      const attemptTimer = setTimeout(() => attemptAbort.abort(), savePostBudgetMs)
+    let upstreamBizHint = ''
+
+    for (let typeIdx = 0; typeIdx < goodlifeApiAttempts.length; typeIdx++) {
+      const apiPt = goodlifeApiAttempts[typeIdx]!
       try {
-        dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
-          method: 'POST',
-          headers: {
-            'access-token': accessToken,
-            'content-type': 'application/json',
-            'Rpc-Transit-Life-Account': accountId,
-          },
-          body: JSON.stringify(saveBody),
-          signal: attemptAbort.signal,
-        })
-        raw = await dr.text()
+        built = await buildGoodlifeProductSaveBody(
+          accountId,
+          token,
+          erp,
+          mode,
+          accountName,
+          buildAbort.signal,
+          { goodlifeProductTypeOverride: apiPt },
+        )
       } catch (e) {
-        clearTimeout(attemptTimer)
+        clearTimeout(buildTimer)
         const msg = e instanceof Error ? e.message : String(e)
         const isAbort =
           (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
           /aborted|AbortError/i.test(msg)
-        const canNetRetry = attempt < maxAttempts - 1 && /aborted|AbortError|timeout|fetch failed|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket/i.test(msg)
-        if (canNetRetry) {
+        console.warn(
+          '[meoo douyin goods/save] phase_fail',
+          JSON.stringify({
+            phase: 'build',
+            mode,
+            goodlife_api_product_type: apiPt,
+            is_abort: isAbort,
+            build_budget_s: Math.round(buildBudgetMs / 1000),
+            message: msg.slice(0, 400),
+          }),
+        )
+        json(res, isAbort ? 504 : 502, {
+          message: isAbort
+            ? `抖音商品保存「模板/组装」阶段超时（约 ${Math.round(buildBudgetMs / 1000)}s）：template/get 或组装未及时完成。请稍后重试或检查 DOUYIN_OPENAPI_BASE_URL 中继。可调环境变量 DOUYIN_GOODS_BUILD_TIMEOUT_MS（默认 38s）。`
+            : `组装商品保存请求失败：${msg}`,
+        })
+        return
+      }
+
+      saveBody = built.body
+      const prod = saveBody.product as Record<string, unknown>
+      if (prod && typeof prod === 'object') normalizeGoodlifeProductTopLevelTimes(prod)
+      bodyBytes = JSON.stringify(saveBody).length
+      const badAk = findAttrMapDataUrlOrBlobKeys(prod.attr_key_value_map)
+      const skuObj = saveBody.sku as Record<string, unknown> | undefined
+      const badSk = findAttrMapDataUrlOrBlobKeys(skuObj?.attr_key_value_map)
+      if (badAk.length > 0 || badSk.length > 0) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message:
+            '组装后的 attr_key_value_map 仍含有 data:image/blob: 内联图，抖音无法接受且易导致超时。请检查开放平台类目手填项与图片来源。',
+          bad_product_attr_keys: badAk.slice(0, 40),
+          bad_sku_attr_keys: badSk.slice(0, 40),
+        })
+        return
+      }
+      if (bodyBytes > 2_400_000) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message: `商品保存请求体约 ${Math.round(bodyBytes / 1_000_000)}MB，过大（常见原因：图片仍为 base64 内联）。请改为 https 图片 URL 后再试。`,
+          save_body_bytes: bodyBytes,
+        })
+        return
+      }
+      const saveLogSummary = summarizeDouyinProductSaveForLog(saveBody, mode, {
+        templateProductAttrs: built.templateProductAttrs,
+        templateSkuAttrs: built.templateSkuAttrs,
+        erpUiProductType: built.erpUiProductType,
+        goodlifeApiProductType: built.goodlifeApiProductType,
+      })
+      console.info(
+        '[meoo douyin goods/save] built',
+        JSON.stringify({
+          ...saveLogSummary,
+          save_body_bytes: bodyBytes,
+          goodlife_api_attempt: typeIdx + 1,
+          goodlife_api_attempts: goodlifeApiAttempts.length,
+        }),
+      )
+
+      const attrMap =
+        prod.attr_key_value_map && typeof prod.attr_key_value_map === 'object' && !Array.isArray(prod.attr_key_value_map)
+          ? (prod.attr_key_value_map as Record<string, string>)
+          : {}
+      const missProd = listUnfilledRequiredTemplateAttrs(built.templateProductAttrs, attrMap)
+      const publishableImages = productImageUrlsFromErp(erp).filter((u) => /^https?:\/\//i.test(u))
+      if (
+        missProd.some((k) => /^image_list$/i.test(k) || /image|img|carousel|头图|主图|轮播|封面/i.test(k)) &&
+        publishableImages.length === 0
+      ) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message:
+            '缺少商品头图/轮播图（image_list 等）。请在「① 商品基础信息」上传头图并取得 https 公网地址后再提交；data/blob 预览图无法用于 goods/save。',
+          missing_required_product_attr_keys: missProd.filter((k) => /image|img/i.test(k)).slice(0, 12),
+        })
+        return
+      }
+      const categoryIdSave = String(erp.category_id ?? '').trim()
+      const descKey =
+        Object.keys(attrMap).find((k) => attrKeyIsDouyinDescription(k)) ?? 'Description'
+      const descVal = String(attrMap[descKey] ?? '').trim()
+      const topDesc = String(prod.desc ?? '').trim()
+      if (
+        topDesc &&
+        descVal &&
+        !isDouyinDescriptionAttrUnused(descVal) &&
+        !isDouyinNoteRichTextJsonString(descVal) &&
+        topDesc !== descVal
+      ) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message:
+            '商品顶层 desc 与开放平台 Description 不一致。有富文本时 Description 应为 "[]"，短描述写在 product.desc / 商品说明。',
+          product_desc_len: topDesc.length,
+          description_attr_len: descVal.length,
+        })
+        return
+      }
+      const descCheck = validateDouyinDescriptionAttrForSave(descVal, categoryIdSave)
+      if (!descCheck.ok) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message: descCheck.message,
+          description_len: descCheck.description_len,
+        })
+        return
+      }
+      const richRaw = String(attrMap.description_rich_text ?? '').trim()
+      if (richRaw && !isDouyinNoteRichTextJsonString(richRaw)) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message:
+            'description_rich_text（其他说明/富文本）须为 NOTE 控件 JSON 列表，不能为纯文本。请点「一键填满」或清空该字段后重试。',
+          description_rich_text_preview: richRaw.slice(0, 120),
+        })
+        return
+      }
+      const nameLen = String(erp.product_name ?? '').trim().length
+      if (nameLen < 4) {
+        clearTimeout(buildTimer)
+        json(res, 400, {
+          message: '商品名称过短（建议至少 4 个字），抖音审核与 Description/SubTitle 校验易失败。',
+          name_len: nameLen,
+        })
+        return
+      }
+      const maxAttempts = douyinGoodsSaveRetryMaxAttempts()
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) {
+          const backoff = 500 + attempt * 450
+          console.info(
+            '[meoo douyin goods/save] retry_backoff',
+            JSON.stringify({ phase: 'before_product_save_retry', mode, attempt, backoff_ms: backoff }),
+          )
+          await sleepMs(backoff)
+        }
+        console.info(
+          '[meoo douyin goods/save] posting_save',
+          JSON.stringify({
+            phase: 'before_product_save_post',
+            mode,
+            attempt,
+            goodlife_api_product_type: apiPt,
+            max_attempts: maxAttempts,
+            save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+            save_body_bytes: bodyBytes,
+          }),
+        )
+        const accessToken = await ensureDouyinToken(session)
+        const attemptAbort = new AbortController()
+        const attemptTimer = setTimeout(() => attemptAbort.abort(), savePostBudgetMs)
+        try {
+          dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
+            method: 'POST',
+            headers: {
+              'access-token': accessToken,
+              'content-type': 'application/json',
+              'Rpc-Transit-Life-Account': accountId,
+            },
+            body: JSON.stringify(saveBody),
+            signal: attemptAbort.signal,
+          })
+          raw = await dr.text()
+        } catch (e) {
+          clearTimeout(attemptTimer)
+          const msg = e instanceof Error ? e.message : String(e)
+          const isAbort =
+            (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
+            /aborted|AbortError/i.test(msg)
+          const canNetRetry =
+            attempt < maxAttempts - 1 &&
+            /aborted|AbortError|timeout|fetch failed|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket/i.test(msg)
+          if (canNetRetry) {
+            console.warn(
+              '[meoo douyin goods/save] phase_fail_retry',
+              JSON.stringify({
+                phase: 'product_save_fetch',
+                mode,
+                attempt,
+                is_abort: isAbort,
+                save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+                message: msg.slice(0, 400),
+              }),
+            )
+            continue
+          }
+          clearTimeout(buildTimer)
           console.warn(
-            '[meoo douyin goods/save] phase_fail_retry',
+            '[meoo douyin goods/save] phase_fail',
             JSON.stringify({
               phase: 'product_save_fetch',
               mode,
               attempt,
               is_abort: isAbort,
               save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+              save_body_bytes: bodyBytes,
               message: msg.slice(0, 400),
             }),
           )
-          continue
+          json(res, isAbort ? 504 : 502, {
+            message: isAbort
+              ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
+              : `抖音 goods/save 网络失败：${msg}`,
+          })
+          return
         }
-        console.warn(
-          '[meoo douyin goods/save] phase_fail',
-          JSON.stringify({
-            phase: 'product_save_fetch',
-            mode,
-            attempt,
-            is_abort: isAbort,
-            save_post_budget_s: Math.round(savePostBudgetMs / 1000),
-            save_body_bytes: bodyBytes,
-            message: msg.slice(0, 400),
-          }),
-        )
-        json(res, isAbort ? 504 : 502, {
-          message: isAbort
-            ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
-            : `抖音 goods/save 网络失败：${msg}`,
-        })
-        return
-      }
-      clearTimeout(attemptTimer)
-      trimmed = raw.replace(/^\uFEFF/, '').trim()
-      if (trimmed.startsWith('<') || !trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+        clearTimeout(attemptTimer)
+        trimmed = raw.replace(/^\uFEFF/, '').trim()
+        if (trimmed.startsWith('<') || !trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+          break
+        }
+        const jAttempt = parseDouyinJson(trimmed)
+        if (dr.ok && !getDataError(jAttempt).ok) {
+          if (isDouyinSaveResponseTokenExpired(jAttempt) && attempt < maxAttempts - 1) {
+            invalidateDouyinMerchantClientTokenCache(session)
+            console.warn(
+              '[meoo douyin goods/save] access_token_stale_retry',
+              JSON.stringify({
+                mode,
+                attempt,
+                logid: extractDouyinLogidFromEnvelope(jAttempt),
+                hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+              }),
+            )
+            continue
+          }
+          if (isDouyinProductSaveResponseRetryable(jAttempt, raw) && attempt < maxAttempts - 1) {
+            console.warn(
+              '[meoo douyin goods/save] upstream_transient_retry',
+              JSON.stringify({
+                mode,
+                attempt,
+                logid: extractDouyinLogidFromEnvelope(jAttempt),
+                hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+              }),
+            )
+            continue
+          }
+        }
         break
       }
-      const jAttempt = parseDouyinJson(trimmed)
-      if (dr.ok && !getDataError(jAttempt).ok) {
-        if (isDouyinSaveResponseTokenExpired(jAttempt) && attempt < maxAttempts - 1) {
-          invalidateDouyinMerchantClientTokenCache(session)
-          console.warn(
-            '[meoo douyin goods/save] access_token_stale_retry',
-            JSON.stringify({
-              mode,
-              attempt,
-              logid: extractDouyinLogidFromEnvelope(jAttempt),
-              hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
-            }),
-          )
-          continue
+
+      upstreamBizHint = ''
+      try {
+        const peek = trimmed.replace(/^\uFEFF/, '').trim()
+        if (peek.startsWith('{')) {
+          const jpeek = parseDouyinJson(peek)
+          const ge = getDataError(jpeek)
+          upstreamBizHint = ge.ok ? 'biz_ok' : String(ge.msg ?? 'biz_err').slice(0, 240)
         }
-        if (isDouyinProductSaveResponseRetryable(jAttempt, raw) && attempt < maxAttempts - 1) {
-          console.warn(
-            '[meoo douyin goods/save] upstream_transient_retry',
-            JSON.stringify({
-              mode,
-              attempt,
-              logid: extractDouyinLogidFromEnvelope(jAttempt),
-              hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
-            }),
-          )
-          continue
-        }
+      } catch {
+        upstreamBizHint = 'parse_skip'
+      }
+      const jPosted = trimmed.startsWith('{') ? parseDouyinJson(trimmed) : ({} as Record<string, unknown>)
+      console.info(
+        '[meoo douyin goods/save] posted',
+        JSON.stringify({
+          phase: 'after_product_save_post',
+          mode,
+          client_trace: clientTrace || undefined,
+          http_status: dr.status,
+          upstream_biz: upstreamBizHint,
+          goodlife_api_product_type: apiPt,
+          logid: extractDouyinLogidFromEnvelope(jPosted),
+          save_body_bytes: bodyBytes,
+        }),
+      )
+
+      if (dr.ok && getDataError(jPosted).ok) {
+        break
+      }
+      if (
+        isDouyinSaveTemplateMismatchError(jPosted, raw) &&
+        typeIdx < goodlifeApiAttempts.length - 1
+      ) {
+        console.warn(
+          '[meoo douyin goods/save] product_type_retry',
+          JSON.stringify({
+            category_id: String(erp.category_id ?? '').trim(),
+            failed_goodlife_product_type: apiPt,
+            next_goodlife_product_type: goodlifeApiAttempts[typeIdx + 1],
+            upstream_biz: upstreamBizHint,
+          }),
+        )
+        continue
       }
       break
     }
-    let upstreamBizHint = ''
-    try {
-      const peek = trimmed.replace(/^\uFEFF/, '').trim()
-      if (peek.startsWith('{')) {
-        const jpeek = parseDouyinJson(peek)
-        const ge = getDataError(jpeek)
-        upstreamBizHint = ge.ok ? 'biz_ok' : String(ge.msg ?? 'biz_err').slice(0, 240)
-      }
-    } catch {
-      upstreamBizHint = 'parse_skip'
-    }
-    const jPosted = trimmed.startsWith('{') ? parseDouyinJson(trimmed) : ({} as Record<string, unknown>)
-    console.info(
-      '[meoo douyin goods/save] posted',
-      JSON.stringify({
-        phase: 'after_product_save_post',
-        mode,
-        client_trace: clientTrace || undefined,
-        http_status: dr.status,
-        upstream_biz: upstreamBizHint,
-        logid: extractDouyinLogidFromEnvelope(jPosted),
-        save_body_bytes: bodyBytes,
-      }),
-    )
+    clearTimeout(buildTimer)
+
     if (trimmed.startsWith('<')) {
       json(res, 502, {
         message: `抖音 goods/save 经自建出口返回 HTML：${douyinGoodsSaveUpstreamHint(dr.status, raw)}`,
