@@ -1241,6 +1241,23 @@ function parseTradeRuleDefaults(raw: unknown, productType: number): TradeRuleDef
   }
 }
 
+function isLikelyClientFetchNetworkError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '')
+  return /fetch failed|failed to fetch|networkerror|network error|load failed|aborted|abort/i.test(msg)
+}
+
+function emptyTemplateOkResult(productType: number): GoodsTemplateResult {
+  return {
+    ok: true,
+    product_attrs: [],
+    sku_attrs: [],
+    sales_channels: DEFAULT_TEMPLATE_SALES_CHANNELS,
+    staff_sales_options: DEFAULT_STAFF_SALES_OPTIONS,
+    after_sale_policies: DEFAULT_AFTER_SALE_POLICIES,
+    trade_rule_defaults: defaultTradeRuleDefaults(productType),
+  }
+}
+
 export async function getDouyinGoodsTemplate(params: {
   category_id: string
   product_type: number
@@ -1255,39 +1272,56 @@ export async function getDouyinGoodsTemplate(params: {
     product_type: String(params.product_type),
   })
   appendDouyinAccountIdToQuery(q)
-  const qs = q.toString()
+  const qs = `?${q}`
   const paths = ['/api/meoo-douyin-goods-template-get', '/api/merchant/douyin/goods/template/get'] as const
   const headers = authHeaders()
+  let lastHttpMessage = ''
+  let lastNetworkMessage = ''
   for (const p of paths) {
-    const res = await fetch(url(`${p}?${qs}`), { method: 'GET', headers })
-    const text = await res.text()
-    const ct = res.headers.get('content-type') ?? ''
-    const trim = text.trimStart()
-    if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
-    if (res.status === 404) continue
-    let data: Record<string, unknown> = {}
-    try {
-      data = JSON.parse(text || '{}') as Record<string, unknown>
-    } catch {
-      data = {}
-    }
-    if (!res.ok) {
-      return {
-        ok: false,
-        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    const targets = merchantApiFetchUrlCandidates([`${p}${qs}`])
+    for (const target of targets) {
+      try {
+        const res = await fetch(target, { method: 'GET', headers })
+        const text = await res.text()
+        const ct = res.headers.get('content-type') ?? ''
+        const trim = text.trimStart()
+        if (isLikelyRouteMiss404(res, trim, ct)) continue
+        if (res.ok && (trim.startsWith('<') || /text\/html/i.test(ct))) continue
+        let data: Record<string, unknown> = {}
+        try {
+          data = JSON.parse(text || '{}') as Record<string, unknown>
+        } catch {
+          data = {}
+        }
+        if (!res.ok) {
+          lastHttpMessage =
+            (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`
+          continue
+        }
+        return mapDouyinGoodsTemplatePayload(
+          data,
+          params.product_type,
+          params.category_id,
+          params.allowEmptyTemplate,
+        )
+      } catch (e) {
+        lastNetworkMessage = e instanceof Error ? e.message : String(e)
+        if (params.allowEmptyTemplate && isLikelyClientFetchNetworkError(e)) {
+          return emptyTemplateOkResult(params.product_type)
+        }
       }
     }
-    return mapDouyinGoodsTemplatePayload(data, params.product_type, params.category_id, params.allowEmptyTemplate)
   }
-  const res = await fetch(url(`${paths[1]}?${qs}`), { method: 'GET', headers })
-  const data = await parseJson(res)
-  if (!res.ok) {
-    return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
-    }
+  if (params.allowEmptyTemplate) {
+    return emptyTemplateOkResult(params.product_type)
   }
-  return mapDouyinGoodsTemplatePayload(data, params.product_type, params.category_id, params.allowEmptyTemplate)
+  return {
+    ok: false,
+    message:
+      lastNetworkMessage && isLikelyClientFetchNetworkError({ message: lastNetworkMessage })
+        ? `模板接口网络异常（${lastNetworkMessage}）。请检查网络或稍后重试；若仅创建零售代金券，可刷新后重试，保存时由服务端组装模板。`
+        : lastHttpMessage || lastNetworkMessage || '模板接口无法访问',
+  }
 }
 
 function mapDouyinGoodsTemplatePayload(

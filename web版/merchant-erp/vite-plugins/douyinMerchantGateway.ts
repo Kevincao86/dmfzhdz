@@ -1152,7 +1152,20 @@ export async function handleDouyinGoodsProductDraftQueryGet(
   }
 }
 
-/** 代理 goodlife template/get（与 save 链路同源，勿用本地 mock 模板） */
+/** template/get 上游失败或空 attrs 时返回与 save 兜底一致的结构（避免前端「fetch failed」卡死） */
+function buildSyntheticTemplateGetEnvelope(productType: number): Record<string, unknown> {
+  const syn = syntheticGoodlifeTemplateAttrsBundle(productType)
+  return {
+    data: {
+      error_code: 0,
+      description: '',
+      product_attrs: syn.productAttrs,
+      sku_attrs: syn.skuAttrs,
+    },
+  }
+}
+
+/** 代理 goodlife template/get；中继失败时对零售代金券等返回服务端 synthetic 模板 */
 export async function handleDouyinGoodsTemplateGetGet(
   req: IncomingMessage,
   res: ServerResponse,
@@ -1177,24 +1190,84 @@ export async function handleDouyinGoodsTemplateGetGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
-    u.searchParams.set('account_id', accountId)
-    u.searchParams.set('category_id', categoryId)
-    u.searchParams.set('product_type', String(productType))
-    const dr = await douyinServerFetch(u.toString(), {
-      method: 'GET',
-      headers: {
-        'access-token': token,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
+    let bundle = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
+    try {
+      bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, productType)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn(
+        '[meoo douyin template/get] upstream_fetch_failed',
+        JSON.stringify({ category_id: categoryId, product_type: productType, message: msg.slice(0, 200) }),
+      )
+    }
+    if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
+      const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/template/get/'))
+      u.searchParams.set('account_id', accountId)
+      u.searchParams.set('category_id', categoryId)
+      u.searchParams.set('product_type', String(productType))
+      try {
+        const dr = await douyinServerFetch(u.toString(), {
+          method: 'GET',
+          headers: {
+            'access-token': token,
+            'content-type': 'application/json',
+            'Rpc-Transit-Life-Account': accountId,
+          },
+        })
+        const raw = await dr.text()
+        const j = parseDouyinJson(raw)
+        if (getDataError(j).ok) {
+          const data = j.data as Record<string, unknown> | undefined
+          const { pa, sa } = extractProductSkuAttrsFromTemplateEnvelope(data, j)
+          if (pa.length > 0 || sa.length > 0) {
+            res.statusCode = dr.status
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(raw)
+            return
+          }
+        }
+      } catch {
+        /* 有 bundle 但透传失败：用 bundle 组装 envelope */
+      }
+      json(res, 200, {
+        data: {
+          error_code: 0,
+          description: '',
+          product_attrs: bundle.productAttrs,
+          sku_attrs: bundle.skuAttrs,
+        },
+      })
+      return
+    }
+    const useSynthetic =
+      productType === 2 ||
+      (productType === 1 && categoryRetailGroupAndVoucherLikely(categoryId)) ||
+      inferProductTypeEligibleFromTemplate(productType, bundle.productAttrs, bundle.skuAttrs, categoryId)
+    if (useSynthetic) {
+      console.warn(
+        '[meoo douyin template/get] synthetic_fallback',
+        JSON.stringify({ category_id: categoryId, product_type: productType }),
+      )
+      json(res, 200, buildSyntheticTemplateGetEnvelope(productType))
+      return
+    }
+    json(res, 502, {
+      message: `抖音未返回类目 ${categoryId}、商品类型 ${productType} 的模板，且当前类目不支持本地兜底。请检查 DOUYIN_OPENAPI_BASE_URL 中继或更换类目。`,
     })
-    const raw = await dr.text()
-    res.statusCode = dr.status
-    res.setHeader('Content-Type', 'application/json; charset=utf-8')
-    res.end(raw)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    if (
+      productType === 2 ||
+      categoryRetailGroupAndVoucherLikely(categoryId) ||
+      productType === 1
+    ) {
+      console.warn(
+        '[meoo douyin template/get] error_synthetic_fallback',
+        JSON.stringify({ category_id: categoryId, product_type: productType, message: msg.slice(0, 200) }),
+      )
+      json(res, 200, buildSyntheticTemplateGetEnvelope(productType))
+      return
+    }
     json(res, 502, { message: `抖音商品模板查询失败：${msg}` })
   }
 }
@@ -1231,21 +1304,35 @@ export async function handleDouyinGoodsProductTypesGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const types: { product_type: number; label: string; eligible: boolean }[] = []
-    for (const t of base) {
-      const bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, t.product_type)
-      const eligible = inferProductTypeEligibleFromTemplate(
-        t.product_type,
-        bundle.productAttrs,
-        bundle.skuAttrs,
-        categoryId,
-      )
-      types.push({ ...t, eligible })
-    }
+    const types = await Promise.all(
+      base.map(async (t) => {
+        let bundle = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
+        try {
+          bundle = await fetchTemplateAttrsBundle(accountId, token, categoryId, t.product_type)
+        } catch {
+          /* 单次失败不拖垮整页；由 infer + 零售兜底决定 eligible */
+        }
+        const eligible = inferProductTypeEligibleFromTemplate(
+          t.product_type,
+          bundle.productAttrs,
+          bundle.skuAttrs,
+          categoryId,
+        )
+        return { ...t, eligible }
+      }),
+    )
     json(res, 200, { types })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    json(res, 502, { message: `查询类目可用商品类型失败：${msg}` })
+    console.warn(
+      '[meoo douyin product-types] error_using_retail_fallback',
+      JSON.stringify({ category_id: categoryId, message: msg.slice(0, 200) }),
+    )
+    const types = base.map((t) => ({
+      ...t,
+      eligible: inferProductTypeEligibleFromTemplate(t.product_type, [], [], categoryId),
+    }))
+    json(res, 200, { types })
   }
 }
 
@@ -2174,20 +2261,33 @@ async function fetchTemplateAttrsBundle(
   let last = { productAttrs: [] as Record<string, unknown>[], skuAttrs: [] as Record<string, unknown>[] }
   for (const pt of productTypeAttempts) {
     for (const obt of openBizAttempts) {
-      const bundle = await fetchTemplateAttrsBundleOnce(
-        accountId,
-        token,
-        categoryId,
-        pt,
-        obt,
-        signal,
-      )
-      last = bundle
-      if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
-        if (ttl > 0) {
-          templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+      try {
+        const bundle = await fetchTemplateAttrsBundleOnce(
+          accountId,
+          token,
+          categoryId,
+          pt,
+          obt,
+          signal,
+        )
+        last = bundle
+        if (bundle.productAttrs.length > 0 || bundle.skuAttrs.length > 0) {
+          if (ttl > 0) {
+            templateAttrsBundleCache.set(ck, { expiresAt: Date.now() + ttl, bundle })
+          }
+          return bundle
         }
-        return bundle
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.warn(
+          '[meoo douyin template/get] bundle_attempt_failed',
+          JSON.stringify({
+            category_id: categoryId,
+            product_type: pt,
+            open_biz_type: obt ?? null,
+            message: msg.slice(0, 200),
+          }),
+        )
       }
     }
   }
