@@ -2417,8 +2417,8 @@ function syntheticGoodlifeGroupBuyTemplateAttrsBundle(): {
     {
       key: 'Notification',
       name: '使用规则',
-      value_type: 'TEXT',
-      is_multi: false,
+      value_type: 'NOTIFICATION',
+      is_multi: true,
       is_required: true,
     },
     {
@@ -2488,8 +2488,8 @@ function syntheticGoodlifeVoucherTemplateAttrsBundle(): {
     {
       key: 'Notification',
       name: '使用规则',
-      value_type: 'TEXT',
-      is_multi: false,
+      value_type: 'NOTIFICATION',
+      is_multi: true,
       is_required: true,
     },
     {
@@ -3554,6 +3554,11 @@ function mergeGoodlifeProductAttrMapFromErp(
       continue
     }
 
+    /** Notification 须为 [{title,content}] 列表 JSON，勿写纯文本（会报 Notification参数不合法） */
+    if (/^notification$/i.test(key) || vt === 'NOTIFICATION') {
+      continue
+    }
+
     if (/^limit_use_rule$/i.test(key) || vt === 'LIMIT_USE_RULE') {
       out[key] = douyinLimitUseRuleJson(false)
       continue
@@ -3637,6 +3642,9 @@ function mergeGoodlifeProductAttrMapFromErp(
     const vt = String(a.value_type ?? '').toUpperCase()
     if (/^limit_use_rule$/i.test(key) || vt === 'LIMIT_USE_RULE') {
       out[key] = douyinLimitUseRuleJson(false)
+      continue
+    }
+    if (/^notification$/i.test(key) || vt === 'NOTIFICATION') {
       continue
     }
     if (vt.includes('IMAGE') || vt === 'PIC') {

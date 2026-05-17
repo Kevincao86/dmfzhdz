@@ -8,6 +8,10 @@ import {
   normalizeDouyinDescription,
   stripDouyinDescriptionUnsafeChars,
 } from './douyinDescriptionNormalize.js'
+import {
+  isDouyinNotificationAttrJson,
+  normalizeDouyinNotificationValue,
+} from './douyinNotificationFormat.js'
 
 export type DouyinTemplateAttrMeta = {
   key: string
@@ -35,6 +39,11 @@ export function attrTemplateIsNoteRichText(meta: DouyinTemplateAttrMeta): boolea
     return true
   }
   return false
+}
+
+export function attrTemplateIsNotification(meta: DouyinTemplateAttrMeta): boolean {
+  const { key, value_type: vt } = meta
+  return vt === 'NOTIFICATION' || /^notification$/i.test(key)
 }
 
 export function isDouyinNoteRichTextJsonString(raw: string): boolean {
@@ -96,6 +105,17 @@ export function finalizeDouyinProductAttrsByTemplate(
       continue
     }
 
+    if (attrTemplateIsNotification(meta)) {
+      if (!cur || !isDouyinNotificationAttrJson(cur)) {
+        merged[key] = normalizeDouyinNotificationValue(
+          cur,
+          '使用规则',
+          ctx.productDesc || ctx.productName,
+        )
+      }
+      continue
+    }
+
     /** Description / description_rich_text 由 applyDouyinProductDescriptionAttrs 统一处理 */
     if (attrKeyIsDouyinDescription(key)) continue
   }
@@ -104,6 +124,9 @@ export function finalizeDouyinProductAttrsByTemplate(
     if (metaByKey.has(key)) continue
     if (/^description_rich/i.test(key) && val.trim() && !isDouyinNoteRichTextJsonString(val)) {
       merged[key] = encodeDouyinNoteRichTextFromPlain(val)
+    }
+    if (/^notification$/i.test(key) && val.trim() && !isDouyinNotificationAttrJson(val)) {
+      merged[key] = normalizeDouyinNotificationValue(val, '使用规则', ctx.productDesc || ctx.productName)
     }
   }
 
