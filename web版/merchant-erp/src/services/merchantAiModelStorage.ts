@@ -53,7 +53,6 @@ export function pickAutoResolvedImageModel(): string {
 
 function normalizeTextModelStored(raw: string | null | undefined): string {
   const s = raw?.trim().toLowerCase() ?? ''
-  if (s === 'deepseek') return 'minimax'
   if (s === 'auto' || !s) return pickAutoResolvedTextModel()
   if (selectableAiIds().has(s)) return s
   if (isValidAiVendorSlug(s)) return s
