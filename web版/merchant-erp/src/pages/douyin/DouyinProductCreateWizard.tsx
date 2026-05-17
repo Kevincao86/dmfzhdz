@@ -354,7 +354,7 @@ export default function DouyinProductCreateWizard({
       )
       if (descCheck.length < 4 && !detail.product_desc?.trim()) {
         setActionMsg({
-          text: '建议填写商品说明（用于 Description 短描述与详情富文本），至少一句完整话',
+          text: '建议填写商品说明（写入 description_rich_text 富文本；顶层短描述自动生成）',
           ok: false,
         })
         return
@@ -542,7 +542,7 @@ export default function DouyinProductCreateWizard({
           )}
 
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            开放平台字段（SubTitle、Description、图片列表、use_date 等）由服务端按{' '}
+            开放平台字段（SubTitle、description_rich_text、图片列表、use_date 等）由服务端按{' '}
             <strong>template.get</strong> 自动写入。SubTitle 为「随时退|免预约」等政策标签，请勿在此页手填副标题。
           </div>
 

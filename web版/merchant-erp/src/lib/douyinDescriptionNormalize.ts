@@ -97,7 +97,9 @@ export function sanitizeDouyinDescriptionInProductAttrs(
   return norm
 }
 
-/** 长图文写入 NOTE 型 attr（JSON）；短 Description 与 product.desc 对齐 */
+/**
+ * @deprecated 请使用 applyDouyinProductDescriptionAttrs（douyinProductDescriptionAttrs.ts）
+ */
 export function applyDouyinDescriptionRichTextSplit(
   merged: Record<string, string>,
   productName: string,
@@ -105,18 +107,16 @@ export function applyDouyinDescriptionRichTextSplit(
   categoryId?: string,
 ): string {
   const short = sanitizeDouyinDescriptionInProductAttrs(merged, productName, undefined, categoryId)
-  const long = stripDouyinDescriptionUnsafeChars(longDetail).slice(0, 8000)
-  if (long.length > short.length + 20) {
-    const noteJson = encodeDouyinNoteRichTextFromPlain(long)
-    if (!merged.description_rich_text?.trim()) {
-      merged.description_rich_text = noteJson
-    }
-    for (const key of Object.keys(merged)) {
-      if (/^description_rich/i.test(key) && !attrKeyIsDouyinDescription(key)) {
-        const cur = (merged[key] ?? '').trim()
-        if (!cur || !cur.startsWith('[')) merged[key] = noteJson
-      }
-    }
+  const long = stripDouyinDescriptionUnsafeChars(longDetail).slice(0, 8000) || short
+  const noteJson = encodeDouyinNoteRichTextFromPlain(long)
+  if (!merged.description_rich_text?.trim() || !merged.description_rich_text.trim().startsWith('[')) {
+    merged.description_rich_text = noteJson
+  }
+  for (const key of Object.keys(merged)) {
+    if (attrKeyIsDouyinDescription(key)) merged[key] = '[]'
+  }
+  if (!Object.keys(merged).some(attrKeyIsDouyinDescription) && productName.trim()) {
+    merged.Description = '[]'
   }
   return short
 }

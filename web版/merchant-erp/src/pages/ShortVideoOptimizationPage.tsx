@@ -325,7 +325,9 @@ export default function ShortVideoOptimizationPage() {
   const validateEngine = (): string | null => {
     if (engine === 'kling' && !cfg?.klingConfigured) return '当前环境未开通可灵，请联系管理员。'
     if (engine === 'seedance' && !cfg?.arkKeyConfigured) return '当前环境未开通火山视频生成，请联系管理员。'
-    if (engine === 'seedance' && !sdModelEp.trim()) return '请先选择视频模型。'
+    if (engine === 'seedance' && !sdModelEp.trim()) {
+      return cfg?.arkVideoSetupIssue ?? '请先选择视频模型（需配置火山方舟真实 ep- 接入点）。'
+    }
     return null
   }
 
@@ -1075,7 +1077,10 @@ export default function ShortVideoOptimizationPage() {
                 </select>
               ) : (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-950">
-                  暂无可用模型，请联系管理员配置后再试。
+                  {cfg?.configLoadError
+                    ? `无法加载视频配置（${cfg.configLoadError}）。请检查网络后刷新页面。`
+                    : cfg?.arkVideoSetupIssue ??
+                      '暂无可用模型。请在运营管控台「AI模型 → 短视频 API」填写真实 ep- 接入点，或在 Vercel 设置 MERCHANT_AI_ARK_VIDEO_ENDPOINTS（格式：显示名|ep-xxxx）。'}
                 </div>
               )}
             </label>
