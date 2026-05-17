@@ -18,6 +18,20 @@ export function isDouyinRetailCategory(categoryId: string): boolean {
   return String(categoryId ?? '').trim() === '5003003'
 }
 
+/** goodlife product/save 顶层售卖时间等：平台要求 Unix 秒，勿传毫秒 */
+export function toDouyinUnixSeconds(value: unknown): number {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return Math.floor(Date.now() / 1000)
+  return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n)
+}
+
+export function normalizeGoodlifeProductTopLevelTimes(product: Record<string, unknown>): void {
+  for (const key of ['sold_start_time', 'sold_end_time'] as const) {
+    if (product[key] == null) continue
+    product[key] = toDouyinUnixSeconds(product[key])
+  }
+}
+
 /** 从 template.get 的 value_demo 解析允许的 show_channel 枚举，如 "1-不限制 2-仅直播间" */
 export function allowedShowChannelsFromTemplateAttrs(
   productAttrs: Array<Record<string, unknown>>,

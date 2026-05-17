@@ -76,7 +76,9 @@ import {
   douyinUseDateJson,
   douyinUseTimeJson,
   normalizeDouyinShowChannelValue,
+  normalizeGoodlifeProductTopLevelTimes,
   sanitizeDouyinTradeRuleProductAttrs,
+  toDouyinUnixSeconds,
 } from '../src/lib/douyinTradeRuleAttrNormalize.js'
 import {
   type DouyinMerchantSession,
@@ -3175,8 +3177,8 @@ async function buildGoodlifeProductSaveBody(
     }
   }
 
-  const nowMs = Date.now()
-  const oneYearMs = nowMs + 366 * 86400000
+  const nowSec = toDouyinUnixSeconds(Date.now())
+  const oneYearSec = nowSec + 366 * 86400
 
   const product: Record<string, unknown> = {
     product_name,
@@ -3187,10 +3189,11 @@ async function buildGoodlifeProductSaveBody(
     open_biz_type: resolveOpenBizTypeForGoodlifeSave(erp, product_type, category_id),
     out_id,
     account_name,
-    sold_start_time: nowMs,
-    sold_end_time: oneYearMs,
+    sold_start_time: nowSec,
+    sold_end_time: oneYearSec,
     pois: poi_ids.map((poi_id) => ({ poi_id })),
   }
+  normalizeGoodlifeProductTopLevelTimes(product)
 
   const extIn = erp.product_ext
   if (extIn && typeof extIn === 'object' && !Array.isArray(extIn)) {
@@ -3549,6 +3552,10 @@ function summarizeDouyinProductSaveForLog(
     missing_required_sku_attr_keys,
     implicit_missing_combo_rule_attr,
     poi_count: Array.isArray(product?.pois) ? (product!.pois as unknown[]).length : 0,
+    sold_start_time: product?.sold_start_time ?? null,
+    sold_end_time: product?.sold_end_time ?? null,
+    sold_times_are_unix_sec:
+      Number(product?.sold_start_time) > 0 && Number(product?.sold_start_time) < 1e12,
   }
 }
 
@@ -3956,8 +3963,9 @@ export async function handleDouyinGoodsProductSavePost(
     clearTimeout(buildTimer)
 
     const saveBody = built.body
-    const bodyBytes = JSON.stringify(saveBody).length
     const prod = saveBody.product as Record<string, unknown>
+    if (prod && typeof prod === 'object') normalizeGoodlifeProductTopLevelTimes(prod)
+    const bodyBytes = JSON.stringify(saveBody).length
     const badAk = findAttrMapDataUrlOrBlobKeys(prod.attr_key_value_map)
     const skuObj = saveBody.sku as Record<string, unknown> | undefined
     const badSk = findAttrMapDataUrlOrBlobKeys(skuObj?.attr_key_value_map)
