@@ -71,10 +71,15 @@ import {
   finalizeDouyinSubTitleInProductAttrs,
 } from '../src/lib/douyinSubTitleNormalize.js'
 import {
+  applyDouyinProductDiyNameStrategy,
   attrKeyIsDouyinPlatformUnifiedDescription,
   attrKeyIsDouyinProductDiyName,
+  buildDouyinVoucherDaiCoreName,
   describeDouyinProductDiyNameForLog,
   finalizeDouyinVoucherNameAttrsInProductMap,
+  isDouyinProductDiyNameBizError,
+  normalizeDouyinVoucherProductTitle,
+  type DouyinProductDiyNameApplyStrategy,
 } from '../src/lib/douyinProductDiyNameFormat.js'
 import {
   douyinAppointmentJson,
@@ -3869,7 +3874,10 @@ async function buildGoodlifeProductSaveBody(
   _mode: 'draft' | 'submit',
   account_name: string,
   douyinHttpSignal?: AbortSignal,
-  opts?: { goodlifeProductTypeOverride?: number },
+  opts?: {
+    goodlifeProductTypeOverride?: number
+    productDiyNameStrategy?: DouyinProductDiyNameApplyStrategy
+  },
 ): Promise<{
   body: Record<string, unknown>
   templateProductAttrs: Record<string, unknown>[]
@@ -4056,7 +4064,7 @@ async function buildGoodlifeProductSaveBody(
 
   const product: Record<string, unknown> = {
     product_name,
-    desc: product_name,
+    desc: productDescRaw || product_name,
     category_id,
     product_type: goodlifeApiProductType,
     biz_line: 1,
@@ -4178,12 +4186,20 @@ async function buildGoodlifeProductSaveBody(
   finalizeDouyinSubTitleInProductAttrs(attrs, mergedProductAttrs, {
     tradeRules: extractDouyinSubTitleTradeContextFromErp(erp),
   })
-  finalizeDouyinVoucherNameAttrsInProductMap(attrs, mergedProductAttrs, {
-    productName: product_name,
-    actualAmountFen: actualFen,
-    originAmountFen: originFen,
-    isVoucher,
-  })
+  const { canonicalTitle: voucherCanonicalTitle } = finalizeDouyinVoucherNameAttrsInProductMap(
+    attrs,
+    mergedProductAttrs,
+    {
+      productName: product_name,
+      actualAmountFen: actualFen,
+      originAmountFen: originFen,
+      isVoucher,
+      strategy: opts?.productDiyNameStrategy,
+    },
+  )
+  if (isVoucher && voucherCanonicalTitle) {
+    product.product_name = voucherCanonicalTitle
+  }
   product.desc = descShort
   pruneEmptyNonRequiredImageAttrs(attrs, mergedProductAttrs)
 
@@ -4191,8 +4207,12 @@ async function buildGoodlifeProductSaveBody(
     product.attr_key_value_map = mergedProductAttrs
   }
 
+  const skuDisplayName = (isVoucher && voucherCanonicalTitle ? voucherCanonicalTitle : product_name).slice(
+    0,
+    120,
+  )
   const sku: Record<string, unknown> = {
-    sku_name: product_name.slice(0, 120),
+    sku_name: skuDisplayName,
     actual_amount: actualFen,
     origin_amount: originFen,
     status: 1,
@@ -4302,6 +4322,42 @@ function summarizeComboRuleForLog(combo: unknown): Record<string, unknown> {
     one_item_per_group,
     combo_mode: modes.slice(0, 10),
   }
+}
+
+/** product_diy_name 参数不合法时，在已组装的 saveBody 上切换策略并重算字节数 */
+function repatchGoodlifeSaveBodyVoucherDiyStrategy(
+  saveBody: Record<string, unknown>,
+  templateProductAttrs: Record<string, unknown>[],
+  erp: Record<string, unknown>,
+  strategy: DouyinProductDiyNameApplyStrategy,
+): number {
+  const prod = saveBody.product as Record<string, unknown> | undefined
+  if (!prod) return JSON.stringify(saveBody).length
+  const skuObj = saveBody.sku as Record<string, unknown> | undefined
+  const prevMap =
+    prod.attr_key_value_map && typeof prod.attr_key_value_map === 'object' && !Array.isArray(prod.attr_key_value_map)
+      ? (prod.attr_key_value_map as Record<string, string>)
+      : {}
+  const attrMap = { ...prevMap }
+  const actualFen = Number(skuObj?.actual_amount) || yuanToFen(Number(erp.price_yuan) || 0)
+  const originFen = Number(skuObj?.origin_amount) || actualFen
+  const canonicalTitle = normalizeDouyinVoucherProductTitle(
+    String(prod.product_name ?? erp.product_name ?? ''),
+    actualFen,
+    originFen,
+  )
+  const daiCore = buildDouyinVoucherDaiCoreName(canonicalTitle, actualFen, originFen)
+  applyDouyinProductDiyNameStrategy(templateProductAttrs, attrMap, {
+    canonicalTitle,
+    daiCore,
+    strategy,
+  })
+  prod.attr_key_value_map = attrMap
+  if (strategy === 'unified_off_full_diy' || strategy === 'diy_sync_title') {
+    prod.product_name = canonicalTitle
+    if (skuObj) skuObj.sku_name = canonicalTitle.slice(0, 120)
+  }
+  return JSON.stringify(saveBody).length
 }
 
 function summarizeDouyinProductSaveForLog(
@@ -4433,7 +4489,9 @@ function summarizeDouyinProductSaveForLog(
           description_is_note_json: false,
           description_rich_is_note_json: false,
         }),
-    ...(ak ? describeDouyinProductDiyNameForLog(ak) : {}),
+    ...(ak
+      ? describeDouyinProductDiyNameForLog(ak, meta.templateProductAttrs)
+      : {}),
     attr_keys_sample: ak ? Object.keys(ak).slice(0, 36) : [],
     sku_attr_keys: sk ? Object.keys(sk) : [],
     missing_required_product_attr_keys,
@@ -4981,146 +5039,192 @@ export async function handleDouyinGoodsProductSavePost(
         return
       }
       const maxAttempts = douyinGoodsSaveRetryMaxAttempts()
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (attempt > 0) {
-          const backoff = 500 + attempt * 450
+      const diyRepostStrategies: DouyinProductDiyNameApplyStrategy[] = [
+        'omit_diy',
+        'unified_off_full_diy',
+        'diy_sync_title',
+        'diy_dai_only',
+      ]
+      let diyRepostIdx = 0
+      let jPosted: Record<string, unknown> = {}
+      postSaveLoop: while (true) {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          if (attempt > 0) {
+            const backoff = 500 + attempt * 450
+            console.info(
+              '[meoo douyin goods/save] retry_backoff',
+              JSON.stringify({ phase: 'before_product_save_retry', mode, attempt, backoff_ms: backoff }),
+            )
+            await sleepMs(backoff)
+          }
           console.info(
-            '[meoo douyin goods/save] retry_backoff',
-            JSON.stringify({ phase: 'before_product_save_retry', mode, attempt, backoff_ms: backoff }),
+            '[meoo douyin goods/save] posting_save',
+            JSON.stringify({
+              phase: 'before_product_save_post',
+              mode,
+              attempt,
+              goodlife_api_product_type: apiPt,
+              max_attempts: maxAttempts,
+              save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+              save_body_bytes: bodyBytes,
+              product_diy_repost_idx: diyRepostIdx,
+            }),
           )
-          await sleepMs(backoff)
-        }
-        console.info(
-          '[meoo douyin goods/save] posting_save',
-          JSON.stringify({
-            phase: 'before_product_save_post',
-            mode,
-            attempt,
-            goodlife_api_product_type: apiPt,
-            max_attempts: maxAttempts,
-            save_post_budget_s: Math.round(savePostBudgetMs / 1000),
-            save_body_bytes: bodyBytes,
-          }),
-        )
-        const accessToken = await ensureDouyinToken(session)
-        const attemptAbort = new AbortController()
-        const attemptTimer = setTimeout(() => attemptAbort.abort(), savePostBudgetMs)
-        try {
-          dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
-            method: 'POST',
-            headers: {
-              'access-token': accessToken,
-              'content-type': 'application/json',
-              'Rpc-Transit-Life-Account': accountId,
-            },
-            body: JSON.stringify(saveBody),
-            signal: attemptAbort.signal,
-          })
-          raw = await dr.text()
-        } catch (e) {
-          clearTimeout(attemptTimer)
-          const msg = e instanceof Error ? e.message : String(e)
-          const isAbort =
-            (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
-            /aborted|AbortError/i.test(msg)
-          const canNetRetry =
-            attempt < maxAttempts - 1 &&
-            /aborted|AbortError|timeout|fetch failed|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket/i.test(msg)
-          if (canNetRetry) {
+          const accessToken = await ensureDouyinToken(session)
+          const attemptAbort = new AbortController()
+          const attemptTimer = setTimeout(() => attemptAbort.abort(), savePostBudgetMs)
+          try {
+            dr = await douyinServerFetch(douyinOpenApiUrl('/goodlife/v1/goods/product/save/'), {
+              method: 'POST',
+              headers: {
+                'access-token': accessToken,
+                'content-type': 'application/json',
+                'Rpc-Transit-Life-Account': accountId,
+              },
+              body: JSON.stringify(saveBody),
+              signal: attemptAbort.signal,
+            })
+            raw = await dr.text()
+          } catch (e) {
+            clearTimeout(attemptTimer)
+            const msg = e instanceof Error ? e.message : String(e)
+            const isAbort =
+              (e instanceof Error && (e.name === 'AbortError' || /aborted|AbortError|timeout/i.test(msg))) ||
+              /aborted|AbortError/i.test(msg)
+            const canNetRetry =
+              attempt < maxAttempts - 1 &&
+              /aborted|AbortError|timeout|fetch failed|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket/i.test(msg)
+            if (canNetRetry) {
+              console.warn(
+                '[meoo douyin goods/save] phase_fail_retry',
+                JSON.stringify({
+                  phase: 'product_save_fetch',
+                  mode,
+                  attempt,
+                  is_abort: isAbort,
+                  save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+                  message: msg.slice(0, 400),
+                }),
+              )
+              continue
+            }
+            clearTimeout(buildTimer)
             console.warn(
-              '[meoo douyin goods/save] phase_fail_retry',
+              '[meoo douyin goods/save] phase_fail',
               JSON.stringify({
                 phase: 'product_save_fetch',
                 mode,
                 attempt,
                 is_abort: isAbort,
                 save_post_budget_s: Math.round(savePostBudgetMs / 1000),
+                save_body_bytes: bodyBytes,
                 message: msg.slice(0, 400),
               }),
             )
-            continue
+            json(res, isAbort ? 504 : 502, {
+              message: isAbort
+                ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
+                : `抖音 goods/save 网络失败：${msg}`,
+            })
+            return
           }
-          clearTimeout(buildTimer)
-          console.warn(
-            '[meoo douyin goods/save] phase_fail',
-            JSON.stringify({
-              phase: 'product_save_fetch',
-              mode,
-              attempt,
-              is_abort: isAbort,
-              save_post_budget_s: Math.round(savePostBudgetMs / 1000),
-              save_body_bytes: bodyBytes,
-              message: msg.slice(0, 400),
-            }),
-          )
-          json(res, isAbort ? 504 : 502, {
-            message: isAbort
-              ? `抖音 goods/save 请求超时（本阶段约 ${Math.round(savePostBudgetMs / 1000)}s）。中继应已收到 POST；若中继无日志请查 Vercel→该请求是否到达、或调大 DOUYIN_GOODS_SAVE_POST_TIMEOUT_MS。`
-              : `抖音 goods/save 网络失败：${msg}`,
-          })
-          return
-        }
-        clearTimeout(attemptTimer)
-        trimmed = raw.replace(/^\uFEFF/, '').trim()
-        if (trimmed.startsWith('<') || !trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+          clearTimeout(attemptTimer)
+          trimmed = raw.replace(/^\uFEFF/, '').trim()
+          if (trimmed.startsWith('<') || !trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+            break
+          }
+          const jAttempt = parseDouyinJson(trimmed)
+          if (dr.ok && !getDataError(jAttempt).ok) {
+            if (isDouyinSaveResponseTokenExpired(jAttempt) && attempt < maxAttempts - 1) {
+              invalidateDouyinMerchantClientTokenCache(session)
+              console.warn(
+                '[meoo douyin goods/save] access_token_stale_retry',
+                JSON.stringify({
+                  mode,
+                  attempt,
+                  logid: extractDouyinLogidFromEnvelope(jAttempt),
+                  hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+                }),
+              )
+              continue
+            }
+            if (isDouyinProductSaveResponseRetryable(jAttempt, raw) && attempt < maxAttempts - 1) {
+              console.warn(
+                '[meoo douyin goods/save] upstream_transient_retry',
+                JSON.stringify({
+                  mode,
+                  attempt,
+                  logid: extractDouyinLogidFromEnvelope(jAttempt),
+                  hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
+                }),
+              )
+              continue
+            }
+          }
           break
         }
-        const jAttempt = parseDouyinJson(trimmed)
-        if (dr.ok && !getDataError(jAttempt).ok) {
-          if (isDouyinSaveResponseTokenExpired(jAttempt) && attempt < maxAttempts - 1) {
-            invalidateDouyinMerchantClientTokenCache(session)
-            console.warn(
-              '[meoo douyin goods/save] access_token_stale_retry',
-              JSON.stringify({
-                mode,
-                attempt,
-                logid: extractDouyinLogidFromEnvelope(jAttempt),
-                hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
-              }),
-            )
-            continue
-          }
-          if (isDouyinProductSaveResponseRetryable(jAttempt, raw) && attempt < maxAttempts - 1) {
-            console.warn(
-              '[meoo douyin goods/save] upstream_transient_retry',
-              JSON.stringify({
-                mode,
-                attempt,
-                logid: extractDouyinLogidFromEnvelope(jAttempt),
-                hint: String((jAttempt.data as Record<string, unknown> | undefined)?.description ?? '').slice(0, 240),
-              }),
-            )
-            continue
-          }
-        }
-        break
-      }
 
-      upstreamBizHint = ''
-      try {
-        const peek = trimmed.replace(/^\uFEFF/, '').trim()
-        if (peek.startsWith('{')) {
-          const jpeek = parseDouyinJson(peek)
-          const ge = getDataError(jpeek)
-          upstreamBizHint = ge.ok ? 'biz_ok' : String(ge.msg ?? 'biz_err').slice(0, 240)
+        upstreamBizHint = ''
+        try {
+          const peek = trimmed.replace(/^\uFEFF/, '').trim()
+          if (peek.startsWith('{')) {
+            const jpeek = parseDouyinJson(peek)
+            const ge = getDataError(jpeek)
+            upstreamBizHint = ge.ok ? 'biz_ok' : String(ge.msg ?? 'biz_err').slice(0, 240)
+          }
+        } catch {
+          upstreamBizHint = 'parse_skip'
         }
-      } catch {
-        upstreamBizHint = 'parse_skip'
+        jPosted = trimmed.startsWith('{') ? parseDouyinJson(trimmed) : ({} as Record<string, unknown>)
+        const prodPosted = saveBody.product as Record<string, unknown>
+        const akPosted =
+          prodPosted?.attr_key_value_map && typeof prodPosted.attr_key_value_map === 'object'
+            ? (prodPosted.attr_key_value_map as Record<string, string>)
+            : {}
+        console.info(
+          '[meoo douyin goods/save] posted',
+          JSON.stringify({
+            phase: 'after_product_save_post',
+            mode,
+            client_trace: clientTrace || undefined,
+            http_status: dr.status,
+            upstream_biz: upstreamBizHint,
+            goodlife_api_product_type: apiPt,
+            logid: extractDouyinLogidFromEnvelope(jPosted),
+            save_body_bytes: bodyBytes,
+            product_diy_repost_idx: diyRepostIdx,
+            ...describeDouyinProductDiyNameForLog(akPosted, built.templateProductAttrs),
+          }),
+        )
+
+        if (dr.ok && getDataError(jPosted).ok) {
+          break postSaveLoop
+        }
+        if (
+          isErpUiVoucherProductType(erpUiProductType) &&
+          isDouyinProductDiyNameBizError(upstreamBizHint) &&
+          diyRepostIdx < diyRepostStrategies.length
+        ) {
+          const strategy = diyRepostStrategies[diyRepostIdx]!
+          diyRepostIdx += 1
+          bodyBytes = repatchGoodlifeSaveBodyVoucherDiyStrategy(
+            saveBody,
+            built.templateProductAttrs,
+            erp,
+            strategy,
+          )
+          console.warn(
+            '[meoo douyin goods/save] product_diy_name_strategy_retry',
+            JSON.stringify({
+              strategy,
+              product_diy_repost_idx: diyRepostIdx,
+              save_body_bytes: bodyBytes,
+            }),
+          )
+          continue postSaveLoop
+        }
+        break postSaveLoop
       }
-      const jPosted = trimmed.startsWith('{') ? parseDouyinJson(trimmed) : ({} as Record<string, unknown>)
-      console.info(
-        '[meoo douyin goods/save] posted',
-        JSON.stringify({
-          phase: 'after_product_save_post',
-          mode,
-          client_trace: clientTrace || undefined,
-          http_status: dr.status,
-          upstream_biz: upstreamBizHint,
-          goodlife_api_product_type: apiPt,
-          logid: extractDouyinLogidFromEnvelope(jPosted),
-          save_body_bytes: bodyBytes,
-        }),
-      )
 
       if (dr.ok && getDataError(jPosted).ok) {
         break
