@@ -2,7 +2,7 @@ import type { TemplateAttr } from '../services/douyinProductApi'
 import {
   attrKeyIsDouyinProductNameHint,
   attrKeyIsDouyinSubTitle,
-  deriveDistinctDouyinSubTitle,
+  buildDouyinSubTitleFromTradeRules,
 } from './douyinSubTitleNormalize'
 import { normalizeDouyinDescription } from './douyinDescriptionNormalize'
 import {
@@ -179,12 +179,12 @@ export function buildDouyinTemplateAutoFillMaps(
     undefined,
     input.categoryId.trim(),
   )
-  const subtitle = deriveDistinctDouyinSubTitle(
-    name,
-    input.productDesc.trim() || name,
-    descAttr,
-    input.categoryId.trim(),
-  )
+  const subtitle = buildDouyinSubTitleFromTradeRules({
+    afterSalePolicy: input.afterSalePolicy.trim(),
+    reserveMode: input.reserveMode,
+    reserveAdvanceDays: 1,
+    consumeValidDays: Number(input.consumeValidDays) || 360,
+  })
   const head = input.headUrl.trim()
   const aux = input.auxUrls.map((u) => u.trim()).filter(Boolean)
   const env = input.envUrls.map((u) => u.trim()).filter(Boolean)

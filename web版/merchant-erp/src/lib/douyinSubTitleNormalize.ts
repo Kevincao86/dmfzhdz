@@ -1,25 +1,15 @@
-import { stripDouyinDescriptionUnsafeChars } from './douyinDescriptionNormalize.js'
+/**
+ * 来客 attr `SubTitle`（官方 template.get 说明）：
+ * 过期退、随时退、x日内可退、免预约、提前x日预约；
+ * 多个以英文半角 | 分隔，不要空格（目前仅退款/预约相关生效）。
+ * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/template.get
+ */
 
-const DEFAULT_SUBTITLE_MAX_LEN = 12
-const DEFAULT_SUBTITLE_MIN_LEN = 4
-/** 零售火锅等类目（5003003）副标题常见下限更长，过短易报「SubTitle参数不合法」 */
-const RETAIL_SUBTITLE_MIN_LEN = 8
-const RETAIL_SUBTITLE_MAX_LEN = 12
-
-/** 来客 goodlife attr `SubTitle`：短卖点文案，过长、过短或与主标题雷同会报「SubTitle参数不合法」 */
-export function douyinSubTitleMaxLen(override?: number, categoryId?: string): number {
-  if (override != null && Number.isFinite(override) && override >= 4 && override <= 60) {
-    return Math.floor(override)
-  }
-  const cid = String(categoryId ?? '').trim()
-  if (cid === '5003003') return RETAIL_SUBTITLE_MAX_LEN
-  return DEFAULT_SUBTITLE_MAX_LEN
-}
-
-export function douyinSubTitleMinLen(categoryId?: string): number {
-  const cid = String(categoryId ?? '').trim()
-  if (cid === '5003003') return RETAIL_SUBTITLE_MIN_LEN
-  return DEFAULT_SUBTITLE_MIN_LEN
+export type DouyinSubTitleTradeContext = {
+  afterSalePolicy?: string
+  reserveMode?: string
+  reserveAdvanceDays?: number
+  consumeValidDays?: number
 }
 
 export function attrKeyIsDouyinSubTitle(key: string): boolean {
@@ -30,196 +20,147 @@ export function attrKeyIsDouyinProductNameHint(key: string): boolean {
   return /^product_name_hint$/i.test(String(key ?? '').trim())
 }
 
-function stripForSubTitleCompare(raw: string): string {
-  return String(raw ?? '')
+const OFFICIAL_TAG_RE =
+  /^(过期退|随时退|免预约|\d{1,3}日内可退|提前\d{1,2}日预约)$/
+
+/** 从 ERP trade_rules 生成符合文档的 SubTitle */
+export function buildDouyinSubTitleFromTradeRules(ctx: DouyinSubTitleTradeContext): string {
+  const tags: string[] = []
+  const asp = String(ctx.afterSalePolicy ?? 'refund_anytime').trim()
+
+  if (asp === 'refund_auto_expire') {
+    tags.push('过期退')
+  } else if (asp === 'no_refund') {
+    /** 不可退类目仍建议带「随时退」以外标签；平台侧 SubTitle 仅退款文案生效，默认给随时退避免空值 */
+    tags.push('随时退')
+  } else {
+    tags.push('随时退')
+  }
+
+  const reserve = String(ctx.reserveMode ?? 'none').trim()
+  if (reserve === 'required') {
+    const d = Math.max(1, Math.min(30, Math.floor(Number(ctx.reserveAdvanceDays) || 1)))
+    tags.push(`提前${d}日预约`)
+  } else {
+    tags.push('免预约')
+  }
+
+  const uniq: string[] = []
+  for (const t of tags) {
+    if (t && !uniq.includes(t)) uniq.push(t)
+  }
+  return uniq.join('|')
+}
+
+function parseOfficialSubTitlePipe(raw: string): string | null {
+  const t = String(raw ?? '')
     .replace(/\s+/g, '')
-    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9·]/g, '')
     .trim()
+  if (!t) return null
+  const parts = t.split('|').filter(Boolean)
+  if (parts.length === 0) return null
+  if (!parts.every((p) => OFFICIAL_TAG_RE.test(p))) return null
+  return parts.join('|')
 }
 
-/** 与主标题相同、或为主标题/副标题的前缀子串时，抖音常拒收 */
-export function subTitleSimilarToProductName(subTitle: string, productName: string): boolean {
-  const a = stripForSubTitleCompare(subTitle)
-  const b = stripForSubTitleCompare(productName)
-  if (!a || !b) return false
-  if (a === b) return true
-  if (a.length >= 4 && b.startsWith(a)) return true
-  if (b.length >= 4 && a.startsWith(b)) return true
-  return false
+export function extractDouyinSubTitleTradeContextFromErp(
+  erp: Record<string, unknown>,
+): DouyinSubTitleTradeContext {
+  const trade =
+    erp.trade_rules && typeof erp.trade_rules === 'object'
+      ? (erp.trade_rules as Record<string, unknown>)
+      : {}
+  return {
+    afterSalePolicy: String(trade.after_sale_policy ?? 'refund_anytime'),
+    reserveMode: String(trade.reserve_mode ?? 'none'),
+    reserveAdvanceDays: Number(trade.reserve_advance_value) || 1,
+    consumeValidDays: Number(trade.consume_valid_days) || 360,
+  }
 }
 
-function padDouyinSubTitleToMin(s: string, minLen: number, maxLen: number): string {
-  let out = s
-  const fillers = ['到店可用', '品质优选', '欢迎选购', '限时特惠']
-  for (const f of fillers) {
-    if (out.length >= minLen) break
-    out = (out + f).slice(0, maxLen)
-  }
-  if (out.length < minLen) {
-    out = '品质团购特惠'.slice(0, maxLen)
-  }
-  return out
-}
-
-/**
- * 生成与主标题明显区分的短卖点（零售类目优先 8～12 字）。
- */
-export function deriveDistinctDouyinSubTitle(
-  productName: string,
-  productDesc: string,
-  descriptionShort: string | undefined,
-  categoryId?: string,
-  maxLenOverride?: number,
-): string {
-  const maxLen = douyinSubTitleMaxLen(maxLenOverride, categoryId)
-  const minLen = douyinSubTitleMinLen(categoryId)
-  const nameNorm = stripForSubTitleCompare(productName)
-
-  const candidates: string[] = []
-
-  const descNorm = stripForSubTitleCompare(stripDouyinDescriptionUnsafeChars(productDesc).slice(0, 120))
-  if (descNorm && !subTitleSimilarToProductName(descNorm, productName)) {
-    candidates.push(descNorm)
-  }
-
-  const shortNorm = stripForSubTitleCompare(descriptionShort ?? '')
-  if (shortNorm && !subTitleSimilarToProductName(shortNorm, productName)) {
-    candidates.push(shortNorm)
-  }
-
-  if (nameNorm.length >= 2) {
-    const tail = nameNorm.slice(-Math.min(6, nameNorm.length))
-    if (tail.length >= 2) {
-      candidates.push(`${tail}到店可用`, `${tail}品质优选`)
-    }
-  }
-
-  for (const fixed of ['品质团购特惠', '门店优惠团购', '欢迎到店选购', '限时特惠套餐']) {
-    candidates.push(fixed)
-  }
-
-  for (const raw of candidates) {
-    let s = raw.replace(/[^\u4e00-\u9fa5a-zA-Z0-9·]/g, '').slice(0, maxLen)
-    s = padDouyinSubTitleToMin(s, minLen, maxLen)
-    if (!subTitleSimilarToProductName(s, productName)) return s
-  }
-
-  return padDouyinSubTitleToMin('品质团购特惠', minLen, maxLen)
-}
-
-/**
- * 规范副标题：去空白/标点噪音、满足类目上下限，且不与商品名雷同。
- */
 export function finalizeDouyinSubTitleValue(
   raw: string,
-  productName: string,
-  productDesc: string,
-  descriptionShort: string | undefined,
-  categoryId?: string,
-  maxLenOverride?: number,
+  tradeCtx: DouyinSubTitleTradeContext,
 ): string {
-  const maxLen = douyinSubTitleMaxLen(maxLenOverride, categoryId)
-  const minLen = douyinSubTitleMinLen(categoryId)
-
-  let s = String(raw ?? '')
-    .replace(/\s+/g, '')
-    .trim()
-  if (s.startsWith('{') || s.startsWith('[')) s = ''
-  const clause = (s.split(/[。，；！？\n]/)[0] ?? s).trim()
-  s = clause.replace(/[^\u4e00-\u9fa5a-zA-Z0-9·]/g, '')
-
-  if (!s || subTitleSimilarToProductName(s, productName)) {
-    s = deriveDistinctDouyinSubTitle(productName, productDesc, descriptionShort, categoryId, maxLenOverride)
-  }
-
-  s = padDouyinSubTitleToMin(s.slice(0, maxLen), minLen, maxLen)
-
-  if (subTitleSimilarToProductName(s, productName)) {
-    s = deriveDistinctDouyinSubTitle(productName, productDesc, descriptionShort, categoryId, maxLenOverride)
-  }
-
-  return s.slice(0, maxLen)
+  const official = parseOfficialSubTitlePipe(raw)
+  if (official) return official
+  return buildDouyinSubTitleFromTradeRules(tradeCtx)
 }
 
-/** @deprecated 请使用 finalizeDouyinSubTitleValue */
+/** @deprecated 使用 finalizeDouyinSubTitleValue + tradeCtx */
 export function normalizeDouyinSubTitle(
   raw: string,
-  productName: string,
-  maxLenOverride?: number,
-  categoryId?: string,
+  _productName: string,
+  _maxLenOverride?: number,
+  _categoryId?: string,
 ): string {
-  return finalizeDouyinSubTitleValue(raw, productName, '', undefined, categoryId, maxLenOverride)
+  return finalizeDouyinSubTitleValue(raw, {})
 }
 
 export function finalizeDouyinSubTitleInProductAttrs(
   templateProductAttrs: Record<string, unknown>[],
   merged: Record<string, string>,
   ctx: {
-    productName: string
-    productDesc: string
-    descriptionShort?: string
-    categoryId?: string
-    maxLenOverride?: number
+    tradeRules: DouyinSubTitleTradeContext
   },
 ): void {
-  const pn = ctx.productName.trim()
+  const tradeCtx = ctx.tradeRules
   const meta = templateProductAttrs.find((a) =>
     attrKeyIsDouyinSubTitle(String((a as Record<string, unknown>).key ?? '')),
   )
-  const isRequired = meta ? Boolean((meta as Record<string, unknown>).is_required) : true
+  const isRequired = meta ? Boolean((meta as Record<string, unknown>).is_required) : false
 
   for (const key of Object.keys(merged)) {
     if (attrKeyIsDouyinSubTitle(key)) {
-      merged[key] = finalizeDouyinSubTitleValue(
-        merged[key] ?? '',
-        pn,
-        ctx.productDesc,
-        ctx.descriptionShort,
-        ctx.categoryId,
-        ctx.maxLenOverride,
-      )
+      merged[key] = finalizeDouyinSubTitleValue(merged[key] ?? '', tradeCtx)
     } else if (attrKeyIsDouyinProductNameHint(key)) {
       const v = (merged[key] ?? '').trim()
-      if (v.length > 80 || (v.includes('。') && v.length > 40)) {
-        merged[key] = finalizeDouyinSubTitleValue(
-          v,
-          pn,
-          ctx.productDesc,
-          ctx.descriptionShort,
-          ctx.categoryId,
-          ctx.maxLenOverride,
-        )
-      } else if (!v) {
-        delete merged[key]
-      }
+      if (v) delete merged[key]
     }
   }
 
-  if (!Object.keys(merged).some(attrKeyIsDouyinSubTitle) && pn && isRequired) {
-    merged.SubTitle = finalizeDouyinSubTitleValue(
-      '',
-      pn,
-      ctx.productDesc,
-      ctx.descriptionShort,
-      ctx.categoryId,
-      ctx.maxLenOverride,
-    )
+  if (!Object.keys(merged).some(attrKeyIsDouyinSubTitle) && isRequired) {
+    merged.SubTitle = buildDouyinSubTitleFromTradeRules(tradeCtx)
   }
 }
 
 export function sanitizeDouyinProductAttrSubTitleFields(
   merged: Record<string, string>,
-  productName: string,
-  maxLenOverride?: number,
-  categoryId?: string,
-  productDesc = '',
-  descriptionShort?: string,
+  _productName: string,
+  _maxLenOverride?: number,
+  _categoryId?: string,
+  _productDesc = '',
+  _descriptionShort?: string,
+  tradeRules: DouyinSubTitleTradeContext = {},
 ): void {
-  finalizeDouyinSubTitleInProductAttrs([], merged, {
-    productName,
-    productDesc,
-    descriptionShort,
-    categoryId,
-    maxLenOverride,
-  })
+  finalizeDouyinSubTitleInProductAttrs([], merged, { tradeRules })
+}
+
+/** @deprecated 不再用商品名比较；SubTitle 为政策标签 */
+export function subTitleSimilarToProductName(_subTitle: string, _productName: string): boolean {
+  return false
+}
+
+/** @deprecated */
+export function deriveDistinctDouyinSubTitle(
+  _productName: string,
+  _productDesc: string,
+  _descriptionShort: string | undefined,
+  _categoryId?: string,
+  _maxLenOverride?: number,
+): string {
+  return buildDouyinSubTitleFromTradeRules({})
+}
+
+/** @deprecated */
+export function douyinSubTitleMaxLen(override?: number, _categoryId?: string): number {
+  if (override != null && Number.isFinite(override) && override >= 4 && override <= 120) {
+    return Math.floor(override)
+  }
+  return 80
+}
+
+/** @deprecated */
+export function douyinSubTitleMinLen(_categoryId?: string): number {
+  return 4
 }

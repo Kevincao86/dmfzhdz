@@ -1414,7 +1414,7 @@ function parseProductSaveResponse(res: Response, data: Record<string, unknown>):
         : ''
     const subTitleHint =
       /subtitle|副标题/i.test(base) || /subtitle|副标题/i.test(sub)
-        ? ' 说明：SubTitle 为短卖点（零售类目建议 8～12 字且勿与商品名相同）；「商品名称规范」可留空。请部署最新版后点「一键填满」。'
+        ? ' 说明：SubTitle 为退款/预约政策标签（如 随时退|免预约），由售后与预约选项自动生成，勿手填商品名。'
         : ''
     const showChannelHint =
       /show_channel/i.test(base) || /show_channel|投放渠道/i.test(sub)

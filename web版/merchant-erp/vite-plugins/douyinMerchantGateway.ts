@@ -64,11 +64,9 @@ import {
 } from '../src/lib/douyinNoteRichTextFormat.js'
 import {
   attrKeyIsDouyinSubTitle,
-  douyinSubTitleMaxLen,
-  douyinSubTitleMinLen,
+  buildDouyinSubTitleFromTradeRules,
+  extractDouyinSubTitleTradeContextFromErp,
   finalizeDouyinSubTitleInProductAttrs,
-  finalizeDouyinSubTitleValue,
-  subTitleSimilarToProductName,
 } from '../src/lib/douyinSubTitleNormalize.js'
 import {
   douyinAppointmentJson,
@@ -2774,13 +2772,7 @@ function mergeGoodlifeProductAttrMapFromErp(
         continue
       }
       if (attrKeyIsDouyinSubTitle(key) || /副标题/.test(name)) {
-        out[key] = finalizeDouyinSubTitleValue(
-          productDesc || productName,
-          productName,
-          productDesc,
-          undefined,
-          String(erp.category_id ?? '').trim(),
-        )
+        out[key] = buildDouyinSubTitleFromTradeRules(extractDouyinSubTitleTradeContextFromErp(erp))
         continue
       }
       if (/标题|商品名称|名称(?!规范)/.test(name) && productName && !/副标题/.test(name)) {
@@ -2798,13 +2790,8 @@ function mergeGoodlifeProductAttrMapFromErp(
         }
       }
       if (/卖点/.test(name) && !attrKeyIsDouyinSubTitle(key)) {
-        out[key] = finalizeDouyinSubTitleValue(
-          productDesc || productName,
-          productName,
-          productDesc,
-          undefined,
-          String(erp.category_id ?? '').trim(),
-        )
+        const v = (productDesc || productName).slice(0, 80)
+        if (v) out[key] = v
         continue
       }
       if (/购买须知|使用说明|温馨提示|使用规则|注意事项|其他说明/.test(name)) {
@@ -3139,6 +3126,10 @@ async function buildGoodlifeProductSaveBody(
     for (const [k, val] of Object.entries(tplOverrides as Record<string, unknown>)) {
       const key = String(k).trim()
       if (!key) continue
+      /** 手填 SubTitle/Description 易与官方 template 语义冲突，一律由网关按 trade_rules / 模板生成 */
+      if (attrKeyIsDouyinSubTitle(key) || attrKeyIsDouyinDescription(key) || /^description_rich/i.test(key)) {
+        continue
+      }
       const s = typeof val === 'string' ? val.trim() : String(val ?? '').trim()
       if (!s) continue
       if (isGroupBuy) {
@@ -3306,16 +3297,8 @@ async function buildGoodlifeProductSaveBody(
     productDesc: productDescRaw,
     categoryId: category_id,
   })
-  const subtitleMax = (() => {
-    const n = Number(process.env.DOUYIN_GOODS_SUBTITLE_MAX_LEN)
-    return Number.isFinite(n) ? n : undefined
-  })()
   finalizeDouyinSubTitleInProductAttrs(attrs, mergedProductAttrs, {
-    productName: product_name,
-    productDesc: productDescRaw,
-    descriptionShort: descShort,
-    categoryId: category_id,
-    maxLenOverride: subtitleMax,
+    tradeRules: extractDouyinSubTitleTradeContextFromErp(erp),
   })
   product.desc = descShort
   pruneEmptyNonRequiredImageAttrs(attrs, mergedProductAttrs)
@@ -3545,13 +3528,12 @@ function summarizeDouyinProductSaveForLog(
       }
       return 0
     })(),
-    subtitle_similar_to_name: (() => {
-      if (!ak) return false
-      const pn = String((product as Record<string, unknown> | undefined)?.product_name ?? '').trim()
+    subtitle_value: (() => {
+      if (!ak) return null
       for (const [k, v] of Object.entries(ak)) {
-        if (attrKeyIsDouyinSubTitle(k)) return subTitleSimilarToProductName(String(v ?? ''), pn)
+        if (attrKeyIsDouyinSubTitle(k)) return String(v ?? '').slice(0, 120)
       }
-      return false
+      return null
     })(),
     show_channel: ak?.show_channel ?? null,
     description_len: (() => {
@@ -4079,38 +4061,6 @@ export async function handleDouyinGoodsProductSavePost(
       })
       return
     }
-    const subTitleKey = Object.keys(attrMap).find((k) => attrKeyIsDouyinSubTitle(k))
-    if (subTitleKey) {
-      const subVal = String(attrMap[subTitleKey] ?? '').trim()
-      const subMin = douyinSubTitleMinLen(categoryIdSave)
-      const subMax = douyinSubTitleMaxLen(undefined, categoryIdSave)
-      const pnTrim = String(erp.product_name ?? '').trim()
-      if (subVal.length < subMin) {
-        json(res, 400, {
-          message: `SubTitle（副标题/短卖点）过短（当前 ${subVal.length} 字，类目 ${categoryIdSave || '—'} 建议至少 ${subMin} 字）。请点「一键填满开放平台字段」或清空 SubTitle 后重试。`,
-          subtitle_len: subVal.length,
-          subtitle_min: subMin,
-        })
-        return
-      }
-      if (subVal.length > subMax) {
-        json(res, 400, {
-          message: `SubTitle 过长（当前 ${subVal.length} 字，建议不超过 ${subMax} 字）。`,
-          subtitle_len: subVal.length,
-          subtitle_max: subMax,
-        })
-        return
-      }
-      if (subTitleSimilarToProductName(subVal, pnTrim)) {
-        json(res, 400, {
-          message:
-            'SubTitle 与商品名称过于相似（不可与主标题相同或为其前缀）。请填写独立短卖点，或点「一键填满」由系统自动生成。',
-          subtitle_len: subVal.length,
-        })
-        return
-      }
-    }
-
     const maxAttempts = douyinGoodsSaveRetryMaxAttempts()
     let dr!: Response
     let raw = ''
