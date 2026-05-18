@@ -1,6 +1,7 @@
-import { Bot, Building2, CreditCard, Headphones, LayoutDashboard, Shield, UserSearch } from 'lucide-react'
+import { Bot, Building2, CreditCard, Headphones, Shield, UserSearch } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../cn'
+import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 
 const OPS_NAV = [
   { to: '/customers', label: '客户管理', icon: Building2 },
@@ -18,10 +19,10 @@ export default function OpsAdminLayout() {
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
       <aside className="fixed left-0 top-0 z-40 flex h-screen w-56 flex-col border-r border-slate-800 bg-slate-900">
         <div className="flex h-16 items-center gap-2 border-b border-slate-800 px-4">
-          <LayoutDashboard className="h-6 w-6 text-indigo-400" />
+          <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-9 w-9 shrink-0 rounded-lg object-contain" />
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-white">运营管控台</div>
-            <div className="truncate text-[10px] text-slate-500">ERP 全局管理 · 演示</div>
+            <div className="truncate text-[10px] text-slate-500">{BRAND_NAME}</div>
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">

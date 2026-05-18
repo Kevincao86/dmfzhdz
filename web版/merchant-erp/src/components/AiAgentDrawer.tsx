@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bot, ChevronDown, ChevronRight, Shield, Sparkles, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Shield, X } from 'lucide-react'
+import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { useEffect, useRef, useState } from 'react'
 import { AiAgentComposerBar } from './AiAgentComposerBar'
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
@@ -74,8 +75,8 @@ export default function AiAgentDrawer() {
             <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 px-5 py-4 text-white">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
-                    <Bot className="h-5 w-5" aria-hidden />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/20">
+                    <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="h-8 w-8 object-contain" />
                   </div>
                   <div className="min-w-0">
                     <h2 id="meoo-ai-agent-title" className="truncate text-base font-semibold tracking-tight">
@@ -211,12 +212,11 @@ export function AiAgentFloatingButton() {
     <button
       type="button"
       onClick={() => openDrawer()}
-      className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-900/25 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
+      className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-slate-950 shadow-lg shadow-indigo-900/25 ring-2 ring-cyan-400/40 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
       aria-label="打开墨典 AI 助手"
       title="AI 助手"
     >
-      <span className="sr-only">AI</span>
-      <Sparkles className="h-6 w-6" aria-hidden />
+      <img src={BRAND_LOGO_URL} alt="" className="h-11 w-11 object-contain" />
     </button>
   )
 }

@@ -9,6 +9,13 @@
   margin-bottom: 44rpx;
 }
 
+.brand-logo {
+  width: 128rpx;
+  height: 128rpx;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
 .tag {
   font-size: 20rpx;
   letter-spacing: 0.18em;

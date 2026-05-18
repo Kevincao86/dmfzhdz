@@ -24,9 +24,8 @@ import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
 import { useAiAgent } from '../context/AiAgentContext'
 import { clearDouyinMerchantBindingLocal } from '../lib/merchantSession'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
+import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-
-const LOGO_URL = '/favicon.png'
 
 export default function MeooLayout() {
   const location = useLocation()
@@ -131,26 +130,18 @@ export default function MeooLayout() {
           {!collapsed && (
             <>
               <img
-                src={LOGO_URL}
-                alt="墨典AI智能ERP"
-                className="mr-2 h-10 w-auto"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }}
+                src={BRAND_LOGO_URL}
+                alt={BRAND_NAME}
+                className="mr-2 h-10 w-10 shrink-0 rounded-lg object-contain"
               />
-              <span className="text-lg font-semibold tracking-tight text-white">
-                墨典AI智能ERP
-              </span>
+              <span className="text-lg font-semibold tracking-tight text-white">{BRAND_NAME}</span>
             </>
           )}
           {collapsed && (
             <img
-              src={LOGO_URL}
-              alt="墨典AI智能ERP"
-              className="mx-auto h-8 w-auto"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
+              src={BRAND_LOGO_URL}
+              alt={BRAND_NAME}
+              className="mx-auto h-9 w-9 rounded-lg object-contain"
             />
           )}
         </div>
