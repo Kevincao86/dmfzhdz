@@ -12,6 +12,7 @@ import type {
   AiVendorCatalogEntry,
   RegistryAiModels,
   RegistryFile,
+  RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -67,6 +68,9 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const recruitmentOrders: RegistryRecruitmentOrder[] = Array.isArray(parsed?.recruitmentOrders)
     ? (parsed!.recruitmentOrders as RegistryRecruitmentOrder[])
     : []
+  const mpRecruitmentOrders: RegistryMpRecruitmentOrder[] = Array.isArray(parsed?.mpRecruitmentOrders)
+    ? (parsed!.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+    : []
   const talentPoolCandidates: RegistryTalentPoolRow[] = Array.isArray(parsed?.talentPoolCandidates)
     ? (parsed!.talentPoolCandidates as RegistryTalentPoolRow[])
     : []
@@ -93,6 +97,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     videoAiUpdatedAt,
     videoAiWriter,
     recruitmentOrders,
+    mpRecruitmentOrders,
     talentPoolCandidates,
     recruitmentScheduleRows,
     recruitmentVideoSubmissions,

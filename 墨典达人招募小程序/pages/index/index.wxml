@@ -1,0 +1,42 @@
+<view class="card" style="margin-top:24rpx;">
+  <text class="title-lg">墨典达人招募</text>
+  <text class="hint" style="display:block;margin-top:12rpx;">与商家管理后台「商家达人招募订单」同步，展示订单号、商家信息与招募要求。</text>
+</view>
+
+<view wx:if="{{unconfigured}}" class="card">
+  <text class="hint">尚未连接后台。请配置 utils/config.local.js 中的 MERCHANT_API_BASE_URL。</text>
+</view>
+
+<view wx:elif="{{loading}}" class="card hint">加载中…</view>
+<view wx:elif="{{err}}" class="card hint" style="color:#dc2626;">{{err}}</view>
+
+<block wx:else>
+  <view wx:for="{{rows}}" wx:key="id" class="card list-card" bindtap="goDetail" data-id="{{item.id}}">
+    <text class="order-no">商家订单 {{item.merchantOrderNo}}</text>
+    <text class="merchant-name">{{item.merchantName}} · {{item.storeName}}</text>
+    <text class="title-lg" style="font-size:32rpx;margin-top:16rpx;display:block;">{{item.title}}</text>
+    <view style="margin-top:12rpx;">
+      <text class="tag tag-blue">{{item.platform}}</text>
+      <text class="tag tag-gray">{{item.statusLabel}}</text>
+    </view>
+    <view class="metrics" style="margin-top:20rpx;">
+      <view class="metric-cell">
+        <view class="metric-label">粉丝要求</view>
+        <view class="metric-value">{{item.fansRequirement}}</view>
+      </view>
+      <view class="metric-cell">
+        <view class="metric-label">任务金</view>
+        <view class="metric-value accent">{{item.budgetText}}</view>
+      </view>
+      <view class="metric-cell">
+        <view class="metric-label">招募人数</view>
+        <view class="metric-value">{{item.recruitCount}}</view>
+      </view>
+    </view>
+    <text class="hint" style="display:block;margin-top:16rpx;">{{item.region}} · {{item.summary}}</text>
+    <text class="hint" style="display:block;margin-top:8rpx;">{{item.applicantCount}} 人已报名 · 点击查看任务详情</text>
+  </view>
+  <view wx:if="{{rows.length === 0}}" class="card hint" style="margin-bottom:40rpx;">
+    暂无进行中的招募。请先在运营后台对商家订单选择「小程序招募」，或通过分享链接进入。
+  </view>
+</block>
