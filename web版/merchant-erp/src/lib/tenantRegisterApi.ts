@@ -29,9 +29,16 @@ export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone }),
   })
-  const j = (await res.json().catch(() => ({}))) as SmsSendResult & { message?: string }
+  const j = (await res.json().catch(() => ({}))) as SmsSendResult & {
+    message?: string
+    detail?: string
+  }
   if (!res.ok) {
-    return { ok: false, error: j.error ?? `http_${res.status}`, message: j.message }
+    return {
+      ok: false,
+      error: j.error ?? `http_${res.status}`,
+      message: j.message ?? j.detail,
+    }
   }
   return { ok: j.ok !== false, message: j.message, devCode: j.devCode }
 }

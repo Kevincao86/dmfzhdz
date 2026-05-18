@@ -55,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: sms.error,
         message: sms.message ?? '验证码发送失败',
+        detail: sms.message,
       })
       return
     }
@@ -64,10 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ...(sms.devCode ? { devCode: sms.devCode } : {}),
     })
   } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
     sendJson(res, 500, {
       ok: false,
       error: 'sms_send_failed',
-      detail: e instanceof Error ? e.message : String(e),
+      message: detail,
+      detail,
     })
   }
 }
