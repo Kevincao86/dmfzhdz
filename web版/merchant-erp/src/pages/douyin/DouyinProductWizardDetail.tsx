@@ -2,7 +2,7 @@ import { ChevronLeft, Loader2, Sparkles, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DouyinProductAiModelSection from '../../components/douyin/DouyinProductAiModelSection'
 import {
-  DouyinProductScrollFollowPreview,
+  DouyinProductPreviewAside,
   type DouyinPreviewComboLine,
 } from '../../components/douyin/DouyinProductMobilePreview'
 import DouyinStorePickerModal from '../../components/store/DouyinStorePickerModal'
@@ -222,13 +222,14 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex-1 min-w-[200px]">
-          图片在对应区域展示；售卖/消费/预约等规则会写入<strong>商品说明</strong>并由服务端映射为开放平台字段。
+          图片在对应区域展示；售卖/消费/预约等规则由服务端写入来客 OpenAPI 对应字段（show_channel、use_date、use_time 等），<strong>不会</strong>追加到商品说明正文。
         </div>
       </div>
 
       <DouyinProductAiModelSection />
 
-      <div className="space-y-6 xl:pr-[min(20rem,42vw)]">
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+      <div className="min-w-0 flex-1 space-y-6">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
           <h3 className="font-semibold text-gray-900">基础信息</h3>
@@ -258,7 +259,7 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
             <p className="mt-0.5 text-xs text-gray-500">{props.productName.length} / 40</p>
           </div>
           <label className="block text-sm">
-            <span className="font-medium">商品说明（含规则摘要）</span>
+            <span className="font-medium">商品说明</span>
             <textarea
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
               rows={4}
@@ -269,7 +270,7 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
           </label>
           {rulePreview.length > 0 && (
             <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600 whitespace-pre-line">
-              <p className="mb-1 font-medium text-gray-800">将一并写入说明的规则摘要：</p>
+              <p className="mb-1 font-medium text-gray-800">以下规则将映射至来客 OpenAPI 字段（预览参考，不写入上方说明）：</p>
               {rulePreview.join('\n')}
             </div>
           )}
@@ -783,7 +784,9 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
 
       </div>
 
-      <DouyinProductScrollFollowPreview {...previewProps} />
+      <DouyinProductPreviewAside {...previewProps} className="xl:w-[min(100%,300px)] xl:shrink-0" />
+
+      </div>
 
       <DouyinStorePickerModal
         open={props.storeModalOpen}

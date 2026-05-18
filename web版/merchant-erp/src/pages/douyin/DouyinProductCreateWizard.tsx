@@ -390,8 +390,7 @@ export default function DouyinProductCreateWizard({
     stableOutIdRef.current = out_id
 
     const sessionAccountName = readAccountName()
-    const rules = buildFormRules()
-    const descWithRules = composeProductDescWithRules(productDesc, rules)
+    const descForSave = composeProductDescWithRules(productDesc)
 
     return {
       ...(persistedProductIdRef.current ? { product_id: persistedProductIdRef.current } : {}),
@@ -400,7 +399,7 @@ export default function DouyinProductCreateWizard({
       product_type: productType,
       ...(sessionAccountName ? { account_name: sessionAccountName } : {}),
       product_name: name,
-      product_desc: descWithRules.trim() || undefined,
+      product_desc: descForSave.trim() || undefined,
       price_yuan: price,
       origin_price_yuan: origin,
       head_image_urls: [head],
