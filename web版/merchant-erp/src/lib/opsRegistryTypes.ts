@@ -81,6 +81,47 @@ export type RegistryRecruitmentOrder = {
   category: string
   /** 提需摘要（招募名、Brief 节选等） */
   infoSummary?: string
+  acceptMode?: 'manual' | 'miniprogram'
+  linkedMpOrderId?: string
+}
+
+export type RegistryMpRecruitmentApplicant = {
+  id: string
+  name: string
+  platform: string
+  platformAccount?: string
+  platformNickname?: string
+  followers: number
+  douyinSalesLevel?: string
+  contact: string
+  wechatId?: string
+  quotePrice?: string
+  visitTimeSlot?: string
+  alipayAccount?: string
+  intro?: string
+  appliedAt: string
+}
+
+export type RegistryMpRecruitmentOrder = {
+  id: string
+  sourceMerchantOrderId: string
+  customerName: string
+  storeName: string
+  merchantRequirements: string
+  status: 'open' | 'collecting' | 'closed' | 'done'
+  createdAt: string
+  updatedAt: string
+  applicants?: RegistryMpRecruitmentApplicant[]
+  title?: string
+  recruitmentInfo?: string
+  taskDetail?: string
+  platform?: string
+  fansRequirement?: string
+  budgetText?: string
+  recruitCount?: number
+  region?: string
+  category?: string
+  serviceAmount?: number
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
@@ -134,6 +175,7 @@ export type RegistryFile = {
   videoAiUpdatedAt?: string
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
+  mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]

@@ -349,7 +349,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
       } catch {
         /* ignore */
       }
-      window.alert('需求已打包推送至运营管控台「达人招募订单」，状态：待接单。')
+      window.alert('需求已打包推送至运营管控台「商家达人招募订单」，状态：待接单。')
       onBack()
     } catch (e) {
       const detail = e instanceof Error ? e.message.trim() : String(e)

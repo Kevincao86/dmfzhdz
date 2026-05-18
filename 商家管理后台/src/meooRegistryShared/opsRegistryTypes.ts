@@ -81,6 +81,61 @@ export type RegistryRecruitmentOrder = {
   category: string
   /** 提需摘要（招募名、Brief 节选等） */
   infoSummary?: string
+  /** 运营接单方式：手动表格 / 小程序招募 */
+  acceptMode?: 'manual' | 'miniprogram'
+  /** 关联的小程序招募单号（acceptMode=miniprogram 时写入） */
+  linkedMpOrderId?: string
+}
+
+/** 小程序达人招募单（运营「小程序招募」接单后生成，供达人端小程序展示与报名） */
+export type RegistryMpRecruitmentApplicant = {
+  id: string
+  /** 兼容旧数据：等同 platformNickname */
+  name: string
+  platform: string
+  /** 抖音/小红书号 */
+  platformAccount?: string
+  /** 抖音/小红书昵称 */
+  platformNickname?: string
+  followers: number
+  /** 带货等级（抖音） */
+  douyinSalesLevel?: string
+  /** 联系方式（手机等） */
+  contact: string
+  wechatId?: string
+  /** 报价，如 ¥150 */
+  quotePrice?: string
+  /** 探店时间段，精确到小时，如 2026-05-20 14:00-16:00 */
+  visitTimeSlot?: string
+  /** 支付宝账号（结算） */
+  alipayAccount?: string
+  intro?: string
+  appliedAt: string
+}
+
+export type RegistryMpRecruitmentOrder = {
+  id: string
+  /** 商家达人招募订单号 */
+  sourceMerchantOrderId: string
+  customerName: string
+  storeName: string
+  /** 商家要求（由商家订单 infoSummary 自动填入） */
+  merchantRequirements: string
+  status: 'open' | 'collecting' | 'closed' | 'done'
+  createdAt: string
+  updatedAt: string
+  applicants?: RegistryMpRecruitmentApplicant[]
+  /** 列表/详情展示用（创建时从商家订单同步） */
+  title?: string
+  recruitmentInfo?: string
+  taskDetail?: string
+  platform?: string
+  fansRequirement?: string
+  budgetText?: string
+  recruitCount?: number
+  region?: string
+  category?: string
+  serviceAmount?: number
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
@@ -134,6 +189,7 @@ export type RegistryFile = {
   videoAiUpdatedAt?: string
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
+  mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]

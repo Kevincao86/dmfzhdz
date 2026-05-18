@@ -193,7 +193,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       } catch {
         /* ignore */
       }
-      window.alert('新手版需求已推送至运营管控台「达人招募订单」，状态：待接单。')
+      window.alert('新手版需求已推送至运营管控台「商家达人招募订单」，状态：待接单。')
       onBack()
     } catch (e) {
       const detail = e instanceof Error ? e.message.trim() : String(e)

@@ -11,3 +11,4 @@ node_modules/
 
 # 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
 墨典商家小程序/utils/config.local.js
+墨典达人招募小程序/utils/config.local.js

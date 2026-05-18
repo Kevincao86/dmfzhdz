@@ -1,15 +1,19 @@
-import { BarChart3, Bell, Download, FileSpreadsheet } from 'lucide-react'
+import { BarChart3, Bell, Download, FileSpreadsheet, Share2, Smartphone } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import { filterLegacyDemoRecruitmentOrders } from '../recruitmentLegacyDemo'
 import {
+  appendMpRecruitmentOrder,
   appendTalentPoolCandidates,
   fetchRegistry,
   patchRecruitmentOrder,
   setRecruitmentOrders,
+  type RegistryMpRecruitmentOrder,
   type RegistryRecruitmentOrder,
   type RegistryTalentPoolRow,
 } from '../opsRegistryApi'
+import { buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
+import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
 
 const ALERT_PREFS_KEY = 'meoo_ops_recruitment_alert_v1'
@@ -104,7 +108,10 @@ export default function OpsRecruitmentOrdersPage() {
   const prevPendingRef = useRef<number | null>(null)
 
   const [processOrder, setProcessOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [acceptModeChoiceOrder, setAcceptModeChoiceOrder] = useState<RegistryRecruitmentOrder | null>(null)
   const [acceptSheetOrder, setAcceptSheetOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [mpShareInfo, setMpShareInfo] = useState<{ merchantOrderId: string; mpOrderId: string } | null>(null)
+  const [mpAcceptBusy, setMpAcceptBusy] = useState(false)
   const [acceptSheetFile, setAcceptSheetFile] = useState<File | null>(null)
   const [acceptSheetBusy, setAcceptSheetBusy] = useState(false)
   const [alertOpen, setAlertOpen] = useState(false)
@@ -224,10 +231,54 @@ export default function OpsRecruitmentOrdersPage() {
     }
   }
 
-  const openAcceptSheetFlow = (order: RegistryRecruitmentOrder) => {
+  const openAcceptModeChoice = (order: RegistryRecruitmentOrder) => {
     setProcessOrder(null)
+    setAcceptModeChoiceOrder(order)
+  }
+
+  const openAcceptSheetFlow = (order: RegistryRecruitmentOrder) => {
+    setAcceptModeChoiceOrder(null)
     setAcceptSheetOrder(order)
     setAcceptSheetFile(null)
+  }
+
+  const confirmMiniprogramAccept = async (order: RegistryRecruitmentOrder) => {
+    setMpAcceptBusy(true)
+    try {
+      const now = new Date().toLocaleString('zh-CN', { hour12: false })
+      const mpId = `MP-RO-${Date.now()}`
+      const fields = buildMpRecruitmentFieldsFromMerchant(order)
+      const mpOrder: RegistryMpRecruitmentOrder = {
+        id: mpId,
+        sourceMerchantOrderId: order.id,
+        customerName: order.customerName,
+        storeName: order.storeName,
+        status: 'open',
+        createdAt: now,
+        updatedAt: now,
+        applicants: [],
+        ...fields,
+      }
+      const append = await appendMpRecruitmentOrder(mpOrder)
+      if (!append.ok) {
+        window.alert(append.error ?? '创建小程序招募单失败')
+        return
+      }
+      const patch = await patchRecruitmentOrder({
+        id: order.id,
+        status: 'accepted',
+        acceptMode: 'miniprogram',
+        linkedMpOrderId: mpId,
+      })
+      if (!patch.ok) {
+        window.alert(`小程序单已创建，但商家订单状态更新失败：${patch.error ?? ''}`)
+      }
+      setAcceptModeChoiceOrder(null)
+      setMpShareInfo({ merchantOrderId: order.id, mpOrderId: mpId })
+      await loadRegistry()
+    } finally {
+      setMpAcceptBusy(false)
+    }
   }
 
   const cancelAcceptSheetFlow = () => {
@@ -256,7 +307,11 @@ export default function OpsRecruitmentOrdersPage() {
         window.alert(append.error ?? '写入达人池失败')
         return
       }
-      const patch = await patchRecruitmentOrder({ id: acceptSheetOrder.id, status: 'accepted' })
+      const patch = await patchRecruitmentOrder({
+        id: acceptSheetOrder.id,
+        status: 'accepted',
+        acceptMode: 'manual',
+      })
       if (!patch.ok) {
         window.alert(`达人已写入，但订单状态更新失败：${patch.error ?? ''}。请在列表中手动改为已接单。`)
       }
@@ -287,10 +342,9 @@ export default function OpsRecruitmentOrdersPage() {
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-white">达人招募订单</h1>
+          <h1 className="text-xl font-semibold text-white">商家达人招募订单</h1>
           <p className="mt-1 text-sm text-slate-500">
-            订单中枢：接单、分配对接人、跟进、完成与结算；支持新订单提醒、导出与多维统计。列表数据来自 dev 注册表（ERP
-            提需写入），已自动剔除历史内置演示单。
+            商家 ERP / 商家小程序提交的招募需求；接单时可选手动表格或流转至「达人招募小程序」。列表来自共享注册表，已剔除历史演示单。
           </p>
         </div>
         <button
@@ -474,6 +528,23 @@ export default function OpsRecruitmentOrdersPage() {
               {processOrder.infoSummary ? (
                 <p className="text-xs text-slate-500">{processOrder.infoSummary}</p>
               ) : null}
+              {processOrder.acceptMode === 'miniprogram' && processOrder.linkedMpOrderId ? (
+                <p className="text-xs text-emerald-400/90">
+                  小程序招募 ·{' '}
+                  <button
+                    type="button"
+                    className="underline hover:text-emerald-300"
+                    onClick={() =>
+                      setMpShareInfo({
+                        merchantOrderId: processOrder.id,
+                        mpOrderId: processOrder.linkedMpOrderId!,
+                      })
+                    }
+                  >
+                    查看分享路径
+                  </button>
+                </p>
+              ) : null}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {(
@@ -491,7 +562,7 @@ export default function OpsRecruitmentOrdersPage() {
                   disabled={patchBusyId === processOrder.id || processOrder.status === st}
                   onClick={() => {
                     if (st === 'accepted' && processOrder.status === 'pending') {
-                      openAcceptSheetFlow(processOrder)
+                      openAcceptModeChoice(processOrder)
                       return
                     }
                     void changeOrderStatus(processOrder.id, st)
@@ -529,6 +600,102 @@ export default function OpsRecruitmentOrdersPage() {
         </div>
       ) : null}
 
+      {acceptModeChoiceOrder ? (
+        <div
+          className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          onClick={() => {
+            if (mpAcceptBusy) return
+            const o = acceptModeChoiceOrder
+            setAcceptModeChoiceOrder(null)
+            if (o) setProcessOrder(o)
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-600 bg-slate-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-white">已接单：选择招募方式</h3>
+            <p className="mt-1 font-mono text-xs text-slate-400">{acceptModeChoiceOrder.id}</p>
+            <p className="mt-3 text-xs text-slate-500">
+              手动招募需下载模版上传表格解析；小程序招募将自动创建达人招募小程序订单并填入商家要求。
+            </p>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={mpAcceptBusy}
+                onClick={() => openAcceptSheetFlow(acceptModeChoiceOrder)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-950/30 px-4 py-3 text-sm font-medium text-indigo-100 hover:bg-indigo-900/40 disabled:opacity-50"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                手动招募
+              </button>
+              <button
+                type="button"
+                disabled={mpAcceptBusy}
+                onClick={() => void confirmMiniprogramAccept(acceptModeChoiceOrder)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-950/30 px-4 py-3 text-sm font-medium text-emerald-100 hover:bg-emerald-900/40 disabled:opacity-50"
+              >
+                <Smartphone className="h-4 w-4" />
+                {mpAcceptBusy ? '创建中…' : '小程序招募'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {mpShareInfo ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          onClick={() => setMpShareInfo(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl border border-emerald-600/40 bg-slate-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-2">
+              <Share2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+              <div>
+                <h3 className="text-lg font-semibold text-white">小程序招募已开通</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  商家订单 {mpShareInfo.merchantOrderId} 已标记为已接单，并生成小程序单{' '}
+                  <span className="font-mono text-slate-300">{mpShareInfo.mpOrderId}</span>。请将下方路径配置为微信分享或生成小程序码。
+                </p>
+              </div>
+            </div>
+            <label className="mt-4 block text-xs font-medium text-slate-400">小程序分享路径</label>
+            <p className="mt-1 break-all rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-emerald-200">
+              {mpRecruitmentSharePath(mpShareInfo.mpOrderId)}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(mpRecruitmentSharePath(mpShareInfo.mpOrderId))
+                    window.alert('分享路径已复制')
+                  } catch {
+                    window.alert('复制失败，请手动选择路径')
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+              >
+                <Share2 className="h-4 w-4" />
+                复制分享路径
+              </button>
+              <button
+                type="button"
+                onClick={() => setMpShareInfo(null)}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+              >
+                完成
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {acceptSheetOrder ? (
         <div
           className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4"
@@ -542,7 +709,7 @@ export default function OpsRecruitmentOrdersPage() {
             <div className="flex items-start gap-2">
               <FileSpreadsheet className="mt-0.5 h-5 w-5 shrink-0 text-indigo-400" />
               <div>
-                <h3 className="text-lg font-semibold text-white">已接单：上传达人招募表</h3>
+                <h3 className="text-lg font-semibold text-white">手动招募：上传达人招募表</h3>
                 <p className="mt-1 font-mono text-xs text-slate-400">{acceptSheetOrder.id}</p>
                 <p className="mt-2 text-xs text-slate-500">
                   请下载模版填写达人信息后上传。系统将

@@ -4,6 +4,8 @@
  */
 import { createHash } from 'node:crypto'
 import type {
+  RegistryMpRecruitmentApplicant,
+  RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -205,6 +207,8 @@ export async function dispatchOpsRegistrySupabase(opts: {
       const body = JSON.parse(bodyRaw || '{}') as {
         id?: string
         status?: RegistryRecruitmentOrder['status']
+        acceptMode?: RegistryRecruitmentOrder['acceptMode']
+        linkedMpOrderId?: string
       }
       const id = (body.id ?? '').trim()
       const status = body.status
@@ -212,6 +216,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         return { status: 400, body: { ok: false, error: 'invalid_patch' } }
       }
       const okStatus =
+        status === undefined ||
         status === 'pending' ||
         status === 'accepted' ||
         status === 'done' ||
@@ -225,7 +230,91 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!data.recruitmentOrders || idx < 0) {
         return { status: 404, body: { ok: false, error: 'not_found' } }
       }
-      data.recruitmentOrders[idx] = { ...data.recruitmentOrders[idx]!, status }
+      const cur = data.recruitmentOrders[idx]!
+      data.recruitmentOrders[idx] = {
+        ...cur,
+        ...(status !== undefined ? { status } : {}),
+        ...(body.acceptMode === 'manual' || body.acceptMode === 'miniprogram'
+          ? { acceptMode: body.acceptMode }
+          : {}),
+        ...(typeof body.linkedMpOrderId === 'string' && body.linkedMpOrderId.trim()
+          ? { linkedMpOrderId: body.linkedMpOrderId.trim() }
+          : {}),
+      }
+      await io.save(data)
+      return { status: 200, body: { ok: true } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/append') {
+      const body = JSON.parse(bodyRaw || '{}') as { order?: RegistryMpRecruitmentOrder }
+      const order = body.order
+      if (!order || !order.id || !order.sourceMerchantOrderId) {
+        return { status: 400, body: { ok: false, error: 'invalid_mp_order' } }
+      }
+      const data = await io.load()
+      const list = [...(data.mpRecruitmentOrders ?? [])]
+      list.unshift(order)
+      data.mpRecruitmentOrders = list.slice(0, 200)
+      await io.save(data)
+      return { status: 200, body: { ok: true, id: order.id } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/patch') {
+      const body = JSON.parse(bodyRaw || '{}') as {
+        id?: string
+        status?: RegistryMpRecruitmentOrder['status']
+      }
+      const id = (body.id ?? '').trim()
+      const status = body.status
+      if (!id) {
+        return { status: 400, body: { ok: false, error: 'invalid_patch' } }
+      }
+      const okStatus =
+        status === 'open' || status === 'collecting' || status === 'closed' || status === 'done'
+      if (!okStatus) {
+        return { status: 400, body: { ok: false, error: 'invalid_patch' } }
+      }
+      const data = await io.load()
+      const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === id) ?? -1
+      if (!data.mpRecruitmentOrders || idx < 0) {
+        return { status: 404, body: { ok: false, error: 'not_found' } }
+      }
+      data.mpRecruitmentOrders[idx] = {
+        ...data.mpRecruitmentOrders[idx]!,
+        status,
+        updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      }
+      await io.save(data)
+      return { status: 200, body: { ok: true } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/apply') {
+      const body = JSON.parse(bodyRaw || '{}') as {
+        mpOrderId?: string
+        applicant?: RegistryMpRecruitmentApplicant
+      }
+      const mpOrderId = (body.mpOrderId ?? '').trim()
+      const applicant = body.applicant
+      const nick = (applicant?.platformNickname || applicant?.name || '').trim()
+      if (!mpOrderId || !applicant || !applicant.id || !nick) {
+        return { status: 400, body: { ok: false, error: 'invalid_apply' } }
+      }
+      applicant.platformNickname = nick
+      applicant.name = nick
+      const data = await io.load()
+      const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+      if (!data.mpRecruitmentOrders || idx < 0) {
+        return { status: 404, body: { ok: false, error: 'not_found' } }
+      }
+      const cur = data.mpRecruitmentOrders[idx]!
+      const applicants = [...(cur.applicants ?? [])]
+      applicants.unshift(applicant)
+      data.mpRecruitmentOrders[idx] = {
+        ...cur,
+        applicants: applicants.slice(0, 500),
+        status: cur.status === 'open' ? 'collecting' : cur.status,
+        updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      }
       await io.save(data)
       return { status: 200, body: { ok: true } }
     }
