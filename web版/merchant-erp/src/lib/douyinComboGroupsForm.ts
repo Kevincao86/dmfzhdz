@@ -50,22 +50,34 @@ export function appendComboGroup(groups: ComboGroupFormRow[]): ComboGroupFormRow
   ]
 }
 
-/** 按组内有效单品数生成「几选几」选项 */
+/** 几选几下拉：按组内已添加的单品行数（含未填名称的空行） */
+export function comboPickRuleItemCount(itemCount: number): number {
+  return Math.max(1, Math.floor(itemCount) || 1)
+}
+
+/**
+ * 按单品行数生成「几选几」：1 个仅「全部必选」；n≥2 为 n选1…n选n + 全部必选（与来客常见规则一致）
+ */
 export function pickRuleSelectOptionsForItemCount(itemCount: number): { value: string; label: string }[] {
-  const o: { value: string; label: string }[] = [{ value: '', label: '请确认几选几' }]
-  o.push({ value: '全部必选', label: '全部必选' })
-  if (itemCount <= 1) return o
-  for (let k = 1; k <= itemCount; k++) {
-    o.push({ value: `${itemCount}选${k}`, label: `${itemCount}选${k}` })
+  const n = comboPickRuleItemCount(itemCount)
+  if (n <= 1) return [{ value: '全部必选', label: '全部必选' }]
+  const o: { value: string; label: string }[] = []
+  for (let k = 1; k <= n; k++) {
+    o.push({ value: `${n}选${k}`, label: `${n}选${k}` })
   }
+  o.push({ value: '全部必选', label: '全部必选' })
   return o
 }
 
-export function normalizePickRuleForSave(pickRule: string, itemCount: number): string {
+export function normalizePickRuleForItemCount(pickRule: string, itemCount: number): string {
   const allowed = new Set(pickRuleSelectOptionsForItemCount(itemCount).map((x) => x.value))
   const p = pickRule.trim()
   if (p && allowed.has(p)) return p
   return '全部必选'
+}
+
+export function normalizePickRuleForSave(pickRule: string, itemCount: number): string {
+  return normalizePickRuleForItemCount(pickRule, itemCount)
 }
 
 export function comboGroupsFromPackageCombo(
