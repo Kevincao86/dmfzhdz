@@ -11,6 +11,7 @@ import {
   buildVoucherFaceImagePromptBlock,
   extractMainProductFromListingTitle,
   getVoucherFaceDisplayText,
+  voucherVisualTitleForImagePrompt,
   isGroupBuyGoodsProduct,
   isVoucherGoodsProduct,
   isWeakMainProductAnchor,
@@ -984,15 +985,17 @@ function buildImagePrompt(
   )
   const isGroupBuy = isGroupBuyGoodsProduct(goodsTypeCtx?.productType, goodsTypeCtx?.typeLabel)
   const categoryHint = mainProductCategoryHints(main, { isVoucher, isGroupBuy })
-  const titleCtx = titleDraft.trim().slice(0, 280)
+  const titleCtx =
+    isVoucher ? '' : titleDraft.trim().slice(0, 280)
   const faceText = getVoucherFaceDisplayText(listingTitle, priceYuan, originYuan)
+  const voucherVisual = voucherVisualTitleForImagePrompt(listingTitle)
 
   if (isVoucher && (imageRole === 'head' || imageRole === 'aux')) {
     const voucherBlock = buildVoucherFaceImagePromptBlock(
       faceText || main,
-      extractMainProductFromListingTitle(listingTitle) || main,
+      voucherVisual,
     )
-    const bind = `【标题】${listingTitle.slice(0, 160)}。${titleCtx ? `【次要】${titleCtx.slice(0, 120)}` : ''}`
+    const bind = `【券面语义】${voucherVisual}。禁止根据「百货/购物/超市」生成实物场景。`
     const i2iVoucher = `【图生图·代金券纠偏】若底图为售货机、货架、模型、实景商品，必须全部丢弃，仅按下列券面要求重绘平面代金券。`
     const base =
       mode === 'i2i'
@@ -1946,6 +1949,16 @@ export async function handleDouyinGoodsAiAssist(
         json(res, 200, {
           ok: true,
           image_urls: urls,
+          image_meta: {
+            requested_model: requestedVendor,
+            resolved_model: modelUsed,
+            voucher_mode: isVoucherGoodsProduct(
+              goodsTypeCtx.productType,
+              goodsTypeCtx.typeLabel,
+              productName,
+            ),
+            main_product_anchor: mainProductAnchor,
+          },
           ...(modelUsed !== requestedVendor ? { ai_vendor_used: modelUsed } : {}),
         })
         return
@@ -1966,6 +1979,16 @@ export async function handleDouyinGoodsAiAssist(
       json(res, 200, {
         ok: true,
         image_urls: enhanced,
+        image_meta: {
+          requested_model: requestedVendor,
+          resolved_model: modelUsed,
+          voucher_mode: isVoucherGoodsProduct(
+            goodsTypeCtx.productType,
+            goodsTypeCtx.typeLabel,
+            productName,
+          ),
+          main_product_anchor: mainProductAnchor,
+        },
         ...(modelUsed !== requestedVendor ? { ai_vendor_used: modelUsed } : {}),
       })
       return
