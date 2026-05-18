@@ -1,7 +1,19 @@
 import { Move, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
+import { inferVoucherPricesFromTitle } from '../../lib/douyinProductImageAnchor'
 import { buildTradeRuleDescriptionLines, type DouyinProductFormRules } from '../../lib/douyinProductRuleText'
+
+function parseYuanInput(raw: string): number | null {
+  const n = Number.parseFloat(String(raw).replace(/,/g, '').trim())
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+function formatPreviewYuan(raw: string, fallback?: number): string {
+  const n = parseYuanInput(raw) ?? (fallback != null && fallback > 0 ? fallback : null)
+  if (n == null) return '—'
+  return Number.isInteger(n) ? String(n) : n.toFixed(2)
+}
 
 export type DouyinPreviewComboLine = { name: string; qty: string; price: string }
 
@@ -29,6 +41,7 @@ function PreviewPhone({
   props,
   displayPrice,
   displayOrigin,
+  directBuyPrice,
   ruleLines,
 }: {
   tab: PreviewTab
@@ -36,6 +49,7 @@ function PreviewPhone({
   props: Props
   displayPrice: string
   displayOrigin: string
+  directBuyPrice: string
   ruleLines: string[]
 }) {
   const tabs: { id: PreviewTab; label: string }[] = [
@@ -89,7 +103,7 @@ function PreviewPhone({
                 <p className="text-[10px] opacity-90">优惠价</p>
                 <p className="text-lg font-bold leading-none">¥{displayPrice}</p>
               </div>
-              {displayOrigin ? (
+              {displayOrigin !== '—' ? (
                 <p className="text-[10px] line-through opacity-80">¥{displayOrigin}</p>
               ) : null}
             </div>
@@ -153,7 +167,7 @@ function PreviewPhone({
 
       <div className="flex border-t border-gray-100 bg-gray-50 px-2 py-2 text-[9px] text-gray-600">
         <span className="flex-1 text-center">收藏</span>
-        <span className="flex-1 text-center font-medium text-gray-800">直接购买 ¥{displayPrice}</span>
+        <span className="flex-1 text-center font-medium text-gray-800">直接购买 ¥{directBuyPrice}</span>
         <span className="flex-1 text-center font-semibold text-rose-600">App ¥{displayPrice}</span>
       </div>
     </div>
@@ -162,10 +176,13 @@ function PreviewPhone({
 
 export function DouyinProductMobilePreviewFrame(props: Props) {
   const [tab, setTab] = useState<PreviewTab>('product')
-  const displayPrice =
-    Number.parseFloat(props.priceYuan) > 0 ? String(Math.round(Number(props.priceYuan))) : '—'
-  const origin = Number.parseFloat(props.originYuan)
-  const displayOrigin = Number.isFinite(origin) && origin > 0 ? String(Math.round(origin)) : ''
+  const inferred = useMemo(
+    () => inferVoucherPricesFromTitle(props.productName),
+    [props.productName],
+  )
+  const displayPrice = formatPreviewYuan(props.priceYuan, inferred.sale)
+  const displayOrigin = formatPreviewYuan(props.originYuan, inferred.origin)
+  const directBuyPrice = displayOrigin !== '—' ? displayOrigin : displayPrice
   const ruleLines = useMemo(() => buildTradeRuleDescriptionLines(props.formRules), [props.formRules])
 
   return (
@@ -175,6 +192,7 @@ export function DouyinProductMobilePreviewFrame(props: Props) {
       props={props}
       displayPrice={displayPrice}
       displayOrigin={displayOrigin}
+      directBuyPrice={directBuyPrice}
       ruleLines={ruleLines}
     />
   )

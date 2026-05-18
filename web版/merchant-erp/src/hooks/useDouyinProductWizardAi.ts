@@ -49,8 +49,12 @@ export function useDouyinProductWizardAi(params: {
   const aiOn = useCallback((k: AiBusySlot) => !!aiBusySlots[k], [aiBusySlots])
 
   const imageAssistFields = useCallback(() => {
-    return buildImageAssistTextFields(params.productName, params.productDesc)
-  }, [params.productName, params.productDesc])
+    const ctx = params.goodsContext
+    return buildImageAssistTextFields(params.productName, params.productDesc, {
+      productType: ctx?.goods_product_type,
+      productTypeLabel: ctx?.goods_product_type_label,
+    })
+  }, [params.productName, params.productDesc, params.goodsContext])
 
   const postAssist = useCallback(
     async (body: Omit<AiAssistRequest, 'model'>) => {
