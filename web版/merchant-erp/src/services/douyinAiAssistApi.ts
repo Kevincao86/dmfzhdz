@@ -127,6 +127,10 @@ export type AiAssistRequest = {
   product_name: string
   /** 标题框内用户输入，用于「智能优化」改写 */
   title_draft?: string
+  /** 生图专用：团购标题原文（与 product_name 一致时仍显式传入） */
+  listing_title?: string
+  /** 生图专用：前端规则解析的主推产品，供网关锁定语义 */
+  main_product_heuristic?: string
   /** 待美化图片 URL 列表（enhance）；单张或多张 */
   image_urls?: string[]
   image_role?: 'head' | 'aux' | 'env'

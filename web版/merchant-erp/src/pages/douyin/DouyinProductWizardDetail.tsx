@@ -121,15 +121,31 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
     return () => window.removeEventListener('keydown', onKey)
   }, [imagePreviewUrl])
 
-  const { aiOn, optimizeTitleAndDesc, generateHeadImage, enhanceHeadImage } = useDouyinProductWizardAi({
+  const {
+    aiOn,
+    optimizeTitleAndDesc,
+    generateHeadImage,
+    enhanceHeadImage,
+    generateAuxImage,
+    enhanceAuxImages,
+    generateEnvImage,
+    enhanceEnvImages,
+  } = useDouyinProductWizardAi({
     productName: props.productName,
     productDesc: props.productDesc,
     setProductName: props.setProductName,
     setProductDesc: props.setProductDesc,
     setHeadUrl: props.setHeadUrl,
     headUrl: props.headUrl,
+    auxUrls: props.auxUrls,
+    setAuxUrls: props.setAuxUrls,
+    envUrls: props.envUrls,
+    setEnvUrls: props.setEnvUrls,
     goodsContext: props.goodsContext,
   })
+
+  const auxFilledCount = useMemo(() => props.auxUrls.filter((u) => u.trim()).length, [props.auxUrls])
+  const envFilledCount = useMemo(() => props.envUrls.filter((u) => u.trim()).length, [props.envUrls])
 
   const formRules: DouyinProductFormRules = useMemo(
     () => ({
@@ -291,17 +307,52 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
           <h3 className="font-semibold text-gray-900">图片</h3>
           <div>
-            <span className="text-sm font-medium">头图 *</span>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {props.headUrl ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">头图 *</span>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="shrink-0 rounded-lg border focus:ring-2 focus:ring-indigo-300"
-                  onClick={() => setImagePreviewUrl(props.headUrl)}
-                  title="点击放大"
+                  disabled={props.uploading || aiOn('img-head') || !props.headUrl.trim()}
+                  onClick={() => void enhanceHeadImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
                 >
-                  <img src={props.headUrl} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                  {aiOn('img-head') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 优化
                 </button>
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-head')}
+                  onClick={() => void generateHeadImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {aiOn('img-head') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 生成
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {props.headUrl ? (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    className="rounded-lg border focus:ring-2 focus:ring-indigo-300"
+                    onClick={() => setImagePreviewUrl(props.headUrl)}
+                    title="点击放大"
+                  >
+                    <img src={props.headUrl} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      props.setHeadUrl('')
+                    }}
+                    className="absolute -right-2 -top-2 rounded-full bg-gray-800 p-1 text-white shadow hover:bg-gray-900"
+                    aria-label="删除头图"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               ) : null}
               <button
                 type="button"
@@ -311,24 +362,6 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
               >
                 <Upload className="mr-1 h-4 w-4" />
                 上传
-              </button>
-              <button
-                type="button"
-                disabled={props.uploading || aiOn('img-head') || !props.headUrl.trim()}
-                onClick={() => void enhanceHeadImage()}
-                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
-              >
-                {aiOn('img-head') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                AI 优化
-              </button>
-              <button
-                type="button"
-                disabled={props.uploading || aiOn('img-head')}
-                onClick={() => void generateHeadImage()}
-                className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
-              >
-                {aiOn('img-head') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                AI 生成
               </button>
               <input
                 ref={headRef}
@@ -343,7 +376,32 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
             </div>
           </div>
           <div>
-            <span className="text-sm font-medium">辅助图（最多 {MAX_AUX} 张）</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">
+                辅助图（最多 {MAX_AUX} 张）
+                <span className="ml-1 font-normal text-gray-500">（{auxFilledCount}/{MAX_AUX}）</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-aux') || auxFilledCount === 0}
+                  onClick={() => void enhanceAuxImages()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
+                >
+                  {aiOn('img-aux') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 优化
+                </button>
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-aux') || auxFilledCount >= MAX_AUX}
+                  onClick={() => void generateAuxImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {aiOn('img-aux') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 生成
+                </button>
+              </div>
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {props.auxUrls.map((u, i) => (
                 <div key={i} className="relative">
@@ -359,9 +417,8 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
                       type="button"
                       className="absolute -right-1 -top-1 rounded-full bg-white shadow"
                       onClick={() => {
-                        const next = [...props.auxUrls]
-                        next[i] = ''
-                        props.setAuxUrls(next.filter(Boolean).length ? next : [''])
+                        const next = props.auxUrls.filter((_, j) => j !== i)
+                        props.setAuxUrls(next.filter((x) => x.trim()).length ? next.filter((x) => x.trim()) : [''])
                       }}
                     >
                       <X className="h-3 w-3" />
@@ -369,7 +426,7 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
                   ) : null}
                 </div>
               ))}
-              {props.auxUrls.filter(Boolean).length < MAX_AUX && (
+              {auxFilledCount < MAX_AUX && (
                 <button
                   type="button"
                   disabled={props.uploading}
@@ -399,7 +456,32 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
             />
           </div>
           <div>
-            <span className="text-sm font-medium">环境图（最多 {MAX_ENV} 张）</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">
+                环境图（最多 {MAX_ENV} 张）
+                <span className="ml-1 font-normal text-gray-500">（{envFilledCount}/{MAX_ENV}）</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-env') || envFilledCount === 0}
+                  onClick={() => void enhanceEnvImages()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
+                >
+                  {aiOn('img-env') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 优化
+                </button>
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-env') || envFilledCount >= MAX_ENV}
+                  onClick={() => void generateEnvImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {aiOn('img-env') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 生成
+                </button>
+              </div>
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {props.envUrls.map((u, i) => (
                 <div key={i} className="relative">
@@ -410,9 +492,22 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
                       空
                     </div>
                   )}
+                  {u ? (
+                    <button
+                      type="button"
+                      className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white shadow"
+                      onClick={() => {
+                        const next = props.envUrls.filter((_, j) => j !== i)
+                        props.setEnvUrls(next.filter((x) => x.trim()).length ? next.filter((x) => x.trim()) : [''])
+                      }}
+                      aria-label="删除"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
                 </div>
               ))}
-              {props.envUrls.filter(Boolean).length < MAX_ENV && (
+              {envFilledCount < MAX_ENV && (
                 <button
                   type="button"
                   disabled={props.uploading}

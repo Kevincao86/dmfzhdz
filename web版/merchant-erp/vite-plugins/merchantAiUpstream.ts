@@ -7,6 +7,11 @@
 import type { ServerResponse } from 'node:http'
 
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
+import {
+  extractMainProductFromListingTitle,
+  isWeakMainProductAnchor,
+  mainProductCategoryHints,
+} from '../src/lib/douyinProductImageAnchor.js'
 import { defaultModelIdForFamily } from '../src/services/ai/tokenmixClient.js'
 import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
 
@@ -227,11 +232,21 @@ async function runImageGenerateWithBuiltinFailover(
   titleDraft: string,
   imageRole: string,
   lockSuffix: string,
+  mainProductAnchor: string,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
   try {
-    const urls = await runImageGenerate(primaryNorm, keyFirst, env, productName, titleDraft, imageRole, lockSuffix)
+    const urls = await runImageGenerate(
+      primaryNorm,
+      keyFirst,
+      env,
+      productName,
+      titleDraft,
+      imageRole,
+      lockSuffix,
+      mainProductAnchor,
+    )
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
     lastErr = e
@@ -241,7 +256,16 @@ async function runImageGenerateWithBuiltinFailover(
     const { key } = pickKey(env, alt)
     if (!key) continue
     try {
-      const urls = await runImageGenerate(alt, key, env, productName, titleDraft, imageRole, lockSuffix)
+      const urls = await runImageGenerate(
+        alt,
+        key,
+        env,
+        productName,
+        titleDraft,
+        imageRole,
+        lockSuffix,
+        mainProductAnchor,
+      )
       return { urls, modelUsed: alt }
     } catch (e) {
       lastErr = e
@@ -391,6 +415,7 @@ async function runImageEnhanceWithBuiltinFailover(
   imageRole: string,
   imageUrls: string[],
   lockSuffix: string,
+  mainProductAnchor: string,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -398,7 +423,17 @@ async function runImageEnhanceWithBuiltinFailover(
     const enhanced: string[] = []
     for (const u of imageUrls) {
       enhanced.push(
-        await runImageEnhanceOne(primaryNorm, keyFirst, env, productName, titleDraft, imageRole, u, lockSuffix),
+        await runImageEnhanceOne(
+          primaryNorm,
+          keyFirst,
+          env,
+          productName,
+          titleDraft,
+          imageRole,
+          u,
+          lockSuffix,
+          mainProductAnchor,
+        ),
       )
     }
     return { urls: enhanced, modelUsed: primaryNorm }
@@ -412,7 +447,19 @@ async function runImageEnhanceWithBuiltinFailover(
     try {
       const enhanced: string[] = []
       for (const u of imageUrls) {
-        enhanced.push(await runImageEnhanceOne(alt, key, env, productName, titleDraft, imageRole, u, lockSuffix))
+        enhanced.push(
+          await runImageEnhanceOne(
+            alt,
+            key,
+            env,
+            productName,
+            titleDraft,
+            imageRole,
+            u,
+            lockSuffix,
+            mainProductAnchor,
+          ),
+        )
       }
       return { urls: enhanced, modelUsed: alt }
     } catch (e) {
@@ -834,21 +881,56 @@ function mergeProductSellingAnchor(productName: string, titleDraft: string): str
   return `${n}。${t}`.slice(0, 600)
 }
 
+/** 生图前：先读商品标题锁定主推产品；规则不足时用豆包短调用补全 */
+async function resolveMainProductAnchorForImage(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  productName: string,
+): Promise<string> {
+  const listingTitle = String(body.listing_title ?? productName).trim() || productName.trim()
+  const fromClient = String(body.main_product_heuristic ?? '').trim()
+  let anchor = fromClient || extractMainProductFromListingTitle(listingTitle)
+
+  if (!isWeakMainProductAnchor(anchor, listingTitle)) {
+    return anchor.slice(0, 120)
+  }
+
+  const { key } = pickKey(env, 'doubao')
+  if (!key) return (anchor || listingTitle).slice(0, 120)
+
+  const system = `你是抖音来客团购「商品标题」解析助手。只根据标题识别「主推产品/服务」名称。
+规则：去掉满减面额、渠道词；标题含「|」时以左侧为主；代金券/团购券类须输出券的适用品类名，勿输出具体无关货架单品。
+只输出一行 JSON：{"main_product":"..."}，main_product 不超过 28 字，勿 Markdown、勿其它字段。`
+  const user = `商品标题：${listingTitle}`
+  try {
+    const raw = await callDoubaoChat(key, env, system, user)
+    const parsed = JSON.parse(stripAssistantJsonFence(raw)) as { main_product?: string }
+    const mp = String(parsed.main_product ?? '').trim()
+    if (mp.length >= 2) return mp.slice(0, 120)
+  } catch {
+    /* 规则锚或标题兜底 */
+  }
+  return (anchor || extractMainProductFromListingTitle(listingTitle) || listingTitle).slice(0, 120)
+}
+
 function buildImagePrompt(
   productName: string,
   titleDraft: string,
   imageRole: string,
   mode: 't2i' | 'i2i',
   lockSuffix = '',
+  mainProductAnchor = '',
 ): string {
-  const name = productName.trim() || '本地生活服务'
-  const anchor = mergeProductSellingAnchor(productName, titleDraft)
-  const extraTail =
-    anchor !== name && anchor.length > name.length
-      ? `全文商品语义锚（名称+说明合一，生图须与此一致）：「${anchor.slice(0, 420)}」。`
-      : ''
-  const bind = `【硬性锚定·最高优先级】成片必须与下列商品语义完全一致，不得偷换为其它商品、其它品类、无关品牌或无关场景：「${anchor.slice(0, 480)}」。${extraTail}禁止：手机/电脑/平板等数码特写、无关餐饮、卖场展厅样板间、奢侈品店橱窗、办公室工位、空镜建筑走廊等占位画面；允许且鼓励：与上述语义一致的实物商品、包装、成分特写、家庭/门店使用场景、到店服务过程等。`
-  const i2iLocalLife = `【图生图·主图纠偏】用户上传图仅作构图、色调或清晰度参考。若原图主体、场景或品类与上文「硬性锚定」明显不符（例如无关展厅、卖场、数码、办公、与商品无关的室内空景），须视为错误底图：必须丢弃原图错误主体，按文字锚定重绘正确商品/包装/服务画面，禁止把错误场景「美化延续」成片。若原图与商品语义大致一致，可在不偏离锚定前提下提升清晰度、色彩与质感。`
+  const listingTitle = productName.trim() || '本地生活服务'
+  const main =
+    mainProductAnchor.trim() ||
+    extractMainProductFromListingTitle(listingTitle) ||
+    mergeProductSellingAnchor(productName, titleDraft).slice(0, 120)
+  const categoryHint = mainProductCategoryHints(main)
+  const titleCtx = titleDraft.trim().slice(0, 280)
+  const stepOne = `【两步流程·必须遵守】①已从商品标题解析主推产品：「${main}」。②成片、场景、道具必须仅服务该主推，不得偷换为其它单品或无关业态。${categoryHint}`
+  const bind = `${stepOne}\n【硬性锚定】团购标题原文：「${listingTitle.slice(0, 200)}」。${titleCtx ? `补充上下文（次要，不得偏离主推）：${titleCtx}` : ''}禁止：手机/电脑/平板等数码特写、与主推无关的卖场货架特写、展厅样板间、奢侈品橱窗、办公室工位、空镜走廊等占位画面。`
+  const i2iLocalLife = `【图生图·主图纠偏】用户上传图仅作构图、色调或清晰度参考。若原图主体、场景或品类与上文「主推产品」明显不符（例如无关展厅、卖场、数码、办公、与主推无关的室内空景），须视为错误底图：必须丢弃原图错误主体，按「${main}」重绘，禁止把错误场景「美化延续」成片。若原图与主推大致一致，可在不偏离锚定前提下提升清晰度、色彩与质感。`
   const base =
     mode === 'i2i'
       ? `${i2iLocalLife}${bind}须符合本地生活广告与平台素材规范；成片第一眼须能识别为上述同一商品/服务。`
@@ -859,7 +941,7 @@ function buildImagePrompt(
   } else if (imageRole === 'env') {
     out = `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感；环境须与商品类目及门店业态相符，不得生成与锚定商品无关的其它业态场景。`
   } else {
-    out = `${base}主图/头图风格，构图留白适中；再次强调商品语义锚：「${anchor.slice(0, 80)}${anchor.length > 80 ? '…' : ''}」。`
+    out = `${base}主图/头图风格，构图留白适中；再次强调主推产品：「${main.slice(0, 80)}${main.length > 80 ? '…' : ''}」。`
   }
   return lockSuffix ? `${out}${lockSuffix}` : out
 }
@@ -1076,8 +1158,9 @@ async function runImageGenerate(
   titleDraft: string,
   imageRole: string,
   lockSuffix = '',
+  mainProductAnchor = '',
 ): Promise<string[]> {
-  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 't2i', lockSuffix)
+  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 't2i', lockSuffix, mainProductAnchor)
   if (model === 'qwen') {
     const u = await qwenWanxOneImage(key, env, prompt)
     return [u]
@@ -1114,8 +1197,9 @@ async function runImageEnhanceOne(
   imageRole: string,
   _sourceUrl: string,
   lockSuffix = '',
+  mainProductAnchor = '',
 ): Promise<string> {
-  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 'i2i', lockSuffix)
+  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 'i2i', lockSuffix, mainProductAnchor)
   if (model === 'qwen') {
     return qwenWanxOneImage(key, env, prompt, _sourceUrl)
   }
@@ -1699,6 +1783,9 @@ export async function handleDouyinGoodsAiAssist(
     }
 
     try {
+      const mainProductAnchor = await resolveMainProductAnchorForImage(env, body, productName)
+      const imageLockSuffix =
+        goodsLock + `\n\n【主推产品·已从商品标题解析】${mainProductAnchor}`
       if (action === 'image_generate') {
         const { urls, modelUsed } = await runImageGenerateWithBuiltinFailover(
           model,
@@ -1707,7 +1794,8 @@ export async function handleDouyinGoodsAiAssist(
           productName,
           titleDraft,
           imageRole,
-          goodsLock,
+          imageLockSuffix,
+          mainProductAnchor,
         )
         json(res, 200, {
           ok: true,
@@ -1724,7 +1812,8 @@ export async function handleDouyinGoodsAiAssist(
         titleDraft,
         imageRole,
         imageUrls,
-        goodsLock,
+        imageLockSuffix,
+        mainProductAnchor,
       )
       json(res, 200, {
         ok: true,
