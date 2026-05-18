@@ -25,6 +25,13 @@ export function createDefaultComboGroups(): ComboGroupFormRow[] {
   return [{ id: newRowId('cg'), pickRule: '全部必选', items: [createEmptyComboItem()] }]
 }
 
+export function appendComboGroup(groups: ComboGroupFormRow[]): ComboGroupFormRow[] {
+  return [
+    ...groups,
+    { id: newRowId('cg'), pickRule: '全部必选', items: [createEmptyComboItem()] },
+  ]
+}
+
 /** 按组内有效单品数生成「几选几」选项 */
 export function pickRuleSelectOptionsForItemCount(itemCount: number): { value: string; label: string }[] {
   const o: { value: string; label: string }[] = [{ value: '', label: '请确认几选几' }]

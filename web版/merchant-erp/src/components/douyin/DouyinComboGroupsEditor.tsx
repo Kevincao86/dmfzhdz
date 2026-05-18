@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
 import {
+  appendComboGroup,
   type ComboGroupFormRow,
   createEmptyComboItem,
   pickRuleSelectOptionsForItemCount,
@@ -10,13 +11,20 @@ type Props = {
   groups: ComboGroupFormRow[]
   onChange: (next: ComboGroupFormRow[]) => void
   className?: string
+  /** 为 false 时由外层卡片标题栏/底栏提供「新增商品组」 */
+  showAddGroupButton?: boolean
 }
 
 function newGroupId(): string {
   return `cg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export default function DouyinComboGroupsEditor({ groups, onChange, className }: Props) {
+export default function DouyinComboGroupsEditor({
+  groups,
+  onChange,
+  className,
+  showAddGroupButton = true,
+}: Props) {
   const updateGroup = (gid: string, patch: Partial<ComboGroupFormRow>) => {
     onChange(groups.map((g) => (g.id === gid ? { ...g, ...patch } : g)))
   }
@@ -39,10 +47,7 @@ export default function DouyinComboGroupsEditor({ groups, onChange, className }:
   }
 
   const addGroup = () => {
-    onChange([
-      ...groups,
-      { id: newGroupId(), pickRule: '全部必选', items: [createEmptyComboItem()] },
-    ])
+    onChange(appendComboGroup(groups))
   }
 
   const removeGroup = (gid: string) => {
@@ -203,19 +208,25 @@ export default function DouyinComboGroupsEditor({ groups, onChange, className }:
           </div>
         )
       })}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={addGroup}
-          className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100"
-        >
-          <Plus className="h-4 w-4" />
-          添加商品组
-        </button>
-        <span className="text-xs text-gray-500">
+      {showAddGroupButton ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
+          <button
+            type="button"
+            onClick={addGroup}
+            className="inline-flex items-center gap-1 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" />
+            新增商品组
+          </button>
+          <span className="text-xs text-gray-500">
+            共 {listedCount} 个单品 · {groups.length} 个组
+          </span>
+        </div>
+      ) : (
+        <p className="border-t border-gray-100 pt-2 text-xs text-gray-500">
           共 {listedCount} 个单品 · {groups.length} 个组
-        </span>
-      </div>
+        </p>
+      )}
     </div>
   )
 }
