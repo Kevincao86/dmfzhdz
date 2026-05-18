@@ -1,3 +1,244 @@
-.list-card:active {
-  opacity: 0.92;
+.home-page {
+  padding-bottom: 48rpx;
+}
+
+.member-card {
+  margin-top: 24rpx;
+}
+
+.member-card--cta {
+  text-align: center;
+  background: linear-gradient(160deg, #ffffff 0%, #ede9fe 55%, #e0e7ff 100%);
+  border-color: #c7d2fe;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.member-avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 4rpx solid #fff;
+  box-shadow: 0 4rpx 16rpx rgba(79, 70, 229, 0.2);
+}
+
+.member-avatar--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #c7d2fe, #a5b4fc);
+}
+
+.member-avatar-letter {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+.member-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-name {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.member-tag {
+  display: inline-block;
+  margin-top: 10rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.member-hint {
+  display: block;
+  margin-top: 10rpx;
+}
+
+.member-chevron {
+  font-size: 44rpx;
+  font-weight: 300;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+.cta-icon {
+  font-size: 48rpx;
+  color: #6366f1;
+  margin-bottom: 8rpx;
+}
+
+.cta-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.cta-desc {
+  display: block;
+  margin-top: 12rpx;
+  padding: 0 16rpx;
+}
+
+.cta-btn {
+  margin-top: 28rpx;
+  width: 100%;
+}
+
+.hall-wrap {
+  margin: 24rpx 28rpx 8rpx;
+}
+
+.hall-tabs {
+  display: flex;
+  padding: 8rpx;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 20rpx;
+  border: 1rpx solid #e2e8f0;
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+}
+
+.hall-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 20rpx 12rpx;
+  border-radius: 14rpx;
+  transition: all 0.2s;
+}
+
+.hall-tab-text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.hall-tab.active .hall-tab-text {
+  color: #0f172a;
+}
+
+.hall-tab.active {
+  background: #fff;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.08);
+}
+
+.hall-tab--urgent.active {
+  background: linear-gradient(135deg, #fff1f2, #ffffff);
+}
+
+.hall-badge {
+  min-width: 36rpx;
+  padding: 0 12rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 36rpx;
+  border-radius: 18rpx;
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.hall-badge--urgent {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.job-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.job-card--urgent::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8rpx;
+  background: linear-gradient(180deg, #f43f5e, #fb7185);
+  border-radius: 8rpx 0 0 8rpx;
+}
+
+.job-card--hover {
+  transform: scale(0.99);
+  opacity: 0.96;
+}
+
+.job-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.job-card-top .tag {
+  margin-top: 0;
+}
+
+.job-title {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.job-meta {
+  display: block;
+  margin-top: 12rpx;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.job-summary {
+  display: block;
+  margin-top: 8rpx;
+}
+
+.job-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.job-foot-left {
+  font-size: 24rpx;
+  color: #94a3b8;
+}
+
+.job-foot-link {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.empty-block {
+  margin-bottom: 48rpx;
+}
+
+.empty-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #334155;
+  margin: 12rpx 0 8rpx;
 }

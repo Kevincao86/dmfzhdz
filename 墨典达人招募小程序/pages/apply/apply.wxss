@@ -1,1 +1,68 @@
-@import "../detail/detail.wxss";
+.page-hero--compact {
+  padding: 28rpx 32rpx;
+}
+
+.page-hero--compact .page-hero-title {
+  font-size: 36rpx;
+}
+
+.page-hero--compact .page-hero-sub {
+  font-size: 24rpx;
+}
+
+.sync-card {
+  background: linear-gradient(135deg, #eef2ff 0%, #ffffff 100%);
+  border-color: #c7d2fe;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.sync-icon-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  font-size: 32rpx;
+  color: #4f46e5;
+  background: #e0e7ff;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+
+.sync-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sync-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sync-hint {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.tip-card {
+  padding: 24rpx 32rpx;
+  background: #f8fafc;
+}
+
+.submit-wrap {
+  margin-bottom: 48rpx;
+  padding: 28rpx 32rpx;
+}
+
+.submit-btn {
+  width: 100%;
+}

@@ -1,6 +1,11 @@
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
+const memberStore = require('../../utils/talentMember.js')
 const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
+const regionPicker = require('../../utils/regionPicker.js')
+const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
+const applyFormState = require('../../utils/applyFormState.js')
+const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
 
 const DOUYIN_LEVELS = ['LV0', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7', '暂无等级']
 
@@ -25,31 +30,82 @@ Page({
     visitTimeEnd: '',
     alipayAccount: '',
     submitting: false,
+    provinces: [],
+    cities: [],
+    province: '',
+    city: '',
+    provinceIndex: 0,
+    cityIndex: 0,
+    hasMember: false,
+    canSyncMember: false,
+    syncMemberProfile: false,
+    memberTypeLabel: '',
   },
   onLoad(options) {
     const mpOrderId = options && options.mpId ? decodeURIComponent(options.mpId) : ''
     const merchantOrderNo =
       options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
     const platform = normalizePlatform(options && options.platform ? decodeURIComponent(options.platform) : '抖音')
-    this.setData({
+    const member = memberStore.readMember()
+    const canSyncMember = memberSyncAvailable(member, platform)
+    const patch = {
       mpOrderId,
       merchantOrderNo,
       platform,
       labels: labels(platform),
-    })
+      hasMember: !!member,
+      canSyncMember,
+      syncMemberProfile: false,
+      memberTypeLabel: member ? memberStore.memberTypeLabel(member.memberType) : '',
+      ...emptyApplyFields(DOUYIN_LEVELS),
+    }
+    if (!patch.provinces?.length) {
+      Object.assign(patch, setupRegionState('', ''))
+    }
+    this.setData(patch)
     if (!mpOrderId) {
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
     }
   },
+  onSyncMemberChange(e) {
+    const sync = !!e.detail.value
+    if (sync) {
+      const member = memberStore.readMember()
+      const fields = applyFieldsFromMember(member, this.data.platform, DOUYIN_LEVELS)
+      if (!fields) {
+        wx.showToast({ title: '暂无可用会员资料', icon: 'none' })
+        this.setData({ syncMemberProfile: false })
+        return
+      }
+      this.setData({ syncMemberProfile: true, ...fields })
+      return
+    }
+    this.setData({
+      syncMemberProfile: false,
+      ...emptyApplyFields(DOUYIN_LEVELS),
+    })
+  },
+  goRegister() {
+    wx.navigateTo({ url: '/pages/register/register' })
+  },
   onField(e) {
     const k = e.currentTarget.dataset.k
-    if (k) this.setData({ [k]: e.detail.value })
+    if (k) this.setData({ [k]: e.detail.value, syncMemberProfile: false })
+  },
+  onProvinceChange(e) {
+    onProvincePick(this, e)
+    this.setData({ syncMemberProfile: false })
+  },
+  onCityChange(e) {
+    onCityPick(this, e)
+    this.setData({ syncMemberProfile: false })
   },
   onDouyinLevelChange(e) {
     const i = Number(e.detail.value)
     this.setData({
       douyinLevelIndex: i,
       douyinSalesLevel: DOUYIN_LEVELS[i] || '',
+      syncMemberProfile: false,
     })
   },
   onVisitDateChange(e) {
@@ -73,6 +129,8 @@ Page({
     }
     if (!String(this.data.contact || '').trim()) return '请填写联系方式'
     if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
+    const regionErr = validateRegion(this.data.province, this.data.city)
+    if (regionErr) return regionErr
     if (!String(this.data.quotePrice || '').trim()) return '请填写报价'
     if (!this.data.visitDate || !this.data.visitTimeStart || !this.data.visitTimeEnd) {
       return '请选择探店日期与时间段'
@@ -119,6 +177,8 @@ Page({
         paymentMethod: `支付宝：${alipayAccount}`,
         mpOrderId: this.data.mpOrderId,
         merchantOrderNo: this.data.merchantOrderNo,
+        province: String(this.data.province || '').trim(),
+        city: String(this.data.city || '').trim(),
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       }
       await ops.applyToMpOrder(this.data.mpOrderId, applicant)

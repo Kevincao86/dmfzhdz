@@ -31,7 +31,7 @@ function parseRecruitCount(summary: string, fallbackFans: number): number {
 /** 从商家达人招募订单生成小程序单展示字段 */
 export function buildMpRecruitmentFieldsFromMerchant(
   order: RegistryRecruitmentOrder,
-  opts?: { platform?: '抖音' | '小红书' },
+  opts?: { platform?: '抖音' | '小红书'; urgent?: boolean },
 ): Pick<
   RegistryMpRecruitmentOrder,
   | 'title'
@@ -45,6 +45,7 @@ export function buildMpRecruitmentFieldsFromMerchant(
   | 'region'
   | 'category'
   | 'serviceAmount'
+  | 'urgent'
 > {
   const summary = String(order.infoSummary || '').trim()
   const region = pickField(summary, '城市') || order.storeName || order.storeAddress || '—'
@@ -94,6 +95,10 @@ export function buildMpRecruitmentFieldsFromMerchant(
     summary ||
     `${order.customerName} · ${order.storeName} 达人招募（预算约 ${budgetText}）`
 
+  const urgentAuto =
+    /急单|紧急|加急|尽快|48\s*小时|24\s*小时|当日|明天探店/.test(summary) || budget >= 3000
+  const urgent = typeof opts?.urgent === 'boolean' ? opts.urgent : urgentAuto
+
   return {
     title,
     recruitmentInfo: recruitmentLines.join('\n'),
@@ -106,5 +111,6 @@ export function buildMpRecruitmentFieldsFromMerchant(
     region,
     category,
     serviceAmount: budget,
+    urgent,
   }
 }

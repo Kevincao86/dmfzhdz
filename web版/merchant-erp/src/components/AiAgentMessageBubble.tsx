@@ -29,6 +29,32 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             </li>
           ))}
         </ol>
+        {m.preview.productPlan ? (
+          <div className="mt-4 rounded-xl border border-indigo-100 bg-white/90 p-3 text-sm text-slate-800">
+            <p className="font-semibold text-indigo-900">{m.preview.productPlan.productName}</p>
+            <p className="mt-1 text-indigo-700">
+              建议售价 ¥{m.preview.productPlan.suggestedPriceYuan}
+              {m.preview.productPlan.originYuan != null
+                ? ` · 划线 ¥${m.preview.productPlan.originYuan}`
+                : ''}
+            </p>
+            {m.preview.productPlan.comboLines.length > 0 && (
+              <ul className="mt-2 list-inside list-disc text-xs text-slate-600">
+                {m.preview.productPlan.comboLines.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            )}
+            {m.preview.productPlan.description ? (
+              <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                {m.preview.productPlan.description}
+              </p>
+            ) : null}
+            {m.preview.productPlan.marginNote ? (
+              <p className="mt-2 text-xs text-amber-800">{m.preview.productPlan.marginNote}</p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="mt-3 text-[11px] text-slate-500">
           类型：<span className="font-mono text-slate-600">{m.preview.taskType}</span>
         </p>

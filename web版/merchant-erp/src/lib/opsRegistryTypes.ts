@@ -109,6 +109,8 @@ export type RegistryMpRecruitmentApplicant = {
   mpOrderId?: string
   merchantOrderNo?: string
   appliedAt: string
+  province?: string
+  city?: string
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -128,6 +130,36 @@ export type RegistryTalentLibraryEntry = {
   updatedAt: string
   lastMpOrderId?: string
   lastMerchantOrderNo?: string
+  province?: string
+  city?: string
+}
+
+/** 达人招募小程序 · 单平台资料（抖音/小红书） */
+export type RegistryMpTalentPlatformProfile = {
+  platformAccount: string
+  platformNickname: string
+  profileLink: string
+  followers: number
+  douyinSalesLevel?: string
+  quotePrice: string
+  alipayAccount: string
+}
+
+/** 达人招募小程序 · 墨典达人会员 */
+export type RegistryMpTalentMember = {
+  id: string
+  memberType: 'douyin' | 'xiaohongshu' | 'both'
+  wxNickName: string
+  wxAvatarUrl: string
+  wxOpenId?: string
+  contact: string
+  wechatId: string
+  province?: string
+  city?: string
+  douyin?: RegistryMpTalentPlatformProfile
+  xiaohongshu?: RegistryMpTalentPlatformProfile
+  registeredAt: string
+  updatedAt: string
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -150,6 +182,8 @@ export type RegistryMpRecruitmentOrder = {
   region?: string
   category?: string
   serviceAmount?: number
+  /** 急单大厅展示 */
+  urgent?: boolean
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
@@ -204,6 +238,7 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  mpTalentMembers?: RegistryMpTalentMember[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]

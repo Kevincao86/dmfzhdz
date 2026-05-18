@@ -1,12 +1,13 @@
 /**
- * POST /api/meoo-ops-mp-recruitment-orders-append — 达人招募小程序/运营台创建小程序招募单。
+ * POST /api/meoo-ops-mp-talent-member-register — 达人招募小程序注册墨典达人会员。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
-import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
+import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
+import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -56,41 +57,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { order?: RegistryMpRecruitmentOrder }
+    let body: { member?: RegistryMpTalentMember }
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { order?: RegistryMpRecruitmentOrder }
+      body = JSON.parse(rawBody(req) || '{}') as { member?: RegistryMpTalentMember }
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
-    const order = body.order
-    if (!order || !order.id || !order.sourceMerchantOrderId) {
-      sendOpsJson(res, 400, { ok: false, error: 'invalid_mp_order' })
+    const member = body.member
+    if (!member || !member.memberType || !String(member.wxNickName || '').trim()) {
+      sendOpsJson(res, 400, { ok: false, error: 'invalid_member' })
+      return
+    }
+    if (!String(member.contact || '').trim() || !String(member.wechatId || '').trim()) {
+      sendOpsJson(res, 400, { ok: false, error: 'contact_required' })
       return
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const list = [...(data.mpRecruitmentOrders ?? [])]
-    const sid = String(order.sourceMerchantOrderId || '').trim()
-    const dup = list.find((o) => o && String(o.sourceMerchantOrderId || '').trim() === sid)
-    if (dup) {
-      sendOpsJson(res, 409, {
-        ok: false,
-        error: 'duplicate_merchant_order',
-        existingId: dup.id,
-      })
-      return
-    }
-    list.unshift(order)
-    data.mpRecruitmentOrders = list.slice(0, 200)
+    upsertMpTalentMember(data, member)
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true, id: order.id })
+    sendOpsJson(res, 200, { ok: true, id: member.id })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
       ok: false,
-      error: 'meoo_ops_mp_recruitment_orders_append_failed',
+      error: 'meoo_ops_mp_talent_member_register_failed',
       detail: msg.slice(0, 800),
     })
   }

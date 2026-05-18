@@ -1,10 +1,10 @@
 {
-  "pages": ["pages/index/index", "pages/detail/detail", "pages/apply/apply"],
+  "pages": ["pages/index/index", "pages/register/register", "pages/detail/detail", "pages/apply/apply"],
   "window": {
     "navigationBarTitleText": "墨典达人招募",
-    "navigationBarBackgroundColor": "#0f172a",
+    "navigationBarBackgroundColor": "#312e81",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f1f5f9",
+    "backgroundColor": "#eef2ff",
     "backgroundTextStyle": "dark"
   },
   "lazyCodeLoading": "requiredComponents"

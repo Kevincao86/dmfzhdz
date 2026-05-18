@@ -30,6 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Store,
     children: [
       { path: '/store/info', label: '店铺信息' },
+      { path: '/store/menu', label: '菜单价目表' },
       { path: '/store/decoration', label: '店铺装修' },
     ],
   },
@@ -43,6 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/activity', label: '活动中心' },
       { path: '/reviews', label: '评论管理' },
       { path: '/geo', label: 'GEO运营优化' },
+      { path: '/operation/competitors', label: '竞争对手分析' },
       { path: '/ai-operation/content', label: 'AI 文章与话题' },
       { path: '/ai-operation/video-check', label: '短视频优化' },
       { path: '/ai-operation/live-check', label: '直播间分析' },

@@ -14,6 +14,8 @@ import ReviewsManagementPage from './pages/ReviewsManagementPage'
 import StoreDecorationPage from './pages/StoreDecorationPage'
 import StoreDetailPage from './pages/StoreDetailPage'
 import StoreInfoPage from './pages/StoreInfoPage'
+import StoreMenuPage from './pages/StoreMenuPage'
+import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage'
 import ProductCreateFlowPage from './pages/ProductCreateFlowPage'
 import ProductEditFlowPage from './pages/ProductEditFlowPage'
 import ProductsPage from './pages/ProductsPage'
@@ -41,6 +43,7 @@ export default function App() {
           <Route path="ai-agent" element={<AiAgentPage />} />
           <Route path="store" element={<Navigate to="/store/info" replace />} />
           <Route path="store/info" element={<StoreInfoPage />} />
+          <Route path="store/menu" element={<StoreMenuPage />} />
           <Route path="store/detail/:platform/:poiId" element={<StoreDetailPage />} />
           <Route path="store/decoration" element={<StoreDecorationPage />} />
           <Route path="products" element={<ProductsPage />} />
@@ -53,6 +56,7 @@ export default function App() {
           <Route path="activity" element={<ActivityCenterPage />} />
           <Route path="reviews" element={<ReviewsManagementPage />} />
           <Route path="geo" element={<GeoPage />} />
+          <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
           <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />
           <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
           <Route path="ai-operation/content" element={<AiOperationContentPage />} />

@@ -28,6 +28,7 @@ import {
   replaceProductEditLibraryRowId,
   upsertProductEditLibraryDraft,
 } from '../../lib/productEditLibrary'
+import { consumeAiProductDraft } from '../../lib/aiProductDraft'
 import { readMerchantSession } from '../../lib/merchantSession'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
@@ -213,6 +214,33 @@ export default function DouyinProductCreateWizard({
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (isEdit) return
+    const draft = consumeAiProductDraft()
+    if (!draft) return
+    if (draft.productName) setProductName(draft.productName)
+    if (draft.productDesc) setProductDesc(draft.productDesc)
+    if (draft.priceYuan) setPriceYuan(draft.priceYuan)
+    if (draft.originYuan) setOriginYuan(draft.originYuan)
+    if (draft.comboSummary) {
+      const parts = draft.comboSummary.split(/[；;]/).filter(Boolean)
+      setComboGroups([
+        {
+          id: `cg-ai-${Date.now()}`,
+          groupName: '套餐内容',
+          pickRule: '全部必选',
+          items: parts.map((name, i) => ({
+            id: `ci-ai-${i}-${Date.now()}`,
+            name: name.trim(),
+            priceYuan: '',
+            quantity: 1,
+          })),
+        },
+      ])
+    }
+    setStep('detail')
+  }, [isEdit])
 
   useEffect(() => {
     if (!isEdit || !editProductId?.trim()) return

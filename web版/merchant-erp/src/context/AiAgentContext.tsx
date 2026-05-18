@@ -10,15 +10,26 @@ import {
   type ReactNode,
   type SetStateAction,
 } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { saveAiProductDraft } from '../lib/aiProductDraft'
 import type {
   AiAgentArchivedSession,
   AiAgentMessage,
   AiAgentOpenContext,
   AiAgentPendingQuote,
   AiPermissionId,
+  AiProductPlanPreview,
   AiTaskPreviewPayload,
   AiTaskType,
 } from '../lib/aiAgentTypes'
+import {
+  competitorReportSummary,
+  loadSelectedCompetitorStore,
+  latestCompetitorReportForPoi,
+} from '../lib/competitorStorage'
+import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
+import { readStoreMarginConfig } from '../lib/storeMarginsRead'
+import { fetchAiProductPlan } from '../services/storeIntelApi'
 import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import {
@@ -236,7 +247,25 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
   }
 }
 
+function buildProductPlanContext(userBrief: string) {
+  const marginCfg = readStoreMarginConfig()
+  const menu = loadStoreMenuRecord()
+  const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 35) : ''
+  const sel = loadSelectedCompetitorStore()
+  const cmp = sel?.poiId ? latestCompetitorReportForPoi(sel.poiId) : null
+  return {
+    userBrief,
+    platform: 'douyin',
+    storeName: sel?.storeName ?? menu?.storeName,
+    menuSummary: menuSummary || undefined,
+    margins: marginCfg.margins,
+    industryPath: marginCfg.industry.path || marginCfg.industry.name || undefined,
+    competitorSummary: cmp ? competitorReportSummary(cmp) : undefined,
+  }
+}
+
 export function AiAgentProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pageContext, setPageContext] = useState<AiAgentOpenContext | null>(null)
   const [messages, setMessages] = useState<AiAgentMessage[]>(() => [
@@ -402,13 +431,52 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       messagesRef.current = next
       return next
     })
+    return msg.id
   }, [pageContext?.pageLabel])
+
+  const attachProductPlanToPreview = useCallback(async (previewMsgId: string, userBrief: string) => {
+    const r = await fetchAiProductPlan(buildProductPlanContext(userBrief))
+    if (!r.ok) return
+    const plan: AiProductPlanPreview = {
+      productName: r.plan.productName,
+      suggestedPriceYuan: r.plan.suggestedPriceYuan,
+      description: r.plan.description,
+      comboLines: r.plan.comboLines,
+      ...(r.plan.originYuan != null ? { originYuan: r.plan.originYuan } : {}),
+      ...(r.plan.marginNote ? { marginNote: r.plan.marginNote } : {}),
+      ...(r.plan.competitorNote ? { competitorNote: r.plan.competitorNote } : {}),
+      ...(r.plan.riskLevel ? { riskLevel: r.plan.riskLevel } : {}),
+    }
+    setMessages((prev) => {
+      const next = prev.map((m) => {
+        if (m.id !== previewMsgId || !m.preview) return m
+        return {
+          ...m,
+          content:
+            '已结合菜单价目、门店毛利率与竞品分析生成团购方案草案。请确认后进入「创建商品」页预览并调整价格、图片与售后规则，再提交至抖音来客。',
+          preview: { ...m.preview, productPlan: plan },
+        }
+      })
+      messagesRef.current = next
+      return next
+    })
+  }, [])
+
+  const pushCreateProductPreview = useCallback(
+    (userBrief: string, pageLabel?: string) => {
+      const intro =
+        '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与周边竞品生成方案草案；确认后将打开抖音创建商品页供您修改价格、图片与售后规则。是否继续？'
+      const id = pushPreview('create_product', intro, pageLabel)
+      void attachProductPlanToPreview(id, userBrief)
+    },
+    [pushPreview, attachProductPlanToPreview],
+  )
 
   const scheduleKeywordPreview = useCallback(
     (trimmed: string, pageLabel?: string) => {
       const intro = '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。'
-      if (/创建|商品|套餐|上架|双人|单人/.test(trimmed)) {
-        setTimeout(() => pushPreview('create_product', intro, pageLabel), 200)
+      if (/创建|商品|套餐|上架|双人|单人|火锅|团购/.test(trimmed)) {
+        setTimeout(() => pushCreateProductPreview(trimmed, pageLabel), 200)
       } else if (/达人|招募|探店/.test(trimmed)) {
         setTimeout(() => pushPreview('recruit_influencer', intro, pageLabel), 200)
       } else if (/差评|评价|评论/.test(trimmed)) {
@@ -420,7 +488,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         )
       }
     },
-    [pushPreview],
+    [pushCreateProductPreview, pushPreview],
   )
 
   const runGatewayForSnapshot = useCallback(
@@ -595,9 +663,50 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const confirmPendingTask = useCallback(() => {
     if (!pendingPreviewId) return
+    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
+    const p = pending?.preview
+    const title = p?.title ?? '任务'
+
+    if (p?.taskType === 'create_product') {
+      const plan = p.productPlan
+      const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+      const brief = lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() || '团购商品'
+      if (plan) {
+        saveAiProductDraft({
+          platform: 'douyin',
+          productName: plan.productName,
+          productDesc: plan.description,
+          priceYuan: String(plan.suggestedPriceYuan),
+          originYuan: plan.originYuan != null ? String(plan.originYuan) : undefined,
+          comboSummary: plan.comboLines.join('；'),
+          planNotes: [plan.marginNote, plan.competitorNote].filter(Boolean).join('\n'),
+        })
+      } else {
+        saveAiProductDraft({
+          platform: 'douyin',
+          productName: brief.slice(0, 60),
+          productDesc: brief,
+        })
+      }
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          createAgentMessage(
+            'task_result',
+            `「${title}」已确认。正在打开抖音创建商品页，您可在预览中调整价格、图片与交易售后规则后提交上架。`,
+            { resultSummary: 'confirmed' },
+          ),
+        ]
+        messagesRef.current = next
+        return next
+      })
+      setPendingPreviewId(null)
+      setDrawerOpen(false)
+      navigate('/products/create', { state: { platforms: ['douyin'] } })
+      return
+    }
+
     setMessages((prev) => {
-      const p = prev.find((m) => m.id === pendingPreviewId)?.preview
-      const title = p?.title ?? '任务'
       const next = [
         ...prev,
         createAgentMessage(
@@ -610,7 +719,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       return next
     })
     setPendingPreviewId(null)
-  }, [pendingPreviewId])
+  }, [pendingPreviewId, navigate])
 
   const cancelPendingTask = useCallback(() => {
     if (!pendingPreviewId) return

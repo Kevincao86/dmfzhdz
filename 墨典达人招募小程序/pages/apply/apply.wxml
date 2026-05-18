@@ -1,16 +1,40 @@
-<view class="page-with-bar">
-  <view class="card" style="margin-top:24rpx;">
-    <text class="order-no">招募订单 {{mpOrderId}}</text>
-    <text class="order-no" style="display:block;margin-top:8rpx;">商家订单 {{merchantOrderNo}}</text>
-    <text class="hint" style="display:block;margin-top:12rpx;">平台：{{platform}} · 本表单字段已按平台展示</text>
+<view class="page-shell page-with-bar">
+  <view class="page-hero page-hero--compact">
+    <text class="page-hero-title">提交报名</text>
+    <text class="page-hero-sub">平台 {{platform}} · 订单 {{merchantOrderNo}}</text>
+  </view>
+
+  <view class="card sync-card" wx:if="{{canSyncMember}}">
+    <view class="sync-row">
+      <view class="sync-icon-wrap">⇄</view>
+      <view class="sync-text">
+        <text class="sync-title">同步会员资料</text>
+        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料（探店时间需重选）</text>
+      </view>
+      <switch checked="{{syncMemberProfile}}" color="#6366f1" bindchange="onSyncMemberChange" />
+    </view>
+  </view>
+
+  <view class="card tip-card" wx:elif="{{hasMember}}">
+    <text class="hint">本单为{{platform}}招募，会员资料未含该平台，请手动填写或 </text>
+    <text class="link-text" bindtap="goRegister">完善资料</text>
+  </view>
+
+  <view class="card tip-card" wx:else>
+    <text class="hint">未注册也可直接报名。 </text>
+    <text class="link-text" bindtap="goRegister">注册会员</text>
+    <text class="hint"> 后可下次一键同步。</text>
   </view>
 
   <view class="card apply-form">
-    <view class="section-title">新建报名表单</view>
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">达人信息</text>
+    </view>
 
     <view class="form-row">
       <text class="form-label">{{labels.accountId}}</text>
-      <input class="input" placeholder="达人ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
+      <input class="input" placeholder="请输入平台 ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
     </view>
 
     <view class="form-row">
@@ -20,7 +44,7 @@
 
     <view class="form-row">
       <text class="form-label">{{labels.profileLink}}</text>
-      <input class="input" placeholder="https://..." value="{{profileLink}}" data-k="profileLink" bindinput="onField" />
+      <input class="input" placeholder="主页链接" value="{{profileLink}}" data-k="profileLink" bindinput="onField" />
     </view>
 
     <view class="form-row">
@@ -34,6 +58,13 @@
         <view class="picker-val">{{douyinSalesLevel || '请选择'}}</view>
       </picker>
     </view>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">联系与地域</text>
+    </view>
 
     <view class="form-row">
       <text class="form-label">联系方式</text>
@@ -42,12 +73,34 @@
 
     <view class="form-row">
       <text class="form-label">微信号</text>
-      <input class="input" placeholder="微信 ID" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
+      <input class="input" placeholder="便于商家联系" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
+    </view>
+
+    <view class="form-row form-row-inline">
+      <view class="form-col">
+        <text class="form-label">省份</text>
+        <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
+          <view class="picker-val">{{province || '请选择'}}</view>
+        </picker>
+      </view>
+      <view class="form-col">
+        <text class="form-label">城市</text>
+        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
+          <view class="picker-val">{{city || '请选择'}}</view>
+        </picker>
+      </view>
+    </view>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">报价与探店</text>
     </view>
 
     <view class="form-row">
-      <text class="form-label">报价</text>
-      <input class="input" type="digit" placeholder="元" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
+      <text class="form-label">报价（元）</text>
+      <input class="input" type="digit" placeholder="您的报价" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
     </view>
 
     <view class="form-row">
@@ -59,13 +112,13 @@
 
     <view class="form-row form-row-inline">
       <view class="form-col">
-        <text class="form-label">开始时间</text>
+        <text class="form-label">开始</text>
         <picker mode="time" value="{{visitTimeStart}}" bindchange="onVisitTimeStartChange">
           <view class="picker-val">{{visitTimeStart || '时:分'}}</view>
         </picker>
       </view>
       <view class="form-col">
-        <text class="form-label">结束时间</text>
+        <text class="form-label">结束</text>
         <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
           <view class="picker-val">{{visitTimeEnd || '时:分'}}</view>
         </picker>
@@ -73,11 +126,13 @@
     </view>
 
     <view class="form-row">
-      <text class="form-label">支付宝账号（结算）</text>
-      <input class="input" placeholder="用于打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
+      <text class="form-label">支付宝账号</text>
+      <input class="input" placeholder="用于结算打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
     </view>
+  </view>
 
-    <button class="btn-primary" style="margin-top:28rpx;" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
+  <view class="card card--flat submit-wrap">
+    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
       提交报名
     </button>
   </view>

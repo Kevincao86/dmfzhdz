@@ -14,6 +14,7 @@ import {
 } from '../opsRegistryApi'
 import { normalizeRecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import { buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
+import { findMpOrderByMerchantOrderId } from '../mpRecruitmentDedup'
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
 
@@ -114,6 +115,8 @@ export default function OpsRecruitmentOrdersPage() {
   const [mpShareInfo, setMpShareInfo] = useState<{ merchantOrderId: string; mpOrderId: string } | null>(null)
   const [mpAcceptBusy, setMpAcceptBusy] = useState(false)
   const [mpRecruitPlatform, setMpRecruitPlatform] = useState<'抖音' | '小红书'>('抖音')
+  /** 小程序招募下发至达人端：正常单 → 招募大厅；加急单 → 急单大厅 */
+  const [mpHallKind, setMpHallKind] = useState<'normal' | 'urgent'>('normal')
   const [acceptSheetFile, setAcceptSheetFile] = useState<File | null>(null)
   const [acceptSheetBusy, setAcceptSheetBusy] = useState(false)
   const [alertOpen, setAlertOpen] = useState(false)
@@ -236,6 +239,7 @@ export default function OpsRecruitmentOrdersPage() {
   const openAcceptModeChoice = (order: RegistryRecruitmentOrder) => {
     setProcessOrder(null)
     setMpRecruitPlatform(normalizeRecruitmentPlatform(order.recruitmentPlatform || order.accountType))
+    setMpHallKind('normal')
     setAcceptModeChoiceOrder(order)
   }
 
@@ -248,10 +252,24 @@ export default function OpsRecruitmentOrdersPage() {
   const confirmMiniprogramAccept = async (order: RegistryRecruitmentOrder) => {
     setMpAcceptBusy(true)
     try {
+      const reg = await fetchRegistry()
+      const existing = findMpOrderByMerchantOrderId(reg.mpRecruitmentOrders, order.id)
+      if (existing) {
+        window.alert(
+          `该商家订单已存在小程序招募单 ${existing.id}，不可重复创建。请在「小程序达人招募订单」查看。`,
+        )
+        return
+      }
+      if (order.linkedMpOrderId?.trim()) {
+        window.alert(`该订单已关联小程序单 ${order.linkedMpOrderId.trim()}，不可重复创建。`)
+        return
+      }
+
       const now = new Date().toLocaleString('zh-CN', { hour12: false })
       const mpId = `MP-RO-${Date.now()}`
       const platform = mpRecruitPlatform
-      const fields = buildMpRecruitmentFieldsFromMerchant(order, { platform })
+      const urgent = mpHallKind === 'urgent'
+      const fields = buildMpRecruitmentFieldsFromMerchant(order, { platform, urgent })
       const mpOrder: RegistryMpRecruitmentOrder = {
         id: mpId,
         sourceMerchantOrderId: order.id,
@@ -265,7 +283,11 @@ export default function OpsRecruitmentOrdersPage() {
       }
       const append = await appendMpRecruitmentOrder(mpOrder)
       if (!append.ok) {
-        window.alert(append.error ?? '创建小程序招募单失败')
+        const msg =
+          append.error === 'duplicate_merchant_order'
+            ? '该商家订单已有小程序招募单，不可重复创建。'
+            : (append.error ?? '创建小程序招募单失败')
+        window.alert(msg)
         return
       }
       const patch = await patchRecruitmentOrder({
@@ -637,6 +659,39 @@ export default function OpsRecruitmentOrdersPage() {
                 <option value="小红书">小红书</option>
               </select>
               <p className="mt-1 text-[10px] text-slate-600">小红书招募单不展示带货等级；报名表单字段随平台切换。</p>
+            </div>
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-slate-400">达人端展示大厅</label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={mpAcceptBusy}
+                  onClick={() => setMpHallKind('normal')}
+                  className={cn(
+                    'rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors',
+                    mpHallKind === 'normal'
+                      ? 'border-sky-500/60 bg-sky-950/40 text-sky-100'
+                      : 'border-slate-700 bg-slate-950 text-slate-400 hover:border-slate-600',
+                  )}
+                >
+                  正常单
+                  <span className="mt-0.5 block text-[10px] font-normal opacity-80">招募大厅</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={mpAcceptBusy}
+                  onClick={() => setMpHallKind('urgent')}
+                  className={cn(
+                    'rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors',
+                    mpHallKind === 'urgent'
+                      ? 'border-rose-500/60 bg-rose-950/40 text-rose-100'
+                      : 'border-slate-700 bg-slate-950 text-slate-400 hover:border-slate-600',
+                  )}
+                >
+                  加急单
+                  <span className="mt-0.5 block text-[10px] font-normal opacity-80">急单大厅</span>
+                </button>
+              </div>
             </div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
               <button

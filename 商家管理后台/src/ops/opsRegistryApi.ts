@@ -92,6 +92,8 @@ export type RegistryMpRecruitmentApplicant = {
   mpOrderId?: string
   merchantOrderNo?: string
   appliedAt: string
+  province?: string
+  city?: string
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -111,6 +113,8 @@ export type RegistryTalentLibraryEntry = {
   updatedAt: string
   lastMpOrderId?: string
   lastMerchantOrderNo?: string
+  province?: string
+  city?: string
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -133,6 +137,8 @@ export type RegistryMpRecruitmentOrder = {
   region?: string
   category?: string
   serviceAmount?: number
+  /** 加急单 → 达人端急单大厅；否则招募大厅 */
+  urgent?: boolean
 }
 
 export type RegistryTalentPoolRow = {
