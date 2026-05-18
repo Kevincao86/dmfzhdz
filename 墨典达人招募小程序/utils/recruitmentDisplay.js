@@ -1,3 +1,12 @@
+const {
+  shouldExcludeRecruitmentSegment,
+  filterRecruitmentInfoLines,
+  filterRecruitmentInfoText,
+  filterTaskDetailText,
+  explodeAndFilterDisplayLines,
+  normalizeRecruitmentPlatform,
+} = require('./recruitmentInfoFilter.js')
+
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
   const m = String(summary || '').match(re)
@@ -39,10 +48,12 @@ function enrichMpOrder(mp, merchant) {
   const customerName = mp.customerName || (merchant && merchant.customerName) || '—'
   const storeName = mp.storeName || (merchant && merchant.storeName) || '—'
   const merchantOrderNo = mp.sourceMerchantOrderId || (merchant && merchant.id) || '—'
-  const platform =
+  const platform = normalizeRecruitmentPlatform(
     mp.platform ||
-    (merchant && merchant.accountType && merchant.accountType !== '—' ? merchant.accountType : '') ||
-    '抖音'
+      merchant?.recruitmentPlatform ||
+      (merchant && merchant.accountType && merchant.accountType !== '—' ? merchant.accountType : '') ||
+      '抖音',
+  )
   const region =
     mp.region || pickField(summary, '城市') || storeName || (merchant && merchant.storeAddress) || '—'
   const category =
@@ -73,29 +84,37 @@ function enrichMpOrder(mp, merchant) {
         : `${customerName}·${storeName}达人招募`
   }
 
-  let recruitmentInfo = mp.recruitmentInfo
+  let recruitmentInfo = mp.recruitmentInfo ? filterRecruitmentInfoText(mp.recruitmentInfo) : ''
   let taskDetail = mp.taskDetail
   if (!recruitmentInfo && summary) {
     const parts = summary.split(/[；;]/).map((p) => p.trim()).filter(Boolean)
     const rec = []
     const task = []
     for (const p of parts) {
-      if (/套餐|探店|策略|档位|佣金|预算|招募[:：]|城市|行业/.test(p)) rec.push(p)
+      if (shouldExcludeRecruitmentSegment(p)) continue
+      if (/套餐|探店|策略|档位|佣金|招募[:：]|城市|行业|时段|达人|粉丝|带货|营销/.test(p)) rec.push(p)
       else if (/说明|交付|备注|要求|结算|出片|组/.test(p)) task.push(p)
       else rec.push(p)
     }
-    recruitmentInfo = rec.join('\n') || summary
-    if (!taskDetail) taskDetail = task.length ? task.join('\n') : ''
+    recruitmentInfo = filterRecruitmentInfoLines(rec).join('\n') || filterRecruitmentInfoText(summary)
+    if (!taskDetail) taskDetail = task.length ? filterTaskDetailText(task.join('\n')) : ''
   }
   if (!taskDetail) {
-    taskDetail = mp.merchantRequirements || summary || '详见招募信息'
+    taskDetail = filterTaskDetailText(mp.merchantRequirements || summary || '详见招募信息')
+  } else {
+    taskDetail = filterTaskDetailText(taskDetail)
   }
   if (!recruitmentInfo) {
-    recruitmentInfo = mp.merchantRequirements || summary || '—'
+    recruitmentInfo = filterRecruitmentInfoText(mp.merchantRequirements || summary || '—')
+  } else {
+    recruitmentInfo = filterRecruitmentInfoText(recruitmentInfo)
   }
 
-  const recruitmentInfoLines = splitLines(recruitmentInfo)
-  const taskDetailLines = splitLines(taskDetail)
+  let recruitmentInfoLines = explodeAndFilterDisplayLines(recruitmentInfo)
+  if (platform === '小红书') {
+    recruitmentInfoLines = recruitmentInfoLines.filter((l) => !/带货等级/.test(l))
+  }
+  const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)
 
   const tags = [
     { text: platform, tone: platform.includes('红') ? 'pink' : 'blue' },

@@ -1,3 +1,10 @@
+import {
+  filterRecruitmentInfoLines,
+  filterRecruitmentInfoText,
+  filterTaskDetailText,
+  normalizeRecruitmentPlatform,
+  shouldExcludeRecruitmentSegment,
+} from '../meooRegistryShared/recruitmentInfoFilter.js'
 import type { RegistryMpRecruitmentOrder, RegistryRecruitmentOrder } from './opsRegistryApi'
 
 function pickField(summary: string, key: string): string {
@@ -24,6 +31,7 @@ function parseRecruitCount(summary: string, fallbackFans: number): number {
 /** 从商家达人招募订单生成小程序单展示字段 */
 export function buildMpRecruitmentFieldsFromMerchant(
   order: RegistryRecruitmentOrder,
+  opts?: { platform?: '抖音' | '小红书' },
 ): Pick<
   RegistryMpRecruitmentOrder,
   | 'title'
@@ -41,7 +49,9 @@ export function buildMpRecruitmentFieldsFromMerchant(
   const summary = String(order.infoSummary || '').trim()
   const region = pickField(summary, '城市') || order.storeName || order.storeAddress || '—'
   const category = pickField(summary, '行业') || order.category || '本地生活'
-  const platform = order.accountType && order.accountType !== '—' ? order.accountType : '抖音'
+  const platform = normalizeRecruitmentPlatform(
+    opts?.platform || order.recruitmentPlatform || order.accountType,
+  )
   const budget = Math.max(0, order.serviceAmount || 0)
   const budgetText = budget > 0 ? `¥${budget.toLocaleString('zh-CN')}` : '面议'
   const recruitCount = parseRecruitCount(summary, order.fans) || (order.fans > 0 ? order.fans : 1)
@@ -52,7 +62,8 @@ export function buildMpRecruitmentFieldsFromMerchant(
   if (summary) {
     const parts = summary.split(/[；;]/).map((p) => p.trim()).filter(Boolean)
     for (const p of parts) {
-      if (/套餐|探店|策略|档位|佣金|预算|招募[:：]|城市|行业/.test(p)) {
+      if (shouldExcludeRecruitmentSegment(p)) continue
+      if (/套餐|探店|策略|档位|佣金|招募[:：]|城市|行业|时段|达人|粉丝|带货|营销|佣金/.test(p)) {
         recruitmentLines.push(p)
       } else if (/说明|交付|备注|要求|结算|出片|组/.test(p)) {
         taskLines.push(p)
@@ -61,7 +72,15 @@ export function buildMpRecruitmentFieldsFromMerchant(
       }
     }
   }
-  if (!recruitmentLines.length && summary) recruitmentLines.push(summary)
+  const filteredRecruitment = filterRecruitmentInfoLines(recruitmentLines)
+  if (!filteredRecruitment.length && summary) {
+    const fallback = filterRecruitmentInfoText(summary)
+    if (fallback) recruitmentLines.push(...fallback.split('\n'))
+    else recruitmentLines.length = 0
+  } else {
+    recruitmentLines.length = 0
+    recruitmentLines.push(...filteredRecruitment)
+  }
   if (!taskLines.length && order.storeAddress && order.storeAddress !== '—') {
     taskLines.push(`门店/地址：${order.storeAddress}`)
   }
@@ -78,7 +97,7 @@ export function buildMpRecruitmentFieldsFromMerchant(
   return {
     title,
     recruitmentInfo: recruitmentLines.join('\n'),
-    taskDetail: taskLines.length ? taskLines.join('\n') : merchantRequirements,
+    taskDetail: filterTaskDetailText(taskLines.length ? taskLines.join('\n') : merchantRequirements),
     merchantRequirements,
     platform,
     fansRequirement,

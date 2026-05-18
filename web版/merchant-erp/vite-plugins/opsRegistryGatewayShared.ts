@@ -23,6 +23,7 @@ import type {
   RegistryVendorKeys,
 } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
+import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 import { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
 
 export { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
@@ -537,14 +538,30 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               return
             }
             const cur = data.mpRecruitmentOrders[idx]!
+            const merchantOrderNo = cur.sourceMerchantOrderId
+            const platform = cur.platform || '抖音'
+            const row = {
+              ...applicant,
+              mpOrderId,
+              merchantOrderNo,
+              paymentMethod:
+                applicant.paymentMethod ||
+                (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
+            }
             const applicants = [...(cur.applicants ?? [])]
-            applicants.unshift(applicant)
+            applicants.unshift(row)
             data.mpRecruitmentOrders[idx] = {
               ...cur,
               applicants: applicants.slice(0, 500),
               status: cur.status === 'open' ? 'collecting' : cur.status,
               updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
             }
+            upsertTalentLibraryFromApplicant(data, {
+              platform,
+              applicant: row,
+              mpOrderId,
+              merchantOrderNo,
+            })
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
             return

@@ -1,0 +1,84 @@
+<view class="page-with-bar">
+  <view class="card" style="margin-top:24rpx;">
+    <text class="order-no">招募订单 {{mpOrderId}}</text>
+    <text class="order-no" style="display:block;margin-top:8rpx;">商家订单 {{merchantOrderNo}}</text>
+    <text class="hint" style="display:block;margin-top:12rpx;">平台：{{platform}} · 本表单字段已按平台展示</text>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-title">新建报名表单</view>
+
+    <view class="form-row">
+      <text class="form-label">{{labels.accountId}}</text>
+      <input class="input" placeholder="达人ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">{{labels.nickname}}</text>
+      <input class="input" placeholder="平台昵称" value="{{platformNickname}}" data-k="platformNickname" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">{{labels.profileLink}}</text>
+      <input class="input" placeholder="https://..." value="{{profileLink}}" data-k="profileLink" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">粉丝数</text>
+      <input class="input" type="number" placeholder="如 20000" value="{{followers}}" data-k="followers" bindinput="onField" />
+    </view>
+
+    <view class="form-row" wx:if="{{labels.showSalesLevel}}">
+      <text class="form-label">带货等级（抖音）</text>
+      <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
+        <view class="picker-val">{{douyinSalesLevel || '请选择'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">联系方式</text>
+      <input class="input" type="number" placeholder="手机号" value="{{contact}}" data-k="contact" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">微信号</text>
+      <input class="input" placeholder="微信 ID" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">报价</text>
+      <input class="input" type="digit" placeholder="元" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">探店日期</text>
+      <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
+        <view class="picker-val">{{visitDate || '选择日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-row form-row-inline">
+      <view class="form-col">
+        <text class="form-label">开始时间</text>
+        <picker mode="time" value="{{visitTimeStart}}" bindchange="onVisitTimeStartChange">
+          <view class="picker-val">{{visitTimeStart || '时:分'}}</view>
+        </picker>
+      </view>
+      <view class="form-col">
+        <text class="form-label">结束时间</text>
+        <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
+          <view class="picker-val">{{visitTimeEnd || '时:分'}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">支付宝账号（结算）</text>
+      <input class="input" placeholder="用于打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
+    </view>
+
+    <button class="btn-primary" style="margin-top:28rpx;" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
+      提交报名
+    </button>
+  </view>
+</view>

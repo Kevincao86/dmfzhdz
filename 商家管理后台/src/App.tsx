@@ -8,6 +8,7 @@ import OpsCustomerDetailPage from './ops/pages/OpsCustomerDetailPage'
 import OpsCustomersListPage from './ops/pages/OpsCustomersListPage'
 import OpsRecruitmentOrdersPage from './ops/pages/OpsRecruitmentOrdersPage'
 import OpsMpRecruitmentOrdersPage from './ops/pages/OpsMpRecruitmentOrdersPage'
+import OpsTalentLibraryPage from './ops/pages/OpsTalentLibraryPage'
 import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
 
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="accounts" element={<OpsAccountsPermissionsPage />} />
           <Route path="recruitment-orders" element={<OpsRecruitmentOrdersPage />} />
           <Route path="mp-recruitment-orders" element={<OpsMpRecruitmentOrdersPage />} />
+          <Route path="talent-library" element={<OpsTalentLibraryPage />} />
           <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
           <Route path="support" element={<OpsSupportWorkbenchPage />} />

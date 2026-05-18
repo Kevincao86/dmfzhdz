@@ -110,6 +110,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                 <th className="px-3 py-3">小程序单号</th>
                 <th className="px-3 py-3">关联商家订单</th>
                 <th className="px-3 py-3">客户 / 门店</th>
+                <th className="px-3 py-3">平台</th>
                 <th className="px-3 py-3">状态</th>
                 <th className="px-3 py-3">报名数</th>
                 <th className="px-3 py-3">创建时间</th>
@@ -119,7 +120,7 @@ export default function OpsMpRecruitmentOrdersPage() {
             <tbody className="divide-y divide-slate-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={8} className="px-3 py-10 text-center text-sm text-slate-500">
                     暂无小程序招募单。请在「商家达人招募订单」处理弹窗中选择「小程序招募」创建。
                   </td>
                 </tr>
@@ -132,6 +133,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                       <div>{o.customerName}</div>
                       <div className="text-xs text-slate-500">{o.storeName}</div>
                     </td>
+                    <td className="px-3 py-2 text-slate-400">{o.platform || '抖音'}</td>
                     <td className="px-3 py-2">
                       <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', mpStatusStyle(o.status))}>
                         {mpStatusLabel(o.status)}
@@ -168,6 +170,10 @@ export default function OpsMpRecruitmentOrdersPage() {
               <p>
                 <span className="text-slate-500">客户 / 门店：</span>
                 {detail.customerName} · {detail.storeName}
+              </p>
+              <p>
+                <span className="text-slate-500">招募平台：</span>
+                {detail.platform || '抖音'}
               </p>
               <p>
                 <span className="text-slate-500">分享路径：</span>
@@ -217,10 +223,20 @@ export default function OpsMpRecruitmentOrdersPage() {
                         </div>
                         <div className="mt-1 space-y-0.5 text-slate-500">
                           <div>号：{a.platformAccount || '—'}</div>
-                          {a.douyinSalesLevel ? <div>带货等级：{a.douyinSalesLevel}</div> : null}
+                          {a.profileLink ? (
+                            <div className="truncate" title={a.profileLink}>
+                              主页：
+                              <a href={a.profileLink} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">
+                                {a.profileLink}
+                              </a>
+                            </div>
+                          ) : null}
+                          {a.douyinSalesLevel && detail.platform !== '小红书' ? (
+                            <div>带货等级：{a.douyinSalesLevel}</div>
+                          ) : null}
                           <div>联系：{a.contact || '—'} · 微信：{a.wechatId || '—'}</div>
                           <div>报价：{a.quotePrice || '—'} · 探店：{a.visitTimeSlot || '—'}</div>
-                          <div>支付宝：{a.alipayAccount || '—'}</div>
+                          <div>收款：{a.paymentMethod || (a.alipayAccount ? `支付宝：${a.alipayAccount}` : '—')}</div>
                         </div>
                         {a.intro ? <div className="mt-1 text-slate-600">{a.intro}</div> : null}
                         <div className="mt-1 text-[10px] text-slate-600">{a.appliedAt}</div>
