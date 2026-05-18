@@ -2,9 +2,7 @@
   <!-- 顶栏 -->
   <view class="top-bar">
     <view class="store-block">
-      <view class="avatar">
-        <text class="avatar-text">店</text>
-      </view>
+      <image class="avatar avatar-img" src="/images/logo.png" mode="aspectFit" />
       <view class="store-text">
         <text class="store-name">{{storeName}}</text>
         <view class="status-pill">{{statusText}}</view>

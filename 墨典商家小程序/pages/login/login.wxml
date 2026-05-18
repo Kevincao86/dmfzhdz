@@ -1,5 +1,6 @@
 <view class="wrap">
   <view class="brand">
+    <image class="brand-logo" src="/images/logo.png" mode="aspectFit" />
     <text class="tag">LOCAL LIFE OS</text>
     <text class="title">墨典 · 商家端</text>
     <text class="desc">与电脑端商家后台使用同一账号与数据；本页仅用于登录。</text>

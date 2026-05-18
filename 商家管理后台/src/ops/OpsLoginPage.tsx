@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
+import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 
 const OPS_ACCOUNTS = new Set(['18768501283', '17826822524'])
 const OPS_PASSWORD = '123456'
@@ -43,9 +44,7 @@ export default function OpsLoginPage() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 px-4 py-10">
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-8 shadow-xl">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-600/30 ring-1 ring-indigo-500/40">
-            <LayoutDashboard className="h-8 w-8 text-indigo-300" />
-          </div>
+          <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-16 w-16 rounded-xl object-contain" />
           <h1 className="mt-4 text-xl font-semibold text-white">运营管控台</h1>
           <p className="mt-2 text-sm text-slate-500">请使用授权手机号登录</p>
         </div>

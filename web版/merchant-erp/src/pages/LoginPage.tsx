@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Cpu, MapPin, ShieldCheck, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
 import { cn } from '../cn'
 import FloatingOnlineSupport from '../components/FloatingOnlineSupport'
+import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../lib/tenantAuthEmail'
 import { PosterDataArt, PosterFutureArt, PosterLocalLifeArt } from './login/LoginPosterArt'
@@ -176,6 +177,11 @@ export default function LoginPage() {
           )}
         >
           <header className="mb-6 lg:mb-8">
+            <img
+              src={BRAND_LOGO_URL}
+              alt={BRAND_NAME}
+              className="mb-4 h-16 w-16 object-contain sm:h-20 sm:w-20"
+            />
             <div className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-300/90 sm:text-xs">
               <Zap className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
               Local Life OS
