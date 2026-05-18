@@ -1,4 +1,4 @@
-import { Bot, Building2, CreditCard, Headphones, Shield, Smartphone, UserSearch } from 'lucide-react'
+import { Bot, Building2, CreditCard, Headphones, Library, Shield, Smartphone, UserSearch } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../cn'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
@@ -9,6 +9,7 @@ const OPS_NAV = [
   { to: '/accounts', label: '账号与权限', icon: Shield },
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch },
   { to: '/mp-recruitment-orders', label: '小程序达人招募订单', icon: Smartphone },
+  { to: '/talent-library', label: '墨典达人库', icon: Library },
   { to: '/ai-models', label: 'AI 模型', icon: Bot },
   { to: '/support', label: '在线客服', icon: Headphones },
 ] as const

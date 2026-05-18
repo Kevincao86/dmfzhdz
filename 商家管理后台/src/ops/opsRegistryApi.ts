@@ -68,6 +68,7 @@ export type RegistryRecruitmentOrder = {
   infoSummary?: string
   acceptMode?: 'manual' | 'miniprogram'
   linkedMpOrderId?: string
+  recruitmentPlatform?: '抖音' | '小红书'
 }
 
 export type RegistryMpRecruitmentApplicant = {
@@ -84,7 +85,30 @@ export type RegistryMpRecruitmentApplicant = {
   visitTimeSlot?: string
   alipayAccount?: string
   intro?: string
+  profileLink?: string
+  paymentMethod?: string
+  mpOrderId?: string
+  merchantOrderNo?: string
   appliedAt: string
+}
+
+export type RegistryTalentLibraryEntry = {
+  id: string
+  platform: '抖音' | '小红书'
+  platformAccount: string
+  platformNickname: string
+  profileLink: string
+  followers: number
+  douyinSalesLevel?: string
+  contact: string
+  wechatId: string
+  quotePrice: string
+  paymentMethod: string
+  alipayAccount?: string
+  visitTimeSlot?: string
+  updatedAt: string
+  lastMpOrderId?: string
+  lastMerchantOrderNo?: string
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -163,6 +187,7 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  talentLibraryEntries?: RegistryTalentLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
@@ -342,6 +367,7 @@ export async function patchRecruitmentOrder(body: {
   status?: RegistryRecruitmentOrder['status']
   acceptMode?: RegistryRecruitmentOrder['acceptMode']
   linkedMpOrderId?: string
+  recruitmentPlatform?: RegistryRecruitmentOrder['recruitmentPlatform']
 }): Promise<{ ok: boolean; error?: string }> {
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-recruitment-orders-patch', '/api/ops-sync/recruitment-orders/patch'],

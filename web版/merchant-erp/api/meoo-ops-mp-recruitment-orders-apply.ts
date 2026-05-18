@@ -8,6 +8,7 @@ import {
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentApplicant } from '../src/lib/opsRegistryTypes.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 
 export const config = { maxDuration: 60 }
 
@@ -81,14 +82,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const cur = data.mpRecruitmentOrders[idx]!
+    const merchantOrderNo = cur.sourceMerchantOrderId
+    const platform = cur.platform || '抖音'
+    const row = {
+      ...applicant,
+      mpOrderId,
+      merchantOrderNo,
+      paymentMethod: applicant.paymentMethod || (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
+    }
     const applicants = [...(cur.applicants ?? [])]
-    applicants.unshift(applicant)
+    applicants.unshift(row)
     data.mpRecruitmentOrders[idx] = {
       ...cur,
       applicants: applicants.slice(0, 500),
       status: cur.status === 'open' ? 'collecting' : cur.status,
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     }
+    upsertTalentLibraryFromApplicant(data, {
+      platform,
+      applicant: row,
+      mpOrderId,
+      merchantOrderNo,
+    })
     await io.save(data)
     sendOpsJson(res, 200, { ok: true })
   } catch (e) {

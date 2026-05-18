@@ -1,5 +1,5 @@
 {
-  "pages": ["pages/index/index", "pages/detail/detail"],
+  "pages": ["pages/index/index", "pages/detail/detail", "pages/apply/apply"],
   "window": {
     "navigationBarTitleText": "墨典达人招募",
     "navigationBarBackgroundColor": "#0f172a",

@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Cpu, MapPin, ShieldCheck, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
+import { Cpu, MapPin, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
 import { cn } from '../cn'
 import FloatingOnlineSupport from '../components/FloatingOnlineSupport'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-import { loginNameToTenantEmail } from '../lib/tenantAuthEmail'
+import LoginAuthPanel from './login/LoginAuthPanel'
 import { PosterDataArt, PosterFutureArt, PosterLocalLifeArt } from './login/LoginPosterArt'
 
 const LIFE_TAGS = [
@@ -50,11 +50,9 @@ const CAROUSEL_MS = 5200
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [loginName, setLoginName] = useState('')
-  const [password, setPassword] = useState('')
+  const [loginName] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [infoHint, setInfoHint] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
   const [slide, setSlide] = useState(0)
 
   useEffect(() => {
@@ -88,40 +86,6 @@ export default function LoginPage() {
     }, CAROUSEL_MS)
     return () => window.clearInterval(id)
   }, [])
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!supabase) return
-    setErr(null)
-    setInfoHint(null)
-    const name = loginName.trim()
-    if (name.length < 2) {
-      setErr('账户名至少 2 个字符')
-      return
-    }
-    if (password.length < 6) {
-      setErr('密码至少 6 位')
-      return
-    }
-    setBusy(true)
-    try {
-      const sb = supabase
-      const email = loginNameToTenantEmail(name)
-      const { error } = await sb.auth.signInWithPassword({ email, password })
-      if (error) {
-        setErr(error.message.includes('Invalid login') ? '账号或密码错误' : error.message)
-        return
-      }
-      const { data: after } = await sb.auth.getSession()
-      if (!after.session) {
-        setErr('登录已成功，但未读到会话。请刷新本页或稍后再试。')
-        return
-      }
-      navigate('/', { replace: true })
-    } finally {
-      setBusy(false)
-    }
-  }
 
   if (!supabaseConfigured) {
     return (
@@ -209,77 +173,13 @@ export default function LoginPage() {
             </div>
           </header>
 
-          <div
-            className={cn(
-              'w-full shrink-0 rounded-3xl border border-white/15 bg-white/95 shadow-2xl shadow-cyan-950/25 ring-1 ring-white/25 backdrop-blur-md',
-              'max-h-[min(540px,calc(100dvh-14rem))] overflow-y-auto lg:max-h-[min(600px,calc(100dvh-8rem))]',
-            )}
-          >
-            <div className="sticky top-0 z-[1] border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-cyan-50/80 px-5 py-3.5">
-              <h2 className="text-lg font-bold tracking-tight text-slate-900">商家登录</h2>
-              <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                输入官方提供的账户名与密码进入工作台。
-              </p>
-            </div>
-
-            <div className="px-5 pb-6 pt-5 sm:px-7">
-              <div className="mb-4 flex items-start gap-3 rounded-xl border border-slate-200/90 bg-slate-50/90 p-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400/25 to-orange-400/15 ring-1 ring-slate-200/80">
-                  <ShieldCheck className="h-5 w-5 text-cyan-700" />
-                </div>
-                <div className="min-w-0 text-left">
-                  <p className="text-xs font-semibold text-slate-800">安全可信登录</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">经 Supabase Auth 加密传输。</p>
-                </div>
-              </div>
-
-              {infoHint ? (
-                <p className="mb-4 rounded-xl border border-cyan-200/80 bg-cyan-50 px-3 py-2.5 text-center text-sm text-cyan-950">
-                  {infoHint}
-                </p>
-              ) : null}
-
-              <form className="space-y-4" onSubmit={(e) => void submit(e)}>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="meoo-login-name">
-                    账户名
-                  </label>
-                  <input
-                    id="meoo-login-name"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-slate-900 outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/15 sm:text-sm"
-                    autoComplete="username"
-                    placeholder="例如门店简称或工号"
-                    value={loginName}
-                    onChange={(e) => setLoginName(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="meoo-login-pw">
-                    密码
-                  </label>
-                  <input
-                    id="meoo-login-pw"
-                    type="password"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-slate-900 outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/15 sm:text-sm"
-                    autoComplete="current-password"
-                    placeholder="至少 6 位"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                {err ? (
-                  <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 disabled:opacity-60"
-                >
-                  {busy ? '登录中…' : '进入工作台'}
-                </button>
-              </form>
-            </div>
-          </div>
+          <LoginAuthPanel
+            infoHint={infoHint}
+            err={err}
+            onInfoHint={setInfoHint}
+            onErr={setErr}
+            onLoginSuccess={() => navigate('/', { replace: true })}
+          />
         </div>
 
         {/* 右侧：海报轮播（大屏）；小屏置于表单下方 */}

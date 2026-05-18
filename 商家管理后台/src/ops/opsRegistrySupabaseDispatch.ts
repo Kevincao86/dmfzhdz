@@ -13,6 +13,7 @@ import type {
   RegistryVideoSubmission,
 } from '../meooRegistryShared/opsRegistryTypes.js'
 import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders.js'
+import { upsertTalentLibraryFromApplicant } from '../meooRegistryShared/talentLibraryUpsert.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
@@ -209,6 +210,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         status?: RegistryRecruitmentOrder['status']
         acceptMode?: RegistryRecruitmentOrder['acceptMode']
         linkedMpOrderId?: string
+        recruitmentPlatform?: RegistryRecruitmentOrder['recruitmentPlatform']
       }
       const id = (body.id ?? '').trim()
       const status = body.status
@@ -239,6 +241,9 @@ export async function dispatchOpsRegistrySupabase(opts: {
           : {}),
         ...(typeof body.linkedMpOrderId === 'string' && body.linkedMpOrderId.trim()
           ? { linkedMpOrderId: body.linkedMpOrderId.trim() }
+          : {}),
+        ...(body.recruitmentPlatform === '抖音' || body.recruitmentPlatform === '小红书'
+          ? { recruitmentPlatform: body.recruitmentPlatform }
           : {}),
       }
       await io.save(data)
@@ -307,14 +312,28 @@ export async function dispatchOpsRegistrySupabase(opts: {
         return { status: 404, body: { ok: false, error: 'not_found' } }
       }
       const cur = data.mpRecruitmentOrders[idx]!
+      const merchantOrderNo = cur.sourceMerchantOrderId
+      const platform = cur.platform || '抖音'
+      const row = {
+        ...applicant,
+        mpOrderId,
+        merchantOrderNo,
+        paymentMethod: applicant.paymentMethod || (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
+      }
       const applicants = [...(cur.applicants ?? [])]
-      applicants.unshift(applicant)
+      applicants.unshift(row)
       data.mpRecruitmentOrders[idx] = {
         ...cur,
         applicants: applicants.slice(0, 500),
         status: cur.status === 'open' ? 'collecting' : cur.status,
         updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       }
+      upsertTalentLibraryFromApplicant(data, {
+        platform,
+        applicant: row,
+        mpOrderId,
+        merchantOrderNo,
+      })
       await io.save(data)
       return { status: 200, body: { ok: true } }
     }

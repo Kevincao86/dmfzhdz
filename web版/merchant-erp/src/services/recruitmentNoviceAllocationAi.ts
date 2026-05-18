@@ -172,6 +172,21 @@ ${tierDoc}
   return { ...parsed, source: 'ai' }
 }
 
+/** 小红书：按预算估算达人数（无抖音带货等级档位） */
+export function fallbackXiaohongshuNoviceAllocation(budgetYuan: number): NoviceAllocation {
+  const b = Number.isFinite(budgetYuan) && budgetYuan > 0 ? budgetYuan : 0
+  const totalPeople = clampInt(b / 900, 3, 40)
+  return {
+    v3: 0,
+    v4: 0,
+    v5: 0,
+    v5plus: totalPeople,
+    notes: '小红书招募按预算与同城笔记达人行情估算人数（无抖音 V 档位）。',
+    costHint: `按总预算约 ¥${b.toLocaleString('zh-CN')}，建议约 ${totalPeople} 位小红书达人（仅供参考）。`,
+    source: 'fallback',
+  }
+}
+
 /** AI + 离线兜底 */
 export async function generateNoviceKolAllocation(params: {
   city: string

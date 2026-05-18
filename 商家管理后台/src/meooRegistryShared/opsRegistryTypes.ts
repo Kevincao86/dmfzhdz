@@ -85,6 +85,8 @@ export type RegistryRecruitmentOrder = {
   acceptMode?: 'manual' | 'miniprogram'
   /** 关联的小程序招募单号（acceptMode=miniprogram 时写入） */
   linkedMpOrderId?: string
+  /** 下发小程序招募的平台（抖音 / 小红书） */
+  recruitmentPlatform?: '抖音' | '小红书'
 }
 
 /** 小程序达人招募单（运营「小程序招募」接单后生成，供达人端小程序展示与报名） */
@@ -110,7 +112,31 @@ export type RegistryMpRecruitmentApplicant = {
   /** 支付宝账号（结算） */
   alipayAccount?: string
   intro?: string
+  profileLink?: string
+  paymentMethod?: string
+  mpOrderId?: string
+  merchantOrderNo?: string
   appliedAt: string
+}
+
+/** 墨典达人库（按平台+达人ID去重，报价等取最新报名） */
+export type RegistryTalentLibraryEntry = {
+  id: string
+  platform: '抖音' | '小红书'
+  platformAccount: string
+  platformNickname: string
+  profileLink: string
+  followers: number
+  douyinSalesLevel?: string
+  contact: string
+  wechatId: string
+  quotePrice: string
+  paymentMethod: string
+  alipayAccount?: string
+  visitTimeSlot?: string
+  updatedAt: string
+  lastMpOrderId?: string
+  lastMerchantOrderNo?: string
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -190,6 +216,7 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  talentLibraryEntries?: RegistryTalentLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]

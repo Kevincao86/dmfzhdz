@@ -16,24 +16,6 @@
     </view>
 
     <view class="card">
-      <view class="section-title">达人要求 & 任务金</view>
-      <view class="metrics">
-        <view class="metric-cell">
-          <view class="metric-label">达人粉丝</view>
-          <view class="metric-value">{{view.fansRequirement}}</view>
-        </view>
-        <view class="metric-cell">
-          <view class="metric-label">任务金</view>
-          <view class="metric-value accent">{{view.budgetText}}</view>
-        </view>
-        <view class="metric-cell">
-          <view class="metric-label">招募人数</view>
-          <view class="metric-value">{{view.recruitCount}}</view>
-        </view>
-      </view>
-    </view>
-
-    <view class="card">
       <view class="section-title">达人地域要求 (1)</view>
       <text style="font-size:28rpx;color:#374151;">{{view.region}}</text>
     </view>
@@ -54,92 +36,13 @@
     <view class="card">
       <view class="section-title">任务流程</view>
       <text class="hint" style="display:block;line-height:1.7;">
-        1. 填写报名信息并提交；&#10;2. 商家/运营反选通过后，将联系您确认探店排期；&#10;3. 完成内容发布后按商家要求结算。
+        1. 点击「我要报名」填写信息并提交；&#10;2. 商家/运营反选通过后，将联系您确认探店排期；&#10;3. 完成内容发布后按商家要求结算。
       </text>
     </view>
 
-    <view id="apply-block" class="card" wx:if="{{applied}}">
+    <view class="card" wx:if="{{applied}}">
       <text class="title-lg" style="font-size:32rpx;color:#059669;">已提交报名</text>
       <text class="hint" style="display:block;margin-top:12rpx;">订单 {{view.merchantOrderNo}}，请等待反选结果。</text>
-    </view>
-
-    <view id="apply-block" class="card apply-form" wx:elif="{{showApply}}">
-      <view class="section-title">我要报名</view>
-      <text class="hint" style="display:block;margin-bottom:20rpx;">请如实填写以下信息，便于商家筛选与结算。</text>
-
-      <view class="form-row">
-        <text class="form-label">平台</text>
-        <picker mode="selector" range="{{platforms}}" value="{{platformIndex}}" bindchange="onPlatformChange">
-          <view class="picker-val">{{platform}}</view>
-        </picker>
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">抖音/小红书号</text>
-        <input class="input" placeholder="平台账号 ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">抖音/小红书昵称</text>
-        <input class="input" placeholder="平台显示昵称" value="{{platformNickname}}" data-k="platformNickname" bindinput="onField" />
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">粉丝数</text>
-        <input class="input" type="number" placeholder="如 20000" value="{{followers}}" data-k="followers" bindinput="onField" />
-      </view>
-
-      <view class="form-row" wx:if="{{platform === '抖音'}}">
-        <text class="form-label">带货等级（抖音）</text>
-        <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
-          <view class="picker-val">{{douyinSalesLevel || '请选择'}}</view>
-        </picker>
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">联系方式</text>
-        <input class="input" type="number" placeholder="手机号" value="{{contact}}" data-k="contact" bindinput="onField" />
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">微信号</text>
-        <input class="input" placeholder="微信 ID" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">报价</text>
-        <input class="input" type="digit" placeholder="元，如 150" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">探店日期</text>
-        <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
-          <view class="picker-val">{{visitDate || '选择日期'}}</view>
-        </picker>
-      </view>
-
-      <view class="form-row form-row-inline">
-        <view class="form-col">
-          <text class="form-label">开始时间</text>
-          <picker mode="time" value="{{visitTimeStart}}" bindchange="onVisitTimeStartChange">
-            <view class="picker-val">{{visitTimeStart || '时:分'}}</view>
-          </picker>
-        </view>
-        <view class="form-col">
-          <text class="form-label">结束时间</text>
-          <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
-            <view class="picker-val">{{visitTimeEnd || '时:分'}}</view>
-          </picker>
-        </view>
-      </view>
-
-      <view class="form-row">
-        <text class="form-label">支付宝账号</text>
-        <input class="input" placeholder="用于结算打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
-        <text class="hint" style="display:block;margin-top:8rpx;">请填写与实名一致的支付宝账号</text>
-      </view>
-
-      <button class="btn-primary" style="margin-top:28rpx;" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">确认提交报名</button>
     </view>
   </block>
 </view>
@@ -147,6 +50,6 @@
 <view wx:if="{{view && !loading}}" class="bottom-bar">
   <button class="bottom-icon" open-type="share">分享</button>
   <button class="bottom-icon" bindtap="goHome">首页</button>
-  <button wx:if="{{!applied}}" class="btn-primary" style="flex:1;margin:0;" bindtap="scrollToApply">我要报名</button>
+  <button wx:if="{{!applied}}" class="btn-primary" style="flex:1;margin:0;" bindtap="goApply">我要报名</button>
   <button wx:else class="btn-primary" style="flex:1;margin:0;" open-type="share">分享给好友</button>
 </view>

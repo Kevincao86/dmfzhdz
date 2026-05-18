@@ -12,6 +12,7 @@ import {
   type RegistryRecruitmentOrder,
   type RegistryTalentPoolRow,
 } from '../opsRegistryApi'
+import { normalizeRecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import { buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
@@ -112,6 +113,7 @@ export default function OpsRecruitmentOrdersPage() {
   const [acceptSheetOrder, setAcceptSheetOrder] = useState<RegistryRecruitmentOrder | null>(null)
   const [mpShareInfo, setMpShareInfo] = useState<{ merchantOrderId: string; mpOrderId: string } | null>(null)
   const [mpAcceptBusy, setMpAcceptBusy] = useState(false)
+  const [mpRecruitPlatform, setMpRecruitPlatform] = useState<'抖音' | '小红书'>('抖音')
   const [acceptSheetFile, setAcceptSheetFile] = useState<File | null>(null)
   const [acceptSheetBusy, setAcceptSheetBusy] = useState(false)
   const [alertOpen, setAlertOpen] = useState(false)
@@ -233,6 +235,7 @@ export default function OpsRecruitmentOrdersPage() {
 
   const openAcceptModeChoice = (order: RegistryRecruitmentOrder) => {
     setProcessOrder(null)
+    setMpRecruitPlatform(normalizeRecruitmentPlatform(order.recruitmentPlatform || order.accountType))
     setAcceptModeChoiceOrder(order)
   }
 
@@ -247,7 +250,8 @@ export default function OpsRecruitmentOrdersPage() {
     try {
       const now = new Date().toLocaleString('zh-CN', { hour12: false })
       const mpId = `MP-RO-${Date.now()}`
-      const fields = buildMpRecruitmentFieldsFromMerchant(order)
+      const platform = mpRecruitPlatform
+      const fields = buildMpRecruitmentFieldsFromMerchant(order, { platform })
       const mpOrder: RegistryMpRecruitmentOrder = {
         id: mpId,
         sourceMerchantOrderId: order.id,
@@ -269,6 +273,7 @@ export default function OpsRecruitmentOrdersPage() {
         status: 'accepted',
         acceptMode: 'miniprogram',
         linkedMpOrderId: mpId,
+        recruitmentPlatform: platform,
       })
       if (!patch.ok) {
         window.alert(`小程序单已创建，但商家订单状态更新失败：${patch.error ?? ''}`)
@@ -620,6 +625,19 @@ export default function OpsRecruitmentOrdersPage() {
             <p className="mt-3 text-xs text-slate-500">
               手动招募需下载模版上传表格解析；小程序招募将自动创建达人招募小程序订单并填入商家要求。
             </p>
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-slate-400">下发小程序平台</label>
+              <select
+                value={mpRecruitPlatform}
+                disabled={mpAcceptBusy}
+                onChange={(e) => setMpRecruitPlatform(e.target.value as '抖音' | '小红书')}
+                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+              >
+                <option value="抖音">抖音</option>
+                <option value="小红书">小红书</option>
+              </select>
+              <p className="mt-1 text-[10px] text-slate-600">小红书招募单不展示带货等级；报名表单字段随平台切换。</p>
+            </div>
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
