@@ -6,9 +6,18 @@ import {
 } from '../services/douyinAiAssistApi'
 import {
   buildImageAssistTextFields,
-  isVoucherGoodsProduct,
+  buildProductImageUserLine,
 } from '../lib/douyinProductImageAnchor'
-import { resolveModelForAssistAction } from '../services/merchantAiModelStorage'
+import { postAiAgentNativeImage } from '../services/ai/aiClient'
+import {
+  agentNativeImageRouteFromPickerKey,
+  parseAgentImagePickerKey,
+} from '../services/ai/agentImageModelKeys'
+import {
+  resolveImageAiModelForRequest,
+  resolveImageAssistModelId,
+  resolveModelForAssistAction,
+} from '../services/merchantAiModelStorage'
 
 export type AiGoodsContext = {
   goods_category_id?: string
@@ -68,33 +77,64 @@ export function useDouyinProductWizardAi(params: {
 
   const postAssist = useCallback(
     async (body: Omit<AiAssistRequest, 'model'>) => {
+      const isImg = body.action === 'image_generate' || body.action === 'image_enhance'
+      if (isImg) {
+        const ctx = params.goodsContext
+        const listing = String(body.listing_title ?? body.product_name ?? '').trim()
+        const roleRaw = body.image_role ?? 'head'
+        const role: 'head' | 'aux' | 'env' =
+          roleRaw === 'env' ? 'env' : roleRaw === 'aux' ? 'aux' : 'head'
+        const imageUserLine = buildProductImageUserLine(
+          listing,
+          ctx?.goods_product_type,
+          ctx?.goods_product_type_label,
+          role,
+        )
+        const pickerKey = resolveImageAiModelForRequest()
+        const parsed = parseAgentImagePickerKey(pickerKey)
+        if (parsed?.kind === 'style') {
+          const route = agentNativeImageRouteFromPickerKey(pickerKey)
+          if (route.route === 'tokenmix') {
+            const ref =
+              body.action === 'image_enhance' ? body.image_urls?.[0]?.trim() : undefined
+            const agent = await postAiAgentNativeImage(imageUserLine, {
+              imageRoute: 'tokenmix',
+              tokenmixImageModel: route.tokenmixImageModel,
+              referenceImageDataUrl: ref || undefined,
+            })
+            if (!agent.ok) return { ok: false as const, message: agent.message }
+            console.info(`[商品生图] TokenMix · ${imageUserLine}`)
+            return { ok: true as const, image_urls: [agent.imageUrl] }
+          }
+        }
+        const model = resolveImageAssistModelId() as AiModelId
+        const r = await postDouyinGoodsAiAssist({
+          ...body,
+          model,
+          image_user_line: imageUserLine,
+          ...(params.goodsContext ?? {}),
+        })
+        if (r.ok) {
+          const meta = 'image_meta' in r ? r.image_meta : undefined
+          console.info(
+            `[商品生图] ${meta?.image_user_line ?? imageUserLine} → ${meta?.resolved_model ?? model}`,
+          )
+          return r
+        }
+        if (!r.needVendorKey) return r
+        return {
+          ok: false as const,
+          message: `${r.message} 请在部署环境配置 MERCHANT_AI_QWEN_KEY、MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_MINIMAX_KEY 等密钥。`,
+        }
+      }
+
       const model = resolveModelForAssistAction(body.action) as AiModelId
       const r = await postDouyinGoodsAiAssist({
         ...body,
         model,
         ...(params.goodsContext ?? {}),
       })
-      if (r.ok) {
-        const meta = 'image_meta' in r ? r.image_meta : undefined
-        if (body.action === 'image_generate' || body.action === 'image_enhance') {
-          if (meta?.requested_model !== meta?.resolved_model) {
-            console.info(
-              `[商品生图] 手选「${meta?.requested_model}」未接像素引擎，已使用 ${meta?.resolved_model}；代金券模式=${meta?.voucher_mode}，锚点=${meta?.main_product_anchor}`,
-            )
-          }
-          const listing = String(body.listing_title ?? body.product_name ?? '').trim()
-          const ctx = params.goodsContext
-          const shouldVoucher = isVoucherGoodsProduct(
-            ctx?.goods_product_type,
-            ctx?.goods_product_type_label,
-            listing,
-          )
-          if (shouldVoucher && meta && !meta.voucher_mode) {
-            console.warn('[商品生图] 标题/类型似代金券，但网关未进入券面模式，请检查商品类型与标题')
-          }
-        }
-        return r
-      }
+      if (r.ok) return r
       if (!r.needVendorKey) return r
       return {
         ok: false as const,

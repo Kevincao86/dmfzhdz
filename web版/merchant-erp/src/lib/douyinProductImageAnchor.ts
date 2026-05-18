@@ -123,6 +123,32 @@ export function voucherImageNegativePrompt(): string {
   ].join(', ')
 }
 
+/**
+ * 商品向导生图用户句（与 AI 智能体一致）：按标题关键词，不按类目路径。
+ * 例：代金券 +「80代100代金券」→「帮我生成一张80代100代金券主图」
+ */
+export function buildProductImageUserLine(
+  listingTitle: string,
+  productType?: number | null,
+  productTypeLabel?: string,
+  imageRole: 'head' | 'aux' | 'env' = 'head',
+): string {
+  const listing = listingTitle.trim()
+  const roleWord = imageRole === 'env' ? '环境图' : imageRole === 'aux' ? '辅助图' : '主图'
+  if (!listing) return `帮我生成一张本地生活团购商品${roleWord}`
+
+  const isVoucher = isVoucherGoodsProduct(productType, productTypeLabel, listing)
+  if (isVoucher) {
+    const denom = extractVoucherDenomPhraseFromTitle(listing)
+    const kw = (denom || voucherVisualTitleForImagePrompt(listing)).slice(0, 48)
+    return `帮我生成一张${kw}${roleWord}`
+  }
+
+  const segment = listing.split(LISTING_TITLE_SPLIT).map((p) => p.trim()).filter(Boolean)[0] ?? listing
+  const kw = (extractMainProductFromListingTitle(listing) || segment).slice(0, 48)
+  return `帮我生成一张${kw}${roleWord}`
+}
+
 /** 代金券生图用短标题：只用面额字样，避免「日用百货/购物」把模型引向货架实景 */
 export function voucherVisualTitleForImagePrompt(listingTitle: string): string {
   const denom = extractVoucherDenomPhraseFromTitle(listingTitle)
@@ -298,7 +324,7 @@ export function buildImageAssistTextFields(
       : titleCore
 
   return {
-    product_name: isVoucher ? voucherVisualTitleForImagePrompt(listing) : listing,
+    product_name: listing,
     title_draft,
     listing_title: listing,
     main_product_heuristic: main,

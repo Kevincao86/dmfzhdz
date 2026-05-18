@@ -8,16 +8,10 @@ import type { ServerResponse } from 'node:http'
 
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import {
-  buildVoucherFaceImagePromptBlock,
-  buildVoucherImageLockSuffix,
+  buildProductImageUserLine,
   extractMainProductFromListingTitle,
-  getVoucherFaceDisplayText,
-  resolveVoucherPriceHint,
-  voucherVisualTitleForImagePrompt,
-  isGroupBuyGoodsProduct,
   isVoucherGoodsProduct,
   isWeakMainProductAnchor,
-  mainProductCategoryHints,
   resolveMainProductForImage,
   voucherImageNegativePrompt,
 } from '../src/lib/douyinProductImageAnchor.js'
@@ -245,6 +239,7 @@ async function runImageGenerateWithBuiltinFailover(
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
   listingTitle = '',
+  imageUserLine = '',
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -261,6 +256,7 @@ async function runImageGenerateWithBuiltinFailover(
       goodsTypeCtx,
       priceCtx,
       listingTitle,
+      imageUserLine,
     )
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
@@ -283,6 +279,7 @@ async function runImageGenerateWithBuiltinFailover(
         goodsTypeCtx,
         priceCtx,
         listingTitle,
+        imageUserLine,
       )
       return { urls, modelUsed: alt }
     } catch (e) {
@@ -437,6 +434,7 @@ async function runImageEnhanceWithBuiltinFailover(
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
   listingTitle = '',
+  imageUserLine = '',
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -457,6 +455,7 @@ async function runImageEnhanceWithBuiltinFailover(
           goodsTypeCtx,
           priceCtx,
           listingTitle,
+          imageUserLine,
         ),
       )
     }
@@ -485,6 +484,7 @@ async function runImageEnhanceWithBuiltinFailover(
             goodsTypeCtx,
             priceCtx,
             listingTitle,
+            imageUserLine,
           ),
         )
       }
@@ -896,18 +896,6 @@ async function callTokenMixAssistText(
   return polishVisibleAssistantText(res.content)
 }
 
-/** 合并「商品名称」与 title_draft（常含说明），作为生图唯一商品语义锚，避免只认名称短串而丢说明里的品类信息 */
-function mergeProductSellingAnchor(productName: string, titleDraft: string): string {
-  const n = productName.trim()
-  const t = titleDraft.trim()
-  if (!n && !t) return '本地生活服务'
-  if (!t) return n
-  if (!n) return t.slice(0, 600)
-  if (t.startsWith(n) || t.includes(n)) return t.slice(0, 600)
-  if (n.includes(t)) return n.slice(0, 600)
-  return `${n}。${t}`.slice(0, 600)
-}
-
 /** 生图前：先读商品标题锁定主推产品；规则不足时用豆包短调用补全 */
 async function resolveMainProductAnchorForImage(
   env: MerchantAiEnv,
@@ -966,75 +954,34 @@ type ImageGoodsTypeCtx = { productType?: number | null; typeLabel?: string }
 
 type ImagePriceCtx = { priceYuan?: string; originYuan?: string }
 
+/** 商品生图：与智能体相同，用标题关键词拼用户句，再套自由文生图/图生图模板（不按类目路径） */
 function buildImagePrompt(
   productName: string,
-  titleDraft: string,
+  _titleDraft: string,
   imageRole: string,
   mode: 't2i' | 'i2i',
-  lockSuffix = '',
-  mainProductAnchor = '',
+  _lockSuffix = '',
+  _mainProductAnchor = '',
   goodsTypeCtx?: ImageGoodsTypeCtx,
-  priceYuan = '',
-  originYuan = '',
+  _priceYuan = '',
+  _originYuan = '',
   listingTitleOverride = '',
+  imageUserLineOverride = '',
 ): string {
   const listingTitle = (listingTitleOverride || productName).trim() || '本地生活服务'
-  const main =
-    mainProductAnchor.trim() ||
-    resolveMainProductForImage({
+  const role: 'head' | 'aux' | 'env' =
+    imageRole === 'env' ? 'env' : imageRole === 'aux' ? 'aux' : 'head'
+  const userLine =
+    imageUserLineOverride.trim() ||
+    buildProductImageUserLine(
       listingTitle,
-      productType: goodsTypeCtx?.productType,
-      productTypeLabel: goodsTypeCtx?.typeLabel,
-    }) ||
-    mergeProductSellingAnchor(productName, titleDraft).slice(0, 120)
-  const isVoucher = isVoucherGoodsProduct(
-    goodsTypeCtx?.productType,
-    goodsTypeCtx?.typeLabel,
-    listingTitle,
-  )
-  const isGroupBuy = isGroupBuyGoodsProduct(goodsTypeCtx?.productType, goodsTypeCtx?.typeLabel)
-  const categoryHint = mainProductCategoryHints(main, { isVoucher, isGroupBuy })
-  const titleCtx =
-    isVoucher ? '' : titleDraft.trim().slice(0, 280)
-  const faceText = getVoucherFaceDisplayText(listingTitle, priceYuan, originYuan)
-  const voucherVisual = voucherVisualTitleForImagePrompt(listingTitle)
-
-  if (isVoucher && (imageRole === 'head' || imageRole === 'aux')) {
-    const priceHint = resolveVoucherPriceHint(listingTitle, priceYuan, originYuan)
-    const voucherBlock = buildVoucherFaceImagePromptBlock(
-      faceText || main,
-      voucherVisual,
-      priceHint,
+      goodsTypeCtx?.productType,
+      goodsTypeCtx?.typeLabel,
+      role,
     )
-    const bind = `【券面语义】${voucherVisual}。禁止根据「百货/购物/超市/便利」生成实物场景或微缩卖场。`
-    const i2iVoucher = `【图生图·代金券纠偏】若底图为售货机、货架、模型、实景商品，必须全部丢弃，仅按下列券面要求重绘平面代金券。`
-    const base =
-      mode === 'i2i'
-        ? `${i2iVoucher}${voucherBlock}${bind}`
-        : `${voucherBlock}${bind}构图适合手机团购列表首图，无违规水印。`
-    let out = base
-    if (imageRole === 'aux') {
-      out = `${base}可作为辅助图，仍为券面或核销示意风格。`
-    }
-    return lockSuffix ? `${out}${lockSuffix}` : out
-  }
-
-  const stepOne = `【两步流程·必须遵守】①已从商品标题解析主推产品：「${main}」。②成片、场景、道具必须仅服务该主推，不得偷换为其它单品或无关业态。${categoryHint}`
-  const bind = `${stepOne}\n【硬性锚定】团购标题原文：「${listingTitle.slice(0, 200)}」。${titleCtx ? `补充上下文（次要，不得偏离主推）：${titleCtx}` : ''}禁止：手机/电脑/平板等数码特写、与主推无关的卖场货架特写、展厅样板间、奢侈品橱窗、办公室工位、空镜走廊等占位画面。`
-  const i2iLocalLife = `【图生图·主图纠偏】用户上传图仅作构图、色调或清晰度参考。若原图主体、场景或品类与上文「主推产品」明显不符（例如无关展厅、卖场、数码、办公、与主推无关的室内空景），须视为错误底图：必须丢弃原图错误主体，按「${main}」重绘，禁止把错误场景「美化延续」成片。若原图与主推大致一致，可在不偏离锚定前提下提升清晰度、色彩与质感。`
-  const base =
-    mode === 'i2i'
-      ? `${i2iLocalLife}${bind}须符合本地生活广告与平台素材规范；成片第一眼须能识别为上述同一商品/服务。`
-      : `为抖音来客「本地生活」团购设计一张高质量商品图：主体清晰、光线自然、无牛皮癣文字与违规水印；构图适合手机端列表与详情首屏。${bind}`
-  let out = base
-  if (imageRole === 'aux') {
-    out = `${base}侧重套餐细节、食材/服务特写或卖点展示，可略偏竖构图。`
-  } else if (imageRole === 'env') {
-    out = `${base}侧重门店环境、就餐或体验氛围，干净明亮、有信任感；环境须与商品类目及门店业态相符，不得生成与锚定商品无关的其它业态场景。`
-  } else {
-    out = `${base}主图/头图风格，构图留白适中；再次强调主推产品：「${main.slice(0, 80)}${main.length > 80 ? '…' : ''}」。`
-  }
-  return lockSuffix ? `${out}${lockSuffix}` : out
+  return mode === 'i2i'
+    ? buildAgentFreeformImageI2iPrompt(userLine)
+    : buildAgentFreeformImagePrompt(userLine)
 }
 
 function imagePromptVoucherOpts(
@@ -1273,6 +1220,7 @@ async function runImageGenerate(
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
   listingTitle = '',
+  imageUserLine = '',
 ): Promise<string[]> {
   const listing = listingTitle.trim() || productName
   const prompt = buildImagePrompt(
@@ -1286,6 +1234,7 @@ async function runImageGenerate(
     priceCtx?.priceYuan ?? '',
     priceCtx?.originYuan ?? '',
     listing,
+    imageUserLine,
   )
   const vOpts = imagePromptVoucherOpts(goodsTypeCtx, listing)
   if (model === 'qwen') {
@@ -1330,6 +1279,7 @@ async function runImageEnhanceOne(
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
   listingTitle = '',
+  imageUserLine = '',
 ): Promise<string> {
   const listing = listingTitle.trim() || productName
   const prompt = buildImagePrompt(
@@ -1343,6 +1293,7 @@ async function runImageEnhanceOne(
     priceCtx?.priceYuan ?? '',
     priceCtx?.originYuan ?? '',
     listing,
+    imageUserLine,
   )
   const vOpts = imagePromptVoucherOpts(goodsTypeCtx, listing)
   if (model === 'qwen') {
@@ -1808,28 +1759,10 @@ export async function handleDouyinGoodsAiAssist(
     String(body.listing_title ?? body.product_name ?? '').trim() || '本店服务'
   const productName = String(body.product_name ?? '').trim() || listingTitle
   const titleDraft = String(body.title_draft ?? '').trim() || productName
-  const imageRoleEarly = String(body.image_role ?? 'head').trim() || 'head'
-  const ptEarlyRaw = body.goods_product_type
-  const ptEarlyNum =
-    typeof ptEarlyRaw === 'number' && Number.isFinite(ptEarlyRaw)
-      ? ptEarlyRaw
-      : typeof ptEarlyRaw === 'string' && String(ptEarlyRaw).trim()
-        ? Number(String(ptEarlyRaw).trim())
-        : NaN
-  const typeLabelEarly = String(body.goods_product_type_label ?? '').trim()
-  const isVoucherImageEarly =
-    isVoucherGoodsProduct(
-      Number.isFinite(ptEarlyNum) ? ptEarlyNum : null,
-      typeLabelEarly,
-      listingTitle,
-    ) && (imageRoleEarly === 'head' || imageRoleEarly === 'aux')
-  const imageVendorPickOrder = isVoucherImageEarly
-    ? imageVendorOrderPreferring(env, 'qwen')
-    : imageVendorOrder(env)
   const model = isImageAction
     ? isDouyinAssistAiVendorId(requestedVendor)
       ? requestedVendor
-      : pickPrimaryVendorWithKey(env, imageVendorPickOrder)
+      : pickPrimaryVendorWithKey(env, imageVendorOrder(env))
     : resolveGoodsAssistTextModel(requestedVendor, env)
   const imageUrls = Array.isArray(body.image_urls)
     ? (body.image_urls as unknown[]).map((x) => String(x)).filter(Boolean)
@@ -1964,15 +1897,16 @@ export async function handleDouyinGoodsAiAssist(
         typeLabel: String(body.goods_product_type_label ?? '').trim(),
       }
       const mainProductAnchor = await resolveMainProductAnchorForImage(env, body, productName)
-      const isVoucherFaceImage =
-        isVoucherGoodsProduct(
+      const imageRoleNorm: 'head' | 'aux' | 'env' =
+        imageRole === 'env' ? 'env' : imageRole === 'aux' ? 'aux' : 'head'
+      const imageUserLine =
+        String(body.image_user_line ?? '').trim() ||
+        buildProductImageUserLine(
+          listingTitle,
           goodsTypeCtx.productType,
           goodsTypeCtx.typeLabel,
-          listingTitle,
-        ) && (imageRole === 'head' || imageRole === 'aux')
-      const imageLockSuffix = isVoucherFaceImage
-        ? buildVoucherImageLockSuffix(mainProductAnchor, goodsTypeCtx.typeLabel)
-        : goodsLock + `\n\n【主推产品·已从商品标题解析】${mainProductAnchor}`
+          imageRoleNorm,
+        )
       const priceCtx: ImagePriceCtx = {
         priceYuan: String(body.price_yuan ?? '').trim(),
         originYuan: String(body.origin_yuan ?? '').trim(),
@@ -1985,11 +1919,12 @@ export async function handleDouyinGoodsAiAssist(
           productName,
           titleDraft,
           imageRole,
-          imageLockSuffix,
+          '',
           mainProductAnchor,
           goodsTypeCtx,
           priceCtx,
           listingTitle,
+          imageUserLine,
         )
         json(res, 200, {
           ok: true,
@@ -2003,6 +1938,7 @@ export async function handleDouyinGoodsAiAssist(
               listingTitle,
             ),
             main_product_anchor: mainProductAnchor,
+            image_user_line: imageUserLine,
           },
           ...(modelUsed !== requestedVendor ? { ai_vendor_used: modelUsed } : {}),
         })
@@ -2016,11 +1952,12 @@ export async function handleDouyinGoodsAiAssist(
         titleDraft,
         imageRole,
         imageUrls,
-        imageLockSuffix,
+        '',
         mainProductAnchor,
         goodsTypeCtx,
         priceCtx,
         listingTitle,
+        imageUserLine,
       )
       json(res, 200, {
         ok: true,
@@ -2034,6 +1971,7 @@ export async function handleDouyinGoodsAiAssist(
             listingTitle,
           ),
           main_product_anchor: mainProductAnchor,
+          image_user_line: imageUserLine,
         },
         ...(modelUsed !== requestedVendor ? { ai_vendor_used: modelUsed } : {}),
       })
