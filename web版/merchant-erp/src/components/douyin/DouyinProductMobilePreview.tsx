@@ -271,7 +271,7 @@ export function DouyinProductScrollFollowPreview(props: Props) {
 /** @deprecated 侧栏内嵌，请用 DouyinProductScrollFollowPreview */
 export function DouyinProductPreviewAside(props: Props) {
   return (
-    <aside className={cn('hidden xl:block', props.className)}>
+    <aside className={cn('hidden w-full xl:block', props.className)}>
       <div className="sticky top-20 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="mb-3 text-sm font-semibold text-gray-900">C 端预览</p>
         <DouyinProductMobilePreviewFrame {...props} embedded />

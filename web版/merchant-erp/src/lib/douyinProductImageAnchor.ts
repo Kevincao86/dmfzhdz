@@ -124,29 +124,16 @@ export function voucherImageNegativePrompt(): string {
 }
 
 /**
- * 商品向导生图用户句（与 AI 智能体一致）：按标题关键词，不按类目路径。
- * 例：代金券 +「80代100代金券」→「帮我生成一张80代100代金券主图」
+ * 商品向导生图用户句：仅「帮我生成一张」+ 商品名称框标题 + 主图/辅助图/环境图。
+ * 不解析类目、商品类型、面额规则。
  */
 export function buildProductImageUserLine(
   listingTitle: string,
-  productType?: number | null,
-  productTypeLabel?: string,
   imageRole: 'head' | 'aux' | 'env' = 'head',
 ): string {
-  const listing = listingTitle.trim()
-  const roleWord = imageRole === 'env' ? '环境图' : imageRole === 'aux' ? '辅助图' : '主图'
-  if (!listing) return `帮我生成一张本地生活团购商品${roleWord}`
-
-  const isVoucher = isVoucherGoodsProduct(productType, productTypeLabel, listing)
-  if (isVoucher) {
-    const denom = extractVoucherDenomPhraseFromTitle(listing)
-    const kw = (denom || voucherVisualTitleForImagePrompt(listing)).slice(0, 48)
-    return `帮我生成一张${kw}${roleWord}`
-  }
-
-  const segment = listing.split(LISTING_TITLE_SPLIT).map((p) => p.trim()).filter(Boolean)[0] ?? listing
-  const kw = (extractMainProductFromListingTitle(listing) || segment).slice(0, 48)
-  return `帮我生成一张${kw}${roleWord}`
+  const title = listingTitle.trim() || '团购商品'
+  const suffix = imageRole === 'env' ? '环境图' : imageRole === 'aux' ? '辅助图' : '主图'
+  return `帮我生成一张${title}${suffix}`
 }
 
 /** 代金券生图用短标题：只用面额字样，避免「日用百货/购物」把模型引向货架实景 */

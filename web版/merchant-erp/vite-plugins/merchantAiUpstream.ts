@@ -386,13 +386,18 @@ export async function runAgentFreeformTextToImage(
   env: MerchantAiEnv,
   userLine: string,
   preferredVendor?: 'qwen' | 'doubao' | 'minimax',
-  opts?: { referenceImage?: string },
+  opts?: { referenceImage?: string; exactPrompt?: boolean },
 ): Promise<
   | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
   | { ok: false; message: string }
 > {
   const ref = opts?.referenceImage?.trim()
-  const prompt = ref ? buildAgentFreeformImageI2iPrompt(userLine) : buildAgentFreeformImagePrompt(userLine)
+  const exact = opts?.exactPrompt === true || userLine.trim().startsWith('帮我生成一张')
+  const prompt = exact
+    ? userLine.trim()
+    : ref
+      ? buildAgentFreeformImageI2iPrompt(userLine)
+      : buildAgentFreeformImagePrompt(userLine)
   const order = imageVendorOrderPreferring(env, preferredVendor)
   const primary = pickPrimaryVendorWithKey(env, order)
   const { key, label } = pickKey(env, primary)
@@ -954,46 +959,35 @@ type ImageGoodsTypeCtx = { productType?: number | null; typeLabel?: string }
 
 type ImagePriceCtx = { priceYuan?: string; originYuan?: string }
 
-/** 商品生图：与智能体相同，用标题关键词拼用户句，再套自由文生图/图生图模板（不按类目路径） */
+/** 商品向导生图：prompt 原样下发，不套额外模板、不按类目/类型改写 */
 function buildImagePrompt(
   productName: string,
   _titleDraft: string,
   imageRole: string,
-  mode: 't2i' | 'i2i',
+  _mode: 't2i' | 'i2i',
   _lockSuffix = '',
   _mainProductAnchor = '',
-  goodsTypeCtx?: ImageGoodsTypeCtx,
+  _goodsTypeCtx?: ImageGoodsTypeCtx,
   _priceYuan = '',
   _originYuan = '',
   listingTitleOverride = '',
   imageUserLineOverride = '',
 ): string {
-  const listingTitle = (listingTitleOverride || productName).trim() || '本地生活服务'
+  const listingTitle = (listingTitleOverride || productName).trim()
   const role: 'head' | 'aux' | 'env' =
     imageRole === 'env' ? 'env' : imageRole === 'aux' ? 'aux' : 'head'
-  const userLine =
-    imageUserLineOverride.trim() ||
-    buildProductImageUserLine(
-      listingTitle,
-      goodsTypeCtx?.productType,
-      goodsTypeCtx?.typeLabel,
-      role,
-    )
-  return mode === 'i2i'
-    ? buildAgentFreeformImageI2iPrompt(userLine)
-    : buildAgentFreeformImagePrompt(userLine)
+  const line =
+    imageUserLineOverride.trim() || buildProductImageUserLine(listingTitle, role)
+  return line
 }
 
-function imagePromptVoucherOpts(
-  goodsTypeCtx?: ImageGoodsTypeCtx,
-  listingTitle?: string,
+/** 商品向导固定句式：优化时不沿用错误底图，强制按标题重绘 */
+function goodsWizardImageOpts(
+  imageUserLine: string,
+  mode: 't2i' | 'i2i',
 ): { voucherFaceMode: boolean; forceT2i: boolean } {
-  const isVoucher = isVoucherGoodsProduct(
-    goodsTypeCtx?.productType,
-    goodsTypeCtx?.typeLabel,
-    listingTitle,
-  )
-  return { voucherFaceMode: isVoucher, forceT2i: isVoucher }
+  const exact = imageUserLine.trim().startsWith('帮我生成一张')
+  return { voucherFaceMode: false, forceT2i: exact && mode === 'i2i' }
 }
 
 /** 从商品创建向导传入：锁死前两步的类目与商品类型，避免模型幻觉改业态 */
@@ -1236,7 +1230,7 @@ async function runImageGenerate(
     listing,
     imageUserLine,
   )
-  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, listing)
+  const vOpts = goodsWizardImageOpts(imageUserLine, 't2i')
   if (model === 'qwen') {
     const u = await qwenWanxOneImage(key, env, prompt, undefined, {
       voucherFaceMode: vOpts.voucherFaceMode,
@@ -1251,7 +1245,7 @@ async function runImageGenerate(
       aspect_ratio: '1:1',
       response_format: 'url',
       n: 1,
-      prompt_optimizer: !vOpts.voucherFaceMode,
+      prompt_optimizer: false,
     })
   }
   if (model === 'doubao') {
@@ -1295,7 +1289,7 @@ async function runImageEnhanceOne(
     listing,
     imageUserLine,
   )
-  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, listing)
+  const vOpts = goodsWizardImageOpts(imageUserLine, 'i2i')
   if (model === 'qwen') {
     return qwenWanxOneImage(key, env, prompt, vOpts.forceT2i ? undefined : _sourceUrl, {
       voucherFaceMode: vOpts.voucherFaceMode,
@@ -1901,12 +1895,7 @@ export async function handleDouyinGoodsAiAssist(
         imageRole === 'env' ? 'env' : imageRole === 'aux' ? 'aux' : 'head'
       const imageUserLine =
         String(body.image_user_line ?? '').trim() ||
-        buildProductImageUserLine(
-          listingTitle,
-          goodsTypeCtx.productType,
-          goodsTypeCtx.typeLabel,
-          imageRoleNorm,
-        )
+        buildProductImageUserLine(listingTitle, imageRoleNorm)
       const priceCtx: ImagePriceCtx = {
         priceYuan: String(body.price_yuan ?? '').trim(),
         originYuan: String(body.origin_yuan ?? '').trim(),
