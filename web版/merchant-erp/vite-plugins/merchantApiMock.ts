@@ -137,6 +137,56 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       return
     }
 
+    const storeIntelPaths = [
+      '/api/meoo-store-menu-recognize',
+      '/api/meoo-competitor-analysis',
+      '/api/meoo-ai-product-plan',
+    ] as const
+    if (storeIntelPaths.includes(loc.pathname as (typeof storeIntelPaths)[number])) {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const auth = req.headers['authorization']
+        const intel = await import('./merchantStoreIntelCore.js')
+        const runners = {
+          '/api/meoo-store-menu-recognize': intel.runStoreMenuRecognizeCore,
+          '/api/meoo-competitor-analysis': intel.runCompetitorAnalysisCore,
+          '/api/meoo-ai-product-plan': intel.runAiProductPlanCore,
+        } as const
+        const run = runners[loc.pathname as keyof typeof runners]
+        const out = await run(
+          bodyRaw,
+          typeof auth === 'string' ? auth : undefined,
+          env,
+        )
+        res.statusCode = out.status
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify(out.body))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify({ ok: false, error: 'store_intel_failed', detail: msg.slice(0, 800) }))
+      }
+      return
+    }
+
     if (loc.pathname === '/api/meoo-ai-chat') {
       const method = req.method ?? 'GET'
       if (method === 'OPTIONS') {

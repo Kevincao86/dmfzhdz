@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import type {
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
+  RegistryMpTalentMember,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -13,6 +14,7 @@ import type {
   RegistryVideoSubmission,
 } from '../meooRegistryShared/opsRegistryTypes.js'
 import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders.js'
+import { upsertMpTalentMember } from '../meooRegistryShared/mpTalentMemberUpsert.js'
 import { upsertTalentLibraryFromApplicant } from '../meooRegistryShared/talentLibraryUpsert.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
@@ -258,6 +260,14 @@ export async function dispatchOpsRegistrySupabase(opts: {
       }
       const data = await io.load()
       const list = [...(data.mpRecruitmentOrders ?? [])]
+      const sid = String(order.sourceMerchantOrderId || '').trim()
+      const dup = list.find((o) => o && String(o.sourceMerchantOrderId || '').trim() === sid)
+      if (dup) {
+        return {
+          status: 409,
+          body: { ok: false, error: 'duplicate_merchant_order', existingId: dup.id },
+        }
+      }
       list.unshift(order)
       data.mpRecruitmentOrders = list.slice(0, 200)
       await io.save(data)
@@ -336,6 +346,21 @@ export async function dispatchOpsRegistrySupabase(opts: {
       })
       await io.save(data)
       return { status: 200, body: { ok: true } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-talent-members/register') {
+      const body = JSON.parse(bodyRaw || '{}') as { member?: RegistryMpTalentMember }
+      const member = body.member
+      if (!member || !member.memberType || !String(member.wxNickName || '').trim()) {
+        return { status: 400, body: { ok: false, error: 'invalid_member' } }
+      }
+      if (!String(member.contact || '').trim() || !String(member.wechatId || '').trim()) {
+        return { status: 400, body: { ok: false, error: 'contact_required' } }
+      }
+      const data = await io.load()
+      upsertMpTalentMember(data, member)
+      await io.save(data)
+      return { status: 200, body: { ok: true, id: member.id } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {

@@ -14,6 +14,7 @@ import type {
   RegistryFile,
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
+  RegistryMpTalentMember,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -23,6 +24,7 @@ import type {
   RegistryVendorKeys,
 } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
+import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 import { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
 
@@ -85,6 +87,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
       vendorKeysWriter: 'erp',
       recruitmentOrders: [],
       mpRecruitmentOrders: [],
+      mpTalentMembers: [],
       talentPoolCandidates: [],
       recruitmentScheduleRows: [],
       recruitmentVideoSubmissions: [],
@@ -475,6 +478,12 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             const data = ensureRegistry(viteRoot)
             const list = [...(data.mpRecruitmentOrders ?? [])]
+            const sid = String(order.sourceMerchantOrderId || '').trim()
+            const dup = list.find((o) => o && String(o.sourceMerchantOrderId || '').trim() === sid)
+            if (dup) {
+              json(res, 409, { ok: false, error: 'duplicate_merchant_order', existingId: dup.id })
+              return
+            }
             list.unshift(order)
             data.mpRecruitmentOrders = list.slice(0, 200)
             writeRegistry(viteRoot, data)
@@ -564,6 +573,25 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             })
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
+            return
+          }
+
+          if (method === 'POST' && url === '/api/ops-sync/mp-talent-members/register') {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { member?: RegistryMpTalentMember }
+            const member = body.member
+            if (!member || !member.memberType || !String(member.wxNickName || '').trim()) {
+              json(res, 400, { ok: false, error: 'invalid_member' })
+              return
+            }
+            if (!String(member.contact || '').trim() || !String(member.wechatId || '').trim()) {
+              json(res, 400, { ok: false, error: 'contact_required' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            upsertMpTalentMember(data, member)
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, id: member.id })
             return
           }
 

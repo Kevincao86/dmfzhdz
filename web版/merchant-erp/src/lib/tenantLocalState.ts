@@ -23,6 +23,9 @@ const EXTRA_LOCAL_KEYS = [
   'meoo_last_recruitment_order_id',
   'meoo_last_recruitment_submit',
   'meoo_recruitment_create_draft_v1',
+  'meoo_store_menu_v1',
+  'meoo_competitor_reports_v1',
+  'meoo_competitor_selected_poi_v1',
 ] as const
 
 export function setActiveTenantStorageId(tenantId: string | null): void {

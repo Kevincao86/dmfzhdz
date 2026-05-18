@@ -72,6 +72,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const mpRecruitmentOrders: RegistryMpRecruitmentOrder[] = Array.isArray(parsed?.mpRecruitmentOrders)
     ? (parsed!.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
     : []
+  const mpTalentMembers = Array.isArray(parsed?.mpTalentMembers) ? parsed!.mpTalentMembers : []
   const talentLibraryEntries: RegistryTalentLibraryEntry[] = Array.isArray(parsed?.talentLibraryEntries)
     ? (parsed!.talentLibraryEntries as RegistryTalentLibraryEntry[])
     : []
@@ -102,6 +103,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     videoAiWriter,
     recruitmentOrders,
     mpRecruitmentOrders,
+    mpTalentMembers,
     talentLibraryEntries,
     talentPoolCandidates,
     recruitmentScheduleRows,

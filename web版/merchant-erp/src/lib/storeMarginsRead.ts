@@ -30,6 +30,51 @@ function parseMargins(o: Record<string, unknown>): StorePlatformMargins {
 }
 
 /** 未配置或解析失败时返回默认三平台毛利率 */
+export type StoreMarginIndustry = {
+  code: string
+  leafCategoryId: string
+  name: string
+  path: string
+}
+
+export function readStoreMarginConfig(): {
+  margins: StorePlatformMargins
+  industry: StoreMarginIndustry
+} {
+  try {
+    const raw = window.localStorage.getItem(MEOO_STORE_MARGIN_CONFIG_KEY)
+    if (raw) {
+      const o = JSON.parse(raw) as Record<string, unknown>
+      const ind =
+        o.industry && typeof o.industry === 'object' ? (o.industry as Record<string, unknown>) : {}
+      return {
+        margins: parseMargins(o),
+        industry: {
+          code: typeof ind.code === 'string' ? ind.code : '',
+          leafCategoryId: typeof ind.leafCategoryId === 'string' ? ind.leafCategoryId : '',
+          name: typeof ind.name === 'string' ? ind.name : '',
+          path: typeof ind.path === 'string' ? ind.path : '',
+        },
+      }
+    }
+    const legacy = window.localStorage.getItem(MEOO_STORE_GROSS_MARGINS_KEY)
+    if (legacy) {
+      const o = JSON.parse(legacy) as Record<string, unknown>
+      return {
+        margins: parseMargins(o),
+        industry: { code: '', leafCategoryId: '', name: '', path: '' },
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return {
+    margins: { ...DEFAULT },
+    industry: { code: '', leafCategoryId: '', name: '', path: '' },
+  }
+}
+
+/** 未配置或解析失败时返回默认三平台毛利率 */
 export function readStorePlatformMargins(): StorePlatformMargins {
   try {
     const raw = window.localStorage.getItem(MEOO_STORE_MARGIN_CONFIG_KEY)

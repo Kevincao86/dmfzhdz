@@ -1,32 +1,82 @@
-.section-title {
+/* 详情页补充样式（表单基础见 app.wxss） */
+.detail-hero {
+  margin-top: 16rpx;
   overflow: hidden;
 }
 
-.apply-form .form-row {
-  margin-top: 20rpx;
+.detail-hero-top {
+  margin: -32rpx -32rpx 0;
+  padding: 28rpx 32rpx 24rpx;
+  background: linear-gradient(135deg, #1e293b 0%, #4338ca 100%);
 }
 
-.apply-form .form-label {
-  display: block;
+.detail-hero-top .order-no {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.detail-hero-top .order-copy {
+  color: #c7d2fe;
+  margin-left: 12rpx;
   font-size: 24rpx;
-  color: #6b7280;
+}
+
+.detail-hero-top .merchant-name {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.detail-hero-top .title-lg {
+  color: #fff;
+  margin-top: 16rpx;
+}
+
+.detail-hero-top .tag {
+  margin-top: 16rpx;
+}
+
+.detail-body {
+  padding-top: 8rpx;
+}
+
+.region-value {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.success-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #059669;
+}
+
+.platform-block {
+  margin-top: 8rpx;
+  padding-top: 28rpx;
+  border-top: 2rpx solid #f1f5f9;
+}
+
+.platform-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
   margin-bottom: 8rpx;
 }
 
-.apply-form .picker-val {
-  padding: 16rpx 20rpx;
-  background: #f9fafb;
-  border: 1rpx solid #e5e7eb;
-  border-radius: 12rpx;
-  font-size: 28rpx;
-  color: #111827;
+.platform-head::before {
+  content: '';
+  width: 6rpx;
+  height: 28rpx;
+  border-radius: 3rpx;
+  background: #8b5cf6;
 }
 
-.form-row-inline {
-  display: flex;
-  gap: 16rpx;
+.platform-head--dy::before {
+  background: #1e293b;
 }
 
-.form-col {
-  flex: 1;
+.platform-head--xhs::before {
+  background: #ec4899;
 }

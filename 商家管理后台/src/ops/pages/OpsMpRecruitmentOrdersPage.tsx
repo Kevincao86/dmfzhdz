@@ -111,6 +111,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                 <th className="px-3 py-3">关联商家订单</th>
                 <th className="px-3 py-3">客户 / 门店</th>
                 <th className="px-3 py-3">平台</th>
+                <th className="px-3 py-3">大厅</th>
                 <th className="px-3 py-3">状态</th>
                 <th className="px-3 py-3">报名数</th>
                 <th className="px-3 py-3">创建时间</th>
@@ -120,7 +121,7 @@ export default function OpsMpRecruitmentOrdersPage() {
             <tbody className="divide-y divide-slate-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-500">
                     暂无小程序招募单。请在「商家达人招募订单」处理弹窗中选择「小程序招募」创建。
                   </td>
                 </tr>
@@ -134,6 +135,16 @@ export default function OpsMpRecruitmentOrdersPage() {
                       <div className="text-xs text-slate-500">{o.storeName}</div>
                     </td>
                     <td className="px-3 py-2 text-slate-400">{o.platform || '抖音'}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-medium',
+                          o.urgent ? 'bg-rose-500/15 text-rose-400' : 'bg-sky-500/15 text-sky-400',
+                        )}
+                      >
+                        {o.urgent ? '急单大厅' : '招募大厅'}
+                      </span>
+                    </td>
                     <td className="px-3 py-2">
                       <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', mpStatusStyle(o.status))}>
                         {mpStatusLabel(o.status)}
@@ -234,6 +245,9 @@ export default function OpsMpRecruitmentOrdersPage() {
                           {a.douyinSalesLevel && detail.platform !== '小红书' ? (
                             <div>带货等级：{a.douyinSalesLevel}</div>
                           ) : null}
+                          <div>
+                            省市：{a.province || '—'} {a.city || ''}
+                          </div>
                           <div>联系：{a.contact || '—'} · 微信：{a.wechatId || '—'}</div>
                           <div>报价：{a.quotePrice || '—'} · 探店：{a.visitTimeSlot || '—'}</div>
                           <div>收款：{a.paymentMethod || (a.alipayAccount ? `支付宝：${a.alipayAccount}` : '—')}</div>

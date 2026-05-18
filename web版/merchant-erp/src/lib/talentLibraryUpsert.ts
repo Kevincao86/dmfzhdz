@@ -47,6 +47,8 @@ export function upsertTalentLibraryFromApplicant(
     updatedAt: now,
     lastMpOrderId: opts.mpOrderId,
     lastMerchantOrderNo: opts.merchantOrderNo,
+    province: String(opts.applicant.province || (idx >= 0 ? list[idx]!.province : '') || '').trim() || undefined,
+    city: String(opts.applicant.city || (idx >= 0 ? list[idx]!.city : '') || '').trim() || undefined,
   }
 
   if (idx >= 0) {

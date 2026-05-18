@@ -53,10 +53,23 @@ export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
 /** 对话与任务流消息角色 */
 export type AiAgentMessageRole = 'user' | 'assistant' | 'system' | 'task_preview' | 'task_result'
 
+export type AiProductPlanPreview = {
+  productName: string
+  suggestedPriceYuan: number
+  originYuan?: number
+  description: string
+  comboLines: string[]
+  marginNote?: string
+  competitorNote?: string
+  riskLevel?: 'low' | 'medium' | 'high'
+}
+
 export type AiTaskPreviewPayload = {
   title: string
   steps: string[]
   taskType: AiTaskType
+  /** 创建商品：结构化方案（确认后进入创建向导预填） */
+  productPlan?: AiProductPlanPreview
 }
 
 /** 输入框中待发送的「引用某条对话」片段（发送后写入用户消息正文前缀） */
