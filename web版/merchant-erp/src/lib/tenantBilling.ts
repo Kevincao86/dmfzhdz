@@ -64,6 +64,50 @@ export type TenantSubscriptionSnapshot = {
   officialDays: number | null
 }
 
+export type TenantTrialSnapshot = {
+  tenantId: string
+  trialDays: number
+  trialStartAt: string
+  trialEndAt: string
+}
+
+function readTrialDays(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n)) return 14
+  return Math.max(0, Math.min(3650, Math.floor(n)))
+}
+
+/** 试用起止：以 tenants.created_at 为开始，trial_days 为时长（与注册开通一致） */
+export async function fetchTenantTrialSnapshot(
+  supabase: SupabaseClient,
+): Promise<TenantTrialSnapshot | null> {
+  const tenantId = await fetchPrimaryTenantId(supabase)
+  if (!tenantId) return null
+
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('created_at, trial_days')
+    .eq('id', tenantId)
+    .maybeSingle()
+
+  if (error || !data) return null
+
+  const createdRaw = typeof data.created_at === 'string' ? data.created_at : ''
+  const start = createdRaw ? new Date(createdRaw) : new Date()
+  if (Number.isNaN(start.getTime())) return null
+
+  const trialDays = readTrialDays(data.trial_days)
+  const end = new Date(start)
+  end.setDate(end.getDate() + trialDays)
+
+  return {
+    tenantId,
+    trialDays,
+    trialStartAt: start.toISOString(),
+    trialEndAt: end.toISOString(),
+  }
+}
+
 /** 正式版订阅展示：到期日 + 累计权益天数（同一查询，避免字段类型或会话时机导致漏显） */
 export async function fetchTenantSubscriptionSnapshot(
   supabase: SupabaseClient,

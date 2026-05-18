@@ -7,6 +7,7 @@ import {
   upsertDouyinBindingCloud,
 } from '../../lib/merchantDouyinCloudBinding'
 import {
+  clearDouyinMerchantBindingLocal,
   readMerchantSession,
   writeMerchantSession,
 } from '../../lib/merchantSession'
@@ -60,32 +61,22 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 }
 
 export default function DouyinMerchantSection() {
-  const [accessToken, setAccessToken] = useState<string | null>(() =>
-    readMerchantSession(TOKEN_KEY),
-  )
+  const [accessToken, setAccessToken] = useState<string | null>(null)
   const [bindOpen, setBindOpen] = useState(false)
   /** 默认关闭：避免切页/刷新时定时静默拉取与 TOKEN 刷新叠加重试，误判为断连 */
   const [autoRefresh, setAutoRefresh] = useState(() => readMerchantSession(AUTO_KEY) === '1')
   const [manualRefreshing, setManualRefreshing] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
-  const [appId, setAppId] = useState(() => readMerchantSession(META_APP_ID) ?? '')
+  const [appId, setAppId] = useState('')
   const [appSecret, setAppSecret] = useState('')
-  const [merchantId, setMerchantId] = useState(
-    () => readMerchantSession(META_MERCHANT_ID) ?? '',
-  )
+  const [merchantId, setMerchantId] = useState('')
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
   /** true = 密文；与按钮图标「当前可执行动作」一致：遮罩时显示眼睛=点击显示明文 */
   const [secretMasked, setSecretMasked] = useState(true)
-  const [boundMerchantId, setBoundMerchantId] = useState(() => {
-    if (readMerchantSession(TOKEN_KEY)) return readMerchantSession(META_MERCHANT_ID) ?? ''
-    return ''
-  })
-  const [boundAccountName, setBoundAccountName] = useState(() => {
-    if (readMerchantSession(TOKEN_KEY)) return readMerchantSession(META_ACCOUNT_NAME) ?? ''
-    return ''
-  })
+  const [boundMerchantId, setBoundMerchantId] = useState('')
+  const [boundAccountName, setBoundAccountName] = useState('')
 
   const [keyword, setKeyword] = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
@@ -134,19 +125,15 @@ export default function DouyinMerchantSection() {
         return
       }
 
-      const localTok = readMerchantSession(TOKEN_KEY)
-      const appIdL = readMerchantSession(META_APP_ID)
-      const midL = readMerchantSession(META_MERCHANT_ID)
-      const accL = readMerchantSession(META_ACCOUNT_NAME)
-      if (localTok && appIdL && midL) {
-        const up = await upsertDouyinBindingCloud(sb, {
-          sealedToken: localTok,
-          clientKey: appIdL,
-          merchantAccountId: midL,
-          accountDisplayName: accL,
-        })
-        if (up.ok === false) console.warn('[douyin] 本地绑定备份到云端失败:', up.message)
-      }
+      /** 当前租户无云端绑定时，禁止沿用其它账号留在 localStorage 的凭证（避免串租户） */
+      clearDouyinMerchantBindingLocal()
+      setAccessToken(null)
+      setBoundMerchantId('')
+      setBoundAccountName('')
+      setAppId('')
+      setMerchantId('')
+      setRows([])
+      setTotal(0)
     }
 
     const scheduleHydrate = () => {
