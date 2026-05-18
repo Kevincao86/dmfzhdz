@@ -1,3 +1,5 @@
+import { tenantLocalKey } from './tenantLocalState'
+
 export type KolBriefRecord = {
   id: string
   createdAt: string
@@ -8,12 +10,20 @@ export type KolBriefRecord = {
   previews: [string, string, string]
 }
 
-const RECORDS_KEY = 'meoo_kol_brief_records'
-const SELECTED_BRIEF_KEY = 'meoo_kol_selected_brief_payload'
+const RECORDS_KEY_BASE = 'meoo_kol_brief_records'
+const SELECTED_BRIEF_KEY_BASE = 'meoo_kol_selected_brief_payload'
+
+function recordsKey(): string {
+  return tenantLocalKey(RECORDS_KEY_BASE)
+}
+
+function selectedKey(): string {
+  return tenantLocalKey(SELECTED_BRIEF_KEY_BASE)
+}
 
 export function readKolBriefRecords(): KolBriefRecord[] {
   try {
-    const raw = window.localStorage.getItem(RECORDS_KEY)
+    const raw = window.localStorage.getItem(recordsKey())
     if (!raw) return []
     const j = JSON.parse(raw) as KolBriefRecord[]
     return Array.isArray(j) ? j : []
@@ -23,7 +33,7 @@ export function readKolBriefRecords(): KolBriefRecord[] {
 }
 
 export function writeKolBriefRecords(rows: KolBriefRecord[]) {
-  window.localStorage.setItem(RECORDS_KEY, JSON.stringify(rows.slice(0, 50)))
+  window.localStorage.setItem(recordsKey(), JSON.stringify(rows.slice(0, 50)))
 }
 
 export function appendKolBriefRecord(row: KolBriefRecord) {
@@ -41,13 +51,14 @@ export type SelectedBriefPayload = {
 }
 
 export function writeSelectedBriefForRecruitment(payload: SelectedBriefPayload | null) {
-  if (!payload) window.localStorage.removeItem(SELECTED_BRIEF_KEY)
-  else window.localStorage.setItem(SELECTED_BRIEF_KEY, JSON.stringify(payload))
+  const key = selectedKey()
+  if (!payload) window.localStorage.removeItem(key)
+  else window.localStorage.setItem(key, JSON.stringify(payload))
 }
 
 export function readSelectedBriefForRecruitment(): SelectedBriefPayload | null {
   try {
-    const raw = window.localStorage.getItem(SELECTED_BRIEF_KEY)
+    const raw = window.localStorage.getItem(selectedKey())
     if (!raw) return null
     return JSON.parse(raw) as SelectedBriefPayload
   } catch {

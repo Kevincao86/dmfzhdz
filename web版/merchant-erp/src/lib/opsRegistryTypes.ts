@@ -65,6 +65,10 @@ export type RegistryAiModels = {
 /** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
 export type RegistryRecruitmentOrder = {
   id: string
+  /** Supabase tenants.id：商户端按租户过滤招募单，避免注册表全局快照串数据 */
+  tenantId?: string
+  /** 创建人 auth user id（可选，便于审计） */
+  ownerUserId?: string
   customerName: string
   storeName: string
   talentId: string

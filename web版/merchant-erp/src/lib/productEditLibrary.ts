@@ -1,6 +1,12 @@
 /** 商品列表本地草稿库：创建商品「保存草稿」成功后写入，供 /products/list 与各平台 Tab 合并展示 */
 
+import { tenantLocalKey } from './tenantLocalState'
+
 export const MEOO_PRODUCT_EDIT_LIBRARY_KEY = 'meoo_product_edit_library_v1'
+
+function libraryStorageKey(): string {
+  return tenantLocalKey(MEOO_PRODUCT_EDIT_LIBRARY_KEY)
+}
 
 export type ProductEditLibraryRow = {
   id: string
@@ -40,7 +46,7 @@ export function loadProductEditLibraryDraftBriefPicks(limit = 48): {
 
 export function loadProductEditLibrary(): ProductEditLibraryRow[] {
   try {
-    const raw = window.localStorage.getItem(MEOO_PRODUCT_EDIT_LIBRARY_KEY)
+    const raw = window.localStorage.getItem(libraryStorageKey())
     if (!raw) return []
     const arr = JSON.parse(raw) as unknown
     if (!Array.isArray(arr)) return []
@@ -73,7 +79,7 @@ export function loadProductEditLibrary(): ProductEditLibraryRow[] {
 
 function persist(rows: ProductEditLibraryRow[]) {
   try {
-    window.localStorage.setItem(MEOO_PRODUCT_EDIT_LIBRARY_KEY, JSON.stringify(rows))
+    window.localStorage.setItem(libraryStorageKey(), JSON.stringify(rows))
   } catch {
     /* ignore */
   }

@@ -4,12 +4,17 @@
  */
 
 import type { DouyinProductDetailPayload } from '../services/douyinProductApi'
+import { tenantLocalKey } from './tenantLocalState'
 
-const KEY = 'meoo_product_draft_snapshots_v1'
+const KEY_BASE = 'meoo_product_draft_snapshots_v1'
+
+function storageKey(): string {
+  return tenantLocalKey(KEY_BASE)
+}
 
 function readAll(): Record<string, DouyinProductDetailPayload> {
   try {
-    const raw = window.localStorage.getItem(KEY)
+    const raw = window.localStorage.getItem(storageKey())
     if (!raw) return {}
     const o = JSON.parse(raw) as unknown
     return o && typeof o === 'object' && !Array.isArray(o)
@@ -22,7 +27,7 @@ function readAll(): Record<string, DouyinProductDetailPayload> {
 
 function writeAll(m: Record<string, DouyinProductDetailPayload>) {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(m))
+    window.localStorage.setItem(storageKey(), JSON.stringify(m))
   } catch {
     /* ignore */
   }

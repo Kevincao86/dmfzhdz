@@ -8,6 +8,8 @@ import { formatCityTierBandsLines, resolveCityKolTierBands } from '../../lib/rec
 import { loadRecruitmentIndustryL1Labels } from '../../lib/recruitmentIndustryOptions'
 import { appendRecruitmentOrderToOps } from '../../lib/opsRegistryClient'
 import type { RegistryRecruitmentOrder } from '../../lib/opsRegistryTypes'
+import { resolveRecruitmentOrderTenantMeta } from '../../lib/recruitmentOrderMeta'
+import { tenantLocalKey } from '../../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../../lib/tenantBilling'
 import {
@@ -183,8 +185,10 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       : `预估达人数:${headcount}`
     const tierPriceRef =
       isDouyin && cityTierBands ? formatCityTierBandsLines(cityTierBands).join('；') : ''
+    const tenantMeta = await resolveRecruitmentOrderTenantMeta(supabaseConfigured ? supabase : null)
     const order: RegistryRecruitmentOrder = {
       id,
+      ...tenantMeta,
       customerName,
       storeName,
       talentId: '—',
@@ -207,7 +211,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     try {
       await appendRecruitmentOrderToOps(order)
       try {
-        window.localStorage.setItem('meoo_last_recruitment_order_id', id)
+        window.localStorage.setItem(tenantLocalKey('meoo_last_recruitment_order_id'), id)
       } catch {
         /* ignore */
       }
