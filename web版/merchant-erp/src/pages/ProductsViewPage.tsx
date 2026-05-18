@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpDown, ExternalLink, Filter, Loader2, Pencil, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, ExternalLink, Loader2, Pencil, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -23,6 +23,10 @@ import {
 
 type ListRow = MerchantProductListItem & { origin: 'api' | 'library' }
 
+type OriginFilter = '全部' | 'API' | '本地草稿'
+
+const ALL_FILTER = '全部'
+
 function libToRow(r: ProductEditLibraryRow, plat: CreatePlatformId): ListRow | null {
   const api = r.platformApi ?? 'douyin'
   if (api !== plat) return null
@@ -45,8 +49,9 @@ export default function ProductsViewPage() {
   const [listErr, setListErr] = useState<string | null>(null)
   const [listNote, setListNote] = useState<string | null>(null)
 
-  const [filterOpen, setFilterOpen] = useState(false)
-  const [status, setStatus] = useState<string>('全部')
+  const [filterOrigin, setFilterOrigin] = useState<OriginFilter>(ALL_FILTER)
+  const [filterStatus, setFilterStatus] = useState(ALL_FILTER)
+  const [filterStore, setFilterStore] = useState(ALL_FILTER)
   const [keyword, setKeyword] = useState('')
 
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -93,6 +98,13 @@ export default function ProductsViewPage() {
     }
   }, [activePlat])
 
+  useEffect(() => {
+    setFilterOrigin(ALL_FILTER)
+    setFilterStatus(ALL_FILTER)
+    setFilterStore(ALL_FILTER)
+    setKeyword('')
+  }, [activePlat])
+
   const mergedRows = useMemo(() => {
     const libRows = loadProductEditLibrary()
       .map((r) => libToRow(r, activePlat))
@@ -107,21 +119,40 @@ export default function ProductsViewPage() {
     return Array.from(map.values())
   }, [apiItems, activePlat, libraryTick])
 
-  const statuses = useMemo(
-    () => ['全部', ...Array.from(new Set(mergedRows.map((r) => r.status)))],
+  const statusOptions = useMemo(
+    () => [ALL_FILTER, ...Array.from(new Set(mergedRows.map((r) => r.status).filter(Boolean)))],
     [mergedRows],
   )
 
+  const storeOptions = useMemo(() => {
+    const stores = mergedRows
+      .map((r) => r.store.trim())
+      .filter((s) => s && s !== '—')
+    return [ALL_FILTER, ...Array.from(new Set(stores))]
+  }, [mergedRows])
+
+  const filtersActive =
+    filterOrigin !== ALL_FILTER ||
+    filterStatus !== ALL_FILTER ||
+    filterStore !== ALL_FILTER ||
+    keyword.trim() !== ''
+
   const filtered = useMemo(() => {
+    const kw = keyword.trim()
     return mergedRows.filter((r) => {
-      if (status !== '全部' && r.status !== status) return false
-      if (keyword.trim() !== '' && !r.name.includes(keyword.trim())) return false
+      if (filterOrigin === 'API' && r.origin !== 'api') return false
+      if (filterOrigin === '本地草稿' && r.origin !== 'library') return false
+      if (filterStatus !== ALL_FILTER && r.status !== filterStatus) return false
+      if (filterStore !== ALL_FILTER && r.store !== filterStore) return false
+      if (kw && !r.name.includes(kw)) return false
       return true
     })
-  }, [mergedRows, status, keyword])
+  }, [mergedRows, filterOrigin, filterStatus, filterStore, keyword])
 
   const resetFilters = () => {
-    setStatus('全部')
+    setFilterOrigin(ALL_FILTER)
+    setFilterStatus(ALL_FILTER)
+    setFilterStore(ALL_FILTER)
     setKeyword('')
   }
 
@@ -216,92 +247,6 @@ export default function ProductsViewPage() {
           {listNote && <p className="mt-1 text-xs text-amber-800">{listNote}</p>}
           {listErr && <p className="mt-1 text-xs text-red-700">加载失败：{listErr}</p>}
         </div>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setFilterOpen((v) => !v)}
-            className={cn(
-              'flex items-center rounded-lg border px-4 py-2 text-sm transition-colors',
-              filterOpen || status !== '全部' || keyword.trim() !== ''
-                ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50',
-            )}
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            筛选
-            {mergedRows.length > 0 && filtered.length !== mergedRows.length && (
-              <span className="ml-2 rounded-full bg-indigo-200 px-2 py-0.5 text-xs text-indigo-900">
-                {filtered.length}/{mergedRows.length}
-              </span>
-            )}
-          </button>
-          {filterOpen && (
-            <>
-              <button
-                type="button"
-                className="fixed inset-0 z-10 cursor-default bg-transparent"
-                aria-label="关闭筛选"
-                onClick={() => setFilterOpen(false)}
-              />
-              <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-900">筛选条件</span>
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen(false)}
-                    className="rounded p-1 hover:bg-gray-100"
-                    aria-label="关闭"
-                  >
-                    <X className="h-4 w-4 text-gray-500" />
-                  </button>
-                </div>
-                <label className="mb-3 block text-xs font-medium text-gray-600">
-                  商品名称
-                  <input
-                    type="search"
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    placeholder="输入关键词"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
-                  />
-                </label>
-                <label className="mb-4 block text-xs font-medium text-gray-600">
-                  状态
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900"
-                  >
-                    {statuses.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => resetFilters()}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    重置
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen(false)}
-                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
-                  >
-                    应用
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="flex justify-end">
         <button
           type="button"
           disabled={bulkSyncing}
@@ -336,6 +281,79 @@ export default function ProductsViewPage() {
             </button>
           )
         })}
+      </div>
+
+      <div
+        className={cn(
+          'flex flex-wrap items-end gap-3 rounded-xl border bg-white px-4 py-3',
+          filtersActive ? 'border-indigo-200 bg-indigo-50/40' : 'border-gray-200',
+        )}
+      >
+        <label className="block min-w-[140px] flex-1 text-xs font-medium text-gray-600">
+          商品名称
+          <input
+            type="search"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="输入关键词"
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          />
+        </label>
+        <label className="block min-w-[120px] text-xs font-medium text-gray-600">
+          来源
+          <select
+            value={filterOrigin}
+            onChange={(e) => setFilterOrigin(e.target.value as OriginFilter)}
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          >
+            <option value={ALL_FILTER}>全部</option>
+            <option value="API">API</option>
+            <option value="本地草稿">本地草稿</option>
+          </select>
+        </label>
+        <label className="block min-w-[120px] text-xs font-medium text-gray-600">
+          商品状态
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          >
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block min-w-[160px] flex-[1.2] text-xs font-medium text-gray-600">
+          门店
+          <select
+            value={filterStore}
+            onChange={(e) => setFilterStore(e.target.value)}
+            className="mt-1 w-full max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          >
+            {storeOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex items-center gap-2 pb-0.5">
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={!filtersActive}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            重置
+          </button>
+          {mergedRows.length > 0 && (
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              {filtered.length}/{mergedRows.length} 条
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
