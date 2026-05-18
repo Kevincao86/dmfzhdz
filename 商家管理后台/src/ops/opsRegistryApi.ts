@@ -170,8 +170,30 @@ export type RegistryFile = {
 
 function mapHttpError(status: number): string {
   if (status === 502 || status === 503) return '服务暂不可用（请确认本目录已 npm install 且 vite 插件已加载）'
-  if (status === 404) return '未找到注册表接口'
+  if (status === 404) return '未找到注册表接口（线上请确认已部署最新版并包含 meoo-ops-* 扁平 API）'
   return `http_${status}`
+}
+
+/** 线上 Vercel 优先扁平路由，dev 回退 ops-sync 多段路径 */
+async function postRegistrySync(
+  paths: string[],
+  body: unknown,
+): Promise<{ res: Response; j: Record<string, unknown> }> {
+  let lastRes: Response | undefined
+  let lastJ: Record<string, unknown> = {}
+  for (const path of paths) {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const j = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    if (res.ok) return { res, j }
+    lastRes = res
+    lastJ = j
+    if (res.status !== 404) break
+  }
+  return { res: lastRes!, j: lastJ }
 }
 
 export async function fetchRegistry(): Promise<RegistryFile> {
@@ -321,27 +343,23 @@ export async function patchRecruitmentOrder(body: {
   acceptMode?: RegistryRecruitmentOrder['acceptMode']
   linkedMpOrderId?: string
 }): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch('/api/ops-sync/recruitment-orders/patch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
-  if (!res.ok) return { ok: false, error: j.error ?? mapHttpError(res.status) }
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-recruitment-orders-patch', '/api/ops-sync/recruitment-orders/patch'],
+    body,
+  )
+  if (!res.ok) return { ok: false, error: (j.error as string) ?? mapHttpError(res.status) }
   return { ok: j.ok !== false }
 }
 
 export async function appendMpRecruitmentOrder(
   order: RegistryMpRecruitmentOrder,
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const res = await fetch('/api/ops-sync/mp-recruitment-orders/append', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ order }),
-  })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; id?: string; error?: string }
-  if (!res.ok) return { ok: false, error: j.error ?? mapHttpError(res.status) }
-  return { ok: j.ok !== false, id: j.id }
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-mp-recruitment-orders-append', '/api/ops-sync/mp-recruitment-orders/append'],
+    { order },
+  )
+  if (!res.ok) return { ok: false, error: (j.error as string) ?? mapHttpError(res.status) }
+  return { ok: j.ok !== false, id: typeof j.id === 'string' ? j.id : undefined }
 }
 
 export async function patchMpRecruitmentOrder(body: {
