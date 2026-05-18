@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
+import { clearTenantScopedBrowserState } from '../../lib/tenantLocalState'
 import {
   isCnMobileValid,
   isLoginNameValid,
@@ -110,6 +111,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         onErr('登录已成功，但未读到会话。请刷新本页或稍后再试。')
         return
       }
+      clearTenantScopedBrowserState()
       onLoginSuccess()
     } finally {
       setBusy(false)
@@ -138,7 +140,10 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         return
       }
       const ok = await applySessionTokens(r.access_token, r.refresh_token)
-      if (ok) onLoginSuccess()
+      if (ok) {
+        clearTenantScopedBrowserState()
+        onLoginSuccess()
+      }
     } finally {
       setBusy(false)
     }

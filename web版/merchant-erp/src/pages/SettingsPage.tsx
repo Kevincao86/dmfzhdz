@@ -16,7 +16,9 @@ import { MEOO_TRIAL_SNAPSHOT_KEY } from '../lib/opsRegistryConstants'
 import {
   fetchPrimaryTenantId,
   fetchTenantSubscriptionSnapshot,
+  fetchTenantTrialSnapshot,
   insertMerchantPaymentOrder,
+  type TenantTrialSnapshot,
 } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
@@ -94,6 +96,7 @@ export default function SettingsPage() {
   /** undefined：未拉取；null：无到期记录 */
   const [officialCumulativeDays, setOfficialCumulativeDays] = useState<number | null | undefined>(undefined)
   /** undefined：未拉取；null：无累计天数 */
+  const [trialSnap, setTrialSnap] = useState<TenantTrialSnapshot | null | undefined>(undefined)
 
   const loadOfficialBilling = useCallback(async () => {
     if (!supabaseConfigured || !supabase) {
@@ -137,21 +140,22 @@ export default function SettingsPage() {
   }
 
   const trialStart = useMemo(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - 3)
-    return d
-  }, [])
+    if (trialSnap?.trialStartAt) return new Date(trialSnap.trialStartAt)
+    return null
+  }, [trialSnap])
+
   const trialEnd = useMemo(() => {
-    const d = new Date(trialStart)
-    d.setDate(d.getDate() + 14)
-    return d
-  }, [trialStart])
+    if (trialSnap?.trialEndAt) return new Date(trialSnap.trialEndAt)
+    return null
+  }, [trialSnap])
 
   const trialLeftDays = useMemo(() => {
-    const now = new Date()
-    const ms = trialEnd.getTime() - now.getTime()
+    if (!trialEnd) return null
+    const ms = trialEnd.getTime() - Date.now()
     return Math.max(0, Math.ceil(ms / 86400000))
   }, [trialEnd])
+
+  const trialDaysTotal = trialSnap?.trialDays ?? 14
 
   /** 相对云端登记「服务截止日期」的剩余日历天（可能为负表示已过期） */
   const officialCalendarRemainDays = useMemo(() => {
@@ -183,14 +187,19 @@ export default function SettingsPage() {
     let cancelled = false
     const run = async () => {
       try {
-        const snap = await fetchTenantSubscriptionSnapshot(sb)
+        const [snap, trial] = await Promise.all([
+          fetchTenantSubscriptionSnapshot(sb),
+          fetchTenantTrialSnapshot(sb),
+        ])
         if (cancelled) return
         setOfficialExpireAtIso(snap.serviceExpireAt)
         setOfficialCumulativeDays(snap.officialDays)
+        setTrialSnap(trial)
       } catch {
         if (!cancelled) {
           setOfficialExpireAtIso(null)
           setOfficialCumulativeDays(null)
+          setTrialSnap(null)
         }
       }
     }
@@ -207,6 +216,7 @@ export default function SettingsPage() {
   }, [supabaseConfigured, supabase, tab])
 
   useEffect(() => {
+    if (!trialStart || !trialEnd) return
     try {
       window.localStorage.setItem(
         MEOO_TRIAL_SNAPSHOT_KEY,
@@ -336,20 +346,30 @@ export default function SettingsPage() {
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
                   <div className="mb-2 text-sm font-medium text-blue-900">可使用日期（新注册用户）</div>
                   <p className="text-sm text-blue-800">
-                    免费试用共 <strong>14 天</strong>，自注册成功当日 0 时起算，全功能开放。
+                    免费试用共 <strong>{trialDaysTotal} 天</strong>，自租户开通日起算，全功能开放。
                   </p>
                   <div className="mt-4 space-y-1 text-sm text-blue-900/90">
-                    <p>
-                      <span className="text-blue-700/80">试用开始：</span>
-                      {formatCnDate(trialStart)}
-                    </p>
-                    <p>
-                      <span className="text-blue-700/80">试用结束：</span>
-                      {formatCnDate(trialEnd)}
-                    </p>
-                    <p className="pt-2 text-base font-semibold text-blue-900">
-                      剩余试用：<span className="tabular-nums">{trialLeftDays}</span> 天
-                    </p>
+                    {!supabaseConfigured || !supabase ? (
+                      <p className="text-blue-800/90">接入 Supabase 登录后可查看本租户试用周期。</p>
+                    ) : trialSnap === undefined ? (
+                      <p className="text-blue-800/90">正在加载试用信息…</p>
+                    ) : trialStart && trialEnd ? (
+                      <>
+                        <p>
+                          <span className="text-blue-700/80">试用开始：</span>
+                          {formatCnDate(trialStart)}
+                        </p>
+                        <p>
+                          <span className="text-blue-700/80">试用结束：</span>
+                          {formatCnDate(trialEnd)}
+                        </p>
+                        <p className="pt-2 text-base font-semibold text-blue-900">
+                          剩余试用：<span className="tabular-nums">{trialLeftDays ?? 0}</span> 天
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-blue-800/90">未找到租户试用记录，请联系运营核对账号开通状态。</p>
+                    )}
                   </div>
                 </div>
                 <div className="rounded-xl border border-gray-200 p-5">

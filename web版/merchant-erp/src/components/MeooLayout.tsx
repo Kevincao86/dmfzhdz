@@ -22,8 +22,12 @@ import FloatingOnlineSupport from './FloatingOnlineSupport'
 import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
 import { useAiAgent } from '../context/AiAgentContext'
-import { clearDouyinMerchantBindingLocal } from '../lib/merchantSession'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
+import {
+  clearTenantScopedBrowserState,
+  maskCnPhone,
+  phoneFromAuthUser,
+} from '../lib/tenantLocalState'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
@@ -41,23 +45,32 @@ export default function MeooLayout() {
   const [adminName, setAdminName] = useState('管理员')
   const [enterpriseName, setEnterpriseName] = useState('')
   const [accountType] = useState('主账号')
-  const [phone] = useState('138****8888')
+  const [phone, setPhone] = useState('—')
 
   useEffect(() => {
     const client = supabase
     if (!supabaseConfigured || !client) return
+    let lastUserId: string | null = null
     const apply = () => {
       void (async () => {
         const { data } = await client.auth.getUser()
         const u = data.user
         if (!u) {
-          clearDouyinMerchantBindingLocal()
+          if (lastUserId) clearTenantScopedBrowserState()
+          lastUserId = null
           setAdminName('管理员')
           setEnterpriseName('')
+          setPhone('—')
           return
         }
-        const meta = u.user_metadata as { login_name?: string } | undefined
+        if (lastUserId && lastUserId !== u.id) {
+          clearTenantScopedBrowserState()
+        }
+        lastUserId = u.id
+        const meta = u.user_metadata as { login_name?: string; phone?: string } | undefined
         setAdminName(meta?.login_name ?? u.email?.split('@')[0] ?? '用户')
+        const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
+        setPhone(mobile ? maskCnPhone(mobile) : '—')
         const tid = await fetchPrimaryTenantId(client)
         if (tid) {
           const en = await fetchTenantEnterpriseName(client, tid)
@@ -104,6 +117,7 @@ export default function MeooLayout() {
     setUserOpen(false)
     void (async () => {
       if (supabaseConfigured && supabase) {
+        clearTenantScopedBrowserState()
         await supabase.auth.signOut()
         navigate('/login', {
           replace: true,
