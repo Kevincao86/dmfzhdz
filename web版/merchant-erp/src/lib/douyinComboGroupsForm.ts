@@ -9,6 +9,8 @@ export type ComboItemFormRow = {
 
 export type ComboGroupFormRow = {
   id: string
+  /** 自定义商品组名称，空则保存时用「商品组 N」 */
+  groupName: string
   pickRule: string
   items: ComboItemFormRow[]
 }
@@ -21,14 +23,30 @@ export function createEmptyComboItem(): ComboItemFormRow {
   return { id: newRowId('ci'), name: '', priceYuan: '', quantity: 1 }
 }
 
+export function defaultComboGroupName(index: number): string {
+  return `商品组${index + 1}`
+}
+
 export function createDefaultComboGroups(): ComboGroupFormRow[] {
-  return [{ id: newRowId('cg'), pickRule: '全部必选', items: [createEmptyComboItem()] }]
+  return [
+    {
+      id: newRowId('cg'),
+      groupName: defaultComboGroupName(0),
+      pickRule: '全部必选',
+      items: [createEmptyComboItem()],
+    },
+  ]
 }
 
 export function appendComboGroup(groups: ComboGroupFormRow[]): ComboGroupFormRow[] {
   return [
     ...groups,
-    { id: newRowId('cg'), pickRule: '全部必选', items: [createEmptyComboItem()] },
+    {
+      id: newRowId('cg'),
+      groupName: defaultComboGroupName(groups.length),
+      pickRule: '全部必选',
+      items: [createEmptyComboItem()],
+    },
   ]
 }
 
@@ -57,7 +75,7 @@ export function comboGroupsFromPackageCombo(
   if (!Array.isArray(groups) || groups.length === 0) {
     return createDefaultComboGroups()
   }
-  return groups.map((g) => {
+  return groups.map((g, gi) => {
     const itemsIn = Array.isArray(g.items) ? g.items : []
     const items: ComboItemFormRow[] =
       itemsIn.length > 0
@@ -72,8 +90,10 @@ export function comboGroupsFromPackageCombo(
           }))
         : [createEmptyComboItem()]
     const listed = items.filter((it) => it.name.trim()).length
+    const gn = String(g.group_name ?? '').trim()
     return {
       id: newRowId('cg'),
+      groupName: gn || defaultComboGroupName(gi),
       pickRule: String(g.pick_rule ?? '').trim() || '全部必选',
       items: listed > 0 ? items : [createEmptyComboItem()],
     }
@@ -86,7 +106,8 @@ export function packageComboFromFormGroups(
   fallback: { productName: string; priceYuan: number },
 ): { groups: ComboPackageGroup[] } {
   const out: ComboPackageGroup[] = []
-  for (const g of groups) {
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi]!
     const items = g.items
       .filter((it) => it.name.trim())
       .map((it) => ({
@@ -98,7 +119,10 @@ export function packageComboFromFormGroups(
             : fallback.priceYuan,
       }))
     if (items.length === 0) continue
+    const groupName =
+      g.groupName.trim().slice(0, 60) || defaultComboGroupName(gi)
     out.push({
+      group_name: groupName,
       pick_rule: normalizePickRuleForSave(g.pickRule, items.length),
       items,
     })
@@ -108,6 +132,7 @@ export function packageComboFromFormGroups(
     return {
       groups: [
         {
+          group_name: defaultComboGroupName(0),
           pick_rule: '全部必选',
           items: [
             {

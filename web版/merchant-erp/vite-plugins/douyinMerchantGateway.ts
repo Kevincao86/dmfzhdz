@@ -1175,7 +1175,12 @@ export type DouyinGoodsListItem = {
   name: string
   price: number
   store: string
+  /** @deprecated 请用 audit_status；保留兼容旧前端 */
   status: string
+  /** 平台侧审核状态（草稿/审核中/通过/驳回） */
+  audit_status: string
+  /** 售卖状态（上架中/已下架/已售罄/未上架） */
+  sale_status: string
   platform: string
   source: 'online' | 'draft' | 'local'
 }
@@ -1210,6 +1215,83 @@ function goodlifeDraftStatusLabel(draft_status: number | undefined): string {
       return '审核通过'
     default:
       return '草稿'
+  }
+}
+
+function goodlifeSkuAvailQty(sku: Record<string, unknown> | null): number | undefined {
+  if (!sku) return undefined
+  const stock =
+    sku.stock && typeof sku.stock === 'object'
+      ? (sku.stock as Record<string, unknown>)
+      : null
+  const candidates = [
+    stock?.avail_qty,
+    stock?.available_qty,
+    sku.avail_qty,
+    sku.available_qty,
+    stock?.stock_qty,
+    sku.stock_qty,
+  ]
+  for (const v of candidates) {
+    const n = Number(v)
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n)
+  }
+  return undefined
+}
+
+/** 来客线上售卖状态（与 ERP 商品列表「商品状态」列对齐） */
+function goodlifeSaleStatusLabel(
+  source: 'online' | 'draft' | 'local',
+  online_status: number | undefined,
+  availQty: number | undefined,
+): string {
+  if (source !== 'online') return '未上架'
+  if (online_status === 2 || online_status === 3) return '已下架'
+  if (availQty !== undefined && availQty <= 0) return '已售罄'
+  if (online_status === 1) return '上架中'
+  return '未上架'
+}
+
+function goodlifeAuditStatusLabel(
+  source: 'online' | 'draft' | 'local',
+  draft_status: number | undefined,
+): string {
+  if (source === 'draft') return goodlifeDraftStatusLabel(draft_status)
+  if (source === 'local') return '草稿'
+  if (draft_status != null) return goodlifeDraftStatusLabel(draft_status)
+  return '审核通过'
+}
+
+function mergeDouyinGoodsListItems(
+  a: DouyinGoodsListItem,
+  b: DouyinGoodsListItem,
+): DouyinGoodsListItem {
+  const hasOnline = a.source === 'online' || b.source === 'online'
+  const audit =
+    a.source === 'draft'
+      ? a.audit_status
+      : b.source === 'draft'
+        ? b.audit_status
+        : a.audit_status !== '审核通过'
+          ? a.audit_status
+          : b.audit_status
+  const sale = hasOnline
+    ? a.source === 'online'
+      ? a.sale_status
+      : b.sale_status
+    : a.sale_status === '未上架'
+      ? b.sale_status
+      : a.sale_status
+  return {
+    id: a.id,
+    name: b.name || a.name,
+    price: b.price > 0 ? b.price : a.price,
+    store: b.store !== '—' ? b.store : a.store,
+    audit_status: audit,
+    sale_status: sale,
+    status: audit,
+    platform: b.platform || a.platform,
+    source: hasOnline ? 'online' : a.source === 'draft' || b.source === 'draft' ? 'draft' : a.source,
   }
 }
 
@@ -1253,17 +1335,23 @@ function goodlifeEntryToListItem(
       : typeof product.online_status === 'number'
         ? product.online_status
         : undefined
-  const draft_status = typeof row.draft_status === 'number' ? row.draft_status : undefined
-  const status =
-    source === 'online'
-      ? goodlifeOnlineStatusLabel(online_status)
-      : goodlifeDraftStatusLabel(draft_status)
+  const draft_status =
+    typeof row.draft_status === 'number'
+      ? row.draft_status
+      : typeof product.draft_status === 'number'
+        ? product.draft_status
+        : undefined
+  const availQty = goodlifeSkuAvailQty(firstSku)
+  const audit_status = goodlifeAuditStatusLabel(source, draft_status)
+  const sale_status = goodlifeSaleStatusLabel(source, online_status, availQty)
   return {
     id: product_id,
     name: product_name,
     price,
     store,
-    status,
+    status: audit_status,
+    audit_status,
+    sale_status,
     platform: '抖音来客',
     source,
   }
@@ -1326,7 +1414,9 @@ async function paginateGoodlifeProducts(
     for (const p of products) {
       if (!p || typeof p !== 'object') continue
       const item = goodlifeEntryToListItem(p as Record<string, unknown>, source)
-      if (item) map.set(item.id, item)
+      if (!item) continue
+      const prev = map.get(item.id)
+      map.set(item.id, prev ? mergeDouyinGoodsListItems(prev, item) : item)
     }
     if (!next_cursor || (!has_more && products.length < 50)) break
     cursor = next_cursor
@@ -1383,6 +1473,7 @@ async function fetchAllDouyinGoodsListItems(
     if (map.has(id)) continue
     const name = String(p.product_name ?? '').trim()
     if (!name) continue
+    const audit = String(p._mock_status ?? '草稿')
     map.set(id, {
       id,
       name,
@@ -1391,7 +1482,9 @@ async function fetchAllDouyinGoodsListItems(
         Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
           ? `${(p.poi_ids as string[]).length} 家门店`
           : '—',
-      status: String(p._mock_status ?? '草稿'),
+      status: audit,
+      audit_status: audit,
+      sale_status: '未上架',
       platform: '抖音来客',
       source: 'local',
     })
@@ -1401,18 +1494,23 @@ async function fetchAllDouyinGoodsListItems(
 }
 
 function mockStoreListItems(): DouyinGoodsListItem[] {
-  return Array.from(mockDouyinProductStore.entries()).map(([id, p]) => ({
-    id,
-    name: String(p.product_name ?? '未命名商品'),
-    price: Number(p.price_yuan ?? 0) || 0,
-    store:
-      Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
-        ? `${(p.poi_ids as string[]).length} 家门店`
-        : '—',
-    status: String(p._mock_status ?? '草稿'),
-    platform: '抖音来客',
-    source: 'local' as const,
-  }))
+  return Array.from(mockDouyinProductStore.entries()).map(([id, p]) => {
+    const audit = String(p._mock_status ?? '草稿')
+    return {
+      id,
+      name: String(p.product_name ?? '未命名商品'),
+      price: Number(p.price_yuan ?? 0) || 0,
+      store:
+        Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
+          ? `${(p.poi_ids as string[]).length} 家门店`
+          : '—',
+      status: audit,
+      audit_status: audit,
+      sale_status: '未上架',
+      platform: '抖音来客',
+      source: 'local' as const,
+    }
+  })
 }
 
 function detailPayloadToListItem(
@@ -1421,12 +1519,22 @@ function detailPayloadToListItem(
 ): DouyinGoodsListItem {
   const id = String(detail.product_id ?? detail.out_id ?? '').trim()
   const pois = detail.poi_ids
+  const audit = String(
+    detail._mock_status ?? (source === 'online' ? '审核通过' : '草稿'),
+  )
+  const online_status =
+    typeof detail.online_status === 'number' ? detail.online_status : undefined
+  const stockQty = Number((detail.sales_info as Record<string, unknown> | undefined)?.stock_qty)
+  const availQty = Number.isFinite(stockQty) ? stockQty : undefined
+  const sale = goodlifeSaleStatusLabel(source, online_status, availQty)
   return {
     id,
     name: String(detail.product_name ?? '未命名商品'),
     price: Number(detail.price_yuan ?? 0) || 0,
     store: Array.isArray(pois) && pois.length ? `${pois.length} 家门店` : '—',
-    status: String(detail._mock_status ?? (source === 'online' ? '在售' : '草稿')),
+    status: audit,
+    audit_status: audit,
+    sale_status: sale,
     platform: '抖音来客',
     source,
   }
@@ -2549,6 +2657,7 @@ function mapGoodlifeProductToErpDetail(
         }
         if (!pick_rule) pick_rule = '全部必选'
         return {
+          group_name: String(gr.group_name ?? gr.groupName ?? '').trim() || '商品组',
           pick_rule,
           items: itemsIn.map((it) => {
             const row = it as Record<string, unknown>

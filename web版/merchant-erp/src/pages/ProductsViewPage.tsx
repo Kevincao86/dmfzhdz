@@ -30,12 +30,15 @@ const ALL_FILTER = '全部'
 function libToRow(r: ProductEditLibraryRow, plat: CreatePlatformId): ListRow | null {
   const api = r.platformApi ?? 'douyin'
   if (api !== plat) return null
+  const auditStatus = r.status
   return {
     id: r.id,
     name: r.name,
     price: r.price,
     store: r.store,
-    status: r.status,
+    status: auditStatus,
+    auditStatus,
+    saleStatus: '未上架',
     platform: r.platform,
     origin: 'library',
   }
@@ -50,7 +53,8 @@ export default function ProductsViewPage() {
   const [listNote, setListNote] = useState<string | null>(null)
 
   const [filterOrigin, setFilterOrigin] = useState<OriginFilter>(ALL_FILTER)
-  const [filterStatus, setFilterStatus] = useState(ALL_FILTER)
+  const [filterAuditStatus, setFilterAuditStatus] = useState(ALL_FILTER)
+  const [filterSaleStatus, setFilterSaleStatus] = useState(ALL_FILTER)
   const [filterStore, setFilterStore] = useState(ALL_FILTER)
   const [keyword, setKeyword] = useState('')
 
@@ -100,7 +104,8 @@ export default function ProductsViewPage() {
 
   useEffect(() => {
     setFilterOrigin(ALL_FILTER)
-    setFilterStatus(ALL_FILTER)
+    setFilterAuditStatus(ALL_FILTER)
+    setFilterSaleStatus(ALL_FILTER)
     setFilterStore(ALL_FILTER)
     setKeyword('')
   }, [activePlat])
@@ -119,8 +124,19 @@ export default function ProductsViewPage() {
     return Array.from(map.values())
   }, [apiItems, activePlat, libraryTick])
 
-  const statusOptions = useMemo(
-    () => [ALL_FILTER, ...Array.from(new Set(mergedRows.map((r) => r.status).filter(Boolean)))],
+  const auditStatusOptions = useMemo(
+    () => [
+      ALL_FILTER,
+      ...Array.from(new Set(mergedRows.map((r) => r.auditStatus || r.status).filter(Boolean))),
+    ],
+    [mergedRows],
+  )
+
+  const saleStatusOptions = useMemo(
+    () => [
+      ALL_FILTER,
+      ...Array.from(new Set(mergedRows.map((r) => r.saleStatus).filter(Boolean))),
+    ],
     [mergedRows],
   )
 
@@ -133,7 +149,8 @@ export default function ProductsViewPage() {
 
   const filtersActive =
     filterOrigin !== ALL_FILTER ||
-    filterStatus !== ALL_FILTER ||
+    filterAuditStatus !== ALL_FILTER ||
+    filterSaleStatus !== ALL_FILTER ||
     filterStore !== ALL_FILTER ||
     keyword.trim() !== ''
 
@@ -142,16 +159,19 @@ export default function ProductsViewPage() {
     return mergedRows.filter((r) => {
       if (filterOrigin === 'API' && r.origin !== 'api') return false
       if (filterOrigin === '本地草稿' && r.origin !== 'library') return false
-      if (filterStatus !== ALL_FILTER && r.status !== filterStatus) return false
+      if (filterAuditStatus !== ALL_FILTER && (r.auditStatus || r.status) !== filterAuditStatus)
+        return false
+      if (filterSaleStatus !== ALL_FILTER && r.saleStatus !== filterSaleStatus) return false
       if (filterStore !== ALL_FILTER && r.store !== filterStore) return false
       if (kw && !r.name.includes(kw)) return false
       return true
     })
-  }, [mergedRows, filterOrigin, filterStatus, filterStore, keyword])
+  }, [mergedRows, filterOrigin, filterAuditStatus, filterSaleStatus, filterStore, keyword])
 
   const resetFilters = () => {
     setFilterOrigin(ALL_FILTER)
-    setFilterStatus(ALL_FILTER)
+    setFilterAuditStatus(ALL_FILTER)
+    setFilterSaleStatus(ALL_FILTER)
     setFilterStore(ALL_FILTER)
     setKeyword('')
   }
@@ -168,11 +188,11 @@ export default function ProductsViewPage() {
     window.setTimeout(() => setSyncToast(null), 4200)
   }
 
-  const isOnShelfStatus = (s: string) =>
-    s === '在售' || s.includes('上架') || s === '审核通过'
+  const isOnShelfRow = (row: ListRow) =>
+    row.saleStatus === '上架中' || row.saleStatus === '在售'
 
   const openShelfConfirm = (row: ListRow) => {
-    const goOnline = !isOnShelfStatus(row.status)
+    const goOnline = !isOnShelfRow(row)
     setShelfConfirm({ id: row.id, name: row.name, goOnline })
   }
 
@@ -312,13 +332,27 @@ export default function ProductsViewPage() {
           </select>
         </label>
         <label className="block min-w-[120px] text-xs font-medium text-gray-600">
-          商品状态
+          审核状态
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            value={filterAuditStatus}
+            onChange={(e) => setFilterAuditStatus(e.target.value)}
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
           >
-            {statusOptions.map((s) => (
+            {auditStatusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block min-w-[120px] text-xs font-medium text-gray-600">
+          商品状态
+          <select
+            value={filterSaleStatus}
+            onChange={(e) => setFilterSaleStatus(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          >
+            {saleStatusOptions.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>
@@ -371,7 +405,8 @@ export default function ProductsViewPage() {
               <th className="px-4 py-3">商品名称</th>
               <th className="px-4 py-3">来源</th>
               <th className="px-4 py-3">门店</th>
-              <th className="px-4 py-3">状态</th>
+              <th className="px-4 py-3">审核状态</th>
+              <th className="px-4 py-3">商品状态</th>
               <th className="px-4 py-3">价格</th>
               <th className="px-4 py-3 text-right">操作</th>
             </tr>
@@ -379,7 +414,7 @@ export default function ProductsViewPage() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   {mergedRows.length === 0
                     ? '暂无商品。请先完成平台绑定并刷新列表，或在抖音创建流程中「保存草稿」写入本机草稿库。'
                     : '没有符合筛选条件的商品，请调整条件后重试。'}
@@ -397,7 +432,8 @@ export default function ProductsViewPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-700">{r.store}</td>
-                  <td className="px-4 py-3 text-gray-700">{r.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{r.auditStatus || r.status}</td>
+                  <td className="px-4 py-3 text-gray-700">{r.saleStatus || '—'}</td>
                   <td className="px-4 py-3 text-gray-900">
                     {priceEditId === r.id ? (
                       <form
@@ -479,7 +515,7 @@ export default function ProductsViewPage() {
                             title="上下架（确认后同步至抖音来客）"
                           >
                             <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
-                            {isOnShelfStatus(r.status) ? '下架' : '上架'}
+                            {isOnShelfRow(r) ? '下架' : '上架'}
                           </button>
                         </>
                       )}
