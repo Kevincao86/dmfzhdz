@@ -198,7 +198,7 @@ export function DouyinProductMobilePreviewFrame(props: Props) {
   )
 }
 
-/** 悬浮预览：随页面滚动与鼠标纵向位置在视口内移动 */
+/** 悬浮预览：随页面纵向滚动在视口内移动（不跟随鼠标） */
 export function DouyinProductScrollFollowPreview(props: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const [top, setTop] = useState(88)
@@ -220,19 +220,11 @@ export function DouyinProductScrollFollowPreview(props: Props) {
         setTop(clampTop(window.scrollY + 72))
       })
     }
-    const onMouseMove = (e: MouseEvent) => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => {
-        setTop(clampTop(e.clientY - 100))
-      })
-    }
     window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('mousemove', onMouseMove, { passive: true })
     onScroll()
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('mousemove', onMouseMove)
     }
   }, [collapsed])
 
@@ -270,7 +262,7 @@ export function DouyinProductScrollFollowPreview(props: Props) {
       </div>
       <div className="max-h-[min(70vh,520px)] overflow-y-auto p-3">
         <DouyinProductMobilePreviewFrame {...props} embedded />
-        <p className="mt-2 text-center text-[10px] text-gray-400">随滚动/鼠标移动 · 布局参考抖音来客团购页</p>
+        <p className="mt-2 text-center text-[10px] text-gray-400">随页面滚动 · 布局参考抖音来客团购页</p>
       </div>
     </div>
   )
