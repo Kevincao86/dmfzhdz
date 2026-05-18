@@ -1170,6 +1170,525 @@ export async function handleDouyinGoodsProductDraftQueryGet(
   }
 }
 
+export type DouyinGoodsListItem = {
+  id: string
+  name: string
+  price: number
+  store: string
+  status: string
+  platform: string
+  source: 'online' | 'draft' | 'local'
+}
+
+function goodlifeListAmountToYuan(v: unknown): number {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return 0
+  if (v >= 100 && v < 1e12) return Math.round(v) / 100
+  if (v > 0 && v < 1e6) return Math.round(v)
+  return 0
+}
+
+function goodlifeOnlineStatusLabel(online_status: number | undefined): string {
+  switch (online_status) {
+    case 1:
+      return '在售'
+    case 2:
+      return '已下架'
+    case 3:
+      return '封禁'
+    default:
+      return '在售'
+  }
+}
+
+function goodlifeDraftStatusLabel(draft_status: number | undefined): string {
+  switch (draft_status) {
+    case 10:
+      return '审核中'
+    case 12:
+      return '已驳回'
+    case 1:
+      return '审核通过'
+    default:
+      return '草稿'
+  }
+}
+
+function extractProductsArrayFromGoodlifeEnvelope(j: Record<string, unknown>): unknown[] {
+  const inner = j.data as Record<string, unknown> | undefined
+  const arr = (inner?.products ?? inner?.product_list ?? j.products) as unknown
+  return Array.isArray(arr) ? arr : []
+}
+
+function goodlifeEntryToListItem(
+  row: Record<string, unknown>,
+  source: 'online' | 'draft',
+): DouyinGoodsListItem | null {
+  const product =
+    row.product && typeof row.product === 'object'
+      ? (row.product as Record<string, unknown>)
+      : row
+  const product_id = String(
+    product.product_id ?? product.id ?? row.product_id ?? row.out_id ?? '',
+  ).trim()
+  const product_name = String(product.product_name ?? product.name ?? '').trim()
+  if (!product_id || !product_name) return null
+  const sku =
+    row.sku && typeof row.sku === 'object' ? (row.sku as Record<string, unknown>) : null
+  const skus = Array.isArray(row.skus) ? row.skus : []
+  const firstSku =
+    (skus[0] && typeof skus[0] === 'object' ? (skus[0] as Record<string, unknown>) : null) ?? sku
+  const price = firstSku
+    ? goodlifeListAmountToYuan(firstSku.actual_amount) ||
+      goodlifeListAmountToYuan(firstSku.origin_amount)
+    : 0
+  const poisRaw = product.pois
+  let store = String(product.account_name ?? '').trim()
+  if (Array.isArray(poisRaw) && poisRaw.length > 0) {
+    store = `${poisRaw.length} 家门店`
+  }
+  if (!store) store = '—'
+  const online_status =
+    typeof row.online_status === 'number'
+      ? row.online_status
+      : typeof product.online_status === 'number'
+        ? product.online_status
+        : undefined
+  const draft_status = typeof row.draft_status === 'number' ? row.draft_status : undefined
+  const status =
+    source === 'online'
+      ? goodlifeOnlineStatusLabel(online_status)
+      : goodlifeDraftStatusLabel(draft_status)
+  return {
+    id: product_id,
+    name: product_name,
+    price,
+    store,
+    status,
+    platform: '抖音来客',
+    source,
+  }
+}
+
+async function douyinGoodlifeQueryPage(
+  accountId: string,
+  token: string,
+  path: '/goodlife/v1/goods/product/online/query/' | '/goodlife/v1/goods/product/draft/query/',
+  params: URLSearchParams,
+): Promise<{ products: unknown[]; next_cursor?: string; has_more?: boolean; err?: string }> {
+  const u = new URL(douyinOpenApiUrl(path))
+  u.searchParams.set('account_id', accountId)
+  for (const [k, v] of params.entries()) {
+    u.searchParams.set(k, v)
+  }
+  const dr = await douyinServerFetch(u.toString(), {
+    method: 'GET',
+    headers: {
+      'access-token': token,
+      'content-type': 'application/json',
+      'Rpc-Transit-Life-Account': accountId,
+    },
+  })
+  const raw = await dr.text()
+  const j = parseDouyinJson(raw) as Record<string, unknown>
+  const dataErr = getDataError(j)
+  if (!dr.ok || !dataErr.ok) {
+    return { products: [], err: dataErr.msg || `HTTP ${dr.status}` }
+  }
+  const inner = j.data as Record<string, unknown> | undefined
+  const products = extractProductsArrayFromGoodlifeEnvelope(j)
+  const next_cursor = String(inner?.next_cursor ?? '').trim() || undefined
+  const has_more = inner?.has_more === true
+  return { products, next_cursor, has_more }
+}
+
+async function paginateGoodlifeProducts(
+  accountId: string,
+  token: string,
+  path: '/goodlife/v1/goods/product/online/query/' | '/goodlife/v1/goods/product/draft/query/',
+  baseParams: Record<string, string>,
+  source: 'online' | 'draft',
+  map: Map<string, DouyinGoodsListItem>,
+  warnings: string[],
+): Promise<void> {
+  let cursor = ''
+  for (let page = 0; page < 40; page++) {
+    const q = new URLSearchParams({ count: '50', ...baseParams })
+    if (cursor) q.set('cursor', cursor)
+    const { products, next_cursor, has_more, err } = await douyinGoodlifeQueryPage(
+      accountId,
+      token,
+      path,
+      q,
+    )
+    if (err && products.length === 0 && map.size === 0) {
+      warnings.push(err)
+    }
+    for (const p of products) {
+      if (!p || typeof p !== 'object') continue
+      const item = goodlifeEntryToListItem(p as Record<string, unknown>, source)
+      if (item) map.set(item.id, item)
+    }
+    if (!next_cursor || (!has_more && products.length < 50)) break
+    cursor = next_cursor
+  }
+}
+
+async function fetchAllDouyinGoodsListItems(
+  accountId: string,
+  token: string,
+): Promise<{ items: DouyinGoodsListItem[]; warnings: string[] }> {
+  const warnings: string[] = []
+  const map = new Map<string, DouyinGoodsListItem>()
+
+  await paginateGoodlifeProducts(
+    accountId,
+    token,
+    '/goodlife/v1/goods/product/online/query/',
+    { goods_query_type: '2' },
+    'online',
+    map,
+    warnings,
+  )
+  await paginateGoodlifeProducts(
+    accountId,
+    token,
+    '/goodlife/v1/goods/product/online/query/',
+    { goods_query_type: '3' },
+    'online',
+    map,
+    warnings,
+  )
+  await paginateGoodlifeProducts(
+    accountId,
+    token,
+    '/goodlife/v1/goods/product/draft/query/',
+    {},
+    'draft',
+    map,
+    warnings,
+  )
+  for (const st of ['10', '12', '1'] as const) {
+    await paginateGoodlifeProducts(
+      accountId,
+      token,
+      '/goodlife/v1/goods/product/draft/query/',
+      { status: st },
+      'draft',
+      map,
+      warnings,
+    )
+  }
+
+  for (const [id, p] of mockDouyinProductStore.entries()) {
+    if (map.has(id)) continue
+    const name = String(p.product_name ?? '').trim()
+    if (!name) continue
+    map.set(id, {
+      id,
+      name,
+      price: Number(p.price_yuan ?? 0) || 0,
+      store:
+        Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
+          ? `${(p.poi_ids as string[]).length} 家门店`
+          : '—',
+      status: String(p._mock_status ?? '草稿'),
+      platform: '抖音来客',
+      source: 'local',
+    })
+  }
+
+  return { items: Array.from(map.values()), warnings }
+}
+
+function mockStoreListItems(): DouyinGoodsListItem[] {
+  return Array.from(mockDouyinProductStore.entries()).map(([id, p]) => ({
+    id,
+    name: String(p.product_name ?? '未命名商品'),
+    price: Number(p.price_yuan ?? 0) || 0,
+    store:
+      Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
+        ? `${(p.poi_ids as string[]).length} 家门店`
+        : '—',
+    status: String(p._mock_status ?? '草稿'),
+    platform: '抖音来客',
+    source: 'local' as const,
+  }))
+}
+
+function detailPayloadToListItem(
+  detail: Record<string, unknown>,
+  source: 'online' | 'draft' | 'local',
+): DouyinGoodsListItem {
+  const id = String(detail.product_id ?? detail.out_id ?? '').trim()
+  const pois = detail.poi_ids
+  return {
+    id,
+    name: String(detail.product_name ?? '未命名商品'),
+    price: Number(detail.price_yuan ?? 0) || 0,
+    store: Array.isArray(pois) && pois.length ? `${pois.length} 家门店` : '—',
+    status: String(detail._mock_status ?? (source === 'online' ? '在售' : '草稿')),
+    platform: '抖音来客',
+    source,
+  }
+}
+
+async function fetchGoodlifeProductDetailPreferOnline(
+  accountId: string,
+  token: string,
+  productId: string,
+): Promise<{ detail: Record<string, unknown>; source: 'online' | 'draft' } | null> {
+  const paths: Array<{ path: string; source: 'online' | 'draft' }> = [
+    { path: '/goodlife/v1/goods/product/online/get/', source: 'online' },
+    { path: '/goodlife/v1/goods/product/draft/get/', source: 'draft' },
+  ]
+  for (const { path, source } of paths) {
+    const u = new URL(douyinOpenApiUrl(path))
+    u.searchParams.set('account_id', accountId)
+    u.searchParams.set('product_id', productId)
+    const dr = await douyinServerFetch(u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw)
+    if (!getDataError(j).ok) continue
+    const extracted = extractGoodlifeProductFromGetEnvelope(j)
+    if (!extracted) continue
+    const detail = mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
+    const listStatus =
+      source === 'online'
+        ? goodlifeOnlineStatusLabel(
+            typeof extracted.product.online_status === 'number'
+              ? extracted.product.online_status
+              : undefined,
+          )
+        : goodlifeDraftStatusLabel(
+            typeof extracted.product.draft_status === 'number'
+              ? extracted.product.draft_status
+              : undefined,
+          )
+    return {
+      detail: { ...detail, _mock_status: listStatus },
+      source,
+    }
+  }
+  return null
+}
+
+/** 商品列表：合并来客线上（在售/下架/封禁）与草稿（审核中/驳回等）及本机 save 缓存 */
+export async function handleDouyinGoodsProductsListGet(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+
+  const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1)
+  const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get('page_size') ?? '20') || 20))
+  const keyword = (url.searchParams.get('keyword') ?? '').trim().toLowerCase()
+  const full = url.searchParams.get('full') === '1' || url.searchParams.get('sync_all') === '1'
+
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
+    const { items, warnings } = await fetchAllDouyinGoodsListItems(accountId, token)
+    let filtered = items
+    if (keyword) {
+      filtered = items.filter((x) => x.name.toLowerCase().includes(keyword))
+    }
+    const total = filtered.length
+    const start = full ? 0 : (page - 1) * pageSize
+    const slice = full ? filtered : filtered.slice(start, start + pageSize)
+    json(res, 200, {
+      ok: true,
+      data: {
+        items: slice.map(({ source: _s, ...rest }) => rest),
+        total,
+        page: full ? 1 : page,
+        page_size: full ? total || pageSize : pageSize,
+      },
+      ...(warnings.length ? { message: warnings.join('；') } : {}),
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    let items = mockStoreListItems()
+    if (keyword) items = items.filter((x) => x.name.toLowerCase().includes(keyword))
+    const total = items.length
+    const start = full ? 0 : (page - 1) * pageSize
+    json(res, 200, {
+      ok: true,
+      data: {
+        items: (full ? items : items.slice(start, start + pageSize)).map(
+          ({ source: _s, ...rest }) => rest,
+        ),
+        total,
+        page: full ? 1 : page,
+        page_size: full ? total || pageSize : pageSize,
+      },
+      message: `来客列表拉取失败，已展示本机缓存：${msg}`,
+    })
+  }
+}
+
+/** 单商品拉取：从平台同步该商品信息与状态至 ERP */
+export async function handleDouyinGoodsProductPullSyncPost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+  let product_id = ''
+  let account_id = ''
+  try {
+    const b = JSON.parse(bodyRaw || '{}') as { product_id?: string; account_id?: string }
+    product_id = String(b.product_id ?? '').trim()
+    account_id = String(b.account_id ?? '').trim()
+  } catch {
+    /* ignore */
+  }
+  if (!product_id) {
+    json(res, 400, { ok: false, message: '缺少 product_id' })
+    return
+  }
+
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = account_id || session.merchantId
+    const pulled = await fetchGoodlifeProductDetailPreferOnline(accountId, token, product_id)
+    if (!pulled) {
+      const cached = mockDouyinProductStore.get(product_id)
+      if (cached) {
+        const item = detailPayloadToListItem(cached, 'local')
+        json(res, 200, {
+          ok: true,
+          item,
+          detail: cached,
+          message: '未从来客拉取到线上/草稿详情，已返回本机保存快照',
+        })
+        return
+      }
+      json(res, 404, {
+        ok: false,
+        message:
+          '未在抖音来客找到该商品。请确认商品 ID、账户授权，或先在创建流程中保存草稿。',
+      })
+      return
+    }
+    mockDouyinProductStore.set(product_id, pulled.detail)
+    const item = detailPayloadToListItem(pulled.detail, pulled.source)
+    json(res, 200, {
+      ok: true,
+      item,
+      detail: pulled.detail,
+      message: '已从抖音来客拉取该商品最新信息与状态',
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `拉取商品失败：${msg}` })
+  }
+}
+
+/** 商品上下架：代理 goodlife/v1/goods/product/operate/ */
+export async function handleDouyinGoodsProductOperatePost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
+    return
+  }
+  const session = auth ? resolveSession(auth) : undefined
+  if (!session) {
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    return
+  }
+  let product_id = ''
+  let op_type = 0
+  let account_id = ''
+  try {
+    const b = JSON.parse(bodyRaw || '{}') as {
+      product_id?: string
+      op_type?: number
+      account_id?: string
+    }
+    product_id = String(b.product_id ?? '').trim()
+    op_type = Number(b.op_type)
+    account_id = String(b.account_id ?? '').trim()
+  } catch {
+    /* ignore */
+  }
+  if (!product_id) {
+    json(res, 400, { ok: false, message: '缺少 product_id' })
+    return
+  }
+  if (op_type !== 1 && op_type !== 2) {
+    json(res, 400, { ok: false, message: 'op_type 须为 1（上架）或 2（下架）' })
+    return
+  }
+
+  try {
+    const token = await ensureDouyinToken(session)
+    const accountId = account_id || session.merchantId
+    const u = douyinOpenApiUrl('/goodlife/v1/goods/product/operate/')
+    const dr = await douyinServerFetch(u, {
+      method: 'POST',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+      body: JSON.stringify({
+        account_id: accountId,
+        product_id,
+        op_type,
+      }),
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw)
+    const dataErr = getDataError(j)
+    if (!dr.ok || !dataErr.ok) {
+      json(res, dr.ok ? 400 : dr.status, {
+        ok: false,
+        message: dataErr.msg || `抖音 operate HTTP ${dr.status}`,
+        douyin_response: j,
+      })
+      return
+    }
+    json(res, 200, {
+      ok: true,
+      message: op_type === 1 ? '商品已上架' : '商品已下架',
+      douyin_response: j,
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `上下架失败：${msg}` })
+  }
+}
+
 /** template/get 上游失败或空 attrs 时返回与 save 兜底一致的结构（避免前端「fetch failed」卡死） */
 function buildSyntheticTemplateGetEnvelope(erpUiProductType: number): Record<string, unknown> {
   const syn = syntheticGoodlifeTemplateAttrsBundle(

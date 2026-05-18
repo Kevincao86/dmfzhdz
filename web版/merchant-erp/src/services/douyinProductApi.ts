@@ -460,9 +460,23 @@ export async function getDouyinGoodsProductGet(productId: string): Promise<Douyi
   }
 }
 
-export type ProductSyncResult = { ok: true; message?: string } | { ok: false; message: string }
+export type ProductSyncResult =
+  | {
+      ok: true
+      message?: string
+      item?: {
+        id: string
+        name: string
+        price: number
+        store: string
+        status: string
+        platform: string
+      }
+      detail?: Record<string, unknown>
+    }
+  | { ok: false; message: string }
 
-/** 将 ERP 内编辑结果同步至平台（上架/更新；由网关代理各平台 OpenAPI） */
+/** 从抖音来客拉取单商品信息与状态（由网关代理 online/draft get） */
 export async function postDouyinGoodsProductSync(productId: string): Promise<ProductSyncResult> {
   const id = productId.trim()
   if (!id) return { ok: false, message: '缺少 product_id' }
@@ -485,7 +499,7 @@ export async function postDouyinGoodsProductSync(productId: string): Promise<Pro
     } catch {
       data = {}
     }
-    if (!res.ok) {
+    if (!res.ok || data.ok === false) {
       const msg =
         (typeof data.message === 'string' && data.message) ||
         (typeof data.description === 'string' && data.description) ||
@@ -493,9 +507,41 @@ export async function postDouyinGoodsProductSync(productId: string): Promise<Pro
         `HTTP ${res.status}`
       return { ok: false, message: msg }
     }
+    const itemRaw = data.item
+    let item:
+      | {
+          id: string
+          name: string
+          price: number
+          store: string
+          status: string
+          platform: string
+        }
+      | undefined
+    if (itemRaw && typeof itemRaw === 'object') {
+      const o = itemRaw as Record<string, unknown>
+      const id = String(o.id ?? '').trim()
+      const name = String(o.name ?? '').trim()
+      if (id && name) {
+        item = {
+          id,
+          name,
+          price: Number(o.price) || 0,
+          store: String(o.store ?? '—'),
+          status: String(o.status ?? '—'),
+          platform: String(o.platform ?? '抖音来客'),
+        }
+      }
+    }
+    const detail =
+      data.detail && typeof data.detail === 'object'
+        ? (data.detail as Record<string, unknown>)
+        : undefined
     return {
       ok: true,
       message: typeof data.message === 'string' ? data.message : undefined,
+      ...(item ? { item } : {}),
+      ...(detail ? { detail } : {}),
     }
   }
   return {

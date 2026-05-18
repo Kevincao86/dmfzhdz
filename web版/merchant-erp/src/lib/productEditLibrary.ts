@@ -110,6 +110,30 @@ export function updateProductEditLibraryRow(
   persist(next)
 }
 
+/** 从平台商品列表同步结果写入/更新本地库（按 id 去重） */
+export function upsertProductEditLibraryFromApi(
+  item: {
+    id: string
+    name: string
+    price: number
+    store: string
+    status: string
+    platform: string
+  },
+  platformApi: ProductEditLibraryRow['platformApi'],
+): void {
+  if (!item.id.trim() || !item.name.trim() || !platformApi) return
+  upsertProductEditLibraryDraft({
+    id: item.id.trim(),
+    name: item.name.trim(),
+    platform: item.platform.trim() || '抖音来客',
+    store: item.store.trim() || '—',
+    status: item.status.trim() || '—',
+    price: Number.isFinite(item.price) ? item.price : 0,
+    platformApi,
+  })
+}
+
 export function replaceProductEditLibraryRowId(oldId: string, row: ProductEditLibraryRow): void {
   const o = oldId.trim()
   if (!o) return
