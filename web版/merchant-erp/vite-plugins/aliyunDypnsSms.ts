@@ -2,13 +2,16 @@
  * 阿里云号码认证服务（Dypnsapi）短信验证码：SendSmsVerifyCode / CheckSmsVerifyCode
  * @see https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode
  */
-import DypnsapiModule from '@alicloud/dypnsapi20170525'
+import DypnsapiModule, {
+  CheckSmsVerifyCodeRequest,
+  SendSmsVerifyCodeRequest,
+} from '@alicloud/dypnsapi20170525'
 import { $OpenApiUtil } from '@alicloud/openapi-core'
 
 /** Vercel ESM 加载 CJS SDK 时需取 .default */
 function resolveSdkCtor<T extends new (config: $OpenApiUtil.Config) => {
-  sendSmsVerifyCode: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
-  checkSmsVerifyCode: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
+  sendSmsVerifyCode: (req: SendSmsVerifyCodeRequest) => Promise<{ body?: Record<string, unknown> }>
+  checkSmsVerifyCode: (req: CheckSmsVerifyCodeRequest) => Promise<{ body?: Record<string, unknown> }>
 }>(mod: unknown): T {
   if (typeof mod === 'function') return mod as T
   if (mod && typeof mod === 'object' && 'default' in mod) {
@@ -40,10 +43,7 @@ function createClient(): InstanceType<typeof DypnsClient> {
 
 /** 赠送模板 100001 需 code + min；可用环境变量覆盖 */
 function defaultTemplateParam(): string {
-  return (
-    process.env.ALIYUN_DYPNS_TEMPLATE_PARAM?.trim() ||
-    '{"code":"##code##","min":"5"}'
-  )
+  return process.env.ALIYUN_DYPNS_TEMPLATE_PARAM?.trim() || '{"code":"##code##","min":"5"}'
 }
 
 function apiMessage(body: Record<string, unknown> | undefined): string {
@@ -61,7 +61,7 @@ export async function sendAliyunSmsVerifyCode(
   phone: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const client = createClient()
-  const req: Record<string, unknown> = {
+  const req = new SendSmsVerifyCodeRequest({
     phoneNumber: phone,
     countryCode: '86',
     signName: process.env.ALIYUN_DYPNS_SIGN_NAME!.trim(),
@@ -72,7 +72,7 @@ export async function sendAliyunSmsVerifyCode(
     validTime: 300,
     interval: 60,
     duplicatePolicy: 1,
-  }
+  })
   try {
     const res = await client.sendSmsVerifyCode(req)
     const body = (res.body ?? res) as Record<string, unknown>
@@ -90,11 +90,11 @@ export async function checkAliyunSmsVerifyCode(
   code: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const client = createClient()
-  const req: Record<string, unknown> = {
+  const req = new CheckSmsVerifyCodeRequest({
     phoneNumber: phone,
     countryCode: '86',
     verifyCode: code.trim(),
-  }
+  })
   try {
     const res = await client.checkSmsVerifyCode(req)
     const body = (res.body ?? res) as Record<string, unknown>
