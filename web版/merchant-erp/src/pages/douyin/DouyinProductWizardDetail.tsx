@@ -1,8 +1,8 @@
-import { ChevronLeft, Loader2, Sparkles, Upload, X } from 'lucide-react'
+import { ChevronLeft, Loader2, Plus, Sparkles, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DouyinComboGroupsEditor from '../../components/douyin/DouyinComboGroupsEditor'
 import DouyinProductAiModelSection from '../../components/douyin/DouyinProductAiModelSection'
-import type { ComboGroupFormRow } from '../../lib/douyinComboGroupsForm'
+import { appendComboGroup, type ComboGroupFormRow } from '../../lib/douyinComboGroupsForm'
 import {
   DouyinProductPreviewAside,
   type DouyinPreviewComboLine,
@@ -542,12 +542,38 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
       </div>
 
       {props.productType === 1 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
-          <h3 className="font-semibold">团购单品（商品组）</h3>
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3" data-testid="douyin-combo-groups-card">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-gray-900">团购单品（商品组）</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                可配置多个商品组，每组支持多个单品与几选几规则
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => props.setComboGroups(appendComboGroup(props.comboGroups))}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-indigo-600 bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+            >
+              <Plus className="h-4 w-4" />
+              新增商品组
+            </button>
+          </div>
           <DouyinComboGroupsEditor
             groups={props.comboGroups}
             onChange={props.setComboGroups}
+            showAddGroupButton={false}
           />
+          <div className="flex justify-end border-t border-gray-100 pt-3">
+            <button
+              type="button"
+              onClick={() => props.setComboGroups(appendComboGroup(props.comboGroups))}
+              className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100"
+            >
+              <Plus className="h-4 w-4" />
+              新增商品组
+            </button>
+          </div>
         </div>
       )}
 
