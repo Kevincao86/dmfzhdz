@@ -9,9 +9,12 @@ export type AiProductDraft = {
   priceYuan?: string
   originYuan?: string
   platform: 'douyin'
-  /** 套餐结构说明，供向导参考 */
+  headUrl?: string
+  productType?: number
   comboSummary?: string
   planNotes?: string
+  /** 确认后尝试自动保存并提交审核（需本机曾成功选过类目） */
+  autoSubmit?: boolean
 }
 
 export function saveAiProductDraft(draft: AiProductDraft): void {

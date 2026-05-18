@@ -29,6 +29,7 @@ import {
   upsertProductEditLibraryDraft,
 } from '../../lib/productEditLibrary'
 import { consumeAiProductDraft } from '../../lib/aiProductDraft'
+import { loadDouyinWizardLastContext, saveDouyinWizardLastContext } from '../../lib/douyinWizardLastContext'
 import { readMerchantSession } from '../../lib/merchantSession'
 import {
   loadDouyinGoodsCategoryTreeForPicker,
@@ -60,6 +61,8 @@ type Step = 'category' | 'productType' | 'detail'
 export type DouyinProductWizardProps = {
   variant?: 'create' | 'edit'
   editProductId?: string
+  /** AI 助手确认后：预填并尝试自动提交审核 */
+  autoSubmit?: boolean
 }
 
 function readAccountName(): string {
@@ -73,6 +76,7 @@ function newDraftRowId(): string {
 export default function DouyinProductCreateWizard({
   variant = 'create',
   editProductId,
+  autoSubmit = false,
 }: DouyinProductWizardProps = {}) {
   const navigate = useNavigate()
   const isEdit = variant === 'edit' && Boolean(editProductId?.trim())
@@ -138,6 +142,7 @@ export default function DouyinProductCreateWizard({
 
   const persistedProductIdRef = useRef<string | null>(editProductId?.trim() ?? null)
   const stableOutIdRef = useRef<string | null>(null)
+  const autoSubmitPendingRef = useRef(false)
   const buildFormRules = useCallback((): DouyinProductFormRules => {
     return {
       salesChannel,
@@ -219,10 +224,21 @@ export default function DouyinProductCreateWizard({
     if (isEdit) return
     const draft = consumeAiProductDraft()
     if (!draft) return
+    const lastCtx = loadDouyinWizardLastContext()
+    if (draft.autoSubmit && autoSubmit && lastCtx?.cat3) {
+      if (lastCtx.cat1) setCat1(lastCtx.cat1)
+      if (lastCtx.cat2) setCat2(lastCtx.cat2)
+      setCat3(lastCtx.cat3)
+      setProductType(draft.productType ?? lastCtx.productType)
+      if (lastCtx.poiIds?.length) setSelectedPoiIds(lastCtx.poiIds)
+      autoSubmitPendingRef.current = true
+    }
     if (draft.productName) setProductName(draft.productName)
     if (draft.productDesc) setProductDesc(draft.productDesc)
     if (draft.priceYuan) setPriceYuan(draft.priceYuan)
     if (draft.originYuan) setOriginYuan(draft.originYuan)
+    if (draft.headUrl) setHeadUrl(draft.headUrl)
+    if (draft.productType != null && !autoSubmitPendingRef.current) setProductType(draft.productType)
     if (draft.comboSummary) {
       const parts = draft.comboSummary.split(/[；;]/).filter(Boolean)
       setComboGroups([
@@ -240,7 +256,7 @@ export default function DouyinProductCreateWizard({
       ])
     }
     setStep('detail')
-  }, [isEdit])
+  }, [isEdit, autoSubmit])
 
   useEffect(() => {
     if (!isEdit || !editProductId?.trim()) return
@@ -638,6 +654,16 @@ export default function DouyinProductCreateWizard({
       saveDraftDetailSnapshot(finalPid, { ...detail, product_id: finalPid })
     }
 
+    if (cat3.trim() && productType != null) {
+      saveDouyinWizardLastContext({
+        cat1: cat1 || undefined,
+        cat2: cat2 || undefined,
+        cat3: cat3.trim(),
+        productType,
+        poiIds: selectedPoiIds.length ? selectedPoiIds : undefined,
+      })
+    }
+
     setActionMsg({
       text:
         r.message ??
@@ -650,6 +676,16 @@ export default function DouyinProductCreateWizard({
       setTimeout(() => navigate('/products/list'), 800)
     }
   }
+
+  useEffect(() => {
+    if (!autoSubmitPendingRef.current || step !== 'detail' || loading || saving) return
+    if (!cat3.trim() || productType == null) return
+    const detail = buildPayload()
+    if (!detail || detail.poi_ids.length === 0) return
+    autoSubmitPendingRef.current = false
+    void handleSave('submit')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 一次性自动提交
+  }, [step, loading, saving, cat3, productType, selectedPoiIds.length, headUrl, productName, priceYuan])
 
   const goDetail = async () => {
     if (!cat3 || productType == null) return

@@ -2,6 +2,7 @@ import { CheckCircle2, ClipboardList } from 'lucide-react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
+import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 
 function formatBubbleTime(ts: number): string {
   try {
@@ -15,49 +16,31 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
   const { quoteMessage } = useAiAgent()
   if (m.role === 'task_preview' && m.preview) {
     return (
-      <div className="max-w-[min(100%,42rem)] rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50/95 to-indigo-50/90 p-4 shadow-sm ring-1 ring-violet-100/60">
+      <div className="w-full rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50/95 to-indigo-50/90 p-4 shadow-sm ring-1 ring-violet-100/60">
         <div className="mb-2 flex items-center gap-2 text-violet-900">
           <ClipboardList className="h-4 w-4 shrink-0" />
           <span className="text-sm font-semibold tracking-tight">执行预览 · 需确认</span>
         </div>
         <p className="text-sm leading-relaxed text-slate-700">{m.content}</p>
-        <p className="mt-3 text-xs font-semibold text-violet-900">{m.preview.title}</p>
-        <ol className="mt-2 space-y-1.5 border-l-2 border-violet-200/80 pl-3 text-sm leading-relaxed text-slate-700">
-          {m.preview.steps.map((s, i) => (
-            <li key={i} className="pl-1">
-              {s}
-            </li>
-          ))}
-        </ol>
-        {m.preview.productPlan ? (
-          <div className="mt-4 rounded-xl border border-indigo-100 bg-white/90 p-3 text-sm text-slate-800">
-            <p className="font-semibold text-indigo-900">{m.preview.productPlan.productName}</p>
-            <p className="mt-1 text-indigo-700">
-              建议售价 ¥{m.preview.productPlan.suggestedPriceYuan}
-              {m.preview.productPlan.originYuan != null
-                ? ` · 划线 ¥${m.preview.productPlan.originYuan}`
-                : ''}
-            </p>
-            {m.preview.productPlan.comboLines.length > 0 && (
-              <ul className="mt-2 list-inside list-disc text-xs text-slate-600">
-                {m.preview.productPlan.comboLines.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            )}
-            {m.preview.productPlan.description ? (
-              <p className="mt-2 text-xs leading-relaxed text-slate-600">
-                {m.preview.productPlan.description}
-              </p>
-            ) : null}
-            {m.preview.productPlan.marginNote ? (
-              <p className="mt-2 text-xs text-amber-800">{m.preview.productPlan.marginNote}</p>
-            ) : null}
-          </div>
+        {m.preview.taskType === 'create_product' && m.preview.productPlan ? (
+          <AiAgentProductVisualPreview plan={m.preview.productPlan} />
+        ) : (
+          <>
+            <p className="mt-3 text-xs font-semibold text-violet-900">{m.preview.title}</p>
+            <ol className="mt-2 space-y-1.5 border-l-2 border-violet-200/80 pl-3 text-sm leading-relaxed text-slate-700">
+              {m.preview.steps.map((s, i) => (
+                <li key={i} className="pl-1">
+                  {s}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+        {m.preview.taskType !== 'create_product' ? (
+          <p className="mt-3 text-[11px] text-slate-500">
+            类型：<span className="font-mono text-slate-600">{m.preview.taskType}</span>
+          </p>
         ) : null}
-        <p className="mt-3 text-[11px] text-slate-500">
-          类型：<span className="font-mono text-slate-600">{m.preview.taskType}</span>
-        </p>
       </div>
     )
   }
@@ -120,7 +103,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
 
   return (
     <div className="flex justify-start">
-      <div className="w-full max-w-[min(100%,48rem)]">
+      <div className="w-full">
         <div
           className={cn(
             'rounded-2xl rounded-bl-md px-4 py-3 text-[13px] leading-relaxed shadow-sm',

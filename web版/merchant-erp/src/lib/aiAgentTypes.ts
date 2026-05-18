@@ -62,6 +62,11 @@ export type AiProductPlanPreview = {
   marginNote?: string
   competitorNote?: string
   riskLevel?: 'low' | 'medium' | 'high'
+  /** 1 团购 / 2 代金券 */
+  productType?: number
+  headUrl?: string
+  enrichStatus?: 'loading' | 'ready' | 'error'
+  enrichError?: string
 }
 
 export type AiTaskPreviewPayload = {

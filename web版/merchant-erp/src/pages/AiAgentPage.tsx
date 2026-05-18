@@ -22,6 +22,8 @@ export default function AiAgentPage() {
     applyShortcut,
     aiSending,
     pendingPreviewId,
+    pendingPreviewTaskType,
+    pendingProductPlanLoading,
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
@@ -34,6 +36,10 @@ export default function AiAgentPage() {
   const hasChat = useMemo(() => messages.some((m) => m.role === 'user'), [messages])
   const scrollRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  const confirmLabel =
+    pendingPreviewTaskType === 'create_product' ? '确认并提交审核' : '确认执行'
+  const confirmDisabled = pendingProductPlanLoading || aiSending
 
   useEffect(() => {
     if (!hasChat) return
@@ -73,9 +79,7 @@ export default function AiAgentPage() {
             </button>
           </div>
 
-          <div className="rounded-3xl border border-slate-200/90 bg-white shadow-sm shadow-slate-900/5 ring-1 ring-slate-100">
-            <AiAgentComposerBar layout="centered" />
-          </div>
+          <AiAgentComposerBar layout="centered" />
 
           <div className="mt-4">
             <button
@@ -181,21 +185,23 @@ export default function AiAgentPage() {
           </aside>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div
-              ref={scrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pt-2 pb-2 sm:space-y-4 sm:px-5 sm:pt-2 sm:pb-3"
-            >
-              {messages.map((m) => (
-                <div key={m.id}>
-                  <AiAgentMessageBubble m={m} />
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-2 sm:space-y-4 sm:py-3">
+                {messages.map((m) => (
+                  <div key={m.id}>
+                    <AiAgentMessageBubble m={m} />
                   {m.role === 'task_preview' && m.id === pendingPreviewId ? (
                     <div className="mt-3 flex flex-wrap gap-2 border-t border-violet-100 pt-3">
                       <button
                         type="button"
                         onClick={confirmPendingTask}
-                        className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110"
+                        disabled={confirmDisabled}
+                        className={cn(
+                          'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+                          confirmDisabled && 'cursor-not-allowed opacity-50',
+                        )}
                       >
-                        确认执行
+                        {pendingProductPlanLoading ? '正在生成预览…' : confirmLabel}
                       </button>
                       <button
                         type="button"
@@ -214,11 +220,12 @@ export default function AiAgentPage() {
                     </div>
                   ) : null}
                 </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            <div className="shrink-0 border-t border-slate-200/90 bg-white/95 px-2 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-4">
-              <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="shrink-0 border-t border-slate-200/90 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+              <div className="mx-auto w-full max-w-3xl">
                 <AiAgentComposerBar layout="dock" />
               </div>
               <p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-slate-400">
