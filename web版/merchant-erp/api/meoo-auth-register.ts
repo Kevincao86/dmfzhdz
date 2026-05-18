@@ -6,9 +6,9 @@ import {
   isValidLoginName,
   isValidMerchantShortName,
   normalizeCnMobile,
-  verifySmsCode,
 } from '../vite-plugins/authRegistrationOtp.js'
 import { provisionMerchantTenant } from '../vite-plugins/authRegisterProvision.js'
+import { phoneAlreadyRegistered, verifyAuthSmsCode } from '../vite-plugins/authSmsAuthShared.js'
 
 export const config = { maxDuration: 60 }
 
@@ -94,8 +94,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'password_mismatch', message: '两次输入的密码不一致' })
       return
     }
-    if (!verifySmsCode(phone, smsCode)) {
+    if (!(await verifyAuthSmsCode(phone, smsCode))) {
       sendJson(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+      return
+    }
+    if (await phoneAlreadyRegistered(phone)) {
+      sendJson(res, 409, {
+        ok: false,
+        error: 'phone_exists',
+        message: '该手机号已注册，请直接登录',
+      })
       return
     }
 
@@ -118,7 +126,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, status, { ok: false, error: result.error, message, detail: result.detail })
       return
     }
-    sendJson(res, 200, { ok: true, message: '注册成功，请使用登录名与密码登录' })
+    sendJson(res, 200, {
+      ok: true,
+      message: '注册成功，请使用登录名与密码或手机号验证码登录',
+      tenantId: result.tenantId,
+    })
   } catch (e) {
     sendJson(res, 500, {
       ok: false,

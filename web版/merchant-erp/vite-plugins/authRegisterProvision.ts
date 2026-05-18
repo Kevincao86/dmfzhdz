@@ -1,3 +1,4 @@
+import { syncErpTenantToOpsRegistry } from './authRegistrySync.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
 function loginNameToEmail(loginName: string, domain: string): string {
@@ -115,6 +116,14 @@ export async function provisionMerchantTenant(body: {
     await fetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
     return { ok: false, error: 'member_insert_failed', detail: memText.slice(0, 400) }
   }
+
+  await syncErpTenantToOpsRegistry({
+    tenantId,
+    loginName,
+    merchantName,
+    phone: body.phone,
+    trialDays,
+  })
 
   return { ok: true, tenantId, userId, email }
 }

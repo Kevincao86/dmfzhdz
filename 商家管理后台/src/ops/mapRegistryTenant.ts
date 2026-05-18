@@ -26,7 +26,14 @@ export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
     id: t.id,
     companyName: merchantLabel,
     contactName: `${loginLabel}（${tag}）`,
-    phone: t.source === 'erp' ? '同步' : t.source === 'supabase' ? 'Auth' : '—',
+    phone:
+      typeof t.phone === 'string' && t.phone.trim()
+        ? t.phone.trim()
+        : t.source === 'erp'
+          ? '同步'
+          : t.source === 'supabase'
+            ? '—'
+            : '—',
     industry: t.industry || '—',
     registeredAt: fmt(t.registeredAt),
     accountStatus: t.accountStatus,

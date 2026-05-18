@@ -15,6 +15,7 @@ export type SupabaseTenantRow = {
   merchant_name: string
   login_name: string
   user_email: string
+  owner_phone?: string | null
   account_status: string
   trial_days: number
   official_days: number
@@ -112,6 +113,9 @@ export function supabaseRowsToRegistryTenants(rows: SupabaseTenantRow[]): Regist
       const accountStatus: RegistryTenant['accountStatus'] =
         st === 'disabled' || st === 'frozen' ? st : 'normal'
       const email = typeof r.user_email === 'string' ? r.user_email.trim() : ''
+      const phoneRaw =
+        typeof r.owner_phone === 'string' && r.owner_phone.trim() ? r.owner_phone.replace(/\D/g, '') : ''
+      const phone = phoneRaw.length === 11 ? phoneRaw : undefined
       const created = typeof r.created_at === 'string' && r.created_at.trim() ? r.created_at : now
       const updated = typeof r.updated_at === 'string' && r.updated_at.trim() ? r.updated_at : created
       return {
@@ -126,6 +130,7 @@ export function supabaseRowsToRegistryTenants(rows: SupabaseTenantRow[]): Regist
         officialDays: Math.max(0, Number(r.official_days) || 0),
         updatedAt: updated,
         authLoginEmail: email || undefined,
+        phone,
         walletBalanceCents:
           typeof r.wallet_balance_cents === 'number' && Number.isFinite(r.wallet_balance_cents)
             ? Math.max(0, Math.floor(r.wallet_balance_cents))
