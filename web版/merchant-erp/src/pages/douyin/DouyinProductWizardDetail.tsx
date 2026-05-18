@@ -1,9 +1,8 @@
-import { ChevronLeft, Eye, Loader2, Sparkles, Upload, X } from 'lucide-react'
+import { ChevronLeft, Loader2, Sparkles, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DouyinProductAiModelSection from '../../components/douyin/DouyinProductAiModelSection'
 import {
-  DouyinProductFloatingPreview,
-  DouyinProductPreviewAside,
+  DouyinProductScrollFollowPreview,
   type DouyinPreviewComboLine,
 } from '../../components/douyin/DouyinProductMobilePreview'
 import DouyinStorePickerModal from '../../components/store/DouyinStorePickerModal'
@@ -109,7 +108,6 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
   const [purchaseModal, setPurchaseModal] = useState(false)
   const [reserveModal, setReserveModal] = useState(false)
   const [voucherModal, setVoucherModal] = useState(false)
-  const [floatPreviewOpen, setFloatPreviewOpen] = useState(false)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -133,6 +131,8 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
   } = useDouyinProductWizardAi({
     productName: props.productName,
     productDesc: props.productDesc,
+    priceYuan: props.priceYuan,
+    originYuan: props.originYuan,
     setProductName: props.setProductName,
     setProductDesc: props.setProductDesc,
     setHeadUrl: props.setHeadUrl,
@@ -224,20 +224,11 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex-1 min-w-[200px]">
           图片在对应区域展示；售卖/消费/预约等规则会写入<strong>商品说明</strong>并由服务端映射为开放平台字段。
         </div>
-        <button
-          type="button"
-          onClick={() => setFloatPreviewOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
-        >
-          <Eye className="h-4 w-4" />
-          预览
-        </button>
       </div>
 
       <DouyinProductAiModelSection />
 
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1 space-y-6">
+      <div className="space-y-6 xl:pr-[min(20rem,42vw)]">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
           <h3 className="font-semibold text-gray-900">基础信息</h3>
@@ -760,9 +751,9 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
         </button>
       </div>
 
-        </div>
-        <DouyinProductPreviewAside {...previewProps} />
       </div>
+
+      <DouyinProductScrollFollowPreview {...previewProps} />
 
       {props.actionMsg && (
         <p
@@ -864,21 +855,6 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
           props.setVoucherUseLimit(true)
           setVoucherModal(false)
         }}
-      />
-
-      <button
-        type="button"
-        onClick={() => setFloatPreviewOpen(true)}
-        className="fixed bottom-20 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-lg xl:hidden"
-      >
-        <Eye className="h-4 w-4" />
-        预览
-      </button>
-
-      <DouyinProductFloatingPreview
-        open={floatPreviewOpen}
-        onClose={() => setFloatPreviewOpen(false)}
-        {...previewProps}
       />
 
       {imagePreviewUrl ? (
