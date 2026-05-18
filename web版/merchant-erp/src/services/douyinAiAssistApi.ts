@@ -131,6 +131,9 @@ export type AiAssistRequest = {
   listing_title?: string
   /** 生图专用：前端规则解析的主推产品，供网关锁定语义 */
   main_product_heuristic?: string
+  /** 生图专用：售价/划线价（元），代金券券面字样 */
+  price_yuan?: string
+  origin_yuan?: string
   /** 待美化图片 URL 列表（enhance）；单张或多张 */
   image_urls?: string[]
   image_role?: 'head' | 'aux' | 'env'

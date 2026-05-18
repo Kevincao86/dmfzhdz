@@ -8,12 +8,15 @@ import type { ServerResponse } from 'node:http'
 
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import {
+  buildVoucherFaceImagePromptBlock,
   extractMainProductFromListingTitle,
+  getVoucherFaceDisplayText,
   isGroupBuyGoodsProduct,
   isVoucherGoodsProduct,
   isWeakMainProductAnchor,
   mainProductCategoryHints,
   resolveMainProductForImage,
+  voucherImageNegativePrompt,
 } from '../src/lib/douyinProductImageAnchor.js'
 import { defaultModelIdForFamily } from '../src/services/ai/tokenmixClient.js'
 import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
@@ -237,6 +240,7 @@ async function runImageGenerateWithBuiltinFailover(
   lockSuffix: string,
   mainProductAnchor: string,
   goodsTypeCtx?: ImageGoodsTypeCtx,
+  priceCtx?: ImagePriceCtx,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -251,6 +255,7 @@ async function runImageGenerateWithBuiltinFailover(
       lockSuffix,
       mainProductAnchor,
       goodsTypeCtx,
+      priceCtx,
     )
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
@@ -271,6 +276,7 @@ async function runImageGenerateWithBuiltinFailover(
         lockSuffix,
         mainProductAnchor,
         goodsTypeCtx,
+        priceCtx,
       )
       return { urls, modelUsed: alt }
     } catch (e) {
@@ -423,6 +429,7 @@ async function runImageEnhanceWithBuiltinFailover(
   lockSuffix: string,
   mainProductAnchor: string,
   goodsTypeCtx?: ImageGoodsTypeCtx,
+  priceCtx?: ImagePriceCtx,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -441,6 +448,7 @@ async function runImageEnhanceWithBuiltinFailover(
           lockSuffix,
           mainProductAnchor,
           goodsTypeCtx,
+          priceCtx,
         ),
       )
     }
@@ -467,6 +475,7 @@ async function runImageEnhanceWithBuiltinFailover(
             lockSuffix,
             mainProductAnchor,
             goodsTypeCtx,
+            priceCtx,
           ),
         )
       }
@@ -946,6 +955,8 @@ async function resolveMainProductAnchorForImage(
 
 type ImageGoodsTypeCtx = { productType?: number | null; typeLabel?: string }
 
+type ImagePriceCtx = { priceYuan?: string; originYuan?: string }
+
 function buildImagePrompt(
   productName: string,
   titleDraft: string,
@@ -954,6 +965,8 @@ function buildImagePrompt(
   lockSuffix = '',
   mainProductAnchor = '',
   goodsTypeCtx?: ImageGoodsTypeCtx,
+  priceYuan = '',
+  originYuan = '',
 ): string {
   const listingTitle = productName.trim() || '本地生活服务'
   const main =
@@ -972,6 +985,26 @@ function buildImagePrompt(
   const isGroupBuy = isGroupBuyGoodsProduct(goodsTypeCtx?.productType, goodsTypeCtx?.typeLabel)
   const categoryHint = mainProductCategoryHints(main, { isVoucher, isGroupBuy })
   const titleCtx = titleDraft.trim().slice(0, 280)
+  const faceText = getVoucherFaceDisplayText(listingTitle, priceYuan, originYuan)
+
+  if (isVoucher && (imageRole === 'head' || imageRole === 'aux')) {
+    const voucherBlock = buildVoucherFaceImagePromptBlock(
+      faceText || main,
+      extractMainProductFromListingTitle(listingTitle) || main,
+    )
+    const bind = `【标题】${listingTitle.slice(0, 160)}。${titleCtx ? `【次要】${titleCtx.slice(0, 120)}` : ''}`
+    const i2iVoucher = `【图生图·代金券纠偏】若底图为售货机、货架、模型、实景商品，必须全部丢弃，仅按下列券面要求重绘平面代金券。`
+    const base =
+      mode === 'i2i'
+        ? `${i2iVoucher}${voucherBlock}${bind}`
+        : `${voucherBlock}${bind}构图适合手机团购列表首图，无违规水印。`
+    let out = base
+    if (imageRole === 'aux') {
+      out = `${base}可作为辅助图，仍为券面或核销示意风格。`
+    }
+    return lockSuffix ? `${out}${lockSuffix}` : out
+  }
+
   const stepOne = `【两步流程·必须遵守】①已从商品标题解析主推产品：「${main}」。②成片、场景、道具必须仅服务该主推，不得偷换为其它单品或无关业态。${categoryHint}`
   const bind = `${stepOne}\n【硬性锚定】团购标题原文：「${listingTitle.slice(0, 200)}」。${titleCtx ? `补充上下文（次要，不得偏离主推）：${titleCtx}` : ''}禁止：手机/电脑/平板等数码特写、与主推无关的卖场货架特写、展厅样板间、奢侈品橱窗、办公室工位、空镜走廊等占位画面。`
   const i2iLocalLife = `【图生图·主图纠偏】用户上传图仅作构图、色调或清晰度参考。若原图主体、场景或品类与上文「主推产品」明显不符（例如无关展厅、卖场、数码、办公、与主推无关的室内空景），须视为错误底图：必须丢弃原图错误主体，按「${main}」重绘，禁止把错误场景「美化延续」成片。若原图与主推大致一致，可在不偏离锚定前提下提升清晰度、色彩与质感。`
@@ -988,6 +1021,18 @@ function buildImagePrompt(
     out = `${base}主图/头图风格，构图留白适中；再次强调主推产品：「${main.slice(0, 80)}${main.length > 80 ? '…' : ''}」。`
   }
   return lockSuffix ? `${out}${lockSuffix}` : out
+}
+
+function imagePromptVoucherOpts(
+  goodsTypeCtx?: ImageGoodsTypeCtx,
+  listingTitle?: string,
+): { voucherFaceMode: boolean; forceT2i: boolean } {
+  const isVoucher = isVoucherGoodsProduct(
+    goodsTypeCtx?.productType,
+    goodsTypeCtx?.typeLabel,
+    listingTitle,
+  )
+  return { voucherFaceMode: isVoucher, forceT2i: isVoucher }
 }
 
 /** 从商品创建向导传入：锁死前两步的类目与商品类型，避免模型幻觉改业态 */
@@ -1106,18 +1151,26 @@ async function qwenWanxOneImage(
   env: MerchantAiEnv,
   prompt: string,
   refImageUrl?: string,
+  opts?: { voucherFaceMode?: boolean; forceT2i?: boolean },
 ): Promise<string> {
   const input: Record<string, unknown> = { prompt }
   let parameterExtras: Record<string, unknown> | undefined
-  if (refImageUrl) {
+  const useRef = refImageUrl && !opts?.forceT2i
+  const voucherNeg = voucherImageNegativePrompt()
+  if (useRef) {
     input.ref_image = refImageUrl
-    input.negative_prompt =
-      '模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮'
-    parameterExtras = { ref_strength: qwenI2iRefStrength(env), ref_mode: 'repaint' }
+    input.negative_prompt = opts?.voucherFaceMode
+      ? `${voucherNeg}, 模糊, 低质量, 畸形文字`
+      : '模糊, 低质量, 畸形文字, 水印, 与商品无关的展厅, 卖场内景, 样板间, 办公室, 工位, 数码卖场, 奢侈品橱窗, 空镜走廊, 无关餐饮'
+    parameterExtras = {
+      ref_strength: opts?.voucherFaceMode ? 0.18 : qwenI2iRefStrength(env),
+      ref_mode: 'repaint',
+    }
   } else {
     parameterExtras = {
-      negative_prompt:
-        '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位',
+      negative_prompt: opts?.voucherFaceMode
+        ? `${voucherNeg}, 手机, 数码, 低分辨率, 水印`
+        : '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位',
     }
   }
   const taskId = await qwenWanxCreateTask(apiKey, env, input, parameterExtras)
@@ -1204,6 +1257,7 @@ async function runImageGenerate(
   lockSuffix = '',
   mainProductAnchor = '',
   goodsTypeCtx?: ImageGoodsTypeCtx,
+  priceCtx?: ImagePriceCtx,
 ): Promise<string[]> {
   const prompt = buildImagePrompt(
     productName,
@@ -1213,9 +1267,14 @@ async function runImageGenerate(
     lockSuffix,
     mainProductAnchor,
     goodsTypeCtx,
+    priceCtx?.priceYuan ?? '',
+    priceCtx?.originYuan ?? '',
   )
+  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, productName)
   if (model === 'qwen') {
-    const u = await qwenWanxOneImage(key, env, prompt)
+    const u = await qwenWanxOneImage(key, env, prompt, undefined, {
+      voucherFaceMode: vOpts.voucherFaceMode,
+    })
     return [u]
   }
   if (model === 'minimax') {
@@ -1226,7 +1285,7 @@ async function runImageGenerate(
       aspect_ratio: '1:1',
       response_format: 'url',
       n: 1,
-      prompt_optimizer: true,
+      prompt_optimizer: !vOpts.voucherFaceMode,
     })
   }
   if (model === 'doubao') {
@@ -1252,6 +1311,7 @@ async function runImageEnhanceOne(
   lockSuffix = '',
   mainProductAnchor = '',
   goodsTypeCtx?: ImageGoodsTypeCtx,
+  priceCtx?: ImagePriceCtx,
 ): Promise<string> {
   const prompt = buildImagePrompt(
     productName,
@@ -1261,9 +1321,15 @@ async function runImageEnhanceOne(
     lockSuffix,
     mainProductAnchor,
     goodsTypeCtx,
+    priceCtx?.priceYuan ?? '',
+    priceCtx?.originYuan ?? '',
   )
+  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, productName)
   if (model === 'qwen') {
-    return qwenWanxOneImage(key, env, prompt, _sourceUrl)
+    return qwenWanxOneImage(key, env, prompt, vOpts.forceT2i ? undefined : _sourceUrl, {
+      voucherFaceMode: vOpts.voucherFaceMode,
+      forceT2i: vOpts.forceT2i,
+    })
   }
   if (model === 'minimax') {
     const mmModel = minimaxImageModelId(env)
@@ -1283,13 +1349,14 @@ async function runImageEnhanceOne(
   }
   if (model === 'doubao') {
     const imgModel = doubaoImageModelId(env)
-    const urls = await doubaoSeedreamUrls(env, key, {
+    const payload: Record<string, unknown> = {
       model: imgModel,
       prompt,
-      image: _sourceUrl,
       size: '2K',
       response_format: 'url',
-    })
+    }
+    if (!vOpts.forceT2i) payload.image = _sourceUrl
+    const urls = await doubaoSeedreamUrls(env, key, payload)
     return urls[0]!
   }
   throw new Error(`不支持的图生图 model：${model}`)
@@ -1859,6 +1926,10 @@ export async function handleDouyinGoodsAiAssist(
       const mainProductAnchor = await resolveMainProductAnchorForImage(env, body, productName)
       const imageLockSuffix =
         goodsLock + `\n\n【主推产品·已从商品标题解析】${mainProductAnchor}`
+      const priceCtx: ImagePriceCtx = {
+        priceYuan: String(body.price_yuan ?? '').trim(),
+        originYuan: String(body.origin_yuan ?? '').trim(),
+      }
       if (action === 'image_generate') {
         const { urls, modelUsed } = await runImageGenerateWithBuiltinFailover(
           model,
@@ -1870,6 +1941,7 @@ export async function handleDouyinGoodsAiAssist(
           imageLockSuffix,
           mainProductAnchor,
           goodsTypeCtx,
+          priceCtx,
         )
         json(res, 200, {
           ok: true,
@@ -1889,6 +1961,7 @@ export async function handleDouyinGoodsAiAssist(
         imageLockSuffix,
         mainProductAnchor,
         goodsTypeCtx,
+        priceCtx,
       )
       json(res, 200, {
         ok: true,

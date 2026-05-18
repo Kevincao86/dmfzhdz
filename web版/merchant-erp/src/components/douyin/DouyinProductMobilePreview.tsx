@@ -1,5 +1,5 @@
 import { Move, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import { inferVoucherPricesFromTitle } from '../../lib/douyinProductImageAnchor'
 import { buildTradeRuleDescriptionLines, type DouyinProductFormRules } from '../../lib/douyinProductRuleText'
@@ -198,7 +198,85 @@ export function DouyinProductMobilePreviewFrame(props: Props) {
   )
 }
 
-/** 大屏侧栏内嵌预览 */
+/** 悬浮预览：随页面滚动与鼠标纵向位置在视口内移动 */
+export function DouyinProductScrollFollowPreview(props: Props) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [top, setTop] = useState(88)
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    if (collapsed) return
+    let raf = 0
+    const clampTop = (y: number) => {
+      const h = panelRef.current?.offsetHeight ?? 420
+      const margin = 12
+      const minTop = 64
+      const maxTop = Math.max(minTop, window.innerHeight - h - margin)
+      return Math.max(minTop, Math.min(maxTop, y))
+    }
+    const onScroll = () => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        setTop(clampTop(window.scrollY + 72))
+      })
+    }
+    const onMouseMove = (e: MouseEvent) => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => {
+        setTop(clampTop(e.clientY - 100))
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('mousemove', onMouseMove, { passive: true })
+    onScroll()
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('mousemove', onMouseMove)
+    }
+  }, [collapsed])
+
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        className="fixed right-4 z-[54] rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+        style={{ top }}
+        onClick={() => setCollapsed(false)}
+      >
+        展开 C 端预览
+      </button>
+    )
+  }
+
+  return (
+    <div
+      ref={panelRef}
+      className={cn(
+        'fixed right-4 z-[54] w-[min(100vw-2rem,300px)] rounded-xl border border-gray-200 bg-white shadow-2xl',
+        props.className,
+      )}
+      style={{ top }}
+    >
+      <div className="flex items-center justify-between border-b bg-gray-50 px-3 py-2">
+        <span className="text-xs font-semibold text-gray-800">C 端预览</span>
+        <button
+          type="button"
+          className="rounded px-2 py-0.5 text-[10px] text-gray-500 hover:bg-gray-200"
+          onClick={() => setCollapsed(true)}
+        >
+          收起
+        </button>
+      </div>
+      <div className="max-h-[min(70vh,520px)] overflow-y-auto p-3">
+        <DouyinProductMobilePreviewFrame {...props} embedded />
+        <p className="mt-2 text-center text-[10px] text-gray-400">随滚动/鼠标移动 · 布局参考抖音来客团购页</p>
+      </div>
+    </div>
+  )
+}
+
+/** @deprecated 侧栏内嵌，请用 DouyinProductScrollFollowPreview */
 export function DouyinProductPreviewAside(props: Props) {
   return (
     <aside className={cn('hidden xl:block', props.className)}>

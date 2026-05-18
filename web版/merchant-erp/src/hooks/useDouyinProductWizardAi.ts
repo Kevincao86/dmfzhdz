@@ -22,6 +22,8 @@ const MAX_ENV = 10
 export function useDouyinProductWizardAi(params: {
   productName: string
   productDesc: string
+  priceYuan?: string
+  originYuan?: string
   setProductName: (v: string) => void
   setProductDesc: (v: string) => void
   setHeadUrl: (v: string) => void
@@ -50,11 +52,16 @@ export function useDouyinProductWizardAi(params: {
 
   const imageAssistFields = useCallback(() => {
     const ctx = params.goodsContext
-    return buildImageAssistTextFields(params.productName, params.productDesc, {
+    const base = buildImageAssistTextFields(params.productName, params.productDesc, {
       productType: ctx?.goods_product_type,
       productTypeLabel: ctx?.goods_product_type_label,
     })
-  }, [params.productName, params.productDesc, params.goodsContext])
+    return {
+      ...base,
+      price_yuan: params.priceYuan?.trim() || undefined,
+      origin_yuan: params.originYuan?.trim() || undefined,
+    }
+  }, [params.productName, params.productDesc, params.priceYuan, params.originYuan, params.goodsContext])
 
   const postAssist = useCallback(
     async (body: Omit<AiAssistRequest, 'model'>) => {
