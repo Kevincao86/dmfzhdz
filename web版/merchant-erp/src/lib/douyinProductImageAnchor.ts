@@ -132,15 +132,50 @@ export function voucherVisualTitleForImagePrompt(listingTitle: string): string {
   return '代金券'
 }
 
+export type VoucherPriceHint = { sale?: number; origin?: number }
+
+/** 合并标题解析与表单售价/划线价 */
+export function resolveVoucherPriceHint(
+  listingTitle: string,
+  priceYuan?: string,
+  originYuan?: string,
+): VoucherPriceHint {
+  const fromTitle = inferVoucherPricesFromTitle(listingTitle)
+  const sale = Number.parseFloat(String(priceYuan ?? '').trim())
+  const origin = Number.parseFloat(String(originYuan ?? '').trim())
+  return {
+    sale: Number.isFinite(sale) && sale > 0 ? sale : fromTitle.sale,
+    origin: Number.isFinite(origin) && origin > 0 ? origin : fromTitle.origin,
+  }
+}
+
 /** 代金券专用生图指令（平面券面，非实景） */
-export function buildVoucherFaceImagePromptBlock(faceText: string, subtitle?: string): string {
+export function buildVoucherFaceImagePromptBlock(
+  faceText: string,
+  subtitle?: string,
+  priceHint?: VoucherPriceHint,
+): string {
   const face = faceText.trim() || '代金券'
   const sub = (subtitle ?? '团购代金券').trim().slice(0, 24)
-  return `Flat 2D digital coupon voucher poster, local life group-buy, NO photo, NO 3D diorama, NO vending machine, NO supermarket shelf.
+  const sale = priceHint?.sale
+  const origin = priceHint?.origin
+  const priceSemantics =
+    sale != null && origin != null && sale > 0 && origin > 0
+      ? `【面额语义·必遵守】「${sale}代${origin}」= 顾客实付${sale}元、享${origin}元抵扣额度；券面主字写「${face}」或「${sale}代${origin}」。严禁写成「满${sale}元使用」、严禁只写「¥${origin}」而无「代」字。`
+      : ''
+  return `Flat 2D digital coupon voucher poster, local life Douyin group-buy voucher face only. NO photo, NO 3D diorama, NO vending machine, NO supermarket shelf, NO retail scene.
 【画面类型·最高优先级】团购代金券平面主图（扁平插画/券面设计，禁止摄影实景与微缩模型场景）。
+${priceSemantics}
 【券面主文案·必须清晰可读】超大号中文：「${face}」${sub && sub !== face ? `，副标「${sub}」` : ''}。
 【视觉】红橙金渐变券体、圆角、简洁背景；可有「到店核销」小字。
 【严禁】自动售货机、货架、超市、日用百货陈列、玩具模型、建筑模型、餐饮、人物、办公室、展厅。`
+}
+
+/** 代金券生图尾部锁定：不含类目路径，避免「日用百货」诱发卖场实景 */
+export function buildVoucherImageLockSuffix(anchor: string, typeLabel?: string): string {
+  const typeBit = (typeLabel ?? '').trim() || '代金券'
+  const a = anchor.trim() || '代金券'
+  return `\n\n【商品类型·${typeBit}】券面主图锁定。主文案必须与标题面额一致：「${a}」。禁止满额门槛券式文案（如仅「满90元使用」）；禁止售货机、货架、超市、百货陈列、3D 模型店实景。`
 }
 
 /** 从团购标题抽取品类/券种描述（去掉满减等，保留「通用代金券」等） */
@@ -177,7 +212,13 @@ export function resolveMainProductForImage(input: {
 
   if (isVoucher && denom) {
     const category = extractMainProductFromListingTitle(listing)
-    if (category && !category.includes(denom) && category.length <= 40) {
+    const retailNoise = /百货|超市|购物|便利|卖场|零售|售货|货架/.test(category)
+    if (
+      category &&
+      !category.includes(denom) &&
+      category.length <= 40 &&
+      !retailNoise
+    ) {
       return `${denom}（${category}）`.slice(0, 120)
     }
     return denom.slice(0, 120)
@@ -257,7 +298,7 @@ export function buildImageAssistTextFields(
       : titleCore
 
   return {
-    product_name: listing,
+    product_name: isVoucher ? voucherVisualTitleForImagePrompt(listing) : listing,
     title_draft,
     listing_title: listing,
     main_product_heuristic: main,

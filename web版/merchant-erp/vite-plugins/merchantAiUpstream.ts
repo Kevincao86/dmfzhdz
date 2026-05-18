@@ -9,8 +9,10 @@ import type { ServerResponse } from 'node:http'
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import {
   buildVoucherFaceImagePromptBlock,
+  buildVoucherImageLockSuffix,
   extractMainProductFromListingTitle,
   getVoucherFaceDisplayText,
+  resolveVoucherPriceHint,
   voucherVisualTitleForImagePrompt,
   isGroupBuyGoodsProduct,
   isVoucherGoodsProduct,
@@ -242,6 +244,7 @@ async function runImageGenerateWithBuiltinFailover(
   mainProductAnchor: string,
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
+  listingTitle = '',
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -257,6 +260,7 @@ async function runImageGenerateWithBuiltinFailover(
       mainProductAnchor,
       goodsTypeCtx,
       priceCtx,
+      listingTitle,
     )
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
@@ -278,6 +282,7 @@ async function runImageGenerateWithBuiltinFailover(
         mainProductAnchor,
         goodsTypeCtx,
         priceCtx,
+        listingTitle,
       )
       return { urls, modelUsed: alt }
     } catch (e) {
@@ -431,6 +436,7 @@ async function runImageEnhanceWithBuiltinFailover(
   mainProductAnchor: string,
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
+  listingTitle = '',
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -450,6 +456,7 @@ async function runImageEnhanceWithBuiltinFailover(
           mainProductAnchor,
           goodsTypeCtx,
           priceCtx,
+          listingTitle,
         ),
       )
     }
@@ -477,6 +484,7 @@ async function runImageEnhanceWithBuiltinFailover(
             mainProductAnchor,
             goodsTypeCtx,
             priceCtx,
+            listingTitle,
           ),
         )
       }
@@ -968,8 +976,9 @@ function buildImagePrompt(
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceYuan = '',
   originYuan = '',
+  listingTitleOverride = '',
 ): string {
-  const listingTitle = productName.trim() || '本地生活服务'
+  const listingTitle = (listingTitleOverride || productName).trim() || '本地生活服务'
   const main =
     mainProductAnchor.trim() ||
     resolveMainProductForImage({
@@ -991,11 +1000,13 @@ function buildImagePrompt(
   const voucherVisual = voucherVisualTitleForImagePrompt(listingTitle)
 
   if (isVoucher && (imageRole === 'head' || imageRole === 'aux')) {
+    const priceHint = resolveVoucherPriceHint(listingTitle, priceYuan, originYuan)
     const voucherBlock = buildVoucherFaceImagePromptBlock(
       faceText || main,
       voucherVisual,
+      priceHint,
     )
-    const bind = `【券面语义】${voucherVisual}。禁止根据「百货/购物/超市」生成实物场景。`
+    const bind = `【券面语义】${voucherVisual}。禁止根据「百货/购物/超市/便利」生成实物场景或微缩卖场。`
     const i2iVoucher = `【图生图·代金券纠偏】若底图为售货机、货架、模型、实景商品，必须全部丢弃，仅按下列券面要求重绘平面代金券。`
     const base =
       mode === 'i2i'
@@ -1261,7 +1272,9 @@ async function runImageGenerate(
   mainProductAnchor = '',
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
+  listingTitle = '',
 ): Promise<string[]> {
+  const listing = listingTitle.trim() || productName
   const prompt = buildImagePrompt(
     productName,
     titleDraft,
@@ -1272,8 +1285,9 @@ async function runImageGenerate(
     goodsTypeCtx,
     priceCtx?.priceYuan ?? '',
     priceCtx?.originYuan ?? '',
+    listing,
   )
-  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, productName)
+  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, listing)
   if (model === 'qwen') {
     const u = await qwenWanxOneImage(key, env, prompt, undefined, {
       voucherFaceMode: vOpts.voucherFaceMode,
@@ -1315,7 +1329,9 @@ async function runImageEnhanceOne(
   mainProductAnchor = '',
   goodsTypeCtx?: ImageGoodsTypeCtx,
   priceCtx?: ImagePriceCtx,
+  listingTitle = '',
 ): Promise<string> {
+  const listing = listingTitle.trim() || productName
   const prompt = buildImagePrompt(
     productName,
     titleDraft,
@@ -1326,8 +1342,9 @@ async function runImageEnhanceOne(
     goodsTypeCtx,
     priceCtx?.priceYuan ?? '',
     priceCtx?.originYuan ?? '',
+    listing,
   )
-  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, productName)
+  const vOpts = imagePromptVoucherOpts(goodsTypeCtx, listing)
   if (model === 'qwen') {
     return qwenWanxOneImage(key, env, prompt, vOpts.forceT2i ? undefined : _sourceUrl, {
       voucherFaceMode: vOpts.voucherFaceMode,
@@ -1787,13 +1804,33 @@ export async function handleDouyinGoodsAiAssist(
   const action = String(body.action ?? '')
   const requestedVendor = normalizeAiModelPreserveCustom(body.model)
   const isImageAction = action === 'image_generate' || action === 'image_enhance'
+  const listingTitle =
+    String(body.listing_title ?? body.product_name ?? '').trim() || '本店服务'
+  const productName = String(body.product_name ?? '').trim() || listingTitle
+  const titleDraft = String(body.title_draft ?? '').trim() || productName
+  const imageRoleEarly = String(body.image_role ?? 'head').trim() || 'head'
+  const ptEarlyRaw = body.goods_product_type
+  const ptEarlyNum =
+    typeof ptEarlyRaw === 'number' && Number.isFinite(ptEarlyRaw)
+      ? ptEarlyRaw
+      : typeof ptEarlyRaw === 'string' && String(ptEarlyRaw).trim()
+        ? Number(String(ptEarlyRaw).trim())
+        : NaN
+  const typeLabelEarly = String(body.goods_product_type_label ?? '').trim()
+  const isVoucherImageEarly =
+    isVoucherGoodsProduct(
+      Number.isFinite(ptEarlyNum) ? ptEarlyNum : null,
+      typeLabelEarly,
+      listingTitle,
+    ) && (imageRoleEarly === 'head' || imageRoleEarly === 'aux')
+  const imageVendorPickOrder = isVoucherImageEarly
+    ? imageVendorOrderPreferring(env, 'qwen')
+    : imageVendorOrder(env)
   const model = isImageAction
     ? isDouyinAssistAiVendorId(requestedVendor)
       ? requestedVendor
-      : pickPrimaryVendorWithKey(env, imageVendorOrder(env))
+      : pickPrimaryVendorWithKey(env, imageVendorPickOrder)
     : resolveGoodsAssistTextModel(requestedVendor, env)
-  const productName = String(body.product_name ?? '').trim() || '本店服务'
-  const titleDraft = String(body.title_draft ?? '').trim() || productName
   const imageUrls = Array.isArray(body.image_urls)
     ? (body.image_urls as unknown[]).map((x) => String(x)).filter(Boolean)
     : []
@@ -1927,8 +1964,15 @@ export async function handleDouyinGoodsAiAssist(
         typeLabel: String(body.goods_product_type_label ?? '').trim(),
       }
       const mainProductAnchor = await resolveMainProductAnchorForImage(env, body, productName)
-      const imageLockSuffix =
-        goodsLock + `\n\n【主推产品·已从商品标题解析】${mainProductAnchor}`
+      const isVoucherFaceImage =
+        isVoucherGoodsProduct(
+          goodsTypeCtx.productType,
+          goodsTypeCtx.typeLabel,
+          listingTitle,
+        ) && (imageRole === 'head' || imageRole === 'aux')
+      const imageLockSuffix = isVoucherFaceImage
+        ? buildVoucherImageLockSuffix(mainProductAnchor, goodsTypeCtx.typeLabel)
+        : goodsLock + `\n\n【主推产品·已从商品标题解析】${mainProductAnchor}`
       const priceCtx: ImagePriceCtx = {
         priceYuan: String(body.price_yuan ?? '').trim(),
         originYuan: String(body.origin_yuan ?? '').trim(),
@@ -1945,6 +1989,7 @@ export async function handleDouyinGoodsAiAssist(
           mainProductAnchor,
           goodsTypeCtx,
           priceCtx,
+          listingTitle,
         )
         json(res, 200, {
           ok: true,
@@ -1955,7 +2000,7 @@ export async function handleDouyinGoodsAiAssist(
             voucher_mode: isVoucherGoodsProduct(
               goodsTypeCtx.productType,
               goodsTypeCtx.typeLabel,
-              productName,
+              listingTitle,
             ),
             main_product_anchor: mainProductAnchor,
           },
@@ -1975,6 +2020,7 @@ export async function handleDouyinGoodsAiAssist(
         mainProductAnchor,
         goodsTypeCtx,
         priceCtx,
+        listingTitle,
       )
       json(res, 200, {
         ok: true,
@@ -1985,7 +2031,7 @@ export async function handleDouyinGoodsAiAssist(
           voucher_mode: isVoucherGoodsProduct(
             goodsTypeCtx.productType,
             goodsTypeCtx.typeLabel,
-            productName,
+            listingTitle,
           ),
           main_product_anchor: mainProductAnchor,
         },
