@@ -2,6 +2,7 @@
  * 抖音来客 template.get / goods.save 的 Notification（使用规则）须为 NotificationStruct 列表 JSON。
  * @see NotificationStruct { title, content }；goods/save 示例可传 "[]"
  */
+import { sanitizeDouyinProductDescriptionCompliance } from './douyinDescCompliance.js'
 import { stripDouyinDescriptionUnsafeChars } from './douyinDescriptionNormalize.js'
 
 export function isDouyinNotificationAttrJson(raw: string): boolean {
@@ -24,7 +25,9 @@ export function isDouyinNotificationAttrJson(raw: string): boolean {
 
 export function encodeDouyinNotificationJson(title: string, content: string): string {
   const t = title.trim().slice(0, 200) || '使用规则'
-  const cleaned = stripDouyinDescriptionUnsafeChars(content.trim().slice(0, 12_000) || '欢迎到店体验，详询门店。')
+  const cleaned = sanitizeDouyinProductDescriptionCompliance(
+    stripDouyinDescriptionUnsafeChars(content.trim().slice(0, 12_000) || '欢迎到店体验，详询门店。'),
+  )
   const lines = cleaned
     .split(/\n+/)
     .map((x) => x.trim())

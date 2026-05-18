@@ -2546,6 +2546,55 @@ function syntheticGoodlifeVoucherTemplateAttrsBundle(): {
       is_multi: false,
       is_required: false,
     },
+    {
+      key: 'use_date',
+      name: '顾客可消费日期',
+      value_type: 'USE_DATE',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'use_time',
+      name: '每日消费时段',
+      value_type: 'USE_TIME',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'can_no_use_date',
+      name: '顾客不可消费日期',
+      value_type: 'CAN_NO_USE_DATE',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'appointment',
+      name: '预约信息',
+      value_type: 'APPOINTMENT',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'RefundPolicy',
+      name: '售后政策',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: true,
+    },
+    {
+      key: 'show_channel',
+      name: '投放渠道',
+      value_type: 'INT',
+      is_multi: false,
+      is_required: false,
+    },
+    {
+      key: 'limit_use_rule',
+      name: '限制使用规则',
+      value_type: 'LIMIT_USE_RULE',
+      is_multi: false,
+      is_required: true,
+    },
   ]
   const skuAttrs: Record<string, unknown>[] = [
     {
@@ -2566,6 +2615,13 @@ function syntheticGoodlifeVoucherTemplateAttrsBundle(): {
       key: 'stock_qty',
       name: '库存',
       value_type: 'INT',
+      is_multi: false,
+      is_required: false,
+    },
+    {
+      key: 'limit_rule',
+      name: '限购规则',
+      value_type: 'LIMIT_RULE',
       is_multi: false,
       is_required: false,
     },
@@ -3586,7 +3642,9 @@ function mergeGoodlifeProductAttrMapFromErp(
     }
 
     if (/^limit_use_rule$/i.test(key) || vt === 'LIMIT_USE_RULE') {
-      out[key] = douyinLimitUseRuleJson(false)
+      const voucherLimit = consume.voucher_limit === true
+      const voucherMax = Math.max(1, Math.floor(Number(consume.voucher_max) || 1))
+      out[key] = voucherLimit ? douyinLimitUseRuleJson(true, voucherMax) : douyinLimitUseRuleJson(false)
       continue
     }
 
@@ -3677,7 +3735,9 @@ function mergeGoodlifeProductAttrMapFromErp(
     if (!Boolean(a.is_required)) continue
     const vt = String(a.value_type ?? '').toUpperCase()
     if (/^limit_use_rule$/i.test(key) || vt === 'LIMIT_USE_RULE') {
-      out[key] = douyinLimitUseRuleJson(false)
+      const voucherLimit = consume.voucher_limit === true
+      const voucherMax = Math.max(1, Math.floor(Number(consume.voucher_max) || 1))
+      out[key] = voucherLimit ? douyinLimitUseRuleJson(true, voucherMax) : douyinLimitUseRuleJson(false)
       continue
     }
     if (/^notification$/i.test(key) || vt === 'NOTIFICATION') {

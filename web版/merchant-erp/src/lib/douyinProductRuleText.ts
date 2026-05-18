@@ -1,3 +1,5 @@
+import { sanitizeDouyinProductDescriptionCompliance } from './douyinDescCompliance.js'
+
 /**
  * 将售卖/消费/预约等规则整理为「商品说明」附录，供 description_rich_text / Notification 展示。
  * 网关仍按 trade_rules / sales_info 写入 use_date、use_time、limit_use_rule 等 OpenAPI 字段。
@@ -161,7 +163,7 @@ export function composeProductDescWithRules(
   userDesc: string,
   rules: DouyinProductFormRules,
 ): string {
-  const base = String(userDesc ?? '').trim()
+  const base = sanitizeDouyinProductDescriptionCompliance(String(userDesc ?? '').trim())
   const ruleLines = buildTradeRuleDescriptionLines(rules)
   const block = ruleLines.join('\n')
   if (!block) return base
