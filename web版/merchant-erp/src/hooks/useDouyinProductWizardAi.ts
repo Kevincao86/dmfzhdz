@@ -4,7 +4,10 @@ import {
   type AiAssistRequest,
   type AiModelId,
 } from '../services/douyinAiAssistApi'
-import { buildImageAssistTextFields } from '../lib/douyinProductImageAnchor'
+import {
+  buildImageAssistTextFields,
+  isVoucherGoodsProduct,
+} from '../lib/douyinProductImageAnchor'
 import { resolveModelForAssistAction } from '../services/merchantAiModelStorage'
 
 export type AiGoodsContext = {
@@ -73,14 +76,22 @@ export function useDouyinProductWizardAi(params: {
       })
       if (r.ok) {
         const meta = 'image_meta' in r ? r.image_meta : undefined
-        if (
-          meta &&
-          meta.requested_model !== meta.resolved_model &&
-          (body.action === 'image_generate' || body.action === 'image_enhance')
-        ) {
-          console.info(
-            `[商品生图] 手选「${meta.requested_model}」未接像素引擎，已使用 ${meta.resolved_model}；代金券模式=${meta.voucher_mode}，锚点=${meta.main_product_anchor}`,
+        if (body.action === 'image_generate' || body.action === 'image_enhance') {
+          if (meta?.requested_model !== meta?.resolved_model) {
+            console.info(
+              `[商品生图] 手选「${meta?.requested_model}」未接像素引擎，已使用 ${meta?.resolved_model}；代金券模式=${meta?.voucher_mode}，锚点=${meta?.main_product_anchor}`,
+            )
+          }
+          const listing = String(body.listing_title ?? body.product_name ?? '').trim()
+          const ctx = params.goodsContext
+          const shouldVoucher = isVoucherGoodsProduct(
+            ctx?.goods_product_type,
+            ctx?.goods_product_type_label,
+            listing,
           )
+          if (shouldVoucher && meta && !meta.voucher_mode) {
+            console.warn('[商品生图] 标题/类型似代金券，但网关未进入券面模式，请检查商品类型与标题')
+          }
         }
         return r
       }
