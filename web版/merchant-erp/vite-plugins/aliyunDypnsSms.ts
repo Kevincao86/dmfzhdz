@@ -2,8 +2,23 @@
  * 阿里云号码认证服务（Dypnsapi）短信验证码：SendSmsVerifyCode / CheckSmsVerifyCode
  * @see https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode
  */
-import Dypnsapi20170525, * as $Dypnsapi from '@alicloud/dypnsapi20170525'
-import { Config } from '@alicloud/openapi-client'
+import DypnsapiModule from '@alicloud/dypnsapi20170525'
+import { $OpenApiUtil } from '@alicloud/openapi-core'
+
+/** Vercel ESM 加载 CJS SDK 时需取 .default */
+function resolveSdkCtor<T extends new (config: $OpenApiUtil.Config) => {
+  sendSmsVerifyCode: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
+  checkSmsVerifyCode: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
+}>(mod: unknown): T {
+  if (typeof mod === 'function') return mod as T
+  if (mod && typeof mod === 'object' && 'default' in mod) {
+    const d = (mod as { default: unknown }).default
+    if (typeof d === 'function') return d as T
+  }
+  throw new Error('Dypnsapi SDK constructor unavailable')
+}
+
+const DypnsClient = resolveSdkCtor(DypnsapiModule)
 
 export function aliyunSmsConfigured(): boolean {
   return !!(
@@ -14,40 +29,54 @@ export function aliyunSmsConfigured(): boolean {
   )
 }
 
-function createClient(): Dypnsapi20170525 {
-  return new Dypnsapi20170525(
-    new Config({
-      accessKeyId: process.env.ALIBABA_CLOUD_ACCESS_KEY_ID!.trim(),
-      accessKeySecret: process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET!.trim(),
-      endpoint: (process.env.ALIYUN_DYPNS_ENDPOINT ?? 'dypnsapi.aliyuncs.com').trim(),
-    }),
+function createClient(): InstanceType<typeof DypnsClient> {
+  const config = new $OpenApiUtil.Config({
+    accessKeyId: process.env.ALIBABA_CLOUD_ACCESS_KEY_ID!.trim(),
+    accessKeySecret: process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET!.trim(),
+    endpoint: (process.env.ALIYUN_DYPNS_ENDPOINT ?? 'dypnsapi.aliyuncs.com').trim(),
+  })
+  return new DypnsClient(config)
+}
+
+/** 赠送模板 100001 需 code + min；可用环境变量覆盖 */
+function defaultTemplateParam(): string {
+  return (
+    process.env.ALIYUN_DYPNS_TEMPLATE_PARAM?.trim() ||
+    '{"code":"##code##","min":"5"}'
   )
 }
 
-function apiMessage(body: { code?: string; message?: string; Message?: string } | undefined): string {
+function apiMessage(body: Record<string, unknown> | undefined): string {
   if (!body) return 'unknown'
-  return String(body.message ?? body.Message ?? body.code ?? 'unknown')
+  const msg = body.message ?? body.Message ?? body.code
+  return String(msg ?? 'unknown')
+}
+
+function isOkBody(body: Record<string, unknown> | undefined): boolean {
+  if (!body) return false
+  return body.code === 'OK' || body.Code === 'OK' || body.success === true || body.Success === true
 }
 
 export async function sendAliyunSmsVerifyCode(
   phone: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const client = createClient()
-  const req = new $Dypnsapi.SendSmsVerifyCodeRequest({
+  const req: Record<string, unknown> = {
     phoneNumber: phone,
     countryCode: '86',
     signName: process.env.ALIYUN_DYPNS_SIGN_NAME!.trim(),
     templateCode: process.env.ALIYUN_DYPNS_TEMPLATE_CODE!.trim(),
-    templateParam: process.env.ALIYUN_DYPNS_TEMPLATE_PARAM?.trim() || '{"code":"##code##"}',
+    templateParam: defaultTemplateParam(),
     codeLength: 6,
+    codeType: 1,
     validTime: 300,
     interval: 60,
     duplicatePolicy: 1,
-  })
+  }
   try {
     const res = await client.sendSmsVerifyCode(req)
-    const body = res.body
-    if (body?.code === 'OK' || body?.success === true) {
+    const body = (res.body ?? res) as Record<string, unknown>
+    if (isOkBody(body)) {
       return { ok: true }
     }
     return { ok: false, message: apiMessage(body) }
@@ -61,15 +90,15 @@ export async function checkAliyunSmsVerifyCode(
   code: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const client = createClient()
-  const req = new $Dypnsapi.CheckSmsVerifyCodeRequest({
+  const req: Record<string, unknown> = {
     phoneNumber: phone,
     countryCode: '86',
     verifyCode: code.trim(),
-  })
+  }
   try {
     const res = await client.checkSmsVerifyCode(req)
-    const body = res.body
-    if (body?.code === 'OK' || body?.success === true) {
+    const body = (res.body ?? res) as Record<string, unknown>
+    if (isOkBody(body)) {
       return { ok: true }
     }
     return { ok: false, message: apiMessage(body) }
