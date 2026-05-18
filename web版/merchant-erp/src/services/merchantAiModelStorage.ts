@@ -71,10 +71,7 @@ function normalizeImageModelStored(raw: string | null | undefined): string {
   return pickAutoResolvedImageModel()
 }
 
-/**
- * 商品 AI 生图/修图：仅解析为网关已接的像素引擎（万相 / 豆包 Seedream / MiniMax）。
- * OpenAI·DALL·E、Claude 图像等 TokenMix 项在智能体页可用，但本接口不会调用它们（此前误传 openai 导致静默回落且 UI 误导）。
- */
+/** 商品 assist 内置生图：万相 / 豆包 / MiniMax；TokenMix（OpenAI 等）由向导走 /api/meoo-ai-agent-image */
 export function resolveImageAssistModelId(): string {
   const id = resolveImageAiModelForRequest()
   if (id.startsWith('img::v::')) {

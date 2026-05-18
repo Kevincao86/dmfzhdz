@@ -134,6 +134,8 @@ export type AiAssistRequest = {
   /** 生图专用：售价/划线价（元），代金券券面字样 */
   price_yuan?: string
   origin_yuan?: string
+  /** 生图用户句，如「帮我生成一张80代100代金券主图」 */
+  image_user_line?: string
   /** 待美化图片 URL 列表（enhance）；单张或多张 */
   image_urls?: string[]
   image_role?: 'head' | 'aux' | 'env'
@@ -167,6 +169,7 @@ export type AiAssistResult =
         resolved_model: string
         voucher_mode: boolean
         main_product_anchor: string
+        image_user_line?: string
       }
     }
 
