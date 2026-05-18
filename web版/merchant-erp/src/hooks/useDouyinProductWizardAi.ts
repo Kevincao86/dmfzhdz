@@ -79,17 +79,11 @@ export function useDouyinProductWizardAi(params: {
     async (body: Omit<AiAssistRequest, 'model'>) => {
       const isImg = body.action === 'image_generate' || body.action === 'image_enhance'
       if (isImg) {
-        const ctx = params.goodsContext
         const listing = String(body.listing_title ?? body.product_name ?? '').trim()
         const roleRaw = body.image_role ?? 'head'
         const role: 'head' | 'aux' | 'env' =
           roleRaw === 'env' ? 'env' : roleRaw === 'aux' ? 'aux' : 'head'
-        const imageUserLine = buildProductImageUserLine(
-          listing,
-          ctx?.goods_product_type,
-          ctx?.goods_product_type_label,
-          role,
-        )
+        const imageUserLine = buildProductImageUserLine(listing, role)
         const pickerKey = resolveImageAiModelForRequest()
         const parsed = parseAgentImagePickerKey(pickerKey)
         if (parsed?.kind === 'style') {
@@ -112,7 +106,6 @@ export function useDouyinProductWizardAi(params: {
           ...body,
           model,
           image_user_line: imageUserLine,
-          ...(params.goodsContext ?? {}),
         })
         if (r.ok) {
           const meta = 'image_meta' in r ? r.image_meta : undefined
