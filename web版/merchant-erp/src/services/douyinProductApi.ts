@@ -326,6 +326,8 @@ export type ComboPackageItem = {
 }
 
 export type ComboPackageGroup = {
+  /** 商品组展示名，映射 goodlife combo_rule.groups[].group_name */
+  group_name?: string
   pick_rule: string
   items: ComboPackageItem[]
 }

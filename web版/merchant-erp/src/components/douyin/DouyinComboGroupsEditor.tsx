@@ -3,6 +3,7 @@ import {
   appendComboGroup,
   type ComboGroupFormRow,
   createEmptyComboItem,
+  defaultComboGroupName,
   pickRuleSelectOptionsForItemCount,
 } from '../../lib/douyinComboGroupsForm'
 import { cn } from '../../cn'
@@ -52,7 +53,18 @@ export default function DouyinComboGroupsEditor({
 
   const removeGroup = (gid: string) => {
     const next = groups.filter((g) => g.id !== gid)
-    onChange(next.length > 0 ? next : [{ id: newGroupId(), pickRule: '全部必选', items: [createEmptyComboItem()] }])
+    onChange(
+      next.length > 0
+        ? next
+        : [
+            {
+              id: newGroupId(),
+              groupName: defaultComboGroupName(0),
+              pickRule: '全部必选',
+              items: [createEmptyComboItem()],
+            },
+          ],
+    )
   }
 
   const moveGroup = (idx: number, dir: -1 | 1) => {
@@ -104,7 +116,16 @@ export default function DouyinComboGroupsEditor({
             className="rounded-lg border border-indigo-100 bg-indigo-50/30 p-4 space-y-3"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-semibold text-gray-900">商品组 {gi + 1}</span>
+              <label className="min-w-[10rem] flex-1 text-xs text-gray-600">
+                商品组名称
+                <input
+                  className="mt-1 w-full max-w-xs rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-900"
+                  value={g.groupName}
+                  onChange={(e) => updateGroup(g.id, { groupName: e.target.value })}
+                  placeholder={defaultComboGroupName(gi)}
+                  maxLength={60}
+                />
+              </label>
               <select
                 value={g.pickRule}
                 onChange={(e) => updateGroup(g.id, { pickRule: e.target.value })}

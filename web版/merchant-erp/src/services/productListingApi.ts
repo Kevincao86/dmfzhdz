@@ -106,7 +106,10 @@ export type MerchantProductListItem = {
   name: string
   price: number
   store: string
+  /** 平台审核状态（兼容旧字段，等同 auditStatus） */
   status: string
+  auditStatus: string
+  saleStatus: string
   platform: string
 }
 
@@ -200,12 +203,22 @@ export async function fetchMerchantProductList(
       const name = String(o.name ?? '').trim()
       if (!id || !name) continue
       const price = Number(o.price)
+      const auditStatus = String(o.audit_status ?? o.status ?? '—')
+      let saleStatus = String(o.sale_status ?? '').trim()
+      if (!saleStatus) {
+        const legacy = String(o.status ?? '')
+        if (legacy === '在售' || legacy.includes('上架')) saleStatus = '上架中'
+        else if (legacy === '已下架' || legacy === '封禁') saleStatus = '已下架'
+        else saleStatus = '—'
+      }
       items.push({
         id,
         name,
         price: Number.isFinite(price) ? price : 0,
         store: String(o.store ?? '—'),
-        status: String(o.status ?? '—'),
+        status: auditStatus,
+        auditStatus,
+        saleStatus,
         platform: String(o.platform ?? createPlatformLabel(platform)),
       })
     }
