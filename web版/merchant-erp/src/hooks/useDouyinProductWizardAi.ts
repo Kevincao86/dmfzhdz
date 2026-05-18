@@ -4,6 +4,7 @@ import {
   type AiAssistRequest,
   type AiModelId,
 } from '../services/douyinAiAssistApi'
+import { sanitizeDouyinProductDescriptionCompliance } from '../lib/douyinDescCompliance'
 import {
   buildImageAssistTextFields,
   buildProductImageUserLine,
@@ -158,7 +159,9 @@ export function useDouyinProductWizardAi(params: {
       else if (r.title) params.setProductName(r.title.slice(0, 40))
       if (!d.ok) {
         if (r.ok) window.alert(d.message)
-      } else if (d.description) params.setProductDesc(d.description)
+      } else if (d.description) {
+        params.setProductDesc(sanitizeDouyinProductDescriptionCompliance(d.description))
+      }
     } finally {
       endAi('title')
       endAi('desc')

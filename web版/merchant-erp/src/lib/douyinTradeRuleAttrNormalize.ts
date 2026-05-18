@@ -184,6 +184,12 @@ export function sanitizeDouyinTradeRuleProductAttrs(
   const reserveMode = typeof trade.reserve_mode === 'string' ? trade.reserve_mode.trim() : ''
   const reserveAdvance = Math.max(1, Math.floor(Number(trade.reserve_advance_value) || 1))
   const allowedShow = allowedShowChannelsFromTemplateAttrs(templateProductAttrs)
+  const consume =
+    erp.consume_rules && typeof erp.consume_rules === 'object'
+      ? (erp.consume_rules as Record<string, unknown>)
+      : {}
+  const voucherLimit = consume.voucher_limit === true
+  const voucherMax = Math.max(1, Math.floor(Number(consume.voucher_max) || 1))
 
   for (const key of Object.keys(merged)) {
     const lk = key.toLowerCase()
@@ -214,10 +220,17 @@ export function sanitizeDouyinTradeRuleProductAttrs(
       continue
     }
     if (attrKeyEq(key, 'can_no_use_date')) {
+      if (trade.non_consume_date_mode === 'partial_dates') {
+        const block: Record<string, unknown> = { enable: true }
+        if (Array.isArray(trade.non_consume_holidays) && trade.non_consume_holidays.length) {
+          block.can_no_use_holiday = true
+        }
+        merged[key] = JSON.stringify(block)
+        continue
+      }
       const cur = tryParseJsonObject(merged[key] ?? '')
       if (!cur || typeof cur.enable !== 'boolean') {
-        const legacyEnable = cur?.can_no_use_holiday === true
-        merged[key] = douyinCanNoUseDateJson(Boolean(legacyEnable))
+        merged[key] = douyinCanNoUseDateJson(false)
       }
       continue
     }
@@ -235,7 +248,9 @@ export function sanitizeDouyinTradeRuleProductAttrs(
       continue
     }
     if (attrKeyEq(key, 'limit_use_rule')) {
-      merged[key] = normalizeDouyinLimitUseRuleValue(merged[key] ?? '')
+      merged[key] = voucherLimit
+        ? douyinLimitUseRuleJson(true, voucherMax)
+        : normalizeDouyinLimitUseRuleValue(merged[key] ?? '')
       continue
     }
     if (attrKeyEq(key, 'Notification')) {
@@ -275,7 +290,14 @@ export function sanitizeDouyinTradeRuleProductAttrs(
     attrKeyEq(String(a.key ?? ''), 'limit_use_rule'),
   )
   if (tplNeedsLimitUseRule && !Object.keys(merged).some((k) => attrKeyEq(k, 'limit_use_rule'))) {
-    merged.limit_use_rule = douyinLimitUseRuleJson(false)
+    merged.limit_use_rule = voucherLimit ? douyinLimitUseRuleJson(true, voucherMax) : douyinLimitUseRuleJson(false)
+  }
+  if (trade.non_consume_date_mode === 'partial_dates' && !Object.keys(merged).some((k) => attrKeyEq(k, 'can_no_use_date'))) {
+    const block: Record<string, unknown> = { enable: true }
+    if (Array.isArray(trade.non_consume_holidays) && trade.non_consume_holidays.length) {
+      block.can_no_use_holiday = true
+    }
+    merged.can_no_use_date = JSON.stringify(block)
   }
   const tplNeedsNotification = templateProductAttrs.some((a) =>
     attrKeyEq(String(a.key ?? ''), 'Notification'),

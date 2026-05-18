@@ -2,7 +2,7 @@ import { ChevronLeft, Loader2, Sparkles, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DouyinProductAiModelSection from '../../components/douyin/DouyinProductAiModelSection'
 import {
-  DouyinProductPreviewAside,
+  DouyinProductScrollFollowPreview,
   type DouyinPreviewComboLine,
 } from '../../components/douyin/DouyinProductMobilePreview'
 import DouyinStorePickerModal from '../../components/store/DouyinStorePickerModal'
@@ -228,8 +228,7 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
 
       <DouyinProductAiModelSection />
 
-      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_min(300px,28vw)] xl:items-start xl:gap-6">
-      <div className="min-w-0 space-y-6">
+      <div className="space-y-6 xl:pr-[min(20rem,42vw)]">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
           <h3 className="font-semibold text-gray-900">基础信息</h3>
@@ -784,8 +783,7 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
 
       </div>
 
-      <DouyinProductPreviewAside {...previewProps} />
-      </div>
+      <DouyinProductScrollFollowPreview {...previewProps} />
 
       <DouyinStorePickerModal
         open={props.storeModalOpen}
