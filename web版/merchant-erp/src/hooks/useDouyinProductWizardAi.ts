@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   postDouyinGoodsAiAssist,
   type AiAssistRequest,
   type AiModelId,
 } from '../services/douyinAiAssistApi'
+import { buildImageAssistTextFields } from '../lib/douyinProductImageAnchor'
 import { resolveModelForAssistAction } from '../services/merchantAiModelStorage'
 
 export type AiGoodsContext = {
@@ -15,6 +16,9 @@ export type AiGoodsContext = {
 
 type AiBusySlot = 'title' | 'desc' | 'img-head' | 'img-aux' | 'img-env'
 
+const MAX_AUX = 4
+const MAX_ENV = 10
+
 export function useDouyinProductWizardAi(params: {
   productName: string
   productDesc: string
@@ -22,6 +26,10 @@ export function useDouyinProductWizardAi(params: {
   setProductDesc: (v: string) => void
   setHeadUrl: (v: string) => void
   headUrl: string
+  auxUrls: string[]
+  setAuxUrls: (v: string[]) => void
+  envUrls: string[]
+  setEnvUrls: (v: string[]) => void
   goodsContext?: AiGoodsContext
 }) {
   const [aiBusySlots, setAiBusySlots] = useState<Partial<Record<AiBusySlot, boolean>>>({})
@@ -40,11 +48,8 @@ export function useDouyinProductWizardAi(params: {
 
   const aiOn = useCallback((k: AiBusySlot) => !!aiBusySlots[k], [aiBusySlots])
 
-  const imageAssistTitleDraft = useMemo(() => {
-    const name = params.productName.trim()
-    if (!name) return ''
-    const desc = params.productDesc.trim().slice(0, 400)
-    return desc ? `${name}。${desc}` : name
+  const imageAssistFields = useCallback(() => {
+    return buildImageAssistTextFields(params.productName, params.productDesc)
   }, [params.productName, params.productDesc])
 
   const postAssist = useCallback(
@@ -100,10 +105,10 @@ export function useDouyinProductWizardAi(params: {
     }
     beginAi('img-head')
     try {
+      const img = imageAssistFields()
       const r = await postAssist({
         action: 'image_generate',
-        product_name: n,
-        title_draft: imageAssistTitleDraft || n,
+        ...img,
         image_role: 'head',
       })
       if (!r.ok) window.alert(r.message)
@@ -111,7 +116,7 @@ export function useDouyinProductWizardAi(params: {
     } finally {
       endAi('img-head')
     }
-  }, [postAssist, params, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi])
 
   const enhanceHeadImage = useCallback(async () => {
     const h = params.headUrl.trim()
@@ -119,13 +124,16 @@ export function useDouyinProductWizardAi(params: {
       window.alert('请先上传头图后再优化')
       return
     }
-    const n = params.productName.trim() || '商品'
+    if (!params.productName.trim()) {
+      window.alert('请先填写商品名称，以便 AI 根据标题解析主推产品后再优化头图')
+      return
+    }
     beginAi('img-head')
     try {
+      const img = imageAssistFields()
       const r = await postAssist({
         action: 'image_enhance',
-        product_name: n,
-        title_draft: imageAssistTitleDraft || n,
+        ...img,
         image_urls: [h],
         image_role: 'head',
       })
@@ -134,12 +142,132 @@ export function useDouyinProductWizardAi(params: {
     } finally {
       endAi('img-head')
     }
-  }, [postAssist, params, imageAssistTitleDraft, beginAi, endAi])
+  }, [postAssist, params, imageAssistFields, beginAi, endAi])
+
+  const filledAux = useCallback(
+    () => params.auxUrls.map((u) => u.trim()).filter(Boolean),
+    [params.auxUrls],
+  )
+
+  const filledEnv = useCallback(
+    () => params.envUrls.map((u) => u.trim()).filter(Boolean),
+    [params.envUrls],
+  )
+
+  const generateAuxImage = useCallback(async () => {
+    if (filledAux().length >= MAX_AUX) return
+    const n = params.productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称')
+      return
+    }
+    beginAi('img-aux')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_generate',
+        ...img,
+        image_role: 'aux',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) {
+        const next = [...filledAux(), r.image_urls[0]!].slice(0, MAX_AUX)
+        params.setAuxUrls(next.length > 0 ? next : [''])
+      }
+    } finally {
+      endAi('img-aux')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux])
+
+  const enhanceAuxImages = useCallback(async () => {
+    const urls = filledAux()
+    if (urls.length === 0) {
+      window.alert('请先上传辅助图后再优化')
+      return
+    }
+    if (!params.productName.trim()) {
+      window.alert('请先填写商品名称，以便 AI 根据标题解析主推产品')
+      return
+    }
+    beginAi('img-aux')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_enhance',
+        ...img,
+        image_urls: urls,
+        image_role: 'aux',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.length) {
+        params.setAuxUrls(r.image_urls.slice(0, MAX_AUX))
+      }
+    } finally {
+      endAi('img-aux')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux])
+
+  const generateEnvImage = useCallback(async () => {
+    if (filledEnv().length >= MAX_ENV) return
+    const n = params.productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称')
+      return
+    }
+    beginAi('img-env')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_generate',
+        ...img,
+        image_role: 'env',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) {
+        const next = [...filledEnv(), r.image_urls[0]!].slice(0, MAX_ENV)
+        params.setEnvUrls(next.length > 0 ? next : [''])
+      }
+    } finally {
+      endAi('img-env')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv])
+
+  const enhanceEnvImages = useCallback(async () => {
+    const urls = filledEnv()
+    if (urls.length === 0) {
+      window.alert('请先上传环境图后再优化')
+      return
+    }
+    if (!params.productName.trim()) {
+      window.alert('请先填写商品名称，以便 AI 根据标题解析主推产品')
+      return
+    }
+    beginAi('img-env')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_enhance',
+        ...img,
+        image_urls: urls,
+        image_role: 'env',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.length) {
+        params.setEnvUrls(r.image_urls.slice(0, MAX_ENV))
+      }
+    } finally {
+      endAi('img-env')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv])
 
   return {
     aiOn,
     optimizeTitleAndDesc,
     generateHeadImage,
     enhanceHeadImage,
+    generateAuxImage,
+    enhanceAuxImages,
+    generateEnvImage,
+    enhanceEnvImages,
   }
 }
