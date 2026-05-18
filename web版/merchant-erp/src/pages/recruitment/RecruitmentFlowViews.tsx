@@ -12,17 +12,25 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
-  fetchOpsRegistry,
+  fetchOpsRegistryForTenant,
   setRecruitmentScheduleRowsOnOps,
   setRecruitmentVideoSubmissionsOnOps,
   setTalentPoolCandidatesOnOps,
 } from '../../lib/opsRegistryClient'
 import type { RegistryScheduleRow, RegistryTalentPoolRow, RegistryVideoSubmission } from '../../lib/opsRegistryTypes'
+import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
+import { tenantLocalKey } from '../../lib/tenantLocalState'
+import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { generateRecruitmentScheduleRowsAi } from '../../services/recruitmentScheduleAi'
+
+async function loadTenantScopedRegistry() {
+  const tenantId = supabaseConfigured && supabase ? await fetchPrimaryTenantId(supabase) : null
+  return fetchOpsRegistryForTenant(tenantId)
+}
 
 function readLastSubmitMeta(): { table?: number; slots?: string[]; name?: string; stores?: { name: string }[] } {
   try {
-    const raw = window.localStorage.getItem('meoo_last_recruitment_submit')
+    const raw = window.localStorage.getItem(tenantLocalKey('meoo_last_recruitment_submit'))
     if (!raw) return {}
     return JSON.parse(raw) as {
       tablePerMeal?: number
@@ -45,7 +53,7 @@ export function RecruitmentTalentPoolView({ onBack }: { onBack: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetchOpsRegistry()
+      const r = await loadTenantScopedRegistry()
       setAllRows(r.talentPoolCandidates ?? [])
     } catch {
       setAllRows([])
@@ -63,7 +71,7 @@ export function RecruitmentTalentPoolView({ onBack }: { onBack: () => void }) {
   const rows = useMemo(() => {
     let lastOrderId = ''
     try {
-      lastOrderId = window.localStorage.getItem('meoo_last_recruitment_order_id')?.trim() ?? ''
+      lastOrderId = window.localStorage.getItem(tenantLocalKey('meoo_last_recruitment_order_id'))?.trim() ?? ''
     } catch {
       /* ignore */
     }
@@ -261,7 +269,7 @@ export function RecruitmentScheduleView({
 
   const load = useCallback(async () => {
     try {
-      const r = await fetchOpsRegistry()
+      const r = await loadTenantScopedRegistry()
       setRows(r.recruitmentScheduleRows ?? [])
       setLoadErr(null)
     } catch {
@@ -292,7 +300,7 @@ export function RecruitmentScheduleView({
       if (next.length === 0) {
         const slots = meta.slots?.length ? meta.slots : ['09:00-12:00', '14:00-17:00']
         const table = meta.table ?? 4
-        const pool = (await fetchOpsRegistry()).talentPoolCandidates?.filter((t) => t.status === 'confirmed') ?? []
+        const pool = (await loadTenantScopedRegistry()).talentPoolCandidates?.filter((t) => t.status === 'confirmed') ?? []
         if (pool.length === 0) {
           window.alert('AI 未返回排期，且达人池中无「已确认」达人，无法生成规则回退排期。请先在达人池确认达人或检查 AI 配置。')
           await load()
@@ -398,7 +406,7 @@ export function RecruitmentVideoReviewView({ onBack }: { onBack: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetchOpsRegistry()
+      const r = await loadTenantScopedRegistry()
       setCards(r.recruitmentVideoSubmissions ?? [])
     } catch {
       setCards([])

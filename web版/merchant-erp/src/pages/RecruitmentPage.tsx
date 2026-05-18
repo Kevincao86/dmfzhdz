@@ -30,8 +30,10 @@ import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaE
 import { loadRecruitmentIndustryL1Labels } from '../lib/recruitmentIndustryOptions'
 import { buildRecruitmentProgressSteps, recruitmentOrderStatusLabel } from '../lib/recruitmentOrderProgress'
 import { readMerchantSession } from '../lib/merchantSession'
-import { appendRecruitmentOrderToOps, fetchOpsRegistry } from '../lib/opsRegistryClient'
+import { appendRecruitmentOrderToOps, fetchOpsRegistryForTenant } from '../lib/opsRegistryClient'
+import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import type { RegistryRecruitmentOrder } from '../lib/opsRegistryTypes'
+import { tenantLocalKey } from '../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../lib/tenantBilling'
 import { getDouyinStores, type DouyinStoreRow } from '../services/douyinMerchantApi'
@@ -112,7 +114,9 @@ function parseCommissionPctFromDraft(draft: string): number {
 
 type StoreRow = { name: string; address: string }
 
-const RECRUITMENT_CREATE_DRAFT_KEY = 'meoo_recruitment_create_draft_v1'
+const RECRUITMENT_CREATE_DRAFT_KEY_BASE = 'meoo_recruitment_create_draft_v1'
+const LAST_RECRUITMENT_ORDER_KEY_BASE = 'meoo_last_recruitment_order_id'
+const LAST_RECRUITMENT_SUBMIT_KEY_BASE = 'meoo_last_recruitment_submit'
 
 type RecruitmentCreateDraftV1 = {
   v: 1
@@ -200,7 +204,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(RECRUITMENT_CREATE_DRAFT_KEY)
+      const raw = window.localStorage.getItem(tenantLocalKey(RECRUITMENT_CREATE_DRAFT_KEY_BASE))
       if (!raw) return
       const d = JSON.parse(raw) as Partial<RecruitmentCreateDraftV1>
       if (d.v !== 1) return
@@ -310,8 +314,10 @@ function CreateForm({ onBack }: { onBack: () => void }) {
       const storeName = validStores[0]?.name.trim() || '—'
       const storeAddress = validStores[0]?.address.trim() || '—'
       const id = `RO${Date.now()}`
+      const tenantMeta = await resolveRecruitmentOrderTenantMeta(supabaseConfigured ? supabase : null)
       const order: RegistryRecruitmentOrder = {
         id,
+        ...tenantMeta,
         customerName,
         storeName,
         talentId: '—',
@@ -329,7 +335,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
         infoSummary: `招募：${name}；模式：${recruitMode === 'designated' ? `指定达人(${designatedInput.trim()})` : 'AI智能匹配'}；Brief：${selectedBrief.mainProductName}（${selectedBrief.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${industry === '餐饮' && provideMeal ? tablePerMeal : '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、') || '—'}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}`,
       }
       window.localStorage.setItem(
-        'meoo_last_recruitment_submit',
+        tenantLocalKey(LAST_RECRUITMENT_SUBMIT_KEY_BASE),
         JSON.stringify({
           name,
           tablePerMeal: industry === '餐饮' && provideMeal ? tablePerMeal : undefined,
@@ -345,7 +351,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
       )
       await appendRecruitmentOrderToOps(order)
       try {
-        window.localStorage.setItem('meoo_last_recruitment_order_id', id)
+        window.localStorage.setItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE), id)
       } catch {
         /* ignore */
       }
@@ -855,7 +861,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                     note,
                   }
                   try {
-                    window.localStorage.setItem(RECRUITMENT_CREATE_DRAFT_KEY, JSON.stringify(draft))
+                    window.localStorage.setItem(tenantLocalKey(RECRUITMENT_CREATE_DRAFT_KEY_BASE), JSON.stringify(draft))
                     window.alert('草稿已保存到本机浏览器，下次进入本页将自动还原。')
                   } catch {
                     window.alert('保存失败：浏览器可能禁止写入本地存储。')
@@ -1048,21 +1054,23 @@ export default function RecruitmentPage() {
       try {
         let lastId = ''
         try {
-          lastId = window.localStorage.getItem('meoo_last_recruitment_order_id')?.trim() ?? ''
+          lastId = window.localStorage.getItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE))?.trim() ?? ''
         } catch {
           lastId = ''
         }
-        if (!lastId) {
+        const tenantId =
+          supabaseConfigured && supabase ? await fetchPrimaryTenantId(supabase) : null
+        if (!tenantId) {
           if (!cancelled) {
             setHubOrder(null)
             setHubOrderLoading(false)
           }
           return
         }
-        const reg = await fetchOpsRegistry()
+        const reg = await fetchOpsRegistryForTenant(tenantId)
         if (cancelled) return
         const orders = reg.recruitmentOrders ?? []
-        const found = orders.find((o) => o.id === lastId) ?? null
+        const found = lastId ? orders.find((o) => o.id === lastId) ?? null : null
         setHubOrder(found)
         setHubOrderLoading(false)
       } catch (e) {
@@ -1101,7 +1109,7 @@ export default function RecruitmentPage() {
   const hubStoredOrderId = useMemo(() => {
     if (screen !== 'hub') return ''
     try {
-      return window.localStorage.getItem('meoo_last_recruitment_order_id')?.trim() ?? ''
+      return window.localStorage.getItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE))?.trim() ?? ''
     } catch {
       return ''
     }

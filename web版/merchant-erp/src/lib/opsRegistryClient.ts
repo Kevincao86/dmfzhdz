@@ -7,6 +7,7 @@ import type {
   RegistryTenant,
   RegistryVideoSubmission,
 } from './opsRegistryTypes'
+import { filterRegistryForTenant } from './tenantRegistryScope'
 
 /** 注册表与商户网关分离：优先运营台域名（线上 ERP 静态站无 /api/ops-sync 时需配置）。 */
 function registryApiBase(): string {
@@ -47,6 +48,12 @@ export async function fetchOpsRegistry(): Promise<RegistryFile> {
   } catch {
     return await fetchRegistryAt('/api/ops-sync/registry')
   }
+}
+
+/** 商户 ERP：仅返回当前租户的招募/排期/视频/Brief 相关切片（注册表快照本身为全局，须客户端过滤） */
+export async function fetchOpsRegistryForTenant(tenantId: string | null): Promise<RegistryFile> {
+  const raw = await fetchOpsRegistry()
+  return filterRegistryForTenant(raw, tenantId)
 }
 
 export async function pushErpTenant(tenant: RegistryTenant): Promise<void> {

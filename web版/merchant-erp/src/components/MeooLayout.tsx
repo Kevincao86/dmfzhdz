@@ -27,6 +27,7 @@ import {
   clearTenantScopedBrowserState,
   maskCnPhone,
   phoneFromAuthUser,
+  setActiveTenantStorageId,
 } from '../lib/tenantLocalState'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
@@ -72,6 +73,7 @@ export default function MeooLayout() {
         const mobile = phoneFromAuthUser({ phone: u.phone, user_metadata: meta })
         setPhone(mobile ? maskCnPhone(mobile) : '—')
         const tid = await fetchPrimaryTenantId(client)
+        setActiveTenantStorageId(tid)
         if (tid) {
           const en = await fetchTenantEnterpriseName(client, tid)
           setEnterpriseName(en ?? '')
