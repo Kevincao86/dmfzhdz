@@ -30,6 +30,9 @@ import {
 import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
 import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import { fetchAiProductPlan } from '../services/storeIntelApi'
+import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
+import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
+import { loadDouyinWizardLastContext } from '../lib/douyinWizardLastContext'
 import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import {
@@ -146,6 +149,9 @@ type AiAgentContextValue = {
   sendUserText: (text: string) => void
   applyShortcut: (taskType: AiTaskType) => void
   pendingPreviewId: string | null
+  pendingPreviewTaskType: AiTaskType | null
+  /** 商品预览正在生成标题/头图时禁用确认 */
+  pendingProductPlanLoading: boolean
   confirmPendingTask: () => void
   cancelPendingTask: () => void
   modifyPendingTask: () => void
@@ -434,38 +440,84 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     return msg.id
   }, [pageContext?.pageLabel])
 
-  const attachProductPlanToPreview = useCallback(async (previewMsgId: string, userBrief: string) => {
-    const r = await fetchAiProductPlan(buildProductPlanContext(userBrief))
-    if (!r.ok) return
-    const plan: AiProductPlanPreview = {
-      productName: r.plan.productName,
-      suggestedPriceYuan: r.plan.suggestedPriceYuan,
-      description: r.plan.description,
-      comboLines: r.plan.comboLines,
-      ...(r.plan.originYuan != null ? { originYuan: r.plan.originYuan } : {}),
-      ...(r.plan.marginNote ? { marginNote: r.plan.marginNote } : {}),
-      ...(r.plan.competitorNote ? { competitorNote: r.plan.competitorNote } : {}),
-      ...(r.plan.riskLevel ? { riskLevel: r.plan.riskLevel } : {}),
-    }
-    setMessages((prev) => {
-      const next = prev.map((m) => {
-        if (m.id !== previewMsgId || !m.preview) return m
-        return {
-          ...m,
-          content:
-            '已结合菜单价目、门店毛利率与竞品分析生成团购方案草案。请确认后进入「创建商品」页预览并调整价格、图片与售后规则，再提交至抖音来客。',
-          preview: { ...m.preview, productPlan: plan },
-        }
+  const patchPreviewProductPlan = useCallback(
+    (previewMsgId: string, patch: Partial<AiProductPlanPreview>, content?: string) => {
+      setMessages((prev) => {
+        const next = prev.map((m) => {
+          if (m.id !== previewMsgId || !m.preview) return m
+          const cur = m.preview.productPlan
+          return {
+            ...m,
+            ...(content ? { content } : {}),
+            preview: {
+              ...m.preview,
+              productPlan: cur ? { ...cur, ...patch } : ({ ...patch } as AiProductPlanPreview),
+            },
+          }
+        })
+        messagesRef.current = next
+        return next
       })
-      messagesRef.current = next
-      return next
-    })
-  }, [])
+    },
+    [],
+  )
+
+  const attachProductPlanToPreview = useCallback(
+    async (previewMsgId: string, userBrief: string) => {
+      patchPreviewProductPlan(
+        previewMsgId,
+        { enrichStatus: 'loading' },
+        '正在生成团购方案，并优化标题、说明与主图…',
+      )
+      const r = await fetchAiProductPlan(buildProductPlanContext(userBrief))
+      if (!r.ok) {
+        patchPreviewProductPlan(
+          previewMsgId,
+          { enrichStatus: 'error', enrichError: r.message },
+          '方案生成失败，请稍后重试或改在「创建商品」页手动填写。',
+        )
+        return
+      }
+      const basePlan: AiProductPlanPreview = {
+        productName: r.plan.productName,
+        suggestedPriceYuan: r.plan.suggestedPriceYuan,
+        description: r.plan.description,
+        comboLines: r.plan.comboLines,
+        productType: inferDouyinProductTypeFromText(`${userBrief} ${r.plan.productName}`),
+        enrichStatus: 'loading',
+        ...(r.plan.originYuan != null ? { originYuan: r.plan.originYuan } : {}),
+        ...(r.plan.marginNote ? { marginNote: r.plan.marginNote } : {}),
+        ...(r.plan.competitorNote ? { competitorNote: r.plan.competitorNote } : {}),
+        ...(r.plan.riskLevel ? { riskLevel: r.plan.riskLevel } : {}),
+      }
+      patchPreviewProductPlan(previewMsgId, basePlan)
+      try {
+        const enriched = await enrichAiProductPlanPreview(basePlan, userBrief)
+        patchPreviewProductPlan(
+          previewMsgId,
+          enriched,
+          '已生成 C 端团购预览（含 AI 优化标题与主图）。请核对手机预览效果，确认后将自动提交抖音来客审核。',
+        )
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        patchPreviewProductPlan(
+          previewMsgId,
+          {
+            ...basePlan,
+            enrichStatus: 'ready',
+            enrichError: `主图/标题优化未完成：${msg.slice(0, 120)}`,
+          },
+          '方案已生成；主图或标题优化未完成，确认后可在创建页补全。',
+        )
+      }
+    },
+    [patchPreviewProductPlan],
+  )
 
   const pushCreateProductPreview = useCallback(
     (userBrief: string, pageLabel?: string) => {
       const intro =
-        '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与周边竞品生成方案草案；确认后将打开抖音创建商品页供您修改价格、图片与售后规则。是否继续？'
+        '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
       const id = pushPreview('create_product', intro, pageLabel)
       void attachProductPlanToPreview(id, userBrief)
     },
@@ -671,6 +723,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const plan = p.productPlan
       const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
       const brief = lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() || '团购商品'
+      const lastCtx = loadDouyinWizardLastContext()
+      const canAutoSubmit = Boolean(lastCtx?.cat3 && plan?.enrichStatus === 'ready')
       if (plan) {
         saveAiProductDraft({
           platform: 'douyin',
@@ -678,14 +732,18 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           productDesc: plan.description,
           priceYuan: String(plan.suggestedPriceYuan),
           originYuan: plan.originYuan != null ? String(plan.originYuan) : undefined,
+          headUrl: plan.headUrl,
+          productType: plan.productType,
           comboSummary: plan.comboLines.join('；'),
           planNotes: [plan.marginNote, plan.competitorNote].filter(Boolean).join('\n'),
+          autoSubmit: canAutoSubmit,
         })
       } else {
         saveAiProductDraft({
           platform: 'douyin',
           productName: brief.slice(0, 60),
           productDesc: brief,
+          autoSubmit: false,
         })
       }
       setMessages((prev) => {
@@ -693,7 +751,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           ...prev,
           createAgentMessage(
             'task_result',
-            `「${title}」已确认。正在打开抖音创建商品页，您可在预览中调整价格、图片与交易售后规则后提交上架。`,
+            canAutoSubmit
+              ? `「${title}」已确认。正在打开创建商品页并自动提交抖音来客审核…`
+              : `「${title}」已确认。请先在「创建商品」页选择类目并保存一次，之后可在此一键自动提交；本次将为您预填方案。`,
             { resultSummary: 'confirmed' },
           ),
         ]
@@ -702,7 +762,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       setPendingPreviewId(null)
       setDrawerOpen(false)
-      navigate('/products/create', { state: { platforms: ['douyin'] } })
+      navigate('/products/create', {
+        state: { platforms: ['douyin'], autoSubmit: canAutoSubmit },
+      })
       return
     }
 
@@ -818,6 +880,18 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions, scheduleKeywordPreview],
   )
 
+  const pendingPreviewTaskType = useMemo((): AiTaskType | null => {
+    if (!pendingPreviewId) return null
+    const m = messages.find((x) => x.id === pendingPreviewId)
+    return m?.preview?.taskType ?? null
+  }, [pendingPreviewId, messages])
+
+  const pendingProductPlanLoading = useMemo(() => {
+    if (!pendingPreviewId) return false
+    const m = messages.find((x) => x.id === pendingPreviewId)
+    return m?.preview?.productPlan?.enrichStatus === 'loading'
+  }, [pendingPreviewId, messages])
+
   const value = useMemo<AiAgentContextValue>(
     () => ({
       drawerOpen,
@@ -831,6 +905,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       sendUserText,
       applyShortcut,
       pendingPreviewId,
+      pendingPreviewTaskType,
+      pendingProductPlanLoading,
       confirmPendingTask,
       cancelPendingTask,
       modifyPendingTask,
@@ -863,6 +939,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       sendUserText,
       applyShortcut,
       pendingPreviewId,
+      pendingPreviewTaskType,
       confirmPendingTask,
       cancelPendingTask,
       modifyPendingTask,
@@ -871,6 +948,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setModelPickerKey,
       modelPickerOptions,
       aiSending,
+      pendingProductPlanLoading,
       pendingComposerImages,
       addComposerImages,
       addComposerImageFiles,

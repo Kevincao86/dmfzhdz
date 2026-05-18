@@ -28,11 +28,17 @@ export default function AiAgentDrawer() {
     messages,
     applyShortcut,
     pendingPreviewId,
+    pendingPreviewTaskType,
+    pendingProductPlanLoading,
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
     aiSending,
   } = useAiAgent()
+
+  const confirmLabel =
+    pendingPreviewTaskType === 'create_product' ? '确认并提交审核' : '确认执行'
+  const confirmDisabled = pendingProductPlanLoading || aiSending
 
   const listRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -166,9 +172,13 @@ export default function AiAgentDrawer() {
                       <button
                         type="button"
                         onClick={confirmPendingTask}
-                        className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110"
+                        disabled={confirmDisabled}
+                        className={cn(
+                          'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+                          confirmDisabled && 'cursor-not-allowed opacity-50',
+                        )}
                       >
-                        确认执行
+                        {pendingProductPlanLoading ? '正在生成预览…' : confirmLabel}
                       </button>
                       <button
                         type="button"
@@ -191,9 +201,7 @@ export default function AiAgentDrawer() {
             </div>
 
             <footer className="shrink-0 border-t border-slate-100 bg-white p-3">
-              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-2 ring-1 ring-slate-100">
-                <AiAgentComposerBar layout="dock" />
-              </div>
+              <AiAgentComposerBar layout="dock" />
               <p className="mt-2 text-center text-[10px] text-slate-400">
                 涉及创建、修改、删除、发布等操作前将展示预览并由您确认
               </p>

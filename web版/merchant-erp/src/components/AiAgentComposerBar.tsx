@@ -1,12 +1,17 @@
-import { ChevronDown, ImagePlus, Loader2, Mic, Send, Volume2 } from 'lucide-react'
+import { ChevronDown, ImagePlus, Loader2, Mic, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { MeooAgentMascot } from './MeooAgentMascot'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import { shouldSubmitComposerOnEnter } from '../lib/composerEnterKey'
 
 type Layout = 'centered' | 'dock'
 type ModelFilterTab = 'all' | 'chat' | 'image'
+
+const FILTER_TABS: { id: ModelFilterTab; label: string; short: string }[] = [
+  { id: 'all', label: '全部模型', short: '全部' },
+  { id: 'chat', label: '对话', short: '对话' },
+  { id: 'image', label: '文生图 / 图生图', short: '生图' },
+]
 
 function readImageFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
   const out: File[] = []
@@ -31,6 +36,25 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
+function shortModelLabel(label: string): string {
+  const head = label.split(/[·\-–|]/)[0]?.trim() ?? label
+  if (head.length <= 10) return head
+  return `${head.slice(0, 9)}…`
+}
+
+function useClickOutside(refs: React.RefObject<HTMLElement | null>[], onOutside: () => void, active: boolean) {
+  useEffect(() => {
+    if (!active) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (refs.some((r) => r.current?.contains(t))) return
+      onOutside()
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [refs, onOutside, active])
+}
+
 export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const {
     inputDraft,
@@ -45,7 +69,6 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     addComposerImages,
     addComposerImageFiles,
     removeComposerImage,
-    messages,
     pendingQuote,
     clearPendingQuote,
   } = useAiAgent()
@@ -53,19 +76,37 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const recRef = useRef<SpeechRecognition | null>(null)
   const imeComposingRef = useRef(false)
+  const filterWrapRef = useRef<HTMLDivElement>(null)
+  const modelWrapRef = useRef<HTMLDivElement>(null)
   const [listening, setListening] = useState(false)
   const [modelFilter, setModelFilter] = useState<ModelFilterTab>('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [modelOpen, setModelOpen] = useState(false)
 
   const filteredModelOptions = useMemo(() => {
     if (modelFilter === 'all') return modelPickerOptions
     return modelPickerOptions.filter((o) => (o.capability ?? 'chat') === modelFilter)
   }, [modelPickerOptions, modelFilter])
 
+  const currentModel = useMemo(
+    () => modelPickerOptions.find((o) => o.key === modelPickerKey),
+    [modelPickerOptions, modelPickerKey],
+  )
+
+  const filterShort = FILTER_TABS.find((t) => t.id === modelFilter)?.short ?? '全部'
+
   useEffect(() => {
     if (filteredModelOptions.some((o) => o.key === modelPickerKey)) return
     const first = filteredModelOptions[0]?.key
     if (first) setModelPickerKey(first)
   }, [filteredModelOptions, modelPickerKey, setModelPickerKey])
+
+  const closeMenus = useCallback(() => {
+    setFilterOpen(false)
+    setModelOpen(false)
+  }, [])
+
+  useClickOutside([filterWrapRef, modelWrapRef], closeMenus, filterOpen || modelOpen)
 
   const stopListening = useCallback(() => {
     try {
@@ -91,6 +132,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
       stopListening()
       return
     }
+    closeMenus()
     const r = new Ctor()
     r.lang = 'zh-CN'
     r.interimResults = false
@@ -108,25 +150,19 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     } catch {
       window.alert('无法启动语音识别，请检查麦克风权限。')
     }
-  }, [listening, setInputDraft, stopListening])
+  }, [listening, setInputDraft, stopListening, closeMenus])
 
-  const speakLastReply = useCallback(() => {
-    const last = [...messages].reverse().find((m) => m.role === 'assistant' && m.content.trim())
-    if (!last?.content.trim()) {
-      window.alert('暂无可朗读的助手回复，请先对话一轮。')
-      return
-    }
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(last.content)
-    u.lang = 'zh-CN'
-    window.speechSynthesis.speak(u)
-  }, [messages])
-
-  const rows = layout === 'centered' ? 5 : 2
+  const rows = layout === 'centered' ? 4 : 2
   const disabled = Boolean(pendingPreviewId)
+  const modelShort = shortModelLabel(currentModel?.label ?? '模型')
 
   return (
-    <div className="w-full">
+    <div
+      className={cn(
+        'w-full rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/80',
+        layout === 'centered' && 'rounded-3xl shadow-md shadow-slate-900/5',
+      )}
+    >
       <input
         ref={fileRef}
         type="file"
@@ -140,53 +176,43 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
         }}
       />
 
-      <div className="flex items-end gap-1.5 sm:gap-2">
-        <MeooAgentMascot
-          aiSending={aiSending}
-          inputDraft={inputDraft}
-          className="shrink-0 scale-[0.92] pb-0.5 sm:scale-100"
-        />
-        <div className="min-w-0 flex-1">
-      {pendingQuote ? (
-        <div className="mb-2 flex items-start gap-2 rounded-xl border border-indigo-200/90 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-950">
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-indigo-900">引用对话</p>
-            <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-[11px] text-indigo-900/90">
-              {pendingQuote.role === 'user' ? '我' : '助手'}：{pendingQuote.excerpt}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={clearPendingQuote}
-            className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100/80"
-          >
-            移除
-          </button>
-        </div>
-      ) : null}
-      {pendingComposerImages.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-2 px-1">
-          {pendingComposerImages.map((src, i) => (
-            <div key={i} className="group relative">
-              <img src={src} alt="" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
-              <button
-                type="button"
-                onClick={() => removeComposerImage(i)}
-                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white opacity-0 shadow group-hover:opacity-100"
-                aria-label="移除图片"
-              >
-                ×
-              </button>
+      <div className="px-3 pt-3 sm:px-4 sm:pt-3.5">
+        {pendingQuote ? (
+          <div className="mb-2 flex items-start gap-2 rounded-xl border border-indigo-200/90 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-950">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-indigo-900">引用对话</p>
+              <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-[11px] text-indigo-900/90">
+                {pendingQuote.role === 'user' ? '我' : '助手'}：{pendingQuote.excerpt}
+              </p>
             </div>
-          ))}
-        </div>
-      ) : null}
+            <button
+              type="button"
+              onClick={clearPendingQuote}
+              className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100/80"
+            >
+              移除
+            </button>
+          </div>
+        ) : null}
 
-      <div
-        className={cn(
-          layout === 'centered' ? 'rounded-t-3xl px-2 pt-2 sm:px-3' : 'px-1 pt-1',
-        )}
-      >
+        {pendingComposerImages.length > 0 ? (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {pendingComposerImages.map((src, i) => (
+              <div key={i} className="group relative">
+                <img src={src} alt="" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeComposerImage(i)}
+                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white opacity-0 shadow group-hover:opacity-100"
+                  aria-label="移除图片"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <textarea
           value={inputDraft}
           onChange={(e) => setInputDraft(e.target.value)}
@@ -212,74 +238,128 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           disabled={disabled}
           placeholder={
             modelFilter === 'image'
-              ? '文生图：直接描述画面；图生图：先点右侧上传参考图，再写希望保留或修改的内容。'
-              : '描述你想完成的任务，或输入 @ 提及页面要点；可直接粘贴多张截图（Ctrl+V）…'
+              ? '文生图：描述画面；图生图：先上传参考图再写修改要求…'
+              : '描述你想完成的任务，或输入 @ 提及页面要点；可直接粘贴截图（Ctrl+V）…'
           }
           className={cn(
-            'w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 disabled:opacity-50',
-            layout === 'dock' && 'max-h-40 min-h-[2.75rem]',
+            'w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-50',
+            layout === 'dock' && 'max-h-36 min-h-[2.5rem]',
           )}
         />
       </div>
 
-      <div
-        className={cn(
-          'flex flex-wrap items-center gap-2 border-slate-100 pt-2',
-          layout === 'centered' ? 'border-t px-3 pb-2.5 sm:px-4' : 'px-1 pb-1',
-        )}
-      >
-        <div className="relative min-w-0 flex-1 basis-[10rem] sm:max-w-[min(100%,14rem)]">
-          <div className="mb-1 flex flex-wrap gap-1">
-            {(
-              [
-                { id: 'all' as const, label: '全部' },
-                { id: 'chat' as const, label: '对话' },
-                { id: 'image' as const, label: '文生图 / 图生图' },
-              ] satisfies { id: ModelFilterTab; label: string }[]
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                disabled={aiSending || disabled}
-                onClick={() => setModelFilter(tab.id)}
-                className={cn(
-                  'rounded-lg px-2 py-0.5 text-[11px] font-medium transition',
-                  modelFilter === tab.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                  (aiSending || disabled) && 'cursor-not-allowed opacity-50',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          <select
-            aria-label="选择助手风格"
-            value={modelPickerKey}
-            disabled={aiSending || disabled}
-            onChange={(e) => setModelPickerKey(e.target.value)}
-            className={cn(
-              'h-10 w-full min-w-0 cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50 py-0 pl-3 pr-9',
-              'text-xs font-medium text-slate-800 hover:bg-white',
-              'focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100',
-              (aiSending || disabled) && 'cursor-not-allowed opacity-60',
-            )}
-          >
-            {filteredModelOptions.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-        </div>
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2 py-2 sm:px-3">
+        <button
+          type="button"
+          disabled={disabled || aiSending || pendingComposerImages.length >= 4}
+          onClick={() => fileRef.current?.click()}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white disabled:opacity-40"
+          title="上传或粘贴截图（最多 4 张）"
+          aria-label="上传图片"
+        >
+          <ImagePlus className="h-4 w-4" />
+        </button>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5">
+          <div ref={filterWrapRef} className="relative">
+            <button
+              type="button"
+              disabled={aiSending || disabled}
+              onClick={() => {
+                setModelOpen(false)
+                setFilterOpen((v) => !v)
+              }}
+              className={cn(
+                'inline-flex h-8 max-w-[5.5rem] items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-700 hover:bg-white',
+                filterOpen && 'border-indigo-300 bg-indigo-50 text-indigo-800',
+                (aiSending || disabled) && 'cursor-not-allowed opacity-50',
+              )}
+              aria-expanded={filterOpen}
+              aria-haspopup="listbox"
+            >
+              <span className="truncate">{filterShort}</span>
+              <ChevronDown className={cn('h-3 w-3 shrink-0 opacity-60', filterOpen && 'rotate-180')} />
+            </button>
+            {filterOpen ? (
+              <div
+                role="listbox"
+                className="absolute bottom-full right-0 z-50 mb-1.5 min-w-[9.5rem] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+              >
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">模式</p>
+                {FILTER_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="option"
+                    aria-selected={modelFilter === tab.id}
+                    onClick={() => {
+                      setModelFilter(tab.id)
+                      setFilterOpen(false)
+                    }}
+                    className={cn(
+                      'flex w-full items-center px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50',
+                      modelFilter === tab.id && 'bg-indigo-50 font-medium text-indigo-900',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div ref={modelWrapRef} className="relative">
+            <button
+              type="button"
+              disabled={aiSending || disabled}
+              onClick={() => {
+                setFilterOpen(false)
+                setModelOpen((v) => !v)
+              }}
+              className={cn(
+                'inline-flex h-8 max-w-[7.5rem] items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-700 hover:bg-white',
+                modelOpen && 'border-indigo-300 bg-indigo-50 text-indigo-800',
+                (aiSending || disabled) && 'cursor-not-allowed opacity-50',
+              )}
+              title={currentModel?.label}
+              aria-expanded={modelOpen}
+              aria-haspopup="listbox"
+            >
+              <span className="truncate">{modelShort}</span>
+              <ChevronDown className={cn('h-3 w-3 shrink-0 opacity-60', modelOpen && 'rotate-180')} />
+            </button>
+            {modelOpen ? (
+              <div
+                role="listbox"
+                className="absolute bottom-full right-0 z-50 mb-1.5 max-h-52 w-[min(16rem,calc(100vw-3rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+              >
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">模型</p>
+                {filteredModelOptions.map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    role="option"
+                    aria-selected={modelPickerKey === o.key}
+                    onClick={() => {
+                      setModelPickerKey(o.key)
+                      setModelOpen(false)
+                    }}
+                    className={cn(
+                      'flex w-full px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:bg-slate-50',
+                      modelPickerKey === o.key && 'bg-indigo-50 font-medium text-indigo-900',
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           <button
             type="button"
             className={cn(
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white',
               listening && 'border-indigo-300 bg-indigo-50 text-indigo-700',
             )}
             title={listening ? '点击停止听写' : '语音转文字'}
@@ -288,25 +368,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           >
             {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
           </button>
-          <button
-            type="button"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
-            title="朗读最近一条助手回复"
-            aria-label="语音朗读"
-            onClick={speakLastReply}
-          >
-            <Volume2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            disabled={disabled || aiSending || pendingComposerImages.length >= 4}
-            onClick={() => fileRef.current?.click()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40"
-            title="上传或粘贴截图（最多 4 张；输入框内 Ctrl+V 可一次粘贴多张）"
-            aria-label="上传图片"
-          >
-            <ImagePlus className="h-4 w-4" />
-          </button>
+
           <button
             type="button"
             onClick={() => sendUserText(inputDraft)}
@@ -315,13 +377,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
               aiSending ||
               disabled
             }
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="发送"
           >
             {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
-        </div>
-      </div>
         </div>
       </div>
     </div>

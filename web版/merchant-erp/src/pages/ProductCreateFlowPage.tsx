@@ -11,7 +11,7 @@ import { cn } from '../cn'
 import DouyinProductCreateWizard from './douyin/DouyinProductCreateWizard'
 import { postPlatformProductDraft } from '../services/productListingApi'
 
-type LocationState = { platforms?: unknown }
+type LocationState = { platforms?: unknown; autoSubmit?: boolean }
 
 function normalizePlatforms(raw: unknown): CreatePlatformId[] {
   if (!Array.isArray(raw)) return []
@@ -124,7 +124,9 @@ export default function ProductCreateFlowPage() {
             })}
           </div>
         )}
-        <DouyinProductCreateWizard />
+        <DouyinProductCreateWizard
+          autoSubmit={Boolean((location.state as LocationState | null)?.autoSubmit)}
+        />
       </div>
     )
   }
