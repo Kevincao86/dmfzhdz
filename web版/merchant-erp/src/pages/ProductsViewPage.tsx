@@ -16,7 +16,9 @@ import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/product
 import {
   type MerchantProductListItem,
   fetchMerchantProductList,
-  postMerchantProductSync,
+  postMerchantProductShelfOperate,
+  pullMerchantProductFromPlatform,
+  syncAllMerchantProductsFromPlatforms,
 } from '../services/productListingApi'
 
 type ListRow = MerchantProductListItem & { origin: 'api' | 'library' }
@@ -48,7 +50,14 @@ export default function ProductsViewPage() {
   const [keyword, setKeyword] = useState('')
 
   const [syncingId, setSyncingId] = useState<string | null>(null)
+  const [bulkSyncing, setBulkSyncing] = useState(false)
   const [syncToast, setSyncToast] = useState<string | null>(null)
+  const [shelfConfirm, setShelfConfirm] = useState<{
+    id: string
+    name: string
+    goOnline: boolean
+  } | null>(null)
+  const [shelfBusy, setShelfBusy] = useState(false)
   const [priceEditId, setPriceEditId] = useState<string | null>(null)
   const [priceEditValue, setPriceEditValue] = useState('')
 
@@ -124,26 +133,62 @@ export default function ProductsViewPage() {
       saveDraftDetailSnapshot(id, { ...snap, price_yuan: price })
     }
     refreshLibrary()
-    setSyncToast(`已更新价格为 ¥${Math.round(price)}，可点「同步」推送到抖音来客`)
+    setSyncToast(`已更新价格为 ¥${Math.round(price)}，可在编辑页保存后推送至抖音来客`)
     window.setTimeout(() => setSyncToast(null), 4200)
   }
 
-  const toggleShelfLocal = (id: string, currentStatus: string) => {
-    const onShelf = currentStatus.includes('上架') || currentStatus === '在售'
-    const next = onShelf ? '已下架' : '已上架'
-    updateProductEditLibraryRow(id, { status: next })
-    refreshLibrary()
-    setSyncToast(onShelf ? '已标记为下架（本地），请同步至平台' : '已标记为上架（本地），请同步至平台')
-    window.setTimeout(() => setSyncToast(null), 4200)
+  const isOnShelfStatus = (s: string) =>
+    s === '在售' || s.includes('上架') || s === '审核通过'
+
+  const openShelfConfirm = (row: ListRow) => {
+    const goOnline = !isOnShelfStatus(row.status)
+    setShelfConfirm({ id: row.id, name: row.name, goOnline })
   }
 
-  const runSync = async (id: string) => {
+  const confirmShelfChange = async () => {
+    if (!shelfConfirm || activePlat !== 'douyin') return
+    setShelfBusy(true)
+    setSyncToast(null)
+    const r = await postMerchantProductShelfOperate(
+      activePlat,
+      shelfConfirm.id,
+      shelfConfirm.goOnline ? 'online' : 'offline',
+    )
+    setShelfBusy(false)
+    setShelfConfirm(null)
+    if (r.ok) {
+      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+      if (r2.ok) setApiItems(r2.items)
+      refreshLibrary()
+    }
+    setSyncToast(r.ok ? r.message ?? '上下架已同步至平台' : r.message)
+    window.setTimeout(() => setSyncToast(null), 4800)
+  }
+
+  const runPullSync = async (id: string) => {
     setSyncingId(id)
     setSyncToast(null)
-    const r = await postMerchantProductSync(activePlat, id)
+    const r = await pullMerchantProductFromPlatform(activePlat, id)
     setSyncingId(null)
-    setSyncToast(r.ok ? r.message ?? '已请求与各平台同步商品信息' : r.message)
+    if (r.ok) {
+      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+      if (r2.ok) setApiItems(r2.items)
+      refreshLibrary()
+    }
+    setSyncToast(r.ok ? r.message ?? '已从平台拉取该商品信息' : r.message)
     window.setTimeout(() => setSyncToast(null), 4200)
+  }
+
+  const runBulkSync = async () => {
+    setBulkSyncing(true)
+    setSyncToast(null)
+    const r = await syncAllMerchantProductsFromPlatforms()
+    const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+    if (r2.ok) setApiItems(r2.items)
+    refreshLibrary()
+    setBulkSyncing(false)
+    setSyncToast(r.ok ? r.message ?? '同步完成' : r.message)
+    window.setTimeout(() => setSyncToast(null), 5200)
   }
 
   return (
@@ -166,7 +211,7 @@ export default function ProductsViewPage() {
         <div>
           <h1 className="erp-page-title">商品列表</h1>
           <p className="mt-1 text-sm text-gray-500">
-            列表合并展示本地草稿与当前账号下的平台商品。可筛选、编辑；「同步」将把变更推到抖音来客对应商品（本地草稿无平台编号时会用本机保存的快照自动重试）。
+            合并展示本地草稿与平台商品。「同步商品」拉取各平台全量状态；行内「同步」仅拉取该商品在平台侧的信息；上下架需确认后同步至来客。
           </p>
           {listNote && <p className="mt-1 text-xs text-amber-800">{listNote}</p>}
           {listErr && <p className="mt-1 text-xs text-red-700">加载失败：{listErr}</p>}
@@ -254,6 +299,18 @@ export default function ProductsViewPage() {
             </>
           )}
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={bulkSyncing}
+          onClick={() => void runBulkSync()}
+          className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          <RefreshCw className={cn('mr-2 h-4 w-4', bulkSyncing && 'animate-spin')} />
+          {bulkSyncing ? '同步中…' : '同步商品'}
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
@@ -399,23 +456,23 @@ export default function ProductsViewPage() {
                           </Link>
                           <button
                             type="button"
-                            onClick={() => toggleShelfLocal(r.id, r.status)}
+                            onClick={() => openShelfConfirm(r)}
                             className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                            title="上下架（先更新本地状态，再点同步推送）"
+                            title="上下架（确认后同步至抖音来客）"
                           >
                             <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
-                            {r.status.includes('上架') || r.status === '在售' ? '下架' : '上架'}
+                            {isOnShelfStatus(r.status) ? '下架' : '上架'}
                           </button>
                         </>
                       )}
                       <button
                         type="button"
                         disabled={activePlat !== 'douyin' || syncingId === r.id}
-                        onClick={() => void runSync(r.id)}
+                        onClick={() => void runPullSync(r.id)}
                         className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
                         title={
                           activePlat === 'douyin'
-                            ? '将本行商品变更同步到抖音来客'
+                            ? '从抖音来客拉取该商品信息与状态'
                             : '当前仅抖音来客支持同步'
                         }
                       >
@@ -432,6 +489,48 @@ export default function ProductsViewPage() {
           </tbody>
         </table>
       </div>
+
+      {shelfConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => !shelfBusy && setShelfConfirm(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shelf-confirm-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="shelf-confirm-title" className="text-lg font-semibold text-gray-900">
+              确认{shelfConfirm.goOnline ? '上架' : '下架'}
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              商品「{shelfConfirm.name}」将{shelfConfirm.goOnline ? '上架' : '下架'}
+              并同步至抖音来客，是否继续？
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={shelfBusy}
+                onClick={() => setShelfConfirm(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={shelfBusy}
+                onClick={() => void confirmShelfChange()}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {shelfBusy ? '处理中…' : '确认'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

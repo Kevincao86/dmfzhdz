@@ -11,6 +11,9 @@ import {
   handleDouyinGoodsProductDraftQueryGet,
   handleDouyinGoodsProductGetGet,
   handleDouyinGoodsProductOnlineQueryGet,
+  handleDouyinGoodsProductOperatePost,
+  handleDouyinGoodsProductPullSyncPost,
+  handleDouyinGoodsProductsListGet,
   handleDouyinGoodsProductSavePost,
   handleDouyinGoodsProductTypesGet,
   handleDouyinGoodsTemplateGetGet,
@@ -23,7 +26,6 @@ import {
   postDouyinAkteCommentReply,
 } from './douyinMerchantGateway.js'
 import { handleFinanceReconcileGet } from './financeReconcileGateway.js'
-import { mockDouyinProductStore } from './mockDouyinProductStore.js'
 import {
   generateGrossMarginSuggestionByAi,
   generateReviewReplyByDoubao,
@@ -221,36 +223,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       }
 
       if (method === 'GET' && pathname === '/api/merchant/douyin/goods/products') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
-          return true
-        }
-        const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1)
-        const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get('page_size') ?? '20') || 20))
-        const keyword = (url.searchParams.get('keyword') ?? '').trim().toLowerCase()
-        let items = Array.from(mockDouyinProductStore.entries()).map(([id, p]) => ({
-          id,
-          name: String(p.product_name ?? '未命名商品'),
-          price: Number(p.price_yuan ?? 0) || 0,
-          store: Array.isArray(p.poi_ids) && p.poi_ids.length ? `${(p.poi_ids as string[]).length} 家门店` : '—',
-          status: String(p._mock_status ?? '草稿'),
-          platform: '抖音来客',
-        }))
-        if (keyword) {
-          items = items.filter((x) => x.name.toLowerCase().includes(keyword))
-        }
-        const total = items.length
-        const start = (page - 1) * pageSize
-        json(res, 200, {
-          ok: true,
-          data: {
-            items: items.slice(start, start + pageSize),
-            total,
-            page,
-            page_size: pageSize,
-          },
-        })
+        await handleDouyinGoodsProductsListGet(req, res, url)
         return true
       }
 
@@ -260,30 +233,14 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       }
 
       if (method === 'POST' && pathname === '/api/merchant/douyin/goods/product/sync') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
-          return true
-        }
         const bodyRaw = await bodyReader()
-        let product_id = ''
-        try {
-          const b = JSON.parse(bodyRaw || '{}') as { product_id?: string }
-          product_id = String(b.product_id ?? '').trim()
-        } catch {
-          /* ignore */
-        }
-        if (!product_id || !mockDouyinProductStore.has(product_id)) {
-          json(res, 400, {
-            ok: false,
-            message: '未找到可同步的平台商品记录。本地草稿请由前端按快照重试保存，或进入「编辑」后再次保存。',
-          })
-          return true
-        }
-        json(res, 200, {
-          ok: true,
-          message: '已提交同步，商品状态将随后更新。',
-        })
+        await handleDouyinGoodsProductPullSyncPost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/douyin/goods/product/operate') {
+        const bodyRaw = await bodyReader()
+        await handleDouyinGoodsProductOperatePost(req, res, bodyRaw)
         return true
       }
 

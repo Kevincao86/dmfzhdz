@@ -9,8 +9,13 @@ import { readMerchantSession } from '../lib/merchantSession'
 import {
   loadDraftDetailSnapshot,
   renameDraftDetailSnapshotKey,
+  saveDraftDetailSnapshot,
 } from '../lib/productDraftSnapshot'
-import { loadProductEditLibrary, replaceProductEditLibraryRowId } from '../lib/productEditLibrary'
+import {
+  loadProductEditLibrary,
+  replaceProductEditLibraryRowId,
+  upsertProductEditLibraryFromApi,
+} from '../lib/productEditLibrary'
 import {
   isLikelyRouteMiss404,
   merchantApiFetchUrlCandidates,
@@ -115,7 +120,7 @@ export type MerchantProductListResult =
  */
 export async function fetchMerchantProductList(
   platform: CreatePlatformId,
-  opts?: { page?: number; pageSize?: number },
+  opts?: { page?: number; pageSize?: number; full?: boolean },
 ): Promise<MerchantProductListResult> {
   if (platform === 'jd') {
     return { ok: true, items: [], total: 0, message: '京东本地生活商品列表尚未接入' }
@@ -137,6 +142,7 @@ export async function fetchMerchantProductList(
     page: String(page),
     page_size: String(pageSize),
   })
+  if (opts?.full) q.set('full', '1')
   const qs = `?${q}`
   const paths =
     platform === 'douyin'
@@ -226,13 +232,150 @@ function sanitizeDetailForResave(detail: DouyinProductDetailPayload): DouyinProd
   return detail
 }
 
-/** 将本地编辑结果同步至平台（演示：抖音；美团/小红书需网关对齐后扩展） */
-export async function postMerchantProductSync(
+/** 从平台拉取单商品信息与状态（行内「同步」） */
+export async function pullMerchantProductFromPlatform(
   platform: CreatePlatformId,
   productId: string,
 ): Promise<MerchantProductSyncResult> {
   if (platform !== 'douyin') {
-    return { ok: false, message: '当前仅抖音来客支持「同步」，其它平台请稍后再试或联系管理员。' }
+    return { ok: false, message: '当前仅抖音来客支持从平台拉取商品，其它平台请稍后再试。' }
+  }
+  const token = readToken(platform)
+  if (!token) {
+    return { ok: false, message: '未找到平台授权' }
+  }
+  const id = productId.trim()
+  const pullRes = await postDouyinGoodsProductSync(id)
+  if (!pullRes.ok) {
+    return { ok: false, message: pullRes.message }
+  }
+  if (pullRes.item) {
+    upsertProductEditLibraryFromApi(pullRes.item, 'douyin')
+  }
+  if (pullRes.detail) {
+    saveDraftDetailSnapshot(id, pullRes.detail as DouyinProductDetailPayload)
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, message: pullRes.message ?? '已从平台拉取该商品最新信息与状态' }
+}
+
+/** 全平台批量拉取商品列表（在售、审核中、已驳回、已下架等）并写入本地库 */
+export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantProductSyncResult> {
+  const platforms: CreatePlatformId[] = ['douyin', 'meituan', 'xiaohongshu']
+  let count = 0
+  const notes: string[] = []
+  for (const platform of platforms) {
+    const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 50, full: true })
+    if (!r.ok) {
+      notes.push(`${createPlatformLabel(platform)}：${r.message}`)
+      continue
+    }
+    if (r.message) notes.push(`${createPlatformLabel(platform)}：${r.message}`)
+    for (const item of r.items) {
+      upsertProductEditLibraryFromApi(item, platform)
+      count++
+    }
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
+  } catch {
+    /* ignore */
+  }
+  if (count === 0 && notes.length > 0) {
+    return { ok: false, message: notes.join('；') }
+  }
+  return {
+    ok: true,
+    message:
+      count > 0
+        ? `已同步 ${count} 个商品（含各平台在售、审核中、已驳回、已下架等状态）${notes.length ? `。${notes.join('；')}` : ''}`
+        : notes.join('；') || '未拉取到商品，请确认平台授权后重试',
+  }
+}
+
+export type MerchantProductShelfResult =
+  | { ok: true; message?: string }
+  | { ok: false; message: string }
+
+/** 上下架并同步至抖音来客 */
+export async function postMerchantProductShelfOperate(
+  platform: CreatePlatformId,
+  productId: string,
+  shelf: 'online' | 'offline',
+): Promise<MerchantProductShelfResult> {
+  if (platform !== 'douyin') {
+    return { ok: false, message: '当前仅抖音来客支持上下架操作' }
+  }
+  const token = readToken(platform)
+  if (!token) {
+    return { ok: false, message: '未找到平台授权' }
+  }
+  const id = productId.trim()
+  const op_type = shelf === 'online' ? 1 : 2
+  const bodyStr = JSON.stringify({ product_id: id, op_type })
+  const paths = [
+    '/api/meoo-douyin-goods-product-operate',
+    '/api/merchant/douyin/goods/product/operate',
+  ] as const
+  const targets = merchantApiFetchUrlCandidates(paths)
+  let lastStatus = 0
+  for (const target of targets) {
+    const res = await fetch(target, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      body: bodyStr,
+    })
+    lastStatus = res.status
+    const text = await res.text()
+    const trim = text.trimStart()
+    const ct = res.headers.get('content-type') ?? ''
+    if (isLikelyRouteMiss404(res, trim, ct)) continue
+    let data: Record<string, unknown> = {}
+    try {
+      data = JSON.parse(text || '{}') as Record<string, unknown>
+    } catch {
+      data = {}
+    }
+    if (!res.ok || data.ok === false) {
+      return {
+        ok: false,
+        message:
+          (typeof data.message === 'string' && data.message) ||
+          `上下架失败 HTTP ${res.status}`,
+      }
+    }
+    const pull = await pullMerchantProductFromPlatform(platform, id)
+    return {
+      ok: true,
+      message:
+        (typeof data.message === 'string' ? data.message : shelf === 'online' ? '已上架' : '已下架') +
+        (pull.ok ? '，已刷新本地状态' : `（${pull.message}）`),
+    }
+  }
+  return {
+    ok: false,
+    message:
+      lastStatus === 404
+        ? '上下架接口返回 404：请部署含 /api/meoo-douyin-goods-product-operate 的版本'
+        : `HTTP ${lastStatus || 404}`,
+  }
+}
+
+/** 将本地编辑结果推送至平台（保存草稿快照；编辑页等场景使用） */
+export async function pushMerchantProductToPlatform(
+  platform: CreatePlatformId,
+  productId: string,
+): Promise<MerchantProductSyncResult> {
+  if (platform !== 'douyin') {
+    return { ok: false, message: '当前仅抖音来客支持推送，其它平台请稍后再试或联系管理员。' }
   }
   const token = readToken(platform)
   if (!token) {
@@ -240,18 +383,12 @@ export async function postMerchantProductSync(
   }
   const id = productId.trim()
 
-  const syncRes = await postDouyinGoodsProductSync(id)
-  if (syncRes.ok) {
-    return { ok: true, message: syncRes.message }
-  }
-  const syncErr = syncRes.message
-
   const snapshot = loadDraftDetailSnapshot(id)
   if (snapshot) {
     const detail = sanitizeDetailForResave({ ...snapshot })
     const saveRes = await postDouyinGoodsProductSave({ mode: 'draft', detail })
     if (!saveRes.ok) {
-      return { ok: false, message: `${syncErr}；尝试按本地快照重新保存失败：${saveRes.message}` }
+      return { ok: false, message: saveRes.message }
     }
     const newPid = saveRes.product_id?.trim()
     if (newPid && newPid !== id) {
@@ -270,9 +407,20 @@ export async function postMerchantProductSync(
       ok: true,
       message:
         saveRes.message ??
-        '已根据本地草稿快照重新提交至抖音来客（goodlife/v1/goods/product/save）。',
+        '已根据本地草稿快照提交至抖音来客（goodlife/v1/goods/product/save）。',
     }
   }
 
-  return { ok: false, message: syncErr }
+  return {
+    ok: false,
+    message: '未找到本地商品快照，请进入编辑页保存后再推送。',
+  }
+}
+
+/** @deprecated 行内同步请使用 pullMerchantProductFromPlatform */
+export async function postMerchantProductSync(
+  platform: CreatePlatformId,
+  productId: string,
+): Promise<MerchantProductSyncResult> {
+  return pullMerchantProductFromPlatform(platform, productId)
 }
