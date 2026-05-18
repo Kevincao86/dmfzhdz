@@ -1,6 +1,8 @@
 import { ChevronLeft, Loader2, Sparkles, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import DouyinComboGroupsEditor from '../../components/douyin/DouyinComboGroupsEditor'
 import DouyinProductAiModelSection from '../../components/douyin/DouyinProductAiModelSection'
+import type { ComboGroupFormRow } from '../../lib/douyinComboGroupsForm'
 import {
   DouyinProductPreviewAside,
   type DouyinPreviewComboLine,
@@ -44,10 +46,8 @@ export type DouyinWizardDetailProps = {
   setAuxUrls: (v: string[]) => void
   envUrls: string[]
   setEnvUrls: (v: string[]) => void
-  itemName: string
-  setItemName: (v: string) => void
-  itemPriceYuan: string
-  setItemPriceYuan: (v: string) => void
+  comboGroups: ComboGroupFormRow[]
+  setComboGroups: (v: ComboGroupFormRow[]) => void
   salesChannel: string
   setSalesChannel: (v: string) => void
   saleTimeLimited: boolean
@@ -176,17 +176,29 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
 
   const previewComboLines = useMemo((): DouyinPreviewComboLine[] => {
     if (props.productType !== 1) return []
-    const name = props.itemName.trim() || props.productName.trim()
-    if (!name) return []
-    const py = Number.parseFloat(props.itemPriceYuan) || Number.parseFloat(props.priceYuan) || 0
-    return [
-      {
-        name,
+    const fallbackPrice = Number.parseFloat(props.priceYuan) || 0
+    const lines: DouyinPreviewComboLine[] = []
+    for (const g of props.comboGroups) {
+      for (const it of g.items) {
+        const name = it.name.trim()
+        if (!name) continue
+        const py = Number.parseFloat(it.priceYuan) || fallbackPrice
+        lines.push({
+          name,
+          qty: String(Math.max(1, it.quantity || 1)),
+          price: Number.isFinite(py) && py > 0 ? String(py) : '',
+        })
+      }
+    }
+    if (lines.length === 0 && props.productName.trim()) {
+      lines.push({
+        name: props.productName.trim(),
         qty: '1',
-        price: Number.isFinite(py) && py > 0 ? String(py) : '',
-      },
-    ]
-  }, [props.productType, props.itemName, props.productName, props.itemPriceYuan, props.priceYuan])
+        price: fallbackPrice > 0 ? String(fallbackPrice) : '',
+      })
+    }
+    return lines
+  }, [props.productType, props.comboGroups, props.productName, props.priceYuan])
 
   const previewProps = useMemo(
     () => ({
@@ -532,24 +544,10 @@ export default function DouyinProductWizardDetail(props: DouyinWizardDetailProps
       {props.productType === 1 && (
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
           <h3 className="font-semibold">团购单品（商品组）</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-sm block">
-              单品名称
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={props.itemName}
-                onChange={(e) => props.setItemName(e.target.value)}
-              />
-            </label>
-            <label className="text-sm block">
-              单品标价（元）
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={props.itemPriceYuan}
-                onChange={(e) => props.setItemPriceYuan(e.target.value)}
-              />
-            </label>
-          </div>
+          <DouyinComboGroupsEditor
+            groups={props.comboGroups}
+            onChange={props.setComboGroups}
+          />
         </div>
       )}
 

@@ -7,6 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../cn'
 import {
+  comboGroupsFromPackageCombo,
+  createDefaultComboGroups,
+  packageComboFromFormGroups,
+  type ComboGroupFormRow,
+} from '../../lib/douyinComboGroupsForm'
+import {
   composeProductDescWithRules,
   parseFormRulesFromDetailPayload,
   type DouyinProductFormRules,
@@ -93,8 +99,7 @@ export default function DouyinProductCreateWizard({
   const [headUrl, setHeadUrl] = useState('')
   const [auxUrls, setAuxUrls] = useState<string[]>([''])
   const [envUrls, setEnvUrls] = useState<string[]>([''])
-  const [itemName, setItemName] = useState('')
-  const [itemPriceYuan, setItemPriceYuan] = useState('')
+  const [comboGroups, setComboGroups] = useState<ComboGroupFormRow[]>(() => createDefaultComboGroups())
 
   const [selectedPoiIds, setSelectedPoiIds] = useState<string[]>([])
   const [selectedPoiNames, setSelectedPoiNames] = useState<string[]>([])
@@ -244,12 +249,7 @@ export default function DouyinProductCreateWizard({
       setAuxUrls(d.aux_image_urls?.length ? d.aux_image_urls : [''])
       setEnvUrls(d.env_image_urls?.length ? d.env_image_urls : [''])
       setSelectedPoiIds(d.poi_ids ?? [])
-      const g0 = d.package_combo?.groups?.[0]
-      const it0 = g0?.items?.[0]
-      if (it0?.name) setItemName(String(it0.name))
-      if (it0?.origin_price_yuan != null) {
-        setItemPriceYuan(String(Number(it0.origin_price_yuan) || ''))
-      }
+      setComboGroups(comboGroupsFromPackageCombo(d.package_combo))
       const parsed = parseFormRulesFromDetailPayload(
         d.trade_rules,
         d.sales_info,
@@ -380,9 +380,7 @@ export default function DouyinProductCreateWizard({
     const head = headUrl.trim()
     if (!/^https?:\/\//i.test(head)) return null
 
-    const comboName = (itemName.trim() || name).slice(0, 30)
-    const comboPrice = Number.parseFloat(itemPriceYuan) || price
-    const origin = Number.parseFloat(originYuan) || comboPrice
+    const origin = Number.parseFloat(originYuan) || price
 
     const out_id =
       stableOutIdRef.current?.trim() ||
@@ -408,20 +406,7 @@ export default function DouyinProductCreateWizard({
       poi_ids: selectedPoiIds,
       package_combo:
         productType === 1
-          ? {
-              groups: [
-                {
-                  pick_rule: '全部必选',
-                  items: [
-                    {
-                      name: comboName,
-                      quantity: 1,
-                      origin_price_yuan: comboPrice,
-                    },
-                  ],
-                },
-              ],
-            }
+          ? packageComboFromFormGroups(comboGroups, { productName: name, priceYuan: price })
           : undefined,
       sales_info: {
         channel: salesChannel,
@@ -478,8 +463,7 @@ export default function DouyinProductCreateWizard({
     dailyTimePeriods,
     envUrls,
     headUrl,
-    itemName,
-    itemPriceYuan,
+    comboGroups,
     nonConsumeDateMode,
     nonConsumeHolidays,
     nonConsumeSpecificDates,
@@ -866,10 +850,8 @@ export default function DouyinProductCreateWizard({
           setAuxUrls={setAuxUrls}
           envUrls={envUrls}
           setEnvUrls={setEnvUrls}
-          itemName={itemName}
-          setItemName={setItemName}
-          itemPriceYuan={itemPriceYuan}
-          setItemPriceYuan={setItemPriceYuan}
+          comboGroups={comboGroups}
+          setComboGroups={setComboGroups}
           salesChannel={salesChannel}
           setSalesChannel={setSalesChannel}
           saleTimeLimited={saleTimeLimited}
