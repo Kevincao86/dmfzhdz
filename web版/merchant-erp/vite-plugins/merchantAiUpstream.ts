@@ -9,8 +9,11 @@ import type { ServerResponse } from 'node:http'
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import {
   extractMainProductFromListingTitle,
+  isGroupBuyGoodsProduct,
+  isVoucherGoodsProduct,
   isWeakMainProductAnchor,
   mainProductCategoryHints,
+  resolveMainProductForImage,
 } from '../src/lib/douyinProductImageAnchor.js'
 import { defaultModelIdForFamily } from '../src/services/ai/tokenmixClient.js'
 import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
@@ -233,6 +236,7 @@ async function runImageGenerateWithBuiltinFailover(
   imageRole: string,
   lockSuffix: string,
   mainProductAnchor: string,
+  goodsTypeCtx?: ImageGoodsTypeCtx,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -246,6 +250,7 @@ async function runImageGenerateWithBuiltinFailover(
       imageRole,
       lockSuffix,
       mainProductAnchor,
+      goodsTypeCtx,
     )
     return { urls, modelUsed: primaryNorm }
   } catch (e) {
@@ -265,6 +270,7 @@ async function runImageGenerateWithBuiltinFailover(
         imageRole,
         lockSuffix,
         mainProductAnchor,
+        goodsTypeCtx,
       )
       return { urls, modelUsed: alt }
     } catch (e) {
@@ -416,6 +422,7 @@ async function runImageEnhanceWithBuiltinFailover(
   imageUrls: string[],
   lockSuffix: string,
   mainProductAnchor: string,
+  goodsTypeCtx?: ImageGoodsTypeCtx,
 ): Promise<{ urls: string[]; modelUsed: string }> {
   const primaryNorm = normalizeAiModelPreserveCustom(primary)
   let lastErr: unknown = null
@@ -433,6 +440,7 @@ async function runImageEnhanceWithBuiltinFailover(
           u,
           lockSuffix,
           mainProductAnchor,
+          goodsTypeCtx,
         ),
       )
     }
@@ -458,6 +466,7 @@ async function runImageEnhanceWithBuiltinFailover(
             u,
             lockSuffix,
             mainProductAnchor,
+            goodsTypeCtx,
           ),
         )
       }
@@ -888,8 +897,22 @@ async function resolveMainProductAnchorForImage(
   productName: string,
 ): Promise<string> {
   const listingTitle = String(body.listing_title ?? productName).trim() || productName.trim()
+  const productTypeRaw = body.goods_product_type
+  const productType =
+    typeof productTypeRaw === 'number' && Number.isFinite(productTypeRaw)
+      ? productTypeRaw
+      : typeof productTypeRaw === 'string' && String(productTypeRaw).trim()
+        ? Number(String(productTypeRaw).trim())
+        : null
+  const typeLabel = String(body.goods_product_type_label ?? '').trim()
   const fromClient = String(body.main_product_heuristic ?? '').trim()
-  let anchor = fromClient || extractMainProductFromListingTitle(listingTitle)
+  let anchor =
+    fromClient ||
+    resolveMainProductForImage({
+      listingTitle,
+      productType: Number.isFinite(productType) ? productType : null,
+      productTypeLabel: typeLabel,
+    })
 
   if (!isWeakMainProductAnchor(anchor, listingTitle)) {
     return anchor.slice(0, 120)
@@ -898,10 +921,18 @@ async function resolveMainProductAnchorForImage(
   const { key } = pickKey(env, 'doubao')
   if (!key) return (anchor || listingTitle).slice(0, 120)
 
-  const system = `你是抖音来客团购「商品标题」解析助手。只根据标题识别「主推产品/服务」名称。
-规则：去掉满减面额、渠道词；标题含「|」时以左侧为主；代金券/团购券类须输出券的适用品类名，勿输出具体无关货架单品。
-只输出一行 JSON：{"main_product":"..."}，main_product 不超过 28 字，勿 Markdown、勿其它字段。`
-  const user = `商品标题：${listingTitle}`
+  const isVoucher = isVoucherGoodsProduct(
+    Number.isFinite(productType) ? productType : null,
+    typeLabel,
+    listingTitle,
+  )
+  const system = isVoucher
+    ? `你是抖音来客「代金券」标题解析助手。结合商品类型与标题，输出券面主推文案。
+规则：若标题含「90代100代金券」等形式，main_product 必须保留该面额字样；若仅「满90抵100」可输出「满90元抵100元」；可附带适用品类如「日用百货通用代金券」。
+只输出一行 JSON：{"main_product":"..."}，不超过 32 字。`
+    : `你是抖音来客「团购套餐」标题解析助手。识别主推套餐/服务名，勿输出满减数字除非属于套餐名。
+只输出一行 JSON：{"main_product":"..."}，不超过 32 字。`
+  const user = `商品类型：${typeLabel || (Number.isFinite(productType) ? `product_type=${productType}` : '未知')}\n商品标题：${listingTitle}`
   try {
     const raw = await callDoubaoChat(key, env, system, user)
     const parsed = JSON.parse(stripAssistantJsonFence(raw)) as { main_product?: string }
@@ -913,6 +944,8 @@ async function resolveMainProductAnchorForImage(
   return (anchor || extractMainProductFromListingTitle(listingTitle) || listingTitle).slice(0, 120)
 }
 
+type ImageGoodsTypeCtx = { productType?: number | null; typeLabel?: string }
+
 function buildImagePrompt(
   productName: string,
   titleDraft: string,
@@ -920,13 +953,24 @@ function buildImagePrompt(
   mode: 't2i' | 'i2i',
   lockSuffix = '',
   mainProductAnchor = '',
+  goodsTypeCtx?: ImageGoodsTypeCtx,
 ): string {
   const listingTitle = productName.trim() || '本地生活服务'
   const main =
     mainProductAnchor.trim() ||
-    extractMainProductFromListingTitle(listingTitle) ||
+    resolveMainProductForImage({
+      listingTitle,
+      productType: goodsTypeCtx?.productType,
+      productTypeLabel: goodsTypeCtx?.typeLabel,
+    }) ||
     mergeProductSellingAnchor(productName, titleDraft).slice(0, 120)
-  const categoryHint = mainProductCategoryHints(main)
+  const isVoucher = isVoucherGoodsProduct(
+    goodsTypeCtx?.productType,
+    goodsTypeCtx?.typeLabel,
+    listingTitle,
+  )
+  const isGroupBuy = isGroupBuyGoodsProduct(goodsTypeCtx?.productType, goodsTypeCtx?.typeLabel)
+  const categoryHint = mainProductCategoryHints(main, { isVoucher, isGroupBuy })
   const titleCtx = titleDraft.trim().slice(0, 280)
   const stepOne = `【两步流程·必须遵守】①已从商品标题解析主推产品：「${main}」。②成片、场景、道具必须仅服务该主推，不得偷换为其它单品或无关业态。${categoryHint}`
   const bind = `${stepOne}\n【硬性锚定】团购标题原文：「${listingTitle.slice(0, 200)}」。${titleCtx ? `补充上下文（次要，不得偏离主推）：${titleCtx}` : ''}禁止：手机/电脑/平板等数码特写、与主推无关的卖场货架特写、展厅样板间、奢侈品橱窗、办公室工位、空镜走廊等占位画面。`
@@ -1159,8 +1203,17 @@ async function runImageGenerate(
   imageRole: string,
   lockSuffix = '',
   mainProductAnchor = '',
+  goodsTypeCtx?: ImageGoodsTypeCtx,
 ): Promise<string[]> {
-  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 't2i', lockSuffix, mainProductAnchor)
+  const prompt = buildImagePrompt(
+    productName,
+    titleDraft,
+    imageRole,
+    't2i',
+    lockSuffix,
+    mainProductAnchor,
+    goodsTypeCtx,
+  )
   if (model === 'qwen') {
     const u = await qwenWanxOneImage(key, env, prompt)
     return [u]
@@ -1198,8 +1251,17 @@ async function runImageEnhanceOne(
   _sourceUrl: string,
   lockSuffix = '',
   mainProductAnchor = '',
+  goodsTypeCtx?: ImageGoodsTypeCtx,
 ): Promise<string> {
-  const prompt = buildImagePrompt(productName, titleDraft, imageRole, 'i2i', lockSuffix, mainProductAnchor)
+  const prompt = buildImagePrompt(
+    productName,
+    titleDraft,
+    imageRole,
+    'i2i',
+    lockSuffix,
+    mainProductAnchor,
+    goodsTypeCtx,
+  )
   if (model === 'qwen') {
     return qwenWanxOneImage(key, env, prompt, _sourceUrl)
   }
@@ -1783,6 +1845,17 @@ export async function handleDouyinGoodsAiAssist(
     }
 
     try {
+      const ptRaw = body.goods_product_type
+      const ptNum =
+        typeof ptRaw === 'number' && Number.isFinite(ptRaw)
+          ? ptRaw
+          : typeof ptRaw === 'string' && String(ptRaw).trim()
+            ? Number(String(ptRaw).trim())
+            : NaN
+      const goodsTypeCtx: ImageGoodsTypeCtx = {
+        productType: Number.isFinite(ptNum) ? ptNum : null,
+        typeLabel: String(body.goods_product_type_label ?? '').trim(),
+      }
       const mainProductAnchor = await resolveMainProductAnchorForImage(env, body, productName)
       const imageLockSuffix =
         goodsLock + `\n\n【主推产品·已从商品标题解析】${mainProductAnchor}`
@@ -1796,6 +1869,7 @@ export async function handleDouyinGoodsAiAssist(
           imageRole,
           imageLockSuffix,
           mainProductAnchor,
+          goodsTypeCtx,
         )
         json(res, 200, {
           ok: true,
@@ -1814,6 +1888,7 @@ export async function handleDouyinGoodsAiAssist(
         imageUrls,
         imageLockSuffix,
         mainProductAnchor,
+        goodsTypeCtx,
       )
       json(res, 200, {
         ok: true,
