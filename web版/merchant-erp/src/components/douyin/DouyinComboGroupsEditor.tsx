@@ -4,6 +4,7 @@ import {
   type ComboGroupFormRow,
   createEmptyComboItem,
   defaultComboGroupName,
+  normalizePickRuleForItemCount,
   pickRuleSelectOptionsForItemCount,
 } from '../../lib/douyinComboGroupsForm'
 import { cn } from '../../cn'
@@ -77,10 +78,16 @@ export default function DouyinComboGroupsEditor({
     onChange(cp)
   }
 
+  const withSyncedPickRule = (g: ComboGroupFormRow, items: ComboGroupFormRow['items']): ComboGroupFormRow => ({
+    ...g,
+    items,
+    pickRule: normalizePickRuleForItemCount(g.pickRule, items.length),
+  })
+
   const addItem = (gid: string) => {
     onChange(
       groups.map((g) =>
-        g.id === gid ? { ...g, items: [...g.items, createEmptyComboItem()] } : g,
+        g.id === gid ? withSyncedPickRule(g, [...g.items, createEmptyComboItem()]) : g,
       ),
     )
   }
@@ -90,7 +97,7 @@ export default function DouyinComboGroupsEditor({
       groups.map((g) => {
         if (g.id !== gid) return g
         const next = g.items.filter((it) => it.id !== iid)
-        return { ...g, items: next.length > 0 ? next : [createEmptyComboItem()] }
+        return withSyncedPickRule(g, next.length > 0 ? next : [createEmptyComboItem()])
       }),
     )
   }
@@ -108,8 +115,11 @@ export default function DouyinComboGroupsEditor({
         <code className="rounded bg-gray-100 px-1 text-[11px]">combo_rule</code>。
       </p>
       {groups.map((g, gi) => {
-        const listed = g.items.filter((it) => it.name.trim()).length
-        const pickOpts = pickRuleSelectOptionsForItemCount(listed || 1)
+        const itemRowCount = g.items.length
+        const pickOpts = pickRuleSelectOptionsForItemCount(itemRowCount)
+        const pickRuleValue = pickOpts.some((o) => o.value === g.pickRule)
+          ? g.pickRule
+          : normalizePickRuleForItemCount(g.pickRule, itemRowCount)
         return (
           <div
             key={g.id}
@@ -127,10 +137,11 @@ export default function DouyinComboGroupsEditor({
                 />
               </label>
               <select
-                value={g.pickRule}
+                value={pickRuleValue}
                 onChange={(e) => updateGroup(g.id, { pickRule: e.target.value })}
                 className="max-w-[10rem] rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs"
                 aria-label="几选几"
+                title={`共 ${itemRowCount} 个单品行，可选 ${itemRowCount}选1 至 全部必选`}
               >
                 {pickOpts.map((o) => (
                   <option key={o.value || 'empty'} value={o.value}>
