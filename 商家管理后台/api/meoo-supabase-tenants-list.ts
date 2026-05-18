@@ -127,6 +127,7 @@ async function listTenantsWithServiceRoleFetch(
     const uid = ownerByTenant.get(t.id)
     let login_name = ''
     let user_email = ''
+    let owner_phone = ''
     if (uid) {
       try {
         const ur = await fetch(`${base}/auth/v1/admin/users/${encodeURIComponent(uid)}`, {
@@ -137,12 +138,18 @@ async function listTenantsWithServiceRoleFetch(
           try {
             const wrap = JSON.parse(utext) as Record<string, unknown>
             const u = (wrap.user ?? wrap) as Record<string, unknown>
-            const meta = u.user_metadata as { login_name?: string } | undefined
+            const meta = u.user_metadata as { login_name?: string; phone?: string } | undefined
             const email = typeof u.email === 'string' ? u.email : ''
             user_email = email
             login_name =
               (typeof meta?.login_name === 'string' && meta.login_name.trim()) ||
               (email ? email.split('@')[0] ?? '' : '')
+            const metaPhone = typeof meta?.phone === 'string' ? meta.phone.replace(/\D/g, '') : ''
+            const authPhone =
+              typeof u.phone === 'string' ? u.phone.replace(/\D/g, '').replace(/^86/, '') : ''
+            owner_phone =
+              (metaPhone.length === 11 ? metaPhone : '') ||
+              (authPhone.length === 11 ? authPhone : authPhone.length === 13 && authPhone.startsWith('86') ? authPhone.slice(2) : '')
           } catch {
             /* ignore */
           }
@@ -156,6 +163,7 @@ async function listTenantsWithServiceRoleFetch(
       merchant_name: t.name,
       login_name: login_name || '—',
       user_email,
+      owner_phone: owner_phone || null,
       account_status: t.account_status,
       trial_days: t.trial_days,
       official_days: t.official_days,

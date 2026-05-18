@@ -1,14 +1,18 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import {
-  dispatchSms,
   isValidLoginName,
   isValidMerchantShortName,
-  issueSmsCode,
   normalizeCnMobile,
-  verifySmsCode,
 } from './authRegistrationOtp.js'
 import { provisionMerchantTenant } from './authRegisterProvision.js'
+import {
+  createAdminSessionForUserId,
+  findAuthUserByPhone,
+  phoneAlreadyRegistered,
+  sendAuthSmsCode,
+  verifyAuthSmsCode,
+} from './authSmsAuthShared.js'
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -41,22 +45,71 @@ export function authRegisterGatewayPlugin(): Plugin {
             const body = JSON.parse(raw || '{}') as { phone?: string }
             const phone = normalizeCnMobile(body.phone ?? '')
             if (!phone) {
-              json(res, 400, { ok: false, error: 'invalid_phone' })
+              json(res, 400, { ok: false, error: 'invalid_phone', message: '请输入有效大陆手机号' })
               return
             }
-            const { code } = issueSmsCode(phone, viteRoot)
-            const sms = await dispatchSms(phone, code)
-            if (!sms.sent && !sms.devExpose) {
-              json(res, 503, { ok: false, error: 'sms_not_configured' })
+            const sms = await sendAuthSmsCode(phone, viteRoot)
+            if (!sms.ok) {
+              json(res, 503, { ok: false, error: sms.error, message: sms.message })
               return
             }
             json(res, 200, {
               ok: true,
-              message: '验证码已发送',
-              ...(sms.devExpose ? { devCode: sms.devExpose } : {}),
+              message: sms.message,
+              ...(sms.devCode ? { devCode: sms.devCode } : {}),
             })
           } catch (e) {
             json(res, 500, { ok: false, error: 'sms_send_failed', detail: String(e) })
+          }
+          return
+        }
+
+        if (url === '/api/meoo-auth-sms-login') {
+          try {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { phone?: string; smsCode?: string }
+            const phone = normalizeCnMobile(body.phone ?? '')
+            const smsCode = String(body.smsCode ?? '').trim()
+            if (!phone) {
+              json(res, 400, { ok: false, error: 'invalid_phone', message: '请输入有效大陆手机号' })
+              return
+            }
+            if (!/^\d{6}$/.test(smsCode)) {
+              json(res, 400, { ok: false, error: 'invalid_sms_code', message: '请输入 6 位验证码' })
+              return
+            }
+            if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
+              json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+              return
+            }
+            const user = await findAuthUserByPhone(phone)
+            if (!user) {
+              json(res, 404, {
+                ok: false,
+                error: 'phone_not_registered',
+                message: '该手机号尚未注册，请先注册',
+              })
+              return
+            }
+            const session = await createAdminSessionForUserId(user.userId, user.email)
+            if (!session.ok) {
+              json(res, 503, {
+                ok: false,
+                error: session.error,
+                message: '登录服务暂不可用',
+                detail: session.detail,
+              })
+              return
+            }
+            json(res, 200, {
+              ok: true,
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+              expires_in: session.expires_in,
+              loginName: user.loginName,
+            })
+          } catch (e) {
+            json(res, 500, { ok: false, error: 'sms_login_failed', detail: String(e) })
           }
           return
         }
@@ -103,8 +156,12 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, 400, { ok: false, error: 'password_mismatch', message: '两次输入的密码不一致' })
               return
             }
-            if (!verifySmsCode(phone, smsCode, viteRoot)) {
+            if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
               json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+              return
+            }
+            if (await phoneAlreadyRegistered(phone)) {
+              json(res, 409, { ok: false, error: 'phone_exists', message: '该手机号已注册，请直接登录' })
               return
             }
 
@@ -127,7 +184,7 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, status, { ok: false, error: result.error, message: msg, detail: result.detail })
               return
             }
-            json(res, 200, { ok: true, message: '注册成功，请使用登录名与密码登录' })
+            json(res, 200, { ok: true, message: '注册成功，请登录', tenantId: result.tenantId })
           } catch (e) {
             json(res, 500, { ok: false, error: 'register_failed', detail: String(e) })
           }

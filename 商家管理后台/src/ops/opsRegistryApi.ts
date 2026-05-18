@@ -19,6 +19,8 @@ export type RegistryTenant = {
   updatedAt: string
   /** Supabase Auth 登录邮箱（仅云端租户列表合并时填充） */
   authLoginEmail?: string
+  /** 注册手机号（Supabase 租户列表合并时填充） */
+  phone?: string
   walletBalanceCents?: number
   serviceExpireAt?: string
 }
