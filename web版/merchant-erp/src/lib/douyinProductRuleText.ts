@@ -1,8 +1,9 @@
 import { sanitizeDouyinProductDescriptionCompliance } from './douyinDescCompliance.js'
 
 /**
- * 将售卖/消费/预约等规则整理为「商品说明」附录，供 description_rich_text / Notification 展示。
- * 网关仍按 trade_rules / sales_info 写入 use_date、use_time、limit_use_rule 等 OpenAPI 字段。
+ * 售卖/消费/预约规则的中文摘要（仅用于表单预览与 C 端预览展示）。
+ * 保存时由网关写入 show_channel、use_date、use_time、can_no_use_date、appointment、
+ * limit_use_rule、RefundPolicy、sold_*_time、sku.limit_rule 等 OpenAPI 字段，不并入商品说明正文。
  */
 
 export type DouyinWeekdayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
@@ -158,19 +159,12 @@ export function buildTradeRuleDescriptionLines(rules: DouyinProductFormRules): s
   return lines
 }
 
-/** 合并用户手写说明与规则摘要（避免重复追加） */
+/** 商品说明正文：仅保留用户手写内容（合规过滤），规则由网关映射至 OpenAPI 专用字段 */
 export function composeProductDescWithRules(
   userDesc: string,
-  rules: DouyinProductFormRules,
+  _rules?: DouyinProductFormRules,
 ): string {
-  const base = sanitizeDouyinProductDescriptionCompliance(String(userDesc ?? '').trim())
-  const ruleLines = buildTradeRuleDescriptionLines(rules)
-  const block = ruleLines.join('\n')
-  if (!block) return base
-  if (base.includes('投放渠道：') || base.includes('售卖时间：')) {
-    return base
-  }
-  return base ? `${base}\n\n${block}` : block
+  return sanitizeDouyinProductDescriptionCompliance(String(userDesc ?? '').trim())
 }
 
 export function parseFormRulesFromDetailPayload(

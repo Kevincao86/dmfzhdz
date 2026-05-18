@@ -268,14 +268,14 @@ export function DouyinProductScrollFollowPreview(props: Props) {
   )
 }
 
-/** @deprecated 侧栏内嵌，请用 DouyinProductScrollFollowPreview */
+/** 贴靠表单左侧内容区，随页面纵向滚动（sticky，不跟随鼠标） */
 export function DouyinProductPreviewAside(props: Props) {
   return (
     <aside className={cn('hidden w-full xl:block', props.className)}>
       <div className="sticky top-20 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <p className="mb-3 text-sm font-semibold text-gray-900">C 端预览</p>
         <DouyinProductMobilePreviewFrame {...props} embedded />
-        <p className="mt-2 text-center text-[10px] text-gray-400">布局参考抖音来客团购页</p>
+        <p className="mt-2 text-center text-[10px] text-gray-400">随页面滚动 · 布局参考抖音来客团购页</p>
       </div>
     </aside>
   )
