@@ -61,7 +61,10 @@ function logoForImagePicker(o: AiModelPickerOption): string | undefined {
  * 手选展示为 logo + 品牌名。
  */
 export function listWizardImageModelOptions(): WizardAiModelOption[] {
-  const imageOpts = listAiModelPickerOptions().filter((o) => o.capability === 'image')
+  /** 商品向导生图仅走 /api/meoo-douyin-goods-ai-assist → 万相/豆包/MiniMax，勿展示 TokenMix 伪「OpenAI 生图」项 */
+  const imageOpts = listAiModelPickerOptions().filter(
+    (o) => o.capability === 'image' && o.key.startsWith('img::v::'),
+  )
   const seen = new Set<string>()
   const out: WizardAiModelOption[] = []
   for (const o of imageOpts) {

@@ -17,7 +17,9 @@ export default function DouyinProductAiModelSection() {
           <AiModelAutoPicker kind="text" options={textOptions} compactManualTrigger />
         </div>
         <div>
-          <p className="mb-2 text-xs font-medium text-violet-900">图片大模型（与 AI 智能体生图一致）</p>
+          <p className="mb-2 text-xs font-medium text-violet-900">
+            图片大模型（万相 / 豆包 / MiniMax，与商品标题类型绑定）
+          </p>
           <AiModelAutoPicker kind="image" options={imageOptions} compactManualTrigger />
         </div>
       </div>

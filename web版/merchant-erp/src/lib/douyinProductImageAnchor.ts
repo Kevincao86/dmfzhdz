@@ -123,13 +123,24 @@ export function voucherImageNegativePrompt(): string {
   ].join(', ')
 }
 
+/** 代金券生图用短标题：只用面额字样，避免「日用百货/购物」把模型引向货架实景 */
+export function voucherVisualTitleForImagePrompt(listingTitle: string): string {
+  const denom = extractVoucherDenomPhraseFromTitle(listingTitle)
+  if (denom) return denom
+  const cat = extractMainProductFromListingTitle(listingTitle)
+  if (/代金券|团购券|优惠券/.test(cat)) return cat
+  return '代金券'
+}
+
 /** 代金券专用生图指令（平面券面，非实景） */
-export function buildVoucherFaceImagePromptBlock(faceText: string, categoryHint: string): string {
+export function buildVoucherFaceImagePromptBlock(faceText: string, subtitle?: string): string {
   const face = faceText.trim() || '代金券'
-  return `【画面类型·最高优先级】生成一张本地生活「团购代金券」平面主图（2D 平面设计、插画或扁平化券面，禁止摄影实景、禁止 3D 场景）。
-【券面主文案·必须清晰可读】超大号中文居中：「${face}」，可副标「${categoryHint.slice(0, 40)}」。
-【视觉】红橙金渐变券体、圆角、轻微阴影、简洁背景；可有「到店核销」「抖音来客」小字。
-【严禁】自动售货机、货架、超市陈列、玩具/建筑微缩模型、餐饮菜品、人物肖像、办公室、展厅、任何与代金券无关的实体商品或场景。`
+  const sub = (subtitle ?? '团购代金券').trim().slice(0, 24)
+  return `Flat 2D digital coupon voucher poster, local life group-buy, NO photo, NO 3D diorama, NO vending machine, NO supermarket shelf.
+【画面类型·最高优先级】团购代金券平面主图（扁平插画/券面设计，禁止摄影实景与微缩模型场景）。
+【券面主文案·必须清晰可读】超大号中文：「${face}」${sub && sub !== face ? `，副标「${sub}」` : ''}。
+【视觉】红橙金渐变券体、圆角、简洁背景；可有「到店核销」小字。
+【严禁】自动售货机、货架、超市、日用百货陈列、玩具模型、建筑模型、餐饮、人物、办公室、展厅。`
 }
 
 /** 从团购标题抽取品类/券种描述（去掉满减等，保留「通用代金券」等） */
@@ -228,7 +239,8 @@ export function buildImageAssistTextFields(
   })
   const desc = (productDesc ?? '').trim().slice(0, 240)
 
-  const typeLine = isVoucherGoodsProduct(productType, typeLabel, listing)
+  const isVoucher = isVoucherGoodsProduct(productType, typeLabel, listing)
+  const typeLine = isVoucher
     ? `【商品类型】代金券（须生成券面/核销示意，禁止无关实体货架或玩具模型）`
     : isGroupBuyGoodsProduct(productType, typeLabel)
       ? `【商品类型】团购套餐（突出套餐内容/就餐场景）`
@@ -238,9 +250,9 @@ export function buildImageAssistTextFields(
           ? `【商品类型】product_type=${productType}`
           : ''
 
-  const titleCore = `${typeLine ? `${typeLine}\n` : ''}【商品标题·须先解析主推产品再出图】${listing}`
+  const titleCore = `${typeLine ? `${typeLine}\n` : ''}【商品标题·主推】${isVoucher ? voucherVisualTitleForImagePrompt(listing) : listing}`
   const title_draft =
-    desc && listing && !desc.startsWith(listing)
+    !isVoucher && desc && listing && !desc.startsWith(listing)
       ? `${titleCore}\n【说明摘录·次要，勿偏离类型与标题主推】${desc}`
       : titleCore
 

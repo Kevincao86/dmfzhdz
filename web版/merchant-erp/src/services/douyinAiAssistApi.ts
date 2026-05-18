@@ -161,6 +161,13 @@ export type AiAssistResult =
       image_urls?: string[]
       /** 网关因上游失败自动改用的内置厂商 id（minimax / qwen / doubao） */
       ai_vendor_used?: string
+      /** 生图调试：手选厂商 vs 实际像素引擎、是否代金券模式、主推锚点 */
+      image_meta?: {
+        requested_model: string
+        resolved_model: string
+        voucher_mode: boolean
+        main_product_anchor: string
+      }
     }
 
 function parseNeedVendorKey(data: Record<string, unknown>): string | undefined {

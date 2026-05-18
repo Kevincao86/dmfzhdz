@@ -71,7 +71,20 @@ export function useDouyinProductWizardAi(params: {
         model,
         ...(params.goodsContext ?? {}),
       })
-      if (r.ok || !r.needVendorKey) return r
+      if (r.ok) {
+        const meta = 'image_meta' in r ? r.image_meta : undefined
+        if (
+          meta &&
+          meta.requested_model !== meta.resolved_model &&
+          (body.action === 'image_generate' || body.action === 'image_enhance')
+        ) {
+          console.info(
+            `[商品生图] 手选「${meta.requested_model}」未接像素引擎，已使用 ${meta.resolved_model}；代金券模式=${meta.voucher_mode}，锚点=${meta.main_product_anchor}`,
+          )
+        }
+        return r
+      }
+      if (!r.needVendorKey) return r
       return {
         ok: false as const,
         message: `${r.message} 请在部署环境配置 MERCHANT_AI_QWEN_KEY、MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_MINIMAX_KEY 等密钥。`,

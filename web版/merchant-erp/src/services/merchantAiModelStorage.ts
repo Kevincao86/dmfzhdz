@@ -1,8 +1,5 @@
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
-import {
-  nativeImagePreferredVendorFromPicker,
-  parseAgentImagePickerKey,
-} from './ai/agentImageModelKeys'
+import { nativeImagePreferredVendorFromPicker } from './ai/agentImageModelKeys'
 import { listAiUiModelOptions, MEOO_AI_VENDOR_CATALOG_EVENT } from './merchantAiVendorCatalogClient'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
@@ -74,20 +71,27 @@ function normalizeImageModelStored(raw: string | null | undefined): string {
   return pickAutoResolvedImageModel()
 }
 
-/** 商品 AI assist：将智能体 img:: 手选 key 解析为网关 model 字段 */
+/**
+ * 商品 AI 生图/修图：仅解析为网关已接的像素引擎（万相 / 豆包 Seedream / MiniMax）。
+ * OpenAI·DALL·E、Claude 图像等 TokenMix 项在智能体页可用，但本接口不会调用它们（此前误传 openai 导致静默回落且 UI 误导）。
+ */
 export function resolveImageAssistModelId(): string {
   const id = resolveImageAiModelForRequest()
-  if (!id.startsWith('img::')) return id
-  const vendor = nativeImagePreferredVendorFromPicker(id)
-  if (vendor) return vendor
-  const p = parseAgentImagePickerKey(id)
-  if (p?.kind === 'style') {
-    if (p.family === 'gemini') return 'gemini'
-    if (p.family === 'openai' || p.family === 'grok') return 'openai'
-    if (p.family === 'claude') return 'claude'
+  if (id.startsWith('img::v::')) {
+    const vendor = nativeImagePreferredVendorFromPicker(id)
+    if (vendor) return vendor
+    return pickAutoResolvedImageModel()
   }
-  if (p?.kind === 'brand-direct') return p.slug
+  if (id.startsWith('img::')) {
+    return pickAutoResolvedImageModel()
+  }
+  if (isDouyinAssistAiVendorId(id)) return id
   return pickAutoResolvedImageModel()
+}
+
+/** 手选展示用：是否与请求实际使用的生图引擎一致 */
+export function isNativeGoodsImagePickerKey(id: string): boolean {
+  return id.startsWith('img::v::')
 }
 
 export function readStoredAiModel(): string {
