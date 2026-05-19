@@ -60,7 +60,8 @@ export default function OpsCustomersListPage() {
     accountStatus: 'normal' as CustomerAccountStatus,
     membershipPlan: 'free' as 'free' | 'member' | 'member_plus',
     trialDays: '0',
-    officialDays: '365',
+    subscriptionDays: '0',
+    opsGiftDays: '0',
   })
 
   const [tokenmixBindCustomer, setTokenmixBindCustomer] = useState<OpsCustomer | null>(null)
@@ -71,7 +72,7 @@ export default function OpsCustomersListPage() {
 
   const [opsSyncTenantId, setOpsSyncTenantId] = useState('')
   const [opsSyncName, setOpsSyncName] = useState('')
-  const [opsSyncOfficial, setOpsSyncOfficial] = useState('365')
+  const [opsSyncGiftDays, setOpsSyncGiftDays] = useState('0')
   const [opsSyncBusy, setOpsSyncBusy] = useState(false)
   const [opsSyncMsg, setOpsSyncMsg] = useState<string | null>(null)
 
@@ -140,7 +141,7 @@ export default function OpsCustomersListPage() {
     const t = tenants.find((x) => x.id === opsSyncTenantId)
     if (!t) return
     setOpsSyncName(t.merchantName)
-    setOpsSyncOfficial(String(t.officialDays))
+    setOpsSyncGiftDays(String(t.opsGiftDays ?? 0))
   }, [opsSyncTenantId, tenants])
 
   const merged = useMemo(() => tenantsToCustomers(tenants), [tenants])
@@ -273,7 +274,8 @@ export default function OpsCustomersListPage() {
       accountStatus: t.accountStatus,
       membershipPlan: t.membershipPlan ?? 'member',
       trialDays: String(t.trialDays),
-      officialDays: String(t.officialDays),
+      subscriptionDays: String(t.subscriptionDays ?? t.officialDays ?? 0),
+      opsGiftDays: String(t.opsGiftDays ?? 0),
     })
     setFormErr(null)
     setEditOpen(true)
@@ -291,7 +293,7 @@ export default function OpsCustomersListPage() {
             accountStatus: editForm.accountStatus,
             membershipPlan: editForm.membershipPlan,
             trialDays: Math.max(0, Number(editForm.trialDays) || 0),
-            officialDays: Math.max(0, Number(editForm.officialDays) || 0),
+            opsGiftDays: Math.max(0, Number(editForm.opsGiftDays) || 0),
           })
         : await patchTenant({
             id: editTenant.id,
@@ -299,7 +301,9 @@ export default function OpsCustomersListPage() {
             industry: editForm.industry.trim(),
             accountStatus: editForm.accountStatus,
             trialDays: Math.max(0, Number(editForm.trialDays) || 0),
-            officialDays: Math.max(0, Number(editForm.officialDays) || 0),
+            officialDays:
+              Math.max(0, Number(editForm.subscriptionDays) || 0) +
+              Math.max(0, Number(editForm.opsGiftDays) || 0),
           })
       if (!r.ok) {
         setFormErr(r.error ?? '保存失败')
@@ -323,12 +327,12 @@ export default function OpsCustomersListPage() {
         ? await patchSupabaseTenant({
             id: opsSyncTenantId,
             merchantName: opsSyncName.trim(),
-            officialDays: Math.max(0, Math.floor(Number(opsSyncOfficial) || 0)),
+            opsGiftDays: Math.max(0, Math.floor(Number(opsSyncGiftDays) || 0)),
           })
         : await patchTenant({
             id: opsSyncTenantId,
             merchantName: opsSyncName.trim(),
-            officialDays: Math.max(0, Math.floor(Number(opsSyncOfficial) || 0)),
+            officialDays: Math.max(0, Math.floor(Number(opsSyncGiftDays) || 0)),
           })
       setOpsSyncMsg(
         r.ok
@@ -537,12 +541,12 @@ export default function OpsCustomersListPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">正式版权益剩余天数（示意）</label>
+              <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">运营赠送权益（天）</label>
               <input
                 type="number"
                 min={0}
-                value={opsSyncOfficial}
-                onChange={(e) => setOpsSyncOfficial(e.target.value)}
+                value={opsSyncGiftDays}
+                onChange={(e) => setOpsSyncGiftDays(e.target.value)}
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
               />
             </div>
@@ -755,14 +759,37 @@ export default function OpsCustomersListPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-slate-400">正式版权益（天）</label>
+                <label className="mb-1 block text-xs text-slate-400">订阅权益（天，只读）</label>
+                <input
+                  type="number"
+                  readOnly
+                  value={editForm.subscriptionDays}
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-slate-400"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">购买会员/Plus 并由订单确认后自动累加（月付 +30 天）。</p>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">运营赠送权益（天）</label>
                 <input
                   type="number"
                   min={0}
-                  value={editForm.officialDays}
-                  onChange={(e) => setEditForm((f) => ({ ...f, officialDays: e.target.value }))}
+                  value={editForm.opsGiftDays}
+                  onChange={(e) => setEditForm((f) => ({ ...f, opsGiftDays: e.target.value }))}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">总权益（天）</label>
+                <input
+                  type="number"
+                  readOnly
+                  value={
+                    Math.max(0, Number(editForm.subscriptionDays) || 0) +
+                    Math.max(0, Number(editForm.opsGiftDays) || 0)
+                  }
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-2 text-slate-300"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">总权益 = 订阅权益 + 运营赠送；商家端剩余时间以截止日为准。</p>
               </div>
               {formErr ? <p className="text-xs text-red-400">{formErr}</p> : null}
               <button

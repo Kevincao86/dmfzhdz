@@ -5,6 +5,10 @@
  * 计费公式内联在此文件：切勿从 ../src 引用模块，否则 Vercel 打包 api 函数时常见 MODULE_NOT_FOUND → 500。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  buildSubscriptionPurchasePatch,
+  readEntitlementDays,
+} from './tenantEntitlementCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -262,7 +266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
 
-      const tUrl = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}&select=service_expire_at,official_days&limit=1`
+      const tUrl = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}&select=service_expire_at,official_days,subscription_days,ops_gift_days&limit=1`
       const tr = await fetch(tUrl, { headers: hGet })
       const ttext = await tr.text()
       if (!tr.ok) {
@@ -273,7 +277,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         })
         return
       }
-      let trows: { service_expire_at?: unknown; official_days?: unknown }[]
+      let trows: {
+        service_expire_at?: unknown
+        official_days?: unknown
+        subscription_days?: unknown
+        ops_gift_days?: unknown
+      }[]
       try {
         trows = JSON.parse(ttext || '[]') as typeof trows
       } catch {
@@ -286,22 +295,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
 
-      const nowMs = Date.now()
-      let baseMs = nowMs
-      if (tenant.service_expire_at != null && String(tenant.service_expire_at).trim()) {
-        const se = new Date(String(tenant.service_expire_at)).getTime()
-        if (Number.isFinite(se) && se > baseMs) baseMs = se
-      }
-      const newExpireMs = baseMs + days * 86400000
-      const newExpireIso = new Date(newExpireMs).toISOString()
-      const prevOfficial = readNum(tenant.official_days)
-      const prevOfficialSafe = Number.isFinite(prevOfficial) ? prevOfficial : 0
+      const sub = readEntitlementDays(
+        tenant.subscription_days != null ? tenant.subscription_days : tenant.official_days,
+      )
+      const gift = readEntitlementDays(tenant.ops_gift_days)
+      const ent = buildSubscriptionPurchasePatch({
+        subscriptionDays: sub,
+        opsGiftDays: gift,
+        serviceExpireAt:
+          tenant.service_expire_at != null ? String(tenant.service_expire_at) : null,
+        purchasedDays: days,
+      })
 
       const upTenantUrl = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}`
       const nextPlan = membershipPlanFromVerifiedCents(vc)
       const tenantPatch: Record<string, unknown> = {
-        service_expire_at: newExpireIso,
-        official_days: prevOfficialSafe + days,
+        ...ent,
         updated_at: nowIso,
       }
       if (nextPlan) tenantPatch.membership_plan = nextPlan

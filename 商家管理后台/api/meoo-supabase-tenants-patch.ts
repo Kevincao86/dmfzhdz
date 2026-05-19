@@ -3,6 +3,7 @@
  * 使用 fetch 调 PostgREST，避免 @supabase/supabase-js 在 Vercel 上崩溃（与 meoo-supabase-tenants-list 一致）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { buildOpsGiftDaysPatch, readEntitlementDays } from './tenantEntitlementCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -66,14 +67,56 @@ function buildPatchBody(body: Record<string, unknown>): { ok: true; patch: Recor
   if (typeof body.trialDays === 'number' && Number.isFinite(body.trialDays)) {
     patch.trial_days = Math.max(0, Math.min(3650, Math.floor(body.trialDays)))
   }
-  if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
-    patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
-  }
   if (body.membershipPlan === 'free' || body.membershipPlan === 'member' || body.membershipPlan === 'member_plus') {
     patch.membership_plan = body.membershipPlan
   }
 
   return { ok: true, patch }
+}
+
+async function mergeOpsGiftEntitlementPatch(
+  base: string,
+  id: string,
+  headers: Record<string, string>,
+  opsGiftDays: number,
+  patch: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; detail: string }> {
+  const url = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(id)}&select=service_expire_at,subscription_days,ops_gift_days,official_days&limit=1`
+  const tr = await fetch(url, {
+    headers: {
+      apikey: headers.apikey,
+      Authorization: headers.Authorization,
+      Accept: 'application/json',
+    },
+  })
+  const text = await tr.text()
+  if (!tr.ok) return { ok: false, detail: text.slice(0, 400) }
+  let rows: {
+    service_expire_at?: unknown
+    subscription_days?: unknown
+    ops_gift_days?: unknown
+    official_days?: unknown
+  }[]
+  try {
+    rows = JSON.parse(text || '[]') as typeof rows
+  } catch {
+    return { ok: false, detail: text.slice(0, 200) }
+  }
+  const tenant = rows[0]
+  if (!tenant) return { ok: false, detail: 'tenant_not_found' }
+  const sub = readEntitlementDays(
+    tenant.subscription_days != null ? tenant.subscription_days : tenant.official_days,
+  )
+  const oldGift = readEntitlementDays(tenant.ops_gift_days)
+  const ent = buildOpsGiftDaysPatch({
+    subscriptionDays: sub,
+    oldOpsGiftDays: oldGift,
+    newOpsGiftDays: opsGiftDays,
+    serviceExpireAt:
+      tenant.service_expire_at != null ? String(tenant.service_expire_at) : null,
+  })
+  Object.assign(patch, ent)
+  return { ok: true }
 }
 
 async function edgePostPatch(
@@ -138,6 +181,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const id = String(body.id ?? '').trim()
     const base = supabaseUrl.replace(/\/$/, '')
+
+    if (typeof body.opsGiftDays === 'number' && Number.isFinite(body.opsGiftDays)) {
+      if (serviceRole) {
+        const merged = await mergeOpsGiftEntitlementPatch(
+          base,
+          id,
+          serviceRoleHeaders(serviceRole),
+          Math.max(0, Math.min(36500, Math.floor(body.opsGiftDays))),
+          built.patch,
+        )
+        if (!merged.ok) {
+          jsonSend(res, 502, { ok: false, error: 'tenant_load_failed', detail: merged.detail })
+          return
+        }
+      }
+    } else if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
+      built.patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
+    }
 
     if (serviceRole) {
       const url = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(id)}`

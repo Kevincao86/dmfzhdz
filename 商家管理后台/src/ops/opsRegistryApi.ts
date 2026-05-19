@@ -13,6 +13,10 @@ export type RegistryTenant = {
   registeredAt: string
   accountStatus: 'normal' | 'disabled' | 'frozen'
   trialDays: number
+  /** 订阅确认累加（运营不可改） */
+  subscriptionDays?: number
+  /** 运营赠送（可编辑） */
+  opsGiftDays?: number
   officialDays: number
   trialEndsAt?: string
   officialEndsAt?: string

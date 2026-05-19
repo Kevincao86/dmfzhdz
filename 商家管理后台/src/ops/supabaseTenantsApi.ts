@@ -19,6 +19,8 @@ export type SupabaseTenantRow = {
   account_status: string
   trial_days: number
   official_days: number
+  subscription_days?: number
+  ops_gift_days?: number
   wallet_balance_cents?: number
   service_expire_at?: string | null
   created_at: string
@@ -131,7 +133,23 @@ export function supabaseRowsToRegistryTenants(rows: SupabaseTenantRow[]): Regist
         registeredAt: created,
         accountStatus,
         trialDays: Math.max(0, Number(r.trial_days) || 0),
-        officialDays: Math.max(0, Number(r.official_days) || 0),
+        subscriptionDays: (() => {
+          const sub = Math.max(
+            0,
+            Number(r.subscription_days != null ? r.subscription_days : r.official_days) || 0,
+          )
+          return sub
+        })(),
+        opsGiftDays: Math.max(0, Number(r.ops_gift_days) || 0),
+        officialDays: (() => {
+          const sub = Math.max(
+            0,
+            Number(r.subscription_days != null ? r.subscription_days : r.official_days) || 0,
+          )
+          const gift = Math.max(0, Number(r.ops_gift_days) || 0)
+          const total = sub + gift
+          return total > 0 ? total : Math.max(0, Number(r.official_days) || 0)
+        })(),
         updatedAt: updated,
         authLoginEmail: email || undefined,
         phone,
@@ -162,6 +180,7 @@ export async function patchSupabaseTenant(body: {
   accountStatus?: 'normal' | 'disabled' | 'frozen'
   trialDays?: number
   officialDays?: number
+  opsGiftDays?: number
   membershipPlan?: 'free' | 'member' | 'member_plus'
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
   /** 扁平路径，避免 Vercel 深层目录 + supabase-js 打包崩溃（与 meoo-supabase-tenants-list 一致） */
