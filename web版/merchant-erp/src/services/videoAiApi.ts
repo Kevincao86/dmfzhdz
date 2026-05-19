@@ -4,6 +4,7 @@ export type VideoAiBackendConfig = {
   klingConfigured: boolean
   arkKeyConfigured: boolean
   arkVideoModels: { label: string; endpointId: string }[]
+  openshotConfigured?: boolean
   longformPlanner?: { doubao: boolean; qwen: boolean }
   /** 后端返回的商户端说明（不在此页绑 Key） */
   credentialNote?: string

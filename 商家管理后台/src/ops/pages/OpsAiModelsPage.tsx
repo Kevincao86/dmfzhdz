@@ -650,6 +650,67 @@ export default function OpsAiModelsPage() {
               )}
             />
           </div>
+          <div className="md:col-span-2 border-t border-slate-800 pt-4">
+            <p className="mb-3 text-xs font-medium text-cyan-400/90">OpenShot Cloud · AI 批量云剪</p>
+            <label className="mb-1 block text-xs text-slate-400">
+              API 根地址（默认 https://cloud.openshot.org）
+            </label>
+            <input
+              type="text"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.openshotApiBase ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, openshotApiBase: e.target.value }))}
+              placeholder="https://cloud.openshot.org"
+              className={cn(
+                'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">OpenShot 用户名</label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  readOnly={!editingVideoAi}
+                  disabled={loading}
+                  value={editingVideoAi ? (videoAi.openshotUsername ?? '') : ''}
+                  onChange={(e) => setVideoAi((p) => ({ ...p, openshotUsername: e.target.value }))}
+                  placeholder={
+                    (videoAi.openshotUsername ?? '').trim() && !editingVideoAi
+                      ? '已保存 · 请点击「编辑」修改'
+                      : 'Cloud API 账号'
+                  }
+                  className={cn(
+                    'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
+                    !editingVideoAi && 'cursor-default opacity-80',
+                  )}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">OpenShot 密码</label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  readOnly={!editingVideoAi}
+                  disabled={loading}
+                  value={editingVideoAi ? (videoAi.openshotPassword ?? '') : ''}
+                  onChange={(e) => setVideoAi((p) => ({ ...p, openshotPassword: e.target.value }))}
+                  placeholder={
+                    (videoAi.openshotPassword ?? '').trim() && !editingVideoAi
+                      ? '已保存 · 请点击「编辑」修改'
+                      : '留空则清除'
+                  }
+                  className={cn(
+                    'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
+                    !editingVideoAi && 'cursor-default opacity-80',
+                  )}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
