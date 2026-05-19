@@ -121,7 +121,7 @@ export default function DouyinMerchantSection() {
   useEffect(() => {
     if (!supabaseConfigured || !supabase) return
     const sb = supabase
-    let debTimer: ReturnType<typeof setTimeout> | null = null
+    let debTimer: number | null = null
 
     const hydrate = async () => {
       const {

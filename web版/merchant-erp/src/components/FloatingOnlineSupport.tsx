@@ -148,7 +148,7 @@ export default function FloatingOnlineSupport({
     if (!base) return
 
     let disposed = false
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let reconnectTimer: number | null = null
     let attempt = 0
     let activeWs: WebSocket | null = null
 
@@ -257,7 +257,7 @@ export default function FloatingOnlineSupport({
     const sid = sessionIdRef.current
     let cancelled = false
     let ch: ReturnType<typeof client.channel> | null = null
-    let pollTimer: ReturnType<typeof setInterval> | null = null
+    let pollTimer: number | null = null
 
     type RelayRow = { from_role: string; text: string; ts: number; client_msg_id: string }
 
@@ -346,7 +346,7 @@ export default function FloatingOnlineSupport({
     }
 
     void (async () => {
-      let bootWatch: ReturnType<typeof setTimeout> | undefined
+      let bootWatch: number | undefined
       const clearBootWatch = () => {
         if (bootWatch !== undefined) {
           clearTimeout(bootWatch)
