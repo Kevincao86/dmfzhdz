@@ -3,6 +3,7 @@ import {
   Building2,
   CreditCard,
   Headphones,
+  LayoutDashboard,
   Library,
   LogOut,
   Megaphone,
@@ -28,8 +29,9 @@ const OPS_NAV: {
   to: string
   label: string
   icon: typeof Building2
-  permission: OpsPermissionKey | 'staff_admin'
+  permission: OpsPermissionKey | 'staff_admin' | 'home'
 }[] = [
+  { to: '/', label: '首页', icon: LayoutDashboard, permission: 'home' },
   { to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
   { to: '/announcements', label: '公告栏推送', icon: Megaphone, permission: 'announcements' },
   { to: '/payment-orders', label: '订单管理', icon: CreditCard, permission: 'payment_orders' },
@@ -42,6 +44,7 @@ const OPS_NAV: {
 ]
 
 function navVisible(session: OpsSession, item: (typeof OPS_NAV)[number]): boolean {
+  if (item.permission === 'home') return true
   if (item.permission === 'staff_admin') return isSuperAdmin(session)
   return sessionHasPermission(session, item.permission)
 }
@@ -80,7 +83,10 @@ export default function OpsAdminLayout() {
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
           {visibleNav.map(({ to, label, icon: Icon }) => {
-            const active = pathname === to || pathname.startsWith(`${to}/`)
+            const active =
+              to === '/'
+                ? pathname === '/' || pathname === ''
+                : pathname === to || pathname.startsWith(`${to}/`)
             return (
               <NavLink
                 key={to}

@@ -3,6 +3,7 @@ import OpsLoginPage from './ops/OpsLoginPage'
 import OpsRequireAuth from './ops/OpsRequireAuth'
 import OpsAdminLayout from './ops/OpsAdminLayout'
 import OpsAccountsPermissionsPage from './ops/pages/OpsAccountsPermissionsPage'
+import OpsHomePage from './ops/pages/OpsHomePage'
 import OpsAiModelsPage from './ops/pages/OpsAiModelsPage'
 import OpsCustomerDetailPage from './ops/pages/OpsCustomerDetailPage'
 import OpsAnnouncementsPage from './ops/pages/OpsAnnouncementsPage'
@@ -26,7 +27,7 @@ export default function App() {
             </OpsRequireAuth>
           }
         >
-          <Route index element={<Navigate to="/customers" replace />} />
+          <Route index element={<OpsHomePage />} />
           <Route path="customers" element={<OpsCustomersListPage />} />
           <Route path="customers/:customerId" element={<OpsCustomerDetailPage />} />
           <Route path="announcements" element={<OpsAnnouncementsPage />} />
