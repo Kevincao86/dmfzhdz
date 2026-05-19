@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, MapPin, Sparkles, Store, Users, Zap } from 'lucide-react'
 import { cn } from '../cn'
-import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
+import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import LoginAuthPanel from './login/LoginAuthPanel'
 import { PosterPgyTechArt } from './login/LoginPosterArt'
@@ -114,10 +114,10 @@ export default function LoginPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                   MoDian · Local Life OS
                 </p>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                  {BRAND_NAME}
-                  <span className="ml-1.5 bg-gradient-to-r from-cyan-600 to-violet-600 bg-clip-text text-transparent">
-                    AI 智能 ERP
+                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+                  <span className="text-slate-900">{BRAND_NAME_SHORT}</span>
+                  <span className="bg-gradient-to-r from-cyan-500 via-blue-600 to-violet-600 bg-clip-text text-transparent">
+                    AI智能ERP
                   </span>
                 </h1>
               </div>
@@ -177,15 +177,30 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* 右侧：登录表单（纯白面板） */}
+        {/* 右侧：玻璃液态登录区 */}
         <div
           className={cn(
-            'flex w-full flex-col justify-center px-6 py-8 sm:px-10',
-            'lg:w-[min(100%,480px)] lg:flex-none lg:border-l lg:border-slate-200/60 lg:bg-white/90 lg:px-10 lg:py-12 lg:shadow-[-12px_0_48px_-24px_rgba(15,23,42,0.08)] xl:w-[520px] xl:px-12',
+            'relative flex w-full flex-col justify-center px-4 py-8 sm:px-6',
+            'lg:w-[min(100%,500px)] lg:flex-none lg:px-8 lg:py-12 xl:w-[540px] xl:px-10',
           )}
         >
+          <div
+            className="pointer-events-none absolute inset-3 overflow-hidden rounded-[28px] sm:inset-4 lg:inset-6"
+            aria-hidden
+          >
+            <div className="absolute -right-12 -top-16 h-48 w-48 rounded-full bg-cyan-400/25 blur-3xl" />
+            <div className="absolute -bottom-20 -left-8 h-56 w-56 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="absolute left-1/2 top-1/3 h-32 w-32 -translate-x-1/2 rounded-full bg-teal-300/15 blur-2xl" />
+          </div>
+          <div
+            className={cn(
+              'relative rounded-[28px] border border-white/70 p-6 sm:p-8',
+              'bg-white/35 shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.85)]',
+              'backdrop-blur-2xl backdrop-saturate-150',
+            )}
+          >
           <div className="mb-6 lg:hidden">
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-3 py-1 text-[11px] font-semibold text-cyan-700 ring-1 ring-cyan-100">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/50 px-3 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm backdrop-blur-sm">
               <Zap className="h-3 w-3" aria-hidden />
               商家工作台登录
             </div>
@@ -199,9 +214,10 @@ export default function LoginPage() {
             onLoginSuccess={() => navigate('/', { replace: true })}
           />
 
-          <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-400">
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-500/90">
             登录即表示同意平台服务条款与隐私政策 · 数据经加密传输与存储
           </p>
+          </div>
         </div>
       </div>
     </div>
