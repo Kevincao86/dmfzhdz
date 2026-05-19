@@ -1,12 +1,14 @@
 /** 订阅 / 充值档位（与扫码示意一致）；金额单位：分 */
 
-export type PaymentTier = { label: string; yuan: number; cents: number }
+import type { MembershipPlan } from './membershipPlan'
+
+export type PaymentTier = { label: string; yuan: number; cents: number; plan?: MembershipPlan }
 
 export const SUBSCRIPTION_TIERS: PaymentTier[] = [
-  { label: '会员版 · 月度', yuan: 168, cents: 16800 },
-  { label: '会员 Plus · 月度', yuan: 598, cents: 59800 },
-  { label: '会员版 · 季度', yuan: 468, cents: 46800 },
-  { label: '会员 Plus · 季度', yuan: 1688, cents: 168800 },
+  { label: '会员版 · 月度', yuan: 168, cents: 16800, plan: 'member' },
+  { label: '会员 Plus · 月度', yuan: 598, cents: 59800, plan: 'member_plus' },
+  { label: '会员版 · 季度', yuan: 468, cents: 46800, plan: 'member' },
+  { label: '会员 Plus · 季度', yuan: 1688, cents: 168800, plan: 'member_plus' },
 ]
 
 export const RECHARGE_TIERS: PaymentTier[] = [
@@ -41,6 +43,17 @@ export function subscriptionDaysFromVerifiedCents(verifiedCents: number): number
   }
   const unit = 16800 / 30
   return Math.max(1, Math.floor(verifiedCents / unit))
+}
+
+/** 运营确认订阅到账后，按核对金额落位会员档位（与 SUBSCRIPTION_TIERS 一致） */
+export function membershipPlanFromVerifiedCents(verifiedCents: number): MembershipPlan | null {
+  if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return null
+  for (const t of SUBSCRIPTION_TIERS) {
+    if (t.cents === verifiedCents && t.plan) return t.plan
+  }
+  if (verifiedCents >= 59800) return 'member_plus'
+  if (verifiedCents >= 16800) return 'member'
+  return null
 }
 
 /** 充值到账金额 = 核对金额（分） */

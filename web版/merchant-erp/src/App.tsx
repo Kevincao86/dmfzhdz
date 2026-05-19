@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AiAgentProvider } from './context/AiAgentContext'
 import { MembershipProvider } from './context/MembershipContext'
 import RequireMembershipFeature from './components/RequireMembershipFeature'
+import MembershipPlanSync from './components/MembershipPlanSync'
 import MeooLayout from './components/MeooLayout'
 import RequireSupabaseAuth from './components/RequireSupabaseAuth'
 import AiAgentPage from './pages/AiAgentPage'
@@ -39,6 +40,7 @@ export default function App() {
           element={
             <RequireSupabaseAuth>
               <RequireMembershipFeature>
+                <MembershipPlanSync />
                 <MeooLayout />
               </RequireMembershipFeature>
             </RequireSupabaseAuth>
@@ -66,18 +68,6 @@ export default function App() {
           <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
           <Route path="ai-operation/content" element={<AiOperationContentPage />} />
           <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
-          <Route
-            path="ai-operation/live-check"
-            element={
-              <ModulePage title="直播间分析" subtitle="直播间流量与转化诊断" />
-            }
-          />
-          <Route
-            path="operation/platform-target"
-            element={
-              <ModulePage title="平台签框" subtitle="各平台签约目标与完成进度" />
-            }
-          />
           <Route
             path="advertising"
             element={

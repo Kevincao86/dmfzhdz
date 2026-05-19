@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   rechargeCreditFromVerifiedCents,
+  membershipPlanFromVerifiedCents,
   subscriptionDaysFromVerifiedCents,
 } from './paymentTierLogic'
 
@@ -179,14 +180,14 @@ export async function confirmOpsPaymentOrderAdmin(
     const newExpireMs = baseMs + days * 86400000
     const newExpireIso = new Date(newExpireMs).toISOString()
     const prevOfficial = typeof tenant.official_days === 'number' ? tenant.official_days : 0
-    const { error: upTe } = await admin
-      .from('tenants')
-      .update({
-        service_expire_at: newExpireIso,
-        official_days: prevOfficial + days,
-        updated_at: nowIso,
-      })
-      .eq('id', tenantId)
+    const nextPlan = membershipPlanFromVerifiedCents(vc)
+    const tenantPatch: Record<string, unknown> = {
+      service_expire_at: newExpireIso,
+      official_days: prevOfficial + days,
+      updated_at: nowIso,
+    }
+    if (nextPlan) tenantPatch.membership_plan = nextPlan
+    const { error: upTe } = await admin.from('tenants').update(tenantPatch).eq('id', tenantId)
     if (upTe) {
       return {
         ok: false,

@@ -10,17 +10,34 @@ export const config = { maxDuration: 60 }
 
 /** 与 src/ops/paymentTierLogic.ts / web版 meooPaymentTiers 保持一致 */
 const SUBSCRIPTION_TIER_CENTS = new Map<number, number>([
-  [9900, 30],
-  [26800, 90],
-  [69800, 365],
+  [16800, 30],
+  [59800, 30],
+  [46800, 90],
+  [168800, 90],
+])
+
+const SUBSCRIPTION_TIER_PLAN = new Map<number, string>([
+  [16800, 'member'],
+  [59800, 'member_plus'],
+  [46800, 'member'],
+  [168800, 'member_plus'],
 ])
 
 function subscriptionDaysFromVerifiedCents(verifiedCents: number): number {
   if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return 0
   const hit = SUBSCRIPTION_TIER_CENTS.get(verifiedCents)
   if (hit !== undefined) return hit
-  const unit = 9900 / 30
+  const unit = 16800 / 30
   return Math.max(1, Math.floor(verifiedCents / unit))
+}
+
+function membershipPlanFromVerifiedCents(verifiedCents: number): string | null {
+  if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return null
+  const hit = SUBSCRIPTION_TIER_PLAN.get(verifiedCents)
+  if (hit) return hit
+  if (verifiedCents >= 59800) return 'member_plus'
+  if (verifiedCents >= 16800) return 'member'
+  return null
 }
 
 function rechargeCreditFromVerifiedCents(verifiedCents: number): number {
@@ -281,14 +298,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const prevOfficialSafe = Number.isFinite(prevOfficial) ? prevOfficial : 0
 
       const upTenantUrl = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}`
+      const nextPlan = membershipPlanFromVerifiedCents(vc)
+      const tenantPatch: Record<string, unknown> = {
+        service_expire_at: newExpireIso,
+        official_days: prevOfficialSafe + days,
+        updated_at: nowIso,
+      }
+      if (nextPlan) tenantPatch.membership_plan = nextPlan
+
       const upTr = await fetch(upTenantUrl, {
         method: 'PATCH',
         headers: jsonPatchHeaders(serviceRole),
-        body: JSON.stringify({
-          service_expire_at: newExpireIso,
-          official_days: prevOfficialSafe + days,
-          updated_at: nowIso,
-        }),
+        body: JSON.stringify(tenantPatch),
       })
       const upTtext = await upTr.text()
       if (!upTr.ok) {
