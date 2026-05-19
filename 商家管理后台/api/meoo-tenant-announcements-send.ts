@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { sendOpsJson } from './safeOpsJson.js'
 import {
   parseAnnouncementCategory,
+  parseAnnouncementPriority,
   sendTenantAnnouncement,
 } from './tenantAnnouncementsCore.js'
 
@@ -68,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const result = await sendTenantAnnouncement(supabaseUrl, serviceKey, {
       category,
+      priority: parseAnnouncementPriority(body.priority, category),
       title: String(body.title ?? ''),
       body: String(body.body ?? ''),
       targetAll,

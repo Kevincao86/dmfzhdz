@@ -2,9 +2,24 @@
 
 export type TenantAnnouncementCategory = 'subscription_expiring' | 'platform_change'
 
+export type TenantAnnouncementPriority = 'normal' | 'urgent'
+
 export const ANNOUNCEMENT_CATEGORY_ZH: Record<TenantAnnouncementCategory, string> = {
   subscription_expiring: '套餐即将结束预警',
   platform_change: '平台改动预警',
+}
+
+export const ANNOUNCEMENT_PRIORITY_ZH: Record<TenantAnnouncementPriority, string> = {
+  normal: '普通',
+  urgent: '紧急',
+}
+
+export function parseAnnouncementPriority(
+  raw: unknown,
+  category: TenantAnnouncementCategory,
+): TenantAnnouncementPriority {
+  if (category !== 'platform_change') return 'normal'
+  return raw === 'urgent' ? 'urgent' : 'normal'
 }
 
 export function parseAnnouncementCategory(raw: unknown): TenantAnnouncementCategory | null {
@@ -14,6 +29,7 @@ export function parseAnnouncementCategory(raw: unknown): TenantAnnouncementCateg
 
 export type SendTenantAnnouncementInput = {
   category: TenantAnnouncementCategory
+  priority?: TenantAnnouncementPriority
   title: string
   body: string
   targetAll: boolean
@@ -28,6 +44,7 @@ export type SendTenantAnnouncementResult =
 export type OpsAnnouncementListRow = {
   id: string
   category: TenantAnnouncementCategory
+  priority: TenantAnnouncementPriority
   title: string
   body: string
   target_all: boolean
@@ -48,7 +65,7 @@ function serviceRoleHeaders(serviceKey: string, prefer?: string): Record<string,
 }
 
 function isMissingTableError(msg: string): boolean {
-  return /tenant_announcements|tenant_announcement_deliveries|does not exist|Could not find|schema cache/i.test(
+  return /tenant_announcements|tenant_announcement_deliveries|tenant_announcement_priority|\.priority|does not exist|Could not find|schema cache/i.test(
     msg,
   )
 }
@@ -98,6 +115,8 @@ export async function sendTenantAnnouncement(
     if (tenantIds.length === 0) return { ok: false, error: 'no_tenants' }
   }
 
+  const priority = parseAnnouncementPriority(input.priority, input.category)
+
   const base = supabaseUrl.replace(/\/$/, '')
   const insUrl = `${base}/rest/v1/tenant_announcements`
   const insRes = await fetch(insUrl, {
@@ -105,6 +124,7 @@ export async function sendTenantAnnouncement(
     headers: serviceRoleHeaders(serviceKey, 'return=representation'),
     body: JSON.stringify({
       category: input.category,
+      priority,
       title,
       body,
       target_all: input.targetAll,
@@ -164,7 +184,7 @@ export async function listTenantAnnouncementsForOps(
   limit = 50,
 ): Promise<{ ok: true; rows: OpsAnnouncementListRow[] } | { ok: false; error: string; detail?: string }> {
   const base = supabaseUrl.replace(/\/$/, '')
-  const url = `${base}/rest/v1/tenant_announcements?select=id,category,title,body,target_all,recipient_count,created_at,created_by&order=created_at.desc&limit=${limit}`
+  const url = `${base}/rest/v1/tenant_announcements?select=id,category,priority,title,body,target_all,recipient_count,created_at,created_by&order=created_at.desc&limit=${limit}`
   const r = await fetch(url, { headers: serviceRoleHeaders(serviceKey) })
   const text = await r.text()
   if (!r.ok) {
@@ -175,16 +195,21 @@ export async function listTenantAnnouncementsForOps(
   }
   try {
     const data = JSON.parse(text || '[]') as Record<string, unknown>[]
-    const rows = data.map((row) => ({
-      id: String(row.id ?? ''),
-      category: (parseAnnouncementCategory(row.category) ?? 'platform_change') as TenantAnnouncementCategory,
-      title: String(row.title ?? ''),
-      body: String(row.body ?? ''),
-      target_all: Boolean(row.target_all),
-      recipient_count: Number(row.recipient_count) || 0,
-      created_at: String(row.created_at ?? ''),
-      created_by: typeof row.created_by === 'string' ? row.created_by : null,
-    }))
+    const rows = data.map((row) => {
+      const category = (parseAnnouncementCategory(row.category) ??
+        'platform_change') as TenantAnnouncementCategory
+      return {
+        id: String(row.id ?? ''),
+        category,
+        priority: parseAnnouncementPriority(row.priority, category),
+        title: String(row.title ?? ''),
+        body: String(row.body ?? ''),
+        target_all: Boolean(row.target_all),
+        recipient_count: Number(row.recipient_count) || 0,
+        created_at: String(row.created_at ?? ''),
+        created_by: typeof row.created_by === 'string' ? row.created_by : null,
+      }
+    })
     return { ok: true, rows }
   } catch {
     return { ok: false, error: 'list_failed', detail: text.slice(0, 400) }

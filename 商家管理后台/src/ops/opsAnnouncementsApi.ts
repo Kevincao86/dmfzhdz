@@ -1,8 +1,12 @@
-import type { TenantAnnouncementCategory } from '../../api/tenantAnnouncementsCore'
+import type {
+  TenantAnnouncementCategory,
+  TenantAnnouncementPriority,
+} from '../../api/tenantAnnouncementsCore'
 
 export type OpsAnnouncementRow = {
   id: string
   category: TenantAnnouncementCategory
+  priority: TenantAnnouncementPriority
   title: string
   body: string
   target_all: boolean
@@ -45,6 +49,7 @@ export async function fetchOpsAnnouncements(): Promise<
 
 export async function sendOpsAnnouncement(payload: {
   category: TenantAnnouncementCategory
+  priority?: TenantAnnouncementPriority
   title: string
   body: string
   targetAll: boolean

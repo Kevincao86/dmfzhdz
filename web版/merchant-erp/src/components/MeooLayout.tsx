@@ -20,6 +20,8 @@ import { cn } from '../cn'
 import AiAgentDrawer, { AiAgentFloatingButton } from './AiAgentDrawer'
 import FloatingOnlineSupport from './FloatingOnlineSupport'
 import TenantAnnouncementBell from './TenantAnnouncementBell'
+import TenantUrgentAnnouncementModal from './TenantUrgentAnnouncementModal'
+import { TenantAnnouncementProvider } from '../context/TenantAnnouncementContext'
 import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
 import { useAiAgent } from '../context/AiAgentContext'
@@ -138,6 +140,7 @@ export default function MeooLayout() {
   const mainMargin = collapsed ? 'ml-16' : 'ml-64'
 
   return (
+    <TenantAnnouncementProvider>
     <div className="flex min-h-screen bg-slate-100">
       <aside
         className={cn(
@@ -493,6 +496,8 @@ export default function MeooLayout() {
         </div>
       </div>
       <OpsRegistryBridge />
+      <TenantUrgentAnnouncementModal />
     </div>
+    </TenantAnnouncementProvider>
   )
 }

@@ -1,7 +1,12 @@
 import { Megaphone, RefreshCw, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
-import { ANNOUNCEMENT_CATEGORY_ZH, type TenantAnnouncementCategory } from '../../../api/tenantAnnouncementsCore'
+import {
+  ANNOUNCEMENT_CATEGORY_ZH,
+  ANNOUNCEMENT_PRIORITY_ZH,
+  type TenantAnnouncementCategory,
+  type TenantAnnouncementPriority,
+} from '../../../api/tenantAnnouncementsCore'
 import {
   countByExpiringBucket,
   draftExpiringAnnouncementCopy,
@@ -36,6 +41,7 @@ export default function OpsAnnouncementsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [targetAll, setTargetAll] = useState(false)
   const [category, setCategory] = useState<TenantAnnouncementCategory>('subscription_expiring')
+  const [priority, setPriority] = useState<TenantAnnouncementPriority>('normal')
   const [expiringBucket, setExpiringBucket] = useState<ExpiringBucket | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
@@ -165,9 +171,13 @@ export default function OpsAnnouncementsPage() {
       return
     }
     const recipientHint = targetAll ? `全部 ${tenants.length} 个租户` : `${selected.size} 个租户`
+    const priorityHint =
+      category === 'platform_change'
+        ? `\n标签：${ANNOUNCEMENT_PRIORITY_ZH[priority]}${priority === 'urgent' ? '（首页弹窗）' : ''}`
+        : ''
     if (
       !window.confirm(
-        `确认发送「${ANNOUNCEMENT_CATEGORY_ZH[category]}」？\n收件：${recipientHint}\n标题：${t}`,
+        `确认发送「${ANNOUNCEMENT_CATEGORY_ZH[category]}」？\n收件：${recipientHint}${priorityHint}\n标题：${t}`,
       )
     ) {
       return
@@ -176,6 +186,7 @@ export default function OpsAnnouncementsPage() {
     setSending(true)
     const r = await sendOpsAnnouncement({
       category,
+      priority: category === 'platform_change' ? priority : 'normal',
       title: t,
       body: b,
       targetAll,
@@ -190,13 +201,17 @@ export default function OpsAnnouncementsPage() {
     }
     setSendMsg({
       tone: 'ok',
-      text: `已推送，共 ${r.recipientCount} 个租户；商户 ERP 右上角铃铛可查看。`,
+      text:
+        category === 'platform_change' && priority === 'urgent'
+          ? `已推送，共 ${r.recipientCount} 个租户；紧急公告将在商户 ERP 首页弹窗展示，铃铛中也可查看。`
+          : `已推送，共 ${r.recipientCount} 个租户；商户 ERP 右上角铃铛可查看。`,
     })
     setTitle('')
     setBody('')
     setSelected(new Set())
     setTargetAll(false)
     setExpiringBucket(null)
+    setPriority('normal')
     void loadHistory()
   }
 
@@ -227,6 +242,9 @@ export default function OpsAnnouncementsPage() {
                   setCategory(v)
                   if (v !== 'subscription_expiring') {
                     setExpiringBucket(null)
+                  }
+                  if (v !== 'platform_change') {
+                    setPriority('normal')
                   }
                 }}
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
@@ -262,6 +280,36 @@ export default function OpsAnnouncementsPage() {
                 <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-500">
                   <Sparkles className="h-3 w-3 text-indigo-400" />
                   选择后将自动勾选对应客户，并 AI 智能起草标题与正文（可再编辑）
+                </p>
+              </div>
+            ) : null}
+
+            {category === 'platform_change' ? (
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  优先级标签
+                </label>
+                <div className="flex gap-2">
+                  {(['normal', 'urgent'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPriority(p)}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+                        priority === p
+                          ? p === 'urgent'
+                            ? 'border-red-400 bg-red-500/20 text-red-100'
+                            : 'border-slate-500 bg-slate-800 text-slate-100'
+                          : 'border-slate-700 bg-slate-950 text-slate-400 hover:border-slate-500',
+                      )}
+                    >
+                      {ANNOUNCEMENT_PRIORITY_ZH[p]}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  紧急：商户登录后进入 ERP 首页将居中弹窗；普通：仅在右上角铃铛列表展示。
                 </p>
               </div>
             ) : null}
@@ -411,6 +459,18 @@ export default function OpsAnnouncementsPage() {
                   <span className="rounded bg-indigo-500/15 px-2 py-0.5 text-xs text-indigo-300">
                     {ANNOUNCEMENT_CATEGORY_ZH[row.category]}
                   </span>
+                  {row.category === 'platform_change' ? (
+                    <span
+                      className={cn(
+                        'rounded px-2 py-0.5 text-xs',
+                        row.priority === 'urgent'
+                          ? 'bg-red-500/20 text-red-300'
+                          : 'bg-slate-700 text-slate-400',
+                      )}
+                    >
+                      {ANNOUNCEMENT_PRIORITY_ZH[row.priority ?? 'normal']}
+                    </span>
+                  ) : null}
                   <span className="text-xs text-slate-500">{fmt(row.created_at)}</span>
                   <span className="text-xs text-slate-400">
                     {row.target_all ? '全部用户' : `${row.recipient_count} 人`}
