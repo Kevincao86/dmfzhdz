@@ -1,190 +1,287 @@
-import { KeyRound, Shield, Sliders, Users } from 'lucide-react'
+import { Plus, Shield, Trash2, UserCog } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchRegistry, patchTenant, type RegistryTenant } from '../opsRegistryApi'
+import { Navigate } from 'react-router-dom'
+import { cn } from '../../cn'
+import {
+  createOpsSubAccount,
+  deleteOpsSubAccount,
+  ensureOpsMasterAccount,
+  isSuperAdmin,
+  OPS_MASTER_PHONE,
+  OPS_PERMISSION_MODULES,
+  readOpsSession,
+  readOpsStaffAccounts,
+  refreshOpsSessionFromStorage,
+  updateOpsSubAccount,
+  type OpsPermissionKey,
+  type OpsStaffAccount,
+} from '../opsStaffAuth'
 
-const PRESET_ROLES = ['管理员', '运营', '客服', '财务', '门店负责人']
-
-function tenantStatusLabel(s: RegistryTenant['accountStatus']): string {
-  if (s === 'normal') return '正常'
-  if (s === 'disabled') return '停用'
-  return '冻结'
+function permissionLabels(keys: OpsPermissionKey[]): string {
+  if (keys.length === OPS_PERMISSION_MODULES.length) return '全部模块'
+  return keys
+    .map((k) => OPS_PERMISSION_MODULES.find((m) => m.key === k)?.label ?? k)
+    .join('、')
 }
 
 export default function OpsAccountsPermissionsPage() {
-  const [tenants, setTenants] = useState<RegistryTenant[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [batchBusy, setBatchBusy] = useState(false)
-  const [freezeDays, setFreezeDays] = useState('90')
-  const [autoFreezeUnpaid, setAutoFreezeUnpaid] = useState(true)
+  const session = readOpsSession()
+  const [staff, setStaff] = useState<OpsStaffAccount[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [formErr, setFormErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  const loadTenants = useCallback(async () => {
-    try {
-      const r = await fetchRegistry()
-      setTenants(r.tenants ?? [])
-    } catch {
-      setTenants([])
-    }
+  const [form, setForm] = useState({
+    phone: '',
+    displayName: '',
+    password: '',
+    permissions: [] as OpsPermissionKey[],
+  })
+
+  const reload = useCallback(async () => {
+    await ensureOpsMasterAccount()
+    setStaff(readOpsStaffAccounts())
   }, [])
 
   useEffect(() => {
-    void loadTenants()
-  }, [loadTenants])
+    void reload()
+    const onChange = () => void reload()
+    window.addEventListener('meoo-ops-staff-changed', onChange)
+    return () => window.removeEventListener('meoo-ops-staff-changed', onChange)
+  }, [reload])
 
-  const rows = useMemo(() => {
-    return tenants.map((t) => ({
-      id: t.id,
-      customerName: t.merchantName,
-      loginName: t.loginName,
-      accountKind:
-        t.source === 'erp' ? 'ERP 注册' : t.source === 'supabase' ? 'Supabase' : '运营手工',
-      status: tenantStatusLabel(t.accountStatus),
-      accountStatus: t.accountStatus,
-      lastLoginAt: t.updatedAt ? t.updatedAt.replace('T', ' ').slice(0, 19) : '—',
-    }))
-  }, [tenants])
+  const editing = useMemo(
+    () => (editId ? staff.find((a) => a.id === editId) ?? null : null),
+    [editId, staff],
+  )
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const subAccounts = useMemo(() => staff.filter((a) => a.role === 'sub_admin'), [staff])
+  const master = useMemo(() => staff.find((a) => a.role === 'super_admin'), [staff])
+
+  if (!session || !isSuperAdmin(session)) {
+    return <Navigate to="/customers" replace />
+  }
+
+  const resetForm = () => {
+    setForm({ phone: '', displayName: '', password: '', permissions: [] })
+    setFormErr(null)
+    setCreateOpen(false)
+    setEditId(null)
+  }
+
+  const openEdit = (a: OpsStaffAccount) => {
+    setEditId(a.id)
+    setCreateOpen(false)
+    setForm({
+      phone: a.phone,
+      displayName: a.displayName,
+      password: '',
+      permissions: [...a.permissions],
+    })
+    setFormErr(null)
+  }
+
+  const togglePermission = (key: OpsPermissionKey) => {
+    setForm((f) => {
+      const has = f.permissions.includes(key)
+      return {
+        ...f,
+        permissions: has ? f.permissions.filter((p) => p !== key) : [...f.permissions, key],
+      }
     })
   }
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === rows.length) {
-      setSelectedIds(new Set())
-      return
-    }
-    setSelectedIds(new Set(rows.map((r) => r.id)))
+  const selectAllPermissions = () => {
+    setForm((f) => ({
+      ...f,
+      permissions: OPS_PERMISSION_MODULES.map((m) => m.key),
+    }))
   }
 
-  const batchSetAccountStatus = async (accountStatus: RegistryTenant['accountStatus']) => {
-    const ids = [...selectedIds]
-    if (ids.length === 0) {
-      window.alert('请先勾选需要操作的租户行。')
+  const handleCreate = async () => {
+    setFormErr(null)
+    setBusy(true)
+    try {
+      const r = await createOpsSubAccount({
+        phone: form.phone,
+        displayName: form.displayName,
+        password: form.password,
+        permissions: form.permissions,
+      })
+      if (!r.ok) {
+        const msg: Record<string, string> = {
+          invalid_phone: '请输入 11 位手机号',
+          reserved_phone: '该号码为主账号保留',
+          phone_exists: '该手机号已存在',
+          password_too_short: '密码至少 6 位',
+          permissions_required: '请至少勾选一个功能模块',
+        }
+        setFormErr(msg[r.error] ?? r.error)
+        return
+      }
+      resetForm()
+      await reload()
+      window.alert('子账号已创建')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleUpdate = async () => {
+    if (!editId) return
+    setFormErr(null)
+    setBusy(true)
+    try {
+      const r = await updateOpsSubAccount(editId, {
+        displayName: form.displayName,
+        permissions: form.permissions,
+        password: form.password.trim() || undefined,
+      })
+      if (!r.ok) {
+        const msg: Record<string, string> = {
+          permissions_required: '请至少勾选一个功能模块',
+          password_too_short: '密码至少 6 位',
+          cannot_edit_master: '无法修改主账号',
+        }
+        setFormErr(msg[r.error] ?? r.error)
+        return
+      }
+      refreshOpsSessionFromStorage()
+      resetForm()
+      await reload()
+      window.alert('已保存')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleToggleStatus = async (a: OpsStaffAccount) => {
+    const next = a.status === 'active' ? 'disabled' : 'active'
+    const label = next === 'disabled' ? '停用' : '启用'
+    if (!window.confirm(`确定${label}子账号「${a.displayName}」？`)) return
+    const r = await updateOpsSubAccount(a.id, { status: next })
+    if (!r.ok) {
+      window.alert('操作失败')
       return
     }
-    setBatchBusy(true)
-    try {
-      for (const id of ids) {
-        const r = await patchTenant({ id, accountStatus })
-        if (!r.ok) {
-          window.alert(r.error ?? '更新失败')
-          await loadTenants()
-          return
-        }
-      }
-      setSelectedIds(new Set())
-      await loadTenants()
-      window.alert('已写入注册表：所选租户账号状态已更新。')
-    } finally {
-      setBatchBusy(false)
+    await reload()
+  }
+
+  const handleDelete = async (a: OpsStaffAccount) => {
+    if (!window.confirm(`确定删除子账号「${a.displayName}」（${a.phone}）？`)) return
+    const r = await deleteOpsSubAccount(a.id)
+    if (!r.ok) {
+      window.alert('删除失败')
+      return
     }
+    await reload()
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto max-w-5xl space-y-8">
       <div>
         <h1 className="text-xl font-semibold text-white">账号与权限管理</h1>
         <p className="mt-1 text-sm text-slate-500">
-          全局租户列表来自 dev 注册表；批量启停将调用注册表 patch 接口。冻结规则与角色矩阵仍为配置说明（未接独立任务服务）。
+          管理运营管控台登录账号。主账号 {OPS_MASTER_PHONE} 拥有全部权限；可创建子账号并分配菜单模块。
         </p>
       </div>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-200">
-          <Users className="h-4 w-4 text-indigo-400" />
-          租户账号列表（注册表）
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <Shield className="h-4 w-4 text-amber-400" />
+          主账号
         </h2>
-        <div className="mb-3 flex flex-wrap gap-2">
+        {master ? (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
+            <p className="font-medium text-amber-100">{master.displayName}</p>
+            <p className="mt-1 font-mono text-xs text-slate-400">{master.phone}</p>
+            <p className="mt-2 text-xs text-slate-500">全部功能模块 · 可创建与管理子账号</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            <UserCog className="h-4 w-4 text-indigo-400" />
+            运营子账号（{subAccounts.length}）
+          </h2>
           <button
             type="button"
-            disabled={batchBusy}
-            onClick={() => void batchSetAccountStatus('normal')}
-            className="rounded-lg bg-emerald-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+            onClick={() => {
+              resetForm()
+              setCreateOpen(true)
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
           >
-            批量启用（正常）
-          </button>
-          <button
-            type="button"
-            disabled={batchBusy}
-            onClick={() => void batchSetAccountStatus('disabled')}
-            className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-600 disabled:opacity-50"
-          >
-            批量停用
-          </button>
-          <button
-            type="button"
-            disabled={batchBusy}
-            onClick={() => void batchSetAccountStatus('frozen')}
-            className="rounded-lg bg-amber-700/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
-          >
-            批量冻结
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              window.alert(
-                '当前为 dev 环境：批量重置密码需对接消息通道与密码哈希服务；此处不执行写操作。请在生产环境接入认证服务后启用。',
-              )
-            }
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
-          >
-            <KeyRound className="h-3.5 w-3.5" />
-            批量重置密码
-          </button>
-          <button
-            type="button"
-            onClick={() => void loadTenants()}
-            className="ml-auto text-xs text-indigo-400 hover:underline"
-          >
-            刷新
+            <Plus className="h-3.5 w-3.5" />
+            创建子账号
           </button>
         </div>
+
         <div className="overflow-x-auto rounded-lg border border-slate-800">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-slate-950 text-[11px] font-semibold uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={rows.length > 0 && selectedIds.size === rows.length}
-                    onChange={() => toggleSelectAll()}
-                    className="rounded border-slate-600"
-                  />
-                </th>
-                <th className="px-3 py-2.5">客户</th>
-                <th className="px-3 py-2.5">登录账号</th>
-                <th className="px-3 py-2.5">类型</th>
+                <th className="px-3 py-2.5">姓名</th>
+                <th className="px-3 py-2.5">手机号</th>
+                <th className="px-3 py-2.5">权限模块</th>
                 <th className="px-3 py-2.5">状态</th>
-                <th className="px-3 py-2.5">最近更新</th>
+                <th className="px-3 py-2.5 text-right">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {rows.length === 0 ? (
+              {subAccounts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm text-slate-500">
-                    暂无租户。请在 ERP 或「客户管理」创建商户后写入注册表。
+                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                    暂无子账号，点击「创建子账号」添加
                   </td>
                 </tr>
               ) : (
-                rows.map((a) => (
+                subAccounts.map((a) => (
                   <tr key={a.id} className="hover:bg-slate-800/30">
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(a.id)}
-                        onChange={() => toggleSelect(a.id)}
-                        className="rounded border-slate-600"
-                      />
+                    <td className="px-3 py-2 text-slate-200">{a.displayName}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-slate-300">{a.phone}</td>
+                    <td className="max-w-xs px-3 py-2 text-xs text-slate-400">
+                      {permissionLabels(a.permissions)}
                     </td>
-                    <td className="px-3 py-2 text-slate-300">{a.customerName}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-slate-200">{a.loginName}</td>
-                    <td className="px-3 py-2 text-slate-400">{a.accountKind}</td>
-                    <td className="px-3 py-2 text-xs text-slate-400">{a.status}</td>
-                    <td className="px-3 py-2 text-xs text-slate-500">{a.lastLoginAt}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={cn(
+                          'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                          a.status === 'active'
+                            ? 'bg-emerald-500/15 text-emerald-400'
+                            : 'bg-slate-700 text-slate-400',
+                        )}
+                      >
+                        {a.status === 'active' ? '正常' : '停用'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(a)}
+                        className="mr-2 text-xs text-indigo-400 hover:underline"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleStatus(a)}
+                        className="mr-2 text-xs text-slate-400 hover:underline"
+                      >
+                        {a.status === 'active' ? '停用' : '启用'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(a)}
+                        className="inline-flex items-center gap-0.5 text-xs text-rose-400 hover:underline"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        删除
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -193,49 +290,105 @@ export default function OpsAccountsPermissionsPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-200">
-          <Sliders className="h-4 w-4 text-amber-400" />
-          账号冻结规则（可配置）
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={autoFreezeUnpaid}
-              onChange={(e) => setAutoFreezeUnpaid(e.target.checked)}
-              className="rounded border-slate-600 bg-slate-950 text-indigo-500"
-            />
-            欠费超过宽限期自动冻结登录
-          </label>
-          <div>
-            <label className="mb-1 block text-xs text-slate-500">长期未登录自动冻结（天）</label>
-            <input
-              type="number"
-              min={30}
-              value={freezeDays}
-              onChange={(e) => setFreezeDays(e.target.value)}
-              className="w-full max-w-xs rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
-            />
+      {createOpen || editing ? (
+        <section className="rounded-xl border border-indigo-500/40 bg-slate-900 p-5">
+          <h2 className="mb-4 text-sm font-semibold text-slate-200">
+            {editing ? `编辑子账号 · ${editing.phone}` : '新建子账号'}
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {!editing ? (
+              <div>
+                <label className="mb-1 block text-xs text-slate-500">手机号（登录账号）</label>
+                <input
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phone: e.target.value.replace(/\D/g, '').slice(0, 11) }))
+                  }
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+                  placeholder="11 位手机号"
+                />
+              </div>
+            ) : null}
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">显示名称</label>
+              <input
+                value={form.displayName}
+                onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">
+                {editing ? '新密码（留空不修改）' : '登录密码'}
+              </label>
+              <input
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+                placeholder={editing ? '不修改请留空' : '至少 6 位'}
+              />
+            </div>
           </div>
-        </div>
-        <p className="mt-3 text-xs text-slate-600">
-          上述规则为界面占位；持久化需接入计费与任务调度。租户启停请以列表勾选 + 批量按钮为准（已写注册表）。
-        </p>
-      </section>
 
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-200">
-          <Shield className="h-4 w-4 text-sky-400" />
-          角色与权限
-        </h2>
-        <p className="mb-3 text-sm text-slate-500">
-          预设角色：{PRESET_ROLES.join('、')}。自定义角色可配置菜单与数据权限（如仅查看指定门店）；支持按客户 / 门店维度下发策略。
-        </p>
-        <div className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-sm text-slate-500">
-          角色矩阵、数据范围编辑器与「按客户下发」在生产环境由权限服务渲染；此处为占位说明。
-        </div>
-      </section>
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-400">可访问的功能模块</span>
+              <button
+                type="button"
+                onClick={selectAllPermissions}
+                className="text-xs text-indigo-400 hover:underline"
+              >
+                全选
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {OPS_PERMISSION_MODULES.map((m) => {
+                const checked = form.permissions.includes(m.key)
+                return (
+                  <label
+                    key={m.key}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+                      checked
+                        ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200'
+                        : 'border-slate-700 text-slate-400 hover:border-slate-600',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => togglePermission(m.key)}
+                      className="rounded border-slate-600"
+                    />
+                    {m.label}
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
+          {formErr ? <p className="mt-3 text-sm text-rose-400">{formErr}</p> : null}
+
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void (editing ? handleUpdate() : handleCreate())}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {busy ? '保存中…' : editing ? '保存' : '创建'}
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+            >
+              取消
+            </button>
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }
