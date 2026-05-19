@@ -39,7 +39,7 @@ export default function AiAgentDrawer() {
     applyShortcut,
     pendingPreviewId,
     pendingPreviewTaskType,
-    pendingProductPlanLoading,
+    pendingPreviewLoading,
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
@@ -47,8 +47,12 @@ export default function AiAgentDrawer() {
   } = useAiAgent()
 
   const confirmLabel =
-    pendingPreviewTaskType === 'create_product' ? '确认并提交审核' : '确认执行'
-  const confirmDisabled = pendingProductPlanLoading || aiSending
+    pendingPreviewTaskType === 'create_product'
+      ? '确认并提交审核'
+      : pendingPreviewTaskType === 'recruit_influencer'
+        ? '确认并打开招募'
+        : '确认执行'
+  const confirmDisabled = pendingPreviewLoading || aiSending
 
   const listRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -188,7 +192,7 @@ export default function AiAgentDrawer() {
                           confirmDisabled && 'cursor-not-allowed opacity-50',
                         )}
                       >
-                        {pendingProductPlanLoading ? '正在生成预览…' : confirmLabel}
+                        {pendingPreviewLoading ? '正在生成预览…' : confirmLabel}
                       </button>
                       <button
                         type="button"

@@ -19,9 +19,18 @@ import type {
   AiAgentPendingQuote,
   AiPermissionId,
   AiProductPlanPreview,
+  AiRecruitmentBriefPreview,
   AiTaskPreviewPayload,
   AiTaskType,
 } from '../lib/aiAgentTypes'
+import {
+  briefProductNameHint,
+  inferTaskTypeFromText,
+  inferVoucherPricesFromText,
+  parseAgentActionType,
+  summarizeAssistantContent,
+} from '../lib/aiAgentActionParse'
+import { appendKolBriefRecord, writeSelectedBriefForRecruitment } from '../lib/kolBriefStorage'
 import {
   competitorReportSummary,
   loadSelectedCompetitorStore,
@@ -31,6 +40,7 @@ import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
 import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import { fetchAiProductPlan } from '../services/storeIntelApi'
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
+import { buildAiRecruitmentBriefPreview } from '../services/aiAgentRecruitmentBriefEnrich'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
 import { loadDouyinWizardLastContext } from '../lib/douyinWizardLastContext'
 import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
@@ -110,15 +120,6 @@ function savePickerKey(key: string): void {
   }
 }
 
-function inferTaskType(t: string): AiTaskType | undefined {
-  if (/创建|商品|套餐|上架|双人|单人/.test(t)) return 'create_product'
-  if (/达人|招募|探店/.test(t)) return 'recruit_influencer'
-  if (/差评|评价|评论/.test(t)) return 'handle_review'
-  if (/分析|原因|异常/.test(t)) return 'analyze_exception'
-  if (/同步|失败/.test(t)) return 'sync_platform'
-  return undefined
-}
-
 function agentMessagesToChatMessages(msgs: AiAgentMessage[]): AIMessage[] {
   const out: AIMessage[] = []
   for (const m of msgs) {
@@ -155,8 +156,8 @@ type AiAgentContextValue = {
   applyShortcut: (taskType: AiTaskType) => void
   pendingPreviewId: string | null
   pendingPreviewTaskType: AiTaskType | null
-  /** 商品预览正在生成标题/头图时禁用确认 */
-  pendingProductPlanLoading: boolean
+  /** 商品/招募预览生成中（禁用确认） */
+  pendingPreviewLoading: boolean
   confirmPendingTask: () => void
   cancelPendingTask: () => void
   modifyPendingTask: () => void
@@ -473,6 +474,30 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const patchPreviewRecruitmentBrief = useCallback(
+    (previewMsgId: string, patch: Partial<AiRecruitmentBriefPreview>, content?: string) => {
+      setMessages((prev) => {
+        const next = prev.map((m) => {
+          if (m.id !== previewMsgId || !m.preview) return m
+          const cur = m.preview.recruitmentBrief
+          return {
+            ...m,
+            ...(content ? { content } : {}),
+            preview: {
+              ...m.preview,
+              recruitmentBrief: cur
+                ? { ...cur, ...patch }
+                : ({ ...patch } as AiRecruitmentBriefPreview),
+            },
+          }
+        })
+        messagesRef.current = next
+        return next
+      })
+    },
+    [],
+  )
+
   const attachProductPlanToPreview = useCallback(
     async (previewMsgId: string, userBrief: string) => {
       patchPreviewProductPlan(
@@ -529,29 +554,126 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (userBrief: string, pageLabel?: string) => {
       const intro =
         '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
-      const id = pushPreview('create_product', intro, pageLabel)
-      void attachProductPlanToPreview(id, userBrief)
+      const voucher = inferVoucherPricesFromText(userBrief)
+      const preview = buildPreviewForTask('create_product', pageLabel)
+      const msg = createAgentMessage('task_preview', intro, {
+        preview: {
+          ...preview,
+          productPlan: {
+            productName: briefProductNameHint(userBrief),
+            suggestedPriceYuan: voucher.price ?? 0,
+            description: '正在生成方案…',
+            comboLines: [],
+            productType: inferDouyinProductTypeFromText(userBrief),
+            enrichStatus: 'loading',
+            ...(voucher.origin != null ? { originYuan: voucher.origin } : {}),
+          },
+        },
+      })
+      setPendingPreviewId(msg.id)
+      setMessages((prev) => {
+        const next = [...prev, msg]
+        messagesRef.current = next
+        return next
+      })
+      void attachProductPlanToPreview(msg.id, userBrief)
     },
-    [pushPreview, attachProductPlanToPreview],
+    [attachProductPlanToPreview],
   )
 
-  const scheduleKeywordPreview = useCallback(
-    (trimmed: string, pageLabel?: string) => {
-      const intro = '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。'
-      if (/创建|商品|套餐|上架|双人|单人|火锅|团购/.test(trimmed)) {
-        setTimeout(() => pushCreateProductPreview(trimmed, pageLabel), 200)
-      } else if (/达人|招募|探店/.test(trimmed)) {
-        setTimeout(() => pushPreview('recruit_influencer', intro, pageLabel), 200)
-      } else if (/差评|评价|评论/.test(trimmed)) {
-        setTimeout(() => pushPreview('handle_review', intro, pageLabel), 200)
-      } else if (/同步|失败|异常|分析/.test(trimmed)) {
-        setTimeout(
-          () => pushPreview(/分析|原因|异常/.test(trimmed) ? 'analyze_exception' : 'sync_platform', intro, pageLabel),
-          200,
+  const attachRecruitmentBriefToPreview = useCallback(
+    async (previewMsgId: string, userBrief: string) => {
+      patchPreviewRecruitmentBrief(
+        previewMsgId,
+        { enrichStatus: 'loading' },
+        '正在生成达人探店图文 Brief（3 个版本）…',
+      )
+      try {
+        const brief = await buildAiRecruitmentBriefPreview(userBrief)
+        patchPreviewRecruitmentBrief(
+          previewMsgId,
+          brief,
+          '已生成达人招募图文 Brief。请核对主推品与文案，确认后将带入「达人招募」页。',
+        )
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        patchPreviewRecruitmentBrief(
+          previewMsgId,
+          {
+            platform: '抖音来客',
+            mainProductName: briefProductNameHint(userBrief),
+            tags: [],
+            briefText: userBrief.slice(0, 400),
+            enrichStatus: 'ready',
+            enrichError: `Brief 生成未完成：${msg.slice(0, 120)}`,
+          },
+          'Brief 生成失败，确认后可在招募页手动补充。',
         )
       }
     },
-    [pushCreateProductPreview, pushPreview],
+    [patchPreviewRecruitmentBrief],
+  )
+
+  const pushRecruitInfluencerPreview = useCallback(
+    (userBrief: string, pageLabel?: string) => {
+      const intro =
+        '检测到您希望招募达人。我将结合门店商品与行业标签生成探店图文 Brief，并在下方展示可核对的三版文案。'
+      const preview = buildPreviewForTask('recruit_influencer', pageLabel)
+      const msg = createAgentMessage('task_preview', intro, {
+        preview: {
+          ...preview,
+          recruitmentBrief: {
+            platform: '抖音来客',
+            mainProductName: briefProductNameHint(userBrief),
+            tags: [],
+            briefText: '',
+            enrichStatus: 'loading',
+          },
+        },
+      })
+      setPendingPreviewId(msg.id)
+      setMessages((prev) => {
+        const next = [...prev, msg]
+        messagesRef.current = next
+        return next
+      })
+      void attachRecruitmentBriefToPreview(msg.id, userBrief)
+    },
+    [attachRecruitmentBriefToPreview],
+  )
+
+  const scheduleTaskPreview = useCallback(
+    (trimmed: string, assistantContent: string | undefined, explicitTaskType: AiTaskType | undefined, pageLabel?: string) => {
+      const taskType =
+        explicitTaskType ??
+        inferTaskTypeFromText(trimmed) ??
+        (assistantContent ? parseAgentActionType(assistantContent) : undefined)
+      if (!taskType) return
+
+      const intro = '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。'
+      setTimeout(() => {
+        switch (taskType) {
+          case 'create_product':
+            pushCreateProductPreview(trimmed, pageLabel)
+            break
+          case 'recruit_influencer':
+            pushRecruitInfluencerPreview(trimmed, pageLabel)
+            break
+          case 'handle_review':
+            pushPreview('handle_review', intro, pageLabel)
+            break
+          case 'analyze_exception':
+            pushPreview('analyze_exception', intro, pageLabel)
+            break
+          case 'sync_platform':
+            pushPreview('sync_platform', intro, pageLabel)
+            break
+          default:
+            break
+        }
+      }, 200)
+    },
+    [pushCreateProductPreview, pushRecruitInfluencerPreview, pushPreview],
   )
 
   const runGatewayForSnapshot = useCallback(
@@ -582,13 +704,21 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           ...(imageDataUrls.length ? { imageDataUrls } : {}),
           taskType,
         })
-        const assistantMsg = createAgentMessage('assistant', res.content)
+        const display =
+          summarizeAssistantContent(res.content) ??
+          res.content
+        const assistantMsg = createAgentMessage('assistant', display)
         setMessages((prev) => {
           const next = [...prev, assistantMsg]
           messagesRef.current = next
           return next
         })
-        scheduleKeywordPreview(trimmed, previewPage ?? pageContext?.pageLabel)
+        scheduleTaskPreview(
+          trimmed,
+          res.content,
+          taskType ?? inferTaskTypeFromText(trimmed),
+          previewPage ?? pageContext?.pageLabel,
+        )
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setMessages((prev) => {
@@ -606,7 +736,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         setAiSending(false)
       }
     },
-    [modelPickerKey, pageContext?.pageLabel, scheduleKeywordPreview],
+    [modelPickerKey, pageContext?.pageLabel, scheduleTaskPreview],
   )
 
   const sendUserText = useCallback(
@@ -674,7 +804,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                   messagesRef.current = next
                   return next
                 })
-                scheduleKeywordPreview(trimmed, pageContext?.pageLabel)
+                scheduleTaskPreview(trimmed, undefined, inferTaskTypeFromText(trimmed), pageContext?.pageLabel)
                 return
               }
             } finally {
@@ -684,7 +814,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           await runGatewayForSnapshot(
             messagesRef.current,
             line,
-            inferTaskType(line),
+            inferTaskTypeFromText(line),
             pageContext?.pageLabel,
             imgs,
             effectiveChatPickerKey(nextPickerKey),
@@ -698,7 +828,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       pendingPreviewId,
       pageContext?.pageLabel,
       runGatewayForSnapshot,
-      scheduleKeywordPreview,
+      scheduleTaskPreview,
       modelPickerKey,
       modelPickerOptions,
     ],
@@ -776,6 +906,48 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       navigate('/products/create', {
         state: { platforms: ['douyin'], autoSubmit: canAutoSubmit },
       })
+      return
+    }
+
+    if (p?.taskType === 'recruit_influencer') {
+      const brief = p.recruitmentBrief
+      if (brief?.briefText?.trim()) {
+        const recordId =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `brief-${Date.now()}`
+        appendKolBriefRecord({
+          id: recordId,
+          createdAt: new Date().toISOString(),
+          platform: brief.platform,
+          mainProductName: brief.mainProductName,
+          tags: brief.tags,
+          previews: brief.previews ?? [brief.briefText, brief.briefText, brief.briefText],
+        })
+        writeSelectedBriefForRecruitment({
+          recordId,
+          variantIndex: 0,
+          text: brief.briefText,
+          platform: brief.platform,
+          mainProductName: brief.mainProductName,
+          tags: brief.tags,
+        })
+      }
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          createAgentMessage(
+            'task_result',
+            `「${title}」已确认。已写入达人 Brief，正在打开达人招募页…`,
+            { resultSummary: 'confirmed' },
+          ),
+        ]
+        messagesRef.current = next
+        return next
+      })
+      setPendingPreviewId(null)
+      setDrawerOpen(false)
+      navigate('/recruitment')
       return
     }
 
@@ -870,7 +1042,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                   messagesRef.current = next
                   return next
                 })
-                scheduleKeywordPreview(q, pl)
+                scheduleTaskPreview(q, undefined, inferTaskTypeFromText(q), pl)
                 return
               }
             } finally {
@@ -880,7 +1052,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           await runGatewayForSnapshot(
             messagesRef.current,
             q,
-            inferTaskType(q),
+            inferTaskTypeFromText(q),
             pl,
             [],
             effectiveChatPickerKey(nextPickerKey),
@@ -888,7 +1060,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         })()
       })
     },
-    [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions, scheduleKeywordPreview],
+    [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions, scheduleTaskPreview],
   )
 
   const pendingPreviewTaskType = useMemo((): AiTaskType | null => {
@@ -897,10 +1069,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     return m?.preview?.taskType ?? null
   }, [pendingPreviewId, messages])
 
-  const pendingProductPlanLoading = useMemo(() => {
+  const pendingPreviewLoading = useMemo(() => {
     if (!pendingPreviewId) return false
     const m = messages.find((x) => x.id === pendingPreviewId)
-    return m?.preview?.productPlan?.enrichStatus === 'loading'
+    const p = m?.preview
+    if (!p) return false
+    if (p.taskType === 'create_product') return p.productPlan?.enrichStatus === 'loading'
+    if (p.taskType === 'recruit_influencer') return p.recruitmentBrief?.enrichStatus === 'loading'
+    return false
   }, [pendingPreviewId, messages])
 
   const value = useMemo<AiAgentContextValue>(
@@ -917,7 +1093,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       applyShortcut,
       pendingPreviewId,
       pendingPreviewTaskType,
-      pendingProductPlanLoading,
+      pendingPreviewLoading,
       confirmPendingTask,
       cancelPendingTask,
       modifyPendingTask,
@@ -959,7 +1135,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setModelPickerKey,
       modelPickerOptions,
       aiSending,
-      pendingProductPlanLoading,
+      pendingPreviewLoading,
       pendingComposerImages,
       addComposerImages,
       addComposerImageFiles,
