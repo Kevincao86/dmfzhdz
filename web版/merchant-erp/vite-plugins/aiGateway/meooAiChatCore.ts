@@ -10,6 +10,7 @@ import {
 import { verifyBearerJwt } from './authSupabase.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChat } from './chatRouter.js'
+import { assertAiChatAccess } from '../tenantMembershipCore.js'
 
 const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
 
@@ -48,6 +49,15 @@ export async function runMeooAiChatCore(
     return { status: 400, body: { ok: false, error: 'invalid_provider' } }
   }
 
+  const access = await assertAiChatAccess(user.id, provider, env)
+  if (!access.ok) {
+    return {
+      status: access.status,
+      body: { ok: false, error: access.error, detail: access.detail },
+    }
+  }
+  const chatEnv = access.envForChat
+
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined
 
@@ -82,7 +92,7 @@ export async function runMeooAiChatCore(
   })
 
   try {
-    const res = await routeAiChat(req, env)
+    const res = await routeAiChat(req, chatEnv)
     /** 勿把 SDK 完整 raw 对象写入 HTTP 响应：常含循环引用，JSON.stringify 会抛错导致 Vercel 500 */
     const okBody: Record<string, unknown> = {
       ok: true,

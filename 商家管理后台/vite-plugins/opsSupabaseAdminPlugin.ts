@@ -15,6 +15,7 @@ import {
 import {
   opsTenantPatchAdmin,
   opsTenantResetPasswordAdmin,
+  opsTenantTokenmixAdmin,
   opsTenantWalletLedgerAdmin,
 } from '../api/opsTenantsMutationsBackend'
 
@@ -63,6 +64,10 @@ type TenantRow = {
   official_days: number
   wallet_balance_cents: number
   service_expire_at: string | null
+  membership_plan?: string
+  tokenmix_api_key?: string | null
+  direct_ai_calls_used?: number
+  direct_ai_usage_month?: string | null
   created_at: string
   updated_at: string
 }
@@ -76,7 +81,7 @@ async function listTenantsWithAdminClient(
   })
 
   const fullTenantSelect =
-    'id, name, account_status, trial_days, official_days, wallet_balance_cents, service_expire_at, created_at, updated_at'
+    'id, name, account_status, trial_days, official_days, wallet_balance_cents, service_expire_at, membership_plan, tokenmix_api_key, direct_ai_calls_used, direct_ai_usage_month, created_at, updated_at'
 
   let trows: TenantRow[] | null = null
   const fullRes = await admin.from('tenants').select(fullTenantSelect).order('created_at', { ascending: false })
@@ -84,7 +89,7 @@ async function listTenantsWithAdminClient(
   if (!fullRes.error) {
     trows = (fullRes.data ?? []) as TenantRow[]
   } else if (
-    /wallet_balance_cents|service_expire_at|does not exist|Could not find|schema cache/i.test(fullRes.error.message)
+    /wallet_balance_cents|service_expire_at|membership_plan|tokenmix_api_key|does not exist|Could not find|schema cache/i.test(fullRes.error.message)
   ) {
     const legacy = await admin
       .from('tenants')
@@ -140,6 +145,10 @@ async function listTenantsWithAdminClient(
       official_days: t.official_days,
       wallet_balance_cents: typeof t.wallet_balance_cents === 'number' ? t.wallet_balance_cents : 0,
       service_expire_at: t.service_expire_at ?? null,
+      membership_plan: t.membership_plan ?? 'member',
+      tokenmix_bound: !!(typeof t.tokenmix_api_key === 'string' && t.tokenmix_api_key.trim()),
+      direct_ai_calls_used: typeof t.direct_ai_calls_used === 'number' ? t.direct_ai_calls_used : 0,
+      direct_ai_usage_month: t.direct_ai_usage_month ?? null,
       created_at: t.created_at,
       updated_at: t.updated_at,
       owner_user_id: uid ?? null,
@@ -203,6 +212,10 @@ function isMeooTenantsResetPasswordPath(urlPath: string): boolean {
   return urlPath === '/api/meoo-supabase-tenants-reset-password'
 }
 
+function isMeooTenantsTokenmixPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-supabase-tenants-tokenmix'
+}
+
 async function edgePost(
   supabaseUrl: string,
   anon: string,
@@ -236,6 +249,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
           !urlPath.startsWith('/api/ops-supabase/') &&
           !isMeooTenantsPatchPath(urlPath) &&
           !isMeooTenantsResetPasswordPath(urlPath) &&
+          !isMeooTenantsTokenmixPath(urlPath) &&
           !isMeooFlatOpsGetPath(urlPath) &&
           !isMeooPaymentOrdersVerifyPath(urlPath) &&
           !isMeooPaymentOrdersConfirmPath(urlPath)
@@ -271,6 +285,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
           urlPath === '/api/ops-supabase/tenants/reset-password' ||
           isMeooTenantsPatchPath(urlPath) ||
           isMeooTenantsResetPasswordPath(urlPath) ||
+          isMeooTenantsTokenmixPath(urlPath) ||
           isPaymentOrdersListPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/verify' ||
           isMeooPaymentOrdersVerifyPath(urlPath) ||
@@ -499,6 +514,35 @@ export function opsSupabaseAdminPlugin(): Plugin {
               hint:
                 '配置 SUPABASE_SERVICE_ROLE_KEY，或 ANON+MEOO_PROVISION_SECRET 并部署 ops-reset-tenant-auth-password',
             })
+            return
+          }
+
+          if (method === 'POST' && isMeooTenantsTokenmixPath(urlPath)) {
+            const raw = await readBody(req as IncomingMessage)
+            let body: Record<string, unknown>
+            try {
+              body = JSON.parse(raw || '{}') as Record<string, unknown>
+            } catch {
+              json(res, 400, { ok: false, error: 'invalid_json' })
+              return
+            }
+            if (!effectiveKey) {
+              json(res, 503, {
+                ok: false,
+                error: 'supabase_admin_not_configured',
+                hint: 'TokenMix 绑定需要 SUPABASE_SERVICE_ROLE_KEY',
+              })
+              return
+            }
+            const admin = createClient(supabaseUrl, effectiveKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            })
+            const tr = await opsTenantTokenmixAdmin(admin, body, process.env as Record<string, string>)
+            if (!tr.ok) {
+              json(res, tr.status, tr.body)
+              return
+            }
+            json(res, 200, tr.body)
             return
           }
 

@@ -10,6 +10,7 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayShared.js'
 import { verifyBearerJwt } from '../vite-plugins/aiGateway/authSupabase.js'
+import { assertAiChatAccess } from '../vite-plugins/tenantMembershipCore.js'
 import { runMeooAgentImageRequest } from '../vite-plugins/meooAgentImageCore.js'
 
 export const config = { maxDuration: 300 }
@@ -68,8 +69,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const tokenmixImageModel =
     typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
 
+  const env0 = process.env as Record<string, string>
+  const accessProvider =
+    imageRoute === 'tokenmix'
+      ? 'tokenmix'
+      : preferredVendor ?? 'qwen'
+  const access = await assertAiChatAccess(user.id, accessProvider, env0)
+  if (!access.ok) {
+    sendMerchantJson(res, access.status, {
+      ok: false,
+      error: access.error,
+      detail: access.detail,
+    })
+    return
+  }
+
   try {
-    const out = await runMeooAgentImageRequest(process.env as Record<string, string>, {
+    const out = await runMeooAgentImageRequest(access.envForChat, {
       prompt,
       referenceImage,
       preferredVendor,

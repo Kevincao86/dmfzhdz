@@ -1,3 +1,5 @@
+import type { MembershipPlan } from '../../lib/membershipPlan.js'
+import { membershipAllowsTokenMix } from '../../lib/membershipPlan.js'
 import type { AIProvider, AIModelFamily } from './types'
 import {
   TOKENMIX_FAMILY_CATALOG,
@@ -242,6 +244,30 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
   })
 
   return out
+}
+
+/** 按会员档位过滤智能体模型下拉（免费/会员：四厂商；Plus：含 TokenMix） */
+export function listAiModelPickerOptionsForPlan(plan: MembershipPlan): AiModelPickerOption[] {
+  const all = listAiModelPickerOptions()
+  if (membershipAllowsTokenMix(plan)) return all
+  return all.filter((o) => {
+    if (o.provider === 'tokenmix') return false
+    if (o.provider === 'kimi') return false
+    return (
+      o.provider === 'qwen' ||
+      o.provider === 'doubao' ||
+      o.provider === 'minimax' ||
+      o.provider === 'deepseek'
+    )
+  })
+}
+
+export function defaultAiModelPickerKeyForPlan(plan: MembershipPlan): string {
+  const opts = listAiModelPickerOptionsForPlan(plan)
+  const prefer =
+    opts.find((o) => o.provider === 'qwen' && o.capability !== 'image') ??
+    opts.find((o) => o.capability !== 'image')
+  return prefer?.key ?? opts[0]?.key ?? 'qwen::__default__'
 }
 
 export type ParsedModelPicker =

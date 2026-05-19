@@ -45,7 +45,12 @@ import {
   effectiveChatPickerKey,
   isAgentImagePickerKey,
 } from '../services/ai/agentImageModelKeys'
-import { listAiModelPickerOptions, parseAiModelPickerKey } from '../services/ai/modelRegistry'
+import {
+  defaultAiModelPickerKeyForPlan,
+  listAiModelPickerOptionsForPlan,
+  parseAiModelPickerKey,
+} from '../services/ai/modelRegistry'
+import { useMembership } from './MembershipContext'
 import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
 import { postAiAgentNativeImage, postAiChat, type AiAgentNativeImageOk } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
@@ -85,12 +90,12 @@ function captionForAgentImageResult(img: AiAgentNativeImageOk, isI2i: boolean): 
 
 const PREFS_KEY = 'meoo_ai_model_picker_key'
 
-function loadPickerKey(): string {
-  const fallback = listAiModelPickerOptions()[0]?.key ?? 'tokenmix::openai::__default__'
+function loadPickerKey(plan: import('../lib/membershipPlan').MembershipPlan): string {
+  const fallback = defaultAiModelPickerKeyForPlan(plan)
   try {
     const raw = localStorage.getItem(PREFS_KEY)
     if (!raw) return fallback
-    const opts = listAiModelPickerOptions()
+    const opts = listAiModelPickerOptionsForPlan(plan)
     return opts.some((o) => o.key === raw) ? raw : fallback
   } catch {
     return fallback
@@ -159,7 +164,7 @@ type AiAgentContextValue = {
   /** 多模型：下拉 key，与 modelRegistry 中 listAiModelPickerOptions 一致 */
   modelPickerKey: string
   setModelPickerKey: (key: string) => void
-  modelPickerOptions: ReturnType<typeof listAiModelPickerOptions>
+  modelPickerOptions: ReturnType<typeof listAiModelPickerOptionsForPlan>
   aiSending: boolean
   /** 主输入区待发送的截图（最多 4 张） */
   pendingComposerImages: string[]
@@ -272,6 +277,7 @@ function buildProductPlanContext(userBrief: string) {
 
 export function AiAgentProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
+  const { plan } = useMembership()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pageContext, setPageContext] = useState<AiAgentOpenContext | null>(null)
   const [messages, setMessages] = useState<AiAgentMessage[]>(() => [
@@ -284,7 +290,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
   const [pendingQuote, setPendingQuote] = useState<AiAgentPendingQuote | null>(null)
   const pendingQuoteRef = useRef<AiAgentPendingQuote | null>(null)
-  const [modelPickerKey, setModelPickerKeyState] = useState('tokenmix::openai::__default__')
+  const [modelPickerKey, setModelPickerKeyState] = useState(() =>
+    defaultAiModelPickerKeyForPlan('member'),
+  )
   const [aiSending, setAiSending] = useState(false)
 
   const messagesRef = useRef(messages)
@@ -298,10 +306,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   }, [pendingQuote])
 
   useEffect(() => {
-    setModelPickerKeyState(loadPickerKey())
-  }, [])
+    const key = loadPickerKey(plan)
+    setModelPickerKeyState(key)
+  }, [plan])
 
-  const modelPickerOptions = useMemo(() => listAiModelPickerOptions(), [])
+  const modelPickerOptions = useMemo(() => listAiModelPickerOptionsForPlan(plan), [plan])
 
   const setModelPickerKey = useCallback((key: string) => {
     setModelPickerKeyState(key)

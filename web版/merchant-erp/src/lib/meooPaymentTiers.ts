@@ -3,9 +3,10 @@
 export type PaymentTier = { label: string; yuan: number; cents: number }
 
 export const SUBSCRIPTION_TIERS: PaymentTier[] = [
-  { label: '月度 · 30 天', yuan: 99, cents: 9900 },
-  { label: '季度 · 90 天', yuan: 268, cents: 26800 },
-  { label: '年度 · 365 天', yuan: 698, cents: 69800 },
+  { label: '会员版 · 月度', yuan: 168, cents: 16800 },
+  { label: '会员 Plus · 月度', yuan: 598, cents: 59800 },
+  { label: '会员版 · 季度', yuan: 468, cents: 46800 },
+  { label: '会员 Plus · 季度', yuan: 1688, cents: 168800 },
 ]
 
 export const RECHARGE_TIERS: PaymentTier[] = [
@@ -34,12 +35,11 @@ export function subscriptionDaysFromVerifiedCents(verifiedCents: number): number
   if (!Number.isFinite(verifiedCents) || verifiedCents <= 0) return 0
   for (const t of SUBSCRIPTION_TIERS) {
     if (t.cents === verifiedCents) {
-      if (t.cents === 9900) return 30
-      if (t.cents === 26800) return 90
-      if (t.cents === 69800) return 365
+      if (t.cents === 16800 || t.cents === 59800) return 30
+      if (t.cents === 46800 || t.cents === 168800) return 90
     }
   }
-  const unit = 9900 / 30
+  const unit = 16800 / 30
   return Math.max(1, Math.floor(verifiedCents / unit))
 }
 

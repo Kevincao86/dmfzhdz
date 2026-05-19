@@ -1,4 +1,4 @@
-import { Download, Eye, KeyRound, Pencil, Plus, Snowflake, UserX, X } from 'lucide-react'
+import { BarChart3, Download, Eye, KeyRound, Link2, Pencil, Plus, Snowflake, UserX, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
@@ -13,6 +13,11 @@ import {
   supabaseOpsAvailableOnClient,
   supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
+import {
+  bindTenantTokenmixKey,
+  fetchTenantTokenmixUsage,
+  type TokenmixUsageResponse,
+} from '../opsTokenmixTenantsApi'
 
 const OPS_RESET_PASSWORD = '123456'
 
@@ -53,9 +58,16 @@ export default function OpsCustomersListPage() {
     merchantName: '',
     industry: '',
     accountStatus: 'normal' as CustomerAccountStatus,
+    membershipPlan: 'member' as 'free' | 'member' | 'member_plus',
     trialDays: '14',
     officialDays: '365',
   })
+
+  const [tokenmixBindCustomer, setTokenmixBindCustomer] = useState<OpsCustomer | null>(null)
+  const [tokenmixKeyDraft, setTokenmixKeyDraft] = useState('')
+  const [tokenmixUsageCustomer, setTokenmixUsageCustomer] = useState<OpsCustomer | null>(null)
+  const [tokenmixUsageData, setTokenmixUsageData] = useState<TokenmixUsageResponse | null>(null)
+  const [tokenmixRowBusy, setTokenmixRowBusy] = useState<string | null>(null)
 
   const [opsSyncTenantId, setOpsSyncTenantId] = useState('')
   const [opsSyncName, setOpsSyncName] = useState('')
@@ -259,6 +271,7 @@ export default function OpsCustomersListPage() {
       merchantName: t.merchantName,
       industry: t.industry,
       accountStatus: t.accountStatus,
+      membershipPlan: t.membershipPlan ?? 'member',
       trialDays: String(t.trialDays),
       officialDays: String(t.officialDays),
     })
@@ -276,6 +289,7 @@ export default function OpsCustomersListPage() {
             id: editTenant.id,
             merchantName: editForm.merchantName.trim(),
             accountStatus: editForm.accountStatus,
+            membershipPlan: editForm.membershipPlan,
             trialDays: Math.max(0, Number(editForm.trialDays) || 0),
             officialDays: Math.max(0, Number(editForm.officialDays) || 0),
           })
@@ -326,6 +340,55 @@ export default function OpsCustomersListPage() {
       await reload()
     } finally {
       setOpsSyncBusy(false)
+    }
+  }
+
+  const openTokenmixBind = (c: OpsCustomer) => {
+    const t = tenants.find((x) => x.id === c.id)
+    if (!t || !isSupabaseTenant(t)) {
+      window.alert('仅 Supabase 云端租户可绑定 TokenMix 密钥。')
+      return
+    }
+    setTokenmixKeyDraft('')
+    setTokenmixBindCustomer(c)
+  }
+
+  const submitTokenmixBind = async () => {
+    if (!tokenmixBindCustomer) return
+    const key = tokenmixKeyDraft.trim()
+    if (key.length < 8) {
+      window.alert('请输入有效的 TokenMix API Key')
+      return
+    }
+    setTokenmixRowBusy(tokenmixBindCustomer.id)
+    try {
+      const r = await bindTenantTokenmixKey(tokenmixBindCustomer.id, key)
+      if (!r.ok) {
+        window.alert([r.error, r.detail].filter(Boolean).join(' — ') || '绑定失败')
+        return
+      }
+      setTokenmixBindCustomer(null)
+      await reload()
+      window.alert(`「${tokenmixBindCustomer.companyName}」TokenMix 已绑定。`)
+    } finally {
+      setTokenmixRowBusy(null)
+    }
+  }
+
+  const openTokenmixUsage = async (c: OpsCustomer) => {
+    const t = tenants.find((x) => x.id === c.id)
+    if (!t || !isSupabaseTenant(t)) {
+      window.alert('仅 Supabase 云端租户可查看用量。')
+      return
+    }
+    setTokenmixUsageCustomer(c)
+    setTokenmixUsageData(null)
+    setTokenmixRowBusy(c.id)
+    try {
+      const r = await fetchTenantTokenmixUsage(c.id)
+      setTokenmixUsageData(r)
+    } finally {
+      setTokenmixRowBusy(null)
     }
   }
 
@@ -658,6 +721,24 @@ export default function OpsCustomersListPage() {
             <p className="mb-3 text-xs text-slate-500">登录名：{editTenant.loginName}（只读）</p>
             <div className="space-y-3 text-sm">
               <div>
+                <label className="mb-1 block text-xs text-slate-400">会员档位</label>
+                <select
+                  value={editForm.membershipPlan}
+                  onChange={(e) =>
+                    setEditForm((f) => ({
+                      ...f,
+                      membershipPlan: e.target.value as 'free' | 'member' | 'member_plus',
+                    }))
+                  }
+                  disabled={!isSupabaseTenant(editTenant)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-200 disabled:opacity-50"
+                >
+                  <option value="free">免费版</option>
+                  <option value="member">会员版（¥168/月）</option>
+                  <option value="member_plus">会员 Plus（¥598/月）</option>
+                </select>
+              </div>
+              <div>
                 <label className="mb-1 block text-xs text-slate-400">商家名</label>
                 <input
                   value={editForm.merchantName}
@@ -720,6 +801,99 @@ export default function OpsCustomersListPage() {
           </div>
         </div>
       )}
+
+      {tokenmixBindCustomer ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => tokenmixRowBusy !== tokenmixBindCustomer.id && setTokenmixBindCustomer(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-2 text-lg font-semibold text-white">Tokenmix 绑定</h2>
+            <p className="mb-3 text-xs text-slate-500">{tokenmixBindCustomer.companyName}</p>
+            <label className="mb-1 block text-xs text-slate-400">API 密钥</label>
+            <input
+              type="password"
+              autoComplete="off"
+              value={tokenmixKeyDraft}
+              onChange={(e) => setTokenmixKeyDraft(e.target.value)}
+              placeholder="sk-..."
+              className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={tokenmixRowBusy === tokenmixBindCustomer.id}
+                onClick={() => setTokenmixBindCustomer(null)}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={tokenmixRowBusy === tokenmixBindCustomer.id}
+                onClick={() => void submitTokenmixBind()}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {tokenmixRowBusy === tokenmixBindCustomer.id ? '保存中…' : '保存绑定'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {tokenmixUsageCustomer ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setTokenmixUsageCustomer(null)}
+        >
+          <div
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-2 text-lg font-semibold text-white">用量明细</h2>
+            <p className="mb-4 text-xs text-slate-500">{tokenmixUsageCustomer.companyName}</p>
+            {!tokenmixUsageData ? (
+              <p className="text-sm text-slate-400">加载中…</p>
+            ) : !tokenmixUsageData.ok ? (
+              <p className="text-sm text-red-400">
+                {[tokenmixUsageData.error, tokenmixUsageData.detail].filter(Boolean).join(' — ')}
+              </p>
+            ) : (
+              <div className="space-y-3 text-sm text-slate-300">
+                <p>会员档位：{tokenmixUsageData.membershipPlan ?? '—'}</p>
+                <p>TokenMix：{tokenmixUsageData.tokenmixBound ? '已绑定' : '未绑定'}</p>
+                <p>
+                  直连 AI 本月：{tokenmixUsageData.directAiCallsUsed ?? 0} 次
+                  {tokenmixUsageData.directAiUsageMonth
+                    ? `（${tokenmixUsageData.directAiUsageMonth}）`
+                    : ''}
+                </p>
+                {tokenmixUsageData.tokenmixUsage ? (
+                  <pre className="overflow-x-auto rounded-lg bg-slate-950 p-3 text-[11px] text-slate-400">
+                    {JSON.stringify(tokenmixUsageData.tokenmixUsage, null, 2)}
+                  </pre>
+                ) : (
+                  <p className="text-xs text-slate-500">未绑定 TokenMix 或暂无同步快照。</p>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              className="mt-4 w-full rounded-lg border border-slate-600 py-2 text-sm text-slate-300"
+              onClick={() => setTokenmixUsageCustomer(null)}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {resetPwdModalCustomer ? (
         <div
@@ -949,6 +1123,28 @@ export default function OpsCustomersListPage() {
                         <Eye className="h-3 w-3" />
                         详情
                       </Link>
+                      {isSupabaseTenant(tenants.find((x) => x.id === c.id)) ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={tokenmixRowBusy === c.id}
+                            onClick={() => openTokenmixBind(c)}
+                            className="inline-flex items-center gap-0.5 rounded-md border border-cyan-800/50 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-950/30 disabled:opacity-50"
+                          >
+                            <Link2 className="h-3 w-3" />
+                            Tokenmix
+                          </button>
+                          <button
+                            type="button"
+                            disabled={tokenmixRowBusy === c.id}
+                            onClick={() => void openTokenmixUsage(c)}
+                            className="inline-flex items-center gap-0.5 rounded-md border border-violet-800/50 px-2 py-1 text-xs text-violet-300 hover:bg-violet-950/30 disabled:opacity-50"
+                          >
+                            <BarChart3 className="h-3 w-3" />
+                            用量
+                          </button>
+                        </>
+                      ) : null}
                       <button
                         type="button"
                         disabled={
