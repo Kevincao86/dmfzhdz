@@ -17,8 +17,8 @@ export const MERCHANT_PLATFORM_BRANDS: MerchantPlatformBrand[] = [
     id: 'douyin',
     shortName: '抖音',
     merchantName: '抖音商家版',
-    gradient: 'from-gray-900 via-gray-800 to-pink-600',
-    ring: 'ring-pink-200',
+    gradient: 'from-black to-black',
+    ring: 'ring-slate-300',
   },
   {
     id: 'meituan',
@@ -47,6 +47,22 @@ export function getMerchantPlatformBrand(id: string): MerchantPlatformBrand | un
   return MERCHANT_PLATFORM_BRANDS.find((p) => p.id === id)
 }
 
+/** 抖音 App 双色音符（非 TikTok / 来客「T」形图标） */
+function DouyinAppLogoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden>
+      <path
+        fill="#25F4EE"
+        d="M19.82 7.04c3.28 2.62 8.02 3.25 12.04 1.6v6.7c-2.87-.38-5.84.35-8.18 2.02-2.74 1.99-4.4 5.22-4.4 8.8v14.62h-6.7V21.16c0-8.66 2.95-12.54 7.24-15.8v2.68z"
+      />
+      <path
+        fill="#FE2C55"
+        d="M31.86 8.64v6.7c2.87.38 5.84 1.34 8.18 3.01 2.74 1.99 4.4 5.22 4.4 8.8v14.62h6.7V29.76c0-8.66-2.95-12.54-7.24-15.8-3.28-2.62-8.02-3.25-12.04-1.6z"
+      />
+    </svg>
+  )
+}
+
 /** 平台 Logo（简化品牌色块 + 标识，避免依赖外链图床） */
 export function PlatformBrandLogo({
   id,
@@ -62,9 +78,7 @@ export function PlatformBrandLogo({
     size === 'sm' ? 'h-9 w-9 text-sm' : size === 'lg' ? 'h-14 w-14 text-xl' : 'h-11 w-11 text-base'
   const label =
     id === 'douyin' ? (
-      <svg viewBox="0 0 24 24" className="h-[55%] w-[55%] fill-white" aria-hidden>
-        <path d="M16.6 5.82s-.51.72-2.04 1.28c-1.44.51-3.45.64-3.45.64s2.17 9.92 2.58 11.74c.38 1.66 1.15 2.3 2.3 2.3 1.02 0 2.04-.64 2.04-.64l-.51 3.07s-1.92 1.02-3.58 1.02c-2.43 0-3.32-1.47-4.22-3.32-.96-1.98-2.04-4.22-2.04-4.22l-1.6-7.87h-3.9V5.82h16.6z" />
-      </svg>
+      <DouyinAppLogoMark className="h-[62%] w-[62%]" />
     ) : id === 'meituan' ? (
       <span className="text-xs font-bold leading-none text-gray-900">点评</span>
     ) : id === 'xhs' ? (
