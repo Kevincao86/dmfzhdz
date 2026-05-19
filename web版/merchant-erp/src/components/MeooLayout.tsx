@@ -15,7 +15,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { childActive, NAV_ITEMS, pathActive } from '../config/nav'
+import { childActive, filterNavItemsForPlan, NAV_ITEMS, pathActive } from '../config/nav'
+import { useMembership } from '../context/MembershipContext'
 import { cn } from '../cn'
 import AiAgentDrawer, { AiAgentFloatingButton } from './AiAgentDrawer'
 import FloatingOnlineSupport from './FloatingOnlineSupport'
@@ -43,6 +44,8 @@ export default function MeooLayout() {
   const [personalSettingsFormKey, setPersonalSettingsFormKey] = useState(0)
   const [headerSearchQuery, setHeaderSearchQuery] = useState('')
   const { submitTopSearchQuery } = useAiAgent()
+  const { plan } = useMembership()
+  const navItems = useMemo(() => filterNavItemsForPlan(NAV_ITEMS, plan), [plan])
   const [adminName, setAdminName] = useState('管理员')
   const [enterpriseName, setEnterpriseName] = useState('')
   const [accountType] = useState('主账号')
@@ -89,7 +92,7 @@ export default function MeooLayout() {
 
   const defaultOpen = useMemo(() => {
     const paths: string[] = []
-    for (const item of NAV_ITEMS) {
+    for (const item of navItems) {
       if (!item.children) continue
       if (
         item.children.some((c) => childActive(pathname, c.path)) ||
@@ -99,7 +102,7 @@ export default function MeooLayout() {
       }
     }
     return paths
-  }, [pathname])
+  }, [pathname, navItems])
 
   useEffect(() => {
     setOpenGroups((prev) => {
@@ -163,7 +166,7 @@ export default function MeooLayout() {
         </div>
 
         <nav className="h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             const active = item.children
               ? item.children.some((c) => childActive(pathname, c.path))

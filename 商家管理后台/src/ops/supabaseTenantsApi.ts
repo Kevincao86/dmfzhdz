@@ -24,6 +24,10 @@ export type SupabaseTenantRow = {
   created_at: string
   updated_at: string
   owner_user_id?: string | null
+  membership_plan?: string
+  tokenmix_bound?: boolean
+  direct_ai_calls_used?: number
+  direct_ai_usage_month?: string | null
 }
 
 /** 是否应对同源 `/api/ops-supabase/*` 发请求（线上恒为 true） */
@@ -139,6 +143,14 @@ export function supabaseRowsToRegistryTenants(rows: SupabaseTenantRow[]): Regist
           typeof r.service_expire_at === 'string' && r.service_expire_at.trim()
             ? r.service_expire_at
             : undefined,
+        membershipPlan: ((): RegistryTenant['membershipPlan'] => {
+          const p = r.membership_plan
+          if (p === 'free' || p === 'member' || p === 'member_plus') return p
+          return 'member'
+        })(),
+        tokenmixBound: !!r.tokenmix_bound,
+        directAiCallsUsed:
+          typeof r.direct_ai_calls_used === 'number' ? Math.max(0, r.direct_ai_calls_used) : 0,
       }
     })
     .filter((t) => t.id.length > 0)
@@ -150,6 +162,7 @@ export async function patchSupabaseTenant(body: {
   accountStatus?: 'normal' | 'disabled' | 'frozen'
   trialDays?: number
   officialDays?: number
+  membershipPlan?: 'free' | 'member' | 'member_plus'
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
   /** 扁平路径，避免 Vercel 深层目录 + supabase-js 打包崩溃（与 meoo-supabase-tenants-list 一致） */
   const res = await fetch('/api/meoo-supabase-tenants-patch', {

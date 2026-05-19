@@ -42,6 +42,10 @@ type TenantRow = {
   official_days: number
   wallet_balance_cents: number
   service_expire_at: string | null
+  membership_plan?: string
+  tokenmix_api_key?: string | null
+  direct_ai_calls_used?: number
+  direct_ai_usage_month?: string | null
   created_at: string
   updated_at: string
 }
@@ -62,7 +66,7 @@ async function listTenantsWithServiceRoleFetch(
   const headers = serviceRoleHeaders(serviceKey)
 
   const fullTenantSelect =
-    'id,name,account_status,trial_days,official_days,wallet_balance_cents,service_expire_at,created_at,updated_at'
+    'id,name,account_status,trial_days,official_days,wallet_balance_cents,service_expire_at,membership_plan,tokenmix_api_key,direct_ai_calls_used,direct_ai_usage_month,created_at,updated_at'
   const fullUrl = `${base}/rest/v1/tenants?select=${encodeURIComponent(fullTenantSelect)}&order=created_at.desc`
 
   const tr = await fetch(fullUrl, { headers })
@@ -77,7 +81,7 @@ async function listTenantsWithServiceRoleFetch(
       return { ok: false, message: 'tenants_select_failed', detail: ttext.slice(0, 400) }
     }
   } else if (
-    /wallet_balance_cents|service_expire_at|does not exist|Could not find|schema cache/i.test(ttext)
+    /wallet_balance_cents|service_expire_at|membership_plan|tokenmix_api_key|does not exist|Could not find|schema cache/i.test(ttext)
   ) {
     const legacyUrl = `${base}/rest/v1/tenants?select=id,name,account_status,trial_days,official_days,created_at,updated_at&order=created_at.desc`
     const legacy = await fetch(legacyUrl, { headers })
@@ -169,6 +173,11 @@ async function listTenantsWithServiceRoleFetch(
       official_days: t.official_days,
       wallet_balance_cents: typeof t.wallet_balance_cents === 'number' ? t.wallet_balance_cents : 0,
       service_expire_at: t.service_expire_at ?? null,
+      membership_plan: t.membership_plan ?? 'member',
+      tokenmix_bound: !!(typeof t.tokenmix_api_key === 'string' && t.tokenmix_api_key.trim()),
+      direct_ai_calls_used:
+        typeof t.direct_ai_calls_used === 'number' ? t.direct_ai_calls_used : 0,
+      direct_ai_usage_month: t.direct_ai_usage_month ?? null,
       created_at: t.created_at,
       updated_at: t.updated_at,
       owner_user_id: uid ?? null,

@@ -69,6 +69,9 @@ function buildPatchBody(body: Record<string, unknown>): { ok: true; patch: Recor
   if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
     patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
   }
+  if (body.membershipPlan === 'free' || body.membershipPlan === 'member' || body.membershipPlan === 'member_plus') {
+    patch.membership_plan = body.membershipPlan
+  }
 
   return { ok: true, patch }
 }

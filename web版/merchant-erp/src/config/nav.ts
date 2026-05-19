@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { isPathBlockedForFree, type MembershipPlan } from '../lib/membershipPlan'
 import {
   Bot,
   Briefcase,
@@ -73,4 +74,19 @@ export function pathActive(pathname: string, itemPath: string) {
 export function childActive(pathname: string, childPath: string) {
   if (childPath === '/') return pathname === '/'
   return pathname === childPath || pathname.startsWith(`${childPath}/`)
+}
+
+/** 免费版隐藏 GEO、竞对分析、报税管理等入口 */
+export function filterNavItemsForPlan(items: NavItem[], plan: MembershipPlan): NavItem[] {
+  if (plan !== 'free') return items
+  return items
+    .map((item) => {
+      if (!item.children?.length) {
+        return isPathBlockedForFree(item.path) ? null : item
+      }
+      const children = item.children.filter((c) => !isPathBlockedForFree(c.path))
+      if (children.length === 0) return null
+      return { ...item, children }
+    })
+    .filter((x): x is NavItem => x != null)
 }

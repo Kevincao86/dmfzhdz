@@ -23,6 +23,9 @@ export type RegistryTenant = {
   phone?: string
   walletBalanceCents?: number
   serviceExpireAt?: string
+  membershipPlan?: 'free' | 'member' | 'member_plus'
+  tokenmixBound?: boolean
+  directAiCallsUsed?: number
 }
 
 export type AiVendorCatalogEntry = {

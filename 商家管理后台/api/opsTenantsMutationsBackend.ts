@@ -3,6 +3,7 @@
  * 置于 api 根目录，避免 Vercel Serverless 打包后 api/lib 相对路径解析失败。
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { probeTokenMixUsage } from '../../web版/merchant-erp/vite-plugins/tokenmixUsageProbe.js'
 
 export type TenantMutationResult =
   | { ok: true }
@@ -30,6 +31,9 @@ export async function opsTenantPatchAdmin(
   }
   if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
     patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
+  }
+  if (body.membershipPlan === 'free' || body.membershipPlan === 'member' || body.membershipPlan === 'member_plus') {
+    patch.membership_plan = body.membershipPlan
   }
 
   const { error } = await admin.from('tenants').update(patch).eq('id', id)
@@ -110,4 +114,74 @@ export async function opsTenantWalletLedgerAdmin(
     }
   }
   return { ok: true, rows: ledgerRows ?? [] }
+}
+
+export async function opsTenantTokenmixAdmin(
+  admin: SupabaseClient,
+  body: Record<string, unknown>,
+  env: Record<string, string>,
+): Promise<TenantMutationResult | { ok: true; body: Record<string, unknown> }> {
+  const id = typeof body.id === 'string' ? body.id.trim() : ''
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+    return { ok: false, status: 400, body: { ok: false, error: 'invalid_id' } }
+  }
+  const action = typeof body.action === 'string' ? body.action.trim() : ''
+
+  if (action === 'bind') {
+    const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
+    if (apiKey.length < 8) {
+      return { ok: false, status: 400, body: { ok: false, error: 'invalid_api_key' } }
+    }
+    const { error } = await admin
+      .from('tenants')
+      .update({ tokenmix_api_key: apiKey, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) {
+      return { ok: false, status: 502, body: { ok: false, error: 'bind_failed', detail: error.message } }
+    }
+    return { ok: true, body: { ok: true, bound: true } }
+  }
+
+  if (action === 'usage') {
+    const { data, error } = await admin
+      .from('tenants')
+      .select(
+        'membership_plan, tokenmix_api_key, direct_ai_calls_used, direct_ai_usage_month, tokenmix_usage_snapshot',
+      )
+      .eq('id', id)
+      .maybeSingle()
+    if (error || !data) {
+      return {
+        ok: false,
+        status: 404,
+        body: { ok: false, error: 'tenant_not_found', detail: error?.message },
+      }
+    }
+    const key =
+      typeof data.tokenmix_api_key === 'string' && data.tokenmix_api_key.trim()
+        ? data.tokenmix_api_key.trim()
+        : ''
+    let tokenmixUsage = data.tokenmix_usage_snapshot as Record<string, unknown> | null
+    if (key) {
+      const snap = await probeTokenMixUsage(key, env)
+      tokenmixUsage = snap as unknown as Record<string, unknown>
+      await admin
+        .from('tenants')
+        .update({ tokenmix_usage_snapshot: snap, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    }
+    return {
+      ok: true,
+      body: {
+        ok: true,
+        membershipPlan: data.membership_plan,
+        tokenmixBound: !!key,
+        directAiCallsUsed: data.direct_ai_calls_used ?? 0,
+        directAiUsageMonth: data.direct_ai_usage_month,
+        tokenmixUsage,
+      },
+    }
+  }
+
+  return { ok: false, status: 400, body: { ok: false, error: 'invalid_action' } }
 }

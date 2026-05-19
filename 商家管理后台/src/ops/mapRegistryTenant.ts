@@ -1,6 +1,12 @@
 import type { OpsCustomer } from './mockData'
 import type { RegistryTenant } from './opsRegistryApi'
 
+const PLAN_ZH: Record<string, string> = {
+  free: '免费版',
+  member: '会员版',
+  member_plus: '会员 Plus',
+}
+
 function fmt(iso: string): string {
   try {
     return new Date(iso).toLocaleString('zh-CN', { hour12: false })
@@ -37,7 +43,7 @@ export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
     industry: t.industry || '—',
     registeredAt: fmt(t.registeredAt),
     accountStatus: t.accountStatus,
-    planName: `试用 ${t.trialDays} 天 / 正式 ${t.officialDays} 天`,
+    planName: `${PLAN_ZH[t.membershipPlan ?? 'member'] ?? '会员版'} · 试用 ${t.trialDays} 天 / 正式 ${t.officialDays} 天`,
     planExpireAt: planExpireLine(t),
     payStatus: t.accountStatus === 'normal' ? 'paid' : t.accountStatus === 'frozen' ? 'overdue' : 'unpaid',
     firstLoginAt: '—',

@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AiAgentProvider } from './context/AiAgentContext'
+import { MembershipProvider } from './context/MembershipContext'
+import RequireMembershipFeature from './components/RequireMembershipFeature'
 import MeooLayout from './components/MeooLayout'
 import RequireSupabaseAuth from './components/RequireSupabaseAuth'
 import AiAgentPage from './pages/AiAgentPage'
@@ -28,6 +30,7 @@ import LoginPage from './pages/LoginPage'
 export default function App() {
   return (
     <BrowserRouter>
+      <MembershipProvider>
       <AiAgentProvider>
         <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -35,7 +38,9 @@ export default function App() {
           path="/"
           element={
             <RequireSupabaseAuth>
-              <MeooLayout />
+              <RequireMembershipFeature>
+                <MeooLayout />
+              </RequireMembershipFeature>
             </RequireSupabaseAuth>
           }
         >
@@ -94,6 +99,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </AiAgentProvider>
+      </MembershipProvider>
     </BrowserRouter>
   )
 }
