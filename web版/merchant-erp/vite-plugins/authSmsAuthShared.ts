@@ -96,21 +96,42 @@ export async function phoneAlreadyRegistered(phone: string): Promise<boolean> {
   return hit !== null
 }
 
+type GenerateLinkProps = {
+  hashed_token?: string
+  action_link?: string
+  email_otp?: string
+  verification_type?: string
+}
+
+function readGenerateLinkProps(linkJson: Record<string, unknown>): GenerateLinkProps {
+  const props = linkJson.properties as GenerateLinkProps | undefined
+  return {
+    hashed_token:
+      (typeof props?.hashed_token === 'string' && props.hashed_token.trim()) ||
+      (typeof linkJson.hashed_token === 'string' && linkJson.hashed_token.trim()) ||
+      undefined,
+    action_link:
+      (typeof props?.action_link === 'string' && props.action_link) ||
+      (typeof linkJson.action_link === 'string' && linkJson.action_link) ||
+      undefined,
+    email_otp:
+      (typeof props?.email_otp === 'string' && props.email_otp.trim()) ||
+      (typeof linkJson.email_otp === 'string' && linkJson.email_otp.trim()) ||
+      undefined,
+    verification_type:
+      (typeof props?.verification_type === 'string' && props.verification_type.trim()) ||
+      (typeof linkJson.verification_type === 'string' && linkJson.verification_type.trim()) ||
+      undefined,
+  }
+}
+
 function extractHashedTokenFromGenerateLink(
   linkJson: Record<string, unknown>,
   linkText: string,
 ): string | null {
-  const props = linkJson.properties as { hashed_token?: string; action_link?: string } | undefined
-  if (typeof props?.hashed_token === 'string' && props.hashed_token.trim()) {
-    return props.hashed_token.trim()
-  }
-  if (typeof linkJson.hashed_token === 'string' && linkJson.hashed_token.trim()) {
-    return linkJson.hashed_token.trim()
-  }
-  const actionLink =
-    (typeof props?.action_link === 'string' && props.action_link) ||
-    (typeof linkJson.action_link === 'string' && linkJson.action_link) ||
-    ''
+  const parsed = readGenerateLinkProps(linkJson)
+  if (parsed.hashed_token) return parsed.hashed_token
+  const actionLink = parsed.action_link ?? ''
   if (actionLink) {
     try {
       const u = new URL(actionLink)
@@ -196,10 +217,8 @@ export async function createAdminSessionForUserId(
     return { ok: false, error: 'user_mismatch', detail: 'generate_link user id mismatch' }
   }
 
+  const linkProps = readGenerateLinkProps(linkJson)
   const tokenHash = extractHashedTokenFromGenerateLink(linkJson, linkText)
-  if (!tokenHash) {
-    return { ok: false, error: 'magiclink_no_token', detail: linkText.slice(0, 200) }
-  }
 
   const verifyHeaders: Record<string, string> = {
     apikey: verifyApiKey,
@@ -207,18 +226,20 @@ export async function createAdminSessionForUserId(
     'Content-Type': 'application/json',
   }
 
-  const verifyTypes = ['magiclink', 'email'] as const
-  let lastDetail = ''
-  for (const verifyType of verifyTypes) {
+  const postVerify = async (
+    body: Record<string, string>,
+  ): Promise<
+    | { ok: true; access_token: string; refresh_token: string; expires_in: number }
+    | { ok: false; detail: string }
+  > => {
     const verifyRes = await fetch(`${base}/auth/v1/verify`, {
       method: 'POST',
       headers: verifyHeaders,
-      body: JSON.stringify({ type: verifyType, token_hash: tokenHash, email }),
+      body: JSON.stringify(body),
     })
     const verifyText = await verifyRes.text()
     if (!verifyRes.ok) {
-      lastDetail = verifyText.slice(0, 400)
-      continue
+      return { ok: false, detail: verifyText.slice(0, 400) }
     }
     const session = parseSessionFromVerifyBody(verifyText)
     if (session?.access_token && session.refresh_token) {
@@ -229,7 +250,33 @@ export async function createAdminSessionForUserId(
         expires_in: session.expires_in ?? 3600,
       }
     }
-    lastDetail = verifyText.slice(0, 200)
+    return { ok: false, detail: verifyText.slice(0, 200) || 'verify returned no session' }
+  }
+
+  let lastDetail = ''
+
+  if (tokenHash) {
+    const verifyType =
+      linkProps.verification_type === 'signup' ||
+      linkProps.verification_type === 'invite' ||
+      linkProps.verification_type === 'recovery' ||
+      linkProps.verification_type === 'magiclink' ||
+      linkProps.verification_type === 'email_change'
+        ? linkProps.verification_type
+        : 'magiclink'
+    const hashResult = await postVerify({ type: verifyType, token_hash: tokenHash })
+    if (hashResult.ok) return hashResult
+    lastDetail = hashResult.detail
+  }
+
+  if (linkProps.email_otp) {
+    const otpResult = await postVerify({ type: 'email', email, token: linkProps.email_otp })
+    if (otpResult.ok) return otpResult
+    lastDetail = otpResult.detail
+  }
+
+  if (!tokenHash && !linkProps.email_otp) {
+    return { ok: false, error: 'magiclink_no_token', detail: linkText.slice(0, 200) }
   }
 
   return { ok: false, error: 'verify_failed', detail: lastDetail || 'verify returned no session' }
