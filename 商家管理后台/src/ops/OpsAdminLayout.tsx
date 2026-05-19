@@ -1,10 +1,21 @@
-import { Bot, Building2, CreditCard, Headphones, Library, Shield, Smartphone, UserSearch } from 'lucide-react'
+import {
+  Bot,
+  Building2,
+  CreditCard,
+  Headphones,
+  Library,
+  Megaphone,
+  Shield,
+  Smartphone,
+  UserSearch,
+} from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../cn'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 
 const OPS_NAV = [
   { to: '/customers', label: '客户管理', icon: Building2 },
+  { to: '/announcements', label: '公告栏推送', icon: Megaphone },
   { to: '/payment-orders', label: '订单管理', icon: CreditCard },
   { to: '/accounts', label: '账号与权限', icon: Shield },
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch },
