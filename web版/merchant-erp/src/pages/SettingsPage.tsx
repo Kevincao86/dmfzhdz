@@ -13,6 +13,7 @@ import { useLocation } from 'react-router-dom'
 import { cn } from '../cn'
 import MeooPayQrModal from '../components/MeooPayQrModal'
 import {
+  computeMemberUsageRemaining,
   fetchPrimaryTenantId,
   fetchTenantSubscriptionSnapshot,
   insertMerchantPaymentOrder,
@@ -77,14 +78,6 @@ function formatCnDate(d: Date) {
   })
 }
 
-/** 本地日历日 0 点起往后推 n 天（用于「总可用天数 → 推算到期」展示） */
-function addLocalCalendarDaysFromToday(days: number): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() + days)
-  return d
-}
-
 const PLAN_FEATURE_LINES: Record<MembershipPlan, string[]> = {
   free: ['直连 AI 每月 50 次（豆包/千问/MiniMax/DeepSeek）', '不含 GEO、竞对分析、报税管理'],
   member: ['全功能开放', 'AI：豆包 / 千问 / MiniMax / DeepSeek'],
@@ -98,22 +91,18 @@ export default function SettingsPage() {
   const [merchantPlat, setMerchantPlat] = useState<'douyin' | 'meituan' | 'xhs'>('douyin')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
-  const [officialExpireAtIso, setOfficialExpireAtIso] = useState<string | null | undefined>(undefined)
+  const [serviceExpireAtIso, setServiceExpireAtIso] = useState<string | null | undefined>(undefined)
   /** undefined：未拉取；null：无到期记录 */
-  const [officialCumulativeDays, setOfficialCumulativeDays] = useState<number | null | undefined>(undefined)
   const loadOfficialBilling = useCallback(async () => {
     if (!supabaseConfigured || !supabase) {
-      setOfficialExpireAtIso(undefined)
-      setOfficialCumulativeDays(undefined)
+      setServiceExpireAtIso(undefined)
       return
     }
     try {
       const snap = await fetchTenantSubscriptionSnapshot(supabase)
-      setOfficialExpireAtIso(snap.serviceExpireAt)
-      setOfficialCumulativeDays(snap.officialDays)
+      setServiceExpireAtIso(snap.serviceExpireAt)
     } catch {
-      setOfficialExpireAtIso(null)
-      setOfficialCumulativeDays(null)
+      setServiceExpireAtIso(null)
     }
   }, [supabaseConfigured, supabase])
 
@@ -144,30 +133,15 @@ export default function SettingsPage() {
     void reloadMembership({ silent: true })
   }
 
-  /** 相对云端登记「服务截止日期」的剩余日历天（可能为负表示已过期） */
-  const officialCalendarRemainDays = useMemo(() => {
-    if (!officialExpireAtIso) return null
-    const end = new Date(officialExpireAtIso)
-    if (Number.isNaN(end.getTime())) return null
-    return Math.ceil((end.getTime() - Date.now()) / 86400000)
-  }, [officialExpireAtIso])
-
-  /** 正式版到期展示：有累计总可用天数时按「今日 0 点 + 总天数」推算；否则用云端登记截止日 */
-  const displayOfficialExpireDate = useMemo((): Date | null => {
-    if (officialCumulativeDays != null && officialCumulativeDays > 0) {
-      return addLocalCalendarDaysFromToday(officialCumulativeDays)
-    }
-    if (officialExpireAtIso) {
-      const d = new Date(officialExpireAtIso)
-      return Number.isNaN(d.getTime()) ? null : d
-    }
-    return null
-  }, [officialCumulativeDays, officialExpireAtIso])
+  const isPaidMember = plan === 'member' || plan === 'member_plus'
+  const memberUsage = useMemo(
+    () => computeMemberUsageRemaining(serviceExpireAtIso ?? null),
+    [serviceExpireAtIso],
+  )
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) {
-      setOfficialExpireAtIso(undefined)
-      setOfficialCumulativeDays(undefined)
+      setServiceExpireAtIso(undefined)
       return
     }
     const sb = supabase
@@ -176,12 +150,10 @@ export default function SettingsPage() {
       try {
         const snap = await fetchTenantSubscriptionSnapshot(sb)
         if (cancelled) return
-        setOfficialExpireAtIso(snap.serviceExpireAt)
-        setOfficialCumulativeDays(snap.officialDays)
+        setServiceExpireAtIso(snap.serviceExpireAt)
       } catch {
         if (!cancelled) {
-          setOfficialExpireAtIso(null)
-          setOfficialCumulativeDays(null)
+          setServiceExpireAtIso(null)
         }
       }
     }
@@ -314,9 +286,9 @@ export default function SettingsPage() {
               <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 商家显示名等资料在
                 <strong className="font-medium text-gray-800"> 运营管控台 → 客户管理 </strong>
-                维护。右侧「正式版到期」在已填写<strong className="font-medium text-gray-800"> 累计总可用天数 </strong>
-                时，按自今日起计满该天数推算；「剩余可用」为总可用天数；「开通权益」为当前登记服务期内的<strong className="font-medium text-gray-800"> 订阅使用天数 </strong>
-                （以运营登记的「服务截止日期」前的剩余日历天为准）。
+                维护。购买<strong className="font-medium text-gray-800"> 会员版 </strong>或
+                <strong className="font-medium text-gray-800"> 会员 Plus </strong>并由运营确认到账后，下方显示
+                <strong className="font-medium text-gray-800"> 剩余使用时间 </strong>（以云端登记的服务截止日期为准）。
               </p>
               <div className="max-w-xl">
                 <div className="rounded-xl border border-gray-200 p-5">
@@ -359,82 +331,42 @@ export default function SettingsPage() {
                   </p>
                   <div className="mt-4 space-y-1 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-3 text-sm text-gray-800">
                     {!supabaseConfigured || !supabase ? (
-                      <p className="text-gray-600">接入 Supabase 登录后可查看当前租户正式版服务有效期。</p>
-                    ) : officialExpireAtIso === undefined ? (
+                      <p className="text-gray-600">接入 Supabase 登录后可查看会员剩余使用时间。</p>
+                    ) : serviceExpireAtIso === undefined ? (
                       <p className="text-gray-500">正在加载订阅信息…</p>
-                    ) : displayOfficialExpireDate != null ||
-                      (officialCumulativeDays != null && officialCumulativeDays > 0) ||
-                      officialExpireAtIso ? (
+                    ) : !isPaidMember ? (
+                      <p className="text-gray-600">
+                        当前为免费版。购买会员版或会员 Plus 并由运营确认到账后，将在此显示剩余使用时间。
+                      </p>
+                    ) : memberUsage.expireDate ? (
                       <>
-                        {displayOfficialExpireDate ? (
-                          <p>
-                            <span className="text-gray-500">正式版到期：</span>
-                            {formatCnDate(displayOfficialExpireDate)}
-                            {officialCumulativeDays != null && officialCumulativeDays > 0 ? (
-                              <span className="ml-1 text-xs font-normal text-gray-400">
-                                （按累计总可用 {officialCumulativeDays} 天自今日起算）
-                              </span>
-                            ) : null}
-                          </p>
+                        <p className="font-medium text-gray-900">
+                          <span className="text-gray-500">剩余使用时间：</span>
+                          <span className="tabular-nums">
+                            {memberUsage.remainDays != null && memberUsage.remainDays > 0
+                              ? memberUsage.remainDays
+                              : 0}
+                          </span>{' '}
+                          天
+                        </p>
+                        <p className="pt-1 text-gray-800">
+                          <span className="text-gray-500">会员到期：</span>
+                          {formatCnDate(memberUsage.expireDate)}
+                        </p>
+                        {memberUsage.remainDays != null && memberUsage.remainDays === 0 ? (
+                          <p className="pt-1 text-sm font-medium text-amber-800">今日到期，请尽快续费。</p>
                         ) : null}
-                        {officialExpireAtIso &&
-                        displayOfficialExpireDate &&
-                        formatCnDate(new Date(officialExpireAtIso)) !== formatCnDate(displayOfficialExpireDate) ? (
-                          <p className="text-xs text-gray-500">
-                            运营云端登记的服务截止：{formatCnDate(new Date(officialExpireAtIso))}
-                          </p>
-                        ) : null}
-
-                        {officialCumulativeDays != null ? (
-                          <p className="pt-1 font-medium text-gray-900">
-                            <span className="text-gray-500">剩余可用（总可用天数）：</span>
-                            <span className="tabular-nums">{officialCumulativeDays}</span> 天
-                          </p>
-                        ) : (
-                          <p className="pt-1 text-gray-500">
-                            <span className="text-gray-500">剩余可用（总可用天数）：</span>暂无记录
-                          </p>
-                        )}
-
-                        {officialCalendarRemainDays != null && officialExpireAtIso ? (
-                          <p className="pt-1 text-gray-800">
-                            <span className="text-gray-500">开通权益（订阅使用天数）：</span>
-                            <span className="tabular-nums font-medium text-gray-900">{officialCalendarRemainDays}</span> 天
-                            <span className="ml-1 text-xs font-normal text-gray-400">（距运营登记截止的剩余日历）</span>
-                          </p>
-                        ) : officialCumulativeDays != null && officialCumulativeDays > 0 ? (
-                          <p className="pt-1 text-xs text-gray-500">
-                            开通权益（订阅使用天数）：待云端登记「服务截止日期」后显示剩余日历。
-                          </p>
-                        ) : null}
-
-                        {officialCalendarRemainDays != null && officialCalendarRemainDays === 0 ? (
-                          <p className="pt-1 text-sm font-medium text-amber-800">登记截止日为今日，请尽快续费。</p>
-                        ) : null}
-                        {officialCalendarRemainDays != null && officialCalendarRemainDays < 0 ? (
+                        {memberUsage.remainDays != null && memberUsage.remainDays < 0 ? (
                           <p className="pt-1 text-sm text-amber-800">
-                            相对云端登记截止已过期{' '}
-                            <span className="tabular-nums font-semibold">{Math.abs(officialCalendarRemainDays)}</span> 天，续费后可恢复全功能。
+                            会员已过期{' '}
+                            <span className="tabular-nums font-semibold">{Math.abs(memberUsage.remainDays)}</span>{' '}
+                            天，续费后可继续使用。
                           </p>
                         ) : null}
-                      </>
-                    ) : officialCumulativeDays != null && officialCumulativeDays > 0 ? (
-                      <>
-                        <p>
-                          <span className="text-gray-500">正式版到期（按总可用推算）：</span>
-                          {formatCnDate(addLocalCalendarDaysFromToday(officialCumulativeDays))}
-                        </p>
-                        <p className="pt-1 font-medium text-gray-900">
-                          <span className="text-gray-500">剩余可用（总可用天数）：</span>
-                          <span className="tabular-nums">{officialCumulativeDays}</span> 天
-                        </p>
-                        <p className="pt-2 text-xs leading-relaxed text-gray-500">
-                          云端尚未写入「服务截止日期」时无法显示「开通权益」剩余日历。请稍后刷新或联系客户经理。
-                        </p>
                       </>
                     ) : (
                       <p className="text-gray-600">
-                        当前未查询到正式版到期日与累计权益。完成订阅并由运营确认到账后，将在此显示；您也可稍后重新进入本页签刷新。
+                        会员档位已开通，服务截止日待运营登记。请稍后刷新或联系客户经理。
                       </p>
                     )}
                   </div>

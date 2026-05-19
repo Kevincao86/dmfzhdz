@@ -58,10 +58,31 @@ export async function fetchPrimaryTenantId(supabase: SupabaseClient): Promise<st
 
 export type TenantSubscriptionSnapshot = {
   tenantId: string | null
-  /** 运营确认订阅后写入的正式版服务截止时刻（ISO） */
+  /** 运营确认订阅后写入的会员服务截止时刻（ISO） */
   serviceExpireAt: string | null
   /** 累计已确认的正式版权益天数（与运营端订单确认逻辑一致） */
   officialDays: number | null
+}
+
+/** 会员剩余使用时间（以 service_expire_at 为准） */
+export type MemberUsageRemaining = {
+  expireAtIso: string | null
+  expireDate: Date | null
+  /** 距截止日的剩余日历天（可为负表示已过期） */
+  remainDays: number | null
+}
+
+export function computeMemberUsageRemaining(serviceExpireAtIso: string | null): MemberUsageRemaining {
+  const expireAtIso = parseServiceExpireAtRaw(serviceExpireAtIso)
+  if (!expireAtIso) {
+    return { expireAtIso: null, expireDate: null, remainDays: null }
+  }
+  const expireDate = new Date(expireAtIso)
+  if (Number.isNaN(expireDate.getTime())) {
+    return { expireAtIso: null, expireDate: null, remainDays: null }
+  }
+  const remainDays = Math.ceil((expireDate.getTime() - Date.now()) / 86400000)
+  return { expireAtIso, expireDate, remainDays }
 }
 
 export type TenantTrialSnapshot = {
