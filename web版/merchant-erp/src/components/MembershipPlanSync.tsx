@@ -44,7 +44,7 @@ export default function MembershipPlanSync() {
     }
     if (prev === 'free' && plan !== 'free' && location.pathname.startsWith('/settings')) {
       const p = new URLSearchParams(location.search)
-      if (p.get('upgrade') === '1' || p.get('tab') === 'subscription') {
+      if (p.get('upgrade') === '1') {
         navigate('/', { replace: true })
       }
     }
