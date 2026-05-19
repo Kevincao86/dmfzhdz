@@ -1,57 +1,33 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Cpu, MapPin, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
+import { BarChart3, MapPin, Sparkles, Store, Users, Zap } from 'lucide-react'
 import { cn } from '../cn'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import LoginAuthPanel from './login/LoginAuthPanel'
-import { PosterDataArt, PosterFutureArt, PosterLocalLifeArt } from './login/LoginPosterArt'
+import { PosterPgyTechArt } from './login/LoginPosterArt'
 
-const LIFE_TAGS = [
-  { icon: Store, label: '门店与 POI' },
-  { icon: UtensilsCrossed, label: '团购到店' },
-  { icon: MapPin, label: '同城流量' },
-  { icon: Sparkles, label: '内容种草' },
+const FEATURES = [
+  { icon: Store, label: '多平台门店', desc: '抖音 · 美团 · 小红书' },
+  { icon: Users, label: '达人招募', desc: '全流程协同管理' },
+  { icon: BarChart3, label: '经营数据', desc: '报表与智能决策' },
+  { icon: MapPin, label: '本地生活', desc: '团购核销与到店' },
 ] as const
 
-const POSTER_SLIDES = [
-  {
-    title: '本地生活 · 一城一味',
-    subtitle: '门店 POI、团购核销与到店履约一体化经营。',
-    gradient:
-      'from-orange-500/35 via-rose-500/20 to-slate-950 ring-1 ring-white/10',
-    Icon: Store,
-    Art: PosterLocalLifeArt,
-  },
-  {
-    title: '智能经营 · 数据驱动',
-    subtitle: '达人招募、经营报表与多平台协同，决策有据可依。',
-    gradient:
-      'from-cyan-500/30 via-blue-600/25 to-slate-950 ring-1 ring-white/10',
-    Icon: Zap,
-    Art: PosterDataArt,
-  },
-  {
-    title: '未来门店 · 科技赋能',
-    subtitle: '自动化流程与云端协作，让连锁扩张更快、更稳。',
-    gradient:
-      'from-violet-500/35 via-fuchsia-500/20 to-slate-950 ring-1 ring-white/10',
-    Icon: Cpu,
-    Art: PosterFutureArt,
-  },
+const FLOAT_STATS = [
+  { label: '本月核销', value: '12.8万', trend: '+18%' },
+  { label: '在招达人', value: '326', trend: '活跃' },
+  { label: '门店覆盖', value: '48', trend: '城' },
 ] as const
-
-const CAROUSEL_MS = 5200
 
 /**
- * 登录页：大屏左侧表单、右侧品牌海报轮播；小屏纵向堆叠。
+ * 登录页：参照蒲公英 PGY 布局 — 左侧品牌视觉、右侧纯白登录区。
  */
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [err, setErr] = useState<string | null>(null)
   const [infoHint, setInfoHint] = useState<string | null>(null)
-  const [slide, setSlide] = useState(0)
 
   useEffect(() => {
     const st = (location.state ?? null) as { authMessage?: string; infoHint?: string } | null
@@ -78,98 +54,142 @@ export default function LoginPage() {
     })
   }, [navigate])
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setSlide((i) => (i + 1) % POSTER_SLIDES.length)
-    }, CAROUSEL_MS)
-    return () => window.clearInterval(id)
-  }, [])
-
   if (!supabaseConfigured) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-slate-950 py-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] text-center">
-        <h1 className="text-lg font-semibold text-white">未配置 Supabase</h1>
-        <p className="max-w-md text-sm leading-relaxed text-slate-400">
-          请在 <code className="rounded bg-slate-800 px-1.5 py-0.5 text-cyan-200">web版/merchant-erp/.env.local</code>{' '}
-          中填写 <code className="text-cyan-200">VITE_SUPABASE_URL</code> 与{' '}
-          <code className="text-cyan-200">VITE_SUPABASE_ANON_KEY</code>，保存后重启{' '}
-          <code className="text-cyan-200">npm run dev</code>。
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#f5f7fb] px-6 py-8 text-center">
+        <h1 className="text-lg font-semibold text-slate-800">未配置 Supabase</h1>
+        <p className="max-w-md text-sm leading-relaxed text-slate-500">
+          请在 <code className="rounded bg-white px-1.5 py-0.5 text-cyan-700 shadow-sm">web版/merchant-erp/.env.local</code>{' '}
+          中填写 <code className="text-cyan-700">VITE_SUPABASE_URL</code> 与{' '}
+          <code className="text-cyan-700">VITE_SUPABASE_ANON_KEY</code>，保存后重启{' '}
+          <code className="text-cyan-700">npm run dev</code>。
         </p>
       </div>
     )
   }
 
   return (
-    <>
+    <div
+      className={cn(
+        'relative min-h-[100dvh] min-h-screen overflow-x-hidden bg-[#f3f6fc]',
+        'pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))]',
+      )}
+    >
+      {/* 背景光晕 */}
       <div
-        className={cn(
-          'relative min-h-[100dvh] min-h-screen overflow-x-hidden bg-slate-950',
-          'pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]',
-        )}
-      >
-      <div
-        className="pointer-events-none fixed inset-0 opacity-35"
+        className="pointer-events-none fixed inset-0"
         aria-hidden
         style={{
-          backgroundImage: `
-            radial-gradient(ellipse 70% 45% at 15% 10%, rgba(34, 211, 238, 0.14), transparent),
-            radial-gradient(ellipse 55% 40% at 95% 75%, rgba(249, 115, 22, 0.1), transparent),
-            linear-gradient(180deg, #020617 0%, #0f172a 50%, #020617 100%)
+          background: `
+            radial-gradient(ellipse 80% 60% at 8% 20%, rgba(14, 165, 233, 0.12), transparent 55%),
+            radial-gradient(ellipse 70% 50% at 92% 80%, rgba(139, 92, 246, 0.1), transparent 50%),
+            radial-gradient(ellipse 50% 40% at 50% 0%, rgba(45, 212, 191, 0.08), transparent 45%),
+            linear-gradient(165deg, #f8fafc 0%, #eef4ff 42%, #f5f3ff 100%)
           `,
         }}
       />
       <div
-        className="pointer-events-none fixed inset-0 opacity-[0.1]"
+        className="pointer-events-none fixed inset-0 opacity-[0.35]"
         aria-hidden
         style={{
           backgroundImage: `
-            linear-gradient(rgba(34, 211, 238, 0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(34, 211, 238, 0.07) 1px, transparent 1px)
+            linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px)
           `,
-          backgroundSize: '44px 44px',
+          backgroundSize: '48px 48px',
         }}
       />
 
-      <div className="relative z-[20] mx-auto flex min-h-[100dvh] w-full max-w-[1600px] flex-col lg:flex-row lg:items-stretch">
-        {/* 左侧：品牌 + 登录 */}
+      <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-[1440px] flex-col lg:flex-row">
+        {/* 左侧：品牌 + 视觉（蒲公英式大图区） */}
+        <div className="relative flex flex-1 flex-col px-6 py-8 sm:px-10 lg:min-h-[100dvh] lg:py-12 lg:pl-12 lg:pr-6 xl:pl-16">
+          <header className="relative z-20 mb-6 lg:mb-8">
+            <div className="flex items-center gap-3">
+              <img
+                src={BRAND_LOGO_URL}
+                alt={BRAND_NAME}
+                className="h-12 w-12 object-contain drop-shadow-sm sm:h-14 sm:w-14"
+              />
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  MoDian · Local Life OS
+                </p>
+                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                  {BRAND_NAME}
+                  <span className="ml-1.5 bg-gradient-to-r from-cyan-600 to-violet-600 bg-clip-text text-transparent">
+                    AI 智能 ERP
+                  </span>
+                </h1>
+              </div>
+            </div>
+            <p className="mt-4 max-w-lg text-sm leading-relaxed text-slate-600 sm:text-[15px]">
+              面向本地生活商家的智能经营系统：多平台门店、达人招募、投流与财务对账，一站协同。
+            </p>
+          </header>
+
+          <div className="relative hidden min-h-[320px] flex-1 lg:block">
+            <div className="absolute inset-0 overflow-hidden rounded-[28px] border border-white/80 bg-white/40 shadow-[0_24px_80px_-20px_rgba(15,23,42,0.12)] backdrop-blur-sm">
+              <PosterPgyTechArt className="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-white/10" />
+            </div>
+
+            {/* 悬浮指标卡 */}
+            <div className="absolute left-4 top-8 z-10 hidden xl:block">
+              <div className="rounded-2xl border border-white/90 bg-white/95 px-4 py-3 shadow-lg shadow-slate-200/60 backdrop-blur-md">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">实时经营</p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-slate-900">{FLOAT_STATS[0].value}</p>
+                <p className="mt-0.5 text-xs font-semibold text-emerald-600">{FLOAT_STATS[0].trend}</p>
+              </div>
+            </div>
+            <div className="absolute bottom-16 right-6 z-10 hidden xl:block">
+              <div className="rounded-2xl border border-white/90 bg-white/95 px-4 py-3 shadow-lg shadow-slate-200/60 backdrop-blur-md">
+                <p className="text-[10px] font-medium text-slate-400">{FLOAT_STATS[1].label}</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">{FLOAT_STATS[1].value}</p>
+              </div>
+            </div>
+
+            <div className="absolute bottom-6 left-6 right-6 z-10 rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-md backdrop-blur-md">
+              <div className="flex items-center gap-2 text-xs font-semibold text-cyan-700">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                智能经营 · 数据驱动
+              </div>
+              <p className="mt-1 text-sm text-slate-600">
+                达人招募、经营报表与多平台协同，让每一次决策都有数据支撑。
+              </p>
+            </div>
+          </div>
+
+          <div className="relative mb-6 h-44 overflow-hidden rounded-2xl border border-white/80 bg-white/50 shadow-md lg:hidden">
+            <PosterPgyTechArt className="h-full w-full object-cover" preserveAspectRatio="xMidYMid slice" />
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:mt-auto lg:grid-cols-2 lg:gap-4 xl:grid-cols-4">
+            {FEATURES.map(({ icon: Icon, label, desc }) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-white/90 bg-white/70 px-3 py-3 shadow-sm backdrop-blur-sm transition hover:border-cyan-200/80 hover:shadow-md sm:px-4 sm:py-3.5"
+              >
+                <Icon className="h-4 w-4 text-cyan-600" aria-hidden />
+                <p className="mt-2 text-xs font-semibold text-slate-800 sm:text-sm">{label}</p>
+                <p className="mt-0.5 text-[10px] text-slate-500 sm:text-[11px]">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 右侧：登录表单（纯白面板） */}
         <div
           className={cn(
-            'flex w-full flex-col justify-center px-[max(1rem,env(safe-area-inset-left))] py-8 sm:py-10 lg:w-[min(100%,520px)] lg:flex-none lg:px-10 xl:w-[min(100%,560px)] xl:px-14',
-            'lg:border-r lg:border-white/[0.06]',
+            'flex w-full flex-col justify-center px-6 py-8 sm:px-10',
+            'lg:w-[min(100%,480px)] lg:flex-none lg:border-l lg:border-slate-200/60 lg:bg-white/90 lg:px-10 lg:py-12 lg:shadow-[-12px_0_48px_-24px_rgba(15,23,42,0.08)] xl:w-[520px] xl:px-12',
           )}
         >
-          <header className="mb-6 lg:mb-8">
-            <img
-              src={BRAND_LOGO_URL}
-              alt={BRAND_NAME}
-              className="mb-4 h-16 w-16 object-contain sm:h-20 sm:w-20"
-            />
-            <div className="inline-flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-300/90 sm:text-xs">
-              <Zap className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" />
-              Local Life OS
+          <div className="mb-6 lg:hidden">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-3 py-1 text-[11px] font-semibold text-cyan-700 ring-1 ring-cyan-100">
+              <Zap className="h-3 w-3" aria-hidden />
+              商家工作台登录
             </div>
-            <h1 className="mt-3 text-[clamp(1.6rem,4vw+0.75rem,2.35rem)] font-bold leading-tight tracking-tight text-white">
-              墨典
-              <span className="bg-gradient-to-r from-cyan-300 via-white to-orange-200 bg-clip-text text-transparent">
-                AI 智能 ERP
-              </span>
-            </h1>
-            <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400 sm:text-[15px]">
-              面向<strong className="font-semibold text-slate-200">本地生活</strong>
-              连锁与单店：团购核销、多平台门店、达人招募与经营数据，一站聚合。
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {LIFE_TAGS.map(({ icon: Icon, label }) => (
-                <span
-                  key={label}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-200 backdrop-blur-sm sm:text-xs"
-                >
-                  <Icon className="h-3 w-3 text-cyan-400" aria-hidden />
-                  {label}
-                </span>
-              ))}
-            </div>
-          </header>
+          </div>
 
           <LoginAuthPanel
             infoHint={infoHint}
@@ -178,93 +198,12 @@ export default function LoginPage() {
             onErr={setErr}
             onLoginSuccess={() => navigate('/', { replace: true })}
           />
-        </div>
 
-        {/* 右侧：海报轮播（大屏）；小屏置于表单下方 */}
-        <div className="relative flex min-h-[240px] flex-1 flex-col px-[max(1rem,env(safe-area-inset-right))] pb-8 pt-4 lg:min-h-[100dvh] lg:p-6 lg:pl-4 lg:pr-8 lg:pb-10 lg:pt-10">
-          <div
-            className="relative flex min-h-[220px] flex-1 overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_24px_80px_-24px_rgba(15,23,42,0.85)] lg:min-h-0 lg:rounded-3xl"
-            role="region"
-            aria-roledescription="carousel"
-            aria-label="品牌海报轮播"
-          >
-            {POSTER_SLIDES.map((s, i) => {
-              const Icon = s.Icon
-              const Art = s.Art
-              const active = i === slide
-              return (
-                <article
-                  key={s.title}
-                  aria-hidden={!active}
-                  className={cn(
-                    'absolute inset-0 flex flex-col justify-end transition-opacity duration-[780ms] ease-out',
-                    active ? 'z-10 opacity-100' : 'z-0 opacity-0',
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'absolute inset-0 bg-gradient-to-br bg-slate-950',
-                      'before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.14),transparent_42%)]',
-                      'after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.06)_48%,transparent_62%)]',
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      'absolute inset-[1px] rounded-[inherit] bg-gradient-to-br opacity-95',
-                      s.gradient,
-                    )}
-                  />
-                  <div className="pointer-events-none absolute inset-x-[-6%] bottom-[-5%] top-[6%] z-[1] overflow-hidden rounded-[inherit] opacity-[0.97]">
-                    <Art className="h-full w-full" preserveAspectRatio="xMidYMid slice" />
-                  </div>
-                  <div
-                    className="pointer-events-none absolute inset-0 z-[2] opacity-[0.12]"
-                    aria-hidden
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)
-                      `,
-                      backgroundSize: '28px 28px',
-                    }}
-                  />
-                  <div className="relative z-[3] flex flex-1 flex-col justify-between p-6 sm:p-8 lg:p-10">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/90 backdrop-blur-md">
-                        <Sparkles className="h-3.5 w-3.5 text-cyan-200" aria-hidden />
-                        Local × Tech
-                      </div>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-black/25 text-white shadow-lg backdrop-blur-md sm:h-14 sm:w-14">
-                        <Icon className="h-6 w-6 sm:h-7 sm:w-7" aria-hidden />
-                      </div>
-                    </div>
-                    <div className="mt-auto max-w-xl">
-                      <h2 className="text-[clamp(1.35rem,2.5vw+0.6rem,2.2rem)] font-bold leading-tight text-white drop-shadow-sm">
-                        {s.title}
-                      </h2>
-                      <p className="mt-3 max-w-md text-sm leading-relaxed text-white/85 sm:text-base">{s.subtitle}</p>
-                    </div>
-                  </div>
-                </article>
-              )
-            })}
-
-            <div className="pointer-events-none absolute bottom-4 left-0 right-0 z-[3] flex justify-center gap-2 sm:bottom-6">
-              {POSTER_SLIDES.map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    'h-2 rounded-full transition-all duration-500',
-                    i === slide ? 'w-8 bg-white shadow-[0_0_16px_rgba(255,255,255,0.35)]' : 'w-2 bg-white/35',
-                  )}
-                  aria-hidden
-                />
-              ))}
-            </div>
-          </div>
+          <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-400">
+            登录即表示同意平台服务条款与隐私政策 · 数据经加密传输与存储
+          </p>
         </div>
       </div>
     </div>
-    </>
   )
 }

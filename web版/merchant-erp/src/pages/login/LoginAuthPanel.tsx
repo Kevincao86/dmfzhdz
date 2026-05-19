@@ -18,9 +18,9 @@ type AuthMode = 'login' | 'register'
 type LoginMethod = 'password' | 'sms'
 
 const inputClass =
-  'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-base text-slate-900 outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/15 sm:text-sm'
+  'w-full rounded-xl border-0 bg-[#f4f6f9] px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-cyan-500/25 sm:text-sm'
 
-const labelClass = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500'
+const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700'
 
 type Props = {
   infoHint: string | null
@@ -271,32 +271,48 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     }
   }
 
+  const primaryBtn =
+    'w-full rounded-xl bg-gradient-to-r from-[#0ea5e9] to-[#14b8a6] py-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_-6px_rgba(14,165,233,0.45)] transition hover:shadow-[0_12px_28px_-6px_rgba(14,165,233,0.5)] disabled:opacity-60'
+
+  const smsBtn =
+    'shrink-0 rounded-xl bg-white px-3 py-3 text-xs font-semibold text-cyan-700 ring-1 ring-cyan-200 hover:bg-cyan-50 disabled:opacity-50 sm:px-4 sm:text-sm'
+
   return (
-    <div className="w-full shrink-0 rounded-3xl border border-white/15 bg-white/95 shadow-2xl shadow-cyan-950/25 ring-1 ring-white/25 backdrop-blur-md max-h-[min(640px,calc(100dvh-14rem))] overflow-y-auto lg:max-h-[min(720px,calc(100dvh-8rem))]">
-      <div className="sticky top-0 z-[1] border-b border-slate-200/90 bg-gradient-to-r from-slate-50 to-cyan-50/80 px-5 py-3.5">
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1">
+    <div className="w-full shrink-0 max-h-[min(720px,calc(100dvh-6rem))] overflow-y-auto lg:max-h-none">
+      <div className="mb-8 hidden lg:block">
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
+        <p className="mt-2 text-sm text-slate-500">使用商家账号进入墨典 AI 智能 ERP 工作台</p>
+      </div>
+      <div className="mb-6 border-b border-slate-200">
+        <div className="flex gap-8">
           <button
             type="button"
             onClick={() => switchMode('login')}
             className={cn(
-              'flex-1 rounded-lg py-2 text-sm font-semibold transition-colors',
-              mode === 'login' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+              'relative pb-3 text-base font-semibold transition-colors',
+              mode === 'login' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600',
             )}
           >
             登录
+            {mode === 'login' ? (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500" />
+            ) : null}
           </button>
           <button
             type="button"
             onClick={() => switchMode('register')}
             className={cn(
-              'flex-1 rounded-lg py-2 text-sm font-semibold transition-colors',
-              mode === 'register' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+              'relative pb-3 text-base font-semibold transition-colors',
+              mode === 'register' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600',
             )}
           >
             注册
+            {mode === 'register' ? (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500" />
+            ) : null}
           </button>
         </div>
-        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        <p className="pb-4 text-xs leading-relaxed text-slate-500 lg:hidden">
           {mode === 'login'
             ? loginMethod === 'password'
               ? '使用登录名与密码进入商家工作台。'
@@ -305,15 +321,15 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         </p>
       </div>
 
-      <div className="px-5 pb-6 pt-5 sm:px-7">
-        <div className="mb-4 flex items-start gap-3 rounded-xl border border-slate-200/90 bg-slate-50/90 p-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400/25 to-orange-400/15 ring-1 ring-slate-200/80">
-            <ShieldCheck className="h-5 w-5 text-cyan-700" />
+      <div>
+        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-[#f4f6f9] px-4 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+            <ShieldCheck className="h-5 w-5 text-cyan-600" />
           </div>
           <div className="min-w-0 text-left">
-            <p className="text-xs font-semibold text-slate-800">安全可信</p>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
-              短信验证码由阿里云号码认证服务发送，会话经 Supabase Auth 加密。
+            <p className="text-sm font-semibold text-slate-800">安全可信</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
+              短信由阿里云发送，会话经 Supabase Auth 加密存储。
             </p>
           </div>
         </div>
@@ -326,7 +342,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
 
         {mode === 'login' ? (
           <>
-            <div className="mb-4 flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <div className="mb-5 flex gap-6 border-b border-slate-100 pb-1">
               <button
                 type="button"
                 onClick={() => {
@@ -334,13 +350,16 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                   onErr(null)
                 }}
                 className={cn(
-                  'flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors sm:text-sm',
+                  'relative pb-2 text-sm font-semibold transition-colors',
                   loginMethod === 'password'
-                    ? 'bg-white text-cyan-800 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-800',
+                    ? 'text-slate-900'
+                    : 'text-slate-400 hover:text-slate-600',
                 )}
               >
                 账号密码
+                {loginMethod === 'password' ? (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-cyan-500" />
+                ) : null}
               </button>
               <button
                 type="button"
@@ -349,10 +368,10 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                   onErr(null)
                 }}
                 className={cn(
-                  'flex-1 rounded-md py-1.5 text-xs font-semibold transition-colors sm:text-sm',
+                  'relative pb-2 text-sm font-semibold transition-colors',
                   loginMethod === 'sms'
-                    ? 'bg-white text-cyan-800 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-800',
+                    ? 'text-slate-900'
+                    : 'text-slate-400 hover:text-slate-600',
                 )}
               >
                 手机验证码
@@ -360,7 +379,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             </div>
 
             {loginMethod === 'password' ? (
-              <form className="space-y-4" onSubmit={(e) => void submitPasswordLogin(e)}>
+              <form className="space-y-5" onSubmit={(e) => void submitPasswordLogin(e)}>
                 <div>
                   <label className={labelClass} htmlFor="meoo-login-name">
                     登录名
@@ -394,13 +413,13 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 disabled:opacity-60"
+                  className={primaryBtn}
                 >
                   {busy ? '登录中…' : '进入工作台'}
                 </button>
               </form>
             ) : (
-              <form className="space-y-4" onSubmit={(e) => void submitSmsLogin(e)}>
+              <form className="space-y-5" onSubmit={(e) => void submitSmsLogin(e)}>
                 <div>
                   <label className={labelClass} htmlFor="meoo-login-phone">
                     手机号
@@ -432,7 +451,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                       type="button"
                       disabled={loginSmsSending || loginSmsCooldown > 0 || busy}
                       onClick={() => void sendSmsForLogin()}
-                      className="shrink-0 rounded-xl border border-cyan-600 bg-cyan-50 px-3 py-2.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-50 sm:px-4 sm:text-sm"
+                      className={smsBtn}
                     >
                       {loginSmsSending ? '发送中…' : loginSmsCooldown > 0 ? `${loginSmsCooldown}s` : '获取验证码'}
                     </button>
@@ -444,7 +463,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 disabled:opacity-60"
+                  className={primaryBtn}
                 >
                   {busy ? '登录中…' : '验证码登录'}
                 </button>
@@ -509,7 +528,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                   type="button"
                   disabled={smsSending || smsCooldown > 0 || busy}
                   onClick={() => void sendSmsForRegister()}
-                  className="shrink-0 rounded-xl border border-cyan-600 bg-cyan-50 px-3 py-2.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-100 disabled:opacity-50 sm:px-4 sm:text-sm"
+                  className={smsBtn}
                 >
                   {smsSending ? '发送中…' : smsCooldown > 0 ? `${smsCooldown}s` : '获取验证码'}
                 </button>
@@ -549,7 +568,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-cyan-900/20 disabled:opacity-60"
+              className={primaryBtn}
             >
               {busy ? '注册中…' : '确认注册'}
             </button>
