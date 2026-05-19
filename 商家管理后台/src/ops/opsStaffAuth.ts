@@ -248,7 +248,7 @@ export function sessionHasPermission(session: OpsSession | null, key: OpsPermiss
 
 export function canAccessOpsPath(session: OpsSession | null, pathname: string): boolean {
   if (!session) return false
-  if (pathname === '/' || pathname === '') return true
+  if (pathname === '/' || pathname === '' || pathname === '/home') return true
   if (pathname.startsWith('/accounts')) {
     return session.role === 'super_admin'
   }
@@ -261,11 +261,8 @@ export function canAccessOpsPath(session: OpsSession | null, pathname: string): 
 }
 
 export function firstAllowedOpsPath(session: OpsSession): string {
-  if (session.role === 'super_admin') return '/customers'
-  for (const m of OPS_PERMISSION_MODULES) {
-    if (session.permissions.includes(m.key)) return m.pathPrefix
-  }
-  return '/login'
+  if (!session) return '/login'
+  return '/'
 }
 
 export async function createOpsSubAccount(input: {
