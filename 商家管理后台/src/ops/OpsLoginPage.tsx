@@ -2,18 +2,30 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
+import {
+  buildOpsSession,
+  ensureOpsMasterAccount,
+  firstAllowedOpsPath,
+  OPS_SESSION_KEY,
+  readOpsSession,
+  verifyOpsLogin,
+  writeOpsSession,
+} from './opsStaffAuth'
 
-const OPS_ACCOUNTS = new Set(['18768501283', '17826822524'])
-const OPS_PASSWORD = '123456'
-export const OPS_SESSION_KEY = 'meoo_ops_login'
+export { OPS_SESSION_KEY }
 
 export default function OpsLoginPage() {
   const navigate = useNavigate()
   useEffect(() => {
-    if (sessionStorage.getItem(OPS_SESSION_KEY) === '1') {
-      navigate('/customers', { replace: true })
-    }
+    sessionStorage.removeItem('meoo_ops_login')
+    void ensureOpsMasterAccount().then(() => {
+      const session = readOpsSession()
+      if (session) {
+        navigate(firstAllowedOpsPath(session), { replace: true })
+      }
+    })
   }, [navigate])
+
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState<string | null>(null)
@@ -22,22 +34,22 @@ export default function OpsLoginPage() {
   const submit = (e: FormEvent) => {
     e.preventDefault()
     setErr(null)
-    const phone = account.trim()
-    if (!OPS_ACCOUNTS.has(phone)) {
-      setErr('账号或密码错误')
-      return
-    }
-    if (password !== OPS_PASSWORD) {
-      setErr('账号或密码错误')
-      return
-    }
     setBusy(true)
-    try {
-      sessionStorage.setItem(OPS_SESSION_KEY, '1')
-      navigate('/customers', { replace: true })
-    } finally {
-      setBusy(false)
-    }
+    void (async () => {
+      try {
+        await ensureOpsMasterAccount()
+        const r = await verifyOpsLogin(account, password)
+        if (!r.ok) {
+          setErr('账号或密码错误')
+          return
+        }
+        const session = buildOpsSession(r.account)
+        writeOpsSession(session)
+        navigate(firstAllowedOpsPath(session), { replace: true })
+      } finally {
+        setBusy(false)
+      }
+    })()
   }
 
   return (

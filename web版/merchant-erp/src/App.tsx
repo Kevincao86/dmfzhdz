@@ -12,7 +12,6 @@ import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
 import GeoPage from './pages/GeoPage'
 import HomeDashboard from './pages/HomeDashboard'
 import ActivityCenterPage from './pages/ActivityCenterPage'
-import ModulePage from './pages/ModulePage'
 import ReviewsManagementPage from './pages/ReviewsManagementPage'
 import StoreDecorationPage from './pages/StoreDecorationPage'
 import StoreDetailPage from './pages/StoreDetailPage'
@@ -25,6 +24,8 @@ import ProductsPage from './pages/ProductsPage'
 import ProductsViewPage from './pages/ProductsViewPage'
 import RecruitmentPage from './pages/RecruitmentPage'
 import SettingsPage from './pages/SettingsPage'
+import LocalPromotionAdvertisingPage from './pages/LocalPromotionAdvertisingPage'
+import LocalPromotionLeadsPage from './pages/LocalPromotionLeadsPage'
 import WalletPage from './pages/WalletPage'
 import LoginPage from './pages/LoginPage'
 
@@ -68,18 +69,8 @@ export default function App() {
           <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
           <Route path="ai-operation/content" element={<AiOperationContentPage />} />
           <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
-          <Route
-            path="advertising"
-            element={
-              <ModulePage title="投流" subtitle="创建和管理广告投放计划" />
-            }
-          />
-          <Route
-            path="leads"
-            element={
-              <ModulePage title="线索" subtitle="线索分配、跟进与转化统计" />
-            }
-          />
+          <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
+          <Route path="leads" element={<LocalPromotionLeadsPage />} />
           <Route path="finance" element={<FinanceReconcilePage />} />
           <Route path="finance/tax" element={<FinanceTaxPage />} />
           <Route path="settings" element={<SettingsPage />} />

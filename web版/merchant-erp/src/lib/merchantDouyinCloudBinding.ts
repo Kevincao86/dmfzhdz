@@ -1,41 +1,50 @@
 /**
- * 抖音来客绑定与 Supabase 租户同步：换设备登录同一商户账号后自动恢复绑定（密文 token 存云端）。
+ * 抖音来客绑定与 Supabase 租户同步（支持同一租户多家来客账号）
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { fetchPrimaryTenantId } from './tenantBilling'
+import {
+  deleteMerchantBindingById,
+  listMerchantBindings,
+  upsertMerchantBinding,
+  type MerchantPlatformBindingRow,
+} from './merchantPlatformBindings'
+import { applyActiveDouyinBinding, pickActiveDouyinBinding } from './douyinActiveBinding'
 
 const PROVIDER = 'douyin' as const
 
 export type DouyinCloudBindingRow = {
+  id: string
   sealed_credentials: string
   client_key: string | null
   merchant_account_id: string | null
   account_display_name: string | null
+  binding_label: string | null
+}
+
+function toLegacy(row: MerchantPlatformBindingRow): DouyinCloudBindingRow {
+  return {
+    id: row.id,
+    sealed_credentials: row.sealedCredentials,
+    client_key: row.clientKey,
+    merchant_account_id: row.merchantAccountId,
+    account_display_name: row.accountDisplayName,
+    binding_label: row.bindingLabel,
+  }
+}
+
+export async function listDouyinBindingsCloud(
+  supabase: SupabaseClient,
+): Promise<DouyinCloudBindingRow[]> {
+  const rows = await listMerchantBindings(supabase, PROVIDER)
+  return rows.map(toLegacy)
 }
 
 export async function fetchDouyinBindingCloud(
   supabase: SupabaseClient,
 ): Promise<DouyinCloudBindingRow | null> {
-  const tenantId = await fetchPrimaryTenantId(supabase)
-  if (!tenantId) return null
-  const { data, error } = await supabase
-    .from('tenant_merchant_bindings')
-    .select('sealed_credentials, client_key, merchant_account_id, account_display_name')
-    .eq('tenant_id', tenantId)
-    .eq('provider', PROVIDER)
-    .maybeSingle()
-  if (error || !data) return null
-  const sealed =
-    typeof data.sealed_credentials === 'string' ? data.sealed_credentials.trim() : ''
-  if (!sealed) return null
-  return {
-    sealed_credentials: sealed,
-    client_key: typeof data.client_key === 'string' ? data.client_key : null,
-    merchant_account_id:
-      typeof data.merchant_account_id === 'string' ? data.merchant_account_id : null,
-    account_display_name:
-      typeof data.account_display_name === 'string' ? data.account_display_name : null,
-  }
+  const rows = await listMerchantBindings(supabase, PROVIDER)
+  const active = pickActiveDouyinBinding(rows)
+  return active ? toLegacy(active) : null
 }
 
 export async function upsertDouyinBindingCloud(
@@ -45,38 +54,48 @@ export async function upsertDouyinBindingCloud(
     clientKey: string
     merchantAccountId: string
     accountDisplayName?: string | null
+    bindingLabel?: string | null
   },
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const tenantId = await fetchPrimaryTenantId(supabase)
-  if (!tenantId) return { ok: false, message: '当前账号未关联商户租户，无法写入云端绑定' }
-
-  const row = {
-    tenant_id: tenantId,
+): Promise<{ ok: true; row: DouyinCloudBindingRow } | { ok: false; message: string }> {
+  const r = await upsertMerchantBinding(supabase, {
     provider: PROVIDER,
-    sealed_credentials: payload.sealedToken.trim(),
-    client_key: payload.clientKey.trim() || null,
-    merchant_account_id: payload.merchantAccountId.trim() || null,
-    account_display_name: payload.accountDisplayName?.trim() || null,
-    updated_at: new Date().toISOString(),
-  }
-
-  const { error } = await supabase.from('tenant_merchant_bindings').upsert(row, {
-    onConflict: 'tenant_id,provider',
+    merchantAccountId: payload.merchantAccountId,
+    sealedCredentials: payload.sealedToken.trim(),
+    clientKey: payload.clientKey,
+    accountDisplayName: payload.accountDisplayName,
+    bindingLabel: payload.bindingLabel ?? payload.accountDisplayName,
   })
-  if (error) return { ok: false, message: error.message }
-  return { ok: true }
+  if (!r.ok) return r
+  applyActiveDouyinBinding(r.row)
+  return { ok: true, row: toLegacy(r.row) }
 }
 
 export async function deleteDouyinBindingCloud(
   supabase: SupabaseClient,
+  bindingId?: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const tenantId = await fetchPrimaryTenantId(supabase)
-  if (!tenantId) return { ok: true }
-  const { error } = await supabase
-    .from('tenant_merchant_bindings')
-    .delete()
-    .eq('tenant_id', tenantId)
-    .eq('provider', PROVIDER)
-  if (error) return { ok: false, message: error.message }
+  if (bindingId) {
+    const d = await deleteMerchantBindingById(supabase, bindingId)
+    if (!d.ok) return d
+    const rows = await listMerchantBindings(supabase, PROVIDER)
+    const active = pickActiveDouyinBinding(rows)
+    applyActiveDouyinBinding(active)
+    return { ok: true }
+  }
+  const rows = await listMerchantBindings(supabase, PROVIDER)
+  for (const row of rows) {
+    const d = await deleteMerchantBindingById(supabase, row.id)
+    if (!d.ok) return d
+  }
+  applyActiveDouyinBinding(null)
   return { ok: true }
+}
+
+export async function hydrateDouyinBindingsFromCloud(
+  supabase: SupabaseClient,
+): Promise<DouyinCloudBindingRow[]> {
+  const rows = await listMerchantBindings(supabase, PROVIDER)
+  const active = pickActiveDouyinBinding(rows)
+  applyActiveDouyinBinding(active)
+  return rows.map(toLegacy)
 }

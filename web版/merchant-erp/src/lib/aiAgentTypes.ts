@@ -9,6 +9,8 @@ export type AiPermissionId =
   | 'influencer'
   | 'review'
   | 'sync'
+  | 'local_ads'
+  | 'local_leads'
 
 export const AI_PERMISSION_LABELS: Record<AiPermissionId, string> = {
   product: '商品管理权限',
@@ -16,6 +18,8 @@ export const AI_PERMISSION_LABELS: Record<AiPermissionId, string> = {
   influencer: '达人招募权限',
   review: '评价处理权限',
   sync: '平台同步权限',
+  local_ads: '本地推投流数据',
+  local_leads: '本地推线索跟进',
 }
 
 /** 可编排的任务类型 */
@@ -26,6 +30,8 @@ export type AiTaskType =
   | 'sync_platform'
   | 'analyze_exception'
   | 'generate_copywriting'
+  | 'optimize_local_ads'
+  | 'follow_local_lead'
 
 export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   create_product: '创建商品',
@@ -34,6 +40,8 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   sync_platform: '同步平台',
   analyze_exception: '分析异常',
   generate_copywriting: '生成推广文案',
+  optimize_local_ads: '优化本地推投放',
+  follow_local_lead: '跟进本地推线索',
 }
 
 /** 新对话 / 重置时的首条助手问候（与上下文初始态一致） */
@@ -45,6 +53,8 @@ export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
   { type: 'create_product', label: '创建商品' },
   { type: 'recruit_influencer', label: '招募达人' },
   { type: 'handle_review', label: '处理评价' },
+  { type: 'optimize_local_ads', label: '优化本地推' },
+  { type: 'follow_local_lead', label: '跟进线索' },
   { type: 'sync_platform', label: '同步平台' },
   { type: 'analyze_exception', label: '分析异常' },
   { type: 'generate_copywriting', label: '生成推广文案' },

@@ -9,13 +9,23 @@ import { useAiAgent } from '../context/AiAgentContext'
 import type { AiPermissionId } from '../lib/aiAgentTypes'
 import { AI_AGENT_SHORTCUTS } from '../lib/aiAgentTypes'
 
-const PERMISSION_ORDER: AiPermissionId[] = ['product', 'store', 'influencer', 'review', 'sync']
+const PERMISSION_ORDER: AiPermissionId[] = [
+  'product',
+  'store',
+  'influencer',
+  'review',
+  'local_ads',
+  'local_leads',
+  'sync',
+]
 
 const PERMISSION_BADGE_SHORT: Record<AiPermissionId, string> = {
   product: '商品',
   store: '店铺',
   influencer: '达人',
   review: '评价',
+  local_ads: '投流',
+  local_leads: '线索',
   sync: '同步',
 }
 

@@ -323,6 +323,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       store: true,
       influencer: true,
       review: true,
+      local_ads: true,
+      local_leads: true,
       sync: true,
     }),
     [],

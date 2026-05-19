@@ -1,11 +1,18 @@
 import { BookOpen, Eye, EyeOff, Search, User } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
+import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
+import { applyActiveDouyinBinding } from '../../lib/douyinActiveBinding'
 import {
   deleteDouyinBindingCloud,
-  fetchDouyinBindingCloud,
+  hydrateDouyinBindingsFromCloud,
+  type DouyinCloudBindingRow,
   upsertDouyinBindingCloud,
 } from '../../lib/merchantDouyinCloudBinding'
+import {
+  fetchMerchantBindingById,
+  readActiveBindingId,
+} from '../../lib/merchantPlatformBindings'
 import {
   clearDouyinMerchantBindingLocal,
   readMerchantSession,
@@ -79,6 +86,8 @@ export default function DouyinMerchantSection() {
   const [secretMasked, setSecretMasked] = useState(true)
   const [boundMerchantId, setBoundMerchantId] = useState('')
   const [boundAccountName, setBoundAccountName] = useState('')
+  const [bindLabel, setBindLabel] = useState('')
+  const [cloudBindings, setCloudBindings] = useState<DouyinCloudBindingRow[]>([])
 
   const [keyword, setKeyword] = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
@@ -112,23 +121,21 @@ export default function DouyinMerchantSection() {
       if (!session?.user) return
       if (bindOpenRef.current) return
 
-      const cloud = await fetchDouyinBindingCloud(sb)
-      if (cloud) {
-        writeMerchantSession(TOKEN_KEY, cloud.sealed_credentials)
-        if (cloud.client_key) writeMerchantSession(META_APP_ID, cloud.client_key)
-        if (cloud.merchant_account_id) writeMerchantSession(META_MERCHANT_ID, cloud.merchant_account_id)
-        if (cloud.account_display_name) writeMerchantSession(META_ACCOUNT_NAME, cloud.account_display_name)
-        else writeMerchantSession(META_ACCOUNT_NAME, null)
-        setAccessToken(cloud.sealed_credentials)
-        setBoundMerchantId(cloud.merchant_account_id ?? '')
-        setBoundAccountName(cloud.account_display_name ?? '')
-        setAppId(cloud.client_key ?? '')
-        setMerchantId(cloud.merchant_account_id ?? '')
+      const rows = await hydrateDouyinBindingsFromCloud(sb)
+      setCloudBindings(rows)
+      const tok = readMerchantSession(TOKEN_KEY)
+      if (tok) {
+        setAccessToken(tok)
+        setBoundMerchantId(readMerchantSession(META_MERCHANT_ID) ?? '')
+        setBoundAccountName(readMerchantSession(META_ACCOUNT_NAME) ?? '')
+        setAppId(readMerchantSession(META_APP_ID) ?? '')
+        setMerchantId(readMerchantSession(META_MERCHANT_ID) ?? '')
         return
       }
 
       /** 当前租户无云端绑定时，禁止沿用其它账号留在 localStorage 的凭证（避免串租户） */
       clearDouyinMerchantBindingLocal()
+      setCloudBindings([])
       setAccessToken(null)
       setBoundMerchantId('')
       setBoundAccountName('')
@@ -326,6 +333,72 @@ export default function DouyinMerchantSection() {
 
   const clampedPage = useMemo(() => Math.min(page, totalPages), [page, totalPages])
 
+  const activeBindingId = readActiveBindingId('douyin')
+
+  const douyinAccountItems = useMemo(
+    () =>
+      cloudBindings.map((b) => ({
+        id: b.id,
+        accountId: b.merchant_account_id ?? '—',
+        displayName: b.binding_label || b.account_display_name || b.merchant_account_id || '来客账号',
+        subLabel: b.client_key ? `AppID ${b.client_key}` : undefined,
+        isActive: b.id === activeBindingId,
+      })),
+    [cloudBindings, activeBindingId],
+  )
+
+  const selectDouyinBinding = useCallback(
+    async (bindingId: string) => {
+      if (!supabaseConfigured || !supabase) return
+      const row = await fetchMerchantBindingById(supabase, bindingId)
+      if (!row || row.provider !== 'douyin') return
+      applyActiveDouyinBinding(row)
+      setAccessToken(row.sealedCredentials)
+      setBoundMerchantId(row.merchantAccountId)
+      setBoundAccountName(row.bindingLabel || row.accountDisplayName || row.merchantAccountId)
+      setAppId(row.clientKey ?? '')
+      setMerchantId(row.merchantAccountId)
+      setPage(1)
+      skipNextStoresAutoLoadRef.current = false
+      await loadStores({
+        silent: false,
+        refresh: true,
+        accessTokenOverride: row.sealedCredentials,
+        merchantIdOverride: row.merchantAccountId,
+      })
+    },
+    [loadStores],
+  )
+
+  const removeDouyinBinding = useCallback(
+    async (bindingId: string) => {
+      if (!window.confirm('确定移除此抖音来客账号？门店列表将切换到其它已绑定账号。')) return
+      if (!supabaseConfigured || !supabase) return
+      const d = await deleteDouyinBindingCloud(supabase, bindingId)
+      if (d.ok === false) {
+        window.alert(d.message)
+        return
+      }
+      const rows = await hydrateDouyinBindingsFromCloud(supabase)
+      setCloudBindings(rows)
+      const tok = readMerchantSession(TOKEN_KEY)
+      setAccessToken(tok)
+      setBoundMerchantId(readMerchantSession(META_MERCHANT_ID) ?? '')
+      setBoundAccountName(readMerchantSession(META_ACCOUNT_NAME) ?? '')
+      if (!tok) {
+        setRows([])
+        setTotal(0)
+        setLastSyncAt(null)
+        setListError(null)
+        setStoresHint(null)
+        return
+      }
+      setPage(1)
+      await loadStores({ silent: false, refresh: true })
+    },
+    [loadStores],
+  )
+
   useEffect(() => {
     if (clampedPage !== page) setPage(clampedPage)
   }, [clampedPage, page])
@@ -362,10 +435,17 @@ export default function DouyinMerchantSection() {
           sealedToken: r.accessToken,
           clientKey: appId.trim(),
           merchantAccountId: merchantId.trim(),
-          accountDisplayName: accName ?? null,
+          accountDisplayName: (accName ?? bindLabel.trim()) || null,
+          bindingLabel: bindLabel.trim() || accName || null,
         })
-        if (cr.ok === false) console.warn('[douyin] 绑定成功后云端同步失败:', cr.message)
+        if (cr.ok === false) {
+          console.warn('[douyin] 绑定成功后云端同步失败:', cr.message)
+        } else {
+          const rows = await hydrateDouyinBindingsFromCloud(supabase)
+          setCloudBindings(rows)
+        }
       }
+      setBindLabel('')
       setAppSecret('')
       setBindOpen(false)
       setPage(1)
@@ -383,25 +463,24 @@ export default function DouyinMerchantSection() {
   }
 
   const disconnect = () => {
-    void (async () => {
-      try {
-        if (supabaseConfigured && supabase) {
-          const d = await deleteDouyinBindingCloud(supabase)
-          if (d.ok === false) console.warn('[douyin] 云端解绑失败:', d.message)
-        }
-      } finally {
-        writeMerchantSession(TOKEN_KEY, null)
-        writeMerchantSession(META_ACCOUNT_NAME, null)
-        setBoundMerchantId('')
-        setBoundAccountName('')
-        setAccessToken(null)
-        setRows([])
-        setTotal(0)
-        setLastSyncAt(null)
-        setListError(null)
-        setStoresHint(null)
-      }
-    })()
+    const id = readActiveBindingId('douyin')
+    if (id) {
+      void removeDouyinBinding(id)
+      return
+    }
+    if (supabaseConfigured && supabase && cloudBindings[0]) {
+      void removeDouyinBinding(cloudBindings[0].id)
+      return
+    }
+    clearDouyinMerchantBindingLocal()
+    setAccessToken(null)
+    setBoundMerchantId('')
+    setBoundAccountName('')
+    setRows([])
+    setTotal(0)
+    setLastSyncAt(null)
+    setListError(null)
+    setStoresHint(null)
   }
 
   return (
@@ -414,12 +493,13 @@ export default function DouyinMerchantSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">抖音来客商家版</h3>
             <p className="text-sm text-gray-500">
-              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细（分页与搜索由接口支持）。
+              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细。可与「巨量本地推」使用不同登录账号；同一平台最多绑定 5 个账号，切换「当前使用」决定门店拉取与商品同步所用凭据。
               {supabaseConfigured ? (
                 <span className="mt-1 block text-gray-600">
-                  已登录商户主账号时，绑定会写入 Supabase（表{' '}
+                  已登录商户主账号时，绑定写入 Supabase（
                   <code className="rounded bg-gray-100 px-1 text-xs">tenant_merchant_bindings</code>
-                  ）；换电脑登录同一账号可自动恢复。部署前请在 Supabase 执行仓库内对应迁移 SQL。
+                  ），换设备可恢复；多账号需执行迁移{' '}
+                  <code className="rounded bg-gray-100 px-1 text-xs">20260524100000</code>。
                 </span>
               ) : null}
             </p>
@@ -434,28 +514,39 @@ export default function DouyinMerchantSection() {
             <BookOpen className="h-4 w-4" />
             绑定说明书
           </button>
-          {!accessToken ? (
-            <button
-              type="button"
-              onClick={() => {
-                setBindError(null)
-                setBindOpen(true)
-              }}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              绑定抖音来客
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setBindOpen(true)}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              重新绑定
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              setBindError(null)
+              setBindOpen(true)
+            }}
+            className={
+              accessToken
+                ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
+                : 'rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700'
+            }
+          >
+            {accessToken ? '添加来客账号' : '绑定抖音来客'}
+          </button>
         </div>
       </div>
+
+      {supabaseConfigured && (cloudBindings.length > 0 || accessToken) ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h4 className="mb-3 text-sm font-semibold text-gray-900">已绑定的来客账号</h4>
+          <MerchantPlatformAccountsPanel
+            accounts={douyinAccountItems}
+            maxAccounts={5}
+            emptyHint="尚未绑定来客账号"
+            onSelectActive={(id) => void selectDouyinBinding(id)}
+            onRemove={(id) => void removeDouyinBinding(id)}
+            onAddClick={() => {
+              setBindError(null)
+              setBindOpen(true)
+            }}
+          />
+        </div>
+      ) : null}
 
       {accessToken ? (
         <div className="space-y-6">
@@ -499,7 +590,7 @@ export default function DouyinMerchantSection() {
                       onClick={disconnect}
                       className="text-xs text-red-600 underline hover:text-red-800"
                     >
-                      断开连接
+                      移除当前账号
                     </button>
                   </div>
                 </div>
@@ -745,7 +836,9 @@ export default function DouyinMerchantSection() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">绑定抖音来客</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {cloudBindings.length > 0 ? '添加抖音来客账号' : '绑定抖音来客'}
+              </h3>
               <button
                 type="button"
                 disabled={bindSubmitting}
@@ -811,6 +904,18 @@ export default function DouyinMerchantSection() {
                     )}
                   </button>
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  备注名（选填，便于区分多店）
+                </label>
+                <input
+                  type="text"
+                  value={bindLabel}
+                  onChange={(e) => setBindLabel(e.target.value)}
+                  placeholder="例如：西湖店来客"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">

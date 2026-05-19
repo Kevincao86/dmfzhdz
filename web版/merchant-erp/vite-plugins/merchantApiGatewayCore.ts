@@ -34,6 +34,7 @@ import {
 } from './merchantAiUpstream.js'
 import { handleMerchantAiVideoRoutes } from './merchantVideoAiGateway.js'
 import { handleMarketingActivitiesListGet } from './marketingActivitiesGateway.js'
+import { handleLocalPromotionRoutes } from './localPromotionGateway.js'
 
 type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs'
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
@@ -139,6 +140,20 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       if (method === 'GET' && pathname === '/api/merchant/marketing/activities') {
         await handleMarketingActivitiesListGet(req, res, url)
         return true
+      }
+
+      if (pathname.startsWith('/api/merchant/local-promotion/')) {
+        let bodyRawLp = ''
+        if (method === 'POST') bodyRawLp = await bodyReader()
+        const lpDone = await handleLocalPromotionRoutes(
+          method,
+          pathname,
+          url,
+          res,
+          bodyRawLp,
+          env as MerchantAiEnv,
+        )
+        if (lpDone) return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/douyin/bind') {

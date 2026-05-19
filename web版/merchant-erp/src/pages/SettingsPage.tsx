@@ -21,6 +21,7 @@ import {
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
 import DouyinMerchantSection from './settings/DouyinMerchantSection'
+import LocalPromotionSection from './settings/LocalPromotionSection'
 import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
 import SubAccountsPanel from './settings/SubAccountsPanel'
@@ -297,6 +298,8 @@ export default function SettingsPage() {
               </div>
 
               <AiModelBindingSection />
+
+              <LocalPromotionSection />
             </div>
           )}
 
