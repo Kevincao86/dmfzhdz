@@ -20,6 +20,7 @@ import {
 import type { RegistryScheduleRow, RegistryTalentPoolRow, RegistryVideoSubmission } from '../../lib/opsRegistryTypes'
 import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
 import { tenantLocalKey } from '../../lib/tenantLocalState'
+import { tenantScheduleRowId } from '../../lib/registryTenantIsolation'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { generateRecruitmentScheduleRowsAi } from '../../services/recruitmentScheduleAi'
 
@@ -284,6 +285,7 @@ export function RecruitmentScheduleView({
   const runAiSchedule = async () => {
     setBusy(true)
     try {
+      const tenantId = supabaseConfigured && supabase ? await fetchPrimaryTenantId(supabase) : null
       const meta = readLastSubmitMeta()
       const ctx = JSON.stringify(
         {
@@ -312,8 +314,9 @@ export function RecruitmentScheduleView({
           const d = new Date(base)
           d.setDate(d.getDate() + i)
           const slot = slots[i % slots.length]!
+          const localId = `sch-${Date.now()}-${i}`
           return {
-            id: `sch-${Date.now()}-${i}`,
+            id: tenantId ? tenantScheduleRowId(tenantId, localId) : localId,
             time: `${d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })} ${slot}`,
             talentName: row.name,
             storeName: meta.stores?.[0]?.name?.trim() || '待补充门店',
@@ -323,6 +326,12 @@ export function RecruitmentScheduleView({
                 : '规则回退排期（建议检查 AI Key 后重新排期）',
           }
         })
+      }
+      if (tenantId) {
+        next = next.map((r) => ({
+          ...r,
+          id: tenantScheduleRowId(tenantId, r.id),
+        }))
       }
       setRows(next)
       await setRecruitmentScheduleRowsOnOps(next)

@@ -7,7 +7,10 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import type { RegistryRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
+import { appendRecruitmentOrderForTenant } from '../src/lib/registryTenantIsolation.js'
+import { recruitmentOrderBelongsToTenant } from '../src/lib/tenantRegistryScope.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -77,18 +80,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
+    const auth = await requireMerchantRegistryAuth(req)
+    if (!auth.ok) {
+      sendOpsJson(res, auth.status, {
+        ok: false,
+        error: auth.error,
+        message: auth.message,
+      })
+      return
+    }
+
     const order = body.order
     if (!order || !order.id || !order.customerName) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_order' })
       return
     }
 
+    const reqTid = typeof order.tenantId === 'string' ? order.tenantId.trim() : ''
+    if (reqTid && reqTid !== auth.tenantId) {
+      sendOpsJson(res, 403, { ok: false, error: 'tenant_mismatch' })
+      return
+    }
+
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const list = [...(data.recruitmentOrders ?? [])]
-    list.unshift(order)
-    data.recruitmentOrders = list.slice(0, 200)
-    await io.save(data)
+    const existing = (data.recruitmentOrders ?? []).find((o) => o.id === order.id)
+    if (existing && !recruitmentOrderBelongsToTenant(existing, auth.tenantId)) {
+      sendOpsJson(res, 403, { ok: false, error: 'forbidden_order' })
+      return
+    }
+
+    const next = appendRecruitmentOrderForTenant(data, order, auth.tenantId, auth.userId)
+    await io.save(next)
     sendOpsJson(res, 200, { ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

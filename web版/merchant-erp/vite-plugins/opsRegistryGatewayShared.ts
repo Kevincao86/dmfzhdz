@@ -26,6 +26,15 @@ import type {
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
+import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
+import {
+  appendRecruitmentOrderForTenant,
+  filterRegistrySnapshotForMerchant,
+  setRecruitmentScheduleRowsForTenant,
+  setTalentPoolCandidatesForTenant,
+  stripRegistryRecruitmentForAnonymous,
+} from '../src/lib/registryTenantIsolation.js'
+import { recruitmentOrderBelongsToTenant } from '../src/lib/tenantRegistryScope.js'
 import { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
 
 export { DEFAULT_AI, normalizeRegistryFile, registryForPersistentFile } from './opsRegistryGatewayCore.js'
@@ -130,7 +139,9 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
         if (
           !url.startsWith('/api/ops-sync') &&
           url !== '/api/meoo-ops-sync-registry' &&
-          url !== '/api/meoo-ops-recruitment-orders-append'
+          url !== '/api/meoo-ops-recruitment-orders-append' &&
+          url !== '/api/meoo-ops-talent-pool-set' &&
+          url !== '/api/meoo-ops-recruitment-schedule-set'
         )
           return next()
 
@@ -140,8 +151,15 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
         const sendCors = () => {
           res.setHeader('Access-Control-Allow-Origin', '*')
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         }
+
+        const authHeader =
+          typeof req.headers.authorization === 'string'
+            ? req.headers.authorization
+            : typeof req.headers.Authorization === 'string'
+              ? req.headers.Authorization
+              : undefined
 
         if (method === 'OPTIONS') {
           sendCors()
@@ -154,12 +172,18 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
 
         try {
           if (method === 'GET' && (url === '/api/ops-sync/registry' || url === '/api/meoo-ops-sync-registry')) {
-            const data = ensureRegistry(viteRoot)
+            let data = ensureRegistry(viteRoot)
             const before = data.recruitmentOrders ?? []
             const cleaned = filterLegacyDemoRecruitmentOrders(before)
             if (cleaned.length !== before.length) {
               data.recruitmentOrders = cleaned
               writeRegistry(viteRoot, data)
+            }
+            const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
+            if (auth.ok) {
+              data = filterRegistrySnapshotForMerchant(auth.tenantId, data)
+            } else {
+              data = stripRegistryRecruitmentForAnonymous(data)
             }
             json(res, 200, data)
             return
@@ -394,6 +418,11 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             method === 'POST' &&
             (url === '/api/ops-sync/recruitment-orders/append' || url === '/api/meoo-ops-recruitment-orders-append')
           ) {
+            const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
+            if (!auth.ok) {
+              json(res, auth.status, { ok: false, error: auth.error, message: auth.message })
+              return
+            }
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as { order?: RegistryRecruitmentOrder }
             const order = body.order
@@ -401,10 +430,18 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               json(res, 400, { ok: false, error: 'invalid_order' })
               return
             }
-            const data = ensureRegistry(viteRoot)
-            const list = [...(data.recruitmentOrders ?? [])]
-            list.unshift(order)
-            data.recruitmentOrders = list.slice(0, 200)
+            const reqTid = typeof order.tenantId === 'string' ? order.tenantId.trim() : ''
+            if (reqTid && reqTid !== auth.tenantId) {
+              json(res, 403, { ok: false, error: 'tenant_mismatch' })
+              return
+            }
+            let data = ensureRegistry(viteRoot)
+            const existing = (data.recruitmentOrders ?? []).find((o) => o.id === order.id)
+            if (existing && !recruitmentOrderBelongsToTenant(existing, auth.tenantId)) {
+              json(res, 403, { ok: false, error: 'forbidden_order' })
+              return
+            }
+            data = appendRecruitmentOrderForTenant(data, order, auth.tenantId, auth.userId)
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
             return
@@ -608,23 +645,40 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/talent-pool/set') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/talent-pool/set' || url === '/api/meoo-ops-talent-pool-set')
+          ) {
+            const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
+            if (!auth.ok) {
+              json(res, auth.status, { ok: false, error: auth.error, message: auth.message })
+              return
+            }
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as { candidates?: RegistryTalentPoolRow[] }
             const candidates = Array.isArray(body.candidates) ? body.candidates : []
-            const data = ensureRegistry(viteRoot)
-            data.talentPoolCandidates = candidates.slice(0, 240)
+            let data = ensureRegistry(viteRoot)
+            data = setTalentPoolCandidatesForTenant(data, auth.tenantId, candidates)
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/recruitment-schedule/set') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/recruitment-schedule/set' ||
+              url === '/api/meoo-ops-recruitment-schedule-set')
+          ) {
+            const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
+            if (!auth.ok) {
+              json(res, auth.status, { ok: false, error: auth.error, message: auth.message })
+              return
+            }
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as { rows?: RegistryScheduleRow[] }
             const rows = Array.isArray(body.rows) ? body.rows : []
-            const data = ensureRegistry(viteRoot)
-            data.recruitmentScheduleRows = rows.slice(0, 400)
+            let data = ensureRegistry(viteRoot)
+            data = setRecruitmentScheduleRowsForTenant(data, auth.tenantId, rows)
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
             return
