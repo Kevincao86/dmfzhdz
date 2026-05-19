@@ -139,7 +139,12 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     try {
       const r = await loginWithSmsCode({ phone: mobile, smsCode: loginSmsCode.trim() })
       if (!r.ok || !r.access_token || !r.refresh_token) {
-        onErr(r.message ?? '验证码登录失败')
+        const hint =
+          r.message ??
+          (r.error === 'supabase_admin_not_configured'
+            ? '登录服务未配置 SUPABASE_SERVICE_ROLE_KEY，请联系管理员'
+            : '验证码登录失败')
+        onErr(import.meta.env.DEV && r.detail ? `${hint}（${r.detail.slice(0, 80)}）` : hint)
         return
       }
       const ok = await applySessionTokens(r.access_token, r.refresh_token)

@@ -8,6 +8,7 @@ import {
 import { provisionMerchantTenant } from './authRegisterProvision.js'
 import {
   createAdminSessionForUserId,
+  smsLoginErrorMessage,
   findAuthUserByPhone,
   phoneAlreadyRegistered,
   sendAuthSmsCode,
@@ -96,7 +97,7 @@ export function authRegisterGatewayPlugin(): Plugin {
               json(res, 503, {
                 ok: false,
                 error: session.error,
-                message: '登录服务暂不可用',
+                message: smsLoginErrorMessage(session.error, session.detail),
                 detail: session.detail,
               })
               return
