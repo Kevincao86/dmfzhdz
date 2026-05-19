@@ -10,6 +10,11 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
+import {
+  filterRegistrySnapshotForMerchant,
+  stripRegistryRecruitmentForAnonymous,
+} from '../src/lib/registryTenantIsolation.js'
 import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -63,7 +68,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await loadRegistrySnapshotForGet(io)
+    let data = await loadRegistrySnapshotForGet(io)
+
+    const auth = await requireMerchantRegistryAuth(req)
+    if (auth.ok) {
+      data = filterRegistrySnapshotForMerchant(auth.tenantId, data)
+    } else {
+      data = stripRegistryRecruitmentForAnonymous(data)
+    }
 
     let payload: string
     try {

@@ -7,7 +7,13 @@ import type {
   RegistryTenant,
   RegistryVideoSubmission,
 } from './opsRegistryTypes'
+import { supabase, supabaseConfigured } from './supabaseClient'
+import {
+  filterRegistrySnapshotForMerchant,
+  stripRegistryRecruitmentForAnonymous,
+} from './registryTenantIsolation'
 import { filterRegistryForTenant } from './tenantRegistryScope'
+import { fetchPrimaryTenantId } from './tenantBilling'
 
 /** 注册表与商户网关分离：优先运营台域名（线上 ERP 静态站无 /api/ops-sync 时需配置）。 */
 function registryApiBase(): string {
@@ -21,17 +27,22 @@ function url(path: string) {
   return `${b}${path}`
 }
 
-/** 线上 ERP 与 Vercel 扁平 `/api/meoo-*` 对齐；未部署时回退旧路径（运营台域名）。 */
-async function postRegistrySync(pathMeoo: string, pathLegacy: string, jsonBody: unknown): Promise<Response> {
-  const payload = JSON.stringify(jsonBody)
-  const headers = { 'Content-Type': 'application/json' }
-  const r1 = await fetch(url(pathMeoo), { method: 'POST', headers, body: payload })
-  if (r1.ok) return r1
-  return fetch(url(pathLegacy), { method: 'POST', headers, body: payload })
+async function registryAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (!supabaseConfigured || !supabase) return headers
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token) headers.Authorization = `Bearer ${token}`
+  } catch {
+    /* ignore */
+  }
+  return headers
 }
 
 async function fetchRegistryAt(path: string): Promise<RegistryFile> {
-  const res = await fetch(url(path))
+  const headers = await registryAuthHeaders()
+  const res = await fetch(url(path), { headers })
   const text = await res.text()
   if (!res.ok) throw new Error(`registry ${res.status}`)
   try {
@@ -41,17 +52,39 @@ async function fetchRegistryAt(path: string): Promise<RegistryFile> {
   }
 }
 
-/** 优先扁平路由，规避运营台 catch-all 异常；失败时回退 `/api/ops-sync/registry`。 */
-export async function fetchOpsRegistry(): Promise<RegistryFile> {
-  try {
-    return await fetchRegistryAt('/api/meoo-ops-sync-registry')
-  } catch {
-    return await fetchRegistryAt('/api/ops-sync/registry')
-  }
+/** 线上 ERP 与 Vercel 扁平 `/api/meoo-*` 对齐；未部署时回退旧路径（运营台域名）。 */
+async function postRegistrySync(pathMeoo: string, pathLegacy: string, jsonBody: unknown): Promise<Response> {
+  const payload = JSON.stringify(jsonBody)
+  const headers = await registryAuthHeaders()
+  const r1 = await fetch(url(pathMeoo), { method: 'POST', headers, body: payload })
+  if (r1.ok) return r1
+  return fetch(url(pathLegacy), { method: 'POST', headers, body: payload })
 }
 
-/** 商户 ERP：仅返回当前租户的招募/排期/视频/Brief 相关切片（注册表快照本身为全局，须客户端过滤） */
+async function resolveClientTenantId(): Promise<string | null> {
+  if (!supabaseConfigured || !supabase) return null
+  return fetchPrimaryTenantId(supabase)
+}
+
+/** 优先扁平路由；服务端按 JWT 过滤招募数据，客户端再按租户兜底。 */
+export async function fetchOpsRegistry(): Promise<RegistryFile> {
+  let raw: RegistryFile
+  try {
+    raw = await fetchRegistryAt('/api/meoo-ops-sync-registry')
+  } catch {
+    raw = await fetchRegistryAt('/api/ops-sync/registry')
+  }
+  const tenantId = await resolveClientTenantId()
+  if (tenantId) return filterRegistrySnapshotForMerchant(tenantId, raw)
+  return stripRegistryRecruitmentForAnonymous(raw)
+}
+
+/** 商户 ERP：仅返回当前租户的招募/排期/视频/Brief 相关切片 */
 export async function fetchOpsRegistryForTenant(tenantId: string | null): Promise<RegistryFile> {
+  if (!tenantId) {
+    const raw = await fetchOpsRegistry()
+    return filterRegistryForTenant(raw, null)
+  }
   const raw = await fetchOpsRegistry()
   return filterRegistryForTenant(raw, tenantId)
 }
@@ -88,27 +121,28 @@ export async function appendRecruitmentOrderToOps(order: RegistryRecruitmentOrde
 }
 
 export async function setTalentPoolCandidatesOnOps(candidates: RegistryTalentPoolRow[]): Promise<void> {
-  const res = await fetch(url('/api/ops-sync/talent-pool/set'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ candidates }),
-  })
+  const headers = await registryAuthHeaders()
+  const body = JSON.stringify({ candidates })
+  const r1 = await fetch(url('/api/meoo-ops-talent-pool-set'), { method: 'POST', headers, body })
+  if (r1.ok) return
+  const res = await fetch(url('/api/ops-sync/talent-pool/set'), { method: 'POST', headers, body })
   if (!res.ok) throw new Error(`talent pool set ${res.status}`)
 }
 
 export async function setRecruitmentScheduleRowsOnOps(rows: RegistryScheduleRow[]): Promise<void> {
-  const res = await fetch(url('/api/ops-sync/recruitment-schedule/set'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rows }),
-  })
+  const headers = await registryAuthHeaders()
+  const body = JSON.stringify({ rows })
+  const r1 = await fetch(url('/api/meoo-ops-recruitment-schedule-set'), { method: 'POST', headers, body })
+  if (r1.ok) return
+  const res = await fetch(url('/api/ops-sync/recruitment-schedule/set'), { method: 'POST', headers, body })
   if (!res.ok) throw new Error(`schedule set ${res.status}`)
 }
 
 export async function setRecruitmentVideoSubmissionsOnOps(videos: RegistryVideoSubmission[]): Promise<void> {
+  const headers = await registryAuthHeaders()
   const res = await fetch(url('/api/ops-sync/recruitment-videos/set'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ videos }),
   })
   if (!res.ok) throw new Error(`videos set ${res.status}`)

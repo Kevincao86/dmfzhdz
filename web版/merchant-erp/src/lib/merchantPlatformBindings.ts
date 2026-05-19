@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { readMerchantSession, writeMerchantSession } from './merchantSession'
+import { tenantLocalKey } from './tenantLocalState'
 
 export type MerchantBindingProvider = 'douyin' | 'local_promotion' | 'xhs_commercial'
 
@@ -54,14 +55,35 @@ function parseRow(raw: Record<string, unknown>): MerchantPlatformBindingRow | nu
   }
 }
 
+function activeBindingStorageKey(provider: MerchantBindingProvider): string {
+  return tenantLocalKey(ACTIVE_ID_KEY[provider])
+}
+
 export function readActiveBindingId(provider: MerchantBindingProvider): string | null {
-  return readMerchantSession(ACTIVE_ID_KEY[provider])
+  const key = activeBindingStorageKey(provider)
+  try {
+    const v = window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key)
+    return typeof v === 'string' && v.trim() ? v.trim() : null
+  } catch {
+    return readMerchantSession(ACTIVE_ID_KEY[provider])
+  }
 }
 
 export function writeActiveBindingId(
   provider: MerchantBindingProvider,
   bindingId: string | null,
 ): void {
+  const key = activeBindingStorageKey(provider)
+  try {
+    if (bindingId == null) {
+      window.sessionStorage.removeItem(key)
+      window.localStorage.removeItem(key)
+    } else {
+      window.sessionStorage.setItem(key, bindingId)
+    }
+  } catch {
+    /* ignore */
+  }
   writeMerchantSession(ACTIVE_ID_KEY[provider], bindingId)
 }
 

@@ -1,11 +1,21 @@
 /**
- * 子账号与岗位（RBAC）：仅存浏览器 localStorage（演示）。
+ * 子账号与岗位（RBAC）：按 Supabase 租户隔离 localStorage。
  * 子账号仅支持账号 + 密码；密码仅存 SHA-256 摘要。
  * 权限挂在「岗位」上，子账号通过 jobRoleId 绑定岗位。
  */
 
+import { tenantLocalKey } from './tenantLocalState'
+
 export const SUB_ACCOUNTS_STORAGE_KEY = 'meoo_sub_accounts_v1'
 export const JOB_ROLES_STORAGE_KEY = 'meoo_job_roles_v1'
+
+function subAccountsKey(): string {
+  return tenantLocalKey(SUB_ACCOUNTS_STORAGE_KEY)
+}
+
+function jobRolesKey(): string {
+  return tenantLocalKey(JOB_ROLES_STORAGE_KEY)
+}
 
 export const PERMISSION_MODULES = [
   { key: 'store', label: '门店管理' },
@@ -129,10 +139,10 @@ function parseJobRole(raw: unknown): JobRoleRecord | null {
 
 export function readJobRoles(): JobRoleRecord[] {
   try {
-    const raw = window.localStorage.getItem(JOB_ROLES_STORAGE_KEY)
+    const raw = window.localStorage.getItem(jobRolesKey())
     if (!raw) {
       const seeded = seedBuiltInJobRoles()
-      window.localStorage.setItem(JOB_ROLES_STORAGE_KEY, JSON.stringify(seeded))
+      window.localStorage.setItem(jobRolesKey(), JSON.stringify(seeded))
       return seeded
     }
     const j = JSON.parse(raw) as unknown
@@ -154,13 +164,13 @@ export function readJobRoles(): JobRoleRecord[] {
     return out
   } catch {
     const seeded = seedBuiltInJobRoles()
-    window.localStorage.setItem(JOB_ROLES_STORAGE_KEY, JSON.stringify(seeded))
+    window.localStorage.setItem(jobRolesKey(), JSON.stringify(seeded))
     return seeded
   }
 }
 
 export function writeJobRoles(list: JobRoleRecord[]): void {
-  window.localStorage.setItem(JOB_ROLES_STORAGE_KEY, JSON.stringify(list))
+  window.localStorage.setItem(jobRolesKey(), JSON.stringify(list))
   window.dispatchEvent(new CustomEvent('meoo-job-roles-changed'))
   window.dispatchEvent(new CustomEvent('meoo-subaccounts-changed'))
 }
@@ -226,7 +236,7 @@ function parseAccount(raw: unknown): SubAccountRecord | null {
 export function readSubAccounts(): SubAccountRecord[] {
   readJobRoles()
   try {
-    const raw = window.localStorage.getItem(SUB_ACCOUNTS_STORAGE_KEY)
+    const raw = window.localStorage.getItem(subAccountsKey())
     if (!raw) return []
     const j = JSON.parse(raw) as unknown
     if (!Array.isArray(j)) return []
@@ -251,7 +261,7 @@ export function readSubAccounts(): SubAccountRecord[] {
 }
 
 export function writeSubAccounts(list: SubAccountRecord[]): void {
-  window.localStorage.setItem(SUB_ACCOUNTS_STORAGE_KEY, JSON.stringify(list))
+  window.localStorage.setItem(subAccountsKey(), JSON.stringify(list))
   window.dispatchEvent(new CustomEvent('meoo-subaccounts-changed'))
 }
 

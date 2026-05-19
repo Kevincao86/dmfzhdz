@@ -32,11 +32,19 @@ export function filterRegistryForTenant(file: RegistryFile, tenantId: string | n
     return src && orderIds.has(src)
   })
 
+  const mpRecruitmentOrders = (file.mpRecruitmentOrders ?? []).filter((o) => {
+    const sid = String(o.sourceMerchantOrderId || '').trim()
+    return sid && orderIds.has(sid)
+  })
+
   return {
     ...base,
     recruitmentOrders: orders,
     recruitmentScheduleRows: [],
     recruitmentVideoSubmissions: [],
     talentPoolCandidates,
+    mpRecruitmentOrders,
+    talentLibraryEntries: [],
+    mpTalentMembers: [],
   }
 }
