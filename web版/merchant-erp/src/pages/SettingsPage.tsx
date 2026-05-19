@@ -275,7 +275,7 @@ export default function SettingsPage() {
               <div>
                 <h3 className="text-lg font-medium text-gray-900">商业化后台</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  对接投流与线索平台：巨量本地推（抖音）、聚光/种小草（小红书，同一授权）。与「商家版后台」店铺经营账号相互独立。
+                  绑定投流与线索所用账号：巨量本地推、小红书聚光 · 种小草。与「商家版后台」店铺经营授权相互独立，可使用不同登录主体。
                 </p>
               </div>
               <LocalPromotionSection />

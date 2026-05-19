@@ -1,11 +1,13 @@
-import { Eye, EyeOff, User } from 'lucide-react'
+import { BookOpen, Eye, EyeOff, User } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import {
   postMeituanBind,
   postMerchantPlatformSync,
 } from '../../services/merchantPlatformApi'
-import { MeituanApiSection } from './apiDocsContent'
 import { PlatformBrandLogo } from '../../lib/platformBranding'
+import BindGuideModal from './bindGuide/BindGuideModal'
+import PlatformBindGuide from './bindGuide/PlatformBindGuide'
+import { MEITUAN_BIND_GUIDE } from './bindGuide/meituanBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
 const TOKEN_KEY = 'meoo_meituan_merchant_token'
@@ -35,6 +37,7 @@ export default function MeituanMerchantSection() {
   )
   const [autoRefresh, setAutoRefresh] = useState(() => readSession(AUTO_KEY) !== '0')
   const [bindOpen, setBindOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [appId, setAppId] = useState(() => readSession(META_APP_ID) ?? '')
   const [appSecret, setAppSecret] = useState('')
   const [extraId, setExtraId] = useState('')
@@ -108,30 +111,40 @@ export default function MeituanMerchantSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">大众点评商家版</h3>
             <p className="text-sm text-gray-500">
-              绑定美团开放平台后，可手动或每 2 小时自动触发后端同步（团购核销、门店授权等）
+              绑定大众点评商家授权后，可同步门店、团购商品、评价与财务等经营数据；支持手动或定时刷新。
             </p>
           </div>
         </div>
-        {!accessToken ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setBindError(null)
-              setBindOpen(true)
-            }}
-            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            onClick={() => setGuideOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            绑定大众点评
+            <BookOpen className="h-4 w-4" />
+            绑定说明书
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setBindOpen(true)}
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            重新绑定
-          </button>
-        )}
+          {!accessToken ? (
+            <button
+              type="button"
+              onClick={() => {
+                setBindError(null)
+                setBindOpen(true)
+              }}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              绑定大众点评
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setBindOpen(true)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              重新绑定
+            </button>
+          )}
+        </div>
       </div>
 
       {accessToken ? (
@@ -143,9 +156,9 @@ export default function MeituanMerchantSection() {
                   <User className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900">美团开放平台已绑定</h4>
+                  <h4 className="font-medium text-gray-900">大众点评已绑定</h4>
                   <p className="text-sm text-gray-500">
-                    AppID：{readSession(META_APP_ID) ?? '—'}
+                    应用编号：{readSession(META_APP_ID) ?? '—'}
                   </p>
                   <div className="mt-2">
                     <button
@@ -174,19 +187,40 @@ export default function MeituanMerchantSection() {
             />
           </div>
 
-          <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-5">
-            <h4 className="mb-1 text-sm font-semibold text-gray-900">API 接口设置通道</h4>
-            <p className="mb-4 text-xs text-gray-600">
-              美团团购券核销 API（POST getScopeUrl）需传入 platform、shopId 等参数，详见业务方案文档。
-            </p>
-            <MeituanApiSection />
-          </div>
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-8 text-center text-sm text-gray-600">
-          尚未绑定。请点击右上角「绑定大众点评」，绑定成功后可使用手动刷新与每 2 小时自动刷新。
+          尚未绑定。请先阅读
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className="mx-1 text-blue-600 underline hover:text-blue-800"
+          >
+            绑定说明书
+          </button>
+          ，再点击「绑定大众点评」完成授权。
         </div>
       )}
+
+      <BindGuideModal
+        open={guideOpen}
+        title="大众点评商家版绑定说明书"
+        onClose={() => setGuideOpen(false)}
+        primaryAction={
+          !accessToken
+            ? {
+                label: '去绑定',
+                onClick: () => {
+                  setGuideOpen(false)
+                  setBindError(null)
+                  setBindOpen(true)
+                },
+              }
+            : undefined
+        }
+      >
+        <PlatformBindGuide config={MEITUAN_BIND_GUIDE} compact />
+      </BindGuideModal>
 
       {bindOpen && (
         <div
@@ -214,7 +248,7 @@ export default function MeituanMerchantSection() {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  AppID
+                  应用编号
                 </label>
                 <input
                   type="text"
@@ -226,7 +260,7 @@ export default function MeituanMerchantSection() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  App Secret
+                  应用密钥
                 </label>
                 <div className="relative">
                   <input
@@ -258,7 +292,7 @@ export default function MeituanMerchantSection() {
                   type="text"
                   value={extraId}
                   onChange={(e) => setExtraId(e.target.value)}
-                  placeholder="如 shopId，由后端按业务使用"
+                  placeholder="多门店时可填门店编号，单店可留空"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

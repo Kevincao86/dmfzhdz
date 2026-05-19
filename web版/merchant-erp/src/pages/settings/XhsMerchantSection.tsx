@@ -1,11 +1,13 @@
-import { Eye, EyeOff, User } from 'lucide-react'
+import { BookOpen, Eye, EyeOff, User } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import {
   postMerchantPlatformSync,
   postXhsBind,
 } from '../../services/merchantPlatformApi'
-import { XhsApiSection } from './apiDocsContent'
 import { PlatformBrandLogo } from '../../lib/platformBranding'
+import BindGuideModal from './bindGuide/BindGuideModal'
+import PlatformBindGuide from './bindGuide/PlatformBindGuide'
+import { XHS_MERCHANT_BIND_GUIDE } from './bindGuide/xhsMerchantBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
 const TOKEN_KEY = 'meoo_xhs_merchant_token'
@@ -35,6 +37,7 @@ export default function XhsMerchantSection() {
   )
   const [autoRefresh, setAutoRefresh] = useState(() => readSession(AUTO_KEY) !== '0')
   const [bindOpen, setBindOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [appId, setAppId] = useState(() => readSession(META_APP_ID) ?? '')
   const [appSecret, setAppSecret] = useState('')
   const [extraId, setExtraId] = useState('')
@@ -71,7 +74,7 @@ export default function XhsMerchantSection() {
   const handleBind = async () => {
     setBindError(null)
     if (!appId.trim() || !appSecret.trim()) {
-      setBindError('请填写 AppID 与 App Secret')
+      setBindError('请填写 应用编号 与 应用密钥')
       return
     }
     setBindSubmitting(true)
@@ -108,30 +111,40 @@ export default function XhsMerchantSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">小红书商家版</h3>
             <p className="text-sm text-gray-500">
-              绑定开放平台应用后，可手动或每 2 小时自动触发后端同步（商品、消息回调等）
+              绑定小红书商家授权后，可同步门店、商品、评价与财务等经营数据；支持手动或定时刷新。
             </p>
           </div>
         </div>
-        {!accessToken ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setBindError(null)
-              setBindOpen(true)
-            }}
-            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            onClick={() => setGuideOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            绑定小红书
+            <BookOpen className="h-4 w-4" />
+            绑定说明书
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setBindOpen(true)}
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            重新绑定
-          </button>
-        )}
+          {!accessToken ? (
+            <button
+              type="button"
+              onClick={() => {
+                setBindError(null)
+                setBindOpen(true)
+              }}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              绑定小红书
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setBindOpen(true)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              重新绑定
+            </button>
+          )}
+        </div>
       </div>
 
       {accessToken ? (
@@ -143,9 +156,9 @@ export default function XhsMerchantSection() {
                   <User className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900">小红书开放平台已绑定</h4>
+                  <h4 className="font-medium text-gray-900">小红书商家版已绑定</h4>
                   <p className="text-sm text-gray-500">
-                    AppID：{readSession(META_APP_ID) ?? '—'}
+                    应用编号：{readSession(META_APP_ID) ?? '—'}
                   </p>
                   <div className="mt-2">
                     <button
@@ -174,19 +187,40 @@ export default function XhsMerchantSection() {
             />
           </div>
 
-          <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-5">
-            <h4 className="mb-1 text-sm font-semibold text-gray-900">API 接口设置通道</h4>
-            <p className="mb-4 text-xs text-gray-600">
-              需在 open.xiaohongshu.com 创建应用并申请「商品管理」等权限后调用。
-            </p>
-            <XhsApiSection />
-          </div>
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-8 text-center text-sm text-gray-600">
-          尚未绑定。请点击右上角「绑定小红书」，绑定成功后可使用手动刷新与每 2 小时自动刷新。
+          尚未绑定。请先阅读
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className="mx-1 text-blue-600 underline hover:text-blue-800"
+          >
+            绑定说明书
+          </button>
+          ，再点击「绑定小红书」完成授权。
         </div>
       )}
+
+      <BindGuideModal
+        open={guideOpen}
+        title="小红书商家版绑定说明书"
+        onClose={() => setGuideOpen(false)}
+        primaryAction={
+          !accessToken
+            ? {
+                label: '去绑定',
+                onClick: () => {
+                  setGuideOpen(false)
+                  setBindError(null)
+                  setBindOpen(true)
+                },
+              }
+            : undefined
+        }
+      >
+        <PlatformBindGuide config={XHS_MERCHANT_BIND_GUIDE} compact />
+      </BindGuideModal>
 
       {bindOpen && (
         <div
@@ -214,7 +248,7 @@ export default function XhsMerchantSection() {
             <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  AppID
+                  应用编号
                 </label>
                 <input
                   type="text"
@@ -226,7 +260,7 @@ export default function XhsMerchantSection() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  App Secret
+                  应用密钥
                 </label>
                 <div className="relative">
                   <input

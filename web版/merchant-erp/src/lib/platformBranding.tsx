@@ -1,13 +1,21 @@
 import { cn } from '../cn'
 
 /** 静态 Logo 资源（public/platforms） */
-export type PlatformLogoKey = 'douyin' | 'dianping' | 'xiaohongshu' | 'douyin_laike'
+export type PlatformLogoKey =
+  | 'douyin'
+  | 'dianping'
+  | 'xiaohongshu'
+  | 'douyin_laike'
+  | 'ocean_engine_local'
+  | 'xhs_juguang'
 
 export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   douyin: '/platforms/douyin.png',
   dianping: '/platforms/dianping.png',
   xiaohongshu: '/platforms/xiaohongshu.png',
   douyin_laike: '/platforms/douyin-laike.png',
+  ocean_engine_local: '/platforms/ocean-engine-local.png',
+  xhs_juguang: '/platforms/xhs-juguang.png',
 }
 
 /** 平台连接（用户侧社交账号） */
