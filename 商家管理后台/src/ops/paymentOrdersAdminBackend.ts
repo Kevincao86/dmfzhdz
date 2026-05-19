@@ -3,6 +3,10 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
+  buildSubscriptionPurchasePatch,
+  readEntitlementDays,
+} from '../../api/tenantEntitlementCore.js'
+import {
   rechargeCreditFromVerifiedCents,
   membershipPlanFromVerifiedCents,
   subscriptionDaysFromVerifiedCents,
@@ -161,7 +165,7 @@ export async function confirmOpsPaymentOrderAdmin(
     }
     const { data: tenant, error: te } = await admin
       .from('tenants')
-      .select('service_expire_at, official_days')
+      .select('service_expire_at, official_days, subscription_days, ops_gift_days')
       .eq('id', tenantId)
       .maybeSingle()
     if (te || !tenant) {
@@ -171,19 +175,20 @@ export async function confirmOpsPaymentOrderAdmin(
         body: { ok: false, error: 'tenant_load_failed', detail: te?.message },
       }
     }
-    const nowMs = Date.now()
-    let baseMs = nowMs
-    if (tenant.service_expire_at) {
-      const se = new Date(String(tenant.service_expire_at)).getTime()
-      if (Number.isFinite(se) && se > baseMs) baseMs = se
-    }
-    const newExpireMs = baseMs + days * 86400000
-    const newExpireIso = new Date(newExpireMs).toISOString()
-    const prevOfficial = typeof tenant.official_days === 'number' ? tenant.official_days : 0
+    const sub = readEntitlementDays(
+      tenant.subscription_days != null ? tenant.subscription_days : tenant.official_days,
+    )
+    const gift = readEntitlementDays(tenant.ops_gift_days)
+    const ent = buildSubscriptionPurchasePatch({
+      subscriptionDays: sub,
+      opsGiftDays: gift,
+      serviceExpireAt:
+        typeof tenant.service_expire_at === 'string' ? tenant.service_expire_at : null,
+      purchasedDays: days,
+    })
     const nextPlan = membershipPlanFromVerifiedCents(vc)
     const tenantPatch: Record<string, unknown> = {
-      service_expire_at: newExpireIso,
-      official_days: prevOfficial + days,
+      ...ent,
       updated_at: nowIso,
     }
     if (nextPlan) tenantPatch.membership_plan = nextPlan

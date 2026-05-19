@@ -42,7 +42,15 @@ export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
     industry: t.industry || '—',
     registeredAt: fmt(t.registeredAt),
     accountStatus: t.accountStatus,
-    planName: `${PLAN_ZH[t.membershipPlan ?? 'free'] ?? '免费版'}${t.officialDays > 0 ? ` · 正式 ${t.officialDays} 天` : ''}`,
+    planName: (() => {
+      const base = PLAN_ZH[t.membershipPlan ?? 'free'] ?? '免费版'
+      const sub = t.subscriptionDays ?? t.officialDays
+      const gift = t.opsGiftDays ?? 0
+      const total = (sub > 0 || gift > 0 ? sub + gift : t.officialDays) || 0
+      if (total <= 0) return base
+      if (gift > 0) return `${base} · 权益 ${total} 天（订${sub}+赠${gift}）`
+      return `${base} · 权益 ${total} 天`
+    })(),
     planExpireAt: planExpireLine(t),
     payStatus: t.accountStatus === 'normal' ? 'paid' : t.accountStatus === 'frozen' ? 'overdue' : 'unpaid',
     firstLoginAt: '—',

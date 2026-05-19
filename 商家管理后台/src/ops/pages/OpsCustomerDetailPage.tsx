@@ -204,10 +204,18 @@ export default function OpsCustomerDetailPage() {
           <h2 className="mb-3 text-sm font-semibold text-slate-200">套餐与账单</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-2">
-              <dt className="text-slate-500">正式权益天数</dt>
-              <dd className="text-right text-slate-200">
-                {tenant.trialDays} / {tenant.officialDays}
+              <dt className="text-slate-500">订阅权益（天）</dt>
+              <dd className="text-right text-slate-200 tabular-nums">
+                {tenant.subscriptionDays ?? tenant.officialDays}
               </dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-slate-500">运营赠送（天）</dt>
+              <dd className="text-right text-slate-200 tabular-nums">{tenant.opsGiftDays ?? 0}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-slate-500">总权益（天）</dt>
+              <dd className="text-right font-medium text-slate-100 tabular-nums">{tenant.officialDays}</dd>
             </div>
             <div className="flex justify-between gap-2">
               <dt className="text-slate-500">当前套餐摘要</dt>

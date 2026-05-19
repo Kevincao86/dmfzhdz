@@ -4,6 +4,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { probeTokenMixUsage } from '../../web版/merchant-erp/vite-plugins/tokenmixUsageProbe.js'
+import { buildOpsGiftDaysPatch, readEntitlementDays } from './tenantEntitlementCore.js'
 
 export type TenantMutationResult =
   | { ok: true }
@@ -29,11 +30,38 @@ export async function opsTenantPatchAdmin(
   if (typeof body.trialDays === 'number' && Number.isFinite(body.trialDays)) {
     patch.trial_days = Math.max(0, Math.min(3650, Math.floor(body.trialDays)))
   }
-  if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
-    patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
-  }
   if (body.membershipPlan === 'free' || body.membershipPlan === 'member' || body.membershipPlan === 'member_plus') {
     patch.membership_plan = body.membershipPlan
+  }
+
+  const giftProvided = typeof body.opsGiftDays === 'number' && Number.isFinite(body.opsGiftDays)
+  if (giftProvided) {
+    const { data: tenant, error: loadErr } = await admin
+      .from('tenants')
+      .select('service_expire_at, subscription_days, ops_gift_days, official_days')
+      .eq('id', id)
+      .maybeSingle()
+    if (loadErr || !tenant) {
+      return {
+        ok: false,
+        status: 502,
+        body: { ok: false, error: 'tenant_load_failed', detail: loadErr?.message ?? 'not_found' },
+      }
+    }
+    const sub = readEntitlementDays(
+      tenant.subscription_days != null ? tenant.subscription_days : tenant.official_days,
+    )
+    const oldGift = readEntitlementDays(tenant.ops_gift_days)
+    const ent = buildOpsGiftDaysPatch({
+      subscriptionDays: sub,
+      oldOpsGiftDays: oldGift,
+      newOpsGiftDays: body.opsGiftDays as number,
+      serviceExpireAt:
+        typeof tenant.service_expire_at === 'string' ? tenant.service_expire_at : null,
+    })
+    Object.assign(patch, ent)
+  } else if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
+    patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
   }
 
   const { error } = await admin.from('tenants').update(patch).eq('id', id)

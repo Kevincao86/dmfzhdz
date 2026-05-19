@@ -66,7 +66,7 @@ async function listTenantsWithServiceRoleFetch(
   const headers = serviceRoleHeaders(serviceKey)
 
   const fullTenantSelect =
-    'id,name,account_status,trial_days,official_days,wallet_balance_cents,service_expire_at,membership_plan,tokenmix_api_key,direct_ai_calls_used,direct_ai_usage_month,created_at,updated_at'
+    'id,name,account_status,trial_days,official_days,subscription_days,ops_gift_days,wallet_balance_cents,service_expire_at,membership_plan,tokenmix_api_key,direct_ai_calls_used,direct_ai_usage_month,created_at,updated_at'
   const fullUrl = `${base}/rest/v1/tenants?select=${encodeURIComponent(fullTenantSelect)}&order=created_at.desc`
 
   const tr = await fetch(fullUrl, { headers })
@@ -81,7 +81,7 @@ async function listTenantsWithServiceRoleFetch(
       return { ok: false, message: 'tenants_select_failed', detail: ttext.slice(0, 400) }
     }
   } else if (
-    /wallet_balance_cents|service_expire_at|membership_plan|tokenmix_api_key|does not exist|Could not find|schema cache/i.test(ttext)
+    /wallet_balance_cents|service_expire_at|membership_plan|tokenmix_api_key|subscription_days|ops_gift_days|does not exist|Could not find|schema cache/i.test(ttext)
   ) {
     const legacyUrl = `${base}/rest/v1/tenants?select=id,name,account_status,trial_days,official_days,created_at,updated_at&order=created_at.desc`
     const legacy = await fetch(legacyUrl, { headers })
@@ -171,6 +171,9 @@ async function listTenantsWithServiceRoleFetch(
       account_status: t.account_status,
       trial_days: t.trial_days,
       official_days: t.official_days,
+      subscription_days:
+        typeof t.subscription_days === 'number' ? t.subscription_days : t.official_days,
+      ops_gift_days: typeof t.ops_gift_days === 'number' ? t.ops_gift_days : 0,
       wallet_balance_cents: typeof t.wallet_balance_cents === 'number' ? t.wallet_balance_cents : 0,
       service_expire_at: t.service_expire_at ?? null,
       membership_plan: t.membership_plan ?? 'member',
