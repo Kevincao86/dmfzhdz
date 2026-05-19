@@ -18,7 +18,7 @@ type AuthMode = 'login' | 'register'
 type LoginMethod = 'password' | 'sms'
 
 const inputClass =
-  'w-full rounded-xl border-0 bg-[#f4f6f9] px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-cyan-500/25 sm:text-sm'
+  'w-full rounded-xl border border-white/60 bg-white/55 px-4 py-3 text-base text-slate-900 outline-none backdrop-blur-sm placeholder:text-slate-400 focus:border-cyan-300/80 focus:bg-white/80 focus:ring-2 focus:ring-cyan-500/20 sm:text-sm'
 
 const labelClass = 'mb-1.5 block text-sm font-medium text-slate-700'
 
@@ -275,15 +275,15 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     'w-full rounded-xl bg-gradient-to-r from-[#0ea5e9] to-[#14b8a6] py-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_-6px_rgba(14,165,233,0.45)] transition hover:shadow-[0_12px_28px_-6px_rgba(14,165,233,0.5)] disabled:opacity-60'
 
   const smsBtn =
-    'shrink-0 rounded-xl bg-white px-3 py-3 text-xs font-semibold text-cyan-700 ring-1 ring-cyan-200 hover:bg-cyan-50 disabled:opacity-50 sm:px-4 sm:text-sm'
+    'shrink-0 rounded-xl border border-white/70 bg-white/60 px-3 py-3 text-xs font-semibold text-cyan-700 backdrop-blur-sm hover:bg-white/80 disabled:opacity-50 sm:px-4 sm:text-sm'
 
   return (
     <div className="w-full shrink-0 max-h-[min(720px,calc(100dvh-6rem))] overflow-y-auto lg:max-h-none">
       <div className="mb-8 hidden lg:block">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
-        <p className="mt-2 text-sm text-slate-500">使用商家账号进入墨典 AI 智能 ERP 工作台</p>
+        <p className="mt-2 text-sm text-slate-600">使用商家账号进入墨典AI智能ERP工作台</p>
       </div>
-      <div className="mb-6 border-b border-slate-200">
+      <div className="mb-6 border-b border-white/50">
         <div className="flex gap-8">
           <button
             type="button"
@@ -322,8 +322,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       </div>
 
       <div>
-        <div className="mb-5 flex items-center gap-3 rounded-2xl bg-[#f4f6f9] px-4 py-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-white/50 bg-white/40 px-4 py-3 backdrop-blur-sm">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/60 bg-white/70 shadow-sm">
             <ShieldCheck className="h-5 w-5 text-cyan-600" />
           </div>
           <div className="min-w-0 text-left">
@@ -342,7 +342,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
 
         {mode === 'login' ? (
           <>
-            <div className="mb-5 flex gap-6 border-b border-slate-100 pb-1">
+            <div className="mb-5 flex gap-6 border-b border-white/40 pb-1">
               <button
                 type="button"
                 onClick={() => {
