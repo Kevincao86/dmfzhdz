@@ -1,7 +1,15 @@
 import { ExternalLink, Megaphone } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
+import { useMembership } from '../../context/MembershipContext'
 import { cn } from '../../cn'
+import {
+  canAddPlatformBinding,
+  platformBindingLimitDescription,
+  platformBindingLimitExceededMessage,
+} from '../../lib/membershipPlan'
+import { toUserFacingError } from '../../lib/userFacingError'
 import {
   applyActiveLocalPromotionBinding,
   localPromotionRowToBindState,
@@ -21,9 +29,10 @@ import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { testLocalPromotionBind } from '../../services/localPromotionApi'
 
 const DOC_URL = 'https://open.oceanengine.com/labels/34'
-const MAX_ACCOUNTS = 5
 
 export default function LocalPromotionSection() {
+  const { plan, entitlements } = useMembership()
+  const bindingLimit = entitlements.platformBindingLimit
   const active = readLocalPromotionBinding()
   const [cloudBindings, setCloudBindings] = useState<MerchantPlatformBindingRow[]>([])
   const [formOpen, setFormOpen] = useState(false)
@@ -70,6 +79,10 @@ export default function LocalPromotionSection() {
 
   const openAddForm = () => {
     setMsg(null)
+    if (!canAddPlatformBinding(plan, cloudBindings.length)) {
+      setMsg({ tone: 'err', text: platformBindingLimitExceededMessage(plan) })
+      return
+    }
     resetForm()
     setFormOpen(true)
   }
@@ -80,12 +93,10 @@ export default function LocalPromotionSection() {
       setMsg({ tone: 'err', text: '请填写 Access Token 与本地推广告主 ID' })
       return
     }
-    if (supabaseConfigured && cloudBindings.length >= MAX_ACCOUNTS) {
-      const exists = cloudBindings.some((b) => b.merchantAccountId === localAccountId.trim())
-      if (!exists) {
-        setMsg({ tone: 'err', text: `最多绑定 ${MAX_ACCOUNTS} 个本地推账号` })
-        return
-      }
+    const exists = cloudBindings.some((b) => b.merchantAccountId === localAccountId.trim())
+    if (!exists && !canAddPlatformBinding(plan, cloudBindings.length)) {
+      setMsg({ tone: 'err', text: platformBindingLimitExceededMessage(plan) })
+      return
     }
     setBusy(true)
     try {
@@ -95,7 +106,7 @@ export default function LocalPromotionSection() {
         localAccountId: localAccountId.trim(),
       })
       if (!r.ok) {
-        setMsg({ tone: 'err', text: r.message })
+        setMsg({ tone: 'err', text: toUserFacingError(r.message, '授权校验') })
         return
       }
 
@@ -196,7 +207,16 @@ export default function LocalPromotionSection() {
               </a>
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              与抖音来客账号相互独立，可使用不同登录主体；最多绑定 {MAX_ACCOUNTS} 个广告主，「当前使用」决定投流与线索数据范围。
+              与抖音来客账号相互独立，可使用不同登录主体；{platformBindingLimitDescription(plan)}，「当前使用」决定投流与线索数据范围。
+              {plan !== 'member_plus' ? (
+                <>
+                  {' '}
+                  <Link to="/settings?tab=subscription" className="text-cyan-600 hover:underline">
+                    升级套餐
+                  </Link>
+                  可绑定更多账号。
+                </>
+              ) : null}
             </p>
           </div>
         </div>
@@ -218,7 +238,8 @@ export default function LocalPromotionSection() {
         <div className="mb-5">
           <MerchantPlatformAccountsPanel
             accounts={accountItems}
-            maxAccounts={MAX_ACCOUNTS}
+            maxAccounts={bindingLimit}
+            planHint={platformBindingLimitDescription(plan)}
             emptyHint="尚未绑定本地推账号"
             onSelectActive={selectBinding}
             onRemove={(id) => void removeBinding(id)}

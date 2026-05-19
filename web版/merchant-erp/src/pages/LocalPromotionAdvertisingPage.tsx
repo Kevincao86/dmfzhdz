@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../cn'
 import { isLocalPromotionBound } from '../lib/localPromotionBinding'
+import { toUserFacingError } from '../lib/userFacingError'
 import type { LocalPromotionRow, LocalProjectRow, LocalReportSummary } from '../lib/localPromotionTypes'
 import ModulePage from './ModulePage'
 import {
@@ -52,14 +53,20 @@ export default function LocalPromotionAdvertisingPage() {
         fetchLocalProjects(),
         fetchLocalReportSummary(),
       ])
-      if (pr.ok) setPromotions(pr.list)
-      if (pj.ok) setProjects(pj.list)
-      if (rep.ok) setSummary(rep.summary)
+      const failures: string[] = []
+      if (pr.ok) {
+        setPromotions(pr.list)
+      } else failures.push(pr.message)
+      if (pj.ok) {
+        setProjects(pj.list)
+      } else failures.push(pj.message)
+      if (rep.ok) {
+        setSummary(rep.summary)
+      } else failures.push(rep.message)
       setDemoMode(Boolean((pr.ok && pr.demoMode) || (pj.ok && pj.demoMode) || (rep.ok && rep.demoMode)))
-      const msg = [pr, pj, rep].map((x) => ('message' in x ? x.message : undefined)).find(Boolean)
-      if (msg) setError(msg)
+      setError(failures.length ? failures[0]! : null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(toUserFacingError(e, '同步投流数据'))
     } finally {
       setLoading(false)
     }
@@ -101,7 +108,7 @@ export default function LocalPromotionAdvertisingPage() {
   return (
     <ModulePage
       title="投流"
-      subtitle="巨量本地推 · 项目 / 广告计划 / 投放数据（Open API）"
+      subtitle="查看本地推项目、广告计划与近 7 日投放数据"
       actions={
         <div className="flex flex-wrap gap-2">
           <button
