@@ -10,6 +10,10 @@ const core = {
 
 let out = { ...core }
 try {
+  const rel = require('./config.release.js')
+  if (rel && typeof rel === 'object') Object.assign(out, rel)
+} catch (_) {}
+try {
   const loc = require('./config.local.js')
   if (loc && typeof loc === 'object') Object.assign(out, loc)
 } catch (_) {}
