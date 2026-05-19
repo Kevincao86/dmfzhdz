@@ -9,7 +9,6 @@ import {
   decodeMeituanSessionToken,
   encodeMeituanSessionToken,
   meituanConfiguredForLiveApi,
-  meituanOpenApiBaseUrl,
   meituanPathFromEnv,
   meituanSignedRequest,
   pickArrayFromMeituanPayload,

@@ -9,7 +9,6 @@ import {
   decodeXhsSessionToken,
   encodeXhsSessionToken,
   xhsConfiguredForLiveApi,
-  xhsOpenApiBaseUrl,
   xhsPathFromEnv,
   xhsSignedRequest,
   pickArrayFromXhsPayload,

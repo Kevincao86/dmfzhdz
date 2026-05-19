@@ -340,8 +340,18 @@ export async function handleXhsCommercialRoutes(
     const summary = j.summary as Record<string, unknown> | undefined
     const promotions = Array.isArray(j.promotions) ? j.promotions : []
     const prompt = `你是小红书聚光投流顾问。近7日数据：${JSON.stringify(summary)}；计划：${JSON.stringify(promotions).slice(0, 2000)}。请用中文给出3条可执行优化建议。`
-    const insight = await generateReviewReplyByDoubao(aiEnv, prompt)
-    json(res, 200, { ok: true, insight: insight || '暂无 AI 建议' })
+    const aiRes = await generateReviewReplyByDoubao(aiEnv, {
+      platformLabel: '小红书聚光',
+      userName: '商家',
+      reviewText: prompt,
+      ratingStars: 3,
+      sentiment: 'neutral',
+    })
+    if (aiRes.ok === false) {
+      json(res, 502, { ok: false, message: aiRes.message })
+      return true
+    }
+    json(res, 200, { ok: true, insight: aiRes.text || '暂无 AI 建议' })
     return true
   }
 
@@ -382,9 +392,23 @@ export async function handleXhsCommercialRoutes(
   if (method === 'POST' && pathname === '/api/merchant/xhs-zhongxiaocao/clues/ai-suggest') {
     const j = parseBody(bodyRaw)
     const clue = j.clue as Record<string, unknown> | undefined
-    const prompt = `你是种小草线索跟进顾问。线索：${JSON.stringify(clue)}。请生成一段简短、礼貌的跟进话术。`
-    const suggestion = await generateReviewReplyByDoubao(aiEnv, prompt)
-    json(res, 200, { ok: true, suggestion: suggestion || '您好，感谢关注，方便留个方便联系的时间吗？' })
+    const name = String(clue?.name ?? '顾客')
+    const phone = String(clue?.phone ?? '')
+    const aiRes = await generateReviewReplyByDoubao(aiEnv, {
+      platformLabel: '种小草线索',
+      userName: name,
+      reviewText: `线索：${JSON.stringify(clue)}。电话：${phone}。请生成一段简短、礼貌的跟进话术，80字以内。`,
+      ratingStars: 5,
+      sentiment: 'good',
+    })
+    if (aiRes.ok === false) {
+      json(res, 502, { ok: false, message: aiRes.message })
+      return true
+    }
+    json(res, 200, {
+      ok: true,
+      suggestion: aiRes.text || '您好，感谢关注，方便留个方便联系的时间吗？',
+    })
     return true
   }
 
