@@ -136,9 +136,7 @@ async function syncOneReviewPlatform(
       message: `小红书：已同步 ${r.items.length} 条评价（近 90 天）。`,
     }
   }
-  reviewsState[p] = []
-  reviewsSyncedAt[p] = new Date().toISOString()
-  return { ok: true, message: '评价同步完成。' }
+  return { ok: false, message: '未知平台' }
 }
 
 
@@ -850,14 +848,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           })
           return true
         }
-        const row = reviewsState[platform].find((r) => r.id === reviewId)
-        if (!row) {
-          json(res, 404, { message: '未找到该评价，请先完成平台评价同步。' })
-          return true
-        }
-        row.replied = true
-        row.replyText = content
-        json(res, 200, { ok: true, item: row })
+        json(res, 400, { message: 'platform 须为 douyin | meituan | xhs' })
         return true
       }
 
