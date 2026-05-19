@@ -296,7 +296,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             ? loginMethod === 'password'
               ? '使用登录名与密码进入商家工作台。'
               : '使用注册手机号与短信验证码登录。'
-            : '填写商家信息并完成手机验证，注册后可立即登录（含 14 天试用）。'}
+            : '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。'}
         </p>
       </div>
 

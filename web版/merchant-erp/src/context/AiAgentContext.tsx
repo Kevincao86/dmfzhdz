@@ -291,7 +291,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [pendingQuote, setPendingQuote] = useState<AiAgentPendingQuote | null>(null)
   const pendingQuoteRef = useRef<AiAgentPendingQuote | null>(null)
   const [modelPickerKey, setModelPickerKeyState] = useState(() =>
-    defaultAiModelPickerKeyForPlan('member'),
+    defaultAiModelPickerKeyForPlan('free'),
   )
   const [aiSending, setAiSending] = useState(false)
 

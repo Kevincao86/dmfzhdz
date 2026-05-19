@@ -170,7 +170,7 @@ export function authRegisterGatewayPlugin(): Plugin {
               password,
               merchantName,
               phone,
-              trialDays: 14,
+              trialDays: 0,
             })
             if (!result.ok) {
               const status =

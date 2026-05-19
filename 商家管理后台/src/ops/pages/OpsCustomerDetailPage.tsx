@@ -204,7 +204,7 @@ export default function OpsCustomerDetailPage() {
           <h2 className="mb-3 text-sm font-semibold text-slate-200">套餐与账单</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-2">
-              <dt className="text-slate-500">试用天数 / 正式权益天数</dt>
+              <dt className="text-slate-500">正式权益天数</dt>
               <dd className="text-right text-slate-200">
                 {tenant.trialDays} / {tenant.officialDays}
               </dd>

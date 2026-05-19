@@ -22,7 +22,7 @@ export async function syncErpTenantToOpsRegistry(input: {
     industry: '云服务',
     registeredAt: now,
     accountStatus: 'normal',
-    trialDays: Math.max(0, Number(input.trialDays) || 14),
+    trialDays: Math.max(0, Number(input.trialDays) || 0),
     officialDays: 0,
     updatedAt: now,
   }

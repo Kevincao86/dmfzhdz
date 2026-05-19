@@ -22,17 +22,17 @@ type MembershipContextValue = {
   reload: () => Promise<void>
 }
 
-const defaultEntitlements = buildTenantEntitlements({ plan: 'member' })
+const defaultEntitlements = buildTenantEntitlements({ plan: 'free' })
 
 const MembershipContext = createContext<MembershipContextValue>({
-  plan: 'member',
+  plan: 'free',
   entitlements: defaultEntitlements,
   loading: true,
   reload: async () => {},
 })
 
 export function MembershipProvider({ children }: { children: ReactNode }) {
-  const [plan, setPlan] = useState<MembershipPlan>('member')
+  const [plan, setPlan] = useState<MembershipPlan>('free')
   const [directUsed, setDirectUsed] = useState(0)
   const [tokenMixBound, setTokenMixBound] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -40,7 +40,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     const client = supabase
     if (!supabaseConfigured || !client) {
-      setPlan('member')
+      setPlan('free')
       setDirectUsed(0)
       setTokenMixBound(false)
       setLoading(false)
@@ -50,7 +50,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     try {
       const tid = await fetchPrimaryTenantId(client)
       if (!tid) {
-        setPlan('member')
+        setPlan('free')
         setDirectUsed(0)
         setTokenMixBound(false)
         return
@@ -61,7 +61,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
         .eq('id', tid)
         .maybeSingle()
       if (error || !data) {
-        setPlan('member')
+        setPlan('free')
         setDirectUsed(0)
         setTokenMixBound(false)
         return
@@ -70,7 +70,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       const p: MembershipPlan =
         rawPlan === 'free' || rawPlan === 'member' || rawPlan === 'member_plus'
           ? rawPlan
-          : 'member'
+          : 'free'
       setPlan(p)
       setDirectUsed(Math.max(0, Math.floor(Number(data.direct_ai_calls_used) || 0)))
       setTokenMixBound(false)

@@ -18,7 +18,6 @@ function fmt(iso: string): string {
 function planExpireLine(t: RegistryTenant): string {
   const parts: string[] = []
   if (t.serviceExpireAt) parts.push(`服务至 ${fmt(t.serviceExpireAt)}`)
-  if (t.trialEndsAt) parts.push(`试用至 ${fmt(t.trialEndsAt)}`)
   if (t.officialEndsAt) parts.push(`正式至 ${fmt(t.officialEndsAt)}`)
   return parts.join('；') || '—'
 }
@@ -43,7 +42,7 @@ export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
     industry: t.industry || '—',
     registeredAt: fmt(t.registeredAt),
     accountStatus: t.accountStatus,
-    planName: `${PLAN_ZH[t.membershipPlan ?? 'member'] ?? '会员版'} · 试用 ${t.trialDays} 天 / 正式 ${t.officialDays} 天`,
+    planName: `${PLAN_ZH[t.membershipPlan ?? 'free'] ?? '免费版'}${t.officialDays > 0 ? ` · 正式 ${t.officialDays} 天` : ''}`,
     planExpireAt: planExpireLine(t),
     payStatus: t.accountStatus === 'normal' ? 'paid' : t.accountStatus === 'frozen' ? 'overdue' : 'unpaid',
     firstLoginAt: '—',
