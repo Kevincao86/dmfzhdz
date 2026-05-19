@@ -1,4 +1,5 @@
-import { Download, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video } from 'lucide-react'
+import { Cloud, Download, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video } from 'lucide-react'
+import { ShortVideoOpenshotBatchPanel } from '../components/ShortVideoOpenshotBatchPanel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
@@ -17,7 +18,7 @@ import {
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
 
-type MainPane = 'optimize' | 'generate'
+type MainPane = 'optimize' | 'generate' | 'cloud_batch'
 type Engine = 'kling' | 'seedance'
 
 const KLING_MODEL_OPTIONS: { id: string; label: string }[] = [
@@ -885,6 +886,7 @@ export default function ShortVideoOptimizationPage() {
           [
             { id: 'optimize' as const, label: '短视频优化（参考画面）', icon: Video },
             { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
+            { id: 'cloud_batch' as const, label: 'AI 批量云剪', icon: Cloud },
           ] as const
         ).map((t) => {
           const Ico = t.icon
@@ -911,6 +913,7 @@ export default function ShortVideoOptimizationPage() {
         })}
       </div>
 
+      {mainPane !== 'cloud_batch' ? (
       <section className="mb-10 rounded-xl border border-zinc-200 bg-zinc-50/60 px-5 py-4">
         <div className="flex flex-wrap gap-6">
           <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
@@ -1139,6 +1142,11 @@ export default function ShortVideoOptimizationPage() {
           </div>
         )}
       </section>
+      ) : null}
+
+      {mainPane === 'cloud_batch' && (
+        <ShortVideoOpenshotBatchPanel lastResultUrl={resultUrl} />
+      )}
 
       {mainPane === 'optimize' && (
         <section className="space-y-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">

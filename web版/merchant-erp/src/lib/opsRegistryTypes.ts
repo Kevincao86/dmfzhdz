@@ -14,6 +14,10 @@ export type RegistryVideoAi = {
    * 或服务端 MERCHANT_AI_DOUBAO_KEY（按合并策略）。
    */
   arkVideoApiKey?: string
+  /** OpenShot Cloud API（批量云剪） */
+  openshotApiBase?: string
+  openshotUsername?: string
+  openshotPassword?: string
 }
 
 /** 运营台可扩展的 AI 供应商目录项（磁盘仅存非内置条目，GET 网关会合并内置目录后再返回）。 */
