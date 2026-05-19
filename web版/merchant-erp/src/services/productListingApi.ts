@@ -150,8 +150,15 @@ export async function fetchMerchantProductList(
   const paths =
     platform === 'douyin'
       ? ([`/api/meoo-douyin-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
-      : ([`/api/merchant/${seg}/goods/products${qs}`] as const)
-  const targets = platform === 'douyin' ? merchantApiFetchUrlCandidates(paths) : [url(paths[0]!)]
+      : platform === 'meituan'
+        ? ([`/api/meoo-meituan-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
+        : platform === 'xiaohongshu'
+          ? ([`/api/meoo-xhs-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
+          : ([`/api/merchant/${seg}/goods/products${qs}`] as const)
+  const targets =
+    platform === 'douyin' || platform === 'meituan' || platform === 'xiaohongshu'
+      ? merchantApiFetchUrlCandidates(paths)
+      : [url(paths[0]!)]
 
   let res: Response | null = null
   let bodyText = ''

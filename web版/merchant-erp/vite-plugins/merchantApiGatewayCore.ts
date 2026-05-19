@@ -25,6 +25,20 @@ import {
   parseDouyinReviewCompositeId,
   postDouyinAkteCommentReply,
 } from './douyinMerchantGateway.js'
+import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
+import {
+  fetchMeituanReviews,
+  handleMeituanBindPost,
+  handleMeituanConnectionCheckGet,
+  handleMeituanGoodsProductSavePost,
+  handleMeituanGoodsProductsListGet,
+  handleMeituanStoreDecorationGet,
+  handleMeituanStoreDetailGet,
+  handleMeituanStoresGet,
+  handleMeituanSyncPost,
+  parseMeituanReviewId,
+  postMeituanCommentReply,
+} from './meituanMerchantGateway.js'
 import { handleFinanceReconcileGet } from './financeReconcileGateway.js'
 import {
   generateGrossMarginSuggestionByAi,
@@ -35,6 +49,21 @@ import {
 import { handleMerchantAiVideoRoutes } from './merchantVideoAiGateway.js'
 import { handleMarketingActivitiesListGet } from './marketingActivitiesGateway.js'
 import { handleLocalPromotionRoutes } from './localPromotionGateway.js'
+import { handleXhsCommercialRoutes } from './xhsCommercialGateway.js'
+import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
+import {
+  fetchXhsReviews,
+  handleXhsBindPost,
+  handleXhsConnectionCheckGet,
+  handleXhsGoodsProductSavePost,
+  handleXhsGoodsProductsListGet,
+  handleXhsStoreDecorationGet,
+  handleXhsStoreDetailGet,
+  handleXhsStoresGet,
+  handleXhsSyncPost,
+  parseXhsReviewId,
+  postXhsCommentReply,
+} from './xhsMerchantGateway.js'
 
 type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs'
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
@@ -81,15 +110,35 @@ async function syncOneReviewPlatform(
       message: `抖音来客：已同步 ${r.items.length} 条评价（近 90 天，需开放平台「餐饮-评价」能力）。`,
     }
   }
+  if (p === 'meituan') {
+    if (!bearer?.trim()) {
+      return { ok: false, message: '请先绑定美团后再同步评价。' }
+    }
+    const r = await fetchMeituanReviews(bearer.trim())
+    if (r.ok === false) return { ok: false, message: r.message }
+    reviewsState.meituan = r.items as ReviewRow[]
+    reviewsSyncedAt.meituan = new Date().toISOString()
+    return {
+      ok: true,
+      message: `美团：已同步 ${r.items.length} 条评价（近 90 天，需开放平台评价管理能力）。`,
+    }
+  }
+  if (p === 'xhs') {
+    if (!bearer?.trim()) {
+      return { ok: false, message: '请先绑定小红书后再同步评价。' }
+    }
+    const r = await fetchXhsReviews(bearer.trim())
+    if (r.ok === false) return { ok: false, message: r.message }
+    reviewsState.xhs = r.items as ReviewRow[]
+    reviewsSyncedAt.xhs = new Date().toISOString()
+    return {
+      ok: true,
+      message: `小红书：已同步 ${r.items.length} 条评价（近 90 天）。`,
+    }
+  }
   reviewsState[p] = []
   reviewsSyncedAt[p] = new Date().toISOString()
-  return {
-    ok: true,
-    message:
-      p === 'meituan'
-        ? '美团：评价同步接口尚未接入，列表已为空。'
-        : '小红书：评价同步接口尚未接入，列表已为空。',
-  }
+  return { ok: true, message: '评价同步完成。' }
 }
 
 
@@ -116,6 +165,35 @@ function bearerToken(req: IncomingMessage): string | null {
   const m = /^Bearer\s+(.+)$/i.exec(h.trim())
   const t = m?.[1]?.trim()
   return t || null
+}
+
+function headerBearerToken(req: IncomingMessage, headerName: string): string | null {
+  const raw = req.headers[headerName]
+  const v = Array.isArray(raw) ? raw[0] : raw
+  if (!v || typeof v !== 'string') return null
+  const m = /^Bearer\s+(.+)$/i.exec(v.trim())
+  return m?.[1]?.trim() || null
+}
+
+function reviewPlatformBearer(req: IncomingMessage, platform: ReviewPlatformApi): string | null {
+  if (platform === 'douyin') {
+    return headerBearerToken(req, 'x-meoo-douyin-token') ?? bearerToken(req)
+  }
+  if (platform === 'meituan') {
+    const mt = headerBearerToken(req, 'x-meoo-meituan-token')
+    if (mt) return mt
+    const auth = bearerToken(req)
+    if (auth && decodeMeituanSessionToken(auth)) return auth
+    return null
+  }
+  if (platform === 'xhs') {
+    const xh = headerBearerToken(req, 'x-meoo-xhs-token')
+    if (xh) return xh
+    const auth = bearerToken(req)
+    if (auth && decodeXhsSessionToken(auth)) return auth
+    return null
+  }
+  return bearerToken(req)
 }
 
 export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContext): Promise<boolean> {
@@ -154,6 +232,24 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           env as MerchantAiEnv,
         )
         if (lpDone) return true
+      }
+
+      if (
+        pathname.startsWith('/api/merchant/xhs-commercial/') ||
+        pathname.startsWith('/api/merchant/xhs-juguang/') ||
+        pathname.startsWith('/api/merchant/xhs-zhongxiaocao/')
+      ) {
+        let bodyRawXhsAd = ''
+        if (method === 'POST') bodyRawXhsAd = await bodyReader()
+        const xhsAdDone = await handleXhsCommercialRoutes(
+          method,
+          pathname,
+          url,
+          res,
+          bodyRawXhsAd,
+          env as MerchantAiEnv,
+        )
+        if (xhsAdDone) return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/douyin/bind') {
@@ -266,88 +362,88 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       }
 
       if (method === 'GET' && pathname === '/api/merchant/meituan/goods/products') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
-          return true
-        }
-        json(res, 200, {
-          ok: true,
-          data: { items: [], total: 0, page: 1, page_size: 20 },
-        })
+        await handleMeituanGoodsProductsListGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/meituan/goods/product/save') {
+        const bodyRaw = await bodyReader()
+        await handleMeituanGoodsProductSavePost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/meituan/stores/detail') {
+        await handleMeituanStoreDetailGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/meituan/stores') {
+        await handleMeituanStoresGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/meituan/store-decoration') {
+        await handleMeituanStoreDecorationGet(req, res, url)
         return true
       }
 
       if (method === 'GET' && pathname === '/api/merchant/xhs/goods/products') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
-          return true
-        }
-        json(res, 200, {
-          ok: true,
-          data: { items: [], total: 0, page: 1, page_size: 20 },
-        })
+        await handleXhsGoodsProductsListGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/xhs/goods/product/save') {
+        const bodyRaw = await bodyReader()
+        await handleXhsGoodsProductSavePost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/xhs/stores/detail') {
+        await handleXhsStoreDetailGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/xhs/stores') {
+        await handleXhsStoresGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/xhs/store-decoration') {
+        await handleXhsStoreDecorationGet(req, res, url)
         return true
       }
 
       if (method === 'GET' && pathname === '/api/merchant/meituan/connection-check') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, {
-            ok: false,
-            message: '缺少 Authorization Bearer（请先在商家版后台完成美团绑定）',
-          })
-          return true
-        }
-        json(res, 200, { ok: true, message: '网关可达，令牌已配置' })
+        await handleMeituanConnectionCheckGet(req, res)
         return true
       }
 
       if (method === 'GET' && pathname === '/api/merchant/xhs/connection-check') {
-        const tok = bearerToken(req)
-        if (!tok) {
-          json(res, 401, {
-            ok: false,
-            message: '缺少 Authorization Bearer（请先在商家版后台完成小红书绑定）',
-          })
-          return true
-        }
-        json(res, 200, { ok: true, message: '网关可达，令牌已配置' })
+        await handleXhsConnectionCheckGet(req, res)
         return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/meituan/bind') {
-        await bodyReader()
-        json(res, 200, {
-          accessToken: `mock-meituan-${Date.now()}`,
-          message: '美团请接独立网关；此处仍为占位',
-        })
+        const bodyRaw = await bodyReader()
+        await handleMeituanBindPost(req, res, bodyRaw)
         return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/meituan/sync') {
         await bodyReader()
-        json(res, 200, {
-          syncedAt: new Date().toLocaleString('zh-CN'),
-        })
+        await handleMeituanSyncPost(req, res)
         return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/xhs/bind') {
-        await bodyReader()
-        json(res, 200, {
-          accessToken: `mock-xhs-${Date.now()}`,
-          message: '小红书请接独立网关；此处仍为占位',
-        })
+        const bodyRaw = await bodyReader()
+        await handleXhsBindPost(req, res, bodyRaw)
         return true
       }
 
       if (method === 'POST' && pathname === '/api/merchant/xhs/sync') {
         await bodyReader()
-        json(res, 200, {
-          syncedAt: new Date().toLocaleString('zh-CN'),
-        })
+        await handleXhsSyncPost(req, res)
         return true
       }
 
@@ -587,11 +683,10 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           json(res, 400, { message: '请求体须为 JSON' })
           return true
         }
-        const tok = bearerToken(req)
         const parts: string[] = []
         if (scope === 'all') {
           for (const pl of ['douyin', 'meituan', 'xhs'] as const) {
-            const r = await syncOneReviewPlatform(pl, tok)
+            const r = await syncOneReviewPlatform(pl, reviewPlatformBearer(req, pl))
             if (r.ok === false && pl === 'douyin') {
               json(res, 502, { ok: false, message: r.message })
               return true
@@ -599,7 +694,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             if (r.ok === true) parts.push(r.message)
           }
         } else {
-          const r = await syncOneReviewPlatform(scope, tok)
+          const r = await syncOneReviewPlatform(scope, reviewPlatformBearer(req, scope))
           if (r.ok === false) {
             json(res, 502, { ok: false, message: r.message })
             return true
@@ -668,6 +763,82 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             item: {
               id: reviewId,
               platform: 'douyin',
+              sentiment: 'good',
+              userName: '',
+              ratingStars: 0,
+              content: '',
+              createdAt: new Date().toISOString(),
+              replied: true,
+              replyText: content,
+            },
+          })
+          return true
+        }
+        if (platform === 'meituan') {
+          const tok = reviewPlatformBearer(req, 'meituan')
+          if (!tok) {
+            json(res, 401, { message: '请先绑定美团后再回复评价。' })
+            return true
+          }
+          if (!parseMeituanReviewId(reviewId)) {
+            json(res, 400, { message: '评价 ID 无效，请重新同步列表。' })
+            return true
+          }
+          const pr = await postMeituanCommentReply(tok, reviewId, content)
+          if (pr.ok === false) {
+            json(res, 502, { ok: false, message: pr.message })
+            return true
+          }
+          const row = reviewsState.meituan.find((r) => r.id === reviewId)
+          if (row) {
+            row.replied = true
+            row.replyText = content
+            json(res, 200, { ok: true, item: row })
+            return true
+          }
+          json(res, 200, {
+            ok: true,
+            item: {
+              id: reviewId,
+              platform: 'meituan',
+              sentiment: 'good',
+              userName: '',
+              ratingStars: 0,
+              content: '',
+              createdAt: new Date().toISOString(),
+              replied: true,
+              replyText: content,
+            },
+          })
+          return true
+        }
+        if (platform === 'xhs') {
+          const tok = reviewPlatformBearer(req, 'xhs')
+          if (!tok) {
+            json(res, 401, { message: '请先绑定小红书后再回复评价。' })
+            return true
+          }
+          if (!parseXhsReviewId(reviewId)) {
+            json(res, 400, { message: '评价 ID 无效，请重新同步列表。' })
+            return true
+          }
+          const pr = await postXhsCommentReply(tok, reviewId, content)
+          if (pr.ok === false) {
+            json(res, 502, { ok: false, message: pr.message })
+            return true
+          }
+          const row = reviewsState.xhs.find((r) => r.id === reviewId)
+          if (row) {
+            row.replied = true
+            row.replyText = content
+            json(res, 200, { ok: true, item: row })
+            return true
+          }
+          json(res, 200, {
+            ok: true,
+            item: {
+              id: reviewId,
+              platform: 'xhs',
               sentiment: 'good',
               userName: '',
               ratingStars: 0,

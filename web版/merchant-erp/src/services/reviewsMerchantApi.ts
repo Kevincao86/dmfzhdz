@@ -35,16 +35,24 @@ export function reviewsTabToApiPlatform(tab: StorePlatformTab): ReviewsApiPlatfo
   return tab
 }
 
-function getHeaders(): HeadersInit {
-  const token = readMerchantSession('meoo_douyin_merchant_token')
-  return {
-    Accept: 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
+function platformSessionHeaders(platform?: ReviewsApiPlatform): HeadersInit {
+  const douyin = readMerchantSession('meoo_douyin_merchant_token')
+  const meituan = readMerchantSession('meoo_meituan_merchant_token')
+  const xhs = readMerchantSession('meoo_xhs_merchant_token')
+  let primary = douyin ?? meituan ?? xhs
+  if (platform === 'meituan') primary = meituan ?? primary
+  if (platform === 'douyin') primary = douyin ?? primary
+  if (platform === 'xhs') primary = xhs ?? primary
+  const h: Record<string, string> = { Accept: 'application/json' }
+  if (primary) h.Authorization = `Bearer ${primary}`
+  if (douyin) h['X-Meoo-Douyin-Token'] = douyin
+  if (meituan) h['X-Meoo-Meituan-Token'] = meituan
+  if (xhs) h['X-Meoo-Xhs-Token'] = xhs
+  return h
 }
 
-function postHeaders(): HeadersInit {
-  return { ...getHeaders(), 'Content-Type': 'application/json' }
+function postHeaders(platform?: ReviewsApiPlatform): HeadersInit {
+  return { ...platformSessionHeaders(platform), 'Content-Type': 'application/json' }
 }
 
 export type ReviewSentimentFilter = 'all' | ReviewSentiment
@@ -68,7 +76,10 @@ export async function fetchReviewsList(
 > {
   const q = new URLSearchParams({ platform, sentiment, replyStatus })
   try {
-    const res = await fetch(url(`/api/merchant/reviews?${q}`), { method: 'GET', headers: getHeaders() })
+    const res = await fetch(url(`/api/merchant/reviews?${q}`), {
+      method: 'GET',
+      headers: platformSessionHeaders(platform),
+    })
     let data: Record<string, unknown> = {}
     try {
       data = (await res.json()) as Record<string, unknown>
@@ -108,7 +119,7 @@ export async function postReviewsSync(
   try {
     const res = await fetch(url('/api/merchant/reviews/sync'), {
       method: 'POST',
-      headers: postHeaders(),
+      headers: postHeaders(platform === 'all' ? undefined : platform),
       body: JSON.stringify({ platform }),
     })
     let data: Record<string, unknown> = {}
@@ -144,7 +155,7 @@ export async function postReviewReply(
   try {
     const res = await fetch(url('/api/merchant/reviews/reply'), {
       method: 'POST',
-      headers: postHeaders(),
+      headers: postHeaders(platform),
       body: JSON.stringify({ platform, reviewId, content }),
     })
     let data: Record<string, unknown> = {}
@@ -179,7 +190,7 @@ export async function postReviewAiSuggest(
   try {
     const res = await fetch(url('/api/merchant/reviews/ai-suggest'), {
       method: 'POST',
-      headers: postHeaders(),
+      headers: postHeaders(platform),
       body: JSON.stringify({ platform, reviewId }),
     })
     let data: Record<string, unknown> = {}

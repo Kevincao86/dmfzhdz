@@ -11,7 +11,6 @@ import {
   postClueAiSuggest,
   postClueCallback,
 } from '../services/localPromotionApi'
-import XhsZhongxiaocaoLeadsPanel from './leads/XhsZhongxiaocaoLeadsPanel'
 
 function formatTime(iso: string): string {
   try {
@@ -21,10 +20,7 @@ function formatTime(iso: string): string {
   }
 }
 
-type LeadChannel = 'local_promotion' | 'zhongxiaocao'
-
 export default function LocalPromotionLeadsPage() {
-  const [channel, setChannel] = useState<LeadChannel>('local_promotion')
   const [items, setItems] = useState<LocalClueRow[]>([])
   const [loading, setLoading] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
@@ -112,7 +108,7 @@ export default function LocalPromotionLeadsPage() {
   return (
     <ModulePage
       title="线索"
-      subtitle="巨量本地推（抖音）与种小草（小红书）分平台回收线索"
+      subtitle="同步本地推线索，AI 生成跟进话术并回传跟进状态"
       actions={
         <button
           type="button"
@@ -125,33 +121,6 @@ export default function LocalPromotionLeadsPage() {
         </button>
       }
     >
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setChannel('local_promotion')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium',
-            channel === 'local_promotion' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-700',
-          )}
-        >
-          巨量本地推 <span className="text-[10px] opacity-80">(抖音)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setChannel('zhongxiaocao')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium',
-            channel === 'zhongxiaocao' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700',
-          )}
-        >
-          种小草 <span className="text-[10px] opacity-80">(小红书)</span>
-        </button>
-      </div>
-
-      {channel === 'zhongxiaocao' ? (
-        <XhsZhongxiaocaoLeadsPanel />
-      ) : (
-        <>
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
           尚未绑定本地推。
@@ -336,8 +305,6 @@ export default function LocalPromotionLeadsPage() {
           <li>统计各广告计划线索转化率，联动投流页优化预算</li>
         </ul>
       </div>
-        </>
-      )}
     </ModulePage>
   )
 }

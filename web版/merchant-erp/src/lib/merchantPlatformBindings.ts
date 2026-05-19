@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { readMerchantSession, writeMerchantSession } from './merchantSession'
 
-export type MerchantBindingProvider = 'douyin' | 'local_promotion'
+export type MerchantBindingProvider = 'douyin' | 'local_promotion' | 'xhs_commercial'
 
 export type MerchantPlatformBindingRow = {
   id: string
@@ -22,11 +22,19 @@ export type MerchantPlatformBindingRow = {
 const ACTIVE_ID_KEY: Record<MerchantBindingProvider, string> = {
   douyin: 'meoo_active_douyin_binding_id',
   local_promotion: 'meoo_active_local_promotion_binding_id',
+  xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
 }
 
 function parseRow(raw: Record<string, unknown>): MerchantPlatformBindingRow | null {
   const id = typeof raw.id === 'string' ? raw.id : ''
-  const provider = raw.provider === 'local_promotion' ? 'local_promotion' : raw.provider === 'douyin' ? 'douyin' : null
+  const provider =
+    raw.provider === 'local_promotion'
+      ? 'local_promotion'
+      : raw.provider === 'xhs_commercial'
+        ? 'xhs_commercial'
+        : raw.provider === 'douyin'
+          ? 'douyin'
+          : null
   const sealed =
     typeof raw.sealed_credentials === 'string' ? raw.sealed_credentials.trim() : ''
   const merchantAccountId =
@@ -167,6 +175,31 @@ export function packLocalPromotionCredentials(input: {
 }
 
 export function unpackLocalPromotionCredentials(
+  sealed: string,
+): { accessToken: string; appId: string } | null {
+  try {
+    const o = JSON.parse(sealed) as { accessToken?: string; appId?: string }
+    const accessToken = typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
+    if (!accessToken) return null
+    return { accessToken, appId: typeof o.appId === 'string' ? o.appId : '' }
+  } catch {
+    return null
+  }
+}
+
+/** 小红书聚光/种小草共用凭证 */
+export function packXhsCommercialCredentials(input: {
+  accessToken: string
+  appId?: string
+}): string {
+  return JSON.stringify({
+    accessToken: input.accessToken.trim(),
+    appId: input.appId?.trim() ?? '',
+    v: 1,
+  })
+}
+
+export function unpackXhsCommercialCredentials(
   sealed: string,
 ): { accessToken: string; appId: string } | null {
   try {

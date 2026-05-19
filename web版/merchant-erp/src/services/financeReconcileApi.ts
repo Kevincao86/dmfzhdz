@@ -54,14 +54,17 @@ export async function fetchFinanceReconcile(params?: {
     const days = Math.min(90, Math.max(1, params?.days ?? 14))
     q.set('days', String(days))
   }
-  const token =
-    readMerchantSession('meoo_douyin_merchant_token') ??
-    readMerchantSession('meoo_meituan_merchant_token') ??
-    readMerchantSession('meoo_xhs_merchant_token')
+  const douyinToken = readMerchantSession('meoo_douyin_merchant_token')
+  const meituanToken = readMerchantSession('meoo_meituan_merchant_token')
+  const xhsToken = readMerchantSession('meoo_xhs_merchant_token')
+  const primary = douyinToken ?? meituanToken ?? xhsToken
   const headers: Record<string, string> = {
     Accept: 'application/json',
   }
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (primary) headers.Authorization = `Bearer ${primary}`
+  if (douyinToken) headers['X-Meoo-Douyin-Token'] = douyinToken
+  if (meituanToken) headers['X-Meoo-Meituan-Token'] = meituanToken
+  if (xhsToken) headers['X-Meoo-Xhs-Token'] = xhsToken
 
   try {
     const res = await fetch(url(`/api/merchant/finance/reconcile?${q}`), {
