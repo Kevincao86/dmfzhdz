@@ -6,6 +6,7 @@ import { normalizeCnMobile } from '../vite-plugins/authRegistrationOtp.js'
 import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
+  smsLoginErrorMessage,
   verifyAuthSmsCode,
 } from '../vite-plugins/authSmsAuthShared.js'
 
@@ -79,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, status, {
         ok: false,
         error: session.error,
-        message: '登录服务暂不可用，请稍后重试',
+        message: smsLoginErrorMessage(session.error, session.detail),
         detail: session.detail,
       })
       return

@@ -1,6 +1,6 @@
 import { aliyunSmsConfigured, checkAliyunSmsVerifyCode, sendAliyunSmsVerifyCode } from './aliyunDypnsSms.js'
 import { dispatchSms, issueSmsCode, normalizeCnMobile, verifySmsCode } from './authRegistrationOtp.js'
-import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
+import { readMerchantSupabaseAdminEnv, readMerchantSupabaseAnonKey } from './merchantSupabaseAdminEnv.js'
 
 export type AuthSmsSendResult =
   | { ok: true; message: string; devCode?: string }
@@ -96,6 +96,63 @@ export async function phoneAlreadyRegistered(phone: string): Promise<boolean> {
   return hit !== null
 }
 
+function extractHashedTokenFromGenerateLink(
+  linkJson: Record<string, unknown>,
+  linkText: string,
+): string | null {
+  const props = linkJson.properties as { hashed_token?: string; action_link?: string } | undefined
+  if (typeof props?.hashed_token === 'string' && props.hashed_token.trim()) {
+    return props.hashed_token.trim()
+  }
+  if (typeof linkJson.hashed_token === 'string' && linkJson.hashed_token.trim()) {
+    return linkJson.hashed_token.trim()
+  }
+  const actionLink =
+    (typeof props?.action_link === 'string' && props.action_link) ||
+    (typeof linkJson.action_link === 'string' && linkJson.action_link) ||
+    ''
+  if (actionLink) {
+    try {
+      const u = new URL(actionLink)
+      const fromQuery =
+        u.searchParams.get('token_hash') ||
+        u.searchParams.get('token') ||
+        u.hash.match(/token_hash=([^&]+)/)?.[1] ||
+        u.hash.match(/token=([^&]+)/)?.[1]
+      if (fromQuery?.trim()) return decodeURIComponent(fromQuery.trim())
+    } catch {
+      /* ignore */
+    }
+  }
+  const m = linkText.match(/"hashed_token"\s*:\s*"([^"]+)"/)
+  return m?.[1]?.trim() || null
+}
+
+function parseSessionFromVerifyBody(verifyText: string): {
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+} | null {
+  try {
+    const verifyJson = JSON.parse(verifyText) as {
+      access_token?: string
+      refresh_token?: string
+      expires_in?: number
+      session?: { access_token?: string; refresh_token?: string; expires_in?: number }
+    }
+    const access_token = verifyJson.access_token ?? verifyJson.session?.access_token
+    const refresh_token = verifyJson.refresh_token ?? verifyJson.session?.refresh_token
+    if (!access_token || !refresh_token) return null
+    return {
+      access_token,
+      refresh_token,
+      expires_in: verifyJson.expires_in ?? verifyJson.session?.expires_in ?? 3600,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function createAdminSessionForUserId(
   userId: string,
   email: string,
@@ -109,15 +166,17 @@ export async function createAdminSessionForUserId(
   }
 
   const base = supabaseUrl.replace(/\/$/, '')
-  const headers: Record<string, string> = {
+  const adminHeaders: Record<string, string> = {
     apikey: serviceRole,
     Authorization: `Bearer ${serviceRole}`,
     'Content-Type': 'application/json',
   }
+  const anonKey = readMerchantSupabaseAnonKey()
+  const verifyApiKey = anonKey || serviceRole
 
   const linkRes = await fetch(`${base}/auth/v1/admin/generate_link`, {
     method: 'POST',
-    headers,
+    headers: adminHeaders,
     body: JSON.stringify({ type: 'magiclink', email }),
   })
   const linkText = await linkRes.text()
@@ -125,57 +184,69 @@ export async function createAdminSessionForUserId(
     return { ok: false, error: 'magiclink_failed', detail: linkText.slice(0, 400) }
   }
 
-  let linkJson: {
-    properties?: { hashed_token?: string }
-    user?: { id?: string }
-  } = {}
+  let linkJson: Record<string, unknown> = {}
   try {
-    linkJson = JSON.parse(linkText) as typeof linkJson
+    linkJson = JSON.parse(linkText) as Record<string, unknown>
   } catch {
     return { ok: false, error: 'magiclink_parse_failed', detail: linkText.slice(0, 200) }
   }
 
-  if (linkJson.user?.id && linkJson.user.id !== userId) {
+  const linkUser = linkJson.user as { id?: string } | undefined
+  if (linkUser?.id && linkUser.id !== userId) {
     return { ok: false, error: 'user_mismatch', detail: 'generate_link user id mismatch' }
   }
 
-  const tokenHash = linkJson.properties?.hashed_token
+  const tokenHash = extractHashedTokenFromGenerateLink(linkJson, linkText)
   if (!tokenHash) {
     return { ok: false, error: 'magiclink_no_token', detail: linkText.slice(0, 200) }
   }
 
-  const verifyRes = await fetch(`${base}/auth/v1/verify`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ type: 'email', token_hash: tokenHash }),
-  })
-  const verifyText = await verifyRes.text()
-  if (!verifyRes.ok) {
-    return { ok: false, error: 'verify_failed', detail: verifyText.slice(0, 400) }
+  const verifyHeaders: Record<string, string> = {
+    apikey: verifyApiKey,
+    Authorization: `Bearer ${verifyApiKey}`,
+    'Content-Type': 'application/json',
   }
 
-  let verifyJson: {
-    access_token?: string
-    refresh_token?: string
-    expires_in?: number
-    session?: { access_token?: string; refresh_token?: string; expires_in?: number }
-  } = {}
-  try {
-    verifyJson = JSON.parse(verifyText) as typeof verifyJson
-  } catch {
-    return { ok: false, error: 'verify_parse_failed', detail: verifyText.slice(0, 200) }
+  const verifyTypes = ['magiclink', 'email'] as const
+  let lastDetail = ''
+  for (const verifyType of verifyTypes) {
+    const verifyRes = await fetch(`${base}/auth/v1/verify`, {
+      method: 'POST',
+      headers: verifyHeaders,
+      body: JSON.stringify({ type: verifyType, token_hash: tokenHash, email }),
+    })
+    const verifyText = await verifyRes.text()
+    if (!verifyRes.ok) {
+      lastDetail = verifyText.slice(0, 400)
+      continue
+    }
+    const session = parseSessionFromVerifyBody(verifyText)
+    if (session?.access_token && session.refresh_token) {
+      return {
+        ok: true,
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+        expires_in: session.expires_in ?? 3600,
+      }
+    }
+    lastDetail = verifyText.slice(0, 200)
   }
 
-  const access_token = verifyJson.access_token ?? verifyJson.session?.access_token
-  const refresh_token = verifyJson.refresh_token ?? verifyJson.session?.refresh_token
-  if (!access_token || !refresh_token) {
-    return { ok: false, error: 'session_missing', detail: verifyText.slice(0, 200) }
-  }
+  return { ok: false, error: 'verify_failed', detail: lastDetail || 'verify returned no session' }
+}
 
-  return {
-    ok: true,
-    access_token,
-    refresh_token,
-    expires_in: verifyJson.expires_in ?? verifyJson.session?.expires_in ?? 3600,
+export function smsLoginErrorMessage(error: string, _detail?: string): string {
+  if (error === 'supabase_admin_not_configured') {
+    return '登录服务未配置完成，请联系管理员在 Vercel 配置 SUPABASE_SERVICE_ROLE_KEY 后重新部署'
   }
+  if (error === 'phone_not_registered') {
+    return '该手机号尚未注册，请先注册'
+  }
+  if (error === 'sms_code_invalid') {
+    return '验证码错误或已过期'
+  }
+  if (error === 'magiclink_failed' || error === 'verify_failed' || error === 'session_missing') {
+    return '登录服务暂不可用，请稍后重试'
+  }
+  return '登录失败，请稍后重试'
 }
