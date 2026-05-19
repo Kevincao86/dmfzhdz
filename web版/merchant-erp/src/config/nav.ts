@@ -48,8 +48,6 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/operation/competitors', label: '竞争对手分析' },
       { path: '/ai-operation/content', label: 'AI 文章与话题' },
       { path: '/ai-operation/video-check', label: '短视频优化' },
-      { path: '/ai-operation/live-check', label: '直播间分析' },
-      { path: '/operation/platform-target', label: '平台签框' },
     ],
   },
   { path: '/advertising', label: '投流', icon: Megaphone },

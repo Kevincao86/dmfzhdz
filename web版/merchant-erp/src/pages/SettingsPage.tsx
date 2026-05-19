@@ -27,6 +27,8 @@ import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
 import SubAccountsPanel from './settings/SubAccountsPanel'
 import XhsMerchantSection from './settings/XhsMerchantSection'
+import { useMembership } from '../context/MembershipContext'
+import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
 
 type VerifyItem = {
   id: string
@@ -86,8 +88,15 @@ function addLocalCalendarDaysFromToday(days: number): Date {
   return d
 }
 
+const PLAN_FEATURE_LINES: Record<MembershipPlan, string[]> = {
+  free: ['直连 AI 每月 50 次（豆包/千问/MiniMax/DeepSeek）', '不含 GEO、竞对分析、报税管理'],
+  member: ['全功能开放', 'AI：豆包 / 千问 / MiniMax / DeepSeek'],
+  member_plus: ['全功能开放', '全部 AI 模型（含 TokenMix 网关）'],
+}
+
 export default function SettingsPage() {
   const location = useLocation()
+  const { plan, entitlements, reload: reloadMembership } = useMembership()
   const [tab, setTab] = useState<SettingsTabId>('platforms')
   const [merchantPlat, setMerchantPlat] = useState<'douyin' | 'meituan' | 'xhs'>('douyin')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
@@ -117,6 +126,7 @@ export default function SettingsPage() {
   const closeSubModal = () => {
     setSubModalOpen(false)
     void loadOfficialBilling()
+    void reloadMembership()
   }
 
   const openSubModal = () => setSubModalOpen(true)
@@ -135,8 +145,9 @@ export default function SettingsPage() {
       amountCents: payload.amountCents,
       payChannel: payload.payChannel,
     })
-    window.alert('已提交支付申报，请等待运营在「订单管理」核对确认。')
+    window.alert('已提交支付申报，请等待运营在「订单管理」核对确认；确认后将自动开通对应会员档位。')
     void loadOfficialBilling()
+    void reloadMembership()
   }
 
   const trialStart = useMemo(() => {
@@ -227,14 +238,20 @@ export default function SettingsPage() {
     }
   }, [trialStart, trialEnd])
 
-  /** 地址栏 ?tab=：同步页签（便于书签与外部跳转） */
+  /** 地址栏 ?tab= / ?upgrade=1：同步页签（便于书签与外部跳转） */
   useEffect(() => {
     const p = new URLSearchParams(location.search)
     const ts = p.get('tab')
-    if (ts && TAB_IDS.has(ts as SettingsTabId)) {
+    if (p.get('upgrade') === '1') {
+      setTab('subscription')
+    } else if (ts && TAB_IDS.has(ts as SettingsTabId)) {
       setTab(ts as SettingsTabId)
     }
   }, [location.search])
+
+  useEffect(() => {
+    if (tab === 'subscription') void reloadMembership()
+  }, [tab, reloadMembership])
 
   const toggleVerify = (id: string) => {
     setVerifyList((list) =>
@@ -377,8 +394,35 @@ export default function SettingsPage() {
                     <Crown className="mr-2 h-5 w-5 text-amber-500" />
                     <span className="font-semibold">正式版订阅</span>
                   </div>
+                  <div className="mb-3 rounded-lg border border-indigo-100 bg-indigo-50/80 px-3 py-2.5 text-sm text-indigo-950">
+                    <p className="font-semibold">
+                      当前版本：{entitlements.planLabel}
+                      {MEMBERSHIP_MONTHLY_YUAN[plan] != null ? (
+                        <span className="ml-1 font-normal text-indigo-800/90">
+                          （¥{MEMBERSHIP_MONTHLY_YUAN[plan]}/月起）
+                        </span>
+                      ) : null}
+                    </p>
+                    <ul className="mt-1.5 list-inside list-disc text-xs text-indigo-900/85">
+                      {PLAN_FEATURE_LINES[plan].map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    {plan === 'free' && entitlements.directAiRemaining != null ? (
+                      <p className="mt-1.5 text-xs text-indigo-800">
+                        本月直连 AI 剩余{' '}
+                        <span className="font-semibold tabular-nums">{entitlements.directAiRemaining}</span> /{' '}
+                        {entitlements.directAiCallLimit} 次
+                      </p>
+                    ) : null}
+                    <p className="mt-1.5 text-[11px] text-indigo-700/80">
+                      与运营管控台「客户管理 → 会员档位」同步；改档后约 20 秒内自动生效。
+                    </p>
+                  </div>
                   <p className="ui-hint-block text-sm text-gray-600">
-                    基础版 <strong className="text-gray-900">¥99 / 月</strong>，支持自动续费，到期前可随时取消。
+                    <strong className="text-gray-900">会员版 ¥168/月</strong>、
+                    <strong className="text-gray-900"> 会员 Plus ¥598/月</strong>
+                    （含季度套餐）；运营确认到账后自动落位对应版本。
                   </p>
                   <div className="mt-4 space-y-1 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-3 text-sm text-gray-800">
                     {!supabaseConfigured || !supabase ? (

@@ -9,7 +9,7 @@ export default function RequireMembershipFeature({ children }: { children: React
 
   if (loading) return null
   if (plan === 'free' && isPathBlockedForFree(pathname)) {
-    return <Navigate to="/settings?upgrade=1" replace />
+    return <Navigate to="/settings?tab=subscription&upgrade=1" replace />
   }
   return <>{children}</>
 }
