@@ -124,8 +124,8 @@ export default function LocalPromotionLeadsPage() {
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
           尚未绑定本地推。
-          <Link to="/settings" className="ml-1 font-medium text-cyan-700 underline">
-            系统设置
+          <Link to="/settings?tab=commercial" className="ml-1 font-medium text-cyan-700 underline">
+            系统设置 · 商业化后台
           </Link>
           中完成授权后可拉取真实线索。
         </div>
