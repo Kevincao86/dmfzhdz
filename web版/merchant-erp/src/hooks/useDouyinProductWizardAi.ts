@@ -98,7 +98,7 @@ export function useDouyinProductWizardAi(params: {
               referenceImageDataUrl: ref || undefined,
             })
             if (!agent.ok) return { ok: false as const, message: agent.message }
-            console.info(`[商品生图] TokenMix · ${imageUserLine}`)
+            console.info(`[商品生图] 高级模型 · ${imageUserLine}`)
             return { ok: true as const, image_urls: [agent.imageUrl] }
           }
         }

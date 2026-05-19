@@ -1,7 +1,14 @@
-import { Megaphone, RefreshCw, Send } from 'lucide-react'
+import { Megaphone, RefreshCw, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import { ANNOUNCEMENT_CATEGORY_ZH, type TenantAnnouncementCategory } from '../../../api/tenantAnnouncementsCore'
+import {
+  countByExpiringBucket,
+  draftExpiringAnnouncementCopy,
+  filterTenantsByExpiringBucket,
+  type AnnouncementTenantRow,
+  type ExpiringBucket,
+} from '../opsAnnouncementEntitlement'
 import { fetchOpsAnnouncements, sendOpsAnnouncement, type OpsAnnouncementRow } from '../opsAnnouncementsApi'
 import {
   fetchSupabaseTenantsForOps,
@@ -24,11 +31,12 @@ function fmt(iso: string): string {
 }
 
 export default function OpsAnnouncementsPage() {
-  const [tenants, setTenants] = useState<{ id: string; name: string; loginName: string; plan: string }[]>([])
+  const [tenants, setTenants] = useState<AnnouncementTenantRow[]>([])
   const [tenantLoadErr, setTenantLoadErr] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [targetAll, setTargetAll] = useState(false)
   const [category, setCategory] = useState<TenantAnnouncementCategory>('subscription_expiring')
+  const [expiringBucket, setExpiringBucket] = useState<ExpiringBucket | null>(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -60,6 +68,7 @@ export default function OpsAnnouncementsPage() {
         name: t.merchantName,
         loginName: t.loginName,
         plan: PLAN_ZH[t.membershipPlan ?? 'free'] ?? '免费版',
+        serviceExpireAt: t.serviceExpireAt ?? null,
       })),
     )
   }, [])
@@ -82,16 +91,40 @@ export default function OpsAnnouncementsPage() {
     void loadHistory()
   }, [loadTenants, loadHistory])
 
+  const bucketCounts = useMemo(() => countByExpiringBucket(tenants), [tenants])
+
+  const applyExpiringBucket = useCallback(
+    (bucket: ExpiringBucket) => {
+      setTargetAll(false)
+      setExpiringBucket(bucket)
+      const matched = filterTenantsByExpiringBucket(tenants, bucket)
+      setSelected(new Set(matched.map((t) => t.id)))
+      const draft = draftExpiringAnnouncementCopy(bucket, matched)
+      setTitle(draft.title)
+      setBody(draft.body)
+      setSendMsg(
+        matched.length === 0
+          ? { tone: 'err', text: `当前无「总权益剩余 ${bucket} 天到期」的 Supabase 客户，请检查 service_expire_at` }
+          : null,
+      )
+    },
+    [tenants],
+  )
+
   const filteredTenants = useMemo(() => {
+    let list = tenants
+    if (category === 'subscription_expiring' && expiringBucket != null) {
+      list = filterTenantsByExpiringBucket(tenants, expiringBucket)
+    }
     const q = tenantKeyword.trim().toLowerCase()
-    if (!q) return tenants
-    return tenants.filter(
+    if (!q) return list
+    return list.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
         t.loginName.toLowerCase().includes(q) ||
         t.id.toLowerCase().includes(q),
     )
-  }, [tenants, tenantKeyword])
+  }, [tenants, tenantKeyword, category, expiringBucket])
 
   const allVisibleSelected =
     filteredTenants.length > 0 && filteredTenants.every((t) => selected.has(t.id))
@@ -162,6 +195,7 @@ export default function OpsAnnouncementsPage() {
     setBody('')
     setSelected(new Set())
     setTargetAll(false)
+    setExpiringBucket(null)
     void loadHistory()
   }
 
@@ -187,13 +221,50 @@ export default function OpsAnnouncementsPage() {
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as TenantAnnouncementCategory)}
+                onChange={(e) => {
+                  const v = e.target.value as TenantAnnouncementCategory
+                  setCategory(v)
+                  if (v !== 'subscription_expiring') {
+                    setExpiringBucket(null)
+                  }
+                }}
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
               >
                 <option value="subscription_expiring">{ANNOUNCEMENT_CATEGORY_ZH.subscription_expiring}</option>
                 <option value="platform_change">{ANNOUNCEMENT_CATEGORY_ZH.platform_change}</option>
               </select>
             </div>
+
+            {category === 'subscription_expiring' ? (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <p className="mb-2 text-xs font-medium text-amber-200/90">
+                  按总权益剩余时长筛选（依据 tenants.service_expire_at，与 ERP 订阅页一致）
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {([5, 3, 1] as const).map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => applyExpiringBucket(days)}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+                        expiringBucket === days
+                          ? 'border-amber-400 bg-amber-500/20 text-amber-100'
+                          : 'border-slate-600 bg-slate-950 text-slate-300 hover:border-amber-500/50',
+                      )}
+                    >
+                      总权益剩余 {days} 天到期
+                      <span className="ml-1 text-slate-400">({bucketCounts[days]})</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-500">
+                  <Sparkles className="h-3 w-3 text-indigo-400" />
+                  选择后将自动勾选对应客户，并 AI 智能起草标题与正文（可再编辑）
+                </p>
+              </div>
+            ) : null}
+
             <div>
               <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
                 标题
@@ -224,7 +295,10 @@ export default function OpsAnnouncementsPage() {
                 checked={targetAll}
                 onChange={(e) => {
                   setTargetAll(e.target.checked)
-                  if (e.target.checked) setSelected(new Set())
+                  if (e.target.checked) {
+                    setSelected(new Set())
+                    setExpiringBucket(null)
+                  }
                 }}
                 className="rounded border-slate-600"
               />
@@ -236,6 +310,7 @@ export default function OpsAnnouncementsPage() {
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs text-slate-400">
                     已选 {selected.size} / {tenants.length}
+                    {expiringBucket != null ? ` · 当前筛选：剩余 ${expiringBucket} 天到期` : ''}
                   </span>
                   <button
                     type="button"
@@ -255,6 +330,9 @@ export default function OpsAnnouncementsPage() {
                   <p className="text-xs text-amber-400">{tenantLoadErr}</p>
                 ) : (
                   <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                    {filteredTenants.length === 0 ? (
+                      <li className="px-1 py-2 text-xs text-slate-500">无匹配客户</li>
+                    ) : null}
                     {filteredTenants.map((t) => (
                       <li key={t.id}>
                         <label className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 hover:bg-slate-800/80">
@@ -268,6 +346,11 @@ export default function OpsAnnouncementsPage() {
                             <span className="font-medium text-slate-200">{t.name}</span>
                             <span className="ml-2 text-xs text-slate-500">{t.loginName}</span>
                             <span className="ml-2 text-xs text-indigo-400/90">{t.plan}</span>
+                            {t.serviceExpireAt ? (
+                              <span className="ml-2 text-xs text-amber-400/80">
+                                至 {fmt(t.serviceExpireAt).slice(0, 10)}
+                              </span>
+                            ) : null}
                           </span>
                         </label>
                       </li>

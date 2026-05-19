@@ -81,7 +81,7 @@ function formatCnDate(d: Date) {
 const PLAN_FEATURE_LINES: Record<MembershipPlan, string[]> = {
   free: ['直连 AI 每月 50 次（豆包/千问/MiniMax/DeepSeek）', '不含 GEO、竞对分析、报税管理'],
   member: ['全功能开放', 'AI：豆包 / 千问 / MiniMax / DeepSeek'],
-  member_plus: ['全功能开放', '全部 AI 模型（含 TokenMix 网关）'],
+  member_plus: ['全功能开放', '全部 AI 模型（含 OpenAI / Claude / Gemini / Grok）'],
 }
 
 export default function SettingsPage() {

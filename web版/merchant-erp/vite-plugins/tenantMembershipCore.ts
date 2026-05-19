@@ -119,7 +119,7 @@ export async function assertAiChatAccess(
         ok: false,
         status: 403,
         error: 'tokenmix_requires_plus',
-        detail: 'TokenMix 全模型仅会员 Plus 可用',
+        detail: 'OpenAI / Claude / Gemini / Grok 等高级模型仅会员 Plus 可用',
       }
     }
     const key = ctx.tokenmixApiKey ?? (env.TOKENMIX_API_KEY ?? '').trim()
@@ -128,7 +128,7 @@ export async function assertAiChatAccess(
         ok: false,
         status: 503,
         error: 'tokenmix_not_configured',
-        detail: '请先在运营管控台为客户绑定 TokenMix API 密钥',
+        detail: '高级 AI 模型通道未配置，请联系运营或客服',
       }
     }
     return { ok: true, envForChat: { ...env, TOKENMIX_API_KEY: key } }
