@@ -60,8 +60,19 @@ export type TenantSubscriptionSnapshot = {
   tenantId: string | null
   /** 运营确认订阅后写入的会员服务截止时刻（ISO） */
   serviceExpireAt: string | null
-  /** 累计已确认的正式版权益天数（与运营端订单确认逻辑一致） */
+  /** 订阅确认累加天数（只读，运营不可改） */
+  subscriptionDays: number | null
+  /** 运营赠送天数 */
+  opsGiftDays: number | null
+  /** 总权益天数 = 订阅 + 赠送 */
   officialDays: number | null
+}
+
+function readEntitlementDays(raw: unknown): number {
+  if (raw == null) return 0
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.floor(n))
 }
 
 /** 会员剩余使用时间（以 service_expire_at 为准） */
@@ -134,25 +145,48 @@ export async function fetchTenantSubscriptionSnapshot(
   supabase: SupabaseClient,
 ): Promise<TenantSubscriptionSnapshot> {
   const tenantId = await fetchPrimaryTenantId(supabase)
-  if (!tenantId) return { tenantId: null, serviceExpireAt: null, officialDays: null }
+  if (!tenantId) {
+    return {
+      tenantId: null,
+      serviceExpireAt: null,
+      subscriptionDays: null,
+      opsGiftDays: null,
+      officialDays: null,
+    }
+  }
 
   const { data, error } = await supabase
     .from('tenants')
-    .select('service_expire_at, official_days')
+    .select('service_expire_at, official_days, subscription_days, ops_gift_days')
     .eq('id', tenantId)
     .maybeSingle()
 
   if (error) {
     if (isMissingDbObjectError(error.message)) {
-      return { tenantId, serviceExpireAt: null, officialDays: null }
+      return {
+        tenantId,
+        serviceExpireAt: null,
+        subscriptionDays: null,
+        opsGiftDays: null,
+        officialDays: null,
+      }
     }
     throw error
   }
 
+  const official = readOfficialDays(data?.official_days)
+  const sub = readEntitlementDays(
+    data?.subscription_days != null ? data.subscription_days : data?.official_days,
+  )
+  const gift = readEntitlementDays(data?.ops_gift_days)
+  const total = sub + gift > 0 ? sub + gift : official
+
   return {
     tenantId,
     serviceExpireAt: parseServiceExpireAtRaw(data?.service_expire_at),
-    officialDays: readOfficialDays(data?.official_days),
+    subscriptionDays: sub,
+    opsGiftDays: gift,
+    officialDays: total,
   }
 }
 

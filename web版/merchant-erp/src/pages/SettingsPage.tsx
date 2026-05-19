@@ -91,18 +91,33 @@ export default function SettingsPage() {
   const [merchantPlat, setMerchantPlat] = useState<'douyin' | 'meituan' | 'xhs'>('douyin')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
-  const [serviceExpireAtIso, setServiceExpireAtIso] = useState<string | null | undefined>(undefined)
-  /** undefined：未拉取；null：无到期记录 */
+  const [subSnap, setSubSnap] = useState<
+    | undefined
+    | {
+        serviceExpireAt: string | null
+        subscriptionDays: number
+        opsGiftDays: number
+      }
+  >(undefined)
+
   const loadOfficialBilling = useCallback(async () => {
     if (!supabaseConfigured || !supabase) {
-      setServiceExpireAtIso(undefined)
+      setSubSnap(undefined)
       return
     }
     try {
       const snap = await fetchTenantSubscriptionSnapshot(supabase)
-      setServiceExpireAtIso(snap.serviceExpireAt)
+      setSubSnap({
+        serviceExpireAt: snap.serviceExpireAt,
+        subscriptionDays: snap.subscriptionDays ?? 0,
+        opsGiftDays: snap.opsGiftDays ?? 0,
+      })
     } catch {
-      setServiceExpireAtIso(null)
+      setSubSnap({
+        serviceExpireAt: null,
+        subscriptionDays: 0,
+        opsGiftDays: 0,
+      })
     }
   }, [supabaseConfigured, supabase])
 
@@ -135,13 +150,14 @@ export default function SettingsPage() {
 
   const isPaidMember = plan === 'member' || plan === 'member_plus'
   const memberUsage = useMemo(
-    () => computeMemberUsageRemaining(serviceExpireAtIso ?? null),
-    [serviceExpireAtIso],
+    () => computeMemberUsageRemaining(subSnap?.serviceExpireAt ?? null),
+    [subSnap?.serviceExpireAt],
   )
+  const totalEntitlementDays = (subSnap?.subscriptionDays ?? 0) + (subSnap?.opsGiftDays ?? 0)
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) {
-      setServiceExpireAtIso(undefined)
+      setSubSnap(undefined)
       return
     }
     const sb = supabase
@@ -150,10 +166,14 @@ export default function SettingsPage() {
       try {
         const snap = await fetchTenantSubscriptionSnapshot(sb)
         if (cancelled) return
-        setServiceExpireAtIso(snap.serviceExpireAt)
+        setSubSnap({
+          serviceExpireAt: snap.serviceExpireAt,
+          subscriptionDays: snap.subscriptionDays ?? 0,
+          opsGiftDays: snap.opsGiftDays ?? 0,
+        })
       } catch {
         if (!cancelled) {
-          setServiceExpireAtIso(null)
+          setSubSnap({ serviceExpireAt: null, subscriptionDays: 0, opsGiftDays: 0 })
         }
       }
     }
@@ -288,7 +308,8 @@ export default function SettingsPage() {
                 <strong className="font-medium text-gray-800"> 运营管控台 → 客户管理 </strong>
                 维护。购买<strong className="font-medium text-gray-800"> 会员版 </strong>或
                 <strong className="font-medium text-gray-800"> 会员 Plus </strong>并由运营确认到账后，下方显示
-                <strong className="font-medium text-gray-800"> 剩余使用时间 </strong>（以云端登记的服务截止日期为准）。
+                <strong className="font-medium text-gray-800"> 订阅时长、赠送时长 </strong>与
+                <strong className="font-medium text-gray-800"> 总剩余时长 </strong>（截止日以云端登记为准）。
               </p>
               <div className="max-w-xl">
                 <div className="rounded-xl border border-gray-200 p-5">
@@ -332,27 +353,39 @@ export default function SettingsPage() {
                   <div className="mt-4 space-y-1 rounded-lg border border-gray-100 bg-gray-50/80 px-3 py-3 text-sm text-gray-800">
                     {!supabaseConfigured || !supabase ? (
                       <p className="text-gray-600">接入 Supabase 登录后可查看会员剩余使用时间。</p>
-                    ) : serviceExpireAtIso === undefined ? (
+                    ) : subSnap === undefined ? (
                       <p className="text-gray-500">正在加载订阅信息…</p>
                     ) : !isPaidMember ? (
                       <p className="text-gray-600">
-                        当前为免费版。购买会员版或会员 Plus 并由运营确认到账后，将在此显示剩余使用时间。
+                        当前为免费版。购买会员版或会员 Plus 并由运营确认到账后，将在此显示订阅时长与剩余使用时间。
                       </p>
-                    ) : memberUsage.expireDate ? (
+                    ) : memberUsage.expireDate || totalEntitlementDays > 0 ? (
                       <>
-                        <p className="font-medium text-gray-900">
-                          <span className="text-gray-500">剩余使用时间：</span>
+                        <p className="text-gray-800">
+                          <span className="text-gray-500">订阅时长：</span>
+                          <span className="tabular-nums font-medium text-gray-900">{subSnap.subscriptionDays}</span> 天
+                          <span className="mx-2 text-gray-300">+</span>
+                          <span className="text-gray-500">赠送时长：</span>
+                          <span className="tabular-nums font-medium text-gray-900">{subSnap.opsGiftDays}</span> 天
+                        </p>
+                        <p className="pt-1 font-medium text-gray-900">
+                          <span className="text-gray-500">总剩余时长：</span>
                           <span className="tabular-nums">
                             {memberUsage.remainDays != null && memberUsage.remainDays > 0
                               ? memberUsage.remainDays
                               : 0}
                           </span>{' '}
                           天
+                          <span className="ml-2 text-xs font-normal text-gray-400">
+                            （累计权益 {totalEntitlementDays} 天）
+                          </span>
                         </p>
-                        <p className="pt-1 text-gray-800">
-                          <span className="text-gray-500">会员到期：</span>
-                          {formatCnDate(memberUsage.expireDate)}
-                        </p>
+                        {memberUsage.expireDate ? (
+                          <p className="pt-1 text-gray-800">
+                            <span className="text-gray-500">会员到期：</span>
+                            {formatCnDate(memberUsage.expireDate)}
+                          </p>
+                        ) : null}
                         {memberUsage.remainDays != null && memberUsage.remainDays === 0 ? (
                           <p className="pt-1 text-sm font-medium text-amber-800">今日到期，请尽快续费。</p>
                         ) : null}
