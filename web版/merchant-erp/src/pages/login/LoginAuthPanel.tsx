@@ -278,7 +278,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     'shrink-0 rounded-xl border border-white/70 bg-white/60 px-3 py-3 text-xs font-semibold text-cyan-700 backdrop-blur-sm hover:bg-white/80 disabled:opacity-50 sm:px-4 sm:text-sm'
 
   return (
-    <div className="w-full shrink-0 max-h-[min(720px,calc(100dvh-6rem))] overflow-y-auto lg:max-h-none">
+    <div className="flex w-full min-h-0 flex-1 flex-col">
       <div className="mb-8 hidden lg:block">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
         <p className="mt-2 text-sm text-slate-600">使用商家账号进入墨典AI智能ERP工作台</p>
