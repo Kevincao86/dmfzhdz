@@ -28,11 +28,7 @@ import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
 import SubAccountsPanel from './settings/SubAccountsPanel'
 import XhsMerchantSection from './settings/XhsMerchantSection'
 import PlatformConnectionsPanel from './settings/PlatformConnectionsPanel'
-import {
-  MERCHANT_PLATFORM_BRANDS,
-  PlatformBrandLogo,
-  type MerchantPlatformBrandId,
-} from '../lib/platformBranding'
+import { MERCHANT_BACKEND_PLATFORMS, PlatformBrandLogo } from '../lib/platformBranding'
 import { useMembership } from '../context/MembershipContext'
 import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
 
@@ -206,12 +202,6 @@ export default function SettingsPage() {
     if (tab === 'subscription') void reloadMembership({ silent: true })
   }, [tab, reloadMembership])
 
-  const openMerchantPlatform = useCallback((id: MerchantPlatformBrandId) => {
-    if (id === 'jd') return
-    setMerchantPlat(id)
-    setTab('merchant')
-  }, [])
-
   const toggleVerify = (id: string) => {
     setVerifyList((list) =>
       list.map((item) => {
@@ -274,7 +264,7 @@ export default function SettingsPage() {
         <div className="p-6 sm:p-8">
           {tab === 'platforms' && (
             <div className="space-y-8">
-              <PlatformConnectionsPanel onManage={openMerchantPlatform} />
+              <PlatformConnectionsPanel />
 
               <AiModelBindingSection />
             </div>
@@ -474,11 +464,11 @@ export default function SettingsPage() {
                 <p className="text-sm text-gray-500">切换查看各平台商家后台</p>
               </div>
               <div className="mb-6 flex flex-wrap gap-2">
-                {MERCHANT_PLATFORM_BRANDS.filter((p) => p.id !== 'jd').map((p) => (
+                {MERCHANT_BACKEND_PLATFORMS.map((p) => (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setMerchantPlat(p.id as 'douyin' | 'meituan' | 'xhs')}
+                    onClick={() => setMerchantPlat(p.id)}
                     className={cn(
                       'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
                       merchantPlat === p.id
@@ -486,8 +476,8 @@ export default function SettingsPage() {
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
                     )}
                   >
-                    <PlatformBrandLogo id={p.id} size="sm" />
-                    {p.merchantName}
+                    <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
+                    {p.tabName}
                   </button>
                 ))}
               </div>

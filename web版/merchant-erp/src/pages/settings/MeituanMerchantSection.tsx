@@ -5,6 +5,7 @@ import {
   postMerchantPlatformSync,
 } from '../../services/merchantPlatformApi'
 import { MeituanApiSection } from './apiDocsContent'
+import { PlatformBrandLogo } from '../../lib/platformBranding'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
 const TOKEN_KEY = 'meoo_meituan_merchant_token'
@@ -103,9 +104,7 @@ export default function MeituanMerchantSection() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start">
-          <div className="mr-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-yellow-100">
-            <i className="fa-solid fa-utensils text-xl text-yellow-700" />
-          </div>
+          <PlatformBrandLogo logo="dianping" alt="大众点评" size="lg" className="mr-4" />
           <div>
             <h3 className="text-lg font-semibold text-gray-900">大众点评商家版</h3>
             <p className="text-sm text-gray-500">
