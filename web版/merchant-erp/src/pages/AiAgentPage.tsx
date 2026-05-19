@@ -23,7 +23,7 @@ export default function AiAgentPage() {
     aiSending,
     pendingPreviewId,
     pendingPreviewTaskType,
-    pendingProductPlanLoading,
+    pendingPreviewLoading,
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
@@ -38,8 +38,12 @@ export default function AiAgentPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   const confirmLabel =
-    pendingPreviewTaskType === 'create_product' ? '确认并提交审核' : '确认执行'
-  const confirmDisabled = pendingProductPlanLoading || aiSending
+    pendingPreviewTaskType === 'create_product'
+      ? '确认并提交审核'
+      : pendingPreviewTaskType === 'recruit_influencer'
+        ? '确认并打开招募'
+        : '确认执行'
+  const confirmDisabled = pendingPreviewLoading || aiSending
 
   useEffect(() => {
     if (!hasChat) return
@@ -201,7 +205,7 @@ export default function AiAgentPage() {
                           confirmDisabled && 'cursor-not-allowed opacity-50',
                         )}
                       >
-                        {pendingProductPlanLoading ? '正在生成预览…' : confirmLabel}
+                        {pendingPreviewLoading ? '正在生成预览…' : confirmLabel}
                       </button>
                       <button
                         type="button"

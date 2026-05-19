@@ -79,12 +79,25 @@ export type AiProductPlanPreview = {
   enrichError?: string
 }
 
+/** 达人招募：图文 Brief 预览（确认后写入招募页） */
+export type AiRecruitmentBriefPreview = {
+  platform: string
+  mainProductName: string
+  tags: string[]
+  briefText: string
+  previews?: [string, string, string]
+  enrichStatus?: 'loading' | 'ready' | 'error'
+  enrichError?: string
+}
+
 export type AiTaskPreviewPayload = {
   title: string
   steps: string[]
   taskType: AiTaskType
   /** 创建商品：结构化方案（确认后进入创建向导预填） */
   productPlan?: AiProductPlanPreview
+  /** 达人招募：图文 Brief */
+  recruitmentBrief?: AiRecruitmentBriefPreview
 }
 
 /** 输入框中待发送的「引用某条对话」片段（发送后写入用户消息正文前缀） */
