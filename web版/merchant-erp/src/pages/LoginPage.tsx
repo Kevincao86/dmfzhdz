@@ -23,6 +23,15 @@ const FLOAT_STATS = [
 const POSTER_HEIGHT_CLASS =
   'h-[min(52vh,500px)] min-h-[400px] max-h-[500px] shrink-0'
 
+/** 右侧玻璃区：至少与左侧插画同高，内容多时可向下延伸；超高时在视口内滚动 */
+const AUTH_PANEL_SHELL_CLASS = cn(
+  'relative rounded-[28px] border border-white/70 p-6 sm:p-8',
+  'bg-white/35 shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.85)]',
+  'backdrop-blur-2xl backdrop-saturate-150',
+  'min-h-[max(400px,min(52vh,500px))]',
+  'max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain',
+)
+
 /**
  * 登录页：参照蒲公英 PGY — 顶栏品牌 + 左右主模块顶对齐；左侧插画尺寸固定。
  */
@@ -191,34 +200,25 @@ export default function LoginPage() {
               <div className="absolute left-1/2 top-1/3 h-32 w-32 -translate-x-1/2 rounded-full bg-teal-300/15 blur-2xl" />
             </div>
 
-            <div
-              className={cn(
-                'relative flex max-h-[min(720px,calc(100dvh-12rem))] flex-col overflow-hidden rounded-[28px] border border-white/70',
-                'bg-white/35 shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.85)]',
-                'backdrop-blur-2xl backdrop-saturate-150 lg:max-h-[min(640px,calc(100dvh-14rem))]',
-                POSTER_HEIGHT_CLASS,
-              )}
-            >
-              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 sm:p-8">
-                <div className="mb-6 lg:hidden">
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/50 px-3 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm backdrop-blur-sm">
-                    <Zap className="h-3 w-3" aria-hidden />
-                    商家工作台登录
-                  </div>
+            <div className={AUTH_PANEL_SHELL_CLASS}>
+              <div className="mb-6 lg:hidden">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/50 px-3 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm backdrop-blur-sm">
+                  <Zap className="h-3 w-3" aria-hidden />
+                  商家工作台
                 </div>
-
-                <LoginAuthPanel
-                  infoHint={infoHint}
-                  err={err}
-                  onInfoHint={setInfoHint}
-                  onErr={setErr}
-                  onLoginSuccess={() => navigate('/', { replace: true })}
-                />
-
-                <p className="mt-6 shrink-0 text-center text-[11px] leading-relaxed text-slate-500/90">
-                  登录即表示同意平台服务条款与隐私政策 · 数据经加密传输与存储
-                </p>
               </div>
+
+              <LoginAuthPanel
+                infoHint={infoHint}
+                err={err}
+                onInfoHint={setInfoHint}
+                onErr={setErr}
+                onLoginSuccess={() => navigate('/', { replace: true })}
+              />
+
+              <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-500/90">
+                登录即表示同意平台服务条款与隐私政策 · 数据经加密传输与存储
+              </p>
             </div>
           </div>
         </div>
