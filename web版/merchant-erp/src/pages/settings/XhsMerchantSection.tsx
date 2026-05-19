@@ -5,6 +5,7 @@ import {
   postXhsBind,
 } from '../../services/merchantPlatformApi'
 import { XhsApiSection } from './apiDocsContent'
+import { PlatformBrandLogo } from '../../lib/platformBranding'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
 const TOKEN_KEY = 'meoo_xhs_merchant_token'
@@ -103,9 +104,7 @@ export default function XhsMerchantSection() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start">
-          <div className="mr-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-100">
-            <i className="fa-solid fa-book text-xl text-red-600" />
-          </div>
+          <PlatformBrandLogo logo="xiaohongshu" alt="小红书" size="lg" className="mr-4" />
           <div>
             <h3 className="text-lg font-semibold text-gray-900">小红书商家版</h3>
             <p className="text-sm text-gray-500">

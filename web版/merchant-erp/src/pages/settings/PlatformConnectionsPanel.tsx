@@ -1,82 +1,63 @@
-import { ChevronRight, Plus } from 'lucide-react'
-import { useMemo } from 'react'
-import { cn } from '../../cn'
+import { Plus } from 'lucide-react'
+import { useState } from 'react'
 import {
-  MERCHANT_PLATFORM_BRANDS,
   PlatformBrandLogo,
-  type MerchantPlatformBrandId,
+  PlatformLogoPlaceholder,
+  SOCIAL_PLATFORM_BRANDS,
 } from '../../lib/platformBranding'
-import { readMerchantSession } from '../../lib/merchantSession'
-
-const TOKEN_BY_PLATFORM: Record<MerchantPlatformBrandId, string | null> = {
-  douyin: 'meoo_douyin_merchant_token',
-  meituan: 'meoo_meituan_merchant_token',
-  xhs: 'meoo_xhs_merchant_token',
-  jd: null,
-}
 
 const MAX_ACCOUNTS = 3
 
-type Props = {
-  onManage: (id: MerchantPlatformBrandId) => void
-}
+export default function PlatformConnectionsPanel() {
+  const [bindHint, setBindHint] = useState<string | null>(null)
 
-export default function PlatformConnectionsPanel({ onManage }: Props) {
-  const connected = useMemo(() => {
-    const map: Record<string, boolean> = {}
-    for (const p of MERCHANT_PLATFORM_BRANDS) {
-      const key = TOKEN_BY_PLATFORM[p.id]
-      map[p.id] = Boolean(key && readMerchantSession(key)?.trim())
-    }
-    return map
-  }, [])
+  const onBind = (name: string) => {
+    setBindHint(`${name}社交账号绑定即将上线，敬请期待。`)
+    window.setTimeout(() => setBindHint(null), 4000)
+  }
 
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white px-4 py-4 sm:px-5">
         <h3 className="text-lg font-semibold text-slate-900">平台账号绑定</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          连接各本地生活平台商家账号，用于商品、门店、评价、财务对账等能力。每个平台最多绑定 {MAX_ACCOUNTS}{' '}
-          个账号；详细授权请在「商家版后台」完成。
+        <p className="mt-1 text-sm leading-relaxed text-slate-600">
+          绑定您的<strong className="font-medium text-slate-800">用户侧社交账号</strong>
+          （如抖音、小红书、大众点评等），用于内容发布、账号运营与数据同步。此处为
+          <strong className="font-medium text-slate-800"> C 端/创作者账号</strong>，与下方「商家版后台」中的
+          抖音来客、大众点评商家版等<strong className="font-medium text-slate-800">经营侧授权</strong>
+          相互独立。每个平台最多绑定 {MAX_ACCOUNTS} 个账号。
         </p>
+        {bindHint ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {bindHint}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {MERCHANT_PLATFORM_BRANDS.map((p) => {
+        {SOCIAL_PLATFORM_BRANDS.map((p) => {
           const isJd = p.id === 'jd'
-          const isOn = connected[p.id]
           return (
             <div
               key={p.id}
-              className={cn(
-                'group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md',
-                isOn ? `border-transparent ring-2 ${p.ring}` : 'border-slate-200',
-              )}
+              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
             >
-              {isOn ? (
-                <div
-                  className={cn('pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r', p.gradient)}
-                  aria-hidden
-                />
-              ) : null}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <PlatformBrandLogo id={p.id} size="md" />
+                  {p.logo ? (
+                    <PlatformBrandLogo logo={p.logo} alt={p.shortName} size="md" />
+                  ) : (
+                    <PlatformLogoPlaceholder label="JD" size="md" />
+                  )}
                   <div className="min-w-0">
                     <h4 className="font-semibold text-slate-900">{p.shortName}</h4>
                     <p className="mt-0.5 text-sm text-slate-500">
-                      {isOn ? '已连接 · 1 个账号' : '未连接'}
-                      {!isJd ? ` · 最多 ${MAX_ACCOUNTS} 个` : ''}
+                      未连接 · 最多 {MAX_ACCOUNTS} 个
                     </p>
                   </div>
                 </div>
-                <span
-                  className={cn(
-                    'shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                    isOn ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
-                  )}
-                >
-                  {isOn ? '已连接' : isJd ? '即将开放' : '未连接'}
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                  {isJd ? '即将开放' : '未连接'}
                 </span>
               </div>
 
@@ -92,31 +73,19 @@ export default function PlatformConnectionsPanel({ onManage }: Props) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => onManage(p.id)}
-                    className={cn(
-                      'inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                      isOn
-                        ? 'border border-slate-200 text-slate-700 hover:bg-slate-50'
-                        : 'bg-blue-600 text-white hover:bg-blue-700',
-                    )}
+                    onClick={() => onBind(p.shortName)}
+                    className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
                   >
-                    {isOn ? (
-                      <>
-                        管理绑定
-                        <ChevronRight className="ml-1 h-4 w-4" />
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="mr-1 h-4 w-4" />
-                        去绑定
-                      </>
-                    )}
+                    <Plus className="mr-1 h-4 w-4" />
+                    去绑定
                   </button>
                 )}
               </div>
 
-              {!isOn && !isJd ? (
-                <p className="mt-3 text-center text-xs text-slate-400">点击「去绑定」进入商家版后台完成授权</p>
+              {!isJd ? (
+                <p className="mt-3 text-center text-xs text-slate-400">
+                  绑定后可在此管理社交账号授权（功能开发中）
+                </p>
               ) : null}
             </div>
           )

@@ -30,6 +30,7 @@ import {
   postDouyinBind,
   type DouyinStoreRow,
 } from '../../services/douyinMerchantApi'
+import { PlatformBrandLogo } from '../../lib/platformBranding'
 import DouyinBindGuide from './DouyinBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
@@ -509,9 +510,7 @@ export default function DouyinMerchantSection() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start">
-          <div className="mr-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-pink-100">
-            <i className="fa-brands fa-tiktok text-xl text-pink-600" />
-          </div>
+          <PlatformBrandLogo logo="douyin_laike" alt="抖音来客" size="lg" className="mr-4" />
           <div>
             <h3 className="text-lg font-semibold text-gray-900">抖音来客商家版</h3>
             <p className="text-sm text-gray-500">
