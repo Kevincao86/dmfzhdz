@@ -120,7 +120,7 @@ export default function SettingsPage() {
   const closeSubModal = () => {
     setSubModalOpen(false)
     void loadOfficialBilling()
-    void reloadMembership()
+    void reloadMembership({ silent: true })
   }
 
   const openSubModal = () => setSubModalOpen(true)
@@ -141,7 +141,7 @@ export default function SettingsPage() {
     })
     window.alert('已提交支付申报，请等待运营在「订单管理」核对确认；确认后将自动开通对应会员档位。')
     void loadOfficialBilling()
-    void reloadMembership()
+    void reloadMembership({ silent: true })
   }
 
   /** 相对云端登记「服务截止日期」的剩余日历天（可能为负表示已过期） */
@@ -209,7 +209,7 @@ export default function SettingsPage() {
   }, [location.search])
 
   useEffect(() => {
-    if (tab === 'subscription') void reloadMembership()
+    if (tab === 'subscription') void reloadMembership({ silent: true })
   }, [tab, reloadMembership])
 
   const toggleVerify = (id: string) => {
