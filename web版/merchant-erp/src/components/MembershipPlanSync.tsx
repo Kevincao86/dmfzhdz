@@ -12,11 +12,12 @@ export default function MembershipPlanSync() {
 
   useEffect(() => {
     const tick = () => {
-      if (document.visibilityState === 'visible') void reload()
+      if (document.visibilityState === 'visible') void reload({ silent: true })
     }
-    tick()
     const id = window.setInterval(tick, 20_000)
-    const onVis = () => tick()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void reload({ silent: true })
+    }
     document.addEventListener('visibilitychange', onVis)
     return () => {
       window.clearInterval(id)
