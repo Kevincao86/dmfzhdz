@@ -2,15 +2,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type TenantAnnouncementCategory = 'subscription_expiring' | 'platform_change'
 
+export type TenantAnnouncementPriority = 'normal' | 'urgent'
+
 export const ANNOUNCEMENT_CATEGORY_ZH: Record<TenantAnnouncementCategory, string> = {
   subscription_expiring: '套餐即将结束',
   platform_change: '平台改动',
+}
+
+export const ANNOUNCEMENT_PRIORITY_ZH: Record<TenantAnnouncementPriority, string> = {
+  normal: '普通',
+  urgent: '紧急',
 }
 
 export type TenantAnnouncementInboxItem = {
   deliveryId: string
   announcementId: string
   category: TenantAnnouncementCategory
+  priority: TenantAnnouncementPriority
   title: string
   body: string
   readAt: string | null
@@ -23,8 +31,16 @@ function parseCategory(raw: unknown): TenantAnnouncementCategory {
   return 'platform_change'
 }
 
+function parsePriority(
+  raw: unknown,
+  category: TenantAnnouncementCategory,
+): TenantAnnouncementPriority {
+  if (category !== 'platform_change') return 'normal'
+  return raw === 'urgent' ? 'urgent' : 'normal'
+}
+
 function isMissingAnnouncementTables(msg: string): boolean {
-  return /tenant_announcements|tenant_announcement_deliveries|does not exist|Could not find|schema cache/i.test(
+  return /tenant_announcements|tenant_announcement_deliveries|tenant_announcement_priority|\.priority|does not exist|Could not find|schema cache/i.test(
     msg,
   )
 }
@@ -46,6 +62,7 @@ export async function fetchTenantAnnouncementInbox(
       tenant_announcements (
         id,
         category,
+        priority,
         title,
         body,
         created_at
@@ -69,6 +86,7 @@ export async function fetchTenantAnnouncementInbox(
       | {
           id?: string
           category?: unknown
+          priority?: unknown
           title?: string
           body?: string
           created_at?: string
@@ -76,6 +94,7 @@ export async function fetchTenantAnnouncementInbox(
       | {
           id?: string
           category?: unknown
+          priority?: unknown
           title?: string
           body?: string
           created_at?: string
@@ -85,10 +104,12 @@ export async function fetchTenantAnnouncementInbox(
     const a = Array.isArray(ann) ? ann[0] : ann
     if (!a?.id) continue
 
+    const category = parseCategory(a.category)
     items.push({
       deliveryId: String(row.id),
       announcementId: String(a.id),
-      category: parseCategory(a.category),
+      category,
+      priority: parsePriority(a.priority, category),
       title: String(a.title ?? ''),
       body: String(a.body ?? ''),
       readAt: typeof row.read_at === 'string' ? row.read_at : null,

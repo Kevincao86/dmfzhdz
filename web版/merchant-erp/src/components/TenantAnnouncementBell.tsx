@@ -1,16 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bell, CheckCheck, Megaphone, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '../cn'
-import { fetchPrimaryTenantId } from '../lib/tenantBilling'
+import { useTenantAnnouncements } from '../context/TenantAnnouncementContext'
 import {
   ANNOUNCEMENT_CATEGORY_ZH,
-  fetchTenantAnnouncementInbox,
-  markAllTenantAnnouncementsRead,
-  markTenantAnnouncementRead,
-  type TenantAnnouncementInboxItem,
+  ANNOUNCEMENT_PRIORITY_ZH,
 } from '../lib/tenantAnnouncements'
-import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { supabaseConfigured } from '../lib/supabaseClient'
 
 function fmt(iso: string): string {
   try {
@@ -22,87 +19,37 @@ function fmt(iso: string): string {
 
 export default function TenantAnnouncementBell() {
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<TenantAnnouncementInboxItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [tenantId, setTenantId] = useState<string | null>(null)
   const [userDismissed, setUserDismissed] = useState(false)
-  const prevUnreadRef = useRef(0)
+  const prevNormalUnreadRef = useRef(0)
 
-  const reload = useCallback(async () => {
-    if (!supabaseConfigured || !supabase) {
-      setItems([])
-      setTenantId(null)
-      return
-    }
-    const tid = await fetchPrimaryTenantId(supabase)
-    setTenantId(tid)
-    if (!tid) {
-      setItems([])
-      return
-    }
-    setLoading(true)
-    const r = await fetchTenantAnnouncementInbox(supabase, tid)
-    setLoading(false)
-    if (r.ok) setItems(r.items)
-  }, [])
+  const {
+    items,
+    loading,
+    unreadCount,
+    normalUnreadCount,
+    reload,
+    markItemRead,
+    markAllRead,
+  } = useTenantAnnouncements()
 
   useEffect(() => {
-    void reload()
-    const t = window.setInterval(() => void reload(), 45_000)
-    return () => window.clearInterval(t)
-  }, [reload])
-
-  useEffect(() => {
-    if (!supabaseConfigured || !supabase) return
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      void reload()
-    })
-    return () => subscription.unsubscribe()
-  }, [reload])
-
-  const unreadCount = useMemo(() => items.filter((i) => !i.readAt).length, [items])
-
-  useEffect(() => {
-    if (unreadCount === 0) {
-      prevUnreadRef.current = 0
+    if (normalUnreadCount === 0) {
+      prevNormalUnreadRef.current = 0
       return
     }
-    const hasNewUnread = unreadCount > prevUnreadRef.current
-    prevUnreadRef.current = unreadCount
+    const hasNewUnread = normalUnreadCount > prevNormalUnreadRef.current
+    prevNormalUnreadRef.current = normalUnreadCount
     if (!userDismissed || hasNewUnread) {
       if (hasNewUnread) setUserDismissed(false)
       setOpen(true)
     }
-  }, [unreadCount, userDismissed])
-
-  const markItemRead = async (item: TenantAnnouncementInboxItem) => {
-    if (item.readAt || !supabase) return
-    const r = await markTenantAnnouncementRead(supabase, item.deliveryId)
-    if (r.ok) {
-      setItems((prev) =>
-        prev.map((x) =>
-          x.deliveryId === item.deliveryId ? { ...x, readAt: new Date().toISOString() } : x,
-        ),
-      )
-    }
-  }
+  }, [normalUnreadCount, userDismissed])
 
   const closePanel = () => {
     setOpen(false)
     setUserDismissed(true)
-    const unread = items.filter((i) => !i.readAt)
+    const unread = items.filter((i) => !i.readAt && i.priority !== 'urgent')
     if (unread.length > 0) void Promise.all(unread.map((i) => markItemRead(i)))
-  }
-
-  const markAllRead = async () => {
-    if (!supabase || !tenantId || unreadCount === 0) return
-    const r = await markAllTenantAnnouncementsRead(supabase, tenantId)
-    if (r.ok) {
-      const now = new Date().toISOString()
-      setItems((prev) => prev.map((x) => ({ ...x, readAt: x.readAt ?? now })))
-    }
   }
 
   if (!supabaseConfigured) return null
@@ -186,22 +133,33 @@ export default function TenantAnnouncementBell() {
                       return (
                         <li
                           key={item.deliveryId}
-                          className={cn(
-                            'px-4 py-3',
-                            unread && 'bg-cyan-50/40',
-                          )}
+                          className={cn('px-4 py-3', unread && 'bg-cyan-50/40')}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <span
-                              className={cn(
-                                'rounded px-1.5 py-0.5 text-[10px] font-medium',
-                                item.category === 'subscription_expiring'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-sky-100 text-sky-800',
-                              )}
-                            >
-                              {ANNOUNCEMENT_CATEGORY_ZH[item.category]}
-                            </span>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex flex-wrap gap-1">
+                              <span
+                                className={cn(
+                                  'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                                  item.category === 'subscription_expiring'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-sky-100 text-sky-800',
+                                )}
+                              >
+                                {ANNOUNCEMENT_CATEGORY_ZH[item.category]}
+                              </span>
+                              {item.category === 'platform_change' ? (
+                                <span
+                                  className={cn(
+                                    'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                                    item.priority === 'urgent'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-slate-100 text-slate-600',
+                                  )}
+                                >
+                                  {ANNOUNCEMENT_PRIORITY_ZH[item.priority]}
+                                </span>
+                              ) : null}
+                            </div>
                             <span className="shrink-0 text-[10px] text-slate-400">
                               {fmt(item.announcedAt)}
                             </span>
