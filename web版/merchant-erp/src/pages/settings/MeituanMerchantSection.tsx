@@ -107,7 +107,7 @@ export default function MeituanMerchantSection() {
             <i className="fa-solid fa-utensils text-xl text-yellow-700" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">美团点评商家版</h3>
+            <h3 className="text-lg font-semibold text-gray-900">大众点评商家版</h3>
             <p className="text-sm text-gray-500">
               绑定美团开放平台后，可手动或每 2 小时自动触发后端同步（团购核销、门店授权等）
             </p>
@@ -122,7 +122,7 @@ export default function MeituanMerchantSection() {
             }}
             className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
-            绑定美团点评
+            绑定大众点评
           </button>
         ) : (
           <button
@@ -185,7 +185,7 @@ export default function MeituanMerchantSection() {
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-8 text-center text-sm text-gray-600">
-          尚未绑定。请点击右上角「绑定美团点评」，绑定成功后可使用手动刷新与每 2 小时自动刷新。
+          尚未绑定。请点击右上角「绑定大众点评」，绑定成功后可使用手动刷新与每 2 小时自动刷新。
         </div>
       )}
 
@@ -201,7 +201,7 @@ export default function MeituanMerchantSection() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">绑定美团点评</h3>
+              <h3 className="text-lg font-semibold text-gray-900">绑定大众点评</h3>
               <button
                 type="button"
                 disabled={bindSubmitting}

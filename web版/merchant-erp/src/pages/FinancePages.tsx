@@ -48,8 +48,8 @@ type PlatformView = 'all' | FinancePlatformId
 
 const PLATFORM_FILTER_OPTIONS: { value: PlatformView; label: string }[] = [
   { value: 'all', label: '全部平台' },
-  { value: 'douyin', label: '抖音来客' },
-  { value: 'meituan', label: '美团点评' },
+  { value: 'douyin', label: '抖音' },
+  { value: 'meituan', label: '大众点评' },
   { value: 'xhs', label: '小红书' },
 ]
 
@@ -231,7 +231,7 @@ export function FinanceReconcilePage() {
   return (
     <ModulePage
       title="财务对账"
-      subtitle="当前对账优先支持抖音来客订单数据；其它平台将陆续开放。订单、核销与金额会与「商品列表」中的门店毛利率结合，粗算预估毛利，仅供参考。"
+      subtitle="支持抖音、大众点评、小红书等平台对账数据（需先在系统设置完成各平台绑定）。订单、核销与金额会与「商品列表」中的门店毛利率结合，粗算预估毛利，仅供参考。"
       actions={
         <div className="flex flex-wrap gap-2">
           <button

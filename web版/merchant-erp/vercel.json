@@ -34,6 +34,10 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-finance-reconcile.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-tenant-subaccount-mutate.ts": {
       "includeFiles": "vite-plugins/merchantSupabaseAdminEnv.ts",
       "maxDuration": 30

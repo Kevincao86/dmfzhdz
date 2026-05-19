@@ -1,16 +1,10 @@
 /**
  * 各平台财务对账台数据（订单、核销、金额等）。
- * 本地：`GET /api/merchant/finance/reconcile`；生产由网关聚合各开放平台对账/订单接口。
+ * 生产优先 `GET /api/meoo-finance-reconcile`，回退 `/api/merchant/finance/reconcile`。
  */
 
 import { readMerchantSession } from '../lib/merchantSession'
-
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
-
-function url(path: string) {
-  const b = apiBase().replace(/\/$/, '')
-  return `${b}${path}`
-}
+import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 
 export type FinancePlatformId = 'douyin' | 'meituan' | 'xhs'
 
@@ -36,6 +30,11 @@ export type FinanceReconcileResult =
       endDate?: string
     }
   | { ok: false; message: string }
+
+function responseLooksLikeHtml(text: string, contentType: string): boolean {
+  const t = text.trimStart()
+  return t.startsWith('<') || /text\/html/i.test(contentType)
+}
 
 export async function fetchFinanceReconcile(params?: {
   days?: number
@@ -66,17 +65,41 @@ export async function fetchFinanceReconcile(params?: {
   if (meituanToken) headers['X-Meoo-Meituan-Token'] = meituanToken
   if (xhsToken) headers['X-Meoo-Xhs-Token'] = xhsToken
 
+  const qs = `?${q}`
+  const paths = [`/api/meoo-finance-reconcile${qs}`, `/api/merchant/finance/reconcile${qs}`]
+  const targets = merchantApiFetchUrlCandidates(paths)
+
   try {
-    const res = await fetch(url(`/api/merchant/finance/reconcile?${q}`), {
-      method: 'GET',
-      headers,
-      signal: params?.signal,
-    })
+    let res: Response | null = null
+    let bodyText = ''
+    for (const target of targets) {
+      const r = await fetch(target, {
+        method: 'GET',
+        headers,
+        signal: params?.signal,
+      })
+      const text = await r.text()
+      const ct = r.headers.get('content-type') ?? ''
+      const trim = text.trim()
+      if (r.status === 404 || isLikelyRouteMiss404(r, trim, ct)) continue
+      if (r.ok && responseLooksLikeHtml(text, ct)) continue
+      res = r
+      bodyText = text
+      break
+    }
+
+    if (!res) {
+      return {
+        ok: false,
+        message: '财务对账接口 404（请部署 api/meoo-finance-reconcile）',
+      }
+    }
+
     let data: Record<string, unknown> = {}
     try {
-      data = (await res.json()) as Record<string, unknown>
+      data = JSON.parse(bodyText || '{}') as Record<string, unknown>
     } catch {
-      /* ignore */
+      data = {}
     }
     if (!res.ok) {
       const msg =
