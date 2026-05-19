@@ -1,4 +1,4 @@
-import { Activity, Loader2, Megaphone, UserPlus, Users } from 'lucide-react'
+import { Activity, Crown, Loader2, Megaphone, Sparkles, UserPlus, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
@@ -8,6 +8,7 @@ import {
   type DashboardStats,
 } from '../opsDashboardCompute'
 import { buildDashboardRange, formatRangeCaption, type DashboardPreset } from '../opsDashboardRange'
+import { fetchOpsPaymentOrders, type OpsPaymentOrderRow } from '../opsPaymentOrdersApi'
 import { fetchRegistry } from '../opsRegistryApi'
 import { fetchSupabaseTenantsForOps } from '../supabaseTenantsApi'
 
@@ -56,13 +57,15 @@ function DailyTable({ rows }: { rows: DashboardDailyPoint[] }) {
   if (rows.length === 0) return null
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800">
-      <table className="w-full min-w-[520px] text-left text-sm">
+      <table className="w-full min-w-[720px] text-left text-sm">
         <thead className="bg-slate-950 text-[11px] font-semibold uppercase text-slate-500">
           <tr>
             <th className="px-3 py-2.5">日期</th>
             <th className="px-3 py-2.5">新增注册</th>
             <th className="px-3 py-2.5">活跃用户</th>
             <th className="px-3 py-2.5">达人招募商户</th>
+            <th className="px-3 py-2.5">会员版订阅</th>
+            <th className="px-3 py-2.5">会员 Plus 订阅</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800">
@@ -72,6 +75,8 @@ function DailyTable({ rows }: { rows: DashboardDailyPoint[] }) {
               <td className="px-3 py-2 tabular-nums text-slate-200">{r.registered}</td>
               <td className="px-3 py-2 tabular-nums text-slate-200">{r.active}</td>
               <td className="px-3 py-2 tabular-nums text-slate-200">{r.recruitmentMerchants}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-200">{r.memberSubscribe}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-200">{r.memberPlusSubscribe}</td>
             </tr>
           ))}
         </tbody>
@@ -121,9 +126,13 @@ export default function OpsHomePage() {
         /* 招募统计可仅用 Supabase 租户；注册表不可用时招募数为 0 */
       }
 
+      let paymentOrders: OpsPaymentOrderRow[] = []
+      const po = await fetchOpsPaymentOrders()
+      if (po.ok) paymentOrders = po.rows
+
       const r = buildDashboardRange(preset, customStart, customEnd)
-      setStats(computeDashboardStats(tenants, recruitmentOrders, mpOrders, r))
-      setDaily(computeDashboardDailySeries(tenants, recruitmentOrders, mpOrders, r))
+      setStats(computeDashboardStats(tenants, recruitmentOrders, mpOrders, paymentOrders, r))
+      setDaily(computeDashboardDailySeries(tenants, recruitmentOrders, mpOrders, paymentOrders, r))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStats(null)
@@ -142,7 +151,7 @@ export default function OpsHomePage() {
       <div>
         <h1 className="text-xl font-semibold text-white">运营首页</h1>
         <p className="mt-1 text-sm text-slate-500">
-          数据看板汇总商户注册、活跃与达人招募使用情况（统计周期：{formatRangeCaption(range)}）
+          数据看板汇总商户注册、活跃、达人招募与订阅开通情况（统计周期：{formatRangeCaption(range)}）
         </p>
       </div>
 
@@ -205,7 +214,7 @@ export default function OpsHomePage() {
         </div>
       ) : stats ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <StatCard
               icon={UserPlus}
               iconClass="bg-emerald-500/15 text-emerald-400"
@@ -226,6 +235,20 @@ export default function OpsHomePage() {
               label="调用达人招募商户数"
               value={stats.recruitmentMerchants}
               hint="周期内发起商家招募或小程序招募订单的去重商户数"
+            />
+            <StatCard
+              icon={Crown}
+              iconClass="bg-amber-500/15 text-amber-400"
+              label="订阅会员版用户数"
+              value={stats.memberSubscribeUsers}
+              hint="周期内确认会员版订阅或运营开通会员档位的去重商户数"
+            />
+            <StatCard
+              icon={Sparkles}
+              iconClass="bg-fuchsia-500/15 text-fuchsia-400"
+              label="订阅会员 Plus 用户数"
+              value={stats.memberPlusSubscribeUsers}
+              hint="周期内确认会员 Plus 订阅或运营开通 Plus 档位的去重商户数"
             />
           </div>
 
