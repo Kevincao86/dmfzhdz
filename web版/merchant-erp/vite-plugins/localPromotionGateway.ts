@@ -9,6 +9,19 @@ import { generateReviewReplyByDoubao } from './merchantAiUpstream.js'
 
 const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
 
+function mapOceanError(raw: string, status?: number): string {
+  const s = raw.trim()
+  const lower = s.toLowerCase()
+  if (status === 404 || /not_found|page could not be found/.test(lower)) {
+    return '巨量开放平台接口不可用，请检查授权或稍后重试。'
+  }
+  if (status && status >= 500) return '巨量开放平台暂时繁忙，请稍后再试。'
+  if (!/[\u4e00-\u9fff]/.test(s)) {
+    return '连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通线索/投放权限。'
+  }
+  return s
+}
+
 export type LocalPromotionCredentials = {
   accessToken: string
   localAccountId: string
@@ -66,10 +79,13 @@ async function oceanGet<T>(
   try {
     parsed = JSON.parse(text) as OeEnvelope<T>
   } catch {
-    return { ok: false, message: text.slice(0, 300) || `HTTP ${r.status}` }
+    return { ok: false, message: mapOceanError(text, r.status) }
+  }
+  if (!r.ok) {
+    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status) }
   }
   if (parsed.code !== 0 && parsed.code !== undefined) {
-    return { ok: false, message: parsed.message ?? `开放平台错误 code=${parsed.code}` }
+    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
   }
   return { ok: true, data: (parsed.data ?? {}) as T }
 }
@@ -94,10 +110,13 @@ async function oceanPost<T>(
   try {
     parsed = JSON.parse(text) as OeEnvelope<T>
   } catch {
-    return { ok: false, message: text.slice(0, 300) || `HTTP ${r.status}` }
+    return { ok: false, message: mapOceanError(text, r.status) }
+  }
+  if (!r.ok) {
+    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status) }
   }
   if (parsed.code !== 0 && parsed.code !== undefined) {
-    return { ok: false, message: parsed.message ?? `开放平台错误 code=${parsed.code}` }
+    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
   }
   return { ok: true, data: (parsed.data ?? {}) as T }
 }
@@ -262,7 +281,11 @@ export async function handleLocalPromotionRoutes(
       page_size: '1',
     })
     if (!pr.ok) {
-      json(res, 200, { ok: true, demoMode: true, message: `无法连接开放平台，将使用演示数据：${pr.message}` })
+      json(res, 200, {
+        ok: true,
+        demoMode: true,
+        message: '无法连接巨量本地推，当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。',
+      })
       return true
     }
     json(res, 200, { ok: true, demoMode: false, message: '本地推授权校验通过' })
@@ -448,7 +471,11 @@ export async function handleLocalPromotionRoutes(
       },
     )
     if (!pr.ok) {
-      json(res, 200, { ok: true, ...demoClues(), message: pr.message })
+      json(res, 200, {
+        ok: true,
+        ...demoClues(),
+        message: '暂无法从巨量拉取真实线索，已展示演示数据；请确认已开通线索权限或稍后重试。',
+      })
       return true
     }
     const list = (pr.data.list ?? []).map((c) => {

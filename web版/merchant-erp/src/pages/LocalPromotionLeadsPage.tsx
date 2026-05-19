@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../cn'
 import { isLocalPromotionBound } from '../lib/localPromotionBinding'
+import { toUserFacingError } from '../lib/userFacingError'
 import { CLUE_CONVERT_STATES, type ClueConvertState, type LocalClueRow } from '../lib/localPromotionTypes'
 import ModulePage from './ModulePage'
 import {
@@ -44,12 +45,12 @@ export default function LocalPromotionLeadsPage() {
       if (r.ok) {
         setItems(r.list)
         setDemoMode(Boolean(r.demoMode))
-        if (r.message) setError(r.message)
+        setError(null)
       } else {
         setError(r.message)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(toUserFacingError(e, '拉取线索'))
     } finally {
       setLoading(false)
     }
@@ -107,7 +108,7 @@ export default function LocalPromotionLeadsPage() {
   return (
     <ModulePage
       title="线索"
-      subtitle="巨量本地推线索 · 拉取、AI 跟进话术、状态回传（life/get · life/callback）"
+      subtitle="同步本地推线索，AI 生成跟进话术并回传跟进状态"
       actions={
         <button
           type="button"
@@ -134,7 +135,11 @@ export default function LocalPromotionLeadsPage() {
         </div>
       ) : null}
 
-      {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
+      {error ? (
+        <div className="erp-panel mb-4 border-rose-200 bg-rose-50/90 p-4 text-sm text-rose-800" role="alert">
+          {error}
+        </div>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {(
@@ -214,7 +219,7 @@ export default function LocalPromotionLeadsPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">回传状态（开放平台）</label>
+                <label className="mb-1 block text-xs font-medium text-slate-600">回传状态</label>
                 <select
                   value={callbackState}
                   onChange={(e) => setCallbackState(e.target.value as ClueConvertState)}
@@ -227,7 +232,7 @@ export default function LocalPromotionLeadsPage() {
                   ))}
                 </select>
                 <p className="mt-1 text-[10px] text-slate-400">
-                  对应接口 POST /open_api/2/tools/clue/life/callback/
+                  回传后巨量本地推将更新该线索的跟进阶段。
                 </p>
               </div>
 

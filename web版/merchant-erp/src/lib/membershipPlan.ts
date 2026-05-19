@@ -15,6 +15,34 @@ export const MEMBERSHIP_MONTHLY_YUAN: Partial<Record<MembershipPlan, number>> = 
 /** 免费版直连四厂商每月上限 */
 export const FREE_DIRECT_AI_CALL_LIMIT = 50
 
+/** 各会员档位：抖音来客 / 巨量本地推 每平台可绑定账号数 */
+export function platformBindingLimit(plan: MembershipPlan): number {
+  if (plan === 'member_plus') return 50
+  if (plan === 'member') return 5
+  return 1
+}
+
+export function platformBindingLimitDescription(plan: MembershipPlan): string {
+  const n = platformBindingLimit(plan)
+  return `${MEMBERSHIP_PLAN_LABELS[plan]}：每个平台最多绑定 ${n} 个账号`
+}
+
+export function canAddPlatformBinding(plan: MembershipPlan, currentCount: number): boolean {
+  return currentCount < platformBindingLimit(plan)
+}
+
+export function platformBindingLimitExceededMessage(plan: MembershipPlan): string {
+  const n = platformBindingLimit(plan)
+  const label = MEMBERSHIP_PLAN_LABELS[plan]
+  if (plan === 'free') {
+    return `${label}每个平台仅可绑定 1 个账号。如需绑定更多，请升级会员版（5 个）或会员 Plus（50 个）。`
+  }
+  if (plan === 'member') {
+    return `${label}每个平台最多绑定 ${n} 个账号。如需更多，请升级会员 Plus（50 个）。`
+  }
+  return `${label}每个平台最多绑定 ${n} 个账号。`
+}
+
 /** 会员版 / 免费版可选 AI 厂商（不含 TokenMix、Kimi） */
 export const BASIC_AI_PROVIDERS = ['qwen', 'doubao', 'minimax', 'deepseek'] as const
 export type BasicAiProvider = (typeof BASIC_AI_PROVIDERS)[number]
@@ -50,6 +78,8 @@ export function isPathBlockedForFree(pathname: string): boolean {
 export type TenantEntitlements = {
   plan: MembershipPlan
   planLabel: string
+  /** 来客 / 本地推每平台账号上限 */
+  platformBindingLimit: number
   directAiCallsUsed: number
   directAiCallLimit: number | null
   directAiRemaining: number | null
@@ -75,6 +105,7 @@ export function buildTenantEntitlements(input: {
   return {
     plan,
     planLabel: MEMBERSHIP_PLAN_LABELS[plan],
+    platformBindingLimit: platformBindingLimit(plan),
     directAiCallsUsed: used,
     directAiCallLimit: limit,
     directAiRemaining: remaining,

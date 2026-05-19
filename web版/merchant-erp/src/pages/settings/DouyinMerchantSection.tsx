@@ -2,7 +2,13 @@ import { BookOpen, Eye, EyeOff, Search, User } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
+import { useMembership } from '../../context/MembershipContext'
 import { applyActiveDouyinBinding } from '../../lib/douyinActiveBinding'
+import {
+  canAddPlatformBinding,
+  platformBindingLimitDescription,
+  platformBindingLimitExceededMessage,
+} from '../../lib/membershipPlan'
 import {
   deleteDouyinBindingCloud,
   hydrateDouyinBindingsFromCloud,
@@ -69,6 +75,8 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 }
 
 export default function DouyinMerchantSection() {
+  const { plan, entitlements } = useMembership()
+  const bindingLimit = entitlements.platformBindingLimit
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [bindOpen, setBindOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
@@ -403,10 +411,24 @@ export default function DouyinMerchantSection() {
     if (clampedPage !== page) setPage(clampedPage)
   }, [clampedPage, page])
 
+  const openBindForm = () => {
+    setBindError(null)
+    if (!canAddPlatformBinding(plan, cloudBindings.length)) {
+      setBindError(platformBindingLimitExceededMessage(plan))
+      return
+    }
+    setBindOpen(true)
+  }
+
   const handleBind = async () => {
     setBindError(null)
     if (!appId.trim() || !appSecret.trim() || !merchantId.trim()) {
       setBindError('请填写 AppID、App Secret 与商户 ID')
+      return
+    }
+    const exists = cloudBindings.some((b) => b.merchant_account_id === merchantId.trim())
+    if (!exists && !canAddPlatformBinding(plan, cloudBindings.length)) {
+      setBindError(platformBindingLimitExceededMessage(plan))
       return
     }
     setBindSubmitting(true)
@@ -493,7 +515,7 @@ export default function DouyinMerchantSection() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900">抖音来客商家版</h3>
             <p className="text-sm text-gray-500">
-              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细。可与「巨量本地推」使用不同登录账号；同一平台最多绑定 5 个账号，切换「当前使用」决定门店拉取与商品同步所用凭据。
+              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细。可与「巨量本地推」使用不同登录账号；{platformBindingLimitDescription(plan)}，切换「当前使用」决定门店拉取与商品同步所用凭据。
               {supabaseConfigured ? (
                 <span className="mt-1 block text-gray-600">
                   已登录商户主账号时，绑定写入 Supabase（
@@ -516,10 +538,7 @@ export default function DouyinMerchantSection() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              setBindError(null)
-              setBindOpen(true)
-            }}
+            onClick={openBindForm}
             className={
               accessToken
                 ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50'
@@ -536,14 +555,12 @@ export default function DouyinMerchantSection() {
           <h4 className="mb-3 text-sm font-semibold text-gray-900">已绑定的来客账号</h4>
           <MerchantPlatformAccountsPanel
             accounts={douyinAccountItems}
-            maxAccounts={5}
+            maxAccounts={bindingLimit}
+            planHint={platformBindingLimitDescription(plan)}
             emptyHint="尚未绑定来客账号"
             onSelectActive={(id) => void selectDouyinBinding(id)}
             onRemove={(id) => void removeDouyinBinding(id)}
-            onAddClick={() => {
-              setBindError(null)
-              setBindOpen(true)
-            }}
+            onAddClick={openBindForm}
           />
         </div>
       ) : null}
@@ -811,8 +828,7 @@ export default function DouyinMerchantSection() {
                   type="button"
                   onClick={() => {
                     setGuideOpen(false)
-                    setBindError(null)
-                    setBindOpen(true)
+                    openBindForm()
                   }}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >

@@ -14,6 +14,7 @@ export type PlatformAccountListItem = {
 export default function MerchantPlatformAccountsPanel({
   accounts,
   maxAccounts = 5,
+  planHint,
   emptyHint,
   onSelectActive,
   onRemove,
@@ -21,6 +22,8 @@ export default function MerchantPlatformAccountsPanel({
 }: {
   accounts: PlatformAccountListItem[]
   maxAccounts?: number
+  /** 当前套餐绑定上限说明 */
+  planHint?: string
   emptyHint: string
   onSelectActive: (id: string) => void
   onRemove: (id: string) => void
@@ -31,9 +34,12 @@ export default function MerchantPlatformAccountsPanel({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-slate-500">
-          已绑定 {accounts.length} / {maxAccounts} 个账号
-        </p>
+        <div className="text-xs text-slate-500">
+          <p>
+            已绑定 {accounts.length} / {maxAccounts} 个账号
+          </p>
+          {planHint ? <p className="mt-0.5 text-slate-400">{planHint}</p> : null}
+        </div>
         <button
           type="button"
           disabled={atLimit}
