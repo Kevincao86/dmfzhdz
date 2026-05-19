@@ -19,7 +19,7 @@ type MembershipContextValue = {
   plan: MembershipPlan
   entitlements: TenantEntitlements
   loading: boolean
-  reload: () => Promise<void>
+  reload: (opts?: { silent?: boolean }) => Promise<void>
 }
 
 const defaultEntitlements = buildTenantEntitlements({ plan: 'free' })
@@ -37,7 +37,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [tokenMixBound, setTokenMixBound] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (opts?: { silent?: boolean }) => {
     const client = supabase
     if (!supabaseConfigured || !client) {
       setPlan('free')
@@ -46,7 +46,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
-    setLoading(true)
+    if (!opts?.silent) setLoading(true)
     try {
       const tid = await fetchPrimaryTenantId(client)
       if (!tid) {
@@ -83,7 +83,7 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
     void reload()
     const client = supabase
     if (!client) return
-    const { data: sub } = client.auth.onAuthStateChange(() => void reload())
+    const { data: sub } = client.auth.onAuthStateChange(() => void reload({ silent: true }))
     return () => sub.subscription.unsubscribe()
   }, [reload])
 
