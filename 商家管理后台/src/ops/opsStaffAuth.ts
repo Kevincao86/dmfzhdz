@@ -105,39 +105,60 @@ export function readOpsStaffAccounts(): OpsStaffAccount[] {
 }
 
 function writeOpsStaffAccounts(accounts: OpsStaffAccount[]): void {
-  localStorage.setItem(OPS_STAFF_STORAGE_KEY, JSON.stringify(accounts))
+  const serialized = JSON.stringify(accounts)
+  if (localStorage.getItem(OPS_STAFF_STORAGE_KEY) === serialized) return
+  localStorage.setItem(OPS_STAFF_STORAGE_KEY, serialized)
   window.dispatchEvent(new CustomEvent('meoo-ops-staff-changed'))
 }
 
-/** 确保主账号存在且密码为当前默认（仅当无记录或主账号缺失时写入） */
+/** 确保主账号存在且密码为当前默认（无变更时不写入，避免触发 storage 事件死循环） */
 export async function ensureOpsMasterAccount(): Promise<void> {
   const list = readOpsStaffAccounts()
   const hash = await hashOpsPassword(OPS_MASTER_DEFAULT_PASSWORD)
+  const perms = allPermissionKeys()
   const now = new Date().toISOString()
   const idx = list.findIndex((a) => a.phone === OPS_MASTER_PHONE)
+  const hasExtraSuperAdmin = list.some((a) => a.role === 'super_admin' && a.phone !== OPS_MASTER_PHONE)
+
   if (idx >= 0) {
     const cur = list[idx]!
-    list[idx] = {
+    const displayName = cur.displayName || '超级管理员'
+    const masterChanged =
+      cur.role !== 'super_admin' ||
+      cur.passwordHash !== hash ||
+      cur.status !== 'active' ||
+      cur.displayName !== displayName ||
+      JSON.stringify(cur.permissions) !== JSON.stringify(perms)
+
+    const nextMaster: OpsStaffAccount = {
       ...cur,
       role: 'super_admin',
       passwordHash: hash,
-      permissions: allPermissionKeys(),
+      permissions: perms,
       status: 'active',
-      displayName: cur.displayName || '超级管理员',
-      updatedAt: now,
+      displayName,
+      updatedAt: masterChanged ? now : cur.updatedAt,
     }
-    writeOpsStaffAccounts(list.filter((a) => a.role !== 'super_admin' || a.phone === OPS_MASTER_PHONE))
+
+    const nextList = list
+      .filter((a) => a.role !== 'super_admin' || a.phone === OPS_MASTER_PHONE)
+      .map((a) => (a.phone === OPS_MASTER_PHONE ? nextMaster : a))
+
+    if (masterChanged || hasExtraSuperAdmin || nextList.length !== list.length) {
+      writeOpsStaffAccounts(nextList)
+    }
     return
   }
+
   writeOpsStaffAccounts([
-    ...list.filter((a) => a.phone !== OPS_MASTER_PHONE),
+    ...list.filter((a) => a.phone !== OPS_MASTER_PHONE && a.role !== 'super_admin'),
     {
       id: 'ops_master',
       phone: OPS_MASTER_PHONE,
       displayName: '超级管理员',
       role: 'super_admin',
       passwordHash: hash,
-      permissions: allPermissionKeys(),
+      permissions: perms,
       status: 'active',
       createdAt: now,
       updatedAt: now,

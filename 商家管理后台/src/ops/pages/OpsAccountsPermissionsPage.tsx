@@ -39,17 +39,22 @@ export default function OpsAccountsPermissionsPage() {
     permissions: [] as OpsPermissionKey[],
   })
 
-  const reload = useCallback(async () => {
-    await ensureOpsMasterAccount()
+  const reloadStaff = useCallback(() => {
     setStaff(readOpsStaffAccounts())
   }, [])
 
   useEffect(() => {
-    void reload()
-    const onChange = () => void reload()
+    let cancelled = false
+    void ensureOpsMasterAccount().then(() => {
+      if (!cancelled) reloadStaff()
+    })
+    const onChange = () => reloadStaff()
     window.addEventListener('meoo-ops-staff-changed', onChange)
-    return () => window.removeEventListener('meoo-ops-staff-changed', onChange)
-  }, [reload])
+    return () => {
+      cancelled = true
+      window.removeEventListener('meoo-ops-staff-changed', onChange)
+    }
+  }, [reloadStaff])
 
   const editing = useMemo(
     () => (editId ? staff.find((a) => a.id === editId) ?? null : null),
@@ -121,7 +126,7 @@ export default function OpsAccountsPermissionsPage() {
         return
       }
       resetForm()
-      await reload()
+      reloadStaff()
       window.alert('子账号已创建')
     } finally {
       setBusy(false)
@@ -149,7 +154,7 @@ export default function OpsAccountsPermissionsPage() {
       }
       refreshOpsSessionFromStorage()
       resetForm()
-      await reload()
+      reloadStaff()
       window.alert('已保存')
     } finally {
       setBusy(false)
@@ -165,7 +170,7 @@ export default function OpsAccountsPermissionsPage() {
       window.alert('操作失败')
       return
     }
-    await reload()
+    reloadStaff()
   }
 
   const handleDelete = async (a: OpsStaffAccount) => {
@@ -175,7 +180,7 @@ export default function OpsAccountsPermissionsPage() {
       window.alert('删除失败')
       return
     }
-    await reload()
+    reloadStaff()
   }
 
   return (
