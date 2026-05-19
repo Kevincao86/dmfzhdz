@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Search, User } from 'lucide-react'
+import { BookOpen, Eye, EyeOff, Search, User } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import {
@@ -17,6 +17,7 @@ import {
   postDouyinBind,
   type DouyinStoreRow,
 } from '../../services/douyinMerchantApi'
+import DouyinBindGuide from './DouyinBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
 const TOKEN_KEY = 'meoo_douyin_merchant_token'
@@ -63,6 +64,7 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 export default function DouyinMerchantSection() {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [bindOpen, setBindOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   /** 默认关闭：避免切页/刷新时定时静默拉取与 TOKEN 刷新叠加重试，误判为断连 */
   const [autoRefresh, setAutoRefresh] = useState(() => readMerchantSession(AUTO_KEY) === '1')
   const [manualRefreshing, setManualRefreshing] = useState(false)
@@ -423,26 +425,36 @@ export default function DouyinMerchantSection() {
             </p>
           </div>
         </div>
-        {!accessToken ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              setBindError(null)
-              setBindOpen(true)
-            }}
-            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            onClick={() => setGuideOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            绑定抖音来客
+            <BookOpen className="h-4 w-4" />
+            绑定说明书
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setBindOpen(true)}
-            className="shrink-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            重新绑定
-          </button>
-        )}
+          {!accessToken ? (
+            <button
+              type="button"
+              onClick={() => {
+                setBindError(null)
+                setBindOpen(true)
+              }}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              绑定抖音来客
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setBindOpen(true)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              重新绑定
+            </button>
+          )}
+        </div>
       </div>
 
       {accessToken ? (
@@ -653,8 +665,71 @@ export default function DouyinMerchantSection() {
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50/80 p-8 text-center text-sm text-gray-600">
-          尚未绑定。请点击右上角「绑定抖音来客」，在弹窗中填写 AppID、App Secret 与商户根账户
-          ID，提交后将请求后端完成鉴权并拉取门店列表。
+          <p>
+            尚未绑定。请先阅读
+            <button
+              type="button"
+              onClick={() => setGuideOpen(true)}
+              className="mx-1 text-blue-600 underline hover:text-blue-800"
+            >
+              绑定说明书
+            </button>
+            完成来客与开放平台配置，再点击「绑定抖音来客」填写 AppID、App Secret 与商户 ID。
+          </p>
+        </div>
+      )}
+
+      {guideOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="douyin-bind-guide-title"
+          onClick={() => setGuideOpen(false)}
+        >
+          <div
+            className="flex max-h-[min(90vh,900px)] w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4">
+              <h3 id="douyin-bind-guide-title" className="text-lg font-semibold text-gray-900">
+                抖音来客绑定说明书
+              </h3>
+              <button
+                type="button"
+                onClick={() => setGuideOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                aria-label="关闭"
+              >
+                <span className="text-xl leading-none">×</span>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <DouyinBindGuide compact />
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setGuideOpen(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                关闭
+              </button>
+              {!accessToken ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuideOpen(false)
+                    setBindError(null)
+                    setBindOpen(true)
+                  }}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  去绑定
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
 
@@ -681,8 +756,20 @@ export default function DouyinMerchantSection() {
                 <span className="text-xl leading-none">×</span>
               </button>
             </div>
-            <p className="mb-4 text-sm text-gray-600">
+            <p className="mb-2 text-sm text-gray-600">
               凭证将提交至服务端完成鉴权并拉取门店；App Secret 请勿泄露或长期保存在浏览器本地。
+            </p>
+            <p className="mb-4 text-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setBindOpen(false)
+                  setGuideOpen(true)
+                }}
+                className="text-blue-600 underline hover:text-blue-800"
+              >
+                首次绑定？查看图文绑定说明书
+              </button>
             </p>
             <div className="space-y-4">
               <div>

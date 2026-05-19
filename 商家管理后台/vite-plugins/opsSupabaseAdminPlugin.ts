@@ -13,6 +13,11 @@ import {
   verifyOpsPaymentOrderAdmin,
 } from '../src/ops/paymentOrdersAdminBackend'
 import {
+  listTenantAnnouncementsForOps,
+  parseAnnouncementCategory,
+  sendTenantAnnouncement,
+} from '../api/tenantAnnouncementsCore'
+import {
   opsTenantPatchAdmin,
   opsTenantResetPasswordAdmin,
   opsTenantTokenmixAdmin,
@@ -224,6 +229,14 @@ function isMeooTenantsTokenmixPath(urlPath: string): boolean {
   return urlPath === '/api/meoo-supabase-tenants-tokenmix'
 }
 
+function isMeooAnnouncementsSendPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-tenant-announcements-send'
+}
+
+function isMeooAnnouncementsListPath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-tenant-announcements-list'
+}
+
 async function edgePost(
   supabaseUrl: string,
   anon: string,
@@ -260,7 +273,9 @@ export function opsSupabaseAdminPlugin(): Plugin {
           !isMeooTenantsTokenmixPath(urlPath) &&
           !isMeooFlatOpsGetPath(urlPath) &&
           !isMeooPaymentOrdersVerifyPath(urlPath) &&
-          !isMeooPaymentOrdersConfirmPath(urlPath)
+          !isMeooPaymentOrdersConfirmPath(urlPath) &&
+          !isMeooAnnouncementsSendPath(urlPath) &&
+          !isMeooAnnouncementsListPath(urlPath)
         ) {
           return next()
         }
@@ -299,7 +314,9 @@ export function opsSupabaseAdminPlugin(): Plugin {
           isMeooPaymentOrdersVerifyPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/confirm' ||
           isMeooPaymentOrdersConfirmPath(urlPath) ||
-          urlPath === '/api/ops-supabase/payment-orders/delete'
+          urlPath === '/api/ops-supabase/payment-orders/delete' ||
+          isMeooAnnouncementsSendPath(urlPath) ||
+          isMeooAnnouncementsListPath(urlPath)
         if (!isOpsSupabaseRoute) {
           return next()
         }
@@ -653,6 +670,70 @@ export function opsSupabaseAdminPlugin(): Plugin {
               return
             }
             json(res, 200, { ok: true })
+            return
+          }
+
+          if (method === 'GET' && isMeooAnnouncementsListPath(urlPath)) {
+            if (!effectiveKey) {
+              json(res, 503, { ok: false, error: 'supabase_admin_not_configured' })
+              return
+            }
+            const admin = createClient(supabaseUrl, effectiveKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            })
+            const lr = await listTenantAnnouncementsForOps(admin)
+            if (!lr.ok) {
+              json(res, lr.error === 'migration_required' ? 503 : 500, lr)
+              return
+            }
+            json(res, 200, { ok: true, rows: lr.rows })
+            return
+          }
+
+          if (method === 'POST' && isMeooAnnouncementsSendPath(urlPath)) {
+            if (!effectiveKey) {
+              json(res, 503, { ok: false, error: 'supabase_admin_not_configured' })
+              return
+            }
+            const raw = await readBody(req as IncomingMessage)
+            let body: Record<string, unknown>
+            try {
+              body = JSON.parse(raw || '{}') as Record<string, unknown>
+            } catch {
+              json(res, 400, { ok: false, error: 'invalid_json' })
+              return
+            }
+            const category = parseAnnouncementCategory(body.category)
+            if (!category) {
+              json(res, 400, { ok: false, error: 'invalid_category' })
+              return
+            }
+            const targetAll = body.targetAll === true || body.target_all === true
+            const tenantIds = Array.isArray(body.tenantIds)
+              ? body.tenantIds
+              : Array.isArray(body.tenant_ids)
+                ? body.tenant_ids
+                : []
+            const admin = createClient(supabaseUrl, effectiveKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            })
+            const sr = await sendTenantAnnouncement(admin, {
+              category,
+              title: String(body.title ?? ''),
+              body: String(body.body ?? ''),
+              targetAll,
+              tenantIds: tenantIds.map(String),
+              createdBy: typeof body.createdBy === 'string' ? body.createdBy : null,
+            })
+            if (!sr.ok) {
+              json(res, sr.error === 'migration_required' ? 503 : 400, sr)
+              return
+            }
+            json(res, 200, {
+              ok: true,
+              announcementId: sr.announcementId,
+              recipientCount: sr.recipientCount,
+            })
             return
           }
 

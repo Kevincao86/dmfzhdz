@@ -40,6 +40,8 @@ function statusClass(s: CustomerAccountStatus): string {
 export default function OpsCustomersListPage() {
   const [tenants, setTenants] = useState<RegistryTenant[]>([])
   const [statusFilter, setStatusFilter] = useState<'all' | CustomerAccountStatus>('all')
+  const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'member' | 'member_plus'>('all')
+  const [expiringSoonOnly, setExpiringSoonOnly] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [syncHint, setSyncHint] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -146,9 +148,23 @@ export default function OpsCustomersListPage() {
 
   const merged = useMemo(() => tenantsToCustomers(tenants), [tenants])
 
+  const tenantById = useMemo(() => new Map(tenants.map((t) => [t.id, t])), [tenants])
+
   const rows = useMemo(() => {
+    const fiveDaysMs = 5 * 24 * 60 * 60 * 1000
     return merged.filter((c) => {
       if (statusFilter !== 'all' && c.accountStatus !== statusFilter) return false
+      const t = tenantById.get(c.id)
+      if (planFilter !== 'all') {
+        const plan = t?.membershipPlan ?? 'free'
+        if (plan !== planFilter) return false
+      }
+      if (expiringSoonOnly) {
+        const exp = t?.serviceExpireAt
+        if (!exp) return false
+        const remain = new Date(exp).getTime() - Date.now()
+        if (remain > fiveDaysMs) return false
+      }
       if (!keyword.trim()) return true
       const q = keyword.trim().toLowerCase()
       return (
@@ -158,7 +174,7 @@ export default function OpsCustomersListPage() {
         c.industry.toLowerCase().includes(q)
       )
     })
-  }, [merged, statusFilter, keyword])
+  }, [merged, statusFilter, planFilter, expiringSoonOnly, keyword, tenantById])
 
   const exportDemo = () => {
     window.alert('演示环境：导出将连接管理端导出任务（Excel），由生产网关实现。')
@@ -580,6 +596,30 @@ export default function OpsCustomersListPage() {
             <option value="disabled">停用</option>
             <option value="frozen">冻结</option>
           </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">会员版本</label>
+          <select
+            value={planFilter}
+            onChange={(e) => setPlanFilter(e.target.value as typeof planFilter)}
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+          >
+            <option value="all">全部</option>
+            <option value="free">免费版</option>
+            <option value="member">会员版</option>
+            <option value="member_plus">会员 Plus</option>
+          </select>
+        </div>
+        <div className="flex items-end pb-0.5">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={expiringSoonOnly}
+              onChange={(e) => setExpiringSoonOnly(e.target.checked)}
+              className="rounded border-slate-600"
+            />
+            订阅剩余 &lt; 5 天
+          </label>
         </div>
         <div className="min-w-[12rem] flex-1">
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">搜索</label>
