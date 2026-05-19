@@ -1,6 +1,13 @@
+import {
+  formatCityTierBandsSummary,
+  resolveCityKolTierBands,
+  type CityKolTierBands,
+  type KolTierBand,
+} from '../lib/recruitmentCityTierPricing'
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
 import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
-import { formatCityTierBandsSummary, resolveCityKolTierBands } from '../lib/recruitmentCityTierPricing'
+
+export type CityTierBandsSource = 'ai' | 'static'
 
 /** 达人档位分配策略（影响 AI / 离线估算权重） */
 export type KolTierStrategy = 'more_v3' | 'more_v4' | 'more_v5'
@@ -78,6 +85,103 @@ export function fallbackNoviceKolAllocation(
   }
 }
 
+function parseTierBandObj(raw: unknown): KolTierBand | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const o = raw as Record<string, unknown>
+  const min = typeof o.min === 'number' ? o.min : Number(o.min)
+  const maxRaw = o.max
+  const max =
+    maxRaw === null || maxRaw === undefined || maxRaw === ''
+      ? null
+      : typeof maxRaw === 'number'
+        ? maxRaw
+        : Number(maxRaw)
+  if (!Number.isFinite(min) || min < 0) return null
+  if (max !== null && (!Number.isFinite(max) || max < min)) return null
+  return { min: Math.floor(min), max: max === null ? null : Math.floor(max) }
+}
+
+function parseCityTierBandsJson(text: string, cityInput: string): CityKolTierBands | null {
+  const t = text.trim()
+  const tryObj = (s: string): Record<string, unknown> | null => {
+    try {
+      const j = JSON.parse(s) as unknown
+      return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : null
+    } catch {
+      return null
+    }
+  }
+  let o = tryObj(t)
+  if (!o) {
+    const m = t.match(/\{[\s\S]*\}/)
+    if (m) o = tryObj(m[0])
+  }
+  if (!o) return null
+  const v3 = parseTierBandObj(o.v3)
+  const v4 = parseTierBandObj(o.v4)
+  const v5 = parseTierBandObj(o.v5)
+  const v5plus = parseTierBandObj(o.v5plus ?? o.v5_plus ?? o['v5+'])
+  if (!v3 || !v4 || !v5 || !v5plus) return null
+  const displayCity = cityInput.trim() || '当前城市'
+  return {
+    cityKey: displayCity.replace(/市$/u, '').toLowerCase(),
+    displayCity,
+    v3,
+    v4,
+    v5,
+    v5plus,
+  }
+}
+
+/**
+ * 由文本大模型按城市（及可选行业）估算 V3–V5+ 单人探店参考成本带（元/人次）。
+ */
+export async function requestCityKolTierBandsAi(
+  city: string,
+  industry?: string,
+): Promise<CityKolTierBands | null> {
+  const c = city.trim()
+  if (!c) return null
+  const model = resolveTextAiModelForRequest() as AiModelId
+  const ind = (industry ?? '').trim() || '本地生活'
+  const titleDraft = `你是本地生活达人探店成本顾问。请根据「${c}」${ind !== '本地生活' ? `、行业「${ind}」` : ''}的抖音团购探店撮合行情，给出各带货等级达人单次探店/条内容的参考成本区间（人民币元/人次，非承诺报价）。
+
+硬性要求：
+1. 仅输出一个 JSON 对象，不要 Markdown、不要代码围栏。
+2. 字段：v3、v4、v5、v5plus，每个为对象 { "min": 非负整数, "max": 正整数或 null }；v5plus 的 max 可为 null 表示「以上」。
+3. 区间应递增：V3 通常最低，V5+ 最高；相邻档位可衔接，符合该城市一线/新一线/二线等量级。
+4. 可选 notes 一句话说明假设。
+
+请输出 JSON。`
+
+  const r = await postDouyinGoodsAiAssist({
+    model,
+    action: 'operation_article',
+    product_name: '同城达人档位参考成本',
+    title_draft: titleDraft,
+  })
+  if (!r.ok || !r.description) return null
+  return parseCityTierBandsJson(r.description, c)
+}
+
+/** AI 估算城市档位；失败则回退静态表 */
+export async function resolveCityKolTierBandsSmart(params: {
+  city: string
+  industry?: string
+}): Promise<{ bands: CityKolTierBands; source: CityTierBandsSource }> {
+  const city = params.city.trim()
+  if (!city) {
+    return { bands: resolveCityKolTierBands(city), source: 'static' }
+  }
+  try {
+    const ai = await requestCityKolTierBandsAi(city, params.industry)
+    if (ai) return { bands: ai, source: 'ai' }
+  } catch {
+    /* ignore */
+  }
+  return { bands: resolveCityKolTierBands(city), source: 'static' }
+}
+
 function parseAllocationJson(text: string): Omit<NoviceAllocation, 'source'> | null {
   const t = text.trim()
   const tryObj = (s: string): Record<string, unknown> | null => {
@@ -132,10 +236,11 @@ export async function requestNoviceKolAllocationAi(params: {
   budgetYuan: number
   strategy: KolTierStrategy
   kolCommissionPct: number
+  cityTierBands?: CityKolTierBands
 }): Promise<NoviceAllocation | null> {
   const model = resolveTextAiModelForRequest() as AiModelId
   const stratZh = kolTierStrategyLabel(params.strategy)
-  const bands = resolveCityKolTierBands(params.city)
+  const bands = params.cityTierBands ?? resolveCityKolTierBands(params.city)
   const tierDoc = formatCityTierBandsSummary(bands)
   const comm = Math.max(0, Math.min(80, Math.round(Number(params.kolCommissionPct) || 0)))
   const titleDraft = `你是本地生活达人招募成本顾问。根据城市达人撮合的行情，为商家做一次「档位人数」分配建议。
@@ -195,11 +300,12 @@ export async function generateNoviceKolAllocation(params: {
   budgetYuan: number
   strategy: KolTierStrategy
   kolCommissionPct: number
+  cityTierBands?: CityKolTierBands
 }): Promise<NoviceAllocation> {
   try {
     const ai = await requestNoviceKolAllocationAi(params)
     if (ai) {
-      const bands = resolveCityKolTierBands(params.city)
+      const bands = params.cityTierBands ?? resolveCityKolTierBands(params.city)
       const tierLine = formatCityTierBandsSummary(bands)
       if (!ai.costHint?.includes('参考城市')) {
         return {

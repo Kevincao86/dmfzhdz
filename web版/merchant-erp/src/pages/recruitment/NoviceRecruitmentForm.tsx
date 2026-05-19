@@ -1,10 +1,16 @@
-import { ChevronLeft, RefreshCw, Sparkles } from 'lucide-react'
+import { ChevronLeft, RefreshCw, Sparkles, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MeooPayQrModal from '../../components/MeooPayQrModal'
+import DouyinStorePickerModal from '../../components/store/DouyinStorePickerModal'
 import { cn } from '../../cn'
 import { buildErpRegistryTenant } from '../../lib/buildErpRegistryTenant'
 import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../../lib/dbSchemaErrorHint'
-import { formatCityTierBandsLines, resolveCityKolTierBands } from '../../lib/recruitmentCityTierPricing'
+import { readMerchantSession } from '../../lib/merchantSession'
+import {
+  formatCityTierBandsLines,
+  resolveCityKolTierBands,
+  type CityKolTierBands,
+} from '../../lib/recruitmentCityTierPricing'
 import { loadRecruitmentIndustryL1Labels } from '../../lib/recruitmentIndustryOptions'
 import { appendRecruitmentOrderToOps } from '../../lib/opsRegistryClient'
 import type { RegistryRecruitmentOrder } from '../../lib/opsRegistryTypes'
@@ -12,13 +18,18 @@ import { resolveRecruitmentOrderTenantMeta } from '../../lib/recruitmentOrderMet
 import { tenantLocalKey } from '../../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../../lib/tenantBilling'
+import { getDouyinStores } from '../../services/douyinMerchantApi'
 import {
   fallbackXiaohongshuNoviceAllocation,
   generateNoviceKolAllocation,
   kolTierStrategyLabel,
+  resolveCityKolTierBandsSmart,
+  type CityTierBandsSource,
   type KolTierStrategy,
   type NoviceAllocation,
 } from '../../services/recruitmentNoviceAllocationAi'
+
+type SelectedStore = { id: string; name: string; address?: string }
 
 const NOVICE_PLATFORMS = ['抖音', '小红书'] as const
 type NoviceDeliveryPlatform = (typeof NOVICE_PLATFORMS)[number]
@@ -59,6 +70,14 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [strategy, setStrategy] = useState<KolTierStrategy>('more_v4')
   const [kolCommissionInput, setKolCommissionInput] = useState('15')
 
+  const [selectedStores, setSelectedStores] = useState<SelectedStore[]>([])
+  const [storePickerOpen, setStorePickerOpen] = useState(false)
+  const [storesBoundHint, setStoresBoundHint] = useState<string | null>(null)
+
+  const [cityTierBands, setCityTierBands] = useState<CityKolTierBands | null>(null)
+  const [cityTierSource, setCityTierSource] = useState<CityTierBandsSource | null>(null)
+  const [cityTierLoading, setCityTierLoading] = useState(false)
+
   const [allocation, setAllocation] = useState<NoviceAllocation | null>(null)
   const [allocationFresh, setAllocationFresh] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -85,12 +104,68 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
 
   useEffect(() => {
     setAllocationFresh(false)
-  }, [city, industry, packageNote, budget, strategy, recruitStart, recruitEnd, visitStart, visitEnd, kolCommissionInput, deliveryPlatform])
+  }, [
+    city,
+    industry,
+    packageNote,
+    budget,
+    strategy,
+    recruitStart,
+    recruitEnd,
+    visitStart,
+    visitEnd,
+    kolCommissionInput,
+    deliveryPlatform,
+    selectedStores,
+    cityTierBands,
+  ])
 
   const isDouyin = deliveryPlatform === '抖音'
 
-  const cityTierBands = useMemo(() => (city.trim() ? resolveCityKolTierBands(city) : null), [city])
-  const tierBandLines = useMemo(() => (cityTierBands ? formatCityTierBandsLines(cityTierBands) : []), [cityTierBands])
+  const tierBandLines = useMemo(
+    () => (cityTierBands ? formatCityTierBandsLines(cityTierBands) : []),
+    [cityTierBands],
+  )
+
+  useEffect(() => {
+    const tok = readMerchantSession('meoo_douyin_merchant_token')
+    if (!tok) {
+      setStoresBoundHint('请先在「系统设置」绑定抖音来客，以便同步门店')
+      return
+    }
+    setStoresBoundHint(null)
+  }, [])
+
+  useEffect(() => {
+    if (!isDouyin || !city.trim()) {
+      setCityTierBands(null)
+      setCityTierSource(null)
+      setCityTierLoading(false)
+      return
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      setCityTierLoading(true)
+      void resolveCityKolTierBandsSmart({ city: city.trim(), industry })
+        .then(({ bands, source }) => {
+          if (cancelled) return
+          setCityTierBands(bands)
+          setCityTierSource(source)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setCityTierBands(resolveCityKolTierBands(city))
+          setCityTierSource('static')
+        })
+        .finally(() => {
+          if (!cancelled) setCityTierLoading(false)
+        })
+    }, 650)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [city, industry, isDouyin])
 
   const runAllocation = useCallback(async () => {
     setAiErr(null)
@@ -112,6 +187,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             budgetYuan: budget,
             strategy,
             kolCommissionPct: parseKolCommissionPctFromDraft(kolCommissionInput),
+            cityTierBands: cityTierBands ?? undefined,
           })
         : fallbackXiaohongshuNoviceAllocation(budget)
       setAllocation(res)
@@ -121,10 +197,14 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     } finally {
       setAiLoading(false)
     }
-  }, [budget, city, industry, isDouyin, kolCommissionInput, packageNote, strategy])
+  }, [budget, city, cityTierBands, industry, isDouyin, kolCommissionInput, packageNote, strategy])
 
   const submit = async () => {
     setPushErr(null)
+    if (selectedStores.length === 0) {
+      setPushErr('请至少选择一家已绑定的探店门店')
+      return
+    }
     if (!city.trim()) {
       setPushErr('请填写城市')
       return
@@ -173,11 +253,14 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       skipRecruitmentWalletCheckRef.current = false
     }
 
-    const kolPct = parseKolCommissionPctFromDraft(kolCommissionInput)
+    const kolPct = isDouyin ? parseKolCommissionPctFromDraft(kolCommissionInput) : 0
     const tenant = buildErpRegistryTenant()
     const customerName = tenant?.merchantName ?? '墨典 ERP 商户'
-    const storeName = city.trim()
-    const storeAddress = `${city.trim()} · ${industry}`
+    const storeName = selectedStores.map((s) => s.name).join('、') || city.trim()
+    const storeAddress =
+      selectedStores.map((s) => (s.address?.trim() ? `${s.name}（${s.address.trim()}）` : s.name)).join('；') ||
+      `${city.trim()} · ${industry}`
+    const storeIdsLine = selectedStores.map((s) => s.id).join(',')
     const id = `RO-NV${Date.now()}`
     const headcount = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
     const tierLine = isDouyin
@@ -204,7 +287,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${city.trim()}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；达人佣金:${kolPct}%；${isDouyin ? `同城档位参考:${tierPriceRef || '—'}；策略:${kolTierStrategyLabel(strategy)}；` : ''}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${city.trim()}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；同城档位参考:${tierPriceRef || '—'}；策略:${kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}档位成本来源:${cityTierSource === 'ai' ? 'AI估算' : cityTierSource === 'static' ? '默认表' : '—'}；分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     setSubmitting(true)
@@ -265,7 +348,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">新手版 · AI 纯智能处理</h1>
             <p className="mt-1 text-sm text-gray-500">
-              填写投放平台、城市、行业、套餐说明、总预算、达人佣金与时间段；抖音将结合同城 V3–V5+ 档位分配，小红书按预算估算达人数（无带货等级）。
+              选择已绑定门店（可多选）、城市与行业后，抖音将结合 AI 估算的同城档位参考成本分配 V3–V5+ 人数；小红书按预算估算达人数（不展示达人佣金与带货档位）。
             </p>
           </div>
         </div>
@@ -297,8 +380,58 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               ))}
             </div>
             {!isDouyin ? (
-              <p className="mt-1 text-xs text-amber-700">小红书不展示抖音带货等级与 V 档位策略，运营接单后可下发小红书报名表单。</p>
+              <p className="mt-1 text-xs text-amber-700">
+                小红书不展示达人佣金与抖音带货档位；运营接单后可下发小红书报名表单。
+              </p>
             ) : null}
+          </div>
+
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-medium text-gray-600">
+                探店门店 <span className="text-red-500">*</span>
+                <span className="ml-1 font-normal text-gray-400">（已绑定来客门店，可多选）</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const tok = readMerchantSession('meoo_douyin_merchant_token')
+                  if (!tok) {
+                    setStoresBoundHint('请先在「系统设置」绑定抖音来客并登录门店账号')
+                    return
+                  }
+                  setStoresBoundHint(null)
+                  setStorePickerOpen(true)
+                }}
+                className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-100"
+              >
+                <Store className="h-3.5 w-3.5" />
+                选择门店
+              </button>
+            </div>
+            {storesBoundHint ? <p className="mb-2 text-xs text-amber-700">{storesBoundHint}</p> : null}
+            {selectedStores.length > 0 ? (
+              <div className="mb-1 flex flex-wrap gap-2">
+                {selectedStores.map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-800"
+                  >
+                    <span className="truncate">{s.name}</span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-slate-400 hover:text-red-600"
+                      aria-label={`移除 ${s.name}`}
+                      onClick={() => setSelectedStores((prev) => prev.filter((x) => x.id !== s.id))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">请点击「选择门店」勾选一家或多家中探店门店</p>
+            )}
           </div>
 
           <div>
@@ -311,14 +444,34 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               placeholder="例如：成都"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
-            {isDouyin && tierBandLines.length ? (
+            {isDouyin && city.trim() ? (
               <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-xs text-indigo-900">
-                <p className="mb-1 font-medium text-indigo-950">同城达人档位参考成本（元/人次，估算）</p>
-                <ul className="list-inside list-disc space-y-0.5 text-indigo-900/90">
-                  {tierBandLines.map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-indigo-950">同城达人档位参考成本（元/人次，估算）</p>
+                  {cityTierLoading ? (
+                    <span className="inline-flex items-center gap-1 text-indigo-700">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      AI 分析中…
+                    </span>
+                  ) : cityTierSource === 'ai' ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                      AI 估算
+                    </span>
+                  ) : cityTierSource === 'static' ? (
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                      默认参考
+                    </span>
+                  ) : null}
+                </div>
+                {tierBandLines.length ? (
+                  <ul className="list-inside list-disc space-y-0.5 text-indigo-900/90">
+                    {tierBandLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                ) : cityTierLoading ? (
+                  <p className="text-indigo-800/80">正在根据城市与行业估算各档位单次成本…</p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -364,20 +517,22 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              达人佣金（%） <span className="text-red-500">*</span>
-            </label>
-            <input
-              inputMode="numeric"
-              value={kolCommissionInput}
-              onChange={(e) => setKolCommissionInput(filterKolCommissionInputDigits(e.target.value))}
-              onBlur={() => setKolCommissionInput(String(parseKolCommissionPctFromDraft(kolCommissionInput)))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              placeholder="例如：15"
-            />
-            <p className="mt-1 text-xs text-gray-500">当前有效：{parseKolCommissionPctFromDraft(kolCommissionInput)}%（0～80，整数）</p>
-          </div>
+          {isDouyin ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                达人佣金（%） <span className="text-red-500">*</span>
+              </label>
+              <input
+                inputMode="numeric"
+                value={kolCommissionInput}
+                onChange={(e) => setKolCommissionInput(filterKolCommissionInputDigits(e.target.value))}
+                onBlur={() => setKolCommissionInput(String(parseKolCommissionPctFromDraft(kolCommissionInput)))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                placeholder="例如：15"
+              />
+              <p className="mt-1 text-xs text-gray-500">当前有效：{parseKolCommissionPctFromDraft(kolCommissionInput)}%（0～80，整数）</p>
+            </div>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -550,6 +705,47 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           </div>
         </div>
       </div>
+
+      <DouyinStorePickerModal
+        open={storePickerOpen}
+        onClose={() => setStorePickerOpen(false)}
+        initialPoiIds={selectedStores.map((s) => s.id)}
+        onConfirm={(poiIds, rows) => {
+          void (async () => {
+            const tok = readMerchantSession('meoo_douyin_merchant_token')
+            let next: SelectedStore[] = poiIds.map((id) => ({
+              id,
+              name: rows.find((r) => r.id === id)?.name ?? id,
+            }))
+            if (tok) {
+              try {
+                const r = await getDouyinStores({
+                  accessToken: tok,
+                  merchantId: readMerchantSession('meoo_douyin_merchant_id') ?? undefined,
+                  page: 1,
+                  pageSize: 100,
+                  claimScope: 'claimed',
+                  relationType: 'all',
+                })
+                if (r.ok) {
+                  next = poiIds.map((id) => {
+                    const row = r.items.find((x) => x.id === id)
+                    return {
+                      id,
+                      name: row?.name ?? rows.find((x) => x.id === id)?.name ?? id,
+                      address: row?.address,
+                    }
+                  })
+                }
+              } catch {
+                /* keep picker names */
+              }
+            }
+            setSelectedStores(next)
+            setStorePickerOpen(false)
+          })()
+        }}
+      />
 
       <MeooPayQrModal
         open={recruitRechargeOpen}
