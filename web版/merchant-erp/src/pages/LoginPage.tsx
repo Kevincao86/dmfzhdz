@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Cpu, MapPin, Sparkles, Store, UtensilsCrossed, Zap } from 'lucide-react'
 import { cn } from '../cn'
-import FloatingOnlineSupport from '../components/FloatingOnlineSupport'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import LoginAuthPanel from './login/LoginAuthPanel'
@@ -50,7 +49,6 @@ const CAROUSEL_MS = 5200
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [loginName] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [infoHint, setInfoHint] = useState<string | null>(null)
   const [slide, setSlide] = useState(0)
@@ -267,7 +265,6 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
-    <FloatingOnlineSupport customerId={loginName.trim()} />
     </>
   )
 }

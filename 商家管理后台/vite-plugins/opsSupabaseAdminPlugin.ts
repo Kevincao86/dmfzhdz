@@ -678,12 +678,15 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, 503, { ok: false, error: 'supabase_admin_not_configured' })
               return
             }
-            const admin = createClient(supabaseUrl, effectiveKey, {
-              auth: { autoRefreshToken: false, persistSession: false },
-            })
-            const lr = await listTenantAnnouncementsForOps(admin)
+            const lr = await listTenantAnnouncementsForOps(supabaseUrl, effectiveKey)
             if (!lr.ok) {
-              json(res, lr.error === 'migration_required' ? 503 : 500, lr)
+              json(res, lr.error === 'migration_required' ? 503 : 500, {
+                ...lr,
+                hint:
+                  lr.error === 'migration_required'
+                    ? '请在 Supabase 执行迁移 20260522100000_tenant_announcements.sql'
+                    : undefined,
+              })
               return
             }
             json(res, 200, { ok: true, rows: lr.rows })
@@ -714,10 +717,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
               : Array.isArray(body.tenant_ids)
                 ? body.tenant_ids
                 : []
-            const admin = createClient(supabaseUrl, effectiveKey, {
-              auth: { autoRefreshToken: false, persistSession: false },
-            })
-            const sr = await sendTenantAnnouncement(admin, {
+            const sr = await sendTenantAnnouncement(supabaseUrl, effectiveKey, {
               category,
               title: String(body.title ?? ''),
               body: String(body.body ?? ''),
