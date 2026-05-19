@@ -2,6 +2,7 @@ import {
   CalendarDays,
   Crown,
   Link2,
+  Megaphone,
   Plus,
   ScanLine,
   Shield,
@@ -58,11 +59,12 @@ const SHOW_VERIFY_SYSTEM_TAB = false
 
 const ALL_TABS = [
   { id: 'platforms' as const, label: '平台连接', icon: Link2 },
-  { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
+  { id: 'commercial' as const, label: '商业化后台', icon: Megaphone },
   { id: 'verify' as const, label: '核销系统', icon: ScanLine },
   { id: 'merchant' as const, label: '商家版后台', icon: Store },
   { id: 'accounts' as const, label: '账号管理', icon: Users },
   { id: 'permissions' as const, label: '权限设置', icon: Shield },
+  { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
 ] as const
 
 const TABS = SHOW_VERIFY_SYSTEM_TAB ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'verify')
@@ -227,7 +229,7 @@ export default function SettingsPage() {
         <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-teal-500" aria-hidden />
         <h1 className="erp-page-title">系统设置</h1>
         <p className="mt-1.5 text-sm text-slate-600">
-          管理平台连接、订阅与商家后台、账号权限与基础配置
+          管理平台连接、商业化投放、商家后台、账号权限与订阅
         </p>
       </div>
 
@@ -298,7 +300,17 @@ export default function SettingsPage() {
               </div>
 
               <AiModelBindingSection />
+            </div>
+          )}
 
+          {tab === 'commercial' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">商业化后台</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  对接广告投放与线索回收平台；账号与抖音来客等店铺经营后台相互独立，可分别绑定多家广告主。
+                </p>
+              </div>
               <LocalPromotionSection />
             </div>
           )}

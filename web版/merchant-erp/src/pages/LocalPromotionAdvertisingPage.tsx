@@ -135,8 +135,8 @@ export default function LocalPromotionAdvertisingPage() {
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
           尚未绑定本地推，当前展示演示数据。
-          <Link to="/settings" className="ml-1 font-medium text-cyan-700 underline">
-            前往系统设置 → 平台连接
+          <Link to="/settings?tab=commercial" className="ml-1 font-medium text-cyan-700 underline">
+            前往系统设置 · 商业化后台
           </Link>
           配置 Access Token 与广告主 ID。
         </div>
