@@ -35,7 +35,7 @@ export async function provisionMerchantTenant(body: {
   const loginName = body.loginName.trim()
   const password = body.password
   const merchantName = body.merchantName.trim()
-  const trialDays = Math.max(0, Math.min(3650, Number(body.trialDays) || 14))
+  const trialDays = Math.max(0, Math.min(3650, Number(body.trialDays) || 0))
   const officialDays = 0
 
   if (!loginName || password.length < 6 || !merchantName) {
@@ -90,6 +90,7 @@ export async function provisionMerchantTenant(body: {
       trial_days: trialDays,
       official_days: officialDays,
       account_status: 'normal',
+      membership_plan: 'free',
     }),
   })
   const tenantText = await tenantRes.text()

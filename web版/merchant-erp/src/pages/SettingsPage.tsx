@@ -12,13 +12,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { cn } from '../cn'
 import MeooPayQrModal from '../components/MeooPayQrModal'
-import { MEOO_TRIAL_SNAPSHOT_KEY } from '../lib/opsRegistryConstants'
 import {
   fetchPrimaryTenantId,
   fetchTenantSubscriptionSnapshot,
-  fetchTenantTrialSnapshot,
   insertMerchantPaymentOrder,
-  type TenantTrialSnapshot,
 } from '../lib/tenantBilling'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
@@ -59,7 +56,7 @@ const SHOW_VERIFY_SYSTEM_TAB = false
 
 const ALL_TABS = [
   { id: 'platforms' as const, label: '平台连接', icon: Link2 },
-  { id: 'subscription' as const, label: '订阅与试用', icon: CalendarDays },
+  { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
   { id: 'verify' as const, label: '核销系统', icon: ScanLine },
   { id: 'merchant' as const, label: '商家版后台', icon: Store },
   { id: 'accounts' as const, label: '账号管理', icon: Users },
@@ -104,9 +101,6 @@ export default function SettingsPage() {
   const [officialExpireAtIso, setOfficialExpireAtIso] = useState<string | null | undefined>(undefined)
   /** undefined：未拉取；null：无到期记录 */
   const [officialCumulativeDays, setOfficialCumulativeDays] = useState<number | null | undefined>(undefined)
-  /** undefined：未拉取；null：无累计天数 */
-  const [trialSnap, setTrialSnap] = useState<TenantTrialSnapshot | null | undefined>(undefined)
-
   const loadOfficialBilling = useCallback(async () => {
     if (!supabaseConfigured || !supabase) {
       setOfficialExpireAtIso(undefined)
@@ -150,24 +144,6 @@ export default function SettingsPage() {
     void reloadMembership()
   }
 
-  const trialStart = useMemo(() => {
-    if (trialSnap?.trialStartAt) return new Date(trialSnap.trialStartAt)
-    return null
-  }, [trialSnap])
-
-  const trialEnd = useMemo(() => {
-    if (trialSnap?.trialEndAt) return new Date(trialSnap.trialEndAt)
-    return null
-  }, [trialSnap])
-
-  const trialLeftDays = useMemo(() => {
-    if (!trialEnd) return null
-    const ms = trialEnd.getTime() - Date.now()
-    return Math.max(0, Math.ceil(ms / 86400000))
-  }, [trialEnd])
-
-  const trialDaysTotal = trialSnap?.trialDays ?? 14
-
   /** 相对云端登记「服务截止日期」的剩余日历天（可能为负表示已过期） */
   const officialCalendarRemainDays = useMemo(() => {
     if (!officialExpireAtIso) return null
@@ -198,19 +174,14 @@ export default function SettingsPage() {
     let cancelled = false
     const run = async () => {
       try {
-        const [snap, trial] = await Promise.all([
-          fetchTenantSubscriptionSnapshot(sb),
-          fetchTenantTrialSnapshot(sb),
-        ])
+        const snap = await fetchTenantSubscriptionSnapshot(sb)
         if (cancelled) return
         setOfficialExpireAtIso(snap.serviceExpireAt)
         setOfficialCumulativeDays(snap.officialDays)
-        setTrialSnap(trial)
       } catch {
         if (!cancelled) {
           setOfficialExpireAtIso(null)
           setOfficialCumulativeDays(null)
-          setTrialSnap(null)
         }
       }
     }
@@ -225,18 +196,6 @@ export default function SettingsPage() {
       subscription.unsubscribe()
     }
   }, [supabaseConfigured, supabase, tab])
-
-  useEffect(() => {
-    if (!trialStart || !trialEnd) return
-    try {
-      window.localStorage.setItem(
-        MEOO_TRIAL_SNAPSHOT_KEY,
-        JSON.stringify({ trialStart: trialStart.toISOString(), trialEnd: trialEnd.toISOString() }),
-      )
-    } catch {
-      /* ignore */
-    }
-  }, [trialStart, trialEnd])
 
   /** 地址栏 ?tab= / ?upgrade=1：同步页签（便于书签与外部跳转） */
   useEffect(() => {
@@ -351,7 +310,7 @@ export default function SettingsPage() {
 
           {tab === 'subscription' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900">订阅与试用</h3>
+              <h3 className="text-lg font-medium text-gray-900">订阅</h3>
               <p className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                 商家显示名等资料在
                 <strong className="font-medium text-gray-800"> 运营管控台 → 客户管理 </strong>
@@ -359,41 +318,15 @@ export default function SettingsPage() {
                 时，按自今日起计满该天数推算；「剩余可用」为总可用天数；「开通权益」为当前登记服务期内的<strong className="font-medium text-gray-800"> 订阅使用天数 </strong>
                 （以运营登记的「服务截止日期」前的剩余日历天为准）。
               </p>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
-                  <div className="mb-2 text-sm font-medium text-blue-900">可使用日期（新注册用户）</div>
-                  <p className="text-sm text-blue-800">
-                    免费试用共 <strong>{trialDaysTotal} 天</strong>，自租户开通日起算，全功能开放。
-                  </p>
-                  <div className="mt-4 space-y-1 text-sm text-blue-900/90">
-                    {!supabaseConfigured || !supabase ? (
-                      <p className="text-blue-800/90">接入 Supabase 登录后可查看本租户试用周期。</p>
-                    ) : trialSnap === undefined ? (
-                      <p className="text-blue-800/90">正在加载试用信息…</p>
-                    ) : trialStart && trialEnd ? (
-                      <>
-                        <p>
-                          <span className="text-blue-700/80">试用开始：</span>
-                          {formatCnDate(trialStart)}
-                        </p>
-                        <p>
-                          <span className="text-blue-700/80">试用结束：</span>
-                          {formatCnDate(trialEnd)}
-                        </p>
-                        <p className="pt-2 text-base font-semibold text-blue-900">
-                          剩余试用：<span className="tabular-nums">{trialLeftDays ?? 0}</span> 天
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-blue-800/90">未找到租户试用记录，请联系运营核对账号开通状态。</p>
-                    )}
-                  </div>
-                </div>
+              <div className="max-w-xl">
                 <div className="rounded-xl border border-gray-200 p-5">
                   <div className="mb-2 flex items-center text-gray-900">
                     <Crown className="mr-2 h-5 w-5 text-amber-500" />
-                    <span className="font-semibold">正式版订阅</span>
+                    <span className="font-semibold">订阅与会员</span>
                   </div>
+                  <p className="mb-3 text-sm text-gray-600">
+                    新注册默认为<strong className="text-gray-900"> 免费版 </strong>，无试用期；升级会员请在下方选择套餐。
+                  </p>
                   <div className="mb-3 rounded-lg border border-indigo-100 bg-indigo-50/80 px-3 py-2.5 text-sm text-indigo-950">
                     <p className="font-semibold">
                       当前版本：{entitlements.planLabel}

@@ -51,15 +51,15 @@ export default function OpsCustomersListPage() {
     loginName: '',
     password: '',
     merchantName: '',
-    trialDays: '14',
-    officialDays: '365',
+    trialDays: '0',
+    officialDays: '0',
   })
   const [editForm, setEditForm] = useState({
     merchantName: '',
     industry: '',
     accountStatus: 'normal' as CustomerAccountStatus,
-    membershipPlan: 'member' as 'free' | 'member' | 'member_plus',
-    trialDays: '14',
+    membershipPlan: 'free' as 'free' | 'member' | 'member_plus',
+    trialDays: '0',
     officialDays: '365',
   })
 
@@ -443,7 +443,7 @@ export default function OpsCustomersListPage() {
               return
             }
             setCreateOpen(false)
-            setForm({ loginName: '', password: '', merchantName: '', trialDays: '14', officialDays: '365' })
+            setForm({ loginName: '', password: '', merchantName: '', trialDays: '0', officialDays: '0' })
             await reload()
             window.alert(
               `Supabase 中已有登录名「${loginName}」，已在本地注册表补写客户记录。\n` +
@@ -475,7 +475,7 @@ export default function OpsCustomersListPage() {
           }
         }
         setCreateOpen(false)
-        setForm({ loginName: '', password: '', merchantName: '', trialDays: '14', officialDays: '365' })
+        setForm({ loginName: '', password: '', merchantName: '', trialDays: '0', officialDays: '0' })
         await reload()
         return
       }
@@ -485,7 +485,7 @@ export default function OpsCustomersListPage() {
         return
       }
       setCreateOpen(false)
-      setForm({ loginName: '', password: '', merchantName: '', trialDays: '14', officialDays: '365' })
+      setForm({ loginName: '', password: '', merchantName: '', trialDays: '0', officialDays: '0' })
       await reload()
     } finally {
       setSubmitting(false)
@@ -657,30 +657,18 @@ export default function OpsCustomersListPage() {
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-slate-400">试用时长（天）</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.trialDays}
-                    onChange={(e) => setForm((f) => ({ ...f, trialDays: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-slate-400">正式版权益（天）</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.officialDays}
-                    onChange={(e) => setForm((f) => ({ ...f, officialDays: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
-                  />
-                </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">正式版权益（天，可选）</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.officialDays}
+                  onChange={(e) => setForm((f) => ({ ...f, officialDays: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                />
               </div>
               {formErr ? <p className="text-xs text-red-400">{formErr}</p> : null}
-              <p className="text-[11px] text-slate-500">演示：密码摘写入注册表；生产请走统一账号中心。</p>
+              <p className="text-[11px] text-slate-500">新账号默认免费版、无试用；会员档位请在创建后于「编辑」中设置。</p>
               <button
                 type="button"
                 disabled={submitting}
@@ -766,27 +754,15 @@ export default function OpsCustomersListPage() {
                   <option value="frozen">冻结</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="mb-1 block text-xs text-slate-400">试用（天）</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editForm.trialDays}
-                    onChange={(e) => setEditForm((f) => ({ ...f, trialDays: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-slate-400">正式（天）</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editForm.officialDays}
-                    onChange={(e) => setEditForm((f) => ({ ...f, officialDays: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
-                  />
-                </div>
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">正式版权益（天）</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={editForm.officialDays}
+                  onChange={(e) => setEditForm((f) => ({ ...f, officialDays: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                />
               </div>
               {formErr ? <p className="text-xs text-red-400">{formErr}</p> : null}
               <button

@@ -50,7 +50,7 @@ export function buildErpRegistryTenant(): RegistryTenant | null {
 
   const trialSnap = readTrialSnapshot()
   const now = new Date()
-  let trialDays = 14
+  let trialDays = 0
   let trialEndsAt: string | undefined
   if (trialSnap) {
     const ts = new Date(trialSnap.trialStart)

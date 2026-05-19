@@ -112,7 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       password,
       merchantName,
       phone,
-      trialDays: 14,
+      trialDays: 0,
     })
     if (!result.ok) {
       const status =
