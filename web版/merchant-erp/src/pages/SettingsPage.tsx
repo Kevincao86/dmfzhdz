@@ -3,7 +3,6 @@ import {
   Crown,
   Link2,
   Megaphone,
-  Plus,
   ScanLine,
   Shield,
   Store,
@@ -28,6 +27,12 @@ import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
 import SubAccountsPanel from './settings/SubAccountsPanel'
 import XhsMerchantSection from './settings/XhsMerchantSection'
+import PlatformConnectionsPanel from './settings/PlatformConnectionsPanel'
+import {
+  MERCHANT_PLATFORM_BRANDS,
+  PlatformBrandLogo,
+  type MerchantPlatformBrandId,
+} from '../lib/platformBranding'
 import { useMembership } from '../context/MembershipContext'
 import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
 
@@ -46,13 +51,6 @@ const VERIFY_INITIAL: VerifyItem[] = [
   { id: 'yinbao', name: '银豹', icon: 'fa-solid fa-paw', status: 'disconnected' },
   { id: 'maituan', name: '迈团', icon: 'fa-solid fa-store', status: 'disconnected' },
   { id: 'other', name: '其他核销系统', icon: 'fa-solid fa-credit-card', status: 'disconnected' },
-]
-
-const PLAT_BIND = [
-  { id: 'douyin', name: '抖音来客', icon: 'fa-brands fa-tiktok', max: 3 },
-  { id: 'meituan', name: '美团点评', icon: 'fa-solid fa-utensils', max: 3 },
-  { id: 'xhs', name: '小红书', icon: 'fa-solid fa-book', max: 3 },
-  { id: 'jd', name: '京东本地生活', icon: 'fa-solid fa-bag-shopping', max: 3 },
 ]
 
 /** 恢复「核销系统」页签与对接区块时改为 true */
@@ -208,6 +206,12 @@ export default function SettingsPage() {
     if (tab === 'subscription') void reloadMembership({ silent: true })
   }, [tab, reloadMembership])
 
+  const openMerchantPlatform = useCallback((id: MerchantPlatformBrandId) => {
+    if (id === 'jd') return
+    setMerchantPlat(id)
+    setTab('merchant')
+  }, [])
+
   const toggleVerify = (id: string) => {
     setVerifyList((list) =>
       list.map((item) => {
@@ -242,9 +246,9 @@ export default function SettingsPage() {
         onCompletedPayment={(p) => submitSubscriptionPaid(p)}
       />
 
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200">
-          <nav className="flex flex-wrap gap-1 px-2 sm:px-4">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50/60">
+          <nav className="flex flex-wrap gap-0.5 px-2 py-1 sm:px-3">
             {TABS.map((t) => {
               const Icon = t.icon
               return (
@@ -253,10 +257,10 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => setTab(t.id as SettingsTabId)}
                   className={cn(
-                    'flex items-center px-3 py-3 text-sm font-medium transition-colors sm:px-4',
+                    'flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors sm:px-4',
                     tab === t.id
-                      ? 'border-b-2 border-blue-600 bg-blue-50 text-blue-600'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                      ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200/80'
+                      : 'text-slate-600 hover:bg-white/70 hover:text-slate-900',
                   )}
                 >
                   <Icon className="mr-2 h-4 w-4 shrink-0" />
@@ -267,38 +271,10 @@ export default function SettingsPage() {
           </nav>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 sm:p-8">
           {tab === 'platforms' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-lg font-medium text-gray-900">平台账号绑定</h3>
-                <p className="text-sm text-gray-500">每个平台最多可绑定3个账号</p>
-              </div>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {PLAT_BIND.map((p) => (
-                  <div key={p.id} className="rounded-xl border border-gray-200 p-5">
-                    <div className="mb-4 flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
-                          <i className={`${p.icon} text-lg text-gray-600`} />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900">{p.name}</h4>
-                          <p className="text-sm text-gray-500">0/{p.max} 个账号</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                      >
-                        <Plus className="mr-1 h-4 w-4" />
-                        绑定
-                      </button>
-                    </div>
-                    <div className="py-4 text-center text-sm text-gray-400">暂无绑定账号</div>
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-8">
+              <PlatformConnectionsPanel onManage={openMerchantPlatform} />
 
               <AiModelBindingSection />
             </div>
@@ -498,26 +474,20 @@ export default function SettingsPage() {
                 <p className="text-sm text-gray-500">切换查看各平台商家后台</p>
               </div>
               <div className="mb-6 flex flex-wrap gap-2">
-                {(
-                  [
-                    { id: 'douyin' as const, name: '抖音来客' },
-                    { id: 'meituan' as const, name: '美团点评' },
-                    { id: 'xhs' as const, name: '小红书' },
-                  ]
-                ).map((p) => (
+                {MERCHANT_PLATFORM_BRANDS.filter((p) => p.id !== 'jd').map((p) => (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setMerchantPlat(p.id)}
+                    onClick={() => setMerchantPlat(p.id as 'douyin' | 'meituan' | 'xhs')}
                     className={cn(
-                      'flex items-center rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                      'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
                       merchantPlat === p.id
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                        ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
                     )}
                   >
-                    <Store className="mr-2 h-4 w-4" />
-                    {p.name}
+                    <PlatformBrandLogo id={p.id} size="sm" />
+                    {p.merchantName}
                   </button>
                 ))}
               </div>
