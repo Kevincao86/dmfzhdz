@@ -184,7 +184,8 @@ export default function OpsAnnouncementsPage() {
     setSending(false)
 
     if (!r.ok) {
-      setSendMsg({ tone: 'err', text: r.hint ?? r.detail ?? r.error })
+      const parts = [r.hint, r.detail, r.error].filter(Boolean)
+      setSendMsg({ tone: 'err', text: parts.join(' · ') || '发送失败' })
       return
     }
     setSendMsg({
