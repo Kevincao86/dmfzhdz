@@ -23,6 +23,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
 import DouyinMerchantSection from './settings/DouyinMerchantSection'
 import LocalPromotionSection from './settings/LocalPromotionSection'
+import XhsCommercialSection from './settings/XhsCommercialSection'
 import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
 import SubAccountsPanel from './settings/SubAccountsPanel'
@@ -308,10 +309,11 @@ export default function SettingsPage() {
               <div>
                 <h3 className="text-lg font-medium text-gray-900">商业化后台</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  对接广告投放与线索回收平台；账号与抖音来客等店铺经营后台相互独立，可分别绑定多家广告主。
+                  对接投流与线索平台：巨量本地推（抖音）、聚光/种小草（小红书，同一授权）。与「商家版后台」店铺经营账号相互独立。
                 </p>
               </div>
               <LocalPromotionSection />
+              <XhsCommercialSection />
             </div>
           )}
 

@@ -1,9 +1,13 @@
 /**
  * GET /api/merchant/finance/reconcile
- * 聚合各平台对账数据：抖音来客走开放平台真实接口；美团/小红书待接开放平台后在此扩展。
+ * 聚合各平台对账数据：抖音来客、美团走开放平台（或演示数据）；小红书待接。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
+import { fetchMeituanFinanceReconcileRows } from './meituanMerchantGateway.js'
+import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
+import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
+import { fetchXhsFinanceReconcileRows } from './xhsMerchantGateway.js'
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -13,6 +17,32 @@ function json(res: ServerResponse, status: number, body: unknown) {
 
 function parseBearer(req: IncomingMessage): string | undefined {
   return req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+}
+
+function headerToken(req: IncomingMessage, name: string): string | undefined {
+  const raw = req.headers[name]
+  const v = Array.isArray(raw) ? raw[0] : raw
+  if (!v || typeof v !== 'string') return undefined
+  const m = /^Bearer\s+(\S+)/i.exec(v.trim())
+  return m?.[1]?.trim() || undefined
+}
+
+function resolvePlatformTokens(req: IncomingMessage): {
+  douyin?: string
+  meituan?: string
+  xhs?: string
+} {
+  const auth = parseBearer(req)
+  let douyin = headerToken(req, 'x-meoo-douyin-token')
+  let meituan = headerToken(req, 'x-meoo-meituan-token')
+  let xhs = headerToken(req, 'x-meoo-xhs-token')
+
+  if (auth) {
+    if (decodeMeituanSessionToken(auth)) meituan = meituan || auth
+    else if (decodeXhsSessionToken(auth)) xhs = xhs || auth
+    else douyin = douyin || auth
+  }
+  return { douyin, meituan, xhs }
 }
 
 function isYmd(s: string): boolean {
@@ -68,14 +98,12 @@ export async function handleFinanceReconcileGet(
     startYmd = addCalendarDaysShanghai(endYmd, -(days - 1))
   }
 
-  const bearer = parseBearer(req)
+  const { douyin: douyinToken, meituan: meituanToken, xhs: xhsToken } = resolvePlatformTokens(req)
   const warnings: string[] = []
   const rows: Record<string, unknown>[] = []
 
-  if (!bearer) {
-    warnings.push('缺少 Authorization: Bearer，无法拉取抖音来客对账；请在商家后台完成抖音来客绑定后刷新。')
-  } else {
-    const dy = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd)
+  if (douyinToken) {
+    const dy = await fetchDouyinFinanceReconcileRows(douyinToken, startYmd, endYmd)
     for (const w of dy.warnings) warnings.push(w)
     for (const r of dy.rows) {
       rows.push({
@@ -88,7 +116,44 @@ export async function handleFinanceReconcileGet(
         verifyAmountYuan: r.verifyAmountYuan,
       })
     }
-    warnings.push('美团、小红书财务对账行待网关接入对应开放平台 API 后与本接口聚合。')
+  } else {
+    warnings.push('未绑定抖音来客，跳过抖音对账。')
+  }
+
+  if (meituanToken) {
+    const mt = await fetchMeituanFinanceReconcileRows(meituanToken, startYmd, endYmd)
+    for (const w of mt.warnings) warnings.push(w)
+    for (const r of mt.rows) {
+      rows.push({
+        date: r.date,
+        platform: r.platform,
+        platformLabel: r.platformLabel,
+        orderCount: r.orderCount,
+        verifyOrderCount: r.verifyOrderCount,
+        salesAmountYuan: r.salesAmountYuan,
+        verifyAmountYuan: r.verifyAmountYuan,
+      })
+    }
+  } else {
+    warnings.push('未绑定美团，跳过美团对账。')
+  }
+
+  if (xhsToken) {
+    const xh = await fetchXhsFinanceReconcileRows(xhsToken, startYmd, endYmd)
+    for (const w of xh.warnings) warnings.push(w)
+    for (const r of xh.rows) {
+      rows.push({
+        date: r.date,
+        platform: r.platform,
+        platformLabel: r.platformLabel,
+        orderCount: r.orderCount,
+        verifyOrderCount: r.verifyOrderCount,
+        salesAmountYuan: r.salesAmountYuan,
+        verifyAmountYuan: r.verifyAmountYuan,
+      })
+    }
+  } else {
+    warnings.push('未绑定小红书商家后台，跳过小红书对账。')
   }
 
   json(res, 200, {

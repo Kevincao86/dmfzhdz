@@ -9,19 +9,18 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { cn } from '../cn'
-import { isLocalPromotionBound } from '../lib/localPromotionBinding'
-import { toUserFacingError } from '../lib/userFacingError'
-import type { LocalPromotionRow, LocalProjectRow, LocalReportSummary } from '../lib/localPromotionTypes'
-import ModulePage from './ModulePage'
+import { cn } from '../../cn'
+import { isLocalPromotionBound } from '../../lib/localPromotionBinding'
+import { toUserFacingError } from '../../lib/userFacingError'
+import type { LocalPromotionRow, LocalProjectRow, LocalReportSummary } from '../../lib/localPromotionTypes'
+import ModulePage from '../ModulePage'
 import {
   fetchLocalProjects,
   fetchLocalPromotions,
   fetchLocalReportSummary,
   postAdAiInsight,
   updatePromotionStatus,
-} from '../services/localPromotionApi'
-import XhsJuguangAdvertisingPanel from './advertising/XhsJuguangAdvertisingPanel'
+} from '../../services/localPromotionApi'
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -33,10 +32,7 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   )
 }
 
-type AdChannel = 'local_promotion' | 'juguang'
-
-export default function LocalPromotionAdvertisingPage() {
-  const [channel, setChannel] = useState<AdChannel>('local_promotion')
+export default function OceanEngineAdvertisingPanel() {
   const [tab, setTab] = useState<'promotions' | 'projects'>('promotions')
   const [promotions, setPromotions] = useState<LocalPromotionRow[]>([])
   const [projects, setProjects] = useState<LocalProjectRow[]>([])
@@ -112,7 +108,7 @@ export default function LocalPromotionAdvertisingPage() {
   return (
     <ModulePage
       title="投流"
-      subtitle="巨量本地推（抖音）与聚光（小红书）分平台查看投放数据"
+      subtitle="巨量本地推：项目、广告计划与近 7 日投放数据"
       actions={
         <div className="flex flex-wrap gap-2">
           <button
@@ -136,33 +132,6 @@ export default function LocalPromotionAdvertisingPage() {
         </div>
       }
     >
-      <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setChannel('local_promotion')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium',
-            channel === 'local_promotion' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-700',
-          )}
-        >
-          巨量本地推 <span className="text-[10px] opacity-80">(抖音)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setChannel('juguang')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium',
-            channel === 'juguang' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700',
-          )}
-        >
-          聚光 <span className="text-[10px] opacity-80">(小红书)</span>
-        </button>
-      </div>
-
-      {channel === 'juguang' ? (
-        <XhsJuguangAdvertisingPanel />
-      ) : (
-        <>
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
           尚未绑定本地推，当前展示演示数据。
@@ -313,11 +282,9 @@ export default function LocalPromotionAdvertisingPage() {
           <li>根据近 7 日消耗、CTR、转化成本生成投放优化建议</li>
           <li>识别低效广告并建议暂停或调价（需结合报表接口）</li>
           <li>按门店/项目维度对比，推荐预算倾斜方案</li>
-          <li>生成本地推 / 聚光广告文案与创意方向（可在 AI 智能体中描述需求）</li>
+          <li>生成本地推广告文案与短视频脚本方向（可在 AI 智能体中描述需求）</li>
         </ul>
       </div>
-        </>
-      )}
     </ModulePage>
   )
 }
