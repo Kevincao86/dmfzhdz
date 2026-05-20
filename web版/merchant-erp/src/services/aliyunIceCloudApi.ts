@@ -59,6 +59,19 @@ const UPLOAD_INIT_PATHS = [
   '/api/merchant/ai/video/ice/upload-init',
 ] as const
 
+const UPLOAD_SERVER_PATHS = [
+  '/api/meoo-merchant-ai-video-ice-upload',
+  '/api/merchant/ai/video/ice/upload',
+] as const
+
+const UPLOAD_MULTIPART_PATHS = [
+  '/api/meoo-merchant-ai-video-ice-multipart',
+  '/api/merchant/ai/video/ice/multipart',
+] as const
+
+/** 与后端 ICE_UPLOAD_CHUNK_BYTES 一致：超过则走分片经 BFF 上传 */
+const ICE_CLIENT_CHUNK_BYTES = 2 * 1024 * 1024
+
 const PIPELINE_PATHS = [
   '/api/meoo-merchant-ai-video-ice-pipeline',
   '/api/meoo-merchant-ai-video-openshot-pipeline',
@@ -110,16 +123,130 @@ export async function postIceUploadInit(body: {
   return { ok: false, message: '本地上传接口未部署' }
 }
 
-/** 本地上传：先取 OSS 凭证，再 PUT 直传，返回可供云剪拉取的 mediaUrl */
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  const chunk = 0x8000
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+async function postJsonPaths<T extends { ok: boolean; message?: string }>(
+  paths: readonly string[],
+  body: unknown,
+): Promise<T | { ok: false; message: string }> {
+  for (const p of paths) {
+    try {
+      const res = await fetch(p, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body),
+      })
+      const j = await parseJson<T & { message?: string }>(res)
+      if (res.status === 404) continue
+      if (!res.ok || !j || !('ok' in j) || !j.ok) {
+        return { ok: false, message: j?.message ?? `请求失败 HTTP ${res.status}` }
+      }
+      return j as T
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: msg }
+    }
+  }
+  return { ok: false, message: '本地上传接口未部署' }
+}
+
+async function uploadIceViaServer(
+  file: File,
+): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  const contentType = file.type || 'video/mp4'
+  const label = file.name.replace(/\.[^.]+$/, '') || file.name
+
+  if (file.size <= ICE_CLIENT_CHUNK_BYTES) {
+    const contentBase64 = await blobToBase64(file)
+    const r = await postJsonPaths<{
+      ok: true
+      mediaUrl: string
+      label?: string
+    }>(UPLOAD_SERVER_PATHS, {
+      fileName: file.name,
+      contentType,
+      contentBase64,
+    })
+    if (!r.ok) return r
+    return { ok: true, mediaUrl: r.mediaUrl, label: r.label ?? label }
+  }
+
+  const init = await postJsonPaths<{
+    ok: true
+    uploadId: string
+    objectKey: string
+    partSize: number
+    partCount: number
+  }>(UPLOAD_MULTIPART_PATHS, {
+    step: 'init',
+    fileName: file.name,
+    contentType,
+    sizeBytes: file.size,
+  })
+  if (!init.ok) return init
+
+  const parts: { partNumber: number; etag: string }[] = []
+  for (let i = 0; i < init.partCount; i++) {
+    const start = i * init.partSize
+    const end = Math.min(start + init.partSize, file.size)
+    const slice = file.slice(start, end)
+    const contentBase64 = await blobToBase64(slice)
+    const part = await postJsonPaths<{ ok: true; etag: string; partNumber: number }>(
+      UPLOAD_MULTIPART_PATHS,
+      {
+        step: 'part',
+        objectKey: init.objectKey,
+        uploadId: init.uploadId,
+        partNumber: i + 1,
+        contentBase64,
+      },
+    )
+    if (!part.ok) return part
+    parts.push({ partNumber: i + 1, etag: part.etag })
+  }
+
+  const done = await postJsonPaths<{
+    ok: true
+    mediaUrl: string
+    label?: string
+  }>(UPLOAD_MULTIPART_PATHS, {
+    step: 'complete',
+    objectKey: init.objectKey,
+    uploadId: init.uploadId,
+    fileName: file.name,
+    parts,
+  })
+  if (!done.ok) return done
+  return { ok: true, mediaUrl: done.mediaUrl, label: done.label ?? label }
+}
+
+/** 本地上传：经商户 BFF 写入 OSS（无需浏览器直传，避免 CORS） */
 export async function uploadIceLocalVideoFile(
   file: File,
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  const viaServer = await uploadIceViaServer(file)
+  if (viaServer.ok) return viaServer
+
   const init = await postIceUploadInit({
     fileName: file.name,
     contentType: file.type || 'video/mp4',
     sizeBytes: file.size,
   })
-  if (!init.ok) return init
+  if (!init.ok) {
+    return {
+      ok: false,
+      message: `${viaServer.message}；${init.message}`,
+    }
+  }
 
   let putRes: Response
   try {
@@ -130,7 +257,10 @@ export async function uploadIceLocalVideoFile(
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, message: `上传到 OSS 失败：${msg}` }
+    return {
+      ok: false,
+      message: `上传到 OSS 失败：${msg}。若持续出现 Failed to fetch，请在阿里云 OSS 控制台为 Bucket 配置 CORS（允许本站域名 PUT），或刷新后重试（已优先走服务端上传）。`,
+    }
   }
   if (!putRes.ok) {
     return { ok: false, message: `OSS 上传失败 HTTP ${putRes.status}` }
