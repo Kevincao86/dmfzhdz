@@ -16,6 +16,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
+import { iceOssUploadAvailable } from './aliyunOssIceParse.js'
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -86,15 +87,19 @@ export async function handleAliyunIceRoutes(input: {
   const cfg = await resolveIceConfig(viteRoot, rawEnv)
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/ice/config') {
+    const envMap = rawEnv as Record<string, string | undefined>
+    const ossUpload =
+      cfg != null ? iceOssUploadAvailable(cfg, envMap) : false
     json(res, 200, {
       configured: !!cfg,
       regionId: cfg?.regionId ?? 'cn-shanghai',
       hasOssOutput: Boolean(cfg?.outputOssUrlPrefix?.trim()),
       hasVodOutput: Boolean(cfg?.vodStorageLocation?.trim()),
+      localUploadEnabled: ossUpload,
       presets: ICE_EFFECT_PRESETS.map((p) => p.label),
       effectOptions: ICE_EFFECT_PRESETS,
       credentialNote:
-        '墨典AI云剪（阿里云 ICE）的 AppId、AccessKey 由运营在「AI模型 → 短视频 API」维护；成片输出需配置点播存储地址或 OSS URL 前缀。',
+        '墨典AI云剪凭据由运营在「AI模型 → 短视频 API」维护；配置 OSS URL 前缀后可本地上传素材，成片输出需点播存储或 OSS 前缀。',
       docsUrl:
         'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview',
     })
@@ -106,6 +111,37 @@ export async function handleAliyunIceRoutes(input: {
       ok: false,
       message:
         '未配置阿里云 ICE：请在运营台填写 AppId、AccessKey ID、AccessKey Secret，或配置环境变量 ALIYUN_ICE_APP_ID / ALIBABA_CLOUD_ACCESS_KEY_ID / ALIBABA_CLOUD_ACCESS_KEY_SECRET。',
+    })
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/ice/upload-init') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON' })
+      return true
+    }
+    const fileName = String(parsed.fileName ?? 'video.mp4').trim()
+    const contentType = String(parsed.contentType ?? 'video/mp4').trim()
+    const sizeBytes = Number(parsed.sizeBytes ?? parsed.size ?? 0)
+    const { createIceSourceUploadPlan } = await import('./aliyunOssIceUpload.js')
+    const plan = await createIceSourceUploadPlan(cfg, rawEnv as Record<string, string | undefined>, {
+      fileName,
+      contentType,
+      sizeBytes,
+    })
+    if (!plan.ok) {
+      json(res, 400, { ok: false, message: plan.message })
+      return true
+    }
+    json(res, 200, {
+      ok: true,
+      uploadUrl: plan.uploadUrl,
+      contentType: plan.contentType,
+      mediaUrl: plan.mediaUrl,
+      objectKey: plan.objectKey,
     })
     return true
   }

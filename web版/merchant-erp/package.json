@@ -19,6 +19,7 @@
     "@ffmpeg/util": "^0.12.1",
     "@supabase/supabase-js": "^2.49.1",
     "@vercel/node": "^5.5.16",
+    "ali-oss": "^6.23.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",

@@ -17,6 +17,7 @@ import type {
   AiAgentMessage,
   AiAgentOpenContext,
   AiAgentPendingQuote,
+  AiComposerAttachment,
   AiPermissionId,
   AiProductPlanPreview,
   AiRecruitmentBriefPreview,
@@ -45,6 +46,11 @@ import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefa
 import { loadDouyinWizardLastContext } from '../lib/douyinWizardLastContext'
 import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
+import {
+  extractVideoPosterDataUrl,
+  isComposerImageFile,
+  isComposerVideoFile,
+} from '../lib/aiVideoPoster'
 import {
   detectImageGenerationIntent,
   modelPickerKeyForNativeImageVendor,
@@ -131,6 +137,16 @@ function agentMessagesToChatMessages(msgs: AiAgentMessage[]): AIMessage[] {
 }
 
 const MAX_ARCHIVED_SESSIONS = 10
+const MAX_COMPOSER_ATTACHMENTS = 4
+const MAX_COMPOSER_VIDEO_BYTES = 100 * 1024 * 1024
+
+function revokeComposerAttachment(att: AiComposerAttachment) {
+  if (att.kind === 'video') URL.revokeObjectURL(att.previewUrl)
+}
+
+function attachmentVisionUrls(attachments: AiComposerAttachment[]): string[] {
+  return attachments.map((a) => (a.kind === 'image' ? a.url : a.posterUrl))
+}
 
 function cloneAgentMessages(msgs: AiAgentMessage[]): AiAgentMessage[] {
   return structuredClone(msgs) as AiAgentMessage[]
@@ -167,13 +183,11 @@ type AiAgentContextValue = {
   setModelPickerKey: (key: string) => void
   modelPickerOptions: ReturnType<typeof listAiModelPickerOptionsForPlan>
   aiSending: boolean
-  /** 主输入区待发送的截图（最多 4 张） */
-  pendingComposerImages: string[]
-  addComposerImages: (files: FileList | null) => Promise<void>
-  /** 从剪贴板等多处收集的 File 数组（与 addComposerImages 共用压缩与 4 张上限） */
-  addComposerImageFiles: (files: File[]) => Promise<void>
-  removeComposerImage: (index: number) => void
-  clearComposerImages: () => void
+  /** 主输入区待发送的图片/视频（最多 4 个） */
+  pendingComposerAttachments: AiComposerAttachment[]
+  addComposerMediaFiles: (files: FileList | File[] | null) => Promise<void>
+  removeComposerAttachment: (index: number) => void
+  clearComposerAttachments: () => void
   /** 发送下一条用户消息时，将附在正文前的「引用」片段 */
   pendingQuote: AiAgentPendingQuote | null
   quoteMessage: (m: AiAgentMessage) => void
@@ -287,7 +301,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [archivedSessions, setArchivedSessions] = useState<AiAgentArchivedSession[]>([])
   const [sidebarActiveArchiveId, setSidebarActiveArchiveId] = useState<string | null>(null)
   const [inputDraft, setInputDraft] = useState('')
-  const [pendingComposerImages, setPendingComposerImages] = useState<string[]>([])
+  const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
+    AiComposerAttachment[]
+  >([])
   const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
   const [pendingQuote, setPendingQuote] = useState<AiAgentPendingQuote | null>(null)
   const pendingQuoteRef = useRef<AiAgentPendingQuote | null>(null)
@@ -341,30 +357,32 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     setDrawerOpen(false)
   }, [])
 
-  const addComposerImages = useCallback(async (files: FileList | null) => {
+  const addComposerMediaFiles = useCallback(async (files: FileList | File[] | null) => {
     if (!files?.length) return
-    const urls: string[] = []
-    for (let i = 0; i < files.length && urls.length < 4; i++) {
+    const added: AiComposerAttachment[] = []
+    for (const file of Array.from(files)) {
+      if (added.length >= MAX_COMPOSER_ATTACHMENTS) break
       try {
-        urls.push(await compressImageFileToDataUrl(files[i]))
+        if (isComposerImageFile(file)) {
+          added.push({ kind: 'image', url: await compressImageFileToDataUrl(file) })
+        } else if (isComposerVideoFile(file)) {
+          if (file.size > MAX_COMPOSER_VIDEO_BYTES) continue
+          const posterUrl = await extractVideoPosterDataUrl(file)
+          const previewUrl = URL.createObjectURL(file)
+          added.push({
+            kind: 'video',
+            previewUrl,
+            posterUrl,
+            name: file.name || 'video.mp4',
+          })
+        }
       } catch {
         /* 跳过无法解析的文件 */
       }
     }
-    if (!urls.length) return
-    setPendingComposerImages((prev) => [...prev, ...urls].slice(0, 4))
+    if (!added.length) return
+    setPendingComposerAttachments((prev) => [...prev, ...added].slice(0, MAX_COMPOSER_ATTACHMENTS))
   }, [])
-
-  const addComposerImageFiles = useCallback(
-    async (files: File[]) => {
-      const imgs = files.filter((f) => /^image\//i.test(f.type))
-      if (!imgs.length) return
-      const dt = new DataTransfer()
-      for (const f of imgs) dt.items.add(f)
-      await addComposerImages(dt.files)
-    },
-    [addComposerImages],
-  )
 
   const clearPendingQuote = useCallback(() => setPendingQuote(null), [])
 
@@ -372,8 +390,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     if (m.role !== 'user' && m.role !== 'assistant') return
     const text = (m.content ?? '').trim()
     const hasImg = Boolean(m.imageUrls?.some((u) => u?.trim()))
+    const hasVid = Boolean(m.videoUrls?.some((u) => u?.trim()))
     let excerpt = text.slice(0, 500)
-    if (!excerpt) excerpt = hasImg ? '［附图，无文字］' : '（空消息）'
+    if (!excerpt) excerpt = hasVid ? '［附视频，无文字］' : hasImg ? '［附图，无文字］' : '（空消息）'
+    else if (hasVid) excerpt = `［附视频］ ${excerpt}`.slice(0, 500)
     else if (hasImg) excerpt = `［附图］ ${excerpt}`.slice(0, 500)
     setPendingQuote({
       quotedMessageId: m.id,
@@ -382,12 +402,19 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const removeComposerImage = useCallback((index: number) => {
-    setPendingComposerImages((prev) => prev.filter((_, i) => i !== index))
+  const removeComposerAttachment = useCallback((index: number) => {
+    setPendingComposerAttachments((prev) => {
+      const hit = prev[index]
+      if (hit) revokeComposerAttachment(hit)
+      return prev.filter((_, i) => i !== index)
+    })
   }, [])
 
-  const clearComposerImages = useCallback(() => {
-    setPendingComposerImages([])
+  const clearComposerAttachments = useCallback(() => {
+    setPendingComposerAttachments((prev) => {
+      for (const a of prev) revokeComposerAttachment(a)
+      return []
+    })
   }, [])
 
   const pushCurrentToArchiveIfHasUser = useCallback(() => {
@@ -412,7 +439,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     messagesRef.current = fresh
     setPendingPreviewId(null)
     setInputDraft('')
-    setPendingComposerImages([])
+    setPendingComposerAttachments((prev) => {
+      for (const a of prev) revokeComposerAttachment(a)
+      return []
+    })
     setPendingQuote(null)
   }, [])
 
@@ -433,7 +463,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       messagesRef.current = next
       setPendingPreviewId(null)
       setInputDraft('')
-      setPendingComposerImages([])
+      setPendingComposerAttachments((prev) => {
+      for (const a of prev) revokeComposerAttachment(a)
+      return []
+    })
       setPendingQuote(null)
       setSidebarActiveArchiveId(sessionId)
     },
@@ -742,10 +775,17 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const sendUserText = useCallback(
     (text: string) => {
       const trimmed = text.trim()
-      const imgs = [...pendingComposerImages]
+      const attachments = [...pendingComposerAttachments]
+      const visionUrls = attachmentVisionUrls(attachments)
       const pq = pendingQuoteRef.current
-      if ((!trimmed && imgs.length === 0 && !pq) || aiSending || pendingPreviewId) return
-      let line = trimmed || (imgs.length ? '请结合附图说明你的需求。' : '')
+      if ((!trimmed && attachments.length === 0 && !pq) || aiSending || pendingPreviewId) return
+      let line =
+        trimmed ||
+        (attachments.some((a) => a.kind === 'video')
+          ? '请结合附带的视频（已提供首帧截图）说明你的需求。'
+          : attachments.length
+            ? '请结合附图说明你的需求。'
+            : '')
       if (pq) {
         const who = pq.role === 'user' ? '我' : '助手'
         const shortId = pq.quotedMessageId.slice(0, 8)
@@ -754,18 +794,31 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         setPendingQuote(null)
       }
       setSidebarActiveArchiveId(null)
-      setPendingComposerImages([])
+      for (const a of attachments) {
+        if (a.kind === 'video') revokeComposerAttachment(a)
+      }
+      setPendingComposerAttachments([])
       const nextPickerKey = resolveModelPickerKeyForImageIntent(
         modelPickerKey,
         modelPickerOptions,
         line,
-        imgs.length > 0,
+        visionUrls.length > 0,
       )
       if (nextPickerKey !== modelPickerKey) {
         setModelPickerKeyState(nextPickerKey)
         savePickerKey(nextPickerKey)
       }
-      const userMsg = createAgentMessage('user', line, { imageUrls: imgs.length ? imgs : undefined })
+      const bubbleImageUrls: string[] = []
+      for (const a of attachments) {
+        if (a.kind === 'image') bubbleImageUrls.push(a.url)
+        else bubbleImageUrls.push(a.posterUrl)
+      }
+      const userMsg = createAgentMessage('user', line, {
+        imageUrls: bubbleImageUrls.length ? bubbleImageUrls : undefined,
+        videoUrls: attachments
+          .filter((a): a is Extract<AiComposerAttachment, { kind: 'video' }> => a.kind === 'video')
+          .map((a) => a.previewUrl),
+      })
       setMessages((prev) => {
         const next = [...prev, userMsg]
         messagesRef.current = next
@@ -774,10 +827,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setInputDraft('')
       queueMicrotask(() => {
         void (async () => {
-          const refImg = imgs[0]?.trim()
+          const refImg = visionUrls[0]?.trim()
           const tryNativePixel =
-            (detectImageGenerationIntent(line) && imgs.length === 0) ||
-            (isAgentImagePickerKey(nextPickerKey) && imgs.length === 0 && trimmed.length > 0) ||
+            (detectImageGenerationIntent(line) && visionUrls.length === 0) ||
+            (isAgentImagePickerKey(nextPickerKey) && visionUrls.length === 0 && trimmed.length > 0) ||
             (Boolean(refImg) &&
               (isAgentImagePickerKey(nextPickerKey) || detectImageGenerationIntent(line)))
           if (tryNativePixel) {
@@ -816,7 +869,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             line,
             inferTaskTypeFromText(line),
             pageContext?.pageLabel,
-            imgs,
+            visionUrls,
             effectiveChatPickerKey(nextPickerKey),
           )
         })()
@@ -824,7 +877,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     },
     [
       aiSending,
-      pendingComposerImages,
+      pendingComposerAttachments,
       pendingPreviewId,
       pageContext?.pageLabel,
       runGatewayForSnapshot,
@@ -838,7 +891,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (taskType: AiTaskType) => {
       if (aiSending || pendingPreviewId) return
       setSidebarActiveArchiveId(null)
-      setPendingComposerImages([])
+      setPendingComposerAttachments((prev) => {
+      for (const a of prev) revokeComposerAttachment(a)
+      return []
+    })
       const label = AI_TASK_TYPE_LABELS[taskType]
       const line = `使用快捷任务：${label}`
       const userMsg = createAgentMessage('user', line)
@@ -996,7 +1052,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (query: string) => {
       const q = query.trim()
       if (!q || aiSending) return
-      setPendingComposerImages([])
+      setPendingComposerAttachments((prev) => {
+      for (const a of prev) revokeComposerAttachment(a)
+      return []
+    })
       const nextPickerKey = resolveModelPickerKeyForImageIntent(
         modelPickerKey,
         modelPickerOptions,
@@ -1102,11 +1161,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setModelPickerKey,
       modelPickerOptions,
       aiSending,
-      pendingComposerImages,
-      addComposerImages,
-      addComposerImageFiles,
-      removeComposerImage,
-      clearComposerImages,
+      pendingComposerAttachments,
+      addComposerMediaFiles,
+      removeComposerAttachment,
+      clearComposerAttachments,
       pendingQuote,
       quoteMessage,
       clearPendingQuote,
@@ -1136,11 +1194,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerOptions,
       aiSending,
       pendingPreviewLoading,
-      pendingComposerImages,
-      addComposerImages,
-      addComposerImageFiles,
-      removeComposerImage,
-      clearComposerImages,
+      pendingComposerAttachments,
+      addComposerMediaFiles,
+      removeComposerAttachment,
+      clearComposerAttachments,
       pendingQuote,
       quoteMessage,
       clearPendingQuote,

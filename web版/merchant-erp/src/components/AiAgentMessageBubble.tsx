@@ -65,6 +65,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
   const isUser = m.role === 'user'
   const isSystem = m.role === 'system'
   const imgs = m.imageUrls?.filter(Boolean) ?? []
+  const videos = m.videoUrls?.filter(Boolean) ?? []
   const timeStr = formatBubbleTime(m.createdAt)
 
   if (isUser) {
@@ -72,11 +73,20 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
       <div className="flex justify-end">
         <div className="max-w-[min(100%,26rem)]">
           <div className="rounded-2xl rounded-br-md bg-slate-700 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-50 shadow-md ring-1 ring-slate-900/10">
-            {imgs.length > 0 ? (
+            {videos.length > 0 || imgs.length > 0 ? (
               <div className="mb-2 flex flex-wrap justify-end gap-2">
+                {videos.map((src, i) => (
+                  <video
+                    key={`v-${i}`}
+                    src={src}
+                    controls
+                    playsInline
+                    className="max-h-40 max-w-[min(100%,14rem)] rounded-lg border border-white/15 bg-black object-contain"
+                  />
+                ))}
                 {imgs.map((src, i) => (
                   <img
-                    key={i}
+                    key={`i-${i}`}
                     src={src}
                     alt=""
                     className="max-h-36 max-w-[min(100%,11rem)] rounded-lg border border-white/15 object-contain"

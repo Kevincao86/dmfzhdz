@@ -5,6 +5,8 @@ export type AliyunIceCloudConfig = {
   regionId: string
   hasOssOutput?: boolean
   hasVodOutput?: boolean
+  /** 已配置 OSS 前缀时可本地上传至 Bucket */
+  localUploadEnabled?: boolean
   presets: string[]
   effectOptions?: { id: string; label: string }[]
   credentialNote?: string
@@ -52,6 +54,11 @@ const CONFIG_PATHS = [
   '/api/merchant/ai/video/openshot/config',
 ] as const
 
+const UPLOAD_INIT_PATHS = [
+  '/api/meoo-merchant-ai-video-ice-upload-init',
+  '/api/merchant/ai/video/ice/upload-init',
+] as const
+
 const PIPELINE_PATHS = [
   '/api/meoo-merchant-ai-video-ice-pipeline',
   '/api/meoo-merchant-ai-video-openshot-pipeline',
@@ -71,6 +78,64 @@ export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig 
     }
   }
   return null
+}
+
+export type IceUploadInitResult =
+  | { ok: true; uploadUrl: string; contentType: string; mediaUrl: string; objectKey?: string }
+  | { ok: false; message: string }
+
+export async function postIceUploadInit(body: {
+  fileName: string
+  contentType: string
+  sizeBytes: number
+}): Promise<IceUploadInitResult> {
+  for (const p of UPLOAD_INIT_PATHS) {
+    try {
+      const res = await fetch(p, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body),
+      })
+      const j = await parseJson<IceUploadInitResult & { message?: string }>(res)
+      if (res.status === 404) continue
+      if (!res.ok || !j?.ok) {
+        return { ok: false, message: j?.message ?? `上传初始化失败 HTTP ${res.status}` }
+      }
+      return j as IceUploadInitResult
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: msg }
+    }
+  }
+  return { ok: false, message: '本地上传接口未部署' }
+}
+
+/** 本地上传：先取 OSS 凭证，再 PUT 直传，返回可供云剪拉取的 mediaUrl */
+export async function uploadIceLocalVideoFile(
+  file: File,
+): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  const init = await postIceUploadInit({
+    fileName: file.name,
+    contentType: file.type || 'video/mp4',
+    sizeBytes: file.size,
+  })
+  if (!init.ok) return init
+
+  let putRes: Response
+  try {
+    putRes = await fetch(init.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': init.contentType },
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `上传到 OSS 失败：${msg}` }
+  }
+  if (!putRes.ok) {
+    return { ok: false, message: `OSS 上传失败 HTTP ${putRes.status}` }
+  }
+  return { ok: true, mediaUrl: init.mediaUrl, label: file.name.replace(/\.[^.]+$/, '') || file.name }
 }
 
 export async function postIcePipeline(body: {

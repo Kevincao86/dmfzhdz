@@ -746,7 +746,7 @@ export default function OpsAiModelsPage() {
               )}
             />
             <label className="mb-1 block text-xs text-slate-400">
-              OSS 成片 URL 前缀（与地域同 bucket，二选一或都配）
+              OSS 成片 URL 前缀（与地域同 bucket；亦用于商户本地上传素材到 source/ 目录）
             </label>
             <input
               type="text"
