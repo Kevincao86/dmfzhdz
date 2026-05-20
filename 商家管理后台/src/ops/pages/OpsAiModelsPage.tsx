@@ -261,7 +261,7 @@ export default function OpsAiModelsPage() {
             。商户 ERP 文案 / 生图默认<strong className="text-slate-400">自动</strong>
             选用已配置 Key 的厂商，不再由运营台固定「默认模型」。保存后写入项目根{' '}
             <span className="font-mono text-slate-400">.meoo-dev-sync</span>，ERP 约 2.5 秒内拉取。
-            商户 ERP「短视频优化」页<strong className="text-slate-400">仅选择模型与参数</strong>
+            商户 ERP「短视频AI处理」页<strong className="text-slate-400">仅选择模型与参数</strong>
             ，不在商户端暴露密钥。
           </p>
         </div>
@@ -621,7 +621,7 @@ export default function OpsAiModelsPage() {
               disabled={loading}
               value={videoAi.arkVideoEndpoints ?? ''}
               onChange={(e) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: e.target.value }))}
-              placeholder="Seedance 2.0|doubao-seedance-2-0-260128, Pro|ep-xxxxxxxx"
+              placeholder="Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215, Pro|ep-xxxxxxxx"
               className={cn(
                 'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
                 !editingVideoAi && 'cursor-default opacity-80',

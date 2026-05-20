@@ -17,6 +17,7 @@ import {
   listValidArkVideoModels,
   looksLikeArkPlaceholderEndpointId,
   looksLikeDoubaoChatModelId,
+  normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
   pickMergedArkEndpointsField,
 } from '../src/lib/arkVideoEndpointsConfig.js'
@@ -169,8 +170,18 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
       `「${endpointId}」为对话模型，不能用于视频生成。请改用 Seedance 模型（如 ${DEFAULT_SEEDANCE_VIDEO_MODEL_ID}）或 Seedance 专用 ep- 接入点。`
     )
   }
+  if (/has not activated the model/i.test(msg)) {
+    const modelId = msg.match(/model\s+([^\s.]+)/i)?.[1] ?? endpointId
+    return (
+      `当前 API Key 所属火山方舟账号尚未开通视频模型「${modelId}」。` +
+      `请登录火山方舟控制台 → 模型广场 / 开通管理 → 找到 Seedance 并开通该模型（或创建基于已开通模型的推理接入点 ep-），` +
+      `然后在运营台「短视频 API」填写已开通的模型 ID 或 ep（须与 API Key 同账号）。` +
+      `控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/model`
+    )
+  }
   if (upstreamStatus === 404 || /does not exist|not have access/i.test(msg)) {
-    return `方舟视频接入点无效或无权访问（${endpointId}）：${msg}。请在火山方舟控制台确认该 ep 已开通 Seedance 视频推理且与当前 API Key 同账号。`
+    const kind = /^ep-/i.test(endpointId) ? '推理接入点 ep' : '模型'
+    return `方舟视频${kind}无效或无权访问（${endpointId}）：${msg}。请在火山方舟控制台确认已开通 Seedance 视频服务，且与运营台配置的 API Key 为同一账号。`
   }
   return msg
 }
@@ -491,7 +502,8 @@ async function arkCreateVideoTask(
       msg:
         '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key，或设置服务端 MERCHANT_AI_DOUBAO_KEY。',
     }
-  let modelId = typeof body.model === 'string' ? body.model.trim() : ''
+  let modelId =
+    typeof body.model === 'string' ? normalizeArkVideoModelParam(body.model) : ''
   if (!modelId) {
     const list = parseArkVideoModelList(env)
     if (list[0]?.endpointId) modelId = list[0].endpointId

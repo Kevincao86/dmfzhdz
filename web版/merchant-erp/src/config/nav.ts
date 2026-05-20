@@ -47,7 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
       { path: '/geo', label: 'GEO运营优化' },
       { path: '/operation/competitors', label: '竞争对手分析' },
       { path: '/ai-operation/content', label: 'AI 文章与话题' },
-      { path: '/ai-operation/video-check', label: '短视频优化' },
+      { path: '/ai-operation/video-check', label: '短视频AI处理' },
     ],
   },
   { path: '/advertising', label: '投流', icon: Megaphone },

@@ -2,11 +2,26 @@
 
 export type ArkVideoModelOption = { label: string; endpointId: string }
 
-/** Seedance 2.0 默认模型（无 ep 配置时作回退，须账号已开通） */
-export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-2-0-260128'
+/** Seedance 1.5 Pro 默认模型（方舟 API 模型名，须账号已开通） */
+export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-1-5-pro-251215'
+
+/** 运营/文档中的友好名 → 方舟 model 参数 */
+const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
+  'doubao-seedance-1.5-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
+  'doubao-seedance-1-5-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
+}
+
+export function normalizeArkVideoModelParam(modelId: string): string {
+  const t = modelId.trim()
+  if (/^ep-/i.test(t)) return t
+  const lower = t.toLowerCase()
+  return SEEDANCE_MODEL_ALIASES[lower] ?? lower
+}
 
 export function isDoubaoSeedanceModelId(id: string): boolean {
-  return /^doubao-seedance/i.test(id.trim())
+  const t = id.trim()
+  if (/^doubao-seedance/i.test(t)) return true
+  return Object.keys(SEEDANCE_MODEL_ALIASES).includes(t.toLowerCase())
 }
 
 export function isArkVideoEndpointId(id: string): boolean {
@@ -113,8 +128,12 @@ export function listValidArkVideoModels(
   const out: ArkVideoModelOption[] = [...fromList]
 
   const seedId = String(seedanceModelId ?? '').trim()
-  if (seedId && isDoubaoSeedanceModelId(seedId) && !seen.has(seedId)) {
-    out.unshift({ label: 'Seedance（模型 ID · 推荐）', endpointId: seedId })
+  // 仅当运营未配置任何视频模型时，才注入 env 默认模型 ID，避免未开通的模型出现在下拉里
+  if (fromList.length === 0 && seedId && isDoubaoSeedanceModelId(seedId) && !seen.has(seedId)) {
+    out.unshift({
+      label: 'Seedance 1.5 Pro（模型 ID · 需在方舟开通）',
+      endpointId: seedId,
+    })
     seen.add(seedId)
   }
 
@@ -141,7 +160,7 @@ export function describeArkVideoSetupIssue(
   if (!raw) {
     return (
       '方舟 Key 已配置，但未配置视频模型。请在运营台填写「Seedance · 方舟视频接入点」' +
-      '（格式：Seedance 2.0|doubao-seedance-2-0-260128 或 显示名|ep-xxxx），' +
+      `（格式：Seedance 1.5 Pro|${DEFAULT_SEEDANCE_VIDEO_MODEL_ID} 或 显示名|ep-xxxx），` +
       '或在 Vercel 设置 MERCHANT_AI_SEEDANCE_VIDEO_MODEL / MERCHANT_AI_ARK_VIDEO_ENDPOINTS。'
     )
   }
@@ -150,7 +169,7 @@ export function describeArkVideoSetupIssue(
   if (chatOnly.length > 0 && chatOnly.length === all.length) {
     return (
       `当前配置为对话模型（如 ${chatOnly[0]!.endpointId}），不能用于视频生成。` +
-      '请改为 Seedance 模型 ID（doubao-seedance-2-0-260128）或方舟控制台创建的 Seedance 视频 ep- 接入点。'
+      `请改为 Seedance 模型 ID（${DEFAULT_SEEDANCE_VIDEO_MODEL_ID}）或方舟控制台创建的 Seedance 视频 ep- 接入点。`
     )
   }
   const placeholders = all.filter((m) => looksLikeArkPlaceholderEndpointId(m.endpointId))
@@ -163,7 +182,7 @@ export function describeArkVideoSetupIssue(
   const valid = listValidArkVideoModels(raw)
   if (valid.length === 0) {
     return (
-      '接入点格式无法识别。请使用「显示名|ep-xxxx」或「显示名|doubao-seedance-2-0-260128」，多个用英文逗号分隔。'
+      `接入点格式无法识别。请使用「显示名|ep-xxxx」或「Seedance 1.5 Pro|${DEFAULT_SEEDANCE_VIDEO_MODEL_ID}」，多个用英文逗号分隔。`
     )
   }
   return null
