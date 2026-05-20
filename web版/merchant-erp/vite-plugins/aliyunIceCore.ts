@@ -160,6 +160,53 @@ export function buildIceUploadTargetConfig(
   }
 }
 
+const ICE_UPLOAD_EXTENSIONS = new Set([
+  'mp4',
+  'mov',
+  'm4v',
+  'avi',
+  'mkv',
+  'webm',
+  'flv',
+  'mpeg',
+  'mpg',
+  '3gp',
+  'mp3',
+  'm4a',
+  'wav',
+  'aac',
+  'flac',
+  'ogg',
+])
+
+/** ICE UploadMetadata.FileExtension：小写、无点；URL 无后缀时默认 mp4 */
+export function parseIceFileExtensionFromUrl(mediaUrl: string): string {
+  let pathPart = mediaUrl.trim()
+  try {
+    pathPart = new URL(mediaUrl).pathname
+  } catch {
+    pathPart = mediaUrl.split('?')[0]?.split('#')[0] ?? mediaUrl
+  }
+  const file = pathPart.split('/').filter(Boolean).pop() ?? ''
+  const dot = file.lastIndexOf('.')
+  if (dot > 0 && dot < file.length - 1) {
+    const raw = file.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (raw.length >= 2 && raw.length <= 8 && ICE_UPLOAD_EXTENSIONS.has(raw)) return raw
+  }
+  return 'mp4'
+}
+
+function buildIceUploadMetadata(mediaUrl: string, title: string): string {
+  const ext = parseIceFileExtensionFromUrl(mediaUrl)
+  return JSON.stringify([
+    {
+      SourceURL: mediaUrl,
+      Title: title.slice(0, 120),
+      FileExtension: ext,
+    },
+  ])
+}
+
 function buildOutputConfig(
   cfg: AliyunIceConfig,
   width: number,
@@ -213,7 +260,7 @@ async function uploadUrlToMediaId(
   const target = buildIceUploadTargetConfig(cfg)
   if (!target.ok) return { ok: false, message: target.message }
 
-  const meta = JSON.stringify([{ SourceURL: mediaUrl, Title: title.slice(0, 120) }])
+  const meta = buildIceUploadMetadata(mediaUrl, title)
   try {
     const res = await client.uploadMediaByURL(
       new UploadMediaByURLRequest({
