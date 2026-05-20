@@ -255,6 +255,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           pathname,
           searchParams: url.searchParams,
           res,
+          req,
           bodyRaw: bodyRawVideo,
           viteRoot,
           env: env as MerchantAiEnv,

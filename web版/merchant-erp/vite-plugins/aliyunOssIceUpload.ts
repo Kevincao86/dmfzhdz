@@ -389,6 +389,34 @@ function sniffOssErrorXml(buf: Buffer): string | null {
   return [code, msg].filter(Boolean).join(': ') || head.slice(0, 200)
 }
 
+/** ISO BMFF（MP4/MOV）文件头 */
+export function isLikelyMp4Buffer(buf: Buffer): boolean {
+  if (buf.length < 12) return false
+  return buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70
+}
+
+function sniffInvalidIceOutputBody(buf: Buffer): string | null {
+  const xmlErr = sniffOssErrorXml(buf)
+  if (xmlErr) return `读取成片失败：${xmlErr}`
+  const head = buf.toString('utf8', 0, Math.min(buf.length, 120)).trimStart()
+  if (head.startsWith('<!') || /^<html/i.test(head)) {
+    return '拉取到的不是视频文件（疑似 HTML 错误页），请检查 OSS 权限或 API 路由'
+  }
+  if (head.startsWith('{') || head.startsWith('[')) {
+    return '拉取到的不是视频文件（疑似 JSON 错误），请稍后重试或联系运营'
+  }
+  if (!isLikelyMp4Buffer(buf)) {
+    return 'OSS 上的成片不是有效 MP4，请确认 ICE 输出为 H.264/AAC 的 .mp4 并重新提交云剪'
+  }
+  return null
+}
+
+function normalizeIceVideoContentType(ct: string): string {
+  const t = ct.trim().toLowerCase()
+  if (t.includes('video/') || t.includes('mp4')) return 'video/mp4'
+  return 'video/mp4'
+}
+
 /** 服务端拉取成片（优先 OSS SDK get，私有桶不依赖公网直链） */
 export async function fetchIceOutputObject(
   cfg: AliyunIceConfig,
@@ -401,12 +429,11 @@ export async function fetchIceOutputObject(
       const result = await client.get(parsed.objectKey)
       const raw = result.content
       const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as Buffer)
-      const ct =
-        String(result.res?.headers?.['content-type'] ?? '').trim() || 'video/mp4'
-      const xmlErr = sniffOssErrorXml(buf)
-      if (xmlErr) {
-        return { ok: false, message: `读取成片失败：${xmlErr}` }
-      }
+      const ct = normalizeIceVideoContentType(
+        String(result.res?.headers?.['content-type'] ?? '').trim() || 'video/mp4',
+      )
+      const invalid = sniffInvalidIceOutputBody(buf)
+      if (invalid) return { ok: false, message: invalid }
       if (buf.length < MIN_ICE_OUTPUT_BYTES) {
         return {
           ok: false,
@@ -428,10 +455,10 @@ export async function fetchIceOutputObject(
     if (!res.ok) {
       return { ok: false, message: `拉取成片失败 HTTP ${res.status}` }
     }
-    const ct = res.headers.get('content-type') ?? 'video/mp4'
+    const ct = normalizeIceVideoContentType(res.headers.get('content-type') ?? 'video/mp4')
     const buf = Buffer.from(await res.arrayBuffer())
-    const xmlErr = sniffOssErrorXml(buf)
-    if (xmlErr) return { ok: false, message: `读取成片失败：${xmlErr}` }
+    const invalid = sniffInvalidIceOutputBody(buf)
+    if (invalid) return { ok: false, message: invalid }
     if (buf.length < MIN_ICE_OUTPUT_BYTES) {
       return { ok: false, message: `成片文件过小（${buf.length} 字节），请稍后重试。` }
     }
