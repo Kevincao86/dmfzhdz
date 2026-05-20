@@ -125,6 +125,41 @@ function buildTimeline(mediaId: string, clipEndSec: number, effectId: string): o
   }
 }
 
+/** UploadMediaByURL 必填：目标为 ICE/VOD 点播库，非商户自研 OSS Bucket */
+export function buildIceUploadTargetConfig(
+  cfg: AliyunIceConfig,
+): { ok: true; value: string } | { ok: false; message: string } {
+  const raw = cfg.vodStorageLocation?.trim() ?? ''
+  if (!raw) {
+    return {
+      ok: false,
+      message:
+        '缺少 ICE 点播存储地址：请在运营台「AI模型 → 短视频 API → 墨典AI云剪」填写 StorageLocation（如 outin-***.oss-cn-shanghai.aliyuncs.com）。粘贴 HTTPS 链接或本地上传后提交云剪均需此项；仅填 OSS 成片前缀不够。',
+    }
+  }
+  let storageLocation = raw
+  if (raw.includes('://')) {
+    try {
+      storageLocation = new URL(raw).hostname
+    } catch {
+      return { ok: false, message: '点播存储地址格式无效' }
+    }
+  } else {
+    storageLocation = raw.split('/')[0]?.trim() ?? raw
+  }
+  if (!/\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(storageLocation)) {
+    return {
+      ok: false,
+      message:
+        '点播存储地址须为 ICE 控制台中的 VOD StorageLocation（如 outin-***.oss-cn-shanghai.aliyuncs.com），不能填商户 Bucket 的 oss 域名。',
+    }
+  }
+  return {
+    ok: true,
+    value: JSON.stringify({ StorageType: 'oss', StorageLocation: storageLocation }),
+  }
+}
+
 function buildOutputConfig(
   cfg: AliyunIceConfig,
   width: number,
@@ -175,6 +210,9 @@ async function uploadUrlToMediaId(
   mediaUrl: string,
   title: string,
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
+  const target = buildIceUploadTargetConfig(cfg)
+  if (!target.ok) return { ok: false, message: target.message }
+
   const meta = JSON.stringify([{ SourceURL: mediaUrl, Title: title.slice(0, 120) }])
   try {
     const res = await client.uploadMediaByURL(
@@ -182,6 +220,7 @@ async function uploadUrlToMediaId(
         uploadURLs: mediaUrl,
         appId: cfg.appId,
         mediaMetaData: meta,
+        uploadTargetConfig: target.value,
       }),
     )
     const jobs = bodyOf(res)?.uploadJobs as { mediaId?: string }[] | undefined

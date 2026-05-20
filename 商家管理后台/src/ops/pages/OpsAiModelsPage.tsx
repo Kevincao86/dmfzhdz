@@ -730,7 +730,7 @@ export default function OpsAiModelsPage() {
               )}
             />
             <label className="mb-1 block text-xs text-slate-400">
-              点播存储地址 StorageLocation（成片输出到 VOD 时填写）
+              点播存储地址 StorageLocation（链接拉取素材、成片输出到 VOD 时必填）
             </label>
             <input
               type="text"
