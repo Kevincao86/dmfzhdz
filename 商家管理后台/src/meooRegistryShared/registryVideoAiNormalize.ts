@@ -17,8 +17,11 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     klingApiBase: slice('klingApiBase', 260),
     arkVideoEndpoints: slice('arkVideoEndpoints', 8192),
     arkVideoApiKey: slice('arkVideoApiKey', 520),
-    openshotApiBase: slice('openshotApiBase', 260),
-    openshotUsername: slice('openshotUsername', 260),
-    openshotPassword: slice('openshotPassword', 520),
+    iceAppId: slice('iceAppId', 120),
+    iceAccessKeyId: slice('iceAccessKeyId', 260),
+    iceAccessKeySecret: slice('iceAccessKeySecret', 520),
+    iceRegion: slice('iceRegion', 64),
+    iceVodStorageLocation: slice('iceVodStorageLocation', 520),
+    iceOutputOssUrlPrefix: slice('iceOutputOssUrlPrefix', 520),
   }
 }

@@ -14,10 +14,16 @@ export type RegistryVideoAi = {
    * 或服务端 MERCHANT_AI_DOUBAO_KEY（按合并策略）。
    */
   arkVideoApiKey?: string
-  /** OpenShot Cloud API（批量云剪） */
-  openshotApiBase?: string
-  openshotUsername?: string
-  openshotPassword?: string
+  /** 阿里云 ICE 云剪辑 AppId（IMS 控制台） */
+  iceAppId?: string
+  iceAccessKeyId?: string
+  iceAccessKeySecret?: string
+  /** 默认 cn-shanghai */
+  iceRegion?: string
+  /** 成片输出到点播时的 StorageLocation */
+  iceVodStorageLocation?: string
+  /** 成片输出到 OSS 时的 URL 前缀（与 region 同地域 bucket） */
+  iceOutputOssUrlPrefix?: string
 }
 
 /** 运营台可扩展的 AI 供应商目录项（磁盘仅存非内置条目，GET 网关会合并内置目录后再返回）。 */

@@ -18,7 +18,7 @@ import {
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
-import { handleOpenshotCloudRoutes } from './openshotCloudGateway.js'
+import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 
 /** 将注册表中的 videoAi / vendorKeys 合入 env：非空 env 优先生效（与本地 registry.json 规则一致）。 */
 function applyRegistrySliceToVideoAiEnv(
@@ -39,9 +39,12 @@ function applyRegistrySliceToVideoAiEnv(
   fill('KLING_ACCESS_KEY', vx.klingAccessKey)
   fill('KLING_SECRET_KEY', vx.klingSecretKey)
   fill('KLING_API_BASE', vx.klingApiBase)
-  fill('OPENSHOT_CLOUD_USER', vx.openshotUsername)
-  fill('OPENSHOT_CLOUD_PASSWORD', vx.openshotPassword)
-  fill('OPENSHOT_CLOUD_API_BASE', vx.openshotApiBase)
+  fill('ALIYUN_ICE_APP_ID', vx.iceAppId)
+  fill('ALIYUN_ICE_ACCESS_KEY_ID', vx.iceAccessKeyId)
+  fill('ALIYUN_ICE_ACCESS_KEY_SECRET', vx.iceAccessKeySecret)
+  fill('ALIYUN_ICE_REGION', vx.iceRegion)
+  fill('ALIYUN_ICE_VOD_STORAGE_LOCATION', vx.iceVodStorageLocation)
+  fill('ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX', vx.iceOutputOssUrlPrefix)
 
   const envEp = String(
     out.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ?? out.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ?? '',
@@ -538,7 +541,7 @@ export async function handleMerchantAiVideoRoutes(input: {
   const { method, pathname, searchParams, res, bodyRaw, env: rawEnv } = input
   const env = await mergeVideoAiMerchantEnvWithSnapshot(input.viteRoot, rawEnv)
 
-  if (await handleOpenshotCloudRoutes({ ...input, env })) return true
+  if (await handleAliyunIceRoutes({ ...input, env })) return true
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/config') {
     const kCfg = pickKlingCreds(env)
@@ -551,16 +554,21 @@ export async function handleMerchantAiVideoRoutes(input: {
     const arkKeyOk = !!doubaoBearerKey(env)
     const qwenOk = !!(env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
     const arkVideoSetupIssue = describeArkVideoSetupIssue(arkKeyOk, endpointsRaw)
-    const openshotUser = (env.OPENSHOT_CLOUD_USER ?? env.OPENCUT_CLOUD_USER ?? '').trim()
-    const openshotPass = (env.OPENSHOT_CLOUD_PASSWORD ?? env.OPENCUT_CLOUD_PASSWORD ?? '').trim()
+    const iceOk = Boolean(
+      (env.ALIYUN_ICE_APP_ID ?? '').trim() &&
+        (env.ALIYUN_ICE_ACCESS_KEY_ID ?? env.ALIBABA_CLOUD_ACCESS_KEY_ID ?? '').trim() &&
+        (env.ALIYUN_ICE_ACCESS_KEY_SECRET ?? env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ?? '').trim(),
+    )
     const credentialNote =
-      '商户端仅可选择模型能力与参数；可灵密钥、方舟 Key / 视频推理接入点、OpenShot Cloud 账号由运营人员在「管控台 · AI模型」中维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。'
+      '商户端仅可选择模型能力与参数；可灵、方舟视频、阿里云 ICE 云剪辑凭据由运营在「管控台 · AI模型」维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。'
     json(res, 200, {
       klingConfigured: kCfg.ok,
       arkVideoModels: arkOpts,
       arkKeyConfigured: arkKeyOk,
       arkVideoSetupIssue,
-      openshotConfigured: !!(openshotUser && openshotPass),
+      iceConfigured: iceOk,
+      /** @deprecated 使用 iceConfigured */
+      openshotConfigured: iceOk,
       longformPlanner: {
         doubao: arkKeyOk,
         qwen: qwenOk,

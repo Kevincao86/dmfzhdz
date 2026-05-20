@@ -187,9 +187,12 @@ export type RegistryVideoAi = {
   klingApiBase?: string
   arkVideoEndpoints?: string
   arkVideoApiKey?: string
-  openshotApiBase?: string
-  openshotUsername?: string
-  openshotPassword?: string
+  iceAppId?: string
+  iceAccessKeyId?: string
+  iceAccessKeySecret?: string
+  iceRegion?: string
+  iceVodStorageLocation?: string
+  iceOutputOssUrlPrefix?: string
 }
 
 export type RegistryFile = {

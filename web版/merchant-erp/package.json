@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@alicloud/dypnsapi20170525": "^2.0.0",
+    "@alicloud/ice20201109": "^6.19.0",
     "@alicloud/openapi-client": "^0.4.15",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
