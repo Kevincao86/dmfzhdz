@@ -337,7 +337,8 @@ export async function handleAliyunIceRoutes(input: {
       effectId: effect.id,
     })
     if (!out.ok) {
-      json(res, 502, { ok: false, message: out.message, step: out.step })
+      const clientErr = /InvalidParameter|MissingParameter/i.test(out.message)
+      json(res, clientErr ? 400 : 502, { ok: false, message: out.message, step: out.step })
       return true
     }
     json(res, 200, {
