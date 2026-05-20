@@ -17,6 +17,13 @@ import {
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
 import { iceOssUploadAvailable } from './aliyunOssIceParse.js'
+import { fetchIceOutputObject } from './aliyunOssIceUpload.js'
+
+function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
+  const q = new URLSearchParams({ id: jobId })
+  if (inline) q.set('inline', '1')
+  return `/api/meoo-merchant-ai-video-ice-job-download?${q.toString()}`
+}
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -367,7 +374,8 @@ export async function handleAliyunIceRoutes(input: {
       progress: st.progress,
       done: st.done,
       failed: st.failed,
-      downloadUrl: st.downloadUrl,
+      downloadUrl: st.done ? iceJobDownloadProxyPath(jobId) : undefined,
+      previewUrl: st.done ? iceJobDownloadProxyPath(jobId, true) : undefined,
       message: st.message,
     })
     return true
@@ -379,29 +387,27 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 400, { ok: false, message: '缺少 id' })
       return true
     }
+    const inline = searchParams.get('inline') === '1'
     const st = await iceGetProducingJob(cfg, jobId)
     if (!st.ok || !st.downloadUrl) {
       json(res, 404, { ok: false, message: st.ok ? '成片地址尚未生成' : st.message })
       return true
     }
-    let upstream: Response
-    try {
-      upstream = await fetch(st.downloadUrl, { redirect: 'follow' })
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      json(res, 502, { ok: false, message: msg })
+    const fetched = await fetchIceOutputObject(cfg, st.downloadUrl)
+    if (!fetched.ok) {
+      json(res, 502, { ok: false, message: fetched.message })
       return true
     }
-    if (!upstream.ok) {
-      json(res, upstream.status, { ok: false, message: `拉取成片失败 HTTP ${upstream.status}` })
-      return true
-    }
-    const ct = upstream.headers.get('content-type') ?? 'video/mp4'
-    const buf = Buffer.from(await upstream.arrayBuffer())
     res.statusCode = 200
-    res.setHeader('Content-Type', ct)
-    res.setHeader('Content-Disposition', `attachment; filename="ice-${jobId}.mp4"`)
-    res.end(buf)
+    res.setHeader('Content-Type', fetched.contentType)
+    res.setHeader(
+      'Content-Disposition',
+      inline
+        ? `inline; filename="ice-${jobId}.mp4"`
+        : `attachment; filename="ice-${jobId}.mp4"`,
+    )
+    res.setHeader('Cache-Control', 'private, max-age=300')
+    res.end(fetched.buf)
     return true
   }
 

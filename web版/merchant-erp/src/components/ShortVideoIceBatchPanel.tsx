@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { cn } from '../cn'
 import {
   downloadIceExportBlob,
+  iceJobDownloadProxyPath,
   fetchAliyunIceCloudConfig,
   fetchIceJobStatus,
   ICE_ASPECT_PRESETS,
@@ -209,10 +210,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         })
         return false
       }
-      if (st.done && st.downloadUrl) {
+      if (st.done) {
         patchJob(localJobId, {
           phase: 'done',
-          downloadUrl: st.downloadUrl,
+          downloadUrl: iceJobDownloadProxyPath(iceJobId),
           message: '剪辑完成，可在右侧下载成片',
         })
         return true
@@ -238,7 +239,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       URL.revokeObjectURL(blobUrl)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (job.downloadUrl) window.open(job.downloadUrl, '_blank', 'noopener')
+      if (job.exportId) window.open(iceJobDownloadProxyPath(job.exportId, true), '_blank', 'noopener')
       else setErr(msg)
     }
   }
@@ -751,15 +752,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     <Download className="h-5 w-5" />
                     下载 MP4
                   </button>
-                  {latestDone.downloadUrl ? (
+                  {latestDone.exportId ? (
                     <a
-                      href={latestDone.downloadUrl}
+                      href={iceJobDownloadProxyPath(latestDone.exportId, true)}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-2 flex items-center justify-center gap-1 text-xs text-emerald-800 hover:underline"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
-                      在浏览器中打开成片链接
+                      在浏览器中预览成片
                     </a>
                   ) : null}
                 </div>
@@ -814,13 +815,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                               <Download className="h-3.5 w-3.5" />
                               下载
                             </button>
-                            {j.downloadUrl ? (
+                            {j.exportId ? (
                               <a
-                                href={j.downloadUrl}
+                                href={iceJobDownloadProxyPath(j.exportId, true)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center justify-center rounded-md border border-zinc-300 px-2 py-1.5 text-zinc-700 hover:bg-zinc-50"
-                                title="打开链接"
+                                title="预览成片"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>

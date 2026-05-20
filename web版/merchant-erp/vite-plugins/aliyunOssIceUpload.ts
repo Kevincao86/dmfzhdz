@@ -266,3 +266,66 @@ export async function completeIceMultipartUpload(
     return { ok: false, message: `OSS 合并分片失败：${msg}` }
   }
 }
+
+/** 解析成片 OSS 直链：https://bucket.oss-cn-xxx.aliyuncs.com/key/object.mp4 */
+export function parseOssObjectUrl(raw: string): { bucket: string; region: string; objectKey: string } | null {
+  try {
+    const url = new URL(raw.trim())
+    const m = url.hostname.match(/^([^.]+)\.oss-([a-z0-9-]+)\.aliyuncs\.com$/i)
+    if (!m?.[1] || !m[2]) return null
+    const objectKey = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
+    if (!objectKey) return null
+    return { bucket: m[1], region: m[2], objectKey }
+  } catch {
+    return null
+  }
+}
+
+/** 私有 Bucket 成片：生成限时可读签名 URL（与 ICE AccessKey 相同） */
+export async function signIceOssObjectUrl(
+  cfg: AliyunIceConfig,
+  rawUrl: string,
+  expiresSec = 3600,
+): Promise<string | null> {
+  const parsed = parseOssObjectUrl(rawUrl)
+  if (!parsed) return null
+  try {
+    const { default: OSS } = await import('ali-oss')
+    const client = new OSS({
+      region: `oss-${parsed.region}`,
+      accessKeyId: cfg.accessKeyId,
+      accessKeySecret: cfg.accessKeySecret,
+      bucket: parsed.bucket,
+    })
+    return client.signatureUrl(parsed.objectKey, { expires: expiresSec })
+  } catch {
+    return null
+  }
+}
+
+/** 服务端拉取成片（私有 OSS 先签名再 GET） */
+export async function fetchIceOutputObject(
+  cfg: AliyunIceConfig,
+  rawUrl: string,
+): Promise<{ ok: true; buf: Buffer; contentType: string } | { ok: false; message: string }> {
+  let fetchUrl = rawUrl.trim()
+  const signed = await signIceOssObjectUrl(cfg, fetchUrl)
+  if (signed) fetchUrl = signed
+  try {
+    const res = await fetch(fetchUrl, { redirect: 'follow' })
+    if (!res.ok) {
+      if (!signed && parseOssObjectUrl(rawUrl)) {
+        return {
+          ok: false,
+          message:
+            '成片 OSS 拒绝访问（Bucket 为私有）。请确认 ICE AccessKey 对该 Bucket 有读权限，或通过「下载 MP4」经系统代理获取。',
+        }
+      }
+      return { ok: false, message: `拉取成片失败 HTTP ${res.status}` }
+    }
+    const ct = res.headers.get('content-type') ?? 'video/mp4'
+    return { ok: true, buf: Buffer.from(await res.arrayBuffer()), contentType: ct }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
