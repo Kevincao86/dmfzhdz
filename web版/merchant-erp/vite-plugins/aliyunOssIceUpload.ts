@@ -303,28 +303,108 @@ export async function signIceOssObjectUrl(
   }
 }
 
-/** 服务端拉取成片（私有 OSS 先签名再 GET） */
+/** 有效 MP4 至少应有若干 KB；过小视为未写完或 ICE 未写入 OSS */
+export const MIN_ICE_OUTPUT_BYTES = 2048
+
+type OssHeadResult = { res?: { headers?: Record<string, string | number | string[]> } }
+type OssGetResult = { content: Buffer | Uint8Array; res?: { headers?: Record<string, string> } }
+type OssObjectClient = {
+  head(name: string): Promise<OssHeadResult>
+  get(name: string): Promise<OssGetResult>
+}
+
+async function ossClientForObject(
+  cfg: AliyunIceConfig,
+  parsed: { bucket: string; region: string },
+): Promise<OssObjectClient> {
+  const { default: OSS } = await import('ali-oss')
+  return new OSS({
+    region: `oss-${parsed.region}`,
+    accessKeyId: cfg.accessKeyId,
+    accessKeySecret: cfg.accessKeySecret,
+    bucket: parsed.bucket,
+  }) as unknown as OssObjectClient
+}
+
+/** HEAD 成片 OSS 对象大小（用于轮询「Success 但尚未落盘」） */
+export async function probeIceOutputObjectSize(
+  cfg: AliyunIceConfig,
+  rawUrl: string,
+): Promise<{ ok: true; size: number } | { ok: false; message: string }> {
+  const parsed = parseOssObjectUrl(rawUrl)
+  if (!parsed) {
+    return { ok: true, size: -1 }
+  }
+  try {
+    const client = await ossClientForObject(cfg, parsed)
+    const head = await client.head(parsed.objectKey)
+    const size = Number(head.res?.headers?.['content-length'] ?? 0)
+    return { ok: true, size: Number.isFinite(size) ? size : 0 }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (/not found|404|NoSuchKey/i.test(msg)) {
+      return { ok: true, size: 0 }
+    }
+    return { ok: false, message: msg }
+  }
+}
+
+function sniffOssErrorXml(buf: Buffer): string | null {
+  if (buf.length > 8192) return null
+  const head = buf.toString('utf8', 0, Math.min(buf.length, 400))
+  if (!head.includes('<Error>')) return null
+  const code = /<Code>([^<]+)<\/Code>/i.exec(head)?.[1]
+  const msg = /<Message>([^<]+)<\/Message>/i.exec(head)?.[1]
+  return [code, msg].filter(Boolean).join(': ') || head.slice(0, 200)
+}
+
+/** 服务端拉取成片（优先 OSS SDK get，私有桶不依赖公网直链） */
 export async function fetchIceOutputObject(
   cfg: AliyunIceConfig,
   rawUrl: string,
 ): Promise<{ ok: true; buf: Buffer; contentType: string } | { ok: false; message: string }> {
+  const parsed = parseOssObjectUrl(rawUrl)
+  if (parsed) {
+    try {
+      const client = await ossClientForObject(cfg, parsed)
+      const result = await client.get(parsed.objectKey)
+      const raw = result.content
+      const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as Buffer)
+      const ct =
+        String(result.res?.headers?.['content-type'] ?? '').trim() || 'video/mp4'
+      const xmlErr = sniffOssErrorXml(buf)
+      if (xmlErr) {
+        return { ok: false, message: `读取成片失败：${xmlErr}` }
+      }
+      if (buf.length < MIN_ICE_OUTPUT_BYTES) {
+        return {
+          ok: false,
+          message: `成片文件过小（${buf.length} 字节）。请确认 ICE 对 Bucket「${parsed.bucket}」有写入权限，且输出 OSS 与 ICE 同在 cn-shanghai；稍后重试或联系运营检查运营台 OSS 前缀配置。`,
+        }
+      }
+      return { ok: true, buf, contentType: ct }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: `OSS 读取成片失败：${msg}` }
+    }
+  }
+
   let fetchUrl = rawUrl.trim()
   const signed = await signIceOssObjectUrl(cfg, fetchUrl)
   if (signed) fetchUrl = signed
   try {
     const res = await fetch(fetchUrl, { redirect: 'follow' })
     if (!res.ok) {
-      if (!signed && parseOssObjectUrl(rawUrl)) {
-        return {
-          ok: false,
-          message:
-            '成片 OSS 拒绝访问（Bucket 为私有）。请确认 ICE AccessKey 对该 Bucket 有读权限，或通过「下载 MP4」经系统代理获取。',
-        }
-      }
       return { ok: false, message: `拉取成片失败 HTTP ${res.status}` }
     }
     const ct = res.headers.get('content-type') ?? 'video/mp4'
-    return { ok: true, buf: Buffer.from(await res.arrayBuffer()), contentType: ct }
+    const buf = Buffer.from(await res.arrayBuffer())
+    const xmlErr = sniffOssErrorXml(buf)
+    if (xmlErr) return { ok: false, message: `读取成片失败：${xmlErr}` }
+    if (buf.length < MIN_ICE_OUTPUT_BYTES) {
+      return { ok: false, message: `成片文件过小（${buf.length} 字节），请稍后重试。` }
+    }
+    return { ok: true, buf, contentType: ct }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }

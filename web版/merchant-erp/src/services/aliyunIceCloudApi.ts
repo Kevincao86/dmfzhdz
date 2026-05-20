@@ -24,6 +24,9 @@ export type IceJobStatus =
       progress?: number
       done: boolean
       failed: boolean
+      /** ICE Success 但 OSS 尚未写入可读文件 */
+      outputPending?: boolean
+      outputBytes?: number
       downloadUrl?: string
       /** 经 BFF 代理预览（私有 OSS 不可直链打开） */
       previewUrl?: string
@@ -349,6 +352,9 @@ export async function downloadIceExportBlob(jobId: string): Promise<string> {
         throw new Error(j?.message ?? `下载失败 HTTP ${res.status}`)
       }
       const blob = await res.blob()
+      if (blob.size < 2048) {
+        throw new Error('下载到的成片为空，请稍后在任务列表重试或重新提交云剪')
+      }
       return URL.createObjectURL(blob)
     } catch (e) {
       if (p === paths[paths.length - 1]) throw e

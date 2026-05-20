@@ -210,11 +210,22 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         })
         return false
       }
+      if (st.outputPending) {
+        patchJob(localJobId, {
+          phase: 'polling',
+          message: st.message ?? '成片写入 OSS 中，请稍候…',
+        })
+        await new Promise((r) => setTimeout(r, POLL_MS))
+        continue
+      }
       if (st.done) {
         patchJob(localJobId, {
           phase: 'done',
           downloadUrl: iceJobDownloadProxyPath(iceJobId),
-          message: '剪辑完成，可在右侧下载成片',
+          message:
+            st.outputBytes && st.outputBytes > 0
+              ? `剪辑完成（约 ${Math.round(st.outputBytes / 1024)} KB），可下载成片`
+              : '剪辑完成，可在右侧下载成片',
         })
         return true
       }
