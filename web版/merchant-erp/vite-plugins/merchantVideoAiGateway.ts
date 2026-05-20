@@ -628,6 +628,7 @@ export async function handleMerchantAiVideoRoutes(input: {
   searchParams: URLSearchParams
   res: ServerResponse
   bodyRaw: string
+  req?: import('node:http').IncomingMessage
   viteRoot?: string
   env: MerchantAiEnv
 }): Promise<boolean> {

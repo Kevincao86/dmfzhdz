@@ -41,6 +41,25 @@ export function iceJobDownloadProxyPath(jobId: string, inline = false): string {
   return `/api/meoo-merchant-ai-video-ice-job-download?${q.toString()}`
 }
 
+export function iceExportFileName(label: string): string {
+  const safe = label.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim() || 'meoo-ice-output'
+  return `${safe.slice(0, 80)}.mp4`
+}
+
+/**
+ * 同步触发浏览器下载（须在用户点击回调内调用，勿先 await fetch，否则会被拦截）。
+ */
+export function triggerIceExportDownload(jobId: string, label: string): void {
+  const a = document.createElement('a')
+  a.href = iceJobDownloadProxyPath(jobId)
+  a.download = iceExportFileName(label)
+  a.rel = 'noopener'
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 export type IceBatchJob = {
   id: string
   label: string
@@ -336,35 +355,45 @@ export async function fetchIceJobStatus(jobId: string): Promise<IceJobStatus> {
   return { ok: false, message: '任务状态接口未部署' }
 }
 
-export async function downloadIceExportBlob(jobId: string): Promise<string> {
+/** 拉取成片为 Blob URL（用于内嵌预览；下载请用 triggerIceExportDownload） */
+export async function fetchIceExportPreviewUrl(jobId: string): Promise<string> {
   const paths = [
-    `/api/meoo-merchant-ai-video-ice-job-download?id=${encodeURIComponent(jobId)}`,
-    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(jobId)}`,
-    `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}`,
-    `/api/merchant/ai/video/openshot/export-download?id=${encodeURIComponent(jobId)}`,
+    `/api/meoo-merchant-ai-video-ice-job-download?id=${encodeURIComponent(jobId)}&inline=1`,
+    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(jobId)}&inline=1`,
+    `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}&inline=1`,
+    `/api/merchant/ai/video/openshot/export-download?id=${encodeURIComponent(jobId)}&inline=1`,
   ]
   for (const p of paths) {
     try {
       const res = await fetch(p)
       if (res.status === 404) continue
+      const ct = (res.headers.get('content-type') ?? '').toLowerCase()
       if (!res.ok) {
-        const j = await parseJson<{ message?: string; ok?: boolean }>(res)
-        const detail = j?.message ?? `下载失败 HTTP ${res.status}`
+        const j = ct.includes('json') ? await parseJson<{ message?: string }>(res) : null
+        const detail = j?.message ?? `预览加载失败 HTTP ${res.status}`
         if (res.status === 409) {
-          throw new Error(`${detail}（成片尚未写入完成，请稍后在任务列表重试）`)
+          throw new Error(`${detail}（成片尚未写入完成，请稍后重试）`)
         }
         throw new Error(detail)
       }
+      if (ct.includes('json') || ct.includes('text/html')) {
+        throw new Error('预览接口返回了非视频内容，请确认已部署最新版云剪下载 API')
+      }
       const blob = await res.blob()
       if (blob.size < 2048) {
-        throw new Error('下载到的成片为空，请稍后在任务列表重试或重新提交云剪')
+        throw new Error('预览到的成片为空，请稍后重试或重新提交云剪')
       }
       return URL.createObjectURL(blob)
     } catch (e) {
       if (p === paths[paths.length - 1]) throw e
     }
   }
-  throw new Error('下载接口未部署')
+  throw new Error('预览接口未部署')
+}
+
+/** @deprecated 请用 triggerIceExportDownload；保留供需要 Blob 的场景 */
+export async function downloadIceExportBlob(jobId: string): Promise<string> {
+  return fetchIceExportPreviewUrl(jobId)
 }
 
 export const ICE_ASPECT_PRESETS = [

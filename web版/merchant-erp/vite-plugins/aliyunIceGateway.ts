@@ -1,7 +1,7 @@
 /**
  * 阿里云 ICE 云剪辑 — 商户端 BFF（AppId / AccessKey 仅存服务端与运营注册表）。
  */
-import type { ServerResponse } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
@@ -81,6 +81,7 @@ export async function handleAliyunIceRoutes(input: {
   searchParams: URLSearchParams
   res: ServerResponse
   bodyRaw: string
+  req?: IncomingMessage
   viteRoot?: string
   env: MerchantAiEnv
 }): Promise<boolean> {
@@ -90,7 +91,7 @@ export async function handleAliyunIceRoutes(input: {
 
   if (!pathname.startsWith('/api/merchant/ai/video/ice')) return false
 
-  const { method, searchParams, res, bodyRaw, viteRoot, env: rawEnv } = input
+  const { method, searchParams, res, bodyRaw, req, viteRoot, env: rawEnv } = input
   const cfg = await resolveIceConfig(viteRoot, rawEnv)
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/ice/config') {
@@ -423,8 +424,9 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 502, { ok: false, message: fetched.message })
       return true
     }
-    res.statusCode = 200
-    res.setHeader('Content-Type', fetched.contentType)
+    const total = fetched.buf.length
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader(
       'Content-Disposition',
       inline
@@ -432,7 +434,32 @@ export async function handleAliyunIceRoutes(input: {
         : `attachment; filename="ice-${jobId}.mp4"`,
     )
     res.setHeader('Cache-Control', 'private, max-age=300')
-    res.setHeader('Content-Length', String(fetched.buf.length))
+
+    const rangeHeader = req?.headers?.range
+    if (inline && typeof rangeHeader === 'string') {
+      const m = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim())
+      if (m) {
+        const start = m[1] ? Number.parseInt(m[1], 10) : 0
+        const end = m[2] ? Number.parseInt(m[2], 10) : total - 1
+        if (
+          Number.isFinite(start) &&
+          Number.isFinite(end) &&
+          start >= 0 &&
+          end >= start &&
+          end < total
+        ) {
+          const chunk = fetched.buf.subarray(start, end + 1)
+          res.statusCode = 206
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`)
+          res.setHeader('Content-Length', String(chunk.length))
+          res.end(chunk)
+          return true
+        }
+      }
+    }
+
+    res.statusCode = 200
+    res.setHeader('Content-Length', String(total))
     res.end(fetched.buf)
     return true
   }

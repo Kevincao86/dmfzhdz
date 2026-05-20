@@ -15,8 +15,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../cn'
 import {
-  downloadIceExportBlob,
+  fetchIceExportPreviewUrl,
   iceJobDownloadProxyPath,
+  triggerIceExportDownload,
   fetchAliyunIceCloudConfig,
   fetchIceJobStatus,
   ICE_ASPECT_PRESETS,
@@ -72,7 +73,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [uploading, setUploading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const previewBlobRef = useRef<string | null>(null)
 
   const [aspectId, setAspectId] = useState<(typeof ICE_ASPECT_PRESETS)[number]['id']>('9:16')
   const [clipEndSec, setClipEndSec] = useState(10)
@@ -239,21 +243,54 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     return false
   }
 
-  const downloadJob = async (job: IceBatchJob) => {
-    if (!job.exportId) return
-    try {
-      const blobUrl = await downloadIceExportBlob(job.exportId)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = `${job.label}.mp4`
-      a.click()
-      URL.revokeObjectURL(blobUrl)
-      setErr(null)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setErr(msg)
+  const downloadJob = (job: IceBatchJob) => {
+    if (!job.exportId) {
+      setErr('缺少剪辑任务编号，请重新提交云剪')
+      return
     }
+    setErr(null)
+    setHint('正在唤起浏览器下载…若未出现文件，请查看浏览器是否拦截下载，或点击下方「新窗口打开」链接')
+    triggerIceExportDownload(job.exportId, job.label)
   }
+
+  useEffect(() => {
+    const exportId = latestDone?.exportId
+    if (!exportId) {
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current)
+        previewBlobRef.current = null
+      }
+      setPreviewBlobUrl(null)
+      setPreviewLoading(false)
+      return
+    }
+    let cancelled = false
+    setPreviewLoading(true)
+    setErr(null)
+    void fetchIceExportPreviewUrl(exportId)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url)
+          return
+        }
+        if (previewBlobRef.current) URL.revokeObjectURL(previewBlobRef.current)
+        previewBlobRef.current = url
+        setPreviewBlobUrl(url)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : String(e)
+          setErr(msg)
+          setPreviewBlobUrl(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [latestDone?.exportId])
 
   const runBatch = async () => {
     if (!cfg?.configured) {
@@ -756,21 +793,35 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   </div>
                   <p className="mb-3 truncate text-xs text-emerald-800">{latestDone.label}</p>
                   {latestDone.exportId ? (
-                    <video
-                      key={latestDone.exportId}
-                      src={iceJobDownloadProxyPath(latestDone.exportId, true)}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="mb-3 max-h-48 w-full rounded-lg border border-emerald-200 bg-black object-contain"
-                      onError={() =>
-                        setErr('预览加载失败：成片可能仍在写入 OSS，或 Bucket 权限/前缀配置有误，请稍后重试下载。')
-                      }
-                    />
+                    <div className="relative mb-3">
+                      {previewLoading ? (
+                        <div className="flex h-40 items-center justify-center rounded-lg border border-emerald-200 bg-black/90">
+                          <Loader2 className="h-8 w-8 animate-spin text-emerald-200" />
+                        </div>
+                      ) : previewBlobUrl ? (
+                        <video
+                          key={previewBlobUrl}
+                          src={previewBlobUrl}
+                          controls
+                          playsInline
+                          preload="auto"
+                          className="max-h-48 w-full rounded-lg border border-emerald-200 bg-black object-contain"
+                          onError={() =>
+                            setErr(
+                              '预览解码失败：成片可能不是浏览器可播的 MP4（H.264），请尝试下载后用本地播放器打开。',
+                            )
+                          }
+                        />
+                      ) : (
+                        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-emerald-300 bg-emerald-50/50 text-xs text-emerald-800">
+                          预览未加载，请点下载或下方链接
+                        </div>
+                      )}
+                    </div>
                   ) : null}
                   <button
                     type="button"
-                    onClick={() => void downloadJob(latestDone)}
+                    onClick={() => downloadJob(latestDone)}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700"
                   >
                     <Download className="h-5 w-5" />
@@ -833,7 +884,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                           <div className="mt-2 flex gap-2">
                             <button
                               type="button"
-                              onClick={() => void downloadJob(j)}
+                              onClick={() => downloadJob(j)}
                               className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-orange-600 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
                             >
                               <Download className="h-3.5 w-3.5" />
