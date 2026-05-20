@@ -255,7 +255,12 @@ export default function ShortVideoOptimizationPage() {
   useEffect(() => {
     void fetchVideoAiConfig().then((c) => {
       setCfg(c)
-      if (c?.arkVideoModels.length) setSdModelEp(c.arkVideoModels[0].endpointId)
+      if (c?.arkVideoModels.length) {
+        const preferred =
+          c.arkVideoModels.find((m) => /^doubao-seedance/i.test(m.endpointId)) ??
+          c.arkVideoModels[0]
+        setSdModelEp(preferred.endpointId)
+      }
       setCfgLoaded(true)
     })
   }, [])
@@ -1083,7 +1088,7 @@ export default function ShortVideoOptimizationPage() {
                   {cfg?.configLoadError
                     ? `无法加载视频配置（${cfg.configLoadError}）。请检查网络后刷新页面。`
                     : cfg?.arkVideoSetupIssue ??
-                      '暂无可用模型。请在运营管控台「AI模型 → 短视频 API」填写真实 ep- 接入点，或在 Vercel 设置 MERCHANT_AI_ARK_VIDEO_ENDPOINTS（格式：显示名|ep-xxxx）。'}
+                      '暂无可用模型。请在运营台填写 Seedance 模型（如 Seedance 2.0|doubao-seedance-2-0-260128）或视频 ep- 接入点；勿使用 Doubao-Seed 对话模型的 ep。'}
                 </div>
               )}
             </label>
