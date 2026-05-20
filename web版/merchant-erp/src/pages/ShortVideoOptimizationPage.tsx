@@ -886,7 +886,7 @@ export default function ShortVideoOptimizationPage() {
           [
             { id: 'optimize' as const, label: '短视频优化（参考画面）', icon: Video },
             { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
-            { id: 'cloud_batch' as const, label: '阿里云 ICE 云剪', icon: Cloud },
+            { id: 'cloud_batch' as const, label: '墨典AI云剪', icon: Cloud },
           ] as const
         ).map((t) => {
           const Ico = t.icon

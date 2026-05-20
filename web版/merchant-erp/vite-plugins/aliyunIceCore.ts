@@ -218,6 +218,7 @@ export async function iceRunSinglePipeline(
   input: {
     mediaUrl: string
     projectName: string
+    editBrief: string
     width: number
     height: number
     clipEndSec: number
@@ -249,7 +250,7 @@ export async function iceRunSinglePipeline(
       outputMediaConfig: JSON.stringify(out.config),
       projectMetadata: JSON.stringify({
         Title: input.projectName.slice(0, 120),
-        Description: '墨典 AI 批量云剪',
+        Description: input.editBrief.slice(0, 500) || '墨典AI云剪',
       }),
       editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
       source: 'OPENAPI',
