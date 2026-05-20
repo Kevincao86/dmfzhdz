@@ -1,5 +1,5 @@
-import type { RegistryFile, RegistryRecruitmentOrder } from './opsRegistryTypes'
-import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders'
+import type { RegistryFile, RegistryRecruitmentOrder } from './opsRegistryTypes.js'
+import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 
 /** 无 tenantId 的历史订单：仅在同浏览器未登录云端租户时不展示；已登录租户一律不展示 */
 export function recruitmentOrderBelongsToTenant(

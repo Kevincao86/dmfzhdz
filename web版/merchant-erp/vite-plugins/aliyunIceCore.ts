@@ -2,21 +2,28 @@
  * 阿里云智能媒体服务 ICE（2020-11-09）云剪辑。
  * @see https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview
  */
-import IceModule from '@alicloud/ice20201109'
+import IceModule, {
+  GetMediaInfoRequest,
+  GetMediaProducingJobRequest,
+  SubmitMediaProducingJobRequest,
+  UploadMediaByURLRequest,
+} from '@alicloud/ice20201109'
 import { $OpenApiUtil } from '@alicloud/openapi-core'
 
-type IceSdkClient = {
-  uploadMediaByURL: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
-  getMediaInfo: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
-  submitMediaProducingJob: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
-  getMediaProducingJob: (req: Record<string, unknown>) => Promise<{ body?: Record<string, unknown> }>
+type IceClientClass = {
+  new (config: $OpenApiUtil.Config): {
+    uploadMediaByURL(req: UploadMediaByURLRequest): Promise<{ body?: Record<string, unknown> }>
+    getMediaInfo(req: GetMediaInfoRequest): Promise<{ body?: Record<string, unknown> }>
+    submitMediaProducingJob(req: SubmitMediaProducingJobRequest): Promise<{ body?: Record<string, unknown> }>
+    getMediaProducingJob(req: GetMediaProducingJobRequest): Promise<{ body?: Record<string, unknown> }>
+  }
 }
 
-function resolveSdkCtor<T extends new (config: $OpenApiUtil.Config) => IceSdkClient>(mod: unknown): T {
-  if (typeof mod === 'function') return mod as T
+function resolveSdkCtor(mod: unknown): IceClientClass {
+  if (typeof mod === 'function') return mod as IceClientClass
   if (mod && typeof mod === 'object' && 'default' in mod) {
     const d = (mod as { default: unknown }).default
-    if (typeof d === 'function') return d as T
+    if (typeof d === 'function') return d as IceClientClass
   }
   throw new Error('ICE SDK 不可用')
 }
@@ -170,11 +177,13 @@ async function uploadUrlToMediaId(
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
   const meta = JSON.stringify([{ SourceURL: mediaUrl, Title: title.slice(0, 120) }])
   try {
-    const res = await client.uploadMediaByURL({
-      uploadURLs: mediaUrl,
-      appId: cfg.appId,
-      mediaMetaData: meta,
-    })
+    const res = await client.uploadMediaByURL(
+      new UploadMediaByURLRequest({
+        uploadURLs: mediaUrl,
+        appId: cfg.appId,
+        mediaMetaData: meta,
+      }),
+    )
     const jobs = bodyOf(res)?.uploadJobs as { mediaId?: string }[] | undefined
     const first = jobs?.[0]
     const mediaId = first?.mediaId?.trim()
@@ -194,7 +203,7 @@ async function waitMediaReady(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   for (let i = 0; i < maxTries; i++) {
     try {
-      const res = await client.getMediaInfo({ mediaId })
+      const res = await client.getMediaInfo(new GetMediaInfoRequest({ mediaId }))
       const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
       const basic = info?.mediaBasicInfo as Record<string, unknown> | undefined
       const status = String(info?.status ?? basic?.status ?? '').toLowerCase()
@@ -244,18 +253,20 @@ export async function iceRunSinglePipeline(
 
   const timeline = buildTimeline(up.mediaId, input.clipEndSec, input.effectId)
   try {
-    const res = await client.submitMediaProducingJob({
-      timeline: JSON.stringify(timeline),
-      outputMediaTarget: out.target,
-      outputMediaConfig: JSON.stringify(out.config),
-      projectMetadata: JSON.stringify({
-        Title: input.projectName.slice(0, 120),
-        Description: input.editBrief.slice(0, 500) || '墨典AI云剪',
+    const res = await client.submitMediaProducingJob(
+      new SubmitMediaProducingJobRequest({
+        timeline: JSON.stringify(timeline),
+        outputMediaTarget: out.target,
+        outputMediaConfig: JSON.stringify(out.config),
+        projectMetadata: JSON.stringify({
+          Title: input.projectName.slice(0, 120),
+          Description: input.editBrief.slice(0, 500) || '墨典AI云剪',
+        }),
+        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
+        source: 'OPENAPI',
+        clientToken: jobKey,
       }),
-      editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
-      source: 'OPENAPI',
-      clientToken: jobKey,
-    })
+    )
     const submitBody = bodyOf(res)
     const jobId = typeof submitBody?.jobId === 'string' ? submitBody.jobId.trim() : ''
     if (!jobId) return { ok: false, message: '未返回剪辑 JobId', step: 'submit_job' }
@@ -288,7 +299,7 @@ export async function iceGetProducingJob(
 > {
   const client = createClient(cfg)
   try {
-    const res = await client.getMediaProducingJob({ jobId })
+    const res = await client.getMediaProducingJob(new GetMediaProducingJobRequest({ jobId }))
     const job = bodyOf(res)?.mediaProducingJob as Record<string, unknown> | undefined
     if (!job) return { ok: false, message: '未找到剪辑任务' }
     const status = String(job.status ?? '')
