@@ -25,9 +25,18 @@ export type IceJobStatus =
       done: boolean
       failed: boolean
       downloadUrl?: string
+      /** 经 BFF 代理预览（私有 OSS 不可直链打开） */
+      previewUrl?: string
       message?: string
     }
   | { ok: false; message: string }
+
+/** 成片下载/预览代理（勿用 ICE 返回的 OSS 直链） */
+export function iceJobDownloadProxyPath(jobId: string, inline = false): string {
+  const q = new URLSearchParams({ id: jobId })
+  if (inline) q.set('inline', '1')
+  return `/api/meoo-merchant-ai-video-ice-job-download?${q.toString()}`
+}
 
 export type IceBatchJob = {
   id: string
