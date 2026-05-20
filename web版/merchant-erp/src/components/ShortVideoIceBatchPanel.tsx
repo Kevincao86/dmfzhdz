@@ -113,11 +113,24 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     setHint(`已加入 ${urls.length} 条素材，填写剪辑指令后即可提交`)
   }, [urlText])
 
+  const openLocalFilePicker = useCallback(() => {
+    if (busy || uploading) return
+    if (!cfg?.localUploadEnabled) {
+      setErr(
+        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
+      )
+      return
+    }
+    fileInputRef.current?.click()
+  }, [busy, uploading, cfg?.localUploadEnabled])
+
   const handleLocalFiles = useCallback(
     async (files: FileList | null) => {
       if (!files?.length || uploading || busy) return
       if (!cfg?.localUploadEnabled) {
-        setErr('本地上传不可用：请运营在「短视频 API」配置 OSS 成片 URL 前缀（与您的 Bucket 一致）。')
+        setErr(
+          '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
+        )
         return
       }
       setUploading(true)
@@ -323,26 +336,59 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             />
             <div className="space-y-4 px-5 pb-5">
               <input
+                id="ice-local-video-input"
                 ref={fileInputRef}
                 type="file"
                 accept="video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm"
                 multiple
-                className="hidden"
+                className="sr-only"
                 disabled={busy || uploading}
                 onChange={(e) => {
                   void handleLocalFiles(e.target.files)
                   e.target.value = ''
                 }}
               />
-              <button
-                type="button"
-                disabled={busy || uploading || !cfg?.localUploadEnabled}
-                onClick={() => fileInputRef.current?.click()}
+              {!cfg?.localUploadEnabled ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
+                  <p className="font-medium">本地上传未开启</p>
+                  <p className="mt-1 text-amber-900/90">
+                    需在运营管理后台「AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方
+                    HTTPS 链接作为素材。
+                  </p>
+                </div>
+              ) : null}
+              <label
+                htmlFor="ice-local-video-input"
+                role="button"
+                tabIndex={busy || uploading ? -1 : 0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    openLocalFilePicker()
+                  }
+                }}
+                onClick={(e) => {
+                  if (!cfg?.localUploadEnabled) {
+                    e.preventDefault()
+                    openLocalFilePicker()
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (busy || uploading) return
+                  void handleLocalFiles(e.dataTransfer.files)
+                }}
                 className={cn(
-                  'flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition',
+                  'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition',
+                  busy || uploading ? 'pointer-events-none opacity-60' : '',
                   cfg?.localUploadEnabled
                     ? 'border-orange-300 bg-orange-50/50 hover:border-orange-400 hover:bg-orange-50'
-                    : 'cursor-not-allowed border-zinc-200 bg-zinc-50 opacity-60',
+                    : 'border-zinc-300 bg-zinc-50 hover:border-amber-400 hover:bg-amber-50/40',
                 )}
               >
                 {uploading ? (
@@ -352,15 +398,22 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   </>
                 ) : (
                   <>
-                    <Upload className="h-8 w-8 text-orange-600" />
+                    <Upload
+                      className={cn(
+                        'h-8 w-8',
+                        cfg?.localUploadEnabled ? 'text-orange-600' : 'text-amber-600',
+                      )}
+                    />
                     <span className="text-sm font-semibold text-zinc-900">本地上传视频</span>
-                    <span className="text-xs text-zinc-500">
-                      支持 MP4 / MOV 等，单文件 ≤ 500MB
-                      {!cfg?.localUploadEnabled ? '（需配置 OSS URL 前缀）' : ''}
+                    <span className="text-center text-xs text-zinc-500">
+                      点击或拖拽到此处 · MP4 / MOV 等 · 单文件 ≤ 500MB
+                      {!cfg?.localUploadEnabled ? (
+                        <span className="mt-1 block text-amber-800">未配置 OSS 时点击可查看说明</span>
+                      ) : null}
                     </span>
                   </>
                 )}
-              </button>
+              </label>
 
               <div className="flex items-center gap-3 text-xs text-zinc-400">
                 <span className="h-px flex-1 bg-zinc-200" />

@@ -612,7 +612,7 @@ export default function OpsAiModelsPage() {
           </div>
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs text-slate-400">
-              Seedance · 方舟视频接入点列表（逗号分隔「显示名|ep-xxxx」）
+              Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）
             </label>
             <textarea
               spellCheck={false}
@@ -621,7 +621,7 @@ export default function OpsAiModelsPage() {
               disabled={loading}
               value={videoAi.arkVideoEndpoints ?? ''}
               onChange={(e) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: e.target.value }))}
-              placeholder="Seedance 2 Pro|ep-xxxxxxxx, Lite|ep-yyyyyyyy"
+              placeholder="Seedance 2.0|doubao-seedance-2-0-260128, Pro|ep-xxxxxxxx"
               className={cn(
                 'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
                 !editingVideoAi && 'cursor-default opacity-80',
@@ -745,22 +745,46 @@ export default function OpsAiModelsPage() {
                 !editingVideoAi && 'cursor-default opacity-80',
               )}
             />
-            <label className="mb-1 block text-xs text-slate-400">
-              OSS 成片 URL 前缀（与地域同 bucket；亦用于商户本地上传素材到 source/ 目录）
-            </label>
-            <input
-              type="text"
-              autoComplete="off"
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={videoAi.iceOutputOssUrlPrefix ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, iceOutputOssUrlPrefix: e.target.value }))}
-              placeholder="https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/"
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
+            <div className="mt-4 rounded-lg border border-cyan-900/60 bg-cyan-950/30 p-4">
+              <p className="mb-2 text-xs font-semibold text-cyan-200">
+                本地上传 · OSS 成片 URL 前缀
+                <span className="ml-2 rounded bg-cyan-900/80 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">
+                  商户「墨典AI云剪」必填
+                </span>
+              </p>
+              <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+                填写后商户 ERP 可将视频直传到该 Bucket 的{' '}
+                <span className="font-mono text-slate-300">source/日期/</span> 目录；须为标准 OSS 域名，例如{' '}
+                <span className="font-mono text-slate-300">
+                  https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/
+                </span>
+                。与 ICE AccessKey 须对该 Bucket 有写权限。
+              </p>
+              {(videoAi.iceOutputOssUrlPrefix ?? '').trim() && !editingVideoAi ? (
+                <p className="mb-2 text-[11px] text-emerald-400/95">
+                  已配置：{(videoAi.iceOutputOssUrlPrefix ?? '').trim()}
+                </p>
+              ) : !editingVideoAi ? (
+                <p className="mb-2 text-[11px] text-amber-400/95">
+                  未配置 — 商户端「本地上传视频」不可用（仍可用 HTTPS 链接）
+                </p>
+              ) : null}
+              <label className="mb-1 block text-xs text-slate-400">OSS 成片 URL 前缀</label>
+              <input
+                type="text"
+                autoComplete="off"
+                readOnly={!editingVideoAi}
+                disabled={loading}
+                value={videoAi.iceOutputOssUrlPrefix ?? ''}
+                onChange={(e) => setVideoAi((p) => ({ ...p, iceOutputOssUrlPrefix: e.target.value }))}
+                placeholder="https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/"
+                className={cn(
+                  'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
+                  !editingVideoAi && 'cursor-default opacity-80',
+                  editingVideoAi && 'border-cyan-800/80',
+                )}
+              />
+            </div>
           </div>
         </div>
       </section>

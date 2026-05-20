@@ -10,9 +10,14 @@ import crypto from 'node:crypto'
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
+  DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   describeArkVideoSetupIssue,
+  isArkVideoEndpointId,
+  isDoubaoSeedanceModelId,
   listValidArkVideoModels,
   looksLikeArkPlaceholderEndpointId,
+  looksLikeDoubaoChatModelId,
+  parseSeedanceCliFlags,
   pickMergedArkEndpointsField,
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
@@ -150,6 +155,20 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
   if (looksLikeArkPlaceholderEndpointId(endpointId)) {
     return `视频推理接入点「${endpointId}」为占位示例，不可用。请到运营管控台「AI模型 → 短视频 API」或 Vercel 环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 填写火山方舟控制台真实的 ep- 接入点（形如 ep-2024xxxxxxxx）。`
   }
+  if (/does not support content generation/i.test(msg)) {
+    const underlying = msg.match(/specified model\s+([^\s]+)/i)?.[1] ?? ''
+    return (
+      `当前所选接入点绑定了对话模型${underlying ? `（${underlying}）` : ''}，无法用于 Seedance 视频生成。` +
+      `请在火山方舟控制台新建「Seedance / 视频生成」推理接入点（勿选 Doubao-Seed 对话模型），` +
+      `或在运营台填写 Seedance 模型 ID，例如：Seedance 2.0|${DEFAULT_SEEDANCE_VIDEO_MODEL_ID}；` +
+      `也可在 Vercel 设置 MERCHANT_AI_SEEDANCE_VIDEO_MODEL=${DEFAULT_SEEDANCE_VIDEO_MODEL_ID} 后重试。`
+    )
+  }
+  if (looksLikeDoubaoChatModelId(endpointId)) {
+    return (
+      `「${endpointId}」为对话模型，不能用于视频生成。请改用 Seedance 模型（如 ${DEFAULT_SEEDANCE_VIDEO_MODEL_ID}）或 Seedance 专用 ep- 接入点。`
+    )
+  }
   if (upstreamStatus === 404 || /does not exist|not have access/i.test(msg)) {
     return `方舟视频接入点无效或无权访问（${endpointId}）：${msg}。请在火山方舟控制台确认该 ep 已开通 Seedance 视频推理且与当前 API Key 同账号。`
   }
@@ -183,6 +202,13 @@ function klingBase(env: MerchantAiEnv): string {
   return b || 'https://api-beijing.klingai.com'
 }
 
+function seedanceVideoModelFromEnv(env: MerchantAiEnv): string {
+  const fromEnv = String(
+    (env as Record<string, string>).MERCHANT_AI_SEEDANCE_VIDEO_MODEL ?? '',
+  ).trim()
+  return fromEnv || DEFAULT_SEEDANCE_VIDEO_MODEL_ID
+}
+
 function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
   const raw = (
     env.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ??
@@ -190,7 +216,7 @@ function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
     ''
   ).trim()
   const fb = String((env as Record<string, string>).MERCHANT_AI_ARK_VIDEO_FALLBACK_ENDPOINT ?? '').trim()
-  return listValidArkVideoModels(raw, fb)
+  return listValidArkVideoModels(raw, fb, seedanceVideoModelFromEnv(env))
 }
 
 function signKlingJwt(accessKey: string, secretKey: string): string {
@@ -363,41 +389,15 @@ function unwrapKlingTask(obj: Record<string, unknown>): {
   return { taskId, taskStatus, rawMessage: message }
 }
 
-async function arkCreateVideoTask(
-  env: MerchantAiEnv,
+function buildArkVideoTaskPayload(
+  modelId: string,
   body: Record<string, unknown>,
-): Promise<{ ok: false; msg: string; status?: number } | { ok: true; taskId: string; raw?: unknown }> {
-  const key = doubaoBearerKey(env)
-  if (!key)
-    return {
-      ok: false,
-      msg:
-        '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key，或设置服务端 MERCHANT_AI_DOUBAO_KEY。',
-    }
-  let modelEp = typeof body.model === 'string' ? body.model.trim() : ''
-  if (!modelEp) {
-    const list = parseArkVideoModelList(env)
-    if (list[0]?.endpointId) modelEp = list[0].endpointId
-  }
-  if (!modelEp)
-    return {
-      ok: false,
-      msg:
-        '请选择视频推理接入点，或由运营在管控台「短视频 API」录入接入点清单；也可在服务环境变量 MERCHANT_AI_ARK_VIDEO_ENDPOINTS 提供别名|ep-xxxx。',
-    }
-  if (looksLikeArkPlaceholderEndpointId(modelEp)) {
-    return {
-      ok: false,
-      msg: arkCreateTaskUserMessage('', modelEp),
-      status: 400,
-    }
-  }
-
+): { ok: false; msg: string } | { ok: true; payload: Record<string, unknown> } {
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const imagesUnknown = body.images_base64
-
-  /** 形如 ["data:image/jpeg;base64,..."] 或可灵式纯 base64 列表 */
   const extraFlags = typeof body.flags === 'string' ? body.flags.trim() : ''
+  const useSeedanceV2 = isDoubaoSeedanceModelId(modelId)
+  const flagParsed = parseSeedanceCliFlags(extraFlags)
 
   let contentArr: Record<string, unknown>[]
   if (Array.isArray(body.content)) {
@@ -411,7 +411,9 @@ async function arkCreateVideoTask(
         if (t) imageRows.push(t)
       }
     }
-    let textCombined = `${prompt}${extraFlags ? ` ${extraFlags}` : ''}`.trim()
+    let textCombined = useSeedanceV2
+      ? prompt
+      : `${prompt}${extraFlags ? ` ${extraFlags}` : ''}`.trim()
     if (!textCombined && imageRows.length > 0) {
       textCombined = '按上传的画面生成连贯短视频。'
     }
@@ -428,6 +430,26 @@ async function arkCreateVideoTask(
     }
   }
 
+  const payload: Record<string, unknown> = { model: modelId, content: contentArr }
+  if (useSeedanceV2) {
+    if (flagParsed.duration) payload.duration = flagParsed.duration
+    if (flagParsed.ratio) payload.ratio = flagParsed.ratio
+    payload.watermark = flagParsed.watermark ?? false
+    payload.resolution =
+      flagParsed.resolution ?? (flagParsed.duration && flagParsed.duration >= 10 ? '1080p' : '720p')
+  }
+  return { ok: true, payload }
+}
+
+async function arkPostVideoGenerationTask(
+  env: MerchantAiEnv,
+  key: string,
+  payload: Record<string, unknown>,
+  modelForError: string,
+): Promise<
+  | { ok: false; msg: string; status?: number; rawMsg?: string }
+  | { ok: true; taskId: string; raw?: unknown }
+> {
   const root = arkApiV3Root(env)
   const res = await fetch(`${root}/contents/generations/tasks`, {
     method: 'POST',
@@ -435,7 +457,7 @@ async function arkCreateVideoTask(
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model: modelEp, content: contentArr }),
+    body: JSON.stringify(payload),
   })
   const j = await readJsonResponse(res)
   const idRaw = typeof j.id === 'string' ? j.id : null
@@ -449,12 +471,71 @@ async function arkCreateVideoTask(
       `方舟创建视频任务失败（HTTP ${res.status}）。`
     return {
       ok: false,
-      msg: arkCreateTaskUserMessage(rawMsg, modelEp, res.status),
+      msg: arkCreateTaskUserMessage(rawMsg, modelForError, res.status),
       status: arkCreateTaskHttpStatus(res.status),
+      rawMsg,
     }
   }
   if (!idRaw) return { ok: false, msg: '方舟未返回任务 id。', status: res.status }
   return { ok: true, taskId: idRaw, raw: j }
+}
+
+async function arkCreateVideoTask(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+): Promise<{ ok: false; msg: string; status?: number } | { ok: true; taskId: string; raw?: unknown }> {
+  const key = doubaoBearerKey(env)
+  if (!key)
+    return {
+      ok: false,
+      msg:
+        '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key，或设置服务端 MERCHANT_AI_DOUBAO_KEY。',
+    }
+  let modelId = typeof body.model === 'string' ? body.model.trim() : ''
+  if (!modelId) {
+    const list = parseArkVideoModelList(env)
+    if (list[0]?.endpointId) modelId = list[0].endpointId
+  }
+  if (!modelId)
+    return {
+      ok: false,
+      msg:
+        '请选择视频模型，或由运营在管控台「短视频 API」录入 Seedance 模型 ID 或 ep- 接入点；也可设置 MERCHANT_AI_SEEDANCE_VIDEO_MODEL。',
+    }
+  if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) {
+    return {
+      ok: false,
+      msg: arkCreateTaskUserMessage('', modelId),
+      status: 400,
+    }
+  }
+
+  const built = buildArkVideoTaskPayload(modelId, body)
+  if (built.ok === false) return { ok: false, msg: built.msg }
+
+  let posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
+
+  if (
+    posted.ok === false &&
+    isArkVideoEndpointId(modelId) &&
+    posted.rawMsg &&
+    /does not support content generation/i.test(posted.rawMsg)
+  ) {
+    const fallback = seedanceVideoModelFromEnv(env)
+    if (fallback && isDoubaoSeedanceModelId(fallback) && fallback !== modelId) {
+      const retryBuilt = buildArkVideoTaskPayload(fallback, body)
+      if (retryBuilt.ok === true) {
+        const retry = await arkPostVideoGenerationTask(env, key, retryBuilt.payload, fallback)
+        if (retry.ok === true) return retry
+        posted = retry
+      }
+    }
+  }
+
+  if (posted.ok === false) {
+    return { ok: false, msg: posted.msg, status: posted.status }
+  }
+  return { ok: true, taskId: posted.taskId, raw: posted.raw }
 }
 
 async function arkGetVideoTask(
