@@ -515,12 +515,13 @@ export default function SettingsPage() {
                       type="button"
                       onClick={() => setWaimaiPlat(p.id)}
                       className={cn(
-                        'rounded-xl border px-4 py-2 text-sm font-medium transition-all',
+                        'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
                         waimaiPlat === p.id
                           ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'
                           : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
                       )}
                     >
+                      <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
                       {p.tabName}
                     </button>
                   ))}
