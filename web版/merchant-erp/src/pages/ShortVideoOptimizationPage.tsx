@@ -1,5 +1,5 @@
 import { Cloud, Download, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video } from 'lucide-react'
-import { ShortVideoOpenshotBatchPanel } from '../components/ShortVideoOpenshotBatchPanel'
+import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
@@ -886,7 +886,7 @@ export default function ShortVideoOptimizationPage() {
           [
             { id: 'optimize' as const, label: '短视频优化（参考画面）', icon: Video },
             { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
-            { id: 'cloud_batch' as const, label: 'AI 批量云剪', icon: Cloud },
+            { id: 'cloud_batch' as const, label: '阿里云 ICE 云剪', icon: Cloud },
           ] as const
         ).map((t) => {
           const Ico = t.icon
@@ -1145,7 +1145,7 @@ export default function ShortVideoOptimizationPage() {
       ) : null}
 
       {mainPane === 'cloud_batch' && (
-        <ShortVideoOpenshotBatchPanel lastResultUrl={resultUrl} />
+        <ShortVideoIceBatchPanel lastResultUrl={resultUrl} />
       )}
 
       {mainPane === 'optimize' && (

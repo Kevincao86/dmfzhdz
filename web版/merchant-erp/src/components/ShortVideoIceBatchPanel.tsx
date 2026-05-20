@@ -2,17 +2,17 @@ import { Cloud, Download, ExternalLink, Loader2, Plus, Trash2 } from 'lucide-rea
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../cn'
 import {
-  downloadOpenshotExportBlob,
-  fetchOpenshotCloudConfig,
-  fetchOpenshotExportStatus,
-  OPENCUT_ASPECT_PRESETS,
-  postOpenshotPipeline,
-  type OpenshotBatchJob,
-  type OpenshotCloudConfig,
-} from '../services/openshotCloudApi'
+  downloadIceExportBlob,
+  fetchAliyunIceCloudConfig,
+  fetchIceJobStatus,
+  ICE_ASPECT_PRESETS,
+  postIcePipeline,
+  type IceBatchJob,
+  type AliyunIceCloudConfig,
+} from '../services/aliyunIceCloudApi'
 
-const POLL_MS = 4000
-const POLL_MAX = 90
+const POLL_MS = 5000
+const POLL_MAX = 120
 
 function newJobId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
@@ -26,37 +26,46 @@ function parseUrlLines(text: string): string[] {
     .filter((s) => /^https?:\/\//i.test(s))
 }
 
+function formatProgress(p?: number): string {
+  if (p == null || Number.isNaN(p)) return ''
+  const n = p <= 1 ? Math.round(p * 100) : Math.round(p)
+  return ` ${n}%`
+}
+
 type Props = {
-  /** 上一环节 AI 生成的成片，可一键加入队列 */
   lastResultUrl?: string | null
 }
 
-export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
-  const [cfg, setCfg] = useState<OpenshotCloudConfig | null>(null)
+export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
+  const [cfg, setCfg] = useState<AliyunIceCloudConfig | null>(null)
   const [urlText, setUrlText] = useState('')
-  const [jobs, setJobs] = useState<OpenshotBatchJob[]>([])
+  const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
 
-  const [aspectId, setAspectId] = useState<(typeof OPENCUT_ASPECT_PRESETS)[number]['id']>('9:16')
+  const [aspectId, setAspectId] = useState<(typeof ICE_ASPECT_PRESETS)[number]['id']>('9:16')
   const [clipEndSec, setClipEndSec] = useState(10)
-  const [preset, setPreset] = useState('Zoom In')
-  const [presetLengthSec, setPresetLengthSec] = useState(3)
+  const [preset, setPreset] = useState('无附加特效')
 
   const aspect = useMemo(
-    () => OPENCUT_ASPECT_PRESETS.find((a) => a.id === aspectId) ?? OPENCUT_ASPECT_PRESETS[0],
+    () => ICE_ASPECT_PRESETS.find((a) => a.id === aspectId) ?? ICE_ASPECT_PRESETS[0],
     [aspectId],
   )
 
+  const presetOptions = cfg?.effectOptions?.map((o) => o.label) ?? cfg?.presets ?? ['无附加特效', '淡入淡出']
+
   useEffect(() => {
-    void fetchOpenshotCloudConfig().then(setCfg)
+    void fetchAliyunIceCloudConfig().then((c) => {
+      setCfg(c)
+      if (c?.presets?.[0]) setPreset(c.presets[0])
+    })
   }, [])
 
   const addUrlsFromText = useCallback(() => {
     const urls = parseUrlLines(urlText)
     if (urls.length === 0) {
-      setErr('请粘贴至少一条公网可访问的 https 媒体地址（视频或图片）')
+      setErr('请粘贴至少一条公网可访问的 https 音视频地址')
       return
     }
     setErr(null)
@@ -89,42 +98,45 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
 
   const removeJob = (id: string) => setJobs((prev) => prev.filter((j) => j.id !== id))
 
-  const patchJob = (id: string, patch: Partial<OpenshotBatchJob>) => {
+  const patchJob = (id: string, patch: Partial<IceBatchJob>) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)))
   }
 
-  const pollExport = async (jobId: string, exportId: string): Promise<boolean> => {
+  const pollJob = async (localJobId: string, iceJobId: string): Promise<boolean> => {
     for (let i = 0; i < POLL_MAX; i++) {
-      const st = await fetchOpenshotExportStatus(exportId)
+      const st = await fetchIceJobStatus(iceJobId)
       if (!st.ok) {
-        patchJob(jobId, { phase: 'failed', message: st.message })
+        patchJob(localJobId, { phase: 'failed', message: st.message })
         return false
       }
       if (st.failed) {
-        patchJob(jobId, { phase: 'failed', message: `渲染失败：${st.status}` })
+        patchJob(localJobId, {
+          phase: 'failed',
+          message: st.message ? `剪辑失败：${st.message}` : `剪辑失败：${st.status}`,
+        })
         return false
       }
       if (st.done && st.downloadUrl) {
-        patchJob(jobId, {
+        patchJob(localJobId, {
           phase: 'done',
           downloadUrl: st.downloadUrl,
-          message: '渲染完成',
+          message: '剪辑完成',
         })
         return true
       }
-      patchJob(jobId, {
+      patchJob(localJobId, {
         phase: 'polling',
-        message: `渲染中… ${st.status}${st.progress != null ? ` ${Math.round(st.progress * 100)}%` : ''}`,
+        message: `剪辑中… ${st.status}${formatProgress(st.progress)}`,
       })
       await new Promise((r) => setTimeout(r, POLL_MS))
     }
-    patchJob(jobId, { phase: 'failed', message: '渲染超时，请稍后在 OpenShot 控制台查看' })
+    patchJob(localJobId, { phase: 'failed', message: '剪辑超时，请稍后在阿里云 ICE 控制台查看' })
     return false
   }
 
   const runBatch = async () => {
     if (!cfg?.configured) {
-      setErr('未配置 OpenShot Cloud 账号，请联系运营在管控台填写或配置服务端环境变量。')
+      setErr('未配置阿里云 ICE，请在运营管控台「AI模型 → 短视频 API」填写 AppId 与 AccessKey。')
       return
     }
     const pending = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
@@ -134,39 +146,38 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
     }
     setBusy(true)
     setErr(null)
-    setHint(`批量云剪：共 ${pending.length} 条，按序提交 OpenShot…`)
+    setHint(`批量云剪：共 ${pending.length} 条，按序提交阿里云 ICE…`)
 
     for (const job of pending) {
-      patchJob(job.id, { phase: 'pipeline', message: '创建项目并提交导出…' })
-      const pipe = await postOpenshotPipeline({
+      patchJob(job.id, { phase: 'pipeline', message: 'URL 拉取上传并提交剪辑合成…' })
+      const pipe = await postIcePipeline({
         mediaUrl: job.mediaUrl,
         projectName: `墨典云剪-${job.label}`,
         width: aspect.width,
         height: aspect.height,
         clipEndSec,
         preset,
-        presetLengthSec,
       })
       if (!pipe.ok) {
         patchJob(job.id, { phase: 'failed', message: pipe.message })
         continue
       }
       patchJob(job.id, {
-        exportId: pipe.exportId,
+        exportId: pipe.jobId,
         phase: 'polling',
-        message: '等待云端渲染…',
+        message: '等待云端剪辑…',
       })
-      await pollExport(job.id, pipe.exportId)
+      await pollJob(job.id, pipe.jobId)
     }
 
     setBusy(false)
     setHint('批量任务已跑完，请查看各条状态并下载成片。')
   }
 
-  const downloadJob = async (job: OpenshotBatchJob) => {
+  const downloadJob = async (job: IceBatchJob) => {
     if (!job.exportId) return
     try {
-      const blobUrl = await downloadOpenshotExportBlob(job.exportId)
+      const blobUrl = await downloadIceExportBlob(job.exportId)
       const a = document.createElement('a')
       a.href = blobUrl
       a.download = `${job.label}.mp4`
@@ -182,31 +193,28 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
   return (
     <section className="space-y-8 rounded-xl border border-cyan-200/80 bg-gradient-to-br from-cyan-50/50 to-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PanelTitle />
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
+            <Cloud className="h-5 w-5 text-cyan-600" />
+            AI 批量云剪（阿里云 ICE）
+          </h2>
+          <p className="mt-1 text-sm text-zinc-600">
+            智能媒体服务云剪辑：URL 拉取上传、Timeline 合成，适合探店成片批量包装。
+          </p>
+        </div>
         <span
           className={cn(
             'rounded-full px-3 py-1 text-xs font-medium',
             cfg?.configured ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900',
           )}
         >
-          {cfg?.configured ? '已连接 OpenShot Cloud' : '未配置账号'}
+          {cfg?.configured ? '已配置 ICE' : '未配置凭据'}
         </span>
       </div>
 
-      <div className="rounded-lg border border-cyan-100 bg-white px-4 py-3 text-xs leading-relaxed text-slate-600">
-        基于{' '}
-        <a
-          href={cfg?.docsUrl ?? 'https://www.openshot.org/zh-hant/cloud-api/'}
-          target="_blank"
-          rel="noreferrer"
-          className="font-medium text-cyan-800 underline"
-        >
-          OpenShot Cloud API
-        </a>
-        ：对每条公网素材自动执行「建项 → 上轨 → 动效预设 → 导出」。媒体须为 OpenShot 云端可拉取的 HTTPS 地址。
-      </div>
+      <IceDocHint cfg={cfg} />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1 text-xs text-zinc-600">
           <span>画幅</span>
           <select
@@ -215,7 +223,7 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
             onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
             className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
           >
-            {OPENCUT_ASPECT_PRESETS.map((a) => (
+            {ICE_ASPECT_PRESETS.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label}
               </option>
@@ -235,32 +243,19 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-zinc-600">
-          <span>动效预设</span>
+          <span>剪辑特效</span>
           <select
             value={preset}
             disabled={busy}
             onChange={(e) => setPreset(e.target.value)}
             className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
           >
-            {(cfg?.presets ?? ['Zoom In', 'Zoom Out', 'Fade']).map((p) => (
+            {presetOptions.map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-zinc-600">
-          <span>动效长度（秒）</span>
-          <input
-            type="number"
-            min={0.5}
-            max={clipEndSec}
-            step={0.5}
-            value={presetLengthSec}
-            disabled={busy}
-            onChange={(e) => setPresetLengthSec(Number(e.target.value) || 3)}
-            className="rounded-lg border border-zinc-300 px-2 py-2 text-sm"
-          />
         </label>
       </div>
 
@@ -270,15 +265,29 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
           value={urlText}
           disabled={busy}
           onChange={(e) => setUrlText(e.target.value)}
-          placeholder={'https://example.com/video1.mp4\nhttps://example.com/cover.jpg'}
+          placeholder={'https://example.com/video1.mp4\nhttps://example.com/video2.mp4'}
           className="min-h-[88px] w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm"
         />
-        <UrlActions
-          busy={busy}
-          hasLastResult={Boolean(lastResultUrl)}
-          onAdd={addUrlsFromText}
-          onAppendLast={appendLastResult}
-        />
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={addUrlsFromText}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-950 hover:bg-cyan-100"
+          >
+            <Plus className="h-4 w-4" /> 加入队列
+          </button>
+          {lastResultUrl ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={appendLastResult}
+              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50"
+            >
+              使用上一段 AI 成片
+            </button>
+          ) : null}
+        </div>
       </label>
 
       {jobs.length > 0 ? (
@@ -335,7 +344,14 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
       ) : null}
 
       {(hint || err) && (
-        <HintBox err={err} hint={hint} />
+        <div
+          className={cn(
+            'rounded-lg px-4 py-3 text-sm',
+            err ? 'border border-red-200 bg-red-50 text-red-900' : 'border border-cyan-200 bg-cyan-50 text-cyan-950',
+          )}
+        >
+          {err ?? hint}
+        </div>
       )}
 
       <button
@@ -351,64 +367,28 @@ export function ShortVideoOpenshotBatchPanel({ lastResultUrl }: Props) {
   )
 }
 
-function PanelTitle() {
+function IceDocHint({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
   return (
-    <div>
-      <h2 className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
-        <Cloud className="h-5 w-5 text-cyan-600" />
-        AI 批量云剪（OpenShot Cloud）
-      </h2>
-      <p className="mt-1 text-sm text-zinc-600">
-        对多条素材统一加动效、裁画幅并导出 MP4，适合探店成片批量包装。
-      </p>
-    </div>
-  )
-}
-
-function UrlActions({
-  busy,
-  hasLastResult,
-  onAdd,
-  onAppendLast,
-}: {
-  busy: boolean
-  hasLastResult: boolean
-  onAdd: () => void
-  onAppendLast: () => void
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onAdd}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-300 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-950 hover:bg-cyan-100"
+    <div className="rounded-lg border border-cyan-100 bg-white px-4 py-3 text-xs leading-relaxed text-slate-600">
+      基于{' '}
+      <a
+        href={
+          cfg?.docsUrl ??
+          'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview'
+        }
+        target="_blank"
+        rel="noreferrer"
+        className="font-medium text-cyan-800 underline"
       >
-        <Plus className="h-4 w-4" /> 加入队列
-      </button>
-      {hasLastResult ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onAppendLast}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50"
-        >
-          使用上一段 AI 成片
-        </button>
+        阿里云智能媒体服务 ICE
+      </a>
+      ：对每条公网音视频执行「URL 上传 → 剪辑合成（SubmitMediaProducingJob）」。
+      {cfg?.regionId ? ` 当前地域：${cfg.regionId}。` : ''}
+      {!cfg?.hasOssOutput && !cfg?.hasVodOutput && cfg?.configured ? (
+        <span className="mt-1 block text-amber-800">
+          提示：还需在运营台配置「点播存储地址」或「OSS 输出 URL 前缀」才能生成成片。
+        </span>
       ) : null}
-    </div>
-  )
-}
-
-function HintBox({ err, hint }: { err: string | null; hint: string | null }) {
-  return (
-    <div
-      className={cn(
-        'rounded-lg px-4 py-3 text-sm',
-        err ? 'border border-red-200 bg-red-50 text-red-900' : 'border border-cyan-200 bg-cyan-50 text-cyan-950',
-      )}
-    >
-      {err ?? hint}
     </div>
   )
 }

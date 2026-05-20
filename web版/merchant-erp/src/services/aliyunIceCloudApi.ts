@@ -1,24 +1,21 @@
-/** OpenShot Cloud API — 经商户 BFF 代理，密钥不暴露前端 */
+/** 阿里云 ICE 云剪辑 — 经商户 BFF 代理 */
 
-export type OpenshotCloudConfig = {
+export type AliyunIceCloudConfig = {
   configured: boolean
-  apiBase: string
+  regionId: string
+  hasOssOutput?: boolean
+  hasVodOutput?: boolean
   presets: string[]
+  effectOptions?: { id: string; label: string }[]
   credentialNote?: string
   docsUrl?: string
 }
 
-export type OpenshotPipelineResult =
-  | {
-      ok: true
-      projectId: string
-      exportId: string
-      exportUrl: string
-      downloadPath: string
-    }
+export type IcePipelineResult =
+  | { ok: true; jobId: string; exportId: string; projectId?: string }
   | { ok: false; message: string; step?: string }
 
-export type OpenshotExportStatus =
+export type IceJobStatus =
   | {
       ok: true
       status: string
@@ -26,10 +23,11 @@ export type OpenshotExportStatus =
       done: boolean
       failed: boolean
       downloadUrl?: string
+      message?: string
     }
   | { ok: false; message: string }
 
-export type OpenshotBatchJob = {
+export type IceBatchJob = {
   id: string
   label: string
   mediaUrl: string
@@ -48,21 +46,25 @@ async function parseJson<T>(res: Response): Promise<T | null> {
 }
 
 const CONFIG_PATHS = [
+  '/api/meoo-merchant-ai-video-ice-config',
   '/api/meoo-merchant-ai-video-openshot-config',
+  '/api/merchant/ai/video/ice/config',
   '/api/merchant/ai/video/openshot/config',
 ] as const
 
 const PIPELINE_PATHS = [
+  '/api/meoo-merchant-ai-video-ice-pipeline',
   '/api/meoo-merchant-ai-video-openshot-pipeline',
+  '/api/merchant/ai/video/ice/pipeline',
   '/api/merchant/ai/video/openshot/pipeline',
 ] as const
 
-export async function fetchOpenshotCloudConfig(): Promise<OpenshotCloudConfig | null> {
+export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig | null> {
   for (const p of CONFIG_PATHS) {
     try {
       const res = await fetch(p)
       if (res.status === 404) continue
-      const j = await parseJson<OpenshotCloudConfig>(res)
+      const j = await parseJson<AliyunIceCloudConfig>(res)
       if (res.ok && j && typeof j.configured === 'boolean') return j
     } catch {
       /* next */
@@ -71,16 +73,15 @@ export async function fetchOpenshotCloudConfig(): Promise<OpenshotCloudConfig | 
   return null
 }
 
-export async function postOpenshotPipeline(body: {
+export async function postIcePipeline(body: {
   mediaUrl: string
   projectName?: string
   width: number
   height: number
   clipEndSec: number
   preset: string
-  presetLengthSec: number
-  curve?: string
-}): Promise<OpenshotPipelineResult> {
+  presetLengthSec?: number
+}): Promise<IcePipelineResult> {
   for (const p of PIPELINE_PATHS) {
     try {
       const res = await fetch(p, {
@@ -88,30 +89,32 @@ export async function postOpenshotPipeline(body: {
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify(body),
       })
-      const j = await parseJson<OpenshotPipelineResult & { message?: string }>(res)
+      const j = await parseJson<IcePipelineResult & { message?: string }>(res)
       if (res.status === 404) continue
       if (!res.ok || !j?.ok) {
         return { ok: false, message: j?.message ?? `云剪提交失败 HTTP ${res.status}` }
       }
-      return j as OpenshotPipelineResult
+      return j as IcePipelineResult
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       return { ok: false, message: msg }
     }
   }
-  return { ok: false, message: 'OpenShot 云剪接口未部署' }
+  return { ok: false, message: '云剪辑接口未部署' }
 }
 
-export async function fetchOpenshotExportStatus(exportId: string): Promise<OpenshotExportStatus> {
+export async function fetchIceJobStatus(jobId: string): Promise<IceJobStatus> {
   const paths = [
-    `/api/meoo-merchant-ai-video-openshot-export?id=${encodeURIComponent(exportId)}`,
-    `/api/merchant/ai/video/openshot/export?id=${encodeURIComponent(exportId)}`,
+    `/api/meoo-merchant-ai-video-ice-job?id=${encodeURIComponent(jobId)}`,
+    `/api/meoo-merchant-ai-video-openshot-export?id=${encodeURIComponent(jobId)}`,
+    `/api/merchant/ai/video/ice/job?id=${encodeURIComponent(jobId)}`,
+    `/api/merchant/ai/video/openshot/export?id=${encodeURIComponent(jobId)}`,
   ]
   for (const p of paths) {
     try {
       const res = await fetch(p)
       if (res.status === 404) continue
-      const j = await parseJson<OpenshotExportStatus & { message?: string }>(res)
+      const j = await parseJson<IceJobStatus & { message?: string }>(res)
       if (!res.ok || !j?.ok) {
         return { ok: false, message: j?.message ?? `查询失败 HTTP ${res.status}` }
       }
@@ -121,14 +124,15 @@ export async function fetchOpenshotExportStatus(exportId: string): Promise<Opens
       return { ok: false, message: msg }
     }
   }
-  return { ok: false, message: '导出状态接口未部署' }
+  return { ok: false, message: '任务状态接口未部署' }
 }
 
-/** 经 BFF 下载成片，返回 blob URL */
-export async function downloadOpenshotExportBlob(exportId: string): Promise<string> {
+export async function downloadIceExportBlob(jobId: string): Promise<string> {
   const paths = [
-    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(exportId)}`,
-    `/api/merchant/ai/video/openshot/export-download?id=${encodeURIComponent(exportId)}`,
+    `/api/meoo-merchant-ai-video-ice-job-download?id=${encodeURIComponent(jobId)}`,
+    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(jobId)}`,
+    `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}`,
+    `/api/merchant/ai/video/openshot/export-download?id=${encodeURIComponent(jobId)}`,
   ]
   for (const p of paths) {
     try {
@@ -147,7 +151,7 @@ export async function downloadOpenshotExportBlob(exportId: string): Promise<stri
   throw new Error('下载接口未部署')
 }
 
-export const OPENCUT_ASPECT_PRESETS = [
+export const ICE_ASPECT_PRESETS = [
   { id: '9:16', label: '竖屏 9:16', width: 1080, height: 1920 },
   { id: '16:9', label: '横屏 16:9', width: 1920, height: 1080 },
   { id: '1:1', label: '方屏 1:1', width: 1080, height: 1080 },

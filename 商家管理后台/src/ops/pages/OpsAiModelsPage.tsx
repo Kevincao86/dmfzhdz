@@ -651,18 +651,23 @@ export default function OpsAiModelsPage() {
             />
           </div>
           <div className="md:col-span-2 border-t border-slate-800 pt-4">
-            <p className="mb-3 text-xs font-medium text-cyan-400/90">OpenShot Cloud · AI 批量云剪</p>
-            <label className="mb-1 block text-xs text-slate-400">
-              API 根地址（默认 https://cloud.openshot.org）
-            </label>
+            <p className="mb-3 text-xs font-medium text-cyan-400/90">阿里云 ICE · AI 批量云剪</p>
+            <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
+              智能媒体服务云剪辑（ICE 2020-11-09）。商户 ERP 批量云剪经 BFF 调用，密钥仅存服务端与注册表。
+            </p>
+            <label className="mb-1 block text-xs text-slate-400">ICE AppId（IMS 控制台应用 ID）</label>
             <input
               type="text"
               autoComplete="off"
               readOnly={!editingVideoAi}
               disabled={loading}
-              value={videoAi.openshotApiBase ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, openshotApiBase: e.target.value }))}
-              placeholder="https://cloud.openshot.org"
+              value={editingVideoAi ? (videoAi.iceAppId ?? '') : ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, iceAppId: e.target.value }))}
+              placeholder={
+                (videoAi.iceAppId ?? '').trim() && !editingVideoAi
+                  ? '已保存 · 请点击「编辑」修改'
+                  : '应用 AppId'
+              }
               className={cn(
                 'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
                 !editingVideoAi && 'cursor-default opacity-80',
@@ -670,18 +675,18 @@ export default function OpsAiModelsPage() {
             />
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs text-slate-400">OpenShot 用户名</label>
+                <label className="mb-1 block text-xs text-slate-400">AccessKey ID</label>
                 <input
                   type="text"
                   autoComplete="off"
                   readOnly={!editingVideoAi}
                   disabled={loading}
-                  value={editingVideoAi ? (videoAi.openshotUsername ?? '') : ''}
-                  onChange={(e) => setVideoAi((p) => ({ ...p, openshotUsername: e.target.value }))}
+                  value={editingVideoAi ? (videoAi.iceAccessKeyId ?? '') : ''}
+                  onChange={(e) => setVideoAi((p) => ({ ...p, iceAccessKeyId: e.target.value }))}
                   placeholder={
-                    (videoAi.openshotUsername ?? '').trim() && !editingVideoAi
+                    (videoAi.iceAccessKeyId ?? '').trim() && !editingVideoAi
                       ? '已保存 · 请点击「编辑」修改'
-                      : 'Cloud API 账号'
+                      : 'RAM AccessKey ID'
                   }
                   className={cn(
                     'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
@@ -690,18 +695,18 @@ export default function OpsAiModelsPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-slate-400">OpenShot 密码</label>
+                <label className="mb-1 block text-xs text-slate-400">AccessKey Secret</label>
                 <input
                   type="password"
                   autoComplete="off"
                   readOnly={!editingVideoAi}
                   disabled={loading}
-                  value={editingVideoAi ? (videoAi.openshotPassword ?? '') : ''}
-                  onChange={(e) => setVideoAi((p) => ({ ...p, openshotPassword: e.target.value }))}
+                  value={editingVideoAi ? (videoAi.iceAccessKeySecret ?? '') : ''}
+                  onChange={(e) => setVideoAi((p) => ({ ...p, iceAccessKeySecret: e.target.value }))}
                   placeholder={
-                    (videoAi.openshotPassword ?? '').trim() && !editingVideoAi
+                    (videoAi.iceAccessKeySecret ?? '').trim() && !editingVideoAi
                       ? '已保存 · 请点击「编辑」修改'
-                      : '留空则清除'
+                      : 'RAM AccessKey Secret'
                   }
                   className={cn(
                     'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
@@ -710,6 +715,52 @@ export default function OpsAiModelsPage() {
                 />
               </div>
             </div>
+            <label className="mb-1 mt-3 block text-xs text-slate-400">地域（默认 cn-shanghai）</label>
+            <input
+              type="text"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.iceRegion ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, iceRegion: e.target.value }))}
+              placeholder="cn-shanghai"
+              className={cn(
+                'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+            <label className="mb-1 block text-xs text-slate-400">
+              点播存储地址 StorageLocation（成片输出到 VOD 时填写）
+            </label>
+            <input
+              type="text"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.iceVodStorageLocation ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, iceVodStorageLocation: e.target.value }))}
+              placeholder="out-xxx.oss-cn-shanghai.aliyuncs.com"
+              className={cn(
+                'mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+            <label className="mb-1 block text-xs text-slate-400">
+              OSS 成片 URL 前缀（与地域同 bucket，二选一或都配）
+            </label>
+            <input
+              type="text"
+              autoComplete="off"
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.iceOutputOssUrlPrefix ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, iceOutputOssUrlPrefix: e.target.value }))}
+              placeholder="https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/"
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
           </div>
         </div>
       </section>
