@@ -248,10 +248,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       a.download = `${job.label}.mp4`
       a.click()
       URL.revokeObjectURL(blobUrl)
+      setErr(null)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (job.exportId) window.open(iceJobDownloadProxyPath(job.exportId, true), '_blank', 'noopener')
-      else setErr(msg)
+      setErr(msg)
     }
   }
 
@@ -755,6 +755,19 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     最新成片已就绪
                   </div>
                   <p className="mb-3 truncate text-xs text-emerald-800">{latestDone.label}</p>
+                  {latestDone.exportId ? (
+                    <video
+                      key={latestDone.exportId}
+                      src={iceJobDownloadProxyPath(latestDone.exportId, true)}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="mb-3 max-h-48 w-full rounded-lg border border-emerald-200 bg-black object-contain"
+                      onError={() =>
+                        setErr('预览加载失败：成片可能仍在写入 OSS，或 Bucket 权限/前缀配置有误，请稍后重试下载。')
+                      }
+                    />
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => void downloadJob(latestDone)}

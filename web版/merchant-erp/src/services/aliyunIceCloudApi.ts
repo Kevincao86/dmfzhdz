@@ -348,8 +348,12 @@ export async function downloadIceExportBlob(jobId: string): Promise<string> {
       const res = await fetch(p)
       if (res.status === 404) continue
       if (!res.ok) {
-        const j = await parseJson<{ message?: string }>(res)
-        throw new Error(j?.message ?? `下载失败 HTTP ${res.status}`)
+        const j = await parseJson<{ message?: string; ok?: boolean }>(res)
+        const detail = j?.message ?? `下载失败 HTTP ${res.status}`
+        if (res.status === 409) {
+          throw new Error(`${detail}（成片尚未写入完成，请稍后在任务列表重试）`)
+        }
+        throw new Error(detail)
       }
       const blob = await res.blob()
       if (blob.size < 2048) {
