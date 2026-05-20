@@ -3,12 +3,12 @@ import type {
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
-} from './opsRegistryTypes'
-import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders'
+} from './opsRegistryTypes.js'
+import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 import {
   filterRegistryForTenant,
   recruitmentOrderBelongsToTenant,
-} from './tenantRegistryScope'
+} from './tenantRegistryScope.js'
 
 export function tenantScheduleRowId(tenantId: string, localId: string): string {
   const tid = tenantId.trim()
