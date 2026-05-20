@@ -8,6 +8,7 @@ import {
   isCreatePlatformId,
 } from '../constants/productCreatePlatforms'
 import { cn } from '../cn'
+import { MerchantPlatformIcon } from '../lib/platformBranding'
 import DouyinProductCreateWizard from './douyin/DouyinProductCreateWizard'
 import WaimaiProductCreateWizard from './waimai/WaimaiProductCreateWizard'
 import { getMerchantPlatform } from '../constants/merchantPlatforms'
@@ -230,14 +231,14 @@ export default function ProductCreateFlowPage() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-6 flex items-start gap-3">
-          <div
-            className={cn(
-              'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r text-lg font-bold text-white',
-              activeMeta.color,
-            )}
-          >
-            {activeMeta.letter}
-          </div>
+          <MerchantPlatformIcon
+            platformId={activeMeta.id}
+            name={activeMeta.name}
+            letter={activeMeta.letter}
+            color={activeMeta.color}
+            size="lg"
+            className="rounded-lg"
+          />
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{activeMeta.name}</h2>
             <p className="mt-1 text-xs text-gray-500">

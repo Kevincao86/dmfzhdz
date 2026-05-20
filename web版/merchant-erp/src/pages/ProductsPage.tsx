@@ -37,6 +37,7 @@ import {
   type PlatformConnStatus,
   probeMerchantPlatforms,
 } from '../services/platformConnectivityProbe'
+import { MerchantPlatformIcon } from '../lib/platformBranding'
 import StoreGrossMarginConfigCard from '../components/StoreGrossMarginConfigCard'
 import { useAiAgent } from '../context/AiAgentContext'
 
@@ -65,12 +66,11 @@ function CreateProductModal({ onClose }: { onClose: () => void }) {
       const rows = await probeMerchantPlatforms()
       if (cancelled) return
       const byId = Object.fromEntries(rows.map((r) => [r.id, r.status])) as Record<string, Conn>
-      setConn({
-        douyin: byId.douyin ?? 'error',
-        meituan: byId.meituan ?? 'error',
-        xiaohongshu: byId.xiaohongshu ?? 'error',
-        jd: byId.jd ?? 'opening',
-      })
+      setConn(
+        Object.fromEntries(
+          PRODUCT_CREATE_PLATFORMS.map((p) => [p.id, byId[p.id] ?? 'error']),
+        ) as Record<string, Conn>,
+      )
     }
 
     void run()
@@ -156,14 +156,14 @@ function CreateProductModal({ onClose }: { onClose: () => void }) {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <div
-                              className={cn(
-                                'flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-r text-sm font-bold text-white',
-                                p.color,
-                              )}
-                            >
-                              {p.letter}
-                            </div>
+                            <MerchantPlatformIcon
+                              platformId={p.id}
+                              name={p.name}
+                              letter={p.letter}
+                              color={p.color}
+                              size="md"
+                              className="rounded-lg"
+                            />
                             <div>
                               <div className="font-medium text-gray-900">{p.name}</div>
                               {st === 'connected' && (

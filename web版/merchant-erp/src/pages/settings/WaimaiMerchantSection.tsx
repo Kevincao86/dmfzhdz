@@ -4,7 +4,7 @@ import {
   getMerchantPlatform,
   type MerchantPlatformId,
 } from '../../constants/merchantPlatforms'
-import { PlatformLogoPlaceholder } from '../../lib/platformBranding'
+import { merchantPlatformLogoKey, PlatformBrandLogo } from '../../lib/platformBranding'
 import { postWaimaiBind, postWaimaiSync } from '../../services/merchantPlatformApi'
 import BindGuideModal from './bindGuide/BindGuideModal'
 import { MerchantSyncControls } from './MerchantSyncControls'
@@ -33,6 +33,7 @@ type Props = {
 
 export default function WaimaiMerchantSection({ platformId, guideSteps }: Props) {
   const meta = getMerchantPlatform(platformId)
+  const logoKey = merchantPlatformLogoKey(platformId)
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     readSession(meta.tokenSessionKey),
   )
@@ -110,7 +111,9 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start">
-          <PlatformLogoPlaceholder label={meta.letter} size="lg" className="mr-4" />
+          {logoKey ? (
+            <PlatformBrandLogo logo={logoKey} alt={meta.name} size="lg" className="mr-4" />
+          ) : null}
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{meta.name}</h3>
             <p className="text-sm text-gray-500">

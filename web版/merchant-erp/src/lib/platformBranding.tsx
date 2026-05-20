@@ -1,4 +1,5 @@
 import { cn } from '../cn'
+import type { MerchantPlatformId } from '../constants/merchantPlatforms'
 
 /** 静态 Logo 资源（public/platforms） */
 export type PlatformLogoKey =
@@ -8,6 +9,9 @@ export type PlatformLogoKey =
   | 'douyin_laike'
   | 'ocean_engine_local'
   | 'xhs_juguang'
+  | 'eleme_shangou'
+  | 'meituan_waimai'
+  | 'jd_waimai'
 
 export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   douyin: '/platforms/douyin.png',
@@ -16,6 +20,23 @@ export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   douyin_laike: '/platforms/douyin-laike.png',
   ocean_engine_local: '/platforms/ocean-engine-local.png',
   xhs_juguang: '/platforms/xhs-juguang.png',
+  eleme_shangou: '/platforms/eleme-shangou.png',
+  meituan_waimai: '/platforms/meituan-waimai.png',
+  jd_waimai: '/platforms/jd-waimai.png',
+}
+
+/** 创建商品 / 系统设置商家后台 — 各经营平台 Logo（无图时回退字母占位） */
+export const MERCHANT_PLATFORM_LOGO: Partial<Record<MerchantPlatformId, PlatformLogoKey>> = {
+  douyin: 'douyin_laike',
+  meituan: 'dianping',
+  xiaohongshu: 'xiaohongshu',
+  eleme: 'eleme_shangou',
+  meituan_waimai: 'meituan_waimai',
+  jd_waimai: 'jd_waimai',
+}
+
+export function merchantPlatformLogoKey(id: MerchantPlatformId): PlatformLogoKey | null {
+  return MERCHANT_PLATFORM_LOGO[id] ?? null
 }
 
 /** 平台连接（用户侧社交账号） */
@@ -56,13 +77,13 @@ export type WaimaiBackendPlatformId = 'eleme' | 'meituan_waimai' | 'jd_waimai'
 export type WaimaiBackendPlatformBrand = {
   id: WaimaiBackendPlatformId
   tabName: string
-  letter: string
+  logo: PlatformLogoKey
 }
 
 export const WAIMAI_BACKEND_PLATFORMS: WaimaiBackendPlatformBrand[] = [
-  { id: 'eleme', tabName: '淘宝闪购', letter: '闪' },
-  { id: 'meituan_waimai', tabName: '美团外卖', letter: '外' },
-  { id: 'jd_waimai', tabName: '京东外卖', letter: '京' },
+  { id: 'eleme', tabName: '淘宝闪购', logo: 'eleme_shangou' },
+  { id: 'meituan_waimai', tabName: '美团外卖', logo: 'meituan_waimai' },
+  { id: 'jd_waimai', tabName: '京东外卖', logo: 'jd_waimai' },
 ]
 
 export function PlatformBrandLogo({
@@ -84,6 +105,52 @@ export function PlatformBrandLogo({
       alt={alt ?? ''}
       className={cn('shrink-0 rounded-xl object-cover shadow-sm', box, className)}
     />
+  )
+}
+
+/** 创建商品 / 列表 — 与系统设置商家后台共用 Logo */
+export function MerchantPlatformIcon({
+  platformId,
+  name,
+  letter,
+  color,
+  className,
+  size = 'md',
+}: {
+  platformId: MerchantPlatformId | string
+  name?: string
+  letter?: string
+  /** 无 Logo 时渐变占位（来自 merchantPlatforms.color） */
+  color?: string
+  className?: string
+  size?: 'sm' | 'md' | 'lg'
+}) {
+  const logo = MERCHANT_PLATFORM_LOGO[platformId as MerchantPlatformId]
+  if (logo) {
+    return (
+      <PlatformBrandLogo
+        logo={logo}
+        alt={name ?? platformId}
+        size={size}
+        className={className}
+      />
+    )
+  }
+  const fallback = (letter ?? platformId.slice(0, 1)).slice(0, 1)
+  const box =
+    size === 'sm' ? 'h-9 w-9 text-xs' : size === 'lg' ? 'h-14 w-14 text-base' : 'h-10 w-10 text-sm'
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-xl bg-gradient-to-r font-bold text-white shadow-sm',
+        color ?? 'from-slate-500 to-slate-600',
+        box,
+        className,
+      )}
+      aria-hidden
+    >
+      {fallback}
+    </div>
   )
 }
 
