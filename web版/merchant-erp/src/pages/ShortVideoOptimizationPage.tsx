@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
+  KLING_DEFAULT_MODEL_ID,
+  VIDEO_ENGINE_LABEL_KLING,
+  VIDEO_ENGINE_LABEL_SEEDANCE,
+  VIDEO_MODEL_DEFAULT_LABEL,
+} from '../lib/shortVideoUiLabels'
+import {
   downloadVideoUrlAsBlob,
   fetchKlingVideoStatus,
   fetchSeedanceVideoStatus,
@@ -215,7 +221,7 @@ export default function ShortVideoOptimizationPage() {
   const [genPrompt, setGenPrompt] = useState('')
   const [storyFiles, setStoryFiles] = useState<File[]>([])
 
-  const [klingModel, setKlingModel] = useState(KLING_MODEL_OPTIONS[1].id)
+  const [klingModel, setKlingModel] = useState(KLING_DEFAULT_MODEL_ID)
   const [aspect, setAspect] = useState<'16:9' | '9:16' | '1:1'>('16:9')
   const [durationSec, setDurationSec] = useState<'5' | '10'>('5')
   const [kMode, setKMode] = useState<'std' | 'pro'>('std')
@@ -329,8 +335,10 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const validateEngine = (): string | null => {
-    if (engine === 'kling' && !cfg?.klingConfigured) return '当前环境未开通可灵，请联系管理员。'
-    if (engine === 'seedance' && !cfg?.arkKeyConfigured) return '当前环境未开通火山视频生成，请联系管理员。'
+    if (engine === 'kling' && !cfg?.klingConfigured)
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_KLING}，请联系管理员。`
+    if (engine === 'seedance' && !cfg?.arkKeyConfigured)
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请联系管理员。`
     if (engine === 'seedance' && !sdModelEp.trim()) {
       return cfg?.arkVideoSetupIssue ?? '请先选择视频模型（需配置火山方舟真实 ep- 接入点）。'
     }
@@ -879,17 +887,17 @@ export default function ShortVideoOptimizationPage() {
         <span className="absolute left-0 top-2 h-10 w-1 rounded-full bg-gradient-to-b from-orange-500 to-cyan-500" aria-hidden />
         <div className="flex items-center gap-3">
           <Film className="h-8 w-8 shrink-0 text-orange-500" aria-hidden />
-          <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频优化与生成</h1>
+          <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频AI处理</h1>
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          在原片基础上优化镜头，或用文案与配图生成新短片。先选择模型与参数，再上传素材并描述需求即可。
+          参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择墨典视频模型与参数，再上传素材并描述需求即可。
         </p>
       </header>
 
       <div className="erp-panel mb-8 flex overflow-hidden p-1">
         {(
           [
-            { id: 'optimize' as const, label: '短视频优化（参考画面）', icon: Video },
+            { id: 'optimize' as const, label: '参考画面处理', icon: Video },
             { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
             { id: 'cloud_batch' as const, label: '墨典AI云剪', icon: Cloud },
           ] as const
@@ -928,7 +936,7 @@ export default function ShortVideoOptimizationPage() {
               checked={engine === 'kling'}
               onChange={() => setEngine('kling')}
             />
-            可灵
+            {VIDEO_ENGINE_LABEL_KLING}
             <span className="text-zinc-500">
               {cfgLoaded ? (cfg?.klingConfigured ? '· 可用' : '· 未开通') : '…'}
             </span>
@@ -940,7 +948,7 @@ export default function ShortVideoOptimizationPage() {
               checked={engine === 'seedance'}
               onChange={() => setEngine('seedance')}
             />
-            火山视频
+            {VIDEO_ENGINE_LABEL_SEEDANCE}
             <span className="text-zinc-500">
               {cfgLoaded
                 ? cfg?.arkKeyConfigured
@@ -1011,7 +1019,7 @@ export default function ShortVideoOptimizationPage() {
         {engine === 'kling' && (
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-zinc-600 md:col-span-2">
-              <span>模型版本</span>
+              <span>视频模型</span>
               <select
                 value={klingModel}
                 onChange={(e) => setKlingModel(e.target.value)}
@@ -1019,7 +1027,7 @@ export default function ShortVideoOptimizationPage() {
               >
                 {KLING_MODEL_OPTIONS.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.label}
+                    {m.id === KLING_DEFAULT_MODEL_ID ? VIDEO_MODEL_DEFAULT_LABEL : m.label}
                   </option>
                 ))}
               </select>
@@ -1077,9 +1085,9 @@ export default function ShortVideoOptimizationPage() {
                   <option value="" disabled hidden>
                     请选择
                   </option>
-                  {cfg!.arkVideoModels.map((row) => (
+                  {cfg!.arkVideoModels.map((row, idx) => (
                     <option key={row.endpointId} value={row.endpointId}>
-                      {row.label}
+                      {idx === 0 ? VIDEO_MODEL_DEFAULT_LABEL : row.label}
                     </option>
                   ))}
                 </select>
@@ -1088,7 +1096,7 @@ export default function ShortVideoOptimizationPage() {
                   {cfg?.configLoadError
                     ? `无法加载视频配置（${cfg.configLoadError}）。请检查网络后刷新页面。`
                     : cfg?.arkVideoSetupIssue ??
-                      '暂无可用模型。请在运营台填写 Seedance 模型（如 Seedance 2.0|doubao-seedance-2-0-260128）或视频 ep- 接入点；勿使用 Doubao-Seed 对话模型的 ep。'}
+                      '暂无可用模型。请在运营台填写 Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215 或视频 ep- 接入点；勿使用 Doubao-Seed 对话模型的 ep。'}
                 </div>
               )}
             </label>
