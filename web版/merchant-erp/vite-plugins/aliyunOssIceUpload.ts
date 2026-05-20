@@ -267,10 +267,23 @@ export async function completeIceMultipartUpload(
   }
 }
 
-/** 解析成片 OSS 直链：https://bucket.oss-cn-xxx.aliyuncs.com/key/object.mp4 */
+/** 解析成片 OSS 直链：https://bucket.oss-cn-xxx.aliyuncs.com/key/object.mp4（可带签名 query） */
 export function parseOssObjectUrl(raw: string): { bucket: string; region: string; objectKey: string } | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('oss://')) {
+    const rest = trimmed.slice(6)
+    const slash = rest.indexOf('/')
+    if (slash <= 0) return null
+    const bucket = rest.slice(0, slash)
+    const objectKey = rest.slice(slash + 1)
+    if (!bucket || !objectKey) return null
+    const region =
+      (process.env.ALIYUN_ICE_REGION ?? process.env.ALIYUN_ICE_OUTPUT_OSS_REGION ?? 'cn-shanghai').trim()
+    return { bucket, region, objectKey }
+  }
   try {
-    const url = new URL(raw.trim())
+    const url = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`)
     const m = url.hostname.match(/^([^.]+)\.oss-([a-z0-9-]+)\.aliyuncs\.com$/i)
     if (!m?.[1] || !m[2]) return null
     const objectKey = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
@@ -279,6 +292,24 @@ export function parseOssObjectUrl(raw: string): { bucket: string; region: string
   } catch {
     return null
   }
+}
+
+/** 轮询/下载前判断 OSS 成片是否可读（禁止 size=-1 误判为已就绪） */
+export async function evaluateIceOutputReady(
+  cfg: AliyunIceConfig,
+  downloadUrl: string,
+): Promise<{ ready: boolean; bytes: number; message?: string }> {
+  const probe = await probeIceOutputObjectSize(cfg, downloadUrl)
+  if (!probe.ok) {
+    return { ready: false, bytes: 0, message: probe.message }
+  }
+  if (probe.size >= MIN_ICE_OUTPUT_BYTES) {
+    return { ready: true, bytes: probe.size }
+  }
+  if (probe.size > 0) {
+    return { ready: false, bytes: probe.size, message: '成片写入 OSS 中…' }
+  }
+  return { ready: false, bytes: 0, message: '成片写入 OSS 中…' }
 }
 
 /** 私有 Bucket 成片：生成限时可读签名 URL（与 ICE AccessKey 相同） */

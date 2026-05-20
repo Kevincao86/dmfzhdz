@@ -17,11 +17,7 @@ import {
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
 import { iceOssUploadAvailable } from './aliyunOssIceParse.js'
-import {
-  fetchIceOutputObject,
-  MIN_ICE_OUTPUT_BYTES,
-  probeIceOutputObjectSize,
-} from './aliyunOssIceUpload.js'
+import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
   const q = new URLSearchParams({ id: jobId })
@@ -374,14 +370,19 @@ export async function handleAliyunIceRoutes(input: {
     }
     let outputBytes = 0
     let outputReady = false
-    if (st.done && st.downloadUrl) {
-      const probe = await probeIceOutputObjectSize(cfg, st.downloadUrl)
-      if (probe.ok) {
-        outputBytes = Math.max(0, probe.size)
-        outputReady = probe.size < 0 || probe.size >= MIN_ICE_OUTPUT_BYTES
+    let pendingMessage = '剪辑已完成，成片正在写入 OSS…'
+    if (st.done && !st.failed) {
+      if (!st.downloadUrl) {
+        pendingMessage =
+          '剪辑已完成，但未解析到成片地址。请确认运营台已配置「OSS 成片 URL 前缀」且 ICE 对 Bucket 有写入权限。'
+      } else {
+        const evalOut = await evaluateIceOutputReady(cfg, st.downloadUrl)
+        outputBytes = evalOut.bytes
+        outputReady = evalOut.ready
+        if (evalOut.message) pendingMessage = evalOut.message
       }
     }
-    const outputPending = st.done && !st.failed && !!st.downloadUrl && !outputReady
+    const outputPending = st.done && !st.failed && !outputReady
     json(res, 200, {
       ok: true,
       status: st.status,
@@ -392,9 +393,7 @@ export async function handleAliyunIceRoutes(input: {
       outputBytes: outputBytes > 0 ? outputBytes : undefined,
       downloadUrl: outputReady ? iceJobDownloadProxyPath(jobId) : undefined,
       previewUrl: outputReady ? iceJobDownloadProxyPath(jobId, true) : undefined,
-      message: outputPending
-        ? '剪辑已完成，成片正在写入 OSS…'
-        : st.message,
+      message: outputPending ? pendingMessage : st.message,
     })
     return true
   }
@@ -409,6 +408,14 @@ export async function handleAliyunIceRoutes(input: {
     const st = await iceGetProducingJob(cfg, jobId)
     if (!st.ok || !st.downloadUrl) {
       json(res, 404, { ok: false, message: st.ok ? '成片地址尚未生成' : st.message })
+      return true
+    }
+    const evalOut = await evaluateIceOutputReady(cfg, st.downloadUrl)
+    if (!evalOut.ready) {
+      json(res, 409, {
+        ok: false,
+        message: evalOut.message ?? '成片尚未就绪，请稍后在任务列表重试下载',
+      })
       return true
     }
     const fetched = await fetchIceOutputObject(cfg, st.downloadUrl)

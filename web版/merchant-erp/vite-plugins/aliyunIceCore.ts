@@ -368,6 +368,73 @@ export async function iceRunSinglePipeline(
   }
 }
 
+function readIceJobString(job: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = job[k]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
+  return undefined
+}
+
+async function iceFileUrlFromMediaInfo(
+  client: InstanceType<typeof IceClient>,
+  mediaId: string,
+): Promise<string | undefined> {
+  try {
+    const res = await client.getMediaInfo(
+      new GetMediaInfoRequest({ mediaId, outputType: 'oss' }),
+    )
+    const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
+    if (!info) return undefined
+    const basic = (info.mediaBasicInfo ?? info.MediaBasicInfo) as Record<string, unknown> | undefined
+    const fromBasic = readIceJobString(basic ?? {}, 'inputURL', 'InputURL')
+    if (fromBasic && /^https?:\/\//i.test(fromBasic)) return fromBasic
+
+    const list = (info.fileInfoList ?? info.FileInfoList) as unknown
+    if (!Array.isArray(list)) return undefined
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const row = item as Record<string, unknown>
+      const fb = (row.fileBasicInfo ?? row.FileBasicInfo) as Record<string, unknown> | undefined
+      const fileUrl = readIceJobString(fb ?? row, 'fileUrl', 'FileUrl')
+      if (fileUrl && /^https?:\/\//i.test(fileUrl)) return fileUrl
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** 解析成片可下载地址（兼容 PascalCase 字段、OutputMediaConfig、OSS 前缀回退、MediaId） */
+export async function iceResolveJobDownloadUrl(
+  client: InstanceType<typeof IceClient>,
+  cfg: AliyunIceConfig,
+  job: Record<string, unknown>,
+): Promise<string | undefined> {
+  let url = readIceJobString(job, 'mediaURL', 'MediaURL', 'mediaUrl', 'MediaUrl')
+  if (!url) {
+    const configRaw = readIceJobString(job, 'outputMediaConfig', 'OutputMediaConfig')
+    if (configRaw) {
+      try {
+        const o = JSON.parse(configRaw) as Record<string, unknown>
+        url = readIceJobString(o, 'MediaURL', 'mediaURL', 'mediaUrl')
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  if (!url) {
+    const prefix = cfg.outputOssUrlPrefix?.replace(/\/+$/, '')
+    const token = readIceJobString(job, 'clientToken', 'ClientToken')
+    if (prefix && token) url = `${prefix}/${token}.mp4`
+  }
+  if (!url) {
+    const mediaId = readIceJobString(job, 'mediaId', 'MediaId')
+    if (mediaId) url = await iceFileUrlFromMediaInfo(client, mediaId)
+  }
+  return url
+}
+
 export async function iceGetProducingJob(
   cfg: AliyunIceConfig,
   jobId: string,
@@ -388,20 +455,24 @@ export async function iceGetProducingJob(
     const res = await client.getMediaProducingJob(new GetMediaProducingJobRequest({ jobId }))
     const job = bodyOf(res)?.mediaProducingJob as Record<string, unknown> | undefined
     if (!job) return { ok: false, message: '未找到剪辑任务' }
-    const status = String(job.status ?? '')
+    const status = String(job.status ?? job.Status ?? '')
     const st = status.toLowerCase()
     const done = st === 'success'
     const failed = st === 'failed'
-    const downloadUrl =
-      typeof job.mediaURL === 'string' ? job.mediaURL.trim() || undefined : undefined
+    const downloadUrl = done ? await iceResolveJobDownloadUrl(client, cfg, job) : undefined
     return {
       ok: true,
       status,
       done,
       failed,
       downloadUrl,
-      progress: typeof job.progress === 'number' ? job.progress : undefined,
-      message: typeof job.message === 'string' ? job.message : undefined,
+      progress:
+        typeof job.progress === 'number'
+          ? job.progress
+          : typeof job.Progress === 'number'
+            ? job.Progress
+            : undefined,
+      message: readIceJobString(job, 'message', 'Message'),
     }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
