@@ -17,7 +17,11 @@ import {
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
 import { iceOssUploadAvailable } from './aliyunOssIceParse.js'
-import { fetchIceOutputObject } from './aliyunOssIceUpload.js'
+import {
+  fetchIceOutputObject,
+  MIN_ICE_OUTPUT_BYTES,
+  probeIceOutputObjectSize,
+} from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
   const q = new URLSearchParams({ id: jobId })
@@ -368,15 +372,29 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 502, { ok: false, message: st.message })
       return true
     }
+    let outputBytes = 0
+    let outputReady = false
+    if (st.done && st.downloadUrl) {
+      const probe = await probeIceOutputObjectSize(cfg, st.downloadUrl)
+      if (probe.ok) {
+        outputBytes = Math.max(0, probe.size)
+        outputReady = probe.size < 0 || probe.size >= MIN_ICE_OUTPUT_BYTES
+      }
+    }
+    const outputPending = st.done && !st.failed && !!st.downloadUrl && !outputReady
     json(res, 200, {
       ok: true,
       status: st.status,
       progress: st.progress,
-      done: st.done,
+      done: outputReady,
       failed: st.failed,
-      downloadUrl: st.done ? iceJobDownloadProxyPath(jobId) : undefined,
-      previewUrl: st.done ? iceJobDownloadProxyPath(jobId, true) : undefined,
-      message: st.message,
+      outputPending,
+      outputBytes: outputBytes > 0 ? outputBytes : undefined,
+      downloadUrl: outputReady ? iceJobDownloadProxyPath(jobId) : undefined,
+      previewUrl: outputReady ? iceJobDownloadProxyPath(jobId, true) : undefined,
+      message: outputPending
+        ? '剪辑已完成，成片正在写入 OSS…'
+        : st.message,
     })
     return true
   }
@@ -407,6 +425,7 @@ export async function handleAliyunIceRoutes(input: {
         : `attachment; filename="ice-${jobId}.mp4"`,
     )
     res.setHeader('Cache-Control', 'private, max-age=300')
+    res.setHeader('Content-Length', String(fetched.buf.length))
     res.end(fetched.buf)
     return true
   }
