@@ -9,6 +9,8 @@ import {
 } from '../constants/productCreatePlatforms'
 import { cn } from '../cn'
 import DouyinProductCreateWizard from './douyin/DouyinProductCreateWizard'
+import WaimaiProductCreateWizard from './waimai/WaimaiProductCreateWizard'
+import { getMerchantPlatform } from '../constants/merchantPlatforms'
 import { postPlatformProductDraft } from '../services/productListingApi'
 
 type LocationState = { platforms?: unknown; autoSubmit?: boolean }
@@ -20,6 +22,10 @@ function normalizePlatforms(raw: unknown): CreatePlatformId[] {
     if (typeof x === 'string' && isCreatePlatformId(x)) out.push(x)
   }
   return out.filter((id) => id !== 'jd')
+}
+
+function isWaimaiPlatform(id: CreatePlatformId): boolean {
+  return getMerchantPlatform(id).channel === 'waimai'
 }
 
 export default function ProductCreateFlowPage() {
@@ -126,6 +132,52 @@ export default function ProductCreateFlowPage() {
         )}
         <DouyinProductCreateWizard
           autoSubmit={Boolean((location.state as LocationState | null)?.autoSubmit)}
+        />
+      </div>
+    )
+  }
+
+  if (active && isWaimaiPlatform(active)) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/products"
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            返回商品管理
+          </Link>
+        </div>
+        <div>
+          <h1 className="erp-page-title">{activeMeta.name} · 创建商品</h1>
+          <p className="mt-1 text-sm text-gray-500">按外卖平台模板填写并提交，确保类目与库存符合平台审核要求。</p>
+        </div>
+        {platforms.length > 1 ? (
+          <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+            {platforms.map((id) => {
+              const meta = PRODUCT_CREATE_PLATFORMS.find((p) => p.id === id)
+              if (!meta) return null
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActive(id)}
+                  className={cn(
+                    'rounded-lg px-4 py-2 text-sm font-medium',
+                    id === active
+                      ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-gray-200'
+                      : 'text-gray-600',
+                  )}
+                >
+                  {meta.name}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
+        <WaimaiProductCreateWizard
+          platformId={active as 'eleme' | 'meituan_waimai' | 'jd_waimai'}
         />
       </div>
     )

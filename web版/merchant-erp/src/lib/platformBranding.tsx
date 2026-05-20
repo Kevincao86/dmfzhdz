@@ -50,6 +50,21 @@ export const MERCHANT_BACKEND_PLATFORMS: MerchantBackendPlatformBrand[] = [
   { id: 'xhs', tabName: '小红书商家版', logo: 'xiaohongshu' },
 ]
 
+/** 外卖平台（商家版后台第二组 Tab，与团购并列） */
+export type WaimaiBackendPlatformId = 'eleme' | 'meituan_waimai' | 'jd_waimai'
+
+export type WaimaiBackendPlatformBrand = {
+  id: WaimaiBackendPlatformId
+  tabName: string
+  letter: string
+}
+
+export const WAIMAI_BACKEND_PLATFORMS: WaimaiBackendPlatformBrand[] = [
+  { id: 'eleme', tabName: '淘宝闪购', letter: '闪' },
+  { id: 'meituan_waimai', tabName: '美团外卖', letter: '外' },
+  { id: 'jd_waimai', tabName: '京东外卖', letter: '京' },
+]
+
 export function PlatformBrandLogo({
   logo,
   alt,

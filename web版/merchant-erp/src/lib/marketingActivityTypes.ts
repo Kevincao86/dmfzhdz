@@ -1,4 +1,10 @@
-export type MarketingActivityPlatform = 'douyin' | 'meituan' | 'xiaohongshu'
+export type MarketingActivityPlatform =
+  | 'douyin'
+  | 'meituan'
+  | 'xiaohongshu'
+  | 'eleme'
+  | 'meituan_waimai'
+  | 'jd_waimai'
 
 /** ERP 统一活动状态（用于筛选 Tab） */
 export type MarketingActivityUiStatus = 'ongoing' | 'enrollable' | 'ended' | 'unknown'

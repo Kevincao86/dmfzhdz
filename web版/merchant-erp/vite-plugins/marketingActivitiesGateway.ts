@@ -7,6 +7,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { handleDouyinMarketingActivityQueryGet } from './douyinMerchantGateway.js'
 import { fetchMeituanMarketingActivities } from './meituanMerchantGateway.js'
 import { fetchXhsMarketingActivities } from './xhsMerchantGateway.js'
+import { fetchWaimaiMarketingActivities, type WaimaiPlatformKey } from './waimaiMerchantGateway.js'
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -49,5 +50,28 @@ export async function handleMarketingActivitiesListGet(
     return
   }
 
-  json(res, 400, { ok: false, message: 'platform 须为 douyin | meituan | xiaohongshu', platform })
+  const waimaiMap: Record<string, WaimaiPlatformKey> = {
+    eleme: 'eleme',
+    meituan_waimai: 'meituan_waimai',
+    'meituan-waimai': 'meituan_waimai',
+    jd_waimai: 'jd_waimai',
+    'jd-waimai': 'jd_waimai',
+  }
+  const wKey = waimaiMap[platform]
+  if (wKey) {
+    const r = await fetchWaimaiMarketingActivities(wKey, bearer)
+    if (r.ok === false) {
+      json(res, 502, { ok: false, message: r.message, platform: wKey })
+      return
+    }
+    json(res, 200, { ok: true, items: r.items, platform: wKey })
+    return
+  }
+
+  json(res, 400, {
+    ok: false,
+    message:
+      'platform 须为 douyin | meituan | xiaohongshu | eleme | meituan_waimai | jd_waimai',
+    platform,
+  })
 }

@@ -31,7 +31,27 @@ function connectivitySessionSig(): string {
     readMerchantSession('meoo_douyin_merchant_id') ?? '',
     readMerchantSession('meoo_meituan_merchant_token') ?? '',
     readMerchantSession('meoo_xhs_merchant_token') ?? '',
+    readMerchantSession('meoo_eleme_merchant_token') ?? '',
+    readMerchantSession('meoo_meituan_waimai_merchant_token') ?? '',
+    readMerchantSession('meoo_jd_waimai_merchant_token') ?? '',
   ].join('\u0001')
+}
+
+async function probeWaimai(id: 'eleme' | 'meituan_waimai' | 'jd_waimai', name: string) {
+  const lastChecked = formatNow()
+  const tokenKey =
+    id === 'eleme'
+      ? 'meoo_eleme_merchant_token'
+      : id === 'meituan_waimai'
+        ? 'meoo_meituan_waimai_merchant_token'
+        : 'meoo_jd_waimai_merchant_token'
+  const tok = readMerchantSession(tokenKey)
+  let row: PlatformConnectivityRow = { id, name, status: 'error', lastChecked }
+  if (tok) {
+    const ok = await checkBearerGateway(`/api/merchant/${id}/connection-check`, tok)
+    row = { ...row, status: ok ? 'connected' : 'error', lastChecked: formatNow() }
+  }
+  return row
 }
 
 type ProbeCache = { rows: PlatformConnectivityRow[]; at: number; sig: string }
@@ -120,7 +140,19 @@ async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow
     }
   }
 
-  return [douyin, meituan, xiaohongshu, { ...jd, lastChecked: formatNow() }]
+  const eleme = await probeWaimai('eleme', '淘宝闪购')
+  const meituanWaimai = await probeWaimai('meituan_waimai', '美团外卖')
+  const jdWaimai = await probeWaimai('jd_waimai', '京东外卖')
+
+  return [
+    douyin,
+    meituan,
+    xiaohongshu,
+    { ...jd, lastChecked: formatNow() },
+    eleme,
+    meituanWaimai,
+    jdWaimai,
+  ]
 }
 
 function cloneRows(rows: PlatformConnectivityRow[]): PlatformConnectivityRow[] {

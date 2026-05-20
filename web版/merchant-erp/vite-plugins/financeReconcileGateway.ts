@@ -8,6 +8,11 @@ import { fetchMeituanFinanceReconcileRows } from './meituanMerchantGateway.js'
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
 import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
 import { fetchXhsFinanceReconcileRows } from './xhsMerchantGateway.js'
+import {
+  decodeWaimaiBearer,
+  fetchWaimaiFinanceReconcileRows,
+  type WaimaiPlatformKey,
+} from './waimaiMerchantGateway.js'
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -31,18 +36,27 @@ function resolvePlatformTokens(req: IncomingMessage): {
   douyin?: string
   meituan?: string
   xhs?: string
+  eleme?: string
+  meituan_waimai?: string
+  jd_waimai?: string
 } {
   const auth = parseBearer(req)
   let douyin = headerToken(req, 'x-meoo-douyin-token')
   let meituan = headerToken(req, 'x-meoo-meituan-token')
   let xhs = headerToken(req, 'x-meoo-xhs-token')
+  let eleme = headerToken(req, 'x-meoo-eleme-token')
+  let meituan_waimai = headerToken(req, 'x-meoo-meituan-waimai-token')
+  let jd_waimai = headerToken(req, 'x-meoo-jd-waimai-token')
 
   if (auth) {
     if (decodeMeituanSessionToken(auth)) meituan = meituan || auth
     else if (decodeXhsSessionToken(auth)) xhs = xhs || auth
+    else if (decodeWaimaiBearer('eleme', auth)) eleme = eleme || auth
+    else if (decodeWaimaiBearer('meituan_waimai', auth)) meituan_waimai = meituan_waimai || auth
+    else if (decodeWaimaiBearer('jd_waimai', auth)) jd_waimai = jd_waimai || auth
     else douyin = douyin || auth
   }
-  return { douyin, meituan, xhs }
+  return { douyin, meituan, xhs, eleme, meituan_waimai, jd_waimai }
 }
 
 function isYmd(s: string): boolean {
@@ -98,7 +112,14 @@ export async function handleFinanceReconcileGet(
     startYmd = addCalendarDaysShanghai(endYmd, -(days - 1))
   }
 
-  const { douyin: douyinToken, meituan: meituanToken, xhs: xhsToken } = resolvePlatformTokens(req)
+  const {
+    douyin: douyinToken,
+    meituan: meituanToken,
+    xhs: xhsToken,
+    eleme: elemeToken,
+    meituan_waimai: meituanWaimaiToken,
+    jd_waimai: jdWaimaiToken,
+  } = resolvePlatformTokens(req)
   const warnings: string[] = []
   const rows: Record<string, unknown>[] = []
 
@@ -110,6 +131,7 @@ export async function handleFinanceReconcileGet(
         date: r.date,
         platform: r.platform,
         platformLabel: r.platformLabel,
+        channel: 'groupbuy',
         orderCount: r.orderCount,
         verifyOrderCount: r.verifyOrderCount,
         salesAmountYuan: r.salesAmountYuan,
@@ -128,6 +150,7 @@ export async function handleFinanceReconcileGet(
         date: r.date,
         platform: r.platform,
         platformLabel: r.platformLabel,
+        channel: 'groupbuy',
         orderCount: r.orderCount,
         verifyOrderCount: r.verifyOrderCount,
         salesAmountYuan: r.salesAmountYuan,
@@ -135,7 +158,7 @@ export async function handleFinanceReconcileGet(
       })
     }
   } else {
-    warnings.push('未绑定美团，跳过美团对账。')
+    warnings.push('未绑定美团点评，跳过美团对账。')
   }
 
   if (xhsToken) {
@@ -146,6 +169,7 @@ export async function handleFinanceReconcileGet(
         date: r.date,
         platform: r.platform,
         platformLabel: r.platformLabel,
+        channel: 'groupbuy',
         orderCount: r.orderCount,
         verifyOrderCount: r.verifyOrderCount,
         salesAmountYuan: r.salesAmountYuan,
@@ -154,6 +178,32 @@ export async function handleFinanceReconcileGet(
     }
   } else {
     warnings.push('未绑定小红书商家后台，跳过小红书对账。')
+  }
+
+  const waimaiPlatforms: { key: WaimaiPlatformKey; token?: string; label: string }[] = [
+    { key: 'eleme', token: elemeToken, label: '淘宝闪购' },
+    { key: 'meituan_waimai', token: meituanWaimaiToken, label: '美团外卖' },
+    { key: 'jd_waimai', token: jdWaimaiToken, label: '京东外卖' },
+  ]
+  for (const wp of waimaiPlatforms) {
+    if (wp.token) {
+      const wm = await fetchWaimaiFinanceReconcileRows(wp.key, wp.token, startYmd, endYmd)
+      for (const w of wm.warnings) warnings.push(w)
+      for (const r of wm.rows) {
+        rows.push({
+          date: r.date,
+          platform: r.platform,
+          platformLabel: r.platformLabel,
+          channel: 'waimai',
+          orderCount: r.orderCount,
+          verifyOrderCount: r.verifyOrderCount,
+          salesAmountYuan: r.salesAmountYuan,
+          verifyAmountYuan: r.verifyAmountYuan,
+        })
+      }
+    } else {
+      warnings.push(`未绑定${wp.label}，跳过${wp.label}对账。`)
+    }
   }
 
   json(res, 200, {

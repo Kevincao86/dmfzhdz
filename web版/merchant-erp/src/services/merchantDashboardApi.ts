@@ -159,7 +159,15 @@ export async function fetchHomeDashboardByPlatforms(
   trendByPlatform: Record<StorePlatformTab, number[]>
   trendDates: string[]
 }> {
-  const allTabs: StorePlatformTab[] = ['douyin', 'meituan', 'xiaohongshu', 'jd']
+  const allTabs: StorePlatformTab[] = [
+    'douyin',
+    'meituan',
+    'xiaohongshu',
+    'jd',
+    'eleme',
+    'meituan_waimai',
+    'jd_waimai',
+  ]
   const days = range === 'realtime' ? 1 : range === 'day7' ? 7 : 30
   const trendDates = lastNDates(days)
 
@@ -168,6 +176,9 @@ export async function fetchHomeDashboardByPlatforms(
     meituan: Array(days).fill(0),
     xiaohongshu: Array(days).fill(0),
     jd: Array(days).fill(0),
+    eleme: Array(days).fill(0),
+    meituan_waimai: Array(days).fill(0),
+    jd_waimai: Array(days).fill(0),
   }
 
   const three = ['douyin', 'meituan', 'xiaohongshu'] as const

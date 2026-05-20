@@ -31,7 +31,10 @@ function formatYuan(n: number): string {
 }
 
 function marginForPlatform(margins: StorePlatformMargins, p: FinancePlatformId): number {
-  return margins[p]
+  if (p === 'douyin') return margins.douyin
+  if (p === 'meituan' || p === 'meituan_waimai') return margins.meituan
+  if (p === 'xhs' || p === 'eleme' || p === 'jd_waimai') return margins.xhs
+  return margins.douyin
 }
 
 function shanghaiTodayYmd(): string {
@@ -44,13 +47,18 @@ function addCalendarDaysShanghai(ymd: string, deltaDays: number): string {
 }
 
 type DayRangePreset = 7 | 15 | 30
-type PlatformView = 'all' | FinancePlatformId
+type PlatformView = 'all' | 'groupbuy' | 'waimai' | FinancePlatformId
 
 const PLATFORM_FILTER_OPTIONS: { value: PlatformView; label: string }[] = [
   { value: 'all', label: '全部平台' },
-  { value: 'douyin', label: '抖音' },
-  { value: 'meituan', label: '大众点评' },
+  { value: 'groupbuy', label: '团购平台' },
+  { value: 'waimai', label: '外卖平台' },
+  { value: 'douyin', label: '抖音来客' },
+  { value: 'meituan', label: '美团点评' },
   { value: 'xhs', label: '小红书' },
+  { value: 'eleme', label: '淘宝闪购' },
+  { value: 'meituan_waimai', label: '美团外卖' },
+  { value: 'jd_waimai', label: '京东外卖' },
 ]
 
 export function FinanceReconcilePage() {
@@ -142,6 +150,8 @@ export function FinanceReconcilePage() {
 
   const filteredEnriched = useMemo(() => {
     if (platformFilter === 'all') return enriched
+    if (platformFilter === 'groupbuy') return enriched.filter((r) => r.channel === 'groupbuy')
+    if (platformFilter === 'waimai') return enriched.filter((r) => r.channel === 'waimai')
     return enriched.filter((r) => r.platform === platformFilter)
   }, [enriched, platformFilter])
 
