@@ -13,7 +13,13 @@ function url(path: string) {
 }
 
 /** 与列表查询 query 一致（小红书为 xhs） */
-export type ReviewsApiPlatform = 'douyin' | 'meituan' | 'xhs'
+export type ReviewsApiPlatform =
+  | 'douyin'
+  | 'meituan'
+  | 'xhs'
+  | 'eleme'
+  | 'meituan_waimai'
+  | 'jd_waimai'
 
 export type ReviewSentiment = 'good' | 'neutral' | 'bad'
 
@@ -32,22 +38,33 @@ export type ReviewListItem = {
 export function reviewsTabToApiPlatform(tab: StorePlatformTab): ReviewsApiPlatform | null {
   if (tab === 'jd') return null
   if (tab === 'xiaohongshu') return 'xhs'
-  return tab
+  if (tab === 'eleme' || tab === 'meituan_waimai' || tab === 'jd_waimai') return tab
+  if (tab === 'douyin' || tab === 'meituan') return tab
+  return null
 }
 
 function platformSessionHeaders(platform?: ReviewsApiPlatform): HeadersInit {
   const douyin = readMerchantSession('meoo_douyin_merchant_token')
   const meituan = readMerchantSession('meoo_meituan_merchant_token')
   const xhs = readMerchantSession('meoo_xhs_merchant_token')
-  let primary = douyin ?? meituan ?? xhs
+  const eleme = readMerchantSession('meoo_eleme_merchant_token')
+  const meituanWaimai = readMerchantSession('meoo_meituan_waimai_merchant_token')
+  const jdWaimai = readMerchantSession('meoo_jd_waimai_merchant_token')
+  let primary = douyin ?? meituan ?? xhs ?? eleme ?? meituanWaimai ?? jdWaimai
   if (platform === 'meituan') primary = meituan ?? primary
   if (platform === 'douyin') primary = douyin ?? primary
   if (platform === 'xhs') primary = xhs ?? primary
+  if (platform === 'eleme') primary = eleme ?? primary
+  if (platform === 'meituan_waimai') primary = meituanWaimai ?? primary
+  if (platform === 'jd_waimai') primary = jdWaimai ?? primary
   const h: Record<string, string> = { Accept: 'application/json' }
   if (primary) h.Authorization = `Bearer ${primary}`
   if (douyin) h['X-Meoo-Douyin-Token'] = douyin
   if (meituan) h['X-Meoo-Meituan-Token'] = meituan
   if (xhs) h['X-Meoo-Xhs-Token'] = xhs
+  if (eleme) h['X-Meoo-Eleme-Token'] = eleme
+  if (meituanWaimai) h['X-Meoo-Meituan-Waimai-Token'] = meituanWaimai
+  if (jdWaimai) h['X-Meoo-Jd-Waimai-Token'] = jdWaimai
   return h
 }
 

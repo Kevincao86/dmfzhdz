@@ -16,8 +16,20 @@ const STATUS_TABS: { id: MarketingActivityStatusFilter; label: string }[] = [
   { id: 'ended', label: '已结束' },
 ]
 
-function platformTabToApi(p: StorePlatformTab): 'douyin' | 'meituan' | 'xiaohongshu' | null {
-  if (p === 'douyin' || p === 'meituan' || p === 'xiaohongshu') return p
+function platformTabToApi(
+  p: StorePlatformTab,
+): 'douyin' | 'meituan' | 'xiaohongshu' | 'eleme' | 'meituan_waimai' | 'jd_waimai' | null {
+  if (p === 'jd') return null
+  if (p === 'xiaohongshu') return 'xiaohongshu'
+  if (
+    p === 'douyin' ||
+    p === 'meituan' ||
+    p === 'eleme' ||
+    p === 'meituan_waimai' ||
+    p === 'jd_waimai'
+  ) {
+    return p
+  }
   return null
 }
 

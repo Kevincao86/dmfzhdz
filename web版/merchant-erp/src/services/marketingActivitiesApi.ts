@@ -15,7 +15,10 @@ function responseLooksLikeHtml(text: string, contentType: string): boolean {
 function tokenForPlatform(platform: MarketingActivityPlatform): string | null {
   if (platform === 'douyin') return readMerchantSession('meoo_douyin_merchant_token')
   if (platform === 'meituan') return readMerchantSession('meoo_meituan_merchant_token')
-  return readMerchantSession('meoo_xhs_merchant_token')
+  if (platform === 'xiaohongshu') return readMerchantSession('meoo_xhs_merchant_token')
+  if (platform === 'eleme') return readMerchantSession('meoo_eleme_merchant_token')
+  if (platform === 'meituan_waimai') return readMerchantSession('meoo_meituan_waimai_merchant_token')
+  return readMerchantSession('meoo_jd_waimai_merchant_token')
 }
 
 function normalizeItems(raw: unknown, platform: MarketingActivityPlatform): MarketingActivityItem[] {

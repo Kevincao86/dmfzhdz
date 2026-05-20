@@ -36,6 +36,9 @@ const TOKEN_KEYS: Record<CreatePlatformId, string> = {
   meituan: 'meoo_meituan_merchant_token',
   xiaohongshu: 'meoo_xhs_merchant_token',
   jd: 'meoo_jd_merchant_token',
+  eleme: 'meoo_eleme_merchant_token',
+  meituan_waimai: 'meoo_meituan_waimai_merchant_token',
+  jd_waimai: 'meoo_jd_waimai_merchant_token',
 }
 
 /** 与 `readMerchantSession` 一致：抖音来客 token 在 localStorage，其它平台多在 sessionStorage */
@@ -285,7 +288,14 @@ export async function pullMerchantProductFromPlatform(
 
 /** 全平台批量拉取商品列表（在售、审核中、已驳回、已下架等）并写入本地库 */
 export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantProductSyncResult> {
-  const platforms: CreatePlatformId[] = ['douyin', 'meituan', 'xiaohongshu']
+  const platforms: CreatePlatformId[] = [
+    'douyin',
+    'meituan',
+    'xiaohongshu',
+    'eleme',
+    'meituan_waimai',
+    'jd_waimai',
+  ]
   let count = 0
   const notes: string[] = []
   for (const platform of platforms) {

@@ -32,9 +32,9 @@ export default function StorePlatformSwitcher({
             )}
           >
             {p.name}
-            {p.id === 'jd' && (
+            {'comingSoon' in p && p.comingSoon ? (
               <span className="ml-1.5 text-xs font-normal text-amber-600">即将</span>
-            )}
+            ) : null}
           </button>
         )
       })}

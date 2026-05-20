@@ -20,16 +20,32 @@ function url(path: string) {
   return `${b}${path}`
 }
 
-export type StorePlatformTab = 'douyin' | 'meituan' | 'xiaohongshu' | 'jd'
+export type StorePlatformTab =
+  | 'douyin'
+  | 'meituan'
+  | 'xiaohongshu'
+  | 'jd'
+  | 'eleme'
+  | 'meituan_waimai'
+  | 'jd_waimai'
 
-export function storeTabToken(tab: StorePlatformTab): string | null {
-  if (tab === 'douyin') return readMerchantSession('meoo_douyin_merchant_token')
-  if (tab === 'meituan') return readMerchantSession('meoo_meituan_merchant_token')
-  if (tab === 'xiaohongshu') return readMerchantSession('meoo_xhs_merchant_token')
-  return null
+const TOKEN_BY_TAB: Record<StorePlatformTab, string | null> = {
+  douyin: 'meoo_douyin_merchant_token',
+  meituan: 'meoo_meituan_merchant_token',
+  xiaohongshu: 'meoo_xhs_merchant_token',
+  jd: null,
+  eleme: 'meoo_eleme_merchant_token',
+  meituan_waimai: 'meoo_meituan_waimai_merchant_token',
+  jd_waimai: 'meoo_jd_waimai_merchant_token',
 }
 
-export function storeTabApiSegment(tab: Exclude<StorePlatformTab, 'jd'>): string {
+export function storeTabToken(tab: StorePlatformTab): string | null {
+  const key = TOKEN_BY_TAB[tab]
+  return key ? readMerchantSession(key) : null
+}
+
+export function storeTabApiSegment(tab: StorePlatformTab): string | null {
+  if (tab === 'jd') return null
   if (tab === 'xiaohongshu') return 'xhs'
   return tab
 }
@@ -118,5 +134,9 @@ export async function fetchStoresForPlatform(
       storeBrand: params.storeBrand,
     })
   }
-  return fetchBearerStoresJson(storeTabApiSegment(tab), token, params)
+  const seg = storeTabApiSegment(tab)
+  if (!seg) {
+    return { ok: false, message: '该平台门店接口尚未接入。' }
+  }
+  return fetchBearerStoresJson(seg, token, params)
 }

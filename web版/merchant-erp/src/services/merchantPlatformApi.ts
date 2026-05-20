@@ -92,6 +92,60 @@ export type SyncResult =
   | { ok: false; message: string }
 
 /** 手动 / 定时触发的全量同步（由后端向美团或小红书拉数） */
+export type WaimaiBindPlatformId = 'eleme' | 'meituan_waimai' | 'jd_waimai'
+
+export async function postWaimaiBind(
+  platform: WaimaiBindPlatformId,
+  payload: GenericBindPayload,
+): Promise<GenericBindResult> {
+  const res = await fetch(url(`/api/merchant/${platform}/bind`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message:
+        (typeof data.message === 'string' && data.message) ||
+        (typeof data.error === 'string' && data.error) ||
+        `HTTP ${res.status}`,
+    }
+  }
+  const token = data.accessToken ?? data.token
+  if (typeof token !== 'string' || !token) {
+    return { ok: false, message: '绑定接口未返回 accessToken' }
+  }
+  return { ok: true, accessToken: token }
+}
+
+export async function postWaimaiSync(
+  platform: WaimaiBindPlatformId,
+  accessToken: string,
+): Promise<SyncResult> {
+  const res = await fetch(url(`/api/merchant/${platform}/sync`), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+  const data = await parseJson(res)
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
+    }
+  }
+  return {
+    ok: true,
+    syncedAt:
+      (typeof data.syncedAt === 'string' && data.syncedAt) ||
+      new Date().toLocaleString('zh-CN'),
+  }
+}
+
 export async function postMerchantPlatformSync(
   platform: 'meituan' | 'xhs',
   accessToken: string,

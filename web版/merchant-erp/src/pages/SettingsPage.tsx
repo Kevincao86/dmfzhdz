@@ -27,8 +27,19 @@ import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
 import SubAccountsPanel from './settings/SubAccountsPanel'
 import XhsMerchantSection from './settings/XhsMerchantSection'
+import WaimaiMerchantSection from './settings/WaimaiMerchantSection'
 import PlatformConnectionsPanel from './settings/PlatformConnectionsPanel'
-import { MERCHANT_BACKEND_PLATFORMS, PlatformBrandLogo } from '../lib/platformBranding'
+import {
+  MERCHANT_BACKEND_PLATFORMS,
+  PlatformBrandLogo,
+  WAIMAI_BACKEND_PLATFORMS,
+  type WaimaiBackendPlatformId,
+} from '../lib/platformBranding'
+import {
+  ELEME_BIND_GUIDE_STEPS,
+  JD_WAIMAI_BIND_GUIDE_STEPS,
+  MEITUAN_WAIMAI_BIND_GUIDE_STEPS,
+} from './settings/bindGuide/waimaiBindGuides'
 import { useMembership } from '../context/MembershipContext'
 import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
 
@@ -87,6 +98,7 @@ export default function SettingsPage() {
   const { plan, entitlements, reload: reloadMembership } = useMembership()
   const [tab, setTab] = useState<SettingsTabId>('platforms')
   const [merchantPlat, setMerchantPlat] = useState<'douyin' | 'meituan' | 'xhs'>('douyin')
+  const [waimaiPlat, setWaimaiPlat] = useState<WaimaiBackendPlatformId>('eleme')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
   const [subSnap, setSubSnap] = useState<
@@ -458,37 +470,76 @@ export default function SettingsPage() {
           )}
 
           {tab === 'merchant' && (
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-lg font-medium text-gray-900">商家版后台</h3>
-                <p className="text-sm text-gray-500">切换查看各平台商家后台</p>
-              </div>
-              <div className="mb-6 flex flex-wrap gap-2">
-                {MERCHANT_BACKEND_PLATFORMS.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setMerchantPlat(p.id)}
-                    className={cn(
-                      'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
-                      merchantPlat === p.id
-                        ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-                    )}
-                  >
-                    <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
-                    {p.tabName}
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-10">
+              <section className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">团购平台</h3>
+                  <p className="text-sm text-gray-500">抖音来客、美团点评、小红书等到店团购经营授权</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {MERCHANT_BACKEND_PLATFORMS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setMerchantPlat(p.id)}
+                      className={cn(
+                        'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
+                        merchantPlat === p.id
+                          ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                      )}
+                    >
+                      <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
+                      {p.tabName}
+                    </button>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-gray-200 p-6">
+                  {merchantPlat === 'douyin' && <DouyinMerchantSection />}
+                  {merchantPlat === 'meituan' && <MeituanMerchantSection />}
+                  {merchantPlat === 'xhs' && <XhsMerchantSection />}
+                </div>
+              </section>
 
-              <div className="rounded-xl border border-gray-200 p-6">
-                {merchantPlat === 'douyin' && <DouyinMerchantSection />}
-
-                {merchantPlat === 'meituan' && <MeituanMerchantSection />}
-
-                {merchantPlat === 'xhs' && <XhsMerchantSection />}
-              </div>
+              <section className="space-y-4 border-t border-gray-100 pt-8">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">外卖平台</h3>
+                  <p className="text-sm text-gray-500">
+                    淘宝闪购、美团外卖、京东外卖商家自研 OpenAPI（绑定方式同抖音来客）
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {WAIMAI_BACKEND_PLATFORMS.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setWaimaiPlat(p.id)}
+                      className={cn(
+                        'rounded-xl border px-4 py-2 text-sm font-medium transition-all',
+                        waimaiPlat === p.id
+                          ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+                      )}
+                    >
+                      {p.tabName}
+                    </button>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-gray-200 p-6">
+                  {waimaiPlat === 'eleme' && (
+                    <WaimaiMerchantSection platformId="eleme" guideSteps={[...ELEME_BIND_GUIDE_STEPS]} />
+                  )}
+                  {waimaiPlat === 'meituan_waimai' && (
+                    <WaimaiMerchantSection
+                      platformId="meituan_waimai"
+                      guideSteps={[...MEITUAN_WAIMAI_BIND_GUIDE_STEPS]}
+                    />
+                  )}
+                  {waimaiPlat === 'jd_waimai' && (
+                    <WaimaiMerchantSection platformId="jd_waimai" guideSteps={[...JD_WAIMAI_BIND_GUIDE_STEPS]} />
+                  )}
+                </div>
+              </section>
             </div>
           )}
 

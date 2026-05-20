@@ -3,20 +3,24 @@
  * 生产优先 `GET /api/meoo-finance-reconcile`，回退 `/api/merchant/finance/reconcile`。
  */
 
+import {
+  financePlatformChannel,
+  type FinancePlatformId,
+} from '../constants/merchantPlatforms'
 import { readMerchantSession } from '../lib/merchantSession'
 import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 
-export type FinancePlatformId = 'douyin' | 'meituan' | 'xhs'
+export type { FinancePlatformId }
 
 export type FinanceReconcileRow = {
   date: string
   platform: FinancePlatformId
   platformLabel: string
+  /** 团购 / 外卖，用于财务页筛选 */
+  channel?: 'groupbuy' | 'waimai'
   orderCount: number
   verifyOrderCount: number
-  /** 售卖口径金额（下单/成交额等，由平台定义） */
   salesAmountYuan: number
-  /** 核销口径金额 */
   verifyAmountYuan: number
 }
 
@@ -38,7 +42,6 @@ function responseLooksLikeHtml(text: string, contentType: string): boolean {
 
 export async function fetchFinanceReconcile(params?: {
   days?: number
-  /** 与 endDate 同时传入时优先于 days，格式 YYYY-MM-DD（上海日历日，与网关一致） */
   startDate?: string
   endDate?: string
   signal?: AbortSignal
@@ -56,7 +59,16 @@ export async function fetchFinanceReconcile(params?: {
   const douyinToken = readMerchantSession('meoo_douyin_merchant_token')
   const meituanToken = readMerchantSession('meoo_meituan_merchant_token')
   const xhsToken = readMerchantSession('meoo_xhs_merchant_token')
-  const primary = douyinToken ?? meituanToken ?? xhsToken
+  const elemeToken = readMerchantSession('meoo_eleme_merchant_token')
+  const meituanWaimaiToken = readMerchantSession('meoo_meituan_waimai_merchant_token')
+  const jdWaimaiToken = readMerchantSession('meoo_jd_waimai_merchant_token')
+  const primary =
+    douyinToken ??
+    meituanToken ??
+    xhsToken ??
+    elemeToken ??
+    meituanWaimaiToken ??
+    jdWaimaiToken
   const headers: Record<string, string> = {
     Accept: 'application/json',
   }
@@ -64,6 +76,9 @@ export async function fetchFinanceReconcile(params?: {
   if (douyinToken) headers['X-Meoo-Douyin-Token'] = douyinToken
   if (meituanToken) headers['X-Meoo-Meituan-Token'] = meituanToken
   if (xhsToken) headers['X-Meoo-Xhs-Token'] = xhsToken
+  if (elemeToken) headers['X-Meoo-Eleme-Token'] = elemeToken
+  if (meituanWaimaiToken) headers['X-Meoo-Meituan-Waimai-Token'] = meituanWaimaiToken
+  if (jdWaimaiToken) headers['X-Meoo-Jd-Waimai-Token'] = jdWaimaiToken
 
   const qs = `?${q}`
   const paths = [`/api/meoo-finance-reconcile${qs}`, `/api/merchant/finance/reconcile${qs}`]
@@ -78,75 +93,64 @@ export async function fetchFinanceReconcile(params?: {
         headers,
         signal: params?.signal,
       })
-      const text = await r.text()
-      const ct = r.headers.get('content-type') ?? ''
-      const trim = text.trim()
-      if (r.status === 404 || isLikelyRouteMiss404(r, trim, ct)) continue
-      if (r.ok && responseLooksLikeHtml(text, ct)) continue
+      bodyText = await r.text()
+      if (
+        r.status === 404 &&
+        isLikelyRouteMiss404(r, bodyText.trim(), r.headers.get('content-type') ?? '')
+      ) {
+        continue
+      }
       res = r
-      bodyText = text
       break
     }
-
     if (!res) {
-      return {
-        ok: false,
-        message: '财务对账接口 404（请部署 api/meoo-finance-reconcile）',
-      }
+      return { ok: false, message: '财务对账接口未部署' }
     }
-
+    if (responseLooksLikeHtml(bodyText, res.headers.get('content-type') ?? '')) {
+      return { ok: false, message: '财务对账接口返回了 HTML 页面，请检查部署路由。' }
+    }
     let data: Record<string, unknown> = {}
     try {
-      data = JSON.parse(bodyText || '{}') as Record<string, unknown>
+      data = JSON.parse(bodyText) as Record<string, unknown>
     } catch {
-      data = {}
+      return { ok: false, message: '财务对账响应非 JSON' }
     }
     if (!res.ok) {
-      const msg =
-        (typeof data.message === 'string' && data.message) ||
-        (typeof data.error === 'string' && data.error) ||
-        `HTTP ${res.status}`
-      return { ok: false, message: msg }
-    }
-    if (data.ok === false) {
-      return { ok: false, message: typeof data.message === 'string' ? data.message : '对账接口返回失败' }
-    }
-    const rawRows = data.rows ?? data.data
-    const rows: FinanceReconcileRow[] = []
-    if (Array.isArray(rawRows)) {
-      for (const row of rawRows) {
-        if (!row || typeof row !== 'object') continue
-        const r = row as Record<string, unknown>
-        const platform = String(r.platform ?? 'douyin').toLowerCase()
-        if (platform !== 'douyin' && platform !== 'meituan' && platform !== 'xhs') continue
-        rows.push({
-          date: String(r.date ?? '').slice(0, 10),
-          platform: platform as FinancePlatformId,
-          platformLabel: String(r.platformLabel ?? r.platform_label ?? ''),
-          orderCount: Math.max(0, Math.round(Number(r.orderCount ?? r.order_count ?? 0))),
-          verifyOrderCount: Math.max(0, Math.round(Number(r.verifyOrderCount ?? r.verify_order_count ?? 0))),
-          salesAmountYuan: Math.max(0, Number(r.salesAmountYuan ?? r.sales_amount_yuan ?? 0)),
-          verifyAmountYuan: Math.max(0, Number(r.verifyAmountYuan ?? r.verify_amount_yuan ?? 0)),
-        })
+      return {
+        ok: false,
+        message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
       }
     }
-    const fetchedAt =
-      typeof data.fetchedAt === 'string'
-        ? data.fetchedAt
-        : typeof data.fetched_at === 'string'
-          ? data.fetched_at
-          : new Date().toISOString()
-    const warningsRaw = data.warnings
-    const warnings = Array.isArray(warningsRaw)
-      ? warningsRaw.filter((x): x is string => typeof x === 'string')
-      : undefined
-    const startDate = typeof data.startDate === 'string' ? data.startDate : undefined
-    const endDate = typeof data.endDate === 'string' ? data.endDate : undefined
-    return { ok: true, rows, fetchedAt, warnings, startDate, endDate }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') {
-      return { ok: false, message: '请求已取消' }
+    const rowsRaw = data.rows
+    const rows: FinanceReconcileRow[] = Array.isArray(rowsRaw)
+      ? rowsRaw.map((row) => {
+          const r = row as Record<string, unknown>
+          const platform = String(r.platform ?? '') as FinancePlatformId
+          return {
+            date: String(r.date ?? ''),
+            platform,
+            platformLabel: String(r.platformLabel ?? r.platform ?? ''),
+            channel:
+              r.channel === 'waimai' || r.channel === 'groupbuy'
+                ? r.channel
+                : financePlatformChannel(platform),
+            orderCount: Number(r.orderCount ?? 0),
+            verifyOrderCount: Number(r.verifyOrderCount ?? 0),
+            salesAmountYuan: Number(r.salesAmountYuan ?? 0),
+            verifyAmountYuan: Number(r.verifyAmountYuan ?? 0),
+          }
+        })
+      : []
+    return {
+      ok: true,
+      rows,
+      fetchedAt: String(data.fetchedAt ?? new Date().toISOString()),
+      warnings: Array.isArray(data.warnings) ? (data.warnings as string[]) : undefined,
+      startDate: typeof data.startDate === 'string' ? data.startDate : undefined,
+      endDate: typeof data.endDate === 'string' ? data.endDate : undefined,
     }
-    return { ok: false, message: e instanceof Error ? e.message : '网络错误' }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg }
   }
 }

@@ -64,8 +64,14 @@ import {
   parseXhsReviewId,
   postXhsCommentReply,
 } from './xhsMerchantGateway.js'
+import {
+  decodeWaimaiBearer,
+  fetchWaimaiReviews,
+  tryHandleWaimaiMerchantRoute,
+  type WaimaiPlatformKey,
+} from './waimaiMerchantGateway.js'
 
-type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs'
+type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs' | WaimaiPlatformKey
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
 type ReviewRow = {
   id: string
@@ -83,12 +89,18 @@ const REVIEW_PLATFORM_LABELS: Record<ReviewPlatformApi, string> = {
   douyin: '抖音来客',
   meituan: '美团点评',
   xhs: '小红书',
+  eleme: '淘宝闪购',
+  meituan_waimai: '美团外卖',
+  jd_waimai: '京东外卖',
 }
 
 const reviewsState: Record<ReviewPlatformApi, ReviewRow[]> = {
   douyin: [],
   meituan: [],
   xhs: [],
+  eleme: [],
+  meituan_waimai: [],
+  jd_waimai: [],
 }
 
 const reviewsSyncedAt: Partial<Record<ReviewPlatformApi, string>> = {}
@@ -134,6 +146,19 @@ async function syncOneReviewPlatform(
     return {
       ok: true,
       message: `小红书：已同步 ${r.items.length} 条评价（近 90 天）。`,
+    }
+  }
+  if (p === 'eleme' || p === 'meituan_waimai' || p === 'jd_waimai') {
+    if (!bearer?.trim()) {
+      return { ok: false, message: `请先绑定${REVIEW_PLATFORM_LABELS[p]}后再同步评价。` }
+    }
+    const r = await fetchWaimaiReviews(p, bearer.trim())
+    if (r.ok === false) return { ok: false, message: r.message }
+    reviewsState[p] = r.items as ReviewRow[]
+    reviewsSyncedAt[p] = new Date().toISOString()
+    return {
+      ok: true,
+      message: `${REVIEW_PLATFORM_LABELS[p]}：已同步 ${r.items.length} 条评价。`,
     }
   }
   return { ok: false, message: '未知平台' }
@@ -191,7 +216,31 @@ function reviewPlatformBearer(req: IncomingMessage, platform: ReviewPlatformApi)
     if (auth && decodeXhsSessionToken(auth)) return auth
     return null
   }
+  if (platform === 'eleme' || platform === 'meituan_waimai' || platform === 'jd_waimai') {
+    const header =
+      platform === 'eleme'
+        ? 'x-meoo-eleme-token'
+        : platform === 'meituan_waimai'
+          ? 'x-meoo-meituan-waimai-token'
+          : 'x-meoo-jd-waimai-token'
+    const tok = headerBearerToken(req, header)
+    if (tok) return tok
+    const auth = bearerToken(req)
+    if (auth && decodeWaimaiBearer(platform, auth)) return auth
+    return null
+  }
   return bearerToken(req)
+}
+
+function isReviewPlatformApi(s: string): s is ReviewPlatformApi {
+  return (
+    s === 'douyin' ||
+    s === 'meituan' ||
+    s === 'xhs' ||
+    s === 'eleme' ||
+    s === 'meituan_waimai' ||
+    s === 'jd_waimai'
+  )
 }
 
 export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContext): Promise<boolean> {
@@ -211,6 +260,25 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           env: env as MerchantAiEnv,
         })
         if (videoDone) return true
+      }
+
+      if (pathname.startsWith('/api/merchant/eleme/') ||
+        pathname.startsWith('/api/merchant/meituan_waimai/') ||
+        pathname.startsWith('/api/merchant/jd_waimai/') ||
+        pathname === '/api/merchant/eleme/bind' ||
+        pathname === '/api/merchant/meituan_waimai/bind' ||
+        pathname === '/api/merchant/jd_waimai/bind') {
+        let bodyWaimai = ''
+        if (method === 'POST') bodyWaimai = await bodyReader()
+        const waimaiDone = await tryHandleWaimaiMerchantRoute({
+          method,
+          pathname,
+          req,
+          res,
+          url,
+          bodyRaw: bodyWaimai,
+        })
+        if (waimaiDone) return true
       }
 
       if (method === 'GET' && pathname === '/api/merchant/marketing/activities') {
@@ -639,8 +707,11 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         const platform = (url.searchParams.get('platform') ?? 'douyin').trim() as ReviewPlatformApi
         const sentiment = (url.searchParams.get('sentiment') ?? 'all').trim()
         const replyStatus = (url.searchParams.get('replyStatus') ?? 'all').trim()
-        if (platform !== 'douyin' && platform !== 'meituan' && platform !== 'xhs') {
-          json(res, 400, { message: 'Query platform 须为 douyin | meituan | xhs' })
+        if (!isReviewPlatformApi(platform)) {
+          json(res, 400, {
+            message:
+              'Query platform 须为 douyin | meituan | xhs | eleme | meituan_waimai | jd_waimai',
+          })
           return true
         }
         let rows = [...reviewsState[platform]]
@@ -676,14 +747,21 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         let scope: ReviewPlatformApi | 'all' = 'all'
         try {
           const j = JSON.parse(bodyRaw || '{}') as { platform?: string }
-          if (j.platform === 'douyin' || j.platform === 'meituan' || j.platform === 'xhs') scope = j.platform
+          if (j.platform && isReviewPlatformApi(j.platform)) scope = j.platform
         } catch {
           json(res, 400, { message: '请求体须为 JSON' })
           return true
         }
         const parts: string[] = []
         if (scope === 'all') {
-          for (const pl of ['douyin', 'meituan', 'xhs'] as const) {
+          for (const pl of [
+            'douyin',
+            'meituan',
+            'xhs',
+            'eleme',
+            'meituan_waimai',
+            'jd_waimai',
+          ] as const) {
             const r = await syncOneReviewPlatform(pl, reviewPlatformBearer(req, pl))
             if (r.ok === false && pl === 'douyin') {
               json(res, 502, { ok: false, message: r.message })
@@ -718,11 +796,14 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             reviewId?: string
             content?: string
           }
-          if (j.platform !== 'douyin' && j.platform !== 'meituan' && j.platform !== 'xhs') {
-            json(res, 400, { message: 'platform 须为 douyin | meituan | xhs' })
+          if (!isReviewPlatformApi(j.platform ?? '')) {
+            json(res, 400, {
+              message:
+                'platform 须为 douyin | meituan | xhs | eleme | meituan_waimai | jd_waimai',
+            })
             return true
           }
-          platform = j.platform
+          platform = j.platform as ReviewPlatformApi
           reviewId = typeof j.reviewId === 'string' ? j.reviewId : ''
           content = typeof j.content === 'string' ? j.content.trim() : ''
         } catch {
@@ -848,7 +929,31 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           })
           return true
         }
-        json(res, 400, { message: 'platform 须为 douyin | meituan | xhs' })
+        if (platform === 'eleme' || platform === 'meituan_waimai' || platform === 'jd_waimai') {
+          const row = reviewsState[platform].find((r) => r.id === reviewId)
+          if (row) {
+            row.replied = true
+            row.replyText = content
+            json(res, 200, { ok: true, item: row })
+            return true
+          }
+          json(res, 200, {
+            ok: true,
+            item: {
+              id: reviewId,
+              platform,
+              sentiment: 'good',
+              userName: '',
+              ratingStars: 0,
+              content: '',
+              createdAt: new Date().toISOString(),
+              replied: true,
+              replyText: content,
+            },
+          })
+          return true
+        }
+        json(res, 400, { message: '未知评价平台' })
         return true
       }
 
@@ -858,11 +963,14 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         let reviewId: string
         try {
           const j = JSON.parse(bodyRaw || '{}') as { platform?: string; reviewId?: string }
-          if (j.platform !== 'douyin' && j.platform !== 'meituan' && j.platform !== 'xhs') {
-            json(res, 400, { message: 'platform 须为 douyin | meituan | xhs' })
+          if (!isReviewPlatformApi(j.platform ?? '')) {
+            json(res, 400, {
+              message:
+                'platform 须为 douyin | meituan | xhs | eleme | meituan_waimai | jd_waimai',
+            })
             return true
           }
-          platform = j.platform
+          platform = j.platform as ReviewPlatformApi
           reviewId = typeof j.reviewId === 'string' ? j.reviewId : ''
         } catch {
           json(res, 400, { message: '请求体须为 JSON：{ platform, reviewId }' })

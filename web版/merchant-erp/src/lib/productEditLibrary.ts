@@ -16,7 +16,14 @@ export type ProductEditLibraryRow = {
   status: string
   price: number
   /** 与 `CreatePlatformId` 一致，用于商品列表按平台 Tab 过滤 */
-  platformApi?: 'douyin' | 'meituan' | 'xiaohongshu' | 'jd'
+  platformApi?:
+    | 'douyin'
+    | 'meituan'
+    | 'xiaohongshu'
+    | 'jd'
+    | 'eleme'
+    | 'meituan_waimai'
+    | 'jd_waimai'
 }
 
 /** 商品列表/创建页「草稿」状态，用于 Brief 向导等拉取本地草稿箱 */
