@@ -1,8 +1,10 @@
-import { ChevronDown, ImagePlus, Loader2, Mic, Send } from 'lucide-react'
+import { ChevronDown, Film, ImagePlus, Loader2, Mic, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
+import type { AiComposerAttachment } from '../lib/aiAgentTypes'
 import { shouldSubmitComposerOnEnter } from '../lib/composerEnterKey'
+import { isComposerImageFile, isComposerVideoFile } from '../lib/aiVideoPoster'
 
 type Layout = 'centered' | 'dock'
 type ModelFilterTab = 'all' | 'chat' | 'image'
@@ -13,7 +15,10 @@ const FILTER_TABS: { id: ModelFilterTab; label: string; short: string }[] = [
   { id: 'image', label: '文生图 / 图生图', short: '生图' },
 ]
 
-function readImageFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
+const MEDIA_ACCEPT =
+  'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm'
+
+function readMediaFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
   const out: File[] = []
   const items = ev.clipboardData?.items
   if (!items) return out
@@ -21,7 +26,7 @@ function readImageFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElemen
     const it = items[i]
     if (it?.kind === 'file') {
       const f = it.getAsFile()
-      if (f && /^image\//i.test(f.type)) out.push(f)
+      if (f && (isComposerImageFile(f) || isComposerVideoFile(f))) out.push(f)
     }
   }
   return out
@@ -55,6 +60,44 @@ function useClickOutside(refs: React.RefObject<HTMLElement | null>[], onOutside:
   }, [refs, onOutside, active])
 }
 
+function AttachmentPreview({
+  att,
+  onRemove,
+}: {
+  att: AiComposerAttachment
+  onRemove: () => void
+}) {
+  return (
+    <div className="group relative">
+      {att.kind === 'image' ? (
+        <img src={att.url} alt="" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" />
+      ) : (
+        <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-zinc-900">
+          <video
+            src={att.previewUrl}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+          />
+          <span className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-0.5 bg-black/55 py-0.5 text-[9px] text-white">
+            <Film className="h-3 w-3" />
+            视频
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white opacity-0 shadow group-hover:opacity-100"
+        aria-label="移除附件"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
 export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const {
     inputDraft,
@@ -65,10 +108,9 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     modelPickerOptions,
     aiSending,
     pendingPreviewId,
-    pendingComposerImages,
-    addComposerImages,
-    addComposerImageFiles,
-    removeComposerImage,
+    pendingComposerAttachments,
+    addComposerMediaFiles,
+    removeComposerAttachment,
     pendingQuote,
     clearPendingQuote,
   } = useAiAgent()
@@ -155,6 +197,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const rows = layout === 'centered' ? 4 : 2
   const disabled = Boolean(pendingPreviewId)
   const modelShort = shortModelLabel(currentModel?.label ?? '模型')
+  const attachmentFull = pendingComposerAttachments.length >= 4
 
   return (
     <div
@@ -166,11 +209,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
       <input
         ref={fileRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept={MEDIA_ACCEPT}
         multiple
         className="hidden"
         onChange={(e) => {
-          void addComposerImages(e.target.files).finally(() => {
+          void addComposerMediaFiles(e.target.files).finally(() => {
             if (fileRef.current) fileRef.current.value = ''
           })
         }}
@@ -195,20 +238,14 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           </div>
         ) : null}
 
-        {pendingComposerImages.length > 0 ? (
+        {pendingComposerAttachments.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-2">
-            {pendingComposerImages.map((src, i) => (
-              <div key={i} className="group relative">
-                <img src={src} alt="" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" />
-                <button
-                  type="button"
-                  onClick={() => removeComposerImage(i)}
-                  className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white opacity-0 shadow group-hover:opacity-100"
-                  aria-label="移除图片"
-                >
-                  ×
-                </button>
-              </div>
+            {pendingComposerAttachments.map((att, i) => (
+              <AttachmentPreview
+                key={`${att.kind}-${i}`}
+                att={att}
+                onRemove={() => removeComposerAttachment(i)}
+              />
             ))}
           </div>
         ) : null}
@@ -217,10 +254,10 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           value={inputDraft}
           onChange={(e) => setInputDraft(e.target.value)}
           onPaste={(e) => {
-            const files = readImageFilesFromClipboard(e)
+            const files = readMediaFilesFromClipboard(e)
             if (!files.length) return
             e.preventDefault()
-            void addComposerImageFiles(files)
+            void addComposerMediaFiles(files)
           }}
           onCompositionStart={() => {
             imeComposingRef.current = true
@@ -238,8 +275,8 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           disabled={disabled}
           placeholder={
             modelFilter === 'image'
-              ? '文生图：描述画面；图生图：先上传参考图再写修改要求…'
-              : '描述你想完成的任务，或输入 @ 提及页面要点；可直接粘贴截图（Ctrl+V）…'
+              ? '文生图：描述画面；图生图：先上传参考图/视频首帧再写修改要求…'
+              : '描述你想完成的任务；可上传图片或视频（视频将提取首帧供模型理解），也可粘贴截图…'
           }
           className={cn(
             'w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-50',
@@ -251,11 +288,11 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2 py-2 sm:px-3">
         <button
           type="button"
-          disabled={disabled || aiSending || pendingComposerImages.length >= 4}
+          disabled={disabled || aiSending || attachmentFull}
           onClick={() => fileRef.current?.click()}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white disabled:opacity-40"
-          title="上传或粘贴截图（最多 4 张）"
-          aria-label="上传图片"
+          title="上传图片或视频（最多 4 个，视频单文件 ≤100MB）"
+          aria-label="上传图片或视频"
         >
           <ImagePlus className="h-4 w-4" />
         </button>
@@ -373,7 +410,9 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
             type="button"
             onClick={() => sendUserText(inputDraft)}
             disabled={
-              (!inputDraft.trim() && pendingComposerImages.length === 0 && !pendingQuote) ||
+              (!inputDraft.trim() &&
+                pendingComposerAttachments.length === 0 &&
+                !pendingQuote) ||
               aiSending ||
               disabled
             }

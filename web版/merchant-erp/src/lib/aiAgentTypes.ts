@@ -100,6 +100,11 @@ export type AiTaskPreviewPayload = {
   recruitmentBrief?: AiRecruitmentBriefPreview
 }
 
+/** 输入框待发送附件：图片或本地视频（视频另带首帧 poster 供模型理解） */
+export type AiComposerAttachment =
+  | { kind: 'image'; url: string }
+  | { kind: 'video'; previewUrl: string; posterUrl: string; name: string }
+
 /** 输入框中待发送的「引用某条对话」片段（发送后写入用户消息正文前缀） */
 export type AiAgentPendingQuote = {
   quotedMessageId: string
@@ -112,8 +117,10 @@ export type AiAgentMessage = {
   role: AiAgentMessageRole
   content: string
   createdAt: number
-  /** 用户消息附带的截图预览（data URL） */
+  /** 用户消息附带的图片或视频首帧预览（data URL） */
   imageUrls?: string[]
+  /** 用户消息附带的本地视频预览（blob URL，刷新后可能失效） */
+  videoUrls?: string[]
   /** 待确认的执行预览（仅 task_preview 使用） */
   preview?: AiTaskPreviewPayload
   /** 任务完成摘要（仅 task_result） */
@@ -147,7 +154,7 @@ function newId(): string {
 export function createAgentMessage(
   role: AiAgentMessageRole,
   content: string,
-  extra?: Partial<Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'imageUrls'>>,
+  extra?: Partial<Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'imageUrls' | 'videoUrls'>>,
 ): AiAgentMessage {
   return {
     id: newId(),

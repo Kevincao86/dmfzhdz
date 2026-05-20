@@ -5,12 +5,14 @@ import {
   Download,
   ExternalLink,
   Film,
+  Link2,
   Loader2,
   Plus,
   Sparkles,
   Trash2,
+  Upload,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../cn'
 import {
   downloadIceExportBlob,
@@ -18,6 +20,7 @@ import {
   fetchIceJobStatus,
   ICE_ASPECT_PRESETS,
   postIcePipeline,
+  uploadIceLocalVideoFile,
   type IceBatchJob,
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
@@ -61,8 +64,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [editBrief, setEditBrief] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [aspectId, setAspectId] = useState<(typeof ICE_ASPECT_PRESETS)[number]['id']>('9:16')
   const [clipEndSec, setClipEndSec] = useState(10)
@@ -79,7 +84,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
   const briefOk = editBrief.trim().length >= 4
-  const canSubmit = cfg?.configured && pendingCount > 0 && briefOk && !busy
+  const canSubmit = cfg?.configured && pendingCount > 0 && briefOk && !busy && !uploading
 
   useEffect(() => {
     void fetchAliyunIceCloudConfig().then((c) => {
@@ -107,6 +112,47 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     setUrlText('')
     setHint(`已加入 ${urls.length} 条素材，填写剪辑指令后即可提交`)
   }, [urlText])
+
+  const handleLocalFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files?.length || uploading || busy) return
+      if (!cfg?.localUploadEnabled) {
+        setErr('本地上传不可用：请运营在「短视频 API」配置 OSS 成片 URL 前缀（与您的 Bucket 一致）。')
+        return
+      }
+      setUploading(true)
+      setErr(null)
+      let added = 0
+      for (const file of Array.from(files)) {
+        const isVideo =
+          file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name)
+        if (!isVideo) {
+          setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
+          continue
+        }
+        const r = await uploadIceLocalVideoFile(file)
+        if (!r.ok) {
+          setErr(r.message)
+          continue
+        }
+        setJobs((prev) => [
+          ...prev,
+          {
+            id: newJobId(),
+            label: r.label.slice(0, 40),
+            mediaUrl: r.mediaUrl,
+            phase: 'pending' as const,
+          },
+        ])
+        added += 1
+      }
+      setUploading(false)
+      if (added > 0) {
+        setHint(`已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`)
+      }
+    },
+    [uploading, busy, cfg?.localUploadEnabled],
+  )
 
   const appendLastResult = useCallback(() => {
     const u = lastResultUrl?.trim()
@@ -245,7 +291,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       {/* 流程指引 */}
       <ol className="grid gap-3 sm:grid-cols-3">
         {[
-          { n: 1, title: '添加素材', sub: '必填 · 公网 HTTPS 视频地址' },
+          { n: 1, title: '添加素材', sub: '必填 · 本地上传或 HTTPS 链接' },
           { n: 2, title: '填写剪辑指令', sub: '必填 · 描述风格与包装要求' },
           { n: 3, title: '提交并下载', sub: '成片出现在右侧输出区' },
         ].map((s) => (
@@ -273,20 +319,69 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               step={1}
               title="素材来源"
               required
-              hint="每行一条公网 HTTPS 链接；也可使用本页上一段 AI 生成的成片"
+              hint="推荐本地上传（写入您已开通的 OSS）；亦可粘贴公网 HTTPS 链接或使用上一段 AI 成片"
             />
-            <div className="space-y-3 px-5 pb-5">
+            <div className="space-y-4 px-5 pb-5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm"
+                multiple
+                className="hidden"
+                disabled={busy || uploading}
+                onChange={(e) => {
+                  void handleLocalFiles(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+              <button
+                type="button"
+                disabled={busy || uploading || !cfg?.localUploadEnabled}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  'flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition',
+                  cfg?.localUploadEnabled
+                    ? 'border-orange-300 bg-orange-50/50 hover:border-orange-400 hover:bg-orange-50'
+                    : 'cursor-not-allowed border-zinc-200 bg-zinc-50 opacity-60',
+                )}
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
+                    <span className="text-sm font-medium text-zinc-800">正在上传到 OSS…</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-orange-600" />
+                    <span className="text-sm font-semibold text-zinc-900">本地上传视频</span>
+                    <span className="text-xs text-zinc-500">
+                      支持 MP4 / MOV 等，单文件 ≤ 500MB
+                      {!cfg?.localUploadEnabled ? '（需配置 OSS URL 前缀）' : ''}
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-3 text-xs text-zinc-400">
+                <span className="h-px flex-1 bg-zinc-200" />
+                <span className="flex items-center gap-1">
+                  <Link2 className="h-3.5 w-3.5" />
+                  或使用链接
+                </span>
+                <span className="h-px flex-1 bg-zinc-200" />
+              </div>
+
               <textarea
                 value={urlText}
-                disabled={busy}
+                disabled={busy || uploading}
                 onChange={(e) => setUrlText(e.target.value)}
                 placeholder={'https://your-cdn.com/shop-tour-01.mp4\nhttps://your-cdn.com/shop-tour-02.mp4'}
-                className="min-h-[100px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                className="min-h-[88px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
               />
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || uploading}
                   onClick={addUrlsFromText}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
@@ -296,7 +391,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {lastResultUrl ? (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy || uploading}
                     onClick={appendLastResult}
                     className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
                   >
@@ -565,18 +660,25 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 function ServiceBadge({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
   const ready = cfg?.configured && (cfg.hasOssOutput || cfg.hasVodOutput)
   return (
-    <span
-      className={cn(
-        'rounded-full px-3 py-1.5 text-xs font-medium',
-        ready
-          ? 'bg-emerald-100 text-emerald-900'
-          : cfg?.configured
-            ? 'bg-amber-100 text-amber-900'
-            : 'bg-red-100 text-red-900',
-      )}
-    >
-      {ready ? '服务就绪' : cfg?.configured ? '待配置输出存储' : '未配置凭据'}
-    </span>
+    <div className="flex flex-col items-end gap-1">
+      <span
+        className={cn(
+          'rounded-full px-3 py-1.5 text-xs font-medium',
+          ready
+            ? 'bg-emerald-100 text-emerald-900'
+            : cfg?.configured
+              ? 'bg-amber-100 text-amber-900'
+              : 'bg-red-100 text-red-900',
+        )}
+      >
+        {ready ? '服务就绪' : cfg?.configured ? '待配置输出存储' : '未配置凭据'}
+      </span>
+      {cfg?.localUploadEnabled ? (
+        <span className="text-[11px] text-emerald-700">本地上传已开启</span>
+      ) : cfg?.configured ? (
+        <span className="text-[11px] text-zinc-500">本地上传需 OSS 前缀</span>
+      ) : null}
+    </div>
   )
 }
 
@@ -644,6 +746,11 @@ function ConfigFootnote({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
     <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
       墨典AI云剪由智能媒体服务提供算力；凭据由运营在管控台维护。
       {cfg.regionId ? ` 地域 ${cfg.regionId}。` : ''}
+      {cfg.localUploadEnabled ? (
+        <span className="mt-1 block text-zinc-600">
+          本地上传写入 OSS 的 source/ 目录，云剪完成后在右侧下载成片。
+        </span>
+      ) : null}
       {!cfg.hasOssOutput && !cfg.hasVodOutput && cfg.configured ? (
         <span className="mt-1 block text-amber-700">
           运营还需配置点播存储或 OSS 输出前缀，否则无法生成成片。
