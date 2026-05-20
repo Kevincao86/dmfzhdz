@@ -30,6 +30,14 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-merchant-ai-video-ice-upload.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-merchant-ai-video-ice-multipart.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 120
+    },
     "api/meoo-marketing-activities.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60

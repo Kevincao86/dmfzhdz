@@ -115,6 +115,163 @@ export async function handleAliyunIceRoutes(input: {
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/ice/upload') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const fileName = String(parsed.fileName ?? 'video.mp4').trim() || 'video.mp4'
+    const contentType = String(parsed.contentType ?? 'video/mp4').trim() || 'video/mp4'
+    const contentBase64 = typeof parsed.contentBase64 === 'string' ? parsed.contentBase64.trim() : ''
+    if (!contentBase64) {
+      json(res, 400, { ok: false, message: '缺少 contentBase64' })
+      return true
+    }
+    const { resolveIceServerUploadMaxBytes, putIceSourceObject } = await import('./aliyunOssIceUpload.js')
+    const maxBytes = resolveIceServerUploadMaxBytes()
+    const approxBytes = Math.ceil((contentBase64.length * 3) / 4)
+    if (approxBytes > maxBytes) {
+      json(res, 400, {
+        ok: false,
+        message: `单请求超过 ${Math.floor(maxBytes / (1024 * 1024))}MB，请由前端自动走分片上传；若仍失败可改用 HTTPS 链接添加素材。`,
+      })
+      return true
+    }
+    let buf: Buffer
+    try {
+      buf = Buffer.from(contentBase64, 'base64')
+    } catch {
+      json(res, 400, { ok: false, message: 'contentBase64 非法' })
+      return true
+    }
+    const put = await putIceSourceObject(cfg, rawEnv as Record<string, string | undefined>, {
+      fileName,
+      contentType,
+      buffer: buf,
+    })
+    if (!put.ok) {
+      json(res, 400, { ok: false, message: put.message })
+      return true
+    }
+    json(res, 200, {
+      ok: true,
+      mediaUrl: put.mediaUrl,
+      objectKey: put.objectKey,
+      label: fileName.replace(/\.[^.]+$/, '') || fileName,
+    })
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/ice/multipart') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const step = String(parsed.step ?? '').trim()
+    const envMap = rawEnv as Record<string, string | undefined>
+    const {
+      ICE_UPLOAD_CHUNK_BYTES,
+      initIceMultipartUpload,
+      uploadIceMultipartPart,
+      completeIceMultipartUpload,
+    } = await import('./aliyunOssIceUpload.js')
+
+    if (step === 'init') {
+      const fileName = String(parsed.fileName ?? 'video.mp4').trim() || 'video.mp4'
+      const contentType = String(parsed.contentType ?? 'video/mp4').trim() || 'video/mp4'
+      const sizeBytes = Number(parsed.sizeBytes ?? 0)
+      const init = await initIceMultipartUpload(cfg, envMap, { fileName, contentType, sizeBytes })
+      if (!init.ok) {
+        json(res, 400, { ok: false, message: init.message })
+        return true
+      }
+      json(res, 200, {
+        ok: true,
+        uploadId: init.uploadId,
+        objectKey: init.objectKey,
+        partSize: init.partSize,
+        partCount: init.partCount,
+      })
+      return true
+    }
+
+    if (step === 'part') {
+      const objectKey = String(parsed.objectKey ?? '').trim()
+      const uploadId = String(parsed.uploadId ?? '').trim()
+      const partNumber = Number(parsed.partNumber ?? 0)
+      const contentBase64 = typeof parsed.contentBase64 === 'string' ? parsed.contentBase64.trim() : ''
+      if (!objectKey || !uploadId || !contentBase64) {
+        json(res, 400, { ok: false, message: '缺少 objectKey、uploadId 或 contentBase64' })
+        return true
+      }
+      const approxBytes = Math.ceil((contentBase64.length * 3) / 4)
+      if (approxBytes > ICE_UPLOAD_CHUNK_BYTES + 256 * 1024) {
+        json(res, 400, { ok: false, message: '单片过大' })
+        return true
+      }
+      let buf: Buffer
+      try {
+        buf = Buffer.from(contentBase64, 'base64')
+      } catch {
+        json(res, 400, { ok: false, message: 'contentBase64 非法' })
+        return true
+      }
+      const part = await uploadIceMultipartPart(cfg, envMap, {
+        objectKey,
+        uploadId,
+        partNumber,
+        buffer: buf,
+      })
+      if (!part.ok) {
+        json(res, 400, { ok: false, message: part.message })
+        return true
+      }
+      json(res, 200, { ok: true, etag: part.etag, partNumber })
+      return true
+    }
+
+    if (step === 'complete') {
+      const objectKey = String(parsed.objectKey ?? '').trim()
+      const uploadId = String(parsed.uploadId ?? '').trim()
+      const fileName = String(parsed.fileName ?? 'video.mp4').trim() || 'video.mp4'
+      const partsRaw = parsed.parts
+      if (!objectKey || !uploadId || !Array.isArray(partsRaw)) {
+        json(res, 400, { ok: false, message: '缺少 objectKey、uploadId 或 parts' })
+        return true
+      }
+      const parts = partsRaw
+        .map((p) => {
+          const row = p as Record<string, unknown>
+          return {
+            partNumber: Number(row.partNumber ?? 0),
+            etag: String(row.etag ?? '').trim(),
+          }
+        })
+        .filter((p) => p.partNumber >= 1 && p.etag)
+      const done = await completeIceMultipartUpload(cfg, envMap, { objectKey, uploadId, parts })
+      if (!done.ok) {
+        json(res, 400, { ok: false, message: done.message })
+        return true
+      }
+      json(res, 200, {
+        ok: true,
+        mediaUrl: done.mediaUrl,
+        objectKey: done.objectKey,
+        label: fileName.replace(/\.[^.]+$/, '') || fileName,
+      })
+      return true
+    }
+
+    json(res, 400, { ok: false, message: 'step 须为 init、part 或 complete' })
+    return true
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/ai/video/ice/upload-init') {
     let parsed: Record<string, unknown>
     try {
