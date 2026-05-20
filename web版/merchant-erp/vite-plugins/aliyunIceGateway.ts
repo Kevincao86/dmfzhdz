@@ -94,7 +94,7 @@ export async function handleAliyunIceRoutes(input: {
       presets: ICE_EFFECT_PRESETS.map((p) => p.label),
       effectOptions: ICE_EFFECT_PRESETS,
       credentialNote:
-        '阿里云 ICE 的 AppId、AccessKey ID、AccessKey Secret 由运营在「AI模型 → 短视频 API」维护；成片输出需配置点播存储地址或 OSS URL 前缀。',
+        '墨典AI云剪（阿里云 ICE）的 AppId、AccessKey 由运营在「AI模型 → 短视频 API」维护；成片输出需配置点播存储地址或 OSS URL 前缀。',
       docsUrl:
         'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview',
     })
@@ -130,11 +130,13 @@ export async function handleAliyunIceRoutes(input: {
     const effect =
       ICE_EFFECT_PRESETS.find((p) => p.label === presetLabel || p.id === presetLabel) ??
       ICE_EFFECT_PRESETS[0]
-    const projectName = String(parsed.projectName ?? '墨典云剪').trim().slice(0, 120)
+    const projectName = String(parsed.projectName ?? '墨典AI云剪').trim().slice(0, 120)
+    const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
     const out = await iceRunSinglePipeline(cfg, {
       mediaUrl,
       projectName,
+      editBrief,
       width,
       height,
       clipEndSec,

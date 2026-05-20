@@ -76,6 +76,8 @@ export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig 
 export async function postIcePipeline(body: {
   mediaUrl: string
   projectName?: string
+  /** 剪辑文案指令，写入云端项目描述 */
+  editBrief?: string
   width: number
   height: number
   clipEndSec: number

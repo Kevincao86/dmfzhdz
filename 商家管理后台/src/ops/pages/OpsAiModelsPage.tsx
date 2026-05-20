@@ -651,7 +651,7 @@ export default function OpsAiModelsPage() {
             />
           </div>
           <div className="md:col-span-2 border-t border-slate-800 pt-4">
-            <p className="mb-3 text-xs font-medium text-cyan-400/90">阿里云 ICE · AI 批量云剪</p>
+            <p className="mb-3 text-xs font-medium text-cyan-400/90">墨典AI云剪 · 服务凭据</p>
             <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
               智能媒体服务云剪辑（ICE 2020-11-09）。商户 ERP 批量云剪经 BFF 调用，密钥仅存服务端与注册表。
             </p>
