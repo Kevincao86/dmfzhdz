@@ -11,6 +11,7 @@ import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js
 import {
   ICE_EFFECT_PRESETS,
   iceGetProducingJob,
+  iceRunImagesPipeline,
   iceRunSinglePipeline,
   mergeAliyunIceConfig,
   readAliyunIceConfigFromEnv,
@@ -320,11 +321,13 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 400, { ok: false, message: '请求体必须为 JSON' })
       return true
     }
+    const imageUrlsRaw = parsed.imageUrls
+    const imageUrls = Array.isArray(imageUrlsRaw)
+      ? imageUrlsRaw
+          .map((u) => String(u ?? '').trim())
+          .filter((u) => /^https?:\/\//i.test(u))
+      : []
     const mediaUrl = String(parsed.mediaUrl ?? '').trim()
-    if (!mediaUrl || !/^https?:\/\//i.test(mediaUrl)) {
-      json(res, 400, { ok: false, message: 'mediaUrl 须为公网可访问的 http(s) 音视频地址' })
-      return true
-    }
     const width = Math.min(4096, Math.max(128, Number(parsed.width) || 1080))
     const height = Math.min(4096, Math.max(128, Number(parsed.height) || 1920))
     const clipEndSec = Math.min(120, Math.max(1, Number(parsed.clipEndSec) || 10))
@@ -335,15 +338,28 @@ export async function handleAliyunIceRoutes(input: {
     const projectName = String(parsed.projectName ?? '墨典AI云剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
-    const out = await iceRunSinglePipeline(cfg, {
-      mediaUrl,
-      projectName,
-      editBrief,
-      width,
-      height,
-      clipEndSec,
-      effectId: effect.id,
-    })
+    const out =
+      imageUrls.length > 0
+        ? await iceRunImagesPipeline(cfg, {
+            imageUrls,
+            projectName,
+            editBrief,
+            width,
+            height,
+            secPerImage: Math.min(30, Math.max(0.5, clipEndSec)),
+            effectId: effect.id,
+          })
+        : mediaUrl && /^https?:\/\//i.test(mediaUrl)
+          ? await iceRunSinglePipeline(cfg, {
+              mediaUrl,
+              projectName,
+              editBrief,
+              width,
+              height,
+              clipEndSec,
+              effectId: effect.id,
+            })
+          : { ok: false as const, message: '请提供 mediaUrl 或 imageUrls（公网 https 图片）', step: 'validate' }
     if (!out.ok) {
       const clientErr = /InvalidParameter|MissingParameter/i.test(out.message)
       json(res, clientErr ? 400 : 502, { ok: false, message: out.message, step: out.step })

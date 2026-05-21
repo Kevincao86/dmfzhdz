@@ -5,12 +5,14 @@ import {
   Download,
   ExternalLink,
   Film,
+  ImagePlus,
   Link2,
   Loader2,
   Plus,
   Sparkles,
   Trash2,
   Upload,
+  Zap,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../cn'
@@ -22,7 +24,7 @@ import {
   fetchIceJobStatus,
   ICE_ASPECT_PRESETS,
   postIcePipeline,
-  uploadIceLocalVideoFile,
+  uploadIceLocalMediaFile,
   type IceBatchJob,
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
@@ -56,6 +58,29 @@ function parseUrlLines(text: string): string[] {
     .filter((s) => /^https?:\/\//i.test(s))
 }
 
+const IMAGE_URL_RE = /\.(jpe?g|png|webp|gif|bmp|heic)(\?|#|$)/i
+
+function parseImageUrlLines(text: string): string[] {
+  return parseUrlLines(text).filter((s) => IMAGE_URL_RE.test(s) || /\/image\//i.test(s))
+}
+
+function isImageFile(file: File): boolean {
+  return (
+    file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name)
+  )
+}
+
+function isVideoFile(file: File): boolean {
+  return file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name)
+}
+
+type IceImageItem = {
+  id: string
+  label: string
+  mediaUrl: string
+  previewUrl?: string
+}
+
 function formatProgress(p?: number): string {
   if (p == null || Number.isNaN(p)) return ''
   const n = p <= 1 ? Math.round(p * 100) : Math.round(p)
@@ -69,6 +94,8 @@ type Props = {
 export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [cfg, setCfg] = useState<AliyunIceCloudConfig | null>(null)
   const [urlText, setUrlText] = useState('')
+  const [imageUrlText, setImageUrlText] = useState('')
+  const [imageItems, setImageItems] = useState<IceImageItem[]>([])
   const [editBrief, setEditBrief] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [busy, setBusy] = useState(false)
@@ -78,6 +105,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const imageFileInputRef = useRef<HTMLInputElement>(null)
+  const imagePreviewUrlsRef = useRef<string[]>([])
   const previewBlobRef = useRef<string | null>(null)
 
   const [aspectId, setAspectId] = useState<(typeof ICE_ASPECT_PRESETS)[number]['id']>('9:16')
@@ -102,12 +131,27 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
   const briefOk = editBrief.trim().length >= 4
   const canSubmit = cfg?.configured && pendingCount > 0 && briefOk && !busy && !uploading
+  const canOneClickImages =
+    cfg?.configured && imageItems.length > 0 && briefOk && !busy && !uploading
 
   useEffect(() => {
     void fetchAliyunIceCloudConfig().then((c) => {
       setCfg(c)
       if (c?.presets?.[0]) setPreset(c.presets[0])
     })
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      for (const u of imagePreviewUrlsRef.current) {
+        try {
+          URL.revokeObjectURL(u)
+        } catch {
+          /* ignore */
+        }
+      }
+      imagePreviewUrlsRef.current = []
+    }
   }, [])
 
   const addUrlsFromText = useCallback(() => {
@@ -154,13 +198,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr(null)
       let added = 0
       for (const file of Array.from(files)) {
-        const isVideo =
-          file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name)
-        if (!isVideo) {
+        if (!isVideoFile(file)) {
           setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
           continue
         }
-        const r = await uploadIceLocalVideoFile(file)
+        const r = await uploadIceLocalMediaFile(file)
         if (!r.ok) {
           setErr(r.message)
           continue
@@ -183,6 +225,92 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     },
     [uploading, busy, cfg?.localUploadEnabled],
   )
+
+  const openImageFilePicker = useCallback(() => {
+    if (busy || uploading) return
+    if (!cfg?.localUploadEnabled) {
+      setErr(
+        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
+      )
+      return
+    }
+    imageFileInputRef.current?.click()
+  }, [busy, uploading, cfg?.localUploadEnabled])
+
+  const handleLocalImages = useCallback(
+    async (files: FileList | null) => {
+      if (!files?.length || uploading || busy) return
+      if (!cfg?.localUploadEnabled) {
+        setErr('本地上传尚未开启，请先配置 OSS 前缀。')
+        return
+      }
+      setUploading(true)
+      setErr(null)
+      let added = 0
+      for (const file of Array.from(files)) {
+        if (!isImageFile(file)) {
+          setErr(`「${file.name}」不是支持的图片格式（jpg/png/webp 等）`)
+          continue
+        }
+        const r = await uploadIceLocalMediaFile(file)
+        if (!r.ok) {
+          setErr(r.message)
+          continue
+        }
+        const previewUrl = URL.createObjectURL(file)
+        imagePreviewUrlsRef.current.push(previewUrl)
+        setImageItems((prev) => [
+          ...prev,
+          {
+            id: newJobId(),
+            label: r.label.slice(0, 32),
+            mediaUrl: r.mediaUrl,
+            previewUrl,
+          },
+        ])
+        added += 1
+      }
+      setUploading(false)
+      if (added > 0) {
+        setHint(`已上传 ${added} 张图片，填写剪辑指令后点击「一键成片」。`)
+      }
+    },
+    [uploading, busy, cfg?.localUploadEnabled],
+  )
+
+  const addImageUrlsFromText = useCallback(() => {
+    const urls = parseImageUrlLines(imageUrlText)
+    if (urls.length === 0) {
+      setErr('请粘贴至少一条图片 https 链接（.jpg / .png / .webp 等）')
+      return
+    }
+    setErr(null)
+    setImageItems((prev) => [
+      ...prev,
+      ...urls.map((mediaUrl, i) => ({
+        id: newJobId(),
+        label: `图片 ${prev.length + i + 1}`,
+        mediaUrl,
+      })),
+    ])
+    setImageUrlText('')
+    setHint(`已加入 ${urls.length} 张图片链接`)
+  }, [imageUrlText])
+
+  const removeImageItem = useCallback((id: string) => {
+    setImageItems((prev) => {
+      const hit = prev.find((x) => x.id === id)
+      if (hit?.previewUrl) {
+        try {
+          URL.revokeObjectURL(hit.previewUrl)
+        } catch {
+          /* ignore */
+        }
+        imagePreviewUrlsRef.current = imagePreviewUrlsRef.current.filter((u) => u !== hit.previewUrl)
+      }
+      return prev.filter((x) => x.id !== id)
+    })
+  }, [])
 
   const appendLastResult = useCallback(() => {
     const u = lastResultUrl?.trim()
@@ -245,6 +373,60 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     }
     patchJob(localJobId, { phase: 'failed', message: '剪辑超时，请稍后重试或联系运营' })
     return false
+  }
+
+  const runOneClickImages = async () => {
+    if (!cfg?.configured) {
+      setErr('墨典AI云剪服务未就绪')
+      return
+    }
+    if (!briefOk) {
+      setErr('请填写剪辑文案指令（至少 4 个字）')
+      return
+    }
+    if (imageItems.length === 0) {
+      setErr('请先上传或粘贴至少一张图片')
+      return
+    }
+    const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const localId = newJobId()
+    const label = `多图合成 · ${imageItems.length} 张`
+    setBusy(true)
+    setErr(null)
+    setHint(`正在将 ${imageItems.length} 张图片合成为一条成片…`)
+    setJobs((prev) => [
+      ...prev,
+      {
+        id: localId,
+        label,
+        mediaUrl: imageUrls[0]!,
+        imageUrls,
+        phase: 'pipeline',
+        message: '多图合成 · 提交云端…',
+      },
+    ])
+    const pipe = await postIcePipeline({
+      imageUrls,
+      projectName: `墨典AI云剪-${label}`.slice(0, 120),
+      editBrief: editBrief.trim(),
+      width: aspect.width,
+      height: aspect.height,
+      clipEndSec,
+      preset,
+    })
+    if (!pipe.ok) {
+      patchJob(localId, { phase: 'failed', message: pipe.message })
+      setBusy(false)
+      return
+    }
+    patchJob(localId, {
+      exportId: pipe.jobId,
+      phase: 'polling',
+      message: '多图合成 · 云端剪辑中…',
+    })
+    await pollJob(localId, pipe.jobId)
+    setBusy(false)
+    setHint('多图一键成片已提交，请在右侧下载 MP4。')
   }
 
   const downloadJob = (job: IceBatchJob) => {
@@ -425,7 +607,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       {/* 流程指引 */}
       <ol className="grid gap-3 sm:grid-cols-3">
         {[
-          { n: 1, title: '添加素材', sub: '必填 · 本地上传或 HTTPS 链接' },
+          { n: 1, title: '添加素材', sub: '视频队列或「多图一键成片」' },
           { n: 2, title: '填写剪辑指令', sub: '必填 · 描述风格与包装要求' },
           { n: 3, title: '提交并下载', sub: '成片出现在右侧输出区' },
         ].map((s) => (
@@ -573,11 +755,142 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   </button>
                 ) : null}
               </div>
+
+              <div className="flex items-center gap-3 text-xs text-zinc-400">
+                <span className="h-px flex-1 bg-zinc-200" />
+                <span className="flex items-center gap-1">
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  多图一键成片
+                </span>
+                <span className="h-px flex-1 bg-zinc-200" />
+              </div>
+
+              <input
+                id="ice-local-image-input"
+                ref={imageFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/*,.jpg,.jpeg,.png,.webp,.gif"
+                multiple
+                className="sr-only"
+                disabled={busy || uploading}
+                onChange={(e) => {
+                  void handleLocalImages(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+              <label
+                htmlFor="ice-local-image-input"
+                role="button"
+                tabIndex={busy || uploading ? -1 : 0}
+                onClick={(e) => {
+                  if (!cfg?.localUploadEnabled) {
+                    e.preventDefault()
+                    openImageFilePicker()
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (busy || uploading) return
+                  const imgs = Array.from(e.dataTransfer.files).filter(isImageFile)
+                  if (imgs.length === 0) {
+                    setErr('请拖入 jpg/png/webp 等图片文件')
+                    return
+                  }
+                  const dt = new DataTransfer()
+                  for (const f of imgs) dt.items.add(f)
+                  void handleLocalImages(dt.files)
+                }}
+                className={cn(
+                  'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition',
+                  busy || uploading ? 'pointer-events-none opacity-60' : '',
+                  'border-violet-200 bg-violet-50/40 hover:border-violet-400 hover:bg-violet-50/70',
+                )}
+              >
+                <ImagePlus className="h-7 w-7 text-violet-600" />
+                <span className="text-sm font-semibold text-zinc-900">本地上传图片（可多选）</span>
+                <span className="text-center text-xs text-zinc-500">
+                  JPG / PNG / WebP · 多张合成一条竖屏短视频
+                </span>
+              </label>
+
+              <textarea
+                value={imageUrlText}
+                disabled={busy || uploading}
+                onChange={(e) => setImageUrlText(e.target.value)}
+                placeholder={'https://your-cdn.com/photo-01.jpg\nhttps://your-cdn.com/photo-02.png'}
+                className="min-h-[72px] w-full rounded-lg border border-violet-200 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busy || uploading}
+                  onClick={addImageUrlsFromText}
+                  className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm text-violet-900 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  加入图片列表
+                </button>
+                <button
+                  type="button"
+                  disabled={!canOneClickImages}
+                  onClick={() => void runOneClickImages()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  <Zap className="h-4 w-4" />
+                  一键成片
+                </button>
+              </div>
+
+              {imageItems.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {imageItems.map((img) => (
+                    <div
+                      key={img.id}
+                      className="group relative overflow-hidden rounded-lg border border-violet-200 bg-zinc-100"
+                    >
+                      {img.previewUrl ? (
+                        <img
+                          src={img.previewUrl}
+                          alt={img.label}
+                          className="aspect-[9/16] w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex aspect-[9/16] items-center justify-center text-[10px] text-zinc-500">
+                          外链图
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => removeImageItem(img.id)}
+                        className="absolute right-1 top-1 rounded bg-black/50 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
+                        aria-label="移除图片"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                      <p className="truncate px-1 py-0.5 text-[10px] text-zinc-600">{img.label}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-violet-800/80">
+                  上传多张门店/商品图后，填写剪辑指令并点「一键成片」，将按顺序合成为一条 MP4。
+                </p>
+              )}
+
               {jobs.length > 0 ? (
                 <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
                   {jobs.map((j) => (
                     <li key={j.id} className="flex items-center gap-2 px-3 py-2 text-sm">
-                      <Film className="h-4 w-4 shrink-0 text-zinc-400" />
+                      {j.imageUrls?.length ? (
+                        <ImagePlus className="h-4 w-4 shrink-0 text-violet-500" />
+                      ) : (
+                        <Film className="h-4 w-4 shrink-0 text-zinc-400" />
+                      )}
                       <span className="min-w-0 flex-1 truncate font-medium text-zinc-800">{j.label}</span>
                       <PhasePill phase={j.phase} />
                       <button
@@ -645,7 +958,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       ))}
                     </select>
                   </Field>
-                  <Field label="取用时长（秒）">
+                  <Field label={imageItems.length > 0 ? '每张图片时长（秒）' : '取用时长（秒）'}>
                     <input
                       type="number"
                       min={1}

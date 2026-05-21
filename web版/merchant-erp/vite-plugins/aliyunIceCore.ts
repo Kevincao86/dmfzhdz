@@ -125,6 +125,35 @@ function buildTimeline(mediaId: string, clipEndSec: number, effectId: string): o
   }
 }
 
+/** 多图轮播时间线：每张图占用 secPerImage 秒，顺序拼接为一条成片 */
+function buildTimelineFromImages(
+  mediaIds: string[],
+  secPerImage: number,
+  effectId: string,
+): object {
+  let cursor = 0
+  const clips: Record<string, unknown>[] = []
+  for (let i = 0; i < mediaIds.length; i++) {
+    const dur = Math.max(0.5, secPerImage)
+    const clip: Record<string, unknown> = {
+      MediaId: mediaIds[i],
+      TimelineIn: cursor,
+      TimelineOut: cursor + dur,
+    }
+    const effects: Record<string, unknown>[] = []
+    if (effectId === 'fade') {
+      effects.push({ Type: 'Fade', SubType: 'In', Duration: Math.min(0.8, dur * 0.2) })
+      if (i === mediaIds.length - 1) {
+        effects.push({ Type: 'Fade', SubType: 'Out', Duration: Math.min(0.8, dur * 0.2) })
+      }
+    }
+    if (effects.length) clip.Effects = effects
+    clips.push(clip)
+    cursor += dur
+  }
+  return { VideoTracks: [{ VideoTrackClips: clips }] }
+}
+
 /** UploadMediaByURL 必填：目标为 ICE/VOD 点播库，非商户自研 OSS Bucket */
 export function buildIceUploadTargetConfig(
   cfg: AliyunIceConfig,
@@ -177,6 +206,13 @@ const ICE_UPLOAD_EXTENSIONS = new Set([
   'aac',
   'flac',
   'ogg',
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'bmp',
+  'heic',
 ])
 
 /** ICE UploadMetadata.FileExtension：小写、无点；URL 无后缀时默认 mp4 */
@@ -305,6 +341,90 @@ async function waitMediaReady(
     await sleep(2500)
   }
   return { ok: true }
+}
+
+const ICE_MAX_IMAGES_PER_JOB = 30
+
+/** 多图素材：逐张注册媒资 → 拼接时间线 → 合成一条 MP4 */
+export async function iceRunImagesPipeline(
+  cfg: AliyunIceConfig,
+  input: {
+    imageUrls: string[]
+    projectName: string
+    editBrief: string
+    width: number
+    height: number
+    secPerImage: number
+    effectId: string
+  },
+): Promise<
+  | { ok: true; jobId: string; mediaId?: string }
+  | { ok: false; message: string; step?: string }
+> {
+  const urls = input.imageUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
+  if (urls.length === 0) {
+    return { ok: false, message: '请提供至少一张公网可访问的图片 URL', step: 'validate' }
+  }
+  if (urls.length > ICE_MAX_IMAGES_PER_JOB) {
+    return {
+      ok: false,
+      message: `单次最多合成 ${ICE_MAX_IMAGES_PER_JOB} 张图片`,
+      step: 'validate',
+    }
+  }
+
+  const client = createClient(cfg)
+  const jobKey = `meoo-img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const mediaIds: string[] = []
+
+  for (let i = 0; i < urls.length; i++) {
+    const title = `${input.projectName}-图${i + 1}`.slice(0, 120)
+    const up = await uploadUrlToMediaId(client, cfg, urls[i]!, title)
+    if (!up.ok) {
+      return { ok: false, message: `第 ${i + 1} 张图片上传失败：${up.message}`, step: 'upload_media' }
+    }
+    const ready = await waitMediaReady(client, up.mediaId, 12)
+    if (!ready.ok) {
+      return { ok: false, message: `第 ${i + 1} 张图片媒资未就绪：${ready.message}`, step: 'wait_media' }
+    }
+    mediaIds.push(up.mediaId)
+  }
+
+  const out = buildOutputConfig(cfg, input.width, input.height, jobKey)
+  if (!out.ok) {
+    return { ok: false, message: out.message, step: 'output_config' }
+  }
+
+  const timeline = buildTimelineFromImages(mediaIds, input.secPerImage, input.effectId)
+  try {
+    const res = await client.submitMediaProducingJob(
+      new SubmitMediaProducingJobRequest({
+        timeline: JSON.stringify(timeline),
+        outputMediaTarget: out.target,
+        outputMediaConfig: JSON.stringify(out.config),
+        projectMetadata: JSON.stringify({
+          Title: input.projectName.slice(0, 120),
+          Description:
+            (input.editBrief.slice(0, 500) || '墨典AI云剪') +
+            `；多图合成 ${urls.length} 张`,
+        }),
+        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
+        source: 'OPENAPI',
+        clientToken: jobKey,
+      }),
+    )
+    const submitBody = bodyOf(res)
+    const jobId = typeof submitBody?.jobId === 'string' ? submitBody.jobId.trim() : ''
+    if (!jobId) return { ok: false, message: '未返回剪辑 JobId', step: 'submit_job' }
+    const mediaId = typeof submitBody?.mediaId === 'string' ? submitBody.mediaId : undefined
+    return { ok: true, jobId, mediaId }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : String(e),
+      step: 'submit_job',
+    }
+  }
 }
 
 /** 单条素材：URL 拉取上传 → 剪辑合成 */
