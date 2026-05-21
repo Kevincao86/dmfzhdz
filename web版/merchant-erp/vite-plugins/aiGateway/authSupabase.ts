@@ -28,7 +28,12 @@ export async function verifyBearerJwt(
     },
   })
   if (!r.ok) return null
-  const j = (await r.json()) as { id?: string; email?: string }
+  let j: { id?: string; email?: string }
+  try {
+    j = (await r.json()) as { id?: string; email?: string }
+  } catch {
+    return null
+  }
   const id = typeof j.id === 'string' && j.id.trim() ? j.id.trim() : ''
   if (!id) return null
   return { id, email: typeof j.email === 'string' ? j.email : undefined }

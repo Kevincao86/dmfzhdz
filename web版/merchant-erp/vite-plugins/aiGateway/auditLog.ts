@@ -1,6 +1,6 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
 import { AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
-import { dialogueStyleAddonForPickerKey } from '../../src/services/ai/agentModelRoute.js'
+import { dialogueStyleAddonForPickerKey } from './agentDialogueStyle.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 
 export type AuditStatus = 'ok' | 'error'

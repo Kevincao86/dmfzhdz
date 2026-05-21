@@ -49,14 +49,20 @@ export async function runMeooAiChatCore(
     return { status: 400, body: { ok: false, error: 'invalid_provider' } }
   }
 
-  const access = await assertAiChatAccess(user.id, provider, env)
-  if (!access.ok) {
-    return {
-      status: access.status,
-      body: { ok: false, error: access.error, detail: access.detail },
+  let chatEnv = env
+  try {
+    const access = await assertAiChatAccess(user.id, provider, env)
+    if (!access.ok) {
+      return {
+        status: access.status,
+        body: { ok: false, error: access.error, detail: access.detail },
+      }
     }
+    chatEnv = access.envForChat
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { status: 503, body: { ok: false, error: 'access_check_failed', detail: msg.slice(0, 400) } }
   }
-  const chatEnv = access.envForChat
 
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined

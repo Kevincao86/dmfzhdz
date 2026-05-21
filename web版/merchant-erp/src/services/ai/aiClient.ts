@@ -71,10 +71,18 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
       }
       if (res.status !== 404) {
         if (json && typeof json === 'object') {
-          const o = json as { ok?: boolean; error?: unknown; detail?: string }
+          const o = json as {
+            ok?: boolean
+            error?: unknown
+            detail?: string
+            hint?: string
+            message?: string
+          }
           const code = typeof o.error === 'string' ? o.error.trim() : ''
           const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
-          const parts = [code, detail].filter(Boolean)
+          const hint = typeof o.hint === 'string' ? o.hint.trim() : ''
+          const topMsg = typeof o.message === 'string' ? o.message.trim() : ''
+          const parts = [code, detail, hint, topMsg].filter(Boolean)
           if (parts.length) throw new Error(parts.join(' — '))
           if (o.error && typeof o.error === 'object' && o.error !== null) {
             const nest = o.error as { message?: string; code?: string | number }
@@ -86,7 +94,13 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
             }
           }
         }
-        throw new Error(text?.trim() || `HTTP ${res.status}`)
+        const trimmed = text?.trim() ?? ''
+        if (/MODULE_NOT_FOUND|Cannot find module/i.test(trimmed)) {
+          throw new Error(
+            `智能体服务端模块加载失败（HTTP ${res.status}）。请重新部署并确认 Vercel 环境变量（SUPABASE_URL、TOKENMIX_API_KEY 等）已配置。${trimmed.slice(0, 200)}`,
+          )
+        }
+        throw new Error(trimmed || `HTTP ${res.status}`)
       }
       lastErr = text.slice(0, 200)
     }
