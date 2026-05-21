@@ -40,12 +40,14 @@ Page({
     canSyncMember: false,
     syncMemberProfile: false,
     memberTypeLabel: '',
+    isIceMode: false,
   },
   onLoad(options) {
     const mpOrderId = options && options.mpId ? decodeURIComponent(options.mpId) : ''
     const merchantOrderNo =
       options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
     const platform = normalizePlatform(options && options.platform ? decodeURIComponent(options.platform) : '抖音')
+    const isIceMode = options && options.ice === '1'
     const member = memberStore.readMember()
     const canSyncMember = memberSyncAvailable(member, platform)
     const patch = {
@@ -131,12 +133,14 @@ Page({
     if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
     const regionErr = validateRegion(this.data.province, this.data.city)
     if (regionErr) return regionErr
-    if (!String(this.data.quotePrice || '').trim()) return '请填写报价'
-    if (!this.data.visitDate || !this.data.visitTimeStart || !this.data.visitTimeEnd) {
-      return '请选择探店日期与时间段'
+    if (!this.data.isIceMode) {
+      if (!String(this.data.quotePrice || '').trim()) return '请填写报价'
+      if (!this.data.visitDate || !this.data.visitTimeStart || !this.data.visitTimeEnd) {
+        return '请选择探店日期与时间段'
+      }
+      if (this.data.visitTimeStart >= this.data.visitTimeEnd) return '探店结束时间须晚于开始时间'
+      if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
     }
-    if (this.data.visitTimeStart >= this.data.visitTimeEnd) return '探店结束时间须晚于开始时间'
-    if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
     return null
   },
   async onSubmit() {
@@ -151,15 +155,18 @@ Page({
     }
 
     const platformNickname = String(this.data.platformNickname || '').trim()
-    const visitTimeSlot = `${this.data.visitDate} ${this.data.visitTimeStart}-${this.data.visitTimeEnd}`
+    const visitTimeSlot = this.data.isIceMode
+      ? '云剪任务·无需探店'
+      : `${this.data.visitDate} ${this.data.visitTimeStart}-${this.data.visitTimeEnd}`
     const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
     const platform = this.data.platform
     const alipayAccount = String(this.data.alipayAccount || '').trim()
 
     this.setData({ submitting: true })
     try {
+      const applicantId = `app-${Date.now()}`
       const applicant = {
-        id: `app-${Date.now()}`,
+        id: applicantId,
         name: platformNickname,
         platform,
         platformAccount: String(this.data.platformAccount || '').trim(),
@@ -171,10 +178,10 @@ Page({
           : undefined,
         contact: String(this.data.contact || '').trim(),
         wechatId: String(this.data.wechatId || '').trim(),
-        quotePrice: String(this.data.quotePrice || '').trim(),
+        quotePrice: this.data.isIceMode ? '云剪' : String(this.data.quotePrice || '').trim(),
         visitTimeSlot,
-        alipayAccount,
-        paymentMethod: `支付宝：${alipayAccount}`,
+        alipayAccount: this.data.isIceMode ? '' : alipayAccount,
+        paymentMethod: this.data.isIceMode ? '云剪任务' : `支付宝：${alipayAccount}`,
         mpOrderId: this.data.mpOrderId,
         merchantOrderNo: this.data.merchantOrderNo,
         province: String(this.data.province || '').trim(),
@@ -182,7 +189,14 @@ Page({
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       }
       await ops.applyToMpOrder(this.data.mpOrderId, applicant)
-      wx.showToast({ title: '报名成功', icon: 'success' })
+      if (this.data.isIceMode) {
+        try {
+          wx.setStorageSync(`meoo_ice_applicant_v1_${this.data.mpOrderId}`, applicantId)
+        } catch {
+          /* ignore */
+        }
+      }
+      wx.showToast({ title: this.data.isIceMode ? '认领成功' : '报名成功', icon: 'success' })
       setTimeout(() => {
         wx.redirectTo({
           url: `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`,

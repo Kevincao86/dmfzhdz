@@ -25,6 +25,7 @@ import type {
 } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
+import { applyIceMpRecruitment, isIceMpOrder, submitIceDouyinForApplicant } from '../src/lib/mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
 import {
@@ -141,7 +142,10 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-sync-registry' &&
           url !== '/api/meoo-ops-recruitment-orders-append' &&
           url !== '/api/meoo-ops-talent-pool-set' &&
-          url !== '/api/meoo-ops-recruitment-schedule-set'
+          url !== '/api/meoo-ops-recruitment-schedule-set' &&
+          url !== '/api/meoo-ops-mp-recruitment-orders-apply' &&
+          url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
+          url !== '/api/meoo-ops-mp-talent-member-register'
         )
           return next()
 
@@ -562,7 +566,11 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/mp-recruitment-orders/apply') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/apply' ||
+              url === '/api/meoo-ops-mp-recruitment-orders-apply')
+          ) {
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as {
               mpOrderId?: string
@@ -594,22 +602,90 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
                 applicant.paymentMethod ||
                 (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
             }
-            const applicants = [...(cur.applicants ?? [])]
-            applicants.unshift(row)
+            let applicants = [...(cur.applicants ?? [])]
+            let iceVideoSlots = cur.iceVideoSlots
+            if (isIceMpOrder(cur)) {
+              const dup = applicants.find((a) => a.id === row.id)
+              if (dup?.assignedIceSlotId) {
+                json(res, 200, {
+                  ok: true,
+                  assignedVideoDownloadUrl: dup.assignedVideoDownloadUrl,
+                })
+                return
+              }
+              const applied = applyIceMpRecruitment(cur, row)
+              if (!applied.ok) {
+                json(res, 409, { ok: false, error: applied.code ?? 'apply_failed', message: applied.error })
+                return
+              }
+              const existingIdx = applicants.findIndex((a) => a.id === applied.applicant.id)
+              if (existingIdx >= 0) applicants[existingIdx] = applied.applicant
+              else applicants.unshift(applied.applicant)
+              iceVideoSlots = cur.iceVideoSlots?.map((s) =>
+                s.slotId === applied.slot.slotId ? applied.slot : s,
+              )
+            } else {
+              applicants.unshift(row)
+            }
             data.mpRecruitmentOrders[idx] = {
               ...cur,
               applicants: applicants.slice(0, 500),
+              iceVideoSlots,
               status: cur.status === 'open' ? 'collecting' : cur.status,
               updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
             }
+            const savedApplicant =
+              isIceMpOrder(cur) ?
+                (data.mpRecruitmentOrders[idx]!.applicants ?? []).find((a) => a.id === row.id) ?? row
+              : row
             upsertTalentLibraryFromApplicant(data, {
               platform,
-              applicant: row,
+              applicant: savedApplicant,
               mpOrderId,
               merchantOrderNo,
             })
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/ice-submit' ||
+              url === '/api/meoo-ops-mp-recruitment-ice-submit')
+          ) {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              mpOrderId?: string
+              applicantId?: string
+              douyinPublishUrl?: string
+            }
+            const mpOrderId = (body.mpOrderId ?? '').trim()
+            const applicantId = (body.applicantId ?? '').trim()
+            const douyinPublishUrl = (body.douyinPublishUrl ?? '').trim()
+            if (!mpOrderId || !applicantId || !douyinPublishUrl) {
+              json(res, 400, { ok: false, error: 'invalid_submit' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+            if (!data.mpRecruitmentOrders || idx < 0) {
+              json(res, 404, { ok: false, error: 'not_found' })
+              return
+            }
+            const cur = data.mpRecruitmentOrders[idx]!
+            if (!isIceMpOrder(cur)) {
+              json(res, 400, { ok: false, error: 'not_ice_order' })
+              return
+            }
+            const result = submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
+            if (!result.ok) {
+              json(res, 400, { ok: false, error: 'verify_failed', message: result.error })
+              return
+            }
+            data.mpRecruitmentOrders[idx] = result.mp
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, status: result.mp.status, aiVerifyStatus: 'passed' })
             return
           }
 

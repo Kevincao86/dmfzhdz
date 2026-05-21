@@ -72,6 +72,20 @@ export type RegistryAiModels = {
   controlledByOps: boolean
 }
 
+export type RecruitmentOrderKind = 'recruitment' | 'recruitment_ice'
+
+export type MpRecruitmentHall = 'normal' | 'urgent' | 'ice'
+
+/** 云剪批量成片槽位：每位达人认领后分配一条下载链接 */
+export type RegistryIceVideoSlot = {
+  slotId: string
+  label: string
+  downloadUrl: string
+  iceJobId?: string
+  assignedApplicantId?: string
+  assignedAt?: string
+}
+
 /** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
 export type RegistryRecruitmentOrder = {
   id: string
@@ -91,12 +105,17 @@ export type RegistryRecruitmentOrder = {
   category: string
   /** 提需摘要（招募名、Brief 节选等） */
   infoSummary?: string
-  /** 运营接单方式：手动表格 / 小程序招募 */
-  acceptMode?: 'manual' | 'miniprogram'
-  /** 关联的小程序招募单号（acceptMode=miniprogram 时写入） */
+  /** 订单类型：常规招募 / 云剪批量招募投放 */
+  orderKind?: RecruitmentOrderKind
+  /** 运营接单方式：手动表格 / 小程序招募 / 云剪单 */
+  acceptMode?: 'manual' | 'miniprogram' | 'ice'
+  /** 关联的小程序招募单号（acceptMode=miniprogram|ice 时写入） */
   linkedMpOrderId?: string
   /** 下发小程序招募的平台（抖音 / 小红书） */
   recruitmentPlatform?: '抖音' | '小红书'
+  /** 云剪成片数量（批量云剪派发达人投放时写入） */
+  iceVideoCount?: number
+  iceVideoSlots?: RegistryIceVideoSlot[]
 }
 
 /** 小程序达人招募单（运营「小程序招募」接单后生成，供达人端小程序展示与报名） */
@@ -129,6 +148,14 @@ export type RegistryMpRecruitmentApplicant = {
   appliedAt: string
   province?: string
   city?: string
+  /** 云剪单：系统分配的成片槽位 */
+  assignedIceSlotId?: string
+  assignedVideoLabel?: string
+  assignedVideoDownloadUrl?: string
+  douyinPublishUrl?: string
+  aiVerifyStatus?: 'pending' | 'passed' | 'failed'
+  aiVerifyNote?: string
+  completedAt?: string
 }
 
 /** 墨典达人库（按平台+达人ID去重，报价等取最新报名） */
@@ -187,10 +214,14 @@ export type RegistryMpRecruitmentOrder = {
   storeName: string
   /** 商家要求（由商家订单 infoSummary 自动填入） */
   merchantRequirements: string
-  status: 'open' | 'collecting' | 'closed' | 'done'
+  status: 'open' | 'collecting' | 'pending_settlement' | 'closed' | 'done'
   createdAt: string
   updatedAt: string
   applicants?: RegistryMpRecruitmentApplicant[]
+  orderKind?: RecruitmentOrderKind
+  /** 达人端大厅：招募 / 急单 / 云剪任务 */
+  hall?: MpRecruitmentHall
+  iceVideoSlots?: RegistryIceVideoSlot[]
   /** 列表/详情展示用（创建时从商家订单同步） */
   title?: string
   recruitmentInfo?: string

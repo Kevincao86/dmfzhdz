@@ -51,4 +51,22 @@ async function registerTalentMember(member) {
   throw lastErr || new Error('会员注册接口不可用')
 }
 
-module.exports = { fetchRegistry, applyToMpOrder, registerTalentMember }
+async function submitIceDouyin(mpOrderId, applicantId, douyinPublishUrl) {
+  const paths = [
+    '/api/meoo-ops-mp-recruitment-ice-submit',
+    '/api/ops-sync/mp-recruitment-orders/ice-submit',
+  ]
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await merchantRequest('POST', path, { mpOrderId, applicantId, douyinPublishUrl })
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('云剪回传接口不可用')
+}
+
+module.exports = { fetchRegistry, applyToMpOrder, registerTalentMember, submitIceDouyin }

@@ -3,4 +3,9 @@ function isUrgentMpOrder(mp) {
   return !!(mp && mp.urgent === true)
 }
 
-module.exports = { isUrgentMpOrder }
+/** 云剪任务大厅（有素材仅发布） */
+function isIceMpOrder(mp) {
+  return !!(mp && (mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'))
+}
+
+module.exports = { isUrgentMpOrder, isIceMpOrder }

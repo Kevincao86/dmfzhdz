@@ -72,6 +72,19 @@ export type RegistryAiModels = {
   controlledByOps: boolean
 }
 
+export type RecruitmentOrderKind = 'recruitment' | 'recruitment_ice'
+
+export type MpRecruitmentHall = 'normal' | 'urgent' | 'ice'
+
+export type RegistryIceVideoSlot = {
+  slotId: string
+  label: string
+  downloadUrl: string
+  iceJobId?: string
+  assignedApplicantId?: string
+  assignedAt?: string
+}
+
 /** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
 export type RegistryRecruitmentOrder = {
   id: string
@@ -95,9 +108,12 @@ export type RegistryRecruitmentOrder = {
   category: string
   /** 提需摘要（招募名、Brief 节选等） */
   infoSummary?: string
-  acceptMode?: 'manual' | 'miniprogram'
+  orderKind?: RecruitmentOrderKind
+  acceptMode?: 'manual' | 'miniprogram' | 'ice'
   linkedMpOrderId?: string
   recruitmentPlatform?: '抖音' | '小红书'
+  iceVideoCount?: number
+  iceVideoSlots?: RegistryIceVideoSlot[]
 }
 
 export type RegistryMpRecruitmentApplicant = {
@@ -121,6 +137,13 @@ export type RegistryMpRecruitmentApplicant = {
   appliedAt: string
   province?: string
   city?: string
+  assignedIceSlotId?: string
+  assignedVideoLabel?: string
+  assignedVideoDownloadUrl?: string
+  douyinPublishUrl?: string
+  aiVerifyStatus?: 'pending' | 'passed' | 'failed'
+  aiVerifyNote?: string
+  completedAt?: string
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -178,10 +201,13 @@ export type RegistryMpRecruitmentOrder = {
   customerName: string
   storeName: string
   merchantRequirements: string
-  status: 'open' | 'collecting' | 'closed' | 'done'
+  status: 'open' | 'collecting' | 'pending_settlement' | 'closed' | 'done'
   createdAt: string
   updatedAt: string
   applicants?: RegistryMpRecruitmentApplicant[]
+  orderKind?: RecruitmentOrderKind
+  hall?: MpRecruitmentHall
+  iceVideoSlots?: RegistryIceVideoSlot[]
   title?: string
   recruitmentInfo?: string
   taskDetail?: string

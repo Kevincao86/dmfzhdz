@@ -75,9 +75,19 @@ export type RegistryRecruitmentOrder = {
   storeAddress: string
   category: string
   infoSummary?: string
-  acceptMode?: 'manual' | 'miniprogram'
+  orderKind?: 'recruitment' | 'recruitment_ice'
+  acceptMode?: 'manual' | 'miniprogram' | 'ice'
   linkedMpOrderId?: string
   recruitmentPlatform?: '抖音' | '小红书'
+  iceVideoCount?: number
+  iceVideoSlots?: Array<{
+    slotId: string
+    label: string
+    downloadUrl: string
+    iceJobId?: string
+    assignedApplicantId?: string
+    assignedAt?: string
+  }>
 }
 
 export type RegistryMpRecruitmentApplicant = {
@@ -101,6 +111,13 @@ export type RegistryMpRecruitmentApplicant = {
   appliedAt: string
   province?: string
   city?: string
+  assignedIceSlotId?: string
+  assignedVideoLabel?: string
+  assignedVideoDownloadUrl?: string
+  douyinPublishUrl?: string
+  aiVerifyStatus?: 'pending' | 'passed' | 'failed'
+  aiVerifyNote?: string
+  completedAt?: string
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -130,10 +147,13 @@ export type RegistryMpRecruitmentOrder = {
   customerName: string
   storeName: string
   merchantRequirements: string
-  status: 'open' | 'collecting' | 'closed' | 'done'
+  status: 'open' | 'collecting' | 'pending_settlement' | 'closed' | 'done'
   createdAt: string
   updatedAt: string
   applicants?: RegistryMpRecruitmentApplicant[]
+  orderKind?: 'recruitment' | 'recruitment_ice'
+  hall?: 'normal' | 'urgent' | 'ice'
+  iceVideoSlots?: RegistryRecruitmentOrder['iceVideoSlots']
   title?: string
   recruitmentInfo?: string
   taskDetail?: string

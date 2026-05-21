@@ -1,4 +1,4 @@
-import { BarChart3, Bell, Download, FileSpreadsheet, Share2, Smartphone } from 'lucide-react'
+import { BarChart3, Bell, Download, FileSpreadsheet, Film, Share2, Smartphone } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import { filterLegacyDemoRecruitmentOrders } from '../recruitmentLegacyDemo'
@@ -13,7 +13,7 @@ import {
   type RegistryTalentPoolRow,
 } from '../opsRegistryApi'
 import { normalizeRecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
-import { buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
+import { buildMpRecruitmentFieldsForIce, buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
 import {
   MP_RECRUIT_ALREADY_SUBMITTED_MSG,
   resolveMpOrderForMerchantOrder,
@@ -328,6 +328,75 @@ export default function OpsRecruitmentOrdersPage() {
     }
   }
 
+  const confirmIceAccept = async (order: RegistryRecruitmentOrder) => {
+    setMpAcceptBusy(true)
+    try {
+      const reg = await fetchRegistry()
+      const existing = resolveMpOrderForMerchantOrder(reg.mpRecruitmentOrders, order)
+      if (existing) {
+        window.alert(`${MP_RECRUIT_ALREADY_SUBMITTED_MSG}\n关联小程序单号：${existing.id}`)
+        setAcceptModeChoiceOrder(null)
+        setMpShareInfo({ merchantOrderId: order.id, mpOrderId: existing.id })
+        return
+      }
+
+      const slots = (order.iceVideoSlots ?? []).map((s) => ({
+        slotId: s.slotId,
+        label: s.label,
+        downloadUrl: s.downloadUrl,
+        iceJobId: s.iceJobId,
+      }))
+      const n = order.iceVideoCount ?? slots.length
+      if (!slots.length) {
+        window.alert('该云剪订单缺少成片链接，请让商户在 ERP 重新派发达人投放。')
+        return
+      }
+
+      const now = new Date().toLocaleString('zh-CN', { hour12: false })
+      const mpId = `MP-ICE-${Date.now()}`
+      const fields = buildMpRecruitmentFieldsForIce(order)
+      const mpOrder: RegistryMpRecruitmentOrder = {
+        id: mpId,
+        sourceMerchantOrderId: order.id,
+        customerName: order.customerName,
+        storeName: order.storeName,
+        status: 'open',
+        createdAt: now,
+        updatedAt: now,
+        applicants: [],
+        orderKind: 'recruitment_ice',
+        hall: 'ice',
+        iceVideoSlots: slots,
+        ...fields,
+        recruitCount: n,
+      }
+      const append = await appendMpRecruitmentOrder(mpOrder)
+      if (!append.ok) {
+        const msg =
+          append.error === 'duplicate_merchant_order'
+            ? '该商家订单已有小程序招募单，不可重复创建。'
+            : (append.error ?? '创建云剪小程序单失败')
+        window.alert(msg)
+        return
+      }
+      const patch = await patchRecruitmentOrder({
+        id: order.id,
+        status: 'accepted',
+        acceptMode: 'ice',
+        linkedMpOrderId: mpId,
+        recruitmentPlatform: '抖音',
+      })
+      if (!patch.ok) {
+        window.alert(`云剪单已创建，但商家订单状态更新失败：${patch.error ?? ''}`)
+      }
+      setAcceptModeChoiceOrder(null)
+      setMpShareInfo({ merchantOrderId: order.id, mpOrderId: mpId })
+      await loadRegistry()
+    } finally {
+      setMpAcceptBusy(false)
+    }
+  }
+
   const cancelAcceptSheetFlow = () => {
     const o = acceptSheetOrder
     setAcceptSheetOrder(null)
@@ -508,8 +577,17 @@ export default function OpsRecruitmentOrdersPage() {
                       <div className="text-[10px] text-slate-600">{o.talentId}</div>
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-400">
-                      {o.fans.toLocaleString('zh-CN')} · {o.accountType}
-                      <div className="text-slate-600">合作 {o.coopTimes} 次</div>
+                      {o.orderKind === 'recruitment_ice' ? (
+                        <>
+                          云剪 {o.iceVideoCount ?? o.iceVideoSlots?.length ?? o.fans} 条
+                          <div className="text-violet-400/90">云剪（招募、云剪）</div>
+                        </>
+                      ) : (
+                        <>
+                          {o.fans.toLocaleString('zh-CN')} · {o.accountType}
+                          <div className="text-slate-600">合作 {o.coopTimes} 次</div>
+                        </>
+                      )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-slate-500">{o.createdAt}</td>
                     <td className="px-3 py-2">
@@ -575,9 +653,15 @@ export default function OpsRecruitmentOrdersPage() {
               {processOrder.infoSummary ? (
                 <p className="text-xs text-slate-500">{processOrder.infoSummary}</p>
               ) : null}
-              {processOrder.acceptMode === 'miniprogram' && processOrder.linkedMpOrderId ? (
+              {processOrder.orderKind === 'recruitment_ice' ? (
+                <p className="text-xs text-violet-300/90">
+                  云剪（招募、云剪）· 成片 {processOrder.iceVideoCount ?? processOrder.iceVideoSlots?.length ?? 0} 条
+                </p>
+              ) : null}
+              {(processOrder.acceptMode === 'miniprogram' || processOrder.acceptMode === 'ice') &&
+              processOrder.linkedMpOrderId ? (
                 <p className="text-xs text-emerald-400/90">
-                  小程序招募 ·{' '}
+                  {processOrder.acceptMode === 'ice' ? '云剪单' : '小程序招募'} ·{' '}
                   <button
                     type="button"
                     className="underline hover:text-emerald-300"
@@ -665,13 +749,26 @@ export default function OpsRecruitmentOrdersPage() {
             <h3 className="text-lg font-semibold text-white">已接单：选择招募方式</h3>
             <p className="mt-1 font-mono text-xs text-slate-400">{acceptModeChoiceOrder.id}</p>
             <p className="mt-3 text-xs text-slate-500">
-              手动招募需下载模版上传表格解析；小程序招募将自动创建达人招募小程序订单并填入商家要求。
+              {acceptModeChoiceOrder.orderKind === 'recruitment_ice'
+                ? '云剪单将下发至达人小程序「云剪任务」大厅；每位达人认领后分配一条成片，回传抖音链接后 AI 核查。'
+                : '手动招募需下载模版上传表格解析；小程序招募将自动创建达人招募小程序订单并填入商家要求。'}
             </p>
+            {acceptModeChoiceOrder.orderKind === 'recruitment_ice' ? (
+              <div className="mt-4 rounded-lg border border-violet-500/40 bg-violet-950/30 px-3 py-2 text-xs text-violet-100">
+                云剪视频数量：{' '}
+                <span className="font-semibold tabular-nums">
+                  {acceptModeChoiceOrder.iceVideoCount ??
+                    acceptModeChoiceOrder.iceVideoSlots?.length ??
+                    0}
+                </span>{' '}
+                条 · 需 {acceptModeChoiceOrder.iceVideoCount ?? acceptModeChoiceOrder.iceVideoSlots?.length ?? 0} 位达人认领发布
+              </div>
+            ) : null}
             <div className="mt-4">
               <label className="block text-xs font-medium text-slate-400">下发小程序平台</label>
               <select
                 value={mpRecruitPlatform}
-                disabled={mpAcceptBusy}
+                disabled={mpAcceptBusy || acceptModeChoiceOrder.orderKind === 'recruitment_ice'}
                 onChange={(e) => setMpRecruitPlatform(e.target.value as '抖音' | '小红书')}
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
               >
@@ -680,6 +777,7 @@ export default function OpsRecruitmentOrdersPage() {
               </select>
               <p className="mt-1 text-[10px] text-slate-600">小红书招募单不展示带货等级；报名表单字段随平台切换。</p>
             </div>
+            {acceptModeChoiceOrder.orderKind !== 'recruitment_ice' ? (
             <div className="mt-4">
               <label className="block text-xs font-medium text-slate-400">达人端展示大厅</label>
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -713,7 +811,9 @@ export default function OpsRecruitmentOrdersPage() {
                 </button>
               </div>
             </div>
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+            ) : null}
+            <div className={cn('mt-5 grid gap-2', acceptModeChoiceOrder.orderKind === 'recruitment_ice' ? '' : 'sm:grid-cols-2')}>
+              {acceptModeChoiceOrder.orderKind !== 'recruitment_ice' ? (
               <button
                 type="button"
                 disabled={mpAcceptBusy}
@@ -723,6 +823,24 @@ export default function OpsRecruitmentOrdersPage() {
                 <FileSpreadsheet className="h-4 w-4" />
                 手动招募
               </button>
+              ) : null}
+              {acceptModeChoiceOrder.orderKind === 'recruitment_ice' ? (
+              <button
+                type="button"
+                disabled={mpAcceptBusy}
+                onClick={() => {
+                  void (async () => {
+                    const hit = await guardMerchantMpRecruitmentDup(acceptModeChoiceOrder)
+                    if (hit) return
+                    void confirmIceAccept(acceptModeChoiceOrder)
+                  })()
+                }}
+                className="flex items-center justify-center gap-2 rounded-lg border border-violet-500/50 bg-violet-950/30 px-4 py-3 text-sm font-medium text-violet-100 hover:bg-violet-900/40 disabled:opacity-50"
+              >
+                <Film className="h-4 w-4" />
+                {mpAcceptBusy ? '创建中…' : '云剪单'}
+              </button>
+              ) : (
               <button
                 type="button"
                 disabled={mpAcceptBusy}
@@ -738,6 +856,7 @@ export default function OpsRecruitmentOrdersPage() {
                 <Smartphone className="h-4 w-4" />
                 {mpAcceptBusy ? '创建中…' : '小程序招募'}
               </button>
+              )}
             </div>
           </div>
         </div>

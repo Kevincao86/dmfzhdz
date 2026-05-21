@@ -114,3 +114,41 @@ export function buildMpRecruitmentFieldsFromMerchant(
     urgent,
   }
 }
+
+/** 云剪单：从商家云剪招募订单生成小程序展示字段 */
+export function buildMpRecruitmentFieldsForIce(
+  order: RegistryRecruitmentOrder,
+): Pick<
+  RegistryMpRecruitmentOrder,
+  | 'title'
+  | 'recruitmentInfo'
+  | 'taskDetail'
+  | 'merchantRequirements'
+  | 'platform'
+  | 'fansRequirement'
+  | 'budgetText'
+  | 'recruitCount'
+  | 'region'
+  | 'category'
+  | 'serviceAmount'
+  | 'urgent'
+> {
+  const n = Math.max(1, order.iceVideoCount ?? order.iceVideoSlots?.length ?? 1)
+  const brief = String(order.infoSummary || '').trim()
+  const platform = normalizeRecruitmentPlatform(order.recruitmentPlatform || order.accountType)
+  return {
+    title: `${order.customerName}·云剪投放（${n} 条成片）`,
+    recruitmentInfo: `订单类型：云剪（招募、云剪）\n云剪视频数量：${n}\n${brief ? brief.slice(0, 800) : ''}`.trim(),
+    taskDetail:
+      '有素材仅发布：认领后系统分配一条云剪成片下载链接；发布至抖音后在本页回传作品链接，AI 自动核查。全部达人通过后进入待结算。',
+    merchantRequirements: brief || `云剪批量投放 ${n} 条，需 ${n} 位达人各发布 1 条抖音作品。`,
+    platform,
+    fansRequirement: '按云剪任务认领',
+    budgetText: order.serviceAmount > 0 ? `¥${order.serviceAmount.toLocaleString('zh-CN')}` : '云剪投放',
+    recruitCount: n,
+    region: order.storeName || '—',
+    category: order.category || '云剪投放',
+    serviceAmount: order.serviceAmount,
+    urgent: false,
+  }
+}
