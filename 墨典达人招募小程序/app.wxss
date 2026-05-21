@@ -216,6 +216,20 @@ page {
   border: none;
 }
 
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 20rpx 32rpx;
+  border: none;
+}
+
+.btn-secondary::after {
+  border: none;
+}
+
 .btn-primary[disabled] {
   opacity: 0.55;
   box-shadow: none;

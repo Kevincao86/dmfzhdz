@@ -74,7 +74,19 @@ export type RegistryAiModels = {
 
 export type RecruitmentOrderKind = 'recruitment' | 'recruitment_ice'
 
+/** 开环：报名→反选→寄样探店→审核发布；闭环：云剪成片直派→确认接收→发布回链 */
+export type RecruitmentFulfillmentLoop = 'open' | 'closed'
+
 export type MpRecruitmentHall = 'normal' | 'urgent' | 'ice'
+
+/** 达人报名/任务进度（开环反选 + 闭环确认接收） */
+export type MpApplicantTaskStatus =
+  | 'applied'
+  | 'pending_confirm'
+  | 'confirmed'
+  | 'rejected'
+  | 'shortlisted'
+  | 'approved'
 
 /** 云剪批量成片槽位：每位达人认领后分配一条下载链接 */
 export type RegistryIceVideoSlot = {
@@ -116,6 +128,9 @@ export type RegistryRecruitmentOrder = {
   /** 云剪成片数量（批量云剪派发达人投放时写入） */
   iceVideoCount?: number
   iceVideoSlots?: RegistryIceVideoSlot[]
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
+  /** 开环：商家是否选择自动发布小程序招募（运营仍可人工发布） */
+  autoPublishMp?: boolean
 }
 
 /** 小程序达人招募单（运营「小程序招募」接单后生成，供达人端小程序展示与报名） */
@@ -156,6 +171,7 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyStatus?: 'pending' | 'passed' | 'failed'
   aiVerifyNote?: string
   completedAt?: string
+  taskStatus?: MpApplicantTaskStatus
 }
 
 /** 墨典达人库（按平台+达人ID去重，报价等取最新报名） */
@@ -234,6 +250,7 @@ export type RegistryMpRecruitmentOrder = {
   category?: string
   serviceAmount?: number
   urgent?: boolean
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */

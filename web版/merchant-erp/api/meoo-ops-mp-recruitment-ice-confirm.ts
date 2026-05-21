@@ -1,15 +1,13 @@
 /**
- * POST /api/meoo-ops-mp-recruitment-orders-apply — 达人招募小程序报名。
+ * POST /api/meoo-ops-mp-recruitment-ice-confirm — 闭环云剪：达人确认接收或拒绝任务。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
-import type { RegistryMpRecruitmentApplicant } from '../src/lib/opsRegistryTypes.js'
-import { handleIceMpApply, isIceMpOrder } from '../src/lib/mpRecruitmentIceCore.js'
+import { handleIceMpConfirm, isIceMpOrder } from '../src/lib/mpRecruitmentIceCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
-import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 
 export const config = { maxDuration: 60 }
 
@@ -58,22 +56,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { mpOrderId?: string; applicant?: RegistryMpRecruitmentApplicant }
+    let body: { mpOrderId?: string; applicantId?: string; action?: 'confirm' | 'reject' }
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { mpOrderId?: string; applicant?: RegistryMpRecruitmentApplicant }
+      body = JSON.parse(rawBody(req) || '{}') as typeof body
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
     const mpOrderId = (body.mpOrderId ?? '').trim()
-    const applicant = body.applicant
-    const nick = (applicant?.platformNickname || applicant?.name || '').trim()
-    if (!mpOrderId || !applicant || !applicant.id || !nick) {
-      sendOpsJson(res, 400, { ok: false, error: 'invalid_apply' })
+    const applicantId = (body.applicantId ?? '').trim()
+    const action = body.action === 'reject' ? 'reject' : 'confirm'
+    if (!mpOrderId || !applicantId) {
+      sendOpsJson(res, 400, { ok: false, error: 'invalid_confirm' })
       return
     }
-    applicant.platformNickname = nick
-    applicant.name = nick
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
@@ -83,54 +79,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const cur = data.mpRecruitmentOrders[idx]!
-    const merchantOrderNo = cur.sourceMerchantOrderId
-    const platform = cur.platform || '抖音'
-    const row = {
-      ...applicant,
-      mpOrderId,
-      merchantOrderNo,
-      paymentMethod: applicant.paymentMethod || (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
-    }
-    if (isIceMpOrder(cur)) {
-      const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' })
-      if (!iceResult.ok) {
-        sendOpsJson(res, 409, { ok: false, error: iceResult.code ?? 'apply_failed', message: iceResult.error })
-        return
-      }
-      data.mpRecruitmentOrders[idx] = iceResult.mp
-      const savedApplicant =
-        (iceResult.mp.applicants ?? []).find((a) => a.id === row.id) ?? row
-      upsertTalentLibraryFromApplicant(data, {
-        platform,
-        applicant: savedApplicant,
-        mpOrderId,
-        merchantOrderNo,
-      })
-      await io.save(data)
-      sendOpsJson(res, 200, iceResult.body)
+    if (!isIceMpOrder(cur)) {
+      sendOpsJson(res, 400, { ok: false, error: 'not_ice_order' })
       return
     }
 
-    const applicants = [{ ...row, taskStatus: row.taskStatus ?? 'applied' }, ...(cur.applicants ?? [])]
-    data.mpRecruitmentOrders[idx] = {
-      ...cur,
-      applicants: applicants.slice(0, 500),
-      status: cur.status === 'open' ? 'collecting' : cur.status,
-      updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    const result = handleIceMpConfirm(cur, applicantId, action)
+    if (!result.ok) {
+      sendOpsJson(res, 409, { ok: false, error: result.code ?? 'confirm_failed', message: result.error })
+      return
     }
-    upsertTalentLibraryFromApplicant(data, {
-      platform,
-      applicant: row,
-      mpOrderId,
-      merchantOrderNo,
-    })
+    data.mpRecruitmentOrders[idx] = result.mp
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true, taskStatus: 'applied' })
+    sendOpsJson(res, 200, result.body)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
       ok: false,
-      error: 'meoo_ops_mp_recruitment_orders_apply_failed',
+      error: 'meoo_ops_mp_recruitment_ice_confirm_failed',
       detail: msg.slice(0, 800),
     })
   }

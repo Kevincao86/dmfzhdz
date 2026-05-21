@@ -17,6 +17,9 @@ Page({
     douyinUrl: '',
     iceSubmitting: false,
     iceVerified: false,
+    icePendingConfirm: false,
+    iceRejected: false,
+    iceConfirming: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -74,17 +77,22 @@ Page({
       let assignedVideoUrl = ''
       let assignedVideoLabel = ''
       let iceVerified = false
+      let icePendingConfirm = false
+      let iceRejected = false
       if (isIce && iceApplicantId) {
         const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
         if (app) {
           assignedVideoUrl = app.assignedVideoDownloadUrl || ''
           assignedVideoLabel = app.assignedVideoLabel || ''
           iceVerified = app.aiVerifyStatus === 'passed'
+          icePendingConfirm = app.taskStatus === 'pending_confirm' || (!app.taskStatus && !assignedVideoUrl)
+          iceRejected = app.taskStatus === 'rejected'
           if (app.douyinPublishUrl) {
             this.setData({ douyinUrl: app.douyinPublishUrl })
           }
         }
       }
+      const iceApplied = Boolean(iceApplicantId)
       this.setData({
         view,
         loading: false,
@@ -93,7 +101,9 @@ Page({
         assignedVideoUrl,
         assignedVideoLabel,
         iceVerified,
-        applied: this.data.applied || Boolean(iceApplicantId && assignedVideoUrl),
+        icePendingConfirm,
+        iceRejected,
+        applied: this.data.applied || iceApplied,
       })
     } catch (e) {
       const msg = String(e.message || e)
@@ -130,6 +140,42 @@ Page({
           content: '链接已复制，请在浏览器中打开下载后发布至抖音。',
           showCancel: false,
         }),
+    })
+  },
+  async confirmIceReceipt() {
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    this.setData({ iceConfirming: true })
+    try {
+      await ops.confirmIceTask(this.data.id, this.data.iceApplicantId, 'confirm')
+      wx.showToast({ title: '已确认接收', icon: 'success' })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ iceConfirming: false })
+    }
+  },
+  async rejectIceTask() {
+    if (!this.data.iceApplicantId) return
+    const that = this
+    wx.showModal({
+      title: '拒绝任务',
+      content: '拒绝后名额将释放，是否继续？',
+      success(res) {
+        if (!res.confirm) return
+        that.setData({ iceConfirming: true })
+        ops
+          .confirmIceTask(that.data.id, that.data.iceApplicantId, 'reject')
+          .then(() => {
+            wx.showToast({ title: '已拒绝', icon: 'none' })
+            return that.loadOrder(that.data.id)
+          })
+          .catch((e) => wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' }))
+          .finally(() => that.setData({ iceConfirming: false }))
+      },
     })
   },
   async submitIceDouyin() {
