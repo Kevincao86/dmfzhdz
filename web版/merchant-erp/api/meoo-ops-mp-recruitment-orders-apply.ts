@@ -7,6 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentApplicant } from '../src/lib/opsRegistryTypes.js'
+import { applyIceMpRecruitment, isIceMpOrder } from '../src/lib/mpRecruitmentIceCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 
@@ -90,11 +91,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       merchantOrderNo,
       paymentMethod: applicant.paymentMethod || (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
     }
-    const applicants = [...(cur.applicants ?? [])]
-    applicants.unshift(row)
+    let applicants = [...(cur.applicants ?? [])]
+    let iceVideoSlots = cur.iceVideoSlots
+    if (isIceMpOrder(cur)) {
+      const dup = applicants.find((a) => a.id === row.id)
+      if (dup?.assignedIceSlotId) {
+        sendOpsJson(res, 200, { ok: true, assignedVideoDownloadUrl: dup.assignedVideoDownloadUrl })
+        return
+      }
+      const applied = applyIceMpRecruitment(cur, row)
+      if (!applied.ok) {
+        sendOpsJson(res, 409, { ok: false, error: applied.code ?? 'apply_failed', message: applied.error })
+        return
+      }
+      const existingIdx = applicants.findIndex((a) => a.id === applied.applicant.id)
+      if (existingIdx >= 0) applicants[existingIdx] = applied.applicant
+      else applicants.unshift(applied.applicant)
+      iceVideoSlots = cur.iceVideoSlots?.map((s) =>
+        s.slotId === applied.slot.slotId ? applied.slot : s,
+      )
+    } else {
+      applicants.unshift(row)
+    }
     data.mpRecruitmentOrders[idx] = {
       ...cur,
       applicants: applicants.slice(0, 500),
+      iceVideoSlots,
       status: cur.status === 'open' ? 'collecting' : cur.status,
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     }

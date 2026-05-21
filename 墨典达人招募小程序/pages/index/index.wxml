@@ -44,6 +44,14 @@
         <text class="hall-tab-text">急单大厅</text>
         <text class="hall-badge hall-badge--urgent" wx:if="{{urgentRows.length}}">{{urgentRows.length}}</text>
       </view>
+      <view
+        class="hall-tab hall-tab--ice {{hallTab === 'ice' ? 'active' : ''}}"
+        data-tab="ice"
+        bindtap="onHallTab"
+      >
+        <text class="hall-tab-text">云剪任务</text>
+        <text class="hall-badge hall-badge--ice" wx:if="{{iceRows.length}}">{{iceRows.length}}</text>
+      </view>
     </view>
   </view>
 
@@ -78,6 +86,7 @@
       <view class="job-card-top">
         <text class="tag tag-blue">{{item.platform}}</text>
         <text class="tag tag-urgent" wx:if="{{item.urgent}}">急单</text>
+        <text class="tag tag-ice" wx:elif="{{item.isIce}}">云剪</text>
         <text class="tag tag-green" wx:else>{{item.statusLabel}}</text>
       </view>
       <text class="job-title">{{item.title}}</text>
@@ -91,10 +100,11 @@
     </view>
 
     <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
-      <text class="state-empty-icon">{{hallTab === 'urgent' ? '⚡' : '📋'}}</text>
-      <text class="empty-title">{{hallTab === 'urgent' ? '暂无急单' : '暂无招募'}}</text>
+      <text class="state-empty-icon">{{hallTab === 'urgent' ? '⚡' : hallTab === 'ice' ? '🎬' : '📋'}}</text>
+      <text class="empty-title">{{hallTab === 'urgent' ? '暂无急单' : hallTab === 'ice' ? '暂无云剪任务' : '暂无招募'}}</text>
       <text class="hint">
         <block wx:if="{{hallTab === 'urgent'}}">急单含加急字样或高预算近期任务，请稍后再看</block>
+        <block wx:elif="{{hallTab === 'ice'}}">运营下发云剪单后展示，认领成片并回传抖音链接</block>
         <block wx:else>运营发布小程序招募后将展示在此</block>
       </text>
     </view>

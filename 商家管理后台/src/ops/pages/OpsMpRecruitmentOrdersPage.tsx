@@ -14,15 +14,17 @@ function mpStatusLabel(s: MpStatus): string {
   const m: Record<MpStatus, string> = {
     open: '招募中',
     collecting: '收集中',
+    pending_settlement: '待结算',
     closed: '已关闭',
     done: '已完成',
   }
-  return m[s]
+  return m[s] ?? s
 }
 
 function mpStatusStyle(s: MpStatus): string {
   if (s === 'open') return 'bg-emerald-500/15 text-emerald-400'
   if (s === 'collecting') return 'bg-sky-500/15 text-sky-400'
+  if (s === 'pending_settlement') return 'bg-violet-500/15 text-violet-300'
   if (s === 'done') return 'bg-indigo-500/15 text-indigo-300'
   return 'bg-slate-600 text-slate-300'
 }
@@ -97,6 +99,7 @@ export default function OpsMpRecruitmentOrdersPage() {
           <option value="all">全部</option>
           <option value="open">招募中</option>
           <option value="collecting">收集中</option>
+          <option value="pending_settlement">待结算</option>
           <option value="closed">已关闭</option>
           <option value="done">已完成</option>
         </select>

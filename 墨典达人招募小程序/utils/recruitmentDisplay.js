@@ -116,10 +116,11 @@ function enrichMpOrder(mp, merchant) {
   }
   const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)
 
+  const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
   const tags = [
     { text: platform, tone: platform.includes('红') ? 'pink' : 'blue' },
-    { text: '线下结算', tone: 'gray' },
-    { text: '需要反选', tone: 'gray' },
+    isIce ? { text: '云剪·仅发布', tone: 'pink' } : { text: '线下结算', tone: 'gray' },
+    isIce ? { text: '有素材', tone: 'gray' } : { text: '需要反选', tone: 'gray' },
   ]
 
   return {
@@ -142,6 +143,11 @@ function enrichMpOrder(mp, merchant) {
     applicantCount: (mp.applicants || []).length,
     status: mp.status,
     summaryShort: recruitmentInfoLines[0] || title,
+    isIce,
+    iceSlotsTotal: isIce ? (mp.iceVideoSlots || []).length || Number(recruitCount) || 0 : 0,
+    iceSlotsTaken: isIce
+      ? (mp.iceVideoSlots || []).filter((s) => s && s.assignedApplicantId).length
+      : 0,
   }
 }
 

@@ -1,6 +1,8 @@
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
+const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
+
 Page({
   data: {
     id: '',
@@ -8,6 +10,13 @@ Page({
     err: '',
     view: null,
     applied: false,
+    isIce: false,
+    iceApplicantId: '',
+    assignedVideoUrl: '',
+    assignedVideoLabel: '',
+    douyinUrl: '',
+    iceSubmitting: false,
+    iceVerified: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -15,6 +24,17 @@ Page({
     this.setData({ id, applied })
     if (id) this.loadOrder(id)
     else this.setData({ loading: false, err: '缺少招募单号' })
+  },
+  onShow() {
+    if (this.data.id) this.syncIceApplicantFromStorage()
+  },
+  syncIceApplicantFromStorage() {
+    try {
+      const raw = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${this.data.id}`)
+      if (raw) this.setData({ iceApplicantId: String(raw) })
+    } catch {
+      /* ignore */
+    }
   },
   onShareAppMessage() {
     const v = this.data.view
@@ -43,13 +63,95 @@ Page({
       }
       const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
       const view = display.enrichMpOrder(mp, merchantOrder)
-      this.setData({ view, loading: false })
+      const isIce = !!view.isIce
+      let iceApplicantId = this.data.iceApplicantId
+      try {
+        const stored = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${id}`)
+        if (stored) iceApplicantId = String(stored)
+      } catch {
+        /* ignore */
+      }
+      let assignedVideoUrl = ''
+      let assignedVideoLabel = ''
+      let iceVerified = false
+      if (isIce && iceApplicantId) {
+        const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
+        if (app) {
+          assignedVideoUrl = app.assignedVideoDownloadUrl || ''
+          assignedVideoLabel = app.assignedVideoLabel || ''
+          iceVerified = app.aiVerifyStatus === 'passed'
+          if (app.douyinPublishUrl) {
+            this.setData({ douyinUrl: app.douyinPublishUrl })
+          }
+        }
+      }
+      this.setData({
+        view,
+        loading: false,
+        isIce,
+        iceApplicantId,
+        assignedVideoUrl,
+        assignedVideoLabel,
+        iceVerified,
+        applied: this.data.applied || Boolean(iceApplicantId && assignedVideoUrl),
+      })
     } catch (e) {
       const msg = String(e.message || e)
       const hint = msg.includes('fail')
         ? '无法加载订单，请确认 dev 服务已启动且已勾选「不校验合法域名」'
         : msg
       this.setData({ loading: false, err: hint })
+    }
+  },
+  onDouyinField(e) {
+    this.setData({ douyinUrl: e.detail.value })
+  },
+  copyDownloadUrl() {
+    const url = this.data.assignedVideoUrl
+    if (!url) return
+    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
+    wx.setClipboardData({
+      data: full,
+      success: () => wx.showToast({ title: '下载链接已复制', icon: 'success' }),
+    })
+  },
+  openDownload() {
+    const url = this.data.assignedVideoUrl
+    if (!url) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
+    wx.setClipboardData({
+      data: full,
+      success: () =>
+        wx.showModal({
+          title: '下载成片',
+          content: '链接已复制，请在浏览器中打开下载后发布至抖音。',
+          showCancel: false,
+        }),
+    })
+  },
+  async submitIceDouyin() {
+    const url = String(this.data.douyinUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '请填写抖音作品链接', icon: 'none' })
+      return
+    }
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先报名认领', icon: 'none' })
+      return
+    }
+    this.setData({ iceSubmitting: true })
+    try {
+      await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
+      wx.showToast({ title: 'AI 核查通过', icon: 'success' })
+      this.setData({ iceVerified: true })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ iceSubmitting: false })
     }
   },
   goHome() {
@@ -62,8 +164,9 @@ Page({
       `mpId=${encodeURIComponent(this.data.id)}`,
       `merchantOrderNo=${encodeURIComponent(v.merchantOrderNo || '')}`,
       `platform=${encodeURIComponent(v.platform || '抖音')}`,
-    ].join('&')
-    wx.navigateTo({ url: `/pages/apply/apply?${q}` })
+    ]
+    if (this.data.isIce) q.push('ice=1')
+    wx.navigateTo({ url: `/pages/apply/apply?${q.join('&')}` })
   },
   copyTask() {
     const v = this.data.view

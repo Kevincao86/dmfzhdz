@@ -26,6 +26,8 @@ import {
   type IceBatchJob,
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
+import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -83,6 +85,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [preset, setPreset] = useState('无附加特效')
   const [batchGenerateEnabled, setBatchGenerateEnabled] = useState(false)
   const [batchGenerateCount, setBatchGenerateCount] = useState<IceBatchGenerateCount>(10)
+  const [dispatchTalent, setDispatchTalent] = useState(false)
+  const [dispatchBusy, setDispatchBusy] = useState(false)
 
   const aspect = useMemo(
     () => ICE_ASPECT_PRESETS.find((a) => a.id === aspectId) ?? ICE_ASPECT_PRESETS[0],
@@ -910,6 +914,62 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               ) : null}
             </div>
           </section>
+
+          {batchGenerateEnabled && doneJobs.length > 0 ? (
+            <div className="mt-5 rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={dispatchTalent}
+                  onChange={(e) => setDispatchTalent(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-violet-300 text-violet-600"
+                />
+                <span className="text-sm text-violet-950">
+                  <span className="font-semibold">派发达人投放</span>
+                  <span className="mt-1 block text-xs font-normal text-violet-800/90">
+                    将 {doneJobs.length} 条批量云剪成片推送至运营「商家达人招募订单」，由运营下发云剪单至达人小程序。
+                  </span>
+                </span>
+              </label>
+              {dispatchTalent ? (
+                <button
+                  type="button"
+                  disabled={dispatchBusy || !briefOk}
+                  onClick={() => {
+                    void (async () => {
+                      setDispatchBusy(true)
+                      setErr(null)
+                      try {
+                        const { orderId } = await dispatchIceBatchToRecruitmentOps({
+                          doneJobs,
+                          editBrief,
+                          supabase: supabaseConfigured ? supabase : null,
+                        })
+                        setHint(
+                          `已派发达人投放，订单 ${orderId} 已写入运营台，请在「商家达人招募订单」处理并选择云剪单。`,
+                        )
+                        setDispatchTalent(false)
+                      } catch (e) {
+                        setErr(e instanceof Error ? e.message : String(e))
+                      } finally {
+                        setDispatchBusy(false)
+                      }
+                    })()
+                  }}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {dispatchBusy ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      提交中…
+                    </>
+                  ) : (
+                    '确认派发达人投放'
+                  )}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           <ConfigFootnote cfg={cfg} />
         </aside>

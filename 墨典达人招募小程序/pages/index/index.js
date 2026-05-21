@@ -2,11 +2,12 @@ const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
 const memberStore = require('../../utils/talentMember.js')
-const { isUrgentMpOrder } = require('../../utils/recruitmentUrgent.js')
+const { isUrgentMpOrder, isIceMpOrder } = require('../../utils/recruitmentUrgent.js')
 
 const STATUS_LABEL = {
   open: '招募中',
   collecting: '收集中',
+  pending_settlement: '待结算',
   closed: '已关闭',
   done: '已完成',
 }
@@ -27,6 +28,7 @@ function mapRow(mp, reg) {
     summary: view.summaryShort,
     applicantCount: view.applicantCount,
     urgent,
+    isIce: isIceMpOrder(mp),
   }
 }
 
@@ -40,6 +42,7 @@ Page({
     memberTypeLabel: '',
     normalRows: [],
     urgentRows: [],
+    iceRows: [],
     displayRows: [],
   },
   onShow() {
@@ -60,6 +63,7 @@ Page({
         loading: false,
         normalRows: [],
         urgentRows: [],
+        iceRows: [],
         displayRows: [],
       })
       return
@@ -70,9 +74,10 @@ Page({
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
       const mapped = openList.map((mp) => mapRow(mp, reg))
-      const urgentRows = mapped.filter((r) => r.urgent)
-      const normalRows = mapped.filter((r) => !r.urgent)
-      this.setData({ normalRows, urgentRows, loading: false })
+      const iceRows = mapped.filter((r) => r.isIce)
+      const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
+      const normalRows = mapped.filter((r) => !r.urgent && !r.isIce)
+      this.setData({ normalRows, urgentRows, iceRows, loading: false })
       this.applyHallTab(this.data.hallTab)
     } catch (e) {
       const msg = String(e.message || e)
@@ -85,17 +90,20 @@ Page({
         err: hint,
         normalRows: [],
         urgentRows: [],
+        iceRows: [],
         displayRows: [],
       })
     }
   },
   applyHallTab(tab) {
-    const displayRows = tab === 'urgent' ? this.data.urgentRows : this.data.normalRows
+    let displayRows = this.data.normalRows
+    if (tab === 'urgent') displayRows = this.data.urgentRows
+    else if (tab === 'ice') displayRows = this.data.iceRows
     this.setData({ hallTab: tab, displayRows })
   },
   onHallTab(e) {
     const tab = e.currentTarget.dataset.tab
-    if (tab === 'urgent' || tab === 'normal') this.applyHallTab(tab)
+    if (tab === 'urgent' || tab === 'normal' || tab === 'ice') this.applyHallTab(tab)
   },
   goRegister() {
     wx.navigateTo({ url: '/pages/register/register' })
