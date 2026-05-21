@@ -14,7 +14,10 @@ import {
 } from '../opsRegistryApi'
 import { normalizeRecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import { buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
-import { findMpOrderByMerchantOrderId } from '../mpRecruitmentDedup'
+import {
+  MP_RECRUIT_ALREADY_SUBMITTED_MSG,
+  resolveMpOrderForMerchantOrder,
+} from '../mpRecruitmentDedup'
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
 
@@ -236,7 +239,28 @@ export default function OpsRecruitmentOrdersPage() {
     }
   }
 
-  const openAcceptModeChoice = (order: RegistryRecruitmentOrder) => {
+  const guardMerchantMpRecruitmentDup = async (
+    order: RegistryRecruitmentOrder,
+  ): Promise<RegistryMpRecruitmentOrder | null> => {
+    try {
+      const reg = await fetchRegistry()
+      const existing = resolveMpOrderForMerchantOrder(reg.mpRecruitmentOrders, order)
+      if (existing) {
+        window.alert(`${MP_RECRUIT_ALREADY_SUBMITTED_MSG}\n关联小程序单号：${existing.id}`)
+        return existing
+      }
+    } catch {
+      /* 网络异常时仍允许进入下一步，由服务端 append 去重 */
+    }
+    return null
+  }
+
+  const openAcceptModeChoice = async (order: RegistryRecruitmentOrder) => {
+    const existing = await guardMerchantMpRecruitmentDup(order)
+    if (existing) {
+      setMpShareInfo({ merchantOrderId: order.id, mpOrderId: existing.id })
+      return
+    }
     setProcessOrder(null)
     setMpRecruitPlatform(normalizeRecruitmentPlatform(order.recruitmentPlatform || order.accountType))
     setMpHallKind('normal')
@@ -253,15 +277,11 @@ export default function OpsRecruitmentOrdersPage() {
     setMpAcceptBusy(true)
     try {
       const reg = await fetchRegistry()
-      const existing = findMpOrderByMerchantOrderId(reg.mpRecruitmentOrders, order.id)
+      const existing = resolveMpOrderForMerchantOrder(reg.mpRecruitmentOrders, order)
       if (existing) {
-        window.alert(
-          `该商家订单已存在小程序招募单 ${existing.id}，不可重复创建。请在「小程序达人招募订单」查看。`,
-        )
-        return
-      }
-      if (order.linkedMpOrderId?.trim()) {
-        window.alert(`该订单已关联小程序单 ${order.linkedMpOrderId.trim()}，不可重复创建。`)
+        window.alert(`${MP_RECRUIT_ALREADY_SUBMITTED_MSG}\n关联小程序单号：${existing.id}`)
+        setAcceptModeChoiceOrder(null)
+        setMpShareInfo({ merchantOrderId: order.id, mpOrderId: existing.id })
         return
       }
 
@@ -589,7 +609,7 @@ export default function OpsRecruitmentOrdersPage() {
                   disabled={patchBusyId === processOrder.id || processOrder.status === st}
                   onClick={() => {
                     if (st === 'accepted' && processOrder.status === 'pending') {
-                      openAcceptModeChoice(processOrder)
+                      void openAcceptModeChoice(processOrder)
                       return
                     }
                     void changeOrderStatus(processOrder.id, st)
@@ -706,7 +726,13 @@ export default function OpsRecruitmentOrdersPage() {
               <button
                 type="button"
                 disabled={mpAcceptBusy}
-                onClick={() => void confirmMiniprogramAccept(acceptModeChoiceOrder)}
+                onClick={() => {
+                  void (async () => {
+                    const hit = await guardMerchantMpRecruitmentDup(acceptModeChoiceOrder)
+                    if (hit) return
+                    void confirmMiniprogramAccept(acceptModeChoiceOrder)
+                  })()
+                }}
                 className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-950/30 px-4 py-3 text-sm font-medium text-emerald-100 hover:bg-emerald-900/40 disabled:opacity-50"
               >
                 <Smartphone className="h-4 w-4" />

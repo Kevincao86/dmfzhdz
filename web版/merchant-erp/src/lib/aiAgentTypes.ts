@@ -46,7 +46,7 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
 
 /** 新对话 / 重置时的首条助手问候（与上下文初始态一致） */
 export const AI_AGENT_WELCOME_CONTENT =
-  '你好，我是墨典 AI 助手。选好助手风格后，直接描述你想做的事；需要改商品、发消息等操作时，我会先给你看步骤说明，你确认后再继续。'
+  '你好，我是墨典 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；我会按所选模型与风格回答。涉及改商品、发消息等操作会先展示预览，确认后再继续。'
 
 /** 智能体首页与抽屉共用的快捷任务 */
 export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [

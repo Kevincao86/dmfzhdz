@@ -30,6 +30,8 @@ export type AIChatRequest = {
   /** 预留：当前网关实现为非流式；stream=true 时返回 501 */
   stream?: boolean
   taskType?: AiTaskType
+  /** 智能体下拉 key，用于服务端拼接对应该模型的对话风格（不改变实际路由模型） */
+  agentPickerKey?: string
 }
 
 export type AIChatResponse = {

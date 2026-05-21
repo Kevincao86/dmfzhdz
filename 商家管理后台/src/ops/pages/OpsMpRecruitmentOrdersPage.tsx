@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
+import { dedupeMpOrdersByMerchantSource } from '../mpRecruitmentDedup'
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import {
   fetchRegistry,
@@ -35,7 +36,7 @@ export default function OpsMpRecruitmentOrdersPage() {
   const load = useCallback(async () => {
     try {
       const r = await fetchRegistry()
-      setOrders(r.mpRecruitmentOrders ?? [])
+      setOrders(dedupeMpOrdersByMerchantSource(r.mpRecruitmentOrders))
     } catch {
       setOrders([])
     }
@@ -78,7 +79,7 @@ export default function OpsMpRecruitmentOrdersPage() {
         <div>
           <h1 className="text-xl font-semibold text-white">小程序达人招募订单</h1>
           <p className="mt-1 text-sm text-slate-500">
-            运营在商家订单中选择「小程序招募」后自动生成；达人通过「墨典达人招募小程序」报名，报名记录同步至本列表。
+            运营在商家订单中选择「小程序招募」后自动生成；同一商家订单仅对应一条小程序单号。达人通过「墨典达人招募小程序」报名，报名记录同步至本列表。
           </p>
         </div>
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">

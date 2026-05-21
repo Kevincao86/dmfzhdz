@@ -51,16 +51,9 @@ import {
   isComposerImageFile,
   isComposerVideoFile,
 } from '../lib/aiVideoPoster'
-import {
-  detectImageGenerationIntent,
-  modelPickerKeyForNativeImageVendor,
-  resolveModelPickerKeyForImageIntent,
-} from '../services/ai/aiImageIntentRouting'
-import {
-  agentNativeImageRouteFromPickerKey,
-  effectiveChatPickerKey,
-  isAgentImagePickerKey,
-} from '../services/ai/agentImageModelKeys'
+import { modelPickerKeyForNativeImageVendor } from '../services/ai/aiImageIntentRouting'
+import { shouldRouteToAgentNativeImage } from '../services/ai/agentModelRoute'
+import { agentNativeImageRouteFromPickerKey, effectiveChatPickerKey } from '../services/ai/agentImageModelKeys'
 import {
   defaultAiModelPickerKeyForPlan,
   listAiModelPickerOptionsForPlan,
@@ -718,9 +711,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       imageDataUrls: string[] = [],
       pickerKeyOverride?: string,
     ) => {
-      const rawKey = pickerKeyOverride ?? modelPickerKey
-      const key = effectiveChatPickerKey(rawKey)
-      const parsed = parseAiModelPickerKey(key)
+      const userPickerKey = pickerKeyOverride ?? modelPickerKey
+      const chatKey = effectiveChatPickerKey(userPickerKey)
+      const parsed = parseAiModelPickerKey(chatKey)
       if (!parsed) return
       setAiSending(true)
       try {
@@ -736,6 +729,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           messages: history,
           ...(imageDataUrls.length ? { imageDataUrls } : {}),
           taskType,
+          agentPickerKey: userPickerKey,
         })
         const display =
           summarizeAssistantContent(res.content) ??
@@ -798,16 +792,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         if (a.kind === 'video') revokeComposerAttachment(a)
       }
       setPendingComposerAttachments([])
-      const nextPickerKey = resolveModelPickerKeyForImageIntent(
-        modelPickerKey,
-        modelPickerOptions,
-        line,
-        visionUrls.length > 0,
-      )
-      if (nextPickerKey !== modelPickerKey) {
-        setModelPickerKeyState(nextPickerKey)
-        savePickerKey(nextPickerKey)
-      }
+      const activePickerKey = modelPickerKey
       const bubbleImageUrls: string[] = []
       for (const a of attachments) {
         if (a.kind === 'image') bubbleImageUrls.push(a.url)
@@ -828,15 +813,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       queueMicrotask(() => {
         void (async () => {
           const refImg = visionUrls[0]?.trim()
-          const tryNativePixel =
-            (detectImageGenerationIntent(line) && visionUrls.length === 0) ||
-            (isAgentImagePickerKey(nextPickerKey) && visionUrls.length === 0 && trimmed.length > 0) ||
-            (Boolean(refImg) &&
-              (isAgentImagePickerKey(nextPickerKey) || detectImageGenerationIntent(line)))
-          if (tryNativePixel) {
+          if (shouldRouteToAgentNativeImage(activePickerKey, line, visionUrls)) {
             setAiSending(true)
             try {
-              const imgOpts = buildAgentImagePostOpts(nextPickerKey, refImg)
+              const imgOpts = buildAgentImagePostOpts(activePickerKey, refImg)
               const imgRes = await postAiAgentNativeImage(line, imgOpts)
               if (imgRes.ok) {
                 if (imgRes.channel === 'builtin') {
@@ -870,7 +850,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             inferTaskTypeFromText(line),
             pageContext?.pageLabel,
             visionUrls,
-            effectiveChatPickerKey(nextPickerKey),
+            activePickerKey,
           )
         })()
       })
@@ -1056,16 +1036,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       for (const a of prev) revokeComposerAttachment(a)
       return []
     })
-      const nextPickerKey = resolveModelPickerKeyForImageIntent(
-        modelPickerKey,
-        modelPickerOptions,
-        q,
-        false,
-      )
-      if (nextPickerKey !== modelPickerKey) {
-        setModelPickerKeyState(nextPickerKey)
-        savePickerKey(nextPickerKey)
-      }
+      const activePickerKey = modelPickerKey
       const pl = '顶部搜索 / AI 指令'
       setPageContext({ pageLabel: pl })
       setDrawerOpen(true)
@@ -1078,10 +1049,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       queueMicrotask(() => {
         void (async () => {
-          if (detectImageGenerationIntent(q) || isAgentImagePickerKey(nextPickerKey)) {
+          if (shouldRouteToAgentNativeImage(activePickerKey, q, [])) {
             setAiSending(true)
             try {
-              const imgOpts = buildAgentImagePostOpts(nextPickerKey)
+              const imgOpts = buildAgentImagePostOpts(activePickerKey)
               const imgRes = await postAiAgentNativeImage(q, imgOpts)
               if (imgRes.ok) {
                 if (imgRes.channel === 'builtin') {
@@ -1114,7 +1085,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             inferTaskTypeFromText(q),
             pl,
             [],
-            effectiveChatPickerKey(nextPickerKey),
+            activePickerKey,
           )
         })()
       })
