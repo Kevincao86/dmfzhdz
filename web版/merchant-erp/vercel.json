@@ -135,7 +135,7 @@
       "maxDuration": 60
     },
     "api/meoo-ai-chat.ts": {
-      "includeFiles": "{vite-plugins,src/lib,src/services/ai}/**",
+      "includeFiles": "{vite-plugins,src}/**",
       "maxDuration": 120
     },
     "api/meoo-ai-agent-image.ts": {

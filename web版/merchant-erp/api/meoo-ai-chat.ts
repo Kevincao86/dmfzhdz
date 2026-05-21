@@ -6,8 +6,7 @@ import {
   handleMerchantApiOptions,
   rawBody,
   sendMerchantJson,
-} from './merchant/merchantGatewayShared.js'
-import { runMeooAiChatCore } from '../vite-plugins/aiGateway/meooAiChatCore.js'
+} from './merchant/merchantGatewayLite.js'
 
 export const config = { maxDuration: 120 }
 
@@ -21,6 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const bodyRaw = rawBody(req)
     const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+    const { runMeooAiChatCore } = await import('../vite-plugins/aiGateway/meooAiChatCore.js')
     const out = await runMeooAiChatCore(bodyRaw, auth, process.env as Record<string, string>)
     try {
       JSON.stringify(out.body)
@@ -38,6 +38,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[meoo-ai-chat] fatal', msg)
-    sendMerchantJson(res, 500, { ok: false, error: 'internal_error', detail: msg.slice(0, 600) })
+    sendMerchantJson(res, 500, {
+      ok: false,
+      error: 'internal_error',
+      detail: msg.slice(0, 600),
+      hint: '若为 MODULE_NOT_FOUND，请确认 Vercel 已包含 web版/merchant-erp/src 与 vite-plugins',
+    })
   }
 }
