@@ -1,0 +1,61 @@
+import type { AIModelFamily } from './types'
+import { isAgentImagePickerKey, parseAgentImagePickerKey, effectiveChatPickerKey } from './agentImageModelKeys'
+import { detectImageGenerationIntent } from './aiImageIntentRouting'
+import { parseAiModelPickerKey } from './modelRegistry'
+
+/**
+ * 是否应走 /api/meoo-ai-agent-image（像素出图）。
+ * 用户选中生图模型时，仅在生图意图或图生图（有参考图）时出图；纯对话仍走 chat。
+ */
+export function shouldRouteToAgentNativeImage(
+  pickerKey: string,
+  userLine: string,
+  visionUrls: string[],
+): boolean {
+  if (!isAgentImagePickerKey(pickerKey)) return false
+  const refImg = visionUrls[0]?.trim()
+  if (refImg) return true
+  return detectImageGenerationIntent(userLine)
+}
+
+function familyFromChatPickerKey(key: string): AIModelFamily | null {
+  const p = parseAiModelPickerKey(key)
+  return p?.provider === 'tokenmix' ? p.modelFamily : null
+}
+
+/** 按用户所选模型（含生图项对应的对话厂商）追加简短对话风格说明 */
+export function dialogueStyleAddonForPickerKey(pickerKey: string): string {
+  const chatKey = effectiveChatPickerKey(pickerKey)
+  const img = parseAgentImagePickerKey(pickerKey)
+  if (img?.kind === 'vendor') {
+    if (img.vendor === 'qwen') return '使用通义千问：中文表达自然，偏本地生活商家运营与短视频脚本。'
+    if (img.vendor === 'doubao') return '使用豆包：口语化、接地气，适合门店老板快速读懂。'
+    if (img.vendor === 'minimax') return '使用 MiniMax：简洁有力，适合口播与短文案。'
+    return '使用墨典内置生图引擎配套的对话风格：务实、可执行。'
+  }
+
+  const parsed = parseAiModelPickerKey(chatKey)
+  if (!parsed) return ''
+
+  if (parsed.provider === 'tokenmix') {
+    const fam = familyFromChatPickerKey(chatKey)
+    switch (fam) {
+      case 'openai':
+        return '使用 OpenAI 系列：结构清晰，要点分明，英文术语保留原文。'
+      case 'claude':
+        return '使用 Claude：条理分明，适当分点，语气专业克制。'
+      case 'gemini':
+        return '使用 Gemini：务实可执行，步骤与结论优先。'
+      case 'grok':
+        return '使用 Grok：直接爽快，可略带网感，避免冗长铺垫。'
+      default:
+        return ''
+    }
+  }
+  if (parsed.provider === 'qwen') return '使用通义千问：中文为主，贴合餐饮/本地生活商家场景。'
+  if (parsed.provider === 'doubao') return '使用豆包：口语自然，像店长在跟店员交代。'
+  if (parsed.provider === 'deepseek') return '使用 DeepSeek：简洁、逻辑清楚，少废话。'
+  if (parsed.provider === 'kimi') return '使用 Kimi：长文也能收束，先结论后展开。'
+  if (parsed.provider === 'minimax') return '使用 MiniMax：短句、好念，适合口播与活动话术。'
+  return ''
+}

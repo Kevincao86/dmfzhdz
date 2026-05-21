@@ -73,7 +73,9 @@ export async function runMeooAiChatCore(
     provider,
     model: rawModel ? rawModel : undefined,
     ...(provider === 'tokenmix' ? { modelFamily } : {}),
-    messages: mergeSystemPrompt(parsed.messages),
+    messages: mergeSystemPrompt(parsed.messages, {
+      agentPickerKey: typeof parsed.agentPickerKey === 'string' ? parsed.agentPickerKey : undefined,
+    }),
     ...(imageDataUrls?.length ? { imageDataUrls } : {}),
     temperature: parsed.temperature,
     stream: false,

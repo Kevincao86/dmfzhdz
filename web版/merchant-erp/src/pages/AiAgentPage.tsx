@@ -66,7 +66,7 @@ export default function AiAgentPage() {
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">我们该做什么？</h1>
             <p className="mt-2 text-sm text-slate-500">
-              先选好助手风格，再描述任务或提问；涉及创建、修改、发布等操作会先展示预览，需您确认后再继续。
+              先在输入框右侧选好模型，再描述任务或提问；涉及创建、修改、发布等操作会先展示预览，需您确认后再继续。
             </p>
             <button
               type="button"

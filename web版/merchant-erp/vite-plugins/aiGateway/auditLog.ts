@@ -1,5 +1,6 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
 import { AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
+import { dialogueStyleAddonForPickerKey } from '../../src/services/ai/agentModelRoute.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 
 export type AuditStatus = 'ok' | 'error'
@@ -32,15 +33,24 @@ export function logAiChatServerLine(payload: Record<string, unknown>): void {
   }
 }
 
-export function mergeSystemPrompt(messages: AIChatRequest['messages']): AIChatRequest['messages'] {
+function buildAgentSystemContent(req: Pick<AIChatRequest, 'agentPickerKey'>): string {
+  const style =
+    typeof req.agentPickerKey === 'string' && req.agentPickerKey.trim()
+      ? dialogueStyleAddonForPickerKey(req.agentPickerKey.trim())
+      : ''
+  return style ? `${AI_AGENT_SYSTEM_PROMPT}\n\n${style}` : AI_AGENT_SYSTEM_PROMPT
+}
+
+export function mergeSystemPrompt(
+  messages: AIChatRequest['messages'],
+  req?: Pick<AIChatRequest, 'agentPickerKey'>,
+): AIChatRequest['messages'] {
+  const base = buildAgentSystemContent(req ?? {})
   const first = messages[0]
   if (first?.role === 'system') {
-    return [
-      { role: 'system', content: `${AI_AGENT_SYSTEM_PROMPT}\n\n${first.content}` },
-      ...messages.slice(1),
-    ]
+    return [{ role: 'system', content: `${base}\n\n${first.content}` }, ...messages.slice(1)]
   }
-  return [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }, ...messages]
+  return [{ role: 'system', content: base }, ...messages]
 }
 
 export async function forwardAuditToMerchantAdmin(opts: {
