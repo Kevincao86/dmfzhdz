@@ -64,6 +64,8 @@ export type IceBatchJob = {
   id: string
   label: string
   mediaUrl: string
+  /** 多图一键成片：按顺序合成的图片 OSS/HTTPS 地址 */
+  imageUrls?: string[]
   phase: 'pending' | 'pipeline' | 'polling' | 'done' | 'failed'
   message?: string
   exportId?: string
@@ -193,7 +195,7 @@ async function postJsonPaths<T extends { ok: boolean; message?: string }>(
 async function uploadIceViaServer(
   file: File,
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
-  const contentType = file.type || 'video/mp4'
+  const contentType = defaultContentType(file)
   const label = file.name.replace(/\.[^.]+$/, '') || file.name
 
   if (file.size <= ICE_CLIENT_CHUNK_BYTES) {
@@ -260,8 +262,14 @@ async function uploadIceViaServer(
   return { ok: true, mediaUrl: done.mediaUrl, label: done.label ?? label }
 }
 
-/** 本地上传：经商户 BFF 写入 OSS（无需浏览器直传，避免 CORS） */
-export async function uploadIceLocalVideoFile(
+function defaultContentType(file: File): string {
+  if (file.type?.trim()) return file.type
+  if (/\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name)) return 'image/jpeg'
+  return 'video/mp4'
+}
+
+/** 本地上传：经商户 BFF 写入 OSS（视频或图片） */
+export async function uploadIceLocalMediaFile(
   file: File,
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
   const viaServer = await uploadIceViaServer(file)
@@ -269,7 +277,7 @@ export async function uploadIceLocalVideoFile(
 
   const init = await postIceUploadInit({
     fileName: file.name,
-    contentType: file.type || 'video/mp4',
+    contentType: defaultContentType(file),
     sizeBytes: file.size,
   })
   if (!init.ok) {
@@ -299,8 +307,12 @@ export async function uploadIceLocalVideoFile(
   return { ok: true, mediaUrl: init.mediaUrl, label: file.name.replace(/\.[^.]+$/, '') || file.name }
 }
 
+/** @deprecated 使用 uploadIceLocalMediaFile */
+export const uploadIceLocalVideoFile = uploadIceLocalMediaFile
+
 export async function postIcePipeline(body: {
-  mediaUrl: string
+  mediaUrl?: string
+  imageUrls?: string[]
   projectName?: string
   /** 剪辑文案指令，写入云端项目描述 */
   editBrief?: string

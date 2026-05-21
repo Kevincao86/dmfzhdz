@@ -22,6 +22,7 @@ const MEDIA_URL_EXPIRES_SEC = 7 * 24 * 3600
 function safeExt(fileName: string): string {
   const ext = path.extname(fileName).toLowerCase()
   if (['.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv'].includes(ext)) return ext
+  if (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.heic'].includes(ext)) return ext
   return '.mp4'
 }
 
