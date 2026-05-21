@@ -48,7 +48,7 @@ import NoviceRecruitmentForm from './recruitment/NoviceRecruitmentForm'
 const FLOW = [
   {
     title: '发布招募需求',
-    desc: '设置探店时间段、地点、达人标签、预算等招募条件',
+    desc: '开环：探店招募条件与预算；云剪闭环：批量成片后派发达人投放',
     icon: Target,
     color: 'bg-blue-500',
     view: 'createPick' as const,
@@ -1399,7 +1399,7 @@ export default function RecruitmentPage() {
               <div>
                 <p className="mb-2 text-xs font-medium text-gray-600">环节进度</p>
                 <div className="flex gap-1.5 overflow-x-auto pb-1">
-                  {buildRecruitmentProgressSteps(hubOrder.status).map((step, idx) => (
+                  {buildRecruitmentProgressSteps(hubOrder).map((step, idx) => (
                     <div
                       key={`${step.title}-${idx}`}
                       className={cn(

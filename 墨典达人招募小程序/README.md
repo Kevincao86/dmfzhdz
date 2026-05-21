@@ -27,9 +27,11 @@
 
 ## 功能
 
-- **招募大厅 / 急单大厅**：拉取注册表中小程序招募单
-- **报名**：提交至 `mpRecruitmentOrders` 对应订单
+- **招募大厅 / 急单大厅（开环）**：达人报名 → 运营反选 → 探店寄样 → 审核发布 → 结算
+- **云剪任务大厅（闭环）**：云剪成片直派 → 达人**确认接收/拒绝** → 下载成片 → 发布抖音回链 → AI 核查 → 待结算
 - **墨典达人会员注册**：资料同步至 `mpTalentMembers` 与墨典达人库
+
+闭环云剪 API：`/api/meoo-ops-mp-recruitment-ice-confirm`（确认/拒绝）、`/api/meoo-ops-mp-recruitment-ice-submit`（回传抖音链接）
 
 ## 上架前
 

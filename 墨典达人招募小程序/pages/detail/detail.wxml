@@ -68,15 +68,15 @@
       <view class="steps" wx:if="{{isIce}}">
         <view class="step-item">
           <text class="step-num">1</text>
-          <text class="step-body">认领任务并填写达人资料</text>
+          <text class="step-body">认领云剪任务（闭环）</text>
         </view>
         <view class="step-item">
           <text class="step-num">2</text>
-          <text class="step-body">下载系统分配的云剪成片</text>
+          <text class="step-body">确认接收后下载分配成片</text>
         </view>
         <view class="step-item">
           <text class="step-num">3</text>
-          <text class="step-body">发布抖音后回传作品链接，AI 自动核查</text>
+          <text class="step-body">发布抖音并回传链接，AI 核查后待结算</text>
         </view>
       </view>
       <view class="steps" wx:else>
@@ -99,7 +99,21 @@
       </view>
     </view>
 
-    <view class="card card--success" wx:if="{{applied && isIce && assignedVideoUrl}}">
+    <view class="card card--success" wx:if="{{applied && isIce && icePendingConfirm}}">
+      <text class="success-title">待确认接收</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">请确认是否接受该云剪投放任务；拒绝后名额将释放。</text>
+      <view style="display:flex;gap:16rpx;margin-top:20rpx;">
+        <button class="btn-primary" style="flex:1;" loading="{{iceConfirming}}" bindtap="confirmIceReceipt">确认接收</button>
+        <button class="btn-secondary" style="flex:1;" loading="{{iceConfirming}}" bindtap="rejectIceTask">拒绝</button>
+      </view>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && iceRejected}}">
+      <text class="success-title">已拒绝任务</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该云剪任务，可返回大厅查看其他任务。</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && assignedVideoUrl}}">
       <text class="success-title">✓ 已分配成片</text>
       <text class="hint" style="display:block;margin-top:12rpx;">{{assignedVideoLabel || '云剪成片'}}</text>
       <button class="btn-primary" style="margin-top:20rpx;" bindtap="openDownload">复制下载链接</button>
@@ -109,6 +123,11 @@
         <button class="btn-primary" style="margin-top:16rpx;" loading="{{iceSubmitting}}" bindtap="submitIceDouyin">提交链接 · AI 核查</button>
       </view>
       <text wx:else class="success-title" style="display:block;margin-top:16rpx;">✓ AI 核查已通过</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce}}">
+      <text class="success-title">✓ 认领成功</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">请在下方确认接收任务。</text>
     </view>
 
     <view class="card card--success" wx:elif="{{applied && !isIce}}">

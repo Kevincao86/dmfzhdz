@@ -196,7 +196,10 @@ Page({
           /* ignore */
         }
       }
-      wx.showToast({ title: this.data.isIceMode ? '认领成功' : '报名成功', icon: 'success' })
+      wx.showToast({
+        title: this.data.isIceMode ? '认领成功，请确认接收' : '报名成功',
+        icon: 'success',
+      })
       setTimeout(() => {
         wx.redirectTo({
           url: `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`,

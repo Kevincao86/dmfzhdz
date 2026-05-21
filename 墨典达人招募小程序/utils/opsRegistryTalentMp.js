@@ -69,4 +69,28 @@ async function submitIceDouyin(mpOrderId, applicantId, douyinPublishUrl) {
   throw lastErr || new Error('云剪回传接口不可用')
 }
 
-module.exports = { fetchRegistry, applyToMpOrder, registerTalentMember, submitIceDouyin }
+async function confirmIceTask(mpOrderId, applicantId, action) {
+  const paths = [
+    '/api/meoo-ops-mp-recruitment-ice-confirm',
+    '/api/ops-sync/mp-recruitment-orders/ice-confirm',
+  ]
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await merchantRequest('POST', path, { mpOrderId, applicantId, action })
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('云剪确认接口不可用')
+}
+
+module.exports = {
+  fetchRegistry,
+  applyToMpOrder,
+  registerTalentMember,
+  submitIceDouyin,
+  confirmIceTask,
+}

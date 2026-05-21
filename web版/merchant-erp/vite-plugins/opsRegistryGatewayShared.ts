@@ -25,7 +25,12 @@ import type {
 } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
-import { applyIceMpRecruitment, isIceMpOrder, submitIceDouyinForApplicant } from '../src/lib/mpRecruitmentIceCore.js'
+import {
+  handleIceMpApply,
+  handleIceMpConfirm,
+  isIceMpOrder,
+  submitIceDouyinForApplicant,
+} from '../src/lib/mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
 import {
@@ -145,6 +150,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-recruitment-schedule-set' &&
           url !== '/api/meoo-ops-mp-recruitment-orders-apply' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
+          url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-talent-member-register'
         )
           return next()
@@ -537,16 +543,23 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             const body = JSON.parse(raw || '{}') as {
               id?: string
               status?: RegistryMpRecruitmentOrder['status']
+              applicants?: RegistryMpRecruitmentApplicant[]
             }
             const id = (body.id ?? '').trim()
             const status = body.status
-            if (!id) {
+            const applicants = body.applicants
+            if (!id || (!status && !applicants)) {
               json(res, 400, { ok: false, error: 'invalid_patch' })
               return
             }
-            const okStatus =
-              status === 'open' || status === 'collecting' || status === 'closed' || status === 'done'
-            if (!okStatus) {
+            if (
+              status &&
+              status !== 'open' &&
+              status !== 'collecting' &&
+              status !== 'pending_settlement' &&
+              status !== 'closed' &&
+              status !== 'done'
+            ) {
               json(res, 400, { ok: false, error: 'invalid_patch' })
               return
             }
@@ -558,7 +571,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             data.mpRecruitmentOrders[idx] = {
               ...data.mpRecruitmentOrders[idx]!,
-              status,
+              ...(status ? { status } : {}),
+              ...(applicants ? { applicants } : {}),
               updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
             }
             writeRegistry(viteRoot, data)
@@ -602,50 +616,80 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
                 applicant.paymentMethod ||
                 (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
             }
-            let applicants = [...(cur.applicants ?? [])]
-            let iceVideoSlots = cur.iceVideoSlots
             if (isIceMpOrder(cur)) {
-              const dup = applicants.find((a) => a.id === row.id)
-              if (dup?.assignedIceSlotId) {
-                json(res, 200, {
-                  ok: true,
-                  assignedVideoDownloadUrl: dup.assignedVideoDownloadUrl,
-                })
+              const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' })
+              if (!iceResult.ok) {
+                json(res, 409, { ok: false, error: iceResult.code ?? 'apply_failed', message: iceResult.error })
                 return
               }
-              const applied = applyIceMpRecruitment(cur, row)
-              if (!applied.ok) {
-                json(res, 409, { ok: false, error: applied.code ?? 'apply_failed', message: applied.error })
-                return
-              }
-              const existingIdx = applicants.findIndex((a) => a.id === applied.applicant.id)
-              if (existingIdx >= 0) applicants[existingIdx] = applied.applicant
-              else applicants.unshift(applied.applicant)
-              iceVideoSlots = cur.iceVideoSlots?.map((s) =>
-                s.slotId === applied.slot.slotId ? applied.slot : s,
-              )
-            } else {
-              applicants.unshift(row)
+              data.mpRecruitmentOrders[idx] = iceResult.mp
+              const savedApplicant =
+                (iceResult.mp.applicants ?? []).find((a) => a.id === row.id) ?? row
+              upsertTalentLibraryFromApplicant(data, {
+                platform,
+                applicant: savedApplicant,
+                mpOrderId,
+                merchantOrderNo,
+              })
+              writeRegistry(viteRoot, data)
+              json(res, 200, iceResult.body)
+              return
             }
+            const applicants = [{ ...row, taskStatus: row.taskStatus ?? 'applied' }, ...(cur.applicants ?? [])]
             data.mpRecruitmentOrders[idx] = {
               ...cur,
               applicants: applicants.slice(0, 500),
-              iceVideoSlots,
               status: cur.status === 'open' ? 'collecting' : cur.status,
               updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
             }
-            const savedApplicant =
-              isIceMpOrder(cur) ?
-                (data.mpRecruitmentOrders[idx]!.applicants ?? []).find((a) => a.id === row.id) ?? row
-              : row
             upsertTalentLibraryFromApplicant(data, {
               platform,
-              applicant: savedApplicant,
+              applicant: row,
               mpOrderId,
               merchantOrderNo,
             })
             writeRegistry(viteRoot, data)
-            json(res, 200, { ok: true })
+            json(res, 200, { ok: true, taskStatus: 'applied' })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/ice-confirm' ||
+              url === '/api/meoo-ops-mp-recruitment-ice-confirm')
+          ) {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              mpOrderId?: string
+              applicantId?: string
+              action?: 'confirm' | 'reject'
+            }
+            const mpOrderId = (body.mpOrderId ?? '').trim()
+            const applicantId = (body.applicantId ?? '').trim()
+            const action = body.action === 'reject' ? 'reject' : 'confirm'
+            if (!mpOrderId || !applicantId) {
+              json(res, 400, { ok: false, error: 'invalid_confirm' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+            if (!data.mpRecruitmentOrders || idx < 0) {
+              json(res, 404, { ok: false, error: 'not_found' })
+              return
+            }
+            const cur = data.mpRecruitmentOrders[idx]!
+            if (!isIceMpOrder(cur)) {
+              json(res, 400, { ok: false, error: 'not_ice_order' })
+              return
+            }
+            const result = handleIceMpConfirm(cur, applicantId, action)
+            if (!result.ok) {
+              json(res, 409, { ok: false, error: result.code ?? 'confirm_failed', message: result.error })
+              return
+            }
+            data.mpRecruitmentOrders[idx] = result.mp
+            writeRegistry(viteRoot, data)
+            json(res, 200, result.body)
             return
           }
 

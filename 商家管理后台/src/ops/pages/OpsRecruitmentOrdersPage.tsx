@@ -299,6 +299,7 @@ export default function OpsRecruitmentOrdersPage() {
         createdAt: now,
         updatedAt: now,
         applicants: [],
+        fulfillmentLoop: 'open',
         ...fields,
       }
       const append = await appendMpRecruitmentOrder(mpOrder)
@@ -366,6 +367,7 @@ export default function OpsRecruitmentOrdersPage() {
         applicants: [],
         orderKind: 'recruitment_ice',
         hall: 'ice',
+        fulfillmentLoop: 'closed',
         iceVideoSlots: slots,
         ...fields,
         recruitCount: n,

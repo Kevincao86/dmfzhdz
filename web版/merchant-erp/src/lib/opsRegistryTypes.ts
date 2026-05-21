@@ -74,6 +74,16 @@ export type RegistryAiModels = {
 
 export type RecruitmentOrderKind = 'recruitment' | 'recruitment_ice'
 
+export type RecruitmentFulfillmentLoop = 'open' | 'closed'
+
+export type MpApplicantTaskStatus =
+  | 'applied'
+  | 'pending_confirm'
+  | 'confirmed'
+  | 'rejected'
+  | 'shortlisted'
+  | 'approved'
+
 export type MpRecruitmentHall = 'normal' | 'urgent' | 'ice'
 
 export type RegistryIceVideoSlot = {
@@ -114,6 +124,8 @@ export type RegistryRecruitmentOrder = {
   recruitmentPlatform?: '抖音' | '小红书'
   iceVideoCount?: number
   iceVideoSlots?: RegistryIceVideoSlot[]
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
+  autoPublishMp?: boolean
 }
 
 export type RegistryMpRecruitmentApplicant = {
@@ -144,6 +156,7 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyStatus?: 'pending' | 'passed' | 'failed'
   aiVerifyNote?: string
   completedAt?: string
+  taskStatus?: MpApplicantTaskStatus
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -220,6 +233,7 @@ export type RegistryMpRecruitmentOrder = {
   serviceAmount?: number
   /** 急单大厅展示 */
   urgent?: boolean
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */

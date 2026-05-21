@@ -59,9 +59,10 @@ export async function dispatchIceBatchToRecruitmentOps(opts: {
     storeAddress: storeName,
     category: '云剪投放',
     orderKind: 'recruitment_ice',
+    fulfillmentLoop: 'closed',
     iceVideoCount: n,
     iceVideoSlots: slots,
-    infoSummary: `【云剪·招募投放】订单类型:云剪（招募、云剪）；云剪视频数量:${n}；剪辑指令:${brief || '—'}；说明:达人认领后下载分配成片，发布抖音并回传作品链接，AI 自动核查；全部通过后进入待结算。`,
+    infoSummary: `【云剪·闭环投放】云剪视频数量:${n}；剪辑指令:${brief || '—'}；流程:运营下发云剪单→达人确认接收→下载成片→发布抖音回链→AI核查→待结算。`,
   }
 
   await appendRecruitmentOrderToOps(order)

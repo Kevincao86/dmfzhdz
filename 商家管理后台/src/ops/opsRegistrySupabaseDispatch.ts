@@ -278,15 +278,22 @@ export async function dispatchOpsRegistrySupabase(opts: {
       const body = JSON.parse(bodyRaw || '{}') as {
         id?: string
         status?: RegistryMpRecruitmentOrder['status']
+        applicants?: RegistryMpRecruitmentApplicant[]
       }
       const id = (body.id ?? '').trim()
       const status = body.status
-      if (!id) {
+      const applicants = body.applicants
+      if (!id || (!status && !applicants)) {
         return { status: 400, body: { ok: false, error: 'invalid_patch' } }
       }
-      const okStatus =
-        status === 'open' || status === 'collecting' || status === 'closed' || status === 'done'
-      if (!okStatus) {
+      if (
+        status &&
+        status !== 'open' &&
+        status !== 'collecting' &&
+        status !== 'pending_settlement' &&
+        status !== 'closed' &&
+        status !== 'done'
+      ) {
         return { status: 400, body: { ok: false, error: 'invalid_patch' } }
       }
       const data = await io.load()
@@ -296,7 +303,8 @@ export async function dispatchOpsRegistrySupabase(opts: {
       }
       data.mpRecruitmentOrders[idx] = {
         ...data.mpRecruitmentOrders[idx]!,
-        status,
+        ...(status ? { status } : {}),
+        ...(applicants ? { applicants } : {}),
         updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       }
       await io.save(data)
@@ -330,53 +338,80 @@ export async function dispatchOpsRegistrySupabase(opts: {
         merchantOrderNo,
         paymentMethod: applicant.paymentMethod || (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
       }
-      const { applyIceMpRecruitment, isIceMpOrder } = await import(
+      const { handleIceMpApply, handleIceMpConfirm, isIceMpOrder } = await import(
         '../meooRegistryShared/mpRecruitmentIceCore.js'
       )
-      let applicants = [...(cur.applicants ?? [])]
-      let iceVideoSlots = cur.iceVideoSlots
       if (isIceMpOrder(cur)) {
-        const dup = applicants.find((a) => a.id === row.id)
-        if (dup?.assignedIceSlotId) {
-          return {
-            status: 200,
-            body: { ok: true, assignedVideoDownloadUrl: dup.assignedVideoDownloadUrl },
-          }
-        }
-        const applied = applyIceMpRecruitment(cur, row)
-        if (!applied.ok) {
+        const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' })
+        if (!iceResult.ok) {
           return {
             status: 409,
-            body: { ok: false, error: applied.code ?? 'apply_failed', message: applied.error },
+            body: { ok: false, error: iceResult.code ?? 'apply_failed', message: iceResult.error },
           }
         }
-        const existingIdx = applicants.findIndex((a) => a.id === applied.applicant.id)
-        if (existingIdx >= 0) applicants[existingIdx] = applied.applicant
-        else applicants.unshift(applied.applicant)
-        iceVideoSlots = cur.iceVideoSlots?.map((s) =>
-          s.slotId === applied.slot.slotId ? applied.slot : s,
-        )
-      } else {
-        applicants.unshift(row)
+        data.mpRecruitmentOrders[idx] = iceResult.mp
+        const savedApplicant =
+          (iceResult.mp.applicants ?? []).find((a) => a.id === row.id) ?? row
+        upsertTalentLibraryFromApplicant(data, {
+          platform,
+          applicant: savedApplicant,
+          mpOrderId,
+          merchantOrderNo,
+        })
+        await io.save(data)
+        return { status: 200, body: iceResult.body }
       }
+      const applicants = [{ ...row, taskStatus: row.taskStatus ?? 'applied' }, ...(cur.applicants ?? [])]
       data.mpRecruitmentOrders[idx] = {
         ...cur,
         applicants: applicants.slice(0, 500),
-        iceVideoSlots,
         status: cur.status === 'open' ? 'collecting' : cur.status,
         updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       }
-      const savedApplicant = isIceMpOrder(cur)
-        ? (data.mpRecruitmentOrders[idx]!.applicants ?? []).find((a) => a.id === row.id) ?? row
-        : row
       upsertTalentLibraryFromApplicant(data, {
         platform,
-        applicant: savedApplicant,
+        applicant: row,
         mpOrderId,
         merchantOrderNo,
       })
       await io.save(data)
-      return { status: 200, body: { ok: true } }
+      return { status: 200, body: { ok: true, taskStatus: 'applied' } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/ice-confirm') {
+      const body = JSON.parse(bodyRaw || '{}') as {
+        mpOrderId?: string
+        applicantId?: string
+        action?: 'confirm' | 'reject'
+      }
+      const mpOrderId = (body.mpOrderId ?? '').trim()
+      const applicantId = (body.applicantId ?? '').trim()
+      const action = body.action === 'reject' ? 'reject' : 'confirm'
+      if (!mpOrderId || !applicantId) {
+        return { status: 400, body: { ok: false, error: 'invalid_confirm' } }
+      }
+      const { handleIceMpConfirm, isIceMpOrder } = await import(
+        '../meooRegistryShared/mpRecruitmentIceCore.js'
+      )
+      const data = await io.load()
+      const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+      if (!data.mpRecruitmentOrders || idx < 0) {
+        return { status: 404, body: { ok: false, error: 'not_found' } }
+      }
+      const cur = data.mpRecruitmentOrders[idx]!
+      if (!isIceMpOrder(cur)) {
+        return { status: 400, body: { ok: false, error: 'not_ice_order' } }
+      }
+      const result = handleIceMpConfirm(cur, applicantId, action)
+      if (!result.ok) {
+        return {
+          status: 409,
+          body: { ok: false, error: result.code ?? 'confirm_failed', message: result.error },
+        }
+      }
+      data.mpRecruitmentOrders[idx] = result.mp
+      await io.save(data)
+      return { status: 200, body: result.body }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/ice-submit') {

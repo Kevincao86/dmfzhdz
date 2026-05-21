@@ -431,7 +431,8 @@ export async function appendMpRecruitmentOrder(
 
 export async function patchMpRecruitmentOrder(body: {
   id: string
-  status: RegistryMpRecruitmentOrder['status']
+  status?: RegistryMpRecruitmentOrder['status']
+  applicants?: RegistryMpRecruitmentOrder['applicants']
 }): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch('/api/ops-sync/mp-recruitment-orders/patch', {
     method: 'POST',
