@@ -36,7 +36,7 @@ import {
   type DashboardRange,
   type HomeAggregateStats,
 } from '../services/merchantDashboardApi'
-import { probeMerchantPlatforms } from '../services/platformConnectivityProbe'
+import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../services/platformConnectivityProbe'
 
 type PlatformId = 'douyin' | 'meituan' | 'xiaohongshu' | 'jd'
 
@@ -123,6 +123,7 @@ export default function HomeDashboard() {
   const [detailId, setDetailId] = useState<PlatformId | null>(null)
   const [homeEmpty, setHomeEmpty] = useState(true)
   const [dashBundle, setDashBundle] = useState<DashBundle | null>(null)
+  const [probeRows, setProbeRows] = useState<PlatformConnectivityRow[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -131,6 +132,7 @@ export default function HomeDashboard() {
       try {
         const probe = await probeMerchantPlatforms()
         if (cancelled) return
+        setProbeRows(probe)
         const connected = probe
           .filter((p) => p.status === 'connected')
           .map((p) => p.id as PlatformId)
@@ -162,16 +164,18 @@ export default function HomeDashboard() {
   const platformRows = useMemo(() => {
     return PLATFORMS.map((p) => {
       const st = dashBundle?.platforms.find((x) => x.id === p.id)
+      const probed = probeRows.find((x) => x.id === p.id)
+      const isConnected = probed?.status === 'connected' || Boolean(st?.connected)
       return {
         ...p,
-        payAmount: homeEmpty ? 0 : (st?.metrics.payAmount ?? 0),
-        verifyAmount: homeEmpty ? 0 : (st?.metrics.verifyAmount ?? 0),
-        conversionRate: homeEmpty ? 0 : (st?.metrics.conversionRate ?? 0),
-        orderCount: homeEmpty ? 0 : (st?.metrics.orderCount ?? 0),
-        isConnected: Boolean(!homeEmpty && st?.connected),
+        payAmount: homeEmpty && !isConnected ? 0 : (st?.metrics.payAmount ?? 0),
+        verifyAmount: homeEmpty && !isConnected ? 0 : (st?.metrics.verifyAmount ?? 0),
+        conversionRate: homeEmpty && !isConnected ? 0 : (st?.metrics.conversionRate ?? 0),
+        orderCount: homeEmpty && !isConnected ? 0 : (st?.metrics.orderCount ?? 0),
+        isConnected,
       }
     })
-  }, [dashBundle, homeEmpty])
+  }, [dashBundle, homeEmpty, probeRows])
 
   const trend = useMemo(() => {
     if (homeEmpty || !dashBundle) return []
