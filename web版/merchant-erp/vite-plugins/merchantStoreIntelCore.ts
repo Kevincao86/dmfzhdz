@@ -1,19 +1,28 @@
 /**
  * 门店情报：菜单 OCR、竞品分析、商品方案（服务端；密钥仅 env）。
  */
-import {
-  parseComboLinesFromApi,
-  parsePriceYuanFromApi,
-} from '../src/lib/aiAgentActionParse.js'
-import type { AIChatRequest, AIProvider } from '../src/services/ai/types.js'
+import type { AIChatRequest } from '../src/services/ai/types.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
-import { routeAiChat } from './aiGateway/chatRouter.js'
+import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
+import { merchantAgentChatFromMessages } from './merchantAiUpstream.js'
 
 export type StoreMenuItemDto = {
   name: string
   priceYuan?: number
   category?: string
   note?: string
+}
+
+export type ProductPlanDto = {
+  productName: string
+  suggestedPriceYuan: number
+  originYuan?: number
+  description: string
+  comboLines: string[]
+  marginNote?: string
+  competitorNote?: string
+  riskLevel?: 'low' | 'medium' | 'high'
+  slotLabel?: string
 }
 
 function extractJsonObject(text: string): Record<string, unknown> {
@@ -33,6 +42,24 @@ function parsePriceYuan(raw: unknown): number | undefined {
     if (Number.isFinite(n) && n > 0) return n
   }
   return undefined
+}
+
+function parseComboLinesFromApi(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const row of raw) {
+    if (typeof row === 'string') {
+      const s = row.trim()
+      if (s && s !== '[object Object]') out.push(s)
+      continue
+    }
+    if (row && typeof row === 'object') {
+      const r = row as Record<string, unknown>
+      const name = String(r.name ?? r.title ?? r.item ?? r.名称 ?? '').trim()
+      if (name) out.push(name)
+    }
+  }
+  return out
 }
 
 function parseMenuItems(obj: Record<string, unknown>): StoreMenuItemDto[] {
@@ -153,7 +180,7 @@ async function llmJsonWithVision(
       temperature: 0.35,
       imageDataUrls: imgs.slice(0, 4),
     }
-    const res = await routeAiChat(req, env)
+    const res = await chatTokenMix(req, env)
     return extractJsonObject(res.content)
   }
 
@@ -216,87 +243,88 @@ async function llmJsonWithVision(
   )
 }
 
-type LlmJsonPick = {
-  provider: AIProvider
-  model?: string
-  modelFamily?: 'openai'
-}
-
-function listLlmJsonProviders(env: Record<string, string>): LlmJsonPick[] {
-  const out: LlmJsonPick[] = []
-  if ((env.TOKENMIX_API_KEY ?? '').trim()) {
-    out.push({
-      provider: 'tokenmix',
-      modelFamily: 'openai',
-      model: (env.MERCHANT_AI_PLAN_JSON_MODEL ?? 'gpt-4o').trim() || 'gpt-4o',
-    })
-  }
-  if ((env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()) {
-    out.push({
-      provider: 'qwen',
-      model: (env.MERCHANT_AI_QWEN_CHAT_MODEL ?? 'qwen-turbo').trim() || 'qwen-turbo',
-    })
-  }
-  if ((env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()) {
-    out.push({
-      provider: 'doubao',
-      model: (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? 'doubao-pro-32k').trim() || 'doubao-pro-32k',
-    })
-  }
-  if ((env.DEEPSEEK_API_KEY ?? '').trim()) {
-    out.push({
-      provider: 'deepseek',
-      model: (env.DEEPSEEK_MODEL ?? 'deepseek-chat').trim() || 'deepseek-chat',
-    })
-  }
-  if ((env.MOONSHOT_API_KEY ?? '').trim()) {
-    out.push({
-      provider: 'kimi',
-      model: (env.KIMI_MODEL ?? 'moonshot-v1-8k').trim() || 'moonshot-v1-8k',
-    })
-  }
-  if ((env.MERCHANT_AI_MINIMAX_KEY ?? env.MINIMAX_API_KEY ?? '').trim()) {
-    out.push({
-      provider: 'minimax',
-      model: (env.MINIMAX_MODEL ?? 'MiniMax-M2').trim() || 'MiniMax-M2',
-    })
-  }
-  return out
-}
-
-/** 商品方案/竞品等 JSON 任务：按已配置 Key 依次尝试多厂商（与对话所选模型无关） */
+/** 商品方案 JSON：优先通义/豆包直连（与商品 AI 同源），再 TokenMix；避免 DeepSeek thinking 导致 500 */
 async function llmJson(
   env: Record<string, string>,
   system: string,
   user: string,
 ): Promise<Record<string, unknown>> {
-  const picks = listLlmJsonProviders(env)
-  if (!picks.length) {
-    throw new Error(
-      '未配置商品方案 LLM：请在环境变量设置 TOKENMIX_API_KEY，或 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / DEEPSEEK_API_KEY / KIMI_API_KEY / MINIMAX_API_KEY 之一',
-    )
-  }
-  let lastErr: Error | null = null
-  for (const pick of picks) {
+  const errors: string[] = []
+  const messages = [
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
+  ]
+
+  const qwenKey = (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
+  if (qwenKey) {
     try {
-      const req: AIChatRequest = {
-        provider: pick.provider,
-        ...(pick.modelFamily
-          ? { modelFamily: pick.modelFamily, model: pick.model }
-          : { model: pick.model }),
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.35,
-      }
-      const res = await routeAiChat(req, env)
-      return extractJsonObject(res.content)
+      const { text } = await merchantAgentChatFromMessages(env, 'qwen', undefined, system, user)
+      return extractJsonObject(text)
     } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e))
+      errors.push(`通义：${e instanceof Error ? e.message : String(e)}`)
     }
   }
-  throw lastErr ?? new Error('商品方案模型调用失败')
+
+  const doubaoKey = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
+  if (doubaoKey) {
+    try {
+      const { text } = await merchantAgentChatFromMessages(env, 'doubao', undefined, system, user)
+      return extractJsonObject(text)
+    } catch (e) {
+      errors.push(`豆包：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  const tokenmixKey = (env.TOKENMIX_API_KEY ?? '').trim()
+  if (tokenmixKey) {
+    try {
+      const req: AIChatRequest = {
+        provider: 'tokenmix',
+        modelFamily: 'openai',
+        model: (env.MERCHANT_AI_PLAN_JSON_MODEL ?? 'gpt-4o').trim() || 'gpt-4o',
+        messages,
+        temperature: 0.35,
+      }
+      const res = await chatTokenMix(req, env)
+      return extractJsonObject(res.content)
+    } catch (e) {
+      errors.push(`TokenMix：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  if (!qwenKey && !doubaoKey && !tokenmixKey) {
+    throw new Error(
+      '未配置商品方案 LLM：请设置 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / DASHSCOPE_API_KEY / ARK_API_KEY / TOKENMIX_API_KEY 之一',
+    )
+  }
+  throw new Error(errors.slice(0, 3).join('；') || '商品方案模型调用失败')
+}
+
+function planDtoFromLlmRow(
+  row: Record<string, unknown>,
+  slotLabel: string,
+  userBrief: string,
+): ProductPlanDto | null {
+  const productName = String(row.productName ?? row.title ?? row.name ?? slotLabel).trim()
+  let suggestedPriceYuan = parsePriceYuan(row.suggestedPriceYuan)
+  if (!productName) return null
+  if (suggestedPriceYuan == null) {
+    const voucherM = userBrief.match(/(\d+)\s*代\s*(\d+)/)
+    if (voucherM) suggestedPriceYuan = Number(voucherM[1])
+    else if (/代金券/.test(slotLabel + userBrief)) suggestedPriceYuan = 15
+    else return null
+  }
+  const originParsed = parsePriceYuan(row.originYuan)
+  return {
+    productName,
+    suggestedPriceYuan,
+    description: String(row.description ?? '').trim(),
+    comboLines: parseComboLinesFromApi(row.comboLines),
+    ...(originParsed != null ? { originYuan: originParsed } : {}),
+    ...(row.riskLevel === 'low' || row.riskLevel === 'medium' || row.riskLevel === 'high'
+      ? { riskLevel: row.riskLevel }
+      : {}),
+  }
 }
 
 export async function runStoreMenuRecognizeCore(
@@ -434,17 +462,6 @@ export async function runCompetitorAnalysisCore(
   }
 }
 
-export type ProductPlanDto = {
-  productName: string
-  suggestedPriceYuan: number
-  originYuan?: number
-  description: string
-  comboLines: string[]
-  marginNote?: string
-  competitorNote?: string
-  riskLevel?: 'low' | 'medium' | 'high'
-}
-
 export async function runAiProductPlanCore(
   bodyRaw: string,
   authHeader: string | undefined,
@@ -455,6 +472,7 @@ export async function runAiProductPlanCore(
 
   let body: {
     userBrief?: string
+    intentLabels?: string[]
     platform?: string
     storeName?: string
     menuSummary?: string
@@ -475,7 +493,13 @@ export async function runAiProductPlanCore(
     ? `商家配置综合毛利率（%）：抖音 ${margins.douyin}，美团 ${margins.meituan}，小红书 ${margins.xhs}。`
     : ''
 
-  const system = `你是抖音来客团购商品策划。根据商家诉求、菜单与竞品信息，输出可上架的团购方案草案。
+  const intentLabels = Array.isArray(body.intentLabels)
+    ? body.intentLabels.map((x) => String(x).trim()).filter(Boolean).slice(0, 6)
+    : []
+
+  const batchMode = intentLabels.length > 1
+
+  const systemSingle = `你是抖音来客团购商品策划。根据商家诉求、菜单与竞品信息，输出可上架的团购方案草案。
 只输出 JSON：
 {
   "productName": "团购标题",
@@ -491,6 +515,23 @@ export async function runAiProductPlanCore(
 代金券须给出 suggestedPriceYuan（售价）与 originYuan（面值）；用户未写明代金面额时，结合毛利率给出合理售价与面值（如 15 代 20）。
 多人套餐须按餐型区分 comboLines 与售价，勿合并到一项。`
 
+  const systemBatch = `你是抖音来客团购商品策划。根据商家诉求、菜单与毛利率，一次性输出多个上架方案。
+只输出 JSON：
+{
+  "plans": [
+    {
+      "slotLabel": "与请求的标签一致，如单人套餐",
+      "productName": "团购标题",
+      "suggestedPriceYuan": 数字,
+      "originYuan": 数字或省略,
+      "description": "详情说明",
+      "comboLines": ["项1","项2"],
+      "riskLevel": "low|medium|high"
+    }
+  ]
+}
+必须为每个 slotLabel 各生成一项，slotLabel 必须与用户给定列表完全一致，顺序一致，不得遗漏或合并。`
+
   const userPrompt = [
     `平台：${String(body.platform ?? 'douyin').trim() || 'douyin'}`,
     body.storeName ? `门店：${body.storeName}` : '',
@@ -498,56 +539,47 @@ export async function runAiProductPlanCore(
     marginLine,
     body.menuSummary ? `菜单参考：\n${body.menuSummary}` : '',
     body.competitorSummary ? `竞品分析：\n${body.competitorSummary}` : '',
+    batchMode ? `需生成的商品标签（各一项）：${intentLabels.join('、')}` : '',
     `商家诉求：${userBrief}`,
   ]
     .filter(Boolean)
     .join('\n\n')
 
   try {
-    const obj = await llmJson(env, system, userPrompt)
-    const productName = String(obj.productName ?? obj.title ?? obj.name ?? '').trim()
-    let suggestedPriceYuan = parsePriceYuanFromApi(obj.suggestedPriceYuan)
-    if (!productName) {
-      throw new Error('方案缺少 productName')
-    }
-    if (suggestedPriceYuan == null) {
-      const voucherM = userBrief.match(/(\d+)\s*代\s*(\d+)/)
-      if (voucherM) {
-        suggestedPriceYuan = Number(voucherM[1])
-      } else if (/代金券/.test(userBrief)) {
-        suggestedPriceYuan = 15
-      } else {
-        throw new Error('方案缺少 suggestedPriceYuan')
+    const obj = await llmJson(env, batchMode ? systemBatch : systemSingle, userPrompt)
+
+    if (batchMode) {
+      const rawPlans = obj.plans ?? obj.items
+      if (!Array.isArray(rawPlans)) {
+        throw new Error('批量方案缺少 plans 数组')
       }
+      const plans: ProductPlanDto[] = []
+      for (const label of intentLabels) {
+        const row =
+          rawPlans.find((p) => {
+            if (!p || typeof p !== 'object') return false
+            const sl = String((p as Record<string, unknown>).slotLabel ?? '').trim()
+            return sl === label
+          }) ?? rawPlans[intentLabels.indexOf(label)]
+        const parsed =
+          row && typeof row === 'object'
+            ? planDtoFromLlmRow(row as Record<string, unknown>, label, userBrief)
+            : null
+        if (parsed) {
+          plans.push({ ...parsed, slotLabel: label })
+        }
+      }
+      if (!plans.length) {
+        throw new Error('批量方案解析为空')
+      }
+      return { status: 200, body: { ok: true, plans } }
     }
-    const originParsed = parsePriceYuanFromApi(obj.originYuan)
-    const plan: ProductPlanDto = {
-      productName,
-      suggestedPriceYuan,
-      description: String(obj.description ?? '').trim(),
-      comboLines: parseComboLinesFromApi(obj.comboLines),
-      ...(originParsed != null ? { originYuan: originParsed } : {}),
-      ...(obj.marginNote != null
-        ? {
-            marginNote:
-              typeof obj.marginNote === 'string'
-                ? obj.marginNote.trim()
-                : JSON.stringify(obj.marginNote).slice(0, 400),
-          }
-        : {}),
-      ...(obj.competitorNote != null
-        ? {
-            competitorNote:
-              typeof obj.competitorNote === 'string'
-                ? obj.competitorNote.trim()
-                : JSON.stringify(obj.competitorNote).slice(0, 400),
-          }
-        : {}),
-      ...(obj.riskLevel === 'low' || obj.riskLevel === 'medium' || obj.riskLevel === 'high'
-        ? { riskLevel: obj.riskLevel }
-        : {}),
+
+    const single = planDtoFromLlmRow(obj, intentLabels[0] ?? '商品方案', userBrief)
+    if (!single) {
+      throw new Error('方案缺少 productName 或 suggestedPriceYuan')
     }
-    return { status: 200, body: { ok: true, plan } }
+    return { status: 200, body: { ok: true, plan: single } }
   } catch (e) {
     const msg =
       e instanceof Error

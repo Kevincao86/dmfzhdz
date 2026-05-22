@@ -32,10 +32,9 @@ function storageKey(): string {
   return tenantLocalKey(BASE_KEY)
 }
 
-export function loadStoreMenuRecord(): StoreMenuRecord | null {
+function parseStoreMenuRaw(raw: string | null): StoreMenuRecord | null {
+  if (!raw) return null
   try {
-    const raw = window.localStorage.getItem(storageKey())
-    if (!raw) return null
     const j = JSON.parse(raw) as StoreMenuRecord
     if (!j || !j.id) return null
     return {
@@ -43,6 +42,20 @@ export function loadStoreMenuRecord(): StoreMenuRecord | null {
       images: Array.isArray(j.images) ? j.images : [],
       items: Array.isArray(j.items) ? j.items : [],
     }
+  } catch {
+    return null
+  }
+}
+
+export function loadStoreMenuRecord(): StoreMenuRecord | null {
+  try {
+    const keyed = parseStoreMenuRaw(window.localStorage.getItem(storageKey()))
+    if (keyed) return keyed
+    // 兼容未挂租户 id 时写入的全局键
+    if (storageKey() !== BASE_KEY) {
+      return parseStoreMenuRaw(window.localStorage.getItem(BASE_KEY))
+    }
+    return null
   } catch {
     return null
   }

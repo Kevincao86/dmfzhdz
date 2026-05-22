@@ -224,7 +224,21 @@ export function coerceAgentTextField(value: unknown, maxLen = 400): string | und
 /** 错误提示展示（避免 [object Object]） */
 export function coerceAgentDisplayError(value: unknown, fallback = '未知错误'): string {
   const t = coerceAgentTextField(value, 600)
-  if (t) return t
+  if (t) {
+    if (t.startsWith('{') && t.includes('"code"')) {
+      try {
+        const o = JSON.parse(t) as Record<string, unknown>
+        if (o.code === 500 || o.code === '500') {
+          return '服务端函数异常（HTTP 500），请查看 Vercel 部署日志'
+        }
+        const msg = coerceAgentTextField(o.message ?? o.detail ?? o.error, 600)
+        if (msg) return msg
+      } catch {
+        /* keep t */
+      }
+    }
+    return t
+  }
   if (value && typeof value === 'object') {
     const o = value as Record<string, unknown>
     for (const k of ['message', 'detail', 'error', 'msg', 'reason']) {
