@@ -39,13 +39,15 @@ import {
 import { isProductPreviewLoading, listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { appendKolBriefRecord, writeSelectedBriefForRecruitment } from '../lib/kolBriefStorage'
 import {
-  competitorReportSummary,
-  loadSelectedCompetitorStore,
-  latestCompetitorReportForPoi,
-} from '../lib/competitorStorage'
-import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
-import { readStoreMarginConfig } from '../lib/storeMarginsRead'
-import { fetchAiProductPlan } from '../services/storeIntelApi'
+  loadMerchantIntelSnapshot,
+  merchantIntelForProductPlanApi,
+  merchantIntelStatusLine,
+} from '../lib/agentMerchantContext'
+import {
+  buildAgentMerchantIntelContextAsync,
+  loadFullMerchantIntelSnapshot,
+} from '../lib/agentMerchantIntelLoader'
+import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeIntelApi'
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
 import { buildAiRecruitmentBriefPreview } from '../services/aiAgentRecruitmentBriefEnrich'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
@@ -312,23 +314,6 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
   }
 }
 
-function buildProductPlanContext(userBrief: string) {
-  const marginCfg = readStoreMarginConfig()
-  const menu = loadStoreMenuRecord()
-  const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 35) : ''
-  const sel = loadSelectedCompetitorStore()
-  const cmp = sel?.poiId ? latestCompetitorReportForPoi(sel.poiId) : null
-  return {
-    userBrief,
-    platform: 'douyin',
-    storeName: sel?.storeName ?? menu?.storeName,
-    menuSummary: menuSummary || undefined,
-    margins: marginCfg.margins,
-    industryPath: marginCfg.industry.path || marginCfg.industry.name || undefined,
-    competitorSummary: cmp ? competitorReportSummary(cmp) : undefined,
-  }
-}
-
 export function AiAgentProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const { plan, entitlements } = useMembership()
@@ -353,12 +338,29 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [aiSending, setAiSending] = useState(false)
   const [taskConfirming, setTaskConfirming] = useState(false)
   const aiRunAbortRef = useRef<AbortController | null>(null)
+  const merchantIntelCacheRef = useRef<{
+    at: number
+    task?: AiTaskType
+    text: string
+  } | null>(null)
+  const MERCHANT_INTEL_CACHE_MS = 45_000
 
   const messagesRef = useRef(messages)
   messagesRef.current = messages
 
   const archivedRef = useRef(archivedSessions)
   archivedRef.current = archivedSessions
+
+  const resolveMerchantIntelBlock = useCallback(async (taskType?: AiTaskType) => {
+    const now = Date.now()
+    const hit = merchantIntelCacheRef.current
+    if (hit && now - hit.at < MERCHANT_INTEL_CACHE_MS && hit.task === taskType) {
+      return hit.text
+    }
+    const text = await buildAgentMerchantIntelContextAsync(taskType)
+    merchantIntelCacheRef.current = { at: now, task: taskType, text }
+    return text
+  }, [])
 
   useEffect(() => {
     pendingQuoteRef.current = pendingQuote
@@ -668,32 +670,44 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         loadingIntro,
       )
 
-      // 顺序请求，避免并行打满 LLM/生图配额导致部分套餐失败
-      const fetched: Array<{
-        intent: (typeof intents)[number]
-        r: Awaited<ReturnType<typeof fetchAiProductPlan>>
-      }> = []
-      for (const intent of intents) {
-        const r = await fetchAiProductPlan(buildProductPlanContext(intent.brief))
-        fetched.push({ intent, r })
-      }
-
-      const basePlans: AiProductPlanPreview[] = fetched.map(({ intent, r }) => {
-        if (!r.ok) {
-          return {
-            slotKey: intent.key,
-            slotLabel: intent.label,
-            productName: intent.label,
-            suggestedPriceYuan: 0,
-            description: '方案生成失败',
-            comboLines: [],
-            productType: intent.productType,
-            enrichStatus: 'error',
-            enrichError: coerceAgentDisplayError(r.message, '方案生成失败'),
-          }
-        }
-        return planFromApi(intent, r.plan, userBrief)
+      const intel = await loadFullMerchantIntelSnapshot('create_product')
+      const planCtx = merchantIntelForProductPlanApi(userBrief, intel)
+      const errorPlan = (intent: (typeof intents)[number], message: string): AiProductPlanPreview => ({
+        slotKey: intent.key,
+        slotLabel: intent.label,
+        productName: intent.label,
+        suggestedPriceYuan: 0,
+        description: '方案生成失败',
+        comboLines: [],
+        productType: intent.productType,
+        enrichStatus: 'error',
+        enrichError: coerceAgentDisplayError(message, '方案生成失败'),
       })
+
+      let basePlans: AiProductPlanPreview[]
+
+      if (intents.length > 1) {
+        const batch = await fetchAiProductPlansBatch({
+          ...planCtx,
+          userBrief,
+          intentLabels: intents.map((i) => i.label),
+        })
+        if (!batch.ok) {
+          basePlans = intents.map((intent) => errorPlan(intent, batch.message))
+        } else {
+          const byLabel = new Map(batch.plans.map((p) => [p.slotLabel, p]))
+          basePlans = intents.map((intent) => {
+            const plan = byLabel.get(intent.label)
+            if (!plan) return errorPlan(intent, '批量方案中缺少该项')
+            return planFromApi(intent, plan, userBrief)
+          })
+        }
+      } else {
+        const r = await fetchAiProductPlan(planCtx)
+        basePlans = intents.map((intent) =>
+          r.ok ? planFromApi(intent, r.plan, userBrief) : errorPlan(intent, r.message),
+        )
+      }
 
       const okPlans = basePlans.filter((p) => p.enrichStatus === 'loading')
       const failedPlans = basePlans.filter((p) => p.enrichStatus === 'error')
@@ -751,10 +765,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const pushCreateProductPreview = useCallback(
     (userBrief: string, pageLabel?: string) => {
       const intents = parseCreateProductIntents(userBrief)
+      const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
         intents.length > 1
-          ? `检测到您要上架 ${intents.length} 个商品（${intents.map((i) => i.label).join('、')}）。将结合菜单价目、毛利率与竞品分析分别生成方案（服务端已配置的多模型依次尝试），并以多个 C 端预览展示。`
-          : '检测到您希望创建/上架商品。将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
+          ? `检测到您要上架 ${intents.length} 个商品（${intents.map((i) => i.label).join('、')}）。${intelLine}，将一次性生成全部方案并以多个 C 端预览展示。`
+          : `检测到您希望创建/上架商品。${intelLine}，将生成团购方案与 C 端预览；确认后将自动提交抖音来客审核。`
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
       const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
@@ -992,7 +1007,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (ownsRun) setAiSending(true)
 
       try {
-        const history = agentMessagesToChatMessages(snapshot)
+        const merchantCtx = await resolveMerchantIntelBlock(taskType)
+        const history: AIMessage[] = [
+          { role: 'system', content: merchantCtx },
+          ...agentMessagesToChatMessages(snapshot),
+        ]
         let chatModel = parsed.model
         if (parsed.provider === 'tokenmix' && !chatModel) {
           chatModel = defaultModelIdForFamily(parsed.modelFamily)
@@ -1045,7 +1064,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         if (ownsRun && ac) endAiRun(ac)
       }
     },
-    [modelPickerKey, pageContext?.pageLabel, scheduleTaskPreview, beginAiRun, endAiRun, appendStoppedMessage],
+    [
+      modelPickerKey,
+      pageContext?.pageLabel,
+      scheduleTaskPreview,
+      beginAiRun,
+      endAiRun,
+      appendStoppedMessage,
+      resolveMerchantIntelBlock,
+    ],
   )
 
   const sendUserText = useCallback(

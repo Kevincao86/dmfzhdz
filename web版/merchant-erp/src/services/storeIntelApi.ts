@@ -33,7 +33,22 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     json = null
   }
   if (!res.ok) {
-    const o = json as { error?: unknown; detail?: unknown; message?: unknown } | null
+    const o = json as {
+      error?: unknown
+      detail?: unknown
+      message?: unknown
+      code?: unknown
+    } | null
+    const vercelCrash =
+      res.status >= 500 &&
+      (o?.code === 500 ||
+        o?.code === '500' ||
+        String(o?.message ?? '').includes('server error has occurred'))
+    if (vercelCrash) {
+      throw new Error(
+        '服务端函数异常（HTTP 500）。请到 Vercel 部署日志查看对应 API；常见原因：未配置 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / TOKENMIX_API_KEY，或函数超时。',
+      )
+    }
     const msg = normalizeApiErrorMessage(o?.error ?? o?.message, o?.detail)
     throw new Error(msg === '生成方案失败' ? `请求失败 ${res.status}` : msg)
   }
@@ -133,48 +148,81 @@ function normalizeApiErrorMessage(err: unknown, detail?: unknown): string {
   return parts.length ? [...new Set(parts)].join(' — ') : '生成方案失败'
 }
 
-export async function fetchAiProductPlan(body: {
+function normalizePlanFromApi(raw: AiProductPlan & { slotLabel?: string }): (AiProductPlan & { slotLabel?: string }) | null {
+  const productName = coerceAgentTextField(raw.productName)
+  const suggestedPriceYuan = parsePriceYuanFromApi(raw.suggestedPriceYuan)
+  if (!productName || suggestedPriceYuan == null) return null
+  return {
+    productName,
+    suggestedPriceYuan,
+    description: coerceAgentTextField(raw.description) || '',
+    comboLines: parseComboLinesFromApi(raw.comboLines),
+    ...(parsePriceYuanFromApi(raw.originYuan) != null
+      ? { originYuan: parsePriceYuanFromApi(raw.originYuan) }
+      : {}),
+    ...(coerceAgentTextField(raw.marginNote) ? { marginNote: coerceAgentTextField(raw.marginNote) } : {}),
+    ...(coerceAgentTextField(raw.competitorNote)
+      ? { competitorNote: coerceAgentTextField(raw.competitorNote) }
+      : {}),
+    ...(raw.riskLevel === 'low' || raw.riskLevel === 'medium' || raw.riskLevel === 'high'
+      ? { riskLevel: raw.riskLevel }
+      : {}),
+    ...(raw.slotLabel ? { slotLabel: raw.slotLabel } : {}),
+  }
+}
+
+export type AiProductPlanRequest = {
   userBrief: string
+  intentLabels?: string[]
   platform?: string
   storeName?: string
   menuSummary?: string
   margins?: { douyin: number; meituan: number; xhs: number }
   industryPath?: string
   competitorSummary?: string
-}): Promise<{ ok: true; plan: AiProductPlan } | { ok: false; message: string }> {
+}
+
+export async function fetchAiProductPlan(
+  body: AiProductPlanRequest,
+): Promise<{ ok: true; plan: AiProductPlan } | { ok: false; message: string }> {
   try {
     const r = await postJson<{ ok: boolean; plan?: AiProductPlan; error?: string; detail?: string }>(
       '/api/meoo-ai-product-plan',
       body,
     )
     if (r.ok && r.plan) {
-      const productName = coerceAgentTextField(r.plan.productName)
-      const suggestedPriceYuan = parsePriceYuanFromApi(r.plan.suggestedPriceYuan)
-      if (productName && suggestedPriceYuan != null) {
-        return {
-          ok: true,
-          plan: {
-            productName,
-            suggestedPriceYuan,
-            description: coerceAgentTextField(r.plan.description) || '',
-            comboLines: parseComboLinesFromApi(r.plan.comboLines),
-            ...(parsePriceYuanFromApi(r.plan.originYuan) != null
-              ? { originYuan: parsePriceYuanFromApi(r.plan.originYuan) }
-              : {}),
-            ...(coerceAgentTextField(r.plan.marginNote)
-              ? { marginNote: coerceAgentTextField(r.plan.marginNote) }
-              : {}),
-            ...(coerceAgentTextField(r.plan.competitorNote)
-              ? { competitorNote: coerceAgentTextField(r.plan.competitorNote) }
-              : {}),
-            ...(r.plan.riskLevel === 'low' ||
-            r.plan.riskLevel === 'medium' ||
-            r.plan.riskLevel === 'high'
-              ? { riskLevel: r.plan.riskLevel }
-              : {}),
-          },
+      const plan = normalizePlanFromApi(r.plan)
+      if (plan) return { ok: true, plan }
+    }
+    return { ok: false, message: normalizeApiErrorMessage(r.error, r.detail) }
+  } catch (e) {
+    return { ok: false, message: coerceAgentDisplayError(e, '生成方案失败') }
+  }
+}
+
+export async function fetchAiProductPlansBatch(
+  body: AiProductPlanRequest & { intentLabels: string[] },
+): Promise<
+  | { ok: true; plans: Array<AiProductPlan & { slotLabel: string }> }
+  | { ok: false; message: string }
+> {
+  try {
+    const r = await postJson<{
+      ok: boolean
+      plans?: Array<AiProductPlan & { slotLabel?: string }>
+      error?: string
+      detail?: string
+    }>('/api/meoo-ai-product-plan', body)
+    if (r.ok && Array.isArray(r.plans)) {
+      const plans: Array<AiProductPlan & { slotLabel: string }> = []
+      for (const row of r.plans) {
+        const norm = normalizePlanFromApi(row)
+        const slotLabel = coerceAgentTextField(row.slotLabel) || norm?.productName
+        if (norm && slotLabel) {
+          plans.push({ ...norm, slotLabel })
         }
       }
+      if (plans.length) return { ok: true, plans }
     }
     return { ok: false, message: normalizeApiErrorMessage(r.error, r.detail) }
   } catch (e) {
