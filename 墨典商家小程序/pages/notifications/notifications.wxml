@@ -1,0 +1,12 @@
+<view class="mp-page">
+  <view wx:if="{{!items.length}}" class="mp-empty">暂无通知</view>
+  <scroll-view wx:else scroll-y class="mp-list-scroll">
+    <view wx:for="{{items}}" wx:key="id" class="mp-list-card {{item.read ? 'read' : ''}}">
+      <text class="mp-list-title">{{item.title}}</text>
+      <text class="mp-list-sub">{{item.body}}</text>
+      <text class="mp-list-meta">{{item.timeLabel}}</text>
+    </view>
+    <view class="mp-list-footer"></view>
+  </scroll-view>
+  <button class="meoo-btn-ghost clear-btn" bindtap="onClear">清空已读</button>
+</view>

@@ -12,11 +12,11 @@
     </view>
     <view class="voice-step-row">
       <text class="voice-step-num">2</text>
-      <text class="voice-step-text">停止后生成招募草稿（字段与电脑端招募一致）</text>
+      <text class="voice-step-text">停止后生成招募草稿</text>
     </view>
     <view class="voice-step-row">
       <text class="voice-step-num">3</text>
-      <text class="voice-step-text">编辑页微调并提交，与电脑端同一门店数据</text>
+      <text class="voice-step-text">编辑页微调并提交</text>
     </view>
   </view>
 

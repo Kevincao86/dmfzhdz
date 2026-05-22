@@ -1,0 +1,138 @@
+<view class="agent-page">
+  <view class="agent-header" style="padding-top: {{statusBarH}}px;">
+    <view class="header-row">
+      <view class="menu-btn" bindtap="onNewChat">
+        <text class="menu-glyph">≡</text>
+      </view>
+      <view class="header-center">
+        <text class="header-title">墨典 AI 智能体</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view
+    scroll-y
+    class="chat-scroll"
+    style="padding-top: {{headerH}}px; padding-bottom: {{scrollBottomPad}}px;"
+    scroll-into-view="{{scrollTo}}"
+    scroll-with-animation
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="chat-inner">
+      <block wx:for="{{messages}}" wx:key="id">
+        <view id="msg-{{item.id}}" class="msg-row {{item.role === 'user' ? 'user' : 'bot'}}">
+          <view class="bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-bot'}}">
+            <view wx:if="{{item.imageUrls && item.imageUrls.length}}" class="msg-images">
+              <image
+                wx:for="{{item.imageUrls}}"
+                wx:for-item="img"
+                wx:key="*this"
+                class="msg-thumb"
+                src="{{img}}"
+                mode="aspectFill"
+                bindtap="onPreviewImage"
+                data-url="{{img}}"
+              />
+            </view>
+            <text class="bubble-text" user-select>{{item.content}}</text>
+          </view>
+        </view>
+      </block>
+      <view wx:if="{{busy}}" class="msg-row bot">
+        <view class="bubble bubble-bot typing">
+          <text class="bubble-text">思考中…</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="composer-dock">
+    <view wx:if="{{attachments.length}}" class="attach-row">
+      <view wx:for="{{attachments}}" wx:key="id" class="attach-item">
+        <image class="attach-thumb" src="{{item.preview}}" mode="aspectFill" />
+        <view class="attach-remove" data-idx="{{index}}" bindtap="onRemoveAttach">×</view>
+      </view>
+    </view>
+
+    <view class="composer-bar">
+      <view class="bar-plus {{attachmentFull ? 'disabled' : ''}}" bindtap="onAttach">
+        <text class="bar-plus-txt">+</text>
+      </view>
+
+      <view class="bar-center">
+        <block wx:if="{{inputMode === 'text'}}">
+          <textarea
+            class="bar-input"
+            placeholder="发消息，可附图…"
+            value="{{input}}"
+            bindinput="onInput"
+            auto-height
+            maxlength="-1"
+            show-confirm-bar="{{false}}"
+            disabled="{{busy}}"
+            confirm-type="send"
+            bindconfirm="onSend"
+          />
+        </block>
+        <view
+          wx:else
+          class="bar-hold {{recording ? 'recording' : ''}}"
+          bindtouchstart="onVoiceStart"
+          bindtouchend="onVoiceEnd"
+          bindtouchcancel="onVoiceEnd"
+        >
+          <text>{{recording ? '松开发送' : '按住说话'}}</text>
+        </view>
+      </view>
+
+      <view class="bar-mode" bindtap="onToggleInputMode">
+        <image
+          wx:if="{{inputMode === 'text'}}"
+          class="bar-mode-img"
+          src="/images/icon-mic.svg"
+          mode="aspectFit"
+        />
+        <image
+          wx:else
+          class="bar-mode-img"
+          src="/images/icon-keyboard.svg"
+          mode="aspectFit"
+        />
+      </view>
+
+      <view class="bar-model" bindtap="onToggleModelMenu">
+        <text class="bar-model-txt">{{modelShort}}</text>
+        <text class="bar-model-arrow">{{modelMenuOpen ? '▴' : '▾'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{modelMenuOpen}}" class="model-mask" bindtap="onCloseModelMenu">
+    <view class="model-sheet" catchtap="onSheetCatch">
+      <view class="sheet-head">
+        <text class="sheet-title">模型</text>
+        <view class="sheet-tabs">
+          <view
+            wx:for="{{filterTabs}}"
+            wx:key="id"
+            class="sheet-tab {{modelFilter === item.id ? 'on' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onFilterTab"
+          >{{item.short}}</view>
+        </view>
+      </view>
+      <scroll-view scroll-y class="sheet-list" enhanced show-scrollbar="{{false}}">
+        <view
+          wx:for="{{filteredModelOptions}}"
+          wx:key="key"
+          class="sheet-item {{modelPickerKey === item.key ? 'on' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onPickModel"
+        >
+          <text>{{item.label}}</text>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>

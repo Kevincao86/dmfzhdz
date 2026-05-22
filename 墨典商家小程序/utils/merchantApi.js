@@ -31,7 +31,7 @@ function merchantRequestAuth(method, path, opts) {
   const bearerToken = opts && opts.bearerToken ? String(opts.bearerToken).trim() : ''
   const b = baseUrl()
   if (!b) {
-    return Promise.reject(new Error('尚未配置电脑端商家后台地址，请联系技术人员。'))
+    return Promise.reject(new Error('尚未配置商家后台 API 地址，请在 config.local.js 设置 MERCHANT_API_BASE_URL。'))
   }
   const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
   const header = {

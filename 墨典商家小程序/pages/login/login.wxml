@@ -3,12 +3,12 @@
     <image class="brand-logo" src="/images/logo.png" mode="aspectFit" />
     <text class="tag">LOCAL LIFE OS</text>
     <text class="title">墨典 · 商家端</text>
-    <text class="desc">与电脑端商家后台使用同一账号与数据；本页仅用于登录。</text>
+    <text class="desc">使用商家账户登录</text>
   </view>
 
   <view class="card meoo-card">
     <text class="card-title">登录</text>
-    <text class="meoo-hint card-sub">账户名与密码由运营端开通（与电脑端相同）。</text>
+    <text class="meoo-hint card-sub">账户名与密码由运营端开通</text>
 
     <view class="field">
       <text class="meoo-label">账户名</text>

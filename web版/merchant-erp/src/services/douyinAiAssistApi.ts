@@ -83,6 +83,8 @@ export type AiAssistAction =
   | 'operation_topic'
   /** GEO：将门店知识包与用户咨询一并送入已绑定的文本模型（联调/实测） */
   | 'geo_ai_consult'
+  /** GEO：根据知识包一键生成模拟用户咨询文案 */
+  | 'geo_ai_consult_question'
   /** GEO：基于抖音来客门店事实 JSON 输出三维度得分与待办（JSON） */
   | 'geo_ai_score'
 
@@ -292,6 +294,21 @@ export async function postGeoAiConsult(body: {
     action: 'geo_ai_consult',
     product_name: body.store_display_name.trim() || '本店 GEO',
     title_draft: body.user_question.trim(),
+    geo_knowledge_pack: body.geo_knowledge_pack.trim(),
+  })
+}
+
+/** GEO 咨询测试：根据当前知识包生成一条模拟用户咨询（填入输入框后再「发送至 AI 模型」） */
+export async function postGeoAiConsultQuestion(body: {
+  model: AiModelId
+  store_display_name: string
+  geo_knowledge_pack: string
+}): Promise<AiAssistResult> {
+  return postDouyinGoodsAiAssist({
+    model: body.model,
+    action: 'geo_ai_consult_question',
+    product_name: body.store_display_name.trim() || '本店 GEO',
+    title_draft: 'geo_consult_question',
     geo_knowledge_pack: body.geo_knowledge_pack.trim(),
   })
 }

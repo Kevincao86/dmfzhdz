@@ -16,7 +16,7 @@ Page({
     displayItems: [],
     syncingId: '',
     hintBanner:
-      '商品列表与电脑端商家后台保持一致。抖音、美团、小红书店铺请先只在电脑端「系统设置」里完成授权；小程序不再提供绑定入口。',
+      '请先在「系统设置」完成各平台授权。',
   },
   onShow() {
     if (!api.getAccessToken()) {
@@ -54,7 +54,7 @@ Page({
     if (!merchant.hasMerchantApi()) {
       this.setData({
         loading: false,
-        errMsg: '尚未连接电脑端商家后台，请联系技术人员检查本地网络配置。',
+        errMsg: '尚未连接商家后台',
         note: '',
         items: [],
         displayItems: [],
@@ -82,6 +82,9 @@ Page({
       displayItems,
       note: r.message || '',
     })
+  },
+  goCreate() {
+    wx.navigateTo({ url: '/pages/product-create/product-create' })
   },
   goVoice() {
     wx.navigateTo({ url: '/pages/product-voice/product-voice' })

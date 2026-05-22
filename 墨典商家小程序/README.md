@@ -5,6 +5,9 @@
 ## 已实现（骨架）
 
 - **登录**：仅账户名 + 密码（与 Web 相同的邮箱推导规则），调用 Supabase `auth/v1/token?grant_type=password`。
+- **订阅与会员**：「我的 → 订阅与会员」读取 `tenants.membership_plan`、订阅/赠送天数与到期日，与 Web「设置 → 订阅」一致；升级申报走 `merchant_payment_orders`（`order_kind=subscription`）。
+- **在线客服**：「我的 → 在线客服」经 Supabase 表 `support_relay_messages` 与商家管理后台「在线客服」坐席同源会话（与 Web 右下角浮窗同一套云端通道；本地 dev 若启用 WebSocket 代理，Web 可走 ws，小程序走云端表）。
+- **同账号平台绑定同步**：登录后 `utils/merchantSessionSyncMp.js` 从 `tenant_merchant_bindings` 拉取与 Web 相同的 **抖音来客 / 巨量本地推 / 小红书聚光** 凭证，写入 `meoo_douyin_merchant_token`、`meoo_local_promotion_bind` 等键；切换 Tab 时会节流刷新。美团 / 小红书商家开放平台 token 目前仅存于 Web 浏览器会话，未上云，小程序暂不能跨设备同步（需在 Web 设置页绑定后，后续可扩展云端存储）。
 - **工作台（首页）**：全局浅色 UI；门店状态条、经营数据大卡、**特色功能**（语音商品 / 语音达人招募 / 语音短视频 / GEO）、**分页字形图标宫格**、待办与快捷推荐；特色项不出现在宫格内以免重复。  
   - **经营概览**：指标占位页（后续可对接 `merchantDashboardApi` 同源接口）。  
   - **模块说明页**：非语音类入口进入 `module-detail`，说明与 Web 哪一路由同源；复杂表格与图表仍在 Web 完成。  

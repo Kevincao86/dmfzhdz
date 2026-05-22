@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="edit-scroll">
   <view class="edit-head meoo-card">
     <text class="edit-head-title">商品草稿</text>
-    <text class="edit-head-desc">以下为 AI / 语音识别预填；正式上架与同步请在电脑端商家后台完成。</text>
+    <text class="edit-head-desc">以下为 AI / 语音识别预填；正式上架请使用「新建商品」向导提交。</text>
   </view>
 
   <text class="edit-section-title">基础信息</text>

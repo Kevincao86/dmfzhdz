@@ -1400,6 +1400,15 @@ const OPERATION_TOPIC_SYSTEM = `你是本地生活门店的短视频与图文选
 - 结合团购、到店体验、节日热点等场景；避免敏感违规话题；
 - 不要 JSON、不要代码围栏，只输出纯文本列表。`
 
+const GEO_AI_CONSULT_QUESTION_SYSTEM = `你是本地生活 GEO 咨询测试文案助手。用户会提供【门店 GEO 知识包】（含门店事实、问法覆盖样例、完整度指标等）。
+
+请生成 1 条模拟真实用户在 AI 搜索、地图或团购 App 里会向该店提出的自然口语咨询（15～60 字，中文）。
+要求：
+- 贴近本地生活高频场景：营业时间、停车、位置怎么走、电话预约、团购套餐、特色服务等；
+- 优先针对知识包中「事实侧待补齐」、字段缺失或新鲜度不足处设计问法，用于检验模型是否会编造；
+- 语气像普通顾客，不要像客服话术；
+- 只输出这一条问句本身：不要序号、不要引号包裹、不要解释、不要 Markdown、不要多行备选。`
+
 const GEO_AI_CONSULT_SYSTEM = `你是本地生活门店在「生成式搜索 / AI 问答」场景下的咨询助手，当前处于 GEO（生成式引擎优化）联调测试。
 用户会提供两段输入：【门店 GEO 知识包】与【当前用户咨询】。知识包来自商家 ERP 中维护的结构化事实、FAQ、问法覆盖摘要等，可能仍含示例或占位数据。
 
@@ -1986,6 +1995,7 @@ export async function handleDouyinGoodsAiAssist(
       action === 'operation_article' ||
       action === 'operation_topic' ||
       action === 'geo_ai_consult' ||
+      action === 'geo_ai_consult_question' ||
       action === 'geo_ai_score')
   ) {
     json(res, 200, missingVendorKeyBody(env, model))
@@ -2022,6 +2032,40 @@ export async function handleDouyinGoodsAiAssist(
         ok: true,
         geo_ai_score: parsed,
         ...(scoreVendor !== requestedVendor ? { ai_vendor_used: scoreVendor } : {}),
+      })
+      return
+    }
+    if (action === 'geo_ai_consult_question') {
+      const geoPack = String(body.geo_knowledge_pack ?? '').trim()
+      if (geoPack.length < 24) {
+        json(res, 400, {
+          ok: false,
+          message: 'GEO 知识包过短：请先完成「同步来客并 AI 综合评分」后再生成咨询文案',
+        })
+        return
+      }
+      const packSlice = geoPack.length > 12000 ? `${geoPack.slice(0, 12000)}\n…（知识包已截断）` : geoPack
+      const user = `门店名称（上下文）：${productName}\n\n【门店 GEO 知识包】\n${packSlice}`
+      const { text: qRaw, modelUsed: qVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        GEO_AI_CONSULT_QUESTION_SYSTEM,
+        user,
+      )
+      const description = qRaw
+        .trim()
+        .replace(/^["'「『]|["'」』]$/g, '')
+        .split(/\n+/)
+        .map((s) => s.replace(/^\d+[\.\)、]\s*/, '').trim())
+        .find((s) => s.length >= 8) ?? qRaw.trim()
+      if (description.length < 8) {
+        json(res, 400, { ok: false, message: '模型未返回有效咨询文案，请重试或手动输入' })
+        return
+      }
+      json(res, 200, {
+        ok: true,
+        description: description.slice(0, 120),
+        ...(qVendor !== requestedVendor ? { ai_vendor_used: qVendor } : {}),
       })
       return
     }

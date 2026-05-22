@@ -1,0 +1,110 @@
+<scroll-view scroll-y class="wizard-scroll" enhanced show-scrollbar="{{false}}">
+  <view class="wizard-steps">
+    <view class="step-dot {{step >= 1 ? 'on' : ''}}">平台</view>
+    <view class="step-line"></view>
+    <view class="step-dot {{step >= 2 ? 'on' : ''}}">类目</view>
+    <view class="step-line"></view>
+    <view class="step-dot {{step >= 3 ? 'on' : ''}}">类型</view>
+    <view class="step-line"></view>
+    <view class="step-dot {{step >= 4 ? 'on' : ''}}">商品</view>
+  </view>
+
+  <view wx:if="{{err}}" class="wizard-err">{{err}}</view>
+
+  <!-- Step 1 -->
+  <view wx:if="{{step === 1}}" class="wizard-card">
+    <text class="wizard-title">选择上架平台</text>
+    <text class="wizard-desc">当前完整创建流程支持抖音来客；其他平台请使用商品列表查看。</text>
+    <view class="plat-grid">
+      <view
+        wx:for="{{platforms}}"
+        wx:key="id"
+        class="plat-chip {{platform === item.id ? 'active' : ''}} {{item.disabled ? 'disabled' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickPlatform"
+      >
+        <text class="plat-name">{{item.label}}</text>
+        <text class="plat-sub">{{item.hint}}</text>
+      </view>
+    </view>
+    <button class="meoo-btn-primary wizard-next" bindtap="onNextFromPlatform">下一步</button>
+  </view>
+
+  <!-- Step 2 -->
+  <view wx:if="{{step === 2}}" class="wizard-card">
+    <text class="wizard-title">选择商品类目</text>
+    <text class="wizard-desc">请选择与门店经营品类匹配的三级类目。</text>
+    <view wx:if="{{catLoading}}" class="wizard-loading">加载类目中…</view>
+    <block wx:else>
+      <text class="meoo-label">一级类目</text>
+      <picker mode="selector" range="{{cat1Labels}}" value="{{cat1Index}}" bindchange="onCat1Change">
+        <view class="picker-box">{{cat1Labels[cat1Index] || '请选择'}}</view>
+      </picker>
+      <text class="meoo-label">二级类目</text>
+      <picker mode="selector" range="{{cat2Labels}}" value="{{cat2Index}}" bindchange="onCat2Change">
+        <view class="picker-box">{{cat2Labels[cat2Index] || '请选择'}}</view>
+      </picker>
+      <text class="meoo-label">三级类目（叶子）</text>
+      <picker mode="selector" range="{{cat3Labels}}" value="{{cat3Index}}" bindchange="onCat3Change">
+        <view class="picker-box">{{cat3Labels[cat3Index] || '请选择'}}</view>
+      </picker>
+    </block>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-primary" bindtap="onNextFromCategory">下一步</button>
+    </view>
+  </view>
+
+  <!-- Step 3 -->
+  <view wx:if="{{step === 3}}" class="wizard-card">
+    <text class="wizard-title">选择商品类型</text>
+    <text class="wizard-desc">类目：{{categoryPath}}</text>
+    <view wx:if="{{typesLoading}}" class="wizard-loading">加载类型…</view>
+    <radio-group wx:else bindchange="onTypeChange">
+      <label wx:for="{{productTypes}}" wx:key="product_type" class="type-row">
+        <radio value="{{item.product_type}}" checked="{{productType === item.product_type}}" />
+        <text>{{item.label}}</text>
+      </label>
+    </radio-group>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-primary" bindtap="onNextFromType">下一步</button>
+    </view>
+  </view>
+
+  <!-- Step 4 -->
+  <view wx:if="{{step === 4}}" class="wizard-card">
+    <text class="wizard-title">填写商品信息</text>
+    <text class="meoo-label">商品名称</text>
+    <input class="meoo-input" value="{{productName}}" data-k="productName" bindinput="onField" placeholder="如：双人火锅套餐" />
+    <text class="meoo-label">售价（元）</text>
+    <input class="meoo-input" type="digit" value="{{priceYuan}}" data-k="priceYuan" bindinput="onField" />
+    <text class="meoo-label">原价（元，可选）</text>
+    <input class="meoo-input" type="digit" value="{{originYuan}}" data-k="originYuan" bindinput="onField" />
+    <text class="meoo-label">商品说明</text>
+    <textarea class="meoo-input area" value="{{productDesc}}" data-k="productDesc" bindinput="onField" maxlength="2000" />
+    <text class="meoo-label">头图（必传）</text>
+    <view class="img-row">
+      <image wx:if="{{headUrl}}" class="thumb" src="{{headUrl}}" mode="aspectFill" />
+      <button class="meoo-btn-ghost mini" bindtap="onPickHead" loading="{{uploading}}">
+        {{headUrl ? '更换头图' : '上传头图'}}
+      </button>
+    </view>
+    <text class="meoo-label">适用门店（至少 1 家）</text>
+    <checkbox-group bindchange="onPoiChange">
+      <label wx:for="{{stores}}" wx:key="id" class="poi-row">
+        <checkbox value="{{item.id}}" checked="{{item.checked}}" />
+        <text>{{item.name}}</text>
+      </label>
+    </checkbox-group>
+    <view wx:if="{{!stores.length && !storesLoading}}" class="meoo-hint">未加载到门店，请确认抖音授权与 POI 认领。</view>
+    <view wx:if="{{actionMsg}}" class="action-msg {{actionOk ? 'ok' : 'bad'}}">{{actionMsg}}</view>
+    <view class="wizard-actions">
+      <button class="meoo-btn-ghost" bindtap="onPrev">上一步</button>
+      <button class="meoo-btn-ghost" bindtap="onSaveDraft" loading="{{saving}}">存草稿</button>
+      <button class="meoo-btn-primary" bindtap="onSubmit" loading="{{saving}}">提交审核</button>
+    </view>
+  </view>
+
+  <view class="wizard-footer-space"></view>
+</scroll-view>

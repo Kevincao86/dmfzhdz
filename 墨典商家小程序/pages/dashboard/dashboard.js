@@ -16,14 +16,14 @@ Page({
     loading: false,
     rangeLabel: '近 7 日',
     stats: [
-      { label: '成交额', value: '—', hint: '连接电脑端后台后展示；店铺授权在电脑端完成' },
+      { label: '成交额', value: '—', hint: '连接商家后台 API 后展示' },
       { label: '订单数', value: '—', hint: '' },
       { label: '转化率', value: '—', hint: '' },
       { label: '涨粉', value: '—', hint: '额外指标接口就绪后展示' },
     ],
     platforms: [],
     todos: [
-      { title: '处理待回复评论', sub: '与电脑端评论管理一致', url: '/pages/reviews-list/reviews-list' },
+      { title: '处理待回复评论', sub: '评论管理', url: '/pages/reviews-list/reviews-list' },
       { title: '商品列表与同步', sub: '多平台商品', url: '/pages/product-list/product-list' },
       { title: '跟进达人招募单', sub: '招募列表', url: '/pages/recruitment/recruitment' },
     ],
@@ -61,7 +61,7 @@ Page({
       {
         label: '成交额',
         value: d.connected ? dashboardMp.formatCurrencyYuan(d.totalRevenue) : '—',
-        hint: d.connected ? '近7日 · 已连接后台' : '请先在电脑端「系统设置」绑定各平台店铺',
+        hint: d.connected ? '近7日 · 已连接' : '请完成各平台店铺授权',
       },
       {
         label: '订单数',
@@ -76,7 +76,7 @@ Page({
       {
         label: '涨粉',
         value: '—',
-        hint: '粉丝等扩展指标可在电脑端查看',
+        hint: '扩展指标陆续接入',
       },
     ]
     this.setData({ loading: false, stats })

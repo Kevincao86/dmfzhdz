@@ -5,6 +5,9 @@
  * 也可只维护一个 LAN_IP 常量，再拼 SUPABASE_URL / MERCHANT_API_BASE_URL（见仓库内已生成的 config.local.js 模板）。
  */
 module.exports = {
+  // UI 设计阶段跳过登录（与 config.js 中 DEV_SKIP_LOGIN 二选一覆盖）：
+  // DEV_SKIP_LOGIN: true,
+  // DEV_SKIP_LOGIN_NAME: 'DMF001',
   // 真机连本机 Docker Supabase 时使用局域网 IP：
   // SUPABASE_URL: 'http://192.168.1.8:54321',
   // 使用云端 Supabase（须 https）：

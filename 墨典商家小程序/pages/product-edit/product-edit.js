@@ -50,7 +50,7 @@ Page({
     wx.setStorageSync('meoo_last_product_submit', payload)
     wx.showModal({
       title: '已保存草稿',
-      content: '草稿已保存在本机。正式上架商品仍需在电脑端商家后台完成同步与审核，此处仅为移动端整理信息。',
+      content: '草稿已保存在本机。完整上架请使用「功能 → 新建商品」提交至平台。',
       showCancel: false,
     })
   },

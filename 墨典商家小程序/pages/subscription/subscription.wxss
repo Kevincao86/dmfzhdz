@@ -1,0 +1,170 @@
+@import '../../app.wxss';
+
+.page {
+  min-height: 100vh;
+  padding: 28rpx 24rpx 60rpx;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #eef4ff 0%, #f3f6fb 35%);
+}
+
+.plan-card {
+  padding: 32rpx 28rpx;
+  margin-bottom: 24rpx;
+  background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
+  color: #fff;
+}
+
+.plan-label {
+  font-size: 22rpx;
+  opacity: 0.9;
+}
+
+.plan-name {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 44rpx;
+  font-weight: 800;
+}
+
+.plan-price {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  opacity: 0.92;
+}
+
+.feat-list {
+  margin-top: 20rpx;
+}
+
+.feat-line {
+  display: block;
+  font-size: 22rpx;
+  line-height: 1.55;
+  opacity: 0.95;
+  margin-top: 6rpx;
+}
+
+.plan-extra {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 22rpx;
+}
+
+.sync-hint {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 20rpx;
+  opacity: 0.8;
+}
+
+.panel {
+  padding: 28rpx 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.panel-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.muted {
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.5;
+  display: block;
+}
+
+.row-line {
+  display: block;
+  font-size: 26rpx;
+  color: #334155;
+  margin-top: 10rpx;
+}
+
+.row-line.strong {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.muted-inline {
+  font-size: 22rpx;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.warn {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #b45309;
+}
+
+.err {
+  display: block;
+  margin: 12rpx 0;
+  font-size: 24rpx;
+  color: #dc2626;
+}
+
+.tier-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin: 20rpx 0;
+}
+
+.tier-chip {
+  padding: 16rpx 22rpx;
+  font-size: 24rpx;
+  border-radius: 16rpx;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  line-height: 1.3;
+}
+
+.tier-chip.on {
+  background: linear-gradient(95deg, #0ea5e9, #06b6d4);
+  color: #fff;
+}
+
+.channel-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.channel-btn {
+  flex: 1;
+  font-size: 26rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  color: #64748b;
+  border: 1rpx solid #e2e8f0;
+}
+
+.channel-btn.on {
+  border-color: #0ea5e9;
+  color: #0284c7;
+  background: #e0f2fe;
+}
+
+.open-sub-btn {
+  margin-top: 24rpx;
+}
+
+.pay-panel {
+  margin-top: 0;
+}
+
+.ghost-btn {
+  margin-top: 20rpx;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 26rpx;
+  border: 1rpx solid #e2e8f0;
+}
