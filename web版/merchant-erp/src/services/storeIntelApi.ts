@@ -4,7 +4,12 @@
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type { StoreMenuItem } from '../lib/storeMenuStorage'
 import type { CompetitorEntry } from '../lib/competitorStorage'
-import { coerceAgentDisplayError } from '../lib/aiAgentActionParse'
+import {
+  coerceAgentDisplayError,
+  coerceAgentTextField,
+  parseComboLinesFromApi,
+  parsePriceYuanFromApi,
+} from '../lib/aiAgentActionParse'
 
 async function bearer(): Promise<string | null> {
   if (!supabaseConfigured || !supabase) return null
@@ -142,9 +147,37 @@ export async function fetchAiProductPlan(body: {
       '/api/meoo-ai-product-plan',
       body,
     )
-    if (r.ok && r.plan?.productName) return { ok: true, plan: r.plan }
+    if (r.ok && r.plan) {
+      const productName = coerceAgentTextField(r.plan.productName)
+      const suggestedPriceYuan = parsePriceYuanFromApi(r.plan.suggestedPriceYuan)
+      if (productName && suggestedPriceYuan != null) {
+        return {
+          ok: true,
+          plan: {
+            productName,
+            suggestedPriceYuan,
+            description: coerceAgentTextField(r.plan.description) || '',
+            comboLines: parseComboLinesFromApi(r.plan.comboLines),
+            ...(parsePriceYuanFromApi(r.plan.originYuan) != null
+              ? { originYuan: parsePriceYuanFromApi(r.plan.originYuan) }
+              : {}),
+            ...(coerceAgentTextField(r.plan.marginNote)
+              ? { marginNote: coerceAgentTextField(r.plan.marginNote) }
+              : {}),
+            ...(coerceAgentTextField(r.plan.competitorNote)
+              ? { competitorNote: coerceAgentTextField(r.plan.competitorNote) }
+              : {}),
+            ...(r.plan.riskLevel === 'low' ||
+            r.plan.riskLevel === 'medium' ||
+            r.plan.riskLevel === 'high'
+              ? { riskLevel: r.plan.riskLevel }
+              : {}),
+          },
+        }
+      }
+    }
     return { ok: false, message: normalizeApiErrorMessage(r.error, r.detail) }
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    return { ok: false, message: coerceAgentDisplayError(e, '生成方案失败') }
   }
 }

@@ -5,7 +5,7 @@ import {
   parseComboLinesFromApi,
   parsePriceYuanFromApi,
 } from '../src/lib/aiAgentActionParse.js'
-import type { AIChatRequest } from '../src/services/ai/types.js'
+import type { AIChatRequest, AIProvider } from '../src/services/ai/types.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
 import { routeAiChat } from './aiGateway/chatRouter.js'
 
@@ -216,23 +216,87 @@ async function llmJsonWithVision(
   )
 }
 
+type LlmJsonPick = {
+  provider: AIProvider
+  model?: string
+  modelFamily?: 'openai'
+}
+
+function listLlmJsonProviders(env: Record<string, string>): LlmJsonPick[] {
+  const out: LlmJsonPick[] = []
+  if ((env.TOKENMIX_API_KEY ?? '').trim()) {
+    out.push({
+      provider: 'tokenmix',
+      modelFamily: 'openai',
+      model: (env.MERCHANT_AI_PLAN_JSON_MODEL ?? 'gpt-4o').trim() || 'gpt-4o',
+    })
+  }
+  if ((env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()) {
+    out.push({
+      provider: 'qwen',
+      model: (env.MERCHANT_AI_QWEN_CHAT_MODEL ?? 'qwen-turbo').trim() || 'qwen-turbo',
+    })
+  }
+  if ((env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()) {
+    out.push({
+      provider: 'doubao',
+      model: (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? 'doubao-pro-32k').trim() || 'doubao-pro-32k',
+    })
+  }
+  if ((env.DEEPSEEK_API_KEY ?? '').trim()) {
+    out.push({
+      provider: 'deepseek',
+      model: (env.DEEPSEEK_MODEL ?? 'deepseek-chat').trim() || 'deepseek-chat',
+    })
+  }
+  if ((env.MOONSHOT_API_KEY ?? '').trim()) {
+    out.push({
+      provider: 'kimi',
+      model: (env.KIMI_MODEL ?? 'moonshot-v1-8k').trim() || 'moonshot-v1-8k',
+    })
+  }
+  if ((env.MERCHANT_AI_MINIMAX_KEY ?? env.MINIMAX_API_KEY ?? '').trim()) {
+    out.push({
+      provider: 'minimax',
+      model: (env.MINIMAX_MODEL ?? 'MiniMax-M2').trim() || 'MiniMax-M2',
+    })
+  }
+  return out
+}
+
+/** 商品方案/竞品等 JSON 任务：按已配置 Key 依次尝试多厂商（与对话所选模型无关） */
 async function llmJson(
   env: Record<string, string>,
   system: string,
   user: string,
 ): Promise<Record<string, unknown>> {
-  const tokenmixKey = (env.TOKENMIX_API_KEY ?? '').trim()
-  const req: AIChatRequest = {
-    provider: tokenmixKey ? 'tokenmix' : 'doubao',
-    ...(tokenmixKey ? { modelFamily: 'openai' as const, model: 'gpt-4o' } : {}),
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    temperature: 0.35,
+  const picks = listLlmJsonProviders(env)
+  if (!picks.length) {
+    throw new Error(
+      '未配置商品方案 LLM：请在环境变量设置 TOKENMIX_API_KEY，或 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / DEEPSEEK_API_KEY / KIMI_API_KEY / MINIMAX_API_KEY 之一',
+    )
   }
-  const res = await routeAiChat(req, env)
-  return extractJsonObject(res.content)
+  let lastErr: Error | null = null
+  for (const pick of picks) {
+    try {
+      const req: AIChatRequest = {
+        provider: pick.provider,
+        ...(pick.modelFamily
+          ? { modelFamily: pick.modelFamily, model: pick.model }
+          : { model: pick.model }),
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.35,
+      }
+      const res = await routeAiChat(req, env)
+      return extractJsonObject(res.content)
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    }
+  }
+  throw lastErr ?? new Error('商品方案模型调用失败')
 }
 
 export async function runStoreMenuRecognizeCore(
@@ -423,7 +487,9 @@ export async function runAiProductPlanCore(
   "competitorNote": "竞品对标一句",
   "riskLevel": "low|medium|high"
 }
-定价须考虑商家毛利率目标与周边竞品；套餐内容须与 userBrief 一致。`
+定价须考虑商家毛利率目标与周边竞品；套餐内容须与 userBrief 一致。
+代金券须给出 suggestedPriceYuan（售价）与 originYuan（面值）；用户未写明代金面额时，结合毛利率给出合理售价与面值（如 15 代 20）。
+多人套餐须按餐型区分 comboLines 与售价，勿合并到一项。`
 
   const userPrompt = [
     `平台：${String(body.platform ?? 'douyin').trim() || 'douyin'}`,
@@ -439,10 +505,20 @@ export async function runAiProductPlanCore(
 
   try {
     const obj = await llmJson(env, system, userPrompt)
-    const productName = String(obj.productName ?? obj.title ?? '').trim()
-    const suggestedPriceYuan = parsePriceYuanFromApi(obj.suggestedPriceYuan)
-    if (!productName || suggestedPriceYuan == null) {
-      throw new Error('方案缺少 productName 或 suggestedPriceYuan')
+    const productName = String(obj.productName ?? obj.title ?? obj.name ?? '').trim()
+    let suggestedPriceYuan = parsePriceYuanFromApi(obj.suggestedPriceYuan)
+    if (!productName) {
+      throw new Error('方案缺少 productName')
+    }
+    if (suggestedPriceYuan == null) {
+      const voucherM = userBrief.match(/(\d+)\s*代\s*(\d+)/)
+      if (voucherM) {
+        suggestedPriceYuan = Number(voucherM[1])
+      } else if (/代金券/.test(userBrief)) {
+        suggestedPriceYuan = 15
+      } else {
+        throw new Error('方案缺少 suggestedPriceYuan')
+      }
     }
     const originParsed = parsePriceYuanFromApi(obj.originYuan)
     const plan: ProductPlanDto = {
@@ -473,7 +549,12 @@ export async function runAiProductPlanCore(
     }
     return { status: 200, body: { ok: true, plan } }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
+    const msg =
+      e instanceof Error
+        ? e.message
+        : typeof e === 'string'
+          ? e
+          : JSON.stringify(e).slice(0, 600)
     return {
       status: 502,
       body: { ok: false, error: 'product_plan_failed', detail: msg.slice(0, 600) },

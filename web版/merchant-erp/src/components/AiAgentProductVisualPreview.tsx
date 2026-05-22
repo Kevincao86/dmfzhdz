@@ -48,9 +48,13 @@ export function AiAgentProductVisualPreview({
       <div className="flex justify-center rounded-xl border border-indigo-100 bg-gradient-to-b from-slate-50 to-white p-4">
         <DouyinProductMobilePreviewFrame
           embedded
-          productName={plan.productName}
-          productDesc={plan.description}
-          priceYuan={String(plan.suggestedPriceYuan)}
+          productName={coerceAgentDisplayError(plan.productName, '商品名称')}
+          productDesc={coerceAgentDisplayError(plan.description, '')}
+          priceYuan={
+            plan.suggestedPriceYuan > 0
+              ? String(plan.suggestedPriceYuan)
+              : ''
+          }
           originYuan={plan.originYuan != null ? String(plan.originYuan) : ''}
           headUrl={plan.headUrl ?? ''}
           envUrls={[]}
