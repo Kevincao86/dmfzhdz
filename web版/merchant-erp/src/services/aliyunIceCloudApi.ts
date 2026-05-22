@@ -47,17 +47,55 @@ export function iceExportFileName(label: string): string {
 }
 
 /**
- * 同步触发浏览器下载（须在用户点击回调内调用，勿先 await fetch，否则会被拦截）。
+ * 经 BFF 拉取成片 Blob 再触发下载（可校验非空并展示错误；避免直链 0 字节空文件）。
  */
+export async function downloadIceExportFile(jobId: string, label: string): Promise<void> {
+  const paths = [
+    iceJobDownloadProxyPath(jobId),
+    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(jobId)}`,
+    `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}`,
+  ]
+  let lastErr = '下载失败'
+  for (const p of paths) {
+    try {
+      const res = await fetch(p)
+      const ct = (res.headers.get('content-type') ?? '').toLowerCase()
+      if (!res.ok) {
+        const j = ct.includes('json') ? await parseJson<{ message?: string }>(res) : null
+        lastErr = j?.message ?? `下载失败 HTTP ${res.status}`
+        if (res.status === 404) continue
+        throw new Error(lastErr)
+      }
+      if (ct.includes('json') || ct.includes('text/html')) {
+        lastErr = '下载接口返回了非视频内容'
+        continue
+      }
+      const blob = await res.blob()
+      if (blob.size < 2048) {
+        throw new Error('下载到的成片为空，请稍后重试或重新提交云剪')
+      }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = iceExportFileName(label)
+      a.rel = 'noopener'
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      return
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (p === paths[paths.length - 1]) throw new Error(lastErr)
+    }
+  }
+  throw new Error(lastErr)
+}
+
+/** @deprecated 请用 downloadIceExportFile */
 export function triggerIceExportDownload(jobId: string, label: string): void {
-  const a = document.createElement('a')
-  a.href = iceJobDownloadProxyPath(jobId)
-  a.download = iceExportFileName(label)
-  a.rel = 'noopener'
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  void downloadIceExportFile(jobId, label)
 }
 
 export type IceBatchJob = {

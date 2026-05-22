@@ -68,6 +68,40 @@ async function resolveIceConfig(
   return mergeAliyunIceConfig(fromEnv, reg)
 }
 
+export async function loadIceGatewayConfig(
+  viteRoot: string | undefined,
+  env: Record<string, string | undefined>,
+): Promise<AliyunIceConfig | null> {
+  return resolveIceConfig(viteRoot, env as MerchantAiEnv)
+}
+
+export type IceJobDownloadPayload =
+  | { ok: true; buf: Buffer }
+  | { ok: false; status: number; message: string }
+
+/** 供 Vercel 扁平下载 API 直连，避免 node-mocks-http 丢失二进制 body */
+export async function fetchIceJobDownloadBuffer(
+  cfg: AliyunIceConfig,
+  jobId: string,
+): Promise<IceJobDownloadPayload> {
+  const st = await iceGetProducingJob(cfg, jobId)
+  if (!st.ok) return { ok: false, status: 502, message: st.message }
+  if (!st.downloadUrl) {
+    return { ok: false, status: 404, message: '成片地址尚未生成' }
+  }
+  const evalOut = await evaluateIceOutputReady(cfg, st.downloadUrl)
+  if (!evalOut.ready) {
+    return {
+      ok: false,
+      status: 409,
+      message: evalOut.message ?? '成片尚未就绪，请稍后在任务列表重试下载',
+    }
+  }
+  const fetched = await fetchIceOutputObject(cfg, st.downloadUrl)
+  if (!fetched.ok) return { ok: false, status: 502, message: fetched.message }
+  return { ok: true, buf: fetched.buf }
+}
+
 /** 兼容旧 OpenShot 路径，统一转发到 ICE */
 const ICE_PATH_ALIASES: Record<string, string> = {
   '/api/merchant/ai/video/openshot/config': '/api/merchant/ai/video/ice/config',
@@ -421,26 +455,17 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 400, { ok: false, message: '缺少 id' })
       return true
     }
+    if (!cfg) {
+      json(res, 503, { ok: false, message: '墨典AI云剪未配置' })
+      return true
+    }
     const inline = searchParams.get('inline') === '1'
-    const st = await iceGetProducingJob(cfg, jobId)
-    if (!st.ok || !st.downloadUrl) {
-      json(res, 404, { ok: false, message: st.ok ? '成片地址尚未生成' : st.message })
+    const payload = await fetchIceJobDownloadBuffer(cfg, jobId)
+    if (!payload.ok) {
+      json(res, payload.status, { ok: false, message: payload.message })
       return true
     }
-    const evalOut = await evaluateIceOutputReady(cfg, st.downloadUrl)
-    if (!evalOut.ready) {
-      json(res, 409, {
-        ok: false,
-        message: evalOut.message ?? '成片尚未就绪，请稍后在任务列表重试下载',
-      })
-      return true
-    }
-    const fetched = await fetchIceOutputObject(cfg, st.downloadUrl)
-    if (!fetched.ok) {
-      json(res, 502, { ok: false, message: fetched.message })
-      return true
-    }
-    const total = fetched.buf.length
+    const total = payload.buf.length
     res.setHeader('Content-Type', 'video/mp4')
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader(
@@ -464,7 +489,7 @@ export async function handleAliyunIceRoutes(input: {
           end >= start &&
           end < total
         ) {
-          const chunk = fetched.buf.subarray(start, end + 1)
+          const chunk = payload.buf.subarray(start, end + 1)
           res.statusCode = 206
           res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`)
           res.setHeader('Content-Length', String(chunk.length))
@@ -476,7 +501,7 @@ export async function handleAliyunIceRoutes(input: {
 
     res.statusCode = 200
     res.setHeader('Content-Length', String(total))
-    res.end(fetched.buf)
+    res.end(payload.buf)
     return true
   }
 

@@ -117,6 +117,14 @@ export async function runMerchantApiGatewayFromPath(
       res.status(status).send(data)
       return
     }
+    const ctRaw = hdrs?.['content-type'] ?? hdrs?.['Content-Type']
+    const ctLower = (typeof ctRaw === 'string' ? ctRaw : String(ctRaw ?? '')).toLowerCase()
+    if (typeof data === 'string' && data.length > 0) {
+      if (ctLower.includes('video/') || ctLower.includes('octet-stream')) {
+        res.status(status).send(Buffer.from(data, 'latin1'))
+        return
+      }
+    }
     res.status(status).send(data ?? '')
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
