@@ -340,7 +340,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         merchantOrderNo,
         paymentMethod: applicant.paymentMethod || (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
       }
-      const { handleIceMpApply, handleIceMpConfirm, isIceMpOrder } = await import(
+      const { handleIceMpApply, isIceMpOrder } = await import(
         '../meooRegistryShared/mpRecruitmentIceCore.js'
       )
       if (isIceMpOrder(cur)) {
