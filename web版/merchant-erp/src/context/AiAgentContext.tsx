@@ -26,8 +26,11 @@ import type {
 } from '../lib/aiAgentTypes'
 import {
   briefProductNameHint,
+  coerceAgentDisplayError,
   coerceAgentTextField,
   inferTaskTypeFromText,
+  parseComboLinesFromApi,
+  parsePriceYuanFromApi,
   inferVoucherPricesFromText,
   parseAgentActionType,
   parseCreateProductIntents,
@@ -575,22 +578,30 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     intent: ReturnType<typeof parseCreateProductIntents>[number],
     plan: import('../services/storeIntelApi').AiProductPlan,
     userBrief: string,
-  ): AiProductPlanPreview => ({
-    slotKey: intent.key,
-    slotLabel: intent.label,
-    productName: plan.productName,
-    suggestedPriceYuan: plan.suggestedPriceYuan,
-    description: plan.description,
-    comboLines: plan.comboLines,
-    productType: intent.productType ?? inferDouyinProductTypeFromText(`${userBrief} ${plan.productName}`),
-    enrichStatus: 'loading',
-    ...(plan.originYuan != null ? { originYuan: plan.originYuan } : {}),
-    ...(coerceAgentTextField(plan.marginNote) ? { marginNote: coerceAgentTextField(plan.marginNote) } : {}),
-    ...(coerceAgentTextField(plan.competitorNote)
-      ? { competitorNote: coerceAgentTextField(plan.competitorNote) }
-      : {}),
-    ...(plan.riskLevel ? { riskLevel: plan.riskLevel } : {}),
-  })
+  ): AiProductPlanPreview => {
+    const productName =
+      coerceAgentTextField(plan.productName) || intent.label
+    const suggestedPriceYuan = parsePriceYuanFromApi(plan.suggestedPriceYuan) ?? 0
+    return {
+      slotKey: intent.key,
+      slotLabel: intent.label,
+      productName,
+      suggestedPriceYuan,
+      description: coerceAgentTextField(plan.description) || '正在生成说明…',
+      comboLines: parseComboLinesFromApi(plan.comboLines),
+      productType:
+        intent.productType ?? inferDouyinProductTypeFromText(`${userBrief} ${productName}`),
+      enrichStatus: 'loading',
+      ...(parsePriceYuanFromApi(plan.originYuan) != null
+        ? { originYuan: parsePriceYuanFromApi(plan.originYuan) }
+        : {}),
+      ...(coerceAgentTextField(plan.marginNote) ? { marginNote: coerceAgentTextField(plan.marginNote) } : {}),
+      ...(coerceAgentTextField(plan.competitorNote)
+        ? { competitorNote: coerceAgentTextField(plan.competitorNote) }
+        : {}),
+      ...(plan.riskLevel ? { riskLevel: plan.riskLevel } : {}),
+    }
+  }
 
   const attachProductPlanToPreview = useCallback(
     async (previewMsgId: string, userBrief: string) => {
@@ -618,12 +629,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         loadingIntro,
       )
 
-      const fetched = await Promise.all(
-        intents.map(async (intent) => {
-          const r = await fetchAiProductPlan(buildProductPlanContext(intent.brief))
-          return { intent, r }
-        }),
-      )
+      // 顺序请求，避免并行打满 LLM/生图配额导致部分套餐失败
+      const fetched: Array<{
+        intent: (typeof intents)[number]
+        r: Awaited<ReturnType<typeof fetchAiProductPlan>>
+      }> = []
+      for (const intent of intents) {
+        const r = await fetchAiProductPlan(buildProductPlanContext(intent.brief))
+        fetched.push({ intent, r })
+      }
 
       const basePlans: AiProductPlanPreview[] = fetched.map(({ intent, r }) => {
         if (!r.ok) {
@@ -636,7 +650,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             comboLines: [],
             productType: intent.productType,
             enrichStatus: 'error',
-            enrichError: r.message,
+            enrichError: coerceAgentDisplayError(r.message, '方案生成失败'),
           }
         }
         return planFromApi(intent, r.plan, userBrief)
@@ -654,23 +668,27 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       )
       if (!anyOk) return
 
-      const enriched = await Promise.all(
-        basePlans.map(async (base, idx) => {
-          if (base.enrichStatus === 'error') return base
-          try {
-            return await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey)
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e)
-            return {
-              ...base,
-              enrichStatus: 'ready' as const,
-              enrichError: `主图/标题优化未完成：${msg.slice(0, 120)}`,
-            }
-          }
-        }),
-      )
+      const enriched: AiProductPlanPreview[] = []
+      for (let idx = 0; idx < basePlans.length; idx++) {
+        const base = basePlans[idx]
+        if (base.enrichStatus === 'error') {
+          enriched.push(base)
+          continue
+        }
+        try {
+          enriched.push(
+            await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey),
+          )
+        } catch (e) {
+          enriched.push({
+            ...base,
+            enrichStatus: 'ready' as const,
+            enrichError: `主图/标题优化未完成：${coerceAgentDisplayError(e, '未知错误').slice(0, 160)}`,
+          })
+        }
+      }
 
-      const readyCount = enriched.filter((p) => p.enrichStatus === 'ready' || p.enrichStatus === 'loading').length
+      const readyCount = enriched.filter((p) => p.enrichStatus === 'ready').length
       patchPreviewProductPlans(
         previewMsgId,
         enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),

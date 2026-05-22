@@ -200,3 +200,45 @@ export function coerceAgentTextField(value: unknown, maxLen = 400): string | und
   }
   return String(value).slice(0, maxLen)
 }
+
+/** 错误提示展示（避免 [object Object]） */
+export function coerceAgentDisplayError(value: unknown, fallback = '未知错误'): string {
+  const t = coerceAgentTextField(value, 600)
+  if (t) return t
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    for (const k of ['message', 'detail', 'error', 'msg', 'reason']) {
+      const nested = coerceAgentTextField(o[k], 600)
+      if (nested) return nested
+    }
+  }
+  if (value == null) return fallback
+  return fallback
+}
+
+export function parseComboLinesFromApi(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const out: string[] = []
+  for (const row of raw) {
+    if (typeof row === 'string') {
+      const s = row.trim()
+      if (s && s !== '[object Object]') out.push(s)
+      continue
+    }
+    if (row && typeof row === 'object') {
+      const r = row as Record<string, unknown>
+      const name = String(r.name ?? r.title ?? r.item ?? r.名称 ?? '').trim()
+      if (name) out.push(name)
+    }
+  }
+  return out
+}
+
+export function parsePriceYuanFromApi(raw: unknown): number | undefined {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return raw
+  if (typeof raw === 'string') {
+    const n = Number.parseFloat(raw.replace(/[^\d.]/g, ''))
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return undefined
+}
