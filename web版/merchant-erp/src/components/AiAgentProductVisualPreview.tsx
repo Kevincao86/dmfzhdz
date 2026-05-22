@@ -6,7 +6,14 @@ import {
 import { defaultAiAgentPreviewFormRules } from '../lib/aiAgentProductPreviewDefaults'
 import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
 
-export function AiAgentProductVisualPreview({ plan }: { plan: AiProductPlanPreview }) {
+export function AiAgentProductVisualPreview({
+  plan,
+  slotLabel,
+}: {
+  plan: AiProductPlanPreview
+  slotLabel?: string
+}) {
+  const label = slotLabel ?? plan.slotLabel
   if (plan.enrichStatus === 'loading') {
     return (
       <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-indigo-100 bg-white py-12">
@@ -25,8 +32,18 @@ export function AiAgentProductVisualPreview({ plan }: { plan: AiProductPlanPrevi
 
   const productType = plan.productType ?? (/代金券|代\d+抵/.test(plan.productName) ? 2 : 1)
 
+  const enrichErr =
+    typeof plan.enrichError === 'string'
+      ? plan.enrichError
+      : plan.enrichError != null
+        ? String(plan.enrichError)
+        : ''
+
   return (
     <div className="mt-4 space-y-3">
+      {label ? (
+        <p className="text-center text-sm font-semibold text-violet-900">{label}</p>
+      ) : null}
       <p className="text-center text-xs font-medium text-indigo-800">抖音来客团购 · C 端预览</p>
       <div className="flex justify-center rounded-xl border border-indigo-100 bg-gradient-to-b from-slate-50 to-white p-4">
         <DouyinProductMobilePreviewFrame
@@ -43,9 +60,7 @@ export function AiAgentProductVisualPreview({ plan }: { plan: AiProductPlanPrevi
           formRules={defaultAiAgentPreviewFormRules()}
         />
       </div>
-      {plan.enrichError ? (
-        <p className="text-center text-xs text-amber-700">{plan.enrichError}</p>
-      ) : null}
+      {enrichErr ? <p className="text-center text-xs text-amber-700">{enrichErr}</p> : null}
       <p className="text-center text-[11px] text-slate-500">
         确认后将按此方案提交抖音来客审核；如需改价、换图或售后规则，可在提交前于创建页微调。
       </p>

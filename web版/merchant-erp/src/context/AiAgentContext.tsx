@@ -11,7 +11,7 @@ import {
   type SetStateAction,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { saveAiProductDraft } from '../lib/aiProductDraft'
+import { saveAiProductDraft, saveAiProductDraftBatch, type AiProductDraft } from '../lib/aiProductDraft'
 import type {
   AiAgentArchivedSession,
   AiAgentMessage,
@@ -26,11 +26,14 @@ import type {
 } from '../lib/aiAgentTypes'
 import {
   briefProductNameHint,
+  coerceAgentTextField,
   inferTaskTypeFromText,
   inferVoucherPricesFromText,
   parseAgentActionType,
+  parseCreateProductIntents,
   summarizeAssistantContent,
 } from '../lib/aiAgentActionParse'
+import { isProductPreviewLoading, listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { appendKolBriefRecord, writeSelectedBriefForRecruitment } from '../lib/kolBriefStorage'
 import {
   competitorReportSummary,
@@ -82,7 +85,7 @@ import { listMerchantBindings } from '../lib/merchantPlatformBindings'
 import { fetchFinanceReconcile } from '../services/financeReconcileApi'
 import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
 import { postAiAgentNativeImage, postAiChat, type AiAgentNativeImageOk } from '../services/ai/aiClient'
-import type { AIMessage } from '../services/ai/types'
+import { MAX_AI_CHAT_IMAGE_ATTACHMENTS, type AIMessage } from '../services/ai/types'
 
 function buildAgentImagePostOpts(
   pickerKey: string,
@@ -150,7 +153,7 @@ function agentMessagesToChatMessages(msgs: AiAgentMessage[]): AIMessage[] {
 }
 
 const MAX_ARCHIVED_SESSIONS = 10
-const MAX_COMPOSER_ATTACHMENTS = 4
+const MAX_COMPOSER_ATTACHMENTS = MAX_AI_CHAT_IMAGE_ATTACHMENTS
 const MAX_COMPOSER_VIDEO_BYTES = 100 * 1024 * 1024
 
 function revokeComposerAttachment(att: AiComposerAttachment) {
@@ -199,7 +202,7 @@ type AiAgentContextValue = {
   modelPickerOptions: ReturnType<typeof listAiModelPickerOptionsForPlan>
   agentProfile: ReturnType<typeof buildAiAgentPlanProfile>
   aiSending: boolean
-  /** 主输入区待发送的图片/视频（最多 4 个） */
+  /** 主输入区待发送的图片/视频（最多 8 个） */
   pendingComposerAttachments: AiComposerAttachment[]
   addComposerMediaFiles: (files: FileList | File[] | null) => Promise<void>
   removeComposerAttachment: (index: number) => void
@@ -388,7 +391,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     if (!files?.length) return
     const added: AiComposerAttachment[] = []
     for (const file of Array.from(files)) {
-      if (added.length >= MAX_COMPOSER_ATTACHMENTS) break
       try {
         if (isComposerImageFile(file)) {
           added.push({ kind: 'image', url: await compressImageFileToDataUrl(file) })
@@ -408,7 +410,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       }
     }
     if (!added.length) return
-    setPendingComposerAttachments((prev) => [...prev, ...added].slice(0, MAX_COMPOSER_ATTACHMENTS))
+    setPendingComposerAttachments((prev) => {
+      const next = [...prev]
+      for (const att of added) {
+        if (next.length >= MAX_COMPOSER_ATTACHMENTS) break
+        next.push(att)
+      }
+      return next.length === prev.length ? prev : next
+    })
   }, [])
 
   const clearPendingQuote = useCallback(() => setPendingQuote(null), [])
@@ -512,18 +521,48 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     return msg.id
   }, [pageContext?.pageLabel])
 
-  const patchPreviewProductPlan = useCallback(
-    (previewMsgId: string, patch: Partial<AiProductPlanPreview>, content?: string) => {
+  const patchPreviewProductPlans = useCallback(
+    (
+      previewMsgId: string,
+      plans: AiProductPlanPreview[],
+      content?: string,
+    ) => {
       setMessages((prev) => {
         const next = prev.map((m) => {
           if (m.id !== previewMsgId || !m.preview) return m
-          const cur = m.preview.productPlan
           return {
             ...m,
             ...(content ? { content } : {}),
             preview: {
               ...m.preview,
-              productPlan: cur ? { ...cur, ...patch } : ({ ...patch } as AiProductPlanPreview),
+              productPlans: plans,
+              productPlan: plans[0],
+            },
+          }
+        })
+        messagesRef.current = next
+        return next
+      })
+    },
+    [],
+  )
+
+  const patchPreviewProductPlan = useCallback(
+    (previewMsgId: string, patch: Partial<AiProductPlanPreview>, content?: string) => {
+      setMessages((prev) => {
+        const next = prev.map((m) => {
+          if (m.id !== previewMsgId || !m.preview) return m
+          const list = listProductPlansFromPreview(m.preview)
+          const cur = list[0]
+          const merged = cur ? { ...cur, ...patch } : ({ ...patch } as AiProductPlanPreview)
+          const plans = list.length ? [merged, ...list.slice(1)] : [merged]
+          return {
+            ...m,
+            ...(content ? { content } : {}),
+            preview: {
+              ...m.preview,
+              productPlans: plans,
+              productPlan: merged,
             },
           }
         })
@@ -558,68 +597,145 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [],
   )
 
+  const planFromApi = (
+    intent: ReturnType<typeof parseCreateProductIntents>[number],
+    plan: import('../services/storeIntelApi').AiProductPlan,
+    userBrief: string,
+  ): AiProductPlanPreview => ({
+    slotKey: intent.key,
+    slotLabel: intent.label,
+    productName: plan.productName,
+    suggestedPriceYuan: plan.suggestedPriceYuan,
+    description: plan.description,
+    comboLines: plan.comboLines,
+    productType: intent.productType ?? inferDouyinProductTypeFromText(`${userBrief} ${plan.productName}`),
+    enrichStatus: 'loading',
+    ...(plan.originYuan != null ? { originYuan: plan.originYuan } : {}),
+    ...(coerceAgentTextField(plan.marginNote) ? { marginNote: coerceAgentTextField(plan.marginNote) } : {}),
+    ...(coerceAgentTextField(plan.competitorNote)
+      ? { competitorNote: coerceAgentTextField(plan.competitorNote) }
+      : {}),
+    ...(plan.riskLevel ? { riskLevel: plan.riskLevel } : {}),
+  })
+
   const attachProductPlanToPreview = useCallback(
     async (previewMsgId: string, userBrief: string) => {
-      patchPreviewProductPlan(
+      const intents = parseCreateProductIntents(userBrief)
+      const loadingIntro =
+        intents.length > 1
+          ? `正在分别为 ${intents.map((i) => i.label).join('、')} 生成团购方案与 C 端预览…`
+          : '正在生成团购方案，并优化标题、说明与主图…'
+      patchPreviewProductPlans(
         previewMsgId,
-        { enrichStatus: 'loading' },
-        '正在生成团购方案，并优化标题、说明与主图…',
+        intents.map((intent) => {
+          const voucher = intent.productType === 2 ? inferVoucherPricesFromText(userBrief) : {}
+          return {
+            slotKey: intent.key,
+            slotLabel: intent.label,
+            productName: intent.label,
+            suggestedPriceYuan: voucher.price ?? 0,
+            description: '正在生成方案…',
+            comboLines: [],
+            productType: intent.productType,
+            enrichStatus: 'loading' as const,
+            ...(voucher.origin != null ? { originYuan: voucher.origin } : {}),
+          }
+        }),
+        loadingIntro,
       )
-      const r = await fetchAiProductPlan(buildProductPlanContext(userBrief))
-      if (!r.ok) {
-        patchPreviewProductPlan(
-          previewMsgId,
-          { enrichStatus: 'error', enrichError: r.message },
-          '方案生成失败，请稍后重试或改在「创建商品」页手动填写。',
-        )
-        return
-      }
-      const basePlan: AiProductPlanPreview = {
-        productName: r.plan.productName,
-        suggestedPriceYuan: r.plan.suggestedPriceYuan,
-        description: r.plan.description,
-        comboLines: r.plan.comboLines,
-        productType: inferDouyinProductTypeFromText(`${userBrief} ${r.plan.productName}`),
-        enrichStatus: 'loading',
-        ...(r.plan.originYuan != null ? { originYuan: r.plan.originYuan } : {}),
-        ...(r.plan.marginNote ? { marginNote: r.plan.marginNote } : {}),
-        ...(r.plan.competitorNote ? { competitorNote: r.plan.competitorNote } : {}),
-        ...(r.plan.riskLevel ? { riskLevel: r.plan.riskLevel } : {}),
-      }
-      patchPreviewProductPlan(previewMsgId, basePlan)
-      try {
-        const enriched = await enrichAiProductPlanPreview(basePlan, userBrief, modelPickerKey)
-        patchPreviewProductPlan(
-          previewMsgId,
-          enriched,
-          '已生成 C 端团购预览（含 AI 优化标题与主图）。请核对手机预览效果，确认后将自动提交抖音来客审核。',
-        )
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        patchPreviewProductPlan(
-          previewMsgId,
-          {
-            ...basePlan,
-            enrichStatus: 'ready',
-            enrichError: `主图/标题优化未完成：${msg.slice(0, 120)}`,
-          },
-          '方案已生成；主图或标题优化未完成，确认后可在创建页补全。',
-        )
-      }
+
+      const fetched = await Promise.all(
+        intents.map(async (intent) => {
+          const r = await fetchAiProductPlan(buildProductPlanContext(intent.brief))
+          return { intent, r }
+        }),
+      )
+
+      const basePlans: AiProductPlanPreview[] = fetched.map(({ intent, r }) => {
+        if (!r.ok) {
+          return {
+            slotKey: intent.key,
+            slotLabel: intent.label,
+            productName: intent.label,
+            suggestedPriceYuan: 0,
+            description: '方案生成失败',
+            comboLines: [],
+            productType: intent.productType,
+            enrichStatus: 'error',
+            enrichError: r.message,
+          }
+        }
+        return planFromApi(intent, r.plan, userBrief)
+      })
+
+      const anyOk = basePlans.some((p) => p.enrichStatus === 'loading')
+      patchPreviewProductPlans(
+        previewMsgId,
+        basePlans,
+        anyOk
+          ? intents.length > 1
+            ? `已生成 ${basePlans.filter((p) => p.enrichStatus === 'loading').length} 项方案草稿，正在优化标题与主图…`
+            : '已生成方案草稿，正在优化标题与主图…'
+          : '方案生成失败，请稍后重试或改在「创建商品」页手动填写。',
+      )
+      if (!anyOk) return
+
+      const enriched = await Promise.all(
+        basePlans.map(async (base, idx) => {
+          if (base.enrichStatus === 'error') return base
+          try {
+            return await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey)
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            return {
+              ...base,
+              enrichStatus: 'ready' as const,
+              enrichError: `主图/标题优化未完成：${msg.slice(0, 120)}`,
+            }
+          }
+        }),
+      )
+
+      const readyCount = enriched.filter((p) => p.enrichStatus === 'ready' || p.enrichStatus === 'loading').length
+      patchPreviewProductPlans(
+        previewMsgId,
+        enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),
+        intents.length > 1
+          ? `已为 ${readyCount} 个商品生成 C 端预览。请逐项核对手机效果，确认后将依次预填创建页。`
+          : '已生成 C 端团购预览（含 AI 优化标题与主图）。请核对手机预览效果，确认后将自动提交抖音来客审核。',
+      )
     },
-    [patchPreviewProductPlan, modelPickerKey],
+    [patchPreviewProductPlans, modelPickerKey],
   )
 
   const pushCreateProductPreview = useCallback(
     (userBrief: string, pageLabel?: string) => {
+      const intents = parseCreateProductIntents(userBrief)
       const intro =
-        '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
+        intents.length > 1
+          ? `检测到您要上架 ${intents.length} 个商品（${intents.map((i) => i.label).join('、')}）。将结合菜单价目、毛利率与竞品分析分别生成方案，并以多个 C 端预览展示。`
+          : '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
+      const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
+        const v = intent.productType === 2 ? inferVoucherPricesFromText(userBrief) : {}
+        return {
+          slotKey: intent.key,
+          slotLabel: intent.label,
+          productName: intent.label,
+          suggestedPriceYuan: v.price ?? 0,
+          description: '正在生成方案…',
+          comboLines: [],
+          productType: intent.productType,
+          enrichStatus: 'loading',
+          ...(v.origin != null ? { originYuan: v.origin } : {}),
+        }
+      })
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
           ...preview,
-          productPlan: {
+          productPlans: initialPlans,
+          productPlan: initialPlans[0] ?? {
             productName: briefProductNameHint(userBrief),
             suggestedPriceYuan: voucher.price ?? 0,
             description: '正在生成方案…',
@@ -1034,24 +1150,32 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const title = p?.title ?? '任务'
 
     if (p?.taskType === 'create_product') {
-      const plan = p.productPlan
+      const plans = listProductPlansFromPreview(p).filter(
+        (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
+      )
+      const plan = plans[0] ?? p.productPlan
       const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
       const brief = lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() || '团购商品'
       const lastCtx = loadDouyinWizardLastContext()
-      const canAutoSubmit = Boolean(lastCtx?.cat3 && plan?.enrichStatus === 'ready')
-      if (plan) {
-        saveAiProductDraft({
-          platform: 'douyin',
-          productName: plan.productName,
-          productDesc: plan.description,
-          priceYuan: String(plan.suggestedPriceYuan),
-          originYuan: plan.originYuan != null ? String(plan.originYuan) : undefined,
-          headUrl: plan.headUrl,
-          productType: plan.productType,
-          comboSummary: plan.comboLines.join('；'),
-          planNotes: [plan.marginNote, plan.competitorNote].filter(Boolean).join('\n'),
-          autoSubmit: canAutoSubmit,
-        })
+      const canAutoSubmit = Boolean(lastCtx?.cat3 && plan?.enrichStatus === 'ready' && plans.length <= 1)
+
+      const toDraft = (pl: AiProductPlanPreview): AiProductDraft => ({
+        platform: 'douyin',
+        productName: pl.productName,
+        productDesc: pl.description,
+        priceYuan: String(pl.suggestedPriceYuan),
+        originYuan: pl.originYuan != null ? String(pl.originYuan) : undefined,
+        headUrl: pl.headUrl,
+        productType: pl.productType,
+        comboSummary: pl.comboLines.join('；'),
+        planNotes: [pl.marginNote, pl.competitorNote].filter(Boolean).join('\n'),
+        autoSubmit: canAutoSubmit,
+      })
+
+      if (plans.length > 1) {
+        saveAiProductDraftBatch(plans.map(toDraft))
+      } else if (plan) {
+        saveAiProductDraft(toDraft(plan))
       } else {
         saveAiProductDraft({
           platform: 'douyin',
@@ -1060,14 +1184,23 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           autoSubmit: false,
         })
       }
+
+      const firstLabel = plan?.slotLabel ?? plan?.productName ?? '商品'
+      const batchNote =
+        plans.length > 1
+          ? `共 ${plans.length} 个方案，创建页将先预填「${firstLabel}」，其余 ${plans.length - 1} 项已排队。`
+          : ''
+
       setMessages((prev) => {
         const next = [
           ...prev,
           createAgentMessage(
             'task_result',
-            canAutoSubmit
-              ? `「${title}」已确认。正在打开创建商品页并自动提交抖音来客审核…`
-              : `「${title}」已确认。请先在「创建商品」页选择类目并保存一次，之后可在此一键自动提交；本次将为您预填方案。`,
+            plans.length > 1
+              ? `「${title}」已确认。${batchNote}`
+              : canAutoSubmit
+                ? `「${title}」已确认。正在打开创建商品页并自动提交抖音来客审核…`
+                : `「${title}」已确认。请先在「创建商品」页选择类目并保存一次，之后可在此一键自动提交；本次将为您预填方案。`,
             { resultSummary: 'confirmed' },
           ),
         ]
@@ -1356,7 +1489,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const m = messages.find((x) => x.id === pendingPreviewId)
     const p = m?.preview
     if (!p) return false
-    if (p.taskType === 'create_product') return p.productPlan?.enrichStatus === 'loading'
+    if (p.taskType === 'create_product') return isProductPreviewLoading(p)
     if (p.taskType === 'recruit_influencer') return p.recruitmentBrief?.enrichStatus === 'loading'
     if (p.taskType === 'file_tax') return p.taxFiling?.enrichStatus === 'loading'
     return false

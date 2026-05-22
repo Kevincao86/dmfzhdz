@@ -2,6 +2,7 @@ import { CheckCircle2, ClipboardList } from 'lucide-react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
+import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
 import { AiAgentRecruitmentOrderDetailCard } from './AiAgentRecruitmentOrderDetail'
@@ -25,9 +26,23 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           <span className="text-sm font-semibold tracking-tight">执行预览 · 需确认</span>
         </div>
         <p className="text-sm leading-relaxed text-slate-700">{m.content}</p>
-        {m.preview.taskType === 'create_product' && m.preview.productPlan ? (
-          <AiAgentProductVisualPreview plan={m.preview.productPlan} />
-        ) : m.preview.taskType === 'recruit_influencer' && m.preview.recruitmentBrief ? (
+        {m.preview.taskType === 'create_product' ? (() => {
+          const productPlans = listProductPlansFromPreview(m.preview)
+          if (!productPlans.length) return null
+          const multi = productPlans.length > 1
+          return (
+            <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : ''}>
+              {productPlans.map((plan) => (
+                <div
+                  key={plan.slotKey ?? plan.slotLabel ?? plan.productName}
+                  className={multi ? 'rounded-xl border border-violet-100/90 bg-white/80 p-2 shadow-sm' : ''}
+                >
+                  <AiAgentProductVisualPreview plan={plan} slotLabel={plan.slotLabel} />
+                </div>
+              ))}
+            </div>
+          )
+        })() : m.preview.taskType === 'recruit_influencer' && m.preview.recruitmentBrief ? (
           <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
         ) : m.preview.taskType === 'file_tax' && m.preview.taxFiling ? (
           <AiAgentTaxPreview tax={m.preview.taxFiling} />

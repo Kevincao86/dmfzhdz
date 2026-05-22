@@ -448,8 +448,22 @@ export async function runAiProductPlanCore(
         ? obj.comboLines.map((x) => String(x)).filter(Boolean)
         : [],
       ...(typeof obj.originYuan === 'number' ? { originYuan: obj.originYuan } : {}),
-      ...(obj.marginNote ? { marginNote: String(obj.marginNote).trim() } : {}),
-      ...(obj.competitorNote ? { competitorNote: String(obj.competitorNote).trim() } : {}),
+      ...(obj.marginNote != null
+        ? {
+            marginNote:
+              typeof obj.marginNote === 'string'
+                ? obj.marginNote.trim()
+                : JSON.stringify(obj.marginNote).slice(0, 400),
+          }
+        : {}),
+      ...(obj.competitorNote != null
+        ? {
+            competitorNote:
+              typeof obj.competitorNote === 'string'
+                ? obj.competitorNote.trim()
+                : JSON.stringify(obj.competitorNote).slice(0, 400),
+          }
+        : {}),
       ...(obj.riskLevel === 'low' || obj.riskLevel === 'medium' || obj.riskLevel === 'high'
         ? { riskLevel: obj.riskLevel }
         : {}),

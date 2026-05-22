@@ -117,6 +117,20 @@ export type AiProductPlan = {
   riskLevel?: 'low' | 'medium' | 'high'
 }
 
+function normalizeApiErrorMessage(err: unknown, detail?: unknown): string {
+  const parts: string[] = []
+  for (const x of [err, detail]) {
+    if (typeof x === 'string' && x.trim()) parts.push(x.trim())
+    else if (x && typeof x === 'object') {
+      const o = x as Record<string, unknown>
+      for (const k of ['message', 'detail', 'error']) {
+        if (typeof o[k] === 'string' && o[k].trim()) parts.push((o[k] as string).trim())
+      }
+    }
+  }
+  return parts.length ? [...new Set(parts)].join(' — ') : '生成方案失败'
+}
+
 export async function fetchAiProductPlan(body: {
   userBrief: string
   platform?: string
@@ -127,12 +141,12 @@ export async function fetchAiProductPlan(body: {
   competitorSummary?: string
 }): Promise<{ ok: true; plan: AiProductPlan } | { ok: false; message: string }> {
   try {
-    const r = await postJson<{ ok: boolean; plan?: AiProductPlan; error?: string }>(
+    const r = await postJson<{ ok: boolean; plan?: AiProductPlan; error?: string; detail?: string }>(
       '/api/meoo-ai-product-plan',
       body,
     )
     if (r.ok && r.plan?.productName) return { ok: true, plan: r.plan }
-    return { ok: false, message: r.error ?? '生成方案失败' }
+    return { ok: false, message: normalizeApiErrorMessage(r.error, r.detail) }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }

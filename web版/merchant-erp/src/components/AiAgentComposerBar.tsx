@@ -1,6 +1,7 @@
 import { ChevronDown, Film, ImagePlus, Loader2, Mic, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
+import { MAX_AI_CHAT_IMAGE_ATTACHMENTS } from '../services/ai/types'
 import { cn } from '../cn'
 import type { AiComposerAttachment } from '../lib/aiAgentTypes'
 import { shouldSubmitComposerOnEnter } from '../lib/composerEnterKey'
@@ -89,7 +90,7 @@ function AttachmentPreview({
       <button
         type="button"
         onClick={onRemove}
-        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[10px] text-white opacity-0 shadow group-hover:opacity-100"
+        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/90 text-[10px] text-white shadow ring-1 ring-white/80"
         aria-label="移除附件"
       >
         ×
@@ -197,7 +198,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const rows = layout === 'centered' ? 4 : 2
   const disabled = Boolean(pendingPreviewId)
   const modelShort = shortModelLabel(currentModel?.label ?? '模型')
-  const attachmentFull = pendingComposerAttachments.length >= 4
+  const attachmentFull = pendingComposerAttachments.length >= MAX_AI_CHAT_IMAGE_ATTACHMENTS
 
   return (
     <div
@@ -291,7 +292,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           disabled={disabled || aiSending || attachmentFull}
           onClick={() => fileRef.current?.click()}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white disabled:opacity-40"
-          title="上传图片或视频（最多 4 个，视频单文件 ≤100MB）"
+          title={`上传图片或视频（最多 ${MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个，视频单文件 ≤100MB）`}
           aria-label="上传图片或视频"
         >
           <ImagePlus className="h-4 w-4" />

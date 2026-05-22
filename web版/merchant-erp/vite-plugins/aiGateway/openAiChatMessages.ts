@@ -1,4 +1,4 @@
-import type { AIChatRequest } from '../../src/services/ai/types.js'
+import { MAX_AI_CHAT_IMAGE_ATTACHMENTS, type AIChatRequest } from '../../src/services/ai/types.js'
 
 /**
  * 供 TokenMix（四大家族）网关将 AIMessage 转为 Chat Completions 形态，并合并附图至多模态。
@@ -18,7 +18,7 @@ type OpenAiChatMessage =
 export function toOpenAiChatCompletionMessages(req: AIChatRequest): OpenAiChatMessage[] {
   const imgs = (req.imageDataUrls ?? [])
     .filter((u) => typeof u === 'string' && u.startsWith('data:image/'))
-    .slice(0, 4)
+    .slice(0, MAX_AI_CHAT_IMAGE_ATTACHMENTS)
 
   const rows: OpenAiChatMessage[] = req.messages.map((m) => {
     if (m.role === 'tool') {
