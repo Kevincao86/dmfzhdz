@@ -4,6 +4,7 @@ import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
+import { AiAgentRecruitmentOrderDetailCard } from './AiAgentRecruitmentOrderDetail'
 import { AiAgentTaxPreview } from './AiAgentTaxPreview'
 
 function formatBubbleTime(ts: number): string {
@@ -62,6 +63,9 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             任务结果
           </div>
           <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+          {m.recruitmentOrder ? (
+            <AiAgentRecruitmentOrderDetailCard order={m.recruitmentOrder} />
+          ) : null}
         </div>
       </div>
     )

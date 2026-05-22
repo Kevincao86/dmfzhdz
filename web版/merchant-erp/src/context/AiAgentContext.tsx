@@ -49,8 +49,12 @@ import {
   buildAiAgentPlanProfile,
   membershipAllowsAiTask,
 } from '../lib/aiAgentPlan'
-import { buildRecruitmentOrderFromAgentBrief } from '../lib/aiAgentRecruitmentOrder'
+import {
+  buildRecruitmentOrderFromAgentBrief,
+  recruitmentOrderDetailFromRegistry,
+} from '../lib/aiAgentRecruitmentOrder'
 import { appendRecruitmentOrderToOps } from '../lib/opsRegistryClient'
+import { buildAgentRecruitmentAllocation } from '../services/aiAgentRecruitmentAllocation'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
 import { appendTaxFilingRecord, buildTaxExportBlob, buildTaxPlatformRows } from '../lib/taxFiling'
 import { buildAiTaxFilingPreview } from '../services/aiAgentTaxFilingPreview'
@@ -183,6 +187,8 @@ type AiAgentContextValue = {
   pendingPreviewTaskType: AiTaskType | null
   /** 商品/招募预览生成中（禁用确认） */
   pendingPreviewLoading: boolean
+  /** 招募订单确认推送中（禁用确认） */
+  taskConfirming: boolean
   confirmPendingTask: () => void
   cancelPendingTask: () => void
   modifyPendingTask: () => void
@@ -332,6 +338,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     defaultAiModelPickerKeyForPlan('free'),
   )
   const [aiSending, setAiSending] = useState(false)
+  const [taskConfirming, setTaskConfirming] = useState(false)
 
   const messagesRef = useRef(messages)
   messagesRef.current = messages
@@ -646,7 +653,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         patchPreviewRecruitmentBrief(
           previewMsgId,
           brief,
-          '已生成达人招募图文 Brief。请核对主推品与文案，确认后将带入「达人招募」页。',
+          '已生成达人招募图文 Brief。请核对主推品与文案，确认后将在本窗口展示招募订单明细（含 AI 档位分配）。',
         )
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
@@ -1077,9 +1084,31 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
     if (p?.taskType === 'recruit_influencer') {
       const brief = p.recruitmentBrief
+      const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+      const userBrief =
+        lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
+        brief?.briefText?.slice(0, 200) ||
+        ''
       void (async () => {
-        let orderId: string | undefined
-        if (brief?.briefText?.trim()) {
+        setTaskConfirming(true)
+        try {
+          if (!brief?.briefText?.trim()) {
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  `「${title}」已确认，但 Brief 为空。请在输入框补充需求后重试。`,
+                  { resultSummary: 'partial' },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
+            setPendingPreviewId(null)
+            return
+          }
+
           const recordId =
             typeof crypto !== 'undefined' && 'randomUUID' in crypto
               ? crypto.randomUUID()
@@ -1100,55 +1129,54 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             mainProductName: brief.mainProductName,
             tags: brief.tags,
           })
+
+          const { intent, allocation } = await buildAgentRecruitmentAllocation(userBrief, brief)
+          const tenantMeta = await resolveRecruitmentOrderTenantMeta(
+            supabaseConfigured ? supabase : null,
+          )
+          const order = buildRecruitmentOrderFromAgentBrief(brief, tenantMeta, {
+            intent,
+            allocation,
+            userBrief,
+          })
+          await appendRecruitmentOrderToOps(order)
+          const orderDetail = recruitmentOrderDetailFromRegistry(order, brief, intent, allocation)
           try {
-            const tenantMeta = await resolveRecruitmentOrderTenantMeta(
-              supabaseConfigured ? supabase : null,
-            )
-            const order = buildRecruitmentOrderFromAgentBrief(brief, tenantMeta)
-            await appendRecruitmentOrderToOps(order)
-            orderId = order.id
-            try {
-              window.localStorage.setItem('meoo_last_recruitment_order_id', order.id)
-            } catch {
-              /* ignore */
-            }
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e)
-            setMessages((prev) => {
-              const next = [
-                ...prev,
-                createAgentMessage(
-                  'task_result',
-                  `Brief 已保存，但招募订单推送失败：${msg.slice(0, 200)}。请在达人招募页手动提交。`,
-                  { resultSummary: 'partial' },
-                ),
-              ]
-              messagesRef.current = next
-              return next
-            })
-            setPendingPreviewId(null)
-            setDrawerOpen(false)
-            navigate('/recruitment')
-            return
+            window.localStorage.setItem('meoo_last_recruitment_order_id', order.id)
+          } catch {
+            /* ignore */
           }
+
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage(
+                'task_result',
+                `「${title}」已确认。招募订单已生成并推送运营台（待接单），下方为 AI 智能分配后的订单明细。`,
+                { resultSummary: 'confirmed', recruitmentOrder: orderDetail },
+              ),
+            ]
+            messagesRef.current = next
+            return next
+          })
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage(
+                'task_result',
+                `Brief 已保存，但招募订单推送失败：${msg.slice(0, 200)}。可在达人招募页手动提交。`,
+                { resultSummary: 'partial' },
+              ),
+            ]
+            messagesRef.current = next
+            return next
+          })
+        } finally {
+          setTaskConfirming(false)
+          setPendingPreviewId(null)
         }
-        setMessages((prev) => {
-          const next = [
-            ...prev,
-            createAgentMessage(
-              'task_result',
-              orderId
-                ? `「${title}」已确认。招募订单 ${orderId} 已推送运营台（待接单），并打开达人招募页。`
-                : `「${title}」已确认。已写入达人 Brief，正在打开达人招募页…`,
-              { resultSummary: 'confirmed' },
-            ),
-          ]
-          messagesRef.current = next
-          return next
-        })
-        setPendingPreviewId(null)
-        setDrawerOpen(false)
-        navigate('/recruitment')
       })()
       return
     }
@@ -1349,6 +1377,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       pendingPreviewId,
       pendingPreviewTaskType,
       pendingPreviewLoading,
+      taskConfirming,
       confirmPendingTask,
       cancelPendingTask,
       modifyPendingTask,
@@ -1392,6 +1421,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       agentProfile,
       aiSending,
       pendingPreviewLoading,
+      taskConfirming,
       pendingComposerAttachments,
       addComposerMediaFiles,
       removeComposerAttachment,
