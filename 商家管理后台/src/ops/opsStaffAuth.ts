@@ -13,7 +13,7 @@ import {
 
 export const OPS_SESSION_KEY = 'meoo_ops_login_v2'
 
-export const OPS_MASTER_PHONE = '18768581283'
+export const OPS_MASTER_PHONE = '18768501283'
 export const OPS_MASTER_DEFAULT_PASSWORD = 'kaiyedaji888'
 
 const OPS_STAFF_STORAGE_KEY = 'meoo_ops_staff_accounts_v1'
