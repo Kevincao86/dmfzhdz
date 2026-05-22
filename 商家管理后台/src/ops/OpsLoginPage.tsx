@@ -3,16 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import {
-  buildOpsSession,
   ensureOpsMasterAccount,
   firstAllowedOpsPath,
-  OPS_SESSION_KEY,
+  migrateLocalOpsStaffToRemoteIfNeeded,
   readOpsSession,
   verifyOpsLogin,
   writeOpsSession,
 } from './opsStaffAuth'
-
-export { OPS_SESSION_KEY }
 
 export default function OpsLoginPage() {
   const navigate = useNavigate()
@@ -43,9 +40,11 @@ export default function OpsLoginPage() {
           setErr('账号或密码错误')
           return
         }
-        const session = buildOpsSession(r.account)
-        writeOpsSession(session)
-        navigate(firstAllowedOpsPath(session), { replace: true })
+        writeOpsSession(r.session)
+        if (r.session.role === 'super_admin') {
+          await migrateLocalOpsStaffToRemoteIfNeeded()
+        }
+        navigate(firstAllowedOpsPath(r.session), { replace: true })
       } finally {
         setBusy(false)
       }

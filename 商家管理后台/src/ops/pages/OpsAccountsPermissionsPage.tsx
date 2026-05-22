@@ -6,11 +6,12 @@ import {
   createOpsSubAccount,
   deleteOpsSubAccount,
   ensureOpsMasterAccount,
+  fetchOpsStaffAccountsRemote,
   isSuperAdmin,
+  migrateLocalOpsStaffToRemoteIfNeeded,
   OPS_MASTER_PHONE,
   OPS_PERMISSION_MODULES,
   readOpsSession,
-  readOpsStaffAccounts,
   refreshOpsSessionFromStorage,
   updateOpsSubAccount,
   type OpsPermissionKey,
@@ -40,14 +41,16 @@ export default function OpsAccountsPermissionsPage() {
   })
 
   const reloadStaff = useCallback(() => {
-    setStaff(readOpsStaffAccounts())
+    void fetchOpsStaffAccountsRemote().then(setStaff)
   }, [])
 
   useEffect(() => {
     let cancelled = false
-    void ensureOpsMasterAccount().then(() => {
-      if (!cancelled) reloadStaff()
-    })
+    void (async () => {
+      await ensureOpsMasterAccount()
+      await migrateLocalOpsStaffToRemoteIfNeeded()
+      if (!cancelled) await fetchOpsStaffAccountsRemote().then(setStaff)
+    })()
     const onChange = () => reloadStaff()
     window.addEventListener('meoo-ops-staff-changed', onChange)
     return () => {

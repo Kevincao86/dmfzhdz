@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import { createOpsRegistryGatewayPlugin } from '../web版/merchant-erp/vite-plugins/opsRegistryGatewayShared'
 import { opsSupabaseAdminPlugin } from './vite-plugins/opsSupabaseAdminPlugin'
+import { opsStaffAuthPlugin } from './vite-plugins/opsStaffAuthPlugin'
 import { provisionTenantProxyPlugin } from './vite-plugins/provisionTenantProxy'
 import { supportOnlineWsPlugin } from './vite-plugins/supportOnlineWs'
 
@@ -20,6 +21,7 @@ export default defineConfig(({ mode }) => {
         registryDir: (viteRoot) => path.resolve(viteRoot, '..', '.meoo-dev-sync'),
       }),
       opsSupabaseAdminPlugin(),
+      opsStaffAuthPlugin(),
       provisionTenantProxyPlugin(),
       react(),
       tailwindcss(),

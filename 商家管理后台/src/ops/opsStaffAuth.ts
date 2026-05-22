@@ -1,11 +1,19 @@
 /**
- * 运营管控台登录账号（主账号 + 子账号），浏览器 localStorage 持久化。
- * 密码仅存 SHA-256 摘要。
+ * 运营管控台登录账号（主账号 + 子账号）。
+ * 线上优先读写 Supabase（/api/meoo-ops-staff-*）；未配置 Supabase 时回退浏览器 localStorage。
+ * 密码仅存 SHA-256 摘要（本地回退路径）。
  */
+
+import {
+  apiMigrateLocalStaff,
+  apiOpsStaffList,
+  apiOpsStaffLogin,
+  apiOpsStaffMutate,
+} from './opsStaffApiClient'
 
 export const OPS_SESSION_KEY = 'meoo_ops_login_v2'
 
-export const OPS_MASTER_PHONE = '18768501283'
+export const OPS_MASTER_PHONE = '18768581283'
 export const OPS_MASTER_DEFAULT_PASSWORD = 'kaiyedaji888'
 
 const OPS_STAFF_STORAGE_KEY = 'meoo_ops_staff_accounts_v1'
@@ -44,6 +52,8 @@ export type OpsSession = {
   role: OpsStaffRole
   permissions: OpsPermissionKey[]
   loginAt: string
+  /** 云端登录会话令牌（Bearer） */
+  sessionToken?: string
 }
 
 export async function hashOpsPassword(plain: string): Promise<string> {
@@ -78,7 +88,8 @@ function parseAccount(raw: unknown): OpsStaffAccount | null {
         OPS_PERMISSION_MODULES.some((m) => m.key === p),
       )
     : []
-  if (!id || phone.length !== 11 || !passwordHash || !createdAt) return null
+  if (!id || phone.length !== 11 || !createdAt) return null
+  if (role === 'sub_admin' && !passwordHash) return null
   return {
     id,
     phone,
@@ -92,7 +103,7 @@ function parseAccount(raw: unknown): OpsStaffAccount | null {
   }
 }
 
-export function readOpsStaffAccounts(): OpsStaffAccount[] {
+function readOpsStaffAccountsLocal(): OpsStaffAccount[] {
   try {
     const raw = localStorage.getItem(OPS_STAFF_STORAGE_KEY)
     if (!raw) return []
@@ -104,16 +115,20 @@ export function readOpsStaffAccounts(): OpsStaffAccount[] {
   }
 }
 
-function writeOpsStaffAccounts(accounts: OpsStaffAccount[]): void {
+function writeOpsStaffAccountsLocal(accounts: OpsStaffAccount[]): void {
   const serialized = JSON.stringify(accounts)
   if (localStorage.getItem(OPS_STAFF_STORAGE_KEY) === serialized) return
   localStorage.setItem(OPS_STAFF_STORAGE_KEY, serialized)
   window.dispatchEvent(new CustomEvent('meoo-ops-staff-changed'))
 }
 
-/** 确保主账号存在且密码为当前默认（无变更时不写入，避免触发 storage 事件死循环） */
-export async function ensureOpsMasterAccount(): Promise<void> {
-  const list = readOpsStaffAccounts()
+function sessionTokenFromStorage(): string | undefined {
+  return readOpsSession()?.sessionToken
+}
+
+/** 确保主账号存在（本地回退路径） */
+export async function ensureOpsMasterAccountLocal(): Promise<void> {
+  const list = readOpsStaffAccountsLocal()
   const hash = await hashOpsPassword(OPS_MASTER_DEFAULT_PASSWORD)
   const perms = allPermissionKeys()
   const now = new Date().toISOString()
@@ -145,12 +160,12 @@ export async function ensureOpsMasterAccount(): Promise<void> {
       .map((a) => (a.phone === OPS_MASTER_PHONE ? nextMaster : a))
 
     if (masterChanged || hasExtraSuperAdmin || nextList.length !== list.length) {
-      writeOpsStaffAccounts(nextList)
+      writeOpsStaffAccountsLocal(nextList)
     }
     return
   }
 
-  writeOpsStaffAccounts([
+  writeOpsStaffAccountsLocal([
     ...list.filter((a) => a.phone !== OPS_MASTER_PHONE && a.role !== 'super_admin'),
     {
       id: 'ops_master',
@@ -166,20 +181,54 @@ export async function ensureOpsMasterAccount(): Promise<void> {
   ])
 }
 
+/** 兼容旧调用：云端模式下为 no-op */
+export async function ensureOpsMasterAccount(): Promise<void> {
+  await ensureOpsMasterAccountLocal()
+}
+
+export function readOpsStaffAccounts(): OpsStaffAccount[] {
+  return readOpsStaffAccountsLocal()
+}
+
+export async function fetchOpsStaffAccountsRemote(): Promise<OpsStaffAccount[]> {
+  const token = sessionTokenFromStorage()
+  if (!token) {
+    await ensureOpsMasterAccountLocal()
+    return readOpsStaffAccountsLocal()
+  }
+  const r = await apiOpsStaffList(token)
+  if (r.ok) return r.accounts
+  if (r.unauthorized) {
+    clearOpsSession()
+    return []
+  }
+  await ensureOpsMasterAccountLocal()
+  return readOpsStaffAccountsLocal()
+}
+
+/** 主账号登录后，将本机 localStorage 子账号一次性导入云端（仅导入云端尚不存在的手机号） */
+export async function migrateLocalOpsStaffToRemoteIfNeeded(): Promise<void> {
+  const session = readOpsSession()
+  if (!session?.sessionToken || session.role !== 'super_admin') return
+  const local = readOpsStaffAccountsLocal().filter((a) => a.role === 'sub_admin')
+  if (local.length === 0) return
+  await apiMigrateLocalStaff(session.sessionToken, local)
+}
+
 export function getOpsAccountById(id: string): OpsStaffAccount | null {
-  return readOpsStaffAccounts().find((a) => a.id === id) ?? null
+  return readOpsStaffAccountsLocal().find((a) => a.id === id) ?? null
 }
 
 export function getOpsAccountByPhone(phone: string): OpsStaffAccount | null {
   const p = phone.replace(/\D/g, '').slice(0, 11)
-  return readOpsStaffAccounts().find((a) => a.phone === p) ?? null
+  return readOpsStaffAccountsLocal().find((a) => a.phone === p) ?? null
 }
 
-export async function verifyOpsLogin(
+async function verifyOpsLoginLocal(
   phone: string,
   password: string,
 ): Promise<{ ok: true; account: OpsStaffAccount } | { ok: false; error: string }> {
-  await ensureOpsMasterAccount()
+  await ensureOpsMasterAccountLocal()
   const p = phone.replace(/\D/g, '').slice(0, 11)
   if (p.length !== 11) return { ok: false, error: 'invalid_phone' }
   const account = getOpsAccountByPhone(p)
@@ -190,7 +239,27 @@ export async function verifyOpsLogin(
   return { ok: true, account }
 }
 
-export function buildOpsSession(account: OpsStaffAccount): OpsSession {
+export async function verifyOpsLogin(
+  phone: string,
+  password: string,
+): Promise<
+  | { ok: true; account: OpsStaffAccount; session: OpsSession }
+  | { ok: false; error: string }
+> {
+  const remote = await apiOpsStaffLogin(phone, password)
+  if (remote.ok) {
+    return { ok: true, account: remote.account, session: remote.session }
+  }
+  if (!remote.useLocalFallback) {
+    return { ok: false, error: remote.error ?? 'bad_password' }
+  }
+
+  const local = await verifyOpsLoginLocal(phone, password)
+  if (!local.ok) return local
+  return { ok: true, account: local.account, session: buildOpsSession(local.account) }
+}
+
+export function buildOpsSession(account: OpsStaffAccount, sessionToken?: string): OpsSession {
   return {
     accountId: account.id,
     phone: account.phone,
@@ -198,6 +267,7 @@ export function buildOpsSession(account: OpsStaffAccount): OpsSession {
     role: account.role,
     permissions: account.role === 'super_admin' ? allPermissionKeys() : [...account.permissions],
     loginAt: new Date().toISOString(),
+    ...(sessionToken ? { sessionToken } : {}),
   }
 }
 
@@ -222,6 +292,7 @@ export function readOpsSession(): OpsSession | null {
       role,
       permissions: role === 'super_admin' ? allPermissionKeys() : permissions,
       loginAt: typeof o.loginAt === 'string' ? o.loginAt : '',
+      sessionToken: typeof o.sessionToken === 'string' ? o.sessionToken : undefined,
     }
   } catch {
     return null
@@ -271,7 +342,21 @@ export async function createOpsSubAccount(input: {
   password: string
   permissions: OpsPermissionKey[]
 }): Promise<{ ok: true; account: OpsStaffAccount } | { ok: false; error: string }> {
-  await ensureOpsMasterAccount()
+  const token = sessionTokenFromStorage()
+  if (token) {
+    const r = await apiOpsStaffMutate(token, {
+      action: 'create',
+      phone: input.phone,
+      displayName: input.displayName,
+      password: input.password,
+      permissions: input.permissions,
+    })
+    if (r.ok && r.account) return { ok: true, account: r.account }
+    if (r.ok) return { ok: false, error: 'invalid_response' }
+    return { ok: false, error: r.error }
+  }
+
+  await ensureOpsMasterAccountLocal()
   const phone = input.phone.replace(/\D/g, '').slice(0, 11)
   if (phone.length !== 11) return { ok: false, error: 'invalid_phone' }
   if (phone === OPS_MASTER_PHONE) return { ok: false, error: 'reserved_phone' }
@@ -279,7 +364,7 @@ export async function createOpsSubAccount(input: {
   const perms = [...new Set(input.permissions)]
   if (perms.length === 0) return { ok: false, error: 'permissions_required' }
 
-  const list = readOpsStaffAccounts()
+  const list = readOpsStaffAccountsLocal()
   if (list.some((a) => a.phone === phone)) return { ok: false, error: 'phone_exists' }
 
   const now = new Date().toISOString()
@@ -294,7 +379,7 @@ export async function createOpsSubAccount(input: {
     createdAt: now,
     updatedAt: now,
   }
-  writeOpsStaffAccounts([...list, account])
+  writeOpsStaffAccountsLocal([...list, account])
   return { ok: true, account }
 }
 
@@ -307,7 +392,14 @@ export async function updateOpsSubAccount(
     password?: string
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const list = readOpsStaffAccounts()
+  const token = sessionTokenFromStorage()
+  if (token) {
+    const r = await apiOpsStaffMutate(token, { action: 'update', id, ...patch })
+    if (r.ok) return { ok: true }
+    return { ok: false, error: r.error }
+  }
+
+  const list = readOpsStaffAccountsLocal()
   const idx = list.findIndex((a) => a.id === id)
   if (idx < 0) return { ok: false, error: 'not_found' }
   const cur = list[idx]!
@@ -333,28 +425,36 @@ export async function updateOpsSubAccount(
     passwordHash,
     updatedAt: now,
   }
-  writeOpsStaffAccounts(list)
+  writeOpsStaffAccountsLocal(list)
   return { ok: true }
 }
 
 export async function deleteOpsSubAccount(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const list = readOpsStaffAccounts()
+  const token = sessionTokenFromStorage()
+  if (token) {
+    const r = await apiOpsStaffMutate(token, { action: 'delete', id })
+    if (r.ok) return { ok: true }
+    return { ok: false, error: r.error }
+  }
+
+  const list = readOpsStaffAccountsLocal()
   const target = list.find((a) => a.id === id)
   if (!target) return { ok: false, error: 'not_found' }
   if (target.role === 'super_admin') return { ok: false, error: 'cannot_delete_master' }
-  writeOpsStaffAccounts(list.filter((a) => a.id !== id))
+  writeOpsStaffAccountsLocal(list.filter((a) => a.id !== id))
   return { ok: true }
 }
 
 export function refreshOpsSessionFromStorage(): OpsSession | null {
   const cur = readOpsSession()
   if (!cur) return null
+  if (cur.sessionToken) return cur
   const account = getOpsAccountById(cur.accountId)
   if (!account || account.status === 'disabled') {
     clearOpsSession()
     return null
   }
-  const next = buildOpsSession(account)
+  const next = buildOpsSession(account, cur.sessionToken)
   writeOpsSession(next)
   return next
 }

@@ -3,6 +3,7 @@
  */
 
 import { readMerchantSession } from '../lib/merchantSession'
+import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 import type { StorePlatformTab } from './merchantStoresApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -92,16 +93,29 @@ export async function fetchReviewsList(
   | { ok: false; message: string }
 > {
   const q = new URLSearchParams({ platform, sentiment, replyStatus })
+  const paths = [`/api/meoo-merchant-reviews?${q}`, `/api/merchant/reviews?${q}`]
   try {
-    const res = await fetch(url(`/api/merchant/reviews?${q}`), {
-      method: 'GET',
-      headers: platformSessionHeaders(platform),
-    })
+    let res: Response | null = null
     let data: Record<string, unknown> = {}
-    try {
-      data = (await res.json()) as Record<string, unknown>
-    } catch {
-      /* ignore */
+    for (const target of merchantApiFetchUrlCandidates(paths)) {
+      const r = await fetch(target, {
+        method: 'GET',
+        headers: platformSessionHeaders(platform),
+      })
+      const text = await r.text()
+      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+        continue
+      }
+      res = r
+      try {
+        data = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        /* ignore */
+      }
+      break
+    }
+    if (!res) {
+      return { ok: false, message: '评论接口未部署' }
     }
     if (!res.ok) {
       return {
@@ -133,17 +147,31 @@ export async function fetchReviewsList(
 export async function postReviewsSync(
   platform: ReviewsApiPlatform | 'all',
 ): Promise<{ ok: true; syncedAt?: string; message?: string } | { ok: false; message: string }> {
+  const body = JSON.stringify({ platform })
+  const paths = ['/api/meoo-merchant-reviews-sync', '/api/merchant/reviews/sync']
   try {
-    const res = await fetch(url('/api/merchant/reviews/sync'), {
-      method: 'POST',
-      headers: postHeaders(platform === 'all' ? undefined : platform),
-      body: JSON.stringify({ platform }),
-    })
+    let res: Response | null = null
     let data: Record<string, unknown> = {}
-    try {
-      data = (await res.json()) as Record<string, unknown>
-    } catch {
-      /* ignore */
+    for (const target of merchantApiFetchUrlCandidates(paths)) {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers: postHeaders(platform === 'all' ? undefined : platform),
+        body,
+      })
+      const text = await r.text()
+      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+        continue
+      }
+      res = r
+      try {
+        data = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        /* ignore */
+      }
+      break
+    }
+    if (!res) {
+      return { ok: false, message: '评论同步接口未部署' }
     }
     if (!res.ok) {
       return {
@@ -169,17 +197,31 @@ export async function postReviewReply(
   reviewId: string,
   content: string,
 ): Promise<{ ok: true; item: ReviewListItem } | { ok: false; message: string }> {
+  const body = JSON.stringify({ platform, reviewId, content })
+  const paths = ['/api/meoo-merchant-reviews-reply', '/api/merchant/reviews/reply']
   try {
-    const res = await fetch(url('/api/merchant/reviews/reply'), {
-      method: 'POST',
-      headers: postHeaders(platform),
-      body: JSON.stringify({ platform, reviewId, content }),
-    })
+    let res: Response | null = null
     let data: Record<string, unknown> = {}
-    try {
-      data = (await res.json()) as Record<string, unknown>
-    } catch {
-      /* ignore */
+    for (const target of merchantApiFetchUrlCandidates(paths)) {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers: postHeaders(platform),
+        body,
+      })
+      const text = await r.text()
+      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+        continue
+      }
+      res = r
+      try {
+        data = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        /* ignore */
+      }
+      break
+    }
+    if (!res) {
+      return { ok: false, message: '评论回复接口未部署' }
     }
     if (!res.ok) {
       return {
@@ -204,17 +246,31 @@ export async function postReviewAiSuggest(
   platform: ReviewsApiPlatform,
   reviewId: string,
 ): Promise<{ ok: true; suggestion: string } | { ok: false; message: string }> {
+  const body = JSON.stringify({ platform, reviewId })
+  const paths = ['/api/meoo-merchant-reviews-ai-suggest', '/api/merchant/reviews/ai-suggest']
   try {
-    const res = await fetch(url('/api/merchant/reviews/ai-suggest'), {
-      method: 'POST',
-      headers: postHeaders(platform),
-      body: JSON.stringify({ platform, reviewId }),
-    })
+    let res: Response | null = null
     let data: Record<string, unknown> = {}
-    try {
-      data = (await res.json()) as Record<string, unknown>
-    } catch {
-      /* ignore */
+    for (const target of merchantApiFetchUrlCandidates(paths)) {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers: postHeaders(platform),
+        body,
+      })
+      const text = await r.text()
+      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+        continue
+      }
+      res = r
+      try {
+        data = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        /* ignore */
+      }
+      break
+    }
+    if (!res) {
+      return { ok: false, message: 'AI 话术接口未部署' }
     }
     if (!res.ok) {
       return {
