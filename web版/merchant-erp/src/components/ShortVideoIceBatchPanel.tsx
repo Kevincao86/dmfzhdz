@@ -1089,7 +1089,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <RequiredMark />
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  描述节奏、字幕、氛围与卖点；可基于已上传的图片/视频由 AI 推断发布意图并生成文案。
+                  描述节奏、字幕、氛围与卖点（建议写明总时长如 10–12 秒、前 3 秒吸睛等）。提交时将解析文案并写入云剪时间线（时长分配、章节字幕、转场），与右侧输出参数共同生效。
                 </p>
               </div>
               <button

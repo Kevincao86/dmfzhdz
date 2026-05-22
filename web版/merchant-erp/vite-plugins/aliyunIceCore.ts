@@ -10,6 +10,11 @@ import IceModule, {
   UploadMediaByURLRequest,
 } from '@alicloud/ice20201109'
 import { $OpenApiUtil } from '@alicloud/openapi-core'
+import {
+  buildSubtitleTracksFromPlan,
+  parseIceEditBriefPlan,
+  type IceBriefTimelinePlan,
+} from './iceBriefTimelinePlan.js'
 
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
@@ -113,32 +118,65 @@ export const ICE_EFFECT_PRESETS = [
   { id: 'fade', label: '淡入淡出' },
 ] as const
 
-function buildTimeline(mediaId: string, clipEndSec: number, effectId: string): object {
+function appendClipEffects(
+  effects: Record<string, unknown>[],
+  plan: IceBriefTimelinePlan,
+  dur: number,
+  index: number,
+  total: number,
+): void {
+  if (plan.useFade) {
+    effects.push({ Type: 'Fade', SubType: 'In', Duration: Math.min(0.8, dur * 0.2) })
+    if (index === total - 1) {
+      effects.push({ Type: 'Fade', SubType: 'Out', Duration: Math.min(0.8, dur * 0.2) })
+    }
+  }
+  if (plan.useTransition && index > 0) {
+    effects.push({ Type: 'Transition', SubType: 'fade', Duration: Math.min(0.45, dur * 0.15) })
+  }
+}
+
+function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
+  const clipEndSec = Math.max(1, plan.clipEndSec)
   const clip: Record<string, unknown> = {
     MediaId: mediaId,
     TimelineIn: 0,
     TimelineOut: clipEndSec,
   }
-  if (effectId === 'fade') {
-    clip.Effects = [{ Type: 'Fade', SubType: 'In', Duration: Math.min(1, clipEndSec * 0.15) }]
+  const effects: Record<string, unknown>[] = []
+  appendClipEffects(effects, plan, clipEndSec, 0, 1)
+  if (plan.fastPace) {
+    effects.push({
+      Type: 'Clip',
+      SubType: 'RandomClip',
+      ClipDuration: Math.min(clipEndSec, Math.max(2, clipEndSec * 0.85)),
+    })
   }
+  if (effects.length) clip.Effects = effects
   return {
     VideoTracks: [{ VideoTrackClips: [clip] }],
+    ...buildSubtitleTracksFromPlan(plan),
   }
 }
 
-/** 多图轮播时间线：每张图占用 secPerImage 秒，顺序拼接为一条成片 */
+/** 多图轮播时间线：按文案解析的每张停留时长拼接，并叠加字幕轨 */
 function buildTimelineFromImages(
   mediaIds: string[],
-  secPerImage: number,
-  effectId: string,
+  plan: IceBriefTimelinePlan,
   width: number,
   height: number,
 ): object {
   let cursor = 0
   const clips: Record<string, unknown>[] = []
+  const durations =
+    plan.imageDurations.length === mediaIds.length
+      ? plan.imageDurations
+      : Array.from({ length: mediaIds.length }, () =>
+          Math.max(0.5, plan.totalDurationSec / mediaIds.length),
+        )
+
   for (let i = 0; i < mediaIds.length; i++) {
-    const dur = Math.max(0.5, secPerImage)
+    const dur = Math.max(0.5, durations[i] ?? 1)
     const clip: Record<string, unknown> = {
       Type: 'Image',
       MediaId: mediaIds[i],
@@ -148,17 +186,16 @@ function buildTimelineFromImages(
       Height: height,
     }
     const effects: Record<string, unknown>[] = []
-    if (effectId === 'fade') {
-      effects.push({ Type: 'Fade', SubType: 'In', Duration: Math.min(0.8, dur * 0.2) })
-      if (i === mediaIds.length - 1) {
-        effects.push({ Type: 'Fade', SubType: 'Out', Duration: Math.min(0.8, dur * 0.2) })
-      }
-    }
+    appendClipEffects(effects, plan, dur, i, mediaIds.length)
     if (effects.length) clip.Effects = effects
     clips.push(clip)
     cursor += dur
   }
-  return { VideoTracks: [{ VideoTrackClips: clips }] }
+
+  return {
+    VideoTracks: [{ VideoTrackClips: clips }],
+    ...buildSubtitleTracksFromPlan(plan),
+  }
 }
 
 /** UploadMediaByURL 必填：目标为 ICE/VOD 点播库，非商户自研 OSS Bucket */
@@ -432,13 +469,12 @@ export async function iceRunImagesPipeline(
     return { ok: false, message: out.message, step: 'output_config' }
   }
 
-  const timeline = buildTimelineFromImages(
-    mediaIds,
-    input.secPerImage,
-    input.effectId,
-    input.width,
-    input.height,
-  )
+  const plan = parseIceEditBriefPlan(input.editBrief, {
+    clipEndSec: input.secPerImage,
+    imageCount: urls.length,
+    effectId: input.effectId,
+  })
+  const timeline = buildTimelineFromImages(mediaIds, plan, input.width, input.height)
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -448,8 +484,8 @@ export async function iceRunImagesPipeline(
         projectMetadata: JSON.stringify({
           Title: input.projectName.slice(0, 120),
           Description:
-            (input.editBrief.slice(0, 500) || '墨典AI云剪') +
-            `；多图合成 ${urls.length} 张`,
+            (input.editBrief.slice(0, 400) || '墨典AI云剪') +
+            `；多图 ${urls.length} 张；已应用时间线：${plan.summary}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
         source: 'OPENAPI',
@@ -500,7 +536,12 @@ export async function iceRunSinglePipeline(
     return { ok: false, message: out.message, step: 'output_config' }
   }
 
-  const timeline = buildTimeline(up.mediaId, input.clipEndSec, input.effectId)
+  const plan = parseIceEditBriefPlan(input.editBrief, {
+    clipEndSec: input.clipEndSec,
+    imageCount: 1,
+    effectId: input.effectId,
+  })
+  const timeline = buildTimeline(up.mediaId, plan)
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -509,7 +550,8 @@ export async function iceRunSinglePipeline(
         outputMediaConfig: JSON.stringify(out.config),
         projectMetadata: JSON.stringify({
           Title: input.projectName.slice(0, 120),
-          Description: input.editBrief.slice(0, 500) || '墨典AI云剪',
+          Description:
+            (input.editBrief.slice(0, 400) || '墨典AI云剪') + `；已应用时间线：${plan.summary}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
         source: 'OPENAPI',
