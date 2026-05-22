@@ -54,7 +54,7 @@ type RecruitmentOrderStatus = RegistryRecruitmentOrder['status']
 function orderStatusLabel(s: RecruitmentOrderStatus): string {
   const m: Record<RecruitmentOrderStatus, string> = {
     pending: '待接单',
-    accepted: '已接单',
+    accepted: '已处理',
     done: '已完成',
     cancelled: '已取消',
     refunded: '已退款',
@@ -245,19 +245,33 @@ export default function OpsRecruitmentOrdersPage() {
     }
   }
 
-  /** 点击「已接单」时立即写入注册表，避免仅弹窗未改状态 */
+  /** 点击「处理」或「已处理」时立即写入注册表，避免列表仍显示待接单 */
   const ensureOrderAccepted = async (
     order: RegistryRecruitmentOrder,
   ): Promise<RegistryRecruitmentOrder | null> => {
     if (order.status !== 'pending') return order
     const r = await patchRecruitmentOrder({ id: order.id, status: 'accepted' })
     if (!r.ok) {
-      window.alert(r.error ?? '标记已接单失败')
+      window.alert(r.error ?? '标记已处理失败')
       return null
     }
     const next = { ...order, status: 'accepted' as const }
     applyOrderStatusLocally(order.id, 'accepted')
     return next
+  }
+
+  const openProcessOrder = async (order: RegistryRecruitmentOrder) => {
+    if (order.status === 'pending') {
+      setPatchBusyId(order.id)
+      try {
+        const accepted = await ensureOrderAccepted(order)
+        if (accepted) setProcessOrder(accepted)
+      } finally {
+        setPatchBusyId(null)
+      }
+      return
+    }
+    setProcessOrder(order)
   }
 
   const guardMerchantMpRecruitmentDup = async (
@@ -289,7 +303,7 @@ export default function OpsRecruitmentOrdersPage() {
           acceptMode,
         })
         if (!r.ok) {
-          window.alert(r.error ?? '同步已接单状态失败')
+          window.alert(r.error ?? '同步已处理状态失败')
           return
         }
         applyOrderStatusLocally(order.id, 'accepted')
@@ -493,11 +507,11 @@ export default function OpsRecruitmentOrdersPage() {
         acceptMode: 'manual',
       })
       if (!patch.ok) {
-        window.alert(`达人已写入，但订单状态更新失败：${patch.error ?? ''}。请在列表中手动改为已接单。`)
+        window.alert(`达人已写入，但订单状态更新失败：${patch.error ?? ''}。请在列表中手动改为已处理。`)
       } else {
         applyOrderStatusLocally(acceptSheetOrder.id, 'accepted')
       }
-      window.alert(`已智能解析并写入 ${candidates.length} 条达人至共享达人池（已关联订单 ${acceptSheetOrder.id}），订单已标记为已接单。请在 ERP「达人池确认」查看。`)
+      window.alert(`已智能解析并写入 ${candidates.length} 条达人至共享达人池（已关联订单 ${acceptSheetOrder.id}），订单已标记为已处理。请在 ERP「达人池确认」查看。`)
       setAcceptSheetOrder(null)
       setAcceptSheetFile(null)
       await loadRegistry()
@@ -585,7 +599,7 @@ export default function OpsRecruitmentOrdersPage() {
         >
           <option value="all">全部</option>
           <option value="pending">待接单</option>
-          <option value="accepted">已接单</option>
+          <option value="accepted">已处理</option>
           <option value="done">已完成</option>
           <option value="cancelled">已取消</option>
           <option value="refunded">已退款</option>
@@ -672,7 +686,7 @@ export default function OpsRecruitmentOrdersPage() {
                       <button
                         type="button"
                         disabled={patchBusyId === o.id}
-                        onClick={() => setProcessOrder(o)}
+                        onClick={() => void openProcessOrder(o)}
                         className="text-xs text-indigo-400 hover:underline disabled:opacity-50"
                       >
                         处理
@@ -747,7 +761,7 @@ export default function OpsRecruitmentOrdersPage() {
               {(
                 [
                   ['pending', '待接单'],
-                  ['accepted', '已接单'],
+                  ['accepted', '已处理'],
                   ['done', '已完成'],
                   ['cancelled', '已取消'],
                   ['refunded', '已退款'],
@@ -812,7 +826,7 @@ export default function OpsRecruitmentOrdersPage() {
             className="w-full max-w-md rounded-xl border border-slate-600 bg-slate-900 p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-white">已接单：选择招募方式</h3>
+            <h3 className="text-lg font-semibold text-white">已处理：选择招募方式</h3>
             <p className="mt-1 font-mono text-xs text-slate-400">{acceptModeChoiceOrder.id}</p>
             <p className="mt-3 text-xs text-slate-500">
               {acceptModeChoiceOrder.orderKind === 'recruitment_ice'
@@ -943,7 +957,7 @@ export default function OpsRecruitmentOrdersPage() {
               <div>
                 <h3 className="text-lg font-semibold text-white">小程序招募已开通</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  商家订单 {mpShareInfo.merchantOrderId} 已标记为已接单，并生成小程序单{' '}
+                  商家订单 {mpShareInfo.merchantOrderId} 已标记为已处理，并生成小程序单{' '}
                   <span className="font-mono text-slate-300">{mpShareInfo.mpOrderId}</span>。请将下方路径配置为微信分享或生成小程序码。
                 </p>
               </div>
