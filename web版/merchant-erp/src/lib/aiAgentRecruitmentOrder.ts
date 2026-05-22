@@ -22,6 +22,7 @@ export function recruitmentOrderDetailFromRegistry(
     totalHeadcount: total,
     tags: brief.tags ?? [],
     briefExcerpt: (brief.briefText || '').slice(0, 160),
+    briefText: brief.briefText || '',
     createdAt: order.createdAt,
     allocation: {
       v3: allocation.v3,
