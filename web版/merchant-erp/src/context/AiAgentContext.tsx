@@ -695,16 +695,25 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return planFromApi(intent, r.plan, userBrief)
       })
 
-      const anyOk = basePlans.some((p) => p.enrichStatus === 'loading')
-      patchPreviewProductPlans(
-        previewMsgId,
-        basePlans,
-        anyOk
-          ? intents.length > 1
-            ? `已生成 ${basePlans.filter((p) => p.enrichStatus === 'loading').length} 项方案草稿，正在优化标题与主图…`
+      const okPlans = basePlans.filter((p) => p.enrichStatus === 'loading')
+      const failedPlans = basePlans.filter((p) => p.enrichStatus === 'error')
+      const anyOk = okPlans.length > 0
+      let statusIntro = '方案生成失败，请稍后重试或改在「创建商品」页手动填写。'
+      if (anyOk && failedPlans.length === 0) {
+        statusIntro =
+          intents.length > 1
+            ? `已生成 ${okPlans.length} 项方案草稿，正在优化标题与主图…`
             : '已生成方案草稿，正在优化标题与主图…'
-          : '方案生成失败，请稍后重试或改在「创建商品」页手动填写。',
-      )
+      } else if (anyOk && failedPlans.length > 0) {
+        statusIntro = `已生成 ${okPlans.length} 项；${failedPlans.length} 项失败：${failedPlans
+          .map((p) => `${p.slotLabel}（${coerceAgentDisplayError(p.enrichError, '失败')}）`)
+          .join('；')}`
+      } else if (failedPlans.length > 0) {
+        statusIntro = `全部方案生成失败：${failedPlans
+          .map((p) => `${p.slotLabel}：${coerceAgentDisplayError(p.enrichError, '失败')}`)
+          .join('；')}`
+      }
+      patchPreviewProductPlans(previewMsgId, basePlans, statusIntro)
       if (!anyOk) return
 
       const enriched: AiProductPlanPreview[] = []
@@ -744,8 +753,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const intents = parseCreateProductIntents(userBrief)
       const intro =
         intents.length > 1
-          ? `检测到您要上架 ${intents.length} 个商品（${intents.map((i) => i.label).join('、')}）。将结合菜单价目、毛利率与竞品分析分别生成方案，并以多个 C 端预览展示。`
-          : '检测到您希望创建/上架商品。我将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
+          ? `检测到您要上架 ${intents.length} 个商品（${intents.map((i) => i.label).join('、')}）。将结合菜单价目、毛利率与竞品分析分别生成方案（服务端已配置的多模型依次尝试），并以多个 C 端预览展示。`
+          : '检测到您希望创建/上架商品。将结合菜单价目、毛利率与竞品分析生成团购方案，并以 C 端预览图展示；确认后将自动提交抖音来客审核。'
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
       const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {

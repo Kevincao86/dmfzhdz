@@ -14,7 +14,11 @@ const ACTION_TO_TASK: Record<string, AiTaskType> = {
 /** 从用户话术推断任务类型（与 scheduleTaskPreview 共用） */
 export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
-  if (/创建|商品|套餐|上架|双人|单人|火锅|团购|代金券|代\s*\d+|抵\s*\d+|券面|上传.*(商品|套餐|券)/.test(x)) {
+  if (
+    /创建|商品|套餐|上架|双人|单人|三人|四人|火锅|团购|代金券|代\s*\d+|抵\s*\d+|券面|上传.*(商品|套餐|券)/.test(
+      x,
+    )
+  ) {
     return 'create_product'
   }
   if (/达人|招募|探店|brief|Brief|种草|探店笔记/.test(x)) return 'recruit_influencer'
@@ -103,12 +107,21 @@ export type CreateProductIntent = {
 }
 
 const MEAL_INTENT_RULES: { pattern: RegExp; label: string }[] = [
-  { pattern: /双人餐|二人餐|2\s*人餐/, label: '双人餐' },
-  { pattern: /三人餐|3\s*人餐/, label: '三人餐' },
-  { pattern: /单人餐|一人餐|1\s*人餐/, label: '单人餐' },
-  { pattern: /四人餐|4\s*人餐/, label: '四人餐' },
-  { pattern: /五人餐|5\s*人餐/, label: '五人餐' },
-  { pattern: /家庭餐|亲子餐/, label: '家庭餐' },
+  { pattern: /双人套餐|双人餐|二人餐|2\s*人餐/, label: '双人套餐' },
+  { pattern: /三人套餐|三人餐|3\s*人餐/, label: '三人套餐' },
+  { pattern: /单人套餐|单人餐|一人餐|1\s*人餐/, label: '单人套餐' },
+  { pattern: /四人套餐|四人餐|4\s*人餐/, label: '四人套餐' },
+  { pattern: /五人套餐|五人餐|5\s*人餐/, label: '五人套餐' },
+  { pattern: /家庭套餐|家庭餐|亲子餐/, label: '家庭套餐' },
+]
+
+const MEAL_INTENT_ORDER = [
+  '单人套餐',
+  '双人套餐',
+  '三人套餐',
+  '四人套餐',
+  '五人套餐',
+  '家庭套餐',
 ]
 
 function stripQuoteBlock(text: string): string {
@@ -142,7 +155,7 @@ export function parseCreateProductIntents(text: string): CreateProductIntent[] {
   }
 
   const voucherMatch = x.match(/(\d+)\s*代\s*(\d+)[^，。.\n]{0,24}?(?:元代金券|代金券|券)?/)
-  if (voucherMatch || /代金券|代\s*\d+\s*抵/.test(x)) {
+  if (voucherMatch || /(?:一张|一个|一款)?\s*代金券|代\s*\d+\s*抵/.test(x)) {
     const label = voucherMatch?.[0]?.replace(/\s+/g, '') ?? '代金券'
     if (!seen.has(label)) {
       seen.add(label)
@@ -179,7 +192,14 @@ export function parseCreateProductIntents(text: string): CreateProductIntent[] {
     })
   }
 
-  return intents.slice(0, 6)
+  const mealIntents = intents.filter((i) => i.productType === 1)
+  const voucherIntents = intents.filter((i) => i.productType === 2)
+  mealIntents.sort(
+    (a, b) =>
+      (MEAL_INTENT_ORDER.indexOf(a.label) === -1 ? 99 : MEAL_INTENT_ORDER.indexOf(a.label)) -
+      (MEAL_INTENT_ORDER.indexOf(b.label) === -1 ? 99 : MEAL_INTENT_ORDER.indexOf(b.label)),
+  )
+  return [...mealIntents, ...voucherIntents].slice(0, 6)
 }
 
 /** 将 API/LLM 杂项字段安全转为展示用字符串 */
