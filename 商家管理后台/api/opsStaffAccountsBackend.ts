@@ -1,7 +1,10 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export const OPS_MASTER_PHONE = '18768581283'
+export const OPS_MASTER_PHONE = '18768501283'
+
+/** 历史误写入的错误主账号手机号（5446bf8 曾写错为 81283），登录时自动清理 */
+export const OPS_MASTER_PHONE_LEGACY_WRONG = '18768581283'
 export const OPS_MASTER_DEFAULT_PASSWORD = 'kaiyedaji888'
 
 export const OPS_MASTER_PASSWORD_HASH =
@@ -165,6 +168,11 @@ async function fetchRowById(admin: SupabaseClient, id: string): Promise<OpsStaff
 }
 
 export async function ensureOpsMasterAccountInDb(admin: SupabaseClient): Promise<void> {
+  const legacyWrong = await fetchRowByPhone(admin, OPS_MASTER_PHONE_LEGACY_WRONG)
+  if (legacyWrong?.role === 'super_admin') {
+    await admin.from('ops_staff_accounts').delete().eq('id', legacyWrong.id)
+  }
+
   const existing = await fetchRowByPhone(admin, OPS_MASTER_PHONE)
   const now = new Date().toISOString()
   const perms = allPermissionKeys()

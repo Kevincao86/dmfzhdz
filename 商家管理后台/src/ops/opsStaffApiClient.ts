@@ -34,8 +34,16 @@ export async function apiOpsStaffLogin(
       body: JSON.stringify({ phone, password }),
     })
     const data = (await res.json()) as Record<string, unknown>
-    if (res.status === 503 || data.error === 'supabase_admin_not_configured') {
+    if (
+      res.status === 503 ||
+      data.error === 'supabase_admin_not_configured' ||
+      data.error === 'ops_staff_table_missing'
+    ) {
       return { ok: false, useLocalFallback: true }
+    }
+    // 云端尚无该账号（子账号未迁移等）时，回退本机 localStorage 校验
+    if (res.status === 401 && data.code === 'not_found') {
+      return { ok: false, useLocalFallback: true, error: 'not_found' }
     }
     if (!res.ok || data.ok === false) {
       return { ok: false, useLocalFallback: false, error: 'bad_credentials' }
