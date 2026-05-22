@@ -78,10 +78,57 @@ async function checkBearerGateway(path: string, token: string): Promise<boolean>
   }
 }
 
+/** 门店查询失败但不像凭证失效（限流/网关/HTML 等）时，仍视为已绑定 */
+function douyinStoreErrorLooksLikeAuthFailure(message: string): boolean {
+  const c = message ?? ''
+  const m = c.toLowerCase()
+  if (/\b401\b|\b403\b/.test(c)) return true
+  if (
+    /未授权|无权|拒绝访问|token无效|access[_-]?token过期|access_token过期|token过期|请刷新或重新授权|请重新授权|会话|解密失败|凭证无效|授权失效|已过期|expired|invalid.*token|鉴权失败/.test(
+      m,
+    )
+  )
+    return true
+  return false
+}
+
+async function probeDouyinConnectivity(lastChecked: string): Promise<PlatformConnectivityRow> {
+  let douyin: PlatformConnectivityRow = {
+    id: 'douyin',
+    name: '抖音来客',
+    status: 'error',
+    lastChecked,
+  }
+  const dyTok = readMerchantSession('meoo_douyin_merchant_token')
+  const dyMid = readMerchantSession('meoo_douyin_merchant_id')
+  if (!dyTok) return douyin
+
+  const r = await getDouyinStores({
+    accessToken: dyTok,
+    page: 1,
+    pageSize: 1,
+    merchantId: dyMid ?? undefined,
+  })
+  const checkedAt = formatNow()
+  if (r.ok) {
+    return { ...douyin, status: 'connected', lastChecked: checkedAt }
+  }
+  if (douyinStoreErrorLooksLikeAuthFailure(r.message ?? '')) {
+    return { ...douyin, status: 'error', lastChecked: checkedAt }
+  }
+  /** 与设置页一致：有有效 binding 凭证即视为已连接，看板数据走独立 summary 接口 */
+  return { ...douyin, status: 'connected', lastChecked: checkedAt }
+}
+
 async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow[]> {
   if (supabaseConfigured && supabase) {
     try {
-      await hydrateDouyinBindingsFromCloud(supabase)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session?.user) {
+        await hydrateDouyinBindingsFromCloud(supabase)
+      }
     } catch {
       /* 云端绑定恢复失败时仍用本地 session 探测 */
     }
@@ -96,27 +143,7 @@ async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow
     lastChecked,
   }
 
-  const dyTok = readMerchantSession('meoo_douyin_merchant_token')
-  const dyMid = readMerchantSession('meoo_douyin_merchant_id')
-  let douyin: PlatformConnectivityRow = {
-    id: 'douyin',
-    name: '抖音来客',
-    status: 'error',
-    lastChecked,
-  }
-  if (dyTok) {
-    const r = await getDouyinStores({
-      accessToken: dyTok,
-      page: 1,
-      pageSize: 1,
-      merchantId: dyMid ?? undefined,
-    })
-    douyin = {
-      ...douyin,
-      status: r.ok ? 'connected' : 'error',
-      lastChecked: formatNow(),
-    }
-  }
+  const douyin = await probeDouyinConnectivity(lastChecked)
 
   const mtTok = readMerchantSession('meoo_meituan_merchant_token')
   let meituan: PlatformConnectivityRow = {

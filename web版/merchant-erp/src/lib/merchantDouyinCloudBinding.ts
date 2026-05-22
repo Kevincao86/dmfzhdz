@@ -8,6 +8,7 @@ import {
   upsertMerchantBinding,
   type MerchantPlatformBindingRow,
 } from './merchantPlatformBindings'
+import { fetchPrimaryTenantId } from './tenantBilling'
 import { applyActiveDouyinBinding, pickActiveDouyinBinding } from './douyinActiveBinding'
 
 const PROVIDER = 'douyin' as const
@@ -94,6 +95,11 @@ export async function deleteDouyinBindingCloud(
 export async function hydrateDouyinBindingsFromCloud(
   supabase: SupabaseClient,
 ): Promise<DouyinCloudBindingRow[]> {
+  const tenantId = await fetchPrimaryTenantId(supabase)
+  if (!tenantId) {
+    /** 登录/租户尚未就绪：勿清空本机 binding，避免首页探测误删凭证 */
+    return []
+  }
   const rows = await listMerchantBindings(supabase, PROVIDER)
   const active = pickActiveDouyinBinding(rows)
   applyActiveDouyinBinding(active)
