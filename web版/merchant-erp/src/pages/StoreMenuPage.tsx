@@ -1,4 +1,4 @@
-import { ImagePlus, Loader2, Save, Sparkles, Trash2 } from 'lucide-react'
+import { ImagePlus, Loader2, Save, Sparkles, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
@@ -116,6 +116,11 @@ export default function StoreMenuPage() {
     persist({ ...record, items })
   }
 
+  const removeImage = (imageId: string) => {
+    if (!record) return
+    persist({ ...record, images: record.images.filter((img) => img.id !== imageId) })
+  }
+
   const removeItem = (index: number) => {
     if (!record) return
     persist({ ...record, items: record.items.filter((_, i) => i !== index) })
@@ -206,12 +211,22 @@ export default function StoreMenuPage() {
         {record.images.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {record.images.map((img) => (
-              <img
-                key={img.id}
-                src={img.dataUrl}
-                alt=""
-                className="h-24 w-24 rounded-lg border object-cover"
-              />
+              <div key={img.id} className="group relative">
+                <img
+                  src={img.dataUrl}
+                  alt={img.fileName ?? ''}
+                  className="h-24 w-24 rounded-lg border border-gray-200 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(img.id)}
+                  className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-gray-900/90 text-white shadow ring-1 ring-white hover:bg-red-600"
+                  aria-label="删除图片"
+                  title="删除图片"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         )}

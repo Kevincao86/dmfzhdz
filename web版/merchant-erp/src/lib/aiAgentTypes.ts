@@ -83,6 +83,9 @@ export type AiProductPlanPreview = {
   headUrl?: string
   enrichStatus?: 'loading' | 'ready' | 'error'
   enrichError?: string
+  /** 多商品预览时的展示标签（如「双人餐」） */
+  slotLabel?: string
+  slotKey?: string
 }
 
 /** 智能体确认后展示的招募订单明细（含 AI 档位分配） */
@@ -128,6 +131,8 @@ export type AiTaskPreviewPayload = {
   taskType: AiTaskType
   /** 创建商品：结构化方案（确认后进入创建向导预填） */
   productPlan?: AiProductPlanPreview
+  /** 创建商品：多个套餐/代金券并列预览 */
+  productPlans?: AiProductPlanPreview[]
   /** 达人招募：图文 Brief */
   recruitmentBrief?: AiRecruitmentBriefPreview
   /** 报税：汇总各已绑定平台后一键申报（需确认） */

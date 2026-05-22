@@ -1,4 +1,8 @@
-import type { AIChatRequest, AIProvider } from '../../src/services/ai/types.js'
+import {
+  MAX_AI_CHAT_IMAGE_ATTACHMENTS,
+  type AIChatRequest,
+  type AIProvider,
+} from '../../src/services/ai/types.js'
 import { normalizeAiModelFamily } from '../../src/services/ai/tokenmixClient.js'
 import {
   mergeSystemPrompt,
@@ -72,7 +76,7 @@ export async function runMeooAiChatCore(
     provider === 'tokenmix' && Array.isArray(parsed.imageDataUrls)
       ? parsed.imageDataUrls
           .filter((x): x is string => typeof x === 'string' && x.startsWith('data:image/'))
-          .slice(0, 4)
+          .slice(0, MAX_AI_CHAT_IMAGE_ATTACHMENTS)
       : undefined
 
   const req: AIChatRequest = {

@@ -1,4 +1,5 @@
 import type { AiTaskType } from './aiAgentTypes'
+import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
 
 const ACTION_TO_TASK: Record<string, AiTaskType> = {
   create_product: 'create_product',
@@ -92,4 +93,110 @@ export function inferVoucherPricesFromText(text: string): { price?: number; orig
   const origin = Number(m[2])
   if (!Number.isFinite(price) || !Number.isFinite(origin)) return {}
   return { price, origin }
+}
+
+export type CreateProductIntent = {
+  key: string
+  label: string
+  brief: string
+  productType: number
+}
+
+const MEAL_INTENT_RULES: { pattern: RegExp; label: string }[] = [
+  { pattern: /双人餐|二人餐|2\s*人餐/, label: '双人餐' },
+  { pattern: /三人餐|3\s*人餐/, label: '三人餐' },
+  { pattern: /单人餐|一人餐|1\s*人餐/, label: '单人餐' },
+  { pattern: /四人餐|4\s*人餐/, label: '四人餐' },
+  { pattern: /五人餐|5\s*人餐/, label: '五人餐' },
+  { pattern: /家庭餐|亲子餐/, label: '家庭餐' },
+]
+
+function stripQuoteBlock(text: string): string {
+  return text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+}
+
+function intentBrief(full: string, focus: string): string {
+  return `${full}\n\n【仅生成以下一项】${focus}。不要与其它餐型或代金券合并；须输出完整团购标题、售价、套餐项与说明。`
+}
+
+/** 从用户话术拆出多个上架意图（如单人/双人/三人餐 + 代金券） */
+export function parseCreateProductIntents(text: string): CreateProductIntent[] {
+  const x = stripQuoteBlock(text)
+  if (!x) {
+    return [{ key: 'main', label: '商品方案', brief: text, productType: 1 }]
+  }
+
+  const intents: CreateProductIntent[] = []
+  const seen = new Set<string>()
+
+  for (const rule of MEAL_INTENT_RULES) {
+    if (!rule.pattern.test(x)) continue
+    if (seen.has(rule.label)) continue
+    seen.add(rule.label)
+    intents.push({
+      key: rule.label,
+      label: rule.label,
+      brief: intentBrief(x, `团购套餐「${rule.label}」`),
+      productType: 1,
+    })
+  }
+
+  const voucherMatch = x.match(/(\d+)\s*代\s*(\d+)[^，。.\n]{0,24}?(?:元代金券|代金券|券)?/)
+  if (voucherMatch || /代金券|代\s*\d+\s*抵/.test(x)) {
+    const label = voucherMatch?.[0]?.replace(/\s+/g, '') ?? '代金券'
+    if (!seen.has(label)) {
+      seen.add(label)
+      intents.push({
+        key: `voucher-${label}`,
+        label,
+        brief: intentBrief(x, `代金券「${label}」`),
+        productType: 2,
+      })
+    }
+  }
+
+  const countMatch = x.match(/(\d+)\s*个(?:商品)?(?:套餐|团购)/)
+  if (!intents.length && countMatch) {
+    const n = Math.min(6, Math.max(1, Number.parseInt(countMatch[1], 10) || 1))
+    for (let i = 1; i <= n; i++) {
+      const label = `套餐方案 ${i}`
+      intents.push({
+        key: `combo-${i}`,
+        label,
+        brief: intentBrief(x, `第 ${i} 个团购套餐（共 ${n} 个，须相互区分售价与内容）`),
+        productType: 1,
+      })
+    }
+  }
+
+  if (!intents.length) {
+    const hint = briefProductNameHint(x)
+    intents.push({
+      key: 'main',
+      label: hint,
+      brief: x,
+      productType: inferDouyinProductTypeFromText(x) === 2 ? 2 : 1,
+    })
+  }
+
+  return intents.slice(0, 6)
+}
+
+/** 将 API/LLM 杂项字段安全转为展示用字符串 */
+export function coerceAgentTextField(value: unknown, maxLen = 400): string | undefined {
+  if (value == null) return undefined
+  if (typeof value === 'string') {
+    const s = value.trim()
+    return s ? s.slice(0, maxLen) : undefined
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'object') {
+    try {
+      const s = JSON.stringify(value)
+      return s.length > 2 ? s.slice(0, maxLen) : undefined
+    } catch {
+      return undefined
+    }
+  }
+  return String(value).slice(0, maxLen)
 }

@@ -1,5 +1,8 @@
 import type { AiTaskType } from '../../lib/aiAgentTypes'
 
+/** 智能体单轮附图上限（输入区与 TokenMix 多模态网关一致） */
+export const MAX_AI_CHAT_IMAGE_ATTACHMENTS = 8
+
 /**
  * AI 网关 — OpenAI/Claude/Gemini/Grok 经 [TokenMix](https://tokenmix.ai/docs)；
  * DeepSeek / Kimi / MiniMax 仍直连各厂商 API。密钥仅服务端。
@@ -24,7 +27,7 @@ export type AIChatRequest = {
   /** 仅 provider=tokenmix 时有效 */
   modelFamily?: AIModelFamily
   messages: AIMessage[]
-  /** 本回合用户随附截图（data URL，最多 4 张）；由网关拼进多模态消息 */
+  /** 本回合用户随附截图（data URL，最多 8 张）；由网关拼进多模态消息 */
   imageDataUrls?: string[]
   temperature?: number
   /** 预留：当前网关实现为非流式；stream=true 时返回 501 */

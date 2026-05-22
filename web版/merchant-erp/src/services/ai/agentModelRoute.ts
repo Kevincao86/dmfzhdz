@@ -2,17 +2,23 @@ import type { AIModelFamily } from './types'
 import { isAgentImagePickerKey, parseAgentImagePickerKey, effectiveChatPickerKey } from './agentImageModelKeys'
 import { detectImageGenerationIntent } from './aiImageIntentRouting'
 import { parseAiModelPickerKey } from './modelRegistry'
+import { inferTaskTypeFromText } from '../../lib/aiAgentActionParse'
 
 /**
  * 是否应走 /api/meoo-ai-agent-image（像素出图）。
  * 用户选中生图模型时，仅在生图意图或图生图（有参考图）时出图；纯对话仍走 chat。
  */
+const STRUCTURED_PRODUCT_PREVIEW_HINT =
+  /预览|审核|组|套餐|代金券|单人餐|双人餐|三人餐|四人餐|五人餐|家庭餐|创建商品|上架|价目|菜单/i
+
 export function shouldRouteToAgentNativeImage(
   pickerKey: string,
   userLine: string,
   visionUrls: string[],
 ): boolean {
   if (!isAgentImagePickerKey(pickerKey)) return false
+  if (inferTaskTypeFromText(userLine) === 'create_product') return false
+  if (visionUrls.length > 0 && STRUCTURED_PRODUCT_PREVIEW_HINT.test(userLine)) return false
   const refImg = visionUrls[0]?.trim()
   if (refImg) return true
   return detectImageGenerationIntent(userLine)

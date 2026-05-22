@@ -22,7 +22,7 @@ const AI_AGENT_SHORTCUTS = [
 ]
 
 const STORAGE_KEY = 'meoo_agent_thread_v2'
-const MAX_ATTACH = 4
+const MAX_ATTACH = 8
 
 function apiBase() {
   return String(config.MERCHANT_API_BASE_URL || '')

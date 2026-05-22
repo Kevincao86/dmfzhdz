@@ -45,3 +45,31 @@ export function consumeAiProductDraft(): AiProductDraft | null {
   }
   return d
 }
+
+const BATCH_KEY = 'meoo_ai_product_drafts_batch'
+
+/** 多方案确认：首项立即预填创建页，其余排队 */
+export function saveAiProductDraftBatch(items: AiProductDraft[]): void {
+  if (!items.length) return
+  saveAiProductDraft(items[0])
+  try {
+    if (items.length > 1) {
+      sessionStorage.setItem(BATCH_KEY, JSON.stringify(items.slice(1)))
+    } else {
+      sessionStorage.removeItem(BATCH_KEY)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function peekAiProductDraftBatchCount(): number {
+  try {
+    const raw = sessionStorage.getItem(BATCH_KEY)
+    if (!raw) return 0
+    const arr = JSON.parse(raw) as AiProductDraft[]
+    return Array.isArray(arr) ? arr.length : 0
+  } catch {
+    return 0
+  }
+}
