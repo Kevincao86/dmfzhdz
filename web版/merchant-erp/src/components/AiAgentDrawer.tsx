@@ -7,7 +7,7 @@ import { AiAgentMessageBubble } from './AiAgentMessageBubble'
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
 import type { AiPermissionId } from '../lib/aiAgentTypes'
-import { AI_AGENT_SHORTCUTS } from '../lib/aiAgentTypes'
+import { aiTaskConfirmLabel } from '../lib/aiAgentPlan'
 
 const PERMISSION_ORDER: AiPermissionId[] = [
   'product',
@@ -17,6 +17,7 @@ const PERMISSION_ORDER: AiPermissionId[] = [
   'local_ads',
   'local_leads',
   'sync',
+  'finance_tax',
 ]
 
 const PERMISSION_BADGE_SHORT: Record<AiPermissionId, string> = {
@@ -27,6 +28,7 @@ const PERMISSION_BADGE_SHORT: Record<AiPermissionId, string> = {
   local_ads: '投流',
   local_leads: '线索',
   sync: '同步',
+  finance_tax: '报税',
 }
 
 export default function AiAgentDrawer() {
@@ -44,14 +46,10 @@ export default function AiAgentDrawer() {
     cancelPendingTask,
     modifyPendingTask,
     aiSending,
+    agentProfile,
   } = useAiAgent()
 
-  const confirmLabel =
-    pendingPreviewTaskType === 'create_product'
-      ? '确认并提交审核'
-      : pendingPreviewTaskType === 'recruit_influencer'
-        ? '确认并打开招募'
-        : '确认执行'
+  const confirmLabel = aiTaskConfirmLabel(pendingPreviewTaskType)
   const confirmDisabled = pendingPreviewLoading || aiSending
 
   const listRef = useRef<HTMLDivElement>(null)
@@ -153,12 +151,12 @@ export default function AiAgentDrawer() {
                 onClick={() => setShortcutsOpen((v) => !v)}
                 className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-100/80"
               >
-                <span>快捷任务（{AI_AGENT_SHORTCUTS.length}）</span>
+                <span>快捷任务（{agentProfile.shortcuts.length}）</span>
                 {shortcutsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
               {shortcutsOpen ? (
                 <div className="mt-2 flex flex-wrap gap-2 pb-1">
-                  {AI_AGENT_SHORTCUTS.map((s) => (
+                  {agentProfile.shortcuts.map((s) => (
                     <button
                       key={s.type}
                       type="button"

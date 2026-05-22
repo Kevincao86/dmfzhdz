@@ -44,7 +44,16 @@ import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich
 import { buildAiRecruitmentBriefPreview } from '../services/aiAgentRecruitmentBriefEnrich'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
 import { loadDouyinWizardLastContext } from '../lib/douyinWizardLastContext'
-import { AI_AGENT_WELCOME_CONTENT, AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
+import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
+import {
+  buildAiAgentPlanProfile,
+  membershipAllowsAiTask,
+} from '../lib/aiAgentPlan'
+import { buildRecruitmentOrderFromAgentBrief } from '../lib/aiAgentRecruitmentOrder'
+import { appendRecruitmentOrderToOps } from '../lib/opsRegistryClient'
+import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
+import { appendTaxFilingRecord, buildTaxExportBlob, buildTaxPlatformRows } from '../lib/taxFiling'
+import { buildAiTaxFilingPreview } from '../services/aiAgentTaxFilingPreview'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import {
   extractVideoPosterDataUrl,
@@ -53,13 +62,20 @@ import {
 } from '../lib/aiVideoPoster'
 import { modelPickerKeyForNativeImageVendor } from '../services/ai/aiImageIntentRouting'
 import { shouldRouteToAgentNativeImage } from '../services/ai/agentModelRoute'
-import { agentNativeImageRouteFromPickerKey, effectiveChatPickerKey } from '../services/ai/agentImageModelKeys'
+import {
+  agentNativeImageRouteFromPickerKey,
+  effectiveChatPickerKey,
+  resolveImagePickerKeyForUserLine,
+} from '../services/ai/agentImageModelKeys'
 import {
   defaultAiModelPickerKeyForPlan,
   listAiModelPickerOptionsForPlan,
   parseAiModelPickerKey,
 } from '../services/ai/modelRegistry'
 import { useMembership } from './MembershipContext'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { listMerchantBindings } from '../lib/merchantPlatformBindings'
+import { fetchFinanceReconcile } from '../services/financeReconcileApi'
 import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
 import { postAiAgentNativeImage, postAiChat, type AiAgentNativeImageOk } from '../services/ai/aiClient'
 import type { AIMessage } from '../services/ai/types'
@@ -175,6 +191,7 @@ type AiAgentContextValue = {
   modelPickerKey: string
   setModelPickerKey: (key: string) => void
   modelPickerOptions: ReturnType<typeof listAiModelPickerOptionsForPlan>
+  agentProfile: ReturnType<typeof buildAiAgentPlanProfile>
   aiSending: boolean
   /** 主输入区待发送的图片/视频（最多 4 个） */
   pendingComposerAttachments: AiComposerAttachment[]
@@ -252,6 +269,16 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
           '输出修复建议清单；高风险项需你二次确认后再改',
         ],
       }
+    case 'file_tax':
+      return {
+        taskType,
+        title: '一键报税',
+        steps: [
+          '读取各已绑定平台（抖音来客、小红书等）与财务对账核销数据',
+          '按申报周期汇总销售额与核销额',
+          '在确认后导出报税数据包并记录申报状态（正式税局接口可后续对接）',
+        ],
+      }
     case 'generate_copywriting':
     default:
       return {
@@ -285,11 +312,12 @@ function buildProductPlanContext(userBrief: string) {
 
 export function AiAgentProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
-  const { plan } = useMembership()
+  const { plan, entitlements } = useMembership()
+  const agentProfile = useMemo(() => buildAiAgentPlanProfile(plan), [plan])
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pageContext, setPageContext] = useState<AiAgentOpenContext | null>(null)
   const [messages, setMessages] = useState<AiAgentMessage[]>(() => [
-    createAgentMessage('assistant', AI_AGENT_WELCOME_CONTENT),
+    createAgentMessage('assistant', buildAiAgentPlanProfile('member').welcome),
   ])
   const [archivedSessions, setArchivedSessions] = useState<AiAgentArchivedSession[]>([])
   const [sidebarActiveArchiveId, setSidebarActiveArchiveId] = useState<string | null>(null)
@@ -320,6 +348,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     setModelPickerKeyState(key)
   }, [plan])
 
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length !== 1 || prev[0]?.role !== 'assistant') return prev
+      return [createAgentMessage('assistant', agentProfile.welcome)]
+    })
+  }, [agentProfile.welcome])
+
   const modelPickerOptions = useMemo(() => listAiModelPickerOptionsForPlan(plan), [plan])
 
   const setModelPickerKey = useCallback((key: string) => {
@@ -328,16 +363,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const permissions = useMemo<Record<AiPermissionId, boolean>>(
-    () => ({
-      product: true,
-      store: true,
-      influencer: true,
-      review: true,
-      local_ads: true,
-      local_leads: true,
-      sync: true,
-    }),
-    [],
+    () => agentProfile.permissions,
+    [agentProfile],
   )
 
   const openDrawer = useCallback((ctx?: AiAgentOpenContext) => {
@@ -427,7 +454,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetToWelcome = useCallback(() => {
-    const fresh = [createAgentMessage('assistant', AI_AGENT_WELCOME_CONTENT)]
+    const fresh = [createAgentMessage('assistant', agentProfile.welcome)]
     setMessages(fresh)
     messagesRef.current = fresh
     setPendingPreviewId(null)
@@ -437,7 +464,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       return []
     })
     setPendingQuote(null)
-  }, [])
+  }, [agentProfile.welcome])
 
   const startNewChat = useCallback(() => {
     pushCurrentToArchiveIfHasUser()
@@ -554,7 +581,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       }
       patchPreviewProductPlan(previewMsgId, basePlan)
       try {
-        const enriched = await enrichAiProductPlanPreview(basePlan, userBrief)
+        const enriched = await enrichAiProductPlanPreview(basePlan, userBrief, modelPickerKey)
         patchPreviewProductPlan(
           previewMsgId,
           enriched,
@@ -573,7 +600,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         )
       }
     },
-    [patchPreviewProductPlan],
+    [patchPreviewProductPlan, modelPickerKey],
   )
 
   const pushCreateProductPreview = useCallback(
@@ -668,6 +695,82 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [attachRecruitmentBriefToPreview],
   )
 
+  const pushTaxFilingPreview = useCallback((pageLabel?: string) => {
+    if (!entitlements.features.financeTax) {
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          createAgentMessage(
+            'assistant',
+            '一键报税为会员功能。请升级会员版后在「财务 → 报税管理」或此处继续使用。',
+          ),
+        ]
+        messagesRef.current = next
+        return next
+      })
+      return
+    }
+    const intro =
+      '将按已绑定平台汇总上一自然月财务对账核销数据，生成报税预览。确认后导出申报数据包并记录状态。'
+    const preview = buildPreviewForTask('file_tax', pageLabel)
+    const msg = createAgentMessage('task_preview', intro, {
+      preview: {
+        ...preview,
+        taxFiling: {
+          periodLabel: '—',
+          startDate: '',
+          endDate: '',
+          platforms: [],
+          totalVerifyYuan: 0,
+          enrichStatus: 'loading',
+        },
+      },
+    })
+    setPendingPreviewId(msg.id)
+    setMessages((prev) => {
+      const next = [...prev, msg]
+      messagesRef.current = next
+      return next
+    })
+    void (async () => {
+      try {
+        const tax = await buildAiTaxFilingPreview()
+        setMessages((prev) => {
+          const next = prev.map((m) => {
+            if (m.id !== msg.id || !m.preview) return m
+            return {
+              ...m,
+              content: `已汇总 ${tax.periodLabel} 各平台核销数据，请核对后确认一键报税。`,
+              preview: { ...m.preview, taxFiling: tax },
+            }
+          })
+          messagesRef.current = next
+          return next
+        })
+      } catch (e) {
+        const err = e instanceof Error ? e.message : String(e)
+        setMessages((prev) => {
+          const next = prev.map((m) => {
+            if (m.id !== msg.id || !m.preview?.taxFiling) return m
+            return {
+              ...m,
+              preview: {
+                ...m.preview,
+                taxFiling: {
+                  ...m.preview.taxFiling!,
+                  enrichStatus: 'error' as const,
+                  enrichError: err,
+                },
+              },
+            }
+          })
+          messagesRef.current = next
+          return next
+        })
+      }
+    })()
+  }, [entitlements.features.financeTax])
+
   const scheduleTaskPreview = useCallback(
     (trimmed: string, assistantContent: string | undefined, explicitTaskType: AiTaskType | undefined, pageLabel?: string) => {
       const taskType =
@@ -685,6 +788,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           case 'recruit_influencer':
             pushRecruitInfluencerPreview(trimmed, pageLabel)
             break
+          case 'file_tax':
+            pushTaxFilingPreview(pageLabel)
+            break
           case 'handle_review':
             pushPreview('handle_review', intro, pageLabel)
             break
@@ -699,7 +805,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
       }, 200)
     },
-    [pushCreateProductPreview, pushRecruitInfluencerPreview, pushPreview],
+    [pushCreateProductPreview, pushRecruitInfluencerPreview, pushTaxFilingPreview, pushPreview],
   )
 
   const runGatewayForSnapshot = useCallback(
@@ -813,10 +919,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       queueMicrotask(() => {
         void (async () => {
           const refImg = visionUrls[0]?.trim()
-          if (shouldRouteToAgentNativeImage(activePickerKey, line, visionUrls)) {
+          const imagePickerKey = resolveImagePickerKeyForUserLine(
+            activePickerKey,
+            modelPickerOptions,
+            line,
+            visionUrls.length > 0,
+          )
+          if (shouldRouteToAgentNativeImage(imagePickerKey, line, visionUrls)) {
             setAiSending(true)
             try {
-              const imgOpts = buildAgentImagePostOpts(activePickerKey, refImg)
+              const imgOpts = buildAgentImagePostOpts(imagePickerKey, refImg)
               const imgRes = await postAiAgentNativeImage(line, imgOpts)
               if (imgRes.ok) {
                 if (imgRes.channel === 'builtin') {
@@ -870,6 +982,24 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const applyShortcut = useCallback(
     (taskType: AiTaskType) => {
       if (aiSending || pendingPreviewId) return
+      if (!membershipAllowsAiTask(plan, taskType)) {
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'assistant',
+              `当前为${agentProfile.planLabel}，「${AI_TASK_TYPE_LABELS[taskType]}」需升级会员后使用。`,
+            ),
+          ]
+          messagesRef.current = next
+          return next
+        })
+        return
+      }
+      if (taskType === 'file_tax') {
+        pushTaxFilingPreview(pageContext?.pageLabel)
+        return
+      }
       setSidebarActiveArchiveId(null)
       setPendingComposerAttachments((prev) => {
       for (const a of prev) revokeComposerAttachment(a)
@@ -887,7 +1017,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         void runGatewayForSnapshot(messagesRef.current, line, taskType, pageContext?.pageLabel, [])
       })
     },
-    [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot],
+    [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot, plan, agentProfile.planLabel, pushTaxFilingPreview],
   )
 
   const confirmPendingTask = useCallback(() => {
@@ -947,43 +1077,136 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
     if (p?.taskType === 'recruit_influencer') {
       const brief = p.recruitmentBrief
-      if (brief?.briefText?.trim()) {
-        const recordId =
-          typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : `brief-${Date.now()}`
-        appendKolBriefRecord({
-          id: recordId,
-          createdAt: new Date().toISOString(),
-          platform: brief.platform,
-          mainProductName: brief.mainProductName,
-          tags: brief.tags,
-          previews: brief.previews ?? [brief.briefText, brief.briefText, brief.briefText],
+      void (async () => {
+        let orderId: string | undefined
+        if (brief?.briefText?.trim()) {
+          const recordId =
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : `brief-${Date.now()}`
+          appendKolBriefRecord({
+            id: recordId,
+            createdAt: new Date().toISOString(),
+            platform: brief.platform,
+            mainProductName: brief.mainProductName,
+            tags: brief.tags,
+            previews: brief.previews ?? [brief.briefText, brief.briefText, brief.briefText],
+          })
+          writeSelectedBriefForRecruitment({
+            recordId,
+            variantIndex: 0,
+            text: brief.briefText,
+            platform: brief.platform,
+            mainProductName: brief.mainProductName,
+            tags: brief.tags,
+          })
+          try {
+            const tenantMeta = await resolveRecruitmentOrderTenantMeta(
+              supabaseConfigured ? supabase : null,
+            )
+            const order = buildRecruitmentOrderFromAgentBrief(brief, tenantMeta)
+            await appendRecruitmentOrderToOps(order)
+            orderId = order.id
+            try {
+              window.localStorage.setItem('meoo_last_recruitment_order_id', order.id)
+            } catch {
+              /* ignore */
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  `Brief 已保存，但招募订单推送失败：${msg.slice(0, 200)}。请在达人招募页手动提交。`,
+                  { resultSummary: 'partial' },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
+            setPendingPreviewId(null)
+            setDrawerOpen(false)
+            navigate('/recruitment')
+            return
+          }
+        }
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'task_result',
+              orderId
+                ? `「${title}」已确认。招募订单 ${orderId} 已推送运营台（待接单），并打开达人招募页。`
+                : `「${title}」已确认。已写入达人 Brief，正在打开达人招募页…`,
+              { resultSummary: 'confirmed' },
+            ),
+          ]
+          messagesRef.current = next
+          return next
         })
-        writeSelectedBriefForRecruitment({
-          recordId,
-          variantIndex: 0,
-          text: brief.briefText,
-          platform: brief.platform,
-          mainProductName: brief.mainProductName,
-          tags: brief.tags,
+        setPendingPreviewId(null)
+        setDrawerOpen(false)
+        navigate('/recruitment')
+      })()
+      return
+    }
+
+    if (p?.taskType === 'file_tax' && p.taxFiling) {
+      const tax = p.taxFiling
+      void (async () => {
+        const period = {
+          label: tax.periodLabel,
+          start: tax.startDate,
+          end: tax.endDate,
+        }
+        let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
+        if (supabaseConfigured && supabase) {
+          const [dy, xhs] = await Promise.all([
+            listMerchantBindings(supabase, 'douyin'),
+            listMerchantBindings(supabase, 'xhs_commercial'),
+          ])
+          bindings = [...dy, ...xhs]
+        }
+        const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
+        const rows = fin.ok ? buildTaxPlatformRows(bindings, fin.rows) : []
+        const blob = buildTaxExportBlob(rows, period)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `meoo-tax-${period.start}-${period.end}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+        appendTaxFilingRecord({
+          id: `TAX-${Date.now()}`,
+          periodLabel: period.label,
+          startDate: period.start,
+          endDate: period.end,
+          submittedAt: new Date().toISOString(),
+          platforms: tax.platforms.map((x) => ({
+            platformId: x.platformId,
+            verifyAmountYuan: x.verifyAmountYuan,
+          })),
+          totalVerifyYuan: tax.totalVerifyYuan,
+          status: 'submitted_mock',
         })
-      }
-      setMessages((prev) => {
-        const next = [
-          ...prev,
-          createAgentMessage(
-            'task_result',
-            `「${title}」已确认。已写入达人 Brief，正在打开达人招募页…`,
-            { resultSummary: 'confirmed' },
-          ),
-        ]
-        messagesRef.current = next
-        return next
-      })
-      setPendingPreviewId(null)
-      setDrawerOpen(false)
-      navigate('/recruitment')
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'task_result',
+              `「${title}」已确认。报税数据包已下载，申报记录已保存。可在「财务 → 报税管理」查看历史。`,
+              { resultSummary: 'confirmed' },
+            ),
+          ]
+          messagesRef.current = next
+          return next
+        })
+        setPendingPreviewId(null)
+        setDrawerOpen(false)
+        navigate('/finance/tax')
+      })()
       return
     }
 
@@ -1049,10 +1272,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       queueMicrotask(() => {
         void (async () => {
-          if (shouldRouteToAgentNativeImage(activePickerKey, q, [])) {
+          const imagePickerKey = resolveImagePickerKeyForUserLine(activePickerKey, modelPickerOptions, q, false)
+          if (shouldRouteToAgentNativeImage(imagePickerKey, q, [])) {
             setAiSending(true)
             try {
-              const imgOpts = buildAgentImagePostOpts(activePickerKey)
+              const imgOpts = buildAgentImagePostOpts(imagePickerKey)
               const imgRes = await postAiAgentNativeImage(q, imgOpts)
               if (imgRes.ok) {
                 if (imgRes.channel === 'builtin') {
@@ -1106,6 +1330,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     if (!p) return false
     if (p.taskType === 'create_product') return p.productPlan?.enrichStatus === 'loading'
     if (p.taskType === 'recruit_influencer') return p.recruitmentBrief?.enrichStatus === 'loading'
+    if (p.taskType === 'file_tax') return p.taxFiling?.enrichStatus === 'loading'
     return false
   }, [pendingPreviewId, messages])
 
@@ -1131,6 +1356,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerKey,
       setModelPickerKey,
       modelPickerOptions,
+      agentProfile,
       aiSending,
       pendingComposerAttachments,
       addComposerMediaFiles,
@@ -1163,6 +1389,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerKey,
       setModelPickerKey,
       modelPickerOptions,
+      agentProfile,
       aiSending,
       pendingPreviewLoading,
       pendingComposerAttachments,

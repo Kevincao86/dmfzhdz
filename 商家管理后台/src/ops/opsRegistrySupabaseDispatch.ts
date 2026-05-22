@@ -238,7 +238,9 @@ export async function dispatchOpsRegistrySupabase(opts: {
       data.recruitmentOrders[idx] = {
         ...cur,
         ...(status !== undefined ? { status } : {}),
-        ...(body.acceptMode === 'manual' || body.acceptMode === 'miniprogram'
+        ...(body.acceptMode === 'manual' ||
+        body.acceptMode === 'miniprogram' ||
+        body.acceptMode === 'ice'
           ? { acceptMode: body.acceptMode }
           : {}),
         ...(typeof body.linkedMpOrderId === 'string' && body.linkedMpOrderId.trim()

@@ -224,6 +224,12 @@ export default function OpsRecruitmentOrdersPage() {
     }
   }
 
+  const applyOrderStatusLocally = (id: string, next: RecruitmentOrderStatus) => {
+    setRegistryOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: next } : o)))
+    setProcessOrder((cur) => (cur && cur.id === id ? { ...cur, status: next } : cur))
+    setAcceptModeChoiceOrder((cur) => (cur && cur.id === id ? { ...cur, status: next } : cur))
+  }
+
   const changeOrderStatus = async (id: string, next: RecruitmentOrderStatus) => {
     setPatchBusyId(id)
     try {
@@ -232,11 +238,26 @@ export default function OpsRecruitmentOrdersPage() {
         window.alert(r.error ?? '更新失败')
         return
       }
+      applyOrderStatusLocally(id, next)
       await loadRegistry()
-      setProcessOrder((cur) => (cur && cur.id === id ? { ...cur, status: next } : cur))
     } finally {
       setPatchBusyId(null)
     }
+  }
+
+  /** 点击「已接单」时立即写入注册表，避免仅弹窗未改状态 */
+  const ensureOrderAccepted = async (
+    order: RegistryRecruitmentOrder,
+  ): Promise<RegistryRecruitmentOrder | null> => {
+    if (order.status !== 'pending') return order
+    const r = await patchRecruitmentOrder({ id: order.id, status: 'accepted' })
+    if (!r.ok) {
+      window.alert(r.error ?? '标记已接单失败')
+      return null
+    }
+    const next = { ...order, status: 'accepted' as const }
+    applyOrderStatusLocally(order.id, 'accepted')
+    return next
   }
 
   const guardMerchantMpRecruitmentDup = async (
@@ -258,13 +279,31 @@ export default function OpsRecruitmentOrdersPage() {
   const openAcceptModeChoice = async (order: RegistryRecruitmentOrder) => {
     const existing = await guardMerchantMpRecruitmentDup(order)
     if (existing) {
+      if (order.status === 'pending') {
+        const acceptMode =
+          existing.orderKind === 'recruitment_ice' || existing.hall === 'ice' ? 'ice' : 'miniprogram'
+        const r = await patchRecruitmentOrder({
+          id: order.id,
+          status: 'accepted',
+          linkedMpOrderId: existing.id,
+          acceptMode,
+        })
+        if (!r.ok) {
+          window.alert(r.error ?? '同步已接单状态失败')
+          return
+        }
+        applyOrderStatusLocally(order.id, 'accepted')
+        await loadRegistry()
+      }
       setMpShareInfo({ merchantOrderId: order.id, mpOrderId: existing.id })
       return
     }
+    const accepted = await ensureOrderAccepted(order)
+    if (!accepted) return
     setProcessOrder(null)
-    setMpRecruitPlatform(normalizeRecruitmentPlatform(order.recruitmentPlatform || order.accountType))
+    setMpRecruitPlatform(normalizeRecruitmentPlatform(accepted.recruitmentPlatform || accepted.accountType))
     setMpHallKind('normal')
-    setAcceptModeChoiceOrder(order)
+    setAcceptModeChoiceOrder(accepted)
   }
 
   const openAcceptSheetFlow = (order: RegistryRecruitmentOrder) => {
@@ -281,7 +320,17 @@ export default function OpsRecruitmentOrdersPage() {
       if (existing) {
         window.alert(`${MP_RECRUIT_ALREADY_SUBMITTED_MSG}\n关联小程序单号：${existing.id}`)
         setAcceptModeChoiceOrder(null)
+        if (order.status === 'pending') {
+          const r = await patchRecruitmentOrder({
+            id: order.id,
+            status: 'accepted',
+            linkedMpOrderId: existing.id,
+            acceptMode: 'miniprogram',
+          })
+          if (r.ok) applyOrderStatusLocally(order.id, 'accepted')
+        }
         setMpShareInfo({ merchantOrderId: order.id, mpOrderId: existing.id })
+        await loadRegistry()
         return
       }
 
@@ -323,6 +372,7 @@ export default function OpsRecruitmentOrdersPage() {
       }
       setAcceptModeChoiceOrder(null)
       setMpShareInfo({ merchantOrderId: order.id, mpOrderId: mpId })
+      applyOrderStatusLocally(order.id, 'accepted')
       await loadRegistry()
     } finally {
       setMpAcceptBusy(false)
@@ -337,7 +387,17 @@ export default function OpsRecruitmentOrdersPage() {
       if (existing) {
         window.alert(`${MP_RECRUIT_ALREADY_SUBMITTED_MSG}\n关联小程序单号：${existing.id}`)
         setAcceptModeChoiceOrder(null)
+        if (order.status === 'pending') {
+          const r = await patchRecruitmentOrder({
+            id: order.id,
+            status: 'accepted',
+            linkedMpOrderId: existing.id,
+            acceptMode: 'ice',
+          })
+          if (r.ok) applyOrderStatusLocally(order.id, 'accepted')
+        }
         setMpShareInfo({ merchantOrderId: order.id, mpOrderId: existing.id })
+        await loadRegistry()
         return
       }
 
@@ -390,6 +450,8 @@ export default function OpsRecruitmentOrdersPage() {
       })
       if (!patch.ok) {
         window.alert(`云剪单已创建，但商家订单状态更新失败：${patch.error ?? ''}`)
+      } else {
+        applyOrderStatusLocally(order.id, 'accepted')
       }
       setAcceptModeChoiceOrder(null)
       setMpShareInfo({ merchantOrderId: order.id, mpOrderId: mpId })
@@ -432,6 +494,8 @@ export default function OpsRecruitmentOrdersPage() {
       })
       if (!patch.ok) {
         window.alert(`达人已写入，但订单状态更新失败：${patch.error ?? ''}。请在列表中手动改为已接单。`)
+      } else {
+        applyOrderStatusLocally(acceptSheetOrder.id, 'accepted')
       }
       window.alert(`已智能解析并写入 ${candidates.length} 条达人至共享达人池（已关联订单 ${acceptSheetOrder.id}），订单已标记为已接单。请在 ERP「达人池确认」查看。`)
       setAcceptSheetOrder(null)

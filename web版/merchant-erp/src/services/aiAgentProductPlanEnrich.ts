@@ -6,11 +6,15 @@ import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
 import { buildProductImageUserLine } from '../lib/douyinProductImageAnchor'
 import { postDouyinGoodsAiAssist } from './douyinAiAssistApi'
-import { resolveModelForAssistAction, resolveImageAssistModelId } from './merchantAiModelStorage'
+import {
+  resolveImageAssistModelIdFromChatPicker,
+  resolveModelForAssistAction,
+} from './merchantAiModelStorage'
 
 export async function enrichAiProductPlanPreview(
   plan: AiProductPlanPreview,
   userBrief: string,
+  chatPickerKey?: string,
 ): Promise<AiProductPlanPreview> {
   const productType = plan.productType ?? inferDouyinProductTypeFromText(`${userBrief} ${plan.productName}`)
   let productName = plan.productName
@@ -45,7 +49,7 @@ export async function enrichAiProductPlanPreview(
       const imageUserLine = buildProductImageUserLine(productName, 'head')
       const imgR = await postDouyinGoodsAiAssist({
         action: 'image_generate',
-        model: resolveImageAssistModelId(),
+        model: resolveImageAssistModelIdFromChatPicker(chatPickerKey),
         product_name: productName,
         listing_title: productName,
         price_yuan: String(plan.suggestedPriceYuan),

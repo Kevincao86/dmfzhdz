@@ -1,5 +1,10 @@
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
-import { nativeImagePreferredVendorFromPicker } from './ai/agentImageModelKeys'
+import {
+  imagePickerKeyForChatSelection,
+  isAgentImagePickerKey,
+  nativeImagePreferredVendorFromPicker,
+} from './ai/agentImageModelKeys'
+import { listAiModelPickerOptions } from './ai/modelRegistry'
 import { listAiUiModelOptions, MEOO_AI_VENDOR_CATALOG_EVENT } from './merchantAiVendorCatalogClient'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import { readVendorKeyMap } from './merchantAiVendorKeysStorage'
@@ -72,6 +77,21 @@ function normalizeImageModelStored(raw: string | null | undefined): string {
 }
 
 /** 商品 assist 内置生图：万相 / 豆包 / MiniMax；TokenMix（OpenAI 等）由向导走 /api/meoo-ai-agent-image */
+/** 智能体/商品 enrich：按用户所选对话模型匹配文生图厂商 */
+export function resolveImageAssistModelIdFromChatPicker(chatPickerKey?: string): string {
+  if (chatPickerKey?.trim()) {
+    const imgKey = isAgentImagePickerKey(chatPickerKey)
+      ? chatPickerKey
+      : imagePickerKeyForChatSelection(chatPickerKey, listAiModelPickerOptions())
+    const id = imgKey
+    if (id.startsWith('img::v::')) {
+      const vendor = nativeImagePreferredVendorFromPicker(id)
+      if (vendor) return vendor
+    }
+  }
+  return resolveImageAssistModelId()
+}
+
 export function resolveImageAssistModelId(): string {
   const id = resolveImageAiModelForRequest()
   if (id.startsWith('img::v::')) {

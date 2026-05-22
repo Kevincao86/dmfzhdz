@@ -4,6 +4,7 @@ import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
+import { AiAgentTaxPreview } from './AiAgentTaxPreview'
 
 function formatBubbleTime(ts: number): string {
   try {
@@ -27,6 +28,8 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           <AiAgentProductVisualPreview plan={m.preview.productPlan} />
         ) : m.preview.taskType === 'recruit_influencer' && m.preview.recruitmentBrief ? (
           <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
+        ) : m.preview.taskType === 'file_tax' && m.preview.taxFiling ? (
+          <AiAgentTaxPreview tax={m.preview.taxFiling} />
         ) : (
           <>
             <p className="mt-3 text-xs font-semibold text-violet-900">{m.preview.title}</p>
@@ -39,7 +42,9 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             </ol>
           </>
         )}
-        {m.preview.taskType !== 'create_product' && m.preview.taskType !== 'recruit_influencer' ? (
+        {m.preview.taskType !== 'create_product' &&
+        m.preview.taskType !== 'recruit_influencer' &&
+        m.preview.taskType !== 'file_tax' ? (
           <p className="mt-3 text-[11px] text-slate-500">
             类型：<span className="font-mono text-slate-600">{m.preview.taskType}</span>
           </p>

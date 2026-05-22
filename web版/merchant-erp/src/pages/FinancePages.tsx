@@ -1,6 +1,17 @@
 import { Download, Loader2, PieChart, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useMembership } from '../context/MembershipContext'
+import { listMerchantBindings } from '../lib/merchantPlatformBindings'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import {
+  appendTaxFilingRecord,
+  buildTaxExportBlob,
+  buildTaxPlatformRows,
+  readTaxFilingHistory,
+  shanghaiMonthRangeYmd,
+  type TaxPlatformRow,
+} from '../lib/taxFiling'
 import {
   Bar,
   BarChart,
@@ -541,23 +552,252 @@ export function FinanceReconcilePage() {
 }
 
 export function FinanceTaxPage() {
+  const { entitlements } = useMembership()
+  const [periodOffset, setPeriodOffset] = useState(-1)
+  const [rows, setRows] = useState<TaxPlatformRow[]>([])
+  const [history, setHistory] = useState(() => readTaxFilingHistory())
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState<string | null>(null)
+  const [filingBusy, setFilingBusy] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const period = useMemo(() => shanghaiMonthRangeYmd(periodOffset), [periodOffset])
+  const totalVerify = useMemo(
+    () => rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
+    [rows],
+  )
+  const boundCount = useMemo(
+    () => rows.filter((r) => r.bindingStatus !== 'unbound').length,
+    [rows],
+  )
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setErr(null)
+    try {
+      let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
+      if (supabaseConfigured && supabase) {
+        const [dy, xhs] = await Promise.all([
+          listMerchantBindings(supabase, 'douyin'),
+          listMerchantBindings(supabase, 'xhs_commercial'),
+        ])
+        bindings = [...dy, ...xhs]
+      }
+      const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
+      if (!fin.ok) {
+        setErr(fin.message)
+        setRows([])
+        return
+      }
+      setRows(buildTaxPlatformRows(bindings, fin.rows))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [period.start, period.end])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const exportOnly = () => {
+    const blob = buildTaxExportBlob(rows, period)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `meoo-tax-${period.start}-${period.end}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    setToast('报税数据已导出')
+  }
+
+  const oneClickFile = async () => {
+    if (!rows.length) {
+      setToast('暂无对账数据，请先完成平台绑定并拉取财务对账')
+      return
+    }
+    setFilingBusy(true)
+    try {
+      exportOnly()
+      appendTaxFilingRecord({
+        id: `TAX-${Date.now()}`,
+        periodLabel: period.label,
+        startDate: period.start,
+        endDate: period.end,
+        submittedAt: new Date().toISOString(),
+        platforms: rows.map((r) => ({
+          platformId: r.platformId,
+          verifyAmountYuan: r.verifyAmountYuan,
+        })),
+        totalVerifyYuan: totalVerify,
+        status: 'submitted_mock',
+      })
+      setHistory(readTaxFilingHistory())
+      setToast('一键报税完成：数据包已下载，申报记录已保存（正式税局接口可后续对接）')
+    } finally {
+      setFilingBusy(false)
+    }
+  }
+
+  if (!entitlements.features.financeTax) {
+    return (
+      <ModulePage title="报税管理" subtitle="会员功能">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+          免费版不包含报税管理。升级会员版后可按已绑定平台汇总对账数据并一键导出申报包。
+        </div>
+      </ModulePage>
+    )
+  }
+
   return (
     <ModulePage
       title="报税管理"
-      subtitle="报税记录与数据导出"
+      subtitle="按已绑定线上平台汇总对账核销数据，支持导出与一键报税（申报包）"
       actions={
-        <button
-          type="button"
-          className="flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          报税数据导出
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <RefreshCw className={cn('mr-2 h-4 w-4', loading && 'animate-spin')} />
+            刷新
+          </button>
+          <button
+            type="button"
+            onClick={exportOnly}
+            disabled={loading || !rows.length}
+            className="flex items-center rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            导出数据包
+          </button>
+          <button
+            type="button"
+            onClick={() => void oneClickFile()}
+            disabled={loading || filingBusy || !rows.length}
+            className="flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {filingBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PieChart className="mr-2 h-4 w-4" />}
+            一键报税
+          </button>
+        </div>
       }
     >
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
-        报税记录将在此汇总；导出成功后将提示「报税数据导出成功」。
+      {toast ? (
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+          {toast}
+        </div>
+      ) : null}
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <label className="text-sm text-gray-600">申报周期</label>
+        <select
+          value={periodOffset}
+          onChange={(e) => setPeriodOffset(Number(e.target.value))}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value={-1}>上一自然月</option>
+          <option value={0}>本月至今</option>
+        </select>
+        <span className="text-sm text-gray-500">
+          {period.label}（{period.start} ~ {period.end}）· 已绑定 {boundCount} 个平台 · 核销合计{' '}
+          <span className="font-semibold tabular-nums">{formatYuan(totalVerify)}</span>
+        </span>
       </div>
+
+      {err ? (
+        <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {err}
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+            <tr>
+              <th className="px-4 py-3">平台</th>
+              <th className="px-4 py-3">渠道</th>
+              <th className="px-4 py-3">绑定状态</th>
+              <th className="px-4 py-3 text-right">订单数</th>
+              <th className="px-4 py-3 text-right">核销额</th>
+              <th className="px-4 py-3 text-right">销售额</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-500" />
+                  <p className="mt-2">正在拉取对账与绑定信息…</p>
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                  暂无数据。请先在系统设置完成平台绑定，并确保财务对账接口可用。
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <tr key={r.platformId} className="hover:bg-gray-50/80">
+                  <td className="px-4 py-3 font-medium text-gray-900">{r.platformLabel}</td>
+                  <td className="px-4 py-3 text-gray-600">{r.channel === 'waimai' ? '外卖' : '团购'}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-xs font-medium',
+                        r.bindingStatus === 'bound'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : r.bindingStatus === 'session_only'
+                            ? 'bg-sky-100 text-sky-800'
+                            : 'bg-gray-100 text-gray-600',
+                      )}
+                    >
+                      {r.bindingLabel}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">{r.orderCount}</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-medium text-emerald-800">
+                    {formatYuan(r.verifyAmountYuan)}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+                    {formatYuan(r.salesAmountYuan)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4">
+        <h3 className="text-sm font-semibold text-gray-900">申报记录</h3>
+        {history.length === 0 ? (
+          <p className="mt-2 text-sm text-gray-500">暂无记录。点击「一键报税」后将在此展示。</p>
+        ) : (
+          <ul className="mt-3 space-y-2 text-sm text-gray-700">
+            {history.slice(0, 8).map((h) => (
+              <li key={h.id} className="flex flex-wrap justify-between gap-2 border-b border-gray-100 pb-2">
+                <span>
+                  {h.periodLabel} · {h.platforms.length} 个平台
+                </span>
+                <span className="tabular-nums text-gray-500">
+                  核销 {formatYuan(h.totalVerifyYuan)} · {new Date(h.submittedAt).toLocaleString('zh-CN')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <p className="mt-4 text-xs leading-relaxed text-gray-500">
+        说明：核销额来自「财务对账」各平台汇总，绑定信息来自系统设置中的账号绑定与会话授权。一键报税当前导出 JSON
+        申报包并记录状态；对接各平台税务开放接口后可替换为真实申报提交。
+      </p>
     </ModulePage>
   )
 }
