@@ -1,4 +1,4 @@
-import type { RegistryMpRecruitmentApplicant, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
+import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import { inferFulfillmentLoop } from './recruitmentLoop.js'
 
 export type ReviewOpenApplicantAction = 'shortlist' | 'approve' | 'reject'

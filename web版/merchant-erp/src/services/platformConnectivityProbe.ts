@@ -2,7 +2,6 @@ import { readMerchantSession } from '../lib/merchantSession'
 import { hydrateDouyinBindingsFromCloud } from '../lib/merchantDouyinCloudBinding'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { getDouyinStores } from './douyinMerchantApi'
-import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 

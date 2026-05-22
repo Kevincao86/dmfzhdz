@@ -6,13 +6,6 @@ import { readMerchantSession } from '../lib/merchantSession'
 import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 import type { StorePlatformTab } from './merchantStoresApi'
 
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
-
-function url(path: string) {
-  const b = apiBase().replace(/\/$/, '')
-  return `${b}${path}`
-}
-
 /** 与列表查询 query 一致（小红书为 xhs） */
 export type ReviewsApiPlatform =
   | 'douyin'

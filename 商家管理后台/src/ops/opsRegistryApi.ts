@@ -118,6 +118,7 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyStatus?: 'pending' | 'passed' | 'failed'
   aiVerifyNote?: string
   completedAt?: string
+  taskStatus?: 'applied' | 'pending_confirm' | 'confirmed' | 'rejected' | 'shortlisted' | 'approved'
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -166,6 +167,7 @@ export type RegistryMpRecruitmentOrder = {
   serviceAmount?: number
   /** 加急单 → 达人端急单大厅；否则招募大厅 */
   urgent?: boolean
+  fulfillmentLoop?: 'open' | 'closed'
 }
 
 export type RegistryTalentPoolRow = {

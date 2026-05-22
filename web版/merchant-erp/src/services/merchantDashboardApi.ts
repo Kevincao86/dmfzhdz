@@ -20,13 +20,6 @@ import { readMerchantSession } from '../lib/merchantSession'
 import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 import { storeTabApiSegment, storeTabToken, type StorePlatformTab } from './merchantStoresApi'
 
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
-
-function url(path: string) {
-  const b = apiBase().replace(/\/$/, '')
-  return `${b}${path}`
-}
-
 export type DashboardRange = 'realtime' | 'day7' | 'day30'
 
 export type PlatformDashboardMetrics = {
