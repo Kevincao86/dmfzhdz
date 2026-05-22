@@ -547,32 +547,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const patchPreviewProductPlan = useCallback(
-    (previewMsgId: string, patch: Partial<AiProductPlanPreview>, content?: string) => {
-      setMessages((prev) => {
-        const next = prev.map((m) => {
-          if (m.id !== previewMsgId || !m.preview) return m
-          const list = listProductPlansFromPreview(m.preview)
-          const cur = list[0]
-          const merged = cur ? { ...cur, ...patch } : ({ ...patch } as AiProductPlanPreview)
-          const plans = list.length ? [merged, ...list.slice(1)] : [merged]
-          return {
-            ...m,
-            ...(content ? { content } : {}),
-            preview: {
-              ...m.preview,
-              productPlans: plans,
-              productPlan: merged,
-            },
-          }
-        })
-        messagesRef.current = next
-        return next
-      })
-    },
-    [],
-  )
-
   const patchPreviewRecruitmentBrief = useCallback(
     (previewMsgId: string, patch: Partial<AiRecruitmentBriefPreview>, content?: string) => {
       setMessages((prev) => {
