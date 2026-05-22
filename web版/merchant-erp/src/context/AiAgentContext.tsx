@@ -174,6 +174,11 @@ function attachmentVisionUrls(attachments: AiComposerAttachment[]): string[] {
   return attachments.map((a) => (a.kind === 'image' ? a.url : a.posterUrl))
 }
 
+function userReferenceImagesFromMessages(msgs: AiAgentMessage[]): string[] {
+  const lastUser = [...msgs].reverse().find((m) => m.role === 'user')
+  return lastUser?.imageUrls?.map((u) => u.trim()).filter(Boolean) ?? []
+}
+
 function cloneAgentMessages(msgs: AiAgentMessage[]): AiAgentMessage[] {
   return structuredClone(msgs) as AiAgentMessage[]
 }
@@ -647,10 +652,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const attachProductPlanToPreview = useCallback(
     async (previewMsgId: string, userBrief: string) => {
       const intents = parseCreateProductIntents(userBrief)
+      const userReferenceImages = userReferenceImagesFromMessages(messagesRef.current)
+      const hasUserRefs = userReferenceImages.length > 0
+      const imagePhaseHint = hasUserRefs
+        ? `正在基于您上传的 ${userReferenceImages.length} 张参考图优化主图`
+        : '正在优化标题与主图'
       const loadingIntro =
         intents.length > 1
           ? `正在分别为 ${intents.map((i) => i.label).join('、')} 生成团购方案与 C 端预览…`
-          : '正在生成团购方案，并优化标题、说明与主图…'
+          : `正在生成团购方案，并${imagePhaseHint}…`
       patchPreviewProductPlans(
         previewMsgId,
         intents.map((intent) => {
@@ -716,8 +726,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (anyOk && failedPlans.length === 0) {
         statusIntro =
           intents.length > 1
-            ? `已生成 ${okPlans.length} 项方案草稿，正在优化标题与主图…`
-            : '已生成方案草稿，正在优化标题与主图…'
+            ? `已生成 ${okPlans.length} 项方案草稿，${imagePhaseHint}…`
+            : `已生成方案草稿，${imagePhaseHint}…`
       } else if (anyOk && failedPlans.length > 0) {
         statusIntro = `已生成 ${okPlans.length} 项；${failedPlans.length} 项失败：${failedPlans
           .map((p) => `${p.slotLabel}（${coerceAgentDisplayError(p.enrichError, '失败')}）`)
@@ -739,7 +749,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         }
         try {
           enriched.push(
-            await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey),
+            await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey, {
+              userReferenceImages,
+              planIndex: idx,
+            }),
           )
         } catch (e) {
           enriched.push({
@@ -755,8 +768,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         previewMsgId,
         enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),
         intents.length > 1
-          ? `已为 ${readyCount} 个商品生成 C 端预览。请逐项核对手机效果，确认后将依次预填创建页。`
-          : '已生成 C 端团购预览（含 AI 优化标题与主图）。请核对手机预览效果，确认后将自动提交抖音来客审核。',
+          ? `已为 ${readyCount} 个商品生成 C 端预览。${hasUserRefs ? '主图已基于您上传的参考图优化。' : ''}请逐项核对手机效果，确认后将依次预填创建页。`
+          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的菜品图' : ''}）。请核对手机预览效果，确认后将自动提交抖音来客审核。`,
       )
     },
     [patchPreviewProductPlans, modelPickerKey],
