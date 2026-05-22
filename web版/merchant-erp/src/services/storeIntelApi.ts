@@ -4,6 +4,7 @@
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type { StoreMenuItem } from '../lib/storeMenuStorage'
 import type { CompetitorEntry } from '../lib/competitorStorage'
+import { coerceAgentDisplayError } from '../lib/aiAgentActionParse'
 
 async function bearer(): Promise<string | null> {
   if (!supabaseConfigured || !supabase) return null
@@ -27,8 +28,9 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     json = null
   }
   if (!res.ok) {
-    const o = json as { error?: string; detail?: string } | null
-    throw new Error([o?.error, o?.detail].filter(Boolean).join(' — ') || `请求失败 ${res.status}`)
+    const o = json as { error?: unknown; detail?: unknown; message?: unknown } | null
+    const msg = normalizeApiErrorMessage(o?.error ?? o?.message, o?.detail)
+    throw new Error(msg === '生成方案失败' ? `请求失败 ${res.status}` : msg)
   }
   return json as T
 }
@@ -120,13 +122,8 @@ export type AiProductPlan = {
 function normalizeApiErrorMessage(err: unknown, detail?: unknown): string {
   const parts: string[] = []
   for (const x of [err, detail]) {
-    if (typeof x === 'string' && x.trim()) parts.push(x.trim())
-    else if (x && typeof x === 'object') {
-      const o = x as Record<string, unknown>
-      for (const k of ['message', 'detail', 'error']) {
-        if (typeof o[k] === 'string' && o[k].trim()) parts.push((o[k] as string).trim())
-      }
-    }
+    const line = coerceAgentDisplayError(x, '')
+    if (line) parts.push(line)
   }
   return parts.length ? [...new Set(parts)].join(' — ') : '生成方案失败'
 }

@@ -4,6 +4,7 @@ import {
   type DouyinPreviewComboLine,
 } from './douyin/DouyinProductMobilePreview'
 import { defaultAiAgentPreviewFormRules } from '../lib/aiAgentProductPreviewDefaults'
+import { coerceAgentDisplayError } from '../lib/aiAgentActionParse'
 import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
 
 export function AiAgentProductVisualPreview({
@@ -24,20 +25,19 @@ export function AiAgentProductVisualPreview({
     )
   }
 
-  const comboLines: DouyinPreviewComboLine[] = plan.comboLines.map((name) => ({
-    name,
-    qty: '1',
-    price: '',
-  }))
+  const comboLines: DouyinPreviewComboLine[] = plan.comboLines
+    .map((line) => ({
+      name: typeof line === 'string' ? line : coerceAgentDisplayError(line, ''),
+      qty: '1',
+      price: '',
+    }))
+    .filter((it) => it.name.trim() && it.name !== '[object Object]')
 
   const productType = plan.productType ?? (/代金券|代\d+抵/.test(plan.productName) ? 2 : 1)
 
-  const enrichErr =
-    typeof plan.enrichError === 'string'
-      ? plan.enrichError
-      : plan.enrichError != null
-        ? String(plan.enrichError)
-        : ''
+  const enrichErr = plan.enrichError
+    ? coerceAgentDisplayError(plan.enrichError, '')
+    : ''
 
   return (
     <div className="mt-4 space-y-3">

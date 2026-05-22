@@ -1,6 +1,10 @@
 /**
  * 门店情报：菜单 OCR、竞品分析、商品方案（服务端；密钥仅 env）。
  */
+import {
+  parseComboLinesFromApi,
+  parsePriceYuanFromApi,
+} from '../src/lib/aiAgentActionParse.js'
 import type { AIChatRequest } from '../src/services/ai/types.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
 import { routeAiChat } from './aiGateway/chatRouter.js'
@@ -435,19 +439,18 @@ export async function runAiProductPlanCore(
 
   try {
     const obj = await llmJson(env, system, userPrompt)
-    const productName = String(obj.productName ?? '').trim()
-    const suggestedPriceYuan = Number(obj.suggestedPriceYuan)
-    if (!productName || !Number.isFinite(suggestedPriceYuan)) {
+    const productName = String(obj.productName ?? obj.title ?? '').trim()
+    const suggestedPriceYuan = parsePriceYuanFromApi(obj.suggestedPriceYuan)
+    if (!productName || suggestedPriceYuan == null) {
       throw new Error('方案缺少 productName 或 suggestedPriceYuan')
     }
+    const originParsed = parsePriceYuanFromApi(obj.originYuan)
     const plan: ProductPlanDto = {
       productName,
       suggestedPriceYuan,
       description: String(obj.description ?? '').trim(),
-      comboLines: Array.isArray(obj.comboLines)
-        ? obj.comboLines.map((x) => String(x)).filter(Boolean)
-        : [],
-      ...(typeof obj.originYuan === 'number' ? { originYuan: obj.originYuan } : {}),
+      comboLines: parseComboLinesFromApi(obj.comboLines),
+      ...(originParsed != null ? { originYuan: originParsed } : {}),
       ...(obj.marginNote != null
         ? {
             marginNote:
