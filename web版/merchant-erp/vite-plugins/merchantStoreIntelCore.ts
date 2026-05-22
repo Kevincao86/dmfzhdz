@@ -22,51 +22,210 @@ function extractJsonObject(text: string): Record<string, unknown> {
   return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>
 }
 
+function parsePriceYuan(raw: unknown): number | undefined {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string') {
+    const n = Number.parseFloat(raw.replace(/[^\d.]/g, ''))
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return undefined
+}
+
 function parseMenuItems(obj: Record<string, unknown>): StoreMenuItemDto[] {
-  const arr = obj.items ?? obj.menu_items ?? obj.dishes
+  const arr =
+    obj.items ??
+    obj.menu_items ??
+    obj.dishes ??
+    obj.menu ??
+    obj.services ??
+    obj.products ??
+    (obj as Record<string, unknown>)['价目'] ??
+    obj.list
   if (!Array.isArray(arr)) return []
   const out: StoreMenuItemDto[] = []
   for (const row of arr) {
     if (!row || typeof row !== 'object') continue
     const r = row as Record<string, unknown>
-    const name = String(r.name ?? r.title ?? r.dish ?? '').trim()
+    const name = String(
+      r.name ?? r.title ?? r.dish ?? r.service ?? r.item ?? r.名称 ?? r.项目 ?? '',
+    ).trim()
     if (!name) continue
-    const priceRaw = r.priceYuan ?? r.price_yuan ?? r.price
-    let priceYuan: number | undefined
-    if (typeof priceRaw === 'number' && Number.isFinite(priceRaw)) priceYuan = priceRaw
-    else if (typeof priceRaw === 'string') {
-      const n = Number.parseFloat(priceRaw.replace(/[^\d.]/g, ''))
-      if (Number.isFinite(n)) priceYuan = n
-    }
+    const priceRaw = r.priceYuan ?? r.price_yuan ?? r.price ?? r.价格 ?? r.amount
+    const priceYuan = parsePriceYuan(priceRaw)
     out.push({
       name,
       ...(priceYuan != null ? { priceYuan } : {}),
-      ...(r.category ? { category: String(r.category).trim() } : {}),
-      ...(r.note ? { note: String(r.note).trim() } : {}),
+      ...(r.category || r.分类
+        ? { category: String(r.category ?? r.分类).trim() }
+        : {}),
+      ...(r.note || r.备注 ? { note: String(r.note ?? r.备注).trim() } : {}),
     })
   }
   return out.slice(0, 200)
+}
+
+function extractChatCompletionText(data: Record<string, unknown>): string {
+  const choices = data.choices as unknown[] | undefined
+  const first = choices?.[0] as Record<string, unknown> | undefined
+  const message = first?.message as Record<string, unknown> | undefined
+  if (typeof message?.content === 'string') return message.content.trim()
+  const output = data.output as Record<string, unknown> | undefined
+  if (typeof output?.text === 'string') return output.text.trim()
+  return ''
+}
+
+function doubaoArkApiV3Root(env: Record<string, string>): string {
+  const raw = (env.MERCHANT_AI_DOUBAO_ARK_BASE ?? '').trim().replace(/\/$/, '')
+  if (!raw) return 'https://ark.cn-beijing.volces.com/api/v3'
+  if (raw.endsWith('/api/v3')) return raw
+  return `${raw}/api/v3`
+}
+
+/** OpenAI 兼容多模态对话（通义 compatible-mode / 火山方舟视觉模型） */
+async function openAiVisionChat(
+  url: string,
+  apiKey: string,
+  model: string,
+  system: string,
+  userText: string,
+  imageDataUrls: string[],
+): Promise<string> {
+  const imgs = imageDataUrls.filter((u) => u.startsWith('data:image/')).slice(0, 4)
+  const userContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = []
+  for (const urlImg of imgs) {
+    userContent.push({ type: 'image_url', image_url: { url: urlImg } })
+  }
+  userContent.push({ type: 'text', text: userText })
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userContent },
+      ],
+      temperature: 0.35,
+      stream: false,
+    }),
+  })
+  const data = (await res.json()) as Record<string, unknown>
+  if (!res.ok) {
+    const errObj = data.error as { message?: string } | undefined
+    throw new Error(
+      (typeof errObj?.message === 'string' && errObj.message) ||
+        (typeof data.message === 'string' && data.message) ||
+        `视觉模型 HTTP ${res.status}`,
+    )
+  }
+  const text = extractChatCompletionText(data)
+  if (!text) throw new Error('视觉模型返回为空')
+  return text
+}
+
+/** 菜单识图必须走视觉模型；纯文本对话无法读图 */
+async function llmJsonWithVision(
+  env: Record<string, string>,
+  system: string,
+  userText: string,
+  imageDataUrls: string[],
+): Promise<Record<string, unknown>> {
+  const imgs = imageDataUrls.filter((u) => u.startsWith('data:image/'))
+  if (!imgs.length) throw new Error('缺少有效图片数据')
+
+  const tokenmixKey = (env.TOKENMIX_API_KEY ?? '').trim()
+  if (tokenmixKey) {
+    const req: AIChatRequest = {
+      provider: 'tokenmix',
+      modelFamily: 'openai',
+      model: (env.MERCHANT_AI_MENU_VISION_MODEL ?? 'gpt-4o').trim() || 'gpt-4o',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userText },
+      ],
+      temperature: 0.35,
+      imageDataUrls: imgs.slice(0, 4),
+    }
+    const res = await routeAiChat(req, env)
+    return extractJsonObject(res.content)
+  }
+
+  const qwenKey = (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
+  const qwenModels = [
+    (env.MERCHANT_AI_QWEN_VL_MODEL ?? '').trim(),
+    'qwen-vl-plus',
+    'qwen2.5-vl-72b-instruct',
+    'qwen-vl-max',
+  ].filter(Boolean)
+  if (qwenKey) {
+    let lastErr: Error | null = null
+    for (const mid of qwenModels) {
+      try {
+        const text = await openAiVisionChat(
+          'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+          qwenKey,
+          mid,
+          system,
+          userText,
+          imgs,
+        )
+        return extractJsonObject(text)
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+      }
+    }
+    throw lastErr ?? new Error('通义视觉模型识图失败')
+  }
+
+  const doubaoKey = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
+  const doubaoModels = [
+    (env.MERCHANT_AI_DOUBAO_VL_MODEL ?? '').trim(),
+    'doubao-1-5-vision-pro-32k-250115',
+    'doubao-seed-1-6-vision-250815',
+    (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? '').trim(),
+  ].filter(Boolean)
+  if (doubaoKey) {
+    let lastErr: Error | null = null
+    for (const mid of doubaoModels) {
+      try {
+        const text = await openAiVisionChat(
+          `${doubaoArkApiV3Root(env)}/chat/completions`,
+          doubaoKey,
+          mid,
+          system,
+          userText,
+          imgs,
+        )
+        return extractJsonObject(text)
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+      }
+    }
+    throw lastErr ?? new Error('豆包视觉模型识图失败')
+  }
+
+  throw new Error(
+    '未配置菜单识图所需的视觉模型 Key：请在环境变量设置 TOKENMIX_API_KEY，或 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY（通义 qwen-vl-plus 或豆包视觉模型）',
+  )
 }
 
 async function llmJson(
   env: Record<string, string>,
   system: string,
   user: string,
-  imageDataUrls?: string[],
 ): Promise<Record<string, unknown>> {
-  const hasVision = imageDataUrls && imageDataUrls.length > 0
   const tokenmixKey = (env.TOKENMIX_API_KEY ?? '').trim()
   const req: AIChatRequest = {
-    provider: hasVision && tokenmixKey ? 'tokenmix' : 'doubao',
-    ...(hasVision && tokenmixKey
-      ? { modelFamily: 'openai' as const, model: 'gpt-4o' }
-      : {}),
+    provider: tokenmixKey ? 'tokenmix' : 'doubao',
+    ...(tokenmixKey ? { modelFamily: 'openai' as const, model: 'gpt-4o' } : {}),
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
     temperature: 0.35,
-    ...(hasVision && imageDataUrls?.length ? { imageDataUrls: imageDataUrls.slice(0, 4) } : {}),
   }
   const res = await routeAiChat(req, env)
   return extractJsonObject(res.content)
@@ -92,18 +251,32 @@ export async function runStoreMenuRecognizeCore(
   }
 
   const storeName = String(body.storeName ?? '').trim()
-  const system = `你是餐饮/本地生活门店菜单识别助手。根据用户上传的菜单或价目表照片，提取结构化菜品列表。
+  const system = `你是本地生活门店菜单/价目表识别助手。根据用户上传的照片，提取可上架或对外展示的服务项目与价格。
+支持：餐饮菜品、口腔/医美/生活服务价目表、套餐项目清单等（不限于餐饮）。
 只输出一个 JSON 对象，不要 markdown 其它说明。格式：
-{"items":[{"name":"菜名","priceYuan":数字或省略,"category":"分类可选","note":"备注可选"}]}
-价格统一为人民币元（数字）；看不清的项可省略 priceYuan；无法识别则 items 为空数组。`
+{"items":[{"name":"项目或菜品名称","priceYuan":数字或省略,"category":"分类/科室可选","note":"规格备注可选"}]}
+价格统一为人民币元（数字，如 2980 写 2980）；能看清的条目尽量全部列出；看不清价格的可省略 priceYuan。`
   const userText = storeName
-    ? `请识别「${storeName}」的菜单/价目表图片中的菜品与价格。`
-    : '请识别菜单/价目表图片中的菜品与价格。'
+    ? `请识别「${storeName}」价目表/菜单图片中的全部可见项目与价格，按行逐项提取。`
+    : '请识别价目表/菜单图片中的全部可见项目与价格，按行逐项提取。'
 
   try {
-    const obj = await llmJson(env, system, userText, [image])
+    const obj = await llmJsonWithVision(env, system, userText, [image])
     const items = parseMenuItems(obj)
     const notes = typeof obj.notes === 'string' ? obj.notes.trim() : undefined
+    if (items.length === 0) {
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          items: [],
+          empty: true,
+          notes:
+            notes ||
+            '模型未从图中解析出结构化条目，请确认已配置视觉模型 Key，或换角度/更高分辨率重试。',
+        },
+      }
+    }
     return {
       status: 200,
       body: { ok: true, items, ...(notes ? { notes } : {}) },
