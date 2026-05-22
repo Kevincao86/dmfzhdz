@@ -41,12 +41,26 @@ export async function recognizeStoreMenuImage(
   | { ok: false; message: string }
 > {
   try {
-    const r = await postJson<{ ok: boolean; items?: StoreMenuItem[]; notes?: string; error?: string }>(
-      '/api/meoo-store-menu-recognize',
-      { imageDataUrl, storeName },
-    )
-    if (r.ok && Array.isArray(r.items)) return { ok: true, items: r.items, notes: r.notes }
-    return { ok: false, message: r.error ?? '识别失败' }
+    const r = await postJson<{
+      ok: boolean
+      items?: StoreMenuItem[]
+      notes?: string
+      empty?: boolean
+      error?: string
+      detail?: string
+    }>('/api/meoo-store-menu-recognize', { imageDataUrl, storeName })
+    if (r.ok && Array.isArray(r.items)) {
+      if (r.items.length === 0) {
+        const hint =
+          r.notes ||
+          r.detail ||
+          '未识别到价目条目。请确认 Vercel 已配置 TOKENMIX_API_KEY 或通义/豆包视觉模型 Key，并重新部署后再试。'
+        return { ok: false, message: hint }
+      }
+      return { ok: true, items: r.items, notes: r.notes }
+    }
+    const msg = [r.error, r.detail, r.notes].filter((x) => typeof x === 'string' && x.trim()).join(' — ')
+    return { ok: false, message: msg || '识别失败' }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }

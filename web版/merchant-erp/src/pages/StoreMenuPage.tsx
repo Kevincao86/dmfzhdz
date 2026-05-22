@@ -75,6 +75,7 @@ export default function StoreMenuPage() {
     setToast(null)
     let mergedItems = [...record.items]
     const newImages = [...record.images]
+    let recognizeErr: string | null = null
     try {
       for (let i = 0; i < Math.min(files.length, 6); i++) {
         const file = files[i]
@@ -85,7 +86,8 @@ export default function StoreMenuPage() {
         if (r.ok && r.items.length) {
           mergedItems = mergeMenuItems(mergedItems, r.items)
         } else if (!r.ok) {
-          setToast(r.message)
+          recognizeErr = r.message
+          break
         }
       }
       persist({
@@ -93,11 +95,15 @@ export default function StoreMenuPage() {
         images: newImages.slice(-12),
         items: mergedItems,
       })
-      setToast(
-        mergedItems.length
-          ? `已识别并合并 ${mergedItems.length} 条菜品`
-          : '已上传图片，未识别到菜品，请换清晰照片重试',
-      )
+      if (recognizeErr) {
+        setToast(recognizeErr)
+      } else {
+        setToast(
+          mergedItems.length
+            ? `已识别并合并 ${mergedItems.length} 条价目/菜品`
+            : '已上传图片，未识别到条目。若反复失败，请在系统设置配置 AI Key 后重新部署，或手动添加。',
+        )
+      }
     } finally {
       setRecognizing(false)
       if (fileRef.current) fileRef.current.value = ''
