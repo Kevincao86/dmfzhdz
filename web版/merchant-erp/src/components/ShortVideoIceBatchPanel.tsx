@@ -30,6 +30,7 @@ import {
 } from '../services/aliyunIceCloudApi'
 import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -99,7 +100,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [editBrief, setEditBrief] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [busy, setBusy] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [videoUploading, setVideoUploading] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
+  const [materialTab, setMaterialTab] = useState<'video' | 'images'>('video')
+  const [briefAiLoading, setBriefAiLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null)
@@ -130,9 +134,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
   const briefOk = editBrief.trim().length >= 4
-  const canSubmit = cfg?.configured && pendingCount > 0 && briefOk && !busy && !uploading
+  const mediaBusy = videoUploading || imageUploading
+  const canSubmit = cfg?.configured && pendingCount > 0 && briefOk && !busy && !mediaBusy
   const canOneClickImages =
-    cfg?.configured && imageItems.length > 0 && briefOk && !busy && !uploading
+    cfg?.configured && imageItems.length > 0 && briefOk && !busy && !mediaBusy
+  const canAiBrief =
+    !busy &&
+    !mediaBusy &&
+    !briefAiLoading &&
+    (imageItems.length > 0 || jobs.some((j) => !j.imageUrls?.length))
 
   useEffect(() => {
     void fetchAliyunIceCloudConfig().then((c) => {
@@ -175,7 +185,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   }, [urlText])
 
   const openLocalFilePicker = useCallback(() => {
-    if (busy || uploading) return
+    if (busy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
         '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
@@ -183,18 +193,18 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     fileInputRef.current?.click()
-  }, [busy, uploading, cfg?.localUploadEnabled])
+  }, [busy, mediaBusy, cfg?.localUploadEnabled])
 
   const handleLocalFiles = useCallback(
     async (files: FileList | null) => {
-      if (!files?.length || uploading || busy) return
+      if (!files?.length || videoUploading || imageUploading || busy) return
       if (!cfg?.localUploadEnabled) {
         setErr(
           '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
         )
         return
       }
-      setUploading(true)
+      setVideoUploading(true)
       setErr(null)
       let added = 0
       for (const file of Array.from(files)) {
@@ -218,16 +228,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         ])
         added += 1
       }
-      setUploading(false)
+      setVideoUploading(false)
       if (added > 0) {
         setHint(`已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`)
       }
     },
-    [uploading, busy, cfg?.localUploadEnabled],
+    [videoUploading, imageUploading, busy, cfg?.localUploadEnabled],
   )
 
   const openImageFilePicker = useCallback(() => {
-    if (busy || uploading) return
+    if (busy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
         '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
@@ -235,16 +245,17 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     imageFileInputRef.current?.click()
-  }, [busy, uploading, cfg?.localUploadEnabled])
+  }, [busy, mediaBusy, cfg?.localUploadEnabled])
 
   const handleLocalImages = useCallback(
     async (files: FileList | null) => {
-      if (!files?.length || uploading || busy) return
+      if (!files?.length || videoUploading || imageUploading || busy) return
       if (!cfg?.localUploadEnabled) {
         setErr('本地上传尚未开启，请先配置 OSS 前缀。')
         return
       }
-      setUploading(true)
+      setImageUploading(true)
+      setMaterialTab('images')
       setErr(null)
       let added = 0
       for (const file of Array.from(files)) {
@@ -257,26 +268,52 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           setErr(r.message)
           continue
         }
-        const previewUrl = URL.createObjectURL(file)
-        imagePreviewUrlsRef.current.push(previewUrl)
         setImageItems((prev) => [
           ...prev,
           {
             id: newJobId(),
             label: r.label.slice(0, 32),
             mediaUrl: r.mediaUrl,
-            previewUrl,
+            previewUrl: r.mediaUrl,
           },
         ])
         added += 1
       }
-      setUploading(false)
+      setImageUploading(false)
       if (added > 0) {
-        setHint(`已上传 ${added} 张图片，填写剪辑指令后点击「一键成片」。`)
+        setHint(`已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。`)
       }
     },
-    [uploading, busy, cfg?.localUploadEnabled],
+    [videoUploading, imageUploading, busy, cfg?.localUploadEnabled],
   )
+
+  const runAiEditBrief = useCallback(async () => {
+    if (!canAiBrief) return
+    const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const videoUrls = jobs
+      .filter((j) => !j.imageUrls?.length)
+      .map((j) => j.mediaUrl)
+      .filter((u) => /^https?:\/\//i.test(u))
+    setBriefAiLoading(true)
+    setErr(null)
+    setHint('正在根据素材分析发布意图并生成剪辑文案…')
+    const r = await generateIceEditBriefAi({
+      imageUrls,
+      videoUrls,
+      imageLabels: imageItems.map((x) => x.label),
+      aspectLabel: aspect.label,
+      clipEndSec,
+      preset,
+      userHint: editBrief.trim() || undefined,
+    })
+    setBriefAiLoading(false)
+    if (!r.ok) {
+      setErr(r.message)
+      return
+    }
+    setEditBrief(r.brief)
+    setHint('已根据素材生成剪辑文案，请核对后提交云剪。')
+  }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, preset, editBrief])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -285,12 +322,14 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     setErr(null)
+    setMaterialTab('images')
     setImageItems((prev) => [
       ...prev,
       ...urls.map((mediaUrl, i) => ({
         id: newJobId(),
         label: `图片 ${prev.length + i + 1}`,
         mediaUrl,
+        previewUrl: mediaUrl,
       })),
     ])
     setImageUrlText('')
@@ -300,7 +339,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const removeImageItem = useCallback((id: string) => {
     setImageItems((prev) => {
       const hit = prev.find((x) => x.id === id)
-      if (hit?.previewUrl) {
+      if (hit?.previewUrl?.startsWith('blob:')) {
         try {
           URL.revokeObjectURL(hit.previewUrl)
         } catch {
@@ -626,18 +665,35 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         ))}
       </ol>
 
-      <div className="grid gap-8 lg:grid-cols-5">
+      <div className="grid gap-6 xl:grid-cols-12">
         {/* 左侧：输入区 */}
-        <div className="space-y-6 lg:col-span-3">
+        <div className="space-y-5 xl:col-span-7">
           {/* ① 素材 */}
           <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
             <SectionHead
               step={1}
               title="素材来源"
               required
-              hint="推荐本地上传（写入您已开通的 OSS）；亦可粘贴公网 HTTPS 链接或使用上一段 AI 成片"
+              hint="视频走任务队列批量云剪；多图按顺序合成一条竖屏成片"
             />
-            <div className="space-y-4 px-5 pb-5">
+            <div className="flex gap-1 border-b border-zinc-100 px-5">
+              <MaterialTabBtn
+                active={materialTab === 'video'}
+                onClick={() => setMaterialTab('video')}
+                label="视频素材"
+                count={jobs.filter((j) => !j.imageUrls?.length).length}
+              />
+              <MaterialTabBtn
+                active={materialTab === 'images'}
+                onClick={() => setMaterialTab('images')}
+                label="多图成片"
+                count={imageItems.length}
+                accent="violet"
+              />
+            </div>
+            <div className="space-y-4 px-5 py-5">
+              {materialTab === 'video' ? (
+                <>
               <input
                 id="ice-local-video-input"
                 ref={fileInputRef}
@@ -645,7 +701,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 accept="video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm"
                 multiple
                 className="sr-only"
-                disabled={busy || uploading}
+                disabled={busy || mediaBusy}
                 onChange={(e) => {
                   void handleLocalFiles(e.target.files)
                   e.target.value = ''
@@ -663,7 +719,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <label
                 htmlFor="ice-local-video-input"
                 role="button"
-                tabIndex={busy || uploading ? -1 : 0}
+                tabIndex={busy || mediaBusy ? -1 : 0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
@@ -683,21 +739,21 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 onDrop={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  if (busy || uploading) return
+                  if (busy || mediaBusy) return
                   void handleLocalFiles(e.dataTransfer.files)
                 }}
                 className={cn(
                   'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition',
-                  busy || uploading ? 'pointer-events-none opacity-60' : '',
+                  busy || mediaBusy ? 'pointer-events-none opacity-60' : '',
                   cfg?.localUploadEnabled
                     ? 'border-orange-300 bg-orange-50/50 hover:border-orange-400 hover:bg-orange-50'
                     : 'border-zinc-300 bg-zinc-50 hover:border-amber-400 hover:bg-amber-50/40',
                 )}
               >
-                {uploading ? (
+                {videoUploading ? (
                   <>
                     <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-                    <span className="text-sm font-medium text-zinc-800">正在上传到 OSS…</span>
+                    <span className="text-sm font-medium text-zinc-800">视频上传中…</span>
                   </>
                 ) : (
                   <>
@@ -729,7 +785,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
               <textarea
                 value={urlText}
-                disabled={busy || uploading}
+                disabled={busy || mediaBusy}
                 onChange={(e) => setUrlText(e.target.value)}
                 placeholder={'https://your-cdn.com/shop-tour-01.mp4\nhttps://your-cdn.com/shop-tour-02.mp4'}
                 className="min-h-[88px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
@@ -737,7 +793,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || uploading}
+                  disabled={busy || mediaBusy}
                   onClick={addUrlsFromText}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
@@ -747,7 +803,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {lastResultUrl ? (
                   <button
                     type="button"
-                    disabled={busy || uploading}
+                    disabled={busy || mediaBusy}
                     onClick={appendLastResult}
                     className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
                   >
@@ -755,132 +811,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   </button>
                 ) : null}
               </div>
-
-              <div className="flex items-center gap-3 text-xs text-zinc-400">
-                <span className="h-px flex-1 bg-zinc-200" />
-                <span className="flex items-center gap-1">
-                  <ImagePlus className="h-3.5 w-3.5" />
-                  多图一键成片
-                </span>
-                <span className="h-px flex-1 bg-zinc-200" />
-              </div>
-
-              <input
-                id="ice-local-image-input"
-                ref={imageFileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/*,.jpg,.jpeg,.png,.webp,.gif"
-                multiple
-                className="sr-only"
-                disabled={busy || uploading}
-                onChange={(e) => {
-                  void handleLocalImages(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              <label
-                htmlFor="ice-local-image-input"
-                role="button"
-                tabIndex={busy || uploading ? -1 : 0}
-                onClick={(e) => {
-                  if (!cfg?.localUploadEnabled) {
-                    e.preventDefault()
-                    openImageFilePicker()
-                  }
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  if (busy || uploading) return
-                  const imgs = Array.from(e.dataTransfer.files).filter(isImageFile)
-                  if (imgs.length === 0) {
-                    setErr('请拖入 jpg/png/webp 等图片文件')
-                    return
-                  }
-                  const dt = new DataTransfer()
-                  for (const f of imgs) dt.items.add(f)
-                  void handleLocalImages(dt.files)
-                }}
-                className={cn(
-                  'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition',
-                  busy || uploading ? 'pointer-events-none opacity-60' : '',
-                  'border-violet-200 bg-violet-50/40 hover:border-violet-400 hover:bg-violet-50/70',
-                )}
-              >
-                <ImagePlus className="h-7 w-7 text-violet-600" />
-                <span className="text-sm font-semibold text-zinc-900">本地上传图片（可多选）</span>
-                <span className="text-center text-xs text-zinc-500">
-                  JPG / PNG / WebP · 多张合成一条竖屏短视频
-                </span>
-              </label>
-
-              <textarea
-                value={imageUrlText}
-                disabled={busy || uploading}
-                onChange={(e) => setImageUrlText(e.target.value)}
-                placeholder={'https://your-cdn.com/photo-01.jpg\nhttps://your-cdn.com/photo-02.png'}
-                className="min-h-[72px] w-full rounded-lg border border-violet-200 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={busy || uploading}
-                  onClick={addImageUrlsFromText}
-                  className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm text-violet-900 hover:bg-violet-50 disabled:opacity-50"
-                >
-                  加入图片列表
-                </button>
-                <button
-                  type="button"
-                  disabled={!canOneClickImages}
-                  onClick={() => void runOneClickImages()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-                >
-                  <Zap className="h-4 w-4" />
-                  一键成片
-                </button>
-              </div>
-
-              {imageItems.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {imageItems.map((img) => (
-                    <div
-                      key={img.id}
-                      className="group relative overflow-hidden rounded-lg border border-violet-200 bg-zinc-100"
-                    >
-                      {img.previewUrl ? (
-                        <img
-                          src={img.previewUrl}
-                          alt={img.label}
-                          className="aspect-[9/16] w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex aspect-[9/16] items-center justify-center text-[10px] text-zinc-500">
-                          外链图
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => removeImageItem(img.id)}
-                        className="absolute right-1 top-1 rounded bg-black/50 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
-                        aria-label="移除图片"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                      <p className="truncate px-1 py-0.5 text-[10px] text-zinc-600">{img.label}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-violet-800/80">
-                  上传多张门店/商品图后，填写剪辑指令并点「一键成片」，将按顺序合成为一条 MP4。
-                </p>
-              )}
 
               {jobs.length > 0 ? (
                 <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
@@ -906,23 +836,175 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-zinc-500">队列为空 — 添加素材后才能提交云剪。</p>
+                <p className="text-xs text-zinc-500">队列为空 — 添加视频素材后才能提交云剪。</p>
               )}
+                </>
+              ) : null}
+
+              {materialTab === 'images' ? (
+                <>
+              <input
+                id="ice-local-image-input"
+                ref={imageFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/*,.jpg,.jpeg,.png,.webp,.gif"
+                multiple
+                className="sr-only"
+                disabled={busy || mediaBusy}
+                onChange={(e) => {
+                  void handleLocalImages(e.target.files)
+                  e.target.value = ''
+                }}
+              />
+              <label
+                htmlFor="ice-local-image-input"
+                role="button"
+                tabIndex={busy || mediaBusy ? -1 : 0}
+                onClick={(e) => {
+                  if (!cfg?.localUploadEnabled) {
+                    e.preventDefault()
+                    openImageFilePicker()
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (busy || mediaBusy) return
+                  const imgs = Array.from(e.dataTransfer.files).filter(isImageFile)
+                  if (imgs.length === 0) {
+                    setErr('请拖入 jpg/png/webp 等图片文件')
+                    return
+                  }
+                  const dt = new DataTransfer()
+                  for (const f of imgs) dt.items.add(f)
+                  void handleLocalImages(dt.files)
+                }}
+                className={cn(
+                  'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition',
+                  busy || mediaBusy ? 'pointer-events-none opacity-60' : '',
+                  'border-violet-200 bg-violet-50/40 hover:border-violet-400 hover:bg-violet-50/70',
+                )}
+              >
+                {imageUploading ? (
+                  <>
+                    <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
+                    <span className="text-sm font-medium text-zinc-800">图片上传中…</span>
+                  </>
+                ) : (
+                  <>
+                    <ImagePlus className="h-7 w-7 text-violet-600" />
+                    <span className="text-sm font-semibold text-zinc-900">本地上传图片（可多选）</span>
+                    <span className="text-center text-xs text-zinc-500">
+                      JPG / PNG / WebP · 多张合成一条竖屏短视频
+                    </span>
+                  </>
+                )}
+              </label>
+
+              <textarea
+                value={imageUrlText}
+                disabled={busy || mediaBusy}
+                onChange={(e) => setImageUrlText(e.target.value)}
+                placeholder={'https://your-cdn.com/photo-01.jpg\nhttps://your-cdn.com/photo-02.png'}
+                className="min-h-[72px] w-full rounded-lg border border-violet-200 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busy || mediaBusy}
+                  onClick={addImageUrlsFromText}
+                  className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm text-violet-900 hover:bg-violet-50 disabled:opacity-50"
+                >
+                  加入图片列表
+                </button>
+                <button
+                  type="button"
+                  disabled={!canOneClickImages}
+                  onClick={() => void runOneClickImages()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  <Zap className="h-4 w-4" />
+                  一键成片
+                </button>
+              </div>
+
+              {imageItems.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-xs font-medium text-violet-900">
+                    已选 {imageItems.length} 张（上传后保留在列表，切换 Tab 不会丢失）
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {imageItems.map((img) => (
+                      <div
+                        key={img.id}
+                        className="group relative overflow-hidden rounded-lg border border-violet-200 bg-zinc-100"
+                      >
+                        <img
+                          src={img.previewUrl || img.mediaUrl}
+                          alt={img.label}
+                          className="aspect-[9/16] w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => removeImageItem(img.id)}
+                          className="absolute right-1 top-1 rounded bg-black/50 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
+                          aria-label="移除图片"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                        <p className="truncate px-1 py-0.5 text-[10px] text-zinc-600">{img.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-violet-800/80">
+                  上传多张门店/商品图后，可 AI 生成剪辑文案，再点「一键成片」合成为 MP4。
+                </p>
+              )}
+                </>
+              ) : null}
             </div>
           </section>
 
           {/* ② 剪辑指令 */}
           <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
-            <SectionHead
-              step={2}
-              title="剪辑文案指令"
-              required
-              hint="告诉云端如何包装：节奏、字幕风格、氛围、需突出的卖点等（会写入剪辑项目描述）"
-            />
-            <div className="space-y-4 px-5 pb-5">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                  <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
+                    2
+                  </span>
+                  剪辑文案指令
+                  <RequiredMark />
+                </h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+                  描述节奏、字幕、氛围与卖点；可基于已上传的图片/视频由 AI 推断发布意图并生成文案。
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={!canAiBrief}
+                onClick={() => void runAiEditBrief()}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {briefAiLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                AI 生成文案
+              </button>
+            </div>
+            <div className="space-y-4 px-5 pb-5 pt-4">
               <textarea
                 value={editBrief}
-                disabled={busy}
+                disabled={busy || briefAiLoading}
                 onChange={(e) => setEditBrief(e.target.value)}
                 placeholder={
                   '示例：竖屏探店短视频，前 3 秒抓眼球，整体轻快；突出「招牌牛肉面」与店内环境；结尾加品牌 Slogan 位；适合抖音发布。'
@@ -995,7 +1077,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <input
                   type="checkbox"
                   checked={batchGenerateEnabled}
-                  disabled={busy || uploading}
+                  disabled={busy || mediaBusy}
                   onChange={(e) => setBatchGenerateEnabled(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-600 focus:ring-orange-500"
                 />
@@ -1017,14 +1099,14 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <button
                   key={n}
                   type="button"
-                  disabled={busy || uploading || !batchGenerateEnabled}
+                  disabled={busy || mediaBusy || !batchGenerateEnabled}
                   onClick={() => setBatchGenerateCount(n)}
                   className={cn(
                     'rounded-lg border px-4 py-2 text-sm font-medium transition',
                     batchGenerateCount === n
                       ? 'border-orange-500 bg-orange-600 text-white shadow-sm'
                       : 'border-zinc-300 bg-white text-zinc-800 hover:border-orange-300 hover:bg-orange-50',
-                    (busy || uploading) && 'cursor-not-allowed opacity-50',
+                    (busy || mediaBusy) && 'cursor-not-allowed opacity-50',
                   )}
                 >
                   {n} 条
@@ -1090,7 +1172,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         </div>
 
         {/* 右侧：成片输出 */}
-        <aside className="lg:col-span-2">
+        <aside className="xl:col-span-5">
           <section className="sticky top-4 rounded-xl border-2 border-orange-200 bg-gradient-to-b from-orange-50/80 to-white shadow-sm">
             <div className="border-b border-orange-100 px-5 py-4">
               <h3 className="flex items-center gap-2 text-base font-semibold text-zinc-900">
@@ -1313,6 +1395,51 @@ function ServiceBadge({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
         <span className="text-[11px] text-zinc-500">本地上传需 OSS 前缀</span>
       ) : null}
     </div>
+  )
+}
+
+function MaterialTabBtn({
+  active,
+  onClick,
+  label,
+  count,
+  accent,
+}: {
+  active: boolean
+  onClick: () => void
+  label: string
+  count: number
+  accent?: 'violet'
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'relative -mb-px rounded-t-lg px-4 py-2.5 text-sm font-medium transition',
+        active
+          ? accent === 'violet'
+            ? 'border border-b-white border-violet-200 bg-white text-violet-900'
+            : 'border border-b-white border-zinc-200 bg-white text-zinc-900'
+          : 'text-zinc-500 hover:text-zinc-800',
+      )}
+    >
+      {label}
+      {count > 0 ? (
+        <span
+          className={cn(
+            'ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+            active
+              ? accent === 'violet'
+                ? 'bg-violet-100 text-violet-800'
+                : 'bg-orange-100 text-orange-800'
+              : 'bg-zinc-100 text-zinc-600',
+          )}
+        >
+          {count}
+        </span>
+      ) : null}
+    </button>
   )
 }
 

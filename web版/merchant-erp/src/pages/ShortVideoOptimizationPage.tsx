@@ -882,7 +882,12 @@ export default function ShortVideoOptimizationPage() {
   }, [thumbUrl])
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 lg:py-12">
+    <div
+      className={cn(
+        'mx-auto px-4 py-8 lg:py-12',
+        mainPane === 'cloud_batch' ? 'max-w-6xl' : 'max-w-4xl',
+      )}
+    >
       <header className="relative mb-10 space-y-2 pl-4">
         <span className="absolute left-0 top-2 h-10 w-1 rounded-full bg-gradient-to-b from-orange-500 to-cyan-500" aria-hidden />
         <div className="flex items-center gap-3">
@@ -1157,9 +1162,9 @@ export default function ShortVideoOptimizationPage() {
       </section>
       ) : null}
 
-      {mainPane === 'cloud_batch' && (
+      <div className={mainPane === 'cloud_batch' ? undefined : 'hidden'} aria-hidden={mainPane !== 'cloud_batch'}>
         <ShortVideoIceBatchPanel lastResultUrl={resultUrl} />
-      )}
+      </div>
 
       {mainPane === 'optimize' && (
         <section className="space-y-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">

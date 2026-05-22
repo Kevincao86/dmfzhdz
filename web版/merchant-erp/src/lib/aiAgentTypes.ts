@@ -95,7 +95,10 @@ export type AiRecruitmentOrderDetail = {
   budgetYuan: number
   totalHeadcount: number
   tags: string[]
+  /** 列表卡片摘要 */
   briefExcerpt: string
+  /** 详情弹层完整 Brief */
+  briefText: string
   createdAt: string
   allocation: {
     v3: number
