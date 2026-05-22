@@ -36,7 +36,7 @@
   <view wx:if="{{payOpen}}" class="pay-mask" catchtap="onClosePay">
     <view class="pay-sheet meoo-card" catchtap="noop">
       <text class="pay-title">账户充值</text>
-      <text class="pay-hint">档位与电脑端订阅扫码一致；支付请备注账号或商户名。</text>
+      <text class="pay-hint">充值档位与商家后台钱包一致；支付请备注账号或商户名。</text>
 
       <view class="tier-row">
         <button

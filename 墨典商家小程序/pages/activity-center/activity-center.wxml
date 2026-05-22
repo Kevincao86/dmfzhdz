@@ -1,0 +1,17 @@
+<view class="mp-page">
+  <view class="mp-tabs">
+    <view wx:for="{{tabs}}" wx:key="id" class="mp-tab {{platform === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onTab">{{item.label}}</view>
+  </view>
+  <view wx:if="{{loading}}" class="mp-empty">加载中…</view>
+  <view wx:elif="{{err}}" class="mp-err">{{err}}</view>
+  <view wx:elif="{{!items.length}}" class="mp-empty">暂无活动</view>
+  <scroll-view wx:else scroll-y class="mp-list-scroll">
+    <view wx:for="{{items}}" wx:key="id" class="mp-list-card">
+      <text class="mp-list-title">{{item.title}}</text>
+      <text class="mp-list-tag">{{item.uiStatusLabel}}</text>
+      <text wx:if="{{item.summary}}" class="mp-list-sub">{{item.summary}}</text>
+      <text wx:if="{{item.startAt}}" class="mp-list-meta">{{item.startAt}} — {{item.endAt}}</text>
+    </view>
+    <view class="mp-list-footer"></view>
+  </scroll-view>
+</view>

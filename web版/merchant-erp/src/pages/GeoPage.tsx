@@ -53,6 +53,7 @@ import {
   GEO_TEXT_AI_MODEL_OPTIONS,
   coerceGeoTextAiModel,
   postGeoAiConsult,
+  postGeoAiConsultQuestion,
   postGeoAiScore,
 } from '../services/douyinAiAssistApi'
 import {
@@ -174,6 +175,7 @@ export default function GeoPage() {
     '这家店营业到几点？有停车位吗？',
   )
   const [consultBusy, setConsultBusy] = useState(false)
+  const [genQuestionBusy, setGenQuestionBusy] = useState(false)
   const [consultErr, setConsultErr] = useState<string | null>(null)
   const [consultReply, setConsultReply] = useState<string | null>(null)
   const [showKnowledgePack, setShowKnowledgePack] = useState(false)
@@ -512,6 +514,47 @@ export default function GeoPage() {
     })
   }, [liveMetrics, activeStores, scopeDisplayName, accountNameFromApi, querySamples])
 
+  const runGeoGenerateConsultQuestion = useCallback(async () => {
+    setConsultErr(null)
+    if (!readDouyinToken()) {
+      setConsultErr('请先在「系统设置 → 平台连接」完成抖音来客绑定后再生成咨询文案。')
+      return
+    }
+    if (!liveMetrics || activeStores.length === 0) {
+      setConsultErr('请先在概览上方完成「同步来客并 AI 综合评分」，再使用 AI 生成咨询文案。')
+      return
+    }
+    if (geoKnowledgePack.length < 24 || geoKnowledgePack.startsWith('（请先完成')) {
+      setConsultErr('知识包尚未就绪，请先同步来客门店并完成评分。')
+      return
+    }
+    setGenQuestionBusy(true)
+    try {
+      const r = await postGeoAiConsultQuestion({
+        model: coerceGeoTextAiModel(resolveTextAiModelForRequest()),
+        store_display_name: scopeDisplayName.slice(0, 80),
+        geo_knowledge_pack: geoKnowledgePack,
+      })
+      if (!r.ok) {
+        setConsultErr(
+          r.needVendorKey
+            ? `${r.message} 请前往「系统设置 → 平台连接」页内的「AI 模型绑定」完成各模型 API Key。`
+            : r.message,
+        )
+        return
+      }
+      const text = (r.description ?? '').trim()
+      if (text.length < 8) {
+        setConsultErr('生成结果过短，请重试或手动输入咨询内容。')
+        return
+      }
+      setConsultQuestion(text)
+      setConsultReply(null)
+    } finally {
+      setGenQuestionBusy(false)
+    }
+  }, [geoKnowledgePack, liveMetrics, activeStores.length, scopeDisplayName, aiModelUiTick])
+
   const runGeoConsult = useCallback(async () => {
     setConsultErr(null)
     setConsultReply(null)
@@ -828,9 +871,11 @@ export default function GeoPage() {
           <div>
             <h2 className="text-xl font-bold text-gray-900">AI 咨询测试</h2>
             <p className="mt-1 text-sm text-gray-500">
-              GEO 算法侧会将本模块维护的结构化信息（门店事实、问法摘要、内容要点等）组装为知识包，与用户输入的咨询语句一并发送至
-              <strong className="font-medium text-gray-700">系统设置中已绑定</strong>
-              的文本模型（与商品、运营页的 AI 能力一致），用于模拟用户在 AI 搜索与问答场景下的对话体验。
+              知识包来自已同步的抖音来客门店事实与 GEO 评分结果。建议先用
+              <strong className="font-medium text-gray-700">「AI 生成咨询文案」</strong>
+              生成贴近真实场景的模拟问法（优先覆盖待补齐字段），再
+              <strong className="font-medium text-gray-700">「发送至 AI 模型」</strong>
+              查看回答是否准确、是否瞎编。
             </p>
           </div>
 
@@ -865,19 +910,37 @@ export default function GeoPage() {
               />
             ) : null}
 
-            <label className="mt-6 block text-sm font-medium text-gray-900">模拟用户咨询</label>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-medium text-gray-900">模拟用户咨询</label>
+              <button
+                type="button"
+                disabled={genQuestionBusy || consultBusy}
+                onClick={() => void runGeoGenerateConsultQuestion()}
+                className="inline-flex items-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-60"
+              >
+                {genQuestionBusy ? (
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Sparkles className="mr-1.5 h-4 w-4" aria-hidden />
+                )}
+                AI 生成咨询文案
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              根据当前知识包与问法覆盖样例生成一条顾客口吻的测试问句，可编辑后再发送。
+            </p>
             <textarea
               value={consultQuestion}
               onChange={(e) => setConsultQuestion(e.target.value)}
               rows={3}
-              placeholder="例如：这家店几点关门？停车方便吗？"
+              placeholder="例如：这家店几点关门？停车方便吗？也可点击上方一键生成"
               className="mt-2 w-full rounded-lg border border-gray-300 p-3 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                disabled={consultBusy}
+                disabled={consultBusy || genQuestionBusy}
                 onClick={() => void runGeoConsult()}
                 className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
               >

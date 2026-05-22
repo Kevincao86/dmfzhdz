@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const devAuth = require('../../utils/devAuth.js')
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryMp.js')
 const rest = require('../../utils/supabaseRest.js')
@@ -68,7 +69,11 @@ Page({
     ],
   },
   onShow() {
-    if (!api.getAccessToken()) {
+    wx.switchTab({ url: '/pages/agent/agent' })
+  },
+
+  _legacyOnShow() {
+    if (!api.isAuthed()) {
       wx.redirectTo({ url: '/pages/login/login' })
       return
     }
@@ -93,6 +98,28 @@ Page({
     let scoreHint = '登录成功后可显示余额'
     let dataBanner = '正在加载…'
     let balanceLoaded = false
+
+    if (devAuth.isDevSkipLogin()) {
+      score = '¥12,580.00'
+      scoreLabel = '可用余额'
+      scoreHint = '开发模式 · 示意数据'
+      metrics[0] = { value: '¥12,580', label: '可用余额', sub: '示意' }
+      metrics[1] = { value: '¥8,420', label: '成交额', sub: '近7日 · 示意' }
+      metrics[2] = { value: '2', label: '招募待办', sub: '待接单 · 示意' }
+      dataBanner =
+        '开发模式：已跳过登录，以下为示意数据，便于设计内部页面。对接真实数据请将 utils/config.js 中 DEV_SKIP_LOGIN 设为 false。'
+      this.setData({
+        erpLinked,
+        balanceLoaded: true,
+        score,
+        scoreLabel,
+        scoreHint,
+        metrics,
+        dataBanner,
+        statusText: '设计预览',
+      })
+      return
+    }
 
     try {
       const tid = await rest.fetchPrimaryTenantId()

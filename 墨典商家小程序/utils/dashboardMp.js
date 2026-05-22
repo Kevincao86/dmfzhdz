@@ -60,7 +60,7 @@ async function fetchAggregateDashboard(/** @type {'day7'|'day30'} */ range) {
     totalOrders: orders,
     conversionRate,
     fansGrowth: 0,
-    leadsHint: connected ? '' : '在电脑端完成各平台店铺授权后，可汇总成交额（小程序不保存店铺密钥）',
+    leadsHint: connected ? '' : '完成各平台授权后可汇总成交额',
   }
 }
 

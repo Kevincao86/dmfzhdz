@@ -1,0 +1,14 @@
+<view class="mp-page">
+  <view class="mp-banner">近 {{days}} 日各平台订单与核销汇总，与商家后台财务对账台同源。</view>
+  <view wx:if="{{loading}}" class="mp-empty">加载中…</view>
+  <view wx:elif="{{err}}" class="mp-err">{{err}}</view>
+  <view wx:elif="{{!items.length}}" class="mp-empty">暂无对账数据</view>
+  <scroll-view wx:else scroll-y class="mp-list-scroll">
+    <view wx:for="{{items}}" wx:key="idx" class="mp-list-card">
+      <text class="mp-list-title">{{item.platformLabel}} · {{item.date}}</text>
+      <text class="mp-list-sub">订单 {{item.orderCount}} · 核销 {{item.verifyOrderCount}}</text>
+      <text class="mp-list-meta">成交额 ¥{{item.salesAmountYuan}} · 核销额 ¥{{item.verifyAmountYuan}}</text>
+    </view>
+    <view class="mp-list-footer"></view>
+  </scroll-view>
+</view>

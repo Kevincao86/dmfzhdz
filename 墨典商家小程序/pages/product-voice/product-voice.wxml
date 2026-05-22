@@ -16,7 +16,7 @@
     </view>
     <view class="voice-step-row">
       <text class="voice-step-num">3</text>
-      <text class="voice-step-text">在编辑页核对字段后提交（与电脑端新建商品流程一致）</text>
+      <text class="voice-step-text">在编辑页核对字段；或直接走「新建商品」向导上架</text>
     </view>
   </view>
 

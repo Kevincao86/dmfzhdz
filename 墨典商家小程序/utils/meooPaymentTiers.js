@@ -2,9 +2,10 @@
 
 module.exports = {
   SUBSCRIPTION_TIERS: [
-    { label: '月度 · 30 天', yuan: 99, cents: 9900 },
-    { label: '季度 · 90 天', yuan: 268, cents: 26800 },
-    { label: '年度 · 365 天', yuan: 698, cents: 69800 },
+    { label: '会员版 · 月度', yuan: 168, cents: 16800, plan: 'member' },
+    { label: '会员 Plus · 月度', yuan: 598, cents: 59800, plan: 'member_plus' },
+    { label: '会员版 · 季度', yuan: 468, cents: 46800, plan: 'member' },
+    { label: '会员 Plus · 季度', yuan: 1688, cents: 168800, plan: 'member_plus' },
   ],
   RECHARGE_TIERS: [
     { label: '¥100', yuan: 100, cents: 10000 },

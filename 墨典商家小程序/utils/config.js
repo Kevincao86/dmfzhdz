@@ -19,6 +19,12 @@ const DEMO_ANON_KEY =
 
 const host = LAN_API_HOST.trim()
 const core = {
+  /**
+   * true：跳过登录页，使用示意账号进入首页（仅本地/UI 设计用，上架前务必 false）。
+   */
+  DEV_SKIP_LOGIN: true,
+  /** 跳过登录时首页展示的门店/账户名 */
+  DEV_SKIP_LOGIN_NAME: 'DMF001',
   SUPABASE_URL: host
     ? `http://${host}:${LOCAL_SUPABASE_PORT}`
     : `http://127.0.0.1:${LOCAL_SUPABASE_PORT}`,

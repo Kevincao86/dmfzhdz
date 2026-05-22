@@ -1,17 +1,17 @@
 <view class="page">
   <view wx:if="{{!erpOk}}" class="hero warn meoo-card">
     <text class="hero-title">未连接商家后台</text>
-    <text class="hero-desc">当前小程序找不到电脑上的商家后台地址。开发调试时请让技术人员把本机配置文件里的后台网址，改成与您电脑上打开的商家后台一致（同一 Wi‑Fi 下一般为 http 开头的局域网地址）。</text>
+    <text class="hero-desc">请配置商家后台 API 地址后重试。</text>
   </view>
 
   <view wx:else class="hero ok meoo-card">
     <view class="hero-row">
       <text class="hero-title">商品列表</text>
-      <text class="hero-badge">与电脑端一致</text>
     </view>
     <text class="hero-desc">{{hintBanner}}</text>
     <view class="hero-actions">
-      <button class="mini-btn primary" size="mini" bindtap="goVoice">语音录入</button>
+      <button class="mini-btn primary" size="mini" bindtap="goCreate">新建商品</button>
+      <button class="mini-btn ghost" size="mini" bindtap="goVoice">语音录入</button>
     </view>
   </view>
 
@@ -55,7 +55,7 @@
     <view wx:if="{{note}}" class="note-strip">{{note}}</view>
     <view wx:if="{{displayItems.length === 0}}" class="state-card meoo-card">
       <text class="state-title">暂无商品</text>
-      <text class="state-text">该平台还没有商品，或电脑端尚未同步到手机。您可在电脑端商家后台维护商品，或使用下方「语音录入」先建草稿。</text>
+      <text class="state-text">该平台暂无商品，可点击「新建商品」创建，或使用语音录入生成草稿。</text>
     </view>
     <view wx:for="{{displayItems}}" wx:key="id" class="prod-card meoo-card">
       <view class="prod-top" bindtap="onOpenItem" data-id="{{item.id}}" data-name="{{item.name}}">

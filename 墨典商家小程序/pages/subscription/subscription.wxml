@@ -1,0 +1,63 @@
+<view class="page">
+  <view class="plan-card meoo-card">
+    <text class="plan-label">当前版本</text>
+    <text class="plan-name">{{planLabel}}</text>
+    <text wx:if="{{monthlyYuan}}" class="plan-price">参考 ¥{{monthlyYuan}}/月起</text>
+    <view class="feat-list">
+      <text wx:for="{{featureLines}}" wx:key="*this" class="feat-line">· {{item}}</text>
+    </view>
+    <text wx:if="{{directAiRemaining != null}}" class="plan-extra">
+      本月直连 AI 剩余 {{directAiRemaining}} / {{directAiLimit}} 次
+    </text>
+    <text class="sync-hint">与商家后台「设置 → 订阅」及运营管控台会员档位同步</text>
+  </view>
+
+  <view class="panel meoo-card">
+    <text class="panel-title">会员时长</text>
+    <block wx:if="{{loading}}">
+      <text class="muted">加载中…</text>
+    </block>
+    <block wx:elif="{{!isPaid}}">
+      <text class="muted">当前为免费版。购买会员并由运营确认到账后，将显示订阅与剩余时长。</text>
+    </block>
+    <block wx:else>
+      <text class="row-line">
+        订阅时长 {{subscriptionDays}} 天 + 赠送 {{opsGiftDays}} 天
+      </text>
+      <text class="row-line strong">
+        总剩余 {{remainDaysDisplay}} 天
+        <text wx:if="{{totalEntitlementDays > 0}}" class="muted-inline">（累计权益 {{totalEntitlementDays}} 天）</text>
+      </text>
+      <text wx:if="{{expireText}}" class="row-line">会员到期：{{expireText}}</text>
+      <text wx:if="{{expireWarn}}" class="warn">{{expireWarn}}</text>
+    </block>
+    <button class="ghost-btn" bindtap="onReload" loading="{{loading}}">刷新</button>
+    <button class="meoo-btn-primary open-sub-btn" bindtap="onOpenSubscribe">打开订阅窗口</button>
+  </view>
+
+  <view wx:if="{{paySheetOpen}}" class="panel meoo-card pay-panel">
+    <text class="panel-title">选择套餐并申报支付</text>
+    <text class="muted">会员版 ¥168/月、会员 Plus ¥598/月（含季度）；运营确认后与电脑端同步。</text>
+    <view class="tier-row">
+      <button
+        wx:for="{{subscriptionTiers}}"
+        wx:key="label"
+        wx:for-index="idx"
+        class="tier-chip {{tierIndex === idx ? 'on' : ''}}"
+        data-index="{{idx}}"
+        bindtap="onPickTier"
+      >
+        {{item.label}}
+      </button>
+    </view>
+    <view class="channel-row">
+      <button class="channel-btn {{channel === 'wechat' ? 'on' : ''}}" data-ch="wechat" bindtap="onPickChannel">微信</button>
+      <button class="channel-btn {{channel === 'alipay' ? 'on' : ''}}" data-ch="alipay" bindtap="onPickChannel">支付宝</button>
+    </view>
+    <text wx:if="{{payErr}}" class="err">{{payErr}}</text>
+    <button class="meoo-btn-primary" bindtap="onSubmitPay" loading="{{payBusy}}" disabled="{{!channel}}">
+      提交支付申报
+    </button>
+    <button class="ghost-btn" bindtap="onCloseSubscribe">收起</button>
+  </view>
+</view>

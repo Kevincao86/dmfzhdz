@@ -1,5 +1,7 @@
 const config = require('./config.js')
 const { loginNameToTenantEmail } = require('./tenantAuth.js')
+const devAuth = require('./devAuth.js')
+const sessionSync = require('./merchantSessionSyncMp.js')
 
 function loginWithPassword(loginName, password) {
   const email = loginNameToTenantEmail(loginName)
@@ -22,6 +24,7 @@ function loginWithPassword(loginName, password) {
           } catch (_) {}
           const app = getApp()
           if (app) app.globalData.accessToken = res.data.access_token
+          void sessionSync.syncFromCloud({ force: true })
           resolve(res.data)
         } else {
           const msg =
@@ -49,6 +52,11 @@ function loginWithPassword(loginName, password) {
 }
 
 function logout() {
+  if (devAuth.isDevSkipLogin()) {
+    devAuth.applyDevSession()
+    return
+  }
+  sessionSync.clearMerchantSessionLocal()
   wx.removeStorageSync('meoo_access_token')
   wx.removeStorageSync('meoo_refresh_token')
   try {
@@ -59,7 +67,15 @@ function logout() {
 }
 
 function getAccessToken() {
+  if (devAuth.isDevSkipLogin()) {
+    devAuth.applyDevSession()
+    return devAuth.DEV_TOKEN
+  }
   return wx.getStorageSync('meoo_access_token') || ''
+}
+
+function isAuthed() {
+  return devAuth.isDevSkipLogin() || Boolean(getAccessToken())
 }
 
 function getRefreshToken() {
@@ -116,4 +132,10 @@ function refreshAccessToken() {
   })
 }
 
-module.exports = { loginWithPassword, logout, getAccessToken, refreshAccessToken }
+module.exports = {
+  loginWithPassword,
+  logout,
+  getAccessToken,
+  refreshAccessToken,
+  isAuthed,
+}

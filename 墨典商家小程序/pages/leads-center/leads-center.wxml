@@ -1,0 +1,15 @@
+<view class="mp-page">
+  <view class="mp-banner">本地推线索列表，支持在商家后台完成回传与转化标记。</view>
+  <view wx:if="{{loading}}" class="mp-empty">加载中…</view>
+  <view wx:elif="{{err}}" class="mp-err">{{err}}</view>
+  <view wx:elif="{{!items.length}}" class="mp-empty">暂无线索</view>
+  <scroll-view wx:else scroll-y class="mp-list-scroll">
+    <view wx:for="{{items}}" wx:key="id" class="mp-list-card">
+      <text class="mp-list-title">{{item.name}}</text>
+      <text class="mp-list-sub">{{item.phone}}</text>
+      <text class="mp-list-tag">{{item.state}}</text>
+      <text wx:if="{{item.createdAt}}" class="mp-list-meta">{{item.createdAt}}</text>
+    </view>
+    <view class="mp-list-footer"></view>
+  </scroll-view>
+</view>

@@ -34,7 +34,7 @@ async function postReviewReply(
   if (!tok)
     return {
       ok: false,
-      message: '请先在电脑端商家后台完成抖音来客店铺授权，再回到小程序查看或回复评价。',
+      message: '请先完成抖音来客店铺授权后再查看或回复评价。',
     }
   try {
     const data = await merchantApi.merchantRequestAuth('POST', '/api/merchant/reviews/reply', {
@@ -42,7 +42,7 @@ async function postReviewReply(
       data: { platform, reviewId, content: String(content || '').trim() },
     })
     if (data && data.item) return { ok: true, item: data.item }
-    return { ok: false, message: '保存失败，请稍后重试或到电脑端操作。' }
+    return { ok: false, message: '保存失败，请稍后重试。' }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }

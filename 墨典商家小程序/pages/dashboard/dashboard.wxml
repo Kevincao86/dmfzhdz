@@ -1,6 +1,6 @@
 <scroll-view scroll-y class="scroll">
   <view class="range-pill">{{rangeLabel}}</view>
-  <text class="subhead">数字由各平台店铺汇总；详细图表请在电脑端商家首页查看</text>
+  <text class="subhead">数字由各平台店铺汇总</text>
   <text wx:if="{{loading}}" class="loading-line">正在拉取汇总…</text>
 
   <view class="stat-grid">

@@ -19,7 +19,7 @@ async function fetchMerchantProductList(/** @type {string} */ platform, opts) {
     return {
       ok: false,
       message:
-        '暂时读不到您在抖音、美团等平台的店铺商品。请先在电脑端打开商家后台，在「系统设置」里完成对应平台的店铺授权；小程序端不保存店铺密钥，列表会在后台连通后与电脑端一致。',
+        '尚未绑定对应平台。请在商家后台「系统设置」完成授权，并将 accessToken 写入本机（键名与 Web 一致，如 meoo_douyin_merchant_token）。',
     }
   }
   const seg = apiSegment(platform)
@@ -63,7 +63,7 @@ async function fetchMerchantProductList(/** @type {string} */ platform, opts) {
 /** 当前仅抖音支持同步（与 Web 一致） */
 async function postMerchantProductSyncDouyin(/** @type {string} */ productId) {
   const token = readPlatformToken('douyin')
-  if (!token) return { ok: false, message: '请先在电脑端商家后台完成抖音来客授权，再尝试同步。' }
+  if (!token) return { ok: false, message: '请先完成抖音来客授权后再同步。' }
   const id = String(productId || '').trim()
   if (!id) return { ok: false, message: '缺少商品 ID' }
   try {

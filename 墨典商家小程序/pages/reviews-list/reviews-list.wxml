@@ -1,7 +1,7 @@
 <view class="page">
   <view wx:if="{{!erpOk}}" class="hero warn meoo-card">
     <text class="hero-title">未连接商家后台</text>
-    <text class="hero-desc">请先让技术人员配置连接电脑端商家后台，与电脑上打开的地址一致。</text>
+    <text class="hero-desc">请配置商家后台 API 地址后重试。</text>
   </view>
 
   <view wx:else class="toolbar">
@@ -73,7 +73,7 @@
       <view wx:if="{{replyingId === item.id}}" class="reply-editor">
         <textarea
           class="reply-ta"
-          placeholder="输入回复内容（与电脑端一致）"
+          placeholder="输入回复内容"
           maxlength="{{500}}"
           bindinput="onReplyInput"
           value="{{replyDraft}}"

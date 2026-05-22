@@ -1,0 +1,37 @@
+<scroll-view scroll-y class="func-scroll" enhanced show-scrollbar="{{false}}">
+  <view class="func-hero">
+    <text class="func-hero-title">商家能力中心</text>
+    <text class="func-hero-desc">店铺 · 商品 · 运营 · 投流 · 线索 · 财务</text>
+  </view>
+
+  <block wx:for="{{sections}}" wx:key="id">
+    <view class="sec-card">
+      <view class="sec-head">
+        <view class="sec-icon sec-tone-{{item.tone}}">{{item.firstChar}}</view>
+        <view class="sec-meta">
+          <text class="sec-title">{{item.title}}</text>
+          <text class="sec-desc">{{item.desc}}</text>
+        </view>
+      </view>
+      <view class="item-grid">
+        <navigator
+          wx:for="{{item.items}}"
+          wx:for-item="cell"
+          wx:key="title"
+          url="{{cell.url}}"
+          class="item-cell"
+          hover-class="item-cell-hover"
+        >
+          <view class="cell-top">
+            <view class="cell-glyph">{{cell.glyph}}</view>
+            <text wx:if="{{cell.badge}}" class="cell-badge">{{cell.badge}}</text>
+          </view>
+          <text class="cell-title">{{cell.title}}</text>
+          <text class="cell-desc">{{cell.desc}}</text>
+        </navigator>
+      </view>
+    </view>
+  </block>
+
+  <view class="func-footer-space"></view>
+</scroll-view>

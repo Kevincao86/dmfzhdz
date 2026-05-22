@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const devAuth = require('../../utils/devAuth.js')
 
 Page({
   data: {
@@ -6,10 +7,14 @@ Page({
     password: '',
     err: '',
     busy: false,
+    devSkip: false,
+  },
+  onLoad() {
+    this.setData({ devSkip: devAuth.isDevSkipLogin() })
   },
   onShow() {
-    if (api.getAccessToken()) {
-      wx.redirectTo({ url: '/pages/home/home' })
+    if (devAuth.isDevSkipLogin() || api.getAccessToken()) {
+      wx.switchTab({ url: '/pages/agent/agent' })
     }
   },
   onLoginName(e) {
@@ -32,7 +37,7 @@ Page({
     this.setData({ busy: true, err: '' })
     try {
       await api.loginWithPassword(loginName, password)
-      wx.redirectTo({ url: '/pages/home/home' })
+      wx.switchTab({ url: '/pages/agent/agent' })
     } catch (e) {
       const msg = e && e.message ? e.message : '登录失败'
       this.setData({ err: msg })

@@ -33,9 +33,8 @@ Page({
   async onSubmit() {
     if (!merchant.hasMerchantApi()) {
       wx.showModal({
-        title: '未连接电脑端后台',
-        content:
-          '请联系技术人员：在小程序配置文件里填写与您电脑上商家后台一致的访问地址（手机与电脑需同一 Wi‑Fi，一般为 http 开头的局域网地址）。保存后重新进入本页即可与电脑端招募数据互通。',
+        title: '未连接商家后台',
+        content: '请检查后台 API 配置与网络连接后重试。',
         showCancel: false,
       })
       return

@@ -1,0 +1,11 @@
+<scroll-view scroll-y class="mp-page" style="height:100vh">
+  <view class="mp-form-card">
+    <text class="wizard-title">地域与关键词建议</text>
+    <text class="wizard-desc">输入门店所在城市、品类与目标客群，AI 生成 GEO 运营要点。</text>
+    <textarea class="meoo-input area" value="{{brief}}" bindinput="onBrief" placeholder="例：上海静安；火锅；周末家庭客" />
+    <button class="meoo-btn-primary" bindtap="onGenerate" loading="{{busy}}">生成建议</button>
+    <view wx:if="{{err}}" class="mp-err" style="text-align:left;margin-top:16rpx">{{err}}</view>
+    <view wx:if="{{out}}" class="mp-output">{{out}}</view>
+  </view>
+  <view class="mp-list-footer"></view>
+</scroll-view>

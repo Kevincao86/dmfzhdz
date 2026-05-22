@@ -1,5 +1,6 @@
 /**
- * 预留：与 Web sessionStorage 键名一致。小程序不提供绑定页；若后续服务端按租户下发会话，可写入这些键供网关请求复用。
+ * 与 Web `merchantSession` / `platformTokens` 键名一致。
+ * 抖音等凭证由 `merchantSessionSyncMp` 在登录后从 `tenant_merchant_bindings` 同步写入。
  */
 const STORAGE_KEYS = {
   douyin: 'meoo_douyin_merchant_token',

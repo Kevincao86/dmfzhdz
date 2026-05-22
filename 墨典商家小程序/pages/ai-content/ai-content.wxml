@@ -1,0 +1,14 @@
+<scroll-view scroll-y class="mp-page" style="height:100vh">
+  <view class="mp-tabs">
+    <view class="mp-tab {{tab === 'article' ? 'active' : ''}}" data-t="article" bindtap="onTab">文章</view>
+    <view class="mp-tab {{tab === 'topic' ? 'active' : ''}}" data-t="topic" bindtap="onTab">话题</view>
+  </view>
+  <view class="mp-form-card">
+    <textarea class="meoo-input area" value="{{brief}}" bindinput="onBrief" placeholder="{{tab === 'article' ? '描述要写的探店/种草文章' : '描述账号定位与想蹭的热点'}}" />
+    <button class="meoo-btn-primary" bindtap="onGenerate" loading="{{busy}}">AI 生成</button>
+    <view wx:if="{{err}}" class="mp-err" style="text-align:left;margin-top:16rpx">{{err}}</view>
+    <view wx:if="{{out}}" class="mp-output">{{out}}</view>
+    <button wx:if="{{out}}" class="meoo-btn-ghost" style="margin-top:20rpx" bindtap="onCopy">复制全文</button>
+  </view>
+  <view class="mp-list-footer"></view>
+</scroll-view>

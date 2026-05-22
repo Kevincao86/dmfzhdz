@@ -65,7 +65,7 @@ Page({
   },
   async load() {
     if (!merchant.hasMerchantApi()) {
-      this.setData({ loading: false, errMsg: '尚未连接电脑端商家后台，请联系技术人员。', items: [], statsText: '' })
+      this.setData({ loading: false, errMsg: '尚未连接商家后台', items: [], statsText: '' })
       return
     }
     this.setData({ loading: true, errMsg: '' })

@@ -1,0 +1,34 @@
+<scroll-view scroll-y class="mine-scroll" enhanced show-scrollbar="{{false}}">
+  <view class="profile-card">
+    <image class="avatar" src="/images/logo.png" mode="aspectFit" />
+    <view class="profile-text">
+      <view class="profile-name-row">
+        <text class="profile-name">{{storeName}}</text>
+        <text wx:if="{{planLabel}}" class="plan-pill plan-pill-{{planPillClass}}">{{planLabel}}</text>
+      </view>
+      <text class="profile-sub">账户 {{loginName || '—'}}</text>
+      <text wx:if="{{devMode}}" class="dev-pill">开发预览</text>
+    </view>
+  </view>
+
+  <view class="menu-card">
+    <view
+      wx:for="{{menu}}"
+      wx:key="id"
+      class="menu-row"
+      data-action="{{item.action}}"
+      data-url="{{item.url}}"
+      bindtap="onMenuTap"
+    >
+      <view class="menu-icon menu-tone-{{item.tone}}">{{item.glyph}}</view>
+      <view class="menu-body">
+        <text class="menu-title">{{item.title}}</text>
+        <text class="menu-desc">{{item.desc}}</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </view>
+  </view>
+
+  <button class="logout-btn" bindtap="onLogout">退出登录</button>
+  <view class="mine-footer-space"></view>
+</scroll-view>

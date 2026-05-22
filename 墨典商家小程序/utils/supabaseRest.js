@@ -139,6 +139,69 @@ async function fetchTenantWalletSummary(tenantId) {
   return { balanceCents: balance, serviceExpireAt: expire, ledger: Array.isArray(ledger) ? ledger : [] }
 }
 
+async function fetchTenantMembershipRow(tenantId) {
+  const token = api.getAccessToken()
+  const tid = encodeURIComponent(String(tenantId || '').trim())
+  const rows = await request(
+    'GET',
+    `/rest/v1/tenants?id=eq.${tid}` +
+      '&select=membership_plan,direct_ai_calls_used,service_expire_at,subscription_days,ops_gift_days,official_days',
+    token,
+  )
+  return rows && rows[0] ? rows[0] : null
+}
+
+async function fetchSupportRelayMessages(sessionId) {
+  const token = api.getAccessToken()
+  const sid = encodeURIComponent(String(sessionId || '').trim())
+  const rows = await request(
+    'GET',
+    `/rest/v1/support_relay_messages?session_id=eq.${sid}` +
+      '&select=from_role,text,ts,client_msg_id&order=ts.asc&limit=200',
+    token,
+  )
+  return Array.isArray(rows) ? rows : []
+}
+
+function insertSupportRelayMessage(row) {
+  return withAuthRetry(async () => {
+    const token = api.getAccessToken()
+    const sub = decodeJwtSub(token)
+    const body = Object.assign({}, row, { author_user_id: sub || null })
+    await new Promise((resolve, reject) => {
+      wx.request({
+        url: `${baseUrl()}/rest/v1/support_relay_messages`,
+        method: 'POST',
+        header: Object.assign(headers(token), { Prefer: 'return=minimal' }),
+        data: body,
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve()
+            return
+          }
+          reject(httpError(res, `发送失败 ${res.statusCode}`))
+        },
+        fail(err) {
+          rejectWxFail(reject, err)
+        },
+      })
+    })
+  })
+}
+
+async function fetchMerchantBindings(tenantId, provider) {
+  const token = api.getAccessToken()
+  const tid = encodeURIComponent(String(tenantId || '').trim())
+  const prov = encodeURIComponent(String(provider || '').trim())
+  const q =
+    `/rest/v1/tenant_merchant_bindings?tenant_id=eq.${tid}` +
+    `&provider=eq.${prov}` +
+    '&select=id,provider,merchant_account_id,account_display_name,binding_label,client_key,sealed_credentials,demo_mode,updated_at' +
+    '&order=updated_at.desc'
+  const rows = await request('GET', q, token)
+  return Array.isArray(rows) ? rows : []
+}
+
 async function insertPaymentOrder(payload) {
   await withAuthRetry(async () => {
     const token = api.getAccessToken()
@@ -178,5 +241,9 @@ module.exports = {
   fetchPrimaryTenantId,
   fetchTenantMerchantName,
   fetchTenantWalletSummary,
+  fetchTenantMembershipRow,
+  fetchMerchantBindings,
+  fetchSupportRelayMessages,
+  insertSupportRelayMessage,
   insertPaymentOrder,
 }

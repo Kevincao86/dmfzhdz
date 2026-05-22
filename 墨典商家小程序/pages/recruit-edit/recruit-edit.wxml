@@ -1,7 +1,7 @@
 <scroll-view scroll-y class="edit-scroll">
   <view class="edit-head meoo-card">
     <text class="edit-head-title">达人招募草稿</text>
-    <text class="edit-head-desc">提交后与电脑端「达人招募」写入同一份数据；若提示未连接后台，请联系技术人员配置小程序访问电脑端商家后台的地址。</text>
+    <text class="edit-head-desc">填写岗位与预算后提交招募单。</text>
   </view>
 
   <text class="edit-section-title">岗位与预算</text>
