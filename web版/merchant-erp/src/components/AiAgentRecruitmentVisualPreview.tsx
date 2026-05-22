@@ -28,7 +28,7 @@ export function AiAgentRecruitmentVisualPreview({ brief }: { brief: AiRecruitmen
       </div>
       {brief.enrichError ? <p className="text-center text-xs text-amber-700">{brief.enrichError}</p> : null}
       <p className="text-center text-[11px] text-slate-500">
-        确认后将 Brief 写入招募页，可在「达人招募」中继续选达人并发布订单。
+        确认后将按您的预算与人数需求 AI 分配达人档位，并在本窗口展示招募订单明细（同时推送运营台待接单）。
       </p>
     </div>
   )

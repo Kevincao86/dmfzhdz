@@ -85,6 +85,29 @@ export type AiProductPlanPreview = {
   enrichError?: string
 }
 
+/** 智能体确认后展示的招募订单明细（含 AI 档位分配） */
+export type AiRecruitmentOrderDetail = {
+  orderId: string
+  opsStatusLabel: string
+  platform: string
+  storeName: string
+  mainProductName: string
+  budgetYuan: number
+  totalHeadcount: number
+  tags: string[]
+  briefExcerpt: string
+  createdAt: string
+  allocation: {
+    v3: number
+    v4: number
+    v5: number
+    v5plus: number
+    source: 'ai' | 'fallback'
+    notes?: string
+    costHint?: string
+  }
+}
+
 /** 达人招募：图文 Brief 预览（确认后写入招募页） */
 export type AiRecruitmentBriefPreview = {
   platform: string
@@ -151,6 +174,8 @@ export type AiAgentMessage = {
   preview?: AiTaskPreviewPayload
   /** 任务完成摘要（仅 task_result） */
   resultSummary?: string
+  /** 达人招募确认后的订单明细（仅 task_result） */
+  recruitmentOrder?: AiRecruitmentOrderDetail
 }
 
 /** 侧边栏「历史对话」快照（条数由上下文裁剪，最多 10 条） */
@@ -180,7 +205,9 @@ function newId(): string {
 export function createAgentMessage(
   role: AiAgentMessageRole,
   content: string,
-  extra?: Partial<Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'imageUrls' | 'videoUrls'>>,
+  extra?: Partial<
+    Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'recruitmentOrder' | 'imageUrls' | 'videoUrls'>
+  >,
 ): AiAgentMessage {
   return {
     id: newId(),

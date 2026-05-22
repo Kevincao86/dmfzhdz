@@ -24,6 +24,7 @@ export default function AiAgentPage() {
     pendingPreviewId,
     pendingPreviewTaskType,
     pendingPreviewLoading,
+    taskConfirming,
     confirmPendingTask,
     cancelPendingTask,
     modifyPendingTask,
@@ -39,7 +40,7 @@ export default function AiAgentPage() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   const confirmLabel = aiTaskConfirmLabel(pendingPreviewTaskType)
-  const confirmDisabled = pendingPreviewLoading || aiSending
+  const confirmDisabled = pendingPreviewLoading || aiSending || taskConfirming
 
   useEffect(() => {
     if (!hasChat) return
@@ -204,7 +205,11 @@ export default function AiAgentPage() {
                           confirmDisabled && 'cursor-not-allowed opacity-50',
                         )}
                       >
-                        {pendingPreviewLoading ? '正在生成预览…' : confirmLabel}
+                        {pendingPreviewLoading
+                          ? '正在生成预览…'
+                          : taskConfirming
+                            ? '正在生成订单…'
+                            : confirmLabel}
                       </button>
                       <button
                         type="button"
