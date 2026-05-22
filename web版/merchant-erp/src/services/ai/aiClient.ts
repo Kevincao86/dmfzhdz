@@ -27,6 +27,14 @@ function aiChatFetchUrlCandidates(path: string): string[] {
   return out
 }
 
+export function isAiRequestAborted(e: unknown): boolean {
+  if (e instanceof DOMException && e.name === 'AbortError') return true
+  if (e instanceof Error) {
+    return e.name === 'AbortError' || /aborted|abort/i.test(e.message)
+  }
+  return false
+}
+
 async function bearer(): Promise<string | null> {
   if (!supabaseConfigured || !supabase) return null
   const { data } = await supabase.auth.getSession()
@@ -34,7 +42,10 @@ async function bearer(): Promise<string | null> {
 }
 
 /** 优先扁平路由 + 同源，避免生产环境深层路径或旧 API 基址落到 SPA */
-export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
+export async function postAiChat(
+  req: AIChatRequest,
+  opts?: { signal?: AbortSignal },
+): Promise<AIChatResponse> {
   const token = await bearer()
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -47,10 +58,14 @@ export async function postAiChat(req: AIChatRequest): Promise<AIChatResponse> {
   for (const p of tryPaths) {
     const targets = aiChatFetchUrlCandidates(p)
     for (const target of targets) {
+      if (opts?.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
       const res = await fetch(target, {
         method: 'POST',
         headers,
         body: JSON.stringify(req),
+        signal: opts?.signal,
       })
       const text = await res.text()
       let json: unknown = null
@@ -137,6 +152,7 @@ export async function postAiAgentNativeImage(
     referenceImageDataUrl?: string
     imageRoute?: 'builtin' | 'tokenmix'
     tokenmixImageModel?: string
+    signal?: AbortSignal
   },
 ): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
   const token = await bearer()
@@ -158,10 +174,14 @@ export async function postAiAgentNativeImage(
   for (const p of tryPaths) {
     const targets = aiChatFetchUrlCandidates(p)
     for (const target of targets) {
+      if (opts?.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
       const res = await fetch(target, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        signal: opts?.signal,
       })
       const text = await res.text()
       let json: unknown = null

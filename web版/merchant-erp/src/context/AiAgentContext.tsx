@@ -87,7 +87,12 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { listMerchantBindings } from '../lib/merchantPlatformBindings'
 import { fetchFinanceReconcile } from '../services/financeReconcileApi'
 import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
-import { postAiAgentNativeImage, postAiChat, type AiAgentNativeImageOk } from '../services/ai/aiClient'
+import {
+  isAiRequestAborted,
+  postAiAgentNativeImage,
+  postAiChat,
+  type AiAgentNativeImageOk,
+} from '../services/ai/aiClient'
 import { MAX_AI_CHAT_IMAGE_ATTACHMENTS, type AIMessage } from '../services/ai/types'
 
 function buildAgentImagePostOpts(
@@ -205,6 +210,8 @@ type AiAgentContextValue = {
   modelPickerOptions: ReturnType<typeof listAiModelPickerOptionsForPlan>
   agentProfile: ReturnType<typeof buildAiAgentPlanProfile>
   aiSending: boolean
+  /** 终止当前进行中的对话/生图请求 */
+  stopAiGeneration: () => void
   /** 主输入区待发送的图片/视频（最多 8 个） */
   pendingComposerAttachments: AiComposerAttachment[]
   addComposerMediaFiles: (files: FileList | File[] | null) => Promise<void>
@@ -345,6 +352,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
   const [aiSending, setAiSending] = useState(false)
   const [taskConfirming, setTaskConfirming] = useState(false)
+  const aiRunAbortRef = useRef<AbortController | null>(null)
 
   const messagesRef = useRef(messages)
   messagesRef.current = messages
@@ -360,6 +368,37 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const key = loadPickerKey(plan)
     setModelPickerKeyState(key)
   }, [plan])
+
+  const beginAiRun = useCallback((): AbortController => {
+    aiRunAbortRef.current?.abort()
+    const ac = new AbortController()
+    aiRunAbortRef.current = ac
+    return ac
+  }, [])
+
+  const endAiRun = useCallback((ac: AbortController) => {
+    if (aiRunAbortRef.current === ac) aiRunAbortRef.current = null
+    setAiSending(false)
+  }, [])
+
+  const appendStoppedMessage = useCallback(() => {
+    setMessages((prev) => {
+      const last = prev[prev.length - 1]
+      if (last?.role === 'assistant' && last.content === '已停止生成。') {
+        return prev
+      }
+      const next = [...prev, createAgentMessage('assistant', '已停止生成。')]
+      messagesRef.current = next
+      return next
+    })
+  }, [])
+
+  const stopAiGeneration = useCallback(() => {
+    aiRunAbortRef.current?.abort()
+    aiRunAbortRef.current = null
+    setAiSending(false)
+    appendStoppedMessage()
+  }, [appendStoppedMessage])
 
   useEffect(() => {
     setMessages((prev) => {
@@ -931,27 +970,36 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       previewPage?: string,
       imageDataUrls: string[] = [],
       pickerKeyOverride?: string,
+      runSignal?: AbortSignal,
     ) => {
       const userPickerKey = pickerKeyOverride ?? modelPickerKey
       const chatKey = effectiveChatPickerKey(userPickerKey)
       const parsed = parseAiModelPickerKey(chatKey)
       if (!parsed) return
-      setAiSending(true)
+
+      const ownsRun = !runSignal
+      const ac = ownsRun ? beginAiRun() : null
+      const signal = runSignal ?? ac!.signal
+      if (ownsRun) setAiSending(true)
+
       try {
         const history = agentMessagesToChatMessages(snapshot)
         let chatModel = parsed.model
         if (parsed.provider === 'tokenmix' && !chatModel) {
           chatModel = defaultModelIdForFamily(parsed.modelFamily)
         }
-        const res = await postAiChat({
-          provider: parsed.provider,
-          model: chatModel || undefined,
-          ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
-          messages: history,
-          ...(imageDataUrls.length ? { imageDataUrls } : {}),
-          taskType,
-          agentPickerKey: userPickerKey,
-        })
+        const res = await postAiChat(
+          {
+            provider: parsed.provider,
+            model: chatModel || undefined,
+            ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
+            messages: history,
+            ...(imageDataUrls.length ? { imageDataUrls } : {}),
+            taskType,
+            agentPickerKey: userPickerKey,
+          },
+          { signal },
+        )
         const display =
           summarizeAssistantContent(res.content) ??
           res.content
@@ -968,6 +1016,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           previewPage ?? pageContext?.pageLabel,
         )
       } catch (e) {
+        if (isAiRequestAborted(e)) {
+          appendStoppedMessage()
+          return
+        }
         const msg = e instanceof Error ? e.message : String(e)
         setMessages((prev) => {
           const next = [
@@ -981,10 +1033,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           return next
         })
       } finally {
-        setAiSending(false)
+        if (ownsRun && ac) endAiRun(ac)
       }
     },
-    [modelPickerKey, pageContext?.pageLabel, scheduleTaskPreview],
+    [modelPickerKey, pageContext?.pageLabel, scheduleTaskPreview, beginAiRun, endAiRun, appendStoppedMessage],
   )
 
   const sendUserText = useCallback(
@@ -1033,18 +1085,22 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setInputDraft('')
       queueMicrotask(() => {
         void (async () => {
-          const refImg = visionUrls[0]?.trim()
-          const imagePickerKey = resolveImagePickerKeyForUserLine(
-            activePickerKey,
-            modelPickerOptions,
-            line,
-            visionUrls.length > 0,
-          )
-          if (shouldRouteToAgentNativeImage(imagePickerKey, line, visionUrls)) {
-            setAiSending(true)
-            try {
+          const ac = beginAiRun()
+          setAiSending(true)
+          try {
+            const refImg = visionUrls[0]?.trim()
+            const imagePickerKey = resolveImagePickerKeyForUserLine(
+              activePickerKey,
+              modelPickerOptions,
+              line,
+              visionUrls.length > 0,
+            )
+            if (shouldRouteToAgentNativeImage(imagePickerKey, line, visionUrls)) {
               const imgOpts = buildAgentImagePostOpts(imagePickerKey, refImg)
-              const imgRes = await postAiAgentNativeImage(line, imgOpts)
+              const imgRes = await postAiAgentNativeImage(line, {
+                ...imgOpts,
+                signal: ac.signal,
+              })
               if (imgRes.ok) {
                 if (imgRes.channel === 'builtin') {
                   const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
@@ -1067,23 +1123,27 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 scheduleTaskPreview(trimmed, undefined, inferTaskTypeFromText(trimmed), pageContext?.pageLabel)
                 return
               }
-            } finally {
-              setAiSending(false)
             }
+            await runGatewayForSnapshot(
+              messagesRef.current,
+              line,
+              inferTaskTypeFromText(line),
+              pageContext?.pageLabel,
+              visionUrls,
+              activePickerKey,
+              ac.signal,
+            )
+          } catch (e) {
+            if (isAiRequestAborted(e)) appendStoppedMessage()
+          } finally {
+            endAiRun(ac)
           }
-          await runGatewayForSnapshot(
-            messagesRef.current,
-            line,
-            inferTaskTypeFromText(line),
-            pageContext?.pageLabel,
-            visionUrls,
-            activePickerKey,
-          )
         })()
       })
     },
     [
       aiSending,
+      stopAiGeneration,
       pendingComposerAttachments,
       pendingPreviewId,
       pageContext?.pageLabel,
@@ -1091,6 +1151,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       scheduleTaskPreview,
       modelPickerKey,
       modelPickerOptions,
+      beginAiRun,
+      endAiRun,
+      appendStoppedMessage,
     ],
   )
 
@@ -1425,12 +1488,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       queueMicrotask(() => {
         void (async () => {
-          const imagePickerKey = resolveImagePickerKeyForUserLine(activePickerKey, modelPickerOptions, q, false)
-          if (shouldRouteToAgentNativeImage(imagePickerKey, q, [])) {
-            setAiSending(true)
-            try {
+          const ac = beginAiRun()
+          setAiSending(true)
+          try {
+            const imagePickerKey = resolveImagePickerKeyForUserLine(activePickerKey, modelPickerOptions, q, false)
+            if (shouldRouteToAgentNativeImage(imagePickerKey, q, [])) {
               const imgOpts = buildAgentImagePostOpts(imagePickerKey)
-              const imgRes = await postAiAgentNativeImage(q, imgOpts)
+              const imgRes = await postAiAgentNativeImage(q, { ...imgOpts, signal: ac.signal })
               if (imgRes.ok) {
                 if (imgRes.channel === 'builtin') {
                   const vk = modelPickerKeyForNativeImageVendor(imgRes.vendorUsed, modelPickerOptions)
@@ -1452,22 +1516,34 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 scheduleTaskPreview(q, undefined, inferTaskTypeFromText(q), pl)
                 return
               }
-            } finally {
-              setAiSending(false)
             }
+            await runGatewayForSnapshot(
+              messagesRef.current,
+              q,
+              inferTaskTypeFromText(q),
+              pl,
+              [],
+              activePickerKey,
+              ac.signal,
+            )
+          } catch (e) {
+            if (isAiRequestAborted(e)) appendStoppedMessage()
+          } finally {
+            endAiRun(ac)
           }
-          await runGatewayForSnapshot(
-            messagesRef.current,
-            q,
-            inferTaskTypeFromText(q),
-            pl,
-            [],
-            activePickerKey,
-          )
         })()
       })
     },
-    [aiSending, runGatewayForSnapshot, modelPickerKey, modelPickerOptions, scheduleTaskPreview],
+    [
+      aiSending,
+      runGatewayForSnapshot,
+      modelPickerKey,
+      modelPickerOptions,
+      scheduleTaskPreview,
+      beginAiRun,
+      endAiRun,
+      appendStoppedMessage,
+    ],
   )
 
   const pendingPreviewTaskType = useMemo((): AiTaskType | null => {
@@ -1512,6 +1588,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerOptions,
       agentProfile,
       aiSending,
+      stopAiGeneration,
       pendingComposerAttachments,
       addComposerMediaFiles,
       removeComposerAttachment,
@@ -1545,6 +1622,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerOptions,
       agentProfile,
       aiSending,
+      stopAiGeneration,
       pendingPreviewLoading,
       taskConfirming,
       pendingComposerAttachments,

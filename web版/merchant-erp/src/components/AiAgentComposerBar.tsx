@@ -1,4 +1,4 @@
-import { ChevronDown, Film, ImagePlus, Loader2, Mic, Send } from 'lucide-react'
+import { ChevronDown, Film, ImagePlus, Loader2, Mic, Send, Square } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { MAX_AI_CHAT_IMAGE_ATTACHMENTS } from '../services/ai/types'
@@ -108,6 +108,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     setModelPickerKey,
     modelPickerOptions,
     aiSending,
+    stopAiGeneration,
     pendingPreviewId,
     pendingComposerAttachments,
     addComposerMediaFiles,
@@ -407,21 +408,33 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
             {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
           </button>
 
-          <button
-            type="button"
-            onClick={() => sendUserText(inputDraft)}
-            disabled={
-              (!inputDraft.trim() &&
-                pendingComposerAttachments.length === 0 &&
-                !pendingQuote) ||
-              aiSending ||
-              disabled
-            }
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="发送"
-          >
-            {aiSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </button>
+          {aiSending ? (
+            <button
+              type="button"
+              onClick={stopAiGeneration}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 shadow-sm transition hover:bg-rose-100"
+              aria-label="停止生成"
+              title="停止生成"
+            >
+              <Square className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => sendUserText(inputDraft)}
+              disabled={
+                (!inputDraft.trim() &&
+                  pendingComposerAttachments.length === 0 &&
+                  !pendingQuote) ||
+                disabled
+              }
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="发送"
+              title="发送"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>
