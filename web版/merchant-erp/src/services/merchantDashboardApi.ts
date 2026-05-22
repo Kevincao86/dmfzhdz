@@ -17,6 +17,7 @@
  */
 
 import { readMerchantSession } from '../lib/merchantSession'
+import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 import { storeTabApiSegment, storeTabToken, type StorePlatformTab } from './merchantStoresApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -89,22 +90,36 @@ async function fetchPlatformDashboard(
   range: DashboardRange,
 ): Promise<PlatformDashboardMetrics> {
   const segment = storeTabApiSegment(tab)
-  const q = new URLSearchParams({ range })
+  if (!segment) return emptyMetrics()
+  const q = new URLSearchParams({ range, platform: segment })
+  const paths = [
+    `/api/meoo-merchant-dashboard-summary?${q}`,
+    `/api/merchant/${segment}/dashboard/summary?${new URLSearchParams({ range })}`,
+  ]
   try {
-    const res = await fetch(url(`/api/merchant/${segment}/dashboard/summary?${q}`), {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-    })
+    let res: Response | null = null
     let data: Record<string, unknown> = {}
-    try {
-      data = (await res.json()) as Record<string, unknown>
-    } catch {
-      return emptyMetrics()
+    for (const target of merchantApiFetchUrlCandidates(paths)) {
+      const r = await fetch(target, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      })
+      const text = await r.text()
+      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+        continue
+      }
+      res = r
+      try {
+        data = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        return emptyMetrics()
+      }
+      break
     }
-    if (!res.ok) return emptyMetrics()
+    if (!res || !res.ok) return emptyMetrics()
 
     const inner = data.data && typeof data.data === 'object' ? (data.data as Record<string, unknown>) : data
 
@@ -239,12 +254,27 @@ async function fetchHomeExtraStatsOnce(): Promise<
   const zero = { fansGrowth: 0, todayNewLeads: 0, pendingComments: 0 }
   const tok = readMerchantSession('meoo_douyin_merchant_token')
   if (!tok) return zero
+  const paths = ['/api/meoo-merchant-home-extra-stats', '/api/merchant/home/extra-stats']
   try {
-    const res = await fetch(url('/api/merchant/home/extra-stats'), {
-      headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' },
-    })
-    if (!res.ok) return zero
-    const data = (await res.json()) as Record<string, unknown>
+    let res: Response | null = null
+    let data: Record<string, unknown> = {}
+    for (const target of merchantApiFetchUrlCandidates(paths)) {
+      const r = await fetch(target, {
+        headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' },
+      })
+      const text = await r.text()
+      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+        continue
+      }
+      res = r
+      try {
+        data = JSON.parse(text) as Record<string, unknown>
+      } catch {
+        return zero
+      }
+      break
+    }
+    if (!res || !res.ok) return zero
     const inner = data.data && typeof data.data === 'object' ? (data.data as Record<string, unknown>) : data
     return {
       fansGrowth: num(inner.fansGrowth ?? inner.fans_growth),

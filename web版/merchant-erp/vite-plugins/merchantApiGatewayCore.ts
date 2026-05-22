@@ -70,6 +70,10 @@ import {
   tryHandleWaimaiMerchantRoute,
   type WaimaiPlatformKey,
 } from './waimaiMerchantGateway.js'
+import {
+  handleMerchantDashboardSummaryGet,
+  handleMerchantHomeExtraStatsGet,
+} from './merchantDashboardGateway.js'
 
 type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs' | WaimaiPlatformKey
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
@@ -523,6 +527,22 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         return true
       }
 
+      const dashMatch = /^\/api\/merchant\/(douyin|meituan|xhs)\/dashboard\/summary$/.exec(pathname)
+      if (method === 'GET' && dashMatch) {
+        await handleMerchantDashboardSummaryGet(
+          req,
+          res,
+          url,
+          dashMatch[1] as 'douyin' | 'meituan' | 'xhs',
+        )
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/home/extra-stats') {
+        await handleMerchantHomeExtraStatsGet(req, res)
+        return true
+      }
+
       /**
        * 门店毛利建议：本地优先调用豆包 / 通义千问生成三平台参考毛利率；无 Key 时用中性预设文案（不含「演示」类措辞）。
        */
@@ -714,6 +734,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
               'Query platform 须为 douyin | meituan | xhs | eleme | meituan_waimai | jd_waimai',
           })
           return true
+        }
+        if (reviewsState[platform].length === 0) {
+          const bearer = reviewPlatformBearer(req, platform)
+          if (bearer?.trim()) {
+            await syncOneReviewPlatform(platform, bearer)
+          }
         }
         let rows = [...reviewsState[platform]]
         if (sentiment === 'good') rows = rows.filter((r) => r.sentiment === 'good')

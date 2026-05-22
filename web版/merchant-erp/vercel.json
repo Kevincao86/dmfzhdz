@@ -46,6 +46,30 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-merchant-dashboard-summary.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-merchant-home-extra-stats.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-merchant-reviews.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-merchant-reviews-sync.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-merchant-reviews-reply.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-merchant-reviews-ai-suggest.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/meoo-tenant-subaccount-mutate.ts": {
       "includeFiles": "vite-plugins/merchantSupabaseAdminEnv.ts",
       "maxDuration": 30

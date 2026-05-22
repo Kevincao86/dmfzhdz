@@ -1,5 +1,8 @@
 import { readMerchantSession } from '../lib/merchantSession'
+import { hydrateDouyinBindingsFromCloud } from '../lib/merchantDouyinCloudBinding'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { getDouyinStores } from './douyinMerchantApi'
+import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
@@ -77,6 +80,14 @@ async function checkBearerGateway(path: string, token: string): Promise<boolean>
 }
 
 async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow[]> {
+  if (supabaseConfigured && supabase) {
+    try {
+      await hydrateDouyinBindingsFromCloud(supabase)
+    } catch {
+      /* 云端绑定恢复失败时仍用本地 session 探测 */
+    }
+  }
+
   const lastChecked = formatNow()
 
   const jd: PlatformConnectivityRow = {
