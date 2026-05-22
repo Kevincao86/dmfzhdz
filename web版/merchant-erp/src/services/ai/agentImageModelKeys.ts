@@ -1,4 +1,6 @@
 import type { AIModelFamily } from './types'
+import { detectImageGenerationIntent } from './aiImageIntentRouting.js'
+import { parseAiModelPickerKey } from './modelRegistry.js'
 import { normalizeAiModelFamily } from './tokenmixClient.js'
 
 /**
@@ -74,4 +76,42 @@ export function fallbackChatPickerKeyFromImagePicker(key: string): string {
 
 export function effectiveChatPickerKey(modelPickerKey: string): string {
   return isAgentImagePickerKey(modelPickerKey) ? fallbackChatPickerKeyFromImagePicker(modelPickerKey) : modelPickerKey
+}
+
+/** 对话模型 → 同品牌文生图 picker（豆包文案 + 豆包 Seedream 等） */
+export function imagePickerKeyForChatSelection(
+  chatPickerKey: string,
+  options: readonly { key: string; capability?: string }[],
+): string {
+  if (isAgentImagePickerKey(chatPickerKey)) return chatPickerKey
+  const parsed = parseAiModelPickerKey(chatPickerKey)
+  if (!parsed) {
+    const auto = options.find((o) => o.key === 'img::v::auto')
+    return auto?.key ?? 'img::v::auto'
+  }
+  if (parsed.provider === 'doubao') {
+    const k = 'img::v::doubao'
+    return options.some((o) => o.key === k) ? k : 'img::v::auto'
+  }
+  if (parsed.provider === 'qwen') {
+    const k = 'img::v::qwen'
+    return options.some((o) => o.key === k) ? k : 'img::v::auto'
+  }
+  if (parsed.provider === 'minimax') {
+    const k = 'img::v::minimax'
+    return options.some((o) => o.key === k) ? k : 'img::v::auto'
+  }
+  return options.find((o) => o.key === 'img::v::auto')?.key ?? 'img::v::auto'
+}
+
+/** 生图意图或附图时：若当前为对话模型，自动解析为文生图 picker */
+export function resolveImagePickerKeyForUserLine(
+  chatPickerKey: string,
+  options: readonly { key: string; capability?: string }[],
+  userLine: string,
+  hasComposerImages: boolean,
+): string {
+  if (isAgentImagePickerKey(chatPickerKey)) return chatPickerKey
+  if (!hasComposerImages && !detectImageGenerationIntent(userLine)) return chatPickerKey
+  return imagePickerKeyForChatSelection(chatPickerKey, options)
 }

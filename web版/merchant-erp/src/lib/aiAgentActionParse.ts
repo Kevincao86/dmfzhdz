@@ -7,6 +7,7 @@ const ACTION_TO_TASK: Record<string, AiTaskType> = {
   sync_platform: 'sync_platform',
   analyze_exception: 'analyze_exception',
   generate_copywriting: 'generate_copywriting',
+  file_tax: 'file_tax',
 }
 
 /** 从用户话术推断任务类型（与 scheduleTaskPreview 共用） */
@@ -19,6 +20,7 @@ export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   if (/差评|评价|评论/.test(x)) return 'handle_review'
   if (/分析|原因|异常/.test(x)) return 'analyze_exception'
   if (/同步|失败/.test(x)) return 'sync_platform'
+  if (/报税|税务|申报|增值税|一键报税|纳税/.test(x)) return 'file_tax'
   return undefined
 }
 
@@ -66,6 +68,8 @@ export function summarizeAssistantContent(content: string): string | null {
       return title || '已理解您的上架需求，请在下方核对抖音 C 端手机预览并确认。'
     case 'recruit_influencer':
       return title || '已理解您的达人招募需求，请在下方查看图文 Brief 并确认。'
+    case 'file_tax':
+      return title || '已理解您的报税需求，请在下方核对各平台汇总后确认一键报税。'
     default:
       return title || '请在下方确认执行预览后继续。'
   }

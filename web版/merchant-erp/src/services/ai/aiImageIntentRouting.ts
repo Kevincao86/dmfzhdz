@@ -1,3 +1,4 @@
+import { resolveImagePickerKeyForUserLine } from './agentImageModelKeys.js'
 import type { AiModelPickerOption } from './modelRegistry'
 
 /** 文案/话术类「生成」不应走像素出图 */
@@ -19,14 +20,14 @@ export function detectImageGenerationIntent(text: string): boolean {
   return false
 }
 
-/** 尊重用户下拉选择，不再在发送前自动改模型 */
+/** 发送前：对话模型 + 生图意图 → 自动切换为文生图 picker */
 export function resolveModelPickerKeyForImageIntent(
   currentKey: string,
-  _options: readonly AiModelPickerOption[],
-  _userLine: string,
-  _hasComposerImages: boolean,
+  options: readonly AiModelPickerOption[],
+  userLine: string,
+  hasComposerImages: boolean,
 ): string {
-  return currentKey
+  return resolveImagePickerKeyForUserLine(currentKey, options, userLine, hasComposerImages)
 }
 
 /** 服务端文生图成功后，将下拉同步为对应直连厂商「默认」项（若存在）。 */

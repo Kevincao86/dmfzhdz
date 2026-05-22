@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AiAgentComposerBar } from '../components/AiAgentComposerBar'
 import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
 import { useAiAgent } from '../context/AiAgentContext'
-import { AI_AGENT_SHORTCUTS } from '../lib/aiAgentTypes'
+import { aiTaskConfirmLabel } from '../lib/aiAgentPlan'
 import { cn } from '../cn'
 
 const INFO_COPY = {
@@ -31,18 +31,14 @@ export default function AiAgentPage() {
     startNewChat,
     resumeArchivedSession,
     sidebarActiveArchiveId,
+    agentProfile,
   } = useAiAgent()
 
   const hasChat = useMemo(() => messages.some((m) => m.role === 'user'), [messages])
   const scrollRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
-  const confirmLabel =
-    pendingPreviewTaskType === 'create_product'
-      ? '确认并提交审核'
-      : pendingPreviewTaskType === 'recruit_influencer'
-        ? '确认并打开招募'
-        : '确认执行'
+  const confirmLabel = aiTaskConfirmLabel(pendingPreviewTaskType)
   const confirmDisabled = pendingPreviewLoading || aiSending
 
   useEffect(() => {
@@ -66,7 +62,10 @@ export default function AiAgentPage() {
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">我们该做什么？</h1>
             <p className="mt-2 text-sm text-slate-500">
-              先在输入框右侧选好模型，再描述任务或提问；涉及创建、修改、发布等操作会先展示预览，需您确认后再继续。
+              <span className="mr-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
+                {agentProfile.planLabel}
+              </span>
+              {agentProfile.composerHint}
             </p>
             <button
               type="button"
@@ -74,7 +73,7 @@ export default function AiAgentPage() {
                 openDrawer({
                   pageLabel: 'AI 智能体',
                   pagePath: '/ai-agent',
-                  suggestedTasks: AI_AGENT_SHORTCUTS.map((s) => s.label),
+                  suggestedTasks: agentProfile.shortcuts.map((s) => s.label),
                 })
               }
               className="mt-3 text-xs font-medium text-indigo-600 underline-offset-2 hover:underline"
@@ -92,11 +91,11 @@ export default function AiAgentPage() {
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white py-2.5 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50"
             >
               {shortcutsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              快捷任务（{AI_AGENT_SHORTCUTS.length}）
+              快捷任务（{agentProfile.shortcuts.length}）
             </button>
             {shortcutsOpen ? (
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {AI_AGENT_SHORTCUTS.map((s) => (
+                {agentProfile.shortcuts.map((s) => (
                   <button
                     key={s.type}
                     type="button"

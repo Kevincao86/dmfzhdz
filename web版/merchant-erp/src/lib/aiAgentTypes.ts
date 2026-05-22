@@ -11,6 +11,7 @@ export type AiPermissionId =
   | 'sync'
   | 'local_ads'
   | 'local_leads'
+  | 'finance_tax'
 
 export const AI_PERMISSION_LABELS: Record<AiPermissionId, string> = {
   product: '商品管理权限',
@@ -20,6 +21,7 @@ export const AI_PERMISSION_LABELS: Record<AiPermissionId, string> = {
   sync: '平台同步权限',
   local_ads: '本地推投流数据',
   local_leads: '本地推线索跟进',
+  finance_tax: '报税管理权限',
 }
 
 /** 可编排的任务类型 */
@@ -32,6 +34,7 @@ export type AiTaskType =
   | 'generate_copywriting'
   | 'optimize_local_ads'
   | 'follow_local_lead'
+  | 'file_tax'
 
 export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   create_product: '创建商品',
@@ -42,11 +45,13 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   generate_copywriting: '生成推广文案',
   optimize_local_ads: '优化本地推投放',
   follow_local_lead: '跟进本地推线索',
+  file_tax: '一键报税',
 }
 
 /** 新对话 / 重置时的首条助手问候（与上下文初始态一致） */
+/** 默认问候；运行时由 {@link buildAiAgentPlanProfile} 按会员档位覆盖 */
 export const AI_AGENT_WELCOME_CONTENT =
-  '你好，我是墨典 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；我会按所选模型与风格回答。涉及改商品、发消息等操作会先展示预览，确认后再继续。'
+  '你好，我是墨典 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；涉及改商品、发招募单、报税、发布等操作会先展示预览，确认后再继续。'
 
 /** 智能体首页与抽屉共用的快捷任务 */
 export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
@@ -58,6 +63,7 @@ export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
   { type: 'sync_platform', label: '同步平台' },
   { type: 'analyze_exception', label: '分析异常' },
   { type: 'generate_copywriting', label: '生成推广文案' },
+  { type: 'file_tax', label: '一键报税' },
 ]
 
 /** 对话与任务流消息角色 */
@@ -98,6 +104,26 @@ export type AiTaskPreviewPayload = {
   productPlan?: AiProductPlanPreview
   /** 达人招募：图文 Brief */
   recruitmentBrief?: AiRecruitmentBriefPreview
+  /** 报税：汇总各已绑定平台后一键申报（需确认） */
+  taxFiling?: AiTaxFilingPreview
+}
+
+/** 智能体报税预览（确认后导出申报包并标记状态） */
+export type AiTaxFilingPreview = {
+  periodLabel: string
+  startDate: string
+  endDate: string
+  platforms: {
+    platformId: string
+    platformLabel: string
+    bindingLabel: string
+    verifyAmountYuan: number
+    orderCount: number
+    status: 'ready' | 'missing_binding'
+  }[]
+  totalVerifyYuan: number
+  enrichStatus?: 'loading' | 'ready' | 'error'
+  enrichError?: string
 }
 
 /** 输入框待发送附件：图片或本地视频（视频另带首帧 poster 供模型理解） */
