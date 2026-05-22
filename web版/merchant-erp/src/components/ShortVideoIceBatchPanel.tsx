@@ -29,6 +29,11 @@ import {
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
 import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
+import {
+  readIceDispatchTrack,
+  writeIceDispatchTrack,
+} from '../lib/iceDispatchSlotProgress'
+import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageIfNeeded } from '../lib/iceImageUploadCompress'
@@ -128,6 +133,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [batchGenerateCount, setBatchGenerateCount] = useState<IceBatchGenerateCount>(10)
   const [dispatchTalent, setDispatchTalent] = useState(false)
   const [dispatchBusy, setDispatchBusy] = useState(false)
+  const [dispatchedOrderId, setDispatchedOrderId] = useState<string | null>(null)
 
   const aspect = useMemo(
     () => ICE_ASPECT_PRESETS.find((a) => a.id === aspectId) ?? ICE_ASPECT_PRESETS[0],
@@ -164,6 +170,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setCfg(c)
       if (c?.presets?.[0]) setPreset(c.presets[0])
     })
+  }, [])
+
+  useEffect(() => {
+    const track = readIceDispatchTrack()
+    if (track?.merchantOrderId) setDispatchedOrderId(track.merchantOrderId)
   }, [])
 
   useEffect(() => {
@@ -1483,8 +1494,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                           editBrief,
                           supabase: supabaseConfigured ? supabase : null,
                         })
+                        writeIceDispatchTrack(orderId)
+                        setDispatchedOrderId(orderId)
                         setHint(
-                          `已派发达人投放，订单 ${orderId} 已写入运营台，请在「商家达人招募订单」处理并选择云剪单。`,
+                          `已派发达人投放，订单 ${orderId} 已写入运营台；下方可查看每条成片的达人接单与完成进度。`,
                         )
                         setDispatchTalent(false)
                       } catch (e) {
@@ -1507,6 +1520,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </button>
               ) : null}
             </div>
+          ) : null}
+
+          {dispatchedOrderId ? (
+            <IceDispatchProgressPanel merchantOrderId={dispatchedOrderId} />
           ) : null}
 
           <ConfigFootnote cfg={cfg} />
