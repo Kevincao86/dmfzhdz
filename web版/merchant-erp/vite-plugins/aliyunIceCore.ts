@@ -5,6 +5,7 @@
 import IceModule, {
   GetMediaInfoRequest,
   GetMediaProducingJobRequest,
+  RegisterMediaInfoRequest,
   SubmitMediaProducingJobRequest,
   UploadMediaByURLRequest,
 } from '@alicloud/ice20201109'
@@ -13,6 +14,7 @@ import { $OpenApiUtil } from '@alicloud/openapi-core'
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
     uploadMediaByURL(req: UploadMediaByURLRequest): Promise<{ body?: Record<string, unknown> }>
+    registerMediaInfo(req: RegisterMediaInfoRequest): Promise<{ body?: Record<string, unknown> }>
     getMediaInfo(req: GetMediaInfoRequest): Promise<{ body?: Record<string, unknown> }>
     submitMediaProducingJob(req: SubmitMediaProducingJobRequest): Promise<{ body?: Record<string, unknown> }>
     getMediaProducingJob(req: GetMediaProducingJobRequest): Promise<{ body?: Record<string, unknown> }>
@@ -130,15 +132,20 @@ function buildTimelineFromImages(
   mediaIds: string[],
   secPerImage: number,
   effectId: string,
+  width: number,
+  height: number,
 ): object {
   let cursor = 0
   const clips: Record<string, unknown>[] = []
   for (let i = 0; i < mediaIds.length; i++) {
     const dur = Math.max(0.5, secPerImage)
     const clip: Record<string, unknown> = {
+      Type: 'Image',
       MediaId: mediaIds[i],
       TimelineIn: cursor,
       TimelineOut: cursor + dur,
+      Width: width,
+      Height: height,
     }
     const effects: Record<string, unknown>[] = []
     if (effectId === 'fade') {
@@ -287,6 +294,36 @@ function buildOutputConfig(
   }
 }
 
+/** 图片须走 RegisterMediaInfo；UploadMediaByURL 仅支持音视频 */
+async function registerImageUrlToMediaId(
+  client: InstanceType<typeof IceClient>,
+  imageUrl: string,
+  title: string,
+): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
+  try {
+    const res = await client.registerMediaInfo(
+      new RegisterMediaInfoRequest({
+        inputURL: imageUrl,
+        mediaType: 'image',
+        title: title.slice(0, 120),
+        overwrite: true,
+        registerConfig: JSON.stringify({ NeedSprite: 'false', NeedSnapshot: 'false' }),
+      }),
+    )
+    const body = bodyOf(res)
+    const mediaId = typeof body?.mediaId === 'string' ? body.mediaId.trim() : ''
+    if (!mediaId) {
+      return {
+        ok: false,
+        message: '图片媒资注册未返回 MediaId，请确认 OSS 地址可被 ICE 访问（与运营台配置的 Bucket 一致）',
+      }
+    }
+    return { ok: true, mediaId }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 async function uploadUrlToMediaId(
   client: InstanceType<typeof IceClient>,
   cfg: AliyunIceConfig,
@@ -379,7 +416,7 @@ export async function iceRunImagesPipeline(
 
   for (let i = 0; i < urls.length; i++) {
     const title = `${input.projectName}-图${i + 1}`.slice(0, 120)
-    const up = await uploadUrlToMediaId(client, cfg, urls[i]!, title)
+    const up = await registerImageUrlToMediaId(client, urls[i]!, title)
     if (!up.ok) {
       return { ok: false, message: `第 ${i + 1} 张图片上传失败：${up.message}`, step: 'upload_media' }
     }
@@ -395,7 +432,13 @@ export async function iceRunImagesPipeline(
     return { ok: false, message: out.message, step: 'output_config' }
   }
 
-  const timeline = buildTimelineFromImages(mediaIds, input.secPerImage, input.effectId)
+  const timeline = buildTimelineFromImages(
+    mediaIds,
+    input.secPerImage,
+    input.effectId,
+    input.width,
+    input.height,
+  )
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({

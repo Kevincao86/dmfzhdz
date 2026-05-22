@@ -268,43 +268,77 @@ function defaultContentType(file: File): string {
   return 'video/mp4'
 }
 
-/** 本地上传：经商户 BFF 写入 OSS（视频或图片） */
+export type IceUploadProgress = { loaded: number; total: number; percent: number }
+
+function putFileToPresignedUrl(
+  uploadUrl: string,
+  file: File,
+  contentType: string,
+  onProgress?: (p: IceUploadProgress) => void,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', uploadUrl)
+    xhr.setRequestHeader('Content-Type', contentType)
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable || !onProgress) return
+      onProgress({
+        loaded: e.loaded,
+        total: e.total,
+        percent: Math.min(100, Math.round((e.loaded / e.total) * 100)),
+      })
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve({ ok: true })
+      else resolve({ ok: false, message: `OSS 上传失败 HTTP ${xhr.status}` })
+    }
+    xhr.onerror = () =>
+      resolve({
+        ok: false,
+        message:
+          '浏览器无法直传 OSS（多为 Bucket 未配置 CORS）。将自动改走服务端上传，体积较大时会更慢。',
+      })
+    xhr.send(file)
+  })
+}
+
+/** 浏览器直传 OSS（预签名 PUT），通常比经 Vercel Base64 中转快 */
+async function uploadIceDirectOss(
+  file: File,
+  onProgress?: (p: IceUploadProgress) => void,
+): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  const contentType = defaultContentType(file)
+  const label = file.name.replace(/\.[^.]+$/, '') || file.name
+  const init = await postIceUploadInit({
+    fileName: file.name,
+    contentType,
+    sizeBytes: file.size,
+  })
+  if (!init.ok) return init
+
+  const put = await putFileToPresignedUrl(init.uploadUrl, file, init.contentType, onProgress)
+  if (!put.ok) return put
+  return { ok: true, mediaUrl: init.mediaUrl, label }
+}
+
+/**
+ * 本地上传至 OSS。
+ * 优先浏览器直传（快）；失败时回退经 BFF Base64 中转（Vercel 单请求约 ≤2MB，大图会分片多次往返，较慢）。
+ */
 export async function uploadIceLocalMediaFile(
   file: File,
+  opts?: { onProgress?: (p: IceUploadProgress) => void },
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  const direct = await uploadIceDirectOss(file, opts?.onProgress)
+  if (direct.ok) return direct
+
   const viaServer = await uploadIceViaServer(file)
   if (viaServer.ok) return viaServer
 
-  const init = await postIceUploadInit({
-    fileName: file.name,
-    contentType: defaultContentType(file),
-    sizeBytes: file.size,
-  })
-  if (!init.ok) {
-    return {
-      ok: false,
-      message: `${viaServer.message}；${init.message}`,
-    }
+  return {
+    ok: false,
+    message: `${direct.message}；${viaServer.message}`,
   }
-
-  let putRes: Response
-  try {
-    putRes = await fetch(init.uploadUrl, {
-      method: 'PUT',
-      body: file,
-      headers: { 'Content-Type': init.contentType },
-    })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return {
-      ok: false,
-      message: `上传到 OSS 失败：${msg}。若持续出现 Failed to fetch，请在阿里云 OSS 控制台为 Bucket 配置 CORS（允许本站域名 PUT），或刷新后重试（已优先走服务端上传）。`,
-    }
-  }
-  if (!putRes.ok) {
-    return { ok: false, message: `OSS 上传失败 HTTP ${putRes.status}` }
-  }
-  return { ok: true, mediaUrl: init.mediaUrl, label: file.name.replace(/\.[^.]+$/, '') || file.name }
 }
 
 /** @deprecated 使用 uploadIceLocalMediaFile */

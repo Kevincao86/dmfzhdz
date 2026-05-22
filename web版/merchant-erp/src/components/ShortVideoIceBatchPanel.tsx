@@ -31,6 +31,7 @@ import {
 import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
+import { compressIceImageIfNeeded } from '../lib/iceImageUploadCompress'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -102,6 +103,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [busy, setBusy] = useState(false)
   const [videoUploading, setVideoUploading] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
+  const [imageUploadProgress, setImageUploadProgress] = useState<{
+    index: number
+    total: number
+    percent: number
+    fileName: string
+  } | null>(null)
   const [materialTab, setMaterialTab] = useState<'video' | 'images'>('video')
   const [briefAiLoading, setBriefAiLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -257,13 +264,32 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setImageUploading(true)
       setMaterialTab('images')
       setErr(null)
+      const list = Array.from(files).filter(isImageFile)
+      if (list.length === 0) {
+        setErr('请选择 jpg/png/webp 等图片文件')
+        setImageUploading(false)
+        return
+      }
       let added = 0
-      for (const file of Array.from(files)) {
-        if (!isImageFile(file)) {
-          setErr(`「${file.name}」不是支持的图片格式（jpg/png/webp 等）`)
-          continue
-        }
-        const r = await uploadIceLocalMediaFile(file)
+      for (let i = 0; i < list.length; i++) {
+        const raw = list[i]!
+        setImageUploadProgress({
+          index: i + 1,
+          total: list.length,
+          percent: 0,
+          fileName: raw.name,
+        })
+        const file = await compressIceImageIfNeeded(raw)
+        const r = await uploadIceLocalMediaFile(file, {
+          onProgress: (p) => {
+            setImageUploadProgress({
+              index: i + 1,
+              total: list.length,
+              percent: p.percent,
+              fileName: raw.name,
+            })
+          },
+        })
         if (!r.ok) {
           setErr(r.message)
           continue
@@ -279,6 +305,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         ])
         added += 1
       }
+      setImageUploadProgress(null)
       setImageUploading(false)
       if (added > 0) {
         setHint(`已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。`)
@@ -892,7 +919,24 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {imageUploading ? (
                   <>
                     <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
-                    <span className="text-sm font-medium text-zinc-800">图片上传中…</span>
+                    <span className="text-sm font-medium text-zinc-800">
+                      {imageUploadProgress
+                        ? `上传中 ${imageUploadProgress.index}/${imageUploadProgress.total} · ${imageUploadProgress.percent}%`
+                        : '图片上传中…'}
+                    </span>
+                    {imageUploadProgress ? (
+                      <span className="max-w-full truncate text-center text-[11px] text-zinc-500">
+                        {imageUploadProgress.fileName}
+                      </span>
+                    ) : null}
+                    {imageUploadProgress ? (
+                      <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-violet-100">
+                        <div
+                          className="h-full rounded-full bg-violet-600 transition-all duration-200"
+                          style={{ width: `${imageUploadProgress.percent}%` }}
+                        />
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -920,15 +964,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm text-violet-900 hover:bg-violet-50 disabled:opacity-50"
                 >
                   加入图片列表
-                </button>
-                <button
-                  type="button"
-                  disabled={!canOneClickImages}
-                  onClick={() => void runOneClickImages()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-                >
-                  <Zap className="h-4 w-4" />
-                  一键成片
                 </button>
               </div>
 
@@ -964,7 +999,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </div>
               ) : (
                 <p className="text-xs text-violet-800/80">
-                  上传多张门店/商品图后，可 AI 生成剪辑文案，再点「一键成片」合成为 MP4。
+                  上传多张图片后，在下方「剪辑文案指令」中生成文案，再点「一键成片」。
                 </p>
               )}
                 </>
@@ -1067,6 +1102,33 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   </Field>
                 </div>
               </div>
+
+              {imageItems.length > 0 ? (
+                <div className="space-y-3 border-t border-violet-100 pt-4">
+                  <p className="text-xs text-violet-900">
+                    已选 <strong>{imageItems.length}</strong> 张图片，文案就绪后可合成一条竖屏 MP4。
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!canOneClickImages}
+                    onClick={() => void runOneClickImages()}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-violet-300 disabled:opacity-70 sm:w-auto"
+                  >
+                    {busy ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Zap className="h-5 w-5" />
+                    )}
+                    一键成片（{imageItems.length} 张图）
+                  </button>
+                  {!briefOk ? (
+                    <p className="flex items-start gap-1.5 text-xs text-amber-800">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      请先填写上方剪辑文案（至少 4 字），或点击右上角「AI 生成文案」。
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </section>
 
