@@ -6,12 +6,20 @@ import { tenantLocalKey } from './tenantLocalState'
 const BASE_KEY = 'meoo_competitor_reports_v1'
 const SELECTED_POI_KEY = 'meoo_competitor_selected_poi_v1'
 
+export type CompetitorHotProduct = {
+  name: string
+  priceYuan?: number
+  channel?: '团购' | '外卖' | '到店'
+  note?: string
+}
+
 export type CompetitorEntry = {
   name: string
   distanceHint?: string
   category?: string
   priceRange?: string
   highlights?: string
+  hotProducts?: CompetitorHotProduct[]
 }
 
 export type CompetitorReport = {
@@ -94,10 +102,21 @@ export function competitorReportSummary(r: CompetitorReport | null, maxCompetito
     `门店：${r.storeName}（${r.address}）`,
     r.industryHint ? `行业：${r.industryHint}` : '',
     `摘要：${r.summary}`,
-    ...r.competitors.slice(0, maxCompetitors).map(
-      (c, i) =>
-        `${i + 1}. ${c.name}${c.distanceHint ? ` · ${c.distanceHint}` : ''}${c.priceRange ? ` · ${c.priceRange}` : ''}${c.highlights ? ` — ${c.highlights}` : ''}`,
-    ),
+    ...r.competitors.slice(0, maxCompetitors).map((c, i) => {
+      const base = `${i + 1}. ${c.name}${c.distanceHint ? ` · ${c.distanceHint}` : ''}${c.priceRange ? ` · ${c.priceRange}` : ''}${c.highlights ? ` — ${c.highlights}` : ''}`
+      const hot =
+        c.hotProducts?.length
+          ? `\n   热销：${c.hotProducts
+              .slice(0, 5)
+              .map((p) => {
+                const price = p.priceYuan != null ? `¥${p.priceYuan}` : ''
+                const ch = p.channel ? `[${p.channel}]` : ''
+                return `${p.name}${price ? price : ''}${ch}${p.note ? `(${p.note})` : ''}`
+              })
+              .join('；')}`
+          : ''
+      return base + hot
+    }),
     ...(r.suggestions.length ? [`建议：${r.suggestions.join('；')}`] : []),
   ]
   return lines.filter(Boolean).join('\n')

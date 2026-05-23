@@ -14,8 +14,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   res.setHeader('Access-Control-Allow-Origin', '*')
 
   const platform = String(req.query.platform ?? 'douyin').trim()
-  if (platform !== 'douyin' && platform !== 'meituan' && platform !== 'xhs') {
-    res.status(400).json({ ok: false, message: 'platform 须为 douyin | meituan | xhs' })
+  const allowed = ['douyin', 'meituan', 'xhs', 'eleme', 'meituan_waimai', 'jd_waimai'] as const
+  if (!allowed.includes(platform as (typeof allowed)[number])) {
+    res.status(400).json({ ok: false, message: 'platform 须为 douyin | meituan | xhs | eleme | meituan_waimai | jd_waimai' })
     return
   }
 

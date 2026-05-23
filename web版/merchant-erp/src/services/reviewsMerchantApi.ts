@@ -27,6 +27,11 @@ export type ReviewListItem = {
   createdAt: string
   replied: boolean
   replyText?: string
+  reviewKind?: 'store' | 'product'
+  poiId?: string
+  poiName?: string
+  productId?: string
+  productName?: string
 }
 
 export function reviewsTabToApiPlatform(tab: StorePlatformTab): ReviewsApiPlatform | null {
@@ -77,15 +82,21 @@ export type ReviewListStats = {
   unreplied: number
 }
 
+export type ReviewKind = 'store' | 'product'
+
 export async function fetchReviewsList(
   platform: ReviewsApiPlatform,
   sentiment: ReviewSentimentFilter,
   replyStatus: ReviewReplyStatusFilter = 'all',
+  opts?: { kind?: ReviewKind; poiId?: string; productId?: string },
 ): Promise<
   | { ok: true; items: ReviewListItem[]; stats?: ReviewListStats; syncedAt?: string }
   | { ok: false; message: string }
 > {
   const q = new URLSearchParams({ platform, sentiment, replyStatus })
+  if (opts?.kind) q.set('kind', opts.kind)
+  if (opts?.poiId?.trim()) q.set('poiId', opts.poiId.trim())
+  if (opts?.productId?.trim()) q.set('productId', opts.productId.trim())
   const paths = [`/api/meoo-merchant-reviews?${q}`, `/api/merchant/reviews?${q}`]
   try {
     let res: Response | null = null
@@ -139,8 +150,14 @@ export async function fetchReviewsList(
 
 export async function postReviewsSync(
   platform: ReviewsApiPlatform | 'all',
+  opts?: { kind?: ReviewKind; poiId?: string; productId?: string },
 ): Promise<{ ok: true; syncedAt?: string; message?: string } | { ok: false; message: string }> {
-  const body = JSON.stringify({ platform })
+  const body = JSON.stringify({
+    platform,
+    kind: opts?.kind,
+    poiId: opts?.poiId,
+    productId: opts?.productId,
+  })
   const paths = ['/api/meoo-merchant-reviews-sync', '/api/merchant/reviews/sync']
   try {
     let res: Response | null = null

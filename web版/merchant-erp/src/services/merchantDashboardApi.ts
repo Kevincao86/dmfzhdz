@@ -189,9 +189,16 @@ export async function fetchHomeDashboardByPlatforms(
     jd_waimai: Array(days).fill(0),
   }
 
-  const three = ['douyin', 'meituan', 'xiaohongshu'] as const
+  const dashboardTabs: Exclude<StorePlatformTab, 'jd'>[] = [
+    'douyin',
+    'meituan',
+    'xiaohongshu',
+    'eleme',
+    'meituan_waimai',
+    'jd_waimai',
+  ]
   const loaded = await Promise.all(
-    three.map(async (id) => {
+    dashboardTabs.map(async (id) => {
       const connected = tabsConnected.includes(id)
       const tok = storeTabToken(id)
       if (!connected || !tok) {
@@ -205,10 +212,18 @@ export async function fetchHomeDashboardByPlatforms(
   const platforms: HomeDashboardPlatformState[] = []
   for (const id of allTabs) {
     if (id === 'jd') {
+      platforms.push({
+        id,
+        connected: tabsConnected.includes('jd'),
+        metrics: emptyMetrics(),
+      })
+      continue
+    }
+    const hit = loaded.find((x) => x.id === id)
+    if (!hit) {
       platforms.push({ id, connected: false, metrics: emptyMetrics() })
       continue
     }
-    const hit = loaded.find((x) => x.id === id)!
     platforms.push({ id: hit.id, connected: hit.connected, metrics: hit.metrics })
     const series = trendDates.map((d, idx) => {
       const t = hit.metrics.trend.find((x) => x.date === d)

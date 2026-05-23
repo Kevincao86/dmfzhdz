@@ -186,6 +186,25 @@ export default function CompetitorAnalysisPage() {
                   {c.highlights ? (
                     <p className="mt-1 text-xs text-gray-600">{c.highlights}</p>
                   ) : null}
+                  {c.hotProducts && c.hotProducts.length > 0 ? (
+                    <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/60 px-2 py-1.5">
+                      <p className="text-[11px] font-medium text-amber-900">热销团购/外卖（推断，供 AI 组品参考）</p>
+                      <ul className="mt-1 space-y-0.5 text-xs text-amber-950">
+                        {c.hotProducts.slice(0, 6).map((p, j) => (
+                          <li key={j}>
+                            {p.name}
+                            {p.priceYuan != null ? (
+                              <span className="font-medium"> · ¥{p.priceYuan}</span>
+                            ) : null}
+                            {p.channel ? (
+                              <span className="text-amber-800/80"> · {p.channel}</span>
+                            ) : null}
+                            {p.note ? <span className="text-amber-800/70"> — {p.note}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>
