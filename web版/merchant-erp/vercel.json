@@ -158,77 +158,13 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
-    "api/meoo-kuaishou-bind.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-category-get.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-product-types.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-template-get.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-product-online-query.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-product-draft-query.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-products.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-product-get.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
     "api/meoo-kuaishou-goods-product-save.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 120
     },
-    "api/meoo-kuaishou-goods-product-sync.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-product-operate.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-goods-image-upload.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
     "api/meoo-kuaishou-goods-ai-assist.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 300
-    },
-    "api/meoo-kuaishou-brands.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-stores.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-store-detail.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-poi-claim.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-kuaishou-store-decoration.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
     },
     "api/meoo-ai-chat.ts": {
       "includeFiles": "{vite-plugins,src}/**",
