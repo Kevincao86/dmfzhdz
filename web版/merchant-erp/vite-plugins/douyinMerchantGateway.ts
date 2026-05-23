@@ -6544,6 +6544,9 @@ function formatDouyinAkteIdList(ids: string[]): string {
   return `[${body.join(',')}]`
 }
 
+/** 抖音评价查询首页游标（官方示例 cursor=%22%22，不可省略） */
+const DOUYIN_AKTE_COMMENT_FIRST_CURSOR = '""'
+
 async function fetchAkteCommentsForTarget(
   accessToken: string,
   accountId: string,
@@ -6569,14 +6572,14 @@ async function fetchAkteCommentsForTarget(
   const nowSec = Math.floor(Date.now() / 1000)
   const startSec = nowSec - 90 * 86400
   const out: MerchantReviewRowDouyin[] = []
-  let cursor = ''
+  let cursor = DOUYIN_AKTE_COMMENT_FIRST_CURSOR
   for (let page = 0; page < 80; page += 1) {
     const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('start_time', String(startSec))
     u.searchParams.set('end_time', String(nowSec))
     u.searchParams.set('count', '100')
-    if (cursor) u.searchParams.set('cursor', cursor)
+    u.searchParams.set('cursor', cursor)
     if (usePoi.length > 0) {
       u.searchParams.set('poi_id_list', formatDouyinAkteIdList(usePoi))
     }
