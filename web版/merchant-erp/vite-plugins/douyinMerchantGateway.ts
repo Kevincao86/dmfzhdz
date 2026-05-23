@@ -6071,19 +6071,28 @@ function orderCreateUnixSec(order: Record<string, unknown>): number {
   return t > 1e12 ? Math.floor(t / 1000) : Math.floor(t)
 }
 
-/** 券维度有 item_update_time 时视为已发生验券/状态更新，计入核销侧（粗口径，以平台结算为准） */
-function orderHasVerifySignal(order: Record<string, unknown>): boolean {
+function unixSecFromApiTime(t: unknown): number {
+  const n = Number(t)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return n > 1e12 ? Math.floor(n / 1000) : Math.floor(n)
+}
+
+/** 团购券 401=已履约；即配无券结构时以订单已完成兜底 */
+function orderIsPaidForSales(order: Record<string, unknown>): boolean {
+  const st = Number(order.order_status)
+  return st === 200 || st === 201 || st === 1
+}
+
+function orderSalesCouponCount(order: Record<string, unknown>): number {
   const certs = order.certificate
-  if (!Array.isArray(certs) || certs.length === 0) return false
-  for (const c of certs) {
-    if (!c || typeof c !== 'object') continue
-    const cert = c as Record<string, unknown>
-    const st = Number(cert.item_status ?? cert.status)
-    if (st === 100 || st === 200 || st === 300 || st === 400) return true
-    const iut = Number(cert.item_update_time)
-    if (Number.isFinite(iut) && iut > 1_000_000_000) return true
-  }
-  return false
+  if (Array.isArray(certs) && certs.length > 0) return certs.length
+  const c = Number(order.count)
+  if (Number.isFinite(c) && c > 0) return Math.floor(c)
+  return 1
+}
+
+function certIsFulfilled(itemStatus: number): boolean {
+  return itemStatus === 401
 }
 
 function orderUniqueId(order: Record<string, unknown>): string {
@@ -6098,35 +6107,89 @@ type DouyinFinanceDayBucket = {
   verifyAmountYuan: number
 }
 
-function mergeOrderIntoFinanceBucket(
+function emptyDouyinFinanceDayBucket(): DouyinFinanceDayBucket {
+  return { orderCount: 0, verifyOrderCount: 0, salesAmountYuan: 0, verifyAmountYuan: 0 }
+}
+
+function certVerifyDedupeKey(order: Record<string, unknown>, cert: Record<string, unknown>): string {
+  const itemId = String(cert.order_item_id ?? cert.certificate_id ?? '').trim()
+  if (itemId) return itemId
+  return `${orderUniqueId(order)}:${String(cert.item_status ?? '')}`
+}
+
+function perCertificatePayYuan(order: Record<string, unknown>, certCount: number): number {
+  const total = orderPayAmountYuan(order)
+  if (certCount <= 1) return total
+  return Math.round((total / certCount) * 100) / 100
+}
+
+function mergeDouyinOrderSales(
   bucket: Map<string, DouyinFinanceDayBucket>,
   order: Record<string, unknown>,
   startYmd: string,
   endYmd: string,
-  seenOrderIds: Set<string>,
+  seenSalesOrderIds: Set<string>,
 ): void {
+  if (!orderIsPaidForSales(order)) return
   const oid = orderUniqueId(order)
-  if (seenOrderIds.has(oid)) return
-  seenOrderIds.add(oid)
+  if (seenSalesOrderIds.has(oid)) return
+  seenSalesOrderIds.add(oid)
   const cu = orderCreateUnixSec(order)
   if (cu <= 0) return
   const day = shanghaiDateStringFromUnixSec(cu)
   if (day < startYmd || day > endYmd) return
-  const cur = bucket.get(day) ?? {
-    orderCount: 0,
-    verifyOrderCount: 0,
-    salesAmountYuan: 0,
-    verifyAmountYuan: 0,
-  }
-  cur.orderCount += 1
-  const yuan = orderPayAmountYuan(order)
-  cur.salesAmountYuan += yuan
-  if (orderHasVerifySignal(order)) {
-    cur.verifyOrderCount += 1
-    cur.verifyAmountYuan += yuan
-  }
+  const cur = bucket.get(day) ?? emptyDouyinFinanceDayBucket()
+  cur.orderCount += orderSalesCouponCount(order)
+  cur.salesAmountYuan += orderPayAmountYuan(order)
   bucket.set(day, cur)
 }
+
+function mergeDouyinOrderVerify(
+  bucket: Map<string, DouyinFinanceDayBucket>,
+  order: Record<string, unknown>,
+  startYmd: string,
+  endYmd: string,
+  seenVerifyCerts: Set<string>,
+  isHermes: boolean,
+): void {
+  const certs = order.certificate
+  if (Array.isArray(certs) && certs.length > 0) {
+    const perCertYuan = perCertificatePayYuan(order, certs.length)
+    for (const c of certs) {
+      if (!c || typeof c !== 'object') continue
+      const cert = c as Record<string, unknown>
+      const st = Number(cert.item_status ?? cert.status)
+      if (!certIsFulfilled(st)) continue
+      const dedupeKey = certVerifyDedupeKey(order, cert)
+      if (seenVerifyCerts.has(dedupeKey)) continue
+      seenVerifyCerts.add(dedupeKey)
+      const verifySec = unixSecFromApiTime(cert.item_update_time)
+      if (verifySec <= 0) continue
+      const day = shanghaiDateStringFromUnixSec(verifySec)
+      if (day < startYmd || day > endYmd) continue
+      const cur = bucket.get(day) ?? emptyDouyinFinanceDayBucket()
+      cur.verifyOrderCount += 1
+      cur.verifyAmountYuan += perCertYuan
+      bucket.set(day, cur)
+    }
+    return
+  }
+  if (!isHermes || Number(order.order_status) !== 1) return
+  const oid = orderUniqueId(order)
+  const dedupeKey = `hermes:${oid}`
+  if (seenVerifyCerts.has(dedupeKey)) return
+  seenVerifyCerts.add(dedupeKey)
+  const verifySec = unixSecFromApiTime(order.update_order_time ?? order.pay_time ?? order.create_order_time)
+  if (verifySec <= 0) return
+  const day = shanghaiDateStringFromUnixSec(verifySec)
+  if (day < startYmd || day > endYmd) return
+  const cur = bucket.get(day) ?? emptyDouyinFinanceDayBucket()
+  cur.verifyOrderCount += 1
+  cur.verifyAmountYuan += orderPayAmountYuan(order)
+  bucket.set(day, cur)
+}
+
+type DouyinOrderQueryTimeRange = 'create' | 'update'
 
 async function paginateDouyinTradeOrders(
   token: string,
@@ -6137,9 +6200,12 @@ async function paginateDouyinTradeOrders(
   startYmd: string,
   endYmd: string,
   bucket: Map<string, DouyinFinanceDayBucket>,
-  seenOrderIds: Set<string>,
+  seenSalesOrderIds: Set<string>,
+  seenVerifyCerts: Set<string>,
+  timeRange: DouyinOrderQueryTimeRange,
   warnings: string[],
 ): Promise<void> {
+  const isHermes = apiPath.includes('hermes')
   let page = 1
   const pageSize = 50
   const maxPages = 100
@@ -6148,9 +6214,14 @@ async function paginateDouyinTradeOrders(
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('page_num', String(page))
     u.searchParams.set('page_size', String(pageSize))
-    u.searchParams.set('create_order_start_time', String(startSec))
-    u.searchParams.set('create_order_end_time', String(endSec))
     u.searchParams.set('get_secret_number', 'false')
+    if (timeRange === 'create') {
+      u.searchParams.set('create_order_start_time', String(startSec))
+      u.searchParams.set('create_order_end_time', String(endSec))
+    } else {
+      u.searchParams.set('update_order_start_time', String(startSec))
+      u.searchParams.set('update_order_end_time', String(endSec))
+    }
 
     const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
@@ -6164,20 +6235,25 @@ async function paginateDouyinTradeOrders(
     const j = parseDouyinJson(raw)
     if (!dr.ok) {
       warnings.push(
-        `抖音${apiPath.includes('hermes') ? '即配' : '团购'}订单 HTTP ${dr.status}：${raw.slice(0, 200)}`,
+        `抖音${isHermes ? '即配' : '团购'}订单 HTTP ${dr.status}：${raw.slice(0, 200)}`,
       )
       break
     }
     const envErr = getDataError(j)
     if (!envErr.ok) {
-      warnings.push(envErr.msg ?? `抖音${apiPath.includes('hermes') ? '即配' : '团购'}订单业务错误`)
+      warnings.push(envErr.msg ?? `抖音${isHermes ? '即配' : '团购'}订单业务错误`)
       break
     }
     const data = j.data as Record<string, unknown> | undefined
     const orders = (data?.orders as unknown[]) ?? []
     for (const rawOrder of orders) {
       if (!rawOrder || typeof rawOrder !== 'object') continue
-      mergeOrderIntoFinanceBucket(bucket, rawOrder as Record<string, unknown>, startYmd, endYmd, seenOrderIds)
+      const order = rawOrder as Record<string, unknown>
+      if (timeRange === 'create') {
+        mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds)
+      } else {
+        mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
+      }
     }
     if (orders.length < pageSize) break
     page += 1
@@ -6206,35 +6282,46 @@ export async function fetchDouyinFinanceReconcileRows(
   }
 
   const bucket = new Map<string, DouyinFinanceDayBucket>()
-  const seenOrderIds = new Set<string>()
+  const seenSalesOrderIds = new Set<string>()
+  const seenVerifyCerts = new Set<string>()
 
   try {
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    await paginateDouyinTradeOrders(
-      token,
-      accountId,
-      '/goodlife/v1/trade/order/query/',
-      rng.startSec,
-      rng.endSec,
-      startYmd,
-      endYmd,
-      bucket,
-      seenOrderIds,
-      warnings,
-    )
-    await paginateDouyinTradeOrders(
-      token,
-      accountId,
-      '/goodlife/v1/hermes/trade/order/query/',
-      rng.startSec,
-      rng.endSec,
-      startYmd,
-      endYmd,
-      bucket,
-      seenOrderIds,
-      warnings,
-    )
+    const paths = [
+      '/goodlife/v1/trade/order/query/' as const,
+      '/goodlife/v1/hermes/trade/order/query/' as const,
+    ]
+    for (const apiPath of paths) {
+      await paginateDouyinTradeOrders(
+        token,
+        accountId,
+        apiPath,
+        rng.startSec,
+        rng.endSec,
+        startYmd,
+        endYmd,
+        bucket,
+        seenSalesOrderIds,
+        seenVerifyCerts,
+        'create',
+        warnings,
+      )
+      await paginateDouyinTradeOrders(
+        token,
+        accountId,
+        apiPath,
+        rng.startSec,
+        rng.endSec,
+        startYmd,
+        endYmd,
+        bucket,
+        seenSalesOrderIds,
+        seenVerifyCerts,
+        'update',
+        warnings,
+      )
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     warnings.push(`抖音对账拉取异常：${msg}`)
@@ -6256,7 +6343,7 @@ export async function fetchDouyinFinanceReconcileRows(
 
   if (warnings.length === 0) {
     warnings.push(
-      '抖音：数据来自 goodlife/v1/trade/order/query（团购）与 hermes/trade/order/query（即配），按创单时间汇总；核销为券状态粗口径，最终以平台结算为准。',
+      '抖音：成交按创单时间汇总已支付订单（200/201/1）；核销仅统计券 item_status=401（已履约），按 item_update_time 归属日期；最终以来客后台为准。',
     )
   }
   return { rows, warnings }
@@ -6306,10 +6393,12 @@ function mapAkteCommentRow(
   ctx: { reviewKind: 'store' | 'product'; poiId?: string; poiName?: string; productId?: string; productName?: string },
 ): MerchantReviewRowDouyin | null {
   const ci = row.comment_info
-  const info = ci && typeof ci === 'object' ? (ci as Record<string, unknown>) : {}
-  const rateId = info.rate_id
-  const poiId = row.poi_id ?? ctx.poiId
-  if (rateId == null || poiId == null) return null
+  const info = ci && typeof ci === 'object' ? (ci as Record<string, unknown>) : row
+  const rateId = info.rate_id ?? row.rate_id
+  const poiId = row.poi_id ?? info.poi_id ?? ctx.poiId
+  if (rateId == null || String(rateId).trim() === '' || poiId == null || String(poiId).trim() === '') {
+    return null
+  }
 
   const compositeId = composeDouyinReviewId(String(poiId), String(rateId))
   const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
@@ -6430,14 +6519,14 @@ async function fetchAkteCommentsForTarget(
   const nowSec = Math.floor(Date.now() / 1000)
   const startSec = nowSec - 90 * 86400
   const out: MerchantReviewRowDouyin[] = []
-  let cursor = '0'
+  let cursor = ''
   for (let page = 0; page < 80; page += 1) {
     const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('start_time', String(startSec))
     u.searchParams.set('end_time', String(nowSec))
-    u.searchParams.set('cursor', cursor)
     u.searchParams.set('count', '100')
+    if (cursor) u.searchParams.set('cursor', cursor)
     if (usePoi.length > 0) {
       u.searchParams.set('poi_id_list', formatDouyinAkteIdList(usePoi))
     }
@@ -6467,11 +6556,22 @@ async function fetchAkteCommentsForTarget(
     const comments = Array.isArray(data?.comments) ? (data!.comments as unknown[]) : []
     for (const c of comments) {
       if (!c || typeof c !== 'object') continue
-      const mapped = mapAkteCommentRow(c as Record<string, unknown>, {
+      const commentRow = c as Record<string, unknown>
+      const mapped = mapAkteCommentRow(commentRow, {
         reviewKind: ctx.reviewKind,
-        poiId: target.poiId,
+        poiId:
+          ctx.poiId ??
+          (commentRow.poi_id != null ? String(commentRow.poi_id) : undefined) ??
+          target.poiId,
         poiName: ctx.poiName,
-        productId: target.productId,
+        productId:
+          ctx.productId ??
+          (commentRow.product_info &&
+          typeof commentRow.product_info === 'object' &&
+          (commentRow.product_info as Record<string, unknown>).product_id != null
+            ? String((commentRow.product_info as Record<string, unknown>).product_id)
+            : undefined) ??
+          target.productId,
         productName: ctx.productName,
       })
       if (mapped) out.push(mapped)
@@ -6539,13 +6639,12 @@ export async function fetchDouyinAkteReviews(
       if (poiTargets.length === 0 && (kind === 'store' || kind === 'all')) {
         return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
       }
-      for (let i = 0; i < poiTargets.length; i += 20) {
-        const batch = poiTargets.slice(i, i + 20)
+      for (const target of poiTargets) {
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { poiIds: batch.map((p) => p.poiId) },
-          { reviewKind: 'store', poiName: batch[0]?.poiName },
+          { poiId: target.poiId },
+          { reviewKind: 'store', poiId: target.poiId, poiName: target.poiName },
         )
         if (r.ok === false) return r
         pushItems(r.items)
@@ -6571,16 +6670,15 @@ export async function fetchDouyinAkteReviews(
       if (productTargets.length === 0 && kind === 'product') {
         return { ok: false, message: '未找到在线商品，请先在「商品」页同步抖音团购商品。' }
       }
-      for (let i = 0; i < productTargets.length; i += 20) {
-        const batch = productTargets.slice(i, i + 20)
+      for (const target of productTargets) {
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { productIds: batch.map((p) => p.productId) },
+          { productId: target.productId },
           {
             reviewKind: 'product',
-            productId: batch[0]?.productId,
-            productName: batch[0]?.productName,
+            productId: target.productId,
+            productName: target.productName,
           },
         )
         if (r.ok === false) return r

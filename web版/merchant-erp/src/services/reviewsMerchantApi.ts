@@ -157,7 +157,10 @@ export async function postReviewsSync(
     poiIds?: string[]
     productIds?: string[]
   },
-): Promise<{ ok: true; syncedAt?: string; message?: string } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; syncedAt?: string; message?: string; items?: ReviewListItem[] }
+  | { ok: false; message: string }
+> {
   const body = JSON.stringify({
     platform,
     kind: opts?.kind,
@@ -204,6 +207,7 @@ export async function postReviewsSync(
       ok: true,
       syncedAt: typeof data.syncedAt === 'string' ? data.syncedAt : undefined,
       message: typeof data.message === 'string' ? data.message : undefined,
+      items: Array.isArray(data.items) ? (data.items as ReviewListItem[]) : undefined,
     }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
