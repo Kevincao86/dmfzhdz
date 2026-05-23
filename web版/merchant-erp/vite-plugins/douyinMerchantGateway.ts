@@ -170,6 +170,17 @@ export type MerchantReviewRowDouyin = {
   createdAt: string
   replied: boolean
   replyText?: string
+  reviewKind?: 'store' | 'product'
+  poiId?: string
+  poiName?: string
+  productId?: string
+  productName?: string
+}
+
+export type DouyinAkteReviewFetchOpts = {
+  kind?: 'store' | 'product' | 'all'
+  poiId?: string
+  productId?: string
 }
 
 /** 同一 Lambda 实例内缓存解密后的会话，减少重复申请 client_token */
@@ -6064,14 +6075,115 @@ function orderHasVerifySignal(order: Record<string, unknown>): boolean {
   for (const c of certs) {
     if (!c || typeof c !== 'object') continue
     const cert = c as Record<string, unknown>
+    const st = Number(cert.item_status ?? cert.status)
+    if (st === 100 || st === 200 || st === 300 || st === 400) return true
     const iut = Number(cert.item_update_time)
     if (Number.isFinite(iut) && iut > 1_000_000_000) return true
   }
   return false
 }
 
+function orderUniqueId(order: Record<string, unknown>): string {
+  const id = String(order.order_id ?? order.id ?? '').trim()
+  return id || `${orderCreateUnixSec(order)}:${orderPayAmountYuan(order)}`
+}
+
+type DouyinFinanceDayBucket = {
+  orderCount: number
+  verifyOrderCount: number
+  salesAmountYuan: number
+  verifyAmountYuan: number
+}
+
+function mergeOrderIntoFinanceBucket(
+  bucket: Map<string, DouyinFinanceDayBucket>,
+  order: Record<string, unknown>,
+  startYmd: string,
+  endYmd: string,
+  seenOrderIds: Set<string>,
+): void {
+  const oid = orderUniqueId(order)
+  if (seenOrderIds.has(oid)) return
+  seenOrderIds.add(oid)
+  const cu = orderCreateUnixSec(order)
+  if (cu <= 0) return
+  const day = shanghaiDateStringFromUnixSec(cu)
+  if (day < startYmd || day > endYmd) return
+  const cur = bucket.get(day) ?? {
+    orderCount: 0,
+    verifyOrderCount: 0,
+    salesAmountYuan: 0,
+    verifyAmountYuan: 0,
+  }
+  cur.orderCount += 1
+  const yuan = orderPayAmountYuan(order)
+  cur.salesAmountYuan += yuan
+  if (orderHasVerifySignal(order)) {
+    cur.verifyOrderCount += 1
+    cur.verifyAmountYuan += yuan
+  }
+  bucket.set(day, cur)
+}
+
+async function paginateDouyinTradeOrders(
+  token: string,
+  accountId: string,
+  apiPath: '/goodlife/v1/trade/order/query/' | '/goodlife/v1/hermes/trade/order/query/',
+  startSec: number,
+  endSec: number,
+  startYmd: string,
+  endYmd: string,
+  bucket: Map<string, DouyinFinanceDayBucket>,
+  seenOrderIds: Set<string>,
+  warnings: string[],
+): Promise<void> {
+  let page = 1
+  const pageSize = 50
+  const maxPages = 100
+  while (page <= maxPages) {
+    const u = new URL(douyinOpenApiUrl(apiPath))
+    u.searchParams.set('account_id', accountId)
+    u.searchParams.set('page_num', String(page))
+    u.searchParams.set('page_size', String(pageSize))
+    u.searchParams.set('create_order_start_time', String(startSec))
+    u.searchParams.set('create_order_end_time', String(endSec))
+    u.searchParams.set('get_secret_number', 'false')
+
+    const dr = await douyinServerFetch(u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw)
+    if (!dr.ok) {
+      warnings.push(
+        `抖音${apiPath.includes('hermes') ? '即配' : '团购'}订单 HTTP ${dr.status}：${raw.slice(0, 200)}`,
+      )
+      break
+    }
+    const envErr = getDataError(j)
+    if (!envErr.ok) {
+      warnings.push(envErr.msg ?? `抖音${apiPath.includes('hermes') ? '即配' : '团购'}订单业务错误`)
+      break
+    }
+    const data = j.data as Record<string, unknown> | undefined
+    const orders = (data?.orders as unknown[]) ?? []
+    for (const rawOrder of orders) {
+      if (!rawOrder || typeof rawOrder !== 'object') continue
+      mergeOrderIntoFinanceBucket(bucket, rawOrder as Record<string, unknown>, startYmd, endYmd, seenOrderIds)
+    }
+    if (orders.length < pageSize) break
+    page += 1
+  }
+  if (page > maxPages) warnings.push('抖音订单分页达到上限，汇总可能不完整')
+}
+
 /**
- * 按创单时间在 [startYmd,endYmd]（上海日历日）内拉取 Hermes 订单并汇总为财务对账行（按日一条）。
+ * 按创单时间在 [startYmd,endYmd] 内拉取团购 trade/order + 即配 hermes 订单，汇总为财务对账行。
  */
 export async function fetchDouyinFinanceReconcileRows(
   bearerToken: string,
@@ -6090,76 +6202,36 @@ export async function fetchDouyinFinanceReconcileRows(
     return { rows: [], warnings }
   }
 
-  const bucket = new Map<
-    string,
-    { orderCount: number; verifyOrderCount: number; salesAmountYuan: number; verifyAmountYuan: number }
-  >()
+  const bucket = new Map<string, DouyinFinanceDayBucket>()
+  const seenOrderIds = new Set<string>()
 
   try {
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    let page = 1
-    const pageSize = 50
-    const maxPages = 100
-
-    while (page <= maxPages) {
-      const u = new URL(douyinOpenApiUrl('/goodlife/v1/hermes/trade/order/query/'))
-      u.searchParams.set('account_id', accountId)
-      u.searchParams.set('page_num', String(page))
-      u.searchParams.set('page_size', String(pageSize))
-      u.searchParams.set('create_order_start_time', String(rng.startSec))
-      u.searchParams.set('create_order_end_time', String(rng.endSec))
-      u.searchParams.set('get_secret_number', 'false')
-
-      const dr = await douyinServerFetch(u.toString(), {
-        method: 'GET',
-        headers: {
-          'access-token': token,
-          'content-type': 'application/json',
-          'Rpc-Transit-Life-Account': accountId,
-        },
-      })
-      const raw = await dr.text()
-      const j = parseDouyinJson(raw)
-      if (!dr.ok) {
-        warnings.push(`抖音订单查询 HTTP ${dr.status}：${raw.slice(0, 240)}`)
-        break
-      }
-      const envErr = getDataError(j)
-      if (!envErr.ok) {
-        warnings.push(envErr.msg ?? '抖音订单查询业务错误')
-        break
-      }
-      const data = j.data as Record<string, unknown> | undefined
-      const orders = (data?.orders as unknown[]) ?? []
-      for (const rawOrder of orders) {
-        if (!rawOrder || typeof rawOrder !== 'object') continue
-        const order = rawOrder as Record<string, unknown>
-        const cu = orderCreateUnixSec(order)
-        if (cu <= 0) continue
-        const day = shanghaiDateStringFromUnixSec(cu)
-        if (day < startYmd || day > endYmd) continue
-        const cur = bucket.get(day) ?? {
-          orderCount: 0,
-          verifyOrderCount: 0,
-          salesAmountYuan: 0,
-          verifyAmountYuan: 0,
-        }
-        cur.orderCount += 1
-        const yuan = orderPayAmountYuan(order)
-        cur.salesAmountYuan += yuan
-        if (orderHasVerifySignal(order)) {
-          cur.verifyOrderCount += 1
-          cur.verifyAmountYuan += yuan
-        }
-        bucket.set(day, cur)
-      }
-      if (orders.length < pageSize) break
-      page += 1
-    }
-    if (page > maxPages) {
-      warnings.push('抖音订单分页达到上限，汇总可能不完整')
-    }
+    await paginateDouyinTradeOrders(
+      token,
+      accountId,
+      '/goodlife/v1/trade/order/query/',
+      rng.startSec,
+      rng.endSec,
+      startYmd,
+      endYmd,
+      bucket,
+      seenOrderIds,
+      warnings,
+    )
+    await paginateDouyinTradeOrders(
+      token,
+      accountId,
+      '/goodlife/v1/hermes/trade/order/query/',
+      rng.startSec,
+      rng.endSec,
+      startYmd,
+      endYmd,
+      bucket,
+      seenOrderIds,
+      warnings,
+    )
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     warnings.push(`抖音对账拉取异常：${msg}`)
@@ -6181,7 +6253,7 @@ export async function fetchDouyinFinanceReconcileRows(
 
   if (warnings.length === 0) {
     warnings.push(
-      '抖音：数据来自开放平台 goodlife/v1/hermes/trade/order/query/（文档说明主要覆盖即配类订单）；到店团购等请以平台对账与对应 OpenAPI 为准。',
+      '抖音：数据来自 goodlife/v1/trade/order/query（团购）与 hermes/trade/order/query（即配），按创单时间汇总；核销为券状态粗口径，最终以平台结算为准。',
     )
   }
   return { rows, warnings }
@@ -6226,100 +6298,249 @@ function isoFromAkteTime(t: unknown): string {
   return new Date(ms).toISOString()
 }
 
-/** 分页拉取近 90 天评价列表并映射为 ERP 行 */
+function mapAkteCommentRow(
+  row: Record<string, unknown>,
+  ctx: { reviewKind: 'store' | 'product'; poiId?: string; poiName?: string; productId?: string; productName?: string },
+): MerchantReviewRowDouyin | null {
+  const ci = row.comment_info
+  const info = ci && typeof ci === 'object' ? (ci as Record<string, unknown>) : {}
+  const rateId = info.rate_id
+  const poiId = row.poi_id ?? ctx.poiId
+  if (rateId == null || poiId == null) return null
+
+  const compositeId = composeDouyinReviewId(String(poiId), String(rateId))
+  const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
+  const stars = akteRateScoreToStars(info.rate_score)
+  const hasReply = info.has_merchant_reply === true
+  const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
+  const firstReply =
+    replyList[0] && typeof replyList[0] === 'object' ? (replyList[0] as Record<string, unknown>) : null
+  const replyText =
+    typeof firstReply?.text === 'string' && firstReply.text.trim() ? firstReply.text.trim() : undefined
+
+  const nick =
+    (typeof info.nickname === 'string' && info.nickname.trim()) ||
+    (typeof info.nick_name === 'string' && info.nick_name.trim()) ||
+    (typeof info.user_name === 'string' && info.user_name.trim()) ||
+    '抖音用户'
+
+  return {
+    id: compositeId,
+    platform: 'douyin',
+    sentiment: sentimentFromStars(stars || 3),
+    userName: nick,
+    ratingStars: stars,
+    content: rateText || '（无文字评价）',
+    createdAt: isoFromAkteTime(info.create_time),
+    replied: hasReply || Boolean(replyText),
+    replyText: replyText || undefined,
+    reviewKind: ctx.reviewKind,
+    poiId: String(poiId),
+    poiName: ctx.poiName,
+    productId: ctx.productId,
+    productName: ctx.productName,
+  }
+}
+
+async function listDouyinOnlineProductIds(
+  accessToken: string,
+  accountId: string,
+  maxProducts: number,
+): Promise<Array<{ productId: string; productName: string }>> {
+  const out: Array<{ productId: string; productName: string }> = []
+  let cursor = ''
+  for (let page = 0; page < 30 && out.length < maxProducts; page += 1) {
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/product/online/query/'))
+    u.searchParams.set('account_id', accountId)
+    u.searchParams.set('count', '50')
+    if (cursor) u.searchParams.set('cursor', cursor)
+    const dr = await douyinServerFetch(u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': accessToken,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw)
+    if (!dr.ok || !getDataError(j).ok) break
+    const data = j.data as Record<string, unknown> | undefined
+    const products = extractProductsArrayFromGoodlifeEnvelope(j)
+    for (const p of products) {
+      if (!p || typeof p !== 'object') continue
+      const o = p as Record<string, unknown>
+      const prod = (o.product && typeof o.product === 'object' ? o.product : o) as Record<string, unknown>
+      const productId = String(prod.product_id ?? prod.id ?? o.product_id ?? '').trim()
+      const productName = String(prod.product_name ?? prod.name ?? o.product_name ?? productId).trim()
+      if (!productId) continue
+      out.push({ productId, productName: productName || productId })
+      if (out.length >= maxProducts) break
+    }
+    const hasMore = data?.has_more === true
+    const next = data?.cursor != null ? String(data.cursor) : ''
+    if (!hasMore || !next || next === cursor) break
+    cursor = next
+  }
+  return out
+}
+
+async function fetchAkteCommentsForTarget(
+  accessToken: string,
+  accountId: string,
+  target: { poiId?: string; productId?: string },
+  ctx: { reviewKind: 'store' | 'product'; poiId?: string; poiName?: string; productId?: string; productName?: string },
+): Promise<{ ok: true; items: MerchantReviewRowDouyin[] } | { ok: false; message: string }> {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const startSec = nowSec - 90 * 86400
+  const out: MerchantReviewRowDouyin[] = []
+  let cursor = '0'
+  for (let page = 0; page < 80; page += 1) {
+    const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
+    u.searchParams.set('account_id', accountId)
+    u.searchParams.set('start_time', String(startSec))
+    u.searchParams.set('end_time', String(nowSec))
+    u.searchParams.set('cursor', cursor)
+    u.searchParams.set('count', '100')
+    if (target.poiId) u.searchParams.set('poi_id', target.poiId)
+    if (target.productId) u.searchParams.set('product_id', target.productId)
+
+    const dr = await douyinServerFetch(u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': accessToken,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const raw = await dr.text()
+    const j = parseDouyinJson(raw)
+    const err = getDataError(j)
+    if (!dr.ok) {
+      return { ok: false, message: raw.slice(0, 400) || `评价查询 HTTP ${dr.status}` }
+    }
+    if (!err.ok) {
+      return { ok: false, message: err.msg ?? '评价查询业务错误（请确认已开通餐饮评价权限）' }
+    }
+
+    const data = j.data as Record<string, unknown> | undefined
+    const comments = Array.isArray(data?.comments) ? (data!.comments as unknown[]) : []
+    for (const c of comments) {
+      if (!c || typeof c !== 'object') continue
+      const mapped = mapAkteCommentRow(c as Record<string, unknown>, {
+        reviewKind: ctx.reviewKind,
+        poiId: target.poiId,
+        poiName: ctx.poiName,
+        productId: target.productId,
+        productName: ctx.productName,
+      })
+      if (mapped) out.push(mapped)
+    }
+
+    const hasMore = data?.has_more === true
+    const next = data?.cursor != null ? String(data.cursor) : ''
+    if (!hasMore || !next || next === cursor) break
+    cursor = next
+  }
+  return { ok: true, items: out }
+}
+
+/** 分页拉取近 90 天评价（须传 poi_id 或 product_id；按门店/商品维度聚合） */
 export async function fetchDouyinAkteReviews(
   bearerToken: string,
+  opts?: DouyinAkteReviewFetchOpts,
 ): Promise<{ ok: true; items: MerchantReviewRowDouyin[] } | { ok: false; message: string }> {
   const auth = bearerToken.trim()
   const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     return { ok: false, message: '会话无效或未绑定抖音来客，请先完成绑定。' }
   }
+  const kind = opts?.kind ?? 'all'
   try {
     const accessToken = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    const nowSec = Math.floor(Date.now() / 1000)
-    const startSec = nowSec - 90 * 86400
+    const merged: MerchantReviewRowDouyin[] = []
+    const seen = new Set<string>()
 
-    const out: MerchantReviewRowDouyin[] = []
-    let cursor = '0'
-    for (let page = 0; page < 80; page += 1) {
-      const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
-      u.searchParams.set('account_id', accountId)
-      u.searchParams.set('start_time', String(startSec))
-      u.searchParams.set('end_time', String(nowSec))
-      u.searchParams.set('cursor', cursor)
-      u.searchParams.set('count', '100')
-
-      const dr = await douyinServerFetch(u.toString(), {
-        method: 'GET',
-        headers: {
-          'access-token': accessToken,
-          'content-type': 'application/json',
-          'Rpc-Transit-Life-Account': accountId,
-        },
-      })
-      const raw = await dr.text()
-      const j = parseDouyinJson(raw)
-      const err = getDataError(j)
-      if (!dr.ok) {
-        return { ok: false, message: raw.slice(0, 400) || `评价查询 HTTP ${dr.status}` }
+    const pushItems = (items: MerchantReviewRowDouyin[]) => {
+      for (const it of items) {
+        if (seen.has(it.id)) continue
+        seen.add(it.id)
+        merged.push(it)
       }
-      if (!err.ok) {
-        return { ok: false, message: err.msg ?? '评价查询业务错误（请确认应用已开通餐饮评价权限 life.capacity.catering.comment）' }
-      }
-
-      const data = j.data as Record<string, unknown> | undefined
-      const comments = Array.isArray(data?.comments) ? (data!.comments as unknown[]) : []
-      for (const c of comments) {
-        if (!c || typeof c !== 'object') continue
-        const row = c as Record<string, unknown>
-        const ci = row.comment_info
-        const info = ci && typeof ci === 'object' ? (ci as Record<string, unknown>) : {}
-        const rateId = info.rate_id
-        const poiId = row.poi_id
-        if (rateId == null || poiId == null) continue
-
-        const compositeId = composeDouyinReviewId(String(poiId), String(rateId))
-        const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
-        const stars = akteRateScoreToStars(info.rate_score)
-        const hasReply = info.has_merchant_reply === true
-        const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
-        const firstReply =
-          replyList[0] && typeof replyList[0] === 'object'
-            ? (replyList[0] as Record<string, unknown>)
-            : null
-        const replyText =
-          typeof firstReply?.text === 'string' && firstReply.text.trim()
-            ? firstReply.text.trim()
-            : undefined
-
-        const nick =
-          (typeof info.nickname === 'string' && info.nickname.trim()) ||
-          (typeof info.nick_name === 'string' && info.nick_name.trim()) ||
-          (typeof info.user_name === 'string' && info.user_name.trim()) ||
-          '抖音用户'
-
-        out.push({
-          id: compositeId,
-          platform: 'douyin',
-          sentiment: sentimentFromStars(stars || 3),
-          userName: nick,
-          ratingStars: stars,
-          content: rateText || '（无文字评价）',
-          createdAt: isoFromAkteTime(info.create_time),
-          replied: hasReply || Boolean(replyText),
-          replyText: replyText || undefined,
-        })
-      }
-
-      const hasMore = data?.has_more === true
-      const next = data?.cursor != null ? String(data.cursor) : ''
-      if (!hasMore || !next || next === cursor) break
-      cursor = next
     }
 
-    return { ok: true, items: out }
+    if (kind === 'store' || kind === 'all') {
+      if (opts?.poiId?.trim()) {
+        const r = await fetchAkteCommentsForTarget(
+          accessToken,
+          accountId,
+          { poiId: opts.poiId.trim() },
+          { reviewKind: 'store' },
+        )
+        if (r.ok === false) return r
+        pushItems(r.items)
+      } else {
+        const { pois } = await fetchMergedAllPois(auth, session, accountId)
+        const poiTargets: Array<{ poiId: string; poiName: string }> = []
+        for (const row of pois) {
+          const poiId = extractRowPoiId(row)
+          if (!poiId) continue
+          const name =
+            typeof row === 'object' && row && (row as Record<string, unknown>).poi
+              ? String(
+                  ((row as Record<string, unknown>).poi as Record<string, unknown>).poi_name ??
+                    poiId,
+                )
+              : poiId
+          poiTargets.push({ poiId, poiName: name })
+          if (poiTargets.length >= 80) break
+        }
+        if (poiTargets.length === 0) {
+          return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
+        }
+        for (const p of poiTargets) {
+          const r = await fetchAkteCommentsForTarget(
+            accessToken,
+            accountId,
+            { poiId: p.poiId },
+            { reviewKind: 'store', poiName: p.poiName },
+          )
+          if (r.ok === false) return r
+          pushItems(r.items)
+        }
+      }
+    }
+
+    if (kind === 'product' || kind === 'all') {
+      if (opts?.productId?.trim()) {
+        const r = await fetchAkteCommentsForTarget(
+          accessToken,
+          accountId,
+          { productId: opts.productId.trim() },
+          { reviewKind: 'product', productId: opts.productId.trim() },
+        )
+        if (r.ok === false) return r
+        pushItems(r.items)
+      } else {
+        const products = await listDouyinOnlineProductIds(accessToken, accountId, 60)
+        if (products.length === 0 && kind === 'product') {
+          return { ok: false, message: '未找到在线商品，请先在「商品」页同步抖音团购商品。' }
+        }
+        for (const p of products) {
+          const r = await fetchAkteCommentsForTarget(
+            accessToken,
+            accountId,
+            { productId: p.productId },
+            { reviewKind: 'product', productId: p.productId, productName: p.productName },
+          )
+          if (r.ok === false) return r
+          pushItems(r.items)
+        }
+      }
+    }
+
+    return { ok: true, items: merged }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `拉取抖音评价失败：${msg}` }

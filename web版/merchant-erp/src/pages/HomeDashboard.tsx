@@ -2,22 +2,26 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
   BarChart3,
+  Bike,
   Calendar,
   CheckCircle2,
   Circle,
   Clock,
   MessageSquare,
   Percent,
+  ShoppingBag,
   ShoppingCart,
   Smartphone,
   Star,
   Store,
   Ticket,
+  Truck,
   UserPlus,
   Users,
   Wallet,
   X,
 } from 'lucide-react'
+import { MERCHANT_PLATFORMS, type MerchantPlatformId } from '../constants/merchantPlatforms'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -38,28 +42,34 @@ import {
 } from '../services/merchantDashboardApi'
 import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../services/platformConnectivityProbe'
 
-type PlatformId = 'douyin' | 'meituan' | 'xiaohongshu' | 'jd'
+type PlatformId = MerchantPlatformId
 
-const EMPTY_AGG: HomeAggregateStats = {
-  totalRevenue: 0,
-  totalOrders: 0,
-  conversionRate: 0,
-  fansGrowth: 0,
-  todayNewLeads: 0,
-  pendingComments: 0,
+const PLATFORM_ICONS: Record<PlatformId, typeof Smartphone> = {
+  douyin: Smartphone,
+  meituan: Ticket,
+  xiaohongshu: Store,
+  jd: Star,
+  eleme: ShoppingBag,
+  meituan_waimai: Truck,
+  jd_waimai: Bike,
 }
 
-const PLATFORMS: {
-  id: PlatformId
-  name: string
-  color: string
-  icon: typeof Smartphone
-}[] = [
-  { id: 'douyin', name: '抖音来客', color: 'bg-pink-500', icon: Smartphone },
-  { id: 'meituan', name: '美团', color: 'bg-yellow-500', icon: Ticket },
-  { id: 'xiaohongshu', name: '小红书', color: 'bg-red-500', icon: Store },
-  { id: 'jd', name: '京东团购', color: 'bg-red-600', icon: Star },
-]
+const PLATFORM_COLORS: Record<PlatformId, string> = {
+  douyin: 'bg-pink-500',
+  meituan: 'bg-yellow-500',
+  xiaohongshu: 'bg-red-500',
+  jd: 'bg-red-600',
+  eleme: 'bg-blue-500',
+  meituan_waimai: 'bg-amber-500',
+  jd_waimai: 'bg-red-700',
+}
+
+const PLATFORMS = MERCHANT_PLATFORMS.map((p) => ({
+  id: p.id,
+  name: p.name,
+  color: PLATFORM_COLORS[p.id],
+  icon: PLATFORM_ICONS[p.id],
+}))
 
 const QUICK: {
   title: string
@@ -78,6 +88,15 @@ const TIME_FILTERS = [
   { value: 'day7' as const, label: '7日', icon: Calendar },
   { value: 'day30' as const, label: '30天', icon: Calendar },
 ]
+
+const EMPTY_AGG: HomeAggregateStats = {
+  totalRevenue: 0,
+  totalOrders: 0,
+  conversionRate: 0,
+  fansGrowth: 0,
+  todayNewLeads: 0,
+  pendingComments: 0,
+}
 
 const TODOS = [
   {
@@ -308,7 +327,7 @@ export default function HomeDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {platformRows.map((p, idx) => {
             const Icon = p.icon
             return (

@@ -98,7 +98,16 @@ const REVIEW_PLATFORM_LABELS: Record<ReviewPlatformApi, string> = {
   jd_waimai: '京东外卖',
 }
 
-const reviewsState: Record<ReviewPlatformApi, ReviewRow[]> = {
+const reviewsStoreState: Record<ReviewPlatformApi, ReviewRow[]> = {
+  douyin: [],
+  meituan: [],
+  xhs: [],
+  eleme: [],
+  meituan_waimai: [],
+  jd_waimai: [],
+}
+
+const reviewsProductState: Record<ReviewPlatformApi, ReviewRow[]> = {
   douyin: [],
   meituan: [],
   xhs: [],
@@ -108,22 +117,55 @@ const reviewsState: Record<ReviewPlatformApi, ReviewRow[]> = {
 }
 
 const reviewsSyncedAt: Partial<Record<ReviewPlatformApi, string>> = {}
+const reviewsProductSyncedAt: Partial<Record<ReviewPlatformApi, string>> = {}
+
+function reviewStateBucket(kind: 'store' | 'product'): Record<ReviewPlatformApi, ReviewRow[]> {
+  return kind === 'product' ? reviewsProductState : reviewsStoreState
+}
+
+function reviewSyncedAtKey(kind: 'store' | 'product', platform: ReviewPlatformApi): string | undefined {
+  return kind === 'product' ? reviewsProductSyncedAt[platform] : reviewsSyncedAt[platform]
+}
+
+function findReviewRow(platform: ReviewPlatformApi, reviewId: string): ReviewRow | undefined {
+  return (
+    reviewsStoreState[platform].find((r) => r.id === reviewId) ??
+    reviewsProductState[platform].find((r) => r.id === reviewId)
+  )
+}
+
+type ReviewSyncOpts = {
+  kind?: 'store' | 'product'
+  poiId?: string
+  productId?: string
+}
 
 async function syncOneReviewPlatform(
   p: ReviewPlatformApi,
   bearer: string | null,
+  opts?: ReviewSyncOpts,
 ): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+  const kind = opts?.kind ?? 'store'
   if (p === 'douyin') {
     if (!bearer?.trim()) {
       return { ok: false, message: '请先绑定抖音来客后再同步评价。' }
     }
-    const r = await fetchDouyinAkteReviews(bearer.trim())
+    const r = await fetchDouyinAkteReviews(bearer.trim(), {
+      kind,
+      poiId: opts?.poiId,
+      productId: opts?.productId,
+    })
     if (r.ok === false) return { ok: false, message: r.message }
-    reviewsState.douyin = r.items as ReviewRow[]
-    reviewsSyncedAt.douyin = new Date().toISOString()
+    if (kind === 'product') {
+      reviewsProductState.douyin = r.items as ReviewRow[]
+      reviewsProductSyncedAt.douyin = new Date().toISOString()
+    } else {
+      reviewsStoreState.douyin = r.items as ReviewRow[]
+      reviewsSyncedAt.douyin = new Date().toISOString()
+    }
     return {
       ok: true,
-      message: `抖音来客：已同步 ${r.items.length} 条评价（近 90 天，需开放平台「餐饮-评价」能力）。`,
+      message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（近 90 天）。`,
     }
   }
   if (p === 'meituan') {
@@ -132,7 +174,7 @@ async function syncOneReviewPlatform(
     }
     const r = await fetchMeituanReviews(bearer.trim())
     if (r.ok === false) return { ok: false, message: r.message }
-    reviewsState.meituan = r.items as ReviewRow[]
+    reviewsStoreState.meituan = r.items as ReviewRow[]
     reviewsSyncedAt.meituan = new Date().toISOString()
     return {
       ok: true,
@@ -145,7 +187,7 @@ async function syncOneReviewPlatform(
     }
     const r = await fetchXhsReviews(bearer.trim())
     if (r.ok === false) return { ok: false, message: r.message }
-    reviewsState.xhs = r.items as ReviewRow[]
+    reviewsStoreState.xhs = r.items as ReviewRow[]
     reviewsSyncedAt.xhs = new Date().toISOString()
     return {
       ok: true,
@@ -158,7 +200,7 @@ async function syncOneReviewPlatform(
     }
     const r = await fetchWaimaiReviews(p, bearer.trim())
     if (r.ok === false) return { ok: false, message: r.message }
-    reviewsState[p] = r.items as ReviewRow[]
+    reviewsStoreState[p] = r.items as ReviewRow[]
     reviewsSyncedAt[p] = new Date().toISOString()
     return {
       ok: true,
@@ -728,6 +770,10 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         const platform = (url.searchParams.get('platform') ?? 'douyin').trim() as ReviewPlatformApi
         const sentiment = (url.searchParams.get('sentiment') ?? 'all').trim()
         const replyStatus = (url.searchParams.get('replyStatus') ?? 'all').trim()
+        const kindRaw = (url.searchParams.get('kind') ?? 'store').trim()
+        const kind: 'store' | 'product' = kindRaw === 'product' ? 'product' : 'store'
+        const poiId = (url.searchParams.get('poiId') ?? '').trim()
+        const productId = (url.searchParams.get('productId') ?? '').trim()
         if (!isReviewPlatformApi(platform)) {
           json(res, 400, {
             message:
@@ -735,13 +781,20 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           })
           return true
         }
-        if (reviewsState[platform].length === 0) {
+        const bucket = reviewStateBucket(kind)
+        if (bucket[platform].length === 0) {
           const bearer = reviewPlatformBearer(req, platform)
           if (bearer?.trim()) {
-            await syncOneReviewPlatform(platform, bearer)
+            await syncOneReviewPlatform(platform, bearer, {
+              kind,
+              poiId: poiId || undefined,
+              productId: productId || undefined,
+            })
           }
         }
-        let rows = [...reviewsState[platform]]
+        let rows = [...bucket[platform]]
+        if (poiId) rows = rows.filter((r) => (r as { poiId?: string }).poiId === poiId)
+        if (productId) rows = rows.filter((r) => (r as { productId?: string }).productId === productId)
         if (sentiment === 'good') rows = rows.filter((r) => r.sentiment === 'good')
         else if (sentiment === 'neutral') rows = rows.filter((r) => r.sentiment === 'neutral')
         else if (sentiment === 'bad') rows = rows.filter((r) => r.sentiment === 'bad')
@@ -764,7 +817,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           ok: true,
           items: rows,
           stats,
-          syncedAt: reviewsSyncedAt[platform] ?? undefined,
+          syncedAt: reviewSyncedAtKey(kind, platform),
         })
         return true
       }
@@ -772,9 +825,19 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       if (method === 'POST' && pathname === '/api/merchant/reviews/sync') {
         const bodyRaw = await bodyReader()
         let scope: ReviewPlatformApi | 'all' = 'all'
+        let syncOpts: ReviewSyncOpts = { kind: 'store' }
         try {
-          const j = JSON.parse(bodyRaw || '{}') as { platform?: string }
+          const j = JSON.parse(bodyRaw || '{}') as {
+            platform?: string
+            kind?: string
+            poiId?: string
+            productId?: string
+          }
           if (j.platform && isReviewPlatformApi(j.platform)) scope = j.platform
+          if (j.kind === 'product') syncOpts.kind = 'product'
+          if (typeof j.poiId === 'string' && j.poiId.trim()) syncOpts.poiId = j.poiId.trim()
+          if (typeof j.productId === 'string' && j.productId.trim())
+            syncOpts.productId = j.productId.trim()
         } catch {
           json(res, 400, { message: '请求体须为 JSON' })
           return true
@@ -789,7 +852,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             'meituan_waimai',
             'jd_waimai',
           ] as const) {
-            const r = await syncOneReviewPlatform(pl, reviewPlatformBearer(req, pl))
+            const r = await syncOneReviewPlatform(pl, reviewPlatformBearer(req, pl), syncOpts)
             if (r.ok === false && pl === 'douyin') {
               json(res, 502, { ok: false, message: r.message })
               return true
@@ -797,7 +860,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             if (r.ok === true) parts.push(r.message)
           }
         } else {
-          const r = await syncOneReviewPlatform(scope, reviewPlatformBearer(req, scope))
+          const r = await syncOneReviewPlatform(scope, reviewPlatformBearer(req, scope), syncOpts)
           if (r.ok === false) {
             json(res, 502, { ok: false, message: r.message })
             return true
@@ -857,7 +920,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = reviewsState.douyin.find((r) => r.id === reviewId)
+          const row = findReviewRow('douyin', reviewId)
           if (row) {
             row.replied = true
             row.replyText = content
@@ -895,7 +958,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = reviewsState.meituan.find((r) => r.id === reviewId)
+          const row = findReviewRow('meituan', reviewId)
           if (row) {
             row.replied = true
             row.replyText = content
@@ -933,7 +996,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = reviewsState.xhs.find((r) => r.id === reviewId)
+          const row = findReviewRow('xhs', reviewId)
           if (row) {
             row.replied = true
             row.replyText = content
@@ -957,7 +1020,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           return true
         }
         if (platform === 'eleme' || platform === 'meituan_waimai' || platform === 'jd_waimai') {
-          const row = reviewsState[platform].find((r) => r.id === reviewId)
+          const row = findReviewRow(platform, reviewId)
           if (row) {
             row.replied = true
             row.replyText = content
@@ -1007,7 +1070,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           json(res, 400, { message: '缺少 reviewId' })
           return true
         }
-        const row = reviewsState[platform].find((r) => r.id === reviewId)
+        const row = findReviewRow(platform, reviewId)
         if (!row) {
           json(res, 404, { message: '未找到该评价' })
           return true

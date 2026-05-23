@@ -10,7 +10,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../cn'
 import StorePlatformSwitcher from '../components/store/StorePlatformSwitcher'
+import { merchantApiFetchUrlCandidates } from '../services/douyinProductApi'
+import { fetchStoresForPlatform } from '../services/merchantStoresApi'
 import type {
+  ReviewKind,
   ReviewListItem,
   ReviewListStats,
   ReviewReplyStatusFilter,
@@ -80,7 +83,9 @@ function StarRow({ n }: { n: number }) {
   )
 }
 
-export default function ReviewsManagementPage() {
+import { Link } from 'react-router-dom'
+
+export default function ReviewsManagementPage({ reviewKind = 'store' }: { reviewKind?: ReviewKind }) {
   const [tab, setTab] = useState<StorePlatformTab>('douyin')
   const [sentiment, setSentiment] = useState<ReviewSentimentFilter>('all')
   const [replyStatus, setReplyStatus] = useState<ReviewReplyStatusFilter>('all')
@@ -100,8 +105,67 @@ export default function ReviewsManagementPage() {
   const [batchBusy, setBatchBusy] = useState(false)
   const [autoReplyBusy, setAutoReplyBusy] = useState(false)
   const [processingAutoId, setProcessingAutoId] = useState<string | null>(null)
+  const [filterPoiId, setFilterPoiId] = useState('')
+  const [filterProductId, setFilterProductId] = useState('')
+  const [storeOptions, setStoreOptions] = useState<Array<{ id: string; name: string }>>([])
+  const [productOptions, setProductOptions] = useState<Array<{ id: string; name: string }>>([])
 
   const apiPlatform = useMemo(() => reviewsTabToApiPlatform(tab), [tab])
+  const reviewOpts = useMemo(
+    () => ({
+      kind: reviewKind,
+      poiId: reviewKind === 'store' && filterPoiId ? filterPoiId : undefined,
+      productId: reviewKind === 'product' && filterProductId ? filterProductId : undefined,
+    }),
+    [reviewKind, filterPoiId, filterProductId],
+  )
+
+  useEffect(() => {
+    if (tab !== 'douyin') {
+      setStoreOptions([])
+      setProductOptions([])
+      return
+    }
+    void fetchStoresForPlatform('douyin', { page: 1, pageSize: 50, relationType: '0' }).then((res) => {
+      if (res.ok) setStoreOptions(res.items.map((s) => ({ id: s.id, name: s.name })))
+    })
+    if (reviewKind === 'product') {
+      void (async () => {
+        for (const target of merchantApiFetchUrlCandidates([
+          '/api/meoo-douyin-goods-product-online-query?count=50',
+          '/api/merchant/douyin/goods/product/online/query?count=50',
+        ])) {
+          try {
+            const r = await fetch(target, { headers: { Accept: 'application/json' } })
+            if (!r.ok) continue
+            const data = (await r.json()) as Record<string, unknown>
+            const inner = data.data && typeof data.data === 'object' ? (data.data as Record<string, unknown>) : data
+            const products = (inner.products ?? inner.product_list ?? inner.items) as unknown
+            if (!Array.isArray(products)) continue
+            setProductOptions(
+              products
+                .map((raw) => {
+                  if (!raw || typeof raw !== 'object') return null
+                  const o = raw as Record<string, unknown>
+                  const prod =
+                    o.product && typeof o.product === 'object'
+                      ? (o.product as Record<string, unknown>)
+                      : o
+                  const id = String(prod.product_id ?? prod.id ?? '').trim()
+                  const name = String(prod.product_name ?? prod.name ?? id).trim()
+                  if (!id) return null
+                  return { id, name: name || id }
+                })
+                .filter((x): x is { id: string; name: string } => x != null),
+            )
+            break
+          } catch {
+            /* try next path */
+          }
+        }
+      })()
+    }
+  }, [tab, reviewKind])
 
   const runAutoReplies = useCallback(async (platform: ReviewsApiPlatform, candidates: ReviewListItem[]) => {
     const pending = candidates.filter((r) => !r.replied)
@@ -139,7 +203,7 @@ export default function ReviewsManagementPage() {
     }
     setLoading(true)
     setError(null)
-    const res = await fetchReviewsList(apiPlatform, sentiment, replyStatus)
+    const res = await fetchReviewsList(apiPlatform, sentiment, replyStatus, reviewOpts)
     setLoading(false)
     if (!res.ok) {
       setItems([])
@@ -152,10 +216,10 @@ export default function ReviewsManagementPage() {
     setSyncedAt(res.syncedAt ?? null)
 
     if (aiReplyOn) {
-      const pendingRes = await fetchReviewsList(apiPlatform, sentiment, 'unreplied')
+      const pendingRes = await fetchReviewsList(apiPlatform, sentiment, 'unreplied', reviewOpts)
       if (pendingRes.ok && pendingRes.items.length > 0) {
         await runAutoReplies(apiPlatform, pendingRes.items)
-        const refresh = await fetchReviewsList(apiPlatform, sentiment, replyStatus)
+        const refresh = await fetchReviewsList(apiPlatform, sentiment, replyStatus, reviewOpts)
         if (refresh.ok) {
           setItems(refresh.items)
           setListStats(refresh.stats ?? null)
@@ -163,7 +227,7 @@ export default function ReviewsManagementPage() {
         }
       }
     }
-  }, [apiPlatform, sentiment, replyStatus, aiReplyOn, runAutoReplies])
+  }, [apiPlatform, sentiment, replyStatus, aiReplyOn, runAutoReplies, reviewOpts])
 
   useEffect(() => {
     void load()
@@ -182,7 +246,7 @@ export default function ReviewsManagementPage() {
     if (!apiPlatform) return
     setSyncing(true)
     setError(null)
-    const res = await postReviewsSync(apiPlatform)
+    const res = await postReviewsSync(apiPlatform, reviewOpts)
     setSyncing(false)
     if (!res.ok) {
       setError(res.message)
@@ -233,7 +297,7 @@ export default function ReviewsManagementPage() {
       n.delete(row.id)
       return n
     })
-    const refresh = await fetchReviewsList(apiPlatform, sentiment, replyStatus)
+    const refresh = await fetchReviewsList(apiPlatform, sentiment, replyStatus, reviewOpts)
     if (refresh.ok) {
       setItems(refresh.items)
       setListStats(refresh.stats ?? null)
@@ -318,10 +382,12 @@ export default function ReviewsManagementPage() {
                 <MessageSquareText className="h-6 w-6" strokeWidth={1.75} />
               </div>
               <div>
-                <h1 className="erp-page-title">评论管理</h1>
+                <h1 className="erp-page-title">
+                  {reviewKind === 'product' ? '商品评价' : '门店评价'}
+                </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
-                  在抖音来客绑定账号后，点击「同步评价」即可更新近 90 天顾客留言；若在抖音侧暂无可展示评价，多与门店实际评价或账号授权范围有关。
-                  美团与小红书将陆续支持，敬请期待。
+                  抖音评价查询须指定门店或商品维度。{reviewKind === 'store' ? '门店评价' : '商品评价'}
+                  支持按筛选条件同步，并可开启 AI 统一回复管理。
                   <span className="font-medium text-slate-800">关闭</span>
                   「24&nbsp;小时智能自动回复」时可自行打字回复，也可用「智能生成话术」帮您起草。
                   <span className="font-medium text-slate-800">开启</span>
@@ -341,8 +407,67 @@ export default function ReviewsManagementPage() {
           </div>
         </header>
 
+        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-1">
+          <Link
+            to="/reviews/store"
+            className={cn(
+              'rounded-lg px-4 py-2 text-sm font-medium',
+              reviewKind === 'store' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50',
+            )}
+          >
+            门店评价
+          </Link>
+          <Link
+            to="/reviews/product"
+            className={cn(
+              'rounded-lg px-4 py-2 text-sm font-medium',
+              reviewKind === 'product' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50',
+            )}
+          >
+            商品评价
+          </Link>
+        </div>
+
         <section className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-sm sm:p-5">
           <StorePlatformSwitcher value={tab} onChange={setTab} />
+          {tab === 'douyin' && reviewKind === 'store' ? (
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs text-slate-500">筛选门店</span>
+                <select
+                  value={filterPoiId}
+                  onChange={(e) => setFilterPoiId(e.target.value)}
+                  className="min-w-[220px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">全部门店（同步全部绑定门店）</option>
+                  {storeOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : null}
+          {tab === 'douyin' && reviewKind === 'product' ? (
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs text-slate-500">筛选商品</span>
+                <select
+                  value={filterProductId}
+                  onChange={(e) => setFilterProductId(e.target.value)}
+                  className="min-w-[220px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">全部在线商品</option>
+                  {productOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : null}
         </section>
 
         {!apiPlatform ? (

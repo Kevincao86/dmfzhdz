@@ -59,10 +59,12 @@ export default function App() {
           <Route path="products/list" element={<ProductsViewPage />} />
           <Route path="products/edit/:platform/:productId" element={<ProductEditFlowPage />} />
           <Route path="products/view" element={<Navigate to="/products/list" replace />} />
-          <Route path="operation" element={<Navigate to="/reviews" replace />} />
+          <Route path="operation" element={<Navigate to="/reviews/store" replace />} />
           <Route path="recruitment" element={<RecruitmentPage />} />
           <Route path="activity" element={<ActivityCenterPage />} />
-          <Route path="reviews" element={<ReviewsManagementPage />} />
+          <Route path="reviews" element={<Navigate to="/reviews/store" replace />} />
+          <Route path="reviews/store" element={<ReviewsManagementPage reviewKind="store" />} />
+          <Route path="reviews/product" element={<ReviewsManagementPage reviewKind="product" />} />
           <Route path="geo" element={<GeoPage />} />
           <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
           <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />

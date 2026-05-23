@@ -7,9 +7,10 @@ import { fetchMeituanFinanceReconcileRows, fetchMeituanReviews } from './meituan
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
 import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
 import { fetchXhsFinanceReconcileRows, fetchXhsReviews } from './xhsMerchantGateway.js'
+import { fetchWaimaiFinanceReconcileRows, type WaimaiPlatformKey } from './waimaiMerchantGateway.js'
 
 export type DashboardRange = 'realtime' | 'day7' | 'day30'
-type DashboardPlatform = 'douyin' | 'meituan' | 'xhs'
+type DashboardPlatform = 'douyin' | 'meituan' | 'xhs' | WaimaiPlatformKey
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -66,6 +67,15 @@ function resolvePlatformBearer(req: IncomingMessage, platform: DashboardPlatform
     if (auth && decodeMeituanSessionToken(auth)) return auth
     return null
   }
+  if (platform === 'eleme') {
+    return headerToken(req, 'x-meoo-eleme-token') ?? parseBearer(req) ?? null
+  }
+  if (platform === 'meituan_waimai') {
+    return headerToken(req, 'x-meoo-meituan-waimai-token') ?? parseBearer(req) ?? null
+  }
+  if (platform === 'jd_waimai') {
+    return headerToken(req, 'x-meoo-jd-waimai-token') ?? parseBearer(req) ?? null
+  }
   const xh = headerToken(req, 'x-meoo-xhs-token')
   if (xh) return xh
   const auth = parseBearer(req)
@@ -93,6 +103,10 @@ async function loadReconcileRows(
   }
   if (platform === 'meituan') {
     const r = await fetchMeituanFinanceReconcileRows(bearer, startYmd, endYmd)
+    return r.rows
+  }
+  if (platform === 'eleme' || platform === 'meituan_waimai' || platform === 'jd_waimai') {
+    const r = await fetchWaimaiFinanceReconcileRows(platform, bearer, startYmd, endYmd)
     return r.rows
   }
   const r = await fetchXhsFinanceReconcileRows(bearer, startYmd, endYmd)

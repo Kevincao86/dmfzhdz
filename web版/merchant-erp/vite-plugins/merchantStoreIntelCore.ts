@@ -422,7 +422,7 @@ export async function runCompetitorAnalysisCore(
 {
   "summary": "一段话",
   "industryHint": "推断的主营品类",
-  "competitors": [{"name":"店名或类型","distanceHint":"约x公里/同商圈","category":"品类","priceRange":"人均或套餐价区间","highlights":"卖点"}],
+  "competitors": [{"name":"店名或类型","distanceHint":"约x公里/同商圈","category":"品类","priceRange":"人均或套餐价区间","highlights":"卖点","hotProducts":[{"name":"热销团购/外卖商品名","priceYuan":39.9,"channel":"团购或外卖或到店","note":"可选：销量/套餐说明"}]}],
   "suggestions": ["给该门店的经营建议1","建议2"]
 }`
 
@@ -431,7 +431,7 @@ export async function runCompetitorAnalysisCore(
     `地址：${address}${city ? `（${city}）` : ''}`,
     industryHint ? `商家填写行业：${industryHint}` : '',
     menuSummary ? `本店菜单摘要：\n${menuSummary}` : '',
-    '请分析周边竞争对手与定价带，并给出上架团购时的差异化建议。',
+    '请分析周边竞争对手与定价带，并为每个竞品推断 2–4 个当地常见的团购/外卖热销商品（含大致售价），供后续 AI 组品参考；并给出上架团购时的差异化建议。',
   ]
     .filter(Boolean)
     .join('\n')
