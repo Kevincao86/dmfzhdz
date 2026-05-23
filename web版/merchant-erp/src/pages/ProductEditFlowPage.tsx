@@ -1,7 +1,10 @@
 import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import DouyinProductCreateWizard from './douyin/DouyinProductCreateWizard'
+import KuaishouProductCreateWizard from './kuaishou/KuaishouProductCreateWizard'
 import { createPlatformLabel, isCreatePlatformId } from '../constants/productCreatePlatforms'
+
+const GROUPBUY_EDIT_PLATFORMS = new Set(['douyin', 'kuaishou'])
 
 export default function ProductEditFlowPage() {
   const { platform, productId } = useParams<{ platform: string; productId: string }>()
@@ -19,7 +22,7 @@ export default function ProductEditFlowPage() {
     )
   }
 
-  if (plat !== 'douyin') {
+  if (!GROUPBUY_EDIT_PLATFORMS.has(plat)) {
     return (
       <div className="mx-auto max-w-2xl space-y-4 p-6">
         <Link to="/products/list" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900">
@@ -27,11 +30,13 @@ export default function ProductEditFlowPage() {
           返回商品列表
         </Link>
         <p className="text-sm text-gray-700">
-          「{createPlatformLabel(plat)}」的商品编辑暂未在本页开放，请先使用该平台官方后台或抖音来客完整编辑流程；后续版本将陆续支持。
+          「{createPlatformLabel(plat)}」的商品编辑暂未在本页开放，请先使用该平台官方后台或团购完整编辑流程；后续版本将陆续支持。
         </p>
       </div>
     )
   }
+
+  const isKuaishou = plat === 'kuaishou'
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -45,12 +50,17 @@ export default function ProductEditFlowPage() {
         </Link>
       </div>
       <div>
-        <h1 className="erp-page-title">抖音来客 · 编辑商品</h1>
+        <h1 className="erp-page-title">{isKuaishou ? '快手团购' : '抖音来客'} · 编辑商品</h1>
         <p className="mt-1 text-sm text-gray-500">
-          与「创建商品」相同的分步表单；数据来自抖音来客或您曾保存的草稿。保存与提交将同步至抖音来客。
+          与「创建商品」相同的分步表单；数据来自{isKuaishou ? '快手团购' : '抖音来客'}或您曾保存的草稿。保存与提交将同步至
+          {isKuaishou ? '快手团购' : '抖音来客'}。
         </p>
       </div>
-      <DouyinProductCreateWizard variant="edit" editProductId={pid} />
+      {isKuaishou ? (
+        <KuaishouProductCreateWizard variant="edit" editProductId={pid} />
+      ) : (
+        <DouyinProductCreateWizard variant="edit" editProductId={pid} />
+      )}
     </div>
   )
 }

@@ -11,6 +11,7 @@ export type PlatformChannel = 'groupbuy' | 'waimai'
 /** 商品创建 / 门店 Tab / 评价 / 活动等共用的平台 ID */
 export type MerchantPlatformId =
   | 'douyin'
+  | 'kuaishou'
   | 'meituan'
   | 'xiaohongshu'
   | 'jd'
@@ -49,6 +50,19 @@ const GROUPBUY: MerchantPlatformDef[] = [
     tokenSessionKey: 'meoo_douyin_merchant_token',
     appIdSessionKey: 'meoo_douyin_app_id',
     docsUrl: 'https://open.douyin.com/',
+    settingsBindable: true,
+    dedicatedProductWizard: true,
+  },
+  {
+    id: 'kuaishou',
+    name: '快手团购',
+    letter: '快',
+    color: 'from-orange-500 to-amber-500',
+    channel: 'groupbuy',
+    apiSegment: 'kuaishou',
+    tokenSessionKey: 'meoo_kuaishou_merchant_token',
+    appIdSessionKey: 'meoo_kuaishou_app_id',
+    docsUrl: 'https://open.kwailocallife.com/',
     settingsBindable: true,
     dedicatedProductWizard: true,
   },
@@ -176,6 +190,7 @@ export function platformChannelLabel(channel: PlatformChannel): string {
 /** 财务 / 评价等 API 平台 ID（不含即将开放的 jd 团购） */
 export type FinancePlatformId =
   | 'douyin'
+  | 'kuaishou'
   | 'meituan'
   | 'xhs'
   | 'eleme'

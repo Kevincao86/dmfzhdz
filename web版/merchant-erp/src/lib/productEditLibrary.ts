@@ -18,6 +18,7 @@ export type ProductEditLibraryRow = {
   /** 与 `CreatePlatformId` 一致，用于商品列表按平台 Tab 过滤 */
   platformApi?:
     | 'douyin'
+    | 'kuaishou'
     | 'meituan'
     | 'xiaohongshu'
     | 'jd'

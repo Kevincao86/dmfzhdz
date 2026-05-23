@@ -17,13 +17,29 @@ const DOUYIN_LOCAL_KEYS = [
   'meoo_douyin_account_name',
 ] as const
 
+const KUAISHOU_LOCAL_KEYS = [
+  'meoo_kuaishou_merchant_token',
+  'meoo_kuaishou_auto_refresh',
+  'meoo_kuaishou_app_id',
+  'meoo_kuaishou_merchant_id',
+  'meoo_kuaishou_account_name',
+] as const
+
 function isDouyinBindingKey(key: string): boolean {
   return key.startsWith('meoo_douyin_')
 }
 
+function isKuaishouBindingKey(key: string): boolean {
+  return key.startsWith('meoo_kuaishou_')
+}
+
+function isPersistentMerchantBindingKey(key: string): boolean {
+  return isDouyinBindingKey(key) || isKuaishouBindingKey(key)
+}
+
 export function readMerchantSession(key: string): string | null {
   try {
-    if (isDouyinBindingKey(key)) {
+    if (isPersistentMerchantBindingKey(key)) {
       const loc = localStorage.getItem(key)
       if (typeof loc === 'string' && loc.trim() !== '') return loc.trim()
       const sess = sessionStorage.getItem(key)
@@ -48,7 +64,7 @@ export function readMerchantSession(key: string): string | null {
 /** 写入商家会话；`value === null` 表示清除（抖音键会同时清 local + session 副本） */
 export function writeMerchantSession(key: string, value: string | null): void {
   try {
-    if (isDouyinBindingKey(key)) {
+    if (isPersistentMerchantBindingKey(key)) {
       if (value == null) {
         localStorage.removeItem(key)
         sessionStorage.removeItem(key)
@@ -67,6 +83,12 @@ export function writeMerchantSession(key: string, value: string | null): void {
 
 export function clearDouyinMerchantBindingLocal(): void {
   for (const k of DOUYIN_LOCAL_KEYS) {
+    writeMerchantSession(k, null)
+  }
+}
+
+export function clearKuaishouMerchantBindingLocal(): void {
+  for (const k of KUAISHOU_LOCAL_KEYS) {
     writeMerchantSession(k, null)
   }
 }

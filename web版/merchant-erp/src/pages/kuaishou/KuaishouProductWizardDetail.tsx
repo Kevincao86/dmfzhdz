@@ -1,0 +1,914 @@
+import { ChevronLeft, Loader2, Plus, Sparkles, Upload, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import DouyinComboGroupsEditor from '../../components/douyin/DouyinComboGroupsEditor'
+import DouyinProductAiModelSection from '../../components/douyin/DouyinProductAiModelSection'
+import { appendComboGroup, type ComboGroupFormRow } from '../../lib/douyinComboGroupsForm'
+import {
+  DouyinProductPreviewAside as KuaishouProductPreviewAside,
+  type DouyinPreviewComboLine as KuaishouPreviewComboLine,
+} from '../../components/douyin/DouyinProductMobilePreview'
+import KuaishouStorePickerModal from '../../components/store/KuaishouStorePickerModal'
+import { useKuaishouProductWizardAi, type AiGoodsContext } from '../../hooks/useKuaishouProductWizardAi'
+import {
+  NonConsumeDatesModal,
+  PurchaseLimitModal,
+  ReserveAdvanceModal,
+  SalePeriodModal,
+  TimePeriodsModal,
+  VoucherUseLimitModal,
+} from '../../components/douyin/DouyinProductFormModals'
+import { cn } from '../../cn'
+import {
+  buildTradeRuleDescriptionLines,
+  type DouyinProductFormRules as KuaishouProductFormRules,
+  type DouyinTimePeriod as KuaishouTimePeriod,
+  type DouyinWeekdayKey as KuaishouWeekdayKey,
+} from '../../lib/douyinProductRuleText'
+import { DEFAULT_TEMPLATE_SALES_CHANNELS } from '../../services/kuaishouProductApi'
+
+const MAX_AUX = 4
+const MAX_ENV = 10
+
+export type KuaishouWizardDetailProps = {
+  isEdit: boolean
+  productType: number | null
+  productName: string
+  setProductName: (v: string) => void
+  productDesc: string
+  setProductDesc: (v: string) => void
+  priceYuan: string
+  setPriceYuan: (v: string) => void
+  originYuan: string
+  setOriginYuan: (v: string) => void
+  headUrl: string
+  setHeadUrl: (v: string) => void
+  auxUrls: string[]
+  setAuxUrls: (v: string[]) => void
+  envUrls: string[]
+  setEnvUrls: (v: string[]) => void
+  comboGroups: ComboGroupFormRow[]
+  setComboGroups: (v: ComboGroupFormRow[]) => void
+  salesChannel: string
+  setSalesChannel: (v: string) => void
+  saleTimeLimited: boolean
+  setSaleTimeLimited: (v: boolean) => void
+  saleStart: string
+  saleEnd: string
+  setSalePeriod: (start: string, end: string) => void
+  consumeValidDays: string
+  setConsumeValidDays: (v: string) => void
+  nonConsumeDateMode: 'all_dates' | 'partial_dates'
+  setNonConsumeDateMode: (v: 'all_dates' | 'partial_dates') => void
+  nonConsumeWeekdays: KuaishouWeekdayKey[]
+  nonConsumeHolidays: string[]
+  nonConsumeSpecificDates: string[]
+  setNonConsumePartial: (w: KuaishouWeekdayKey[], h: string[], d: string[]) => void
+  dailyAllDay: boolean
+  setDailyAllDay: (v: boolean) => void
+  dailyTimePeriods: KuaishouTimePeriod[]
+  setDailyTimePeriods: (p: KuaishouTimePeriod[]) => void
+  purchaseLimitMode: 'none' | 'limited'
+  setPurchaseLimitMode: (v: 'none' | 'limited') => void
+  purchaseLimitPerPerson: number
+  purchaseLimitPerDay: number
+  setPurchaseLimits: (perPerson: number, perDay: number) => void
+  reserveMode: 'none' | 'required'
+  setReserveMode: (v: 'none' | 'required') => void
+  reserveAdvanceDays: number
+  setReserveAdvanceDays: (v: number) => void
+  voucherUseLimit: boolean
+  setVoucherUseLimit: (v: boolean) => void
+  voucherUseMax: number
+  setVoucherUseMax: (v: number) => void
+  afterSalePolicy: string
+  setAfterSalePolicy: (v: string) => void
+  selectedPoiIds: string[]
+  selectedPoiNames: string[]
+  storeModalOpen: boolean
+  setStoreModalOpen: (v: boolean) => void
+  onPoiConfirm: (ids: string[], names: string[]) => void
+  uploading: boolean
+  onPickImage: (file: File, slot: 'head' | 'aux' | 'env', index?: number) => void
+  saving: boolean
+  actionMsg: { text: string; ok: boolean } | null
+  onSaveDraft: () => void
+  onSubmit: () => void
+  onBackType: () => void
+  goodsContext?: AiGoodsContext
+}
+
+export default function KuaishouProductWizardDetail(props: KuaishouWizardDetailProps) {
+  const headRef = useRef<HTMLInputElement>(null)
+  const auxRef = useRef<HTMLInputElement>(null)
+  const envRef = useRef<HTMLInputElement>(null)
+
+  const [saleModal, setSaleModal] = useState(false)
+  const [nonConsumeModal, setNonConsumeModal] = useState(false)
+  const [timeModal, setTimeModal] = useState(false)
+  const [purchaseModal, setPurchaseModal] = useState(false)
+  const [reserveModal, setReserveModal] = useState(false)
+  const [voucherModal, setVoucherModal] = useState(false)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!imagePreviewUrl) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setImagePreviewUrl(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [imagePreviewUrl])
+
+  const {
+    aiOn,
+    optimizeTitleAndDesc,
+    generateHeadImage,
+    enhanceHeadImage,
+    generateAuxImage,
+    enhanceAuxImages,
+    generateEnvImage,
+    enhanceEnvImages,
+  } = useKuaishouProductWizardAi({
+    productName: props.productName,
+    productDesc: props.productDesc,
+    priceYuan: props.priceYuan,
+    originYuan: props.originYuan,
+    setProductName: props.setProductName,
+    setProductDesc: props.setProductDesc,
+    setHeadUrl: props.setHeadUrl,
+    headUrl: props.headUrl,
+    auxUrls: props.auxUrls,
+    setAuxUrls: props.setAuxUrls,
+    envUrls: props.envUrls,
+    setEnvUrls: props.setEnvUrls,
+    goodsContext: props.goodsContext,
+  })
+
+  const auxFilledCount = useMemo(() => props.auxUrls.filter((u) => u.trim()).length, [props.auxUrls])
+  const envFilledCount = useMemo(() => props.envUrls.filter((u) => u.trim()).length, [props.envUrls])
+
+  const formRules: KuaishouProductFormRules = useMemo(
+    () => ({
+      salesChannel: props.salesChannel,
+      saleTimeLimited: props.saleTimeLimited,
+      saleStart: props.saleStart,
+      saleEnd: props.saleEnd,
+      consumeValidDays: Number.parseInt(props.consumeValidDays, 10) || 360,
+      nonConsumeDateMode: props.nonConsumeDateMode,
+      nonConsumeWeekdays: props.nonConsumeWeekdays,
+      nonConsumeHolidays: props.nonConsumeHolidays,
+      nonConsumeSpecificDates: props.nonConsumeSpecificDates,
+      dailyAllDay: props.dailyAllDay,
+      dailyTimePeriods: props.dailyTimePeriods,
+      purchaseLimitMode: props.purchaseLimitMode,
+      purchaseLimitPerPerson: props.purchaseLimitPerPerson,
+      purchaseLimitPerDay: props.purchaseLimitPerDay,
+      reserveMode: props.reserveMode,
+      reserveAdvanceDays: props.reserveAdvanceDays,
+      voucherUseLimit: props.voucherUseLimit,
+      voucherUseMax: props.voucherUseMax,
+      afterSalePolicy: props.afterSalePolicy,
+    }),
+    [props],
+  )
+
+  const rulePreview = useMemo(() => buildTradeRuleDescriptionLines(formRules), [formRules])
+
+  const previewComboLines = useMemo((): KuaishouPreviewComboLine[] => {
+    if (props.productType !== 1) return []
+    const fallbackPrice = Number.parseFloat(props.priceYuan) || 0
+    const lines: KuaishouPreviewComboLine[] = []
+    for (const g of props.comboGroups) {
+      for (const it of g.items) {
+        const name = it.name.trim()
+        if (!name) continue
+        const py = Number.parseFloat(it.priceYuan) || fallbackPrice
+        lines.push({
+          name,
+          qty: String(Math.max(1, it.quantity || 1)),
+          price: Number.isFinite(py) && py > 0 ? String(py) : '',
+        })
+      }
+    }
+    if (lines.length === 0 && props.productName.trim()) {
+      lines.push({
+        name: props.productName.trim(),
+        qty: '1',
+        price: fallbackPrice > 0 ? String(fallbackPrice) : '',
+      })
+    }
+    return lines
+  }, [props.productType, props.comboGroups, props.productName, props.priceYuan])
+
+  const previewProps = useMemo(
+    () => ({
+      productName: props.productName,
+      productDesc: props.productDesc,
+      priceYuan: props.priceYuan,
+      originYuan: props.originYuan,
+      headUrl: props.headUrl,
+      envUrls: props.envUrls,
+      productType: props.productType,
+      comboLines: previewComboLines,
+      poiCount: props.selectedPoiIds.length,
+      formRules,
+    }),
+    [props, previewComboLines, formRules],
+  )
+
+  const uploadAux = (file: File, index: number) => {
+    void props.onPickImage(file, 'aux', index)
+  }
+
+  const uploadEnv = (file: File, index: number) => {
+    void props.onPickImage(file, 'env', index)
+  }
+
+  return (
+    <section className="space-y-4">
+      {!props.isEdit && (
+        <button type="button" className="text-sm text-indigo-600" onClick={props.onBackType}>
+          <ChevronLeft className="inline h-4 w-4" /> 返回类型
+        </button>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex-1 min-w-[200px]">
+          图片在对应区域展示；售卖/消费/预约等规则由服务端写入来客 OpenAPI 对应字段（show_channel、use_date、use_time 等），<strong>不会</strong>追加到商品说明正文。
+        </div>
+      </div>
+
+      <DouyinProductAiModelSection />
+
+      <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+      <div className="min-w-0 flex-1 space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+          <h3 className="font-semibold text-gray-900">基础信息</h3>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-gray-800">商品名称 *</span>
+              <button
+                type="button"
+                disabled={aiOn('title') || aiOn('desc')}
+                onClick={() => void optimizeTitleAndDesc()}
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+              >
+                {aiOn('title') || aiOn('desc') ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                AI 优化标题与说明
+              </button>
+            </div>
+            <input
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={props.productName}
+              maxLength={40}
+              onChange={(e) => props.setProductName(e.target.value)}
+            />
+            <p className="mt-0.5 text-xs text-gray-500">{props.productName.length} / 40</p>
+          </div>
+          <label className="block text-sm">
+            <span className="font-medium">商品说明</span>
+            <textarea
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              rows={4}
+              value={props.productDesc}
+              onChange={(e) => props.setProductDesc(e.target.value)}
+              placeholder="欢迎到店体验，详询门店。"
+            />
+          </label>
+          {rulePreview.length > 0 && (
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600 whitespace-pre-line">
+              <p className="mb-1 font-medium text-gray-800">以下规则将映射至来客 OpenAPI 字段（预览参考，不写入上方说明）：</p>
+              {rulePreview.join('\n')}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="font-medium">售价（元）*</span>
+              <input
+                type="number"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                value={props.priceYuan}
+                onChange={(e) => props.setPriceYuan(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium">划线价（元）</span>
+              <input
+                type="number"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                value={props.originYuan}
+                onChange={(e) => props.setOriginYuan(e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+          <h3 className="font-semibold text-gray-900">图片</h3>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">头图 *</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-head') || !props.headUrl.trim()}
+                  onClick={() => void enhanceHeadImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
+                >
+                  {aiOn('img-head') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 优化
+                </button>
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-head')}
+                  onClick={() => void generateHeadImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {aiOn('img-head') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 生成
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {props.headUrl ? (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    className="rounded-lg border focus:ring-2 focus:ring-indigo-300"
+                    onClick={() => setImagePreviewUrl(props.headUrl)}
+                    title="点击放大"
+                  >
+                    <img src={props.headUrl} alt="" className="h-20 w-20 rounded-lg object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      props.setHeadUrl('')
+                    }}
+                    className="absolute -right-2 -top-2 rounded-full bg-gray-800 p-1 text-white shadow hover:bg-gray-900"
+                    aria-label="删除头图"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                disabled={props.uploading}
+                onClick={() => headRef.current?.click()}
+                className="inline-flex items-center rounded-lg border px-3 py-2 text-sm"
+              >
+                <Upload className="mr-1 h-4 w-4" />
+                上传
+              </button>
+              <input
+                ref={headRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void props.onPickImage(f, 'head')
+                }}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">
+                辅助图（最多 {MAX_AUX} 张）
+                <span className="ml-1 font-normal text-gray-500">（{auxFilledCount}/{MAX_AUX}）</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-aux') || auxFilledCount === 0}
+                  onClick={() => void enhanceAuxImages()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
+                >
+                  {aiOn('img-aux') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 优化
+                </button>
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-aux') || auxFilledCount >= MAX_AUX}
+                  onClick={() => void generateAuxImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {aiOn('img-aux') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 生成
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {props.auxUrls.map((u, i) => (
+                <div key={i} className="relative">
+                  {u ? (
+                    <button type="button" onClick={() => setImagePreviewUrl(u)} title="点击放大"><img src={u} alt="" className="h-16 w-16 rounded border object-cover" /></button>
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded border border-dashed text-xs text-gray-400">
+                      空
+                    </div>
+                  )}
+                  {u ? (
+                    <button
+                      type="button"
+                      className="absolute -right-1 -top-1 rounded-full bg-white shadow"
+                      onClick={() => {
+                        const next = props.auxUrls.filter((_, j) => j !== i)
+                        props.setAuxUrls(next.filter((x) => x.trim()).length ? next.filter((x) => x.trim()) : [''])
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {auxFilledCount < MAX_AUX && (
+                <button
+                  type="button"
+                  disabled={props.uploading}
+                  onClick={() => {
+                    if (props.auxUrls.length < MAX_AUX) {
+                      props.setAuxUrls([...props.auxUrls, ''])
+                    }
+                    auxRef.current?.click()
+                  }}
+                  className="flex h-16 w-16 items-center justify-center rounded border border-dashed text-xs text-gray-500"
+                >
+                  +
+                </button>
+              )}
+            </div>
+            <input
+              ref={auxRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                const idx = props.auxUrls.findIndex((u) => !u.trim())
+                uploadAux(f, idx >= 0 ? idx : props.auxUrls.length)
+              }}
+            />
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium">
+                环境图（最多 {MAX_ENV} 张）
+                <span className="ml-1 font-normal text-gray-500">（{envFilledCount}/{MAX_ENV}）</span>
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-env') || envFilledCount === 0}
+                  onClick={() => void enhanceEnvImages()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-800 disabled:opacity-50"
+                >
+                  {aiOn('img-env') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 优化
+                </button>
+                <button
+                  type="button"
+                  disabled={props.uploading || aiOn('img-env') || envFilledCount >= MAX_ENV}
+                  onClick={() => void generateEnvImage()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-800 disabled:opacity-50"
+                >
+                  {aiOn('img-env') ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  AI 生成
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {props.envUrls.map((u, i) => (
+                <div key={i} className="relative">
+                  {u ? (
+                    <button type="button" onClick={() => setImagePreviewUrl(u)} title="点击放大"><img src={u} alt="" className="h-16 w-16 rounded border object-cover" /></button>
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded border border-dashed text-xs text-gray-400">
+                      空
+                    </div>
+                  )}
+                  {u ? (
+                    <button
+                      type="button"
+                      className="absolute -right-1 -top-1 rounded-full bg-gray-800 p-0.5 text-white shadow"
+                      onClick={() => {
+                        const next = props.envUrls.filter((_, j) => j !== i)
+                        props.setEnvUrls(next.filter((x) => x.trim()).length ? next.filter((x) => x.trim()) : [''])
+                      }}
+                      aria-label="删除"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              {envFilledCount < MAX_ENV && (
+                <button
+                  type="button"
+                  disabled={props.uploading}
+                  onClick={() => {
+                    if (props.envUrls.length < MAX_ENV) props.setEnvUrls([...props.envUrls, ''])
+                    envRef.current?.click()
+                  }}
+                  className="flex h-16 w-16 items-center justify-center rounded border border-dashed text-xs text-gray-500"
+                >
+                  +
+                </button>
+              )}
+            </div>
+            <input
+              ref={envRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                const idx = props.envUrls.findIndex((u) => !u.trim())
+                uploadEnv(f, idx >= 0 ? idx : props.envUrls.length)
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {props.productType === 1 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3" data-testid="kuaishou-combo-groups-card">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-gray-900">团购单品（商品组）</h3>
+              <p className="mt-0.5 text-xs text-gray-500">
+                可配置多个商品组，每组支持多个单品与几选几规则
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => props.setComboGroups(appendComboGroup(props.comboGroups))}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-indigo-600 bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+            >
+              <Plus className="h-4 w-4" />
+              新增商品组
+            </button>
+          </div>
+          <DouyinComboGroupsEditor
+            groups={props.comboGroups}
+            onChange={props.setComboGroups}
+            showAddGroupButton={false}
+          />
+          <div className="flex justify-end border-t border-gray-100 pt-3">
+            <button
+              type="button"
+              onClick={() => props.setComboGroups(appendComboGroup(props.comboGroups))}
+              className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100"
+            >
+              <Plus className="h-4 w-4" />
+              新增商品组
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+        <h3 className="font-semibold">售卖与规则</h3>
+        <label className="block text-sm max-w-md">
+          投放渠道
+          <select
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            value={props.salesChannel}
+            onChange={(e) => props.setSalesChannel(e.target.value)}
+          >
+            {DEFAULT_TEMPLATE_SALES_CHANNELS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="rounded-lg border border-gray-100 bg-gray-50/80 p-3 text-sm">
+          <p className="font-medium">商品售卖日期</p>
+          <div className="mt-2 flex flex-wrap gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.saleTimeLimited}
+                onChange={() => props.setSaleTimeLimited(true)}
+              />
+              限时售卖
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={!props.saleTimeLimited}
+                onChange={() => props.setSaleTimeLimited(false)}
+              />
+              不限时间
+            </label>
+            {props.saleTimeLimited && (
+              <button
+                type="button"
+                className="text-indigo-600 underline"
+                onClick={() => setSaleModal(true)}
+              >
+                选择时间段
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm block">
+            售后政策
+            <select
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              value={props.afterSalePolicy}
+              onChange={(e) => props.setAfterSalePolicy(e.target.value)}
+            >
+              <option value="refund_anytime">随时退</option>
+              <option value="refund_auto_expire">过期退</option>
+              <option value="no_refund">不可退</option>
+            </select>
+          </label>
+          <label className="text-sm block">
+            有效天数
+            <input
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+              value={props.consumeValidDays}
+              onChange={(e) => props.setConsumeValidDays(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="rounded-lg border border-gray-100 p-3">
+            <p className="font-medium">顾客可消费日期</p>
+            <p className="mt-1 text-gray-600">购买后 {props.consumeValidDays} 天内可用</p>
+          </div>
+          <div className="rounded-lg border border-gray-100 p-3">
+            <p className="font-medium">不可消费日期</p>
+            <label className="mt-2 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.nonConsumeDateMode === 'all_dates'}
+                onChange={() => props.setNonConsumeDateMode('all_dates')}
+              />
+              所有日期均可使用
+            </label>
+            <label className="mt-1 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.nonConsumeDateMode === 'partial_dates'}
+                onChange={() => props.setNonConsumeDateMode('partial_dates')}
+              />
+              部分日期不可用
+              {props.nonConsumeDateMode === 'partial_dates' && (
+                <button type="button" className="text-indigo-600 underline" onClick={() => setNonConsumeModal(true)}>
+                  设置
+                </button>
+              )}
+            </label>
+          </div>
+          <div className="rounded-lg border border-gray-100 p-3">
+            <p className="font-medium">每日使用时段</p>
+            <label className="mt-2 flex items-center gap-2">
+              <input type="radio" checked={props.dailyAllDay} onChange={() => props.setDailyAllDay(true)} />
+              全天可用
+            </label>
+            <label className="mt-1 flex items-center gap-2">
+              <input type="radio" checked={!props.dailyAllDay} onChange={() => props.setDailyAllDay(false)} />
+              仅指定时间可用
+              {!props.dailyAllDay && (
+                <button type="button" className="text-indigo-600 underline" onClick={() => setTimeModal(true)}>
+                  设置时段
+                </button>
+              )}
+            </label>
+          </div>
+          <div className="rounded-lg border border-gray-100 p-3">
+            <p className="font-medium">限制购买</p>
+            <label className="mt-2 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.purchaseLimitMode === 'none'}
+                onChange={() => props.setPurchaseLimitMode('none')}
+              />
+              不限制
+            </label>
+            <label className="mt-1 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.purchaseLimitMode === 'limited'}
+                onChange={() => props.setPurchaseLimitMode('limited')}
+              />
+              限制购买
+              {props.purchaseLimitMode === 'limited' && (
+                <button type="button" className="text-indigo-600 underline" onClick={() => setPurchaseModal(true)}>
+                  设置
+                </button>
+              )}
+            </label>
+          </div>
+          <div className="rounded-lg border border-gray-100 p-3">
+            <p className="font-medium">预约规则</p>
+            <label className="mt-2 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.reserveMode === 'none'}
+                onChange={() => props.setReserveMode('none')}
+              />
+              到店不需要预约
+            </label>
+            <label className="mt-1 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.reserveMode === 'required'}
+                onChange={() => props.setReserveMode('required')}
+              />
+              到店需要预约
+              {props.reserveMode === 'required' && (
+                <button type="button" className="text-indigo-600 underline" onClick={() => setReserveModal(true)}>
+                  设置
+                </button>
+              )}
+            </label>
+          </div>
+          <div className="rounded-lg border border-gray-100 p-3">
+            <p className="font-medium">使用张数</p>
+            <label className="mt-2 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={!props.voucherUseLimit}
+                onChange={() => props.setVoucherUseLimit(false)}
+              />
+              不限制张数
+            </label>
+            <label className="mt-1 flex items-center gap-2">
+              <input
+                type="radio"
+                checked={props.voucherUseLimit}
+                onChange={() => props.setVoucherUseLimit(true)}
+              />
+              限制张数
+              {props.voucherUseLimit && (
+                <button type="button" className="text-indigo-600 underline" onClick={() => setVoucherModal(true)}>
+                  设置
+                </button>
+              )}
+            </label>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => props.setStoreModalOpen(true)}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+        >
+          选择适用门店（已选 {props.selectedPoiIds.length} 个）
+        </button>
+      </div>
+
+      {props.actionMsg && (
+        <p
+          className={cn(
+            'rounded-lg border px-3 py-2 text-sm',
+            props.actionMsg.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900',
+          )}
+        >
+          {props.actionMsg.text}
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          disabled={props.saving}
+          onClick={props.onSaveDraft}
+          className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm"
+        >
+          保存草稿
+        </button>
+        <button
+          type="button"
+          disabled={props.saving}
+          onClick={props.onSubmit}
+          className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-medium text-white disabled:bg-gray-400"
+        >
+          {props.saving ? '提交中…' : '提交审核'}
+        </button>
+      </div>
+
+      </div>
+
+      <KuaishouProductPreviewAside {...previewProps} className="xl:w-[min(100%,300px)] xl:shrink-0" />
+
+      </div>
+
+      <KuaishouStorePickerModal
+        open={props.storeModalOpen}
+        onClose={() => props.setStoreModalOpen(false)}
+        initialPoiIds={props.selectedPoiIds}
+        onConfirm={(ids, rows) => {
+          props.onPoiConfirm(ids, rows.map((r) => r.name))
+          props.setStoreModalOpen(false)
+        }}
+      />
+
+      <SalePeriodModal
+        open={saleModal}
+        onClose={() => setSaleModal(false)}
+        saleStart={props.saleStart}
+        saleEnd={props.saleEnd}
+        onConfirm={(s, e) => {
+          props.setSalePeriod(s, e)
+          setSaleModal(false)
+        }}
+      />
+      <NonConsumeDatesModal
+        open={nonConsumeModal}
+        onClose={() => setNonConsumeModal(false)}
+        weekdays={props.nonConsumeWeekdays}
+        holidays={props.nonConsumeHolidays}
+        specificDates={props.nonConsumeSpecificDates}
+        onConfirm={(w, h, d) => {
+          props.setNonConsumePartial(w, h, d)
+          setNonConsumeModal(false)
+        }}
+      />
+      <TimePeriodsModal
+        open={timeModal}
+        onClose={() => setTimeModal(false)}
+        periods={props.dailyTimePeriods}
+        onConfirm={(p) => {
+          props.setDailyTimePeriods(p)
+          setTimeModal(false)
+        }}
+      />
+      <PurchaseLimitModal
+        open={purchaseModal}
+        onClose={() => setPurchaseModal(false)}
+        perPerson={props.purchaseLimitPerPerson}
+        perDay={props.purchaseLimitPerDay}
+        onConfirm={(pp, pd) => {
+          props.setPurchaseLimits(pp, pd)
+          if (pp > 0 || pd > 0) props.setPurchaseLimitMode('limited')
+          setPurchaseModal(false)
+        }}
+      />
+      <ReserveAdvanceModal
+        open={reserveModal}
+        onClose={() => setReserveModal(false)}
+        days={props.reserveAdvanceDays}
+        onConfirm={(d) => {
+          props.setReserveAdvanceDays(d)
+          props.setReserveMode('required')
+          setReserveModal(false)
+        }}
+      />
+      <VoucherUseLimitModal
+        open={voucherModal}
+        onClose={() => setVoucherModal(false)}
+        max={props.voucherUseMax}
+        onConfirm={(n) => {
+          props.setVoucherUseMax(n)
+          props.setVoucherUseLimit(true)
+          setVoucherModal(false)
+        }}
+      />
+
+      {imagePreviewUrl ? (
+        <div
+          className="fixed inset-0 z-[280] flex items-center justify-center bg-black/80 p-4"
+          role="presentation"
+          onClick={() => setImagePreviewUrl(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full bg-white/95 p-2 text-gray-800 shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation()
+              setImagePreviewUrl(null)
+            }}
+            aria-label="关闭"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={imagePreviewUrl}
+            alt=""
+            className="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
+    </section>
+  )
+}

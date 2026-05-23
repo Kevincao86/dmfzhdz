@@ -1,7 +1,9 @@
 import { readMerchantSession } from '../lib/merchantSession'
 import { hydrateDouyinBindingsFromCloud } from '../lib/merchantDouyinCloudBinding'
+import { hydrateKuaishouBindingsFromCloud } from '../lib/merchantKuaishouCloudBinding'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { getDouyinStores } from './douyinMerchantApi'
+import { getKuaishouStores } from './kuaishouMerchantApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
@@ -31,6 +33,8 @@ function connectivitySessionSig(): string {
   return [
     readMerchantSession('meoo_douyin_merchant_token') ?? '',
     readMerchantSession('meoo_douyin_merchant_id') ?? '',
+    readMerchantSession('meoo_kuaishou_merchant_token') ?? '',
+    readMerchantSession('meoo_kuaishou_merchant_id') ?? '',
     readMerchantSession('meoo_meituan_merchant_token') ?? '',
     readMerchantSession('meoo_xhs_merchant_token') ?? '',
     readMerchantSession('meoo_eleme_merchant_token') ?? '',
@@ -120,6 +124,33 @@ async function probeDouyinConnectivity(lastChecked: string): Promise<PlatformCon
   return { ...douyin, status: 'connected', lastChecked: checkedAt }
 }
 
+async function probeKuaishouConnectivity(lastChecked: string): Promise<PlatformConnectivityRow> {
+  let kuaishou: PlatformConnectivityRow = {
+    id: 'kuaishou',
+    name: '快手团购',
+    status: 'error',
+    lastChecked,
+  }
+  const ksTok = readMerchantSession('meoo_kuaishou_merchant_token')
+  const ksMid = readMerchantSession('meoo_kuaishou_merchant_id')
+  if (!ksTok) return kuaishou
+
+  const r = await getKuaishouStores({
+    accessToken: ksTok,
+    page: 1,
+    pageSize: 1,
+    merchantId: ksMid ?? undefined,
+  })
+  const checkedAt = formatNow()
+  if (r.ok) {
+    return { ...kuaishou, status: 'connected', lastChecked: checkedAt }
+  }
+  if (douyinStoreErrorLooksLikeAuthFailure(r.message ?? '')) {
+    return { ...kuaishou, status: 'error', lastChecked: checkedAt }
+  }
+  return { ...kuaishou, status: 'connected', lastChecked: checkedAt }
+}
+
 async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow[]> {
   if (supabaseConfigured && supabase) {
     try {
@@ -128,6 +159,7 @@ async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow
       } = await supabase.auth.getSession()
       if (session?.user) {
         await hydrateDouyinBindingsFromCloud(supabase)
+        await hydrateKuaishouBindingsFromCloud(supabase)
       }
     } catch {
       /* 云端绑定恢复失败时仍用本地 session 探测 */
@@ -144,6 +176,7 @@ async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow
   }
 
   const douyin = await probeDouyinConnectivity(lastChecked)
+  const kuaishou = await probeKuaishouConnectivity(lastChecked)
 
   const mtTok = readMerchantSession('meoo_meituan_merchant_token')
   let meituan: PlatformConnectivityRow = {
@@ -183,6 +216,7 @@ async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow
 
   return [
     douyin,
+    kuaishou,
     meituan,
     xiaohongshu,
     { ...jd, lastChecked: formatNow() },

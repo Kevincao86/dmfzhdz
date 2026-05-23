@@ -9,6 +9,7 @@ import type { StorePlatformTab } from './merchantStoresApi'
 /** 与列表查询 query 一致（小红书为 xhs） */
 export type ReviewsApiPlatform =
   | 'douyin'
+  | 'kuaishou'
   | 'meituan'
   | 'xhs'
   | 'eleme'
@@ -38,12 +39,13 @@ export function reviewsTabToApiPlatform(tab: StorePlatformTab): ReviewsApiPlatfo
   if (tab === 'jd') return null
   if (tab === 'xiaohongshu') return 'xhs'
   if (tab === 'eleme' || tab === 'meituan_waimai' || tab === 'jd_waimai') return tab
-  if (tab === 'douyin' || tab === 'meituan') return tab
+  if (tab === 'douyin' || tab === 'kuaishou' || tab === 'meituan') return tab
   return null
 }
 
 function platformSessionHeaders(platform?: ReviewsApiPlatform): HeadersInit {
   const douyin = readMerchantSession('meoo_douyin_merchant_token')
+  const kuaishou = readMerchantSession('meoo_kuaishou_merchant_token')
   const meituan = readMerchantSession('meoo_meituan_merchant_token')
   const xhs = readMerchantSession('meoo_xhs_merchant_token')
   const eleme = readMerchantSession('meoo_eleme_merchant_token')
@@ -52,6 +54,7 @@ function platformSessionHeaders(platform?: ReviewsApiPlatform): HeadersInit {
   let primary = douyin ?? meituan ?? xhs ?? eleme ?? meituanWaimai ?? jdWaimai
   if (platform === 'meituan') primary = meituan ?? primary
   if (platform === 'douyin') primary = douyin ?? primary
+  if (platform === 'kuaishou') primary = kuaishou ?? primary
   if (platform === 'xhs') primary = xhs ?? primary
   if (platform === 'eleme') primary = eleme ?? primary
   if (platform === 'meituan_waimai') primary = meituanWaimai ?? primary
@@ -59,6 +62,7 @@ function platformSessionHeaders(platform?: ReviewsApiPlatform): HeadersInit {
   const h: Record<string, string> = { Accept: 'application/json' }
   if (primary) h.Authorization = `Bearer ${primary}`
   if (douyin) h['X-Meoo-Douyin-Token'] = douyin
+  if (kuaishou) h['X-Meoo-Kuaishou-Token'] = kuaishou
   if (meituan) h['X-Meoo-Meituan-Token'] = meituan
   if (xhs) h['X-Meoo-Xhs-Token'] = xhs
   if (eleme) h['X-Meoo-Eleme-Token'] = eleme

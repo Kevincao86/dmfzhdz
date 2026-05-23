@@ -169,6 +169,7 @@ export async function fetchHomeDashboardByPlatforms(
 }> {
   const allTabs: StorePlatformTab[] = [
     'douyin',
+    'kuaishou',
     'meituan',
     'xiaohongshu',
     'jd',
@@ -181,6 +182,7 @@ export async function fetchHomeDashboardByPlatforms(
 
   const trendByPlatform: Record<StorePlatformTab, number[]> = {
     douyin: Array(days).fill(0),
+    kuaishou: Array(days).fill(0),
     meituan: Array(days).fill(0),
     xiaohongshu: Array(days).fill(0),
     jd: Array(days).fill(0),
@@ -191,6 +193,7 @@ export async function fetchHomeDashboardByPlatforms(
 
   const dashboardTabs: Exclude<StorePlatformTab, 'jd'>[] = [
     'douyin',
+    'kuaishou',
     'meituan',
     'xiaohongshu',
     'eleme',

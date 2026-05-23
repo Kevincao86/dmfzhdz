@@ -23,6 +23,13 @@ import {
   postDouyinGoodsProductSync,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
+import {
+  postKuaishouGoodsProductSave,
+  postKuaishouGoodsProductSync,
+  type KuaishouProductDetailPayload,
+} from './kuaishouProductApi'
+
+const GROUPBUY_GOODS_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
@@ -33,6 +40,7 @@ function url(path: string) {
 
 const TOKEN_KEYS: Record<CreatePlatformId, string> = {
   douyin: 'meoo_douyin_merchant_token',
+  kuaishou: 'meoo_kuaishou_merchant_token',
   meituan: 'meoo_meituan_merchant_token',
   xiaohongshu: 'meoo_xhs_merchant_token',
   jd: 'meoo_jd_merchant_token',
@@ -153,13 +161,15 @@ export async function fetchMerchantProductList(
   const paths =
     platform === 'douyin'
       ? ([`/api/meoo-douyin-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
-      : platform === 'meituan'
+      : platform === 'kuaishou'
+        ? ([`/api/meoo-kuaishou-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
+        : platform === 'meituan'
         ? ([`/api/meoo-meituan-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
         : platform === 'xiaohongshu'
           ? ([`/api/meoo-xhs-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
           : ([`/api/merchant/${seg}/goods/products${qs}`] as const)
   const targets =
-    platform === 'douyin' || platform === 'meituan' || platform === 'xiaohongshu'
+    platform === 'douyin' || platform === 'kuaishou' || platform === 'meituan' || platform === 'xiaohongshu'
       ? merchantApiFetchUrlCandidates(paths)
       : [url(paths[0]!)]
 
@@ -178,7 +188,7 @@ export async function fetchMerchantProductList(
     const text = await r.text()
     const trim = text.trimStart()
     const ct = r.headers.get('content-type') ?? ''
-    if (platform === 'douyin' && isLikelyRouteMiss404(r, trim, ct)) continue
+    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) continue
     res = r
     bodyText = text
     break
@@ -260,23 +270,29 @@ export async function pullMerchantProductFromPlatform(
   platform: CreatePlatformId,
   productId: string,
 ): Promise<MerchantProductSyncResult> {
-  if (platform !== 'douyin') {
-    return { ok: false, message: '当前仅抖音来客支持从平台拉取商品，其它平台请稍后再试。' }
+  if (!GROUPBUY_GOODS_PLATFORMS.has(platform)) {
+    return { ok: false, message: '当前仅抖音来客与快手团购支持从平台拉取商品，其它平台请稍后再试。' }
   }
   const token = readToken(platform)
   if (!token) {
     return { ok: false, message: '未找到平台授权' }
   }
   const id = productId.trim()
-  const pullRes = await postDouyinGoodsProductSync(id)
+  const pullRes =
+    platform === 'kuaishou'
+      ? await postKuaishouGoodsProductSync(id)
+      : await postDouyinGoodsProductSync(id)
   if (!pullRes.ok) {
     return { ok: false, message: pullRes.message }
   }
   if (pullRes.item) {
-    upsertProductEditLibraryFromApi(pullRes.item, 'douyin')
+    upsertProductEditLibraryFromApi(pullRes.item, platform)
   }
   if (pullRes.detail) {
-    saveDraftDetailSnapshot(id, pullRes.detail as DouyinProductDetailPayload)
+    saveDraftDetailSnapshot(
+      id,
+      pullRes.detail as DouyinProductDetailPayload | KuaishouProductDetailPayload,
+    )
   }
   try {
     window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
@@ -290,6 +306,7 @@ export async function pullMerchantProductFromPlatform(
 export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantProductSyncResult> {
   const platforms: CreatePlatformId[] = [
     'douyin',
+    'kuaishou',
     'meituan',
     'xiaohongshu',
     'eleme',
@@ -331,14 +348,14 @@ export type MerchantProductShelfResult =
   | { ok: true; message?: string }
   | { ok: false; message: string }
 
-/** 上下架并同步至抖音来客 */
+/** 上下架并同步至抖音来客 / 快手团购 */
 export async function postMerchantProductShelfOperate(
   platform: CreatePlatformId,
   productId: string,
   shelf: 'online' | 'offline',
 ): Promise<MerchantProductShelfResult> {
-  if (platform !== 'douyin') {
-    return { ok: false, message: '当前仅抖音来客支持上下架操作' }
+  if (!GROUPBUY_GOODS_PLATFORMS.has(platform)) {
+    return { ok: false, message: '当前仅抖音来客与快手团购支持上下架操作' }
   }
   const token = readToken(platform)
   if (!token) {
@@ -347,10 +364,16 @@ export async function postMerchantProductShelfOperate(
   const id = productId.trim()
   const op_type = shelf === 'online' ? 1 : 2
   const bodyStr = JSON.stringify({ product_id: id, op_type })
-  const paths = [
-    '/api/meoo-douyin-goods-product-operate',
-    '/api/merchant/douyin/goods/product/operate',
-  ] as const
+  const paths =
+    platform === 'kuaishou'
+      ? ([
+          '/api/meoo-kuaishou-goods-product-operate',
+          '/api/merchant/kuaishou/goods/product/operate',
+        ] as const)
+      : ([
+          '/api/meoo-douyin-goods-product-operate',
+          '/api/merchant/douyin/goods/product/operate',
+        ] as const)
   const targets = merchantApiFetchUrlCandidates(paths)
   let lastStatus = 0
   for (const target of targets) {
@@ -394,7 +417,9 @@ export async function postMerchantProductShelfOperate(
     ok: false,
     message:
       lastStatus === 404
-        ? '上下架接口返回 404：请部署含 /api/meoo-douyin-goods-product-operate 的版本'
+        ? platform === 'kuaishou'
+          ? '上下架接口返回 404：请部署含 /api/meoo-kuaishou-goods-product-operate 的版本'
+          : '上下架接口返回 404：请部署含 /api/meoo-douyin-goods-product-operate 的版本'
         : `HTTP ${lastStatus || 404}`,
   }
 }
@@ -404,8 +429,8 @@ export async function pushMerchantProductToPlatform(
   platform: CreatePlatformId,
   productId: string,
 ): Promise<MerchantProductSyncResult> {
-  if (platform !== 'douyin') {
-    return { ok: false, message: '当前仅抖音来客支持推送，其它平台请稍后再试或联系管理员。' }
+  if (!GROUPBUY_GOODS_PLATFORMS.has(platform)) {
+    return { ok: false, message: '当前仅抖音来客与快手团购支持推送，其它平台请稍后再试或联系管理员。' }
   }
   const token = readToken(platform)
   if (!token) {
@@ -416,7 +441,10 @@ export async function pushMerchantProductToPlatform(
   const snapshot = loadDraftDetailSnapshot(id)
   if (snapshot) {
     const detail = sanitizeDetailForResave({ ...snapshot })
-    const saveRes = await postDouyinGoodsProductSave({ mode: 'draft', detail })
+    const saveRes =
+      platform === 'kuaishou'
+        ? await postKuaishouGoodsProductSave({ mode: 'draft', detail })
+        : await postDouyinGoodsProductSave({ mode: 'draft', detail })
     if (!saveRes.ok) {
       return { ok: false, message: saveRes.message }
     }
@@ -437,7 +465,9 @@ export async function pushMerchantProductToPlatform(
       ok: true,
       message:
         saveRes.message ??
-        '已根据本地草稿快照提交至抖音来客（goodlife/v1/goods/product/save）。',
+        (platform === 'kuaishou'
+          ? '已根据本地草稿快照提交至快手团购（goodlife/v1/goods/product/save）。'
+          : '已根据本地草稿快照提交至抖音来客（goodlife/v1/goods/product/save）。'),
     }
   }
 
