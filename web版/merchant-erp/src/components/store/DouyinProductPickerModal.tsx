@@ -2,6 +2,7 @@ import { ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import { fetchAllDouyinOnlineProducts, type DouyinOnlineProductRow } from '../../lib/douyinReviewSyncHelpers'
+import ModalPortal from '../ui/ModalPortal'
 
 export type DouyinProductPickerModalProps = {
   open: boolean
@@ -79,11 +80,12 @@ export default function DouyinProductPickerModal({
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-      role="presentation"
-      onClick={onClose}
-    >
+    <ModalPortal open={open}>
+      <div
+        className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
+        role="presentation"
+        onClick={onClose}
+      >
       <div
         className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl"
         role="dialog"
@@ -135,13 +137,17 @@ export default function DouyinProductPickerModal({
           ) : (
             <ul className="divide-y divide-gray-100">
               {showAllOption ? (
-                <li className="flex items-center py-2">
+                <li
+                  className="flex cursor-pointer items-center rounded-lg px-1 py-2 hover:bg-gray-50"
+                  onClick={() => setDraftId(null)}
+                >
                   <input
                     type="radio"
                     name="douyin-product-pick"
                     className="mr-3 h-4 w-4"
                     checked={draftId === null}
                     onChange={() => setDraftId(null)}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <span className="text-sm font-medium text-gray-900">{allOptionLabel}</span>
                 </li>
@@ -150,15 +156,20 @@ export default function DouyinProductPickerModal({
                 <li className="py-6 text-center text-sm text-gray-500">暂无匹配商品</li>
               ) : (
                 pageItems.map((p) => (
-                  <li key={p.id} className="flex items-start py-2">
+                  <li
+                    key={p.id}
+                    className="flex cursor-pointer items-start rounded-lg px-1 py-2 hover:bg-gray-50"
+                    onClick={() => setDraftId(p.id)}
+                  >
                     <input
                       type="radio"
                       name="douyin-product-pick"
                       className="mr-3 mt-0.5 h-4 w-4"
                       checked={draftId === p.id}
                       onChange={() => setDraftId(p.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
-                    <div className="min-w-0 text-sm">
+                    <div className="min-w-0 flex-1 text-sm">
                       <p className="font-medium text-gray-900">{p.name}</p>
                       <p className="text-xs text-gray-500">{p.id}</p>
                     </div>
@@ -209,7 +220,8 @@ export default function DouyinProductPickerModal({
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </ModalPortal>
   )
 }
 
@@ -235,7 +247,7 @@ export function DouyinProductPickerTrigger({
   const [open, setOpen] = useState(false)
   return (
     <>
-      <label className="block text-sm">
+      <div className="block text-sm">
         <span className="mb-1 block text-xs text-slate-500">{label}</span>
         <button
           type="button"
@@ -245,7 +257,7 @@ export function DouyinProductPickerTrigger({
           <span className={cn('truncate', !valueLabel && 'text-slate-400')}>{valueLabel || placeholder}</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
         </button>
-      </label>
+      </div>
       <DouyinProductPickerModal
         open={open}
         onClose={() => setOpen(false)}
