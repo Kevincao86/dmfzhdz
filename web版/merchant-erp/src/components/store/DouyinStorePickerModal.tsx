@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { cn } from '../../cn'
 import { readMerchantSession } from '../../lib/merchantSession'
 import { getDouyinStores } from '../../services/douyinMerchantApi'
+import ModalPortal from '../ui/ModalPortal'
 
 function readToken() {
   return readMerchantSession('meoo_douyin_merchant_token')
@@ -128,11 +129,12 @@ export default function DouyinStorePickerModal({
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
-      role="presentation"
-      onClick={onClose}
-    >
+    <ModalPortal open={open}>
+      <div
+        className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
+        role="presentation"
+        onClick={onClose}
+      >
       <div
         className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl"
         role="dialog"
@@ -187,19 +189,27 @@ export default function DouyinStorePickerModal({
           ) : (
             <ul className="divide-y divide-gray-100">
               {isSingle && showAllOption ? (
-                <li className="flex items-center py-2">
+                <li
+                  className="flex cursor-pointer items-center rounded-lg px-1 py-2 hover:bg-gray-50"
+                  onClick={() => setModalDraftSingle(null)}
+                >
                   <input
                     type="radio"
                     name="douyin-store-pick"
                     className="mr-3 h-4 w-4"
                     checked={modalDraftSingle === null}
                     onChange={() => setModalDraftSingle(null)}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <span className="text-sm font-medium text-gray-900">{allOptionLabel}</span>
                 </li>
               ) : null}
               {modalStores.map((s) => (
-                <li key={s.id} className="flex items-start py-2">
+                <li
+                  key={s.id}
+                  className="flex cursor-pointer items-start rounded-lg px-1 py-2 hover:bg-gray-50"
+                  onClick={() => (isSingle ? setModalDraftSingle(s.id) : toggleModalPoi(s.id))}
+                >
                   {isSingle ? (
                     <input
                       type="radio"
@@ -207,6 +217,7 @@ export default function DouyinStorePickerModal({
                       className="mr-3 mt-0.5 h-4 w-4"
                       checked={modalDraftSingle === s.id}
                       onChange={() => setModalDraftSingle(s.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
                     <input
@@ -214,9 +225,10 @@ export default function DouyinStorePickerModal({
                       className="mr-3 mt-0.5 h-4 w-4 rounded border-gray-300"
                       checked={modalDraftIds.includes(s.id)}
                       onChange={() => toggleModalPoi(s.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   )}
-                  <div className="min-w-0 text-sm">
+                  <div className="min-w-0 flex-1 text-sm">
                     <p className="font-medium text-gray-900">{s.name}</p>
                     {s.address ? <p className="text-xs text-gray-500">{s.address}</p> : null}
                   </div>
@@ -271,7 +283,8 @@ export default function DouyinStorePickerModal({
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </ModalPortal>
   )
 }
 
@@ -289,7 +302,7 @@ export function DouyinStorePickerTrigger({
   value: string | null
   valueLabel: string
   placeholder?: string
-  onChange: (poiId: string | null, row: DouyinStoreRow | null) => void
+  onChange: (poiId: string | null, row: DouyinStoreRow | null) => boolean | void
   showAllOption?: boolean
   allOptionLabel?: string
   pickerTitle?: string
@@ -297,7 +310,7 @@ export function DouyinStorePickerTrigger({
   const [open, setOpen] = useState(false)
   return (
     <>
-      <label className="block text-sm">
+      <div className="block text-sm">
         <span className="mb-1 block text-xs text-slate-500">{label}</span>
         <button
           type="button"
@@ -307,7 +320,7 @@ export function DouyinStorePickerTrigger({
           <span className={cn('truncate', !valueLabel && 'text-slate-400')}>{valueLabel || placeholder}</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
         </button>
-      </label>
+      </div>
       <DouyinStorePickerModal
         open={open}
         onClose={() => setOpen(false)}
@@ -317,8 +330,8 @@ export function DouyinStorePickerTrigger({
         allOptionLabel={allOptionLabel}
         initialSelectedId={value}
         onConfirmSingle={(id, row) => {
-          onChange(id, row)
-          setOpen(false)
+          const keepOpen = onChange(id, row) === false
+          if (!keepOpen) setOpen(false)
         }}
       />
     </>

@@ -33,21 +33,22 @@ export default function CompetitorAnalysisPage() {
     }
   }, [selected?.poiId])
 
-  const onSelectStore = (poiId: string | null, row: DouyinStoreRow | null) => {
-    if (!poiId || !row?.address) {
-      if (!poiId) {
-        setSelected(null)
-        saveSelectedCompetitorStore(null)
-        setReport(null)
-      } else {
-        setErr('所选门店缺少地址，请换一家带地址的门店')
-      }
+  const onSelectStore = (poiId: string | null, row: DouyinStoreRow | null): boolean | void => {
+    if (!poiId) {
+      setSelected(null)
+      saveSelectedCompetitorStore(null)
+      setReport(null)
+      setErr(null)
       return
+    }
+    if (!row?.address?.trim()) {
+      setErr('所选门店缺少地址，请换一家带地址的门店')
+      return false
     }
     const ref: SelectedStoreRef = {
       poiId: row.id,
       storeName: row.name,
-      address: row.address,
+      address: row.address.trim(),
     }
     setSelected(ref)
     saveSelectedCompetitorStore(ref)
