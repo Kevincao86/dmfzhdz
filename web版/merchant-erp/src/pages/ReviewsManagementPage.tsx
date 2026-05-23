@@ -26,7 +26,6 @@ import type {
   ReviewsApiPlatform,
 } from '../services/reviewsMerchantApi'
 import {
-  fetchReviewsList,
   postReviewAiSuggest,
   postReviewReply,
   postReviewsSync,
@@ -35,6 +34,42 @@ import {
 import type { StorePlatformTab } from '../services/merchantStoresApi'
 
 const AI_LS_KEY = 'meoo_reviews_ai_reply_enabled'
+const REVIEWS_CACHE_PREFIX = 'meoo_reviews_cache_v1'
+
+function reviewsCacheKey(platform: ReviewsApiPlatform, kind: ReviewKind): string {
+  return `${REVIEWS_CACHE_PREFIX}:${platform}:${kind}`
+}
+
+function readReviewsCache(
+  platform: ReviewsApiPlatform,
+  kind: ReviewKind,
+): { items: ReviewListItem[]; syncedAt: string } | null {
+  try {
+    const raw = window.sessionStorage.getItem(reviewsCacheKey(platform, kind))
+    if (!raw) return null
+    const j = JSON.parse(raw) as { items?: ReviewListItem[]; syncedAt?: string }
+    if (!Array.isArray(j.items)) return null
+    return { items: j.items, syncedAt: j.syncedAt ?? new Date().toISOString() }
+  } catch {
+    return null
+  }
+}
+
+function writeReviewsCache(
+  platform: ReviewsApiPlatform,
+  kind: ReviewKind,
+  items: ReviewListItem[],
+  syncedAt: string,
+) {
+  try {
+    window.sessionStorage.setItem(
+      reviewsCacheKey(platform, kind),
+      JSON.stringify({ items, syncedAt }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
 
 function readAiToggle(): boolean {
   try {
@@ -99,7 +134,7 @@ export default function ReviewsManagementPage() {
   const [replyStatus, setReplyStatus] = useState<ReviewReplyStatusFilter>('all')
   const [listStats, setListStats] = useState<ReviewListStats | null>(null)
   const [aiReplyOn, setAiReplyOn] = useState(() => readAiToggle())
-  const [items, setItems] = useState<ReviewListItem[]>([])
+  const [sourceItems, setSourceItems] = useState<ReviewListItem[]>([])
   const [syncedAt, setSyncedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -133,7 +168,38 @@ export default function ReviewsManagementPage() {
     setFilterPoiName('')
     setFilterProductId(null)
     setFilterProductName('')
-  }, [reviewKind])
+    setSourceItems([])
+    setSyncedAt(null)
+  }, [reviewKind, tab])
+
+  const scopedItems = useMemo(() => {
+    let rows = sourceItems
+    if (reviewKind === 'store' && filterPoiId) {
+      rows = rows.filter((x) => String(x.poiId ?? '') === filterPoiId)
+    }
+    if (reviewKind === 'product' && filterProductId) {
+      rows = rows.filter((x) => String(x.productId ?? '') === filterProductId)
+    }
+    return rows
+  }, [sourceItems, reviewKind, filterPoiId, filterProductId])
+
+  const items = useMemo(() => {
+    let rows = scopedItems
+    if (sentiment === 'good') rows = rows.filter((r) => r.sentiment === 'good')
+    else if (sentiment === 'neutral') rows = rows.filter((r) => r.sentiment === 'neutral')
+    else if (sentiment === 'bad') rows = rows.filter((r) => r.sentiment === 'bad')
+    if (replyStatus === 'replied') rows = rows.filter((r) => r.replied)
+    else if (replyStatus === 'unreplied') rows = rows.filter((r) => !r.replied)
+    return rows
+  }, [scopedItems, sentiment, replyStatus])
+
+  useEffect(() => {
+    setListStats({
+      total: scopedItems.length,
+      replied: scopedItems.filter((x) => x.replied).length,
+      unreplied: scopedItems.filter((x) => !x.replied).length,
+    })
+  }, [scopedItems])
 
   const runAutoReplies = useCallback(async (platform: ReviewsApiPlatform, candidates: ReviewListItem[]) => {
     const pending = candidates.filter((r) => !r.replied)
@@ -153,49 +219,46 @@ export default function ReviewsManagementPage() {
           setError(rep.message)
           break
         }
-        setItems((curr) => curr.map((x) => (x.id === row.id ? rep.item : x)))
+        setSourceItems((curr) => {
+          const next = curr.map((x) => (x.id === row.id ? rep.item : x))
+          if (platform) {
+            writeReviewsCache(platform, reviewKind, next, syncedAt ?? new Date().toISOString())
+          }
+          return next
+        })
       }
     } finally {
       setProcessingAutoId(null)
       setAutoReplyBusy(false)
     }
-  }, [])
+  }, [reviewKind, syncedAt])
 
   const load = useCallback(async () => {
     if (!apiPlatform) {
-      setItems([])
-      setListStats(null)
+      setSourceItems([])
       setSyncedAt(null)
       setError(null)
       return
     }
     setLoading(true)
     setError(null)
-    const res = await fetchReviewsList(apiPlatform, sentiment, replyStatus, reviewOpts)
-    setLoading(false)
-    if (!res.ok) {
-      setItems([])
-      setListStats(null)
-      setError(res.message)
-      return
+    const cached = readReviewsCache(apiPlatform, reviewKind)
+    if (cached) {
+      setSourceItems(cached.items)
+      setSyncedAt(cached.syncedAt)
+    } else {
+      setSourceItems([])
+      setSyncedAt(null)
     }
-    setItems(res.items)
-    setListStats(res.stats ?? null)
-    setSyncedAt(res.syncedAt ?? null)
+    setLoading(false)
 
-    if (aiReplyOn) {
-      const pendingRes = await fetchReviewsList(apiPlatform, sentiment, 'unreplied', reviewOpts)
-      if (pendingRes.ok && pendingRes.items.length > 0) {
-        await runAutoReplies(apiPlatform, pendingRes.items)
-        const refresh = await fetchReviewsList(apiPlatform, sentiment, replyStatus, reviewOpts)
-        if (refresh.ok) {
-          setItems(refresh.items)
-          setListStats(refresh.stats ?? null)
-          setSyncedAt(refresh.syncedAt ?? null)
-        }
+    if (aiReplyOn && cached && cached.items.length > 0) {
+      const pending = cached.items.filter((r) => !r.replied)
+      if (pending.length > 0) {
+        await runAutoReplies(apiPlatform, pending)
       }
     }
-  }, [apiPlatform, sentiment, replyStatus, aiReplyOn, runAutoReplies, reviewOpts])
+  }, [apiPlatform, reviewKind, aiReplyOn, runAutoReplies])
 
   useEffect(() => {
     void load()
@@ -257,20 +320,10 @@ export default function ReviewsManagementPage() {
       return
     }
     if (res.items?.length) {
-      let nextItems = res.items
-      if (reviewKind === 'store' && filterPoiId) {
-        nextItems = nextItems.filter((x) => String(x.poiId ?? '') === filterPoiId)
-      }
-      if (reviewKind === 'product' && filterProductId) {
-        nextItems = nextItems.filter((x) => String(x.productId ?? '') === filterProductId)
-      }
-      setItems(nextItems)
-      setListStats({
-        total: nextItems.length,
-        replied: nextItems.filter((x) => x.replied).length,
-        unreplied: nextItems.filter((x) => !x.replied).length,
-      })
-      setSyncedAt(res.syncedAt ?? new Date().toISOString())
+      const syncedAtIso = res.syncedAt ?? new Date().toISOString()
+      setSourceItems(res.items)
+      writeReviewsCache(apiPlatform, reviewKind, res.items, syncedAtIso)
+      setSyncedAt(syncedAtIso)
       if (res.message) setError(null)
       return
     }
@@ -319,11 +372,14 @@ export default function ReviewsManagementPage() {
       n.delete(row.id)
       return n
     })
-    const refresh = await fetchReviewsList(apiPlatform, sentiment, replyStatus, reviewOpts)
-    if (refresh.ok) {
-      setItems(refresh.items)
-      setListStats(refresh.stats ?? null)
-      setSyncedAt(refresh.syncedAt ?? null)
+    if (res.item) {
+      setSourceItems((curr) => {
+        const next = curr.map((x) => (x.id === row.id ? res.item! : x))
+        if (apiPlatform) {
+          writeReviewsCache(apiPlatform, reviewKind, next, syncedAt ?? new Date().toISOString())
+        }
+        return next
+      })
     }
   }
 
@@ -361,14 +417,21 @@ export default function ReviewsManagementPage() {
       if (!res.ok) {
         setError(res.message)
         setBatchBusy(false)
-        await load()
         return
+      }
+      if (res.item) {
+        setSourceItems((curr) => curr.map((x) => (x.id === row.id ? res.item! : x)))
       }
     }
     setBatchBusy(false)
     setBatchOpen(false)
     setSelected(new Set())
-    await load()
+    setSourceItems((curr) => {
+      if (apiPlatform) {
+        writeReviewsCache(apiPlatform, reviewKind, curr, syncedAt ?? new Date().toISOString())
+      }
+      return curr
+    })
   }
 
   const sentimentTabs: { id: ReviewSentimentFilter; label: string }[] = [

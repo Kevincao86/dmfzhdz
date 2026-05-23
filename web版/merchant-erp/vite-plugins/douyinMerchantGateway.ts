@@ -251,7 +251,16 @@ function getDataError(j: Record<string, unknown>): { ok: boolean; msg?: string }
     const e = extra as Record<string, unknown>
     const code = numericErrorCode(e.error_code)
     if (code !== undefined && code !== 0) {
-      return { ok: false, msg: String(e.description ?? `抖音 extra error_code=${code}`) }
+      const sub =
+        typeof e.sub_description === 'string' && e.sub_description.trim()
+          ? e.sub_description.trim()
+          : ''
+      const desc =
+        typeof e.description === 'string' && e.description.trim() ? e.description.trim() : ''
+      return {
+        ok: false,
+        msg: sub || desc || `抖音 extra error_code=${code}`,
+      }
     }
   }
   return { ok: true }
@@ -502,9 +511,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }
 
-function isShopQueryRateLimited(err: unknown): boolean {
+function isDouyinOpenApiRateLimited(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
-  return /太过频繁|请稍后再试|rate limit|429|限流|频率过高|too many requests/i.test(msg)
+  return /太过频繁|太过于频繁|请稍后再试|rate limit|429|限流|频率过高|too many requests/i.test(msg)
+}
+
+function isShopQueryRateLimited(err: unknown): boolean {
+  return isDouyinOpenApiRateLimited(err)
 }
 
 /** 按 relation_type 翻页拉全量（最多 200 页），供认领拆分、tabCounts、装修列表复用 */
@@ -6546,6 +6559,9 @@ function formatDouyinAkteIdList(ids: string[]): string {
 
 /** 抖音评价查询首页游标（官方示例 cursor=%22%22，不可省略） */
 const DOUYIN_AKTE_COMMENT_FIRST_CURSOR = '""'
+/** 评价查询 QPS 约 20；翻页/批次间留间隔并在限频时退避重试 */
+const AKTE_COMMENT_PAGE_DELAY_MS = 450
+const AKTE_COMMENT_BATCH_DELAY_MS = 900
 
 async function fetchAkteCommentsForTarget(
   accessToken: string,
@@ -6574,6 +6590,8 @@ async function fetchAkteCommentsForTarget(
   const out: MerchantReviewRowDouyin[] = []
   let cursor = DOUYIN_AKTE_COMMENT_FIRST_CURSOR
   for (let page = 0; page < 80; page += 1) {
+    if (page > 0) await sleep(AKTE_COMMENT_PAGE_DELAY_MS)
+
     const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
     u.searchParams.set('account_id', accountId)
     u.searchParams.set('start_time', String(startSec))
@@ -6587,22 +6605,39 @@ async function fetchAkteCommentsForTarget(
       u.searchParams.set('product_id_list', formatDouyinAkteIdList(useProduct))
     }
 
-    const dr = await douyinServerFetch(u.toString(), {
-      method: 'GET',
-      headers: {
-        'access-token': accessToken,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
-    })
-    const raw = await dr.text()
-    const j = parseDouyinJson(raw)
-    const err = getDataError(j)
-    if (!dr.ok) {
-      return { ok: false, message: raw.slice(0, 400) || `评价查询 HTTP ${dr.status}` }
+    let raw = ''
+    let j: Record<string, unknown> = {}
+    let lastErr = '评价查询无响应'
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if (attempt > 0) {
+        await sleep(800 * attempt * attempt)
+      }
+      const dr = await douyinServerFetch(u.toString(), {
+        method: 'GET',
+        headers: {
+          'access-token': accessToken,
+          'content-type': 'application/json',
+          'Rpc-Transit-Life-Account': accountId,
+        },
+      })
+      raw = await dr.text()
+      j = parseDouyinJson(raw)
+      const err = getDataError(j)
+      if (!dr.ok) {
+        lastErr = raw.slice(0, 400) || `评价查询 HTTP ${dr.status}`
+        if (attempt < 4 && isDouyinOpenApiRateLimited(lastErr)) continue
+        return { ok: false, message: lastErr }
+      }
+      if (!err.ok) {
+        lastErr = err.msg ?? '评价查询业务错误（请确认已开通餐饮评价权限）'
+        if (attempt < 4 && isDouyinOpenApiRateLimited(lastErr)) continue
+        return { ok: false, message: lastErr }
+      }
+      lastErr = ''
+      break
     }
-    if (!err.ok) {
-      return { ok: false, message: err.msg ?? '评价查询业务错误（请确认已开通餐饮评价权限）' }
+    if (lastErr) {
+      return { ok: false, message: lastErr }
     }
 
     const data = j.data as Record<string, unknown> | undefined
@@ -6692,12 +6727,14 @@ export async function fetchDouyinAkteReviews(
       if (poiTargets.length === 0 && (kind === 'store' || kind === 'all')) {
         return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
       }
-      for (const target of poiTargets) {
+      for (let i = 0; i < poiTargets.length; i += 20) {
+        if (i > 0) await sleep(AKTE_COMMENT_BATCH_DELAY_MS)
+        const batch = poiTargets.slice(i, i + 20)
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { poiId: target.poiId },
-          { reviewKind: 'store', poiId: target.poiId, poiName: target.poiName },
+          { poiIds: batch.map((p) => p.poiId) },
+          { reviewKind: 'store', poiName: batch[0]?.poiName },
         )
         if (r.ok === false) return r
         pushItems(r.items)
@@ -6723,15 +6760,17 @@ export async function fetchDouyinAkteReviews(
       if (productTargets.length === 0 && kind === 'product') {
         return { ok: false, message: '未找到在线商品，请先在「商品」页同步抖音团购商品。' }
       }
-      for (const target of productTargets) {
+      for (let i = 0; i < productTargets.length; i += 20) {
+        if (i > 0) await sleep(AKTE_COMMENT_BATCH_DELAY_MS)
+        const batch = productTargets.slice(i, i + 20)
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { productId: target.productId },
+          { productIds: batch.map((p) => p.productId) },
           {
             reviewKind: 'product',
-            productId: target.productId,
-            productName: target.productName,
+            productId: batch[0]?.productId,
+            productName: batch[0]?.productName,
           },
         )
         if (r.ok === false) return r
