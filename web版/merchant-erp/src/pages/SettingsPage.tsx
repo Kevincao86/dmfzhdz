@@ -21,6 +21,7 @@ import {
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
 import DouyinMerchantSection from './settings/DouyinMerchantSection'
+import KuaishouMerchantSection from './settings/KuaishouMerchantSection'
 import LocalPromotionSection from './settings/LocalPromotionSection'
 import XhsCommercialSection from './settings/XhsCommercialSection'
 import MeituanMerchantSection from './settings/MeituanMerchantSection'
@@ -33,6 +34,7 @@ import {
   MERCHANT_BACKEND_PLATFORMS,
   PlatformBrandLogo,
   WAIMAI_BACKEND_PLATFORMS,
+  type MerchantBackendPlatformId,
   type WaimaiBackendPlatformId,
 } from '../lib/platformBranding'
 import {
@@ -97,7 +99,7 @@ export default function SettingsPage() {
   const location = useLocation()
   const { plan, entitlements, reload: reloadMembership } = useMembership()
   const [tab, setTab] = useState<SettingsTabId>('platforms')
-  const [merchantPlat, setMerchantPlat] = useState<'douyin' | 'meituan' | 'xhs'>('douyin')
+  const [merchantPlat, setMerchantPlat] = useState<MerchantBackendPlatformId>('douyin')
   const [waimaiPlat, setWaimaiPlat] = useState<WaimaiBackendPlatformId>('eleme')
   const [verifyList, setVerifyList] = useState<VerifyItem[]>(VERIFY_INITIAL)
   const [subModalOpen, setSubModalOpen] = useState(false)
@@ -474,7 +476,7 @@ export default function SettingsPage() {
               <section className="space-y-4">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">团购平台</h3>
-                  <p className="text-sm text-gray-500">抖音来客、美团点评、小红书等到店团购经营授权</p>
+                  <p className="text-sm text-gray-500">抖音来客、快手团购、美团点评、小红书等到店团购经营授权</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {MERCHANT_BACKEND_PLATFORMS.map((p) => (
@@ -496,6 +498,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="rounded-xl border border-gray-200 p-6">
                   {merchantPlat === 'douyin' && <DouyinMerchantSection />}
+                  {merchantPlat === 'kuaishou' && <KuaishouMerchantSection />}
                   {merchantPlat === 'meituan' && <MeituanMerchantSection />}
                   {merchantPlat === 'xhs' && <XhsMerchantSection />}
                 </div>

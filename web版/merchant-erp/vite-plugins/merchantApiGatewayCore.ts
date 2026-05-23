@@ -25,6 +25,29 @@ import {
   parseDouyinReviewCompositeId,
   postDouyinAkteCommentReply,
 } from './douyinMerchantGateway.js'
+import {
+  handleKuaishouBindPost,
+  handleKuaishouBrandsGet,
+  handleKuaishouGoodsCategoryGet,
+  handleKuaishouGoodsImageUploadPost,
+  handleKuaishouGoodsIndustryScopeGet,
+  handleKuaishouGoodsProductDraftQueryGet,
+  handleKuaishouGoodsProductGetGet,
+  handleKuaishouGoodsProductOnlineQueryGet,
+  handleKuaishouGoodsProductOperatePost,
+  handleKuaishouGoodsProductPullSyncPost,
+  handleKuaishouGoodsProductsListGet,
+  handleKuaishouGoodsProductSavePost,
+  handleKuaishouGoodsProductTypesGet,
+  handleKuaishouGoodsTemplateGetGet,
+  handleKuaishouPoiClaimPost,
+  handleKuaishouStoreDecorationGet,
+  handleKuaishouStoreDetailGet,
+  handleKuaishouStoresGet,
+  fetchKuaishouAkteReviews,
+  parseKuaishouReviewCompositeId,
+  postKuaishouAkteCommentReply,
+} from './kuaishouMerchantGateway.js'
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
 import {
   fetchMeituanReviews,
@@ -75,7 +98,7 @@ import {
   handleMerchantHomeExtraStatsGet,
 } from './merchantDashboardGateway.js'
 
-type ReviewPlatformApi = 'douyin' | 'meituan' | 'xhs' | WaimaiPlatformKey
+type ReviewPlatformApi = 'douyin' | 'kuaishou' | 'meituan' | 'xhs' | WaimaiPlatformKey
 type ReviewSentiment = 'good' | 'neutral' | 'bad'
 type ReviewRow = {
   id: string
@@ -91,6 +114,7 @@ type ReviewRow = {
 
 const REVIEW_PLATFORM_LABELS: Record<ReviewPlatformApi, string> = {
   douyin: '抖音来客',
+  kuaishou: '快手团购',
   meituan: '美团点评',
   xhs: '小红书',
   eleme: '淘宝闪购',
@@ -100,6 +124,7 @@ const REVIEW_PLATFORM_LABELS: Record<ReviewPlatformApi, string> = {
 
 const reviewsStoreState: Record<ReviewPlatformApi, ReviewRow[]> = {
   douyin: [],
+  kuaishou: [],
   meituan: [],
   xhs: [],
   eleme: [],
@@ -109,6 +134,7 @@ const reviewsStoreState: Record<ReviewPlatformApi, ReviewRow[]> = {
 
 const reviewsProductState: Record<ReviewPlatformApi, ReviewRow[]> = {
   douyin: [],
+  kuaishou: [],
   meituan: [],
   xhs: [],
   eleme: [],
@@ -173,6 +199,33 @@ async function syncOneReviewPlatform(
     return {
       ok: true,
       message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（近 90 天）。`,
+      items: r.items as ReviewRow[],
+      syncedAt,
+    }
+  }
+
+  if (p === 'kuaishou') {
+    if (!bearer?.trim()) {
+      return { ok: false, message: '请先绑定快手团购后再同步评价。' }
+    }
+    const r = await fetchKuaishouAkteReviews(bearer.trim(), {
+      kind,
+      poiId: opts?.poiId,
+      productId: opts?.productId,
+      poiIds: opts?.poiIds,
+      productIds: opts?.productIds,
+    })
+    if (r.ok === false) return { ok: false, message: r.message }
+    if (kind === 'product') {
+      reviewsProductState.kuaishou = r.items as ReviewRow[]
+      reviewsProductSyncedAt.kuaishou = syncedAt
+    } else {
+      reviewsStoreState.kuaishou = r.items as ReviewRow[]
+      reviewsSyncedAt.kuaishou = syncedAt
+    }
+    return {
+      ok: true,
+      message: `快手团购：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（近 90 天）。`,
       items: r.items as ReviewRow[],
       syncedAt,
     }
@@ -263,6 +316,9 @@ function reviewPlatformBearer(req: IncomingMessage, platform: ReviewPlatformApi)
   if (platform === 'douyin') {
     return headerBearerToken(req, 'x-meoo-douyin-token') ?? bearerToken(req)
   }
+  if (platform === 'kuaishou') {
+    return headerBearerToken(req, 'x-meoo-kuaishou-token') ?? bearerToken(req)
+  }
   if (platform === 'meituan') {
     const mt = headerBearerToken(req, 'x-meoo-meituan-token')
     if (mt) return mt
@@ -296,6 +352,7 @@ function reviewPlatformBearer(req: IncomingMessage, platform: ReviewPlatformApi)
 function isReviewPlatformApi(s: string): s is ReviewPlatformApi {
   return (
     s === 'douyin' ||
+    s === 'kuaishou' ||
     s === 'meituan' ||
     s === 'xhs' ||
     s === 'eleme' ||
@@ -486,6 +543,115 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       if (method === 'POST' && pathname === '/api/merchant/douyin/goods/product/save') {
         const bodyRaw = await bodyReader()
         await handleDouyinGoodsProductSavePost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/bind') {
+        const bodyRaw = await bodyReader()
+        await handleKuaishouBindPost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/stores/detail') {
+        await handleKuaishouStoreDetailGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/stores') {
+        await handleKuaishouStoresGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/brands') {
+        await handleKuaishouBrandsGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/stores/poi/claim') {
+        const bodyRaw = await bodyReader()
+        await handleKuaishouPoiClaimPost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/store-decoration') {
+        await handleKuaishouStoreDecorationGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/industry-scope') {
+        await handleKuaishouGoodsIndustryScopeGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/category/get') {
+        await handleKuaishouGoodsCategoryGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/product/online/query') {
+        await handleKuaishouGoodsProductOnlineQueryGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/product/draft/query') {
+        await handleKuaishouGoodsProductDraftQueryGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/goods/image/upload') {
+        const bodyRaw = await bodyReader()
+        await handleKuaishouGoodsImageUploadPost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/product-types') {
+        await handleKuaishouGoodsProductTypesGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/template/get') {
+        await handleKuaishouGoodsTemplateGetGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/goods/ai/assist') {
+        const bodyRaw = await bodyReader()
+        let body: Record<string, unknown> = {}
+        try {
+          body = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+        } catch {
+          json(res, 400, { ok: false, message: '请求体须为 JSON' })
+          return true
+        }
+        await handleDouyinGoodsAiAssist(res, body, env)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/products') {
+        await handleKuaishouGoodsProductsListGet(req, res, url)
+        return true
+      }
+
+      if (method === 'GET' && pathname === '/api/merchant/kuaishou/goods/product/get') {
+        await handleKuaishouGoodsProductGetGet(req, res, url)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/goods/product/sync') {
+        const bodyRaw = await bodyReader()
+        await handleKuaishouGoodsProductPullSyncPost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/goods/product/operate') {
+        const bodyRaw = await bodyReader()
+        await handleKuaishouGoodsProductOperatePost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/kuaishou/goods/product/save') {
+        const bodyRaw = await bodyReader()
+        await handleKuaishouGoodsProductSavePost(req, res, bodyRaw)
         return true
       }
 
@@ -966,6 +1132,45 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             item: {
               id: reviewId,
               platform: 'douyin',
+              sentiment: 'good',
+              userName: '',
+              ratingStars: 0,
+              content: '',
+              createdAt: new Date().toISOString(),
+              replied: true,
+              replyText: content,
+            },
+          })
+          return true
+        }
+        if (platform === 'kuaishou') {
+          const tok = reviewPlatformBearer(req, 'kuaishou')
+          if (!tok) {
+            json(res, 401, { message: '请先绑定快手团购后再回复评价。' })
+            return true
+          }
+          const parsed = parseKuaishouReviewCompositeId(reviewId)
+          if (!parsed) {
+            json(res, 400, { message: '评价 ID 无效，请重新同步列表。' })
+            return true
+          }
+          const pr = await postKuaishouAkteCommentReply(tok, parsed.poiId, parsed.rateId, content)
+          if (pr.ok === false) {
+            json(res, 502, { ok: false, message: pr.message })
+            return true
+          }
+          const row = findReviewRow('kuaishou', reviewId)
+          if (row) {
+            row.replied = true
+            row.replyText = content
+            json(res, 200, { ok: true, item: row })
+            return true
+          }
+          json(res, 200, {
+            ok: true,
+            item: {
+              id: reviewId,
+              platform: 'kuaishou',
               sentiment: 'good',
               userName: '',
               ratingStars: 0,

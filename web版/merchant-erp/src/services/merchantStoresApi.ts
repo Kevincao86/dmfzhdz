@@ -12,6 +12,7 @@ import {
   getDouyinStores,
   type DouyinStoresResult,
 } from './douyinMerchantApi'
+import { getKuaishouStores } from './kuaishouMerchantApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
@@ -22,6 +23,7 @@ function url(path: string) {
 
 export type StorePlatformTab =
   | 'douyin'
+  | 'kuaishou'
   | 'meituan'
   | 'xiaohongshu'
   | 'jd'
@@ -31,6 +33,7 @@ export type StorePlatformTab =
 
 const TOKEN_BY_TAB: Record<StorePlatformTab, string | null> = {
   douyin: 'meoo_douyin_merchant_token',
+  kuaishou: 'meoo_kuaishou_merchant_token',
   meituan: 'meoo_meituan_merchant_token',
   xiaohongshu: 'meoo_xhs_merchant_token',
   jd: null,
@@ -125,6 +128,22 @@ export async function fetchStoresForPlatform(
       pageSize: params.pageSize,
       keyword: params.keyword,
       merchantId: readMerchantSession('meoo_douyin_merchant_id') ?? undefined,
+      claimScope: params.claimScope,
+      relationType: params.relationType,
+      refresh: params.refresh,
+      provinceCity: params.provinceCity,
+      claimStatusFilter: params.claimStatusFilter,
+      businessStatusFilter: params.businessStatusFilter,
+      storeBrand: params.storeBrand,
+    })
+  }
+  if (tab === 'kuaishou') {
+    return getKuaishouStores({
+      accessToken: token,
+      page: params.page,
+      pageSize: params.pageSize,
+      keyword: params.keyword,
+      merchantId: readMerchantSession('meoo_kuaishou_merchant_id') ?? undefined,
       claimScope: params.claimScope,
       relationType: params.relationType,
       refresh: params.refresh,

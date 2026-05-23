@@ -1,0 +1,344 @@
+import { useCallback, useState } from 'react'
+import {
+  postKuaishouGoodsAiAssist,
+  type AiAssistRequest,
+  type AiModelId,
+} from '../services/kuaishouAiAssistApi'
+import { sanitizeDouyinProductDescriptionCompliance } from '../lib/douyinDescCompliance'
+import {
+  buildImageAssistTextFields,
+  buildProductImageUserLine,
+} from '../lib/douyinProductImageAnchor'
+import { postAiAgentNativeImage } from '../services/ai/aiClient'
+import {
+  agentNativeImageRouteFromPickerKey,
+  parseAgentImagePickerKey,
+} from '../services/ai/agentImageModelKeys'
+import {
+  resolveImageAiModelForRequest,
+  resolveImageAssistModelId,
+  resolveModelForAssistAction,
+} from '../services/merchantAiModelStorage'
+
+export type AiGoodsContext = {
+  goods_category_id?: string
+  goods_product_type?: number
+  goods_category_path_zh?: string
+  goods_product_type_label?: string
+}
+
+type AiBusySlot = 'title' | 'desc' | 'img-head' | 'img-aux' | 'img-env'
+
+const MAX_AUX = 4
+const MAX_ENV = 10
+
+export function useKuaishouProductWizardAi(params: {
+  productName: string
+  productDesc: string
+  priceYuan?: string
+  originYuan?: string
+  setProductName: (v: string) => void
+  setProductDesc: (v: string) => void
+  setHeadUrl: (v: string) => void
+  headUrl: string
+  auxUrls: string[]
+  setAuxUrls: (v: string[]) => void
+  envUrls: string[]
+  setEnvUrls: (v: string[]) => void
+  goodsContext?: AiGoodsContext
+}) {
+  const [aiBusySlots, setAiBusySlots] = useState<Partial<Record<AiBusySlot, boolean>>>({})
+
+  const beginAi = useCallback((k: AiBusySlot) => {
+    setAiBusySlots((s) => ({ ...s, [k]: true }))
+  }, [])
+
+  const endAi = useCallback((k: AiBusySlot) => {
+    setAiBusySlots((s) => {
+      const n = { ...s }
+      delete n[k]
+      return n
+    })
+  }, [])
+
+  const aiOn = useCallback((k: AiBusySlot) => !!aiBusySlots[k], [aiBusySlots])
+
+  const imageAssistFields = useCallback(() => {
+    const ctx = params.goodsContext
+    const base = buildImageAssistTextFields(params.productName, params.productDesc, {
+      productType: ctx?.goods_product_type,
+      productTypeLabel: ctx?.goods_product_type_label,
+    })
+    return {
+      ...base,
+      price_yuan: params.priceYuan?.trim() || undefined,
+      origin_yuan: params.originYuan?.trim() || undefined,
+    }
+  }, [params.productName, params.productDesc, params.priceYuan, params.originYuan, params.goodsContext])
+
+  const postAssist = useCallback(
+    async (body: Omit<AiAssistRequest, 'model'>) => {
+      const isImg = body.action === 'image_generate' || body.action === 'image_enhance'
+      if (isImg) {
+        const listing = String(body.listing_title ?? body.product_name ?? '').trim()
+        const roleRaw = body.image_role ?? 'head'
+        const role: 'head' | 'aux' | 'env' =
+          roleRaw === 'env' ? 'env' : roleRaw === 'aux' ? 'aux' : 'head'
+        const imageUserLine = buildProductImageUserLine(listing, role)
+        const pickerKey = resolveImageAiModelForRequest()
+        const parsed = parseAgentImagePickerKey(pickerKey)
+        if (parsed?.kind === 'style') {
+          const route = agentNativeImageRouteFromPickerKey(pickerKey)
+          if (route.route === 'tokenmix') {
+            const ref =
+              body.action === 'image_enhance' ? body.image_urls?.[0]?.trim() : undefined
+            const agent = await postAiAgentNativeImage(imageUserLine, {
+              imageRoute: 'tokenmix',
+              tokenmixImageModel: route.tokenmixImageModel,
+              referenceImageDataUrl: ref || undefined,
+            })
+            if (!agent.ok) return { ok: false as const, message: agent.message }
+            console.info(`[商品生图] 高级模型 · ${imageUserLine}`)
+            return { ok: true as const, image_urls: [agent.imageUrl] }
+          }
+        }
+        const model = resolveImageAssistModelId() as AiModelId
+        const r = await postKuaishouGoodsAiAssist({
+          ...body,
+          model,
+          image_user_line: imageUserLine,
+        })
+        if (r.ok) {
+          const meta = 'image_meta' in r ? r.image_meta : undefined
+          console.info(
+            `[商品生图] ${meta?.image_user_line ?? imageUserLine} → ${meta?.resolved_model ?? model}`,
+          )
+          return r
+        }
+        if (!r.needVendorKey) return r
+        return {
+          ok: false as const,
+          message: `${r.message} 请在部署环境配置 MERCHANT_AI_QWEN_KEY、MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_MINIMAX_KEY 等密钥。`,
+        }
+      }
+
+      const model = resolveModelForAssistAction(body.action) as AiModelId
+      const r = await postKuaishouGoodsAiAssist({
+        ...body,
+        model,
+        ...(params.goodsContext ?? {}),
+      })
+      if (r.ok) return r
+      if (!r.needVendorKey) return r
+      return {
+        ok: false as const,
+        message: `${r.message} 请在部署环境配置 MERCHANT_AI_QWEN_KEY、MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_MINIMAX_KEY 等密钥。`,
+      }
+    },
+    [params.goodsContext],
+  )
+
+  const optimizeTitleAndDesc = useCallback(async () => {
+    const draft = params.productName.trim()
+    if (!draft) {
+      window.alert('请先在商品名称框内输入标题，再点击「AI 优化标题与说明」')
+      return
+    }
+    beginAi('title')
+    beginAi('desc')
+    try {
+      const base = {
+        product_name: draft,
+        title_draft: draft,
+      }
+      const [r, d] = await Promise.all([
+        postAssist({ action: 'optimize_title', ...base }),
+        postAssist({ action: 'generate_desc', ...base }),
+      ])
+      if (!r.ok) window.alert(r.message)
+      else if (r.title) params.setProductName(r.title.slice(0, 40))
+      if (!d.ok) {
+        if (r.ok) window.alert(d.message)
+      } else if (d.description) {
+        params.setProductDesc(sanitizeDouyinProductDescriptionCompliance(d.description))
+      }
+    } finally {
+      endAi('title')
+      endAi('desc')
+    }
+  }, [postAssist, params, beginAi, endAi])
+
+  const generateHeadImage = useCallback(async () => {
+    const n = params.productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称，以便 AI 生成头图')
+      return
+    }
+    beginAi('img-head')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_generate',
+        ...img,
+        image_role: 'head',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) params.setHeadUrl(r.image_urls[0])
+    } finally {
+      endAi('img-head')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi])
+
+  const enhanceHeadImage = useCallback(async () => {
+    const h = params.headUrl.trim()
+    if (!h) {
+      window.alert('请先上传头图后再优化')
+      return
+    }
+    if (!params.productName.trim()) {
+      window.alert('请先填写商品名称，以便 AI 根据标题解析主推产品后再优化头图')
+      return
+    }
+    beginAi('img-head')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_enhance',
+        ...img,
+        image_urls: [h],
+        image_role: 'head',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) params.setHeadUrl(r.image_urls[0])
+    } finally {
+      endAi('img-head')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi])
+
+  const filledAux = useCallback(
+    () => params.auxUrls.map((u) => u.trim()).filter(Boolean),
+    [params.auxUrls],
+  )
+
+  const filledEnv = useCallback(
+    () => params.envUrls.map((u) => u.trim()).filter(Boolean),
+    [params.envUrls],
+  )
+
+  const generateAuxImage = useCallback(async () => {
+    if (filledAux().length >= MAX_AUX) return
+    const n = params.productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称')
+      return
+    }
+    beginAi('img-aux')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_generate',
+        ...img,
+        image_role: 'aux',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) {
+        const next = [...filledAux(), r.image_urls[0]!].slice(0, MAX_AUX)
+        params.setAuxUrls(next.length > 0 ? next : [''])
+      }
+    } finally {
+      endAi('img-aux')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux])
+
+  const enhanceAuxImages = useCallback(async () => {
+    const urls = filledAux()
+    if (urls.length === 0) {
+      window.alert('请先上传辅助图后再优化')
+      return
+    }
+    if (!params.productName.trim()) {
+      window.alert('请先填写商品名称，以便 AI 根据标题解析主推产品')
+      return
+    }
+    beginAi('img-aux')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_enhance',
+        ...img,
+        image_urls: urls,
+        image_role: 'aux',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.length) {
+        params.setAuxUrls(r.image_urls.slice(0, MAX_AUX))
+      }
+    } finally {
+      endAi('img-aux')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledAux])
+
+  const generateEnvImage = useCallback(async () => {
+    if (filledEnv().length >= MAX_ENV) return
+    const n = params.productName.trim()
+    if (!n) {
+      window.alert('请先填写商品名称')
+      return
+    }
+    beginAi('img-env')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_generate',
+        ...img,
+        image_role: 'env',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.[0]) {
+        const next = [...filledEnv(), r.image_urls[0]!].slice(0, MAX_ENV)
+        params.setEnvUrls(next.length > 0 ? next : [''])
+      }
+    } finally {
+      endAi('img-env')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv])
+
+  const enhanceEnvImages = useCallback(async () => {
+    const urls = filledEnv()
+    if (urls.length === 0) {
+      window.alert('请先上传环境图后再优化')
+      return
+    }
+    if (!params.productName.trim()) {
+      window.alert('请先填写商品名称，以便 AI 根据标题解析主推产品')
+      return
+    }
+    beginAi('img-env')
+    try {
+      const img = imageAssistFields()
+      const r = await postAssist({
+        action: 'image_enhance',
+        ...img,
+        image_urls: urls,
+        image_role: 'env',
+      })
+      if (!r.ok) window.alert(r.message)
+      else if (r.image_urls?.length) {
+        params.setEnvUrls(r.image_urls.slice(0, MAX_ENV))
+      }
+    } finally {
+      endAi('img-env')
+    }
+  }, [postAssist, params, imageAssistFields, beginAi, endAi, filledEnv])
+
+  return {
+    aiOn,
+    optimizeTitleAndDesc,
+    generateHeadImage,
+    enhanceHeadImage,
+    generateAuxImage,
+    enhanceAuxImages,
+    generateEnvImage,
+    enhanceEnvImages,
+  }
+}

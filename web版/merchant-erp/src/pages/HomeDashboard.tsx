@@ -176,6 +176,7 @@ export default function HomeDashboard() {
     return trendDates.map((date, i) => ({
       date,
       douyin: trendByPlatform.douyin[i] ?? 0,
+      kuaishou: trendByPlatform.kuaishou[i] ?? 0,
       meituan: trendByPlatform.meituan[i] ?? 0,
       xiaohongshu: trendByPlatform.xiaohongshu[i] ?? 0,
       jd: trendByPlatform.jd[i] ?? 0,
@@ -393,6 +394,7 @@ export default function HomeDashboard() {
                   />
                   <Legend />
                   <Bar dataKey="douyin" name="抖音来客" fill="#ec4899" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="kuaishou" name="快手团购" fill="#ff6600" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="meituan" name="美团" fill="#eab308" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="xiaohongshu" name="小红书" fill="#ef4444" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="jd" name="京东团购" fill="#dc2626" radius={[4, 4, 0, 0]} />

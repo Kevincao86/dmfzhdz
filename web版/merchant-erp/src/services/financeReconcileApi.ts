@@ -57,6 +57,7 @@ export async function fetchFinanceReconcile(params?: {
     q.set('days', String(days))
   }
   const douyinToken = readMerchantSession('meoo_douyin_merchant_token')
+  const kuaishouToken = readMerchantSession('meoo_kuaishou_merchant_token')
   const meituanToken = readMerchantSession('meoo_meituan_merchant_token')
   const xhsToken = readMerchantSession('meoo_xhs_merchant_token')
   const elemeToken = readMerchantSession('meoo_eleme_merchant_token')
@@ -64,6 +65,7 @@ export async function fetchFinanceReconcile(params?: {
   const jdWaimaiToken = readMerchantSession('meoo_jd_waimai_merchant_token')
   const primary =
     douyinToken ??
+    kuaishouToken ??
     meituanToken ??
     xhsToken ??
     elemeToken ??
@@ -74,6 +76,7 @@ export async function fetchFinanceReconcile(params?: {
   }
   if (primary) headers.Authorization = `Bearer ${primary}`
   if (douyinToken) headers['X-Meoo-Douyin-Token'] = douyinToken
+  if (kuaishouToken) headers['X-Meoo-Kuaishou-Token'] = kuaishouToken
   if (meituanToken) headers['X-Meoo-Meituan-Token'] = meituanToken
   if (xhsToken) headers['X-Meoo-Xhs-Token'] = xhsToken
   if (elemeToken) headers['X-Meoo-Eleme-Token'] = elemeToken

@@ -7,6 +7,7 @@ export type PlatformLogoKey =
   | 'dianping'
   | 'xiaohongshu'
   | 'douyin_laike'
+  | 'kuaishou_local'
   | 'ocean_engine_local'
   | 'xhs_juguang'
   | 'eleme_shangou'
@@ -18,6 +19,7 @@ export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
   dianping: '/platforms/dianping.png',
   xiaohongshu: '/platforms/xiaohongshu.png',
   douyin_laike: '/platforms/douyin-laike.png',
+  kuaishou_local: '/platforms/kuaishou-local.png',
   ocean_engine_local: '/platforms/ocean-engine-local.png',
   xhs_juguang: '/platforms/xhs-juguang.png',
   eleme_shangou: '/platforms/eleme-shangou.png',
@@ -28,6 +30,7 @@ export const PLATFORM_LOGO_SRC: Record<PlatformLogoKey, string> = {
 /** 创建商品 / 系统设置商家后台 — 各经营平台 Logo（无图时回退字母占位） */
 export const MERCHANT_PLATFORM_LOGO: Partial<Record<MerchantPlatformId, PlatformLogoKey>> = {
   douyin: 'douyin_laike',
+  kuaishou: 'kuaishou_local',
   meituan: 'dianping',
   xiaohongshu: 'xiaohongshu',
   eleme: 'eleme_shangou',
@@ -57,7 +60,7 @@ export const SOCIAL_PLATFORM_BRANDS: SocialPlatformBrand[] = [
 ]
 
 /** 商家版后台 Tab */
-export type MerchantBackendPlatformId = 'douyin' | 'meituan' | 'xhs'
+export type MerchantBackendPlatformId = 'douyin' | 'kuaishou' | 'meituan' | 'xhs'
 
 export type MerchantBackendPlatformBrand = {
   id: MerchantBackendPlatformId
@@ -67,6 +70,7 @@ export type MerchantBackendPlatformBrand = {
 
 export const MERCHANT_BACKEND_PLATFORMS: MerchantBackendPlatformBrand[] = [
   { id: 'douyin', tabName: '抖音来客', logo: 'douyin_laike' },
+  { id: 'kuaishou', tabName: '快手团购', logo: 'kuaishou_local' },
   { id: 'meituan', tabName: '大众点评商家版', logo: 'dianping' },
   { id: 'xhs', tabName: '小红书商家版', logo: 'xiaohongshu' },
 ]
@@ -99,11 +103,13 @@ export function PlatformBrandLogo({
 }) {
   const box =
     size === 'sm' ? 'h-9 w-9' : size === 'lg' ? 'h-14 w-14' : 'h-11 w-11'
+  const fitClass =
+    logo === 'kuaishou_local' ? 'object-contain bg-white p-0.5' : 'object-cover'
   return (
     <img
       src={PLATFORM_LOGO_SRC[logo]}
       alt={alt ?? ''}
-      className={cn('shrink-0 rounded-xl object-cover shadow-sm', box, className)}
+      className={cn('shrink-0 rounded-xl shadow-sm', box, fitClass, className)}
     />
   )
 }

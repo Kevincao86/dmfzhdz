@@ -4,6 +4,7 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
+import { fetchKuaishouFinanceReconcileRows } from './kuaishouMerchantGateway.js'
 import { fetchMeituanFinanceReconcileRows } from './meituanMerchantGateway.js'
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
 import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
@@ -34,6 +35,7 @@ function headerToken(req: IncomingMessage, name: string): string | undefined {
 
 function resolvePlatformTokens(req: IncomingMessage): {
   douyin?: string
+  kuaishou?: string
   meituan?: string
   xhs?: string
   eleme?: string
@@ -42,6 +44,7 @@ function resolvePlatformTokens(req: IncomingMessage): {
 } {
   const auth = parseBearer(req)
   let douyin = headerToken(req, 'x-meoo-douyin-token')
+  let kuaishou = headerToken(req, 'x-meoo-kuaishou-token')
   let meituan = headerToken(req, 'x-meoo-meituan-token')
   let xhs = headerToken(req, 'x-meoo-xhs-token')
   let eleme = headerToken(req, 'x-meoo-eleme-token')
@@ -54,9 +57,10 @@ function resolvePlatformTokens(req: IncomingMessage): {
     else if (decodeWaimaiBearer('eleme', auth)) eleme = eleme || auth
     else if (decodeWaimaiBearer('meituan_waimai', auth)) meituan_waimai = meituan_waimai || auth
     else if (decodeWaimaiBearer('jd_waimai', auth)) jd_waimai = jd_waimai || auth
+    else if (kuaishou) kuaishou = kuaishou || auth
     else douyin = douyin || auth
   }
-  return { douyin, meituan, xhs, eleme, meituan_waimai, jd_waimai }
+  return { douyin, kuaishou, meituan, xhs, eleme, meituan_waimai, jd_waimai }
 }
 
 function isYmd(s: string): boolean {
@@ -114,6 +118,7 @@ export async function handleFinanceReconcileGet(
 
   const {
     douyin: douyinToken,
+    kuaishou: kuaishouToken,
     meituan: meituanToken,
     xhs: xhsToken,
     eleme: elemeToken,
@@ -148,6 +153,29 @@ export async function handleFinanceReconcileGet(
     )
   } else {
     warnings.push('未绑定抖音来客，跳过抖音对账。')
+  }
+
+  if (kuaishouToken) {
+    jobs.push(
+      (async () => {
+        const ks = await fetchKuaishouFinanceReconcileRows(kuaishouToken, startYmd, endYmd)
+        return {
+          warnings: ks.warnings,
+          rows: ks.rows.map((r) => ({
+            date: r.date,
+            platform: r.platform,
+            platformLabel: r.platformLabel,
+            channel: 'groupbuy',
+            orderCount: r.orderCount,
+            verifyOrderCount: r.verifyOrderCount,
+            salesAmountYuan: r.salesAmountYuan,
+            verifyAmountYuan: r.verifyAmountYuan,
+          })),
+        }
+      })(),
+    )
+  } else {
+    warnings.push('未绑定快手团购，跳过快手对账。')
   }
 
   if (meituanToken) {

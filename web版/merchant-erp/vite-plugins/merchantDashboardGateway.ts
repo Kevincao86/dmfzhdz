@@ -3,6 +3,7 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
+import { fetchKuaishouFinanceReconcileRows } from './kuaishouMerchantGateway.js'
 import { fetchMeituanFinanceReconcileRows } from './meituanMerchantGateway.js'
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
 import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
@@ -10,7 +11,7 @@ import { fetchXhsFinanceReconcileRows } from './xhsMerchantGateway.js'
 import { fetchWaimaiFinanceReconcileRows, type WaimaiPlatformKey } from './waimaiMerchantGateway.js'
 
 export type DashboardRange = 'realtime' | 'day7' | 'day30'
-type DashboardPlatform = 'douyin' | 'meituan' | 'xhs' | WaimaiPlatformKey
+type DashboardPlatform = 'douyin' | 'kuaishou' | 'meituan' | 'xhs' | WaimaiPlatformKey
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status
@@ -60,6 +61,9 @@ function resolvePlatformBearer(req: IncomingMessage, platform: DashboardPlatform
   if (platform === 'douyin') {
     return headerToken(req, 'x-meoo-douyin-token') ?? parseBearer(req) ?? null
   }
+  if (platform === 'kuaishou') {
+    return headerToken(req, 'x-meoo-kuaishou-token') ?? parseBearer(req) ?? null
+  }
   if (platform === 'meituan') {
     const mt = headerToken(req, 'x-meoo-meituan-token')
     if (mt) return mt
@@ -99,6 +103,10 @@ async function loadReconcileRows(
 ): Promise<ReconcileRow[]> {
   if (platform === 'douyin') {
     const r = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd)
+    return r.rows
+  }
+  if (platform === 'kuaishou') {
+    const r = await fetchKuaishouFinanceReconcileRows(bearer, startYmd, endYmd)
     return r.rows
   }
   if (platform === 'meituan') {

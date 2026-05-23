@@ -21,6 +21,12 @@ import {
   syncAllMerchantProductsFromPlatforms,
 } from '../services/productListingApi'
 
+const GROUPBUY_GOODS_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
+
+function isGroupbuyGoodsPlatform(plat: CreatePlatformId): boolean {
+  return GROUPBUY_GOODS_PLATFORMS.has(plat)
+}
+
 type ListRow = MerchantProductListItem & { origin: 'api' | 'library' }
 
 type OriginFilter = '全部' | 'API' | '本地草稿'
@@ -197,7 +203,7 @@ export default function ProductsViewPage() {
   }
 
   const confirmShelfChange = async () => {
-    if (!shelfConfirm || activePlat !== 'douyin') return
+    if (!shelfConfirm || !isGroupbuyGoodsPlatform(activePlat)) return
     setShelfBusy(true)
     setSyncToast(null)
     const r = await postMerchantProductShelfOperate(
@@ -479,9 +485,9 @@ export default function ProductsViewPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
-                      {activePlat === 'douyin' ? (
+                      {isGroupbuyGoodsPlatform(activePlat) ? (
                         <Link
-                          to={`/products/edit/douyin/${encodeURIComponent(r.id)}`}
+                          to={`/products/edit/${activePlat}/${encodeURIComponent(r.id)}`}
                           className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-800 hover:bg-gray-50"
                         >
                           <Pencil className="mr-1 h-3.5 w-3.5" />
@@ -498,12 +504,12 @@ export default function ProductsViewPage() {
                           编辑
                         </button>
                       )}
-                      {activePlat === 'douyin' && (
+                      {isGroupbuyGoodsPlatform(activePlat) && (
                         <>
                           <Link
-                            to={`/products/edit/douyin/${encodeURIComponent(r.id)}`}
+                            to={`/products/edit/${activePlat}/${encodeURIComponent(r.id)}`}
                             className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                            title="编辑平台商品（来客字段）"
+                            title={`编辑平台商品（${createPlatformLabel(activePlat)}字段）`}
                           >
                             <ExternalLink className="mr-1 h-3.5 w-3.5" />
                             平台商品
@@ -512,7 +518,7 @@ export default function ProductsViewPage() {
                             type="button"
                             onClick={() => openShelfConfirm(r)}
                             className="inline-flex items-center rounded-lg border border-gray-200 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                            title="上下架（确认后同步至抖音来客）"
+                            title={`上下架（确认后同步至${createPlatformLabel(activePlat)}）`}
                           >
                             <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
                             {isOnShelfRow(r) ? '下架' : '上架'}
@@ -521,13 +527,13 @@ export default function ProductsViewPage() {
                       )}
                       <button
                         type="button"
-                        disabled={activePlat !== 'douyin' || syncingId === r.id}
+                        disabled={!isGroupbuyGoodsPlatform(activePlat) || syncingId === r.id}
                         onClick={() => void runPullSync(r.id)}
                         className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-800 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
                         title={
-                          activePlat === 'douyin'
-                            ? '从抖音来客拉取该商品信息与状态'
-                            : '当前仅抖音来客支持同步'
+                          isGroupbuyGoodsPlatform(activePlat)
+                            ? `从${createPlatformLabel(activePlat)}拉取该商品信息与状态`
+                            : '当前仅抖音来客与快手团购支持同步'
                         }
                       >
                         <RefreshCw

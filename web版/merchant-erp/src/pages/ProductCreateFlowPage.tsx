@@ -10,6 +10,7 @@ import {
 import { cn } from '../cn'
 import { MerchantPlatformIcon } from '../lib/platformBranding'
 import DouyinProductCreateWizard from './douyin/DouyinProductCreateWizard'
+import KuaishouProductCreateWizard from './kuaishou/KuaishouProductCreateWizard'
 import WaimaiProductCreateWizard from './waimai/WaimaiProductCreateWizard'
 import { getMerchantPlatform } from '../constants/merchantPlatforms'
 import { postPlatformProductDraft } from '../services/productListingApi'
@@ -87,6 +88,55 @@ export default function ProductCreateFlowPage() {
 
   if (platforms.length === 0 || !active || !activeMeta) {
     return null
+  }
+
+  if (active === 'kuaishou') {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/products"
+            className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            返回商品管理
+          </Link>
+        </div>
+        <div>
+          <h1 className="erp-page-title">快手团购 · 创建商品</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            按「类目 → 商品类型 → 商品信息」顺序填写，内容与快手团购上架要求一致。
+          </p>
+        </div>
+        {platforms.length > 1 && (
+          <div className="flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+            {platforms.map((id) => {
+              const meta = PRODUCT_CREATE_PLATFORMS.find((p) => p.id === id)
+              if (!meta) return null
+              const on = id === active
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActive(id)}
+                  className={cn(
+                    'rounded-lg px-4 py-2 text-sm font-medium transition-colors',
+                    on
+                      ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-gray-200'
+                      : 'text-gray-600 hover:bg-white/80',
+                  )}
+                >
+                  {meta.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <KuaishouProductCreateWizard
+          autoSubmit={Boolean((location.state as LocationState | null)?.autoSubmit)}
+        />
+      </div>
+    )
   }
 
   if (active === 'douyin') {
