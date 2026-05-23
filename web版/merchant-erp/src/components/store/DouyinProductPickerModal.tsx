@@ -1,5 +1,5 @@
 import { ChevronDown, Loader2, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import { fetchAllDouyinOnlineProducts, type DouyinOnlineProductRow } from '../../lib/douyinReviewSyncHelpers'
 import ModalPortal from '../ui/ModalPortal'
@@ -31,14 +31,19 @@ export default function DouyinProductPickerModal({
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [draftId, setDraftId] = useState<string | null>(selectedId ?? null)
+  const wasOpenRef = useRef(false)
 
   useEffect(() => {
+    const justOpened = open && !wasOpenRef.current
+    wasOpenRef.current = open
     if (!open) return
-    setDraftId(selectedId ?? null)
-    setKeyword('')
-    setSearchInput('')
-    setPage(1)
-    setLoadErr(null)
+    if (justOpened) {
+      setDraftId(selectedId ?? null)
+      setKeyword('')
+      setSearchInput('')
+      setPage(1)
+      setLoadErr(null)
+    }
     let cancelled = false
     ;(async () => {
       setLoadingAll(true)
