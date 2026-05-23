@@ -2,11 +2,11 @@
  * 首页数据看板：按时间维度聚合各平台订单/核销（复用财务对账拉数逻辑）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { fetchDouyinAkteReviews, fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
-import { fetchMeituanFinanceReconcileRows, fetchMeituanReviews } from './meituanMerchantGateway.js'
+import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
+import { fetchMeituanFinanceReconcileRows } from './meituanMerchantGateway.js'
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
 import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
-import { fetchXhsFinanceReconcileRows, fetchXhsReviews } from './xhsMerchantGateway.js'
+import { fetchXhsFinanceReconcileRows } from './xhsMerchantGateway.js'
 import { fetchWaimaiFinanceReconcileRows, type WaimaiPlatformKey } from './waimaiMerchantGateway.js'
 
 export type DashboardRange = 'realtime' | 'day7' | 'day30'
@@ -165,20 +165,9 @@ export async function handleMerchantDashboardSummaryGet(
   }
 }
 
-async function countUnrepliedReviews(bearer: string, platform: DashboardPlatform): Promise<number> {
-  if (platform === 'douyin') {
-    const r = await fetchDouyinAkteReviews(bearer)
-    if (r.ok === false) return 0
-    return r.items.filter((x) => !x.replied).length
-  }
-  if (platform === 'meituan') {
-    const r = await fetchMeituanReviews(bearer)
-    if (r.ok === false) return 0
-    return r.items.filter((x) => !x.replied).length
-  }
-  const r = await fetchXhsReviews(bearer)
-  if (r.ok === false) return 0
-  return r.items.filter((x) => !x.replied).length
+async function countUnrepliedReviews(_bearer: string, _platform: DashboardPlatform): Promise<number> {
+  /** 不在首页拉全量评价（多门店串行易触发抖音限频）；待处理数请用户在评价管理页同步后查看 */
+  return 0
 }
 
 /** GET /api/merchant/home/extra-stats — 待处理评论等补充指标 */

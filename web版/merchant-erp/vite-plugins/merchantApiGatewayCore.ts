@@ -798,23 +798,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         }
         const bucket = reviewStateBucket(kind)
         const bearer = reviewPlatformBearer(req, platform)
-        const syncOpts: ReviewSyncOpts = { kind }
-        if (poiId) {
-          syncOpts.poiId = poiId
-          syncOpts.poiIds = [poiId]
-        }
-        if (productId) {
-          syncOpts.productId = productId
-          syncOpts.productIds = [productId]
-        }
-        /** Serverless 无进程内缓存：列表 GET 须实时拉平台，避免 POST 同步后 GET 命中空实例 */
-        if (bearer?.trim()) {
-          const live = await syncOneReviewPlatform(platform, bearer.trim(), syncOpts)
-          if (live.ok === false) {
-            json(res, 502, { ok: false, message: live.message })
-            return true
-          }
-        }
+        /** 列表 GET 不实时打平台 OpenAPI（Serverless 易触发抖音限频）；请用 POST /reviews/sync 拉取 */
+        void bearer
         let rows = [...bucket[platform]]
         if (poiId) {
           rows = rows.filter((r) => String((r as { poiId?: string }).poiId ?? '') === poiId)
