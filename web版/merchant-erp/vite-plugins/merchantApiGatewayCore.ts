@@ -797,6 +797,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
               kind,
               poiId: poiId || undefined,
               productId: productId || undefined,
+              poiIds: poiId ? [poiId] : undefined,
+              productIds: productId ? [productId] : undefined,
             })
           }
         }
