@@ -43,8 +43,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { path: '/recruitment', label: '达人招募' },
       { path: '/activity', label: '活动中心' },
-      { path: '/reviews/store', label: '门店评价' },
-      { path: '/reviews/product', label: '商品评价' },
+      { path: '/reviews', label: '评价管理' },
       { path: '/geo', label: 'GEO运营优化' },
       { path: '/operation/competitors', label: '竞争对手分析' },
       { path: '/ai-operation/content', label: 'AI 文章与话题' },

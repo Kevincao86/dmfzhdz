@@ -1,4 +1,4 @@
-import { Loader2, Search, X } from 'lucide-react'
+import { ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '../../cn'
 import { readMerchantSession } from '../../lib/merchantSession'
@@ -12,39 +12,57 @@ function readMerchantId() {
   return readMerchantSession('meoo_douyin_merchant_id')
 }
 
+export type DouyinStoreRow = { id: string; name: string; address?: string }
+
 export type DouyinStorePickerModalProps = {
   open: boolean
   onClose: () => void
-  /** 与创建商品「适用门店」一致：返回勾选的 poi_id 及名称行 */
-  onConfirm: (poiIds: string[], rows: { id: string; name: string }[]) => void
+  title?: string
+  selectionMode?: 'multiple' | 'single'
+  showAllOption?: boolean
+  allOptionLabel?: string
+  onConfirm?: (poiIds: string[], rows: DouyinStoreRow[]) => void
+  onConfirmSingle?: (poiId: string | null, row: DouyinStoreRow | null) => void
   initialPoiIds?: string[]
+  initialSelectedId?: string | null
 }
 
-/**
- * 抖音来客门店多选弹窗（分页、搜索），与商品创建向导「选择适用门店」交互一致。
- */
 export default function DouyinStorePickerModal({
   open,
   onClose,
+  title,
+  selectionMode = 'multiple',
+  showAllOption = false,
+  allOptionLabel = '全部门店（同步全部绑定门店）',
   onConfirm,
+  onConfirmSingle,
   initialPoiIds = [],
+  initialSelectedId = null,
 }: DouyinStorePickerModalProps) {
+  const isSingle = selectionMode === 'single'
+  const modalTitle = title ?? (isSingle ? '选择门店' : '选择适用门店')
+
   const [modalDraftIds, setModalDraftIds] = useState<string[]>([])
+  const [modalDraftSingle, setModalDraftSingle] = useState<string | null>(null)
   const [modalKeyword, setModalKeyword] = useState('')
   const [modalSearchInput, setModalSearchInput] = useState('')
   const [modalPage, setModalPage] = useState(1)
   const [modalPageSize, setModalPageSize] = useState(10)
-  const [modalStores, setModalStores] = useState<{ id: string; name: string }[]>([])
+  const [modalStores, setModalStores] = useState<DouyinStoreRow[]>([])
   const [modalTotal, setModalTotal] = useState(0)
   const [modalLoading, setModalLoading] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    setModalDraftIds([...initialPoiIds])
+    if (isSingle) {
+      setModalDraftSingle(initialSelectedId ?? null)
+    } else {
+      setModalDraftIds([...initialPoiIds])
+    }
     setModalPage(1)
     setModalKeyword('')
     setModalSearchInput('')
-  }, [open, initialPoiIds])
+  }, [open, initialPoiIds, initialSelectedId, isSingle])
 
   useEffect(() => {
     if (!open) return
@@ -60,11 +78,18 @@ export default function DouyinStorePickerModal({
         pageSize: modalPageSize,
         keyword: modalKeyword.trim() || undefined,
         merchantId: mid ?? undefined,
+        relationType: 'all',
       })
       if (cancelled) return
       setModalLoading(false)
       if (r.ok) {
-        setModalStores(r.items.map((x) => ({ id: x.id, name: x.name })))
+        setModalStores(
+          r.items.map((x) => ({
+            id: x.id,
+            name: x.name,
+            address: x.address,
+          })),
+        )
         setModalTotal(r.total)
       } else {
         setModalStores([])
@@ -82,6 +107,20 @@ export default function DouyinStorePickerModal({
   }
 
   const handleConfirm = () => {
+    if (isSingle) {
+      if (!onConfirmSingle) return
+      if (!modalDraftSingle) {
+        onConfirmSingle(null, null)
+        return
+      }
+      const row = modalStores.find((s) => s.id === modalDraftSingle) ?? {
+        id: modalDraftSingle,
+        name: modalDraftSingle,
+      }
+      onConfirmSingle(modalDraftSingle, row)
+      return
+    }
+    if (!onConfirm) return
     const rows = modalStores.filter((s) => modalDraftIds.includes(s.id))
     onConfirm([...modalDraftIds], rows)
   }
@@ -103,14 +142,9 @@ export default function DouyinStorePickerModal({
       >
         <div className="flex items-center justify-between border-b px-5 py-4">
           <h2 id="douyin-store-picker-title" className="text-lg font-semibold text-gray-900">
-            选择适用门店
+            {modalTitle}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
-            aria-label="关闭"
-          >
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100" aria-label="关闭">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -148,19 +182,44 @@ export default function DouyinStorePickerModal({
               <Loader2 className="mr-2 h-6 w-6 animate-spin" />
               加载中…
             </div>
-          ) : modalStores.length === 0 ? (
+          ) : modalStores.length === 0 && !(isSingle && showAllOption) ? (
             <p className="py-8 text-center text-sm text-gray-500">暂无门店数据，请检查绑定与门店列表接口</p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {modalStores.map((s) => (
-                <li key={s.id} className="flex items-center py-2">
+              {isSingle && showAllOption ? (
+                <li className="flex items-center py-2">
                   <input
-                    type="checkbox"
-                    className="mr-3 h-4 w-4 rounded border-gray-300"
-                    checked={modalDraftIds.includes(s.id)}
-                    onChange={() => toggleModalPoi(s.id)}
+                    type="radio"
+                    name="douyin-store-pick"
+                    className="mr-3 h-4 w-4"
+                    checked={modalDraftSingle === null}
+                    onChange={() => setModalDraftSingle(null)}
                   />
-                  <span className="text-sm text-gray-900">{s.name}</span>
+                  <span className="text-sm font-medium text-gray-900">{allOptionLabel}</span>
+                </li>
+              ) : null}
+              {modalStores.map((s) => (
+                <li key={s.id} className="flex items-start py-2">
+                  {isSingle ? (
+                    <input
+                      type="radio"
+                      name="douyin-store-pick"
+                      className="mr-3 mt-0.5 h-4 w-4"
+                      checked={modalDraftSingle === s.id}
+                      onChange={() => setModalDraftSingle(s.id)}
+                    />
+                  ) : (
+                    <input
+                      type="checkbox"
+                      className="mr-3 mt-0.5 h-4 w-4 rounded border-gray-300"
+                      checked={modalDraftIds.includes(s.id)}
+                      onChange={() => toggleModalPoi(s.id)}
+                    />
+                  )}
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium text-gray-900">{s.name}</p>
+                    {s.address ? <p className="text-xs text-gray-500">{s.address}</p> : null}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -179,9 +238,7 @@ export default function DouyinStorePickerModal({
                 }}
                 className={cn(
                   'rounded px-2 py-1',
-                  modalPageSize === n
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50',
+                  modalPageSize === n ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50',
                 )}
               >
                 {n}
@@ -192,12 +249,7 @@ export default function DouyinStorePickerModal({
             </span>
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={modalPage <= 1}
-              onClick={() => setModalPage((p) => Math.max(1, p - 1))}
-              className="rounded border border-gray-300 bg-white px-3 py-1 text-sm disabled:opacity-40"
-            >
+            <button type="button" disabled={modalPage <= 1} onClick={() => setModalPage((p) => Math.max(1, p - 1))} className="rounded border border-gray-300 bg-white px-3 py-1 text-sm disabled:opacity-40">
               上一页
             </button>
             <button
@@ -211,22 +263,64 @@ export default function DouyinStorePickerModal({
           </div>
         </div>
         <div className="flex justify-end gap-2 border-t px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
+          <button type="button" onClick={onClose} className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
             取消
           </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            确定（已选 {modalDraftIds.length} 家）
+          <button type="button" onClick={handleConfirm} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+            {isSingle ? '确定' : `确定（已选 ${modalDraftIds.length} 家）`}
           </button>
         </div>
       </div>
     </div>
+  )
+}
+
+export function DouyinStorePickerTrigger({
+  label,
+  value,
+  valueLabel,
+  placeholder = '请选择门店',
+  onChange,
+  showAllOption = false,
+  allOptionLabel,
+  pickerTitle,
+}: {
+  label: string
+  value: string | null
+  valueLabel: string
+  placeholder?: string
+  onChange: (poiId: string | null, row: DouyinStoreRow | null) => void
+  showAllOption?: boolean
+  allOptionLabel?: string
+  pickerTitle?: string
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <label className="block text-sm">
+        <span className="mb-1 block text-xs text-slate-500">{label}</span>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex min-w-[240px] max-w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-800 hover:border-indigo-300"
+        >
+          <span className={cn('truncate', !valueLabel && 'text-slate-400')}>{valueLabel || placeholder}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+      </label>
+      <DouyinStorePickerModal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={pickerTitle ?? label}
+        selectionMode="single"
+        showAllOption={showAllOption}
+        allOptionLabel={allOptionLabel}
+        initialSelectedId={value}
+        onConfirmSingle={(id, row) => {
+          onChange(id, row)
+          setOpen(false)
+        }}
+      />
+    </>
   )
 }

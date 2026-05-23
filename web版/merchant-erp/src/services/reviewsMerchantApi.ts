@@ -150,13 +150,21 @@ export async function fetchReviewsList(
 
 export async function postReviewsSync(
   platform: ReviewsApiPlatform | 'all',
-  opts?: { kind?: ReviewKind; poiId?: string; productId?: string },
+  opts?: {
+    kind?: ReviewKind
+    poiId?: string
+    productId?: string
+    poiIds?: string[]
+    productIds?: string[]
+  },
 ): Promise<{ ok: true; syncedAt?: string; message?: string } | { ok: false; message: string }> {
   const body = JSON.stringify({
     platform,
     kind: opts?.kind,
     poiId: opts?.poiId,
     productId: opts?.productId,
+    poiIds: opts?.poiIds,
+    productIds: opts?.productIds,
   })
   const paths = ['/api/meoo-merchant-reviews-sync', '/api/merchant/reviews/sync']
   try {
