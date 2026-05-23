@@ -6191,6 +6191,30 @@ function mergeDouyinOrderVerify(
 
 type DouyinOrderQueryTimeRange = 'create' | 'update'
 
+type DouyinFinanceFetchLimits = {
+  pageSize: number
+  createMaxPages: number
+  verifyUpdateMaxPages: number
+  includeHermes: boolean
+  hermesMaxPages: number
+}
+
+function douyinFinanceFetchLimits(startYmd: string, endYmd: string): DouyinFinanceFetchLimits {
+  const daySpan = eachShanghaiYmdInclusive(startYmd, endYmd).length
+  return {
+    pageSize: 100,
+    createMaxPages: daySpan <= 1 ? 15 : daySpan <= 7 ? 20 : daySpan <= 30 ? 28 : 35,
+    verifyUpdateMaxPages: daySpan <= 1 ? 20 : daySpan <= 7 ? 8 : 5,
+    includeHermes: daySpan <= 3,
+    hermesMaxPages: daySpan <= 1 ? 10 : 6,
+  }
+}
+
+type PaginateDouyinOrdersOpts = {
+  maxPages?: number
+  pageSize?: number
+}
+
 async function paginateDouyinTradeOrders(
   token: string,
   accountId: string,
@@ -6204,11 +6228,12 @@ async function paginateDouyinTradeOrders(
   seenVerifyCerts: Set<string>,
   timeRange: DouyinOrderQueryTimeRange,
   warnings: string[],
+  opts?: PaginateDouyinOrdersOpts,
 ): Promise<void> {
   const isHermes = apiPath.includes('hermes')
   let page = 1
-  const pageSize = 50
-  const maxPages = 100
+  const pageSize = opts?.pageSize ?? 100
+  const maxPages = opts?.maxPages ?? 100
   while (page <= maxPages) {
     const u = new URL(douyinOpenApiUrl(apiPath))
     u.searchParams.set('account_id', accountId)
@@ -6251,6 +6276,7 @@ async function paginateDouyinTradeOrders(
       const order = rawOrder as Record<string, unknown>
       if (timeRange === 'create') {
         mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds)
+        mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
       } else {
         mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
       }
@@ -6288,15 +6314,13 @@ export async function fetchDouyinFinanceReconcileRows(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = session.merchantId
-    const paths = [
-      '/goodlife/v1/trade/order/query/' as const,
-      '/goodlife/v1/hermes/trade/order/query/' as const,
-    ]
-    for (const apiPath of paths) {
-      await paginateDouyinTradeOrders(
+    const limits = douyinFinanceFetchLimits(startYmd, endYmd)
+    const paginateOpts = { pageSize: limits.pageSize }
+    const tasks: Promise<void>[] = [
+      paginateDouyinTradeOrders(
         token,
         accountId,
-        apiPath,
+        '/goodlife/v1/trade/order/query/',
         rng.startSec,
         rng.endSec,
         startYmd,
@@ -6306,22 +6330,48 @@ export async function fetchDouyinFinanceReconcileRows(
         seenVerifyCerts,
         'create',
         warnings,
-      )
-      await paginateDouyinTradeOrders(
-        token,
-        accountId,
-        apiPath,
-        rng.startSec,
-        rng.endSec,
-        startYmd,
-        endYmd,
-        bucket,
-        seenSalesOrderIds,
-        seenVerifyCerts,
-        'update',
-        warnings,
+        { ...paginateOpts, maxPages: limits.createMaxPages },
+      ),
+    ]
+    if (limits.verifyUpdateMaxPages > 0) {
+      tasks.push(
+        paginateDouyinTradeOrders(
+          token,
+          accountId,
+          '/goodlife/v1/trade/order/query/',
+          rng.startSec,
+          rng.endSec,
+          startYmd,
+          endYmd,
+          bucket,
+          seenSalesOrderIds,
+          seenVerifyCerts,
+          'update',
+          warnings,
+          { ...paginateOpts, maxPages: limits.verifyUpdateMaxPages },
+        ),
       )
     }
+    if (limits.includeHermes) {
+      tasks.push(
+        paginateDouyinTradeOrders(
+          token,
+          accountId,
+          '/goodlife/v1/hermes/trade/order/query/',
+          rng.startSec,
+          rng.endSec,
+          startYmd,
+          endYmd,
+          bucket,
+          seenSalesOrderIds,
+          seenVerifyCerts,
+          'create',
+          warnings,
+          { ...paginateOpts, maxPages: limits.hermesMaxPages },
+        ),
+      )
+    }
+    await Promise.all(tasks)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     warnings.push(`抖音对账拉取异常：${msg}`)

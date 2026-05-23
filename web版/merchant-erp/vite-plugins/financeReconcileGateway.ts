@@ -123,59 +123,75 @@ export async function handleFinanceReconcileGet(
   const warnings: string[] = []
   const rows: Record<string, unknown>[] = []
 
+  type PlatformPack = { rows: Record<string, unknown>[]; warnings: string[] }
+
+  const jobs: Promise<PlatformPack>[] = []
+
   if (douyinToken) {
-    const dy = await fetchDouyinFinanceReconcileRows(douyinToken, startYmd, endYmd)
-    for (const w of dy.warnings) warnings.push(w)
-    for (const r of dy.rows) {
-      rows.push({
-        date: r.date,
-        platform: r.platform,
-        platformLabel: r.platformLabel,
-        channel: 'groupbuy',
-        orderCount: r.orderCount,
-        verifyOrderCount: r.verifyOrderCount,
-        salesAmountYuan: r.salesAmountYuan,
-        verifyAmountYuan: r.verifyAmountYuan,
-      })
-    }
+    jobs.push(
+      (async () => {
+        const dy = await fetchDouyinFinanceReconcileRows(douyinToken, startYmd, endYmd)
+        return {
+          warnings: dy.warnings,
+          rows: dy.rows.map((r) => ({
+            date: r.date,
+            platform: r.platform,
+            platformLabel: r.platformLabel,
+            channel: 'groupbuy',
+            orderCount: r.orderCount,
+            verifyOrderCount: r.verifyOrderCount,
+            salesAmountYuan: r.salesAmountYuan,
+            verifyAmountYuan: r.verifyAmountYuan,
+          })),
+        }
+      })(),
+    )
   } else {
     warnings.push('未绑定抖音来客，跳过抖音对账。')
   }
 
   if (meituanToken) {
-    const mt = await fetchMeituanFinanceReconcileRows(meituanToken, startYmd, endYmd)
-    for (const w of mt.warnings) warnings.push(w)
-    for (const r of mt.rows) {
-      rows.push({
-        date: r.date,
-        platform: r.platform,
-        platformLabel: r.platformLabel,
-        channel: 'groupbuy',
-        orderCount: r.orderCount,
-        verifyOrderCount: r.verifyOrderCount,
-        salesAmountYuan: r.salesAmountYuan,
-        verifyAmountYuan: r.verifyAmountYuan,
-      })
-    }
+    jobs.push(
+      (async () => {
+        const mt = await fetchMeituanFinanceReconcileRows(meituanToken, startYmd, endYmd)
+        return {
+          warnings: mt.warnings,
+          rows: mt.rows.map((r) => ({
+            date: r.date,
+            platform: r.platform,
+            platformLabel: r.platformLabel,
+            channel: 'groupbuy',
+            orderCount: r.orderCount,
+            verifyOrderCount: r.verifyOrderCount,
+            salesAmountYuan: r.salesAmountYuan,
+            verifyAmountYuan: r.verifyAmountYuan,
+          })),
+        }
+      })(),
+    )
   } else {
     warnings.push('未绑定美团点评，跳过美团对账。')
   }
 
   if (xhsToken) {
-    const xh = await fetchXhsFinanceReconcileRows(xhsToken, startYmd, endYmd)
-    for (const w of xh.warnings) warnings.push(w)
-    for (const r of xh.rows) {
-      rows.push({
-        date: r.date,
-        platform: r.platform,
-        platformLabel: r.platformLabel,
-        channel: 'groupbuy',
-        orderCount: r.orderCount,
-        verifyOrderCount: r.verifyOrderCount,
-        salesAmountYuan: r.salesAmountYuan,
-        verifyAmountYuan: r.verifyAmountYuan,
-      })
-    }
+    jobs.push(
+      (async () => {
+        const xh = await fetchXhsFinanceReconcileRows(xhsToken, startYmd, endYmd)
+        return {
+          warnings: xh.warnings,
+          rows: xh.rows.map((r) => ({
+            date: r.date,
+            platform: r.platform,
+            platformLabel: r.platformLabel,
+            channel: 'groupbuy',
+            orderCount: r.orderCount,
+            verifyOrderCount: r.verifyOrderCount,
+            salesAmountYuan: r.salesAmountYuan,
+            verifyAmountYuan: r.verifyAmountYuan,
+          })),
+        }
+      })(),
+    )
   } else {
     warnings.push('未绑定小红书商家后台，跳过小红书对账。')
   }
@@ -187,23 +203,33 @@ export async function handleFinanceReconcileGet(
   ]
   for (const wp of waimaiPlatforms) {
     if (wp.token) {
-      const wm = await fetchWaimaiFinanceReconcileRows(wp.key, wp.token, startYmd, endYmd)
-      for (const w of wm.warnings) warnings.push(w)
-      for (const r of wm.rows) {
-        rows.push({
-          date: r.date,
-          platform: r.platform,
-          platformLabel: r.platformLabel,
-          channel: 'waimai',
-          orderCount: r.orderCount,
-          verifyOrderCount: r.verifyOrderCount,
-          salesAmountYuan: r.salesAmountYuan,
-          verifyAmountYuan: r.verifyAmountYuan,
-        })
-      }
+      jobs.push(
+        (async () => {
+          const wm = await fetchWaimaiFinanceReconcileRows(wp.key, wp.token!, startYmd, endYmd)
+          return {
+            warnings: wm.warnings,
+            rows: wm.rows.map((r) => ({
+              date: r.date,
+              platform: r.platform,
+              platformLabel: r.platformLabel,
+              channel: 'waimai',
+              orderCount: r.orderCount,
+              verifyOrderCount: r.verifyOrderCount,
+              salesAmountYuan: r.salesAmountYuan,
+              verifyAmountYuan: r.verifyAmountYuan,
+            })),
+          }
+        })(),
+      )
     } else {
       warnings.push(`未绑定${wp.label}，跳过${wp.label}对账。`)
     }
+  }
+
+  const packs = await Promise.all(jobs)
+  for (const pack of packs) {
+    warnings.push(...pack.warnings)
+    rows.push(...pack.rows)
   }
 
   json(res, 200, {
