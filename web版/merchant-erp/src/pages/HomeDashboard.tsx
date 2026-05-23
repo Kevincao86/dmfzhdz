@@ -2,26 +2,20 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
   BarChart3,
-  Bike,
   Calendar,
   CheckCircle2,
   Circle,
   Clock,
   MessageSquare,
   Percent,
-  ShoppingBag,
   ShoppingCart,
-  Smartphone,
-  Star,
-  Store,
-  Ticket,
-  Truck,
   UserPlus,
   Users,
   Wallet,
   X,
 } from 'lucide-react'
 import { MERCHANT_PLATFORMS, type MerchantPlatformId } from '../constants/merchantPlatforms'
+import { MerchantPlatformIcon } from '../lib/platformBranding'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -44,31 +38,11 @@ import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../service
 
 type PlatformId = MerchantPlatformId
 
-const PLATFORM_ICONS: Record<PlatformId, typeof Smartphone> = {
-  douyin: Smartphone,
-  meituan: Ticket,
-  xiaohongshu: Store,
-  jd: Star,
-  eleme: ShoppingBag,
-  meituan_waimai: Truck,
-  jd_waimai: Bike,
-}
-
-const PLATFORM_COLORS: Record<PlatformId, string> = {
-  douyin: 'bg-pink-500',
-  meituan: 'bg-yellow-500',
-  xiaohongshu: 'bg-red-500',
-  jd: 'bg-red-600',
-  eleme: 'bg-blue-500',
-  meituan_waimai: 'bg-amber-500',
-  jd_waimai: 'bg-red-700',
-}
-
 const PLATFORMS = MERCHANT_PLATFORMS.map((p) => ({
   id: p.id,
   name: p.name,
-  color: PLATFORM_COLORS[p.id],
-  icon: PLATFORM_ICONS[p.id],
+  letter: p.letter,
+  color: p.color,
 }))
 
 const QUICK: {
@@ -329,7 +303,6 @@ export default function HomeDashboard() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {platformRows.map((p, idx) => {
-            const Icon = p.icon
             return (
               <motion.div
                 key={p.id}
@@ -340,14 +313,14 @@ export default function HomeDashboard() {
               >
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center">
-                    <div
-                      className={cn(
-                        'mr-3 flex h-10 w-10 items-center justify-center rounded-lg text-white',
-                        p.color,
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                    </div>
+                    <MerchantPlatformIcon
+                      platformId={p.id}
+                      name={p.name}
+                      letter={p.letter}
+                      color={p.color}
+                      size="sm"
+                      className="mr-3"
+                    />
                     <span className="font-semibold text-gray-900">{p.name}</span>
                   </div>
                   <div
@@ -524,14 +497,14 @@ export default function HomeDashboard() {
             >
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center">
-                  <div
-                    className={cn(
-                      'mr-4 flex h-12 w-12 items-center justify-center rounded-xl text-white',
-                      modalPlatform.color,
-                    )}
-                  >
-                    <modalPlatform.icon className="h-6 w-6" />
-                  </div>
+                  <MerchantPlatformIcon
+                    platformId={modalPlatform.id}
+                    name={modalPlatform.name}
+                    letter={modalPlatform.letter}
+                    color={modalPlatform.color}
+                    size="md"
+                    className="mr-4"
+                  />
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">{modalPlatform.name}</h3>
                     <div className="text-sm text-gray-500">数据详情</div>

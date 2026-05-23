@@ -181,6 +181,9 @@ export type DouyinAkteReviewFetchOpts = {
   kind?: 'store' | 'product' | 'all'
   poiId?: string
   productId?: string
+  /** 客户端传入的 poi_id 列表（同步全部门店时优先使用，避免服务端 POI 缓存未命中） */
+  poiIds?: string[]
+  productIds?: string[]
 }
 
 /** 同一 Lambda 实例内缓存解密后的会话，减少重复申请 client_token */
@@ -6471,18 +6474,17 @@ export async function fetchDouyinAkteReviews(
     }
 
     if (kind === 'store' || kind === 'all') {
+      const poiTargets: Array<{ poiId: string; poiName?: string }> = []
       if (opts?.poiId?.trim()) {
-        const r = await fetchAkteCommentsForTarget(
-          accessToken,
-          accountId,
-          { poiId: opts.poiId.trim() },
-          { reviewKind: 'store' },
-        )
-        if (r.ok === false) return r
-        pushItems(r.items)
+        poiTargets.push({ poiId: opts.poiId.trim() })
+      } else if (Array.isArray(opts?.poiIds) && opts.poiIds.length > 0) {
+        for (const id of opts.poiIds) {
+          const poiId = String(id ?? '').trim()
+          if (poiId) poiTargets.push({ poiId })
+          if (poiTargets.length >= 120) break
+        }
       } else {
         const { pois } = await fetchMergedAllPois(auth, session, accountId)
-        const poiTargets: Array<{ poiId: string; poiName: string }> = []
         for (const row of pois) {
           const poiId = extractRowPoiId(row)
           if (!poiId) continue
@@ -6494,49 +6496,56 @@ export async function fetchDouyinAkteReviews(
                 )
               : poiId
           poiTargets.push({ poiId, poiName: name })
-          if (poiTargets.length >= 80) break
+          if (poiTargets.length >= 120) break
         }
-        if (poiTargets.length === 0) {
-          return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
-        }
-        for (const p of poiTargets) {
-          const r = await fetchAkteCommentsForTarget(
-            accessToken,
-            accountId,
-            { poiId: p.poiId },
-            { reviewKind: 'store', poiName: p.poiName },
-          )
-          if (r.ok === false) return r
-          pushItems(r.items)
-        }
+      }
+      if (poiTargets.length === 0 && (kind === 'store' || kind === 'all')) {
+        return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
+      }
+      for (const p of poiTargets) {
+        const r = await fetchAkteCommentsForTarget(
+          accessToken,
+          accountId,
+          { poiId: p.poiId },
+          { reviewKind: 'store', poiId: p.poiId, poiName: p.poiName },
+        )
+        if (r.ok === false) return r
+        pushItems(r.items)
       }
     }
 
     if (kind === 'product' || kind === 'all') {
+      const productTargets: Array<{ productId: string; productName?: string }> = []
       if (opts?.productId?.trim()) {
+        productTargets.push({ productId: opts.productId.trim() })
+      } else if (Array.isArray(opts?.productIds) && opts.productIds.length > 0) {
+        for (const id of opts.productIds) {
+          const productId = String(id ?? '').trim()
+          if (productId) productTargets.push({ productId })
+          if (productTargets.length >= 120) break
+        }
+      } else {
+        const products = await listDouyinOnlineProductIds(accessToken, accountId, 120)
+        for (const p of products) {
+          productTargets.push({ productId: p.productId, productName: p.productName })
+        }
+      }
+      if (productTargets.length === 0 && kind === 'product') {
+        return { ok: false, message: '未找到在线商品，请先在「商品」页同步抖音团购商品。' }
+      }
+      for (const p of productTargets) {
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { productId: opts.productId.trim() },
-          { reviewKind: 'product', productId: opts.productId.trim() },
+          { productId: p.productId },
+          {
+            reviewKind: 'product',
+            productId: p.productId,
+            productName: p.productName,
+          },
         )
         if (r.ok === false) return r
         pushItems(r.items)
-      } else {
-        const products = await listDouyinOnlineProductIds(accessToken, accountId, 60)
-        if (products.length === 0 && kind === 'product') {
-          return { ok: false, message: '未找到在线商品，请先在「商品」页同步抖音团购商品。' }
-        }
-        for (const p of products) {
-          const r = await fetchAkteCommentsForTarget(
-            accessToken,
-            accountId,
-            { productId: p.productId },
-            { reviewKind: 'product', productId: p.productId, productName: p.productName },
-          )
-          if (r.ok === false) return r
-          pushItems(r.items)
-        }
       }
     }
 

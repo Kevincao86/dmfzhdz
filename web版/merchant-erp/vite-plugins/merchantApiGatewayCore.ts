@@ -138,6 +138,8 @@ type ReviewSyncOpts = {
   kind?: 'store' | 'product'
   poiId?: string
   productId?: string
+  poiIds?: string[]
+  productIds?: string[]
 }
 
 async function syncOneReviewPlatform(
@@ -154,6 +156,8 @@ async function syncOneReviewPlatform(
       kind,
       poiId: opts?.poiId,
       productId: opts?.productId,
+      poiIds: opts?.poiIds,
+      productIds: opts?.productIds,
     })
     if (r.ok === false) return { ok: false, message: r.message }
     if (kind === 'product') {
@@ -784,7 +788,11 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         const bucket = reviewStateBucket(kind)
         if (bucket[platform].length === 0) {
           const bearer = reviewPlatformBearer(req, platform)
-          if (bearer?.trim()) {
+          const canDouyinAutoSync =
+            platform !== 'douyin' ||
+            (kind === 'store' && Boolean(poiId)) ||
+            (kind === 'product' && Boolean(productId))
+          if (bearer?.trim() && canDouyinAutoSync) {
             await syncOneReviewPlatform(platform, bearer, {
               kind,
               poiId: poiId || undefined,
@@ -832,12 +840,23 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             kind?: string
             poiId?: string
             productId?: string
+            poiIds?: string[]
+            productIds?: string[]
           }
           if (j.platform && isReviewPlatformApi(j.platform)) scope = j.platform
           if (j.kind === 'product') syncOpts.kind = 'product'
           if (typeof j.poiId === 'string' && j.poiId.trim()) syncOpts.poiId = j.poiId.trim()
           if (typeof j.productId === 'string' && j.productId.trim())
             syncOpts.productId = j.productId.trim()
+          if (Array.isArray(j.poiIds)) {
+            syncOpts.poiIds = j.poiIds.map((x) => String(x ?? '').trim()).filter(Boolean).slice(0, 120)
+          }
+          if (Array.isArray(j.productIds)) {
+            syncOpts.productIds = j.productIds
+              .map((x) => String(x ?? '').trim())
+              .filter(Boolean)
+              .slice(0, 120)
+          }
         } catch {
           json(res, 400, { message: '请求体须为 JSON' })
           return true

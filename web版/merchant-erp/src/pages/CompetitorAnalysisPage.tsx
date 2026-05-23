@@ -1,6 +1,7 @@
-import { Loader2, MapPin, RefreshCw, Sparkles } from 'lucide-react'
+import { Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { DouyinStorePickerTrigger, type DouyinStoreRow } from '../components/store/DouyinStorePickerModal'
 import {
   latestCompetitorReportForPoi,
   loadCompetitorReports,
@@ -13,11 +14,8 @@ import {
 import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
 import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import { analyzeCompetitors } from '../services/storeIntelApi'
-import { fetchStoresForPlatform } from '../services/merchantStoresApi'
-import type { DouyinStoreRow } from '../services/douyinMerchantApi'
 
 export default function CompetitorAnalysisPage() {
-  const [stores, setStores] = useState<DouyinStoreRow[]>([])
   const [selected, setSelected] = useState<SelectedStoreRef | null>(null)
   const [report, setReport] = useState<CompetitorReport | null>(null)
   const [history, setHistory] = useState<CompetitorReport[]>([])
@@ -30,29 +28,31 @@ export default function CompetitorAnalysisPage() {
   }, [])
 
   useEffect(() => {
-    void fetchStoresForPlatform('douyin', { page: 1, pageSize: 50, relationType: '0' }).then((res) => {
-      if (res.ok) setStores(res.items)
-    })
-  }, [])
-
-  useEffect(() => {
     if (selected?.poiId) {
       setReport(latestCompetitorReportForPoi(selected.poiId))
     }
   }, [selected?.poiId])
 
-  const onSelectStore = (poiId: string) => {
-    const st = stores.find((s) => s.id === poiId)
-    if (!st?.address) return
+  const onSelectStore = (poiId: string | null, row: DouyinStoreRow | null) => {
+    if (!poiId || !row?.address) {
+      if (!poiId) {
+        setSelected(null)
+        saveSelectedCompetitorStore(null)
+        setReport(null)
+      } else {
+        setErr('所选门店缺少地址，请换一家带地址的门店')
+      }
+      return
+    }
     const ref: SelectedStoreRef = {
-      poiId: st.id,
-      storeName: st.name,
-      address: st.address,
-      city: st.city,
+      poiId: row.id,
+      storeName: row.name,
+      address: row.address,
     }
     setSelected(ref)
     saveSelectedCompetitorStore(ref)
-    setReport(latestCompetitorReportForPoi(st.id))
+    setReport(latestCompetitorReportForPoi(row.id))
+    setErr(null)
   }
 
   const runAnalysis = useCallback(async () => {
@@ -112,23 +112,18 @@ export default function CompetitorAnalysisPage() {
 
       <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            <MapPin className="mr-1 inline h-4 w-4" />
-            选择门店
-          </label>
-          <select
-            value={selected?.poiId ?? ''}
-            onChange={(e) => onSelectStore(e.target.value)}
-            className="mt-1 w-full max-w-xl rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">请选择已认领门店</option>
-            {stores.map((s) => (
-              <option key={s.id} value={s.id} disabled={!s.address}>
-                {s.name}
-                {s.address ? ` — ${s.address.slice(0, 36)}` : '（无地址）'}
-              </option>
-            ))}
-          </select>
+          <DouyinStorePickerTrigger
+            label="选择门店"
+            value={selected?.poiId ?? null}
+            valueLabel={
+              selected
+                ? `${selected.storeName}${selected.address ? ` — ${selected.address.slice(0, 36)}` : ''}`
+                : ''
+            }
+            placeholder="请选择已认领门店"
+            pickerTitle="选择门店"
+            onChange={onSelectStore}
+          />
         </div>
 
         {selected && (
