@@ -6327,6 +6327,16 @@ function mapAkteCommentRow(
     (typeof info.user_name === 'string' && info.user_name.trim()) ||
     '抖音用户'
 
+  const prodRaw = row.product_info
+  const prodInfo =
+    prodRaw && typeof prodRaw === 'object' ? (prodRaw as Record<string, unknown>) : null
+  const mappedProductId =
+    ctx.productId ??
+    (prodInfo?.product_id != null ? String(prodInfo.product_id) : undefined)
+  const mappedProductName =
+    ctx.productName ??
+    (typeof prodInfo?.product_name === 'string' ? prodInfo.product_name : undefined)
+
   return {
     id: compositeId,
     platform: 'douyin',
@@ -6340,8 +6350,8 @@ function mapAkteCommentRow(
     reviewKind: ctx.reviewKind,
     poiId: String(poiId),
     poiName: ctx.poiName,
-    productId: ctx.productId,
-    productName: ctx.productName,
+    productId: mappedProductId,
+    productName: mappedProductName,
   }
 }
 
@@ -6388,12 +6398,35 @@ async function listDouyinOnlineProductIds(
   return out
 }
 
+function formatDouyinAkteIdList(ids: string[]): string {
+  const cleaned = ids.map((x) => String(x ?? '').trim()).filter(Boolean).slice(0, 20)
+  if (cleaned.length === 0) return ''
+  const body = cleaned.map((id) => (/^\d+$/.test(id) ? id : JSON.stringify(id)))
+  return `[${body.join(',')}]`
+}
+
 async function fetchAkteCommentsForTarget(
   accessToken: string,
   accountId: string,
-  target: { poiId?: string; productId?: string },
+  target: { poiId?: string; productId?: string; poiIds?: string[]; productIds?: string[] },
   ctx: { reviewKind: 'store' | 'product'; poiId?: string; poiName?: string; productId?: string; productName?: string },
 ): Promise<{ ok: true; items: MerchantReviewRowDouyin[] } | { ok: false; message: string }> {
+  const poiIds = [
+    ...(Array.isArray(target.poiIds) ? target.poiIds : []),
+    ...(target.poiId?.trim() ? [target.poiId.trim()] : []),
+  ]
+  const productIds = [
+    ...(Array.isArray(target.productIds) ? target.productIds : []),
+    ...(target.productId?.trim() ? [target.productId.trim()] : []),
+  ]
+  const poiIdList = [...new Set(poiIds.map((x) => x.trim()).filter(Boolean))].slice(0, 20)
+  const productIdList = [...new Set(productIds.map((x) => x.trim()).filter(Boolean))].slice(0, 20)
+  const usePoi = ctx.reviewKind === 'store' ? poiIdList : []
+  const useProduct = ctx.reviewKind === 'product' ? productIdList : []
+  if (usePoi.length === 0 && useProduct.length === 0) {
+    return { ok: false, message: '请至少选择一个门店或商品后再同步评价。' }
+  }
+
   const nowSec = Math.floor(Date.now() / 1000)
   const startSec = nowSec - 90 * 86400
   const out: MerchantReviewRowDouyin[] = []
@@ -6405,8 +6438,12 @@ async function fetchAkteCommentsForTarget(
     u.searchParams.set('end_time', String(nowSec))
     u.searchParams.set('cursor', cursor)
     u.searchParams.set('count', '100')
-    if (target.poiId) u.searchParams.set('poi_id', target.poiId)
-    if (target.productId) u.searchParams.set('product_id', target.productId)
+    if (usePoi.length > 0) {
+      u.searchParams.set('poi_id_list', formatDouyinAkteIdList(usePoi))
+    }
+    if (useProduct.length > 0) {
+      u.searchParams.set('product_id_list', formatDouyinAkteIdList(useProduct))
+    }
 
     const dr = await douyinServerFetch(u.toString(), {
       method: 'GET',
@@ -6502,12 +6539,13 @@ export async function fetchDouyinAkteReviews(
       if (poiTargets.length === 0 && (kind === 'store' || kind === 'all')) {
         return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
       }
-      for (const p of poiTargets) {
+      for (let i = 0; i < poiTargets.length; i += 20) {
+        const batch = poiTargets.slice(i, i + 20)
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { poiId: p.poiId },
-          { reviewKind: 'store', poiId: p.poiId, poiName: p.poiName },
+          { poiIds: batch.map((p) => p.poiId) },
+          { reviewKind: 'store', poiName: batch[0]?.poiName },
         )
         if (r.ok === false) return r
         pushItems(r.items)
@@ -6533,15 +6571,16 @@ export async function fetchDouyinAkteReviews(
       if (productTargets.length === 0 && kind === 'product') {
         return { ok: false, message: '未找到在线商品，请先在「商品」页同步抖音团购商品。' }
       }
-      for (const p of productTargets) {
+      for (let i = 0; i < productTargets.length; i += 20) {
+        const batch = productTargets.slice(i, i + 20)
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { productId: p.productId },
+          { productIds: batch.map((p) => p.productId) },
           {
             reviewKind: 'product',
-            productId: p.productId,
-            productName: p.productName,
+            productId: batch[0]?.productId,
+            productName: batch[0]?.productName,
           },
         )
         if (r.ok === false) return r
