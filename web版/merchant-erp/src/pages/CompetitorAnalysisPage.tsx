@@ -12,7 +12,10 @@ import {
   type SelectedStoreRef,
 } from '../lib/competitorStorage'
 import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
-import { readStoreMarginConfig } from '../lib/storeMarginsRead'
+import {
+  competitorIndustrySourceLabel,
+  resolveCompetitorAnalysisIndustry,
+} from '../lib/competitorIndustry'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 
 export default function CompetitorAnalysisPage() {
@@ -21,6 +24,7 @@ export default function CompetitorAnalysisPage() {
   const [history, setHistory] = useState<CompetitorReport[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const boundIndustry = resolveCompetitorAnalysisIndustry(selected?.storeName)
 
   useEffect(() => {
     setSelected(loadSelectedCompetitorStore())
@@ -63,14 +67,21 @@ export default function CompetitorAnalysisPage() {
     }
     setLoading(true)
     setErr(null)
-    const marginCfg = readStoreMarginConfig()
+    const industry = resolveCompetitorAnalysisIndustry(selected.storeName)
+    if (!industry.path) {
+      setLoading(false)
+      setErr('请先在「商品 → 门店毛利配置」中选择经营类目（如 购物 > 商超便利 或 购物 > 数码家电），再进行分析')
+      return
+    }
     const menu = loadStoreMenuRecord()
     const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 30) : ''
     const r = await analyzeCompetitors({
       storeName: selected.storeName,
       address: selected.address,
       city: selected.city,
-      industryHint: marginCfg.industry.path || marginCfg.industry.name,
+      industryPath: industry.path,
+      industryName: industry.name,
+      industryHint: industry.path,
       menuSummary: menuSummary || undefined,
     })
     setLoading(false)
@@ -83,7 +94,7 @@ export default function CompetitorAnalysisPage() {
       poiId: selected.poiId,
       storeName: selected.storeName,
       address: selected.address,
-      industryHint: r.industryHint,
+      industryHint: industry.path,
       analyzedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       summary: r.summary,
       competitors: r.competitors,
@@ -132,6 +143,23 @@ export default function CompetitorAnalysisPage() {
             当前：<span className="font-medium text-gray-900">{selected.storeName}</span>
             <br />
             {selected.address}
+            <br />
+            <span className="text-xs text-gray-500">
+              分析类目：
+              {boundIndustry.path ? (
+                <>
+                  <span className="font-medium text-indigo-700">{boundIndustry.path}</span>
+                  <span className="text-gray-400">
+                    {' '}
+                    · {competitorIndustrySourceLabel(boundIndustry.source)}
+                  </span>
+                </>
+              ) : (
+                <Link to="/products" className="text-amber-700 underline">
+                  未配置 · 请至商品页选择经营类目
+                </Link>
+              )}
+            </span>
           </p>
         )}
 
@@ -160,7 +188,7 @@ export default function CompetitorAnalysisPage() {
           </div>
           <p className="text-sm leading-relaxed text-gray-800">{report.summary}</p>
           {report.industryHint && (
-            <p className="text-xs text-gray-500">推断品类：{report.industryHint}</p>
+            <p className="text-xs text-gray-500">分析类目：{report.industryHint}</p>
           )}
           <div>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">

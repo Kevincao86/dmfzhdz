@@ -399,6 +399,8 @@ export async function runCompetitorAnalysisCore(
     address?: string
     city?: string
     industryHint?: string
+    industryPath?: string
+    industryName?: string
     menuSummary?: string
   }
   try {
@@ -412,26 +414,41 @@ export async function runCompetitorAnalysisCore(
     return { status: 400, body: { ok: false, error: 'store_name_address_required' } }
   }
 
-  const industryHint = String(body.industryHint ?? '').trim()
+  const industryPath = String(body.industryPath ?? body.industryHint ?? '').trim()
+  const industryName = String(body.industryName ?? '').trim()
+  const boundIndustry = industryPath || industryName
   const menuSummary = String(body.menuSummary ?? '').trim()
   const city = String(body.city ?? '').trim()
 
-  const system = `你是本地生活商业分析师。根据门店地址与行业，推断其周边 3–8 公里内可能的同业竞争格局。
+  const industryRules = boundIndustry
+    ? `【硬性规则 · 商家已绑定经营类目】
+- 绑定类目「${boundIndustry}」是分析的唯一主营行业依据；industryHint 必须原样输出该类目（可含完整路径），禁止改写成餐饮、饮品、奶茶等其他品类。
+- 竞品必须是同一行业或直接替代的同业态门店/连锁（例：类目含「商超便利」「数码家电」「3C」时，竞品应为便利店、超市、3C 数码店、手机卖场、生活电器集合店等；禁止输出喜茶、奈雪、茶颜悦色、咖啡、火锅等餐饮连锁）。
+- 每个竞品的 category 须与绑定类目一致或为其子类；hotProducts 须符合该竞品业态（如数码店推手机/配件套餐，便利店推关东煮/便当/日用品团购等）。
+- 门店名称仅作参考，不得因店名或地址商圈常识覆盖绑定类目。`
+    : `若未提供绑定类目，可结合门店名与地址推断主营品类；industryHint 输出推断结果。`
+
+  const system = `你是本地生活商业分析师。根据门店地址与经营类目，推断其周边 3–8 公里内可能的同业竞争格局。
 你没有实时地图数据：须基于地址语义、城市商圈常识做合理推断，并在 summary 中注明「基于公开信息与区位推断，非实时抓取」。
+${industryRules}
 只输出 JSON：
 {
   "summary": "一段话",
-  "industryHint": "推断的主营品类",
+  "industryHint": "${boundIndustry ? '必须与商家绑定经营类目完全一致' : '推断的主营品类'}",
   "competitors": [{"name":"店名或类型","distanceHint":"约x公里/同商圈","category":"品类","priceRange":"人均或套餐价区间","highlights":"卖点","hotProducts":[{"name":"热销团购/外卖商品名","priceYuan":39.9,"channel":"团购或外卖或到店","note":"可选：销量/套餐说明"}]}],
   "suggestions": ["给该门店的经营建议1","建议2"]
 }`
 
   const userPrompt = [
-    `门店：${storeName}`,
+    `门店：${storeName}（店名仅供参考，行业以绑定类目为准）`,
     `地址：${address}${city ? `（${city}）` : ''}`,
-    industryHint ? `商家填写行业：${industryHint}` : '',
+    boundIndustry
+      ? `【绑定经营类目 · 必须遵守】${boundIndustry}${industryName && industryName !== industryPath ? `（${industryName}）` : ''}`
+      : '',
     menuSummary ? `本店菜单摘要：\n${menuSummary}` : '',
-    '请分析周边竞争对手与定价带，并为每个竞品推断 2–4 个当地常见的团购/外卖热销商品（含大致售价），供后续 AI 组品参考；并给出上架团购时的差异化建议。',
+    boundIndustry
+      ? '请严格按绑定经营类目分析周边同业竞品与定价带，禁止输出跨行业竞品（尤其禁止茶饮/咖啡等）。为每个竞品推断 2–4 个符合其业态的团购/外卖热销商品（含大致售价），并给出差异化建议。'
+      : '请分析周边竞争对手与定价带，并为每个竞品推断 2–4 个当地常见的团购/外卖热销商品（含大致售价），供后续 AI 组品参考；并给出上架团购时的差异化建议。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -448,7 +465,7 @@ export async function runCompetitorAnalysisCore(
       body: {
         ok: true,
         summary,
-        industryHint: String(obj.industryHint ?? industryHint).trim() || undefined,
+        industryHint: boundIndustry || String(obj.industryHint ?? '').trim() || undefined,
         competitors,
         suggestions,
       },
