@@ -146,8 +146,11 @@ async function syncOneReviewPlatform(
   p: ReviewPlatformApi,
   bearer: string | null,
   opts?: ReviewSyncOpts,
-): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+): Promise<
+  { ok: true; message: string; items?: ReviewRow[]; syncedAt: string } | { ok: false; message: string }
+> {
   const kind = opts?.kind ?? 'store'
+  const syncedAt = new Date().toISOString()
   if (p === 'douyin') {
     if (!bearer?.trim()) {
       return { ok: false, message: '请先绑定抖音来客后再同步评价。' }
@@ -162,14 +165,16 @@ async function syncOneReviewPlatform(
     if (r.ok === false) return { ok: false, message: r.message }
     if (kind === 'product') {
       reviewsProductState.douyin = r.items as ReviewRow[]
-      reviewsProductSyncedAt.douyin = new Date().toISOString()
+      reviewsProductSyncedAt.douyin = syncedAt
     } else {
       reviewsStoreState.douyin = r.items as ReviewRow[]
-      reviewsSyncedAt.douyin = new Date().toISOString()
+      reviewsSyncedAt.douyin = syncedAt
     }
     return {
       ok: true,
       message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（近 90 天）。`,
+      items: r.items as ReviewRow[],
+      syncedAt,
     }
   }
   if (p === 'meituan') {
@@ -179,10 +184,12 @@ async function syncOneReviewPlatform(
     const r = await fetchMeituanReviews(bearer.trim())
     if (r.ok === false) return { ok: false, message: r.message }
     reviewsStoreState.meituan = r.items as ReviewRow[]
-    reviewsSyncedAt.meituan = new Date().toISOString()
+    reviewsSyncedAt.meituan = syncedAt
     return {
       ok: true,
       message: `美团：已同步 ${r.items.length} 条评价（近 90 天，需开放平台评价管理能力）。`,
+      items: r.items as ReviewRow[],
+      syncedAt,
     }
   }
   if (p === 'xhs') {
@@ -192,10 +199,12 @@ async function syncOneReviewPlatform(
     const r = await fetchXhsReviews(bearer.trim())
     if (r.ok === false) return { ok: false, message: r.message }
     reviewsStoreState.xhs = r.items as ReviewRow[]
-    reviewsSyncedAt.xhs = new Date().toISOString()
+    reviewsSyncedAt.xhs = syncedAt
     return {
       ok: true,
       message: `小红书：已同步 ${r.items.length} 条评价（近 90 天）。`,
+      items: r.items as ReviewRow[],
+      syncedAt,
     }
   }
   if (p === 'eleme' || p === 'meituan_waimai' || p === 'jd_waimai') {
@@ -205,10 +214,12 @@ async function syncOneReviewPlatform(
     const r = await fetchWaimaiReviews(p, bearer.trim())
     if (r.ok === false) return { ok: false, message: r.message }
     reviewsStoreState[p] = r.items as ReviewRow[]
-    reviewsSyncedAt[p] = new Date().toISOString()
+    reviewsSyncedAt[p] = syncedAt
     return {
       ok: true,
       message: `${REVIEW_PLATFORM_LABELS[p]}：已同步 ${r.items.length} 条评价。`,
+      items: r.items as ReviewRow[],
+      syncedAt,
     }
   }
   return { ok: false, message: '未知平台' }
@@ -786,25 +797,31 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           return true
         }
         const bucket = reviewStateBucket(kind)
-        if (bucket[platform].length === 0) {
-          const bearer = reviewPlatformBearer(req, platform)
-          const canDouyinAutoSync =
-            platform !== 'douyin' ||
-            (kind === 'store' && Boolean(poiId)) ||
-            (kind === 'product' && Boolean(productId))
-          if (bearer?.trim() && canDouyinAutoSync) {
-            await syncOneReviewPlatform(platform, bearer, {
-              kind,
-              poiId: poiId || undefined,
-              productId: productId || undefined,
-              poiIds: poiId ? [poiId] : undefined,
-              productIds: productId ? [productId] : undefined,
-            })
+        const bearer = reviewPlatformBearer(req, platform)
+        const syncOpts: ReviewSyncOpts = { kind }
+        if (poiId) {
+          syncOpts.poiId = poiId
+          syncOpts.poiIds = [poiId]
+        }
+        if (productId) {
+          syncOpts.productId = productId
+          syncOpts.productIds = [productId]
+        }
+        /** Serverless 无进程内缓存：列表 GET 须实时拉平台，避免 POST 同步后 GET 命中空实例 */
+        if (bearer?.trim()) {
+          const live = await syncOneReviewPlatform(platform, bearer.trim(), syncOpts)
+          if (live.ok === false) {
+            json(res, 502, { ok: false, message: live.message })
+            return true
           }
         }
         let rows = [...bucket[platform]]
-        if (poiId) rows = rows.filter((r) => (r as { poiId?: string }).poiId === poiId)
-        if (productId) rows = rows.filter((r) => (r as { productId?: string }).productId === productId)
+        if (poiId) {
+          rows = rows.filter((r) => String((r as { poiId?: string }).poiId ?? '') === poiId)
+        }
+        if (productId) {
+          rows = rows.filter((r) => String((r as { productId?: string }).productId ?? '') === productId)
+        }
         if (sentiment === 'good') rows = rows.filter((r) => r.sentiment === 'good')
         else if (sentiment === 'neutral') rows = rows.filter((r) => r.sentiment === 'neutral')
         else if (sentiment === 'bad') rows = rows.filter((r) => r.sentiment === 'bad')
@@ -864,6 +881,8 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           return true
         }
         const parts: string[] = []
+        let syncedItems: ReviewRow[] | undefined
+        let syncedAt = new Date().toISOString()
         if (scope === 'all') {
           for (const pl of [
             'douyin',
@@ -878,7 +897,13 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
               json(res, 502, { ok: false, message: r.message })
               return true
             }
-            if (r.ok === true) parts.push(r.message)
+            if (r.ok === true) {
+              parts.push(r.message)
+              if (pl === 'douyin') {
+                syncedItems = r.items
+                syncedAt = r.syncedAt
+              }
+            }
           }
         } else {
           const r = await syncOneReviewPlatform(scope, reviewPlatformBearer(req, scope), syncOpts)
@@ -887,11 +912,14 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             return true
           }
           parts.push(r.message)
+          syncedItems = r.items
+          syncedAt = r.syncedAt
         }
         json(res, 200, {
           ok: true,
-          syncedAt: new Date().toISOString(),
+          syncedAt,
           message: parts.join(' '),
+          items: syncedItems,
         })
         return true
       }

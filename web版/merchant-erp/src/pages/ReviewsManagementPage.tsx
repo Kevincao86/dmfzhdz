@@ -256,6 +256,24 @@ export default function ReviewsManagementPage() {
       setError(res.message)
       return
     }
+    if (res.items?.length) {
+      let nextItems = res.items
+      if (reviewKind === 'store' && filterPoiId) {
+        nextItems = nextItems.filter((x) => String(x.poiId ?? '') === filterPoiId)
+      }
+      if (reviewKind === 'product' && filterProductId) {
+        nextItems = nextItems.filter((x) => String(x.productId ?? '') === filterProductId)
+      }
+      setItems(nextItems)
+      setListStats({
+        total: nextItems.length,
+        replied: nextItems.filter((x) => x.replied).length,
+        unreplied: nextItems.filter((x) => !x.replied).length,
+      })
+      setSyncedAt(res.syncedAt ?? new Date().toISOString())
+      if (res.message) setError(null)
+      return
+    }
     await load()
   }
 

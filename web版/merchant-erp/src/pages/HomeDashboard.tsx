@@ -334,7 +334,7 @@ export default function HomeDashboard() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">支付金额</span>
+                    <span className="text-sm text-gray-500">成交金额</span>
                     <span className="text-lg font-bold text-gray-900">{formatMoney(p.payAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -348,7 +348,7 @@ export default function HomeDashboard() {
                     <span className="text-base font-medium text-blue-600">{p.conversionRate}%</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">订单数</span>
+                    <span className="text-sm text-gray-500">成交券数</span>
                     <span className="text-base font-medium text-gray-700">{p.orderCount}</span>
                   </div>
                 </div>
@@ -521,9 +521,9 @@ export default function HomeDashboard() {
 
               <div className="mb-6 grid grid-cols-3 gap-4">
                 {[
-                  { label: '支付金额', value: formatMoney(modalPlatform.payAmount), sub: timeLabel },
+                  { label: '成交金额', value: formatMoney(modalPlatform.payAmount), sub: timeLabel },
                   { label: '核销金额', value: formatMoney(modalPlatform.verifyAmount), sub: timeLabel },
-                  { label: '订单数', value: modalPlatform.orderCount, sub: timeLabel },
+                  { label: '成交券数', value: modalPlatform.orderCount, sub: timeLabel },
                 ].map((cell) => (
                   <div key={cell.label} className="rounded-lg bg-gray-50 p-4">
                     <p className="mb-1 text-sm text-gray-500">{cell.label}</p>
@@ -534,7 +534,7 @@ export default function HomeDashboard() {
               </div>
 
               <div className="h-64 min-h-[180px]">
-                <h4 className="mb-3 text-sm font-medium text-gray-700">支付金额趋势（当前时间维度）</h4>
+                <h4 className="mb-3 text-sm font-medium text-gray-700">成交金额趋势（当前时间维度）</h4>
                 {modalTrend.length === 0 ? (
                   <div className="flex h-[85%] items-center justify-center text-sm text-gray-500">
                     暂无细分趋势
@@ -546,7 +546,7 @@ export default function HomeDashboard() {
                       <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
                       <YAxis stroke="#94a3b8" fontSize={12} />
                       <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }} />
-                      <Bar dataKey="payAmount" name="支付金额" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="payAmount" name="成交金额" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
