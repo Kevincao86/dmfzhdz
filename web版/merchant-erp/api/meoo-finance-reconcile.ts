@@ -8,7 +8,7 @@ import {
   runMerchantApiGatewayFromPath,
 } from './merchant/merchantGatewayShared.js'
 
-export const config = { maxDuration: 60 }
+export const config = { maxDuration: 120 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
