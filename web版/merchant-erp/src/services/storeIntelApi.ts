@@ -93,6 +93,8 @@ export async function analyzeCompetitors(body: {
   address: string
   city?: string
   industryHint?: string
+  industryPath?: string
+  industryName?: string
   menuSummary?: string
 }): Promise<
   | {

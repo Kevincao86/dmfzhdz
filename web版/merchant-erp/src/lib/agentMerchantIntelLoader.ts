@@ -23,7 +23,7 @@ import { tenantLocalKey } from './tenantLocalState'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
 import { getDouyinStores } from '../services/douyinMerchantApi'
-import { readStoreMarginConfig } from './storeMarginsRead'
+import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
 
 const FETCH_TIMEOUT_MS = 12_000
 
@@ -183,14 +183,16 @@ async function maybeRefreshCompetitorReport(
   if (!sel?.address?.trim()) {
     return { note: '竞品：未选分析门店，请到「运营 → 竞争对手分析」选择门店并分析' }
   }
-  const marginCfg = readStoreMarginConfig()
+  const industry = resolveCompetitorAnalysisIndustry(sel.storeName)
   const menuSummary = base.menuSummary
   try {
     const r = await analyzeCompetitors({
       storeName: sel.storeName,
       address: sel.address,
       city: sel.city,
-      industryHint: marginCfg.industry.path || marginCfg.industry.name || undefined,
+      industryPath: industry.path || undefined,
+      industryName: industry.name || undefined,
+      industryHint: industry.path || undefined,
       menuSummary,
     })
     if (!r.ok) return { note: `竞品：/api/meoo-competitor-analysis 失败 — ${r.message}` }
@@ -199,7 +201,7 @@ async function maybeRefreshCompetitorReport(
       poiId: sel.poiId,
       storeName: sel.storeName,
       address: sel.address,
-      industryHint: r.industryHint,
+      industryHint: industry.path || r.industryHint,
       analyzedAt: new Date().toISOString(),
       summary: r.summary,
       competitors: r.competitors,
