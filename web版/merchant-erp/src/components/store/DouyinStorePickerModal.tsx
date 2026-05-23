@@ -1,9 +1,11 @@
 import { ChevronDown, Loader2, Search, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import { readMerchantSession } from '../../lib/merchantSession'
 import { getDouyinStores } from '../../services/douyinMerchantApi'
 import ModalPortal from '../ui/ModalPortal'
+
+const EMPTY_POI_IDS: string[] = []
 
 function readToken() {
   return readMerchantSession('meoo_douyin_merchant_token')
@@ -37,11 +39,12 @@ export default function DouyinStorePickerModal({
   allOptionLabel = '全部门店（同步全部绑定门店）',
   onConfirm,
   onConfirmSingle,
-  initialPoiIds = [],
+  initialPoiIds = EMPTY_POI_IDS,
   initialSelectedId = null,
 }: DouyinStorePickerModalProps) {
   const isSingle = selectionMode === 'single'
   const modalTitle = title ?? (isSingle ? '选择门店' : '选择适用门店')
+  const wasOpenRef = useRef(false)
 
   const [modalDraftIds, setModalDraftIds] = useState<string[]>([])
   const [modalDraftSingle, setModalDraftSingle] = useState<string | null>(null)
@@ -54,7 +57,9 @@ export default function DouyinStorePickerModal({
   const [modalLoading, setModalLoading] = useState(false)
 
   useEffect(() => {
-    if (!open) return
+    const justOpened = open && !wasOpenRef.current
+    wasOpenRef.current = open
+    if (!justOpened) return
     if (isSingle) {
       setModalDraftSingle(initialSelectedId ?? null)
     } else {
