@@ -139,6 +139,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
 
     const storeIntelPaths = [
       '/api/meoo-store-menu-recognize',
+      '/api/meoo-store-menu-excel-recognize',
       '/api/meoo-competitor-analysis',
       '/api/meoo-ai-product-plan',
     ] as const
@@ -164,6 +165,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         const intel = await import('./merchantStoreIntelCore.js')
         const runners = {
           '/api/meoo-store-menu-recognize': intel.runStoreMenuRecognizeCore,
+          '/api/meoo-store-menu-excel-recognize': intel.runStoreMenuExcelRecognizeCore,
           '/api/meoo-competitor-analysis': intel.runCompetitorAnalysisCore,
           '/api/meoo-ai-product-plan': intel.runAiProductPlanCore,
         } as const
