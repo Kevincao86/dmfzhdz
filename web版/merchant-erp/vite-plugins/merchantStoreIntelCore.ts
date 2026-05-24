@@ -689,6 +689,7 @@ export async function runAiProductPlanCore(
   "riskLevel": "low|medium|high"
 }
 定价须考虑商家毛利率目标与周边竞品；套餐内容须与 userBrief 一致。
+comboLines 须优先从「菜单参考」中选取真实品名组合；用户未指定具体商品时不得凭空编造未出现在菜单中的品项，售价须结合菜单单价与毛利率。
 代金券须给出 suggestedPriceYuan（售价）与 originYuan（面值）；用户未写明代金面额时，结合毛利率给出合理售价与面值（如 15 代 20）。
 多人套餐须按餐型区分 comboLines 与售价，勿合并到一项。`
 
@@ -707,7 +708,8 @@ export async function runAiProductPlanCore(
     }
   ]
 }
-必须为每个 slotLabel 各生成一项，slotLabel 必须与用户给定列表完全一致，顺序一致，不得遗漏或合并。`
+必须为每个 slotLabel 各生成一项，slotLabel 必须与用户给定列表完全一致，顺序一致，不得遗漏或合并。
+comboLines 须优先从「菜单参考」选取真实品名；用户未指定具体商品时按菜单价目组品，不得虚构品项。`
 
   const userPrompt = [
     `平台：${String(body.platform ?? 'douyin').trim() || 'douyin'}`,

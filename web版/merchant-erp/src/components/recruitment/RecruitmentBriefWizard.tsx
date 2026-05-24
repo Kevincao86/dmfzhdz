@@ -8,10 +8,12 @@ import {
   type BriefProductPick,
 } from '../../services/recruitmentBriefAi'
 import { loadProductEditLibraryDraftBriefPicks } from '../../lib/productEditLibrary'
+import { loadMerchantBriefProductPicks, resolveMerchantBriefContext } from '../../lib/merchantBriefCatalog'
 import { getDouyinGoodsProductOnlineQuery } from '../../services/douyinProductApi'
 
 function briefProductSourceLabel(source?: BriefProductPick['source']): string {
   if (source === 'douyin_online') return '抖音线上'
+  if (source === 'store_menu') return '菜单价目'
   if (source === 'erp_draftbox') return '草稿箱'
   return '—'
 }
@@ -19,6 +21,8 @@ function briefProductSourceLabel(source?: BriefProductPick['source']): string {
 function briefProductSourceBadgeClass(source?: BriefProductPick['source']): string {
   if (source === 'douyin_online')
     return 'rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-900'
+  if (source === 'store_menu')
+    return 'rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-900'
   return 'rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900'
 }
 
@@ -97,7 +101,12 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
   const runSmartTags = async () => {
     setTagsBusy(true)
     try {
-      const next = await fetchIndustryProductTagsAi(industry || '餐饮')
+      const ctx = resolveMerchantBriefContext()
+      const next = await fetchIndustryProductTagsAi(industry || ctx.industryLabel, {
+        storeName: ctx.storeName,
+        industryPath: ctx.industryPath,
+        menuSummary: ctx.menuSummary,
+      })
       setTagOptions(next)
       setTags((prev) => {
         const keep = prev.filter((x) => next.includes(x))
@@ -115,12 +124,18 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
     const sec = secondaryId ? effectiveSynced.find((p) => p.id === secondaryId) : undefined
     setGenBusy(true)
     try {
+      const ctx = resolveMerchantBriefContext()
       const out = await generateThreeKolBriefs({
         platformLabel,
-        industry: industry || '餐饮',
+        industry: industry || ctx.industryLabel,
         main,
         secondary: sec && sec.id !== main.id ? sec : null,
         tags: tags.length ? tags : tagOptions.slice(0, 4),
+        ctx: {
+          storeName: ctx.storeName,
+          industryPath: ctx.industryPath,
+          menuSummary: ctx.menuSummary,
+        },
       })
       setBriefs(out)
       setStep(3)
@@ -249,7 +264,7 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                       <input
                         value={productSearchKw}
                         onChange={(e) => setProductSearchKw(e.target.value)}
-                        placeholder="可选：输入关键词后点击拉取，将额外合并抖音线上搜索结果；留空则仅展示草稿箱"
+                        placeholder="可选：输入关键词后点击拉取，将额外合并抖音线上搜索结果；留空则展示菜单价目与草稿箱"
                         className="min-w-[12rem] flex-1 rounded border border-gray-200 px-2 py-2 text-sm"
                       />
                       <button
@@ -258,15 +273,20 @@ export default function RecruitmentBriefWizard({ open, onClose, industry, onSave
                         onClick={async () => {
                           setSyncErr(null)
                           const kw = productSearchKw.trim()
-                          const erpDrafts = loadProductEditLibraryDraftBriefPicks(80)
                           const mergedById = new Map<string, BriefProductPick>()
+                          for (const p of loadMerchantBriefProductPicks(80)) {
+                            mergedById.set(p.id, p)
+                          }
+                          const erpDrafts = loadProductEditLibraryDraftBriefPicks(80)
                           for (const p of erpDrafts) {
-                            mergedById.set(p.id, {
-                              id: p.id,
-                              name: p.name,
-                              priceYuan: p.priceYuan,
-                              source: 'erp_draftbox',
-                            })
+                            if (!mergedById.has(p.id)) {
+                              mergedById.set(p.id, {
+                                id: p.id,
+                                name: p.name,
+                                priceYuan: p.priceYuan,
+                                source: 'erp_draftbox',
+                              })
+                            }
                           }
                           setSyncBusy(true)
                           try {

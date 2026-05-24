@@ -805,14 +805,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   )
 
   const attachRecruitmentBriefToPreview = useCallback(
-    async (previewMsgId: string, userBrief: string) => {
+    async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
       patchPreviewRecruitmentBrief(
         previewMsgId,
         { enrichStatus: 'loading' },
         '正在生成达人探店图文 Brief（3 个版本）…',
       )
       try {
-        const brief = await buildAiRecruitmentBriefPreview(userBrief)
+        const brief = await buildAiRecruitmentBriefPreview(userBrief, assistantContent)
         patchPreviewRecruitmentBrief(
           previewMsgId,
           brief,
@@ -902,16 +902,17 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
       void attachProductPlanToPreview(msg.id, userBrief, opts?.assistantContent)
       if (opts?.includeRecruitment) {
-        void attachRecruitmentBriefToPreview(msg.id, userBrief)
+        void attachRecruitmentBriefToPreview(msg.id, userBrief, opts?.assistantContent)
       }
     },
     [attachProductPlanToPreview, attachRecruitmentBriefToPreview],
   )
 
   const pushRecruitInfluencerPreview = useCallback(
-    (userBrief: string, pageLabel?: string) => {
+    (userBrief: string, pageLabel?: string, assistantContent?: string) => {
+      const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
-        '检测到您希望招募达人。我将结合门店商品与行业标签生成探店图文 Brief，并在下方展示可核对的三版文案。'
+        `检测到您希望招募达人。${intelLine}，将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief，并在下方展示可核对的三版文案。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
@@ -931,7 +932,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         messagesRef.current = next
         return next
       })
-      void attachRecruitmentBriefToPreview(msg.id, userBrief)
+      void attachRecruitmentBriefToPreview(msg.id, userBrief, assistantContent)
     },
     [attachRecruitmentBriefToPreview],
   )
@@ -1025,7 +1026,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           includeRecruitment: hasRecruit,
         })
       } else if (hasRecruit) {
-        pushRecruitInfluencerPreview(combinedBrief, pageLabel)
+        pushRecruitInfluencerPreview(combinedBrief, pageLabel, ctx.assistantContent)
       }
     },
     [pushCreateProductPreview, pushRecruitInfluencerPreview],
@@ -1102,7 +1103,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             pushCreateProductPreview(trimmed, pageLabel)
             break
           case 'recruit_influencer':
-            pushRecruitInfluencerPreview(trimmed, pageLabel)
+            pushRecruitInfluencerPreview(trimmed, pageLabel, assistantContent)
             break
           case 'file_tax':
             pushTaxFilingPreview(pageLabel)

@@ -16,6 +16,7 @@ import {
 import MeooPayQrModal from '../components/MeooPayQrModal'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import RecruitmentBriefWizard from '../components/recruitment/RecruitmentBriefWizard'
+import { resolveMerchantBriefContext } from '../lib/merchantBriefCatalog'
 import { cn } from '../cn'
 import { buildErpRegistryTenant } from '../lib/buildErpRegistryTenant'
 import {
@@ -1093,7 +1094,14 @@ export default function RecruitmentPage() {
       const opts = await loadRecruitmentIndustryL1Labels()
       if (!on) return
       setBriefIndustryOptions(opts)
-      setBriefWizardIndustry((prev) => (opts.includes(prev) ? prev : opts[0] ?? '餐饮'))
+      const boundIndustry = resolveMerchantBriefContext().industryLabel
+      setBriefWizardIndustry((prev) => {
+        if (boundIndustry && boundIndustry !== '本地生活' && opts.includes(boundIndustry)) {
+          return boundIndustry
+        }
+        if (opts.includes(prev)) return prev
+        return opts[0] ?? boundIndustry ?? '餐饮'
+      })
     })()
     return () => {
       on = false

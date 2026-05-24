@@ -43,11 +43,18 @@ function parseJsonTags(text: string): string[] | null {
 }
 
 /** 按当前绑定模型与行业，向 AI 请求 Brief 用商品/场景标签（失败则回退本地词表） */
-export async function fetchIndustryProductTagsAi(industry: string): Promise<string[]> {
+export async function fetchIndustryProductTagsAi(
+  industry: string,
+  ctx?: KolBriefGenerationContext,
+): Promise<string[]> {
   const model = resolveTextAiModelForRequest() as AiModelId
-  const titleDraft = `经营行业：${industry || '餐饮'}。
-请只输出一个 JSON 数组（字符串数组），包含 10～14 个适合「本地生活达人探店 Brief」的中文标签词。
-示例：["招牌菜","限时特惠","商务宴请"]
+  const menuBlock = ctx?.menuSummary
+    ? `\n门店菜单/产品参考（标签须贴合以下真实品类与品项，禁止套用无关行业词如「招牌菜」除非确为餐饮）：\n${ctx.menuSummary.slice(0, 900)}`
+    : ''
+  const titleDraft = `经营行业/绑定类目：${industry || '本地生活'}。
+${ctx?.storeName ? `门店名称：${ctx.storeName}` : ''}
+${ctx?.industryPath && ctx.industryPath !== industry ? `类目路径：${ctx.industryPath}` : ''}${menuBlock}
+请只输出一个 JSON 数组（字符串数组），包含 10～14 个适合「${industry || '本地生活'}」达人探店/种草 Brief 的中文标签词，须与上述类目及菜单一致。
 除 JSON 外不要输出任何文字。`
   const r = await postDouyinGoodsAiAssist({
     model,
@@ -65,8 +72,14 @@ export type BriefProductPick = {
   id: string
   name: string
   priceYuan: number
-  /** 商品来源：与商品列表「本地草稿 / 来客线上」对应，便于达人 Brief 勾选时区分 */
-  source?: 'erp_draftbox' | 'douyin_online'
+  /** 商品来源：菜单价目 / 草稿箱 / 来客线上 */
+  source?: 'store_menu' | 'erp_draftbox' | 'douyin_online'
+}
+
+export type KolBriefGenerationContext = {
+  storeName?: string
+  industryPath?: string
+  menuSummary?: string
 }
 
 function splitThreeBriefs(description: string): [string, string, string] {
@@ -93,14 +106,25 @@ export async function generateThreeKolBriefs(args: {
   main: BriefProductPick
   secondary?: BriefProductPick | null
   tags: string[]
+  ctx?: KolBriefGenerationContext
 }): Promise<[string, string, string]> {
   const model = resolveTextAiModelForRequest() as AiModelId
   const sec = args.secondary
-  const titleDraft = `你是达人商务与内容策划。请根据以下事实，写 3 个不同风格的「达人探店合作 Brief」，用于 ${args.platformLabel} 投放；行业：${args.industry || '餐饮'}。
-主推商品：${args.main.name}（约 ¥${args.main.priceYuan}）
-${sec ? `次推商品：${sec.name}（约 ¥${sec.priceYuan}）` : '无固定次推品。'}
+  const ctx = args.ctx
+  const menuBlock = ctx?.menuSummary
+    ? `\n菜单/产品参考（Brief 须基于真实品项，勿虚构未出现的菜品或服务）：\n${ctx.menuSummary.slice(0, 1200)}`
+    : ''
+  const priceMain =
+    args.main.priceYuan > 0 ? `约 ¥${args.main.priceYuan}` : '价格见门店菜单'
+  const priceSec = sec && sec.priceYuan > 0 ? `约 ¥${sec.priceYuan}` : '价格见门店菜单'
+  const titleDraft = `你是达人商务与内容策划。请根据以下事实，写 3 个不同风格的「达人探店/种草合作 Brief」，用于 ${args.platformLabel} 投放。
+经营类目：${args.industry || '本地生活'}${ctx?.industryPath && ctx.industryPath !== args.industry ? `（${ctx.industryPath}）` : ''}
+${ctx?.storeName ? `门店：${ctx.storeName}` : ''}${menuBlock}
+主推商品/服务：${args.main.name}（${priceMain}）
+${sec ? `次推商品/服务：${sec.name}（${priceSec}）` : '无固定次推品。'}
 已选标签：${args.tags.join('、')}
 
+硬性要求：Brief 场景、卖点与标签须严格匹配上述经营类目与真实商品，禁止默认写成餐饮/程序员食堂等无关模板。
 硬性输出格式：恰好三个文本块，块与块之间只用单独一行「|||BREAK|||」分隔（共出现两次分隔行）。不要 Markdown 标题符号，不要编号前缀。每块 200～380 字，语气与结构需明显不同。`
 
   const r = await postDouyinGoodsAiAssist({
