@@ -2,11 +2,10 @@ import { CheckCircle2, ClipboardList } from 'lucide-react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
-import { formatAgentContentForDisplay } from '../lib/aiAgentActionParse'
+import { formatAssistantDisplayText } from '../lib/aiAgentActionParse'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
-import { AiAgentExecutionResultCard } from './AiAgentExecutionResultCard'
 import { AiAgentRecruitmentOrderDetailCard } from './AiAgentRecruitmentOrderDetail'
 import { AiAgentTaxPreview } from './AiAgentTaxPreview'
 
@@ -89,10 +88,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             <CheckCircle2 className="h-4 w-4" />
             任务结果
           </div>
-          <p className="whitespace-pre-wrap leading-relaxed">{formatAgentContentForDisplay(m.content)}</p>
-          {m.executionResult ? (
-            <AiAgentExecutionResultCard result={m.executionResult} />
-          ) : null}
+          <p className="whitespace-pre-wrap leading-relaxed">{formatAssistantDisplayText(m.content)}</p>
           {m.recruitmentOrder ? (
             <AiAgentRecruitmentOrderDetailCard order={m.recruitmentOrder} />
           ) : null}
@@ -184,7 +180,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           ) : null}
           {m.content ? (
             <p className="whitespace-pre-wrap">
-              {formatAgentContentForDisplay(m.content)}
+              {formatAssistantDisplayText(m.content)}
             </p>
           ) : null}
         </div>

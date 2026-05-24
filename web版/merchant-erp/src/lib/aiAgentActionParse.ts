@@ -1,5 +1,4 @@
-import type { AiTaskPreviewPayload, AiTaskType } from './aiAgentTypes'
-import { AI_TASK_TYPE_LABELS } from './aiAgentTypes'
+import type { AiTaskType } from './aiAgentTypes'
 import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
 
 const ACTION_TO_TASK: Record<string, AiTaskType> = {
@@ -8,12 +7,7 @@ const ACTION_TO_TASK: Record<string, AiTaskType> = {
   handle_review: 'handle_review',
   sync_platform: 'sync_platform',
   analyze_exception: 'analyze_exception',
-  competitor_analysis: 'competitor_analysis',
-  run_competitor_analysis: 'competitor_analysis',
-  analyze_competitors: 'competitor_analysis',
   generate_copywriting: 'generate_copywriting',
-  optimize_local_ads: 'optimize_local_ads',
-  follow_local_lead: 'follow_local_lead',
   file_tax: 'file_tax',
 }
 
@@ -28,11 +22,9 @@ export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
     return 'create_product'
   }
   if (/达人|招募|探店|brief|Brief|种草|探店笔记/.test(x)) return 'recruit_influencer'
-  if (/竞品|竞争对手|竞对|周边店/.test(x)) return 'competitor_analysis'
   if (/差评|评价|评论/.test(x)) return 'handle_review'
-  if (/同步|失败/.test(x) && !/竞品|竞争对手/.test(x)) return 'sync_platform'
-  if (/异常|报错|驳回/.test(x) && !/竞品|竞争对手|分析竞品/.test(x)) return 'analyze_exception'
-  if (/分析/.test(x) && !/竞品|竞争对手|竞对/.test(x)) return 'analyze_exception'
+  if (/分析|原因|异常/.test(x)) return 'analyze_exception'
+  if (/同步|失败/.test(x)) return 'sync_platform'
   if (/报税|税务|申报|增值税|一键报税|纳税/.test(x)) return 'file_tax'
   return undefined
 }
@@ -56,55 +48,12 @@ function tryParseJsonObject(raw: string): Record<string, unknown> | null {
   return null
 }
 
-/** 从助手 JSON 解析任务类型（含别名与 steps 推断） */
-export function resolveAgentTaskTypeFromJson(content: string): AiTaskType | undefined {
+/** 从助手回复中的 JSON 预览块解析 actionType */
+export function parseAgentActionType(content: string): AiTaskType | undefined {
   const j = tryParseJsonObject(content)
   if (!j) return undefined
   const at = String(j.actionType ?? j.action_type ?? '').trim()
-  if (ACTION_TO_TASK[at]) return ACTION_TO_TASK[at]
-  if (/competitor|竞品|竞对/.test(at)) return 'competitor_analysis'
-  if (/sync|同步/.test(at)) return 'sync_platform'
-  if (/review|评价/.test(at)) return 'handle_review'
-  if (/marketing_plan|营销方案/.test(at)) return undefined
-  const stepsText = Array.isArray(j.steps)
-    ? (j.steps as unknown[]).map((s) => String(s)).join(' ')
-    : ''
-  if (/meoo-competitor-analysis|竞品分析|竞争对手/.test(stepsText)) return 'competitor_analysis'
-  if (/同步|sync/.test(stepsText)) return 'sync_platform'
-  if (/评价|review/.test(stepsText)) return 'handle_review'
-  if (/招募|influencer/.test(stepsText)) return 'recruit_influencer'
-  if (/商品|product|团购/.test(stepsText)) return 'create_product'
-  return undefined
-}
-
-/** 从助手回复中的 JSON 预览块解析 actionType */
-export function parseAgentActionType(content: string): AiTaskType | undefined {
-  return resolveAgentTaskTypeFromJson(content)
-}
-
-export function parseAgentPreviewSteps(content: string): string[] {
-  const j = tryParseJsonObject(content)
-  if (!j || !Array.isArray(j.steps)) return []
-  return (j.steps as unknown[])
-    .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-    .map((s) => s.trim())
-}
-
-/** 从助手 JSON 构建执行预览载荷 */
-export function parseAgentPreviewPayload(content: string): AiTaskPreviewPayload | null {
-  const taskType = resolveAgentTaskTypeFromJson(content)
-  if (!taskType) return null
-  const title = parseAgentPreviewTitle(content) ?? AI_TASK_TYPE_LABELS[taskType]
-  const steps = parseAgentPreviewSteps(content)
-  if (!steps.length) {
-    steps.push('调用 ERP 接口执行任务', '将结果回写至本对话框')
-  }
-  return {
-    title,
-    steps,
-    taskType,
-    agentActionJson: content,
-  }
+  return ACTION_TO_TASK[at]
 }
 
 export function parseAgentPreviewTitle(content: string): string | undefined {
@@ -117,41 +66,18 @@ export function parseAgentPreviewTitle(content: string): string | undefined {
 /** 助手返回结构化预览 JSON 时，用简短中文替代整段 JSON 展示 */
 export function summarizeAssistantContent(content: string): string | null {
   const taskType = parseAgentActionType(content)
+  if (!taskType) return null
   const title = parseAgentPreviewTitle(content)
-  const j = tryParseJsonObject(content)
-  const steps =
-    j && Array.isArray(j.steps)
-      ? (j.steps as unknown[])
-          .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-          .map((s) => `• ${s.trim()}`)
-          .join('\n')
-      : ''
-
-  if (taskType) {
-    switch (taskType) {
-      case 'create_product':
-        return title || '已理解您的上架需求，请在下方核对抖音 C 端手机预览并确认。'
-      case 'recruit_influencer':
-        return title || '已理解您的达人招募需求，请在下方查看图文 Brief 并确认。'
+  switch (taskType) {
+    case 'create_product':
+      return title || '已理解您的上架需求，请在下方核对抖音 C 端手机预览并确认。'
+    case 'recruit_influencer':
+      return title || '已理解您的达人招募需求，请在下方查看图文 Brief 并确认。'
     case 'file_tax':
       return title || '已理解您的报税需求，请在下方核对各平台汇总后确认一键报税。'
-    case 'competitor_analysis':
-      return title
-        ? `${title}\n${steps}`
-        : '已理解您的竞品分析需求，请确认后我将调用 /api/meoo-competitor-analysis 并在此展示报告。'
     default:
-        return title ? `${title}${steps ? `\n${steps}` : ''}` : '请在下方确认执行预览后继续。'
-    }
+      return title || '请在下方确认执行预览后继续。'
   }
-
-  if (j) {
-    const at = String(j.actionType ?? j.action_type ?? '').trim()
-    if (at === 'create_marketing_plan' || j.confirmRequired === true || j.confirm_required === true) {
-      const head = title || '营销/组品方案已生成'
-      return steps ? `${head}\n${steps}` : head
-    }
-  }
-  return null
 }
 
 /** 从用户描述提取商品名/标题草稿 */
@@ -355,8 +281,6 @@ export function parsePriceYuanFromApi(raw: unknown): number | undefined {
 export function formatAssistantDisplayText(content: string): string {
   if (!content?.trim()) return content
   let s = content.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-  s = s.replace(/```(?:json)?\s*[\s\S]*?```/gi, '')
-  s = s.replace(/^\s*\{[\s\S]*?"actionType"[\s\S]*\}\s*$/gm, '')
   s = s.replace(/^#{1,6}\s+/gm, '')
   s = s.replace(/\*\*([^*]+)\*\*/g, '$1')
   s = s.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '$1')
@@ -365,46 +289,17 @@ export function formatAssistantDisplayText(content: string): string {
   return s.trim()
 }
 
-/** 将助手原始回复转为对话区展示文案（隐藏 JSON 块） */
-export function formatAgentContentForDisplay(content: string): string {
-  const summary = summarizeAssistantContent(content)
-  if (summary) return formatAssistantDisplayText(summary)
-  return formatAssistantDisplayText(content)
-}
-
-/** 助手 JSON/方案是否必须先经用户确认再出执行预览 */
-export function agentContentRequiresDeferral(content: string): boolean {
-  const j = tryParseJsonObject(content)
-  if (j) {
-    if (j.confirmRequired === true || j.confirm_required === true) return true
-    const at = String(j.actionType ?? j.action_type ?? '').trim()
-    if (at === 'create_marketing_plan') return true
-    if (at && !ACTION_TO_TASK[at] && Array.isArray(j.steps) && j.steps.length > 0) return true
-  }
-  return false
-}
-
-/** 用户是否为直接创建/上架意图（非先出方案再确认） */
-export function isDirectCreateIntent(text: string): boolean {
-  const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
-  if (x.startsWith('使用快捷任务：')) return true
-  if (isPlanDesignQuery(x)) return false
-  return /^(帮我)?(立即)?(创建|上架)|直接上架|马上上架/.test(x)
-}
-
 /** 用户是否在请求方案/规划类设计（先出方案，再确认执行） */
 export function isPlanDesignQuery(text: string): boolean {
   const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   if (/确认执行|开始创建|立即上架|按方案执行/.test(x)) return false
-  return /规划|方案设计|活动安排|套餐搭配|组品|618|达人合作|营销策略|推广计划|帮我规划|帮我设计/.test(x)
+  return /规划|方案设计|活动安排|活动方案|套餐搭配|组品|618|达人合作|营销策略|推广计划|抖音推广|推广活动|帮我规划|帮我设计/.test(x)
 }
 
 /** 用户是否明确同意按方案执行 */
 export function isExplicitExecutionIntent(text: string): boolean {
   const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
-  return /确认执行|确认.*方案|按.*方案执行|开始创建|立即上架|需要执行|同意执行|执行方案|确认创建|帮我执行|按上述方案|需要.*确认执行|帮我确认执行|可以执行|同意.*创建|确认.*创建|确认.*招募/.test(
-    x,
-  )
+  return /确认执行|按.*方案执行|开始创建|立即上架|需要执行|同意执行|执行方案|确认创建|帮我执行|按上述方案/.test(x)
 }
 
 /** 用户表示无商品图、请 AI 生成 */
@@ -436,8 +331,6 @@ export function inferTaskTypesFromCombinedContext(
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
     if (/达人|招募|探店|种草|KOL|网红|达人合作/.test(c)) types.add('recruit_influencer')
-    const jsonType = resolveAgentTaskTypeFromJson(c)
-    if (jsonType) types.add(jsonType)
   }
   return [...types]
 }
@@ -448,60 +341,14 @@ export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string 
   if (taskTypes.includes('create_product')) parts.push('商品/套餐创建')
   if (taskTypes.includes('recruit_influencer')) parts.push('达人招募')
   if (!parts.length) return ''
-  return `\n\n——\n\n若需要我按上述方案代您调用 ERP 接口执行${parts.join('与')}，请回复「确认执行」。\n执行完成后，结果将以预览/任务结果卡片直接显示在本对话框。\n如有商品图可在下一条消息上传；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
+  return `\n\n——\n\n若需要我按上述方案执行${parts.join('与')}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
 }
 
 const PLAN_SLOT_PATTERNS: RegExp[] = [
-  /#{1,4}\s*\*{0,2}套餐[一二三四五六1-6][：:\s、]*\*{0,2}([^\n#*]{2,48})/g,
   /套餐[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
   /组品[方案\s]*[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
-  /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*\*{0,2}([^*\n：:]{2,40}(?:套装|组合|套餐|方案|团购|代金券))\*{0,2}/gm,
   /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*([^\n：:]{2,36}(?:套装|组合|套餐|方案))/gm,
 ]
-
-function extractPlanCountFromAssistant(assistantContent: string): number | undefined {
-  const patterns = [
-    /配置\s*(\d+)\s*个(?:商品)?套餐/g,
-    /(\d+)\s*个(?:商品)?(?:套餐|组品|团购方案)/g,
-    /(\d+)\s*款(?:套餐|团购)/g,
-  ]
-  for (const re of patterns) {
-    re.lastIndex = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(assistantContent)) !== null) {
-      const n = Number.parseInt(m[1], 10)
-      if (Number.isFinite(n) && n >= 2) return Math.min(6, n)
-    }
-  }
-  const j = tryParseJsonObject(assistantContent)
-  if (j && Array.isArray(j.steps)) {
-    for (const step of j.steps) {
-      const s = String(step)
-      const m = s.match(/(\d+)\s*个(?:商品)?套餐/)
-      if (m) return Math.min(6, Number.parseInt(m[1], 10) || 0)
-    }
-  }
-  return undefined
-}
-
-function extractVoucherIntentsFromPlan(full: string): CreateProductIntent[] {
-  const intents: CreateProductIntent[] = []
-  const seen = new Set<string>()
-  const re = /(\d+)\s*代\s*(\d+)[^，。.\n]{0,24}?(?:元代金券|代金券|券)?/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(full)) !== null) {
-    const label = m[0].replace(/\s+/g, '').slice(0, 48)
-    if (seen.has(label)) continue
-    seen.add(label)
-    intents.push({
-      key: `voucher-${label}`,
-      label,
-      brief: planIntentBrief(full, `代金券「${label}」`),
-      productType: 2,
-    })
-  }
-  return intents
-}
 
 function planIntentBrief(full: string, focus: string): string {
   return `${full}\n\n【仅生成以下一项】${focus}。不要与其它餐型或代金券合并；须输出完整团购标题、售价、套餐项与说明。`
@@ -535,22 +382,8 @@ export function parseCreateProductIntentsFromPlan(
     }
   }
 
-  if (slots.length > 0) {
-    const vouchers = extractVoucherIntentsFromPlan(full)
-    const merged = [...slots, ...vouchers.filter((v) => !seen.has(v.label))]
-    return merged.slice(0, 6)
-  }
+  if (slots.length > 0) return slots.slice(0, 6)
   if (fromUser.length > 1 || (fromUser.length === 1 && fromUser[0].key !== 'main')) return fromUser
-
-  const planCount = extractPlanCountFromAssistant(assistantContent)
-  if (planCount && planCount > 1) {
-    return Array.from({ length: planCount }, (_, i) => ({
-      key: `plan-${i + 1}`,
-      label: `方案 ${i + 1}`,
-      brief: planIntentBrief(full, `第 ${i + 1} 个团购方案（共 ${planCount} 个，须相互区分售价与内容）`),
-      productType: 1,
-    }))
-  }
 
   const countM = assistantContent.match(/(\d+)\s*个(?:组品|套餐|商品|方案)/)
   if (countM) {
@@ -573,23 +406,10 @@ export function shouldDeferTaskPreview(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
+  if (parseAgentActionType(assistantContent ?? '')) return false
   if (isExplicitExecutionIntent(userText)) return false
-  if (isDirectCreateIntent(userText)) return false
-  if (parseAgentActionType(assistantContent ?? '') && !agentContentRequiresDeferral(assistantContent ?? '')) {
-    return false
-  }
-  if (assistantContent && agentContentRequiresDeferral(assistantContent)) return true
+  if (explicitTaskType && !isPlanDesignQuery(userText)) return false
   if (isPlanDesignQuery(userText)) return true
   if (assistantContent && looksLikePlanDocument(assistantContent)) return true
-  if (
-    assistantContent &&
-    inferTaskTypesFromCombinedContext(userText, assistantContent).length > 0 &&
-    !isDirectCreateIntent(userText)
-  ) {
-    return true
-  }
-  if (explicitTaskType && inferTaskTypeFromText(userText) && !isPlanDesignQuery(userText)) {
-    return false
-  }
   return false
 }

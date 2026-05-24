@@ -31,7 +31,6 @@ export type AiTaskType =
   | 'handle_review'
   | 'sync_platform'
   | 'analyze_exception'
-  | 'competitor_analysis'
   | 'generate_copywriting'
   | 'optimize_local_ads'
   | 'follow_local_lead'
@@ -43,7 +42,6 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
   handle_review: '处理评价',
   sync_platform: '同步平台',
   analyze_exception: '分析异常',
-  competitor_analysis: '竞争对手分析',
   generate_copywriting: '生成推广文案',
   optimize_local_ads: '优化本地推投放',
   follow_local_lead: '跟进本地推线索',
@@ -139,25 +137,6 @@ export type AiTaskPreviewPayload = {
   recruitmentBrief?: AiRecruitmentBriefPreview
   /** 报税：汇总各已绑定平台后一键申报（需确认） */
   taxFiling?: AiTaxFilingPreview
-  /** 原始助手 JSON（确认后执行用） */
-  agentActionJson?: string
-}
-
-/** 智能体确认执行后回写对话区的结构化结果 */
-export type AiAgentExecutionResult = {
-  kind: 'competitor_report' | 'sync_report' | 'text' | 'steps_done'
-  title: string
-  summary: string
-  competitors?: {
-    name: string
-    distanceHint?: string
-    category?: string
-    priceRange?: string
-    highlights?: string
-  }[]
-  suggestions?: string[]
-  stepsDone?: string[]
-  syncCount?: number
 }
 
 /** 智能体报税预览（确认后导出申报包并标记状态） */
@@ -205,8 +184,6 @@ export type AiAgentMessage = {
   resultSummary?: string
   /** 达人招募确认后的订单明细（仅 task_result） */
   recruitmentOrder?: AiRecruitmentOrderDetail
-  /** ERP 接口执行结果（仅 task_result） */
-  executionResult?: AiAgentExecutionResult
 }
 
 /** 侧边栏「历史对话」快照（条数由上下文裁剪，最多 10 条） */
@@ -237,10 +214,7 @@ export function createAgentMessage(
   role: AiAgentMessageRole,
   content: string,
   extra?: Partial<
-    Pick<
-      AiAgentMessage,
-      'preview' | 'resultSummary' | 'recruitmentOrder' | 'executionResult' | 'imageUrls' | 'videoUrls'
-    >
+    Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'recruitmentOrder' | 'imageUrls' | 'videoUrls'>
   >,
 ): AiAgentMessage {
   return {
