@@ -4,10 +4,11 @@ import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { useEffect, useRef, useState } from 'react'
 import { AiAgentComposerBar } from './AiAgentComposerBar'
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
+import { AiAgentPreviewActions } from './AiAgentPreviewActions'
+import { AiAgentThinkingIndicator } from './AiAgentThinkingIndicator'
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
 import type { AiPermissionId } from '../lib/aiAgentTypes'
-import { aiTaskConfirmLabel } from '../lib/aiAgentPlan'
 
 const PERMISSION_ORDER: AiPermissionId[] = [
   'product',
@@ -43,14 +44,10 @@ export default function AiAgentDrawer() {
     pendingPreviewTaskType,
     pendingPreviewLoading,
     taskConfirming,
-    confirmPendingTask,
-    cancelPendingTask,
-    modifyPendingTask,
     aiSending,
     agentProfile,
   } = useAiAgent()
 
-  const confirmLabel = aiTaskConfirmLabel(pendingPreviewTaskType)
   const confirmDisabled = pendingPreviewLoading || aiSending || taskConfirming
 
   const listRef = useRef<HTMLDivElement>(null)
@@ -62,7 +59,7 @@ export default function AiAgentDrawer() {
       const el = listRef.current
       if (el) el.scrollTop = el.scrollHeight
     })
-  }, [drawerOpen, messages])
+  }, [drawerOpen, messages, aiSending])
 
   return (
     <AnimatePresence>
@@ -181,40 +178,14 @@ export default function AiAgentDrawer() {
                 <div key={m.id}>
                   <AiAgentMessageBubble m={m} />
                   {m.role === 'task_preview' && m.id === pendingPreviewId ? (
-                    <div className="mt-3 flex flex-wrap gap-2 border-t border-violet-100 pt-3">
-                      <button
-                        type="button"
-                        onClick={confirmPendingTask}
-                        disabled={confirmDisabled}
-                        className={cn(
-                          'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
-                          confirmDisabled && 'cursor-not-allowed opacity-50',
-                        )}
-                      >
-                        {pendingPreviewLoading
-                          ? '正在生成预览…'
-                          : taskConfirming
-                            ? '正在生成订单…'
-                            : confirmLabel}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={modifyPendingTask}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        修改方案
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelPendingTask}
-                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
-                      >
-                        取消
-                      </button>
-                    </div>
+                    <AiAgentPreviewActions
+                      confirmDisabled={confirmDisabled}
+                      showProductPlatforms={pendingPreviewTaskType === 'create_product'}
+                    />
                   ) : null}
                 </div>
               ))}
+              {aiSending ? <AiAgentThinkingIndicator /> : null}
             </div>
 
             <footer className="shrink-0 border-t border-slate-100 bg-white p-3">
