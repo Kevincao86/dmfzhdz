@@ -96,7 +96,10 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
   }
 
   lines.push(
-    '任务要求：create_product / 文案 / 招募 / GEO / 投流优化等须优先使用上述情报；禁止让用户再报毛利率、完整菜单表、竞品名单（除非快照与接口均为空且用户未附图）。用户附图创建商品时，头图须以其参考图为第一优先级做图生图优化；无附图时才按菜单/竞品情报文生图。执行预览 JSON 须 confirmRequired: true。',
+    '【智能体 ERP 接口托管】用户确认执行预览后，你可代其调用：/api/meoo-competitor-analysis、抖音/快手 goods/product/save、全平台商品 sync、meoo-marketing-activities、达人招募订单推送、报税导出、评价回复草稿等；结果须回写对话区任务结果卡片，勿要求用户手动去其它页面操作。',
+  )
+  lines.push(
+    '任务要求：create_product / 文案 / 招募 / GEO / 投流优化 / 竞品分析等须优先使用上述情报；禁止让用户再报毛利率、完整菜单表、竞品名单（除非快照与接口均为空且用户未附图）。用户附图创建商品时，头图须以其参考图为第一优先级做图生图优化；无附图时才按菜单/竞品情报文生图。执行预览 JSON 须 confirmRequired: true，actionType 须与任务一致（竞品用 competitor_analysis，勿用 analyze_exception）。',
   )
 
   return lines.join('\n')

@@ -76,15 +76,15 @@ export type AiModelPickerOption = {
 /** TokenMix 各家族下展示的「文生图」模型名（与 chat id 独立；出图仍由墨典服务端引擎执行） */
 const AGENT_TOKENMIX_T2I_BY_FAMILY: Partial<Record<AIModelFamily, readonly { id: string; label: string }[]>> = {
   openai: [
-    { id: 'gpt-image-1', label: 'GPT Image 1' },
-    { id: 'dall-e-3', label: 'DALL·E 3' },
+    { id: 'gpt-image-1', label: '绘境 Pro' },
+    { id: 'dall-e-3', label: '绘境 Classic' },
   ],
-  claude: [{ id: 'claude-image-gen', label: 'Claude 图像生成' }],
+  claude: [{ id: 'claude-image-gen', label: '慧思绘境' }],
   gemini: [
-    { id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash（图像）' },
-    { id: 'imagen-3', label: 'Imagen 3' },
+    { id: 'gemini-2.5-flash-image', label: '星鉴绘境' },
+    { id: 'imagen-3', label: '星鉴绘境 Pro' },
   ],
-  grok: [{ id: 'grok-image', label: 'Grok 图像' }],
+  grok: [{ id: 'grok-image', label: '破界绘境' }],
 }
 
 export function listAiModelPickerOptions(): AiModelPickerOption[] {

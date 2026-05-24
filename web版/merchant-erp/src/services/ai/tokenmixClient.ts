@@ -19,36 +19,36 @@ export type TokenMixFamilyDef = {
 export const TOKENMIX_FAMILY_CATALOG: readonly TokenMixFamilyDef[] = [
   {
     id: 'openai',
-    label: 'OpenAI',
+    label: '墨典智能AI · 灵犀',
     models: [
-      { id: 'gpt-4o', label: 'GPT-4o' },
-      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
-      { id: 'o4-mini', label: 'o4-mini' },
+      { id: 'gpt-4o', label: '旗舰对话' },
+      { id: 'gpt-4o-mini', label: '轻量对话' },
+      { id: 'o4-mini', label: '深度推理' },
     ],
   },
   {
     id: 'claude',
-    label: 'Claude',
+    label: '墨典智能AI · 慧思',
     models: [
-      { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
-      { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
-      { id: 'claude-opus-4.7', label: 'Claude Opus 4.7' },
+      { id: 'claude-sonnet-4.6', label: '均衡旗舰' },
+      { id: 'claude-haiku-4.5', label: '迅捷轻量' },
+      { id: 'claude-opus-4.7', label: '顶配深度' },
     ],
   },
   {
     id: 'gemini',
-    label: 'Gemini',
+    label: '墨典智能AI · 星鉴',
     models: [
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash', label: '闪速对话' },
+      { id: 'gemini-2.5-pro', label: '专业对话' },
     ],
   },
   {
     id: 'grok',
-    label: 'Grok',
+    label: '墨典智能AI · 破界',
     models: [
-      { id: 'grok-4.1-fast-non-reasoning', label: 'Grok 4.1 Fast' },
-      { id: 'grok-4.1-fast-reasoning', label: 'Grok 4.1 Fast（推理）' },
+      { id: 'grok-4.1-fast-non-reasoning', label: '极速对话' },
+      { id: 'grok-4.1-fast-reasoning', label: '极速推理' },
     ],
   },
 ] as const
