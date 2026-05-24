@@ -8,6 +8,7 @@ import { merchantAgentChatFromMessages } from './merchantAiUpstream.js'
 
 export type StoreMenuItemDto = {
   name: string
+  productCode?: string
   priceYuan?: number
   category?: string
   note?: string
@@ -83,8 +84,19 @@ function parseMenuItems(obj: Record<string, unknown>): StoreMenuItemDto[] {
     if (!name) continue
     const priceRaw = r.priceYuan ?? r.price_yuan ?? r.price ?? r.价格 ?? r.amount
     const priceYuan = parsePriceYuan(priceRaw)
+    const codeRaw = String(
+      r.productCode ??
+        r.product_code ??
+        r.sku ??
+        r.code ??
+        r.编号 ??
+        r.商品编号 ??
+        r.编码 ??
+        '',
+    ).trim()
     out.push({
       name,
+      ...(codeRaw ? { productCode: codeRaw } : {}),
       ...(priceYuan != null ? { priceYuan } : {}),
       ...(r.category || r.分类
         ? { category: String(r.category ?? r.分类).trim() }
@@ -350,7 +362,7 @@ export async function runStoreMenuRecognizeCore(
   const system = `你是本地生活门店菜单/价目表识别助手。根据用户上传的照片，提取可上架或对外展示的服务项目与价格。
 支持：餐饮菜品、口腔/医美/生活服务价目表、套餐项目清单等（不限于餐饮）。
 只输出一个 JSON 对象，不要 markdown 其它说明。格式：
-{"items":[{"name":"项目或菜品名称","priceYuan":数字或省略,"category":"分类/科室可选","note":"规格备注可选"}]}
+{"items":[{"name":"项目或菜品名称","productCode":"商品编号可选","priceYuan":数字或省略,"category":"分类/科室可选","note":"规格备注可选"}]}
 价格统一为人民币元（数字，如 2980 写 2980）；能看清的条目尽量全部列出；看不清价格的可省略 priceYuan。`
   const userText = storeName
     ? `请识别「${storeName}」价目表/菜单图片中的全部可见项目与价格，按行逐项提取。`
@@ -382,6 +394,102 @@ export async function runStoreMenuRecognizeCore(
     return {
       status: 502,
       body: { ok: false, error: 'menu_recognize_failed', detail: msg.slice(0, 600) },
+    }
+  }
+}
+
+function formatExcelRowsForLlm(rows: string[][], maxRows = 320): string {
+  const slice = rows.slice(0, maxRows)
+  const lines = slice.map((row, i) => {
+    const cells = row.map((c) => String(c ?? '').replace(/\t/g, ' ').trim())
+    return `R${i + 1}\t${cells.join('\t')}`
+  })
+  if (rows.length > maxRows) {
+    lines.push(`…共 ${rows.length} 行，仅展示前 ${maxRows} 行`)
+  }
+  return lines.join('\n')
+}
+
+export async function runStoreMenuExcelRecognizeCore(
+  bodyRaw: string,
+  authHeader: string | undefined,
+  env: Record<string, string>,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const session = await verifyBearerJwt(authHeader, env)
+  if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+
+  let body: { rows?: unknown; fileName?: string; sheetName?: string; storeName?: string }
+  try {
+    body = JSON.parse(bodyRaw || '{}') as typeof body
+  } catch {
+    return { status: 400, body: { ok: false, error: 'invalid_json' } }
+  }
+
+  if (!Array.isArray(body.rows) || body.rows.length === 0) {
+    return { status: 400, body: { ok: false, error: 'rows_required' } }
+  }
+
+  const rows: string[][] = []
+  for (const row of body.rows) {
+    if (!Array.isArray(row)) continue
+    const cells = row.map((c) => String(c ?? '').trim())
+    if (cells.some((c) => c.length > 0)) rows.push(cells)
+  }
+  if (rows.length === 0) {
+    return { status: 400, body: { ok: false, error: 'empty_sheet' } }
+  }
+  if (rows.length > 800) {
+    return { status: 400, body: { ok: false, error: 'too_many_rows', detail: '单次最多 800 行，请拆分文件后重试' } }
+  }
+
+  const storeName = String(body.storeName ?? '').trim()
+  const fileName = String(body.fileName ?? '').trim()
+  const sheetName = String(body.sheetName ?? '').trim()
+  const system = `你是门店价目表/商品清单 Excel 表格解析助手。用户会提供从 Excel/CSV 导出的行数据（Tab 分隔列），可能有表头、合并单元格遗留空列、分类小标题行等。
+请智能识别每一有效数据行的：品名/项目名称(name)、商品编号/SKU/编码(productCode)、价格(priceYuan)、分类(category)、备注(note)。
+规则：
+- 跳过表头行、合计/小计行、纯分类标题行（无价格的单行标题可当作下一行的 category 上下文，或直接忽略）
+- 价格统一为人民币元（数字）；「¥128」「128元」等转为 128
+- 能识别商品编号、条码、SKU、货号、编码等列时填入 productCode
+- 只输出一个 JSON 对象，不要 markdown。格式：
+{"items":[{"name":"名称","productCode":"编号可选","priceYuan":数字或省略,"category":"分类可选","note":"备注可选"}]}
+尽量提取全部有效商品/服务项目，最多 200 条。`
+
+  const meta = [
+    fileName ? `文件名：${fileName}` : '',
+    sheetName ? `工作表：${sheetName}` : '',
+    storeName ? `门店：${storeName}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const userText = `${meta ? `${meta}\n\n` : ''}以下为表格行（R行号\\t列1\\t列2…）：\n${formatExcelRowsForLlm(rows)}`
+
+  try {
+    const obj = await llmJson(env, system, userText)
+    const items = parseMenuItems(obj)
+    const notes = typeof obj.notes === 'string' ? obj.notes.trim() : undefined
+    if (items.length === 0) {
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          items: [],
+          empty: true,
+          notes:
+            notes ||
+            '模型未能从表格中解析出有效条目，请检查列是否含品名/价格，或尝试整理表头后重新上传。',
+        },
+      }
+    }
+    return {
+      status: 200,
+      body: { ok: true, items, ...(notes ? { notes } : {}) },
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return {
+      status: 502,
+      body: { ok: false, error: 'menu_excel_recognize_failed', detail: msg.slice(0, 600) },
     }
   }
 }

@@ -1,7 +1,8 @@
-import { ImagePlus, Loader2, Save, Sparkles, Trash2, X } from 'lucide-react'
+import { FileSpreadsheet, ImagePlus, Loader2, Save, Sparkles, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
+import { isMenuExcelFile, parseMenuExcelFile } from '../lib/parseMenuExcelFile'
 import {
   createEmptyStoreMenuRecord,
   loadStoreMenuRecord,
@@ -9,13 +10,13 @@ import {
   type StoreMenuItem,
   type StoreMenuRecord,
 } from '../lib/storeMenuStorage'
-import { recognizeStoreMenuImage } from '../services/storeIntelApi'
+import { recognizeStoreMenuExcel, recognizeStoreMenuImage } from '../services/storeIntelApi'
 import { fetchStoresForPlatform } from '../services/merchantStoresApi'
 import type { DouyinStoreRow } from '../services/douyinMerchantApi'
 
 function mergeMenuItems(existing: StoreMenuItem[], incoming: StoreMenuItem[]): StoreMenuItem[] {
   const key = (it: StoreMenuItem) =>
-    `${(it.category ?? '').trim()}|${it.name.trim()}|${it.priceYuan ?? ''}`
+    `${(it.category ?? '').trim()}|${it.name.trim()}|${it.productCode ?? ''}|${it.priceYuan ?? ''}`
   const seen = new Set(existing.map(key))
   const out = [...existing]
   for (const it of incoming) {
@@ -34,6 +35,7 @@ export default function StoreMenuPage() {
   const [recognizing, setRecognizing] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const excelRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const r = loadStoreMenuRecord()
@@ -110,6 +112,47 @@ export default function StoreMenuPage() {
     }
   }
 
+  const onUploadExcel = async (files: FileList | null) => {
+    if (!files?.length || !record) return
+    const file = files[0]
+    if (!isMenuExcelFile(file)) {
+      setToast('请上传 .xlsx、.xls 或 .csv 格式的价目表文件')
+      if (excelRef.current) excelRef.current.value = ''
+      return
+    }
+    setRecognizing(true)
+    setToast(null)
+    try {
+      const { rows, sheetName } = await parseMenuExcelFile(file)
+      if (!rows.length) {
+        setToast('表格为空或无法读取，请检查文件格式')
+        return
+      }
+      const r = await recognizeStoreMenuExcel({
+        rows,
+        fileName: file.name,
+        sheetName,
+        storeName: selectedStore?.name,
+      })
+      if (r.ok && r.items.length) {
+        const mergedItems = mergeMenuItems(record.items, r.items)
+        persist({ ...record, items: mergedItems })
+        setToast(
+          r.notes
+            ? `已从 Excel 识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条 — ${r.notes}`
+            : `已从 Excel 识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条`,
+        )
+      } else {
+        setToast(r.ok ? '未识别到有效条目，请检查表格是否含品名与价格列' : r.message)
+      }
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : 'Excel 解析失败')
+    } finally {
+      setRecognizing(false)
+      if (excelRef.current) excelRef.current.value = ''
+    }
+  }
+
   const updateItem = (index: number, patch: Partial<StoreMenuItem>) => {
     if (!record) return
     const items = record.items.map((it, i) => (i === index ? { ...it, ...patch } : it))
@@ -141,7 +184,7 @@ export default function StoreMenuPage() {
       <div>
         <h1 className="erp-page-title">店铺菜单 / 价目表</h1>
         <p className="mt-1 text-sm text-gray-500">
-          上传菜单或价目表照片，AI 自动识别菜品与价格；数据保存在本账号下，供
+          上传菜单照片或 Excel 价目表，AI 自动识别品名、商品编号与价格；数据保存在本账号下，供
           <Link to="/ai-agent" className="mx-1 text-indigo-600 underline">
             AI 助手
           </Link>
@@ -180,6 +223,13 @@ export default function StoreMenuPage() {
             className="hidden"
             onChange={(e) => void onUploadImages(e.target.files)}
           />
+          <input
+            ref={excelRef}
+            type="file"
+            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+            className="hidden"
+            onChange={(e) => void onUploadExcel(e.target.files)}
+          />
           <button
             type="button"
             disabled={recognizing}
@@ -188,6 +238,15 @@ export default function StoreMenuPage() {
           >
             {recognizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
             {recognizing ? '识别中…' : '上传菜单照片并识别'}
+          </button>
+          <button
+            type="button"
+            disabled={recognizing}
+            onClick={() => excelRef.current?.click()}
+            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {recognizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            上传 Excel 并识别
           </button>
           <button
             type="button"
@@ -201,6 +260,10 @@ export default function StoreMenuPage() {
             保存
           </button>
         </div>
+
+        <p className="text-xs text-gray-400">
+          Excel 支持 .xlsx / .xls / .csv，AI 将智能识别品名、商品编号、分类、价格与备注（单次建议不超过 800 行）。
+        </p>
 
         {toast && (
           <p className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
@@ -245,6 +308,7 @@ export default function StoreMenuPage() {
               <tr>
                 <th className="px-4 py-2">分类</th>
                 <th className="px-4 py-2">名称</th>
+                <th className="px-4 py-2">商品编号</th>
                 <th className="px-4 py-2">价格(元)</th>
                 <th className="px-4 py-2">备注</th>
                 <th className="px-4 py-2 w-12" />
@@ -265,6 +329,14 @@ export default function StoreMenuPage() {
                       value={it.name}
                       onChange={(e) => updateItem(i, { name: e.target.value })}
                       className="w-full min-w-[8rem] rounded border border-gray-200 px-2 py-1"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      value={it.productCode ?? ''}
+                      onChange={(e) => updateItem(i, { productCode: e.target.value || undefined })}
+                      placeholder="SKU/编码"
+                      className="w-full min-w-[6rem] rounded border border-gray-200 px-2 py-1"
                     />
                   </td>
                   <td className="px-4 py-2">
@@ -300,9 +372,9 @@ export default function StoreMenuPage() {
               ))}
               {record.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
                     <Sparkles className="mx-auto mb-2 h-8 w-8 text-indigo-300" />
-                    上传菜单照片开始识别，或手动添加菜品
+                    上传菜单照片或 Excel 价目表开始识别，或手动添加菜品
                   </td>
                 </tr>
               )}

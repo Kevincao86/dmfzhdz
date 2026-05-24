@@ -68,7 +68,7 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
       `菜单价目：已上传 ${s.menuImageCount} 张图，条目未识别；可结合用户附图，或提示至「店铺 → 菜单价目表」识别。`,
     )
   } else {
-    lines.push('菜单价目：暂无本地条目；用户附图价目时可结合识图，勿索要 Excel。')
+    lines.push('菜单价目：暂无本地条目；用户附图或 Excel 价目时可结合识别，勿重复索要文件。')
   }
 
   if (s.competitorSummary) {

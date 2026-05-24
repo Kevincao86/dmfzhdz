@@ -7,6 +7,7 @@ const BASE_KEY = 'meoo_store_menu_v1'
 
 export type StoreMenuItem = {
   name: string
+  productCode?: string
   priceYuan?: number
   category?: string
   note?: string
@@ -88,8 +89,9 @@ export function menuItemsSummary(items: StoreMenuItem[], max = 40): string {
         typeof it.priceYuan === 'number' && Number.isFinite(it.priceYuan)
           ? ` ¥${it.priceYuan}`
           : ''
+      const code = it.productCode ? ` #${it.productCode}` : ''
       const cat = it.category ? `[${it.category}] ` : ''
-      return `${cat}${it.name}${p}${it.note ? `（${it.note}）` : ''}`
+      return `${cat}${it.name}${code}${p}${it.note ? `（${it.note}）` : ''}`
     })
   if (items.length > max) lines.push(`…共 ${items.length} 项，仅展示前 ${max} 项`)
   return lines.join('\n')

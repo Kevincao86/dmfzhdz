@@ -88,6 +88,43 @@ export async function recognizeStoreMenuImage(
   }
 }
 
+export async function recognizeStoreMenuExcel(
+  body: {
+    rows: string[][]
+    fileName?: string
+    sheetName?: string
+    storeName?: string
+  },
+): Promise<
+  | { ok: true; items: StoreMenuItem[]; notes?: string }
+  | { ok: false; message: string }
+> {
+  try {
+    const r = await postJson<{
+      ok: boolean
+      items?: StoreMenuItem[]
+      notes?: string
+      empty?: boolean
+      error?: string
+      detail?: string
+    }>('/api/meoo-store-menu-excel-recognize', body)
+    if (r.ok && Array.isArray(r.items)) {
+      if (r.items.length === 0) {
+        const hint =
+          r.notes ||
+          r.detail ||
+          '未识别到价目条目。请确认表格含品名/价格列，且 Vercel 已配置 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / TOKENMIX_API_KEY。'
+        return { ok: false, message: hint }
+      }
+      return { ok: true, items: r.items, notes: r.notes }
+    }
+    const msg = [r.error, r.detail, r.notes].filter((x) => typeof x === 'string' && x.trim()).join(' — ')
+    return { ok: false, message: msg || 'Excel 识别失败' }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export async function analyzeCompetitors(body: {
   storeName: string
   address: string
