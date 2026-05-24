@@ -139,8 +139,8 @@ export default function StoreMenuPage() {
         persist({ ...record, items: mergedItems })
         setToast(
           r.notes
-            ? `已从 Excel 识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条 — ${r.notes}`
-            : `已从 Excel 识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条`,
+            ? `已从工作表「${sheetName}」识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条 — ${r.notes}`
+            : `已从工作表「${sheetName}」识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条`,
         )
       } else {
         setToast(r.ok ? '未识别到有效条目，请检查表格是否含品名与价格列' : r.message)
