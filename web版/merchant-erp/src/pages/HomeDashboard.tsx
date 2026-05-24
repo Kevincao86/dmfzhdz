@@ -23,6 +23,8 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -90,9 +92,8 @@ const TODOS = [
 ]
 
 function formatMoney(n: number) {
-  if (n >= 10000) return `¥${(n / 10000).toFixed(1)}w`
-  if (n >= 1000) return `¥${(n / 1000).toFixed(1)}k`
-  return `¥${n.toLocaleString()}`
+  if (!Number.isFinite(n)) return '¥0.00'
+  return `¥${n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function formatNum(n: number) {
@@ -185,11 +186,25 @@ export default function HomeDashboard() {
 
   const modalTrend = useMemo(() => {
     if (!detailId || !dashBundle) return []
+    const platformState = dashBundle.platforms.find((x) => x.id === detailId)
+    if (timeKey === 'realtime') {
+      const hourly = platformState?.metrics.hourlyTrend ?? []
+      if (hourly.length > 0) {
+        return hourly.map((h) => ({
+          name: h.label,
+          payAmount: h.payAmount,
+        }))
+      }
+      return Array.from({ length: 24 }, (_, hour) => ({
+        name: `${String(hour).padStart(2, '0')}:00`,
+        payAmount: 0,
+      }))
+    }
     return dashBundle.trendDates.map((date, i) => ({
       name: date,
       payAmount: dashBundle.trendByPlatform[detailId][i] ?? 0,
     }))
-  }, [detailId, dashBundle])
+  }, [detailId, dashBundle, timeKey])
 
   if (loading) {
     return (
@@ -391,6 +406,7 @@ export default function HomeDashboard() {
                   <YAxis stroke="#94a3b8" fontSize={12} />
                   <Tooltip
                     contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }}
+                    formatter={(v) => formatMoney(Number(v ?? 0))}
                   />
                   <Legend />
                   <Bar dataKey="douyin" name="抖音来客" fill="#ec4899" radius={[4, 4, 0, 0]} />
@@ -536,18 +552,57 @@ export default function HomeDashboard() {
               </div>
 
               <div className="h-64 min-h-[180px]">
-                <h4 className="mb-3 text-sm font-medium text-gray-700">成交金额趋势（当前时间维度）</h4>
+                <h4 className="mb-3 text-sm font-medium text-gray-700">
+                  {timeKey === 'realtime'
+                    ? '今日成交金额趋势（按小时）'
+                    : '成交金额趋势（当前时间维度）'}
+                </h4>
                 {modalTrend.length === 0 ? (
                   <div className="flex h-[85%] items-center justify-center text-sm text-gray-500">
                     暂无细分趋势
                   </div>
+                ) : timeKey === 'realtime' ? (
+                  <ResponsiveContainer width="100%" height="85%">
+                    <LineChart data={modalTrend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis
+                        dataKey="name"
+                        stroke="#94a3b8"
+                        fontSize={11}
+                        interval={2}
+                        tick={{ fill: '#64748b' }}
+                      />
+                      <YAxis
+                        stroke="#94a3b8"
+                        fontSize={12}
+                        tickFormatter={(v) => formatMoney(Number(v)).replace('¥', '')}
+                      />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }}
+                        formatter={(v) => formatMoney(Number(v ?? 0))}
+                        labelFormatter={(label) => `时段 ${label}`}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="payAmount"
+                        name="成交金额"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        dot={{ r: 2, fill: '#3b82f6' }}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 ) : (
                   <ResponsiveContainer width="100%" height="85%">
                     <BarChart data={modalTrend}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
                       <YAxis stroke="#94a3b8" fontSize={12} />
-                      <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }}
+                        formatter={(v) => formatMoney(Number(v ?? 0))}
+                      />
                       <Bar dataKey="payAmount" name="成交金额" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
