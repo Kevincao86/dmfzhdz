@@ -1,5 +1,6 @@
 import type { AiTaskType } from './aiAgentTypes'
 import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
+import { buildMenuComboIntentLabels } from './merchantBriefCatalog'
 
 const ACTION_TO_TASK: Record<string, AiTaskType> = {
   create_product: 'create_product',
@@ -350,6 +351,42 @@ const PLAN_SLOT_PATTERNS: RegExp[] = [
   /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*([^\n：:]{2,36}(?:套装|组合|套餐|方案))/gm,
 ]
 
+
+function userSpecifiedConcreteProducts(userBrief: string): boolean {
+  const intents = parseCreateProductIntents(userBrief)
+  if (intents.length > 1) return true
+  if (intents[0]?.key !== 'main') return true
+  const x = stripQuoteBlock(userBrief)
+  return /(\d+)\s*代\s*(\d+)|双人|单人|三人|四人|五人|代金券|指定.*(?:商品|套餐)|上架.*(?:套餐|商品|券)/.test(x)
+}
+
+function createProductIntentsFromStoreMenu(
+  _userBrief: string,
+  _assistantContent: string | undefined,
+  full: string,
+): CreateProductIntent[] | null {
+  let planCount: number | undefined
+  const countM = full.match(/(\d+)\s*个(?:组品|套餐|商品|方案|团购)/)
+  if (countM) {
+    planCount = Math.min(6, Math.max(2, Number.parseInt(countM[1], 10) || 2))
+  }
+  if (!planCount) {
+    if (!/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) return null
+    planCount = 2
+  }
+  const combos = buildMenuComboIntentLabels(planCount)
+  if (!combos.length) return null
+  return combos.map(({ label, menuHint }) => ({
+    key: `menu-${label}`,
+    label,
+    brief: planIntentBrief(
+      full,
+      `团购套餐「${label}」，须从门店菜单价目选取真实单品并组合（不得虚构未录入品项）：${menuHint}；须给出团购售价、套餐项明细与说明。`,
+    ),
+    productType: 1,
+  }))
+}
+
 function planIntentBrief(full: string, focus: string): string {
   return `${full}\n\n【仅生成以下一项】${focus}。不要与其它餐型或代金券合并；须输出完整团购标题、售价、套餐项与说明。`
 }
@@ -360,7 +397,17 @@ export function parseCreateProductIntentsFromPlan(
   assistantContent?: string,
 ): CreateProductIntent[] {
   const fromUser = parseCreateProductIntents(userBrief)
-  if (!assistantContent?.trim()) return fromUser
+  if (!assistantContent?.trim()) {
+    if (!userSpecifiedConcreteProducts(userBrief)) {
+      const fromMenu = createProductIntentsFromStoreMenu(
+        userBrief,
+        undefined,
+        stripQuoteBlock(userBrief),
+      )
+      if (fromMenu?.length) return fromMenu
+    }
+    return fromUser
+  }
 
   const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
   const slots: CreateProductIntent[] = []
@@ -389,6 +436,10 @@ export function parseCreateProductIntentsFromPlan(
   if (countM) {
     const n = Math.min(6, Math.max(2, Number.parseInt(countM[1], 10) || 0))
     if (n > 1) {
+      if (!userSpecifiedConcreteProducts(userBrief)) {
+        const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
+        if (fromMenu?.length) return fromMenu
+      }
       return Array.from({ length: n }, (_, i) => ({
         key: `plan-${i + 1}`,
         label: `方案 ${i + 1}`,
@@ -396,6 +447,10 @@ export function parseCreateProductIntentsFromPlan(
         productType: 1,
       }))
     }
+  }
+  if (!userSpecifiedConcreteProducts(userBrief)) {
+    const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
+    if (fromMenu?.length) return fromMenu
   }
   return fromUser
 }
