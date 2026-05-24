@@ -2,6 +2,7 @@ import { CheckCircle2, ClipboardList } from 'lucide-react'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
+import { formatAssistantDisplayText } from '../lib/aiAgentActionParse'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
@@ -28,19 +29,29 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
         <p className="text-sm leading-relaxed text-slate-700">{m.content}</p>
         {m.preview.taskType === 'create_product' ? (() => {
           const productPlans = listProductPlansFromPreview(m.preview)
-          if (!productPlans.length) return null
+          if (!productPlans.length && !m.preview.recruitmentBrief) return null
           const multi = productPlans.length > 1
           return (
-            <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : ''}>
-              {productPlans.map((plan) => (
-                <div
-                  key={plan.slotKey ?? plan.slotLabel ?? plan.productName}
-                  className={multi ? 'rounded-xl border border-violet-100/90 bg-white/80 p-2 shadow-sm' : ''}
-                >
-                  <AiAgentProductVisualPreview plan={plan} slotLabel={plan.slotLabel} />
+            <>
+              {productPlans.length > 0 ? (
+                <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'mt-4'}>
+                  {productPlans.map((plan) => (
+                    <div
+                      key={plan.slotKey ?? plan.slotLabel ?? plan.productName}
+                      className={multi ? 'rounded-xl border border-violet-100/90 bg-white/80 p-2 shadow-sm' : ''}
+                    >
+                      <AiAgentProductVisualPreview plan={plan} slotLabel={plan.slotLabel} />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : null}
+              {m.preview.recruitmentBrief ? (
+                <div className={productPlans.length > 0 ? 'mt-4 border-t border-violet-100/80 pt-4' : 'mt-4'}>
+                  <p className="mb-2 text-xs font-semibold text-violet-900">达人招募方案</p>
+                  <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
+                </div>
+              ) : null}
+            </>
           )
         })() : m.preview.taskType === 'recruit_influencer' && m.preview.recruitmentBrief ? (
           <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
@@ -77,7 +88,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             <CheckCircle2 className="h-4 w-4" />
             任务结果
           </div>
-          <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+          <p className="whitespace-pre-wrap leading-relaxed">{formatAssistantDisplayText(m.content)}</p>
           {m.recruitmentOrder ? (
             <AiAgentRecruitmentOrderDetailCard order={m.recruitmentOrder} />
           ) : null}
@@ -167,7 +178,11 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
               ))}
             </div>
           ) : null}
-          {m.content ? <p className="whitespace-pre-wrap">{m.content}</p> : null}
+          {m.content ? (
+            <p className="whitespace-pre-wrap">
+              {formatAssistantDisplayText(m.content)}
+            </p>
+          ) : null}
         </div>
         {m.role === 'assistant' ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">

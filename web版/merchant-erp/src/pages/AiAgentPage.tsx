@@ -2,8 +2,9 @@ import { Bot, CalendarDays, ChevronDown, ChevronRight, FileText, MessageSquarePl
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AiAgentComposerBar } from '../components/AiAgentComposerBar'
 import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
+import { AiAgentPreviewActions } from '../components/AiAgentPreviewActions'
+import { AiAgentThinkingIndicator } from '../components/AiAgentThinkingIndicator'
 import { useAiAgent } from '../context/AiAgentContext'
-import { aiTaskConfirmLabel } from '../lib/aiAgentPlan'
 import { cn } from '../cn'
 
 const INFO_COPY = {
@@ -25,9 +26,6 @@ export default function AiAgentPage() {
     pendingPreviewTaskType,
     pendingPreviewLoading,
     taskConfirming,
-    confirmPendingTask,
-    cancelPendingTask,
-    modifyPendingTask,
     archivedSessions,
     startNewChat,
     resumeArchivedSession,
@@ -39,7 +37,6 @@ export default function AiAgentPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
-  const confirmLabel = aiTaskConfirmLabel(pendingPreviewTaskType)
   const confirmDisabled = pendingPreviewLoading || aiSending || taskConfirming
 
   useEffect(() => {
@@ -194,41 +191,15 @@ export default function AiAgentPage() {
                 {messages.map((m) => (
                   <div key={m.id}>
                     <AiAgentMessageBubble m={m} />
-                  {m.role === 'task_preview' && m.id === pendingPreviewId ? (
-                    <div className="mt-3 flex flex-wrap gap-2 border-t border-violet-100 pt-3">
-                      <button
-                        type="button"
-                        onClick={confirmPendingTask}
-                        disabled={confirmDisabled}
-                        className={cn(
-                          'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
-                          confirmDisabled && 'cursor-not-allowed opacity-50',
-                        )}
-                      >
-                        {pendingPreviewLoading
-                          ? '正在生成预览…'
-                          : taskConfirming
-                            ? '正在生成订单…'
-                            : confirmLabel}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={modifyPendingTask}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        修改方案
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelPendingTask}
-                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
-                      >
-                        取消
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                    {m.role === 'task_preview' && m.id === pendingPreviewId ? (
+                      <AiAgentPreviewActions
+                        confirmDisabled={confirmDisabled}
+                        showProductPlatforms={pendingPreviewTaskType === 'create_product'}
+                      />
+                    ) : null}
+                  </div>
                 ))}
+                {aiSending ? <AiAgentThinkingIndicator /> : null}
               </div>
             </div>
 
