@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { saveAiProductDraft, saveAiProductDraftBatch, type AiProductDraft } from '../lib/aiProductDraft'
+import { persistAiProductPlansToEditLibrary } from '../lib/aiAgentProductLibrary'
 import type {
   AiAgentArchivedSession,
   AiAgentMessage,
@@ -1409,13 +1410,18 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       })
     }
 
-    const count = Math.max(plans.length, plan ? 1 : 0)
+    const submitPlatforms =
+      previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
+    const readyPlans = plans.length ? plans : plan ? [plan] : []
+    const libCount = persistAiProductPlansToEditLibrary(readyPlans, submitPlatforms[0] ?? 'douyin')
+
+    const count = libCount || Math.max(plans.length, plan ? 1 : 0)
     setMessages((prev) => {
       const next = [
         ...prev,
         createAgentMessage(
           'task_result',
-          `「${title}」已批量保存至草稿箱（${count || 1} 个方案）。您可在「创建商品」页逐项修改后再提交。`,
+          `「${title}」已批量保存至草稿箱（${count || 1} 个方案），已写入商品列表「本地草稿」。您可在「创建商品」页逐项修改后再提交。`,
           { resultSummary: 'confirmed' },
         ),
       ]
@@ -1423,7 +1429,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       return next
     })
     setPendingPreviewId(null)
-  }, [pendingPreviewId])
+  }, [pendingPreviewId, previewSubmitPlatforms])
 
   const applyShortcut = useCallback(
     (taskType: AiTaskType) => {
@@ -1516,6 +1522,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         })
       }
 
+      const readyPlans = plans.length ? plans : plan ? [plan] : []
+      const libCount = persistAiProductPlansToEditLibrary(readyPlans, submitPlatforms[0] ?? 'douyin')
+
       const firstLabel = plan?.slotLabel ?? plan?.productName ?? '商品'
       const batchNote =
         plans.length > 1
@@ -1535,10 +1544,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           createAgentMessage(
             'task_result',
             plans.length > 1
-              ? `「${title}」已确认。${batchNote} 将打开创建页预填方案。`
+              ? `「${title}」已确认。${batchNote}${libCount > 0 ? ` 已写入商品列表「本地草稿」${libCount} 项。` : ''} 将打开创建页预填方案。`
               : canAutoSubmit
-                ? `「${title}」已确认。正在打开创建商品页并自动提交${platNames}审核…`
-                : `「${title}」已确认。将预填方案并提交至${platNames}；若需自动审核请先在创建页保存类目。`,
+                ? `「${title}」已确认。${libCount > 0 ? `已写入商品列表「本地草稿」。` : ''}正在打开创建商品页并自动提交${platNames}审核…`
+                : `「${title}」已确认。${libCount > 0 ? `已写入商品列表「本地草稿」。` : ''}将预填方案并提交至${platNames}；若需自动审核请先在创建页保存类目。`,
             { resultSummary: 'confirmed' },
           ),
         ]

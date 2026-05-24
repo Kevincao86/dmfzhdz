@@ -303,6 +303,27 @@ export async function pullMerchantProductFromPlatform(
 }
 
 /** 全平台批量拉取商品列表（在售、审核中、已驳回、已下架等）并写入本地库 */
+export type PlatformSyncOutcome = {
+  platform: CreatePlatformId
+  label: string
+  ok: boolean
+  count: number
+  message: string
+}
+
+export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): string {
+  if (!outcomes.length) return '未执行同步'
+  return outcomes
+    .map((o) => {
+      if (o.ok) {
+        return o.count > 0 ? `${o.label}同步成功（${o.count} 个）` : `${o.label}同步成功`
+      }
+      const detail = o.message?.trim()
+      return detail ? `${o.label}同步失败：${detail}` : `${o.label}同步失败`
+    })
+    .join('，')
+}
+
 export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantProductSyncResult> {
   const platforms: CreatePlatformId[] = [
     'douyin',
@@ -314,34 +335,46 @@ export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantPr
     'jd_waimai',
   ]
   let count = 0
-  const notes: string[] = []
+  const outcomes: PlatformSyncOutcome[] = []
   for (const platform of platforms) {
+    const label = createPlatformLabel(platform)
     const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 50, full: true })
     if (!r.ok) {
-      notes.push(`${createPlatformLabel(platform)}：${r.message}`)
+      outcomes.push({
+        platform,
+        label,
+        ok: false,
+        count: 0,
+        message: r.message,
+      })
       continue
     }
-    if (r.message) notes.push(`${createPlatformLabel(platform)}：${r.message}`)
+    let platformCount = 0
     for (const item of r.items) {
       upsertProductEditLibraryFromApi(item, platform)
+      platformCount++
       count++
     }
+    outcomes.push({
+      platform,
+      label,
+      ok: true,
+      count: platformCount,
+      message: r.message ?? (platformCount > 0 ? `已同步 ${platformCount} 个` : '无商品'),
+    })
   }
   try {
     window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
   } catch {
     /* ignore */
   }
-  if (count === 0 && notes.length > 0) {
-    return { ok: false, message: notes.join('；') }
+  const summary = formatPlatformSyncSummary(outcomes)
+  const anyOk = outcomes.some((o) => o.ok)
+  const anyFail = outcomes.some((o) => !o.ok)
+  if (!anyOk && anyFail) {
+    return { ok: false, message: summary }
   }
-  return {
-    ok: true,
-    message:
-      count > 0
-        ? `已同步 ${count} 个商品（含各平台在售、审核中、已驳回、已下架等状态）${notes.length ? `。${notes.join('；')}` : ''}`
-        : notes.join('；') || '未拉取到商品，请确认平台授权后重试',
-  }
+  return { ok: true, message: summary }
 }
 
 export type MerchantProductShelfResult =

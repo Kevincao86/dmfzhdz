@@ -244,14 +244,14 @@ export default function ProductsViewPage() {
     if (r2.ok) setApiItems(r2.items)
     refreshLibrary()
     setBulkSyncing(false)
-    setSyncToast(r.ok ? r.message ?? '同步完成' : r.message)
-    window.setTimeout(() => setSyncToast(null), 5200)
+    setSyncToast(r.message ?? (r.ok ? '同步完成' : '同步失败'))
+    window.setTimeout(() => setSyncToast(null), 8000)
   }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {syncToast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] max-w-md -translate-x-1/2 rounded-lg bg-gray-900 px-4 py-2 text-center text-sm text-white shadow-lg">
+        <div className="fixed bottom-6 left-1/2 z-[60] max-w-xl -translate-x-1/2 rounded-lg bg-gray-900 px-4 py-3 text-center text-sm leading-relaxed text-white shadow-lg">
           {syncToast}
         </div>
       )}
