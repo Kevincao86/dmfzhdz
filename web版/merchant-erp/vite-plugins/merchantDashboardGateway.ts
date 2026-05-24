@@ -2,7 +2,7 @@
  * 首页数据看板：按时间维度聚合各平台订单/核销（复用财务对账拉数逻辑）。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { fetchDouyinFinanceReconcileRows } from './douyinMerchantGateway.js'
+import { fetchDouyinFinanceReconcileRows, type FinanceHourlyPayPoint } from './douyinMerchantGateway.js'
 import { fetchKuaishouFinanceReconcileRows } from './kuaishouMerchantGateway.js'
 import { fetchMeituanFinanceReconcileRows } from './meituanMerchantGateway.js'
 import { decodeMeituanSessionToken } from './meituanOpenApiCore.js'
@@ -95,30 +95,54 @@ type ReconcileRow = {
   verifyAmountYuan: number
 }
 
+function buildEmptyHourlyTrend(): FinanceHourlyPayPoint[] {
+  return Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    label: `${String(hour).padStart(2, '0')}:00`,
+    payAmount: 0,
+  }))
+}
+
 async function loadReconcileRows(
   platform: DashboardPlatform,
   bearer: string,
   startYmd: string,
   endYmd: string,
-): Promise<ReconcileRow[]> {
+  range: DashboardRange,
+): Promise<{ rows: ReconcileRow[]; hourlyTrend?: FinanceHourlyPayPoint[] }> {
   if (platform === 'douyin') {
     const r = await fetchDouyinFinanceReconcileRows(bearer, startYmd, endYmd)
-    return r.rows
+    return {
+      rows: r.rows,
+      hourlyTrend: range === 'realtime' ? (r.hourlyTrend ?? buildEmptyHourlyTrend()) : undefined,
+    }
   }
   if (platform === 'kuaishou') {
     const r = await fetchKuaishouFinanceReconcileRows(bearer, startYmd, endYmd)
-    return r.rows
+    return {
+      rows: r.rows,
+      hourlyTrend: range === 'realtime' ? (r.hourlyTrend ?? buildEmptyHourlyTrend()) : undefined,
+    }
   }
   if (platform === 'meituan') {
     const r = await fetchMeituanFinanceReconcileRows(bearer, startYmd, endYmd)
-    return r.rows
+    return {
+      rows: r.rows,
+      hourlyTrend: range === 'realtime' ? buildEmptyHourlyTrend() : undefined,
+    }
   }
   if (platform === 'eleme' || platform === 'meituan_waimai' || platform === 'jd_waimai') {
     const r = await fetchWaimaiFinanceReconcileRows(platform, bearer, startYmd, endYmd)
-    return r.rows
+    return {
+      rows: r.rows,
+      hourlyTrend: range === 'realtime' ? buildEmptyHourlyTrend() : undefined,
+    }
   }
   const r = await fetchXhsFinanceReconcileRows(bearer, startYmd, endYmd)
-  return r.rows
+  return {
+    rows: r.rows,
+    hourlyTrend: range === 'realtime' ? buildEmptyHourlyTrend() : undefined,
+  }
 }
 
 function aggregateDashboard(rows: ReconcileRow[]) {
@@ -164,8 +188,11 @@ export async function handleMerchantDashboardSummaryGet(
   const range = parseRange(url.searchParams.get('range'))
   const { startYmd, endYmd } = rangeToYmd(range)
   try {
-    const rows = await loadReconcileRows(platform, bearer.trim(), startYmd, endYmd)
-    const data = aggregateDashboard(rows)
+    const { rows, hourlyTrend } = await loadReconcileRows(platform, bearer.trim(), startYmd, endYmd, range)
+    const data = {
+      ...aggregateDashboard(rows),
+      ...(range === 'realtime' && hourlyTrend ? { hourlyTrend } : {}),
+    }
     json(res, 200, { ok: true, data })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

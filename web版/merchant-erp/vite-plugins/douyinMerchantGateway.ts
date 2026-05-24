@@ -6040,6 +6040,30 @@ function shanghaiDateStringFromUnixSec(sec: number): string {
   return new Date(sec * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
 }
 
+function shanghaiHourFromUnixSec(sec: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    hour: 'numeric',
+    hour12: false,
+  }).formatToParts(new Date(sec * 1000))
+  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? 0)
+  return Number.isFinite(h) ? h : 0
+}
+
+export type FinanceHourlyPayPoint = {
+  hour: number
+  label: string
+  payAmount: number
+}
+
+export function buildHourlyPayTrend(hourlyPay: Map<number, number>): FinanceHourlyPayPoint[] {
+  return Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    label: `${String(hour).padStart(2, '0')}:00`,
+    payAmount: Math.round((hourlyPay.get(hour) ?? 0) * 100) / 100,
+  }))
+}
+
 function unixRangeInclusiveShanghai(startYmd: string, endYmd: string): { startSec: number; endSec: number } | null {
   const start = `${startYmd.trim()}T00:00:00+08:00`
   const end = `${endYmd.trim()}T23:59:59+08:00`
@@ -6142,6 +6166,7 @@ function mergeDouyinOrderSales(
   startYmd: string,
   endYmd: string,
   seenSalesOrderIds: Set<string>,
+  hourlyPay?: Map<number, number>,
 ): void {
   if (!orderIsPaidForSales(order)) return
   const oid = orderUniqueId(order)
@@ -6151,10 +6176,15 @@ function mergeDouyinOrderSales(
   if (cu <= 0) return
   const day = shanghaiDateStringFromUnixSec(cu)
   if (day < startYmd || day > endYmd) return
+  const amount = orderPayAmountYuan(order)
   const cur = bucket.get(day) ?? emptyDouyinFinanceDayBucket()
   cur.orderCount += orderSalesCouponCount(order)
-  cur.salesAmountYuan += orderPayAmountYuan(order)
+  cur.salesAmountYuan += amount
   bucket.set(day, cur)
+  if (hourlyPay && startYmd === endYmd && day === startYmd) {
+    const hour = shanghaiHourFromUnixSec(cu)
+    hourlyPay.set(hour, (hourlyPay.get(hour) ?? 0) + amount)
+  }
 }
 
 function mergeDouyinOrderVerify(
@@ -6242,6 +6272,7 @@ async function paginateDouyinTradeOrders(
   timeRange: DouyinOrderQueryTimeRange,
   warnings: string[],
   opts?: PaginateDouyinOrdersOpts,
+  hourlyPay?: Map<number, number>,
 ): Promise<void> {
   const isHermes = apiPath.includes('hermes')
   let page = 1
@@ -6288,7 +6319,7 @@ async function paginateDouyinTradeOrders(
       if (!rawOrder || typeof rawOrder !== 'object') continue
       const order = rawOrder as Record<string, unknown>
       if (timeRange === 'create') {
-        mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds)
+        mergeDouyinOrderSales(bucket, order, startYmd, endYmd, seenSalesOrderIds, hourlyPay)
         mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
       } else {
         mergeDouyinOrderVerify(bucket, order, startYmd, endYmd, seenVerifyCerts, isHermes)
@@ -6307,7 +6338,7 @@ export async function fetchDouyinFinanceReconcileRows(
   bearerToken: string,
   startYmd: string,
   endYmd: string,
-): Promise<{ rows: FinanceReconcileRowPayload[]; warnings: string[] }> {
+): Promise<{ rows: FinanceReconcileRowPayload[]; warnings: string[]; hourlyTrend?: FinanceHourlyPayPoint[] }> {
   const warnings: string[] = []
   const session = bearerToken ? resolveSession(bearerToken) : undefined
   if (!session) {
@@ -6323,6 +6354,8 @@ export async function fetchDouyinFinanceReconcileRows(
   const bucket = new Map<string, DouyinFinanceDayBucket>()
   const seenSalesOrderIds = new Set<string>()
   const seenVerifyCerts = new Set<string>()
+  const trackHourly = startYmd === endYmd
+  const hourlyPay = trackHourly ? new Map<number, number>() : undefined
 
   try {
     const token = await ensureDouyinToken(session)
@@ -6344,6 +6377,7 @@ export async function fetchDouyinFinanceReconcileRows(
         'create',
         warnings,
         { ...paginateOpts, maxPages: limits.createMaxPages },
+        hourlyPay,
       ),
     ]
     if (limits.verifyUpdateMaxPages > 0) {
@@ -6362,6 +6396,7 @@ export async function fetchDouyinFinanceReconcileRows(
           'update',
           warnings,
           { ...paginateOpts, maxPages: limits.verifyUpdateMaxPages },
+          hourlyPay,
         ),
       )
     }
@@ -6381,6 +6416,7 @@ export async function fetchDouyinFinanceReconcileRows(
           'create',
           warnings,
           { ...paginateOpts, maxPages: limits.hermesMaxPages },
+          hourlyPay,
         ),
       )
     }
@@ -6409,7 +6445,11 @@ export async function fetchDouyinFinanceReconcileRows(
       '抖音：成交按创单时间汇总已支付订单（200/201/1）；核销仅统计券 item_status=401（已履约），按 item_update_time 归属日期；最终以来客后台为准。',
     )
   }
-  return { rows, warnings }
+  return {
+    rows,
+    warnings,
+    ...(hourlyPay ? { hourlyTrend: buildHourlyPayTrend(hourlyPay) } : {}),
+  }
 }
 
 function akteRateScoreToStars(rateScore: unknown): number {

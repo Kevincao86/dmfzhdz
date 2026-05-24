@@ -28,6 +28,7 @@ export type PlatformDashboardMetrics = {
   conversionRate: number
   orderCount: number
   trend: { date: string; payAmount: number }[]
+  hourlyTrend?: { hour: number; label: string; payAmount: number }[]
 }
 
 export type HomeDashboardPlatformState = {
@@ -52,7 +53,35 @@ function emptyMetrics(): PlatformDashboardMetrics {
     conversionRate: 0,
     orderCount: 0,
     trend: [],
+    hourlyTrend: undefined,
   }
+}
+
+function buildEmptyHourlyTrend(): { hour: number; label: string; payAmount: number }[] {
+  return Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    label: `${String(hour).padStart(2, '0')}:00`,
+    payAmount: 0,
+  }))
+}
+
+function parseHourlyTrend(raw: unknown): { hour: number; label: string; payAmount: number }[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  const out: { hour: number; label: string; payAmount: number }[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as Record<string, unknown>
+    const hour = num(o.hour)
+    if (hour < 0 || hour > 23) continue
+    const label =
+      typeof o.label === 'string' && o.label.trim()
+        ? o.label.trim()
+        : `${String(hour).padStart(2, '0')}:00`
+    out.push({ hour, label, payAmount: num(o.payAmount ?? o.pay_amount) })
+  }
+  if (out.length === 0) return undefined
+  out.sort((a, b) => a.hour - b.hour)
+  return out
 }
 
 function num(v: unknown): number {
@@ -146,12 +175,18 @@ async function fetchPlatformDashboard(
       }
     }
 
+    let hourlyTrend = parseHourlyTrend(inner.hourlyTrend ?? inner.hourly_trend)
+    if (range === 'realtime' && !hourlyTrend) {
+      hourlyTrend = buildEmptyHourlyTrend()
+    }
+
     return {
       payAmount,
       verifyAmount,
       conversionRate,
       orderCount,
       trend,
+      ...(range === 'realtime' && hourlyTrend ? { hourlyTrend } : {}),
     }
   } catch {
     return emptyMetrics()
