@@ -410,6 +410,50 @@ function formatExcelRowsForLlm(rows: string[][], maxRows = 320): string {
   return lines.join('\n')
 }
 
+function excelLinkOnlyToken(text: string): boolean {
+  const t = text.trim()
+  if (!t) return true
+  if (t === '打开链接' || t === '链接' || t === '查看链接') return true
+  if (/^https?:\/\//i.test(t)) return true
+  return false
+}
+
+function excelLooksLikePrice(text: string): boolean {
+  const t = text.replace(/[,¥￥\s]/g, '').trim()
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return false
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0
+}
+
+function excelLooksLikeProductName(text: string): boolean {
+  const t = text.trim()
+  if (!t || excelLinkOnlyToken(t)) return false
+  if (/^\d{8,}$/.test(t)) return false
+  if (/名称|品名|商品名|菜品|项目/.test(t)) return true
+  if (/[\u4e00-\u9fff]/.test(t) && t.length >= 2) return true
+  return false
+}
+
+function excelRowHasProductCore(cells: string[]): boolean {
+  const row = cells.map((c) => String(c ?? '').trim()).filter((c) => c.length > 0)
+  if (row.length === 0) return false
+  const names = row.filter(excelLooksLikeProductName)
+  const prices = row.filter(excelLooksLikePrice)
+  if (names.length > 0 && prices.length > 0) return true
+  if (names.some((n) => n.length >= 4)) return true
+  if (names.some((n) => /名称|品名|商品|菜品|项目|分类/.test(n))) return true
+  return false
+}
+
+function refineExcelProductRows(rows: string[][]): string[][] {
+  let last = -1
+  for (let i = 0; i < rows.length; i++) {
+    if (excelRowHasProductCore(rows[i]!)) last = i
+  }
+  if (last >= 0) return rows.slice(0, last + 1)
+  return rows
+}
+
 export async function runStoreMenuExcelRecognizeCore(
   bodyRaw: string,
   authHeader: string | undefined,
@@ -435,16 +479,17 @@ export async function runStoreMenuExcelRecognizeCore(
     const cells = row.map((c) => String(c ?? '').trim())
     if (cells.some((c) => c.length > 0)) rows.push(cells)
   }
-  if (rows.length === 0) {
+  const refined = refineExcelProductRows(rows)
+  if (refined.length === 0) {
     return { status: 400, body: { ok: false, error: 'empty_sheet' } }
   }
-  if (rows.length > 800) {
+  if (refined.length > 800) {
     return {
       status: 400,
       body: {
         ok: false,
         error: 'too_many_rows',
-        detail: `检测到 ${rows.length} 行有效数据，单次最多 800 行，请拆分文件后重试`,
+        detail: `检测到 ${refined.length} 行有效数据，单次最多 800 行。请删除表格尾部仅含编号/链接的空行，或拆分后重试`,
       },
     }
   }
@@ -469,7 +514,7 @@ export async function runStoreMenuExcelRecognizeCore(
   ]
     .filter(Boolean)
     .join('\n')
-  const userText = `${meta ? `${meta}\n\n` : ''}以下为表格行（R行号\\t列1\\t列2…）：\n${formatExcelRowsForLlm(rows)}`
+  const userText = `${meta ? `${meta}\n\n` : ''}以下为表格行（R行号\\t列1\\t列2…）：\n${formatExcelRowsForLlm(refined)}`
 
   try {
     const obj = await llmJson(env, system, userText)
