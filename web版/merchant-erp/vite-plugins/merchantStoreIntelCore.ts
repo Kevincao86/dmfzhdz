@@ -439,7 +439,14 @@ export async function runStoreMenuExcelRecognizeCore(
     return { status: 400, body: { ok: false, error: 'empty_sheet' } }
   }
   if (rows.length > 800) {
-    return { status: 400, body: { ok: false, error: 'too_many_rows', detail: '单次最多 800 行，请拆分文件后重试' } }
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: 'too_many_rows',
+        detail: `检测到 ${rows.length} 行有效数据，单次最多 800 行，请拆分文件后重试`,
+      },
+    }
   }
 
   const storeName = String(body.storeName ?? '').trim()
