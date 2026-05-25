@@ -19,7 +19,7 @@ const BASE_WELCOME =
 const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话与文生图（每月直连调用 ${50} 次上限）；报税管理、GEO、竞对分析需升级会员。`,
   member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
-  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（含 TokenMix 多模型）；复杂任务与一键报税均已开放。`,
+  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（墨典高阶版智能AI模型）；复杂任务与一键报税均已开放。`,
 }
 
 function shortcutsForPlan(plan: MembershipPlan) {
