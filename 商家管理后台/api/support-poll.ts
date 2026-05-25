@@ -1,8 +1,10 @@
 /**
  * 运营台轮询 Supabase 客服消息（service_role，仅服务端）。
- * 需与商户 ERP 共用同一 Supabase 项目，并已执行迁移 support_relay_messages。
+ * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
  */
-export const config = { runtime: 'edge' }
+export const config = { maxDuration: 30 }
+
+import { notifyFeishuSupportMerchantMessage } from './opsFeishuNotifications.js'
 
 type DbRow = {
   session_id: string
@@ -19,6 +21,68 @@ function json(status: number, body: unknown) {
     status,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   })
+}
+
+function serviceHeaders(serviceRole: string) {
+  return {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+  } as const
+}
+
+/** 原子 claim：仅首次将 feishu_notified_at 置位者返回 claimed */
+async function claimSupportFeishuNotify(
+  supabaseUrl: string,
+  serviceRole: string,
+  row: DbRow,
+): Promise<'claimed' | 'already' | 'unavailable'> {
+  const q = new URLSearchParams({
+    session_id: `eq.${row.session_id}`,
+    client_msg_id: `eq.${row.client_msg_id}`,
+    from_role: 'eq.user',
+    feishu_notified_at: 'is.null',
+  })
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
+      method: 'PATCH',
+      headers: {
+        ...serviceHeaders(serviceRole),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ feishu_notified_at: new Date().toISOString() }),
+    })
+    if (!r.ok) {
+      const detail = await r.text()
+      if (/feishu_notified_at|42703|column|PGRST204/i.test(detail)) return 'unavailable'
+      return 'already'
+    }
+    const updated = (await r.json()) as unknown[]
+    return Array.isArray(updated) && updated.length > 0 ? 'claimed' : 'already'
+  } catch {
+    return 'unavailable'
+  }
+}
+
+async function notifyNewMerchantSupportMessages(
+  supabaseUrl: string,
+  serviceRole: string,
+  rows: DbRow[],
+): Promise<void> {
+  for (const row of rows) {
+    if (row.from_role !== 'user') continue
+    const text = row.text.trim()
+    if (!text) continue
+    const claim = await claimSupportFeishuNotify(supabaseUrl, serviceRole, row)
+    if (claim === 'already') continue
+    notifyFeishuSupportMerchantMessage({
+      sessionId: row.session_id,
+      enterpriseName: row.enterprise_name ?? undefined,
+      customerId: row.customer_id ?? undefined,
+      text,
+      ts: row.ts,
+    })
+  }
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -53,15 +117,12 @@ export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url)
   const sinceRaw = url.searchParams.get('sinceTs')
   const sinceTs = sinceRaw ? Number(sinceRaw) : 0
-
-  const headers = {
-    apikey: serviceRole,
-    Authorization: `Bearer ${serviceRole}`,
-  } as const
+  const headers = serviceHeaders(serviceRole)
 
   try {
     let rows: DbRow[]
-    if (!Number.isFinite(sinceTs) || sinceTs <= 0) {
+    const incremental = Number.isFinite(sinceTs) && sinceTs > 0
+    if (!incremental) {
       const r = await fetch(
         `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,customer_id,enterprise_name,from_role,text,ts,client_msg_id&order=ts.desc&limit=400`,
         { headers },
@@ -81,6 +142,10 @@ export default async function handler(req: Request): Promise<Response> {
         return json(502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
       }
       rows = (await r.json()) as DbRow[]
+    }
+
+    if (incremental && rows.length > 0) {
+      void notifyNewMerchantSupportMessages(supabaseUrl, serviceRole, rows)
     }
 
     const messages = rows.map((row) => ({

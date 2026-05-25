@@ -334,3 +334,11 @@ $$;
 
 revoke all on function public.support_relay_guest_fetch_session(text, text) from public;
 grant execute on function public.support_relay_guest_fetch_session(text, text) to anon;
+
+-- ---------- 20260524120000_support_feishu_notified（客服飞书通知去重）----------
+alter table public.support_relay_messages
+  add column if not exists feishu_notified_at timestamptz;
+
+create index if not exists support_relay_messages_feishu_pending_idx
+  on public.support_relay_messages (ts)
+  where feishu_notified_at is null and from_role = 'user';
