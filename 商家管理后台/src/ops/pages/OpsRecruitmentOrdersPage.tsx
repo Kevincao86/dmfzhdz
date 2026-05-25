@@ -53,13 +53,48 @@ type RecruitmentOrderStatus = RegistryRecruitmentOrder['status']
 
 function orderStatusLabel(s: RecruitmentOrderStatus): string {
   const m: Record<RecruitmentOrderStatus, string> = {
-    pending: '待接单',
+    pending: '待处理',
     accepted: '已处理',
     done: '已完成',
-    cancelled: '已取消',
+    cancelled: '已作废',
     refunded: '已退款',
   }
   return m[s]
+}
+
+function orderDetailRows(order: RegistryRecruitmentOrder): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [
+    { label: '订单号', value: order.id },
+    { label: '客户名称', value: order.customerName },
+    { label: '门店', value: order.storeName },
+    { label: '门店地址', value: order.storeAddress || '—' },
+    { label: '达人', value: `${order.talentName}（${order.talentId}）` },
+    { label: '粉丝 / 账号类型', value: `${order.fans.toLocaleString('zh-CN')} · ${order.accountType}` },
+    { label: '合作次数', value: String(order.coopTimes) },
+    { label: '下单时间', value: order.createdAt },
+    { label: '订单状态', value: orderStatusLabel(order.status) },
+    { label: '服务费', value: `¥${order.serviceAmount.toLocaleString('zh-CN')}` },
+    { label: '佣金比例', value: `${order.commissionPct}%` },
+    { label: '实收金额', value: `¥${order.netAmount.toLocaleString('zh-CN')}` },
+    { label: '品类', value: order.category || '—' },
+    { label: '招募平台', value: order.recruitmentPlatform || order.accountType || '—' },
+  ]
+  if (order.orderKind === 'recruitment_ice') {
+    rows.push({
+      label: '云剪成片',
+      value: `${order.iceVideoCount ?? order.iceVideoSlots?.length ?? 0} 条`,
+    })
+  }
+  if (order.acceptMode) {
+    rows.push({ label: '接单方式', value: order.acceptMode })
+  }
+  if (order.linkedMpOrderId) {
+    rows.push({ label: '关联小程序单', value: order.linkedMpOrderId })
+  }
+  if (order.infoSummary?.trim()) {
+    rows.push({ label: '招募信息详情', value: order.infoSummary.trim() })
+  }
+  return rows
 }
 
 function orderStatusStyle(s: RecruitmentOrderStatus): string {
@@ -113,6 +148,9 @@ export default function OpsRecruitmentOrdersPage() {
   const prevPendingRef = useRef<number | null>(null)
 
   const [processOrder, setProcessOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [detailOrder, setDetailOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [voidConfirmOrder, setVoidConfirmOrder] = useState<RegistryRecruitmentOrder | null>(null)
+  const [voidBusy, setVoidBusy] = useState(false)
   const [acceptModeChoiceOrder, setAcceptModeChoiceOrder] = useState<RegistryRecruitmentOrder | null>(null)
   const [acceptSheetOrder, setAcceptSheetOrder] = useState<RegistryRecruitmentOrder | null>(null)
   const [mpShareInfo, setMpShareInfo] = useState<{ merchantOrderId: string; mpOrderId: string } | null>(null)
@@ -178,7 +216,7 @@ export default function OpsRecruitmentOrdersPage() {
     }
     if (prevPendingRef.current !== null && stats.pending > prevPendingRef.current && Notification.permission === 'granted') {
       try {
-        new Notification('达人招募：新待接单', { body: `当前待接单 ${stats.pending} 条，请及时处理。` })
+        new Notification('达人招募：新待处理订单', { body: `当前待处理 ${stats.pending} 条，请及时处理。` })
       } catch {
         /* ignore */
       }
@@ -245,7 +283,7 @@ export default function OpsRecruitmentOrdersPage() {
     }
   }
 
-  /** 点击「处理」或「已处理」时立即写入注册表，避免列表仍显示待接单 */
+  /** 运营点击「已处理」并选择招募方式时写入注册表 */
   const ensureOrderAccepted = async (
     order: RegistryRecruitmentOrder,
   ): Promise<RegistryRecruitmentOrder | null> => {
@@ -260,18 +298,26 @@ export default function OpsRecruitmentOrdersPage() {
     return next
   }
 
-  const openProcessOrder = async (order: RegistryRecruitmentOrder) => {
-    if (order.status === 'pending') {
-      setPatchBusyId(order.id)
-      try {
-        const accepted = await ensureOrderAccepted(order)
-        if (accepted) setProcessOrder(accepted)
-      } finally {
-        setPatchBusyId(null)
-      }
-      return
-    }
+  const openProcessOrder = (order: RegistryRecruitmentOrder) => {
     setProcessOrder(order)
+  }
+
+  const voidOrder = async (order: RegistryRecruitmentOrder) => {
+    setVoidBusy(true)
+    try {
+      const r = await patchRecruitmentOrder({ id: order.id, status: 'cancelled' })
+      if (!r.ok) {
+        window.alert(r.error ?? '作废失败')
+        return
+      }
+      applyOrderStatusLocally(order.id, 'cancelled')
+      setVoidConfirmOrder(null)
+      setProcessOrder((cur) => (cur?.id === order.id ? null : cur))
+      setDetailOrder((cur) => (cur?.id === order.id ? null : cur))
+      await loadRegistry()
+    } finally {
+      setVoidBusy(false)
+    }
   }
 
   const guardMerchantMpRecruitmentDup = async (
@@ -578,7 +624,7 @@ export default function OpsRecruitmentOrdersPage() {
       <div className="grid gap-3 sm:grid-cols-4">
         {[
           { label: '订单总量', value: stats.total },
-          { label: '待接单', value: stats.pending },
+          { label: '待处理', value: stats.pending },
           { label: '已完成', value: stats.done },
           { label: '完成成交额(元)', value: stats.doneAmount.toLocaleString('zh-CN') },
         ].map((x) => (
@@ -598,10 +644,10 @@ export default function OpsRecruitmentOrdersPage() {
           className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
         >
           <option value="all">全部</option>
-          <option value="pending">待接单</option>
+          <option value="pending">待处理</option>
           <option value="accepted">已处理</option>
           <option value="done">已完成</option>
-          <option value="cancelled">已取消</option>
+          <option value="cancelled">已作废</option>
           <option value="refunded">已退款</option>
         </select>
         <button
@@ -683,14 +729,33 @@ export default function OpsRecruitmentOrdersPage() {
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        disabled={patchBusyId === o.id}
-                        onClick={() => void openProcessOrder(o)}
-                        className="text-xs text-indigo-400 hover:underline disabled:opacity-50"
-                      >
-                        处理
-                      </button>
+                      <div className="flex flex-wrap justify-end gap-x-2 gap-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setDetailOrder(o)}
+                          className="text-xs text-slate-400 hover:text-white hover:underline"
+                        >
+                          查看信息详情
+                        </button>
+                        <button
+                          type="button"
+                          disabled={patchBusyId === o.id}
+                          onClick={() => openProcessOrder(o)}
+                          className="text-xs text-indigo-400 hover:underline disabled:opacity-50"
+                        >
+                          处理
+                        </button>
+                        {o.status !== 'cancelled' && o.status !== 'refunded' ? (
+                          <button
+                            type="button"
+                            disabled={voidBusy && voidConfirmOrder?.id === o.id}
+                            onClick={() => setVoidConfirmOrder(o)}
+                            className="text-xs text-rose-400 hover:underline disabled:opacity-50"
+                          >
+                            作废
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -760,10 +825,10 @@ export default function OpsRecruitmentOrdersPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               {(
                 [
-                  ['pending', '待接单'],
+                  ['pending', '待处理'],
                   ['accepted', '已处理'],
                   ['done', '已完成'],
-                  ['cancelled', '已取消'],
+                  ['cancelled', '已作废'],
                   ['refunded', '已退款'],
                 ] as const
               ).map(([st, label]) => (
@@ -784,27 +849,133 @@ export default function OpsRecruitmentOrdersPage() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 flex justify-between gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(processOrder.id)
-                    window.alert('订单号已复制')
-                  } catch {
-                    window.alert('复制失败，请手动选择订单号')
-                  }
-                }}
-                className="text-xs text-slate-400 hover:text-white hover:underline"
-              >
-                复制订单号
-              </button>
+            <div className="mt-4 flex flex-wrap justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailOrder(processOrder)
+                  }}
+                  className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                >
+                  查看信息详情
+                </button>
+                {processOrder.status !== 'cancelled' && processOrder.status !== 'refunded' ? (
+                  <button
+                    type="button"
+                    disabled={voidBusy}
+                    onClick={() => setVoidConfirmOrder(processOrder)}
+                    className="rounded-lg border border-rose-500/50 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-950/40 disabled:opacity-50"
+                  >
+                    作废
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(processOrder.id)
+                      window.alert('订单号已复制')
+                    } catch {
+                      window.alert('复制失败，请手动选择订单号')
+                    }
+                  }}
+                  className="text-xs text-slate-400 hover:text-white hover:underline"
+                >
+                  复制订单号
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setProcessOrder(null)}
                 className="rounded-lg bg-slate-700 px-4 py-2 text-sm text-white hover:bg-slate-600"
               >
                 关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {detailOrder ? (
+        <div
+          className="fixed inset-0 z-[82] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          onClick={() => setDetailOrder(null)}
+        >
+          <div
+            className="flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col rounded-xl border border-slate-700 bg-slate-900 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-slate-800 px-5 py-4">
+              <h3 className="text-lg font-semibold text-white">招募信息详情</h3>
+              <p className="mt-1 font-mono text-xs text-slate-400">{detailOrder.id}</p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <dl className="space-y-3">
+                {orderDetailRows(detailOrder).map((row) => (
+                  <div key={row.label}>
+                    <dt className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                      {row.label}
+                    </dt>
+                    <dd
+                      className={cn(
+                        'mt-1 text-sm text-slate-200',
+                        row.label === '招募信息详情' && 'whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs leading-relaxed text-slate-300',
+                      )}
+                    >
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-800 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setDetailOrder(null)}
+                className="rounded-lg bg-slate-700 px-4 py-2 text-sm text-white hover:bg-slate-600"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {voidConfirmOrder ? (
+        <div
+          className="fixed inset-0 z-[92] flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          onClick={() => !voidBusy && setVoidConfirmOrder(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-rose-500/40 bg-slate-900 p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-white">确认作废订单</h3>
+            <p className="mt-2 text-sm text-slate-300">
+              确定作废订单 <span className="font-mono text-rose-200">{voidConfirmOrder.id}</span> 吗？
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              作废后订单状态将变为「已作废」，商户侧招募需求将不再继续流转。此操作不可撤销。
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={voidBusy}
+                onClick={() => setVoidConfirmOrder(null)}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={voidBusy}
+                onClick={() => void voidOrder(voidConfirmOrder)}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                {voidBusy ? '作废中…' : '确认作废'}
               </button>
             </div>
           </div>
@@ -1069,7 +1240,7 @@ export default function OpsRecruitmentOrdersPage() {
           >
             <h3 className="text-lg font-semibold text-white">配置新订单提醒</h3>
             <p className="mt-2 text-xs text-slate-500">
-              以下为 dev 本机偏好：待接单数量增加时可弹出浏览器通知。邮件与 Webhook 需接生产消息服务后生效。
+              以下为 dev 本机偏好：待处理数量增加时可弹出浏览器通知。邮件与 Webhook 需接生产消息服务后生效。
             </p>
             <label className="mt-4 block text-xs text-slate-400">通知邮箱（占位，供后续对接）</label>
             <input
@@ -1085,7 +1256,7 @@ export default function OpsRecruitmentOrdersPage() {
                 onChange={(e) => setAlertBrowser(e.target.checked)}
                 className="rounded border-slate-600"
               />
-              待接单增加时使用浏览器通知（需授权）
+              待处理增加时使用浏览器通知（需授权）
             </label>
             <div className="mt-6 flex justify-end gap-2">
               <button
