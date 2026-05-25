@@ -277,7 +277,7 @@ function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPr
         title: '达人招募任务',
         steps: [
           '根据门店与城市筛选达人池与粉丝量级',
-          '生成招募话术与报价区间建议',
+          '生成招募话术与预算分配（纯佣金按本地生活习惯 1～5%，默认 3%）',
           '创建邀约批次并等待你确认后发送',
         ],
       }

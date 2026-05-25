@@ -97,7 +97,7 @@ Page({
         createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
         status: 'pending',
         serviceAmount: budgetNum,
-        commissionPct: 15,
+        commissionPct: 3,
         netAmount: Math.round(Math.max(0, budgetNum) * 0.85),
         storeAddress: '—',
         category: '达人招募',
