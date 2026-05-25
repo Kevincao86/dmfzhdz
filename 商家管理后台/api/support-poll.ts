@@ -1,10 +1,10 @@
 /**
- * 运营台轮询 Supabase 客服消息（service_role，仅服务端）。
+ * 运营台轮询 Supabase 客服消息（service_role，仅服务端 Edge）。
  * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
  */
-export const config = { maxDuration: 30 }
+import { notifySupportMerchantMessageFeishu } from './supportFeishuNotify.js'
 
-import { notifyFeishuSupportMerchantMessage } from './opsFeishuNotifications.js'
+export const config = { runtime: 'edge' }
 
 type DbRow = {
   session_id: string
@@ -75,7 +75,7 @@ async function notifyNewMerchantSupportMessages(
     if (!text) continue
     const claim = await claimSupportFeishuNotify(supabaseUrl, serviceRole, row)
     if (claim === 'already') continue
-    notifyFeishuSupportMerchantMessage({
+    notifySupportMerchantMessageFeishu({
       sessionId: row.session_id,
       enterpriseName: row.enterprise_name ?? undefined,
       customerId: row.customer_id ?? undefined,
