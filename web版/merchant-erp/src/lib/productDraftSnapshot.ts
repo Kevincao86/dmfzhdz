@@ -60,3 +60,12 @@ export function renameDraftDetailSnapshotKey(oldId: string, newId: string): void
   all[n] = { ...snap, product_id: n }
   writeAll(all)
 }
+
+export function removeDraftDetailSnapshot(productId: string): void {
+  const id = productId.trim()
+  if (!id) return
+  const all = readAll()
+  if (!all[id]) return
+  delete all[id]
+  writeAll(all)
+}

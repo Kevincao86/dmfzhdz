@@ -155,3 +155,14 @@ export function replaceProductEditLibraryRowId(oldId: string, row: ProductEditLi
   const next = prev.filter((p) => p.id !== o && p.id !== row.id)
   persist([row, ...next])
 }
+
+/** 删除本地草稿行（仅商品列表「本地草稿」来源） */
+export function deleteProductEditLibraryDraft(id: string): boolean {
+  const key = id.trim()
+  if (!key) return false
+  const prev = loadProductEditLibrary()
+  const next = prev.filter((p) => p.id !== key)
+  if (next.length === prev.length) return false
+  persist(next)
+  return true
+}

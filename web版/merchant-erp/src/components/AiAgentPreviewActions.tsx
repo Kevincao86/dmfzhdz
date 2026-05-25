@@ -32,7 +32,9 @@ export function AiAgentPreviewActions({
     (pendingPreviewLoading
       ? '正在生成预览…'
       : taskConfirming
-        ? '正在生成订单…'
+        ? pendingPreviewTaskType === 'create_product'
+          ? '正在提交审核…'
+          : '正在生成订单…'
         : aiTaskConfirmLabel(pendingPreviewTaskType))
 
   const selectablePlatforms = GROUPBUY_PLATFORMS.filter((p) => !p.comingSoon)
