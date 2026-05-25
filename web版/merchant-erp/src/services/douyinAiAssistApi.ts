@@ -193,17 +193,19 @@ function assistFetchTimeoutMs(action: AiAssistAction): number {
   return 90_000
 }
 
-function abortSignalForAssist(action: AiAssistAction): AbortSignal | undefined {
+function abortSignalForAssist(action: AiAssistAction): AbortSignal {
   const ms = assistFetchTimeoutMs(action)
   const AS = AbortSignal as unknown as { timeout?: (n: number) => AbortSignal }
   if (typeof AS.timeout === 'function') {
     try {
       return AS.timeout(ms)
     } catch {
-      return undefined
+      /* fall through to manual controller */
     }
   }
-  return undefined
+  const ac = new AbortController()
+  setTimeout(() => ac.abort(), ms)
+  return ac.signal
 }
 
 const AI_ASSIST_PATHS = ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist'] as const

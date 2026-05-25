@@ -1,5 +1,5 @@
 /**
- * AI 智能体确认后：直接将商品方案提交平台审核，并同步写入本地草稿箱。
+ * AI 智能体确认后：将商品方案写入本地草稿箱；商家在商品列表编辑页选择类目与门店后再提交审核。
  */
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 import { createPlatformLabel } from '../constants/productCreatePlatforms'
@@ -139,6 +139,103 @@ function buildDouyinDetail(
   }
 }
 
+const DEFAULT_SALES_INFO = {
+  channel: 'all',
+  staff_sales: false,
+  stock_limited: false,
+  stock_qty: 999,
+  sale_time_limited: false,
+}
+
+const DEFAULT_TRADE_RULES = {
+  consume_date_mode: 'days',
+  consume_valid_days: 360,
+  non_consume_date_mode: 'all',
+  daily_consume_mode: 'all_day',
+  daily_all_day: true,
+  customer_purchase_limit_mode: 'unlimited',
+  after_sale_policy: '随时退',
+  reserve_mode: 'not_required',
+  coupon_type: 'douyin',
+}
+
+const DEFAULT_CONSUME_RULES = {
+  in_store_discount: false,
+  extra_fee: false,
+  voucher_limit: false,
+  people_limit: false,
+}
+
+/** 本地草稿箱快照（不要求类目/门店/主图齐全，供商家后续在创建商品页补全并提交） */
+function buildLocalDraftDetail(plan: AiProductPlanPreview): DouyinProductDetailPayload | null {
+  const name = plan.productName.trim()
+  const price = plan.suggestedPriceYuan
+  if (!name || !Number.isFinite(price) || price <= 0) return null
+
+  const head = plan.headUrl?.trim()
+  const productType = plan.productType ?? 1
+  const origin = plan.originYuan != null && plan.originYuan > 0 ? plan.originYuan : price
+  const comboGroups = comboGroupsFromPlan(plan)
+
+  return {
+    out_id: newOutId(),
+    category_id: '',
+    product_type: productType,
+    product_name: name.slice(0, 40),
+    product_desc: composeProductDescWithRules(plan.description || name).trim() || undefined,
+    price_yuan: price,
+    origin_price_yuan: origin,
+    head_image_urls: head && /^https?:\/\//i.test(head) ? [head] : [],
+    aux_image_urls: [],
+    env_image_urls: [],
+    poi_ids: [],
+    package_combo:
+      productType === 1
+        ? packageComboFromFormGroups(comboGroups, { productName: name, priceYuan: price })
+        : undefined,
+    sales_info: { ...DEFAULT_SALES_INFO },
+    trade_rules: { ...DEFAULT_TRADE_RULES },
+    consume_rules: { ...DEFAULT_CONSUME_RULES },
+  }
+}
+
+function saveLocalProductDraft(
+  plan: AiProductPlanPreview,
+  platform: CreatePlatformId,
+  platformLabel: string,
+): AiProductSubmitItemResult {
+  const label = plan.slotLabel ?? plan.productName
+  const detail = buildLocalDraftDetail(plan)
+  if (!detail) {
+    return {
+      planLabel: label,
+      platform,
+      ok: false,
+      message: '方案信息不完整（名称/售价），请核对预览后重试。',
+    }
+  }
+  const intel = loadMerchantIntelSnapshot()
+  const storeLabel = intel.storeName?.trim() || '—'
+  const draftId = newOutId()
+  upsertProductEditLibraryDraft({
+    id: draftId,
+    name: detail.product_name,
+    platform: platformLabel,
+    store: storeLabel,
+    status: '草稿',
+    price: detail.price_yuan,
+    platformApi: platform,
+  })
+  saveDraftDetailSnapshot(draftId, { ...detail, product_id: draftId })
+  return {
+    planLabel: label,
+    platform,
+    ok: true,
+    productId: draftId,
+    message: '已保存至商品列表草稿箱，请在编辑页选择类目与门店后提交审核',
+  }
+}
+
 function storeLabelFromIntel(poiCount: number): string {
   const intel = loadMerchantIntelSnapshot()
   const name = intel.storeName?.trim()
@@ -150,6 +247,9 @@ async function submitDouyinPlan(
   plan: AiProductPlanPreview,
   mode: 'draft' | 'submit',
 ): Promise<AiProductSubmitItemResult> {
+  if (mode === 'draft') {
+    return saveLocalProductDraft(plan, 'douyin', '抖音来客')
+  }
   const label = plan.slotLabel ?? plan.productName
   const lastCtx = loadDouyinWizardLastContext()
   if (!lastCtx?.cat3 || lastCtx.productType == null) {
@@ -220,6 +320,9 @@ async function submitKuaishouPlan(
   plan: AiProductPlanPreview,
   mode: 'draft' | 'submit',
 ): Promise<AiProductSubmitItemResult> {
+  if (mode === 'draft') {
+    return saveLocalProductDraft(plan, 'kuaishou', '快手团购')
+  }
   const label = plan.slotLabel ?? plan.productName
   const lastCtx = loadDouyinWizardLastContext()
   if (!lastCtx?.cat3 || lastCtx.productType == null) {
@@ -328,7 +431,7 @@ export function formatAiProductSubmitSummary(results: AiProductSubmitItemResult[
   return parts.join('\n')
 }
 
-/** 批量提交 AI 商品方案至所选平台（提交审核 + 本地草稿箱同步） */
+/** 批量将 AI 商品方案写入本地草稿箱（mode=draft）或提交平台审核（mode=submit） */
 export async function submitAiProductPlansToPlatforms(
   plans: AiProductPlanPreview[],
   platforms: CreatePlatformId[],

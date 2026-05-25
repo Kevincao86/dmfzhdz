@@ -22,7 +22,6 @@ export function AiAgentPreviewActions({
     previewSubmitPlatforms,
     togglePreviewSubmitPlatform,
     confirmPendingTask,
-    savePendingTaskToDrafts,
     modifyPendingTask,
     cancelPendingTask,
     isPreviewLoading,
@@ -40,7 +39,7 @@ export function AiAgentPreviewActions({
       ? '正在生成预览…'
       : confirming
         ? taskType === 'create_product'
-          ? '正在提交审核…'
+          ? '正在保存至草稿箱…'
           : '正在生成订单…'
         : aiTaskConfirmLabel(taskType))
 
@@ -50,7 +49,9 @@ export function AiAgentPreviewActions({
     <div className="mt-3 space-y-3 border-t border-violet-100 pt-3">
       {showProductPlatforms ? (
         <div>
-          <p className="mb-2 text-[11px] font-medium text-slate-600">提交至平台（可多选）</p>
+          <p className="mb-2 text-[11px] font-medium text-slate-600">
+            草稿归属平台（可多选，保存后请在商品列表选择类目提交）
+          </p>
           <div className="flex flex-wrap gap-2">
             {selectablePlatforms.map((p) => {
               const checked = previewSubmitPlatforms.includes(p.id as CreatePlatformId)
@@ -81,19 +82,6 @@ export function AiAgentPreviewActions({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
-        {showProductPlatforms ? (
-          <button
-            type="button"
-            onClick={() => savePendingTaskToDrafts(previewMessageId)}
-            disabled={confirmDisabled}
-            className={cn(
-              'rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-medium text-indigo-900 hover:bg-indigo-100',
-              confirmDisabled && 'cursor-not-allowed opacity-50',
-            )}
-          >
-            批量保存至草稿箱
-          </button>
-        ) : null}
         <button
           type="button"
           onClick={() => confirmPendingTask(previewMessageId)}
