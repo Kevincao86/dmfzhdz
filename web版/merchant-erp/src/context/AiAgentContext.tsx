@@ -374,6 +374,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     taskTypes: AiTaskType[]
   }
   const pendingExecutionRef = useRef<PendingExecutionCtx | null>(null)
+  /** 商品预览确认后，再进入达人招募 Brief 预览 */
+  const pendingRecruitmentStageRef = useRef<{
+    userBrief: string
+    assistantContent: string
+  } | null>(null)
   const awaitingProductImagesRef = useRef(false)
 
   const [previewSubmitPlatforms, setPreviewSubmitPlatforms] = useState<CreatePlatformId[]>([
@@ -551,6 +556,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     messagesRef.current = fresh
     setPendingPreviewId(null)
     pendingExecutionRef.current = null
+    pendingRecruitmentStageRef.current = null
     awaitingProductImagesRef.current = false
     setPreviewSubmitPlatforms(['douyin'])
     setInputDraft('')
@@ -842,16 +848,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (
       userBrief: string,
       pageLabel?: string,
-      opts?: { assistantContent?: string; includeRecruitment?: boolean },
+      opts?: { assistantContent?: string },
     ) => {
       const intents = parseCreateProductIntentsFromPlan(userBrief, opts?.assistantContent)
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
         intents.length > 1
-          ? `检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将一次性生成全部 C 端预览，您可批量保存草稿或勾选平台提交审核。`
-          : opts?.includeRecruitment
-            ? `将根据方案生成商品 C 端预览与达人招募 Brief。${intelLine}，请核对后批量保存或提交至所选平台。`
-            : `检测到您希望创建/上架商品。${intelLine}，将生成团购方案与 C 端预览；确认后可保存草稿或提交审核。`
+          ? `检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将一次性生成全部 C 端预览，请逐项核对后确认。`
+          : `检测到您希望创建/上架商品。${intelLine}，将生成团购方案与 C 端预览；确认后可保存草稿或提交审核。`
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
       const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
@@ -881,17 +885,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             enrichStatus: 'loading',
             ...(voucher.origin != null ? { originYuan: voucher.origin } : {}),
           },
-          ...(opts?.includeRecruitment
-            ? {
-                recruitmentBrief: {
-                  platform: '抖音来客',
-                  mainProductName: briefProductNameHint(userBrief),
-                  tags: [],
-                  briefText: '',
-                  enrichStatus: 'loading' as const,
-                },
-              }
-            : {}),
         },
       })
       setPendingPreviewId(msg.id)
@@ -902,11 +895,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
       void attachProductPlanToPreview(msg.id, userBrief, opts?.assistantContent)
-      if (opts?.includeRecruitment) {
-        void attachRecruitmentBriefToPreview(msg.id, userBrief, opts?.assistantContent)
-      }
     },
-    [attachProductPlanToPreview, attachRecruitmentBriefToPreview],
+    [attachProductPlanToPreview],
   )
 
   const pushRecruitInfluencerPreview = useCallback(
@@ -1021,10 +1011,16 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         : ctx.userBrief
       const hasProduct = ctx.taskTypes.includes('create_product')
       const hasRecruit = ctx.taskTypes.includes('recruit_influencer')
+      pendingRecruitmentStageRef.current = null
       if (hasProduct) {
+        if (hasRecruit) {
+          pendingRecruitmentStageRef.current = {
+            userBrief: combinedBrief,
+            assistantContent: ctx.assistantContent,
+          }
+        }
         pushCreateProductPreview(combinedBrief, pageLabel, {
           assistantContent: ctx.assistantContent,
-          includeRecruitment: hasRecruit,
         })
       } else if (hasRecruit) {
         pushRecruitInfluencerPreview(combinedBrief, pageLabel, ctx.assistantContent)
@@ -1557,59 +1553,23 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setPendingPreviewId(null)
       setDrawerOpen(false)
 
-      const combinedRecruitBrief = p.recruitmentBrief
-      if (combinedRecruitBrief?.briefText?.trim() && combinedRecruitBrief.enrichStatus === 'ready') {
-        void (async () => {
-          try {
-            const userBrief =
-              lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
-              combinedRecruitBrief.briefText.slice(0, 200)
-            const recordId =
-              typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                ? crypto.randomUUID()
-                : `brief-${Date.now()}`
-            appendKolBriefRecord({
-              id: recordId,
-              createdAt: new Date().toISOString(),
-              platform: combinedRecruitBrief.platform,
-              mainProductName: combinedRecruitBrief.mainProductName,
-              tags: combinedRecruitBrief.tags,
-              previews: combinedRecruitBrief.previews ?? [
-                combinedRecruitBrief.briefText,
-                combinedRecruitBrief.briefText,
-                combinedRecruitBrief.briefText,
-              ],
-            })
-            writeSelectedBriefForRecruitment({
-              recordId,
-              variantIndex: 0,
-              text: combinedRecruitBrief.briefText,
-              platform: combinedRecruitBrief.platform,
-              mainProductName: combinedRecruitBrief.mainProductName,
-              tags: combinedRecruitBrief.tags,
-            })
-            const { intent, allocation } = await buildAgentRecruitmentAllocation(
-              userBrief,
-              combinedRecruitBrief,
-            )
-            const tenantMeta = await resolveRecruitmentOrderTenantMeta(
-              supabaseConfigured ? supabase : null,
-            )
-            const order = buildRecruitmentOrderFromAgentBrief(combinedRecruitBrief, tenantMeta, {
-              intent,
-              allocation,
-              userBrief,
-            })
-            await appendRecruitmentOrderToOps(order)
-          } catch {
-            /* 商品已确认；招募订单失败可在招募页补提 */
-          }
-        })()
-      }
+      const recruitStage = pendingRecruitmentStageRef.current
+      pendingRecruitmentStageRef.current = null
 
       navigate('/products/create', {
         state: { platforms: submitPlatforms, autoSubmit: canAutoSubmit },
       })
+
+      if (recruitStage) {
+        appendAssistantLine(
+          '商品方案已确认。接下来将单独生成达人招募 Brief 预览，请核对三版文案后再确认下达招募订单。',
+        )
+        pushRecruitInfluencerPreview(
+          recruitStage.userBrief,
+          pageContext?.pageLabel,
+          recruitStage.assistantContent,
+        )
+      }
       return
     }
 
@@ -1782,10 +1742,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       return next
     })
     setPendingPreviewId(null)
-  }, [pendingPreviewId, navigate, previewSubmitPlatforms])
+  }, [pendingPreviewId, navigate, previewSubmitPlatforms, appendAssistantLine, pushRecruitInfluencerPreview, pageContext?.pageLabel])
 
   const cancelPendingTask = useCallback(() => {
     if (!pendingPreviewId) return
+    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
+    if (pending?.preview?.taskType === 'create_product') {
+      pendingRecruitmentStageRef.current = null
+    }
     setMessages((prev) => {
       const next = [...prev, createAgentMessage('system', '已取消本次待执行操作。')]
       messagesRef.current = next
@@ -1904,10 +1868,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const m = messages.find((x) => x.id === pendingPreviewId)
     const p = m?.preview
     if (!p) return false
-    if (p.taskType === 'create_product') {
-      const productLoading = isProductPreviewLoading(p)
-      const recruitLoading = p.recruitmentBrief?.enrichStatus === 'loading'
-      return productLoading || recruitLoading
+    if (p?.taskType === 'create_product') {
+      return isProductPreviewLoading(p)
     }
     if (p.taskType === 'recruit_influencer') return p.recruitmentBrief?.enrichStatus === 'loading'
     if (p.taskType === 'file_tax') return p.taxFiling?.enrichStatus === 'loading'

@@ -57,6 +57,13 @@ export function parseAgentActionType(content: string): AiTaskType | undefined {
   return ACTION_TO_TASK[at]
 }
 
+/** 助手 JSON 是否要求用户先确认方案再进入执行预览 */
+export function parseAgentConfirmRequired(content: string): boolean {
+  const j = tryParseJsonObject(content)
+  if (!j) return false
+  return j.confirmRequired === true || j.confirm_required === true
+}
+
 export function parseAgentPreviewTitle(content: string): string | undefined {
   const j = tryParseJsonObject(content)
   if (!j) return undefined
@@ -338,18 +345,46 @@ export function inferTaskTypesFromCombinedContext(
 
 /** 方案设计完成后追加的执行确认引导语 */
 export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string {
-  const parts: string[] = []
-  if (taskTypes.includes('create_product')) parts.push('商品/套餐创建')
-  if (taskTypes.includes('recruit_influencer')) parts.push('达人招募')
-  if (!parts.length) return ''
-  return `\n\n——\n\n若需要我按上述方案执行${parts.join('与')}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
+  const hasProduct = taskTypes.includes('create_product')
+  const hasRecruit = taskTypes.includes('recruit_influencer')
+  if (!hasProduct && !hasRecruit) return ''
+  if (hasProduct && hasRecruit) {
+    return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n执行将分步进行：先展示全部商品/套餐 C 端预览供您确认；确认 OK 后再单独展示达人招募 Brief 预览；Brief 确认后才会下达招募订单。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
+  }
+  const only = hasProduct ? '商品/套餐创建' : '达人招募'
+  return `\n\n——\n\n若需要我按上述方案执行${only}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
 }
 
 const PLAN_SLOT_PATTERNS: RegExp[] = [
   /套餐[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
   /组品[方案\s]*[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
-  /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*([^\n：:]{2,36}(?:套装|组合|套餐|方案))/gm,
+  /(?:^|\n)\s*(?:方案|套餐)[一二三四五六1-6ABCD][：:\s、]*([^\n#*]{2,48})/gm,
+  /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*([^\n：:]{2,36}(?:套装|组合|套餐|方案|组品))/gm,
 ]
+
+const CN_PLAN_COUNT: Record<string, number> = {
+  一: 1,
+  二: 2,
+  两: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+}
+
+function parsePlanCountFromText(text: string): number | undefined {
+  const digitM = text.match(/(\d+)\s*(?:个|套)?(?:组品|套餐|商品|方案|团购)/)
+  if (digitM) {
+    const n = Number.parseInt(digitM[1], 10)
+    if (Number.isFinite(n) && n >= 2) return Math.min(6, n)
+  }
+  const cnM = text.match(/([一二两三四五六])\s*(?:个|套)?(?:组品|套餐|商品|方案|团购)/)
+  if (cnM) {
+    const n = CN_PLAN_COUNT[cnM[1]]
+    if (n && n >= 2) return Math.min(6, n)
+  }
+  return undefined
+}
 
 
 function userSpecifiedConcreteProducts(userBrief: string): boolean {
@@ -365,11 +400,7 @@ function createProductIntentsFromStoreMenu(
   _assistantContent: string | undefined,
   full: string,
 ): CreateProductIntent[] | null {
-  let planCount: number | undefined
-  const countM = full.match(/(\d+)\s*个(?:组品|套餐|商品|方案|团购)/)
-  if (countM) {
-    planCount = Math.min(6, Math.max(2, Number.parseInt(countM[1], 10) || 2))
-  }
+  let planCount: number | undefined = parsePlanCountFromText(full)
   if (!planCount) {
     if (!/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) return null
     planCount = 2
@@ -432,21 +463,21 @@ export function parseCreateProductIntentsFromPlan(
   if (slots.length > 0) return slots.slice(0, 6)
   if (fromUser.length > 1 || (fromUser.length === 1 && fromUser[0].key !== 'main')) return fromUser
 
-  const countM = assistantContent.match(/(\d+)\s*个(?:组品|套餐|商品|方案)/)
-  if (countM) {
-    const n = Math.min(6, Math.max(2, Number.parseInt(countM[1], 10) || 0))
-    if (n > 1) {
-      if (!userSpecifiedConcreteProducts(userBrief)) {
-        const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
-        if (fromMenu?.length) return fromMenu
-      }
-      return Array.from({ length: n }, (_, i) => ({
-        key: `plan-${i + 1}`,
-        label: `方案 ${i + 1}`,
-        brief: planIntentBrief(full, `第 ${i + 1} 个团购方案（共 ${n} 个，须相互区分售价与内容）`),
-        productType: 1,
-      }))
+  const planCount = parsePlanCountFromText(full)
+  if (planCount && planCount > 1) {
+    if (!userSpecifiedConcreteProducts(userBrief)) {
+      const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
+      if (fromMenu?.length) return fromMenu
     }
+    return Array.from({ length: planCount }, (_, i) => ({
+      key: `plan-${i + 1}`,
+      label: `方案 ${i + 1}`,
+      brief: planIntentBrief(
+        full,
+        `第 ${i + 1} 个团购方案（共 ${planCount} 个，须相互区分售价与内容）`,
+      ),
+      productType: 1,
+    }))
   }
   if (!userSpecifiedConcreteProducts(userBrief)) {
     const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
@@ -461,6 +492,7 @@ export function shouldDeferTaskPreview(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
+  if (assistantContent && parseAgentConfirmRequired(assistantContent)) return true
   if (parseAgentActionType(assistantContent ?? '')) return false
   if (isExplicitExecutionIntent(userText)) return false
   if (explicitTaskType && !isPlanDesignQuery(userText)) return false
