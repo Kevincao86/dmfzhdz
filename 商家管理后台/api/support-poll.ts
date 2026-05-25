@@ -2,7 +2,7 @@
  * 运营台轮询 Supabase 客服消息（service_role，仅服务端 Edge）。
  * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
  */
-import { notifySupportMerchantMessageFeishu } from './supportFeishuNotify.js'
+import { sendSupportMerchantMessageFeishu } from './supportFeishuNotify.js'
 
 export const config = { runtime: 'edge' }
 
@@ -55,7 +55,7 @@ async function claimSupportFeishuNotify(
     if (!r.ok) {
       const detail = await r.text()
       if (/feishu_notified_at|42703|column|PGRST204/i.test(detail)) return 'unavailable'
-      return 'already'
+      return 'unavailable'
     }
     const updated = (await r.json()) as unknown[]
     return Array.isArray(updated) && updated.length > 0 ? 'claimed' : 'already'
@@ -75,7 +75,7 @@ async function notifyNewMerchantSupportMessages(
     if (!text) continue
     const claim = await claimSupportFeishuNotify(supabaseUrl, serviceRole, row)
     if (claim === 'already') continue
-    notifySupportMerchantMessageFeishu({
+    await sendSupportMerchantMessageFeishu({
       sessionId: row.session_id,
       enterpriseName: row.enterprise_name ?? undefined,
       customerId: row.customer_id ?? undefined,
@@ -145,7 +145,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (incremental && rows.length > 0) {
-      void notifyNewMerchantSupportMessages(supabaseUrl, serviceRole, rows)
+      await notifyNewMerchantSupportMessages(supabaseUrl, serviceRole, rows)
     }
 
     const messages = rows.map((row) => ({

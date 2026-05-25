@@ -2,13 +2,21 @@
  * Edge 兼容的客服飞书通知（供 support-poll 等 Edge API 使用，勿引入 node:crypto）。
  */
 
+export type SupportFeishuNotifyResult = {
+  ok: boolean
+  skipped?: boolean
+  error?: string
+}
+
 function notifyEnabled(): boolean {
   const v = (process.env.MEOO_FEISHU_NOTIFY_ENABLED ?? '1').trim().toLowerCase()
   return v !== '0' && v !== 'false' && v !== 'off'
 }
 
 function webhookUrl(): string {
-  return (process.env.MEOO_FEISHU_WEBHOOK_SUPPORT ?? process.env.MEOO_FEISHU_WEBHOOK_URL ?? '').trim()
+  const support = (process.env.MEOO_FEISHU_WEBHOOK_SUPPORT ?? '').trim()
+  if (support) return support
+  return (process.env.MEOO_FEISHU_WEBHOOK_URL ?? '').trim()
 }
 
 async function feishuSign(timestamp: number, secret: string): Promise<string> {
@@ -35,36 +43,52 @@ async function buildFeishuBody(text: string): Promise<Record<string, unknown>> {
   return { timestamp: String(timestamp), sign, msg_type: 'text', content }
 }
 
-export function notifySupportMerchantMessageFeishu(payload: {
+export async function sendSupportMerchantMessageFeishu(payload: {
   sessionId: string
   enterpriseName?: string
   customerId?: string
   text: string
   ts?: number
-}): void {
-  void (async () => {
-    if (!notifyEnabled()) return
-    const url = webhookUrl()
-    if (!url) return
-    const preview = payload.text.trim().slice(0, 400)
-    const when = payload.ts
-      ? new Date(payload.ts).toLocaleString('zh-CN', { hour12: false })
-      : new Date().toLocaleString('zh-CN', { hour12: false })
-    const message = [
-      '【在线客服 · 商户新消息】',
-      `企业：${payload.enterpriseName?.trim() || '—'}`,
-      `客户 ID：${payload.customerId?.trim() || '—'}`,
-      `会话：${payload.sessionId}`,
-      `内容：${preview}${payload.text.length > 400 ? '…' : ''}`,
-      `时间：${when}`,
-    ].join('\n')
+}): Promise<SupportFeishuNotifyResult> {
+  if (!notifyEnabled()) return { ok: true, skipped: true }
+  const url = webhookUrl()
+  if (!url) return { ok: true, skipped: true, error: 'webhook_not_configured' }
+
+  const preview = payload.text.trim().slice(0, 400)
+  const when = payload.ts
+    ? new Date(payload.ts).toLocaleString('zh-CN', { hour12: false })
+    : new Date().toLocaleString('zh-CN', { hour12: false })
+  const message = [
+    '【在线客服 · 商户新消息】',
+    `企业：${payload.enterpriseName?.trim() || '—'}`,
+    `客户 ID：${payload.customerId?.trim() || '—'}`,
+    `会话：${payload.sessionId}`,
+    `内容：${preview}${payload.text.length > 400 ? '…' : ''}`,
+    `时间：${when}`,
+  ].join('\n')
+
+  try {
     const body = await buildFeishuBody(message)
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(body),
     })
-  })().catch(() => {
-    /* 通知失败不影响轮询 */
-  })
+    const raw = await res.text()
+    if (!res.ok) {
+      return { ok: false, error: raw.slice(0, 300) || `HTTP ${res.status}` }
+    }
+    let parsed: { code?: number; msg?: string } = {}
+    try {
+      parsed = JSON.parse(raw) as typeof parsed
+    } catch {
+      /* ignore */
+    }
+    if (parsed.code != null && parsed.code !== 0) {
+      return { ok: false, error: parsed.msg ?? raw.slice(0, 200) }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
 }
