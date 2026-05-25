@@ -29,6 +29,7 @@ import {
   coerceAgentDisplayError,
   coerceAgentTextField,
   formatAssistantDisplayText,
+  hasCombinedProductAndRecruitPlan,
   inferTaskTypeFromText,
   inferTaskTypesFromCombinedContext,
   isExplicitExecutionIntent,
@@ -638,6 +639,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setMessages((prev) => {
         const next = prev.map((m) => {
           if (m.id !== previewMsgId || !m.preview) return m
+          if (m.preview.taskType !== 'recruit_influencer') return m
           const cur = m.preview.recruitmentBrief
           return {
             ...m,
@@ -805,8 +807,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         previewMsgId,
         enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),
         intents.length > 1
-          ? `已为 ${readyCount} 个商品生成 C 端预览。${hasUserRefs ? '主图已基于您上传的参考图优化。' : ''}请逐项核对手机效果，确认后将依次预填创建页。`
-          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的菜品图' : ''}）。请核对手机预览效果，确认后将自动提交抖音来客审核。`,
+          ? `已为 ${readyCount} 个商品生成 C 端预览。${hasUserRefs ? '主图已基于您上传的参考图优化。' : ''}请逐项核对手机效果；全部确认 OK 后才会进入达人招募 Brief（本步仅商品）。`
+          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的菜品图' : ''}）。请核对手机预览；确认后将提交审核，若有招募需求将在商品确认后再单独展示 Brief。`,
       )
     },
     [patchPreviewProductPlans, modelPickerKey],
@@ -814,6 +816,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const attachRecruitmentBriefToPreview = useCallback(
     async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
+      const target = messagesRef.current.find((m) => m.id === previewMsgId)
+      if (target?.preview?.taskType !== 'recruit_influencer') return
       patchPreviewRecruitmentBrief(
         previewMsgId,
         { enrichStatus: 'loading' },
@@ -855,8 +859,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
         intents.length > 1
-          ? `检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将一次性生成全部 C 端预览，请逐项核对后确认。`
-          : `检测到您希望创建/上架商品。${intelLine}，将生成团购方案与 C 端预览；确认后可保存草稿或提交审核。`
+          ? `【第 1 步 · 仅商品预览】检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将生成全部 C 端预览供您逐项确认；本步不含达人招募内容，商品全部确认后再进入招募 Brief。`
+          : `【第 1 步 · 仅商品预览】将生成团购 C 端预览供您核对；本步不含达人/Brief/招募内容，确认后再单独进入达人招募预览。${intelLine ? ` ${intelLine}` : ''}`
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
       const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
@@ -904,7 +908,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (userBrief: string, pageLabel?: string, assistantContent?: string) => {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
-        `检测到您希望招募达人。${intelLine}，将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief，并在下方展示可核对的三版文案。`
+        `【第 2 步 · 达人招募 Brief】${intelLine ? `${intelLine}，` : ''}将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief（三版文案），确认后将展示招募订单明细。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
@@ -1086,6 +1090,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const scheduleTaskPreview = useCallback(
     (trimmed: string, assistantContent: string | undefined, explicitTaskType: AiTaskType | undefined, pageLabel?: string) => {
       if (shouldDeferTaskPreview(trimmed, assistantContent, explicitTaskType)) return
+      if (hasCombinedProductAndRecruitPlan(trimmed, assistantContent)) return
 
       const taskType =
         explicitTaskType ??
@@ -1712,6 +1717,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const modifyPendingTask = useCallback(() => {
     if (!pendingPreviewId) return
+    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
+    if (pending?.preview?.taskType === 'create_product') {
+      pendingRecruitmentStageRef.current = null
+    }
     setMessages((prev) => {
       const next = [
         ...prev,
