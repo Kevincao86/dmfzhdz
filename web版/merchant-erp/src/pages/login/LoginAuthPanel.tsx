@@ -142,7 +142,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         const hint =
           r.message ??
           (r.error === 'supabase_admin_not_configured'
-            ? '登录服务未配置 SUPABASE_SERVICE_ROLE_KEY，请联系管理员'
+            ? '登录服务未完全配置，请联系管理员'
             : '验证码登录失败')
         onErr(import.meta.env.DEV && r.detail ? `${hint}（${r.detail.slice(0, 80)}）` : hint)
         return
@@ -335,7 +335,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
           <div className="min-w-0 text-left">
             <p className="text-sm font-semibold text-slate-800">安全可信</p>
             <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-              短信由阿里云发送，会话经 Supabase Auth 加密存储。
+              短信由阿里云发送，登录会话经加密存储，保障账号安全。
             </p>
           </div>
         </div>

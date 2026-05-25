@@ -828,7 +828,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         enriched.map((p, i) => ({ ...p, slotKey: intents[i].key, slotLabel: intents[i].label })),
         intents.length > 1
           ? `已为 ${readyCount} 个商品生成 C 端预览。${hasUserRefs ? '主图已基于您上传的参考图优化。' : ''}请逐项核对手机效果；全部确认 OK 后才会进入达人招募 Brief（本步仅商品）。`
-          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的菜品图' : ''}）。请核对手机预览；确认后将提交审核，若有招募需求将在商品确认后再单独展示 Brief。`,
+          : `已生成 C 端团购预览（含 AI 优化标题与主图${hasUserRefs ? '，主图参考您上传的菜品图' : ''}）。请核对手机预览；确认后将保存至商品列表草稿箱，请在商品编辑页选择类目与门店后提交审核。`,
       )
     },
     [patchPreviewProductPlans, modelPickerKey],
@@ -844,7 +844,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         '正在生成达人探店图文 Brief（3 个版本）…',
       )
       try {
-        const brief = await buildAiRecruitmentBriefPreview(userBrief, assistantContent)
+        const brief = await Promise.race([
+          buildAiRecruitmentBriefPreview(userBrief, assistantContent),
+          new Promise<never>((_, reject) =>
+            window.setTimeout(
+              () => reject(new Error('Brief 生成超时（120s）')),
+              120_000,
+            ),
+          ),
+        ])
         patchPreviewRecruitmentBrief(
           previewMsgId,
           brief,
@@ -880,7 +888,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const intro =
         intents.length > 1
           ? `【创建商品 · 独立预览】检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将生成全部 C 端预览；请在本卡片确认，与其它场景任务互不影响。`
-          : `【创建商品 · 独立预览】将生成团购 C 端预览供您核对。${intelLine ? ` ${intelLine}` : ''}请在本卡片确认后提交。`
+          : `【创建商品 · 独立预览】将生成团购 C 端预览供您核对。${intelLine ? ` ${intelLine}` : ''}请在本卡片确认后保存至草稿箱。`
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
       const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
@@ -1533,7 +1541,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           setConfirmingPreviewId(previewMessageId)
           setTaskConfirming(true)
           try {
-            const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'submit')
+            const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'draft')
             const okCount = results.filter((r) => r.ok).length
             const failCount = results.length - okCount
             const summary = formatAiProductSubmitSummary(results)
@@ -1545,8 +1553,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 createAgentMessage(
                   'task_result',
                   okCount > 0
-                    ? `「${title}」已确认。共 ${okCount} 项已提交平台审核并写入商品列表「本地草稿」。\n${summary}`
-                    : `「${title}」提交失败。\n${summary}`,
+                    ? `「${title}」已确认。共 ${okCount} 项已保存至商品列表草稿箱，请在编辑页选择类目与门店后提交审核。\n${summary}`
+                    : `「${title}」保存草稿失败。\n${summary}`,
                   { resultSummary },
                 ),
               ]

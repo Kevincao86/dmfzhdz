@@ -69,12 +69,9 @@ export default function LoginPage() {
   if (!supabaseConfigured) {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#f5f7fb] px-6 py-8 text-center">
-        <h1 className="text-lg font-semibold text-slate-800">未配置 Supabase</h1>
+        <h1 className="text-lg font-semibold text-slate-800">登录服务未配置</h1>
         <p className="max-w-md text-sm leading-relaxed text-slate-500">
-          请在 <code className="rounded bg-white px-1.5 py-0.5 text-cyan-700 shadow-sm">web版/merchant-erp/.env.local</code>{' '}
-          中填写 <code className="text-cyan-700">VITE_SUPABASE_URL</code> 与{' '}
-          <code className="text-cyan-700">VITE_SUPABASE_ANON_KEY</code>，保存后重启{' '}
-          <code className="text-cyan-700">npm run dev</code>。
+          当前环境缺少商户登录所需配置，请联系管理员或在部署环境中补全相关环境变量后重启服务。
         </p>
       </div>
     )
