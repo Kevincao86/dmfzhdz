@@ -4,6 +4,7 @@ import { buildMenuComboIntentLabels } from './merchantBriefCatalog'
 
 const ACTION_TO_TASK: Record<string, AiTaskType> = {
   create_product: 'create_product',
+  create_product_batch: 'create_product',
   recruit_influencer: 'recruit_influencer',
   handle_review: 'handle_review',
   sync_platform: 'sync_platform',
@@ -349,7 +350,7 @@ export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string 
   const hasRecruit = taskTypes.includes('recruit_influencer')
   if (!hasProduct && !hasRecruit) return ''
   if (hasProduct && hasRecruit) {
-    return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n执行将**严格分两步**：① 先仅展示全部商品/套餐 C 端预览（本步不出现任何达人/Brief/招募内容），您确认全部商品 OK 后；② 再单独展示达人招募 Brief 预览；Brief 确认后才会下达招募订单。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
+    return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n将为涉及的**每一项场景**（如创建商品、达人招募等）**分别生成独立预览卡片**，您可在各卡片内单独确认、修改或取消；确认后我将调用对应接口并返回结果。\n如有商品图可在下一条消息上传；若无图片，回复「自动生成」即可。\n您也可以直接说明需要调整的部分。`
   }
   const only = hasProduct ? '商品/套餐创建' : '达人招募'
   return `\n\n——\n\n若需要我按上述方案执行${only}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
@@ -422,11 +423,157 @@ function planIntentBrief(full: string, focus: string): string {
   return `${full}\n\n【仅生成以下一项】${focus}。不要与其它餐型或代金券合并；须输出完整团购标题、售价、套餐项与说明。`
 }
 
+const META_PRODUCT_STEP_RE =
+  /自动计算|校验各商品|毛利率.*预设|标红预警|权限|requiredPermissions/i
+
+function parsePriceYuanFromText(text: string): number | undefined {
+  const m = text.match(/[¥￥]\s*(\d+(?:\.\d+)?)/)
+  if (!m) return undefined
+  const n = Number.parseFloat(m[1])
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+function inferProductTypeFromLabel(label: string, priceYuan?: number): number {
+  if (/代金券|团购券|优惠券|服务券|福利券|代\s*\d+/.test(label)) return 2
+  if (priceYuan != null && priceYuan <= 50 && /券|福利|贴膜|清洁服务/.test(label)) return 2
+  return 1
+}
+
+/** 从助手 JSON action 的 steps / details 拆出多个商品意图 */
+function parseCreateProductIntentsFromAgentJson(
+  assistantContent: string,
+  userBrief: string,
+): CreateProductIntent[] | null {
+  const j = tryParseJsonObject(assistantContent)
+  if (!j) return null
+  const at = String(j.actionType ?? j.action_type ?? '').trim()
+  if (at !== 'create_product' && at !== 'create_product_batch') return null
+
+  const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
+  const intents: CreateProductIntent[] = []
+  const seen = new Set<string>()
+
+  const pushIntent = (label: string, priceYuan?: number, productType?: number) => {
+    const clean = label.replace(/\*\*/g, '').trim().slice(0, 48)
+    if (clean.length < 2 || seen.has(clean)) return
+    seen.add(clean)
+    const pt = productType ?? inferProductTypeFromLabel(clean, priceYuan)
+    intents.push({
+      key: clean,
+      label: clean,
+      brief: planIntentBrief(
+        full,
+        `${pt === 2 ? '代金券/福利券' : '团购套餐'}「${clean}」${priceYuan != null ? `，售价约 ¥${priceYuan}` : ''}`,
+      ),
+      productType: pt,
+    })
+  }
+
+  const parseCreateStep = (step: string): void => {
+    const s = step.trim()
+    if (!/^创建/.test(s)) return
+    if (META_PRODUCT_STEP_RE.test(s) && !/[¥￥]\d/.test(s)) return
+
+    const priceYuan = parsePriceYuanFromText(s)
+    const tagged = s.match(/的\s*[「【]([^」】]+)[」】]\s*(.+)$/)
+    if (tagged) {
+      const label = `【${tagged[1].trim()}】${tagged[2].replace(/套餐$/u, '').trim()}`.trim()
+      pushIntent(label, priceYuan)
+      return
+    }
+
+    const afterPrice = s.match(/(?:售价)?[¥￥]?\s*\d+(?:\.\d+)?\s*(?:元)?的?\s*(.+)$/)
+    if (afterPrice) {
+      pushIntent(afterPrice[1].replace(/套餐$/u, '').trim(), priceYuan)
+      return
+    }
+
+    const plain = s.match(/^创建(?:一个|一款)?(.{4,60})$/)
+    if (plain) pushIntent(plain[1].trim(), priceYuan)
+  }
+
+  const parseDetailLine = (line: unknown): void => {
+    if (line == null) return
+    if (typeof line === 'object' && !Array.isArray(line)) {
+      const r = line as Record<string, unknown>
+      const name = String(r.name ?? r.title ?? r.productName ?? r.label ?? '').trim()
+      const priceYuan =
+        parsePriceYuanFromApi(r.price ?? r.suggestedPriceYuan ?? r.priceYuan) ??
+        parsePriceYuanFromText(String(r.summary ?? ''))
+      if (name) pushIntent(name, priceYuan)
+      return
+    }
+    const s = String(line).trim()
+    if (!s) return
+    const priceYuan = parsePriceYuanFromText(s)
+    const pipe = s.match(/[：:]\s*\[?([^\]|]+)\]?\s*(?:[¥￥]\s*\d+(?:\.\d+)?)?\s*[|｜]\s*(.+)/)
+    if (pipe) {
+      const tag = pipe[1].trim()
+      const body = pipe[2].trim()
+      pushIntent(tag.startsWith('【') ? `${tag} ${body}` : `【${tag}】${body}`, priceYuan)
+      return
+    }
+    const bracket = s.match(/\[([^\]]+)\]\s*(.+)/)
+    if (bracket) {
+      pushIntent(`【${bracket[1].trim()}】${bracket[2].trim()}`, priceYuan)
+      return
+    }
+    parseCreateStep(s)
+  }
+
+  const details = j.details
+  if (Array.isArray(details)) {
+    for (const row of details) parseDetailLine(row)
+  }
+
+  if (intents.length === 0) {
+    const steps = j.steps
+    if (Array.isArray(steps)) {
+      for (const step of steps) {
+        if (typeof step === 'string') parseCreateStep(step)
+      }
+    }
+  }
+
+  return intents.length > 0 ? intents.slice(0, 6) : null
+}
+
+/** 商品创建步骤结束后引导用户选择下一步 */
+export function buildProductTaskFollowUpPrompt(opts: {
+  okCount: number
+  failCount: number
+  hadRecruitInPlan?: boolean
+}): string {
+  const lines: string[] = []
+  if (opts.okCount > 0 && opts.failCount === 0) {
+    lines.push('商品创建步骤已完成。')
+  } else if (opts.okCount > 0) {
+    lines.push(`商品创建步骤已结束：${opts.okCount} 项已写入草稿，${opts.failCount} 项未成功。`)
+  } else {
+    lines.push('商品创建步骤已结束，本次未能写入草稿（常见原因：创建商品页尚未保存类目与门店）。')
+  }
+  lines.push('')
+  lines.push('接下来您希望我帮您做什么？可直接回复，例如：')
+  if (opts.hadRecruitInPlan) {
+    lines.push('· 「帮我安排达人招募」—— 生成达人探店 Brief 预览')
+  } else {
+    lines.push('· 「帮我安排达人招募」—— 若需达人种草/探店')
+  }
+  lines.push('· 说明要调整的商品方案或重新生成预览')
+  lines.push('· 继续其它推广/运营任务')
+  return lines.join('\n')
+}
+
 /** 结合助手方案中的套餐/组品条目拆出多个上架意图 */
 export function parseCreateProductIntentsFromPlan(
   userBrief: string,
   assistantContent?: string,
 ): CreateProductIntent[] {
+  if (assistantContent?.trim()) {
+    const fromJson = parseCreateProductIntentsFromAgentJson(assistantContent, userBrief)
+    if (fromJson?.length) return fromJson
+  }
+
   const fromUser = parseCreateProductIntents(userBrief)
   if (!assistantContent?.trim()) {
     if (!userSpecifiedConcreteProducts(userBrief)) {

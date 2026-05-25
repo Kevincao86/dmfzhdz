@@ -109,7 +109,6 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     modelPickerOptions,
     aiSending,
     stopAiGeneration,
-    pendingPreviewId,
     pendingComposerAttachments,
     addComposerMediaFiles,
     removeComposerAttachment,
@@ -197,7 +196,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   }, [listening, setInputDraft, stopListening, closeMenus])
 
   const rows = layout === 'centered' ? 4 : 2
-  const disabled = Boolean(pendingPreviewId)
+  const disabled = aiSending
   const modelShort = shortModelLabel(currentModel?.label ?? '模型')
   const attachmentFull = pendingComposerAttachments.length >= MAX_AI_CHAT_IMAGE_ATTACHMENTS
 

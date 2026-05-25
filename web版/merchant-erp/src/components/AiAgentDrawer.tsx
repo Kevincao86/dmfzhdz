@@ -40,15 +40,11 @@ export default function AiAgentDrawer() {
     permissions,
     messages,
     applyShortcut,
-    pendingPreviewId,
-    pendingPreviewTaskType,
-    pendingPreviewLoading,
-    taskConfirming,
+    isPreviewLoading,
+    isPreviewConfirming,
     aiSending,
     agentProfile,
   } = useAiAgent()
-
-  const confirmDisabled = pendingPreviewLoading || aiSending || taskConfirming
 
   const listRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -158,12 +154,12 @@ export default function AiAgentDrawer() {
                     <button
                       key={s.type}
                       type="button"
-                      disabled={Boolean(pendingPreviewId) || aiSending}
+                      disabled={aiSending}
                       onClick={() => applyShortcut(s.type)}
                       className={cn(
                         'rounded-xl border border-indigo-200/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition-colors',
                         'hover:border-indigo-300 hover:bg-indigo-50/80',
-                        pendingPreviewId && 'cursor-not-allowed opacity-50',
+                        aiSending && 'cursor-not-allowed opacity-50',
                       )}
                     >
                       {s.label}
@@ -177,10 +173,13 @@ export default function AiAgentDrawer() {
               {messages.map((m) => (
                 <div key={m.id}>
                   <AiAgentMessageBubble m={m} />
-                  {m.role === 'task_preview' && m.id === pendingPreviewId ? (
+                  {m.role === 'task_preview' && (m.previewStatus ?? 'pending') === 'pending' ? (
                     <AiAgentPreviewActions
-                      confirmDisabled={confirmDisabled}
-                      showProductPlatforms={pendingPreviewTaskType === 'create_product'}
+                      previewMessageId={m.id}
+                      confirmDisabled={
+                        isPreviewLoading(m.id) || isPreviewConfirming(m.id) || aiSending
+                      }
+                      showProductPlatforms={m.preview?.taskType === 'create_product'}
                     />
                   ) : null}
                 </div>

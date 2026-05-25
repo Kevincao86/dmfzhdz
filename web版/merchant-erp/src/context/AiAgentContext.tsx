@@ -18,6 +18,7 @@ import type {
   AiAgentPendingQuote,
   AiComposerAttachment,
   AiPermissionId,
+  AiPreviewStatus,
   AiProductPlanPreview,
   AiRecruitmentBriefPreview,
   AiTaskPreviewPayload,
@@ -31,10 +32,7 @@ import {
   formatAssistantDisplayText,
   hasCombinedProductAndRecruitPlan,
   inferTaskTypeFromText,
-  inferTaskTypesFromCombinedContext,
-  isExplicitExecutionIntent,
   isPlanDesignQuery,
-  isUserDecliningProductImages,
   parseComboLinesFromApi,
   parsePriceYuanFromApi,
   inferVoucherPricesFromText,
@@ -45,7 +43,12 @@ import {
   summarizeAssistantContent,
 } from '../lib/aiAgentActionParse'
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
-import { isProductPreviewLoading, listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
+import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
+import {
+  isPreviewMessageLoading,
+  listPendingPreviewMessages,
+  patchPreviewStatusInMessages,
+} from '../lib/aiAgentPreviewState'
 import { appendKolBriefRecord, writeSelectedBriefForRecruitment } from '../lib/kolBriefStorage'
 import {
   loadMerchantIntelSnapshot,
@@ -64,6 +67,19 @@ import {
   submitAiProductPlansToPlatforms,
 } from '../services/aiAgentProductPlatformSubmit'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
+import {
+  buildCombinedBrief,
+  canAcceptDeferredPlan,
+  createAgentExecutionState,
+  inferDeferredTaskTypes,
+  markPreviewsActive,
+  resetAgentExecutionState,
+  resolveExecutionUserMessage,
+  shouldSkipAutoTaskPreview,
+  storeDeferredPlan,
+  syncStageAfterPreviewChange,
+  type AgentExecutionPlan,
+} from '../lib/aiAgentExecutionFlow'
 import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import {
   buildAiAgentPlanProfile,
@@ -214,16 +230,21 @@ type AiAgentContextValue = {
   sendUserText: (text: string) => void
   applyShortcut: (taskType: AiTaskType) => void
   pendingPreviewId: string | null
+  /** 所有待确认的场景预览消息 id */
+  pendingPreviewIds: string[]
   pendingPreviewTaskType: AiTaskType | null
-  /** 商品/招募预览生成中（禁用确认） */
-  pendingPreviewLoading: boolean
-  /** 招募订单确认推送中（禁用确认） */
+  /** 指定预览消息是否仍在生成中 */
+  isPreviewLoading: (previewMessageId: string) => boolean
+  /** 指定预览是否正在提交/执行 */
+  isPreviewConfirming: (previewMessageId: string) => boolean
+  confirmPendingTask: (previewMessageId: string) => void
+  savePendingTaskToDrafts: (previewMessageId: string) => void
+  cancelPendingTask: (previewMessageId: string) => void
+  modifyPendingTask: (previewMessageId: string) => void
+  /** @deprecated 使用 isPreviewConfirming(id) */
   taskConfirming: boolean
-  confirmPendingTask: () => void
-  /** 批量保存商品方案至草稿箱（不跳转提交） */
-  savePendingTaskToDrafts: () => void
-  cancelPendingTask: () => void
-  modifyPendingTask: () => void
+  /** @deprecated 使用 isPreviewLoading(id) */
+  pendingPreviewLoading: boolean
   /** 创建商品预览：用户勾选的上架平台 */
   previewSubmitPlatforms: CreatePlatformId[]
   togglePreviewSubmitPlatform: (id: CreatePlatformId) => void
@@ -351,7 +372,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     AiComposerAttachment[]
   >([])
-  const [pendingPreviewId, setPendingPreviewId] = useState<string | null>(null)
+  const [confirmingPreviewId, setConfirmingPreviewId] = useState<string | null>(null)
   const [pendingQuote, setPendingQuote] = useState<AiAgentPendingQuote | null>(null)
   const pendingQuoteRef = useRef<AiAgentPendingQuote | null>(null)
   const [modelPickerKey, setModelPickerKeyState] = useState(() =>
@@ -370,18 +391,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const messagesRef = useRef(messages)
   messagesRef.current = messages
 
-  type PendingExecutionCtx = {
-    userBrief: string
-    assistantContent: string
-    taskTypes: AiTaskType[]
-  }
-  const pendingExecutionRef = useRef<PendingExecutionCtx | null>(null)
-  /** 商品预览确认后，再进入达人招募 Brief 预览 */
-  const pendingRecruitmentStageRef = useRef<{
-    userBrief: string
-    assistantContent: string
-  } | null>(null)
-  const awaitingProductImagesRef = useRef(false)
+  /** 方案 → 商品预览 → 达人招募 分步执行状态（单一数据源） */
+  const executionStateRef = useRef(createAgentExecutionState())
 
   const [previewSubmitPlatforms, setPreviewSubmitPlatforms] = useState<CreatePlatformId[]>([
     'douyin',
@@ -556,10 +567,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const fresh = [createAgentMessage('assistant', agentProfile.welcome)]
     setMessages(fresh)
     messagesRef.current = fresh
-    setPendingPreviewId(null)
-    pendingExecutionRef.current = null
-    pendingRecruitmentStageRef.current = null
-    awaitingProductImagesRef.current = false
+    setConfirmingPreviewId(null)
+    executionStateRef.current = resetAgentExecutionState()
     setPreviewSubmitPlatforms(['douyin'])
     setInputDraft('')
     setPendingComposerAttachments((prev) => {
@@ -584,8 +593,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const next = cloneAgentMessages(hit.messages)
       setMessages(next)
       messagesRef.current = next
-      setPendingPreviewId(null)
       setInputDraft('')
+      setConfirmingPreviewId(null)
+      executionStateRef.current = resetAgentExecutionState()
       setPendingComposerAttachments((prev) => {
       for (const a of prev) revokeComposerAttachment(a)
       return []
@@ -598,15 +608,24 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const pushPreview = useCallback((taskType: AiTaskType, intro: string, pageLabelOverride?: string) => {
     const preview = buildPreviewForTask(taskType, pageLabelOverride ?? pageContext?.pageLabel)
-    const msg = createAgentMessage('task_preview', intro, { preview })
-    setPendingPreviewId(msg.id)
+    const msg = createAgentMessage('task_preview', intro, { preview, previewStatus: 'pending' })
     setMessages((prev) => {
       const next = [...prev, msg]
       messagesRef.current = next
+      executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
       return next
     })
     return msg.id
   }, [pageContext?.pageLabel])
+
+  const patchPreviewStatus = useCallback((msgId: string, previewStatus: AiPreviewStatus) => {
+    setMessages((prev) => {
+      const next = patchPreviewStatusInMessages(prev, msgId, previewStatus)
+      messagesRef.current = next
+      executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
+      return next
+    })
+  }, [])
 
   const patchPreviewProductPlans = useCallback(
     (
@@ -791,6 +810,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             await enrichAiProductPlanPreview(base, intents[idx].brief, modelPickerKey, {
               userReferenceImages,
               planIndex: idx,
+              industryPath: intel.industryPath,
             }),
           )
         } catch (e) {
@@ -859,8 +879,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
         intents.length > 1
-          ? `【第 1 步 · 仅商品预览】检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将生成全部 C 端预览供您逐项确认；本步不含达人招募内容，商品全部确认后再进入招募 Brief。`
-          : `【第 1 步 · 仅商品预览】将生成团购 C 端预览供您核对；本步不含达人/Brief/招募内容，确认后再单独进入达人招募预览。${intelLine ? ` ${intelLine}` : ''}`
+          ? `【创建商品 · 独立预览】检测到 ${intents.length} 个商品/套餐方案（${intents.map((i) => i.label).join('、')}）。${intelLine}，将生成全部 C 端预览；请在本卡片确认，与其它场景任务互不影响。`
+          : `【创建商品 · 独立预览】将生成团购 C 端预览供您核对。${intelLine ? ` ${intelLine}` : ''}请在本卡片确认后提交。`
       const voucher = inferVoucherPricesFromText(userBrief)
       const preview = buildPreviewForTask('create_product', pageLabel)
       const initialPlans: AiProductPlanPreview[] = intents.map((intent) => {
@@ -891,12 +911,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             ...(voucher.origin != null ? { originYuan: voucher.origin } : {}),
           },
         },
+        previewStatus: 'pending',
       })
-      setPendingPreviewId(msg.id)
       setPreviewSubmitPlatforms(['douyin'])
       setMessages((prev) => {
         const next = [...prev, msg]
         messagesRef.current = next
+        executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
         return next
       })
       void attachProductPlanToPreview(msg.id, userBrief, opts?.assistantContent)
@@ -908,7 +929,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (userBrief: string, pageLabel?: string, assistantContent?: string) => {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
-        `【第 2 步 · 达人招募 Brief】${intelLine ? `${intelLine}，` : ''}将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief（三版文案），确认后将展示招募订单明细。`
+        `【达人招募 · 独立预览】${intelLine ? `${intelLine}，` : ''}将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief（三版文案）；请在本卡片确认，与其它场景任务互不影响。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
@@ -921,11 +942,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             enrichStatus: 'loading',
           },
         },
+        previewStatus: 'pending',
       })
-      setPendingPreviewId(msg.id)
       setMessages((prev) => {
         const next = [...prev, msg]
         messagesRef.current = next
+        executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
         return next
       })
       void attachRecruitmentBriefToPreview(msg.id, userBrief, assistantContent)
@@ -963,11 +985,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           enrichStatus: 'loading',
         },
       },
+      previewStatus: 'pending',
     })
-    setPendingPreviewId(msg.id)
     setMessages((prev) => {
       const next = [...prev, msg]
       messagesRef.current = next
+      executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
       return next
     })
     void (async () => {
@@ -1009,31 +1032,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     })()
   }, [entitlements.features.financeTax])
 
-  const triggerExecutionPreviews = useCallback(
-    (ctx: PendingExecutionCtx, pageLabel?: string) => {
-      const combinedBrief = ctx.assistantContent
-        ? `${ctx.userBrief}\n\n【方案要点】\n${ctx.assistantContent.slice(0, 3500)}`
-        : ctx.userBrief
-      const hasProduct = ctx.taskTypes.includes('create_product')
-      const hasRecruit = ctx.taskTypes.includes('recruit_influencer')
-      pendingRecruitmentStageRef.current = null
-      if (hasProduct) {
-        if (hasRecruit) {
-          pendingRecruitmentStageRef.current = {
-            userBrief: combinedBrief,
-            assistantContent: ctx.assistantContent,
-          }
-        }
-        pushCreateProductPreview(combinedBrief, pageLabel, {
-          assistantContent: ctx.assistantContent,
-        })
-      } else if (hasRecruit) {
-        pushRecruitInfluencerPreview(combinedBrief, pageLabel, ctx.assistantContent)
-      }
-    },
-    [pushCreateProductPreview, pushRecruitInfluencerPreview],
-  )
-
   const appendAssistantLine = useCallback((content: string) => {
     const msg = createAgentMessage('assistant', content)
     setMessages((prev) => {
@@ -1043,53 +1041,71 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const triggerParallelPreviews = useCallback(
+    (plan: AgentExecutionPlan, taskTypes: AiTaskType[], pageLabel?: string) => {
+      executionStateRef.current = markPreviewsActive(executionStateRef.current)
+      const combinedBrief = buildCombinedBrief(plan)
+      const introGeneric = '根据方案生成的执行预览，请在本卡片确认后继续。'
+
+      for (const taskType of taskTypes) {
+        switch (taskType) {
+          case 'create_product':
+            pushCreateProductPreview(combinedBrief, pageLabel, {
+              assistantContent: plan.assistantContent,
+            })
+            break
+          case 'recruit_influencer':
+            pushRecruitInfluencerPreview(combinedBrief, pageLabel, plan.assistantContent)
+            break
+          case 'file_tax':
+            pushTaxFilingPreview(pageLabel)
+            break
+          case 'handle_review':
+          case 'sync_platform':
+          case 'analyze_exception':
+          case 'generate_copywriting':
+          case 'optimize_local_ads':
+          case 'follow_local_lead':
+            pushPreview(taskType, introGeneric, pageLabel)
+            break
+          default:
+            break
+        }
+      }
+    },
+    [pushCreateProductPreview, pushRecruitInfluencerPreview, pushTaxFilingPreview, pushPreview],
+  )
+
   const tryHandleExecutionFlow = useCallback(
     (strippedLine: string, visionUrls: string[], pageLabel?: string): boolean => {
-      if (awaitingProductImagesRef.current && pendingExecutionRef.current) {
-        if (
-          visionUrls.length > 0 ||
-          isUserDecliningProductImages(strippedLine) ||
-          isExplicitExecutionIntent(strippedLine)
-        ) {
-          awaitingProductImagesRef.current = false
-          const ctx = pendingExecutionRef.current
-          pendingExecutionRef.current = null
-          appendAssistantLine('正在根据方案生成执行预览，请稍候…')
-          triggerExecutionPreviews(ctx, pageLabel)
+      const result = resolveExecutionUserMessage(
+        executionStateRef.current,
+        messagesRef.current,
+        strippedLine,
+        visionUrls,
+      )
+      executionStateRef.current = result.state
+      if (result.assistantLine) appendAssistantLine(result.assistantLine)
+
+      switch (result.action.type) {
+        case 'none':
+          return Boolean(result.assistantLine)
+        case 'prompt_upload_images':
           return true
-        }
-        return false
-      }
-
-      if (pendingExecutionRef.current && isExplicitExecutionIntent(strippedLine)) {
-        const ctx = pendingExecutionRef.current
-        const needsImages =
-          ctx.taskTypes.includes('create_product') &&
-          visionUrls.length === 0 &&
-          !isUserDecliningProductImages(strippedLine)
-
-        if (needsImages) {
-          awaitingProductImagesRef.current = true
-          appendAssistantLine(
-            '请上传商品图片（可多张），我将优化为主图与辅助图；若暂无图片，请回复「自动生成」。',
-          )
+        case 'start_parallel_previews':
+          triggerParallelPreviews(result.action.plan, result.action.taskTypes, pageLabel)
           return true
-        }
-
-        pendingExecutionRef.current = null
-        appendAssistantLine('好的，正在根据方案生成执行预览…')
-        triggerExecutionPreviews(ctx, pageLabel)
-        return true
+        default:
+          return false
       }
-
-      return false
     },
-    [appendAssistantLine, triggerExecutionPreviews],
+    [appendAssistantLine, triggerParallelPreviews],
   )
 
   const scheduleTaskPreview = useCallback(
     (trimmed: string, assistantContent: string | undefined, explicitTaskType: AiTaskType | undefined, pageLabel?: string) => {
       if (shouldDeferTaskPreview(trimmed, assistantContent, explicitTaskType)) return
+      if (shouldSkipAutoTaskPreview(executionStateRef.current, trimmed, assistantContent)) return
       if (hasCombinedProductAndRecruitPlan(trimmed, assistantContent)) return
 
       const taskType =
@@ -1102,10 +1118,33 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const intro = '根据你的描述，我准备执行以下步骤（预览）。请确认后继续。'
       setTimeout(() => {
         switch (taskType) {
-          case 'create_product':
-            pushCreateProductPreview(trimmed, pageLabel)
+          case 'create_product': {
+            const taskTypes = inferDeferredTaskTypes(trimmed, assistantContent)
+            if (taskTypes.length && canAcceptDeferredPlan(executionStateRef.current)) {
+              executionStateRef.current = storeDeferredPlan(
+                executionStateRef.current,
+                trimmed,
+                assistantContent ?? '',
+                taskTypes,
+              )
+            }
+            executionStateRef.current = markPreviewsActive(executionStateRef.current)
+            pushCreateProductPreview(trimmed, pageLabel, { assistantContent })
             break
+          }
           case 'recruit_influencer':
+            if (canAcceptDeferredPlan(executionStateRef.current)) {
+              const taskTypes = inferDeferredTaskTypes(trimmed, assistantContent)
+              if (taskTypes.length) {
+                executionStateRef.current = storeDeferredPlan(
+                  executionStateRef.current,
+                  trimmed,
+                  assistantContent ?? '',
+                  taskTypes,
+                )
+              }
+            }
+            executionStateRef.current = markPreviewsActive(executionStateRef.current)
             pushRecruitInfluencerPreview(trimmed, pageLabel, assistantContent)
             break
           case 'file_tax':
@@ -1182,13 +1221,14 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             : formatAssistantDisplayText(rawSummary ?? res.content)
 
         if (deferPreview) {
-          const taskTypes = inferTaskTypesFromCombinedContext(trimmed, res.content)
-          if (taskTypes.length) {
-            pendingExecutionRef.current = {
-              userBrief: trimmed,
-              assistantContent: res.content,
+          const taskTypes = inferDeferredTaskTypes(trimmed, res.content)
+          if (taskTypes.length && canAcceptDeferredPlan(executionStateRef.current)) {
+            executionStateRef.current = storeDeferredPlan(
+              executionStateRef.current,
+              trimmed,
+              res.content,
               taskTypes,
-            }
+            )
             display = `${display}${buildPlanExecutionConsultation(taskTypes)}`
           }
         }
@@ -1245,7 +1285,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const attachments = [...pendingComposerAttachments]
       const visionUrls = attachmentVisionUrls(attachments)
       const pq = pendingQuoteRef.current
-      if ((!trimmed && attachments.length === 0 && !pq) || aiSending || pendingPreviewId) return
+      if ((!trimmed && attachments.length === 0 && !pq) || aiSending) return
       let line =
         trimmed ||
         (attachments.some((a) => a.kind === 'video')
@@ -1349,7 +1389,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       aiSending,
       stopAiGeneration,
       pendingComposerAttachments,
-      pendingPreviewId,
       pageContext?.pageLabel,
       runGatewayForSnapshot,
       scheduleTaskPreview,
@@ -1372,51 +1411,55 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const savePendingTaskToDrafts = useCallback(() => {
-    if (!pendingPreviewId) return
-    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
-    const p = pending?.preview
-    const title = p?.title ?? '任务'
-    if (p?.taskType !== 'create_product') return
+  const savePendingTaskToDrafts = useCallback(
+    (previewMessageId: string) => {
+      const pending = messagesRef.current.find((m) => m.id === previewMessageId)
+      const p = pending?.preview
+      const title = p?.title ?? '任务'
+      if (p?.taskType !== 'create_product' || pending?.previewStatus !== 'pending') return
 
-    const plans = listProductPlansFromPreview(p).filter(
-      (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
-    )
-    if (!plans.length) return
+      const plans = listProductPlansFromPreview(p).filter(
+        (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
+      )
+      if (!plans.length) return
 
-    const submitPlatforms =
-      previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
+      const submitPlatforms =
+        previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
 
-    void (async () => {
-      setTaskConfirming(true)
-      try {
-        const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'draft')
-        const okCount = results.filter((r) => r.ok).length
-        const summary = formatAiProductSubmitSummary(results)
-        setMessages((prev) => {
-          const next = [
-            ...prev,
-            createAgentMessage(
-              'task_result',
-              okCount > 0
-                ? `「${title}」已保存至草稿箱（${okCount} 项）。${summary}`
-                : `「${title}」保存草稿失败。\n${summary}`,
-              { resultSummary: okCount > 0 ? 'confirmed' : 'partial' },
-            ),
-          ]
-          messagesRef.current = next
-          return next
-        })
-        setPendingPreviewId(null)
-      } finally {
-        setTaskConfirming(false)
-      }
-    })()
-  }, [pendingPreviewId, previewSubmitPlatforms])
+      void (async () => {
+        setConfirmingPreviewId(previewMessageId)
+        setTaskConfirming(true)
+        try {
+          const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'draft')
+          const okCount = results.filter((r) => r.ok).length
+          const summary = formatAiProductSubmitSummary(results)
+          patchPreviewStatus(previewMessageId, 'confirmed')
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage(
+                'task_result',
+                okCount > 0
+                  ? `「${title}」已保存至草稿箱（${okCount} 项）。${summary}`
+                  : `「${title}」保存草稿失败。\n${summary}`,
+                { resultSummary: okCount > 0 ? 'confirmed' : 'partial' },
+              ),
+            ]
+            messagesRef.current = next
+            return next
+          })
+        } finally {
+          setConfirmingPreviewId(null)
+          setTaskConfirming(false)
+        }
+      })()
+    },
+    [previewSubmitPlatforms, patchPreviewStatus],
+  )
 
   const applyShortcut = useCallback(
     (taskType: AiTaskType) => {
-      if (aiSending || pendingPreviewId) return
+      if (aiSending) return
       if (!membershipAllowsAiTask(plan, taskType)) {
         setMessages((prev) => {
           const next = [
@@ -1452,288 +1495,288 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         void runGatewayForSnapshot(messagesRef.current, line, taskType, pageContext?.pageLabel, [])
       })
     },
-    [aiSending, pendingPreviewId, pageContext?.pageLabel, runGatewayForSnapshot, plan, agentProfile.planLabel, pushTaxFilingPreview],
+    [aiSending, pageContext?.pageLabel, runGatewayForSnapshot, plan, agentProfile.planLabel, pushTaxFilingPreview],
   )
 
-  const confirmPendingTask = useCallback(() => {
-    if (!pendingPreviewId) return
-    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
-    const p = pending?.preview
-    const title = p?.title ?? '任务'
+  const confirmPendingTask = useCallback(
+    (previewMessageId: string) => {
+      const pending = messagesRef.current.find((m) => m.id === previewMessageId)
+      if (!pending || pending.previewStatus !== 'pending' || !pending.preview) return
+      const p = pending.preview
+      const title = p.title ?? '任务'
 
-    if (p?.taskType === 'create_product') {
-      const plans = listProductPlansFromPreview(p).filter(
-        (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
-      )
-      if (!plans.length) {
-        setMessages((prev) => {
-          const next = [
-            ...prev,
-            createAgentMessage(
-              'task_result',
-              `「${title}」预览尚未就绪或方案为空，请等待生成完成后再确认。`,
-              { resultSummary: 'partial' },
-            ),
-          ]
-          messagesRef.current = next
-          return next
-        })
-        setPendingPreviewId(null)
-        return
-      }
-
-      const submitPlatforms =
-        previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
-      const recruitStage = pendingRecruitmentStageRef.current
-      pendingRecruitmentStageRef.current = null
-
-      void (async () => {
-        setTaskConfirming(true)
-        try {
-          const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'submit')
-          const okCount = results.filter((r) => r.ok).length
-          const failCount = results.length - okCount
-          const summary = formatAiProductSubmitSummary(results)
-          const resultSummary = okCount > 0 ? (failCount > 0 ? 'partial' : 'confirmed') : 'partial'
-
+      if (p.taskType === 'create_product') {
+        const plans = listProductPlansFromPreview(p).filter(
+          (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
+        )
+        if (!plans.length) {
           setMessages((prev) => {
             const next = [
               ...prev,
               createAgentMessage(
                 'task_result',
-                okCount > 0
-                  ? `「${title}」已确认。共 ${okCount} 项已提交平台审核并写入商品列表「本地草稿」。\n${summary}`
-                  : `「${title}」提交失败。\n${summary}`,
-                { resultSummary },
-              ),
-            ]
-            messagesRef.current = next
-            return next
-          })
-          setPendingPreviewId(null)
-          setDrawerOpen(false)
-
-          if (recruitStage && okCount > 0) {
-            appendAssistantLine(
-              '商品已提交审核。接下来将单独生成达人招募 Brief 预览，请核对三版文案后再确认下达招募订单。',
-            )
-            pushRecruitInfluencerPreview(
-              recruitStage.userBrief,
-              pageContext?.pageLabel,
-              recruitStage.assistantContent,
-            )
-          }
-        } finally {
-          setTaskConfirming(false)
-        }
-      })()
-      return
-    }
-
-    if (p?.taskType === 'recruit_influencer') {
-      const brief = p.recruitmentBrief
-      const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
-      const userBrief =
-        lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
-        brief?.briefText?.slice(0, 200) ||
-        ''
-      void (async () => {
-        setTaskConfirming(true)
-        try {
-          if (!brief?.briefText?.trim()) {
-            setMessages((prev) => {
-              const next = [
-                ...prev,
-                createAgentMessage(
-                  'task_result',
-                  `「${title}」已确认，但 Brief 为空。请在输入框补充需求后重试。`,
-                  { resultSummary: 'partial' },
-                ),
-              ]
-              messagesRef.current = next
-              return next
-            })
-            setPendingPreviewId(null)
-            return
-          }
-
-          const recordId =
-            typeof crypto !== 'undefined' && 'randomUUID' in crypto
-              ? crypto.randomUUID()
-              : `brief-${Date.now()}`
-          appendKolBriefRecord({
-            id: recordId,
-            createdAt: new Date().toISOString(),
-            platform: brief.platform,
-            mainProductName: brief.mainProductName,
-            tags: brief.tags,
-            previews: brief.previews ?? [brief.briefText, brief.briefText, brief.briefText],
-          })
-          writeSelectedBriefForRecruitment({
-            recordId,
-            variantIndex: 0,
-            text: brief.briefText,
-            platform: brief.platform,
-            mainProductName: brief.mainProductName,
-            tags: brief.tags,
-          })
-
-          const { intent, allocation } = await buildAgentRecruitmentAllocation(userBrief, brief)
-          const tenantMeta = await resolveRecruitmentOrderTenantMeta(
-            supabaseConfigured ? supabase : null,
-          )
-          const order = buildRecruitmentOrderFromAgentBrief(brief, tenantMeta, {
-            intent,
-            allocation,
-            userBrief,
-          })
-          await appendRecruitmentOrderToOps(order)
-          const orderDetail = recruitmentOrderDetailFromRegistry(order, brief, intent, allocation)
-          try {
-            window.localStorage.setItem('meoo_last_recruitment_order_id', order.id)
-          } catch {
-            /* ignore */
-          }
-
-          setMessages((prev) => {
-            const next = [
-              ...prev,
-              createAgentMessage(
-                'task_result',
-                `「${title}」已确认。招募订单已生成并推送运营台（待接单），下方为 AI 智能分配后的订单明细。`,
-                { resultSummary: 'confirmed', recruitmentOrder: orderDetail },
-              ),
-            ]
-            messagesRef.current = next
-            return next
-          })
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e)
-          setMessages((prev) => {
-            const next = [
-              ...prev,
-              createAgentMessage(
-                'task_result',
-                `Brief 已保存，但招募订单推送失败：${msg.slice(0, 200)}。可在达人招募页手动提交。`,
+                `「${title}」预览尚未就绪或方案为空，请等待生成完成后再确认。`,
                 { resultSummary: 'partial' },
               ),
             ]
             messagesRef.current = next
             return next
           })
-        } finally {
-          setTaskConfirming(false)
-          setPendingPreviewId(null)
+          return
         }
-      })()
-      return
-    }
 
-    if (p?.taskType === 'file_tax' && p.taxFiling) {
-      const tax = p.taxFiling
-      void (async () => {
-        const period = {
-          label: tax.periodLabel,
-          start: tax.startDate,
-          end: tax.endDate,
-        }
-        let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
-        if (supabaseConfigured && supabase) {
-          const [dy, xhs] = await Promise.all([
-            listMerchantBindings(supabase, 'douyin'),
-            listMerchantBindings(supabase, 'xhs_commercial'),
-          ])
-          bindings = [...dy, ...xhs]
-        }
-        const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-        const rows = fin.ok ? buildTaxPlatformRows(bindings, fin.rows) : []
-        const blob = buildTaxExportBlob(rows, period)
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `meoo-tax-${period.start}-${period.end}.json`
-        a.click()
-        URL.revokeObjectURL(url)
-        appendTaxFilingRecord({
-          id: `TAX-${Date.now()}`,
-          periodLabel: period.label,
-          startDate: period.start,
-          endDate: period.end,
-          submittedAt: new Date().toISOString(),
-          platforms: tax.platforms.map((x) => ({
-            platformId: x.platformId,
-            verifyAmountYuan: x.verifyAmountYuan,
-          })),
-          totalVerifyYuan: tax.totalVerifyYuan,
-          status: 'submitted_mock',
-        })
-        setMessages((prev) => {
-          const next = [
-            ...prev,
-            createAgentMessage(
-              'task_result',
-              `「${title}」已确认。报税数据包已下载，申报记录已保存。可在「财务 → 报税管理」查看历史。`,
-              { resultSummary: 'confirmed' },
-            ),
-          ]
-          messagesRef.current = next
-          return next
-        })
-        setPendingPreviewId(null)
-        setDrawerOpen(false)
-        navigate('/finance/tax')
-      })()
-      return
-    }
+        const submitPlatforms =
+          previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
+        patchPreviewStatus(previewMessageId, 'confirmed')
 
-    setMessages((prev) => {
-      const next = [
-        ...prev,
-        createAgentMessage(
-          'task_result',
-          `「${title}」已确认。后续将按步骤调用业务接口；若接口未就绪，请稍后在对应模块查看执行结果。`,
-          { resultSummary: 'confirmed' },
-        ),
-      ]
-      messagesRef.current = next
-      return next
-    })
-    setPendingPreviewId(null)
-  }, [pendingPreviewId, navigate, previewSubmitPlatforms, appendAssistantLine, pushRecruitInfluencerPreview, pageContext?.pageLabel])
+        void (async () => {
+          setConfirmingPreviewId(previewMessageId)
+          setTaskConfirming(true)
+          try {
+            const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'submit')
+            const okCount = results.filter((r) => r.ok).length
+            const failCount = results.length - okCount
+            const summary = formatAiProductSubmitSummary(results)
+            const resultSummary = okCount > 0 ? (failCount > 0 ? 'partial' : 'confirmed') : 'partial'
 
-  const cancelPendingTask = useCallback(() => {
-    if (!pendingPreviewId) return
-    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
-    if (pending?.preview?.taskType === 'create_product') {
-      pendingRecruitmentStageRef.current = null
-    }
-    setMessages((prev) => {
-      const next = [...prev, createAgentMessage('system', '已取消本次待执行操作。')]
-      messagesRef.current = next
-      return next
-    })
-    setPendingPreviewId(null)
-  }, [pendingPreviewId])
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  okCount > 0
+                    ? `「${title}」已确认。共 ${okCount} 项已提交平台审核并写入商品列表「本地草稿」。\n${summary}`
+                    : `「${title}」提交失败。\n${summary}`,
+                  { resultSummary },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
+          } catch {
+            /* ignore */
+          } finally {
+            setConfirmingPreviewId(null)
+            setTaskConfirming(false)
+          }
+        })()
+        return
+      }
 
-  const modifyPendingTask = useCallback(() => {
-    if (!pendingPreviewId) return
-    const pending = messagesRef.current.find((m) => m.id === pendingPreviewId)
-    if (pending?.preview?.taskType === 'create_product') {
-      pendingRecruitmentStageRef.current = null
-    }
-    setMessages((prev) => {
-      const next = [
-        ...prev,
-        createAgentMessage(
-          'assistant',
-          '请直接在输入框中说明需要调整的部分（例如：只要同步抖音、先不要发布等）。我会根据你的补充重新生成方案。',
-        ),
-      ]
-      messagesRef.current = next
-      return next
-    })
-    setPendingPreviewId(null)
-  }, [pendingPreviewId])
+      if (p.taskType === 'recruit_influencer') {
+        const brief = p.recruitmentBrief
+        const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
+        const userBrief =
+          lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ||
+          brief?.briefText?.slice(0, 200) ||
+          ''
+        void (async () => {
+          setConfirmingPreviewId(previewMessageId)
+          setTaskConfirming(true)
+          try {
+            if (!brief?.briefText?.trim()) {
+              setMessages((prev) => {
+                const next = [
+                  ...prev,
+                  createAgentMessage(
+                    'task_result',
+                    `「${title}」已确认，但 Brief 为空。请在输入框补充需求后重试。`,
+                    { resultSummary: 'partial' },
+                  ),
+                ]
+                messagesRef.current = next
+                return next
+              })
+              return
+            }
+
+            const recordId =
+              typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? crypto.randomUUID()
+                : `brief-${Date.now()}`
+            appendKolBriefRecord({
+              id: recordId,
+              createdAt: new Date().toISOString(),
+              platform: brief.platform,
+              mainProductName: brief.mainProductName,
+              tags: brief.tags,
+              previews: brief.previews ?? [brief.briefText, brief.briefText, brief.briefText],
+            })
+            writeSelectedBriefForRecruitment({
+              recordId,
+              variantIndex: 0,
+              text: brief.briefText,
+              platform: brief.platform,
+              mainProductName: brief.mainProductName,
+              tags: brief.tags,
+            })
+
+            const { intent, allocation } = await buildAgentRecruitmentAllocation(userBrief, brief)
+            const tenantMeta = await resolveRecruitmentOrderTenantMeta(
+              supabaseConfigured ? supabase : null,
+            )
+            const order = buildRecruitmentOrderFromAgentBrief(brief, tenantMeta, {
+              intent,
+              allocation,
+              userBrief,
+            })
+            await appendRecruitmentOrderToOps(order)
+            const orderDetail = recruitmentOrderDetailFromRegistry(order, brief, intent, allocation)
+            try {
+              window.localStorage.setItem('meoo_last_recruitment_order_id', order.id)
+            } catch {
+              /* ignore */
+            }
+
+            patchPreviewStatus(previewMessageId, 'confirmed')
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  `「${title}」已确认。招募订单已生成并推送运营台（待接单），下方为 AI 智能分配后的订单明细。`,
+                  { resultSummary: 'confirmed', recruitmentOrder: orderDetail },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  `Brief 已保存，但招募订单推送失败：${msg.slice(0, 200)}。可在达人招募页手动提交。`,
+                  { resultSummary: 'partial' },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
+          } finally {
+            setConfirmingPreviewId(null)
+            setTaskConfirming(false)
+          }
+        })()
+        return
+      }
+
+      if (p.taskType === 'file_tax' && p.taxFiling) {
+        const tax = p.taxFiling
+        void (async () => {
+          setConfirmingPreviewId(previewMessageId)
+          setTaskConfirming(true)
+          try {
+            const period = {
+              label: tax.periodLabel,
+              start: tax.startDate,
+              end: tax.endDate,
+            }
+            let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
+            if (supabaseConfigured && supabase) {
+              const [dy, xhs] = await Promise.all([
+                listMerchantBindings(supabase, 'douyin'),
+                listMerchantBindings(supabase, 'xhs_commercial'),
+              ])
+              bindings = [...dy, ...xhs]
+            }
+            const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
+            const rows = fin.ok ? buildTaxPlatformRows(bindings, fin.rows) : []
+            const blob = buildTaxExportBlob(rows, period)
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `meoo-tax-${period.start}-${period.end}.json`
+            a.click()
+            URL.revokeObjectURL(url)
+            appendTaxFilingRecord({
+              id: `TAX-${Date.now()}`,
+              periodLabel: period.label,
+              startDate: period.start,
+              endDate: period.end,
+              submittedAt: new Date().toISOString(),
+              platforms: tax.platforms.map((x) => ({
+                platformId: x.platformId,
+                verifyAmountYuan: x.verifyAmountYuan,
+              })),
+              totalVerifyYuan: tax.totalVerifyYuan,
+              status: 'submitted_mock',
+            })
+            patchPreviewStatus(previewMessageId, 'confirmed')
+            setMessages((prev) => {
+              const next = [
+                ...prev,
+                createAgentMessage(
+                  'task_result',
+                  `「${title}」已确认。报税数据包已下载，申报记录已保存。可在「财务 → 报税管理」查看历史。`,
+                  { resultSummary: 'confirmed' },
+                ),
+              ]
+              messagesRef.current = next
+              return next
+            })
+            setDrawerOpen(false)
+            navigate('/finance/tax')
+          } finally {
+            setConfirmingPreviewId(null)
+            setTaskConfirming(false)
+          }
+        })()
+        return
+      }
+
+      patchPreviewStatus(previewMessageId, 'confirmed')
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          createAgentMessage(
+            'task_result',
+            `「${title}」已确认。后续将按步骤调用业务接口；若接口未就绪，请稍后在对应模块查看执行结果。`,
+            { resultSummary: 'confirmed' },
+          ),
+        ]
+        messagesRef.current = next
+        return next
+      })
+    },
+    [navigate, previewSubmitPlatforms, patchPreviewStatus],
+  )
+
+  const cancelPendingTask = useCallback(
+    (previewMessageId: string) => {
+      const pending = messagesRef.current.find((m) => m.id === previewMessageId)
+      if (!pending || pending.previewStatus !== 'pending') return
+      patchPreviewStatus(previewMessageId, 'cancelled')
+      setMessages((prev) => {
+        const next = [...prev, createAgentMessage('system', '已取消本项待执行操作，其它场景预览不受影响。')]
+        messagesRef.current = next
+        return next
+      })
+    },
+    [patchPreviewStatus],
+  )
+
+  const modifyPendingTask = useCallback(
+    (previewMessageId: string) => {
+      const pending = messagesRef.current.find((m) => m.id === previewMessageId)
+      if (!pending || pending.previewStatus !== 'pending') return
+      patchPreviewStatus(previewMessageId, 'cancelled')
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          createAgentMessage(
+            'assistant',
+            '请直接在输入框中说明需要调整的部分（例如：标题不合适、主图要换、佣金比例等）。我会根据你的补充重新生成该场景方案。',
+          ),
+        ]
+        messagesRef.current = next
+        return next
+      })
+    },
+    [patchPreviewStatus],
+  )
 
   const submitTopSearchQuery = useCallback(
     (query: string) => {
@@ -1818,6 +1861,25 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     ],
   )
 
+  const pendingPreviewIds = useMemo(
+    () => listPendingPreviewMessages(messages).map((m) => m.id),
+    [messages],
+  )
+  const pendingPreviewId = pendingPreviewIds[0] ?? null
+
+  const isPreviewLoading = useCallback(
+    (previewMessageId: string) => {
+      const m = messages.find((x) => x.id === previewMessageId)
+      return m ? isPreviewMessageLoading(m) : false
+    },
+    [messages],
+  )
+
+  const isPreviewConfirming = useCallback(
+    (previewMessageId: string) => confirmingPreviewId === previewMessageId,
+    [confirmingPreviewId],
+  )
+
   const pendingPreviewTaskType = useMemo((): AiTaskType | null => {
     if (!pendingPreviewId) return null
     const m = messages.find((x) => x.id === pendingPreviewId)
@@ -1827,14 +1889,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const pendingPreviewLoading = useMemo(() => {
     if (!pendingPreviewId) return false
     const m = messages.find((x) => x.id === pendingPreviewId)
-    const p = m?.preview
-    if (!p) return false
-    if (p?.taskType === 'create_product') {
-      return isProductPreviewLoading(p)
-    }
-    if (p.taskType === 'recruit_influencer') return p.recruitmentBrief?.enrichStatus === 'loading'
-    if (p.taskType === 'file_tax') return p.taxFiling?.enrichStatus === 'loading'
-    return false
+    return m ? isPreviewMessageLoading(m) : false
   }, [pendingPreviewId, messages])
 
   const value = useMemo<AiAgentContextValue>(
@@ -1850,7 +1905,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       sendUserText,
       applyShortcut,
       pendingPreviewId,
+      pendingPreviewIds,
       pendingPreviewTaskType,
+      isPreviewLoading,
+      isPreviewConfirming,
       pendingPreviewLoading,
       taskConfirming,
       confirmPendingTask,
@@ -1889,7 +1947,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       sendUserText,
       applyShortcut,
       pendingPreviewId,
+      pendingPreviewIds,
       pendingPreviewTaskType,
+      isPreviewLoading,
+      isPreviewConfirming,
       confirmPendingTask,
       savePendingTaskToDrafts,
       cancelPendingTask,

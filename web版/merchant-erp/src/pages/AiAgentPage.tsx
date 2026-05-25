@@ -22,10 +22,8 @@ export default function AiAgentPage() {
     openDrawer,
     applyShortcut,
     aiSending,
-    pendingPreviewId,
-    pendingPreviewTaskType,
-    pendingPreviewLoading,
-    taskConfirming,
+    isPreviewLoading,
+    isPreviewConfirming,
     archivedSessions,
     startNewChat,
     resumeArchivedSession,
@@ -37,7 +35,8 @@ export default function AiAgentPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
-  const confirmDisabled = pendingPreviewLoading || aiSending || taskConfirming
+  const confirmDisabledFor = (previewMessageId: string) =>
+    isPreviewLoading(previewMessageId) || isPreviewConfirming(previewMessageId) || aiSending
 
   useEffect(() => {
     if (!hasChat) return
@@ -97,7 +96,7 @@ export default function AiAgentPage() {
                   <button
                     key={s.type}
                     type="button"
-                    disabled={aiSending || Boolean(pendingPreviewId)}
+                    disabled={aiSending}
                     onClick={() => applyShortcut(s.type)}
                     className={cn(
                       'flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-left text-sm font-medium text-slate-800 shadow-sm',
@@ -191,10 +190,11 @@ export default function AiAgentPage() {
                 {messages.map((m) => (
                   <div key={m.id}>
                     <AiAgentMessageBubble m={m} />
-                    {m.role === 'task_preview' && m.id === pendingPreviewId ? (
+                    {m.role === 'task_preview' && (m.previewStatus ?? 'pending') === 'pending' ? (
                       <AiAgentPreviewActions
-                        confirmDisabled={confirmDisabled}
-                        showProductPlatforms={pendingPreviewTaskType === 'create_product'}
+                        previewMessageId={m.id}
+                        confirmDisabled={confirmDisabledFor(m.id)}
+                        showProductPlatforms={m.preview?.taskType === 'create_product'}
                       />
                     ) : null}
                   </div>

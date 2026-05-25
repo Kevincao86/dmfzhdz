@@ -5,37 +5,44 @@ import { GROUPBUY_PLATFORMS } from '../constants/productCreatePlatforms'
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 
 type Props = {
+  previewMessageId: string
   confirmDisabled: boolean
   confirmLabel?: string
   showProductPlatforms?: boolean
 }
 
 export function AiAgentPreviewActions({
+  previewMessageId,
   confirmDisabled,
   confirmLabel: confirmLabelOverride,
   showProductPlatforms = false,
 }: Props) {
   const {
-    pendingPreviewTaskType,
-    pendingPreviewLoading,
-    taskConfirming,
+    messages,
     previewSubmitPlatforms,
     togglePreviewSubmitPlatform,
     confirmPendingTask,
     savePendingTaskToDrafts,
     modifyPendingTask,
     cancelPendingTask,
+    isPreviewLoading,
+    isPreviewConfirming,
   } = useAiAgent()
+
+  const previewMsg = messages.find((m) => m.id === previewMessageId)
+  const taskType = previewMsg?.preview?.taskType ?? null
+  const loading = isPreviewLoading(previewMessageId)
+  const confirming = isPreviewConfirming(previewMessageId)
 
   const confirmLabel =
     confirmLabelOverride ??
-    (pendingPreviewLoading
+    (loading
       ? '正在生成预览…'
-      : taskConfirming
-        ? pendingPreviewTaskType === 'create_product'
+      : confirming
+        ? taskType === 'create_product'
           ? '正在提交审核…'
           : '正在生成订单…'
-        : aiTaskConfirmLabel(pendingPreviewTaskType))
+        : aiTaskConfirmLabel(taskType))
 
   const selectablePlatforms = GROUPBUY_PLATFORMS.filter((p) => !p.comingSoon)
 
@@ -77,7 +84,7 @@ export function AiAgentPreviewActions({
         {showProductPlatforms ? (
           <button
             type="button"
-            onClick={() => savePendingTaskToDrafts()}
+            onClick={() => savePendingTaskToDrafts(previewMessageId)}
             disabled={confirmDisabled}
             className={cn(
               'rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-medium text-indigo-900 hover:bg-indigo-100',
@@ -89,7 +96,7 @@ export function AiAgentPreviewActions({
         ) : null}
         <button
           type="button"
-          onClick={confirmPendingTask}
+          onClick={() => confirmPendingTask(previewMessageId)}
           disabled={confirmDisabled}
           className={cn(
             'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
@@ -100,14 +107,14 @@ export function AiAgentPreviewActions({
         </button>
         <button
           type="button"
-          onClick={modifyPendingTask}
+          onClick={() => modifyPendingTask(previewMessageId)}
           className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           修改方案
         </button>
         <button
           type="button"
-          onClick={cancelPendingTask}
+          onClick={() => cancelPendingTask(previewMessageId)}
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
         >
           取消
