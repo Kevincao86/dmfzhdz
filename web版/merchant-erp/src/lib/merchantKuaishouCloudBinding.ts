@@ -10,6 +10,13 @@ import {
 } from './merchantPlatformBindings'
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { applyActiveKuaishouBinding, pickActiveKuaishouBinding } from './kuaishouActiveBinding'
+import { readMerchantSession } from './merchantSession'
+
+const TOKEN_KEY = 'meoo_kuaishou_merchant_token'
+const META_APP_ID = 'meoo_kuaishou_app_id'
+const META_MERCHANT_ID = 'meoo_kuaishou_merchant_id'
+const META_ACCOUNT_NAME = 'meoo_kuaishou_account_name'
+const CLOUD_BACKUP_ATTEMPTED_KEY = 'meoo_kuaishou_cloud_backup_attempted'
 
 const PROVIDER = 'kuaishou' as const
 
@@ -101,7 +108,37 @@ export async function hydrateKuaishouBindingsFromCloud(
     return []
   }
   const rows = await listMerchantBindings(supabase, PROVIDER)
-  const active = pickActiveKuaishouBinding(rows)
-  applyActiveKuaishouBinding(active)
-  return rows.map(toLegacy)
+  if (rows.length > 0) {
+    const active = pickActiveKuaishouBinding(rows)
+    if (active) applyActiveKuaishouBinding(active)
+    return rows.map(toLegacy)
+  }
+
+  const tok = readMerchantSession(TOKEN_KEY)
+  const merchantId = readMerchantSession(META_MERCHANT_ID)
+  if (tok?.trim() && merchantId?.trim()) {
+    let attempted = false
+    try {
+      attempted = sessionStorage.getItem(CLOUD_BACKUP_ATTEMPTED_KEY) === '1'
+    } catch {
+      /* ignore */
+    }
+    if (!attempted) {
+      try {
+        sessionStorage.setItem(CLOUD_BACKUP_ATTEMPTED_KEY, '1')
+      } catch {
+        /* ignore */
+      }
+      const accountName = readMerchantSession(META_ACCOUNT_NAME)
+      const cr = await upsertKuaishouBindingCloud(supabase, {
+        sealedToken: tok.trim(),
+        clientKey: readMerchantSession(META_APP_ID) ?? '',
+        merchantAccountId: merchantId.trim(),
+        accountDisplayName: accountName,
+        bindingLabel: accountName,
+      })
+      if (cr.ok) return [cr.row]
+    }
+  }
+  return []
 }

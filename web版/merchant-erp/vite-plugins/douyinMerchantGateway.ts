@@ -108,7 +108,7 @@ import {
 export { runDouyinMerchantBind }
 
 /** 绑定链路若 hang 住，Vercel 会以 FUNCTION_INVOCATION_FAILED 结束；对抖音出口强制限时 */
-const DOUYIN_FETCH_TIMEOUT_MS = 25_000
+const DOUYIN_FETCH_TIMEOUT_MS = 45_000
 
 /** 商品保存：template/get + 组装 与 product/save 分阶段限时，避免共用一个 55s 导致 save 未发出、Vercel 无完整日志 */
 function douyinGoodsSaveBuildBudgetMs(): number {

@@ -86,7 +86,7 @@ export function merchantKuaishouSessionSecret(): string {
   return process.env.MERCHANT_KUAISHOU_SESSION_SECRET?.trim() ?? ''
 }
 
-const KUAISHOU_FETCH_TIMEOUT_MS = 25_000
+const KUAISHOU_FETCH_TIMEOUT_MS = 45_000
 
 function fetchTimeoutSignal(ms: number): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
