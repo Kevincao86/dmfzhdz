@@ -51,6 +51,11 @@ import {
 } from '../lib/aiAgentPreviewState'
 import { appendKolBriefRecord, writeSelectedBriefForRecruitment } from '../lib/kolBriefStorage'
 import {
+  loadMerchantBriefProductPicks,
+  pickBriefMainAndSecondary,
+} from '../lib/merchantBriefCatalog'
+import { tenantLocalKey } from '../lib/tenantLocalState'
+import {
   loadMerchantIntelSnapshot,
   merchantIntelForProductPlanApi,
   merchantIntelStatusLine,
@@ -843,11 +848,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (target?.preview?.taskType !== 'recruit_influencer') return
 
       const localBrief = buildLocalRecruitmentBriefPreview(userBrief, assistantContent)
-      patchPreviewRecruitmentBrief(
-        previewMsgId,
-        localBrief,
-        '已生成本地 Brief 预览，正在 AI 优化文案…',
-      )
 
       try {
         const brief = await Promise.race([
@@ -864,7 +864,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           brief,
           brief.enrichError
             ? 'Brief 预览已就绪（部分 AI 优化未完成，可核对后确认）。'
-            : '已生成达人招募图文 Brief。请核对主推品与文案，确认后将在本窗口展示招募订单明细（含 AI 档位分配）。',
+            : '已根据方案生成达人招募图文 Brief（三版）。请核对主推品与文案，确认后将在本窗口展示招募订单明细（含 AI 档位分配）。',
         )
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
@@ -872,7 +872,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           previewMsgId,
           {
             ...localBrief,
-            enrichError: `AI 优化未完成：${msg.slice(0, 120)}`,
+            enrichError: `AI 生成未完成：${msg.slice(0, 120)}`,
           },
           'Brief 预览已就绪，可核对后确认；如需调整请在输入框说明。',
         )
@@ -941,13 +941,23 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     (userBrief: string, pageLabel?: string, assistantContent?: string) => {
       const intelLine = merchantIntelStatusLine(loadMerchantIntelSnapshot())
       const intro =
-        `【达人招募 · 独立预览】${intelLine ? `${intelLine}，` : ''}将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief（三版文案）；请在本卡片确认，与其它场景任务互不影响。`
+        `【达人招募 · 独立预览】${intelLine ? `${intelLine}，` : ''}将结合方案全文、绑定账号类目与菜单/商品生成探店图文 Brief（三版文案）；请在本卡片确认，与其它场景任务互不影响。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
-      const localBrief = buildLocalRecruitmentBriefPreview(userBrief, assistantContent)
+      const catalog = loadMerchantBriefProductPicks(24)
+      const hint = [userBrief, assistantContent].filter(Boolean).join('\n').slice(0, 3500)
+      const { main } = pickBriefMainAndSecondary(userBrief, catalog, hint)
+      const loadingBrief: AiRecruitmentBriefPreview = {
+        platform: '抖音来客',
+        mainProductName: main.name,
+        tags: [],
+        briefText: '',
+        previews: ['', '', ''],
+        enrichStatus: 'loading',
+      }
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
           ...preview,
-          recruitmentBrief: localBrief,
+          recruitmentBrief: loadingBrief,
         },
         previewStatus: 'pending',
       })
@@ -1630,7 +1640,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             await appendRecruitmentOrderToOps(order)
             const orderDetail = recruitmentOrderDetailFromRegistry(order, brief, intent, allocation)
             try {
-              window.localStorage.setItem('meoo_last_recruitment_order_id', order.id)
+              window.localStorage.setItem(tenantLocalKey('meoo_last_recruitment_order_id'), order.id)
+              window.dispatchEvent(
+                new CustomEvent('meoo-recruitment-order-created', { detail: { orderId: order.id } }),
+              )
             } catch {
               /* ignore */
             }

@@ -114,9 +114,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     await io.save(next)
     try {
       const { notifyFeishuRecruitmentOrderCreated } = await import('./opsFeishuNotifications.js')
-      notifyFeishuRecruitmentOrderCreated(order)
+      await notifyFeishuRecruitmentOrderCreated(order)
     } catch {
-      /* ignore */
+      /* 飞书通知失败不影响订单写入 */
     }
     sendOpsJson(res, 200, { ok: true })
   } catch (e) {

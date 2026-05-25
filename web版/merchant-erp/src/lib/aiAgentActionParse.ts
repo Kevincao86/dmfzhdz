@@ -356,6 +356,96 @@ export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string 
   return `\n\n——\n\n若需要我按上述方案执行${only}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
 }
 
+const PLAN_SECTION_HEADER_RE =
+  /(?:^|\n)\s*(?:\d+[.、]\s*)?(?:#{1,4}\s*)?(主套餐|次套餐|赠品(?:策略|方案)?)\s*[：:]\s*([^\n]*)/gim
+
+function normalizePlanSectionKind(raw: string): 'main' | 'sub' | 'gift' | null {
+  if (/主套餐/.test(raw)) return 'main'
+  if (/次套餐/.test(raw)) return 'sub'
+  if (/赠品/.test(raw)) return 'gift'
+  return null
+}
+
+const PLAN_SECTION_LABEL: Record<'main' | 'sub' | 'gift', string> = {
+  main: '主套餐',
+  sub: '次套餐',
+  gift: '赠品策略',
+}
+
+/** 从方案 Markdown 解析「主套餐 / 次套餐 / 赠品策略」等结构化组品（避免误拆成 5 个预览） */
+function parsePlanMarkdownProductSections(
+  userBrief: string,
+  assistantContent: string,
+): CreateProductIntent[] | null {
+  const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
+  const headers: {
+    index: number
+    end: number
+    kind: 'main' | 'sub' | 'gift'
+    titleHint: string
+  }[] = []
+
+  PLAN_SECTION_HEADER_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = PLAN_SECTION_HEADER_RE.exec(full)) !== null) {
+    const kind = normalizePlanSectionKind(m[1])
+    if (!kind) continue
+    headers.push({
+      index: m.index,
+      end: m.index + m[0].length,
+      kind,
+      titleHint: m[2].replace(/\*\*/g, '').trim(),
+    })
+  }
+
+  if (headers.length === 0) return null
+  const hasCombo = headers.some((h) => h.kind === 'main' || h.kind === 'sub')
+  if (!hasCombo) return null
+
+  const seenKinds = new Set<string>()
+  const uniqueHeaders = headers.filter((h) => {
+    if (seenKinds.has(h.kind)) return false
+    seenKinds.add(h.kind)
+    return true
+  })
+
+  const intents: CreateProductIntent[] = []
+  for (let i = 0; i < uniqueHeaders.length; i++) {
+    const h = uniqueHeaders[i]!
+    const nextStart = uniqueHeaders[i + 1]?.index ?? full.length
+    const body = full.slice(h.end, nextStart).trim()
+    let name = h.titleHint
+    if (!name || name.length < 2) {
+      const nameM = body.match(/(?:套餐名称|组合名称|名称)\s*[：:]\s*([^\n*]{2,48})/)
+      if (nameM?.[1]) name = nameM[1].replace(/\*\*/g, '').trim()
+    }
+    const sectionLabel = PLAN_SECTION_LABEL[h.kind]
+    const label =
+      name && name !== sectionLabel
+        ? `${sectionLabel} · ${name.replace(/^[：:\s]+/, '').slice(0, 36)}`
+        : sectionLabel
+    const priceYuan = parsePriceYuanFromText(body) ?? parsePriceYuanFromText(h.titleHint)
+    const focusKind = h.kind === 'gift' ? '赠品/加赠策略' : '团购套餐'
+    intents.push({
+      key: h.kind,
+      label: label.slice(0, 48),
+      brief: planIntentBrief(
+        full,
+        `${focusKind}「${label}」${priceYuan != null ? `，参考售价约 ¥${priceYuan}` : ''}。本节要点：\n${body.slice(0, 900)}`,
+      ),
+      productType: inferProductTypeFromLabel(label, priceYuan),
+    })
+  }
+
+  return intents.length > 0 ? intents : null
+}
+
+const GIFT_THRESHOLD_ONLY_RE = /^(?:消费)?满\s*[¥￥]?\d+/
+
+function isGiftThresholdLine(label: string): boolean {
+  return GIFT_THRESHOLD_ONLY_RE.test(label.replace(/\*\*/g, '').trim())
+}
+
 const PLAN_SLOT_PATTERNS: RegExp[] = [
   /套餐[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
   /组品[方案\s]*[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
@@ -455,7 +545,7 @@ function parseCreateProductIntentsFromAgentJson(
 
   const pushIntent = (label: string, priceYuan?: number, productType?: number) => {
     const clean = label.replace(/\*\*/g, '').trim().slice(0, 48)
-    if (clean.length < 2 || seen.has(clean)) return
+    if (clean.length < 2 || seen.has(clean) || isGiftThresholdLine(clean)) return
     seen.add(clean)
     const pt = productType ?? inferProductTypeFromLabel(clean, priceYuan)
     intents.push({
@@ -474,6 +564,7 @@ function parseCreateProductIntentsFromAgentJson(
     const isCreate = /^创建/.test(s)
     const isVoucherSetup = /^设置(?:代金券|优惠券|团购券)/.test(s)
     if (!isCreate && !isVoucherSetup) return
+    if (/^设置赠品|^赠品策略|^加赠/.test(s)) return
     if (META_PRODUCT_STEP_RE.test(s) && !/[¥￥]\d/.test(s) && !isVoucherSetup) return
 
     if (isVoucherSetup) {
@@ -592,6 +683,8 @@ export function parseCreateProductIntentsFromPlan(
   assistantContent?: string,
 ): CreateProductIntent[] {
   if (assistantContent?.trim()) {
+    const fromMarkdown = parsePlanMarkdownProductSections(userBrief, assistantContent)
+    if (fromMarkdown?.length) return fromMarkdown
     const fromJson = parseCreateProductIntentsFromAgentJson(assistantContent, userBrief)
     if (fromJson?.length) return fromJson
   }

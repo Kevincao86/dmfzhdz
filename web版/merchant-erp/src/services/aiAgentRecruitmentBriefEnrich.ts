@@ -128,6 +128,7 @@ export async function buildAiRecruitmentBriefPreview(
         secondary: secondary && secondary.id !== main.id ? secondary : null,
         tags: tags.slice(0, 8),
         ctx: kolCtx,
+        planContext: hint,
       }),
       BRIEFS_AI_TIMEOUT_MS,
       'Brief 文案生成',
