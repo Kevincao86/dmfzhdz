@@ -471,10 +471,32 @@ function parseCreateProductIntentsFromAgentJson(
 
   const parseCreateStep = (step: string): void => {
     const s = step.trim()
-    if (!/^创建/.test(s)) return
-    if (META_PRODUCT_STEP_RE.test(s) && !/[¥￥]\d/.test(s)) return
+    const isCreate = /^创建/.test(s)
+    const isVoucherSetup = /^设置(?:代金券|优惠券|团购券)/.test(s)
+    if (!isCreate && !isVoucherSetup) return
+    if (META_PRODUCT_STEP_RE.test(s) && !/[¥￥]\d/.test(s) && !isVoucherSetup) return
+
+    if (isVoucherSetup) {
+      const body = s.replace(/^设置(?:代金券|优惠券|团购券)[：:]\s*/, '').trim()
+      const label = body.replace(/[。.]+$/u, '').slice(0, 48) || '代金券组合'
+      const priceYuan = parsePriceYuanFromText(body)
+      pushIntent(`代金券 · ${label}`, priceYuan, 2)
+      return
+    }
 
     const priceYuan = parsePriceYuanFromText(s)
+
+    const comboColon = s.match(/^创建(?:团购)?套餐[：:]\s*(.+)$/u)
+    if (comboColon) {
+      const body = comboColon[1].replace(/[。.]+$/u, '').trim()
+      const name = body
+        .replace(/[，,]\s*(?:售价|团购价)?[¥￥]\s*\d+(?:\.\d+)?\s*元?/gu, '')
+        .replace(/(?:售价|团购价)?[¥￥]\s*\d+(?:\.\d+)?\s*元?/gu, '')
+        .trim()
+      pushIntent(name || body, priceYuan ?? parsePriceYuanFromText(body))
+      return
+    }
+
     const tagged = s.match(/的\s*[「【]([^」】]+)[」】]\s*(.+)$/)
     if (tagged) {
       const label = `【${tagged[1].trim()}】${tagged[2].replace(/套餐$/u, '').trim()}`.trim()
