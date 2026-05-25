@@ -20,6 +20,11 @@ import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../../lib/tenantBilling'
 import { getDouyinStores } from '../../services/douyinMerchantApi'
 import {
+  LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT,
+  LOCAL_LIFE_KOL_COMMISSION_MAX_PCT,
+  LOCAL_LIFE_KOL_COMMISSION_MIN_PCT,
+} from '../../lib/localLifeKolCommission'
+import {
   fallbackXiaohongshuNoviceAllocation,
   generateNoviceKolAllocation,
   kolTierStrategyLabel,
@@ -68,7 +73,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [visitStart, setVisitStart] = useState('')
   const [visitEnd, setVisitEnd] = useState('')
   const [strategy, setStrategy] = useState<KolTierStrategy>('more_v4')
-  const [kolCommissionInput, setKolCommissionInput] = useState('15')
+  const [kolCommissionInput, setKolCommissionInput] = useState(String(LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT))
 
   const [selectedStores, setSelectedStores] = useState<SelectedStore[]>([])
   const [storePickerOpen, setStorePickerOpen] = useState(false)
@@ -528,9 +533,13 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                 onChange={(e) => setKolCommissionInput(filterKolCommissionInputDigits(e.target.value))}
                 onBlur={() => setKolCommissionInput(String(parseKolCommissionPctFromDraft(kolCommissionInput)))}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                placeholder="例如：15"
+                placeholder={`例如：${LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT}`}
               />
-              <p className="mt-1 text-xs text-gray-500">当前有效：{parseKolCommissionPctFromDraft(kolCommissionInput)}%（0～80，整数）</p>
+              <p className="mt-1 text-xs text-gray-500">
+                当前有效：{parseKolCommissionPctFromDraft(kolCommissionInput)}%（0～80；本地生活纯佣金常见{' '}
+                {LOCAL_LIFE_KOL_COMMISSION_MIN_PCT}～{LOCAL_LIFE_KOL_COMMISSION_MAX_PCT}%，默认{' '}
+                {LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT}%）
+              </p>
             </div>
           ) : null}
 

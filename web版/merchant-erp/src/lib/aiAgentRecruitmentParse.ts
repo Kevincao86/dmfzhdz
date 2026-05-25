@@ -1,4 +1,5 @@
 import type { KolTierStrategy } from '../services/recruitmentNoviceAllocationAi'
+import { LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT } from './localLifeKolCommission'
 
 /** 从用户自然语言中解析招募意图（预算、人数、城市、平台等） */
 export type AiRecruitmentIntent = {
@@ -60,8 +61,11 @@ function parseStrategy(text: string): KolTierStrategy {
 
 function parseKolCommission(text: string): number {
   const m = text.match(/佣金\s*[:：]?\s*(\d{1,2})\s*%?/)
-  if (m) return Math.max(0, Math.min(80, Number(m[1])))
-  return 15
+  if (m) {
+    const n = Number(m[1])
+    if (Number.isFinite(n)) return Math.max(0, Math.min(80, n))
+  }
+  return LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT
 }
 
 /** 合并用户多轮输入与 Brief 上下文解析招募参数 */
