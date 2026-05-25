@@ -43,7 +43,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     error: r.error,
     status: r.status,
     hint: r.skipped
-      ? '未配置 Webhook 或已关闭 MEOO_FEISHU_NOTIFY_ENABLED；请在 Vercel 配置 MEOO_FEISHU_WEBHOOK_URL 后重试。'
-      : undefined,
+      ? '未配置 Webhook 或已关闭 MEOO_FEISHU_NOTIFY_ENABLED；请在 Vercel 运营后台项目配置 MEOO_FEISHU_WEBHOOK_URL 后重试。'
+      : r.error?.includes('sign') || r.error?.includes('签名')
+        ? '飞书返回签名校验失败：请在 Vercel 配置 MEOO_FEISHU_WEBHOOK_SECRET（与飞书机器人签名校验密钥一致），或关闭飞书签名校验。'
+        : undefined,
   })
 }

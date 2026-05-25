@@ -4,8 +4,11 @@
  * 环境变量：
  * - MEOO_FEISHU_WEBHOOK_URL：默认 Webhook（未配置分场景 URL 时使用）
  * - MEOO_FEISHU_WEBHOOK_RECRUITMENT / _SUPPORT / _ORDER / _CUSTOMER：分场景覆盖
+ * - MEOO_FEISHU_WEBHOOK_SECRET：飞书机器人「签名校验」密钥（开启签名校验时必填）
  * - MEOO_FEISHU_NOTIFY_ENABLED：设为 0/false 关闭全部通知
  */
+
+import { createHmac } from 'node:crypto'
 
 export type FeishuNotifyScene = 'recruitment' | 'support' | 'payment_order' | 'customer'
 
@@ -31,6 +34,22 @@ function webhookForScene(scene: FeishuNotifyScene): string {
   return (byScene[scene] ?? process.env.MEOO_FEISHU_WEBHOOK_URL ?? '').trim()
 }
 
+function buildFeishuTextBody(text: string): Record<string, unknown> {
+  const content = { text: text.trim().slice(0, 4000) || '（空消息）' }
+  const secret = (process.env.MEOO_FEISHU_WEBHOOK_SECRET ?? '').trim()
+  if (!secret) {
+    return { msg_type: 'text', content }
+  }
+  const timestamp = Math.floor(Date.now() / 1000)
+  const sign = createHmac('sha256', secret).update(`${timestamp}\n`).digest('base64')
+  return {
+    timestamp: String(timestamp),
+    sign,
+    msg_type: 'text',
+    content,
+  }
+}
+
 export async function sendFeishuTextNotify(
   scene: FeishuNotifyScene,
   text: string,
@@ -39,15 +58,11 @@ export async function sendFeishuTextNotify(
   const url = webhookForScene(scene)
   if (!url) return { ok: true, skipped: true, error: 'webhook_not_configured' }
 
-  const body = text.trim().slice(0, 4000) || '（空消息）'
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({
-        msg_type: 'text',
-        content: { text: body },
-      }),
+      body: JSON.stringify(buildFeishuTextBody(text)),
     })
     const raw = await res.text()
     if (!res.ok) {
