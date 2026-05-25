@@ -31,7 +31,9 @@ function webhookForScene(scene: FeishuNotifyScene): string {
     payment_order: process.env.MEOO_FEISHU_WEBHOOK_ORDER,
     customer: process.env.MEOO_FEISHU_WEBHOOK_CUSTOMER,
   }
-  return (byScene[scene] ?? process.env.MEOO_FEISHU_WEBHOOK_URL ?? '').trim()
+  const sceneUrl = (byScene[scene] ?? '').trim()
+  if (sceneUrl) return sceneUrl
+  return (process.env.MEOO_FEISHU_WEBHOOK_URL ?? '').trim()
 }
 
 function buildFeishuTextBody(text: string): Record<string, unknown> {
