@@ -58,6 +58,15 @@ export async function dispatchOpsRegistrySupabase(opts: {
       })
       data.tenants = nextTenants
       await io.save(data)
+      try {
+        const { notifyFeishuRegistryTenantCreated } = await import('../../api/opsFeishuNotifications.js')
+        notifyFeishuRegistryTenantCreated(
+          { ...tenant, source: 'erp', updatedAt: new Date().toISOString() },
+          'erp',
+        )
+      } catch {
+        /* ignore */
+      }
       return { status: 200, body: { ok: true } }
     }
 
@@ -108,6 +117,12 @@ export async function dispatchOpsRegistrySupabase(opts: {
       }
       data.tenants.push(row)
       await io.save(data)
+      try {
+        const { notifyFeishuRegistryTenantCreated } = await import('../../api/opsFeishuNotifications.js')
+        notifyFeishuRegistryTenantCreated(row, 'manual')
+      } catch {
+        /* ignore */
+      }
       return { status: 200, body: { ok: true, id } }
     }
 
@@ -194,6 +209,12 @@ export async function dispatchOpsRegistrySupabase(opts: {
       list.unshift(order)
       data.recruitmentOrders = list.slice(0, 200)
       await io.save(data)
+      try {
+        const { notifyFeishuRecruitmentOrderCreated } = await import('../../api/opsFeishuNotifications.js')
+        notifyFeishuRecruitmentOrderCreated(order)
+      } catch {
+        /* 飞书通知失败不影响写入 */
+      }
       return { status: 200, body: { ok: true } }
     }
 

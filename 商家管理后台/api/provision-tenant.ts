@@ -179,12 +179,32 @@ async function provisionWithServiceRole(
     })
   }
 
+  await notifyProvisionFeishu({ tenantId, merchantName, loginName })
+
   return jsonResponse(200, {
     ok: true,
     tenantId,
     userId,
     email,
   })
+}
+
+async function notifyProvisionFeishu(payload: {
+  tenantId: string
+  merchantName: string
+  loginName: string
+}): Promise<void> {
+  try {
+    const { notifyFeishuCustomerCreated } = await import('./opsFeishuNotifications.js')
+    notifyFeishuCustomerCreated({
+      tenantId: payload.tenantId,
+      merchantName: payload.merchantName,
+      loginName: payload.loginName,
+      source: 'provision',
+    })
+  } catch {
+    /* ignore */
+  }
 }
 
 async function forwardToProvisionEdge(

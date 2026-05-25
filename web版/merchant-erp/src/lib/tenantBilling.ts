@@ -260,6 +260,17 @@ export async function insertMerchantPaymentOrder(
   } else {
     row.pay_channel = payload.payChannel ?? 'wechat'
   }
-  const { error } = await supabase.from('merchant_payment_orders').insert(row)
+  const { data, error } = await supabase.from('merchant_payment_orders').insert(row).select('id').single()
   if (error) throw error
+  const orderId = typeof data?.id === 'string' ? data.id : ''
+  if (orderId && session?.access_token) {
+    const { postFeishuPaymentOrderNotify } = await import('./feishuEventNotifyClient')
+    void postFeishuPaymentOrderNotify({
+      orderId,
+      orderKind: payload.orderKind,
+      amountCents: payload.amountCents,
+      clientNote: payload.clientNote ?? null,
+      accessToken: session.access_token,
+    })
+  }
 }
