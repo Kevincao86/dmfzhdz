@@ -92,7 +92,7 @@ const FOLLOWER_TIER_OPTS = ['1000-5000', '5000-1万', '1万+', '5万+', '10万+'
 const COMMERCE_LEVEL_OPTS = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6+'] as const
 
 /** 商家佣金率快捷档位（筛选） */
-const COMMISSION_PRESET_PCTS = [0, 5, 8, 10, 12, 15, 20, 25, 30, 40, 50, 80] as const
+const COMMISSION_PRESET_PCTS = [0, 3, 5, 8, 10, 12, 15, 20, 25, 30, 40, 50, 80] as const
 
 function filterCommissionInputDigits(raw: string): string {
   return raw.replace(/\D/g, '').slice(0, 3)
@@ -158,7 +158,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
   const [visitEnd, setVisitEnd] = useState('')
   const [visitSlots, setVisitSlots] = useState<string[]>(['09:00-12:00'])
   /** 手动输入中的字符串，仅数字；失焦后规范为 0～80 */
-  const [commissionInput, setCommissionInput] = useState('15')
+  const [commissionInput, setCommissionInput] = useState('3')
   const [categoryOptions, setCategoryOptions] = useState<string[]>(['餐饮'])
   const [industry, setIndustry] = useState('餐饮')
   const [provideMeal, setProvideMeal] = useState(false)
@@ -329,8 +329,8 @@ function CreateForm({ onBack }: { onBack: () => void }) {
         createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
         status: 'pending',
         serviceAmount: budget,
-        commissionPct: 15,
-        netAmount: Math.round(Math.max(0, budget) * 0.85),
+        commissionPct: merchantCommissionPct,
+        netAmount: Math.round(Math.max(0, budget) * (1 - merchantCommissionPct / 100)),
         storeAddress,
         category: talentTags[0] ?? '达人招募',
         infoSummary: `招募：${name}；模式：${recruitMode === 'designated' ? `指定达人(${designatedInput.trim()})` : 'AI智能匹配'}；Brief：${selectedBrief.mainProductName}（${selectedBrief.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${industry === '餐饮' && provideMeal ? tablePerMeal : '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、') || '—'}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}`,

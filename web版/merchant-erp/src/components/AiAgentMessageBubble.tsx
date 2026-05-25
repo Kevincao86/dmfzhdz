@@ -29,29 +29,19 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
         <p className="text-sm leading-relaxed text-slate-700">{m.content}</p>
         {m.preview.taskType === 'create_product' ? (() => {
           const productPlans = listProductPlansFromPreview(m.preview)
-          if (!productPlans.length && !m.preview.recruitmentBrief) return null
+          if (!productPlans.length) return null
           const multi = productPlans.length > 1
           return (
-            <>
-              {productPlans.length > 0 ? (
-                <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'mt-4'}>
-                  {productPlans.map((plan) => (
-                    <div
-                      key={plan.slotKey ?? plan.slotLabel ?? plan.productName}
-                      className={multi ? 'rounded-xl border border-violet-100/90 bg-white/80 p-2 shadow-sm' : ''}
-                    >
-                      <AiAgentProductVisualPreview plan={plan} slotLabel={plan.slotLabel} />
-                    </div>
-                  ))}
+            <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'mt-4'}>
+              {productPlans.map((plan) => (
+                <div
+                  key={plan.slotKey ?? plan.slotLabel ?? plan.productName}
+                  className={multi ? 'rounded-xl border border-violet-100/90 bg-white/80 p-2 shadow-sm' : ''}
+                >
+                  <AiAgentProductVisualPreview plan={plan} slotLabel={plan.slotLabel} />
                 </div>
-              ) : null}
-              {m.preview.recruitmentBrief ? (
-                <div className={productPlans.length > 0 ? 'mt-4 border-t border-violet-100/80 pt-4' : 'mt-4'}>
-                  <p className="mb-2 text-xs font-semibold text-violet-900">达人招募方案</p>
-                  <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
-                </div>
-              ) : null}
-            </>
+              ))}
+            </div>
           )
         })() : m.preview.taskType === 'recruit_influencer' && m.preview.recruitmentBrief ? (
           <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
