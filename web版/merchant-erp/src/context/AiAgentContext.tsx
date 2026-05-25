@@ -1122,8 +1122,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const scheduleTaskPreview = useCallback(
     (trimmed: string, assistantContent: string | undefined, explicitTaskType: AiTaskType | undefined, pageLabel?: string) => {
       if (shouldDeferTaskPreview(trimmed, assistantContent, explicitTaskType)) return
-      if (shouldSkipAutoTaskPreview(executionStateRef.current, trimmed, assistantContent)) return
-      if (hasCombinedProductAndRecruitPlan(trimmed, assistantContent)) return
+      if (shouldSkipAutoTaskPreview(executionStateRef.current, trimmed, assistantContent, explicitTaskType))
+        return
+      if (hasCombinedProductAndRecruitPlan(trimmed, assistantContent, explicitTaskType)) return
 
       const taskType =
         explicitTaskType ??
@@ -1136,7 +1137,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       setTimeout(() => {
         switch (taskType) {
           case 'create_product': {
-            const taskTypes = inferDeferredTaskTypes(trimmed, assistantContent)
+            const taskTypes = inferDeferredTaskTypes(trimmed, assistantContent, explicitTaskType)
             if (taskTypes.length && canAcceptDeferredPlan(executionStateRef.current)) {
               executionStateRef.current = storeDeferredPlan(
                 executionStateRef.current,
@@ -1151,7 +1152,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           }
           case 'recruit_influencer':
             if (canAcceptDeferredPlan(executionStateRef.current)) {
-              const taskTypes = inferDeferredTaskTypes(trimmed, assistantContent)
+              const taskTypes = inferDeferredTaskTypes(trimmed, assistantContent, explicitTaskType)
               if (taskTypes.length) {
                 executionStateRef.current = storeDeferredPlan(
                   executionStateRef.current,
@@ -1238,7 +1239,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             : formatAssistantDisplayText(rawSummary ?? res.content)
 
         if (deferPreview) {
-          const taskTypes = inferDeferredTaskTypes(trimmed, res.content)
+          const taskTypes = inferDeferredTaskTypes(trimmed, res.content, taskType ?? inferTaskTypeFromText(trimmed))
           if (taskTypes.length && canAcceptDeferredPlan(executionStateRef.current)) {
             executionStateRef.current = storeDeferredPlan(
               executionStateRef.current,
