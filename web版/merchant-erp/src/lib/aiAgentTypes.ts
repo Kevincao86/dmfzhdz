@@ -69,6 +69,9 @@ export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [
 /** 对话与任务流消息角色 */
 export type AiAgentMessageRole = 'user' | 'assistant' | 'system' | 'task_preview' | 'task_result'
 
+/** 场景任务预览确认状态（每项任务独立） */
+export type AiPreviewStatus = 'pending' | 'confirmed' | 'cancelled'
+
 export type AiProductPlanPreview = {
   productName: string
   suggestedPriceYuan: number
@@ -180,6 +183,8 @@ export type AiAgentMessage = {
   videoUrls?: string[]
   /** 待确认的执行预览（仅 task_preview 使用） */
   preview?: AiTaskPreviewPayload
+  /** 预览确认状态：多项场景任务各自独立 pending/confirmed/cancelled */
+  previewStatus?: AiPreviewStatus
   /** 任务完成摘要（仅 task_result） */
   resultSummary?: string
   /** 达人招募确认后的订单明细（仅 task_result） */
@@ -214,7 +219,10 @@ export function createAgentMessage(
   role: AiAgentMessageRole,
   content: string,
   extra?: Partial<
-    Pick<AiAgentMessage, 'preview' | 'resultSummary' | 'recruitmentOrder' | 'imageUrls' | 'videoUrls'>
+    Pick<
+      AiAgentMessage,
+      'preview' | 'previewStatus' | 'resultSummary' | 'recruitmentOrder' | 'imageUrls' | 'videoUrls'
+    >
   >,
 ): AiAgentMessage {
   return {
@@ -222,6 +230,7 @@ export function createAgentMessage(
     role,
     content,
     createdAt: Date.now(),
+    ...(role === 'task_preview' && extra?.previewStatus == null ? { previewStatus: 'pending' as const } : {}),
     ...extra,
   }
 }
