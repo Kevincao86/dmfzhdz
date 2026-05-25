@@ -281,11 +281,14 @@ export function buildImageAssistTextFields(
   opts?: {
     productType?: number | null
     productTypeLabel?: string
+    industryPath?: string
   },
 ): ImageAssistTextFields {
   const listing = productName.trim()
   const typeLabel = (opts?.productTypeLabel ?? '').trim()
   const productType = opts?.productType ?? undefined
+  const industryPath = opts?.industryPath?.trim()
+  const visualCategory = inferIndustryVisualCategory(industryPath, listing)
   const main = resolveMainProductForImage({
     listingTitle: listing,
     productType,
@@ -297,7 +300,11 @@ export function buildImageAssistTextFields(
   const typeLine = isVoucher
     ? `【商品类型】代金券（须生成券面/核销示意，禁止无关实体货架或玩具模型）`
     : isGroupBuyGoodsProduct(productType, typeLabel)
-      ? `【商品类型】团购套餐（突出套餐内容/就餐场景）`
+      ? visualCategory === 'digital'
+        ? `【商品类型】数码/3C 团购（须展示标题中的电子设备，禁止餐饮餐桌/火锅/菜品）`
+        : visualCategory === 'catering'
+          ? `【商品类型】餐饮团购套餐（突出餐品或就餐场景）`
+          : `【商品类型】团购套餐（须与标题及经营类目「${industryPath || '本地生活'}」一致，禁止偷换为无关餐饮）`
       : typeLabel
         ? `【商品类型】${typeLabel}`
         : productType != null
@@ -320,9 +327,27 @@ export function buildImageAssistTextFields(
   }
 }
 
+/** 结合绑定类目路径与标题关键词推断生图业态，避免「组合套餐」误判为餐饮 */
+export function inferIndustryVisualCategory(
+  industryPath?: string,
+  anchor?: string,
+): 'catering' | 'digital' | 'beauty' | 'general' {
+  const combined = `${industryPath ?? ''} ${anchor ?? ''}`.trim()
+  if (/数码|3c|3C|手机|电脑|电子|家电|智能穿戴|耳机|平板|投影|鼠标|眼镜|科技|潮品|配件|开学|影音/.test(combined)) {
+    return 'digital'
+  }
+  if (/餐饮|美食|外卖|火锅|烧烤|咖啡|茶饮|蛋糕|烘焙|食堂|菜品|放题|自助/.test(combined)) {
+    return 'catering'
+  }
+  if (/美容|美发|美甲|spa|护理|美睫/.test(combined)) {
+    return 'beauty'
+  }
+  return 'general'
+}
+
 export function mainProductCategoryHints(
   anchor: string,
-  opts?: { isVoucher?: boolean; isGroupBuy?: boolean },
+  opts?: { isVoucher?: boolean; isGroupBuy?: boolean; industryPath?: string },
 ): string {
   const a = anchor.trim()
   const isVoucher = opts?.isVoucher ?? /代金券|团购券|优惠券|通兑|代金/.test(a)
@@ -332,11 +357,20 @@ export function mainProductCategoryHints(
     }
     return '主推为代金券：仅允许平面券面设计；禁止货架、售货机、玩具模型、展厅空镜。'
   }
-  if (opts?.isGroupBuy || /自助|套餐|放题/.test(a)) {
+
+  const industry = inferIndustryVisualCategory(opts?.industryPath, a)
+
+  if (industry === 'digital') {
+    return '主推为数码/3C 零售团购：须展示标题中的真实电子产品（手环、耳机、投影、支架、鼠标、眼镜等），白底或门店数码陈列；严禁餐饮菜品、火锅、餐桌、厨房场景。'
+  }
+  if (industry === 'beauty') {
+    return '主推为到店服务：突出服务过程或效果氛围，勿生成无关商品陈列或餐饮场景。'
+  }
+  if (
+    industry === 'catering' &&
+    (opts?.isGroupBuy || /自助|放题|餐|锅|菜|宴/.test(a))
+  ) {
     return '主推为餐饮团购套餐：突出餐品或就餐场景，勿生成无关零售货架或代金券券面。'
   }
-  if (/美容|美发|美甲|spa|护理/i.test(a)) {
-    return '主推为到店服务：突出服务过程或效果氛围，勿生成无关商品陈列。'
-  }
-  return '主推须与商品类型及标题一致，禁止偷换为数码、无关餐饮或卖场空镜。'
+  return '主推须与商品标题及绑定经营类目一致，禁止偷换为无关餐饮、卖场空镜或与标题不符的品类。'
 }

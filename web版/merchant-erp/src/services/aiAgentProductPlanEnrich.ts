@@ -91,6 +91,7 @@ export async function enrichAiProductPlanPreview(
   const imageFields = buildImageAssistTextFields(titleAnchor, plan.description, {
     productType,
     productTypeLabel: typeLabel,
+    industryPath: opts?.industryPath,
   })
 
   const assistBase = {
@@ -140,8 +141,12 @@ export async function enrichAiProductPlanPreview(
     const categoryHint = mainProductCategoryHints(imageAnchor, {
       isVoucher,
       isGroupBuy: !isVoucher,
+      industryPath: opts?.industryPath,
     })
-    const imageUserLine = `帮我生成一张${imageAnchor}主图。${categoryHint}禁止生成与商品无关的动物、吉祥物或门店 mascots 替代实物。`
+    const industryLockLine = opts?.industryPath?.trim()
+      ? `经营类目：${opts.industryPath.trim()}。`
+      : ''
+    const imageUserLine = `${industryLockLine}帮我生成一张${imageAnchor}主图。${categoryHint}禁止生成与商品无关的动物、吉祥物、门店 mascots 或餐饮菜品（除非标题与类目确为餐饮）。`
     const imageModel = resolveImageAssistModelIdFromChatPicker(chatPickerKey)
     const imageBase = {
       model: imageModel,

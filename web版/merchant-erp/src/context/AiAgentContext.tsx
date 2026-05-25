@@ -61,7 +61,10 @@ import {
 } from '../lib/agentMerchantIntelLoader'
 import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeIntelApi'
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
-import { buildAiRecruitmentBriefPreview } from '../services/aiAgentRecruitmentBriefEnrich'
+import {
+  buildAiRecruitmentBriefPreview,
+  buildLocalRecruitmentBriefPreview,
+} from '../services/aiAgentRecruitmentBriefEnrich'
 import {
   formatAiProductSubmitSummary,
   submitAiProductPlansToPlatforms,
@@ -838,39 +841,40 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
       const target = messagesRef.current.find((m) => m.id === previewMsgId)
       if (target?.preview?.taskType !== 'recruit_influencer') return
+
+      const localBrief = buildLocalRecruitmentBriefPreview(userBrief, assistantContent)
       patchPreviewRecruitmentBrief(
         previewMsgId,
-        { enrichStatus: 'loading' },
-        '正在生成达人探店图文 Brief（3 个版本）…',
+        localBrief,
+        '已生成本地 Brief 预览，正在 AI 优化文案…',
       )
+
       try {
         const brief = await Promise.race([
           buildAiRecruitmentBriefPreview(userBrief, assistantContent),
-          new Promise<never>((_, reject) =>
+          new Promise<AiRecruitmentBriefPreview>((_, reject) =>
             window.setTimeout(
-              () => reject(new Error('Brief 生成超时（120s）')),
-              120_000,
+              () => reject(new Error('Brief 生成超时（90s）')),
+              90_000,
             ),
           ),
         ])
         patchPreviewRecruitmentBrief(
           previewMsgId,
           brief,
-          '已生成达人招募图文 Brief。请核对主推品与文案，确认后将在本窗口展示招募订单明细（含 AI 档位分配）。',
+          brief.enrichError
+            ? 'Brief 预览已就绪（部分 AI 优化未完成，可核对后确认）。'
+            : '已生成达人招募图文 Brief。请核对主推品与文案，确认后将在本窗口展示招募订单明细（含 AI 档位分配）。',
         )
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         patchPreviewRecruitmentBrief(
           previewMsgId,
           {
-            platform: '抖音来客',
-            mainProductName: briefProductNameHint(userBrief),
-            tags: [],
-            briefText: userBrief.slice(0, 400),
-            enrichStatus: 'ready',
-            enrichError: `Brief 生成未完成：${msg.slice(0, 120)}`,
+            ...localBrief,
+            enrichError: `AI 优化未完成：${msg.slice(0, 120)}`,
           },
-          'Brief 生成失败，确认后可在招募页手动补充。',
+          'Brief 预览已就绪，可核对后确认；如需调整请在输入框说明。',
         )
       }
     },
@@ -939,16 +943,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const intro =
         `【达人招募 · 独立预览】${intelLine ? `${intelLine}，` : ''}将结合绑定账号类目、菜单/商品与行业标签生成探店图文 Brief（三版文案）；请在本卡片确认，与其它场景任务互不影响。`
       const preview = buildPreviewForTask('recruit_influencer', pageLabel)
+      const localBrief = buildLocalRecruitmentBriefPreview(userBrief, assistantContent)
       const msg = createAgentMessage('task_preview', intro, {
         preview: {
           ...preview,
-          recruitmentBrief: {
-            platform: '抖音来客',
-            mainProductName: briefProductNameHint(userBrief),
-            tags: [],
-            briefText: '',
-            enrichStatus: 'loading',
-          },
+          recruitmentBrief: localBrief,
         },
         previewStatus: 'pending',
       })
