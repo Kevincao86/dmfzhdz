@@ -97,6 +97,10 @@ function orderDetailRows(order: RegistryRecruitmentOrder): { label: string; valu
   return rows
 }
 
+function hasOrderInfoSummary(order: RegistryRecruitmentOrder): boolean {
+  return Boolean(order.infoSummary?.trim())
+}
+
 function orderStatusStyle(s: RecruitmentOrderStatus): string {
   if (s === 'pending') return 'bg-amber-500/15 text-amber-400'
   if (s === 'accepted') return 'bg-sky-500/15 text-sky-400'
@@ -721,7 +725,25 @@ export default function OpsRecruitmentOrdersPage() {
                         {orderStatusLabel(o.status)}
                       </span>
                     </td>
-                    <td className="max-w-[220px] px-3 py-2 text-xs text-slate-500">{o.infoSummary ?? '—'}</td>
+                    <td className="max-w-[12rem] px-3 py-2 align-top">
+                      {hasOrderInfoSummary(o) ? (
+                        <button
+                          type="button"
+                          onClick={() => setDetailOrder(o)}
+                          className="group w-full max-w-[12rem] text-left"
+                          title="点击查看完整招募信息"
+                        >
+                          <p className="line-clamp-2 text-xs leading-relaxed text-slate-500 group-hover:text-slate-300">
+                            {o.infoSummary!.trim()}
+                          </p>
+                          <span className="mt-1 inline-block text-[11px] text-indigo-400 group-hover:underline">
+                            查看详情
+                          </span>
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-600">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right text-slate-300">
                       <div>¥{o.serviceAmount.toLocaleString('zh-CN')}</div>
                       <div className="text-[10px] text-slate-600">

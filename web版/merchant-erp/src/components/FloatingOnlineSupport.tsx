@@ -136,6 +136,21 @@ export default function FloatingOnlineSupport({
             detail: [error.message, error.code ? `code=${error.code}` : '', hint].filter(Boolean).join(' '),
           }
         }
+        if (from === 'user' && supabase) {
+          const { data: authData } = await supabase.auth.getSession()
+          const token = authData.session?.access_token
+          if (token) {
+            const { postFeishuSupportMessageNotify } = await import('../lib/feishuEventNotifyClient')
+            void postFeishuSupportMessageNotify({
+              sessionId: sessionIdRef.current,
+              enterpriseName: enterpriseNameRef.current.trim() || undefined,
+              customerId: customerIdRef.current.trim() || undefined,
+              text,
+              ts: Date.now(),
+              accessToken: token,
+            })
+          }
+        }
         return { ok: true }
       }
       return { ok: true }

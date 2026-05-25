@@ -112,6 +112,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const next = appendRecruitmentOrderForTenant(data, order, auth.tenantId, auth.userId)
     await io.save(next)
+    try {
+      const { notifyFeishuRecruitmentOrderCreated } = await import('./opsFeishuNotifications.js')
+      notifyFeishuRecruitmentOrderCreated(order)
+    } catch {
+      /* ignore */
+    }
     sendOpsJson(res, 200, { ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
