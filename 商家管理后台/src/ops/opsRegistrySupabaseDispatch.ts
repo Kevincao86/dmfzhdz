@@ -211,7 +211,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       await io.save(data)
       try {
         const { notifyFeishuRecruitmentOrderCreated } = await import('../../api/opsFeishuNotifications.js')
-        notifyFeishuRecruitmentOrderCreated(order)
+        await notifyFeishuRecruitmentOrderCreated(order)
       } catch {
         /* 飞书通知失败不影响写入 */
       }

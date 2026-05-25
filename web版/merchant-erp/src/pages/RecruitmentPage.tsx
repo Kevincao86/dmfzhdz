@@ -1047,6 +1047,12 @@ export default function RecruitmentPage() {
   const refreshHubOrder = useCallback(() => setHubOrderFetchNonce((n) => n + 1), [])
 
   useEffect(() => {
+    const onCreated = () => refreshHubOrder()
+    window.addEventListener('meoo-recruitment-order-created', onCreated)
+    return () => window.removeEventListener('meoo-recruitment-order-created', onCreated)
+  }, [refreshHubOrder])
+
+  useEffect(() => {
     if (screen !== 'hub') return
     let cancelled = false
     setHubOrderLoading(true)
@@ -1055,7 +1061,11 @@ export default function RecruitmentPage() {
       try {
         let lastId = ''
         try {
-          lastId = window.localStorage.getItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE))?.trim() ?? ''
+          lastId =
+            window.localStorage.getItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE))?.trim() ?? ''
+          if (!lastId) {
+            lastId = window.localStorage.getItem(LAST_RECRUITMENT_ORDER_KEY_BASE)?.trim() ?? ''
+          }
         } catch {
           lastId = ''
         }

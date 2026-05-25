@@ -1,5 +1,5 @@
 import type { RegistryRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
-import { notifyFeishuAsync } from './feishuNotify.js'
+import { notifyFeishuAsync, sendFeishuTextNotify, type FeishuNotifyResult } from './feishuNotify.js'
 
 function yuan(cents: number): string {
   return (Math.max(0, cents) / 100).toFixed(2)
@@ -11,9 +11,11 @@ const ORDER_KIND_LABEL: Record<string, string> = {
   refund: '退款',
 }
 
-export function notifyFeishuRecruitmentOrderCreated(order: RegistryRecruitmentOrder): void {
+export async function notifyFeishuRecruitmentOrderCreated(
+  order: RegistryRecruitmentOrder,
+): Promise<FeishuNotifyResult> {
   const summary = (order.infoSummary ?? '').trim().slice(0, 280)
-  notifyFeishuAsync(
+  return sendFeishuTextNotify(
     'recruitment',
     [
       '【达人招募 · 新订单】',
