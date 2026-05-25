@@ -25,7 +25,7 @@ import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
 import { getDouyinStores } from '../services/douyinMerchantApi'
 import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
 
-const FETCH_TIMEOUT_MS = 12_000
+const FETCH_TIMEOUT_MS = 45_000
 
 export type MerchantIntelEnrichment = Pick<
   MerchantIntelSnapshot,

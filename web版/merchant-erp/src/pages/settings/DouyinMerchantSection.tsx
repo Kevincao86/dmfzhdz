@@ -78,7 +78,7 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 export default function DouyinMerchantSection() {
   const { plan, entitlements } = useMembership()
   const bindingLimit = entitlements.platformBindingLimit
-  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(() => readMerchantSession(TOKEN_KEY))
   const [bindOpen, setBindOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
   /** 默认关闭：避免切页/刷新时定时静默拉取与 TOKEN 刷新叠加重试，误判为断连 */
@@ -86,15 +86,15 @@ export default function DouyinMerchantSection() {
   const [manualRefreshing, setManualRefreshing] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
-  const [appId, setAppId] = useState('')
+  const [appId, setAppId] = useState(() => readMerchantSession(META_APP_ID) ?? '')
   const [appSecret, setAppSecret] = useState('')
-  const [merchantId, setMerchantId] = useState('')
+  const [merchantId, setMerchantId] = useState(() => readMerchantSession(META_MERCHANT_ID) ?? '')
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
   /** true = 密文；与按钮图标「当前可执行动作」一致：遮罩时显示眼睛=点击显示明文 */
   const [secretMasked, setSecretMasked] = useState(true)
-  const [boundMerchantId, setBoundMerchantId] = useState('')
-  const [boundAccountName, setBoundAccountName] = useState('')
+  const [boundMerchantId, setBoundMerchantId] = useState(() => readMerchantSession(META_MERCHANT_ID) ?? '')
+  const [boundAccountName, setBoundAccountName] = useState(() => readMerchantSession(META_ACCOUNT_NAME) ?? '')
   const [bindLabel, setBindLabel] = useState('')
   const [cloudBindings, setCloudBindings] = useState<DouyinCloudBindingRow[]>([])
 
@@ -142,9 +142,7 @@ export default function DouyinMerchantSection() {
         return
       }
 
-      /** 当前租户无云端绑定时，禁止沿用其它账号留在 localStorage 的凭证（避免串租户） */
-      clearDouyinMerchantBindingLocal()
-      setCloudBindings([])
+      /** 云端与本地均无凭证时仅更新 UI，勿误清 localStorage（hydrate 已保证不主动删凭证） */
       setAccessToken(null)
       setBoundMerchantId('')
       setBoundAccountName('')

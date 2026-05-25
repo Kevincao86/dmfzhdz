@@ -86,7 +86,7 @@ export function merchantDouyinSessionSecret(): string {
   return process.env.MERCHANT_DOUYIN_SESSION_SECRET?.trim() ?? ''
 }
 
-const DOUYIN_FETCH_TIMEOUT_MS = 25_000
+const DOUYIN_FETCH_TIMEOUT_MS = 45_000
 
 function fetchTimeoutSignal(ms: number): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }

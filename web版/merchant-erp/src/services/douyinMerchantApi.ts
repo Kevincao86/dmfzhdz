@@ -21,8 +21,15 @@ import { extractLifeBrandStructName } from '../lib/douyinLifeBrandExtract'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
-/** 浏览器 → 同源绑定接口；服务端再调抖音（服务端约 25s 超时），此处略放宽避免永久挂起 */
+/** 浏览器 → 同源绑定接口；服务端再调抖音（服务端约 45s 超时），此处略放宽避免永久挂起 */
 const DOUYIN_BIND_CLIENT_TIMEOUT_MS = 70_000
+const DOUYIN_STORES_CLIENT_TIMEOUT_MS = 65_000
+
+function storesFetchTimeoutSignal(): { signal: AbortSignal; clear: () => void } {
+  const ctrl = new AbortController()
+  const id = window.setTimeout(() => ctrl.abort(), DOUYIN_STORES_CLIENT_TIMEOUT_MS)
+  return { signal: ctrl.signal, clear: () => window.clearTimeout(id) }
+}
 
 export const DOUYIN_SHOP_POI_QUERY_DOC =
   'https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/life.capacity.shop/store-management/shop.query'
@@ -275,21 +282,39 @@ export async function getDouyinStores(params: {
   const storePaths = ['/api/meoo-douyin-stores', '/api/merchant/douyin/stores'] as const
   let res: Response | null = null
   let rawText = ''
-  for (const p of storePaths) {
-    const r = await fetch(url(`${p}${qs}`), {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${params.accessToken}`,
-        Accept: 'application/json',
-      },
-    })
-    const text = await r.text()
-    const ct = r.headers.get('content-type') ?? ''
-    if (r.ok && responseLooksLikeHtml(text, ct)) continue
-    if (r.status === 404) continue
-    res = r
-    rawText = text
-    break
+  const { signal, clear: clearStoresTimer } = storesFetchTimeoutSignal()
+  try {
+    for (const p of storePaths) {
+      let r: Response
+      try {
+        r = await fetch(url(`${p}${qs}`), {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${params.accessToken}`,
+            Accept: 'application/json',
+          },
+          signal,
+        })
+      } catch (e) {
+        const name = e instanceof Error ? e.name : ''
+        if (name === 'AbortError') {
+          return {
+            ok: false,
+            message: `门店列表请求超时（${Math.round(DOUYIN_STORES_CLIENT_TIMEOUT_MS / 1000)} 秒）。绑定凭据仍保留，请稍后重试或检查网络。`,
+          }
+        }
+        throw e
+      }
+      const text = await r.text()
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.ok && responseLooksLikeHtml(text, ct)) continue
+      if (r.status === 404) continue
+      res = r
+      rawText = text
+      break
+    }
+  } finally {
+    clearStoresTimer()
   }
   if (!res) {
     return {

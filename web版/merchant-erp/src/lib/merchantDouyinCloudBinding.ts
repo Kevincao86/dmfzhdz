@@ -10,6 +10,13 @@ import {
 } from './merchantPlatformBindings'
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { applyActiveDouyinBinding, pickActiveDouyinBinding } from './douyinActiveBinding'
+import { readMerchantSession } from './merchantSession'
+
+const TOKEN_KEY = 'meoo_douyin_merchant_token'
+const META_APP_ID = 'meoo_douyin_app_id'
+const META_MERCHANT_ID = 'meoo_douyin_merchant_id'
+const META_ACCOUNT_NAME = 'meoo_douyin_account_name'
+const CLOUD_BACKUP_ATTEMPTED_KEY = 'meoo_douyin_cloud_backup_attempted'
 
 const PROVIDER = 'douyin' as const
 
@@ -101,7 +108,38 @@ export async function hydrateDouyinBindingsFromCloud(
     return []
   }
   const rows = await listMerchantBindings(supabase, PROVIDER)
-  const active = pickActiveDouyinBinding(rows)
-  applyActiveDouyinBinding(active)
-  return rows.map(toLegacy)
+  if (rows.length > 0) {
+    const active = pickActiveDouyinBinding(rows)
+    if (active) applyActiveDouyinBinding(active)
+    return rows.map(toLegacy)
+  }
+
+  /** 云端暂无记录时保留本机凭证；仅尝试一次补写云端，避免首页探测反复 upsert */
+  const tok = readMerchantSession(TOKEN_KEY)
+  const merchantId = readMerchantSession(META_MERCHANT_ID)
+  if (tok?.trim() && merchantId?.trim()) {
+    let attempted = false
+    try {
+      attempted = sessionStorage.getItem(CLOUD_BACKUP_ATTEMPTED_KEY) === '1'
+    } catch {
+      /* ignore */
+    }
+    if (!attempted) {
+      try {
+        sessionStorage.setItem(CLOUD_BACKUP_ATTEMPTED_KEY, '1')
+      } catch {
+        /* ignore */
+      }
+      const accountName = readMerchantSession(META_ACCOUNT_NAME)
+      const cr = await upsertDouyinBindingCloud(supabase, {
+        sealedToken: tok.trim(),
+        clientKey: readMerchantSession(META_APP_ID) ?? '',
+        merchantAccountId: merchantId.trim(),
+        accountDisplayName: accountName,
+        bindingLabel: accountName,
+      })
+      if (cr.ok) return [cr.row]
+    }
+  }
+  return []
 }
