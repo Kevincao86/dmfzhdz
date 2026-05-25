@@ -1,4 +1,6 @@
 import type { AiTaskType } from './aiAgentTypes'
+import { AI_TASK_TYPE_LABELS } from './aiAgentTypes'
+import { filterScenarioTaskTypes } from './aiAgentPreviewState'
 import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
 import { buildMenuComboIntentLabels } from './merchantBriefCatalog'
 
@@ -328,32 +330,61 @@ export function looksLikePlanDocument(content: string): boolean {
   return false
 }
 
+/** 用户是否通过「快捷任务」入口发起（九大场景之一） */
+export function isAgentShortcutTaskLine(text: string): boolean {
+  return /^使用快捷任务：/.test(text.replace(/\[引用[\s\S]*?\n\n/, '').trim())
+}
+
 /** 从用户话术 + 助手方案推断需执行的任务类型 */
 export function inferTaskTypesFromCombinedContext(
   userText: string,
   assistantContent?: string,
+  explicitTaskType?: AiTaskType,
 ): AiTaskType[] {
+  if (assistantContent) {
+    const agentAction = parseAgentActionType(assistantContent)
+    if (agentAction) return [agentAction]
+  }
+
+  if (explicitTaskType && (isAgentShortcutTaskLine(userText) || !isPlanDesignQuery(userText))) {
+    return [explicitTaskType]
+  }
+
   const types = new Set<AiTaskType>()
   const userType = inferTaskTypeFromText(userText)
   if (userType) types.add(userType)
-  if (assistantContent) {
+
+  if (assistantContent && looksLikePlanDocument(assistantContent)) {
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
     if (/达人|招募|探店|种草|KOL|网红|达人合作/.test(c)) types.add('recruit_influencer')
   }
+
   return [...types]
 }
 
-/** 方案设计完成后追加的执行确认引导语 */
+/** 方案设计完成后追加的执行确认引导语（按实际涉及场景生成，避免误提无关任务） */
 export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string {
-  const hasProduct = taskTypes.includes('create_product')
-  const hasRecruit = taskTypes.includes('recruit_influencer')
-  if (!hasProduct && !hasRecruit) return ''
-  if (hasProduct && hasRecruit) {
-    return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n将为涉及的**每一项场景**（如创建商品、达人招募等）**分别生成独立预览卡片**，您可在各卡片内单独确认、修改或取消；确认后我将调用对应接口并返回结果。\n如有商品图可在下一条消息上传；若无图片，回复「自动生成」即可。\n您也可以直接说明需要调整的部分。`
+  const filtered = filterScenarioTaskTypes(taskTypes)
+  if (!filtered.length) return ''
+
+  const labels = filtered.map((t) => AI_TASK_TYPE_LABELS[t] ?? t)
+  const adjustHint = '您也可以直接说明需要调整的部分。'
+
+  if (filtered.length === 1) {
+    const only = labels[0]!
+    const productNote =
+      filtered[0] === 'create_product'
+        ? '\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，回复「自动生成」即可。'
+        : ''
+    return `\n\n——\n\n若需要我按上述方案执行「${only}」，请回复「确认执行」。${productNote}\n${adjustHint}`
   }
-  const only = hasProduct ? '商品/套餐创建' : '达人招募'
-  return `\n\n——\n\n若需要我按上述方案执行${only}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
+
+  const list = labels.join('、')
+  const productNote = filtered.includes('create_product')
+    ? '\n如有商品图可在下一条消息上传；若无图片，回复「自动生成」即可。'
+    : ''
+  return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n将为 ${filtered.length} 项场景（${list}）分别生成独立预览卡片，您可在各卡片内单独确认、修改或取消；确认后我将调用对应接口并返回结果。${productNote}\n${adjustHint}`
 }
 
 const PLAN_SECTION_HEADER_RE =
@@ -749,8 +780,12 @@ export function parseCreateProductIntentsFromPlan(
 }
 
 /** 方案同时含「组品/上架」与「达人招募」时需分步执行，不可合并预览 */
-export function hasCombinedProductAndRecruitPlan(userText: string, assistantContent?: string): boolean {
-  const types = inferTaskTypesFromCombinedContext(userText, assistantContent)
+export function hasCombinedProductAndRecruitPlan(
+  userText: string,
+  assistantContent?: string,
+  explicitTaskType?: AiTaskType,
+): boolean {
+  const types = inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType)
   return types.includes('create_product') && types.includes('recruit_influencer')
 }
 
@@ -760,7 +795,7 @@ export function shouldDeferTaskPreview(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
-  if (hasCombinedProductAndRecruitPlan(userText, assistantContent)) return true
+  if (hasCombinedProductAndRecruitPlan(userText, assistantContent, explicitTaskType)) return true
   if (assistantContent && parseAgentConfirmRequired(assistantContent)) return true
   if (parseAgentActionType(assistantContent ?? '')) return false
   if (isExplicitExecutionIntent(userText)) return false

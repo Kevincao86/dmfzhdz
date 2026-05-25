@@ -209,8 +209,14 @@ function taskTypeLabel(t: AiTaskType): string {
   return map[t] ?? t
 }
 
-export function inferDeferredTaskTypes(userText: string, assistantContent?: string): AiTaskType[] {
-  return filterScenarioTaskTypes(inferTaskTypesFromCombinedContext(userText, assistantContent))
+export function inferDeferredTaskTypes(
+  userText: string,
+  assistantContent?: string,
+  explicitTaskType?: AiTaskType,
+): AiTaskType[] {
+  return filterScenarioTaskTypes(
+    inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType),
+  )
 }
 
 /** 组合多场景方案须先「确认执行」，不自动弹出预览 */
@@ -218,7 +224,8 @@ export function shouldSkipAutoTaskPreview(
   _state: AgentExecutionState,
   userText: string,
   assistantContent?: string,
+  explicitTaskType?: AiTaskType,
 ): boolean {
-  const types = inferDeferredTaskTypes(userText, assistantContent)
+  const types = inferDeferredTaskTypes(userText, assistantContent, explicitTaskType)
   return types.length > 1
 }
