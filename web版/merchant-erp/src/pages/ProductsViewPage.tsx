@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpDown, ExternalLink, Loader2, Pencil, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, ExternalLink, Loader2, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -8,11 +8,12 @@ import {
 } from '../constants/productCreatePlatforms'
 import { cn } from '../cn'
 import {
+  deleteProductEditLibraryDraft,
   loadProductEditLibrary,
   updateProductEditLibraryRow,
   type ProductEditLibraryRow,
 } from '../lib/productEditLibrary'
-import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
+import { loadDraftDetailSnapshot, removeDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
 import {
   type MerchantProductListItem,
   fetchMerchantProductList,
@@ -73,6 +74,8 @@ export default function ProductsViewPage() {
     goOnline: boolean
   } | null>(null)
   const [shelfBusy, setShelfBusy] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [priceEditId, setPriceEditId] = useState<string | null>(null)
   const [priceEditValue, setPriceEditValue] = useState('')
 
@@ -220,6 +223,23 @@ export default function ProductsViewPage() {
     }
     setSyncToast(r.ok ? r.message ?? '上下架已同步至平台' : r.message)
     window.setTimeout(() => setSyncToast(null), 4800)
+  }
+
+  const confirmDeleteDraft = async () => {
+    if (!deleteConfirm) return
+    setDeleteBusy(true)
+    setSyncToast(null)
+    const ok = deleteProductEditLibraryDraft(deleteConfirm.id)
+    if (ok) {
+      removeDraftDetailSnapshot(deleteConfirm.id)
+      refreshLibrary()
+      setSyncToast(`已删除本地草稿「${deleteConfirm.name}」`)
+    } else {
+      setSyncToast('删除失败：未找到该草稿')
+    }
+    setDeleteBusy(false)
+    setDeleteConfirm(null)
+    window.setTimeout(() => setSyncToast(null), 4200)
   }
 
   const runPullSync = async (id: string) => {
@@ -541,6 +561,17 @@ export default function ProductsViewPage() {
                         />
                         同步
                       </button>
+                      {r.origin === 'library' ? (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirm({ id: r.id, name: r.name })}
+                          className="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-100"
+                          title="删除本地草稿（不影响平台已提交商品）"
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          删除
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -586,6 +617,47 @@ export default function ProductsViewPage() {
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
               >
                 {shelfBusy ? '处理中…' : '确认'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => !deleteBusy && setDeleteConfirm(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-draft-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-draft-title" className="text-lg font-semibold text-gray-900">
+              确认删除本地草稿
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              将删除「{deleteConfirm.name}」的本地草稿记录。若已提交至平台审核，平台侧商品不受影响。
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => void confirmDeleteDraft()}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteBusy ? '删除中…' : '确认删除'}
               </button>
             </div>
           </div>

@@ -70,7 +70,7 @@ export function membershipAllowsAiTask(plan: MembershipPlan, task: AiTaskType): 
 export function aiTaskConfirmLabel(taskType: AiTaskType | null): string {
   switch (taskType) {
     case 'create_product':
-      return '确认商品方案'
+      return '确认并提交审核'
     case 'recruit_influencer':
       return '确认并下达招募订单'
     case 'file_tax':

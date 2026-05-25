@@ -11,8 +11,6 @@ import {
   type SetStateAction,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { saveAiProductDraft, saveAiProductDraftBatch, type AiProductDraft } from '../lib/aiProductDraft'
-import { persistAiProductPlansToEditLibrary } from '../lib/aiAgentProductLibrary'
 import type {
   AiAgentArchivedSession,
   AiAgentMessage,
@@ -60,8 +58,11 @@ import {
 import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeIntelApi'
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
 import { buildAiRecruitmentBriefPreview } from '../services/aiAgentRecruitmentBriefEnrich'
+import {
+  formatAiProductSubmitSummary,
+  submitAiProductPlansToPlatforms,
+} from '../services/aiAgentProductPlatformSubmit'
 import { inferDouyinProductTypeFromText } from '../lib/aiAgentProductPreviewDefaults'
-import { loadDouyinWizardLastContext } from '../lib/douyinWizardLastContext'
 import { AI_TASK_TYPE_LABELS, createAgentMessage } from '../lib/aiAgentTypes'
 import {
   buildAiAgentPlanProfile,
@@ -1376,55 +1377,36 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     const plans = listProductPlansFromPreview(p).filter(
       (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
     )
-    const plan = plans[0] ?? p.productPlan
-    const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
-    const brief = lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() || '团购商品'
-
-    const toDraft = (pl: AiProductPlanPreview): AiProductDraft => ({
-      platform: 'douyin',
-      productName: pl.productName,
-      productDesc: pl.description,
-      priceYuan: String(pl.suggestedPriceYuan),
-      originYuan: pl.originYuan != null ? String(pl.originYuan) : undefined,
-      headUrl: pl.headUrl,
-      productType: pl.productType,
-      comboSummary: pl.comboLines.join('；'),
-      planNotes: [pl.marginNote, pl.competitorNote].filter(Boolean).join('\n'),
-      autoSubmit: false,
-    })
-
-    if (plans.length > 1) {
-      saveAiProductDraftBatch(plans.map(toDraft))
-    } else if (plan) {
-      saveAiProductDraft(toDraft(plan))
-    } else {
-      saveAiProductDraft({
-        platform: 'douyin',
-        productName: brief.slice(0, 60),
-        productDesc: brief,
-        autoSubmit: false,
-      })
-    }
+    if (!plans.length) return
 
     const submitPlatforms =
       previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
-    const readyPlans = plans.length ? plans : plan ? [plan] : []
-    const libCount = persistAiProductPlansToEditLibrary(readyPlans, submitPlatforms[0] ?? 'douyin')
 
-    const count = libCount || Math.max(plans.length, plan ? 1 : 0)
-    setMessages((prev) => {
-      const next = [
-        ...prev,
-        createAgentMessage(
-          'task_result',
-          `「${title}」已批量保存至草稿箱（${count || 1} 个方案），已写入商品列表「本地草稿」。您可在「创建商品」页逐项修改后再提交。`,
-          { resultSummary: 'confirmed' },
-        ),
-      ]
-      messagesRef.current = next
-      return next
-    })
-    setPendingPreviewId(null)
+    void (async () => {
+      setTaskConfirming(true)
+      try {
+        const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'draft')
+        const okCount = results.filter((r) => r.ok).length
+        const summary = formatAiProductSubmitSummary(results)
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'task_result',
+              okCount > 0
+                ? `「${title}」已保存至草稿箱（${okCount} 项）。${summary}`
+                : `「${title}」保存草稿失败。\n${summary}`,
+              { resultSummary: okCount > 0 ? 'confirmed' : 'partial' },
+            ),
+          ]
+          messagesRef.current = next
+          return next
+        })
+        setPendingPreviewId(null)
+      } finally {
+        setTaskConfirming(false)
+      }
+    })()
   }, [pendingPreviewId, previewSubmitPlatforms])
 
   const applyShortcut = useCallback(
@@ -1478,98 +1460,68 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       const plans = listProductPlansFromPreview(p).filter(
         (pl) => pl.enrichStatus !== 'error' && pl.productName?.trim(),
       )
-      const plan = plans[0] ?? p.productPlan
-      const lastUser = [...messagesRef.current].reverse().find((m) => m.role === 'user')
-      const brief = lastUser?.content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() || '团购商品'
-      const lastCtx = loadDouyinWizardLastContext()
-      const submitPlatforms =
-        previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
-      const canAutoSubmit = Boolean(
-        lastCtx?.cat3 &&
-          plan?.enrichStatus === 'ready' &&
-          plans.length <= 1 &&
-          submitPlatforms.length === 1 &&
-          submitPlatforms[0] === 'douyin',
-      )
-
-      const toDraft = (pl: AiProductPlanPreview): AiProductDraft => ({
-        platform: 'douyin',
-        productName: pl.productName,
-        productDesc: pl.description,
-        priceYuan: String(pl.suggestedPriceYuan),
-        originYuan: pl.originYuan != null ? String(pl.originYuan) : undefined,
-        headUrl: pl.headUrl,
-        productType: pl.productType,
-        comboSummary: pl.comboLines.join('；'),
-        planNotes: [pl.marginNote, pl.competitorNote].filter(Boolean).join('\n'),
-        autoSubmit: canAutoSubmit,
-      })
-
-      if (plans.length > 1) {
-        saveAiProductDraftBatch(plans.map(toDraft))
-      } else if (plan) {
-        saveAiProductDraft(toDraft(plan))
-      } else {
-        saveAiProductDraft({
-          platform: 'douyin',
-          productName: brief.slice(0, 60),
-          productDesc: brief,
-          autoSubmit: false,
+      if (!plans.length) {
+        setMessages((prev) => {
+          const next = [
+            ...prev,
+            createAgentMessage(
+              'task_result',
+              `「${title}」预览尚未就绪或方案为空，请等待生成完成后再确认。`,
+              { resultSummary: 'partial' },
+            ),
+          ]
+          messagesRef.current = next
+          return next
         })
+        setPendingPreviewId(null)
+        return
       }
 
-      const readyPlans = plans.length ? plans : plan ? [plan] : []
-      const libCount = persistAiProductPlansToEditLibrary(readyPlans, submitPlatforms[0] ?? 'douyin')
-
-      const firstLabel = plan?.slotLabel ?? plan?.productName ?? '商品'
-      const batchNote =
-        plans.length > 1
-          ? `共 ${plans.length} 个方案，创建页将先预填「${firstLabel}」，其余 ${plans.length - 1} 项已排队。`
-          : ''
-
-      const platNames =
-        submitPlatforms.length > 1
-          ? `${submitPlatforms.length} 个平台`
-          : submitPlatforms[0] === 'douyin'
-            ? '抖音来客'
-            : submitPlatforms[0]
-
-      setMessages((prev) => {
-        const next = [
-          ...prev,
-          createAgentMessage(
-            'task_result',
-            plans.length > 1
-              ? `「${title}」已确认。${batchNote}${libCount > 0 ? ` 已写入商品列表「本地草稿」${libCount} 项。` : ''} 将打开创建页预填方案。`
-              : canAutoSubmit
-                ? `「${title}」已确认。${libCount > 0 ? `已写入商品列表「本地草稿」。` : ''}正在打开创建商品页并自动提交${platNames}审核…`
-                : `「${title}」已确认。${libCount > 0 ? `已写入商品列表「本地草稿」。` : ''}将预填方案并提交至${platNames}；若需自动审核请先在创建页保存类目。`,
-            { resultSummary: 'confirmed' },
-          ),
-        ]
-        messagesRef.current = next
-        return next
-      })
-      setPendingPreviewId(null)
-      setDrawerOpen(false)
-
+      const submitPlatforms =
+        previewSubmitPlatforms.length > 0 ? previewSubmitPlatforms : (['douyin'] as CreatePlatformId[])
       const recruitStage = pendingRecruitmentStageRef.current
       pendingRecruitmentStageRef.current = null
 
-      navigate('/products/create', {
-        state: { platforms: submitPlatforms, autoSubmit: canAutoSubmit },
-      })
+      void (async () => {
+        setTaskConfirming(true)
+        try {
+          const results = await submitAiProductPlansToPlatforms(plans, submitPlatforms, 'submit')
+          const okCount = results.filter((r) => r.ok).length
+          const failCount = results.length - okCount
+          const summary = formatAiProductSubmitSummary(results)
+          const resultSummary = okCount > 0 ? (failCount > 0 ? 'partial' : 'confirmed') : 'partial'
 
-      if (recruitStage) {
-        appendAssistantLine(
-          '商品方案已确认。接下来将单独生成达人招募 Brief 预览，请核对三版文案后再确认下达招募订单。',
-        )
-        pushRecruitInfluencerPreview(
-          recruitStage.userBrief,
-          pageContext?.pageLabel,
-          recruitStage.assistantContent,
-        )
-      }
+          setMessages((prev) => {
+            const next = [
+              ...prev,
+              createAgentMessage(
+                'task_result',
+                okCount > 0
+                  ? `「${title}」已确认。共 ${okCount} 项已提交平台审核并写入商品列表「本地草稿」。\n${summary}`
+                  : `「${title}」提交失败。\n${summary}`,
+                { resultSummary },
+              ),
+            ]
+            messagesRef.current = next
+            return next
+          })
+          setPendingPreviewId(null)
+          setDrawerOpen(false)
+
+          if (recruitStage && okCount > 0) {
+            appendAssistantLine(
+              '商品已提交审核。接下来将单独生成达人招募 Brief 预览，请核对三版文案后再确认下达招募订单。',
+            )
+            pushRecruitInfluencerPreview(
+              recruitStage.userBrief,
+              pageContext?.pageLabel,
+              recruitStage.assistantContent,
+            )
+          }
+        } finally {
+          setTaskConfirming(false)
+        }
+      })()
       return
     }
 
