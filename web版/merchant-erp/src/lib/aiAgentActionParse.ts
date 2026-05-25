@@ -349,7 +349,7 @@ export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string 
   const hasRecruit = taskTypes.includes('recruit_influencer')
   if (!hasProduct && !hasRecruit) return ''
   if (hasProduct && hasRecruit) {
-    return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n执行将分步进行：先展示全部商品/套餐 C 端预览供您确认；确认 OK 后再单独展示达人招募 Brief 预览；Brief 确认后才会下达招募订单。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
+    return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n执行将**严格分两步**：① 先仅展示全部商品/套餐 C 端预览（本步不出现任何达人/Brief/招募内容），您确认全部商品 OK 后；② 再单独展示达人招募 Brief 预览；Brief 确认后才会下达招募订单。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
   }
   const only = hasProduct ? '商品/套餐创建' : '达人招募'
   return `\n\n——\n\n若需要我按上述方案执行${only}，请回复「确认执行」。\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，我会根据方案自动生成。\n您也可以直接说明需要调整的部分。`
@@ -486,12 +486,19 @@ export function parseCreateProductIntentsFromPlan(
   return fromUser
 }
 
+/** 方案同时含「组品/上架」与「达人招募」时需分步执行，不可合并预览 */
+export function hasCombinedProductAndRecruitPlan(userText: string, assistantContent?: string): boolean {
+  const types = inferTaskTypesFromCombinedContext(userText, assistantContent)
+  return types.includes('create_product') && types.includes('recruit_influencer')
+}
+
 /** 是否应推迟自动预览（等用户确认后再生成执行预览） */
 export function shouldDeferTaskPreview(
   userText: string,
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
+  if (hasCombinedProductAndRecruitPlan(userText, assistantContent)) return true
   if (assistantContent && parseAgentConfirmRequired(assistantContent)) return true
   if (parseAgentActionType(assistantContent ?? '')) return false
   if (isExplicitExecutionIntent(userText)) return false
