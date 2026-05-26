@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const devAuth = require('../../utils/devAuth.js')
 const membershipMp = require('../../utils/membershipMp.js')
+const platformBindingsMp = require('../../utils/platformBindingsMp.js')
 
 Page({
   data: {
@@ -9,6 +10,11 @@ Page({
     planLabel: '',
     planPillClass: 'free',
     devMode: false,
+    showLogoutConfirm: false,
+    bindingsLoading: false,
+    bindingsHint: '',
+    cloudPlatformRows: [],
+    webPlatformRows: [],
     menu: [
       {
         id: 'notify',
@@ -55,7 +61,7 @@ Page({
 
   onShow() {
     if (!api.isAuthed()) {
-      wx.redirectTo({ url: '/pages/login/login' })
+      api.goLogin()
       return
     }
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
@@ -69,11 +75,38 @@ Page({
         this.setData({ loginName: n, storeName: n })
       }
     } catch (_) {}
+    this.setData({ devMode: devAuth.isDevSkipLogin() })
+    void this.refreshAccountData()
+  },
+
+  async refreshAccountData() {
+    if (devAuth.isDevSkipLogin()) {
+      this.setData({
+        planLabel: '开发预览',
+        planPillClass: 'dev',
+        bindingsHint: '开发预览模式不拉取云端绑定',
+        cloudPlatformRows: [],
+        webPlatformRows: [],
+      })
+      this.patchSubscribeMenuDesc('开发预览 · 进入可查看订阅页布局')
+      return
+    }
+
+    this.setData({ bindingsLoading: true })
     try {
       const app = getApp()
-      if (app && typeof app.syncMerchantSession === 'function') void app.syncMerchantSession()
+      if (app && typeof app.syncMerchantSession === 'function') {
+        await app.syncMerchantSession({ force: true })
+      }
     } catch (_) {}
-    this.setData({ devMode: devAuth.isDevSkipLogin() })
+
+    const bindingView = platformBindingsMp.loadPlatformBindingRows()
+    this.setData({
+      bindingsLoading: false,
+      bindingsHint: bindingView.syncHint,
+      cloudPlatformRows: bindingView.cloudRows,
+      webPlatformRows: bindingView.webRows,
+    })
     void this.loadMembershipBadge()
   },
 
@@ -85,11 +118,7 @@ Page({
   },
 
   async loadMembershipBadge() {
-    if (devAuth.isDevSkipLogin()) {
-      this.setData({ planLabel: '开发预览', planPillClass: 'dev' })
-      this.patchSubscribeMenuDesc('开发预览 · 进入可查看订阅页布局')
-      return
-    }
+    if (devAuth.isDevSkipLogin()) return
     try {
       const snap = await membershipMp.loadMembershipSnapshot()
       const plan = snap.ent.plan
@@ -118,30 +147,29 @@ Page({
     const action = e.currentTarget.dataset.action
     const url = e.currentTarget.dataset.url
     if (action === 'switch') {
-      if (devAuth.isDevSkipLogin()) {
-        wx.showToast({ title: '开发模式请改 config', icon: 'none' })
-        return
-      }
-      api.logout()
-      wx.redirectTo({ url: '/pages/login/login' })
+      api.logoutAndGoLogin()
       return
     }
     if (url) wx.navigateTo({ url })
   },
 
   onLogout() {
-    wx.showModal({
-      title: '退出当前账号',
-      content: '确定退出登录？',
-      success(res) {
-        if (!res.confirm) return
-        api.logout()
-        if (devAuth.isDevSkipLogin()) {
-          wx.switchTab({ url: '/pages/agent/agent' })
-        } else {
-          wx.redirectTo({ url: '/pages/login/login' })
-        }
-      },
+    this.setData({ showLogoutConfirm: true })
+  },
+
+  onCancelLogout() {
+    this.setData({ showLogoutConfirm: false })
+  },
+
+  onConfirmLogout() {
+    this.setData({
+      showLogoutConfirm: false,
+      loginName: '',
+      storeName: '墨典商家',
+      planLabel: '',
+      cloudPlatformRows: [],
+      webPlatformRows: [],
     })
+    api.logoutAndGoLogin()
   },
 })

@@ -22,7 +22,66 @@
     <view class="chat-inner">
       <block wx:for="{{messages}}" wx:key="id">
         <view id="msg-{{item.id}}" class="msg-row {{item.role === 'user' ? 'user' : 'bot'}}">
-          <view class="bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-bot'}}">
+          <view wx:if="{{item.role === 'task_preview'}}" class="preview-card">
+            <view class="preview-head">
+              <text class="preview-badge">执行预览 · 需确认</text>
+            </view>
+            <text class="preview-intro">{{item.content}}</text>
+
+            <block wx:if="{{item.preview.taskType === 'create_product'}}">
+              <view
+                wx:for="{{item.preview.productPlans}}"
+                wx:for-item="plan"
+                wx:key="slotKey"
+                class="product-plan-card"
+              >
+                <text class="plan-label">{{plan.slotLabel || plan.productName}}</text>
+                <text wx:if="{{plan.enrichStatus === 'loading'}}" class="plan-meta">生成中…</text>
+                <text wx:elif="{{plan.enrichStatus === 'error'}}" class="plan-meta err">{{plan.enrichError || '生成失败'}}</text>
+                <block wx:else>
+                  <text class="plan-price">¥{{plan.suggestedPriceYuan}}</text>
+                  <text class="plan-desc">{{plan.description}}</text>
+                  <view wx:if="{{plan.comboLines && plan.comboLines.length}}" class="plan-combo">
+                    <text wx:for="{{plan.comboLines}}" wx:for-item="line" wx:key="*this" class="plan-combo-line">· {{line}}</text>
+                  </view>
+                </block>
+              </view>
+            </block>
+
+            <block wx:elif="{{item.preview.taskType === 'recruit_influencer' && item.preview.recruitmentBrief}}">
+              <view class="recruit-brief-card">
+                <text class="plan-label">主推：{{item.preview.recruitmentBrief.mainProductName}}</text>
+                <text wx:if="{{item.preview.recruitmentBrief.enrichStatus === 'loading'}}" class="plan-meta">Brief 生成中…</text>
+                <block wx:else>
+                  <view wx:if="{{item.preview.recruitmentBrief.previews}}" class="brief-versions">
+                    <view
+                      wx:for="{{item.preview.recruitmentBrief.previews}}"
+                      wx:for-item="bv"
+                      wx:key="*this"
+                      class="brief-version"
+                    >
+                      <text class="brief-version-text">{{bv}}</text>
+                    </view>
+                  </view>
+                </block>
+              </view>
+            </block>
+
+            <view
+              wx:if="{{item.previewStatus !== 'confirmed'}}"
+              class="preview-actions"
+            >
+              <view
+                class="preview-confirm-btn"
+                data-id="{{item.id}}"
+                data-task="{{item.preview.taskType}}"
+                bindtap="onConfirmPreview"
+              >确认执行</view>
+            </view>
+            <text wx:else class="preview-done">已确认</text>
+          </view>
+
+          <view wx:else class="bubble {{item.role === 'user' ? 'bubble-user' : 'bubble-bot'}}">
             <view wx:if="{{item.imageUrls && item.imageUrls.length}}" class="msg-images">
               <image
                 wx:for="{{item.imageUrls}}"

@@ -7,13 +7,16 @@ export async function verifyBearerJwt(
   authHeader: string | undefined,
   env: Record<string, string>,
 ): Promise<VerifiedUser | null> {
+  const allowUnauth = (env.MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED ?? '').trim() === '1'
   const jwt =
     typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
       ? authHeader.slice('Bearer '.length).trim()
       : ''
-  if (!jwt) return null
+  if (!jwt) {
+    if (allowUnauth) return { id: 'dev-unauthenticated', email: 'dev' }
+    return null
+  }
 
-  const allowUnauth = (env.MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED ?? '').trim() === '1'
   const supabaseUrl = (env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
   const anon = (env.SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_ANON_KEY ?? '').trim()
   if (!supabaseUrl || !anon) {

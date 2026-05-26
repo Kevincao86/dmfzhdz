@@ -1,0 +1,461 @@
+<scroll-view scroll-y class="sv-root" enhanced="{{true}}" show-scrollbar="{{false}}">
+  <view class="sv-header">
+    <view class="sv-header-bar" />
+    <view class="sv-header-row">
+      <text class="sv-header-icon">映</text>
+      <text class="sv-header-title">短视频AI处理</text>
+    </view>
+    <text class="sv-header-desc">参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择墨典视频模型与参数，再上传素材并描述需求即可。</text>
+  </view>
+
+  <!-- 顶栏三 Tab（与 Web erp-panel 一致） -->
+  <view class="sv-main-tabs">
+    <view
+      wx:for="{{mainTabs}}"
+      wx:key="id"
+      class="sv-main-tab {{mainPane === item.id ? 'active' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onMainTab"
+    >{{item.label}}</view>
+  </view>
+
+  <!-- 模型配置区：云剪 Tab 不显示 -->
+  <view wx:if="{{mainPane !== 'cloud_batch'}}" class="sv-engine-panel">
+    <view class="sv-engine-radios">
+      <view class="sv-radio-row" data-engine="kling" bindtap="onEngine">
+        <view class="sv-radio-dot {{engine === 'kling' ? 'on' : ''}}" />
+        <text>{{engineLabelKling}}</text>
+        <text class="sv-muted">{{cfgLoaded ? (klingConfigured ? '· 可用' : '· 未开通') : '…'}}</text>
+      </view>
+      <view class="sv-radio-row" data-engine="seedance" bindtap="onEngine">
+        <view class="sv-radio-dot {{engine === 'seedance' ? 'on' : ''}}" />
+        <text>{{engineLabelSeedance}}</text>
+        <text class="sv-muted">{{cfgLoaded ? (arkKeyConfigured ? (sdModelIds.length ? '· 可用' : '· 待配置模型') : '· 未开通') : '…'}}</text>
+      </view>
+    </view>
+
+    <view class="sv-longform-box">
+      <label class="sv-check-row">
+        <switch checked="{{longformEnabled}}" disabled="{{busy}}" bindchange="onLongformChange" color="#ea580c" />
+        <view class="sv-check-text">
+          <text class="sv-check-title">长视频合成（最长约 60 秒）</text>
+          <text class="sv-check-sub">由豆包或通义千问拆成 2～6 段连贯脚本；每段固定 10 秒，下一段以上一段结尾画面为参考，最后在本地拼接成一条成片（首次加载拼接组件可能稍慢）。</text>
+        </view>
+      </label>
+      <view wx:if="{{longformEnabled}}" class="sv-longform-extra">
+        <view class="sv-field">
+          <text class="sv-field-lab">分镜策划模型</text>
+          <picker mode="selector" range="{{['豆包', '通义千问']}}" disabled="{{busy}}" bindchange="onPlannerChange">
+            <view class="sv-pick">{{plannerModel === 'qwen' ? '通义千问' : '豆包'}}</view>
+          </picker>
+        </view>
+        <view class="sv-field">
+          <text class="sv-field-lab">片段数量</text>
+          <picker
+            mode="selector"
+            range="{{longformSegmentLabels}}"
+            value="{{longformSegmentIdx}}"
+            disabled="{{busy}}"
+            bindchange="onSegmentCountChange"
+          >
+            <view class="sv-pick">{{longformSegmentLabels[longformSegmentIdx]}}</view>
+          </picker>
+        </view>
+      </view>
+    </view>
+
+    <block wx:if="{{engine === 'kling'}}">
+      <view class="sv-params-grid">
+        <view class="sv-field span2">
+          <text class="sv-field-lab">视频模型</text>
+          <picker mode="selector" range="{{klingModelOptions}}" value="{{klingModelIdx}}" bindchange="klingModelChange">
+            <view class="sv-pick">{{klingModelOptions[klingModelIdx]}}</view>
+          </picker>
+        </view>
+        <view class="sv-field">
+          <text class="sv-field-lab">画面比例</text>
+          <picker mode="selector" range="{{aspectOptions}}" value="{{aspectIdx}}" bindchange="aspectChange">
+            <view class="sv-pick">{{aspectOptions[aspectIdx]}}</view>
+          </picker>
+        </view>
+        <view class="sv-field">
+          <text class="sv-field-lab">清晰度与时长</text>
+          <view class="sv-pick-row">
+            <picker mode="selector" range="{{kModeOptions}}" value="{{kModeIdx}}" bindchange="kModeChange">
+              <view class="sv-pick half">{{kModeOptions[kModeIdx]}}</view>
+            </picker>
+            <picker
+              mode="selector"
+              range="{{durationOptions}}"
+              value="{{durationIdx}}"
+              disabled="{{longformEnabled}}"
+              bindchange="durationChange"
+            >
+              <view class="sv-pick half {{longformEnabled ? 'disabled' : ''}}">{{durationOptions[durationIdx]}}</view>
+            </picker>
+          </view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{engine === 'seedance'}}">
+      <view class="sv-field">
+        <text class="sv-field-lab">视频模型</text>
+        <picker
+          wx:if="{{sdModelLabels.length}}"
+          mode="selector"
+          range="{{sdModelLabels}}"
+          value="{{sdModelIdx}}"
+          disabled="{{busy}}"
+          bindchange="sdModelChange"
+        >
+          <view class="sv-pick">{{sdModelLabels[sdModelIdx]}}</view>
+        </picker>
+        <view wx:else class="sv-warn-box">{{arkVideoSetupIssue || '暂无可用模型，请在运营台配置 Seedance 或 ep- 接入点。'}}</view>
+      </view>
+      <view class="sv-params-grid four">
+        <view class="sv-field">
+          <text class="sv-field-lab">时长</text>
+          <picker
+            mode="selector"
+            range="{{sdDurationOptions}}"
+            value="{{sdDurationIdx}}"
+            disabled="{{busy || longformEnabled}}"
+            bindchange="sdDurChange"
+          >
+            <view class="sv-pick">{{sdDurationOptions[sdDurationIdx]}}</view>
+          </picker>
+        </view>
+        <view class="sv-field">
+          <text class="sv-field-lab">帧率</text>
+          <picker mode="selector" range="{{sdFpsOptions}}" value="{{sdFpsIdx}}" disabled="{{busy}}" bindchange="sdFpsChange">
+            <view class="sv-pick">{{sdFpsOptions[sdFpsIdx]}}</view>
+          </picker>
+        </view>
+        <view class="sv-field">
+          <text class="sv-field-lab">画面比例</text>
+          <picker mode="selector" range="{{sdAspectOptions}}" value="{{sdAspectIdx}}" disabled="{{busy}}" bindchange="sdAspectChange">
+            <view class="sv-pick">{{sdAspectOptions[sdAspectIdx]}}</view>
+          </picker>
+        </view>
+        <view class="sv-field">
+          <text class="sv-field-lab">画面水印</text>
+          <picker mode="selector" range="{{sdWatermarkOptions}}" value="{{sdWatermarkIdx}}" disabled="{{busy}}" bindchange="sdWmChange">
+            <view class="sv-pick">{{sdWatermarkOptions[sdWatermarkIdx]}}</view>
+          </picker>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 参考画面处理 -->
+  <view wx:if="{{mainPane === 'optimize'}}" class="sv-pane">
+    <view class="sv-pane-head">
+      <view class="sv-pane-icon orange">材</view>
+      <view>
+        <text class="sv-pane-title">来源素材</text>
+        <text class="sv-pane-sub">可上传短视频（自动截取一帧）或商品图作为画面参考。</text>
+      </view>
+    </view>
+
+    <view class="sv-upload-zone" bindtap="pickOptimizeMedia">
+      <text class="sv-upload-ico">🎬</text>
+      <text class="sv-upload-title">拖拽或点击选取视频 / 图片</text>
+      <text class="sv-upload-hint">建议使用短于 120s 的镜头，以便快速截帧。</text>
+    </view>
+
+    <block wx:if="{{thumbUrl}}">
+      <image class="sv-thumb" src="{{thumbUrl}}" mode="aspectFit" />
+      <text class="sv-cap">将作为画面参考参与生成。</text>
+    </block>
+    <text wx:else class="sv-muted pad">尚未选择素材。</text>
+
+    <text class="sv-label-main">✦ 希望如何改款 / 重写镜头</text>
+    <textarea
+      class="sv-area"
+      placeholder="示例：提亮餐厅灯光、加入更多人流、突出招牌字体、切换到竖屏观感……"
+      value="{{optPrompt}}"
+      disabled="{{busy}}"
+      bindinput="onOptPrompt"
+    />
+
+    <block wx:if="{{engine === 'kling'}}">
+      <text class="sv-label">不希望出现的内容（可选）</text>
+      <input class="sv-input" value="{{optNegative}}" disabled="{{busy}}" bindinput="onOptNeg" />
+    </block>
+
+    <view wx:if="{{err || hint}}" class="sv-alert {{err ? 'err' : 'hint'}}">{{err || hint}}</view>
+
+    <view class="sv-actions">
+      <button class="sv-btn-orange" loading="{{busy}}" disabled="{{busy}}" bindtap="submitOptimize">
+        {{busy ? (progress || '处理中……') : '提交优化'}}
+      </button>
+      <button wx:if="{{busy}}" class="sv-btn-outline" bindtap="cancelWait">停止等待</button>
+    </view>
+  </view>
+
+  <!-- 短视频生成 -->
+  <view wx:if="{{mainPane === 'generate'}}" class="sv-pane">
+    <view class="sv-gen-modes">
+      <view
+        class="sv-gen-mode {{genMode === 'text' ? 'on' : ''}}"
+        data-mode="text"
+        bindtap="setGenMode"
+      >纯文案生成</view>
+      <view
+        class="sv-gen-mode {{genMode === 'frames' ? 'on' : ''}}"
+        data-mode="frames"
+        bindtap="setGenMode"
+      >分镜 / 多张参考图</view>
+    </view>
+
+    <text class="sv-label-main">执导文案（提示词）</text>
+    <textarea
+      class="sv-area"
+      placeholder="{{genMode === 'text' ? '描述画面节奏、光线、人物与氛围等。' : '用文字说明各镜头顺序与动作；首张图会作为重要参考。'}}"
+      value="{{genPrompt}}"
+      disabled="{{busy}}"
+      bindinput="onGenPrompt"
+    />
+
+    <block wx:if="{{genMode === 'frames'}}">
+      <view class="sv-story-zone" bindtap="pickStoryFrames">
+        <text class="sv-label">拖拽或选择多张分镜（按文件顺序）</text>
+        <text class="sv-muted">点击选择图片</text>
+      </view>
+      <view wx:if="{{storyFiles.length}}" class="sv-story-list">
+        <text wx:for="{{storyFiles}}" wx:key="name" class="sv-story-item">· {{item.name}}</text>
+      </view>
+    </block>
+
+    <view wx:if="{{err || hint}}" class="sv-alert {{err ? 'err' : 'hint'}}">{{err || hint}}</view>
+
+    <view class="sv-actions">
+      <button class="sv-btn-dark" loading="{{busy}}" disabled="{{busy}}" bindtap="submitGenerate">
+        {{busy ? (progress || '处理中……') : '开始生成短片'}}
+      </button>
+      <button wx:if="{{busy}}" class="sv-btn-outline" bindtap="cancelWait">停止等待</button>
+    </view>
+  </view>
+
+  <!-- 墨典AI云剪 -->
+  <view wx:if="{{mainPane === 'cloud_batch'}}" class="sv-ice">
+    <view class="sv-ice-head">
+      <view>
+        <view class="sv-ice-title-row">
+          <text class="sv-ice-logo">云</text>
+          <text class="sv-ice-title">墨典AI云剪</text>
+        </view>
+        <text class="sv-ice-desc">批量包装探店/带货短片：左侧填写素材与剪辑指令，提交后在成片输出区下载 MP4。</text>
+      </view>
+      <text class="sv-badge {{iceServiceReady ? 'ok' : ''}}">{{iceServiceReady ? '服务就绪' : '未就绪'}}</text>
+    </view>
+
+    <view class="sv-steps">
+      <view class="sv-step"><text class="sv-step-n">1</text><view><text class="sv-step-t">添加素材</text><text class="sv-step-s">视频队列或「多图一键成片」</text></view></view>
+      <view class="sv-step"><text class="sv-step-n">2</text><view><text class="sv-step-t">填写剪辑指令</text><text class="sv-step-s">必填 · 描述风格与包装要求</text></view></view>
+      <view class="sv-step"><text class="sv-step-n">3</text><view><text class="sv-step-t">提交并下载</text><text class="sv-step-s">成片出现在输出区</text></view></view>
+    </view>
+
+    <!-- ① 素材来源 -->
+    <view class="sv-ice-sec">
+      <view class="sv-ice-sec-head">
+        <text class="sv-step-n sm">1</text>
+        <text class="sv-ice-sec-title">素材来源 *</text>
+      </view>
+      <text class="sv-pane-sub pad">视频走任务队列批量云剪；多图按顺序合成一条竖屏成片</text>
+      <view class="sv-mat-tabs">
+        <view class="sv-mat-tab {{materialTab === 'video' ? 'on' : ''}}" data-tab="video" bindtap="onMaterialTab">视频素材</view>
+        <view class="sv-mat-tab violet {{materialTab === 'images' ? 'on' : ''}}" data-tab="images" bindtap="onMaterialTab">多图成片</view>
+      </view>
+
+      <block wx:if="{{materialTab === 'video'}}">
+        <view wx:if="{{!iceLocalUpload}}" class="sv-warn-box">
+          <text class="bold">本地上传未开启</text>
+          <text>需在运营管理后台「AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀并保存。仍可粘贴下方 HTTPS 链接。</text>
+        </view>
+        <view class="sv-upload-zone {{iceLocalUpload ? '' : 'muted'}}" bindtap="pickIceVideo">
+          <text wx:if="{{videoUploading}}">视频上传中…</text>
+          <block wx:else>
+            <text class="sv-upload-title">本地上传视频</text>
+            <text class="sv-upload-hint">点击选取 · MP4 / MOV 等 · 单文件 ≤ 500MB</text>
+          </block>
+        </view>
+        <view class="sv-or"><text>或使用链接</text></view>
+        <textarea
+          class="sv-url-area"
+          value="{{urlText}}"
+          disabled="{{iceBusy || videoUploading}}"
+          bindinput="onUrlText"
+          placeholder="https://your-cdn.com/shop-tour-01.mp4"
+        />
+        <view class="sv-ice-btns">
+          <button class="sv-btn-dark sm" disabled="{{iceBusy || videoUploading}}" bindtap="addUrlsFromText">+ 加入任务队列</button>
+          <button wx:if="{{resultUrl}}" class="sv-btn-outline sm" disabled="{{iceBusy}}" bindtap="appendLastResult">使用上一段 AI 成片</button>
+        </view>
+        <view wx:if="{{jobs.length}}" class="sv-queue">
+          <view wx:for="{{jobs}}" wx:key="id" class="sv-queue-row">
+            <text class="sv-queue-name">{{item.label}}</text>
+            <text class="sv-queue-phase">{{item.phase === 'pending' ? '待提交' : item.phase === 'done' ? '可下载' : item.phase === 'failed' ? '失败' : item.phase === 'polling' ? '云端剪辑' : '上传合成'}}</text>
+            <text class="sv-queue-del" data-id="{{item.id}}" bindtap="removeJob">删除</text>
+          </view>
+        </view>
+        <text wx:else class="sv-muted">队列为空 — 添加视频素材后才能提交云剪。</text>
+      </block>
+
+      <block wx:if="{{materialTab === 'images'}}">
+        <view class="sv-upload-zone violet" bindtap="pickIceImages">
+          <text wx:if="{{imageUploading}}">图片上传中…</text>
+          <block wx:else>
+            <text class="sv-upload-title">本地上传图片（可多选）</text>
+            <text class="sv-upload-hint">JPG / PNG / WebP · 多张合成一条竖屏短视频</text>
+          </block>
+        </view>
+        <textarea
+          class="sv-url-area violet"
+          value="{{imageUrlText}}"
+          disabled="{{iceBusy || imageUploading}}"
+          bindinput="onImageUrlText"
+          placeholder="https://your-cdn.com/photo-01.jpg"
+        />
+        <button class="sv-btn-outline violet sm" disabled="{{iceBusy}}" bindtap="addImageUrlsFromText">加入图片列表</button>
+        <view wx:if="{{imageItems.length}}" class="sv-img-grid">
+          <view wx:for="{{imageItems}}" wx:key="id" class="sv-img-cell">
+            <image src="{{item.previewUrl || item.mediaUrl}}" mode="aspectFill" />
+            <text class="sv-img-del" data-id="{{item.id}}" bindtap="removeImageItem">×</text>
+          </view>
+        </view>
+        <text wx:else class="sv-muted violet">上传多张图片后，填写剪辑指令并点「一键成片」。</text>
+      </block>
+    </view>
+
+    <!-- ② 剪辑指令 -->
+    <view class="sv-ice-sec">
+      <view class="sv-ice-sec-head between">
+        <view>
+          <view class="sv-ice-sec-head">
+            <text class="sv-step-n sm">2</text>
+            <text class="sv-ice-sec-title">剪辑文案指令 *</text>
+          </view>
+          <text class="sv-pane-sub pad">描述节奏、字幕、氛围与卖点（建议写明总时长、前 3 秒吸睛等）。</text>
+        </view>
+        <button class="sv-btn-ai" disabled="{{!canAiBrief || briefAiLoading}}" bindtap="runAiEditBrief">
+          {{briefAiLoading ? '生成中…' : 'AI 生成文案'}}
+        </button>
+      </view>
+      <textarea
+        class="sv-area"
+        value="{{editBrief}}"
+        disabled="{{iceBusy || briefAiLoading}}"
+        bindinput="onEditBrief"
+        placeholder="示例：竖屏探店短视频，前 3 秒抓眼球，整体轻快；突出「招牌牛肉面」与店内环境；结尾加品牌 Slogan 位；适合抖音发布。"
+      />
+      <view class="sv-out-params">
+        <text class="sv-out-params-title">输出参数（选填）</text>
+        <view class="sv-params-grid three">
+          <view class="sv-field">
+            <text class="sv-field-lab">画幅</text>
+            <picker mode="selector" range="{{aspectPresets}}" range-key="label" value="{{aspectPresetIdx}}" bindchange="iceAspectChange">
+              <view class="sv-pick">{{aspectPresets[aspectPresetIdx].label}}</view>
+            </picker>
+          </view>
+          <view class="sv-field">
+            <text class="sv-field-lab">{{imageItems.length ? '每张图片时长（秒）' : '取用时长（秒）'}}</text>
+            <input class="sv-input" type="number" value="{{clipEndSec}}" disabled="{{iceBusy}}" bindinput="onClipEnd" />
+          </view>
+          <view class="sv-field">
+            <text class="sv-field-lab">画面特效</text>
+            <picker mode="selector" range="{{presetOptions}}" value="{{presetIdx}}" disabled="{{iceBusy}}" bindchange="presetChange">
+              <view class="sv-pick">{{presetOptions[presetIdx]}}</view>
+            </picker>
+          </view>
+        </view>
+      </view>
+      <block wx:if="{{imageItems.length}}">
+        <button class="sv-btn-violet" disabled="{{!canOneClickImages}}" bindtap="runOneClickImages">一键成片（{{imageItems.length}} 张图）</button>
+        <text wx:if="{{!briefOk}}" class="sv-muted warn">请先填写剪辑文案（至少 4 字），或点「AI 生成文案」。</text>
+      </block>
+    </view>
+
+    <!-- 批量生成 -->
+    <view class="sv-ice-sec">
+      <label class="sv-check-row pad">
+        <switch checked="{{batchGenerateEnabled}}" disabled="{{iceBusy}}" bindchange="onBatchEnable" color="#ea580c" />
+        <view class="sv-check-text">
+          <text class="sv-check-title">启用批量生成</text>
+          <text class="sv-check-sub">未勾选时每个素材仅生成 1 条成片；勾选后按所选条数依次提交。</text>
+        </view>
+      </label>
+      <view class="sv-batch-counts {{batchGenerateEnabled ? '' : 'dim'}}">
+        <view
+          wx:for="{{batchCounts}}"
+          wx:key="*this"
+          class="sv-batch-n {{batchGenerateCount === item ? 'on' : ''}}"
+          data-n="{{item}}"
+          bindtap="onBatchCountTap"
+        >{{item}} 条</view>
+      </view>
+      <text wx:if="{{totalBatchRuns > 0}}" class="sv-muted pad">≈ 共提交 {{totalBatchRuns}} 次云剪</text>
+    </view>
+
+    <!-- 提交 -->
+    <view class="sv-submit-sticky">
+      <view wx:if="{{iceErr || iceHint}}" class="sv-alert {{iceErr ? 'err' : 'hint'}}">{{iceErr || iceHint}}</view>
+      <button class="sv-btn-orange full" disabled="{{!canSubmitIce || downloadBusy}}" loading="{{iceBusy}}" bindtap="runIceBatch">
+        {{iceBusy ? '墨典AI云剪进行中…' : '提交墨典AI云剪'}}
+      </button>
+      <text class="sv-muted center">提交后请在下方「成片输出」查看进度并复制下载链接。</text>
+    </view>
+
+    <!-- 成片输出（Web 右侧栏，小程序置底） -->
+    <view class="sv-output">
+      <view class="sv-output-head">
+        <text class="sv-output-title">成片输出（步骤 3）</text>
+        <text class="sv-pane-sub">剪辑完成后，在此下载 MP4 或打开云端链接。</text>
+      </view>
+      <block wx:if="{{latestDonePreview}}">
+        <video class="sv-video" src="{{latestDonePreview}}" controls />
+        <button class="sv-btn-green" bindtap="copyIceDownload">复制下载链接</button>
+      </block>
+      <view wx:elif="{{iceBusy}}" class="sv-output-empty">
+        <text>云端剪辑中…</text>
+        <text class="sv-muted">完成后可在此预览</text>
+      </view>
+      <view wx:else class="sv-output-empty">
+        <text>暂无成片</text>
+        <text class="sv-muted">完成「素材 + 剪辑指令」后点击提交，成片将显示在此处。</text>
+      </view>
+      <view wx:if="{{jobs.length}}" class="sv-task-list">
+        <text class="sv-task-list-title">任务列表</text>
+        <view
+          wx:for="{{jobs}}"
+          wx:key="id"
+          class="sv-task-item {{item.phase === 'done' ? 'done' : ''}} {{item.phase === 'failed' ? 'fail' : ''}}"
+        >
+          <text class="sv-queue-name">{{item.label}}</text>
+          <text wx:if="{{item.message}}" class="sv-muted">{{item.message}}</text>
+          <view wx:if="{{item.phase === 'done'}}" class="sv-ice-btns">
+            <button class="sv-btn-orange sm" data-id="{{item.exportId}}" bindtap="copyIceDownload">复制下载</button>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 预览 & 下载（Kling/Seedance 共用） -->
+  <view wx:if="{{resultUrl && mainPane !== 'cloud_batch'}}" class="sv-result">
+    <view class="sv-result-head">
+      <text class="sv-result-title">预览 & 下载</text>
+      <button class="sv-btn-lite" bindtap="copyResultLink">复制链接</button>
+    </view>
+    <video class="sv-video dark" src="{{resultUrl}}" controls />
+    <text class="sv-muted">下载链接可能有时效，请尽快保存到本地。</text>
+    <view wx:if="{{resultSegments.length > 1}}" class="sv-segments">
+      <text class="sv-label">长视频各段预览</text>
+      <video wx:for="{{resultSegments}}" wx:key="*this" class="sv-video" src="{{item}}" controls />
+    </view>
+  </view>
+
+  <text class="sv-footer">生成内容由 AI 提供，请合规使用并自行备份成片。</text>
+  <view class="sv-bottom-sp" />
+</scroll-view>

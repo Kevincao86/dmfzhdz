@@ -16,7 +16,7 @@ Page({
     displayItems: [],
     syncingId: '',
     hintBanner:
-      '请先在「系统设置」完成各平台授权。',
+      '切换上方平台 Tab 查看各侧商品；抖音支持单条「同步至来客」拉取最新。点「刷新列表」从平台重新加载。',
   },
   onShow() {
     if (!api.getAccessToken()) {
@@ -86,8 +86,19 @@ Page({
   goCreate() {
     wx.navigateTo({ url: '/pages/product-create/product-create' })
   },
-  goVoice() {
-    wx.navigateTo({ url: '/pages/product-voice/product-voice' })
+  onPullFromPlatform() {
+    if (this.data.loading) return
+    wx.showLoading({ title: '拉取中…', mask: true })
+    void this.loadList().then(() => {
+      try {
+        wx.hideLoading()
+      } catch (_) {}
+      if (this.data.errMsg) {
+        wx.showToast({ title: String(this.data.errMsg).slice(0, 36), icon: 'none' })
+      } else {
+        wx.showToast({ title: '已从平台刷新', icon: 'success' })
+      }
+    })
   },
   onOpenItem(e) {
     const id = e.currentTarget.dataset.id

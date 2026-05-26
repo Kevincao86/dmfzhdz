@@ -1,3 +1,11 @@
+# Merchant ERP（Vite）
+
+## 本地环境与 Vercel 环境变量
+
+**若 API Key 只配在 Vercel 控制台，本机 `npm run dev` 仍无法调用模型**——Vite 只读磁盘上的 `.env` / `.env.local`，不会自动拉取云端。请先同步到本机，步骤见 [docs/LOCAL_DEV_VERCEL_ENV.md](./docs/LOCAL_DEV_VERCEL_ENV.md)。
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

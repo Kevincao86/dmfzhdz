@@ -1,0 +1,152 @@
+<wxs module="tools">
+var includes = function (arr, x) {
+  if (!arr || !arr.length) return false
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === x) return true
+  }
+  return false
+}
+module.exports.includes = includes
+</wxs>
+
+<scroll-view scroll-y class="pro-scroll">
+  <text class="pro-back" bindtap="backManage">‹ 返回发布方式</text>
+  <text class="pro-h1">发布招募需求</text>
+
+  <view class="pro-card meoo-card">
+    <text class="pro-sec">1 招募模式</text>
+    <view class="pro-mode-row">
+      <view class="pro-mode {{recruitMode === 'ai' ? 'on' : ''}}" bindtap="tapModeAi">
+        <text class="pro-mode-title">✦ AI智能匹配</text>
+        <text class="pro-mode-sub">根据条件自动从星图匹配达人</text>
+      </view>
+      <view class="pro-mode {{recruitMode === 'designated' ? 'on' : ''}}" bindtap="tapModeDesignated">
+        <text class="pro-mode-title">指定达人</text>
+        <text class="pro-mode-sub">手动锁定定向合作达人</text>
+      </view>
+    </view>
+    <text wx:if="{{recruitMode === 'designated'}}" class="pro-muted">当前：{{designatedInput || '请在弹窗填写'}}</text>
+
+    <text class="pro-sec">招募名称 <text class="req">*</text></text>
+    <input class="pro-input" value="{{name}}" bindinput="bindName" placeholder="例如：2024春季美食探店招募" />
+
+    <text class="pro-sec">投放平台</text>
+    <view class="pro-chips">
+      <view wx:for="{{platOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapPlat" class="pro-chip {{tools.includes(platformsSel, item) ? 'on' : ''}}">{{item}}</view>
+    </view>
+
+    <text class="pro-sec">内容形态</text>
+    <view class="pro-chips">
+      <view wx:for="{{contentOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapContent" class="pro-chip {{tools.includes(contentSel, item) ? 'on' : ''}}">{{item}}</view>
+    </view>
+
+    <text class="pro-sec">时间与佣金</text>
+    <picker mode="date" value="{{recruitStart}}" bindchange="bindRecruitStart"><view class="pro-picker">招募开始：{{recruitStart || '日期'}}</view></picker>
+    <picker mode="date" value="{{recruitEnd}}" bindchange="bindRecruitEnd"><view class="pro-picker">招募结束：{{recruitEnd || '日期'}}</view></picker>
+    <picker mode="date" value="{{visitStart}}" bindchange="bindVisitStart"><view class="pro-picker">探店开始：{{visitStart || '日期'}}</view></picker>
+    <picker mode="date" value="{{visitEnd}}" bindchange="bindVisitEnd"><view class="pro-picker">探店结束：{{visitEnd || '日期'}}</view></picker>
+
+    <text class="pro-sub">可探店时间</text>
+    <scroll-view scroll-x class="pro-scroll-x" enhanced show-scrollbar="{{false}}">
+      <view class="pro-chips-row">
+        <view wx:for="{{slotOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapSlot" class="pro-chip-inline {{tools.includes(visitSlotsSel, item) ? 'on' : ''}}">{{item}}</view>
+      </view>
+    </scroll-view>
+
+    <text class="pro-sub">商家提供佣金率（0～80）</text>
+    <input class="pro-input" type="digit" value="{{commissionInput}}" bindinput="bindCommission" />
+    <scroll-view scroll-x class="pro-scroll-x mt" enhanced show-scrollbar="{{false}}">
+      <view class="pro-chips-row">
+        <view wx:for="{{commissionPresets}}" wx:key="*this" data-x="{{item}}" bindtap="pickCommissionPreset" class="pro-chip-inline {{commissionInput === item ? 'on' : ''}}">{{item}}%</view>
+      </view>
+    </scroll-view>
+
+    <text class="pro-sec">行业类型</text>
+    <picker mode="selector" range="{{industryOptions}}" value="{{industryIndex}}" bindchange="onIndustryPick">
+      <view class="pro-picker">{{industryOptions[industryIndex]}}</view>
+    </picker>
+
+    <block wx:if="{{industryOptions[industryIndex] === '餐饮'}}">
+      <view class="pro-check-row" bindtap="toggleMeal">
+        <text class="pro-check-glyph">{{provideMeal ? '☑' : '☐'}}</text>
+        <text class="pro-check-label">提供桌餐（用于排期估算）</text>
+      </view>
+      <input wx:if="{{provideMeal}}" class="pro-input mt-sm" type="number" value="{{tablePerMeal}}" bindinput="bindTable" placeholder="每桌人数" />
+    </block>
+
+    <text class="pro-sec">门店信息 <text class="req">*</text></text>
+    <view class="pro-sync-row">
+      <text class="pro-link" bindtap="syncDouyinStores">同步来客门店</text>
+      <text class="pro-link" bindtap="addStoreRow">+ 添加门店</text>
+    </view>
+    <block wx:for="{{stores}}" wx:for-index="si" wx:key="si">
+      <input class="pro-input mt-sm" placeholder="门店名称" value="{{item.name}}" data-i="{{si}}" bindinput="bindStoreName" />
+      <input class="pro-input mt-sm" placeholder="探店地址" value="{{item.address}}" data-i="{{si}}" bindinput="bindStoreAddr" />
+    </block>
+
+    <text class="pro-sec">达人标签 <text class="req">*</text></text>
+    <view class="pro-chips">
+      <view wx:for="{{tagPresetOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapTag" class="pro-chip {{tools.includes(talentTagsSel, item) ? 'on' : ''}}">{{item}}</view>
+    </view>
+
+    <text class="pro-sub">粉丝量级（可多选）</text>
+    <view class="pro-chips">
+      <view wx:for="{{followerOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapFollower" class="pro-chip {{tools.includes(followerSel, item) ? 'on' : ''}}">{{item}}</view>
+    </view>
+
+    <text class="pro-sub">带货等级（可多选）</text>
+    <view class="pro-chips">
+      <view wx:for="{{commerceOpts}}" wx:key="*this" data-x="{{item}}" bindtap="tapCommerce" class="pro-chip {{tools.includes(commerceSel, item) ? 'on' : ''}}">{{item}}</view>
+    </view>
+
+    <text class="pro-sec">达人 Brief</text>
+    <text class="pro-brief">{{selectedBriefLines}}</text>
+    <button class="pro-btn-ghost" bindtap="openBriefPicker">选择Brief</button>
+    <button class="pro-btn-ghost mt-sm" bindtap="goBriefWizard">去生成 Brief</button>
+
+    <text class="pro-sec">预算与合作 <text class="req">*</text></text>
+    <input class="pro-input" type="digit" value="{{budget}}" bindinput="bindBudget" placeholder="总预算（元）" />
+    <input class="pro-input mt-sm" type="number" value="{{headcount}}" bindinput="bindHeadcount" placeholder="招募人数" />
+
+    <text class="pro-sec">其他需求</text>
+    <textarea class="pro-area" value="{{note}}" bindinput="bindNote" placeholder="补充说明、注意事项等" maxlength="2000" />
+
+    <button class="pro-submit" bindtap="onSubmit" loading="{{submitting}}">提交需求</button>
+  </view>
+
+  <view wx:if="{{designatedModalOpen}}" class="pro-modal">
+    <view class="pro-modal-bg" bindtap="closeDesignated"></view>
+    <view class="pro-modal-panel meoo-card">
+      <text class="pro-modal-title">填写指定达人</text>
+      <input class="pro-input" value="{{designatedInput}}" bindinput="bindDesignated" placeholder="达人昵称或达人 ID" />
+      <button class="pro-modal-ok" bindtap="confirmDesignated">确定</button>
+      <button class="pro-modal-cancel" bindtap="closeDesignated">取消</button>
+    </view>
+  </view>
+
+  <view wx:if="{{briefPickerOpen}}" class="pro-modal">
+    <view class="pro-modal-bg" bindtap="closeBriefPicker"></view>
+    <view class="pro-modal-panel meoo-card lg">
+      <text class="pro-modal-title">选择 Brief 版本</text>
+      <scroll-view scroll-y class="pro-brief-list">
+        <block wx:if="{{!briefRecords.length}}">
+          <text class="pro-muted">暂无本地记录，请先在「AI达人Brief生成」中生成并保存。</text>
+        </block>
+        <block wx:for="{{briefRecords}}" wx:key="id">
+          <view class="pro-brief-rec">
+            <text class="pro-brief-rec-title">{{item.mainProductName}}</text>
+            <text class="pro-muted">{{item.platform}} · {{item.createdAt}}</text>
+            <view class="pro-brief-vars">
+              <button size="mini" data-id="{{item.id}}" data-v="{{0}}" bindtap="pickBriefVariant">版本 A</button>
+              <button size="mini" data-id="{{item.id}}" data-v="{{1}}" bindtap="pickBriefVariant">版本 B</button>
+              <button size="mini" data-id="{{item.id}}" data-v="{{2}}" bindtap="pickBriefVariant">版本 C</button>
+            </view>
+          </view>
+        </block>
+      </scroll-view>
+      <button class="pro-modal-ok" bindtap="closeBriefPicker">关闭</button>
+    </view>
+  </view>
+
+  <view class="pro-space" />
+</scroll-view>

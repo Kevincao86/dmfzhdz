@@ -8,6 +8,10 @@ const TONE_BY_PLAT = {
   meituan: 'amber',
   xiaohongshu: 'rose',
   jd: 'red',
+  kuaishou: 'cyan',
+  eleme: 'blue',
+  meituan_waimai: 'amber',
+  jd_waimai: 'red',
 }
 
 /** 经营概览：与电脑端首页类似的汇总指标 */
@@ -25,7 +29,7 @@ Page({
     todos: [
       { title: '处理待回复评论', sub: '评论管理', url: '/pages/reviews-list/reviews-list' },
       { title: '商品列表与同步', sub: '多平台商品', url: '/pages/product-list/product-list' },
-      { title: '跟进达人招募单', sub: '招募列表', url: '/pages/recruitment/recruitment' },
+      { title: '达人招募中心', sub: '五步流程与 Brief', url: '/pages/recruit-hub/recruit-hub' },
     ],
   },
   onShow() {

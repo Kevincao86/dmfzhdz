@@ -25,7 +25,7 @@ Page({
 
   onShow() {
     if (!api.isAuthed()) {
-      wx.redirectTo({ url: '/pages/login/login' })
+      api.goLogin()
       return
     }
     try {

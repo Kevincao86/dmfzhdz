@@ -1,0 +1,1619 @@
+墨典达人招募小程序软件 V1.0
+第 1 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+/* ===== FILE: 墨典达人招募小程序/app.js ===== */
+App({
+  globalData: {},
+})
+
+
+/* ===== FILE: 墨典达人招募小程序/app.json ===== */
+{
+  "pages": ["pages/index/index", "pages/register/register", "pages/detail/detail", "pages/apply/apply"],
+  "window": {
+    "navigationBarTitleText": "墨典达人招募",
+    "navigationBarBackgroundColor": "#312e81",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#eef2ff",
+    "backgroundTextStyle": "dark"
+  },
+  "lazyCodeLoading": "requiredComponents"
+}
+
+
+/* ===== FILE: 墨典达人招募小程序/app.wxss ===== */
+/* 墨典达人招募 · 全局设计系统 */
+page {
+  background: #eef2ff;
+  background-image: linear-gradient(180deg, #e0e7ff 0%, #f1f5f9 28%, #f8fafc 100%);
+  color: #0f172a;
+  font-size: 28rpx;
+  line-height: 1.55;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+}
+
+.page-shell {
+  min-height: 100vh;
+  padding-bottom: 32rpx;
+}
+
+.page-with-bar {
+  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
+}
+
+/* 顶部品牌区 */
+.page-hero {
+  margin: 0 28rpx 8rpx;
+  padding: 36rpx 32rpx 32rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(135deg, #1e293b 0%, #312e81 48%, #4f46e5 100%);
+  box-shadow: 0 16rpx 48rpx rgba(49, 46, 129, 0.28);
+}
+
+
+墨典达人招募小程序软件 V1.0
+第 2 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+.page-hero-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1rpx;
+}
+
+.page-hero-sub {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.5;
+}
+
+/* 卡片 */
+.card {
+  margin: 20rpx 28rpx 0;
+  padding: 32rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 8rpx 32rpx rgba(15, 23, 42, 0.06);
+}
+
+.card--flat {
+  box-shadow: none;
+  border: 1rpx solid #e2e8f0;
+}
+
+.card--accent {
+  background: linear-gradient(145deg, #ffffff 0%, #f5f3ff 100%);
+  border-color: #c7d2fe;
+}
+
+.card--success {
+  background: linear-gradient(145deg, #ecfdf5 0%, #ffffff 100%);
+  border-color: #a7f3d0;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+}
+
+.section-head-dot {
+  width: 8rpx;
+
+墨典达人招募小程序软件 V1.0
+第 3 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  height: 32rpx;
+  border-radius: 4rpx;
+  background: linear-gradient(180deg, #6366f1, #8b5cf6);
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+  flex: 1;
+}
+
+.section-title--plain {
+  margin-bottom: 20rpx;
+}
+
+.hint {
+  color: #64748b;
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.title-lg {
+  font-size: 36rpx;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+}
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  margin-right: 10rpx;
+  margin-top: 10rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+
+.tag-pink {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.tag-blue {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+
+墨典达人招募小程序软件 V1.0
+第 4 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+.tag-gray {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.tag-green {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.tag-urgent {
+  background: linear-gradient(135deg, #fecaca, #fda4af);
+  color: #9f1239;
+  margin-top: 0;
+  font-weight: 600;
+}
+
+/* 指标条 */
+.metrics {
+  display: flex;
+  margin-top: 24rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+}
+
+.metric-cell {
+  flex: 1;
+  padding: 22rpx 12rpx;
+  text-align: center;
+  border-right: 1rpx solid #e2e8f0;
+}
+
+.metric-cell:last-child {
+  border-right: none;
+}
+
+.metric-label {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.metric-value {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+
+墨典达人招募小程序软件 V1.0
+第 5 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+.metric-value.accent {
+  color: #4f46e5;
+}
+
+.line-item {
+  padding: 16rpx 0;
+  font-size: 26rpx;
+  color: #334155;
+  border-bottom: 1rpx solid #f1f5f9;
+  line-height: 1.55;
+}
+
+.line-item:last-child {
+  border-bottom: none;
+}
+
+.btn-copy {
+  float: right;
+  font-size: 24rpx;
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+/* 按钮 */
+.btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: #fff;
+  border-radius: 48rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 12rpx 28rpx rgba(79, 70, 229, 0.35);
+  line-height: 1.4;
+}
+
+.btn-primary::after {
+  border: none;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  padding: 20rpx 32rpx;
+  border: none;
+}
+
+.btn-secondary::after {
+
+墨典达人招募小程序软件 V1.0
+第 6 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  border: none;
+}
+
+.btn-primary[disabled] {
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: #fff;
+  color: #4f46e5;
+  border: 2rpx solid #c7d2fe;
+  border-radius: 48rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.btn-ghost::after {
+  border: none;
+}
+
+.btn-wx {
+  margin-top: 20rpx;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border-radius: 48rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(34, 197, 94, 0.3);
+}
+
+.btn-wx::after {
+  border: none;
+}
+
+/* 底部栏 */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  border-top: 1rpx solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 -8rpx 40rpx rgba(15, 23, 42, 0.08);
+
+墨典达人招募小程序软件 V1.0
+第 7 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+.bottom-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 96rpx;
+  height: 88rpx;
+  padding: 0 12rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 20rpx;
+  line-height: 1.3;
+}
+
+.bottom-icon::after {
+  border: none;
+}
+
+.order-no {
+  font-size: 22rpx;
+  color: #94a3b8;
+  font-family: ui-monospace, monospace;
+}
+
+.merchant-name {
+  font-size: 26rpx;
+  color: #64748b;
+  margin-top: 10rpx;
+}
+
+/* 表单 */
+.apply-form .form-row {
+  margin-top: 24rpx;
+}
+
+.apply-form .form-row:first-child {
+  margin-top: 0;
+}
+
+.apply-form .form-label {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #475569;
+  margin-bottom: 10rpx;
+}
+
+墨典达人招募小程序软件 V1.0
+第 8 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+.input,
+.apply-form .picker-val {
+  padding: 22rpx 24rpx;
+  background: #f8fafc;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+.input {
+  width: 100%;
+  margin-top: 0;
+}
+
+.apply-form .picker-val {
+  min-height: 44rpx;
+  line-height: 44rpx;
+}
+
+.form-row-inline {
+  display: flex;
+  gap: 20rpx;
+}
+
+.form-col {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 状态 */
+.state-loading,
+.state-error,
+.state-empty {
+  text-align: center;
+  padding: 48rpx 24rpx;
+}
+
+.state-error {
+  color: #dc2626;
+}
+
+.state-empty-icon {
+  display: block;
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+  opacity: 0.5;
+}
+
+墨典达人招募小程序软件 V1.0
+第 9 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+.link-text {
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+.loading-dot-wrap {
+  display: flex;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.loading-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #6366f1;
+  animation: meoo-pulse 1.2s ease-in-out infinite;
+}
+
+.loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes meoo-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.bottom-cta {
+  flex: 1;
+  margin: 0;
+}
+
+/* 流程步骤 */
+.steps {
+  margin-top: 8rpx;
+}
+
+
+墨典达人招募小程序软件 V1.0
+第 10 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+.step-item {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 0;
+}
+
+.step-num {
+  flex-shrink: 0;
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 44rpx;
+  text-align: center;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 50%;
+}
+
+.step-body {
+  flex: 1;
+  font-size: 26rpx;
+  color: #475569;
+  line-height: 1.55;
+  padding-top: 4rpx;
+}
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/apply/apply.js ===== */
+const merchant = require('../../utils/merchantApi.js')
+const ops = require('../../utils/opsRegistryTalentMp.js')
+const memberStore = require('../../utils/talentMember.js')
+const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
+const regionPicker = require('../../utils/regionPicker.js')
+const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
+const applyFormState = require('../../utils/applyFormState.js')
+const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
+
+const DOUYIN_LEVELS = ['LV0', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7', '暂无等级']
+
+Page({
+  data: {
+    mpOrderId: '',
+    merchantOrderNo: '',
+    platform: '抖音',
+    labels: labels('抖音'),
+    douyinLevels: DOUYIN_LEVELS,
+    douyinLevelIndex: 0,
+    platformAccount: '',
+    platformNickname: '',
+
+墨典达人招募小程序软件 V1.0
+第 11 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    profileLink: '',
+    followers: '',
+    douyinSalesLevel: '',
+    contact: '',
+    wechatId: '',
+    quotePrice: '',
+    visitDate: '',
+    visitTimeStart: '',
+    visitTimeEnd: '',
+    alipayAccount: '',
+    submitting: false,
+    provinces: [],
+    cities: [],
+    province: '',
+    city: '',
+    provinceIndex: 0,
+    cityIndex: 0,
+    hasMember: false,
+    canSyncMember: false,
+    syncMemberProfile: false,
+    memberTypeLabel: '',
+    isIceMode: false,
+  },
+  onLoad(options) {
+    const mpOrderId = options && options.mpId ? decodeURIComponent(options.mpId) : ''
+    const merchantOrderNo =
+      options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
+    const platform = normalizePlatform(options && options.platform ? decodeURIComponent(options.platform) : '抖音')
+    const isIceMode = options && options.ice === '1'
+    const member = memberStore.readMember()
+    const canSyncMember = memberSyncAvailable(member, platform)
+    const patch = {
+      mpOrderId,
+      merchantOrderNo,
+      platform,
+      labels: labels(platform),
+      hasMember: !!member,
+      canSyncMember,
+      syncMemberProfile: false,
+      memberTypeLabel: member ? memberStore.memberTypeLabel(member.memberType) : '',
+      ...emptyApplyFields(DOUYIN_LEVELS),
+    }
+    if (!patch.provinces?.length) {
+      Object.assign(patch, setupRegionState('', ''))
+    }
+    this.setData(patch)
+    if (!mpOrderId) {
+      wx.showToast({ title: '缺少招募单号', icon: 'none' })
+    }
+  },
+
+墨典达人招募小程序软件 V1.0
+第 12 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  onSyncMemberChange(e) {
+    const sync = !!e.detail.value
+    if (sync) {
+      const member = memberStore.readMember()
+      const fields = applyFieldsFromMember(member, this.data.platform, DOUYIN_LEVELS)
+      if (!fields) {
+        wx.showToast({ title: '暂无可用会员资料', icon: 'none' })
+        this.setData({ syncMemberProfile: false })
+        return
+      }
+      this.setData({ syncMemberProfile: true, ...fields })
+      return
+    }
+    this.setData({
+      syncMemberProfile: false,
+      ...emptyApplyFields(DOUYIN_LEVELS),
+    })
+  },
+  goRegister() {
+    wx.navigateTo({ url: '/pages/register/register' })
+  },
+  onField(e) {
+    const k = e.currentTarget.dataset.k
+    if (k) this.setData({ [k]: e.detail.value, syncMemberProfile: false })
+  },
+  onProvinceChange(e) {
+    onProvincePick(this, e)
+    this.setData({ syncMemberProfile: false })
+  },
+  onCityChange(e) {
+    onCityPick(this, e)
+    this.setData({ syncMemberProfile: false })
+  },
+  onDouyinLevelChange(e) {
+    const i = Number(e.detail.value)
+    this.setData({
+      douyinLevelIndex: i,
+      douyinSalesLevel: DOUYIN_LEVELS[i] || '',
+      syncMemberProfile: false,
+    })
+  },
+  onVisitDateChange(e) {
+    this.setData({ visitDate: e.detail.value })
+  },
+  onVisitTimeStartChange(e) {
+    this.setData({ visitTimeStart: e.detail.value })
+  },
+  onVisitTimeEndChange(e) {
+    this.setData({ visitTimeEnd: e.detail.value })
+  },
+
+墨典达人招募小程序软件 V1.0
+第 13 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  validateForm() {
+    const lb = this.data.labels
+    if (!String(this.data.platformAccount || '').trim()) return `请填写${lb.accountId}`
+    if (!String(this.data.platformNickname || '').trim()) return `请填写${lb.nickname}`
+    if (!String(this.data.profileLink || '').trim()) return `请填写${lb.profileLink}`
+    const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
+    if (!Number.isFinite(followers) || followers <= 0) return '请填写有效粉丝数'
+    if (this.data.labels.showSalesLevel && !String(this.data.douyinSalesLevel || '').trim()) {
+      return '请选择抖音带货等级'
+    }
+    if (!String(this.data.contact || '').trim()) return '请填写联系方式'
+    if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
+    const regionErr = validateRegion(this.data.province, this.data.city)
+    if (regionErr) return regionErr
+    if (!this.data.isIceMode) {
+      if (!String(this.data.quotePrice || '').trim()) return '请填写报价'
+      if (!this.data.visitDate || !this.data.visitTimeStart || !this.data.visitTimeEnd) {
+        return '请选择探店日期与时间段'
+      }
+      if (this.data.visitTimeStart >= this.data.visitTimeEnd) return '探店结束时间须晚于开始时间'
+      if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
+    }
+    return null
+  },
+  async onSubmit() {
+    if (!merchant.hasMerchantApi()) {
+      wx.showToast({ title: '未配置后台地址', icon: 'none' })
+      return
+    }
+    const errMsg = this.validateForm()
+    if (errMsg) {
+      wx.showToast({ title: errMsg, icon: 'none' })
+      return
+    }
+
+    const platformNickname = String(this.data.platformNickname || '').trim()
+    const visitTimeSlot = this.data.isIceMode
+      ? '云剪任务·无需探店'
+      : `${this.data.visitDate} ${this.data.visitTimeStart}-${this.data.visitTimeEnd}`
+    const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
+    const platform = this.data.platform
+    const alipayAccount = String(this.data.alipayAccount || '').trim()
+
+    this.setData({ submitting: true })
+    try {
+      const applicantId = `app-${Date.now()}`
+      const applicant = {
+        id: applicantId,
+        name: platformNickname,
+        platform,
+
+墨典达人招募小程序软件 V1.0
+第 14 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+        platformAccount: String(this.data.platformAccount || '').trim(),
+        platformNickname,
+        profileLink: String(this.data.profileLink || '').trim(),
+        followers: Math.max(0, followers),
+        douyinSalesLevel: this.data.labels.showSalesLevel
+          ? String(this.data.douyinSalesLevel || '').trim()
+          : undefined,
+        contact: String(this.data.contact || '').trim(),
+        wechatId: String(this.data.wechatId || '').trim(),
+        quotePrice: this.data.isIceMode ? '云剪' : String(this.data.quotePrice || '').trim(),
+        visitTimeSlot,
+        alipayAccount: this.data.isIceMode ? '' : alipayAccount,
+        paymentMethod: this.data.isIceMode ? '云剪任务' : `支付宝：${alipayAccount}`,
+        mpOrderId: this.data.mpOrderId,
+        merchantOrderNo: this.data.merchantOrderNo,
+        province: String(this.data.province || '').trim(),
+        city: String(this.data.city || '').trim(),
+        appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      }
+      await ops.applyToMpOrder(this.data.mpOrderId, applicant)
+      if (this.data.isIceMode) {
+        try {
+          wx.setStorageSync(`meoo_ice_applicant_v1_${this.data.mpOrderId}`, applicantId)
+        } catch {
+          /* ignore */
+        }
+      }
+      wx.showToast({
+        title: this.data.isIceMode ? '认领成功，请确认接收' : '报名成功',
+        icon: 'success',
+      })
+      setTimeout(() => {
+        wx.redirectTo({
+          url: `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`,
+        })
+      }, 600)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 40), icon: 'none' })
+    } finally {
+      this.setData({ submitting: false })
+    }
+  },
+})
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/apply/apply.json ===== */
+{
+  "navigationBarTitleText": "填写报名"
+}
+
+
+墨典达人招募小程序软件 V1.0
+第 15 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+/* ===== FILE: 墨典达人招募小程序/pages/apply/apply.wxml ===== */
+<view class="page-shell page-with-bar">
+  <view class="page-hero page-hero--compact">
+    <text class="page-hero-title">提交报名</text>
+    <text class="page-hero-sub">平台 {{platform}} · 订单 {{merchantOrderNo}}</text>
+  </view>
+
+  <view class="card sync-card" wx:if="{{canSyncMember}}">
+    <view class="sync-row">
+      <view class="sync-icon-wrap">⇄</view>
+      <view class="sync-text">
+        <text class="sync-title">同步会员资料</text>
+        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料（探店时间需重选）</text>
+      </view>
+      <switch checked="{{syncMemberProfile}}" color="#6366f1" bindchange="onSyncMemberChange" />
+    </view>
+  </view>
+
+  <view class="card tip-card" wx:elif="{{hasMember}}">
+    <text class="hint">本单为{{platform}}招募，会员资料未含该平台，请手动填写或 </text>
+    <text class="link-text" bindtap="goRegister">完善资料</text>
+  </view>
+
+  <view class="card tip-card" wx:else>
+    <text class="hint">未注册也可直接报名。 </text>
+    <text class="link-text" bindtap="goRegister">注册会员</text>
+    <text class="hint"> 后可下次一键同步。</text>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">达人信息</text>
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">{{labels.accountId}}</text>
+      <input class="input" placeholder="请输入平台 ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">{{labels.nickname}}</text>
+      <input class="input" placeholder="平台昵称" value="{{platformNickname}}" data-k="platformNickname" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">{{labels.profileLink}}</text>
+      <input class="input" placeholder="主页链接" value="{{profileLink}}" data-k="profileLink" bindinput="onField" />
+    </view>
+
+墨典达人招募小程序软件 V1.0
+第 16 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+    <view class="form-row">
+      <text class="form-label">粉丝数</text>
+      <input class="input" type="number" placeholder="如 20000" value="{{followers}}" data-k="followers" bindinput="onField" />
+    </view>
+
+    <view class="form-row" wx:if="{{labels.showSalesLevel}}">
+      <text class="form-label">带货等级（抖音）</text>
+      <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
+        <view class="picker-val">{{douyinSalesLevel || '请选择'}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">联系与地域</text>
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">联系方式</text>
+      <input class="input" type="number" placeholder="手机号" value="{{contact}}" data-k="contact" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">微信号</text>
+      <input class="input" placeholder="便于商家联系" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
+    </view>
+
+    <view class="form-row form-row-inline">
+      <view class="form-col">
+        <text class="form-label">省份</text>
+        <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
+          <view class="picker-val">{{province || '请选择'}}</view>
+        </picker>
+      </view>
+      <view class="form-col">
+        <text class="form-label">城市</text>
+        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
+          <view class="picker-val">{{city || '请选择'}}</view>
+        </picker>
+      </view>
+    </view>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">报价与探店</text>
+
+墨典达人招募小程序软件 V1.0
+第 17 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">报价（元）</text>
+      <input class="input" type="digit" placeholder="您的报价" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">探店日期</text>
+      <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
+        <view class="picker-val">{{visitDate || '选择日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="form-row form-row-inline">
+      <view class="form-col">
+        <text class="form-label">开始</text>
+        <picker mode="time" value="{{visitTimeStart}}" bindchange="onVisitTimeStartChange">
+          <view class="picker-val">{{visitTimeStart || '时:分'}}</view>
+        </picker>
+      </view>
+      <view class="form-col">
+        <text class="form-label">结束</text>
+        <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
+          <view class="picker-val">{{visitTimeEnd || '时:分'}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="form-row">
+      <text class="form-label">支付宝账号</text>
+      <input class="input" placeholder="用于结算打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
+    </view>
+  </view>
+
+  <view class="card card--flat submit-wrap">
+    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
+      提交报名
+    </button>
+  </view>
+</view>
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/apply/apply.wxss ===== */
+.page-hero--compact {
+  padding: 28rpx 32rpx;
+}
+
+.page-hero--compact .page-hero-title {
+  font-size: 36rpx;
+
+墨典达人招募小程序软件 V1.0
+第 18 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+.page-hero--compact .page-hero-sub {
+  font-size: 24rpx;
+}
+
+.sync-card {
+  background: linear-gradient(135deg, #eef2ff 0%, #ffffff 100%);
+  border-color: #c7d2fe;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.sync-icon-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  font-size: 32rpx;
+  color: #4f46e5;
+  background: #e0e7ff;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+
+.sync-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.sync-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sync-hint {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.tip-card {
+
+墨典达人招募小程序软件 V1.0
+第 19 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  padding: 24rpx 32rpx;
+  background: #f8fafc;
+}
+
+.submit-wrap {
+  margin-bottom: 48rpx;
+  padding: 28rpx 32rpx;
+}
+
+.submit-btn {
+  width: 100%;
+}
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/detail/detail.js ===== */
+const merchant = require('../../utils/merchantApi.js')
+const ops = require('../../utils/opsRegistryTalentMp.js')
+const display = require('../../utils/recruitmentDisplay.js')
+const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
+
+Page({
+  data: {
+    id: '',
+    loading: true,
+    err: '',
+    view: null,
+    applied: false,
+    isIce: false,
+    iceApplicantId: '',
+    assignedVideoUrl: '',
+    assignedVideoLabel: '',
+    douyinUrl: '',
+    iceSubmitting: false,
+    iceVerified: false,
+    icePendingConfirm: false,
+    iceRejected: false,
+    iceConfirming: false,
+  },
+  onLoad(options) {
+    const id = options && options.id ? decodeURIComponent(options.id) : ''
+    const applied = options && options.applied === '1'
+    this.setData({ id, applied })
+    if (id) this.loadOrder(id)
+    else this.setData({ loading: false, err: '缺少招募单号' })
+  },
+  onShow() {
+    if (this.data.id) this.syncIceApplicantFromStorage()
+  },
+  syncIceApplicantFromStorage() {
+    try {
+
+墨典达人招募小程序软件 V1.0
+第 20 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      const raw = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${this.data.id}`)
+      if (raw) this.setData({ iceApplicantId: String(raw) })
+    } catch {
+      /* ignore */
+    }
+  },
+  onShareAppMessage() {
+    const v = this.data.view
+    return {
+      title: v ? v.title : '墨典达人招募',
+      path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
+    }
+  },
+  async loadOrder(id) {
+    if (!merchant.hasMerchantApi()) {
+      this.setData({ loading: false, err: '未配置后台地址' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      const reg = await ops.fetchRegistry()
+      const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+      const mp = list.find((o) => o && o.id === id)
+      if (!mp) {
+        this.setData({ loading: false, err: '招募单不存在或已结束' })
+        return
+      }
+      if (mp.status === 'closed' || mp.status === 'done') {
+        this.setData({ loading: false, err: '该招募已结束' })
+        return
+      }
+      const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
+      const view = display.enrichMpOrder(mp, merchantOrder)
+      const isIce = !!view.isIce
+      let iceApplicantId = this.data.iceApplicantId
+      try {
+        const stored = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${id}`)
+        if (stored) iceApplicantId = String(stored)
+      } catch {
+        /* ignore */
+      }
+      let assignedVideoUrl = ''
+      let assignedVideoLabel = ''
+      let iceVerified = false
+      let icePendingConfirm = false
+      let iceRejected = false
+      if (isIce && iceApplicantId) {
+        const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
+        if (app) {
+          assignedVideoUrl = app.assignedVideoDownloadUrl || ''
+
+墨典达人招募小程序软件 V1.0
+第 21 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+          assignedVideoLabel = app.assignedVideoLabel || ''
+          iceVerified = app.aiVerifyStatus === 'passed'
+          icePendingConfirm = app.taskStatus === 'pending_confirm' || (!app.taskStatus && !assignedVideoUrl)
+          iceRejected = app.taskStatus === 'rejected'
+          if (app.douyinPublishUrl) {
+            this.setData({ douyinUrl: app.douyinPublishUrl })
+          }
+        }
+      }
+      const iceApplied = Boolean(iceApplicantId)
+      this.setData({
+        view,
+        loading: false,
+        isIce,
+        iceApplicantId,
+        assignedVideoUrl,
+        assignedVideoLabel,
+        iceVerified,
+        icePendingConfirm,
+        iceRejected,
+        applied: this.data.applied || iceApplied,
+      })
+    } catch (e) {
+      const msg = String(e.message || e)
+      const hint = msg.includes('fail')
+        ? '无法加载订单，请确认 dev 服务已启动且已勾选「不校验合法域名」'
+        : msg
+      this.setData({ loading: false, err: hint })
+    }
+  },
+  onDouyinField(e) {
+    this.setData({ douyinUrl: e.detail.value })
+  },
+  copyDownloadUrl() {
+    const url = this.data.assignedVideoUrl
+    if (!url) return
+    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
+    wx.setClipboardData({
+      data: full,
+      success: () => wx.showToast({ title: '下载链接已复制', icon: 'success' }),
+    })
+  },
+  openDownload() {
+    const url = this.data.assignedVideoUrl
+    if (!url) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
+    wx.setClipboardData({
+
+墨典达人招募小程序软件 V1.0
+第 22 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      data: full,
+      success: () =>
+        wx.showModal({
+          title: '下载成片',
+          content: '链接已复制，请在浏览器中打开下载后发布至抖音。',
+          showCancel: false,
+        }),
+    })
+  },
+  async confirmIceReceipt() {
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    this.setData({ iceConfirming: true })
+    try {
+      await ops.confirmIceTask(this.data.id, this.data.iceApplicantId, 'confirm')
+      wx.showToast({ title: '已确认接收', icon: 'success' })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ iceConfirming: false })
+    }
+  },
+  async rejectIceTask() {
+    if (!this.data.iceApplicantId) return
+    const that = this
+    wx.showModal({
+      title: '拒绝任务',
+      content: '拒绝后名额将释放，是否继续？',
+      success(res) {
+        if (!res.confirm) return
+        that.setData({ iceConfirming: true })
+        ops
+          .confirmIceTask(that.data.id, that.data.iceApplicantId, 'reject')
+          .then(() => {
+            wx.showToast({ title: '已拒绝', icon: 'none' })
+            return that.loadOrder(that.data.id)
+          })
+          .catch((e) => wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' }))
+          .finally(() => that.setData({ iceConfirming: false }))
+      },
+    })
+  },
+  async submitIceDouyin() {
+    const url = String(this.data.douyinUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '请填写抖音作品链接', icon: 'none' })
+      return
+
+墨典达人招募小程序软件 V1.0
+第 23 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    }
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先报名认领', icon: 'none' })
+      return
+    }
+    this.setData({ iceSubmitting: true })
+    try {
+      await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
+      wx.showToast({ title: 'AI 核查通过', icon: 'success' })
+      this.setData({ iceVerified: true })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ iceSubmitting: false })
+    }
+  },
+  goHome() {
+    wx.reLaunch({ url: '/pages/index/index' })
+  },
+  goApply() {
+    const v = this.data.view
+    if (!v || !this.data.id) return
+    const q = [
+      `mpId=${encodeURIComponent(this.data.id)}`,
+      `merchantOrderNo=${encodeURIComponent(v.merchantOrderNo || '')}`,
+      `platform=${encodeURIComponent(v.platform || '抖音')}`,
+    ]
+    if (this.data.isIce) q.push('ice=1')
+    wx.navigateTo({ url: `/pages/apply/apply?${q.join('&')}` })
+  },
+  copyTask() {
+    const v = this.data.view
+    if (!v) return
+    wx.setClipboardData({
+      data: v.taskDetail || '',
+      success: () => wx.showToast({ title: '已复制任务详情', icon: 'success' }),
+    })
+  },
+  copyOrderNo() {
+    const v = this.data.view
+    if (!v) return
+    wx.setClipboardData({
+      data: v.merchantOrderNo || '',
+      success: () => wx.showToast({ title: '已复制订单号', icon: 'success' }),
+    })
+  },
+})
+
+
+
+墨典达人招募小程序软件 V1.0
+第 24 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+/* ===== FILE: 墨典达人招募小程序/pages/detail/detail.json ===== */
+{
+  "navigationBarTitleText": "任务详情",
+  "enableShareAppMessage": true
+}
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/detail/detail.wxml ===== */
+<view class="page-shell page-with-bar">
+  <view wx:if="{{loading}}" class="card state-loading">
+    <view class="loading-dot-wrap">
+      <view class="loading-dot" />
+      <view class="loading-dot" />
+      <view class="loading-dot" />
+    </view>
+    <text class="hint" style="margin-top:20rpx;">加载任务详情…</text>
+  </view>
+  <view wx:elif="{{err}}" class="card state-error state-empty">
+    <text class="state-empty-icon">!</text>
+    <text>{{err}}</text>
+  </view>
+
+  <block wx:elif="{{view}}">
+    <view class="card detail-hero">
+      <view class="detail-hero-top">
+        <view class="order-no" bindtap="copyOrderNo">
+          订单 {{view.merchantOrderNo}}
+          <text class="order-copy">复制</text>
+        </view>
+        <text class="merchant-name">{{view.merchantName}} · {{view.storeName}}</text>
+        <text class="title-lg">{{view.title}}</text>
+        <view>
+          <text wx:for="{{view.tags}}" wx:key="text" class="tag tag-{{item.tone}}">{{item.text}}</text>
+        </view>
+      </view>
+      <view class="detail-body">
+        <view class="metrics">
+          <view class="metric-cell">
+            <view class="metric-label">地域</view>
+            <view class="metric-value accent">{{view.region}}</view>
+          </view>
+          <view class="metric-cell">
+            <view class="metric-label">预算</view>
+            <view class="metric-value">{{view.budgetText}}</view>
+          </view>
+          <view class="metric-cell">
+            <view class="metric-label">需求</view>
+            <view class="metric-value">{{view.recruitCount}}人</view>
+          </view>
+        </view>
+
+墨典达人招募小程序软件 V1.0
+第 25 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="section-head">
+        <view class="section-head-dot" />
+        <text class="section-title">招募信息</text>
+      </view>
+      <view wx:for="{{view.recruitmentInfoLines}}" wx:key="*this" class="line-item">{{item}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-head">
+        <view class="section-head-dot" />
+        <text class="section-title">任务详情</text>
+        <text class="btn-copy" bindtap="copyTask">复制全文</text>
+      </view>
+      <view wx:for="{{view.taskDetailLines}}" wx:key="*this" class="line-item">{{item}}</view>
+    </view>
+
+    <view class="card card--flat">
+      <view class="section-head">
+        <view class="section-head-dot" />
+        <text class="section-title">参与流程</text>
+      </view>
+      <view class="steps" wx:if="{{isIce}}">
+        <view class="step-item">
+          <text class="step-num">1</text>
+          <text class="step-body">认领云剪任务（闭环）</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">2</text>
+          <text class="step-body">确认接收后下载分配成片</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">3</text>
+          <text class="step-body">发布抖音并回传链接，AI 核查后待结算</text>
+        </view>
+      </view>
+      <view class="steps" wx:else>
+        <view class="step-item">
+          <text class="step-num">1</text>
+          <text class="step-body">点击「我要报名」填写信息（无需注册会员）</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">2</text>
+          <text class="step-body">会员可选择是否同步已保存资料</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">3</text>
+
+墨典达人招募小程序软件 V1.0
+第 26 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+          <text class="step-body">商家反选通过后确认探店排期</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">4</text>
+          <text class="step-body">完成内容发布，按约定结算</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="card card--success" wx:if="{{applied && isIce && icePendingConfirm}}">
+      <text class="success-title">待确认接收</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">请确认是否接受该云剪投放任务；拒绝后名额将释放。</text>
+      <view style="display:flex;gap:16rpx;margin-top:20rpx;">
+        <button class="btn-primary" style="flex:1;" loading="{{iceConfirming}}" bindtap="confirmIceReceipt">确认接收</button>
+        <button class="btn-secondary" style="flex:1;" loading="{{iceConfirming}}" bindtap="rejectIceTask">拒绝</button>
+      </view>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && iceRejected}}">
+      <text class="success-title">已拒绝任务</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该云剪任务，可返回大厅查看其他任务。</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && assignedVideoUrl}}">
+      <text class="success-title">✓ 已分配成片</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">{{assignedVideoLabel || '云剪成片'}}</text>
+      <button class="btn-primary" style="margin-top:20rpx;" bindtap="openDownload">复制下载链接</button>
+      <view wx:if="{{!iceVerified}}" style="margin-top:24rpx;">
+        <text class="hint">发布抖音后粘贴作品链接：</text>
+        <input class="ice-input" placeholder="https://www.douyin.com/..." value="{{douyinUrl}}" bindinput="onDouyinField" />
+        <button class="btn-primary" style="margin-top:16rpx;" loading="{{iceSubmitting}}" bindtap="submitIceDouyin">提交链接 · AI 核查</button>
+      </view>
+      <text wx:else class="success-title" style="display:block;margin-top:16rpx;">✓ AI 核查已通过</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce}}">
+      <text class="success-title">✓ 认领成功</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">请在下方确认接收任务。</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && !isIce}}">
+      <text class="success-title">✓ 报名已提交</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">订单 {{view.merchantOrderNo}}，请耐心等待反选结果。</text>
+    </view>
+  </block>
+</view>
+
+<view wx:if="{{view && !loading}}" class="bottom-bar">
+  <button class="bottom-icon" open-type="share">分享</button>
+  <button class="bottom-icon" bindtap="goHome">首页</button>
+
+墨典达人招募小程序软件 V1.0
+第 27 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  <button wx:if="{{!applied}}" class="btn-primary bottom-cta" bindtap="goApply">{{isIce ? '认领云剪任务' : '我要报名'}}</button>
+  <button wx:else class="btn-primary bottom-cta" open-type="share">邀请好友</button>
+</view>
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/detail/detail.wxss ===== */
+/* 详情页补充样式（表单基础见 app.wxss） */
+.detail-hero {
+  margin-top: 16rpx;
+  overflow: hidden;
+}
+
+.detail-hero-top {
+  margin: -32rpx -32rpx 0;
+  padding: 28rpx 32rpx 24rpx;
+  background: linear-gradient(135deg, #1e293b 0%, #4338ca 100%);
+}
+
+.detail-hero-top .order-no {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.detail-hero-top .order-copy {
+  color: #c7d2fe;
+  margin-left: 12rpx;
+  font-size: 24rpx;
+}
+
+.detail-hero-top .merchant-name {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.detail-hero-top .title-lg {
+  color: #fff;
+  margin-top: 16rpx;
+}
+
+.detail-hero-top .tag {
+  margin-top: 16rpx;
+}
+
+.detail-body {
+  padding-top: 8rpx;
+}
+
+.region-value {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+墨典达人招募小程序软件 V1.0
+第 28 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+.success-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #059669;
+}
+
+.platform-block {
+  margin-top: 8rpx;
+  padding-top: 28rpx;
+  border-top: 2rpx solid #f1f5f9;
+}
+
+.platform-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8rpx;
+}
+
+.platform-head::before {
+  content: '';
+  width: 6rpx;
+  height: 28rpx;
+  border-radius: 3rpx;
+  background: #8b5cf6;
+}
+
+.platform-head--dy::before {
+  background: #1e293b;
+}
+
+.platform-head--xhs::before {
+  background: #ec4899;
+}
+
+
+/* ===== FILE: 墨典达人招募小程序/pages/index/index.js ===== */
+const merchant = require('../../utils/merchantApi.js')
+const ops = require('../../utils/opsRegistryTalentMp.js')
+const display = require('../../utils/recruitmentDisplay.js')
+const memberStore = require('../../utils/talentMember.js')
+const { isUrgentMpOrder, isIceMpOrder } = require('../../utils/recruitmentUrgent.js')
+
+const STATUS_LABEL = {
+  open: '招募中',
+  collecting: '收集中',
+
+墨典达人招募小程序软件 V1.0
+第 29 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  pending_settlement: '待结算',
+  closed: '已关闭',
+  done: '已完成',
+}
+
+function mapRow(mp, reg) {
+  const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
+  const view = display.enrichMpOrder(mp, merchantOrder)
+  const urgent = isUrgentMpOrder(mp)
+  return {
+    id: mp.id,
+    merchantOrderNo: view.merchantOrderNo,
+    merchantName: view.merchantName,
+    storeName: view.storeName,
+    title: view.title,
+    statusLabel: STATUS_LABEL[mp.status] || mp.status,
+    platform: view.platform,
+    region: view.region,
+    summary: view.summaryShort,
+    applicantCount: view.applicantCount,
+    urgent,
+    isIce: isIceMpOrder(mp),
+  }
+}
+
+Page({
+  data: {
+    unconfigured: false,
+    loading: true,
+    err: '',
+    hallTab: 'normal',
+    member: null,
+    memberTypeLabel: '',
+    normalRows: [],
+    urgentRows: [],
+    iceRows: [],
+    displayRows: [],
+  },
+  onShow() {
+    this.refreshMember()
+    this.loadList()
+  },
+  refreshMember() {
+    const member = memberStore.readMember()
+    this.setData({
+      member,
+      memberTypeLabel: member ? memberStore.memberTypeLabel(member.memberType) : '',
+    })
+  },
+  async loadList() {
+
+墨典达人招募小程序软件 V1.0
+第 30 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    if (!merchant.hasMerchantApi()) {
+      this.setData({
+        unconfigured: true,
+        loading: false,
+        normalRows: [],
+        urgentRows: [],
+        iceRows: [],
+        displayRows: [],
+      })
+      return
+    }
+    this.setData({ loading: true, err: '', unconfigured: false })
+    try {
+      const reg = await ops.fetchRegistry()
+      const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+      const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
+      const mapped = openList.map((mp) => mapRow(mp, reg))
+      const iceRows = mapped.filter((r) => r.isIce)
+      const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
+      const normalRows = mapped.filter((r) => !r.urgent && !r.isIce)
+      this.setData({ normalRows, urgentRows, iceRows, loading: false })
+      this.applyHallTab(this.data.hallTab)
+    } catch (e) {
+      const msg = String(e.message || e)
+      const hint =
+        msg.includes('fail') || msg.includes('网络')
+          ? '无法连接后台，请确认已运行 npm run dev，且 config.local.js 中 MERCHANT_API_BASE_URL 正确（模拟器可用 http://127.0.0.1:5173）'
+          : msg
+      this.setData({
+        loading: false,
+        err: hint,
+        normalRows: [],
+        urgentRows: [],
+        iceRows: [],
+        displayRows: [],
+      })
+    }
+  },
+  applyHallTab(tab) {
+    let displayRows = this.data.normalRows
+    if (tab === 'urgent') displayRows = this.data.urgentRows
+    else if (tab === 'ice') displayRows = this.data.iceRows
+    this.setData({ hallTab: tab, displayRows })
+  },
+  onHallTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    if (tab === 'urgent' || tab === 'normal' || tab === 'ice') this.applyHallTab(tab)
+  },
+  goRegister() {
+    wx.navigateTo({ url: '/pages/register/register' })

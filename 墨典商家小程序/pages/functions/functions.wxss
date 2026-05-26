@@ -152,6 +152,30 @@
   display: block;
 }
 
+.item-cell-text-only .cell-title {
+  margin-top: 0;
+}
+
+.item-cell-compact {
+  min-height: 124rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(155deg, #ffffff 0%, #f8fafc 100%);
+  border-color: rgba(99, 102, 241, 0.12);
+}
+
+.item-cell-compact .cell-title {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.item-cell-compact .cell-glyph {
+  background: linear-gradient(135deg, #e0e7ff, #cffafe);
+  color: #4338ca;
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
 .func-footer-space {
   height: 40rpx;
 }

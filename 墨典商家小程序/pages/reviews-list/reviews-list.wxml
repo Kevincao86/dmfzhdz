@@ -1,88 +1,131 @@
-<view class="page">
-  <view wx:if="{{!erpOk}}" class="hero warn meoo-card">
-    <text class="hero-title">未连接商家后台</text>
-    <text class="hero-desc">请配置商家后台 API 地址后重试。</text>
+<view class="rev-page">
+  <view wx:if="{{!erpOk}}" class="rev-warn meoo-card">
+    <text class="rev-warn-t">未连接商家后台</text>
+    <text class="rev-warn-s">请先配置商家 API 域名</text>
   </view>
 
-  <view wx:else class="toolbar">
-    <scroll-view scroll-x class="h-scroll" enhanced show-scrollbar="{{false}}">
-      <view class="row-inner">
+  <block wx:else>
+    <view class="rev-head-card meoo-card">
+      <view class="rev-head-row">
+        <text class="rev-h-title">评价管理</text>
+        <text class="rev-sync" bindtap="onSync">{{syncing ? '同步中…' : '同步评价'}}</text>
+      </view>
+      <text class="rev-h-muted">按门店或商品检索评价 · 支持与 Web 同源同步与回复</text>
+      <text class="rev-sync-hint">{{syncedAtText}}</text>
+    </view>
+
+    <view class="rev-kind-tabs">
+      <view
+        wx:for="{{reviewKindTabs}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="kindTab"
+        class="rev-kind-chip {{reviewKind === item.id ? 'on' : ''}}"
+      >{{item.label}}</view>
+    </view>
+
+    <scroll-view scroll-x class="rev-plat-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="rev-plat-inner">
         <view
-          wx:for="{{plats}}"
+          wx:for="{{platUi}}"
           wx:key="id"
           data-id="{{item.id}}"
           bindtap="onPlat"
-          class="chip {{activePlat === item.id ? 'chip-on' : ''}}"
+          class="rev-plat-cell {{activePlatTab === item.id ? 'on' : ''}} {{item.soon ? 'soon' : ''}}"
         >
           {{item.label}}
+          <text wx:if="{{item.soon}}" class="soon-tag">即将</text>
         </view>
       </view>
     </scroll-view>
-    <scroll-view scroll-x class="h-scroll sub" enhanced show-scrollbar="{{false}}">
-      <view class="row-inner">
-        <view
-          wx:for="{{sentiments}}"
-          wx:key="id"
-          data-id="{{item.id}}"
-          bindtap="onSent"
-          class="chip sm {{sentiment === item.id ? 'chip-on' : ''}}"
-        >
-          {{item.label}}
-        </view>
-      </view>
-    </scroll-view>
-    <scroll-view scroll-x class="h-scroll sub" enhanced show-scrollbar="{{false}}">
-      <view class="row-inner">
-        <view
-          wx:for="{{replyTabs}}"
-          wx:key="id"
-          data-id="{{item.id}}"
-          bindtap="onReplyTab"
-          class="chip sm {{replyStatus === item.id ? 'chip-on' : ''}}"
-        >
-          {{item.label}}
-        </view>
-      </view>
-    </scroll-view>
-    <view class="toolbar-foot">
-      <text wx:if="{{statsText}}" class="stats">{{statsText}}</text>
-    </view>
-  </view>
 
-  <view wx:if="{{loading}}" class="state meoo-card">加载中…</view>
-  <view wx:elif="{{errMsg}}" class="state meoo-card err">
-    <text class="e-title">暂无法加载</text>
-    <text class="e-body">{{errMsg}}</text>
-  </view>
-  <block wx:else>
-    <view wx:if="{{items.length === 0}}" class="state meoo-card">暂无评价数据</view>
-    <view wx:for="{{items}}" wx:key="id" class="rev meoo-card">
-      <view class="rev-head">
-        <text class="rev-user">{{item.userName}}</text>
-        <text class="rev-star">{{item.ratingStars}} 星</text>
+    <picker
+      wx:if="{{reviewKind === 'store'}}"
+      mode="selector"
+      range="{{storePickerLabels}}"
+      value="{{storePickerIndex}}"
+      bindchange="onStorePick"
+    >
+      <view class="rev-store-picker meoo-card">
+        <text class="rev-store-label">筛选门店</text>
+        <text class="rev-store-val">{{storePickerLabels[storePickerIndex]}}</text>
+        <text class="rev-picker-arrow">⌄</text>
       </view>
-      <text class="rev-body">{{item.content}}</text>
-      <text class="rev-time">{{item.createdAt}}</text>
-      <view wx:if="{{item.replied}}" class="reply-done">
-        <text class="reply-label">商家回复</text>
-        <text class="reply-body">{{item.replyText}}</text>
-      </view>
-      <view wx:if="{{!item.replied && replyingId !== item.id}}" class="rev-actions">
-        <button class="mini primary" size="mini" data-id="{{item.id}}" bindtap="startReply">回复</button>
-      </view>
-      <view wx:if="{{replyingId === item.id}}" class="reply-editor">
-        <textarea
-          class="reply-ta"
-          placeholder="输入回复内容"
-          maxlength="{{500}}"
-          bindinput="onReplyInput"
-          value="{{replyDraft}}"
-        />
-        <view class="reply-btns">
-          <button class="mini ghost" size="mini" bindtap="cancelReply">取消</button>
-          <button class="mini primary" size="mini" data-id="{{item.id}}" bindtap="submitReply">发送</button>
+    </picker>
+
+    <view class="rev-filters meoo-card">
+      <scroll-view scroll-x class="rev-chip-scroll">
+        <view class="rev-chip-row">
+          <view
+            wx:for="{{sentiments}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            bindtap="onSent"
+            class="rev-chip {{sentiment === item.id ? 'rev-chip-on' : ''}}"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
+      <scroll-view scroll-x class="rev-chip-scroll sub">
+        <view class="rev-chip-row">
+          <view
+            wx:for="{{replyTabs}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            bindtap="onReplyTab"
+            class="rev-chip alt {{replyStatus === item.id ? 'rev-chip-on' : ''}}"
+          >
+            {{item.label}} {{item.cnt}}
+          </view>
+        </view>
+      </scroll-view>
+      <view class="rev-ai-row">
+        <switch checked="{{aiAutoReply}}" bindchange="onAiToggle" color="#2563eb" />
+        <view class="rev-ai-meta">
+          <text class="rev-ai-label">24 小时智能自动回复（意向开关）</text>
+          <text class="rev-ai-sub">请在电脑端同源配置话术策略后启用</text>
         </view>
       </view>
     </view>
+
+    <view wx:if="{{loading}}" class="rev-state">加载中…</view>
+    <view wx:elif="{{errMsg}}" class="rev-state err">
+      <text>{{errMsg}}</text>
+      <button size="mini" bindtap="onSync">同步重试</button>
+    </view>
+    <block wx:else>
+      <view wx:if="{{items.length === 0}}" class="rev-empty meoo-card">
+        <text class="rev-empty-i">⌁</text>
+        <text class="rev-empty-t">暂无符合条件的评价</text>
+        <text class="rev-empty-h">可先点击右上角「同步评价」，或核对门店是否正确绑定来客。</text>
+      </view>
+      <block wx:for="{{items}}" wx:key="id">
+        <view class="rev-item meoo-card">
+          <view class="rev-line1">
+            <text class="rev-user">{{item.userName}}</text>
+            <text class="rev-stars">{{item.ratingStars}} 星 · {{item.sentiment}}</text>
+          </view>
+          <text wx:if="{{item.poiLabel || item.prodLabel}}" class="rev-sub-meta">
+            {{item.poiLabel}} {{item.prodLabel}}
+          </text>
+          <text class="rev-body">{{item.content}}</text>
+          <text class="rev-time">{{item.createdAt}}</text>
+          <view wx:if="{{item.replied}}" class="reply-done">
+            <text class="reply-label">商家回复</text>
+            <text class="reply-body">{{item.replyText}}</text>
+          </view>
+          <view wx:if="{{!item.replied && replyingId !== item.id}}" class="rev-actions">
+            <button class="svc-btn ghost" size="mini" loading="{{suggestBusyId === item.id}}" data-id="{{item.id}}" bindtap="onAiSuggest">AI话术</button>
+            <button class="svc-btn primary" size="mini" data-id="{{item.id}}" bindtap="startReply">回复</button>
+          </view>
+          <view wx:if="{{replyingId === item.id}}" class="reply-editor">
+            <textarea class="reply-ta" placeholder="请输入回复内容" maxlength="{{500}}" bindinput="onReplyInput" value="{{replyDraft}}" />
+            <view class="reply-btns">
+              <button class="svc-btn ghost" size="mini" bindtap="cancelReply">取消</button>
+              <button class="svc-btn primary" size="mini" data-id="{{item.id}}" bindtap="submitReply">发送</button>
+            </view>
+          </view>
+        </view>
+      </block>
+    </block>
   </block>
 </view>

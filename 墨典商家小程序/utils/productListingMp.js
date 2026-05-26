@@ -77,4 +77,33 @@ async function postMerchantProductSyncDouyin(/** @type {string} */ productId) {
   }
 }
 
-module.exports = { fetchMerchantProductList, postMerchantProductSyncDouyin, createPlatformLabel }
+/** 与 Web postPlatformProductDraft 同源：美团/小红书等通用草稿上品 */
+async function postPlatformProductDraft(
+  /** @type {string} */ platform,
+  /** @type {{ title: string, priceYuan: number, description?: string }} */ payload,
+) {
+  const token = readPlatformToken(platform)
+  if (!token) {
+    return { ok: false, message: `未找到${createPlatformLabel(platform)}授权，请先在电脑端系统设置绑定` }
+  }
+  const seg = apiSegment(platform)
+  if (!seg) return { ok: false, message: '不支持的平台' }
+  if (platform === 'jd') return { ok: false, message: '京东本地生活暂未接入该接口' }
+  try {
+    const data = await merchantApi.merchantRequestAuth('POST', `/api/merchant/${seg}/product/draft`, {
+      bearerToken: token,
+      data: {
+        title: String(payload.title || '').trim(),
+        priceYuan: payload.priceYuan,
+        description: payload.description ? String(payload.description).trim() : undefined,
+      },
+    })
+    const draftId = data && (data.draftId || data.draft_id || (data.data && data.data.draft_id))
+    const message = typeof data.message === 'string' ? data.message : undefined
+    return { ok: true, draftId: draftId ? String(draftId) : undefined, message }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+module.exports = { fetchMerchantProductList, postMerchantProductSyncDouyin, postPlatformProductDraft, createPlatformLabel }

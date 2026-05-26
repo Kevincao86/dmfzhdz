@@ -286,14 +286,113 @@ export function smsLoginErrorMessage(error: string, _detail?: string): string {
   if (error === 'supabase_admin_not_configured') {
     return '登录服务未配置完成，请联系管理员在 Vercel 配置 SUPABASE_SERVICE_ROLE_KEY 后重新部署'
   }
+  if (error === 'supabase_not_configured') {
+    return '登录服务未配置，请联系管理员在 Vercel 配置 Supabase URL 与 anon key 后重新部署'
+  }
   if (error === 'phone_not_registered') {
     return '该手机号尚未注册，请先注册'
   }
   if (error === 'sms_code_invalid') {
     return '验证码错误或已过期'
   }
+  if (error === 'invalid_credentials') {
+    return '账号或密码错误'
+  }
   if (error === 'magiclink_failed' || error === 'verify_failed' || error === 'session_missing') {
     return '登录服务暂不可用，请稍后重试'
   }
   return '登录失败，请稍后重试'
+}
+
+function tenantEmailDomain(): string {
+  return (
+    process.env.VITE_SUPABASE_TENANT_EMAIL_DOMAIN ??
+    process.env.TENANT_EMAIL_DOMAIN ??
+    'users.meoo.test'
+  ).trim()
+}
+
+export function loginNameToTenantEmail(loginName: string): string {
+  const domain = tenantEmailDomain()
+  const slug = String(loginName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return `${slug || 'user'}@${domain}`
+}
+
+export type PasswordLoginResult =
+  | {
+      ok: true
+      access_token: string
+      refresh_token: string
+      expires_in?: number
+      loginName: string
+    }
+  | { ok: false; error: string; message: string; detail?: string }
+
+/** 账户名 + 密码 → Supabase session（供小程序经 ERP 网关调用） */
+export async function signInWithPasswordLoginName(
+  loginName: string,
+  password: string,
+): Promise<PasswordLoginResult> {
+  const name = String(loginName || '').trim()
+  if (name.length < 2) {
+    return { ok: false, error: 'invalid_login_name', message: '账户名至少 2 个字符' }
+  }
+  if (String(password || '').length < 6) {
+    return { ok: false, error: 'invalid_password', message: '密码至少 6 位' }
+  }
+
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '')
+    .trim()
+    .replace(/\/$/, '')
+  const anonKey = readMerchantSupabaseAnonKey()
+  if (!supabaseUrl || !anonKey) {
+    return { ok: false, error: 'supabase_not_configured', message: smsLoginErrorMessage('supabase_not_configured') }
+  }
+
+  const email = loginNameToTenantEmail(name)
+  const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: anonKey,
+      Authorization: `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ email, password }),
+  })
+
+  let data: Record<string, unknown> = {}
+  try {
+    data = (await res.json()) as Record<string, unknown>
+  } catch {
+    data = {}
+  }
+
+  if (res.ok && typeof data.access_token === 'string' && data.access_token) {
+    return {
+      ok: true,
+      access_token: data.access_token,
+      refresh_token: typeof data.refresh_token === 'string' ? data.refresh_token : '',
+      expires_in: typeof data.expires_in === 'number' ? data.expires_in : undefined,
+      loginName: name,
+    }
+  }
+
+  const rawMsg =
+    (typeof data.error_description === 'string' && data.error_description) ||
+    (typeof data.msg === 'string' && data.msg) ||
+    (typeof data.message === 'string' && data.message) ||
+    '账号或密码错误'
+  const invalid =
+    res.status === 400 ||
+    data.error_code === 'invalid_credentials' ||
+    /invalid login/i.test(String(rawMsg))
+  return {
+    ok: false,
+    error: invalid ? 'invalid_credentials' : 'password_login_failed',
+    message: invalid ? '账号或密码错误' : String(rawMsg),
+  }
 }

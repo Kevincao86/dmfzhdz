@@ -1,18 +1,19 @@
 /**
- * 复制为 config.local.js（勿提交）后按需修改。
- * config.local.js 会覆盖 config.js 中的同名字段。
+ * 复制为 config.local.js（已在仓库 .gitignore，勿提交）后按需修改。
+ * config.local.js 会合并覆盖 config.js 中的同名字段。
  *
- * 也可只维护一个 LAN_IP 常量，再拼 SUPABASE_URL / MERCHANT_API_BASE_URL（见仓库内已生成的 config.local.js 模板）。
+ * 墨典 AI 智能体要走真实对话：必须设置 MERCHANT_API_BASE_URL，
+ * 与 web版/merchant-erp dev 同源（默认 http://127.0.0.1:5173）。真机请改为电脑的局域网 IPv4。
+ * 本地跳过登录（DEV_SKIP_LOGIN: true）时：电脑需在 merchant-erp 使用 .env.local，
+ * 见 web版/merchant-erp/.env.development.agent.example（MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED=1 + 至少一项 AI Key）。
  */
 module.exports = {
-  // UI 设计阶段跳过登录（与 config.js 中 DEV_SKIP_LOGIN 二选一覆盖）：
-  // DEV_SKIP_LOGIN: true,
-  // DEV_SKIP_LOGIN_NAME: 'DMF001',
-  // 真机连本机 Docker Supabase 时使用局域网 IP：
-  // SUPABASE_URL: 'http://192.168.1.8:54321',
-  // 使用云端 Supabase（须 https）：
-  // SUPABASE_URL: 'https://xxxx.supabase.co',
-  // SUPABASE_ANON_KEY: 'eyJ...',
-  /** 与 Web ERP（merchant-erp）dev 同源，招募单写入 /api/ops-sync；例 http://192.168.1.8:5173 */
-  // MERCHANT_API_BASE_URL: 'http://192.168.1.8:5173',
+  /** 正式/真机：与微信「服务器域名」一致 */
+  MERCHANT_API_BASE_URL: 'https://www.mofangdianai.com',
+  SUPABASE_URL: 'https://rborqkadhtwxqoaskddy.supabase.co',
+  // SUPABASE_ANON_KEY: '从 Supabase Dashboard → API → anon public 复制',
+  DEV_SKIP_LOGIN: false,
+  // 本地 Docker 开发时用下面两行，并勾选「不校验合法域名」：
+  // MERCHANT_API_BASE_URL: 'http://127.0.0.1:5173',
+  // SUPABASE_URL: 'http://127.0.0.1:54321',
 }

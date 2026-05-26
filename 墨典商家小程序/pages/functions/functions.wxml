@@ -10,7 +10,7 @@
         <view class="sec-icon sec-tone-{{item.tone}}">{{item.firstChar}}</view>
         <view class="sec-meta">
           <text class="sec-title">{{item.title}}</text>
-          <text class="sec-desc">{{item.desc}}</text>
+          <text wx:if="{{item.desc}}" class="sec-desc">{{item.desc}}</text>
         </view>
       </view>
       <view class="item-grid">
@@ -19,15 +19,15 @@
           wx:for-item="cell"
           wx:key="title"
           url="{{cell.url}}"
-          class="item-cell"
+          class="item-cell {{cell.desc ? '' : 'item-cell-compact'}}"
           hover-class="item-cell-hover"
         >
-          <view class="cell-top">
-            <view class="cell-glyph">{{cell.glyph}}</view>
+          <view class="cell-top" wx:if="{{cell.glyph || cell.badge}}">
+            <view wx:if="{{cell.glyph}}" class="cell-glyph">{{cell.glyph}}</view>
             <text wx:if="{{cell.badge}}" class="cell-badge">{{cell.badge}}</text>
           </view>
           <text class="cell-title">{{cell.title}}</text>
-          <text class="cell-desc">{{cell.desc}}</text>
+          <text wx:if="{{cell.desc}}" class="cell-desc">{{cell.desc}}</text>
         </navigator>
       </view>
     </view>

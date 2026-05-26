@@ -3,15 +3,12 @@ const sessionSync = require('./utils/merchantSessionSyncMp.js')
 
 App({
   onLaunch() {
-    if (devAuth.isDevSkipLogin()) {
-      devAuth.applyDevSession()
-      this.globalData.accessToken = devAuth.DEV_TOKEN
-      return
-    }
-    const token = wx.getStorageSync('meoo_access_token')
+    const token = String(wx.getStorageSync('meoo_access_token') || '').trim()
     if (token) {
       this.globalData.accessToken = token
-      void sessionSync.syncFromCloud()
+      if (!devAuth.isDevSession()) void sessionSync.syncFromCloud()
+    } else {
+      this.globalData.accessToken = null
     }
   },
   globalData: {
@@ -23,16 +20,13 @@ App({
   },
   /** 供页面校验登录态 */
   ensureAuthed() {
-    if (devAuth.isDevSkipLogin()) {
-      devAuth.applyDevSession()
-      this.globalData.accessToken = devAuth.DEV_TOKEN
-      return true
-    }
     const t = wx.getStorageSync('meoo_access_token')
     if (!t) {
-      wx.redirectTo({ url: '/pages/login/login' })
+      const api = require('./utils/api.js')
+      api.openLoginPage()
       return false
     }
+    this.globalData.accessToken = t
     return true
   },
 })

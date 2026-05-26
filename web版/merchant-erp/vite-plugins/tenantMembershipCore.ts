@@ -92,6 +92,11 @@ export async function assertAiChatAccess(
   provider: string,
   env: Record<string, string>,
 ): Promise<AiAccessCheck> {
+  const allowUnauth = (env.MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED ?? '').trim() === '1'
+  if (allowUnauth && userId === 'dev-unauthenticated') {
+    return { ok: true, envForChat: env }
+  }
+
   const ctx = await loadTenantAiContextForUser(userId, env)
   if (!ctx) {
     return { ok: false, status: 403, error: 'tenant_not_found', detail: '未找到租户，无法调用 AI' }

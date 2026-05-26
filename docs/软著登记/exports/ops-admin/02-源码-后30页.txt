@@ -1,0 +1,1595 @@
+墨典AI智能ERP运营管理平台 V1.0
+第 330 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const hash = hashOpsPasswordSync(password)
+  if (hash !== row.password_hash) return { ok: false, error: 'bad_password' }
+  const account = rowToPublic(row)
+  const loginAt = new Date().toISOString()
+  const session: OpsSessionPayload = {
+    accountId: account.id,
+    phone: account.phone,
+    displayName: account.displayName,
+    role: account.role,
+    permissions: account.permissions,
+    loginAt,
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  }
+  return { ok: true, account, sessionToken: signOpsSessionToken(session, env), session }
+}
+
+export async function createOpsSubAccountInDb(
+  admin: SupabaseClient,
+  input: {
+    phone: string
+    displayName: string
+    password: string
+    permissions: OpsPermissionKey[]
+  },
+): Promise<{ ok: true; account: OpsStaffAccountPublic } | { ok: false; error: string }> {
+  await ensureOpsMasterAccountInDb(admin)
+  const phone = normalizePhone(input.phone)
+  if (phone.length !== 11) return { ok: false, error: 'invalid_phone' }
+  if (phone === OPS_MASTER_PHONE) return { ok: false, error: 'reserved_phone' }
+  if (input.password.length < 6) return { ok: false, error: 'password_too_short' }
+  const perms = [...new Set(input.permissions)]
+  if (perms.length === 0) return { ok: false, error: 'permissions_required' }
+
+  const existing = await fetchRowByPhone(admin, phone)
+  if (existing) return { ok: false, error: 'phone_exists' }
+
+  const now = new Date().toISOString()
+  const row: OpsStaffAccountRow = {
+    id: uid(),
+    phone,
+    display_name: input.displayName.trim() || phone,
+    role: 'sub_admin',
+    password_hash: hashOpsPasswordSync(input.password),
+    permissions: perms,
+    status: 'active',
+    created_at: now,
+    updated_at: now,
+  }
+  const { error } = await admin.from('ops_staff_accounts').insert(row)
+  if (error) return { ok: false, error: error.message }
+
+墨典AI智能ERP运营管理平台 V1.0
+第 331 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  return { ok: true, account: rowToPublic(row) }
+}
+
+export async function updateOpsSubAccountInDb(
+  admin: SupabaseClient,
+  id: string,
+  patch: {
+    displayName?: string
+    permissions?: OpsPermissionKey[]
+    status?: 'active' | 'disabled'
+    password?: string
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await fetchRowById(admin, id)
+  if (!row) return { ok: false, error: 'not_found' }
+  if (row.role === 'super_admin') return { ok: false, error: 'cannot_edit_master' }
+
+  let permissions = parsePermissions(row.permissions, 'sub_admin')
+  if (patch.permissions) {
+    permissions = [...new Set(patch.permissions)]
+    if (permissions.length === 0) return { ok: false, error: 'permissions_required' }
+  }
+  let passwordHash = row.password_hash
+  if (patch.password != null && patch.password.length > 0) {
+    if (patch.password.length < 6) return { ok: false, error: 'password_too_short' }
+    passwordHash = hashOpsPasswordSync(patch.password)
+  }
+
+  const { error } = await admin
+    .from('ops_staff_accounts')
+    .update({
+      display_name: patch.displayName?.trim() ? patch.displayName.trim() : row.display_name,
+      permissions,
+      status: patch.status ?? row.status,
+      password_hash: passwordHash,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function deleteOpsSubAccountInDb(
+  admin: SupabaseClient,
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await fetchRowById(admin, id)
+  if (!row) return { ok: false, error: 'not_found' }
+  if (row.role === 'super_admin') return { ok: false, error: 'cannot_delete_master' }
+  const { error } = await admin.from('ops_staff_accounts').delete().eq('id', id)
+
+墨典AI智能ERP运营管理平台 V1.0
+第 332 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function migrateOpsStaffAccountsInDb(
+  admin: SupabaseClient,
+  accounts: Array<{
+    id: string
+    phone: string
+    displayName: string
+    role: OpsStaffRole
+    passwordHash: string
+    permissions: OpsPermissionKey[]
+    status: 'active' | 'disabled'
+    createdAt: string
+    updatedAt: string
+  }>,
+): Promise<{ ok: true; imported: number } | { ok: false; error: string }> {
+  await ensureOpsMasterAccountInDb(admin)
+  let imported = 0
+  for (const a of accounts) {
+    if (a.role === 'super_admin') continue
+    const phone = normalizePhone(a.phone)
+    if (phone.length !== 11 || phone === OPS_MASTER_PHONE) continue
+    if (!a.passwordHash) continue
+    const existing = await fetchRowByPhone(admin, phone)
+    if (existing) continue
+    const perms = [...new Set(a.permissions)].filter((p) => OPS_PERMISSION_MODULE_KEYS.includes(p))
+    if (perms.length === 0) continue
+    const now = new Date().toISOString()
+    const { error } = await admin.from('ops_staff_accounts').insert({
+      id: a.id || uid(),
+      phone,
+      display_name: a.displayName.trim() || phone,
+      role: 'sub_admin',
+      password_hash: a.passwordHash,
+      permissions: perms,
+      status: a.status === 'disabled' ? 'disabled' : 'active',
+      created_at: a.createdAt || now,
+      updated_at: a.updatedAt || now,
+    })
+    if (!error) imported += 1
+  }
+  return { ok: true, imported }
+}
+
+export async function requireSuperAdminSession(
+  admin: SupabaseClient,
+  token: string,
+  env: NodeJS.ProcessEnv,
+
+墨典AI智能ERP运营管理平台 V1.0
+第 333 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+): Promise<
+  | { ok: true; session: OpsSessionPayload; row: OpsStaffAccountRow }
+  | { ok: false; status: number; error: string }
+> {
+  const payload = verifyOpsSessionToken(token, env)
+  if (!payload) return { ok: false, status: 401, error: 'invalid_session' }
+  const row = await fetchRowById(admin, payload.accountId)
+  if (!row || row.status === 'disabled') return { ok: false, status: 401, error: 'invalid_session' }
+  if (row.role !== 'super_admin') return { ok: false, status: 403, error: 'super_admin_required' }
+  return { ok: true, session: payload, row }
+}
+
+
+/* ===== FILE: 商家管理后台/api/opsSyncRegistryLitePost.ts ===== */
+/**
+ * 运营台注册表「轻量 POST」共用：AI Key / 模型 / 短视频网关等独立路由，避免走 catch-all 时加载整份 dispatch。
+ */
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createRegistrySnapshotIoFetch } from './meooRegistrySnapshotIo.js'
+import { sendOpsJson } from './safeOpsJson.js'
+import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo.js'
+
+export const opsRegistrySyncLiteFnConfig = { maxDuration: 60 }
+
+export function registrySyncLiteSendCors(res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+}
+
+export function registrySyncLiteRawBody(req: VercelRequest): string {
+  try {
+    if (typeof req.body === 'string') return req.body
+    if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
+    if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+export function registrySyncLiteReadSupabase():
+  | { ok: true; supabaseUrl: string; serviceRole: string }
+  | { ok: false } {
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+  const serviceRole = (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE ??
+    ''
+  ).trim()
+
+墨典AI智能ERP运营管理平台 V1.0
+第 334 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (!supabaseUrl || !serviceRole) return { ok: false }
+  return { ok: true, supabaseUrl, serviceRole }
+}
+
+export async function handleRegistrySyncLitePost(
+  req: VercelRequest,
+  res: VercelResponse,
+  run: (io: RegistrySnapshotIo, bodyRaw: string) => Promise<{ status: number; body: unknown }>,
+): Promise<void> {
+  try {
+    registrySyncLiteSendCors(res)
+    if (req.method === 'OPTIONS') {
+      res.status(204).end()
+      return
+    }
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    if (req.method !== 'POST') {
+      res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+      return
+    }
+    const env = registrySyncLiteReadSupabase()
+    if (!env.ok) {
+      res.status(503).send(
+        JSON.stringify({
+          ok: false,
+          error: 'supabase_admin_not_configured',
+          hint:
+            '注册表快照需要 VITE_SUPABASE_URL（或 SUPABASE_URL）与 SUPABASE_SERVICE_ROLE_KEY；并在 Supabase 执行迁移 ops_registry_snapshot。',
+        }),
+      )
+      return
+    }
+    const io = createRegistrySnapshotIoFetch(env.supabaseUrl, env.serviceRole)
+    const bodyRaw = registrySyncLiteRawBody(req)
+    const out = await run(io, bodyRaw)
+    let payload: string
+    try {
+      payload = typeof out.body === 'string' ? out.body : JSON.stringify(out.body)
+    } catch (stringifyErr) {
+      const hint = stringifyErr instanceof Error ? stringifyErr.message : String(stringifyErr)
+      payload = JSON.stringify({
+        ok: false,
+        error: 'registry_response_not_serializable',
+        detail: hint.slice(0, 400),
+      })
+      res.status(500).send(payload)
+      return
+    }
+    res.status(out.status).send(payload)
+  } catch (e) {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 335 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+    const msg = e instanceof Error ? e.message : String(e)
+    sendOpsJson(res, 500, {
+      ok: false,
+      error: 'ops_sync_lite_post_failed',
+      detail: msg.slice(0, 800),
+      hint: '请查看 Vercel Function Logs；多为注册表快照读写异常。',
+    })
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/api/opsTenantsMutationsBackend.ts ===== */
+/**
+ * 运营台 tenants 变更：Service Role 直连；供 Vite 插件与 Vercel API 共用。
+ * 置于 api 根目录，避免 Vercel Serverless 打包后 api/lib 相对路径解析失败。
+ */
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { probeTokenMixUsage } from '../../web版/merchant-erp/vite-plugins/tokenmixUsageProbe.js'
+import { buildOpsGiftDaysPatch, readEntitlementDays } from './tenantEntitlementCore.js'
+
+export type TenantMutationResult =
+  | { ok: true }
+  | { ok: false; status: number; body: Record<string, unknown> }
+
+export async function opsTenantPatchAdmin(
+  admin: SupabaseClient,
+  body: Record<string, unknown>,
+): Promise<TenantMutationResult> {
+  const id = typeof body.id === 'string' ? body.id.trim() : ''
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+    return { ok: false, status: 400, body: { ok: false, error: 'invalid_id' } }
+  }
+
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (typeof body.merchantName === 'string' && body.merchantName.trim())
+    patch.name = body.merchantName.trim()
+  if (body.accountStatus === 'normal' || body.accountStatus === 'disabled' || body.accountStatus === 'frozen') {
+    patch.account_status = body.accountStatus
+  }
+  if (typeof body.trialDays === 'number' && Number.isFinite(body.trialDays)) {
+    patch.trial_days = Math.max(0, Math.min(3650, Math.floor(body.trialDays)))
+  }
+  if (body.membershipPlan === 'free' || body.membershipPlan === 'member' || body.membershipPlan === 'member_plus') {
+    patch.membership_plan = body.membershipPlan
+  }
+
+  const giftProvided = typeof body.opsGiftDays === 'number' && Number.isFinite(body.opsGiftDays)
+  if (giftProvided) {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 336 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+    const { data: tenant, error: loadErr } = await admin
+      .from('tenants')
+      .select('service_expire_at, subscription_days, ops_gift_days, official_days')
+      .eq('id', id)
+      .maybeSingle()
+    if (loadErr || !tenant) {
+      return {
+        ok: false,
+        status: 502,
+        body: { ok: false, error: 'tenant_load_failed', detail: loadErr?.message ?? 'not_found' },
+      }
+    }
+    const sub = readEntitlementDays(
+      tenant.subscription_days != null ? tenant.subscription_days : tenant.official_days,
+    )
+    const oldGift = readEntitlementDays(tenant.ops_gift_days)
+    const ent = buildOpsGiftDaysPatch({
+      subscriptionDays: sub,
+      oldOpsGiftDays: oldGift,
+      newOpsGiftDays: body.opsGiftDays as number,
+      serviceExpireAt:
+        typeof tenant.service_expire_at === 'string' ? tenant.service_expire_at : null,
+    })
+    Object.assign(patch, ent)
+  } else if (typeof body.officialDays === 'number' && Number.isFinite(body.officialDays)) {
+    patch.official_days = Math.max(0, Math.min(36500, Math.floor(body.officialDays)))
+  }
+
+  const { error } = await admin.from('tenants').update(patch).eq('id', id)
+  if (error) {
+    return {
+      ok: false,
+      status: 502,
+      body: { ok: false, error: 'patch_failed', detail: error.message },
+    }
+  }
+  return { ok: true }
+}
+
+export async function opsTenantResetPasswordAdmin(
+  admin: SupabaseClient,
+  body: Record<string, unknown>,
+): Promise<TenantMutationResult> {
+  const id = typeof body.id === 'string' ? body.id.trim() : ''
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+    return { ok: false, status: 400, body: { ok: false, error: 'invalid_id' } }
+  }
+  const rawPw = typeof body.password === 'string' ? body.password : ''
+  const password = rawPw.length >= 6 ? rawPw : '123456'
+
+
+墨典AI智能ERP运营管理平台 V1.0
+第 337 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const { data: members, error: me } = await admin
+    .from('tenant_members')
+    .select('user_id')
+    .eq('tenant_id', id)
+    .eq('role', 'owner')
+    .limit(1)
+  if (me) {
+    return {
+      ok: false,
+      status: 502,
+      body: { ok: false, error: 'members_lookup_failed', detail: me.message },
+    }
+  }
+  const uid = members?.[0]?.user_id
+  if (!uid || typeof uid !== 'string') {
+    return { ok: false, status: 404, body: { ok: false, error: 'owner_not_found' } }
+  }
+  const { error: ue } = await admin.auth.admin.updateUserById(uid, { password })
+  if (ue) {
+    return {
+      ok: false,
+      status: 502,
+      body: { ok: false, error: 'auth_update_failed', detail: ue.message },
+    }
+  }
+  return { ok: true }
+}
+
+export async function opsTenantWalletLedgerAdmin(
+  admin: SupabaseClient,
+  tenantId: string,
+): Promise<
+  | { ok: true; rows: Record<string, unknown>[] }
+  | { ok: false; status: number; body: Record<string, unknown> }
+> {
+  if (!tenantId || !/^[0-9a-f-]{36}$/i.test(tenantId)) {
+    return { ok: false, status: 400, body: { ok: false, error: 'invalid_tenant_id' } }
+  }
+  const { data: ledgerRows, error: le } = await admin
+    .from('tenant_wallet_ledger')
+    .select('id, tenant_id, delta_cents, balance_after_cents, reason, ref_order_id, created_at')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(200)
+  if (le) {
+    return {
+      ok: false,
+      status: 502,
+      body: {
+        ok: false,
+
+墨典AI智能ERP运营管理平台 V1.0
+第 338 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+        error: 'wallet_ledger_select_failed',
+        detail: le.message,
+      },
+    }
+  }
+  return { ok: true, rows: ledgerRows ?? [] }
+}
+
+export async function opsTenantTokenmixAdmin(
+  admin: SupabaseClient,
+  body: Record<string, unknown>,
+  env: Record<string, string>,
+): Promise<TenantMutationResult | { ok: true; body: Record<string, unknown> }> {
+  const id = typeof body.id === 'string' ? body.id.trim() : ''
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+    return { ok: false, status: 400, body: { ok: false, error: 'invalid_id' } }
+  }
+  const action = typeof body.action === 'string' ? body.action.trim() : ''
+
+  if (action === 'bind') {
+    const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
+    if (apiKey.length < 8) {
+      return { ok: false, status: 400, body: { ok: false, error: 'invalid_api_key' } }
+    }
+    const { error } = await admin
+      .from('tenants')
+      .update({ tokenmix_api_key: apiKey, updated_at: new Date().toISOString() })
+      .eq('id', id)
+    if (error) {
+      return { ok: false, status: 502, body: { ok: false, error: 'bind_failed', detail: error.message } }
+    }
+    return { ok: true, body: { ok: true, bound: true } }
+  }
+
+  if (action === 'usage') {
+    const { data, error } = await admin
+      .from('tenants')
+      .select(
+        'membership_plan, tokenmix_api_key, direct_ai_calls_used, direct_ai_usage_month, tokenmix_usage_snapshot',
+      )
+      .eq('id', id)
+      .maybeSingle()
+    if (error || !data) {
+      return {
+        ok: false,
+        status: 404,
+        body: { ok: false, error: 'tenant_not_found', detail: error?.message },
+      }
+    }
+    const key =
+
+墨典AI智能ERP运营管理平台 V1.0
+第 339 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+      typeof data.tokenmix_api_key === 'string' && data.tokenmix_api_key.trim()
+        ? data.tokenmix_api_key.trim()
+        : ''
+    let tokenmixUsage = data.tokenmix_usage_snapshot as Record<string, unknown> | null
+    if (key) {
+      const snap = await probeTokenMixUsage(key, env)
+      tokenmixUsage = snap as unknown as Record<string, unknown>
+      await admin
+        .from('tenants')
+        .update({ tokenmix_usage_snapshot: snap, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    }
+    return {
+      ok: true,
+      body: {
+        ok: true,
+        membershipPlan: data.membership_plan,
+        tokenmixBound: !!key,
+        directAiCallsUsed: data.direct_ai_calls_used ?? 0,
+        directAiUsageMonth: data.direct_ai_usage_month,
+        tokenmixUsage,
+      },
+    }
+  }
+
+  return { ok: false, status: 400, body: { ok: false, error: 'invalid_action' } }
+}
+
+
+/* ===== FILE: 商家管理后台/api/provision-tenant.ts ===== */
+/**
+ * Vercel Serverless（Node）：手动创建租户。
+ *
+ * 使用 Node 运行时以便正确读取 Vercel「Sensitive」环境变量（Edge 对部分密钥支持不完善）。
+ *
+ * 优先路径：VITE_SUPABASE_URL（或 SUPABASE_URL）+ SUPABASE_SERVICE_ROLE_KEY —— 直连 Supabase Admin API，无需 Edge Function。
+ * 备选：同上 URL + ANON_KEY + MEOO_PROVISION_SECRET → 转发 Supabase Edge Function provision-tenant。
+ *
+ * 本地开发仍由 vite-plugins/provisionTenantProxy 处理同源 POST。
+ */
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { sendOpsJson } from './safeOpsJson.js'
+
+export const config = { maxDuration: 60 }
+
+function bodyRaw(req: VercelRequest): string {
+  if (typeof req.body === 'string') return req.body
+  if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
+  if (req.body !== undefined && req.body !== null && typeof req.body === 'object')
+    return JSON.stringify(req.body)
+
+墨典AI智能ERP运营管理平台 V1.0
+第 340 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  return '{}'
+}
+
+function jsonResponse(status: number, body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  })
+}
+
+async function sendFetchResponse(res: VercelResponse, r: Response): Promise<void> {
+  const text = await r.text()
+  const code = Number(r.status)
+  const status = Number.isFinite(code) && code >= 100 && code <= 599 ? code : 500
+  if (!res.writableEnded) {
+    res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8').send(text)
+  }
+}
+
+function loginNameToEmail(loginName: string, domain: string): string {
+  const slug = loginName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return `${slug || 'user'}@${domain}`
+}
+
+type CreateUserJson = {
+  id?: string
+  user?: { id?: string }
+  msg?: string
+  message?: string
+  error_description?: string
+}
+
+async function provisionWithServiceRole(
+  supabaseUrl: string,
+  serviceRole: string,
+  rawBody: string,
+  tenantEmailDomain: string,
+): Promise<Response> {
+  let payload: {
+    loginName?: string
+    password?: string
+    merchantName?: string
+    trialDays?: number
+    officialDays?: number
+  }
+  try {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 341 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+    payload = JSON.parse(rawBody) as typeof payload
+  } catch {
+    return jsonResponse(400, { ok: false, error: 'invalid_json' })
+  }
+
+  const loginName = (payload.loginName ?? '').trim()
+  const password = payload.password ?? ''
+  const merchantName = (payload.merchantName ?? '').trim()
+  const trialDays = Math.max(0, Math.min(3650, Number(payload.trialDays) || 0))
+  const officialDays = Math.max(0, Math.min(36500, Number(payload.officialDays) || 0))
+
+  if (loginName.length < 2 || password.length < 6 || merchantName.length < 1) {
+    return jsonResponse(400, { ok: false, error: 'invalid_fields' })
+  }
+
+  const base = supabaseUrl.replace(/\/$/, '')
+  const email = loginNameToEmail(loginName, tenantEmailDomain)
+  const headers: Record<string, string> = {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    'Content-Type': 'application/json',
+  }
+
+  const createRes = await fetch(`${base}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        login_name: loginName,
+        merchant_name: merchantName,
+      },
+    }),
+  })
+
+  const createText = await createRes.text()
+  let createJson: CreateUserJson = {}
+  try {
+    createJson = JSON.parse(createText) as CreateUserJson
+  } catch {
+    /* ignore */
+  }
+
+  const userId = typeof createJson.id === 'string' ? createJson.id : createJson.user?.id
+
+  if (!createRes.ok || !userId) {
+    const detailRaw =
+      createJson.msg ?? createJson.message ?? createJson.error_description ?? createText
+
+墨典AI智能ERP运营管理平台 V1.0
+第 342 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+    const msg = String(detailRaw).toLowerCase()
+    if (msg.includes('already been registered') || msg.includes('already exists')) {
+      return jsonResponse(409, { ok: false, error: 'login_exists' })
+    }
+    return jsonResponse(400, {
+      ok: false,
+      error: 'auth_create_failed',
+      detail: String(detailRaw).slice(0, 400),
+    })
+  }
+
+  const tenantRes = await fetch(`${base}/rest/v1/tenants`, {
+    method: 'POST',
+    headers: { ...headers, Prefer: 'return=representation' },
+    body: JSON.stringify({
+      name: merchantName,
+      trial_days: trialDays,
+      official_days: officialDays,
+      account_status: 'normal',
+    }),
+  })
+
+  const tenantText = await tenantRes.text()
+  let tenantRows: { id: string }[] = []
+  try {
+    tenantRows = JSON.parse(tenantText) as { id: string }[]
+  } catch {
+    tenantRows = []
+  }
+
+  const tenantId = tenantRows[0]?.id
+  if (!tenantRes.ok || !tenantId) {
+    await fetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
+    return jsonResponse(500, {
+      ok: false,
+      error: 'tenant_insert_failed',
+      detail: tenantText.slice(0, 400),
+    })
+  }
+
+  const memRes = await fetch(`${base}/rest/v1/tenant_members`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      user_id: userId,
+      role: 'owner',
+    }),
+  })
+
+
+墨典AI智能ERP运营管理平台 V1.0
+第 343 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (!memRes.ok) {
+    const memText = await memRes.text()
+    await fetch(`${base}/rest/v1/tenants?id=eq.${tenantId}`, { method: 'DELETE', headers })
+    await fetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
+    return jsonResponse(500, {
+      ok: false,
+      error: 'member_insert_failed',
+      detail: memText.slice(0, 400),
+    })
+  }
+
+  await notifyProvisionFeishu({ tenantId, merchantName, loginName })
+
+  return jsonResponse(200, {
+    ok: true,
+    tenantId,
+    userId,
+    email,
+  })
+}
+
+async function notifyProvisionFeishu(payload: {
+  tenantId: string
+  merchantName: string
+  loginName: string
+}): Promise<void> {
+  try {
+    const { notifyFeishuCustomerCreated } = await import('./opsFeishuNotifications.js')
+    notifyFeishuCustomerCreated({
+      tenantId: payload.tenantId,
+      merchantName: payload.merchantName,
+      loginName: payload.loginName,
+      source: 'provision',
+    })
+  } catch {
+    /* ignore */
+  }
+}
+
+async function forwardToProvisionEdge(
+  supabaseUrl: string,
+  anon: string,
+  secret: string,
+  body: string,
+): Promise<Response> {
+  try {
+    const fnUrl = `${supabaseUrl.replace(/\/$/, '')}/functions/v1/provision-tenant`
+    const upstream = await fetch(fnUrl, {
+      method: 'POST',
+      headers: {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 344 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${anon}`,
+        apikey: anon,
+        'x-meoo-provision-secret': secret,
+      },
+      body,
+    })
+    const text = await upstream.text()
+    return new Response(text, {
+      status: upstream.status,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    })
+  } catch (e) {
+    return jsonResponse(502, {
+      ok: false,
+      error: 'provision_upstream_failed',
+      detail: e instanceof Error ? e.message : String(e),
+    })
+  }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  try {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+
+    if (req.method !== 'POST') {
+      res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+      return
+    }
+
+    const rawBody = bodyRaw(req)
+
+    const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
+    const serviceRole = (
+      process.env.SUPABASE_SERVICE_ROLE_KEY ??
+      process.env.SUPABASE_SERVICE_ROLE ??
+      ''
+    ).trim()
+    const anon = (process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+    const secret = (process.env.MEOO_PROVISION_SECRET ?? '').trim()
+
+    const tenantDomain =
+      (
+        process.env.VITE_SUPABASE_TENANT_EMAIL_DOMAIN ??
+        process.env.TENANT_EMAIL_DOMAIN ??
+        'users.meoo.test'
+      ).trim() || 'users.meoo.test'
+
+    const missingEnv: string[] = []
+    if (!supabaseUrl) missingEnv.push('VITE_SUPABASE_URL 或 SUPABASE_URL')
+
+墨典AI智能ERP运营管理平台 V1.0
+第 345 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+    if (!serviceRole) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY（不要用 VITE_ 前缀；变量须勾选 Production）')
+    if (!anon) missingEnv.push('SUPABASE_ANON_KEY 或 VITE_SUPABASE_ANON_KEY')
+    if (!secret) missingEnv.push('MEOO_PROVISION_SECRET')
+
+    if (supabaseUrl && serviceRole) {
+      await sendFetchResponse(res, await provisionWithServiceRole(supabaseUrl, serviceRole, rawBody, tenantDomain))
+      return
+    }
+
+    if (supabaseUrl && anon && secret) {
+      await sendFetchResponse(res, await forwardToProvisionEdge(supabaseUrl, anon, secret, rawBody))
+      return
+    }
+
+    res.status(503).send(
+      JSON.stringify({
+        ok: false,
+        error: 'provision_not_configured',
+        missingEnv,
+        hint:
+          '推荐：在 Vercel 增加 SUPABASE_SERVICE_ROLE_KEY（与 Dashboard API service_role 一致）并重新部署。备选：配置 MEOO_PROVISION_SECRET 并在 Supabase 部署 Edge Function provision-tenant。',
+      }),
+    )
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    sendOpsJson(res, 500, {
+      ok: false,
+      error: 'provision_handler_failed',
+      detail: msg.slice(0, 800),
+    })
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/api/safeOpsJson.ts ===== */
+import type { VercelResponse } from '@vercel/node'
+
+/** 避免 handler 抛错后未写响应导致 Vercel FUNCTION_INVOCATION_FAILED */
+export function sendOpsJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
+  try {
+    if (res.writableEnded || res.headersSent) return
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.status(status).send(JSON.stringify(body))
+  } catch {
+    try {
+      if (!res.writableEnded && !res.headersSent) res.end()
+    } catch {
+      /* noop */
+    }
+  }
+
+墨典AI智能ERP运营管理平台 V1.0
+第 346 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+
+/* ===== FILE: 商家管理后台/api/support-ops-send.ts ===== */
+/**
+ * 运营台通过 HTTP 发送客服回复，写入 Supabase（service_role）。
+ */
+export const config = { runtime: 'edge' }
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  })
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method !== 'POST') {
+    return json(405, { ok: false, error: 'method_not_allowed' })
+  }
+
+  const expected = process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim()
+  if (!expected) {
+    return json(503, {
+      ok: false,
+      error: 'support_send_not_configured',
+      hint: '配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。',
+    })
+  }
+
+  const auth = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')?.trim()
+  if (auth !== expected) {
+    return json(401, { ok: false, error: 'unauthorized' })
+  }
+
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!supabaseUrl || !serviceRole) {
+    return json(503, { ok: false, error: 'supabase_service_not_configured' })
+  }
+
+  let body: { sessionId?: string; text?: string; id?: string }
+  try {
+    body = (await req.json()) as { sessionId?: string; text?: string; id?: string }
+  } catch {
+    return json(400, { ok: false, error: 'invalid_json' })
+  }
+
+  const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
+  const text = typeof body.text === 'string' ? body.text.trim() : ''
+
+墨典AI智能ERP运营管理平台 V1.0
+第 347 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const id = typeof body.id === 'string' ? body.id.trim() : ''
+  if (!sessionId || !text || !id) {
+    return json(400, { ok: false, error: 'missing_fields' })
+  }
+
+  const row = {
+    session_id: sessionId,
+    customer_id: null,
+    enterprise_name: null,
+    from_role: 'ops',
+    text,
+    ts: Date.now(),
+    client_msg_id: id,
+    author_user_id: null,
+  }
+
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(row),
+    })
+
+    if (!r.ok) {
+      const t = await r.text()
+      return json(502, { ok: false, error: 'supabase_insert_failed', detail: t.slice(0, 500) })
+    }
+
+    return json(200, { ok: true })
+  } catch (e) {
+    return json(502, {
+      ok: false,
+      error: 'support_send_failed',
+      detail: e instanceof Error ? e.message : String(e),
+    })
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/api/support-poll.ts ===== */
+/**
+ * 运营台轮询 Supabase 客服消息（service_role，仅服务端 Edge）。
+ * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
+ */
+import { sendSupportMerchantMessageFeishu } from './supportFeishuNotify.js'
+
+墨典AI智能ERP运营管理平台 V1.0
+第 348 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+export const config = { runtime: 'edge' }
+
+type DbRow = {
+  session_id: string
+  customer_id: string | null
+  enterprise_name: string | null
+  from_role: string
+  text: string
+  ts: number
+  client_msg_id: string
+}
+
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  })
+}
+
+function serviceHeaders(serviceRole: string) {
+  return {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+  } as const
+}
+
+/** 原子 claim：仅首次将 feishu_notified_at 置位者返回 claimed */
+async function claimSupportFeishuNotify(
+  supabaseUrl: string,
+  serviceRole: string,
+  row: DbRow,
+): Promise<'claimed' | 'already' | 'unavailable'> {
+  const q = new URLSearchParams({
+    session_id: `eq.${row.session_id}`,
+    client_msg_id: `eq.${row.client_msg_id}`,
+    from_role: 'eq.user',
+    feishu_notified_at: 'is.null',
+  })
+  try {
+    const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
+      method: 'PATCH',
+      headers: {
+        ...serviceHeaders(serviceRole),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({ feishu_notified_at: new Date().toISOString() }),
+    })
+    if (!r.ok) {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 349 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+      const detail = await r.text()
+      if (/feishu_notified_at|42703|column|PGRST204/i.test(detail)) return 'unavailable'
+      return 'unavailable'
+    }
+    const updated = (await r.json()) as unknown[]
+    return Array.isArray(updated) && updated.length > 0 ? 'claimed' : 'already'
+  } catch {
+    return 'unavailable'
+  }
+}
+
+async function notifyNewMerchantSupportMessages(
+  supabaseUrl: string,
+  serviceRole: string,
+  rows: DbRow[],
+): Promise<void> {
+  for (const row of rows) {
+    if (row.from_role !== 'user') continue
+    const text = row.text.trim()
+    if (!text) continue
+    const claim = await claimSupportFeishuNotify(supabaseUrl, serviceRole, row)
+    if (claim === 'already') continue
+    await sendSupportMerchantMessageFeishu({
+      sessionId: row.session_id,
+      enterpriseName: row.enterprise_name ?? undefined,
+      customerId: row.customer_id ?? undefined,
+      text,
+      ts: row.ts,
+    })
+  }
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method !== 'GET') {
+    return json(405, { ok: false, error: 'method_not_allowed' })
+  }
+
+  const expected = process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim()
+  if (!expected) {
+    return json(503, {
+      ok: false,
+      error: 'support_poll_not_configured',
+      hint: '配置 Vercel 环境变量 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY（及 SUPABASE_URL / VITE_SUPABASE_URL）。',
+    })
+  }
+
+  const auth = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')?.trim()
+  if (auth !== expected) {
+    return json(401, { ok: false, error: 'unauthorized' })
+  }
+
+墨典AI智能ERP运营管理平台 V1.0
+第 350 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
+  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!supabaseUrl || !serviceRole) {
+    return json(503, {
+      ok: false,
+      error: 'supabase_service_not_configured',
+      hint: '在商家管理后台 Vercel 项目中配置 SUPABASE_SERVICE_ROLE_KEY 与 SUPABASE_URL（或 VITE_SUPABASE_URL）。',
+    })
+  }
+
+  const url = new URL(req.url)
+  const sinceRaw = url.searchParams.get('sinceTs')
+  const sinceTs = sinceRaw ? Number(sinceRaw) : 0
+  const headers = serviceHeaders(serviceRole)
+
+  try {
+    let rows: DbRow[]
+    const incremental = Number.isFinite(sinceTs) && sinceTs > 0
+    if (!incremental) {
+      const r = await fetch(
+        `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,customer_id,enterprise_name,from_role,text,ts,client_msg_id&order=ts.desc&limit=400`,
+        { headers },
+      )
+      if (!r.ok) {
+        const t = await r.text()
+        return json(502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+      }
+      rows = ((await r.json()) as DbRow[]).reverse()
+    } else {
+      const r = await fetch(
+        `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,customer_id,enterprise_name,from_role,text,ts,client_msg_id&ts=gt.${sinceTs}&order=ts.asc`,
+        { headers },
+      )
+      if (!r.ok) {
+        const t = await r.text()
+        return json(502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+      }
+      rows = (await r.json()) as DbRow[]
+    }
+
+    if (incremental && rows.length > 0) {
+      await notifyNewMerchantSupportMessages(supabaseUrl, serviceRole, rows)
+    }
+
+    const messages = rows.map((row) => ({
+      type: 'chat' as const,
+      sessionId: row.session_id,
+      from: row.from_role as 'user' | 'bot' | 'agent' | 'system' | 'ops',
+      text: row.text,
+
+墨典AI智能ERP运营管理平台 V1.0
+第 351 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+      ts: row.ts,
+      id: row.client_msg_id,
+      customerId: row.customer_id ?? undefined,
+      enterpriseName: row.enterprise_name ?? undefined,
+    }))
+
+    return json(200, { ok: true, messages })
+  } catch (e) {
+    return json(502, {
+      ok: false,
+      error: 'support_poll_failed',
+      detail: e instanceof Error ? e.message : String(e),
+    })
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/api/supportFeishuNotify.ts ===== */
+/**
+ * Edge 兼容的客服飞书通知（供 support-poll 等 Edge API 使用，勿引入 node:crypto）。
+ */
+
+export type SupportFeishuNotifyResult = {
+  ok: boolean
+  skipped?: boolean
+  error?: string
+}
+
+function notifyEnabled(): boolean {
+  const v = (process.env.MEOO_FEISHU_NOTIFY_ENABLED ?? '1').trim().toLowerCase()
+  return v !== '0' && v !== 'false' && v !== 'off'
+}
+
+function webhookUrl(): string {
+  const support = (process.env.MEOO_FEISHU_WEBHOOK_SUPPORT ?? '').trim()
+  if (support) return support
+  return (process.env.MEOO_FEISHU_WEBHOOK_URL ?? '').trim()
+}
+
+async function feishuSign(timestamp: number, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}\n`))
+  const bytes = new Uint8Array(sig)
+  let binary = ''
+
+墨典AI智能ERP运营管理平台 V1.0
+第 352 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return btoa(binary)
+}
+
+async function buildFeishuBody(text: string): Promise<Record<string, unknown>> {
+  const content = { text: text.trim().slice(0, 4000) || '（空消息）' }
+  const secret = (process.env.MEOO_FEISHU_WEBHOOK_SECRET ?? '').trim()
+  if (!secret) return { msg_type: 'text', content }
+  const timestamp = Math.floor(Date.now() / 1000)
+  const sign = await feishuSign(timestamp, secret)
+  return { timestamp: String(timestamp), sign, msg_type: 'text', content }
+}
+
+export async function sendSupportMerchantMessageFeishu(payload: {
+  sessionId: string
+  enterpriseName?: string
+  customerId?: string
+  text: string
+  ts?: number
+}): Promise<SupportFeishuNotifyResult> {
+  if (!notifyEnabled()) return { ok: true, skipped: true }
+  const url = webhookUrl()
+  if (!url) return { ok: true, skipped: true, error: 'webhook_not_configured' }
+
+  const preview = payload.text.trim().slice(0, 400)
+  const when = payload.ts
+    ? new Date(payload.ts).toLocaleString('zh-CN', { hour12: false })
+    : new Date().toLocaleString('zh-CN', { hour12: false })
+  const message = [
+    '【在线客服 · 商户新消息】',
+    `企业：${payload.enterpriseName?.trim() || '—'}`,
+    `客户 ID：${payload.customerId?.trim() || '—'}`,
+    `会话：${payload.sessionId}`,
+    `内容：${preview}${payload.text.length > 400 ? '…' : ''}`,
+    `时间：${when}`,
+  ].join('\n')
+
+  try {
+    const body = await buildFeishuBody(message)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(body),
+    })
+    const raw = await res.text()
+    if (!res.ok) {
+      return { ok: false, error: raw.slice(0, 300) || `HTTP ${res.status}` }
+    }
+    let parsed: { code?: number; msg?: string } = {}
+    try {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 353 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+      parsed = JSON.parse(raw) as typeof parsed
+    } catch {
+      /* ignore */
+    }
+    if (parsed.code != null && parsed.code !== 0) {
+      return { ok: false, error: parsed.msg ?? raw.slice(0, 200) }
+    }
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/api/tenantAnnouncementsCore.ts ===== */
+/** 运营公告推送：PostgREST fetch（与 meoo-supabase-tenants-list 一致，避免 Vercel 上 supabase-js 崩溃） */
+
+export type TenantAnnouncementCategory = 'subscription_expiring' | 'platform_change'
+
+export type TenantAnnouncementPriority = 'normal' | 'urgent'
+
+export const ANNOUNCEMENT_CATEGORY_ZH: Record<TenantAnnouncementCategory, string> = {
+  subscription_expiring: '套餐即将结束预警',
+  platform_change: '平台改动预警',
+}
+
+export const ANNOUNCEMENT_PRIORITY_ZH: Record<TenantAnnouncementPriority, string> = {
+  normal: '普通',
+  urgent: '紧急',
+}
+
+export function parseAnnouncementPriority(
+  raw: unknown,
+  category: TenantAnnouncementCategory,
+): TenantAnnouncementPriority {
+  if (category !== 'platform_change') return 'normal'
+  return raw === 'urgent' ? 'urgent' : 'normal'
+}
+
+export function parseAnnouncementCategory(raw: unknown): TenantAnnouncementCategory | null {
+  if (raw === 'subscription_expiring' || raw === 'platform_change') return raw
+  return null
+}
+
+export type SendTenantAnnouncementInput = {
+  category: TenantAnnouncementCategory
+  priority?: TenantAnnouncementPriority
+  title: string
+  body: string
+  targetAll: boolean
+
+墨典AI智能ERP运营管理平台 V1.0
+第 354 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  tenantIds: string[]
+  createdBy?: string | null
+}
+
+export type SendTenantAnnouncementResult =
+  | { ok: true; announcementId: string; recipientCount: number }
+  | { ok: false; error: string; detail?: string }
+
+export type OpsAnnouncementListRow = {
+  id: string
+  category: TenantAnnouncementCategory
+  priority: TenantAnnouncementPriority
+  title: string
+  body: string
+  target_all: boolean
+  recipient_count: number
+  created_at: string
+  created_by: string | null
+}
+
+function serviceRoleHeaders(serviceKey: string, prefer?: string): Record<string, string> {
+  const h: Record<string, string> = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+  if (prefer) h.Prefer = prefer
+  return h
+}
+
+function isMissingTableError(msg: string): boolean {
+  return /tenant_announcements|tenant_announcement_deliveries|tenant_announcement_priority|\.priority|does not exist|Could not find|schema cache/i.test(
+    msg,
+  )
+}
+
+async function fetchTenantIds(supabaseUrl: string, serviceKey: string): Promise<
+  | { ok: true; ids: string[] }
+  | { ok: false; error: string; detail?: string }
+> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/tenants?select=id&order=created_at.desc`
+  const r = await fetch(url, { headers: serviceRoleHeaders(serviceKey) })
+  const text = await r.text()
+  if (!r.ok) {
+    return { ok: false, error: 'tenants_list_failed', detail: text.slice(0, 400) }
+  }
+  try {
+    const rows = JSON.parse(text || '[]') as { id?: string }[]
+
+墨典AI智能ERP运营管理平台 V1.0
+第 355 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+    const ids = rows.map((x) => String(x.id ?? '')).filter(Boolean)
+    return { ok: true, ids }
+  } catch {
+    return { ok: false, error: 'tenants_list_failed', detail: text.slice(0, 400) }
+  }
+}
+
+export async function sendTenantAnnouncement(
+  supabaseUrl: string,
+  serviceKey: string,
+  input: SendTenantAnnouncementInput,
+): Promise<SendTenantAnnouncementResult> {
+  const title = String(input.title ?? '').trim()
+  const body = String(input.body ?? '').trim()
+  if (!title) return { ok: false, error: 'title_required' }
+  if (!body) return { ok: false, error: 'body_required' }
+
+  let tenantIds = input.targetAll
+    ? []
+    : [...new Set(input.tenantIds.map((id) => String(id).trim()).filter(Boolean))]
+
+  if (!input.targetAll && tenantIds.length === 0) {
+    return { ok: false, error: 'tenant_ids_required' }
+  }
+
+  if (input.targetAll) {
+    const tr = await fetchTenantIds(supabaseUrl, serviceKey)
+    if (!tr.ok) return tr
+    tenantIds = tr.ids
+    if (tenantIds.length === 0) return { ok: false, error: 'no_tenants' }
+  }
+
+  const priority = parseAnnouncementPriority(input.priority, input.category)
+
+  const base = supabaseUrl.replace(/\/$/, '')
+  const insUrl = `${base}/rest/v1/tenant_announcements`
+  const insRes = await fetch(insUrl, {
+    method: 'POST',
+    headers: serviceRoleHeaders(serviceKey, 'return=representation'),
+    body: JSON.stringify({
+      category: input.category,
+      priority,
+      title,
+      body,
+      target_all: input.targetAll,
+      recipient_count: tenantIds.length,
+      created_by: input.createdBy ?? null,
+    }),
+  })
+  const insText = await insRes.text()
+
+墨典AI智能ERP运营管理平台 V1.0
+第 356 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (!insRes.ok) {
+    if (isMissingTableError(insText)) {
+      return { ok: false, error: 'migration_required', detail: insText.slice(0, 400) }
+    }
+    return { ok: false, error: 'announcement_insert_failed', detail: insText.slice(0, 400) }
+  }
+
+  let announcementId = ''
+  try {
+    const parsed = JSON.parse(insText || '[]') as { id?: string }[] | { id?: string }
+    const row = Array.isArray(parsed) ? parsed[0] : parsed
+    announcementId = String(row?.id ?? '')
+  } catch {
+    return { ok: false, error: 'announcement_insert_failed', detail: insText.slice(0, 400) }
+  }
+  if (!announcementId) {
+    return { ok: false, error: 'announcement_insert_failed', detail: 'no id returned' }
+  }
+
+  const deliveries = tenantIds.map((tenant_id) => ({
+    announcement_id: announcementId,
+    tenant_id,
+  }))
+
+  const delUrl = `${base}/rest/v1/tenant_announcement_deliveries`
+  const batchSize = 200
+  for (let i = 0; i < deliveries.length; i += batchSize) {
+    const chunk = deliveries.slice(i, i + batchSize)
+    const dr = await fetch(delUrl, {
+      method: 'POST',
+      headers: serviceRoleHeaders(serviceKey),
+      body: JSON.stringify(chunk),
+    })
+    const dtext = await dr.text()
+    if (!dr.ok) {
+      if (isMissingTableError(dtext)) {
+        return { ok: false, error: 'migration_required', detail: dtext.slice(0, 400) }
+      }
+      return { ok: false, error: 'delivery_insert_failed', detail: dtext.slice(0, 400) }
+    }
+  }
+
+  return { ok: true, announcementId, recipientCount: tenantIds.length }
+}
+
+export async function listTenantAnnouncementsForOps(
+  supabaseUrl: string,
+  serviceKey: string,
+  limit = 50,
+): Promise<{ ok: true; rows: OpsAnnouncementListRow[] } | { ok: false; error: string; detail?: string }> {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 357 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/tenant_announcements?select=id,category,priority,title,body,target_all,recipient_count,created_at,created_by&order=created_at.desc&limit=${limit}`
+  const r = await fetch(url, { headers: serviceRoleHeaders(serviceKey) })
+  const text = await r.text()
+  if (!r.ok) {
+    if (isMissingTableError(text)) {
+      return { ok: false, error: 'migration_required', detail: text.slice(0, 400) }
+    }
+    return { ok: false, error: 'list_failed', detail: text.slice(0, 400) }
+  }
+  try {
+    const data = JSON.parse(text || '[]') as Record<string, unknown>[]
+    const rows = data.map((row) => {
+      const category = (parseAnnouncementCategory(row.category) ??
+        'platform_change') as TenantAnnouncementCategory
+      return {
+        id: String(row.id ?? ''),
+        category,
+        priority: parseAnnouncementPriority(row.priority, category),
+        title: String(row.title ?? ''),
+        body: String(row.body ?? ''),
+        target_all: Boolean(row.target_all),
+        recipient_count: Number(row.recipient_count) || 0,
+        created_at: String(row.created_at ?? ''),
+        created_by: typeof row.created_by === 'string' ? row.created_by : null,
+      }
+    })
+    return { ok: true, rows }
+  } catch {
+    return { ok: false, error: 'list_failed', detail: text.slice(0, 400) }
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/api/tenantEntitlementCore.ts ===== */
+/** 租户权益天数：订阅权益 + 运营赠送 = 总权益；service_expire_at 随天数变更顺延 */
+
+export function clampEntitlementDays(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(36500, Math.floor(n)))
+}
+
+export function totalEntitlementDays(subscriptionDays: number, opsGiftDays: number): number {
+  return clampEntitlementDays(subscriptionDays) + clampEntitlementDays(opsGiftDays)
+}
+
+export function extendServiceExpireAtIso(
+  currentIso: string | null | undefined,
+  addDays: number,
+): string {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 358 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const days = clampEntitlementDays(addDays)
+  if (days <= 0) {
+    if (currentIso && String(currentIso).trim()) {
+      const d = new Date(String(currentIso))
+      if (!Number.isNaN(d.getTime())) return d.toISOString()
+    }
+    return new Date().toISOString()
+  }
+  const nowMs = Date.now()
+  let baseMs = nowMs
+  if (currentIso != null && String(currentIso).trim()) {
+    const se = new Date(String(currentIso)).getTime()
+    if (Number.isFinite(se) && se > baseMs) baseMs = se
+  }
+  return new Date(baseMs + days * 86400000).toISOString()
+}
+
+export function readEntitlementDays(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  return clampEntitlementDays(n)
+}
+
+/** 订单确认：累加订阅天数并顺延截止日 */
+export function buildSubscriptionPurchasePatch(input: {
+  subscriptionDays: number
+  opsGiftDays: number
+  serviceExpireAt: string | null
+  purchasedDays: number
+}): {
+  subscription_days: number
+  ops_gift_days: number
+  official_days: number
+  service_expire_at: string
+} {
+  const purchased = clampEntitlementDays(input.purchasedDays)
+  const gift = clampEntitlementDays(input.opsGiftDays)
+  const sub = clampEntitlementDays(input.subscriptionDays) + purchased
+  return {
+    subscription_days: sub,
+    ops_gift_days: gift,
+    official_days: totalEntitlementDays(sub, gift),
+    service_expire_at: extendServiceExpireAtIso(input.serviceExpireAt, purchased),
+  }
+}
+
+/** 运营仅改赠送天数：总权益与截止日按差额顺延 */
+export function buildOpsGiftDaysPatch(input: {
+  subscriptionDays: number
+  oldOpsGiftDays: number
+  newOpsGiftDays: number
+
+墨典AI智能ERP运营管理平台 V1.0
+第 359 页 / 共 359 页（登记摘录）
+————————————————————————————————————————————————————————————
+  serviceExpireAt: string | null
+}): {
+  subscription_days: number
+  ops_gift_days: number
+  official_days: number
+  service_expire_at: string
+} {
+  const sub = clampEntitlementDays(input.subscriptionDays)
+  const oldGift = clampEntitlementDays(input.oldOpsGiftDays)
+  const newGift = clampEntitlementDays(input.newOpsGiftDays)
+  const delta = newGift - oldGift
+  const service_expire_at =
+    delta !== 0
+      ? extendServiceExpireAtIso(input.serviceExpireAt, delta)
+      : input.serviceExpireAt && String(input.serviceExpireAt).trim()
+        ? new Date(String(input.serviceExpireAt)).toISOString()
+        : extendServiceExpireAtIso(null, totalEntitlementDays(sub, newGift))
+  return {
+    subscription_days: sub,
+    ops_gift_days: newGift,
+    official_days: totalEntitlementDays(sub, newGift),
+    service_expire_at,
+  }
+}
+
+

@@ -15,6 +15,7 @@ import { verifyBearerJwt } from './authSupabase.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChat } from './chatRouter.js'
 import { assertAiChatAccess } from '../tenantMembershipCore.js'
+import { buildServerMerchantIntelContext } from '../merchantIntelServerCore.js'
 
 const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
 
@@ -79,11 +80,25 @@ export async function runMeooAiChatCore(
           .slice(0, MAX_AI_CHAT_IMAGE_ATTACHMENTS)
       : undefined
 
+  let messagesWithIntel = parsed.messages
+  try {
+    const intel = await buildServerMerchantIntelContext(
+      user.id,
+      env,
+      typeof parsed.taskType === 'string' ? (parsed.taskType as AIChatRequest['taskType']) : undefined,
+    )
+    if (intel?.trim()) {
+      messagesWithIntel = [{ role: 'system', content: intel.trim() }, ...parsed.messages]
+    }
+  } catch {
+    /* 情报注入失败不阻断对话 */
+  }
+
   const req: AIChatRequest = {
     provider,
     model: rawModel ? rawModel : undefined,
     ...(provider === 'tokenmix' ? { modelFamily } : {}),
-    messages: mergeSystemPrompt(parsed.messages, {
+    messages: mergeSystemPrompt(messagesWithIntel, {
       agentPickerKey: typeof parsed.agentPickerKey === 'string' ? parsed.agentPickerKey : undefined,
     }),
     ...(imageDataUrls?.length ? { imageDataUrls } : {}),

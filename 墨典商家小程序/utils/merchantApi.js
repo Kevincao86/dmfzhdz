@@ -63,4 +63,50 @@ function merchantRequestAuth(method, path, opts) {
   })
 }
 
-module.exports = { baseUrl, hasMerchantApi, merchantRequest, merchantRequestAuth }
+/**
+ * 自定义 Header（多单平台令牌等）。
+ * @param {'GET'|'POST'} method
+ * @param {string} path
+ * @param {{ data?: Record<string, unknown>; headers?: Record<string, string> }} [opts]
+ */
+function merchantRequestWithHeaders(method, path, opts) {
+  const b = baseUrl()
+  if (!b) {
+    return Promise.reject(new Error('尚未配置商家后台 API 地址，请在 config.local.js 设置 MERCHANT_API_BASE_URL。'))
+  }
+  const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
+  const header = Object.assign(
+    { Accept: 'application/json', 'Content-Type': 'application/json' },
+    (opts && opts.headers) || {},
+  )
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url,
+      method,
+      header,
+      data: method === 'GET' ? undefined : opts?.data,
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data)
+          return
+        }
+        const msg =
+          (res.data && (res.data.error || res.data.message || res.data.detail)) ||
+          `请求失败 ${res.statusCode}`
+        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+      },
+      fail(err) {
+        const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
+        reject(new Error(em))
+      },
+    })
+  })
+}
+
+module.exports = {
+  baseUrl,
+  hasMerchantApi,
+  merchantRequest,
+  merchantRequestAuth,
+  merchantRequestWithHeaders,
+}

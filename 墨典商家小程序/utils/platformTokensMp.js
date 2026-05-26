@@ -1,21 +1,27 @@
 /**
- * 与 Web `merchantSession` / `platformTokens` 键名一致。
- * 抖音等凭证由 `merchantSessionSyncMp` 在登录后从 `tenant_merchant_bindings` 同步写入。
+ * 与 Web `merchantSession` / `merchantPlatforms.tokenSessionKey` 键名一致。
  */
 const STORAGE_KEYS = {
   douyin: 'meoo_douyin_merchant_token',
   meituan: 'meoo_meituan_merchant_token',
   xiaohongshu: 'meoo_xhs_merchant_token',
   jd: 'meoo_jd_merchant_token',
+  kuaishou: 'meoo_kuaishou_merchant_token',
+  eleme: 'meoo_eleme_merchant_token',
+  meituan_waimai: 'meoo_meituan_waimai_merchant_token',
+  jd_waimai: 'meoo_jd_waimai_merchant_token',
 }
 
-/** @typedef {'douyin'|'meituan'|'xiaohongshu'|'jd'} CreatePlatformId */
-
+/** 列表 Tab（与新建商品分组一致：团购 + 外卖，共 8 个平台） */
 const PLATFORM_TABS = [
-  { id: 'douyin', label: '抖音来客', short: '抖' },
-  { id: 'meituan', label: '美团', short: '美' },
-  { id: 'xiaohongshu', label: '小红书', short: '红' },
-  { id: 'jd', label: '京东', short: '京' },
+  { id: 'douyin', label: '抖音来客' },
+  { id: 'meituan', label: '美团团购' },
+  { id: 'xiaohongshu', label: '小红书' },
+  { id: 'kuaishou', label: '快手团购' },
+  { id: 'jd', label: '京东本地生活' },
+  { id: 'eleme', label: '淘宝闪购' },
+  { id: 'meituan_waimai', label: '美团外卖' },
+  { id: 'jd_waimai', label: '京东外卖' },
 ]
 
 function readPlatformToken(/** @type {string} */ platformId) {
@@ -43,12 +49,22 @@ function writePlatformToken(/** @type {string} */ platformId, /** @type {string}
 /** 与 Web `createPlatformApiSegment` 一致 */
 function apiSegment(/** @type {string} */ platformId) {
   if (platformId === 'xiaohongshu') return 'xhs'
-  if (platformId === 'douyin' || platformId === 'meituan' || platformId === 'jd') return platformId
+  if (
+    platformId === 'douyin' ||
+    platformId === 'meituan' ||
+    platformId === 'jd' ||
+    platformId === 'kuaishou'
+  ) {
+    return platformId
+  }
+  if (platformId === 'eleme') return 'eleme'
+  if (platformId === 'meituan_waimai') return 'meituan_waimai'
+  if (platformId === 'jd_waimai') return 'jd_waimai'
   return null
 }
 
 function hasAnyPlatformToken() {
-  return PLATFORM_TABS.some((p) => Boolean(readPlatformToken(p.id)))
+  return Object.keys(STORAGE_KEYS).some((id) => Boolean(readPlatformToken(id)))
 }
 
 module.exports = {

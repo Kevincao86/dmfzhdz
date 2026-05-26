@@ -31,13 +31,13 @@ Page({
     todos: [
       {
         title: '待回复评论',
-        sub: '与电脑端评论管理一致',
+        sub: '与电脑端评价管理一致',
         url: '/pages/reviews-list/reviews-list',
       },
       {
-        title: '达人招募单跟进',
-        sub: '与电脑端同一份招募数据，可在小程序提交与查看',
-        url: '/pages/recruitment/recruitment',
+        title: '达人招募中心',
+        sub: '五步流程 · Brief · 订单',
+        url: '/pages/recruit-hub/recruit-hub',
       },
     ],
     todoTotal: 2,
@@ -54,8 +54,8 @@ Page({
         key: 'p2',
         size: 'small',
         title: '达人招募',
-        sub: '列表与提交',
-        url: '/pages/recruitment/recruitment',
+        sub: '中心入口 · 五步与 Brief',
+        url: '/pages/recruit-hub/recruit-hub',
         theme: 'sky',
       },
       {

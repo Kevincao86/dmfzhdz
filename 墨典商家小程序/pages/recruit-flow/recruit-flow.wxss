@@ -1,0 +1,123 @@
+.flow-scroll {
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 24rpx 28rpx 48rpx;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 40%);
+}
+
+.flow-hero-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1e1b4b;
+}
+
+.flow-hero-desc {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.55;
+  display: block;
+}
+
+.flow-list {
+  margin-top: 22rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.flow-card {
+  display: block;
+  padding: 24rpx !important;
+  border-left: 8rpx solid #cbd5e1;
+}
+
+.flow-card-hover {
+  opacity: 0.96;
+  transform: scale(0.995);
+}
+
+.flow-tone-blue {
+  border-left-color: #3b82f6;
+}
+
+.flow-tone-indigo {
+  border-left-color: #6366f1;
+}
+
+.flow-tone-cyan {
+  border-left-color: #06b6d4;
+}
+
+.flow-tone-violet {
+  border-left-color: #8b5cf6;
+}
+
+.flow-tone-gray {
+  border-left-color: #94a3b8;
+}
+
+.flow-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flow-step-idx {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 12rpx;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  font-size: 22rpx;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flow-card-arrow {
+  font-size: 36rpx;
+  color: #cbd5e1;
+  font-weight: 300;
+}
+
+.flow-card-title {
+  margin-top: 16rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+}
+
+.flow-card-desc {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.5;
+  display: block;
+}
+
+.flow-card-cta {
+  margin-top: 18rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.flow-foot-link {
+  margin-top: 28rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #4f46e5;
+  padding: 16rpx;
+}
+
+.flow-foot-link-hover {
+  opacity: 0.85;
+}
+
+.flow-foot-space {
+  height: 32rpx;
+}

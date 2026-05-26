@@ -1,0 +1,100 @@
+.hub-scroll {
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 20rpx 28rpx 48rpx;
+  background: linear-gradient(178deg, #ede9fe 0%, #f8fafc 52%);
+}
+
+.hub-strip {
+  margin-bottom: 24rpx;
+}
+
+.hub-strip-title {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #312e81;
+}
+
+.hub-entry {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 26rpx 22rpx;
+  margin-bottom: 16rpx;
+  border-radius: 22rpx;
+  background: #fff;
+  border: 1rpx solid rgba(99, 102, 241, 0.12);
+  box-shadow: 0 10rpx 32rpx rgba(15, 23, 42, 0.06);
+}
+
+.hub-entry-main {
+  border-width: 2rpx;
+  border-color: rgba(99, 102, 241, 0.35);
+  background: linear-gradient(120deg, #ffffff 0%, #eef2ff 100%);
+}
+
+.hub-entry-hover {
+  opacity: 0.96;
+}
+
+.hub-ico-wrap {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hub-ico-wrap.main {
+  background: linear-gradient(145deg, #6366f1, #8b5cf6);
+}
+
+.hub-ico-wrap.v1 {
+  background: linear-gradient(145deg, #a855f7, #ec4899);
+}
+
+.hub-ico-wrap.v2 {
+  background: linear-gradient(145deg, #0ea5e9, #6366f1);
+}
+
+.hub-ico-wrap.v3 {
+  background: linear-gradient(145deg, #14b8a6, #0ea5e9);
+}
+
+.hub-ico-glyph {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #fff;
+}
+
+.hub-entry-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hub-entry-k {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #6366f1;
+  margin-bottom: 6rpx;
+  display: block;
+}
+
+.hub-entry-t {
+  font-size: 31rpx;
+  font-weight: 800;
+  color: #0f172a;
+  display: block;
+}
+
+.hub-chevron {
+  font-size: 40rpx;
+  font-weight: 300;
+  color: #94a3b8;
+}
+
+.hub-foot-space {
+  height: 32rpx;
+}

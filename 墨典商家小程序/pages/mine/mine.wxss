@@ -82,6 +82,91 @@
   border-radius: 999rpx;
 }
 
+.bindings-card {
+  margin: 0 28rpx 20rpx;
+  padding: 28rpx 24rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(15, 23, 42, 0.04);
+  box-shadow: 0 8rpx 28rpx rgba(15, 23, 42, 0.04);
+}
+
+.bindings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.bindings-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.bindings-meta {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.bindings-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.5;
+  margin-bottom: 16rpx;
+}
+
+.bindings-sub {
+  display: block;
+  font-size: 20rpx;
+  color: #94a3b8;
+  margin-bottom: 12rpx;
+}
+
+.bindings-divider {
+  height: 1rpx;
+  background: #f1f5f9;
+  margin: 16rpx 0;
+}
+
+.binding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 0;
+  gap: 16rpx;
+}
+
+.binding-label {
+  font-size: 26rpx;
+  color: #334155;
+  flex-shrink: 0;
+}
+
+.binding-status {
+  font-size: 24rpx;
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.binding-status-on {
+  color: #059669;
+  font-weight: 600;
+}
+
+.binding-status-off {
+  color: #94a3b8;
+}
+
+.binding-status-web {
+  color: #64748b;
+}
+
 .menu-card {
   margin: 0 28rpx;
   background: #fff;
@@ -148,12 +233,81 @@
 
 .logout-btn {
   margin: 32rpx 24rpx;
+  padding: 24rpx;
+  text-align: center;
   background: #fff;
   color: #dc2626;
   border: 1rpx solid rgba(220, 38, 38, 0.25);
   border-radius: 20rpx;
   font-size: 28rpx;
   font-weight: 600;
+}
+
+.logout-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.logout-dialog {
+  width: 100%;
+  max-width: 560rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 36rpx 32rpx 28rpx;
+  box-sizing: border-box;
+}
+
+.logout-dialog-title {
+  display: block;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.logout-dialog-desc {
+  display: block;
+  margin-top: 16rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.logout-dialog-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 32rpx;
+}
+
+.logout-dialog-btn {
+  flex: 1;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.logout-dialog-btn.ghost {
+  background: #f8fafc;
+  color: #475569;
+  border: 1rpx solid #e2e8f0;
+}
+
+.logout-dialog-btn.primary {
+  background: linear-gradient(95deg, #0ea5e9, #14b8a6);
+  color: #fff;
 }
 
 .mine-footer-space {

@@ -182,7 +182,8 @@ async function fetchDouyinStores() {
         if (!x || typeof x !== 'object') continue
         const id = String(x.poi_id || x.id || x.store_id || '').trim()
         const name = String(x.name || x.poi_name || x.store_name || '').trim()
-        if (id && name) items.push({ id, name })
+        const addr = String(x.address || x.addr || '').trim()
+        if (id && name) items.push({ id, name, address: addr })
       }
     }
     return { ok: true, items }
@@ -240,12 +241,12 @@ function buildDefaultPayload(form) {
     },
     trade_rules: {
       consume_date_mode: 'days',
-      consume_valid_days: 360,
+      consume_valid_days: Math.min(3650, Math.max(1, Number.parseInt(String(form.consumeValidDays ?? '360'), 10) || 360)),
       non_consume_date_mode: 'all_dates',
       daily_consume_mode: 'all_day',
       daily_all_day: true,
       customer_purchase_limit_mode: 'none',
-      after_sale_policy: 'refund_anytime',
+      after_sale_policy: String(form.afterSalePolicy || 'refund_anytime').trim() || 'refund_anytime',
       reserve_mode: 'none',
       reserve_channel: 'phone',
       coupon_type: 'douyin',

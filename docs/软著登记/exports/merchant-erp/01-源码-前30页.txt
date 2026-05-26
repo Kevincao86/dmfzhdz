@@ -1,0 +1,1619 @@
+墨典AI智能ERP商家管理系统 V1.0
+第 1 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+/* ===== FILE: web版/merchant-erp/src/App.tsx ===== */
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AiAgentProvider } from './context/AiAgentContext'
+import { MembershipProvider } from './context/MembershipContext'
+import RequireMembershipFeature from './components/RequireMembershipFeature'
+import MembershipPlanSync from './components/MembershipPlanSync'
+import MeooLayout from './components/MeooLayout'
+import RequireSupabaseAuth from './components/RequireSupabaseAuth'
+import AiAgentPage from './pages/AiAgentPage'
+import AiOperationContentPage from './pages/AiOperationContentPage'
+import ShortVideoOptimizationPage from './pages/ShortVideoOptimizationPage'
+import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
+import GeoPage from './pages/GeoPage'
+import HomeDashboard from './pages/HomeDashboard'
+import ActivityCenterPage from './pages/ActivityCenterPage'
+import ReviewsManagementPage from './pages/ReviewsManagementPage'
+import StoreDecorationPage from './pages/StoreDecorationPage'
+import StoreDetailPage from './pages/StoreDetailPage'
+import StoreInfoPage from './pages/StoreInfoPage'
+import StoreMenuPage from './pages/StoreMenuPage'
+import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage'
+import ProductCreateFlowPage from './pages/ProductCreateFlowPage'
+import ProductEditFlowPage from './pages/ProductEditFlowPage'
+import ProductsPage from './pages/ProductsPage'
+import ProductsViewPage from './pages/ProductsViewPage'
+import RecruitmentPage from './pages/RecruitmentPage'
+import SettingsPage from './pages/SettingsPage'
+import LocalPromotionAdvertisingPage from './pages/LocalPromotionAdvertisingPage'
+import LocalPromotionLeadsPage from './pages/LocalPromotionLeadsPage'
+import WalletPage from './pages/WalletPage'
+import LoginPage from './pages/LoginPage'
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <MembershipProvider>
+      <AiAgentProvider>
+        <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={
+            <RequireSupabaseAuth>
+              <RequireMembershipFeature>
+                <MembershipPlanSync />
+                <MeooLayout />
+              </RequireMembershipFeature>
+            </RequireSupabaseAuth>
+          }
+        >
+
+墨典AI智能ERP商家管理系统 V1.0
+第 2 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+          <Route index element={<HomeDashboard />} />
+          <Route path="ai-agent" element={<AiAgentPage />} />
+          <Route path="store" element={<Navigate to="/store/info" replace />} />
+          <Route path="store/info" element={<StoreInfoPage />} />
+          <Route path="store/menu" element={<StoreMenuPage />} />
+          <Route path="store/detail/:platform/:poiId" element={<StoreDetailPage />} />
+          <Route path="store/decoration" element={<StoreDecorationPage />} />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="products/create" element={<ProductCreateFlowPage />} />
+          <Route path="products/list" element={<ProductsViewPage />} />
+          <Route path="products/edit/:platform/:productId" element={<ProductEditFlowPage />} />
+          <Route path="products/view" element={<Navigate to="/products/list" replace />} />
+          <Route path="operation" element={<Navigate to="/reviews" replace />} />
+          <Route path="recruitment" element={<RecruitmentPage />} />
+          <Route path="activity" element={<ActivityCenterPage />} />
+          <Route path="reviews" element={<ReviewsManagementPage />} />
+          <Route path="reviews/store" element={<Navigate to="/reviews?kind=store" replace />} />
+          <Route path="reviews/product" element={<Navigate to="/reviews?kind=product" replace />} />
+          <Route path="geo" element={<GeoPage />} />
+          <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
+          <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />
+          <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
+          <Route path="ai-operation/content" element={<AiOperationContentPage />} />
+          <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
+          <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
+          <Route path="leads" element={<LocalPromotionLeadsPage />} />
+          <Route path="finance" element={<FinanceReconcilePage />} />
+          <Route path="finance/tax" element={<FinanceTaxPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="wallet" element={<WalletPage />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      </AiAgentProvider>
+      </MembershipProvider>
+    </BrowserRouter>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/cn.ts ===== */
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+
+
+墨典AI智能ERP商家管理系统 V1.0
+第 3 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentComposerBar.tsx ===== */
+import { ChevronDown, Film, ImagePlus, Loader2, Mic, Send, Square } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAiAgent } from '../context/AiAgentContext'
+import { MAX_AI_CHAT_IMAGE_ATTACHMENTS } from '../services/ai/types'
+import { cn } from '../cn'
+import type { AiComposerAttachment } from '../lib/aiAgentTypes'
+import { shouldSubmitComposerOnEnter } from '../lib/composerEnterKey'
+import { isComposerImageFile, isComposerVideoFile } from '../lib/aiVideoPoster'
+
+type Layout = 'centered' | 'dock'
+type ModelFilterTab = 'all' | 'chat' | 'image'
+
+const FILTER_TABS: { id: ModelFilterTab; label: string; short: string }[] = [
+  { id: 'all', label: '全部模型', short: '全部' },
+  { id: 'chat', label: '对话', short: '对话' },
+  { id: 'image', label: '文生图 / 图生图', short: '生图' },
+]
+
+const MEDIA_ACCEPT =
+  'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm'
+
+function readMediaFilesFromClipboard(ev: React.ClipboardEvent<HTMLTextAreaElement>): File[] {
+  const out: File[] = []
+  const items = ev.clipboardData?.items
+  if (!items) return out
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]
+    if (it?.kind === 'file') {
+      const f = it.getAsFile()
+      if (f && (isComposerImageFile(f) || isComposerVideoFile(f))) out.push(f)
+    }
+  }
+  return out
+}
+
+function getSpeechRecognitionCtor(): (new () => SpeechRecognition) | null {
+  if (typeof window === 'undefined') return null
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognition
+    webkitSpeechRecognition?: new () => SpeechRecognition
+  }
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
+}
+
+function shortModelLabel(label: string): string {
+  const head = label.split(/[·\-–|]/)[0]?.trim() ?? label
+  if (head.length <= 10) return head
+  return `${head.slice(0, 9)}…`
+}
+
+墨典AI智能ERP商家管理系统 V1.0
+第 4 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+function useClickOutside(refs: React.RefObject<HTMLElement | null>[], onOutside: () => void, active: boolean) {
+  useEffect(() => {
+    if (!active) return
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (refs.some((r) => r.current?.contains(t))) return
+      onOutside()
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [refs, onOutside, active])
+}
+
+function AttachmentPreview({
+  att,
+  onRemove,
+}: {
+  att: AiComposerAttachment
+  onRemove: () => void
+}) {
+  return (
+    <div className="group relative">
+      {att.kind === 'image' ? (
+        <img src={att.url} alt="" className="h-14 w-14 rounded-lg border border-slate-200 object-cover" />
+      ) : (
+        <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-slate-200 bg-zinc-900">
+          <video
+            src={att.previewUrl}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+          />
+          <span className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-0.5 bg-black/55 py-0.5 text-[9px] text-white">
+            <Film className="h-3 w-3" />
+            视频
+          </span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/90 text-[10px] text-white shadow ring-1 ring-white/80"
+        aria-label="移除附件"
+      >
+        ×
+      </button>
+    </div>
+  )
+
+墨典AI智能ERP商家管理系统 V1.0
+第 5 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+export function AiAgentComposerBar({ layout }: { layout: Layout }) {
+  const {
+    inputDraft,
+    setInputDraft,
+    sendUserText,
+    modelPickerKey,
+    setModelPickerKey,
+    modelPickerOptions,
+    aiSending,
+    stopAiGeneration,
+    pendingComposerAttachments,
+    addComposerMediaFiles,
+    removeComposerAttachment,
+    pendingQuote,
+    clearPendingQuote,
+  } = useAiAgent()
+
+  const fileRef = useRef<HTMLInputElement>(null)
+  const recRef = useRef<SpeechRecognition | null>(null)
+  const imeComposingRef = useRef(false)
+  const filterWrapRef = useRef<HTMLDivElement>(null)
+  const modelWrapRef = useRef<HTMLDivElement>(null)
+  const [listening, setListening] = useState(false)
+  const [modelFilter, setModelFilter] = useState<ModelFilterTab>('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [modelOpen, setModelOpen] = useState(false)
+
+  const filteredModelOptions = useMemo(() => {
+    if (modelFilter === 'all') return modelPickerOptions
+    return modelPickerOptions.filter((o) => (o.capability ?? 'chat') === modelFilter)
+  }, [modelPickerOptions, modelFilter])
+
+  const currentModel = useMemo(
+    () => modelPickerOptions.find((o) => o.key === modelPickerKey),
+    [modelPickerOptions, modelPickerKey],
+  )
+
+  const filterShort = FILTER_TABS.find((t) => t.id === modelFilter)?.short ?? '全部'
+
+  useEffect(() => {
+    if (filteredModelOptions.some((o) => o.key === modelPickerKey)) return
+    const first = filteredModelOptions[0]?.key
+    if (first) setModelPickerKey(first)
+  }, [filteredModelOptions, modelPickerKey, setModelPickerKey])
+
+  const closeMenus = useCallback(() => {
+    setFilterOpen(false)
+    setModelOpen(false)
+
+墨典AI智能ERP商家管理系统 V1.0
+第 6 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  }, [])
+
+  useClickOutside([filterWrapRef, modelWrapRef], closeMenus, filterOpen || modelOpen)
+
+  const stopListening = useCallback(() => {
+    try {
+      recRef.current?.stop()
+    } catch {
+      /* noop */
+    }
+    recRef.current = null
+    setListening(false)
+  }, [])
+
+  useEffect(() => {
+    return () => stopListening()
+  }, [stopListening])
+
+  const startListening = useCallback(() => {
+    const Ctor = getSpeechRecognitionCtor()
+    if (!Ctor) {
+      window.alert('当前浏览器不支持语音输入，请使用 Chrome 或 Edge 桌面版，并允许麦克风权限。')
+      return
+    }
+    if (listening) {
+      stopListening()
+      return
+    }
+    closeMenus()
+    const r = new Ctor()
+    r.lang = 'zh-CN'
+    r.interimResults = false
+    r.continuous = false
+    r.onresult = (ev: SpeechRecognitionEvent) => {
+      const t = ev.results[0]?.[0]?.transcript?.trim()
+      if (t) setInputDraft((prev) => (prev.trim() ? `${prev.trim()} ${t}` : t))
+    }
+    r.onerror = () => stopListening()
+    r.onend = () => stopListening()
+    recRef.current = r
+    try {
+      r.start()
+      setListening(true)
+    } catch {
+      window.alert('无法启动语音识别，请检查麦克风权限。')
+    }
+  }, [listening, setInputDraft, stopListening, closeMenus])
+
+  const rows = layout === 'centered' ? 4 : 2
+  const disabled = aiSending
+
+墨典AI智能ERP商家管理系统 V1.0
+第 7 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const modelShort = shortModelLabel(currentModel?.label ?? '模型')
+  const attachmentFull = pendingComposerAttachments.length >= MAX_AI_CHAT_IMAGE_ATTACHMENTS
+
+  return (
+    <div
+      className={cn(
+        'w-full rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-1 ring-slate-100/80',
+        layout === 'centered' && 'rounded-3xl shadow-md shadow-slate-900/5',
+      )}
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        accept={MEDIA_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          void addComposerMediaFiles(e.target.files).finally(() => {
+            if (fileRef.current) fileRef.current.value = ''
+          })
+        }}
+      />
+
+      <div className="px-3 pt-3 sm:px-4 sm:pt-3.5">
+        {pendingQuote ? (
+          <div className="mb-2 flex items-start gap-2 rounded-xl border border-indigo-200/90 bg-indigo-50/90 px-3 py-2 text-xs text-indigo-950">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-indigo-900">引用对话</p>
+              <p className="mt-0.5 line-clamp-3 whitespace-pre-wrap text-[11px] text-indigo-900/90">
+                {pendingQuote.role === 'user' ? '我' : '助手'}：{pendingQuote.excerpt}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearPendingQuote}
+              className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100/80"
+            >
+              移除
+            </button>
+          </div>
+        ) : null}
+
+        {pendingComposerAttachments.length > 0 ? (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {pendingComposerAttachments.map((att, i) => (
+              <AttachmentPreview
+                key={`${att.kind}-${i}`}
+                att={att}
+                onRemove={() => removeComposerAttachment(i)}
+              />
+
+墨典AI智能ERP商家管理系统 V1.0
+第 8 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+            ))}
+          </div>
+        ) : null}
+
+        <textarea
+          value={inputDraft}
+          onChange={(e) => setInputDraft(e.target.value)}
+          onPaste={(e) => {
+            const files = readMediaFilesFromClipboard(e)
+            if (!files.length) return
+            e.preventDefault()
+            void addComposerMediaFiles(files)
+          }}
+          onCompositionStart={() => {
+            imeComposingRef.current = true
+          }}
+          onCompositionEnd={() => {
+            imeComposingRef.current = false
+          }}
+          onKeyDown={(e) => {
+            if (imeComposingRef.current && e.key === 'Enter') return
+            if (!shouldSubmitComposerOnEnter(e)) return
+            e.preventDefault()
+            sendUserText(inputDraft)
+          }}
+          rows={rows}
+          disabled={disabled}
+          placeholder={
+            modelFilter === 'image'
+              ? '文生图：描述画面；图生图：先上传参考图/视频首帧再写修改要求…'
+              : '描述你想完成的任务；可上传图片或视频（视频将提取首帧供模型理解），也可粘贴截图…'
+          }
+          className={cn(
+            'w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-50',
+            layout === 'dock' && 'max-h-36 min-h-[2.5rem]',
+          )}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-2 py-2 sm:px-3">
+        <button
+          type="button"
+          disabled={disabled || aiSending || attachmentFull}
+          onClick={() => fileRef.current?.click()}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white disabled:opacity-40"
+          title={`上传图片或视频（最多 ${MAX_AI_CHAT_IMAGE_ATTACHMENTS} 个，视频单文件 ≤100MB）`}
+          aria-label="上传图片或视频"
+        >
+          <ImagePlus className="h-4 w-4" />
+        </button>
+
+墨典AI智能ERP商家管理系统 V1.0
+第 9 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5">
+          <div ref={filterWrapRef} className="relative">
+            <button
+              type="button"
+              disabled={aiSending || disabled}
+              onClick={() => {
+                setModelOpen(false)
+                setFilterOpen((v) => !v)
+              }}
+              className={cn(
+                'inline-flex h-8 max-w-[5.5rem] items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-700 hover:bg-white',
+                filterOpen && 'border-indigo-300 bg-indigo-50 text-indigo-800',
+                (aiSending || disabled) && 'cursor-not-allowed opacity-50',
+              )}
+              aria-expanded={filterOpen}
+              aria-haspopup="listbox"
+            >
+              <span className="truncate">{filterShort}</span>
+              <ChevronDown className={cn('h-3 w-3 shrink-0 opacity-60', filterOpen && 'rotate-180')} />
+            </button>
+            {filterOpen ? (
+              <div
+                role="listbox"
+                className="absolute bottom-full right-0 z-50 mb-1.5 min-w-[9.5rem] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+              >
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">模式</p>
+                {FILTER_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="option"
+                    aria-selected={modelFilter === tab.id}
+                    onClick={() => {
+                      setModelFilter(tab.id)
+                      setFilterOpen(false)
+                    }}
+                    className={cn(
+                      'flex w-full items-center px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50',
+                      modelFilter === tab.id && 'bg-indigo-50 font-medium text-indigo-900',
+                    )}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div ref={modelWrapRef} className="relative">
+
+墨典AI智能ERP商家管理系统 V1.0
+第 10 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+            <button
+              type="button"
+              disabled={aiSending || disabled}
+              onClick={() => {
+                setFilterOpen(false)
+                setModelOpen((v) => !v)
+              }}
+              className={cn(
+                'inline-flex h-8 max-w-[7.5rem] items-center gap-0.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-700 hover:bg-white',
+                modelOpen && 'border-indigo-300 bg-indigo-50 text-indigo-800',
+                (aiSending || disabled) && 'cursor-not-allowed opacity-50',
+              )}
+              title={currentModel?.label}
+              aria-expanded={modelOpen}
+              aria-haspopup="listbox"
+            >
+              <span className="truncate">{modelShort}</span>
+              <ChevronDown className={cn('h-3 w-3 shrink-0 opacity-60', modelOpen && 'rotate-180')} />
+            </button>
+            {modelOpen ? (
+              <div
+                role="listbox"
+                className="absolute bottom-full right-0 z-50 mb-1.5 max-h-52 w-[min(16rem,calc(100vw-3rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
+              >
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">模型</p>
+                {filteredModelOptions.map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    role="option"
+                    aria-selected={modelPickerKey === o.key}
+                    onClick={() => {
+                      setModelPickerKey(o.key)
+                      setModelOpen(false)
+                    }}
+                    className={cn(
+                      'flex w-full px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:bg-slate-50',
+                      modelPickerKey === o.key && 'bg-indigo-50 font-medium text-indigo-900',
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            className={cn(
+
+墨典AI智能ERP商家管理系统 V1.0
+第 11 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white',
+              listening && 'border-indigo-300 bg-indigo-50 text-indigo-700',
+            )}
+            title={listening ? '点击停止听写' : '语音转文字'}
+            aria-label="语音输入"
+            onClick={startListening}
+          >
+            {listening ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+          </button>
+
+          {aiSending ? (
+            <button
+              type="button"
+              onClick={stopAiGeneration}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700 shadow-sm transition hover:bg-rose-100"
+              aria-label="停止生成"
+              title="停止生成"
+            >
+              <Square className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => sendUserText(inputDraft)}
+              disabled={
+                (!inputDraft.trim() &&
+                  pendingComposerAttachments.length === 0 &&
+                  !pendingQuote) ||
+                disabled
+              }
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="发送"
+              title="发送"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentDrawer.tsx ===== */
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronDown, ChevronRight, Shield, X } from 'lucide-react'
+import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
+import { useEffect, useRef, useState } from 'react'
+import { AiAgentComposerBar } from './AiAgentComposerBar'
+
+墨典AI智能ERP商家管理系统 V1.0
+第 12 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+import { AiAgentMessageBubble } from './AiAgentMessageBubble'
+import { AiAgentPreviewActions } from './AiAgentPreviewActions'
+import { AiAgentThinkingIndicator } from './AiAgentThinkingIndicator'
+import { cn } from '../cn'
+import { useAiAgent } from '../context/AiAgentContext'
+import type { AiPermissionId } from '../lib/aiAgentTypes'
+
+const PERMISSION_ORDER: AiPermissionId[] = [
+  'product',
+  'store',
+  'influencer',
+  'review',
+  'local_ads',
+  'local_leads',
+  'sync',
+  'finance_tax',
+]
+
+const PERMISSION_BADGE_SHORT: Record<AiPermissionId, string> = {
+  product: '商品',
+  store: '店铺',
+  influencer: '达人',
+  review: '评价',
+  local_ads: '投流',
+  local_leads: '线索',
+  sync: '同步',
+  finance_tax: '报税',
+}
+
+export default function AiAgentDrawer() {
+  const {
+    drawerOpen,
+    closeDrawer,
+    pageContext,
+    permissions,
+    messages,
+    applyShortcut,
+    isPreviewLoading,
+    isPreviewConfirming,
+    aiSending,
+    agentProfile,
+  } = useAiAgent()
+
+  const listRef = useRef<HTMLDivElement>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    requestAnimationFrame(() => {
+      const el = listRef.current
+
+墨典AI智能ERP商家管理系统 V1.0
+第 13 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      if (el) el.scrollTop = el.scrollHeight
+    })
+  }, [drawerOpen, messages, aiSending])
+
+  return (
+    <AnimatePresence>
+      {drawerOpen ? (
+        <>
+          <motion.button
+            type="button"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[70] bg-slate-950/40 backdrop-blur-[2px]"
+            aria-label="关闭 AI 抽屉"
+            onClick={closeDrawer}
+          />
+          <motion.aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="meoo-ai-agent-title"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            className={cn(
+              'fixed right-0 top-0 z-[71] flex h-full w-full max-w-full flex-col border-l border-slate-200/90 bg-white shadow-2xl shadow-slate-900/15 sm:max-w-[520px]',
+              'sm:rounded-l-2xl',
+            )}
+          >
+            <header className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-700 px-5 py-4 text-white">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/20">
+                    <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="h-8 w-8 object-contain" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 id="meoo-ai-agent-title" className="truncate text-base font-semibold tracking-tight">
+                      墨典 AI 助手
+                    </h2>
+                    <p className="text-xs text-indigo-100/95">可咨询问题，也可生成任务方案</p>
+                  </div>
+                </div>
+                {pageContext?.pageLabel ? (
+                  <p className="mt-2 truncate rounded-lg bg-black/15 px-2 py-1 text-[11px] text-indigo-50">
+                    上下文：{pageContext.pageLabel}
+                    {pageContext.suggestedTasks?.length
+                      ? ` · 可执行：${pageContext.suggestedTasks.join('、')}`
+                      : ''}
+
+墨典AI智能ERP商家管理系统 V1.0
+第 14 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+                  </p>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={closeDrawer}
+                className="shrink-0 rounded-xl p-2 text-white/90 transition-colors hover:bg-white/15"
+                aria-label="关闭"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="shrink-0 space-y-3 border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+                <span className="text-[11px] font-medium text-slate-600">权限状态</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {PERMISSION_ORDER.map((id) => (
+                  <span
+                    key={id}
+                    className={cn(
+                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1',
+                      permissions[id]
+                        ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+                        : 'bg-slate-100 text-slate-500 ring-slate-200',
+                    )}
+                  >
+                    {permissions[id] ? '已接入' : '未接入'}
+                    {PERMISSION_BADGE_SHORT[id]}权限
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 border-b border-slate-100 px-4 py-2">
+              <button
+                type="button"
+                onClick={() => setShortcutsOpen((v) => !v)}
+                className="flex w-full items-center justify-between rounded-lg px-1 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-100/80"
+              >
+                <span>快捷任务（{agentProfile.shortcuts.length}）</span>
+                {shortcutsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              {shortcutsOpen ? (
+                <div className="mt-2 flex flex-wrap gap-2 pb-1">
+                  {agentProfile.shortcuts.map((s) => (
+                    <button
+                      key={s.type}
+
+墨典AI智能ERP商家管理系统 V1.0
+第 15 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+                      type="button"
+                      disabled={aiSending}
+                      onClick={() => applyShortcut(s.type)}
+                      className={cn(
+                        'rounded-xl border border-indigo-200/80 bg-white px-3 py-1.5 text-xs font-medium text-indigo-800 shadow-sm transition-colors',
+                        'hover:border-indigo-300 hover:bg-indigo-50/80',
+                        aiSending && 'cursor-not-allowed opacity-50',
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+              {messages.map((m) => (
+                <div key={m.id}>
+                  <AiAgentMessageBubble m={m} />
+                  {m.role === 'task_preview' && (m.previewStatus ?? 'pending') === 'pending' ? (
+                    <AiAgentPreviewActions
+                      previewMessageId={m.id}
+                      confirmDisabled={
+                        isPreviewLoading(m.id) || isPreviewConfirming(m.id) || aiSending
+                      }
+                      showProductPlatforms={m.preview?.taskType === 'create_product'}
+                    />
+                  ) : null}
+                </div>
+              ))}
+              {aiSending ? <AiAgentThinkingIndicator /> : null}
+            </div>
+
+            <footer className="shrink-0 border-t border-slate-100 bg-white p-3">
+              <AiAgentComposerBar layout="dock" />
+              <p className="mt-2 text-center text-[10px] text-slate-400">
+                涉及创建、修改、删除、发布等操作前将展示预览并由您确认
+              </p>
+            </footer>
+          </motion.aside>
+        </>
+      ) : null}
+    </AnimatePresence>
+  )
+}
+
+export function AiAgentFloatingButton() {
+  const { openDrawer, drawerOpen } = useAiAgent()
+  if (drawerOpen) return null
+
+墨典AI智能ERP商家管理系统 V1.0
+第 16 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  return (
+    <button
+      type="button"
+      onClick={() => openDrawer()}
+      className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-slate-950 shadow-lg shadow-indigo-900/25 ring-2 ring-cyan-400/40 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
+      aria-label="打开墨典 AI 助手"
+      title="AI 助手"
+    >
+      <img src={BRAND_LOGO_URL} alt="" className="h-11 w-11 object-contain" />
+    </button>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentMessageBubble.tsx ===== */
+import { CheckCircle2, ClipboardList } from 'lucide-react'
+import { useAiAgent } from '../context/AiAgentContext'
+import { cn } from '../cn'
+import type { AiAgentMessage } from '../lib/aiAgentTypes'
+import { formatAssistantDisplayText } from '../lib/aiAgentActionParse'
+import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
+import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
+import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
+import { AiAgentRecruitmentOrderDetailCard } from './AiAgentRecruitmentOrderDetail'
+import { AiAgentTaxPreview } from './AiAgentTaxPreview'
+
+function formatBubbleTime(ts: number): string {
+  try {
+    return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(ts))
+  } catch {
+    return ''
+  }
+}
+
+export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
+  const { quoteMessage } = useAiAgent()
+  if (m.role === 'task_preview' && m.preview) {
+    return (
+      <div className="w-full rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50/95 to-indigo-50/90 p-4 shadow-sm ring-1 ring-violet-100/60">
+        <div className="mb-2 flex items-center gap-2 text-violet-900">
+          <ClipboardList className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-semibold tracking-tight">执行预览 · 需确认</span>
+        </div>
+        <p className="text-sm leading-relaxed text-slate-700">{m.content}</p>
+        {m.preview.taskType === 'create_product' ? (() => {
+          const productPlans = listProductPlansFromPreview(m.preview)
+          if (!productPlans.length) return null
+          const multi = productPlans.length > 1
+          return (
+            <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'mt-4'}>
+
+墨典AI智能ERP商家管理系统 V1.0
+第 17 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+              {productPlans.map((plan) => (
+                <div
+                  key={plan.slotKey ?? plan.slotLabel ?? plan.productName}
+                  className={multi ? 'rounded-xl border border-violet-100/90 bg-white/80 p-2 shadow-sm' : ''}
+                >
+                  <AiAgentProductVisualPreview plan={plan} slotLabel={plan.slotLabel} />
+                </div>
+              ))}
+            </div>
+          )
+        })() : m.preview.taskType === 'recruit_influencer' &&
+          m.preview.recruitmentBrief &&
+          !m.preview.productPlans?.length ? (
+          <AiAgentRecruitmentVisualPreview brief={m.preview.recruitmentBrief} />
+        ) : m.preview.taskType === 'file_tax' && m.preview.taxFiling ? (
+          <AiAgentTaxPreview tax={m.preview.taxFiling} />
+        ) : (
+          <>
+            <p className="mt-3 text-xs font-semibold text-violet-900">{m.preview.title}</p>
+            <ol className="mt-2 space-y-1.5 border-l-2 border-violet-200/80 pl-3 text-sm leading-relaxed text-slate-700">
+              {m.preview.steps.map((s, i) => (
+                <li key={i} className="pl-1">
+                  {s}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+        {m.preview.taskType !== 'create_product' &&
+        m.preview.taskType !== 'recruit_influencer' &&
+        m.preview.taskType !== 'file_tax' ? (
+          <p className="mt-3 text-[11px] text-slate-500">
+            类型：<span className="font-mono text-slate-600">{m.preview.taskType}</span>
+          </p>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (m.role === 'task_result') {
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[min(100%,42rem)] rounded-2xl border border-emerald-200/90 bg-emerald-50/95 px-4 py-3 text-sm text-emerald-950 shadow-sm ring-1 ring-emerald-100/70">
+          <div className="mb-1 flex items-center gap-1.5 font-semibold text-emerald-900">
+            <CheckCircle2 className="h-4 w-4" />
+            任务结果
+          </div>
+          <p className="whitespace-pre-wrap leading-relaxed">{formatAssistantDisplayText(m.content)}</p>
+          {m.recruitmentOrder ? (
+            <AiAgentRecruitmentOrderDetailCard order={m.recruitmentOrder} />
+
+墨典AI智能ERP商家管理系统 V1.0
+第 18 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  const isUser = m.role === 'user'
+  const isSystem = m.role === 'system'
+  const imgs = m.imageUrls?.filter(Boolean) ?? []
+  const videos = m.videoUrls?.filter(Boolean) ?? []
+  const timeStr = formatBubbleTime(m.createdAt)
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[min(100%,26rem)]">
+          <div className="rounded-2xl rounded-br-md bg-slate-700 px-3.5 py-2.5 text-[13px] leading-relaxed text-slate-50 shadow-md ring-1 ring-slate-900/10">
+            {videos.length > 0 || imgs.length > 0 ? (
+              <div className="mb-2 flex flex-wrap justify-end gap-2">
+                {videos.map((src, i) => (
+                  <video
+                    key={`v-${i}`}
+                    src={src}
+                    controls
+                    playsInline
+                    className="max-h-40 max-w-[min(100%,14rem)] rounded-lg border border-white/15 bg-black object-contain"
+                  />
+                ))}
+                {imgs.map((src, i) => (
+                  <img
+                    key={`i-${i}`}
+                    src={src}
+                    alt=""
+                    className="max-h-36 max-w-[min(100%,11rem)] rounded-lg border border-white/15 object-contain"
+                  />
+                ))}
+              </div>
+            ) : null}
+            {m.content ? <p className="whitespace-pre-wrap">{m.content}</p> : null}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => quoteMessage(m)}
+              className="text-[10px] font-medium text-indigo-200/95 underline-offset-2 hover:text-white hover:underline"
+            >
+              引用此条
+            </button>
+            {timeStr ? <p className="text-[10px] text-slate-400">{timeStr}</p> : null}
+          </div>
+
+墨典AI智能ERP商家管理系统 V1.0
+第 19 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+        </div>
+      </div>
+    )
+  }
+
+  const isErrorish =
+    m.role === 'assistant' && /暂时连不上助手|失败|错误|error|500|502/i.test(m.content)
+
+  return (
+    <div className="flex justify-start">
+      <div className="w-full">
+        <div
+          className={cn(
+            'rounded-2xl rounded-bl-md px-4 py-3 text-[13px] leading-relaxed shadow-sm',
+            isSystem
+              ? 'border border-amber-200/90 bg-amber-50/90 text-amber-950 ring-1 ring-amber-100/70'
+              : isErrorish
+                ? 'border border-amber-200/80 bg-amber-50/70 text-amber-950 ring-1 ring-amber-100/50'
+                : 'border border-slate-200/80 bg-slate-50/95 text-slate-800 ring-1 ring-slate-200/40',
+          )}
+        >
+          {imgs.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {imgs.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt=""
+                  className={
+                    m.role === 'assistant' && imgs.length === 1
+                      ? 'max-h-[min(70vh,28rem)] w-full max-w-full rounded-lg border border-slate-200/80 object-contain shadow-sm'
+                      : 'max-h-40 max-w-[min(100%,14rem)] rounded-lg border border-slate-200/80 object-contain'
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+          {m.content ? (
+            <p className="whitespace-pre-wrap">
+              {formatAssistantDisplayText(m.content)}
+            </p>
+          ) : null}
+        </div>
+        {m.role === 'assistant' ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => quoteMessage(m)}
+              className="text-[10px] font-medium text-indigo-600 hover:underline"
+            >
+
+墨典AI智能ERP商家管理系统 V1.0
+第 20 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+              引用此条
+            </button>
+            {timeStr ? <p className="text-[10px] text-slate-400">{timeStr}</p> : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentOverlayModal.tsx ===== */
+import { X } from 'lucide-react'
+import type { ReactNode } from 'react'
+
+type Props = {
+  open: boolean
+  title: string
+  subtitle?: string
+  onClose: () => void
+  children: ReactNode
+  footer?: ReactNode
+}
+
+/** 智能体抽屉内详情弹层（z-index 高于 AiAgentDrawer） */
+export function AiAgentOverlayModal({ open, title, subtitle, onClose, children, footer }: Props) {
+  if (!open) return null
+  return (
+    <div
+      className="fixed inset-0 z-[85] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="flex max-h-[min(88vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-agent-detail-title"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <h3 id="ai-agent-detail-title" className="text-base font-semibold text-slate-900">
+              {title}
+            </h3>
+            {subtitle ? <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+
+墨典AI智能ERP商家管理系统 V1.0
+第 21 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+            className="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+            aria-label="关闭"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">{children}</div>
+        {footer ? (
+          <div className="shrink-0 border-t border-slate-100 px-4 py-3 sm:px-5">{footer}</div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentPreviewActions.tsx ===== */
+import { cn } from '../cn'
+import { useAiAgent } from '../context/AiAgentContext'
+import { aiTaskConfirmLabel } from '../lib/aiAgentPlan'
+import { GROUPBUY_PLATFORMS } from '../constants/productCreatePlatforms'
+import type { CreatePlatformId } from '../constants/productCreatePlatforms'
+
+type Props = {
+  previewMessageId: string
+  confirmDisabled: boolean
+  confirmLabel?: string
+  showProductPlatforms?: boolean
+}
+
+export function AiAgentPreviewActions({
+  previewMessageId,
+  confirmDisabled,
+  confirmLabel: confirmLabelOverride,
+  showProductPlatforms = false,
+}: Props) {
+  const {
+    messages,
+    previewSubmitPlatforms,
+    togglePreviewSubmitPlatform,
+    confirmPendingTask,
+    modifyPendingTask,
+    cancelPendingTask,
+    isPreviewLoading,
+    isPreviewConfirming,
+  } = useAiAgent()
+
+  const previewMsg = messages.find((m) => m.id === previewMessageId)
+  const taskType = previewMsg?.preview?.taskType ?? null
+  const loading = isPreviewLoading(previewMessageId)
+
+墨典AI智能ERP商家管理系统 V1.0
+第 22 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const confirming = isPreviewConfirming(previewMessageId)
+
+  const confirmLabel =
+    confirmLabelOverride ??
+    (loading
+      ? '正在生成预览…'
+      : confirming
+        ? taskType === 'create_product'
+          ? '正在保存至草稿箱…'
+          : '正在生成订单…'
+        : aiTaskConfirmLabel(taskType))
+
+  const selectablePlatforms = GROUPBUY_PLATFORMS.filter((p) => !p.comingSoon)
+
+  return (
+    <div className="mt-3 space-y-3 border-t border-violet-100 pt-3">
+      {showProductPlatforms ? (
+        <div>
+          <p className="mb-2 text-[11px] font-medium text-slate-600">
+            草稿归属平台（可多选，保存后请在商品列表选择类目提交）
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selectablePlatforms.map((p) => {
+              const checked = previewSubmitPlatforms.includes(p.id as CreatePlatformId)
+              return (
+                <label
+                  key={p.id}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition',
+                    checked
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-900'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300',
+                    confirmDisabled && 'cursor-not-allowed opacity-50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={checked}
+                    disabled={confirmDisabled}
+                    onChange={() => togglePreviewSubmitPlatform(p.id as CreatePlatformId)}
+                  />
+                  {p.name}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+
+墨典AI智能ERP商家管理系统 V1.0
+第 23 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => confirmPendingTask(previewMessageId)}
+          disabled={confirmDisabled}
+          className={cn(
+            'rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-xs font-medium text-white shadow-sm hover:brightness-110',
+            confirmDisabled && 'cursor-not-allowed opacity-50',
+          )}
+        >
+          {confirmLabel}
+        </button>
+        <button
+          type="button"
+          onClick={() => modifyPendingTask(previewMessageId)}
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          修改方案
+        </button>
+        <button
+          type="button"
+          onClick={() => cancelPendingTask(previewMessageId)}
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
+        >
+          取消
+        </button>
+      </div>
+    </div>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentProductVisualPreview.tsx ===== */
+import { Loader2 } from 'lucide-react'
+import {
+  DouyinProductMobilePreviewFrame,
+  type DouyinPreviewComboLine,
+} from './douyin/DouyinProductMobilePreview'
+import { defaultAiAgentPreviewFormRules } from '../lib/aiAgentProductPreviewDefaults'
+import { coerceAgentDisplayError } from '../lib/aiAgentActionParse'
+import type { AiProductPlanPreview } from '../lib/aiAgentTypes'
+
+export function AiAgentProductVisualPreview({
+  plan,
+  slotLabel,
+}: {
+  plan: AiProductPlanPreview
+  slotLabel?: string
+}) {
+  const label = slotLabel ?? plan.slotLabel
+
+墨典AI智能ERP商家管理系统 V1.0
+第 24 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (plan.enrichStatus === 'loading') {
+    return (
+      <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-indigo-100 bg-white py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        <p className="mt-3 text-sm text-slate-600">正在优化标题并生成团购主图…</p>
+        <p className="mt-1 text-xs text-slate-400">完成后将展示 C 端预览效果</p>
+      </div>
+    )
+  }
+
+  const comboLines: DouyinPreviewComboLine[] = plan.comboLines
+    .map((line) => ({
+      name: typeof line === 'string' ? line : coerceAgentDisplayError(line, ''),
+      qty: '1',
+      price: '',
+    }))
+    .filter((it) => it.name.trim() && it.name !== '[object Object]')
+
+  const productType = plan.productType ?? (/代金券|代\d+抵/.test(plan.productName) ? 2 : 1)
+
+  const enrichErr = plan.enrichError
+    ? coerceAgentDisplayError(plan.enrichError, '')
+    : ''
+
+  return (
+    <div className="mt-4 space-y-3">
+      {label ? (
+        <p className="text-center text-sm font-semibold text-violet-900">{label}</p>
+      ) : null}
+      <p className="text-center text-xs font-medium text-indigo-800">抖音来客团购 · C 端预览</p>
+      <div className="flex justify-center rounded-xl border border-indigo-100 bg-gradient-to-b from-slate-50 to-white p-4">
+        <DouyinProductMobilePreviewFrame
+          embedded
+          productName={coerceAgentDisplayError(plan.productName, '商品名称')}
+          productDesc={coerceAgentDisplayError(plan.description, '')}
+          priceYuan={
+            plan.suggestedPriceYuan > 0
+              ? String(plan.suggestedPriceYuan)
+              : ''
+          }
+          originYuan={plan.originYuan != null ? String(plan.originYuan) : ''}
+          headUrl={plan.headUrl ?? ''}
+          envUrls={[]}
+          productType={productType}
+          comboLines={comboLines}
+          poiCount={1}
+          formRules={defaultAiAgentPreviewFormRules()}
+        />
+      </div>
+      {enrichErr ? <p className="text-center text-xs text-amber-700">{enrichErr}</p> : null}
+
+墨典AI智能ERP商家管理系统 V1.0
+第 25 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      <p className="text-center text-[11px] text-slate-500">
+        确认后将按此方案提交抖音来客审核；如需改价、换图或售后规则，可在提交前于创建页微调。
+      </p>
+    </div>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentRecruitmentOrderDetail.tsx ===== */
+import { ChevronRight, ExternalLink, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import type { AiRecruitmentOrderDetail } from '../lib/aiAgentTypes'
+import { cn } from '../cn'
+import { AiAgentOverlayModal } from './AiAgentOverlayModal'
+
+export function AiAgentRecruitmentOrderDetailCard({ order }: { order: AiRecruitmentOrderDetail }) {
+  const [detailOpen, setDetailOpen] = useState(false)
+  const tiers = [
+    ['V3', order.allocation.v3],
+    ['V4', order.allocation.v4],
+    ['V5', order.allocation.v5],
+    ['V5+', order.allocation.v5plus],
+  ] as const
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setDetailOpen(true)}
+        className={cn(
+          'mt-3 w-full overflow-hidden rounded-xl border border-emerald-200/90 bg-white text-left shadow-sm ring-1 ring-emerald-100/60',
+          'transition-all hover:border-emerald-300 hover:shadow-md hover:ring-2 hover:ring-emerald-100',
+          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500',
+        )}
+      >
+        <div className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 to-teal-50/80 px-4 py-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-medium text-emerald-800">达人招募订单</p>
+              <p className="mt-0.5 font-mono text-sm font-semibold text-slate-900">{order.orderId}</p>
+            </div>
+            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
+              {order.opsStatusLabel}
+            </span>
+          </div>
+        </div>
+        <div className="space-y-3 px-4 py-3 text-sm text-slate-700">
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <Row label="投放平台" value={order.platform} />
+
+墨典AI智能ERP商家管理系统 V1.0
+第 26 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+            <Row label="主推品" value={order.mainProductName} />
+            <Row label="预算" value={`¥${order.budgetYuan.toLocaleString('zh-CN')}`} />
+            <Row label="计划达人数" value={`${order.totalHeadcount} 人`} />
+          </dl>
+          <div className="grid grid-cols-4 gap-1.5 text-center">
+            {tiers.map(([label, n]) => (
+              <div key={label} className="rounded-md bg-slate-50 px-1 py-1.5 ring-1 ring-slate-100">
+                <p className="text-[9px] text-slate-500">{label}</p>
+                <p className="text-sm font-semibold tabular-nums text-slate-900">{n}</p>
+              </div>
+            ))}
+          </div>
+          {order.briefExcerpt ? (
+            <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">Brief：{order.briefExcerpt}</p>
+          ) : null}
+          <p className="flex items-center justify-end gap-0.5 text-[10px] font-medium text-emerald-700">
+            查看订单详情
+            <ChevronRight className="h-3 w-3" />
+          </p>
+        </div>
+      </button>
+
+      <AiAgentOverlayModal
+        open={detailOpen}
+        title="招募订单详情"
+        subtitle={order.orderId}
+        onClose={() => setDetailOpen(false)}
+        footer={
+          <Link
+            to="/recruitment"
+            onClick={() => setDetailOpen(false)}
+            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:underline"
+          >
+            在达人招募页继续跟进
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        }
+      >
+        <div className="space-y-4 text-sm text-slate-700">
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <Row label="投放平台" value={order.platform} />
+            <Row label="主推品" value={order.mainProductName} />
+            <Row label="门店/商户" value={order.storeName} />
+            <Row label="预算" value={`¥${order.budgetYuan.toLocaleString('zh-CN')}`} />
+            <Row label="计划达人数" value={`${order.totalHeadcount} 人`} />
+            <Row label="创建时间" value={order.createdAt} />
+            <Row label="运营状态" value={order.opsStatusLabel} />
+          </dl>
+          {order.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+
+墨典AI智能ERP商家管理系统 V1.0
+第 27 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+              {order.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-800"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <AllocationBlock order={order} tiers={tiers} />
+          {order.briefText ? (
+            <div>
+              <p className="mb-2 text-xs font-semibold text-slate-600">Brief 全文</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                  {order.briefText}
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </AiAgentOverlayModal>
+    </>
+  )
+}
+
+function AllocationBlock({
+  order,
+  tiers,
+}: {
+  order: AiRecruitmentOrderDetail
+  tiers: ReadonlyArray<readonly [string, number]>
+}) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-3',
+        order.allocation.source === 'ai'
+          ? 'border-emerald-200 bg-emerald-50/50'
+          : 'border-slate-200 bg-slate-50/80',
+      )}
+    >
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+        <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+        AI 智能分配 · 达人档位
+        <span
+          className={cn(
+            'rounded px-1.5 py-0.5 text-[10px] font-medium',
+            order.allocation.source === 'ai' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700',
+
+墨典AI智能ERP商家管理系统 V1.0
+第 28 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+          )}
+        >
+          {order.allocation.source === 'ai' ? '模型估算' : '规则估算'}
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-2 text-center">
+        {tiers.map(([label, n]) => (
+          <div key={label} className="rounded-md bg-white/90 px-1 py-2 ring-1 ring-slate-100">
+            <p className="text-[10px] text-slate-500">{label}</p>
+            <p className="text-lg font-semibold tabular-nums text-slate-900">{n}</p>
+          </div>
+        ))}
+      </div>
+      {order.allocation.costHint ? (
+        <p className="mt-2 text-xs text-slate-600">{order.allocation.costHint}</p>
+      ) : null}
+      {order.allocation.notes ? <p className="mt-1 text-xs text-slate-500">{order.allocation.notes}</p> : null}
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-[10px] text-slate-500">{label}</dt>
+      <dd className="font-medium text-slate-800">{value}</dd>
+    </div>
+  )
+}
+
+
+/* ===== FILE: web版/merchant-erp/src/components/AiAgentRecruitmentVisualPreview.tsx ===== */
+import { ChevronRight, Copy, Loader2, Sparkles } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import type { AiRecruitmentBriefPreview } from '../lib/aiAgentTypes'
+import { cn } from '../cn'
+import { AiAgentOverlayModal } from './AiAgentOverlayModal'
+
+type BriefDetailSelection = {
+  variantLabel: string
+  text: string
+}
+
+export function AiAgentRecruitmentVisualPreview({ brief }: { brief: AiRecruitmentBriefPreview }) {
+  const [detail, setDetail] = useState<BriefDetailSelection | null>(null)
+  const [copyTip, setCopyTip] = useState<string | null>(null)
+
+  const copyBrief = useCallback(async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+
+墨典AI智能ERP商家管理系统 V1.0
+第 29 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      setCopyTip(`已复制版本 ${label}`)
+      window.setTimeout(() => setCopyTip(null), 2000)
+    } catch {
+      setCopyTip('复制失败，请手动选择文本')
+      window.setTimeout(() => setCopyTip(null), 2000)
+    }
+  }, [])
+
+  if (brief.enrichStatus === 'loading') {
+    return (
+      <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-violet-100 bg-white py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
+        <p className="mt-3 text-sm text-slate-600">正在生成达人探店图文 Brief…</p>
+        <p className="mt-1 text-xs text-slate-400">完成后将展示可复制的图文版预览</p>
+      </div>
+    )
+  }
+
+  const variants: [string, string, string] = brief.previews ?? [
+    brief.briefText,
+    brief.briefText,
+    brief.briefText,
+  ]
+
+  return (
+    <div className="mt-4 space-y-3">
+      <p className="text-center text-xs font-medium text-violet-900">达人招募 · 图文 Brief 预览</p>
+      <p className="text-center text-[11px] text-slate-500">点击卡片查看完整 Brief 文案</p>
+      <BriefCard
+        brief={brief}
+        text={variants[0]}
+        variantLabel="A"
+        onOpenDetail={() => setDetail({ variantLabel: 'A', text: variants[0] })}
+      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <BriefCard
+          brief={brief}
+          text={variants[1]}
+          variantLabel="B"
+          compact
+          onOpenDetail={() => setDetail({ variantLabel: 'B', text: variants[1] })}
+        />
+        <BriefCard
+          brief={brief}
+          text={variants[2]}
+          variantLabel="C"
+          compact
+          onOpenDetail={() => setDetail({ variantLabel: 'C', text: variants[2] })}
+        />
+      </div>
+
+墨典AI智能ERP商家管理系统 V1.0
+第 30 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      {brief.enrichError ? <p className="text-center text-xs text-amber-700">{brief.enrichError}</p> : null}
+      <p className="text-center text-[11px] text-slate-500">
+        确认后将按您的预算与人数需求 AI 分配达人档位，并在本窗口展示招募订单明细（同时推送运营台待接单）。
+      </p>
+
+      <AiAgentOverlayModal
+        open={detail != null}
+        title={`达人招募 Brief · 版本 ${detail?.variantLabel ?? ''}`}
+        subtitle={[brief.platform, brief.mainProductName].filter(Boolean).join(' · ')}
+        onClose={() => setDetail(null)}
+        footer={
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {copyTip ? <span className="text-xs text-emerald-700">{copyTip}</span> : <span />}
+            <button
+              type="button"
+              onClick={() => detail && void copyBrief(detail.text, detail.variantLabel)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-medium text-white hover:bg-violet-700"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              复制全文
+            </button>
+          </div>
+        }
+      >
+        {detail ? (
+          <div className="space-y-4">
+            <BriefTags tags={brief.tags} />
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              <MetaRow label="投放平台" value={brief.platform} />
+              <MetaRow label="主推品" value={brief.mainProductName} />
+            </dl>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">
+                {detail.text.trim() || '（暂无内容）'}
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </AiAgentOverlayModal>
+    </div>
+  )
+}
+
+function BriefCard({
+  brief,
+  text,
+  variantLabel,
+  compact,
+  onOpenDetail,
+}: {

@@ -1,0 +1,1608 @@
+墨典商家小程序软件 V1.0
+第 199 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (it.kind === 'mod') return `/pages/module-detail/module-detail?k=${it.key}`
+  return it.url
+}
+
+function flattenItems() {
+  const cells = []
+  for (const sec of FUNCTION_SECTIONS) {
+    for (const it of sec.items) {
+      cells.push({
+        sectionId: sec.id,
+        sectionTitle: sec.title,
+        title: it.title,
+        desc: it.desc,
+        url: itemUrl(it),
+        glyph: it.glyph,
+        tone: sec.tone,
+        badge: it.badge || '',
+      })
+    }
+  }
+  return cells
+}
+
+module.exports = { FUNCTION_SECTIONS, itemUrl, flattenItems }
+
+
+/* ===== FILE: 墨典商家小程序/utils/meooPaymentTiers.js ===== */
+/** 与 web版 merchant-erp/src/lib/meooPaymentTiers.ts 档位保持一致 */
+
+module.exports = {
+  SUBSCRIPTION_TIERS: [
+    { label: '会员版 · 月度', yuan: 168, cents: 16800, plan: 'member' },
+    { label: '会员 Plus · 月度', yuan: 598, cents: 59800, plan: 'member_plus' },
+    { label: '会员版 · 季度', yuan: 468, cents: 46800, plan: 'member' },
+    { label: '会员 Plus · 季度', yuan: 1688, cents: 168800, plan: 'member_plus' },
+  ],
+  RECHARGE_TIERS: [
+    { label: '¥100', yuan: 100, cents: 10000 },
+    { label: '¥300', yuan: 300, cents: 30000 },
+    { label: '¥500', yuan: 500, cents: 50000 },
+  ],
+  yuanInputToCents(yuanStr) {
+    const n = Number(String(yuanStr || '').replace(/,/g, '').trim())
+    if (!Number.isFinite(n) || n < 1) return null
+    return Math.round(n * 100)
+  },
+  yuanRefundInputToCents(yuanStr) {
+    const n = Number(String(yuanStr || '').replace(/,/g, '').trim())
+    if (!Number.isFinite(n) || n <= 0) return null
+    const cents = Math.round(n * 100)
+
+墨典商家小程序软件 V1.0
+第 200 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    return cents >= 1 ? cents : null
+  },
+  formatYuanFromCents(cents) {
+    return (cents / 100).toFixed(2)
+  },
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/merchantApi.js ===== */
+/**
+ * 与 Web ERP 同源：`VITE_MERCHANT_API_BASE_URL`（开发一般为电脑局域网 IP + 端口，如 http://192.168.1.5:5173）
+ * 需在 utils/config.js 或 config.local.js 配置 MERCHANT_API_BASE_URL，小程序写入的招募单才会进入与 Web 相同的 `.meoo-dev-sync` 注册表。
+ */
+const config = require('./config.js')
+
+function baseUrl() {
+  return String(config.MERCHANT_API_BASE_URL || '')
+    .trim()
+    .replace(/\/$/, '')
+}
+
+function hasMerchantApi() {
+  return Boolean(baseUrl())
+}
+
+/**
+ * @param {'GET'|'POST'} method
+ * @param {string} path 以 / 开头，如 /api/ops-sync/registry
+ * @param {Record<string, unknown>} [data] POST 体
+ */
+function merchantRequest(method, path, data) {
+  return merchantRequestAuth(method, path, { data })
+}
+
+/**
+ * 与 Web ERP 一致：平台网关接口使用 Authorization Bearer（绑定接口返回的 accessToken）。
+ */
+function merchantRequestAuth(method, path, opts) {
+  const data = opts && opts.data
+  const bearerToken = opts && opts.bearerToken ? String(opts.bearerToken).trim() : ''
+  const b = baseUrl()
+  if (!b) {
+    return Promise.reject(new Error('尚未配置商家后台 API 地址，请在 config.local.js 设置 MERCHANT_API_BASE_URL。'))
+  }
+  const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
+  const header = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+  if (bearerToken) header.Authorization = `Bearer ${bearerToken}`
+
+墨典商家小程序软件 V1.0
+第 201 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url,
+      method,
+      header,
+      data: method === 'GET' ? undefined : data,
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data)
+          return
+        }
+        const msg =
+          (res.data && (res.data.error || res.data.message || res.data.detail)) ||
+          `请求失败 ${res.statusCode}`
+        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+      },
+      fail(err) {
+        const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
+        reject(new Error(em))
+      },
+    })
+  })
+}
+
+module.exports = { baseUrl, hasMerchantApi, merchantRequest, merchantRequestAuth }
+
+
+/* ===== FILE: 墨典商家小程序/utils/merchantFeatureMp.js ===== */
+const merchantApi = require('./merchantApi.js')
+const { readPlatformToken, apiSegment, PLATFORM_TABS } = require('./platformTokensMp.js')
+
+function financeHeaders() {
+  const h = { Accept: 'application/json' }
+  const pairs = [
+    ['douyin', 'X-Meoo-Douyin-Token'],
+    ['meituan', 'X-Meoo-Meituan-Token'],
+    ['xiaohongshu', 'X-Meoo-Xhs-Token'],
+  ]
+  let primary = ''
+  for (const [plat, hdr] of pairs) {
+    const t = readPlatformToken(plat)
+    if (t) {
+      if (!primary) primary = t
+      h[hdr] = t
+    }
+  }
+  if (primary) h.Authorization = `Bearer ${primary}`
+  return h
+}
+
+
+墨典商家小程序软件 V1.0
+第 202 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+function financeRequestGet(path) {
+  const b = merchantApi.baseUrl()
+  if (!b) return Promise.reject(new Error('请配置商家后台 API 地址'))
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: `${b}${path}`,
+      method: 'GET',
+      header: financeHeaders(),
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data)
+          return
+        }
+        const msg =
+          (res.data && (res.data.message || res.data.error)) || `请求失败 ${res.statusCode}`
+        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+      },
+      fail(err) {
+        reject(new Error((err && err.errMsg) || '网络异常'))
+      },
+    })
+  })
+}
+
+async function fetchFinanceReconcile(days) {
+  if (!merchantApi.hasMerchantApi()) {
+    return { ok: false, message: '请配置商家后台 API 地址' }
+  }
+  const d = Math.min(90, Math.max(1, days || 14))
+  const paths = [`/api/meoo-finance-reconcile?days=${d}`, `/api/merchant/finance/reconcile?days=${d}`]
+  let lastMsg = '拉取失败'
+  for (const p of paths) {
+    try {
+      const data = await financeRequestGet(p)
+      const rows = Array.isArray(data.rows) ? data.rows : []
+      return { ok: true, rows, fetchedAt: data.fetchedAt || '' }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
+    }
+  }
+  return { ok: false, message: lastMsg }
+}
+
+async function fetchStoresForPlatform(platformId, keyword) {
+  const seg = apiSegment(platformId)
+  const token = readPlatformToken(platformId)
+  if (!seg || !token) {
+    const label = PLATFORM_TABS.find((p) => p.id === platformId)
+    return { ok: false, message: `尚未绑定${label ? label.label : platformId}` }
+  }
+
+墨典商家小程序软件 V1.0
+第 203 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const q = new URLSearchParams({ page: '1', pageSize: '50' })
+  if (keyword && String(keyword).trim()) q.set('keyword', String(keyword).trim())
+  try {
+    const data = await merchantApi.merchantRequestAuth(
+      'GET',
+      `/api/merchant/${seg}/stores?${q}`,
+      { bearerToken: token },
+    )
+    const inner = data && data.data && typeof data.data === 'object' ? data.data : data
+    const raw = inner.items || inner.stores || inner.list
+    const items = []
+    if (Array.isArray(raw)) {
+      for (const x of raw) {
+        if (!x || typeof x !== 'object') continue
+        const id = String(x.poi_id || x.id || x.store_id || '').trim()
+        const name = String(x.name || x.poi_name || x.store_name || '').trim()
+        const addr = String(x.address || x.addr || '').trim()
+        if (id && name) items.push({ id, name, address: addr })
+      }
+    }
+    return { ok: true, items, total: typeof inner.total === 'number' ? inner.total : items.length }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+const ACTIVITY_STATUS = {
+  all: '全部',
+  ongoing: '进行中',
+  enrollable: '可报名',
+  ended: '已结束',
+  unknown: '其他',
+}
+
+async function fetchMarketingActivities(platformId, status) {
+  const token = readPlatformToken(platformId)
+  if (!token) {
+    const label = PLATFORM_TABS.find((p) => p.id === platformId)
+    return { ok: false, message: `尚未绑定${label ? label.label : platformId}` }
+  }
+  const q = new URLSearchParams({
+    platform: platformId === 'xiaohongshu' ? 'xiaohongshu' : platformId,
+    page: '1',
+    pageSize: '30',
+  })
+  if (status && status !== 'all') q.set('status', status)
+  const paths = [`/api/meoo-marketing-activities?${q}`, `/api/merchant/marketing/activities?${q}`]
+  let lastMsg = '拉取失败'
+  for (const p of paths) {
+    try {
+
+墨典商家小程序软件 V1.0
+第 204 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+      const data = await merchantApi.merchantRequestAuth('GET', p, { bearerToken: token })
+      const raw = data.items || (data.data && data.data.items)
+      const items = []
+      if (Array.isArray(raw)) {
+        for (const row of raw) {
+          if (!row || typeof row !== 'object') continue
+          const id = String(row.id || row.activity_id || '').trim()
+          if (!id) continue
+          const ui = row.uiStatus || row.ui_status || 'unknown'
+          items.push({
+            id,
+            title: String(row.title || row.activity_name || '平台活动').trim(),
+            summary: typeof row.summary === 'string' ? row.summary : '',
+            uiStatus: ui,
+            uiStatusLabel: ACTIVITY_STATUS[ui] || ui,
+            startAt: row.startAt || row.start_at || '',
+            endAt: row.endAt || row.end_at || '',
+          })
+        }
+      }
+      return { ok: true, items }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
+    }
+  }
+  return { ok: false, message: lastMsg }
+}
+
+function readLocalPromotionCreds() {
+  try {
+    let raw = wx.getStorageSync('meoo_local_promotion_bind')
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        raw = JSON.parse(raw)
+      } catch (_) {
+        return null
+      }
+    }
+    if (!raw || typeof raw !== 'object') return null
+    const access_token = String(raw.accessToken || raw.access_token || '').trim()
+    const local_account_id = String(raw.localAccountId || raw.local_account_id || '').trim()
+    if (!access_token || !local_account_id) return null
+    return { access_token, local_account_id }
+  } catch (_) {
+    return null
+  }
+}
+
+async function fetchLocalPromotions() {
+  if (!merchantApi.hasMerchantApi()) {
+
+墨典商家小程序软件 V1.0
+第 205 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    return { ok: false, message: '请配置商家后台 API 地址' }
+  }
+  const creds = readLocalPromotionCreds()
+  const qs = creds
+    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
+    : ''
+  try {
+    const data = await merchantApi.merchantRequest('GET', `/api/merchant/local-promotion/promotions${qs}`)
+    const list = Array.isArray(data.list) ? data.list : []
+    const items = list.map((x) => ({
+      id: String(x.id || x.promotion_id || ''),
+      name: String(x.name || x.promotion_name || '计划'),
+      status: String(x.status || x.opt_status || '—'),
+      budget: x.budget != null ? String(x.budget) : '',
+    }))
+    return { ok: true, items, demoMode: Boolean(data.demoMode) }
+  } catch (e) {
+    return {
+      ok: false,
+      message:
+        (e instanceof Error ? e.message : String(e)) ||
+        '尚未绑定巨量本地推，请在商家后台「设置 → 商业化后台」完成绑定后重新打开小程序',
+    }
+  }
+}
+
+async function fetchLocalClues(page) {
+  if (!merchantApi.hasMerchantApi()) {
+    return { ok: false, message: '请配置商家后台 API 地址' }
+  }
+  const creds = readLocalPromotionCreds()
+  if (!creds) {
+    return { ok: false, message: '尚未绑定巨量本地推，线索需在设置页完成绑定后同步' }
+  }
+  try {
+    const data = await merchantApi.merchantRequest(
+      'POST',
+      '/api/merchant/local-promotion/clues/list',
+      {
+        ...creds,
+        page: page || 1,
+        page_size: 50,
+      },
+    )
+    const list = Array.isArray(data.list) ? data.list : []
+    const items = list.map((x) => ({
+      id: String(x.clue_id || x.id || ''),
+      name: String(x.name || x.user_name || '线索'),
+      phone: String(x.telephone || x.phone || ''),
+      state: String(x.convert_state || x.state || '—'),
+
+墨典商家小程序软件 V1.0
+第 206 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+      createdAt: String(x.create_time || x.created_at || ''),
+    }))
+    return { ok: true, items, demoMode: Boolean(data.demoMode) }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function postAiAssist(scene, brief) {
+  if (!merchantApi.hasMerchantApi()) {
+    return { ok: false, message: '请配置商家后台 API 地址' }
+  }
+  const token = readPlatformToken('douyin')
+  const paths = ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist']
+  const body = { scene, brief, platform: 'douyin' }
+  let lastMsg = '生成失败'
+  for (const p of paths) {
+    try {
+      const data = await merchantApi.merchantRequestAuth('POST', p, {
+        bearerToken: token || undefined,
+        data: body,
+      })
+      const text = String(data.text || data.result || data.content || '').trim()
+      if (text) return { ok: true, text }
+      lastMsg = data.message || '未返回内容'
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
+    }
+  }
+  return { ok: false, message: lastMsg }
+}
+
+function loadNotifications() {
+  try {
+    const raw = wx.getStorageSync('meoo_mp_notifications')
+    return Array.isArray(raw) ? raw : []
+  } catch (_) {
+    return []
+  }
+}
+
+function pushNotification(item) {
+  const list = loadNotifications()
+  list.unshift({
+    id: `n-${Date.now()}`,
+    title: item.title || '通知',
+    body: item.body || '',
+    time: new Date().toISOString(),
+    read: false,
+  })
+
+墨典商家小程序软件 V1.0
+第 207 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  try {
+    wx.setStorageSync('meoo_mp_notifications', list.slice(0, 80))
+  } catch (_) {}
+}
+
+module.exports = {
+  fetchFinanceReconcile,
+  fetchStoresForPlatform,
+  fetchMarketingActivities,
+  fetchLocalPromotions,
+  fetchLocalClues,
+  postAiAssist,
+  loadNotifications,
+  pushNotification,
+  ACTIVITY_STATUS,
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/merchantSessionSyncMp.js ===== */
+/**
+ * 登录后与 Web 商家后台同步租户级平台绑定（tenant_merchant_bindings）。
+ * 抖音来客 / 巨量本地推 / 小红书聚光 与电脑端设置页写入云端的数据一致。
+ */
+const api = require('./api.js')
+const devAuth = require('./devAuth.js')
+const supabaseRest = require('./supabaseRest.js')
+const { writePlatformToken } = require('./platformTokensMp.js')
+
+const MEOO_ACTIVE_TENANT_ID = 'meoo_active_tenant_id'
+const MEOO_MERCHANT_DISPLAY_NAME = 'meoo_erp_merchant_display_name'
+
+const PROVIDERS = ['douyin', 'local_promotion', 'xhs_commercial']
+
+const ACTIVE_ID_KEY = {
+  douyin: 'meoo_active_douyin_binding_id',
+  local_promotion: 'meoo_active_local_promotion_binding_id',
+  xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
+}
+
+const DOUYIN_KEYS = [
+  'meoo_douyin_merchant_token',
+  'meoo_douyin_auto_refresh',
+  'meoo_douyin_app_id',
+  'meoo_douyin_merchant_id',
+  'meoo_douyin_account_name',
+]
+
+const LEGACY_BIND_KEY = {
+  local_promotion: 'meoo_local_promotion_bind',
+  xhs_commercial: 'meoo_xhs_commercial_bind',
+
+墨典商家小程序软件 V1.0
+第 208 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+/** @type {number} */
+let lastSyncAt = 0
+/** @type {Promise<void> | null} */
+let inflight = null
+
+function tenantScopedKey(base, tenantId) {
+  const tid = String(tenantId || '').trim()
+  return tid ? `${base}@${tid}` : base
+}
+
+function storageGet(key) {
+  try {
+    const v = wx.getStorageSync(key)
+    return typeof v === 'string' && v.trim() ? v.trim() : v != null && v !== '' ? String(v) : ''
+  } catch (_) {
+    return ''
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    if (value == null || value === '') wx.removeStorageSync(key)
+    else wx.setStorageSync(key, value)
+  } catch (_) {}
+}
+
+function readActiveBindingId(provider, tenantId) {
+  const base = ACTIVE_ID_KEY[provider]
+  const scoped = storageGet(tenantScopedKey(base, tenantId))
+  if (scoped) return scoped
+  return storageGet(base)
+}
+
+function writeActiveBindingId(provider, tenantId, bindingId) {
+  const base = ACTIVE_ID_KEY[provider]
+  if (bindingId) {
+    storageSet(tenantScopedKey(base, tenantId), bindingId)
+    storageSet(base, bindingId)
+  } else {
+    try {
+      wx.removeStorageSync(tenantScopedKey(base, tenantId))
+    } catch (_) {}
+    try {
+      wx.removeStorageSync(base)
+    } catch (_) {}
+  }
+}
+
+
+墨典商家小程序软件 V1.0
+第 209 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+/** @param {Record<string, unknown>} raw */
+function parseBindingRow(raw) {
+  const id = typeof raw.id === 'string' ? raw.id : ''
+  const provider =
+    raw.provider === 'local_promotion'
+      ? 'local_promotion'
+      : raw.provider === 'xhs_commercial'
+        ? 'xhs_commercial'
+        : raw.provider === 'douyin'
+          ? 'douyin'
+          : null
+  const sealed =
+    typeof raw.sealed_credentials === 'string' ? raw.sealed_credentials.trim() : ''
+  const merchantAccountId =
+    typeof raw.merchant_account_id === 'string' ? raw.merchant_account_id.trim() : ''
+  if (!id || !provider || !sealed || !merchantAccountId) return null
+  return {
+    id,
+    provider,
+    merchantAccountId,
+    accountDisplayName:
+      typeof raw.account_display_name === 'string' ? raw.account_display_name : '',
+    bindingLabel: typeof raw.binding_label === 'string' ? raw.binding_label : '',
+    clientKey: typeof raw.client_key === 'string' ? raw.client_key : '',
+    sealedCredentials: sealed,
+    demoMode: Boolean(raw.demo_mode),
+    updatedAt: typeof raw.updated_at === 'string' ? raw.updated_at : '',
+  }
+}
+
+function unpackLocalPromotion(sealed) {
+  try {
+    const o = JSON.parse(sealed)
+    const accessToken = typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
+    if (!accessToken) return null
+    return { accessToken, appId: typeof o.appId === 'string' ? o.appId : '' }
+  } catch (_) {
+    return null
+  }
+}
+
+function unpackXhsCommercial(sealed) {
+  try {
+    const o = JSON.parse(sealed)
+    const accessToken = typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
+    if (!accessToken) return null
+    return { accessToken, appId: typeof o.appId === 'string' ? o.appId : '' }
+  } catch (_) {
+    return null
+  }
+
+墨典商家小程序软件 V1.0
+第 210 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+/** @param {ReturnType<typeof parseBindingRow>[]} rows */
+function pickActive(rows, provider, tenantId) {
+  if (!rows.length) return null
+  const activeId = readActiveBindingId(provider, tenantId)
+  if (activeId) {
+    const found = rows.find((r) => r && r.id === activeId)
+    if (found) return found
+  }
+  return rows[0] || null
+}
+
+function clearDouyinLocal() {
+  for (const k of DOUYIN_KEYS) {
+    try {
+      wx.removeStorageSync(k)
+    } catch (_) {}
+  }
+  writePlatformToken('douyin', '')
+}
+
+function applyDouyin(row, tenantId) {
+  if (!row) {
+    clearDouyinLocal()
+    writeActiveBindingId('douyin', tenantId, null)
+    return
+  }
+  storageSet('meoo_douyin_merchant_token', row.sealedCredentials)
+  writePlatformToken('douyin', row.sealedCredentials)
+  if (row.clientKey) storageSet('meoo_douyin_app_id', row.clientKey)
+  storageSet('meoo_douyin_merchant_id', row.merchantAccountId)
+  const name = row.bindingLabel || row.accountDisplayName || row.merchantAccountId
+  if (name) storageSet('meoo_douyin_account_name', name)
+  writeActiveBindingId('douyin', tenantId, row.id)
+}
+
+function applyLocalPromotion(row, tenantId) {
+  const legacyKey = LEGACY_BIND_KEY.local_promotion
+  if (!row) {
+    writeActiveBindingId('local_promotion', tenantId, null)
+    try {
+      wx.removeStorageSync(legacyKey)
+    } catch (_) {}
+    return
+  }
+  const creds = unpackLocalPromotion(row.sealedCredentials)
+  if (!creds) {
+    writeActiveBindingId('local_promotion', tenantId, null)
+    try {
+
+墨典商家小程序软件 V1.0
+第 211 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+      wx.removeStorageSync(legacyKey)
+    } catch (_) {}
+    return
+  }
+  const state = {
+    bindingId: row.id,
+    appId: creds.appId,
+    accessToken: creds.accessToken,
+    localAccountId: row.merchantAccountId,
+    accountName: row.bindingLabel || row.accountDisplayName || row.merchantAccountId,
+    boundAt: row.updatedAt,
+    demoMode: row.demoMode,
+  }
+  storageSet(legacyKey, JSON.stringify(state))
+  writeActiveBindingId('local_promotion', tenantId, row.id)
+}
+
+function applyXhsCommercial(row, tenantId) {
+  const legacyKey = LEGACY_BIND_KEY.xhs_commercial
+  if (!row) {
+    writeActiveBindingId('xhs_commercial', tenantId, null)
+    try {
+      wx.removeStorageSync(legacyKey)
+    } catch (_) {}
+    return
+  }
+  const creds = unpackXhsCommercial(row.sealedCredentials)
+  if (!creds) {
+    writeActiveBindingId('xhs_commercial', tenantId, null)
+    try {
+      wx.removeStorageSync(legacyKey)
+    } catch (_) {}
+    return
+  }
+  const state = {
+    bindingId: row.id,
+    appId: creds.appId,
+    accessToken: creds.accessToken,
+    advertiserId: row.merchantAccountId,
+    accountName: row.bindingLabel || row.accountDisplayName || row.merchantAccountId,
+    boundAt: row.updatedAt,
+    demoMode: row.demoMode,
+  }
+  storageSet(legacyKey, JSON.stringify(state))
+  writeActiveBindingId('xhs_commercial', tenantId, row.id)
+}
+
+function clearPlatformSessionForAccountSwitch() {
+  clearDouyinLocal()
+  for (const p of ['local_promotion', 'xhs_commercial']) {
+
+墨典商家小程序软件 V1.0
+第 212 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    const k = LEGACY_BIND_KEY[p]
+    try {
+      wx.removeStorageSync(k)
+    } catch (_) {}
+  }
+  for (const p of PROVIDERS) {
+    try {
+      wx.removeStorageSync(ACTIVE_ID_KEY[p])
+    } catch (_) {}
+  }
+  for (const plat of ['meituan', 'xiaohongshu', 'jd']) {
+    writePlatformToken(plat, '')
+  }
+}
+
+/**
+ * 登出或切换账号时调用，避免下一账号沿用上一账号本地凭证。
+ */
+function clearMerchantSessionLocal() {
+  clearPlatformSessionForAccountSwitch()
+  try {
+    wx.removeStorageSync(MEOO_ACTIVE_TENANT_ID)
+    wx.removeStorageSync(MEOO_MERCHANT_DISPLAY_NAME)
+  } catch (_) {}
+}
+
+/**
+ * 从 Supabase 拉取 tenant_merchant_bindings 并写入与 Web 相同的 storage 键。
+ * @param {{ force?: boolean }} [opts]
+ */
+async function syncFromCloud(opts) {
+  if (devAuth.isDevSkipLogin()) return
+  if (!api.getAccessToken()) return
+
+  const force = Boolean(opts && opts.force)
+  const now = Date.now()
+  if (!force && now - lastSyncAt < 15000 && inflight) return inflight
+  if (!force && now - lastSyncAt < 15000) return
+
+  if (inflight) return inflight
+
+  inflight = (async () => {
+    try {
+      const tenantId = await supabaseRest.fetchPrimaryTenantId()
+      const prevTenant = storageGet(MEOO_ACTIVE_TENANT_ID)
+      if (prevTenant && prevTenant !== tenantId) {
+        clearPlatformSessionForAccountSwitch()
+      }
+      storageSet(MEOO_ACTIVE_TENANT_ID, tenantId)
+
+
+墨典商家小程序软件 V1.0
+第 213 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+      try {
+        const merchantName = await supabaseRest.fetchTenantMerchantName(tenantId)
+        if (merchantName) storageSet(MEOO_MERCHANT_DISPLAY_NAME, merchantName)
+      } catch (_) {}
+
+      for (const provider of PROVIDERS) {
+        const rawRows = await supabaseRest.fetchMerchantBindings(tenantId, provider)
+        const rows = (Array.isArray(rawRows) ? rawRows : [])
+          .map((r) => parseBindingRow(r))
+          .filter(Boolean)
+        const active = pickActive(rows, provider, tenantId)
+        if (provider === 'douyin') applyDouyin(active, tenantId)
+        else if (provider === 'local_promotion') applyLocalPromotion(active, tenantId)
+        else if (provider === 'xhs_commercial') applyXhsCommercial(active, tenantId)
+      }
+      lastSyncAt = Date.now()
+    } finally {
+      inflight = null
+    }
+  })()
+
+  return inflight
+}
+
+module.exports = {
+  syncFromCloud,
+  clearMerchantSessionLocal,
+  MEOO_ACTIVE_TENANT_ID,
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/mpModules.js ===== */
+/** module-detail 页文案（面向商户可读说明） */
+module.exports.MODULE_COPY = {
+  store_info: {
+    navTitle: '店铺信息',
+    body: '门店档案、多平台门店绑定与营业信息。完整表单和批量操作请在电脑浏览器打开商家后台，进入「店铺 → 店铺信息」。',
+  },
+  store_decoration: {
+    navTitle: '店铺装修',
+    body: '装修模板、轮播与门店素材。小程序可先记着要从哪里进；详细装修请在电脑端商家后台「店铺 → 店铺装修」完成。',
+  },
+  products_list: {
+    navTitle: '商品列表',
+    body: '请返回首页，从「商品列表」进入专用列表页，可与电脑端商品数据对齐；抖音商品支持一键同步到来客。若误开到本说明页，请从工作台重新进入。',
+  },
+  products_flow: {
+    navTitle: '新建商品',
+    body: '与电脑端「创建商品」步骤对应。建议在小程序用「语音录入商品」生成草稿，再到编辑页补充；需要完整图形流程时请用电脑端操作。',
+  },
+
+墨典商家小程序软件 V1.0
+第 214 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  recruitment: {
+    navTitle: '达人招募',
+    body: '招募单与电脑端是同一份数据。请从首页进入「达人招募」列表提交与查看；若只看得到本说明，多半是旧书签入口。',
+  },
+  activity: {
+    navTitle: '活动中心',
+    body: '活动创建、排期与效果数据。完整配置请在电脑端商家后台「运营 → 活动中心」操作。',
+  },
+  reviews: {
+    navTitle: '评论管理',
+    body: '请从首页进入「评论管理」查看与回复顾客评价。本页仅为入口说明。',
+  },
+  geo: {
+    navTitle: 'GEO 运营优化',
+    body: '地域与关键词运营策略，与电脑端「GEO 运营优化」一致，深度配置请在电脑端完成。',
+  },
+  ai_content: {
+    navTitle: 'AI 文章与话题',
+    body: 'AI 辅助内容与话题生产，与电脑端一致，完整能力建议在电脑端使用。',
+  },
+  shortvideo: {
+    navTitle: '短视频优化',
+    body: '脚本诊断、任务与优化建议与电脑端一致。可先用小程序「语音」生成草稿，再到电脑端查看完整看板。',
+  },
+  live_check: {
+    navTitle: '直播间分析',
+    body: '直播间流量与转化分析，与电脑端「直播间分析」一致。',
+  },
+  platform_target: {
+    navTitle: '平台签框',
+    body: '各平台签约目标与完成进度，与电脑端「平台签框」一致。',
+  },
+  advertising: {
+    navTitle: '投流',
+    body: '广告投放计划的创建与管理，与电脑端「投流」一致，建议在电脑端操作。',
+  },
+  leads: {
+    navTitle: '线索',
+    body: '线索分配、跟进与转化统计，与电脑端「线索」一致。',
+  },
+  finance: {
+    navTitle: '财务对账',
+    body: '对账流水与核销数据，与电脑端「财务 → 财务对账」一致。',
+  },
+  finance_tax: {
+    navTitle: '报税管理',
+    body: '税务申报辅助与票据归集，与电脑端「财务 → 报税管理」一致。',
+  },
+  settings: {
+    navTitle: '系统设置',
+
+墨典商家小程序软件 V1.0
+第 215 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    body: '店铺授权（抖音 / 美团 / 小红书等）、子账号、订阅与权限与电脑端「系统设置」一致。涉及密钥与复杂表单的环节请在电脑端完成。',
+  },
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/opsRegistryMp.js ===== */
+const { merchantRequest } = require('./merchantApi.js')
+
+/** @returns {Promise<any>} 完整注册表 JSON（含 recruitmentOrders） */
+async function fetchRegistry() {
+  return merchantRequest('GET', '/api/ops-sync/registry')
+}
+
+/**
+ * 与 Web `appendRecruitmentOrderToOps` 一致：追加一条招募订单到共享注册表。
+ * @param {Record<string, unknown>} order RegistryRecruitmentOrder 形状
+ */
+async function appendRecruitmentOrder(order) {
+  return merchantRequest('POST', '/api/ops-sync/recruitment-orders/append', { order })
+}
+
+module.exports = { fetchRegistry, appendRecruitmentOrder }
+
+
+/* ===== FILE: 墨典商家小程序/utils/platformTokensMp.js ===== */
+/**
+ * 与 Web `merchantSession` / `platformTokens` 键名一致。
+ * 抖音等凭证由 `merchantSessionSyncMp` 在登录后从 `tenant_merchant_bindings` 同步写入。
+ */
+const STORAGE_KEYS = {
+  douyin: 'meoo_douyin_merchant_token',
+  meituan: 'meoo_meituan_merchant_token',
+  xiaohongshu: 'meoo_xhs_merchant_token',
+  jd: 'meoo_jd_merchant_token',
+}
+
+/** @typedef {'douyin'|'meituan'|'xiaohongshu'|'jd'} CreatePlatformId */
+
+const PLATFORM_TABS = [
+  { id: 'douyin', label: '抖音来客', short: '抖' },
+  { id: 'meituan', label: '美团', short: '美' },
+  { id: 'xiaohongshu', label: '小红书', short: '红' },
+  { id: 'jd', label: '京东', short: '京' },
+]
+
+function readPlatformToken(/** @type {string} */ platformId) {
+  const k = STORAGE_KEYS[platformId]
+  if (!k) return ''
+  try {
+    return String(wx.getStorageSync(k) || '').trim()
+
+墨典商家小程序软件 V1.0
+第 216 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  } catch (_) {
+    return ''
+  }
+}
+
+function writePlatformToken(/** @type {string} */ platformId, /** @type {string} */ value) {
+  const k = STORAGE_KEYS[platformId]
+  if (!k) return
+  const v = String(value || '').trim()
+  if (v) wx.setStorageSync(k, v)
+  else {
+    try {
+      wx.removeStorageSync(k)
+    } catch (_) {}
+  }
+}
+
+/** 与 Web `createPlatformApiSegment` 一致 */
+function apiSegment(/** @type {string} */ platformId) {
+  if (platformId === 'xiaohongshu') return 'xhs'
+  if (platformId === 'douyin' || platformId === 'meituan' || platformId === 'jd') return platformId
+  return null
+}
+
+function hasAnyPlatformToken() {
+  return PLATFORM_TABS.some((p) => Boolean(readPlatformToken(p.id)))
+}
+
+module.exports = {
+  STORAGE_KEYS,
+  PLATFORM_TABS,
+  readPlatformToken,
+  writePlatformToken,
+  apiSegment,
+  hasAnyPlatformToken,
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/productListingMp.js ===== */
+const merchantApi = require('./merchantApi.js')
+const { readPlatformToken, apiSegment, PLATFORM_TABS } = require('./platformTokensMp.js')
+
+function createPlatformLabel(id) {
+  const hit = PLATFORM_TABS.find((p) => p.id === id)
+  return hit ? hit.label : id
+}
+
+/**
+ * 对齐 web版/merchant-erp/src/services/productListingApi.ts
+ * @returns {Promise<{ok:true,items:any[],total:number,message?:string}|{ok:false,message:string}>}
+
+墨典商家小程序软件 V1.0
+第 217 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+ */
+async function fetchMerchantProductList(/** @type {string} */ platform, opts) {
+  if (platform === 'jd') {
+    return { ok: true, items: [], total: 0, message: '京东本地生活商品列表尚未接入' }
+  }
+  const token = readPlatformToken(platform)
+  if (!token) {
+    return {
+      ok: false,
+      message:
+        '尚未绑定对应平台。请在商家后台「系统设置」完成授权，并将 accessToken 写入本机（键名与 Web 一致，如 meoo_douyin_merchant_token）。',
+    }
+  }
+  const seg = apiSegment(platform)
+  if (!seg) return { ok: false, message: '不支持的平台' }
+  const page = Math.max(1, (opts && opts.page) || 1)
+  const pageSize = Math.min(50, Math.max(1, (opts && opts.pageSize) || 20))
+  const q = `page=${page}&page_size=${pageSize}`
+  try {
+    const data = await merchantApi.merchantRequestAuth('GET', `/api/merchant/${seg}/goods/products?${q}`, {
+      bearerToken: token,
+    })
+    const d = data && typeof data === 'object' && data.data && typeof data.data === 'object' ? data.data : {}
+    const raw = d.items
+    const items = []
+    if (Array.isArray(raw)) {
+      for (const x of raw) {
+        if (!x || typeof x !== 'object') continue
+        const id = String(x.id || '').trim()
+        const name = String(x.name || '').trim()
+        if (!id || !name) continue
+        const price = Number(x.price)
+        items.push({
+          id,
+          name,
+          price: Number.isFinite(price) ? price : 0,
+          store: String(x.store || '—'),
+          status: String(x.status || '—'),
+          platform: String(x.platform || createPlatformLabel(platform)),
+        })
+      }
+    }
+    const total = typeof d.total === 'number' ? d.total : items.length
+    const message = typeof data.message === 'string' ? data.message : undefined
+    return { ok: true, items, total, message }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg }
+  }
+}
+
+墨典商家小程序软件 V1.0
+第 218 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+/** 当前仅抖音支持同步（与 Web 一致） */
+async function postMerchantProductSyncDouyin(/** @type {string} */ productId) {
+  const token = readPlatformToken('douyin')
+  if (!token) return { ok: false, message: '请先完成抖音来客授权后再同步。' }
+  const id = String(productId || '').trim()
+  if (!id) return { ok: false, message: '缺少商品 ID' }
+  try {
+    const data = await merchantApi.merchantRequestAuth('POST', '/api/merchant/douyin/goods/product/sync', {
+      bearerToken: token,
+      data: { product_id: id },
+    })
+    return { ok: true, message: typeof data.message === 'string' ? data.message : undefined }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+module.exports = { fetchMerchantProductList, postMerchantProductSyncDouyin, createPlatformLabel }
+
+
+/* ===== FILE: 墨典商家小程序/utils/reviewsMp.js ===== */
+const merchantApi = require('./merchantApi.js')
+const { readPlatformToken } = require('./platformTokensMp.js')
+
+/**
+ * @returns {Promise<{ok:true,items:any[],stats?:object}|{ok:false,message:string}>}
+ */
+async function fetchReviewsList(
+  /** @type {'douyin'|'meituan'|'xhs'} */ platform,
+  /** @type {'all'|'good'|'neutral'|'bad'} */ sentiment,
+  /** @type {'all'|'replied'|'unreplied'} */ replyStatus,
+) {
+  const q = `platform=${encodeURIComponent(platform)}&sentiment=${encodeURIComponent(
+    sentiment,
+  )}&replyStatus=${encodeURIComponent(replyStatus)}`
+  const tok = readPlatformToken('douyin')
+  try {
+    const data = await merchantApi.merchantRequestAuth('GET', `/api/merchant/reviews?${q}`, {
+      bearerToken: tok || '',
+    })
+    const items = Array.isArray(data.items) ? data.items : []
+    const stats = data.stats && typeof data.stats === 'object' ? data.stats : undefined
+    return { ok: true, items, stats }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+async function postReviewReply(
+
+墨典商家小程序软件 V1.0
+第 219 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  /** @type {'douyin'|'meituan'|'xhs'} */ platform,
+  /** @type {string} */ reviewId,
+  /** @type {string} */ content,
+) {
+  const tok = readPlatformToken('douyin')
+  if (!tok)
+    return {
+      ok: false,
+      message: '请先完成抖音来客店铺授权后再查看或回复评价。',
+    }
+  try {
+    const data = await merchantApi.merchantRequestAuth('POST', '/api/merchant/reviews/reply', {
+      bearerToken: tok,
+      data: { platform, reviewId, content: String(content || '').trim() },
+    })
+    if (data && data.item) return { ok: true, item: data.item }
+    return { ok: false, message: '保存失败，请稍后重试。' }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+module.exports = { fetchReviewsList, postReviewReply }
+
+
+/* ===== FILE: 墨典商家小程序/utils/supabaseRest.js ===== */
+const config = require('./config.js')
+const api = require('./api.js')
+const { decodeJwtSub } = require('./jwtDecode.js')
+
+function rejectWxFail(reject, err) {
+  const em =
+    err && typeof err.errMsg === 'string'
+      ? err.errMsg
+      : err && typeof err.message === 'string'
+        ? err.message
+        : ''
+  const hint =
+    /127\.0\.0\.1|localhost/i.test(config.SUPABASE_URL || '') &&
+    /fail connect|timeout|CONNECTION_REFUSED|无法连接|domain/i.test(em)
+      ? '（真机请改用电脑局域网 IP：utils/config.js 的 LAN_API_HOST 或 config.local.js）'
+      : ''
+  reject(new Error(em ? `${em}${hint}` : `网络异常${hint}`))
+}
+
+function baseUrl() {
+  return String(config.SUPABASE_URL || '')
+    .trim()
+    .replace(/\/$/, '')
+}
+
+墨典商家小程序软件 V1.0
+第 220 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+function headers(token, extra) {
+  return Object.assign(
+    {
+      apikey: config.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    extra || {},
+  )
+}
+
+function httpError(res, fallbackMsg) {
+  const msg =
+    (res.data &&
+      (res.data.message || res.data.error_description || res.data.hint || res.data.error)) ||
+    fallbackMsg
+  const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  err.statusCode = res.statusCode
+  return err
+}
+
+function shouldRetryAuth(err) {
+  const code = err && err.statusCode
+  const msg = String((err && err.message) || '').toLowerCase()
+  if (code === 401) return true
+  return /jwt expired|invalid jwt|token expired|exp claim/.test(msg)
+}
+
+async function withAuthRetry(run) {
+  try {
+    return await run(false)
+  } catch (e) {
+    if (!shouldRetryAuth(e)) throw e
+    try {
+      await api.refreshAccessToken()
+    } catch (_) {
+      throw e
+    }
+    return await run(true)
+  }
+}
+
+function rawRequest(method, pathAndQuery, tokenUse, body) {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: `${baseUrl()}${pathAndQuery}`,
+      method,
+      header: headers(tokenUse),
+      data: body,
+
+墨典商家小程序软件 V1.0
+第 221 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+      success(res) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(res.data)
+          return
+        }
+        reject(httpError(res, `请求失败 ${res.statusCode}`))
+      },
+      fail(err) {
+        rejectWxFail(reject, err)
+      },
+    })
+  })
+}
+
+function request(method, pathAndQuery, token, body) {
+  return withAuthRetry(async (afterRefresh) => {
+    const tokenUse = afterRefresh ? api.getAccessToken() : token || api.getAccessToken()
+    return rawRequest(method, pathAndQuery, tokenUse, body)
+  })
+}
+
+async function fetchPrimaryTenantId() {
+  const token = api.getAccessToken()
+  const sub = decodeJwtSub(token)
+  if (!sub) throw new Error('登录状态异常，请重新登录')
+  const rows = await request(
+    'GET',
+    `/rest/v1/tenant_members?select=tenant_id&user_id=eq.${encodeURIComponent(sub)}&limit=1`,
+    token,
+  )
+  const tid = rows && rows[0] && rows[0].tenant_id
+  if (!tid) throw new Error('当前账号未关联门店，请联系管理员')
+  return tid
+}
+
+/** tenants.name，用于招募单 customerName 与列表筛选（与 Web 展示一致） */
+async function fetchTenantMerchantName(tenantId) {
+  const token = api.getAccessToken()
+  const rows = await request(
+    'GET',
+    `/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}&select=name`,
+    token,
+  )
+  const n = rows && rows[0] && typeof rows[0].name === 'string' ? rows[0].name.trim() : ''
+  return n
+}
+
+async function fetchTenantWalletSummary(tenantId) {
+  const token = api.getAccessToken()
+  const trows = await request(
+
+墨典商家小程序软件 V1.0
+第 222 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    'GET',
+    `/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}&select=wallet_balance_cents,service_expire_at`,
+    token,
+  )
+  const t = trows && trows[0]
+  const balance = t && typeof t.wallet_balance_cents === 'number' ? t.wallet_balance_cents : 0
+  const expire = t && t.service_expire_at ? t.service_expire_at : null
+  const ledger = await request(
+    'GET',
+    `/rest/v1/tenant_wallet_ledger?tenant_id=eq.${encodeURIComponent(
+      tenantId,
+    )}&select=id,delta_cents,balance_after_cents,reason,created_at&order=created_at.desc&limit=60`,
+    token,
+  )
+  return { balanceCents: balance, serviceExpireAt: expire, ledger: Array.isArray(ledger) ? ledger : [] }
+}
+
+async function fetchTenantMembershipRow(tenantId) {
+  const token = api.getAccessToken()
+  const tid = encodeURIComponent(String(tenantId || '').trim())
+  const rows = await request(
+    'GET',
+    `/rest/v1/tenants?id=eq.${tid}` +
+      '&select=membership_plan,direct_ai_calls_used,service_expire_at,subscription_days,ops_gift_days,official_days',
+    token,
+  )
+  return rows && rows[0] ? rows[0] : null
+}
+
+async function fetchSupportRelayMessages(sessionId) {
+  const token = api.getAccessToken()
+  const sid = encodeURIComponent(String(sessionId || '').trim())
+  const rows = await request(
+    'GET',
+    `/rest/v1/support_relay_messages?session_id=eq.${sid}` +
+      '&select=from_role,text,ts,client_msg_id&order=ts.asc&limit=200',
+    token,
+  )
+  return Array.isArray(rows) ? rows : []
+}
+
+function insertSupportRelayMessage(row) {
+  return withAuthRetry(async () => {
+    const token = api.getAccessToken()
+    const sub = decodeJwtSub(token)
+    const body = Object.assign({}, row, { author_user_id: sub || null })
+    await new Promise((resolve, reject) => {
+      wx.request({
+        url: `${baseUrl()}/rest/v1/support_relay_messages`,
+        method: 'POST',
+
+墨典商家小程序软件 V1.0
+第 223 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+        header: Object.assign(headers(token), { Prefer: 'return=minimal' }),
+        data: body,
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve()
+            return
+          }
+          reject(httpError(res, `发送失败 ${res.statusCode}`))
+        },
+        fail(err) {
+          rejectWxFail(reject, err)
+        },
+      })
+    })
+  })
+}
+
+async function fetchMerchantBindings(tenantId, provider) {
+  const token = api.getAccessToken()
+  const tid = encodeURIComponent(String(tenantId || '').trim())
+  const prov = encodeURIComponent(String(provider || '').trim())
+  const q =
+    `/rest/v1/tenant_merchant_bindings?tenant_id=eq.${tid}` +
+    `&provider=eq.${prov}` +
+    '&select=id,provider,merchant_account_id,account_display_name,binding_label,client_key,sealed_credentials,demo_mode,updated_at' +
+    '&order=updated_at.desc'
+  const rows = await request('GET', q, token)
+  return Array.isArray(rows) ? rows : []
+}
+
+async function insertPaymentOrder(payload) {
+  await withAuthRetry(async () => {
+    const token = api.getAccessToken()
+    const sub = decodeJwtSub(token)
+    const row = {
+      tenant_id: payload.tenantId,
+      created_by_user_id: sub || null,
+      order_kind: payload.orderKind,
+      amount_cents: payload.amountCents,
+      status: 'pending',
+    }
+    if (payload.orderKind !== 'refund') {
+      row.pay_channel = payload.payChannel || 'wechat'
+    }
+    await new Promise((resolve, reject) => {
+      wx.request({
+        url: `${baseUrl()}/rest/v1/merchant_payment_orders`,
+        method: 'POST',
+        header: Object.assign(headers(token), { Prefer: 'return=minimal' }),
+        data: row,
+
+墨典商家小程序软件 V1.0
+第 224 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+        success(res) {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve()
+            return
+          }
+          reject(httpError(res, `提交失败 ${res.statusCode}`))
+        },
+        fail(err) {
+          rejectWxFail(reject, err)
+        },
+      })
+    })
+  })
+}
+
+module.exports = {
+  fetchPrimaryTenantId,
+  fetchTenantMerchantName,
+  fetchTenantWalletSummary,
+  fetchTenantMembershipRow,
+  fetchMerchantBindings,
+  fetchSupportRelayMessages,
+  insertSupportRelayMessage,
+  insertPaymentOrder,
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/supportRelayMp.js ===== */
+const rest = require('./supabaseRest.js')
+
+const SESSION_KEY = 'meoo_support_relay_sid'
+const POLL_MS = 4000
+
+const DEFAULT_BOT = {
+  id: 'welcome-bot',
+  role: 'bot',
+  text: '您好，我是墨典智能助手，可解答常见问题。如需人工协助，请点击「转人工服务」。',
+  at: '',
+  ts: 0,
+}
+
+function randomSid() {
+  return `sid_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function getOrCreateSessionId() {
+  try {
+    const existing = wx.getStorageSync(SESSION_KEY)
+    if (existing && String(existing).trim()) return String(existing).trim()
+    const sid = randomSid()
+
+墨典商家小程序软件 V1.0
+第 225 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    wx.setStorageSync(SESSION_KEY, sid)
+    return sid
+  } catch (_) {
+    return randomSid()
+  }
+}
+
+function formatTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  } catch (_) {
+    return ''
+  }
+}
+
+function relayFromToRole(from) {
+  if (from === 'ops') return 'ops'
+  if (from === 'system') return 'system'
+  if (from === 'agent') return 'agent'
+  if (from === 'bot') return 'bot'
+  return 'user'
+}
+
+function rowToMessage(row) {
+  const ts = Number(row.ts) || 0
+  return {
+    id: String(row.client_msg_id || ''),
+    role: relayFromToRole(String(row.from_role || '')),
+    text: String(row.text || ''),
+    at: formatTime(ts),
+    ts,
+  }
+}
+
+function mergeMessages(prev, rows) {
+  const map = new Map()
+  for (const m of prev) {
+    if (m && m.id) map.set(m.id, m)
+  }
+  for (const r of rows) {
+    const m = rowToMessage(r)
+    if (m.id) map.set(m.id, m)
+  }
+  return [...map.values()].sort((a, b) => (a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id)))
+}
+
+function readCustomerMeta() {
+  let customerId = ''
+  let enterpriseName = ''
+  try {
+
+墨典商家小程序软件 V1.0
+第 226 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    customerId = String(wx.getStorageSync('meoo_login_name') || '').trim()
+    enterpriseName = String(wx.getStorageSync('meoo_erp_merchant_display_name') || '').trim()
+  } catch (_) {}
+  return { customerId, enterpriseName }
+}
+
+async function fetchSessionMessages(sessionId) {
+  const rows = await rest.fetchSupportRelayMessages(sessionId)
+  return mergeMessages([], rows)
+}
+
+async function sendChatLine(from, text, id, sessionId) {
+  const meta = readCustomerMeta()
+  const row = {
+    session_id: sessionId,
+    customer_id: meta.customerId || null,
+    enterprise_name: meta.enterpriseName || null,
+    from_role: from,
+    text,
+    ts: Date.now(),
+    client_msg_id: id,
+  }
+  await rest.insertSupportRelayMessage(row)
+  return { ok: true }
+}
+
+function newMsgId() {
+  return `m_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+module.exports = {
+  SESSION_KEY,
+  POLL_MS,
+  DEFAULT_BOT,
+  getOrCreateSessionId,
+  formatTime,
+  mergeMessages,
+  fetchSessionMessages,
+  sendChatLine,
+  newMsgId,
+  relayFromToRole,
+}
+
+
+/* ===== FILE: 墨典商家小程序/utils/tenantAuth.js ===== */
+const config = require('./config.js')
+
+/** 与 web版 merchant-erp src/lib/tenantAuthEmail.ts 逻辑一致 */
+function loginNameToTenantEmail(loginName) {
+  const domain = config.TENANT_EMAIL_DOMAIN || 'users.meoo.test'
+
+墨典商家小程序软件 V1.0
+第 227 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const slug = String(loginName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return `${slug || 'user'}@${domain}`
+}
+
+module.exports = { loginNameToTenantEmail }
+
+
+/* ===== FILE: 墨典商家小程序/utils/voiceDraft.js ===== */
+const config = require('./config.js')
+
+/**
+ * @param {'product'|'shortvideo'|'recruit'} moduleKey
+ * @param {string} tempFilePath - wx.chooseMedia / RecorderManager 临时路径
+ * @returns {Promise<object>} 草稿对象，写入各编辑页表单
+ */
+function requestVoiceDraft(moduleKey, tempFilePath) {
+  const url = (config.VOICE_DRAFT_URL || '').trim()
+  const token = wx.getStorageSync('meoo_access_token')
+
+  if (!url || !tempFilePath || tempFilePath === 'mock') {
+    return Promise.resolve(mockDraft(moduleKey))
+  }
+
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url,
+      filePath: tempFilePath,
+      name: 'audio',
+      header: {
+        Authorization: token ? `Bearer ${token}` : '',
+        apikey: config.SUPABASE_ANON_KEY,
+      },
+      formData: { module: moduleKey },
+      success(res) {
+        try {
+          const body = JSON.parse(res.data || '{}')
+          if (res.statusCode >= 200 && res.statusCode < 300 && body && typeof body === 'object') {
+            resolve(body.draft || body)
+          } else {
+            reject(new Error(body.error || body.message || `HTTP ${res.statusCode}`))
+          }
+        } catch (e) {
+          reject(e)
+        }
+      },
+      fail: reject,
+
+墨典商家小程序软件 V1.0
+第 228 页 / 共 228 页（登记摘录）
+————————————————————————————————————————————————————————————
+    })
+  })
+}
+
+function mockDraft(moduleKey) {
+  if (moduleKey === 'product') {
+    return {
+      categoryName: '餐饮 · 火锅（演示）',
+      productType: '团购套餐',
+      title: '双人尝鲜套餐 · 语音草稿',
+      subtitle: '含锅底任选、荤菜三份、素菜两份（请按门店实际修改）',
+      priceHint: '¥168',
+      tags: '爆款,双人',
+      rawText: '（未配置 VOICE_DRAFT_URL，以上为模拟识别结果）',
+    }
+  }
+  if (moduleKey === 'shortvideo') {
+    return {
+      hook: '开场：这家店锅底居然能喝三碗？',
+      outline: '中段：展示菜品特写与店内环境\n结尾：引导团购下单',
+      durationSec: '45',
+      tags: '探店,同城',
+      cta: '点击定位到店团购',
+      rawText: '（演示草稿）',
+    }
+  }
+  return {
+    roleTitle: '同城美食探店达人',
+    budget: '面议 · 可按播放量结算',
+    deliverables: '1 条 60s 短视频 + 3 张图文',
+    deadline: '7 天内交付初稿',
+    notes: '优先垂类账号，需到店实拍',
+    rawText: '（演示草稿）',
+  }
+}
+
+module.exports = { requestVoiceDraft, mockDraft }
+
+

@@ -2,9 +2,9 @@ Component({
   data: {
     selected: 0,
     list: [
-      { pagePath: '/pages/agent/agent', text: '墨典AI' },
-      { pagePath: '/pages/functions/functions', text: '功能' },
-      { pagePath: '/pages/mine/mine', text: '我的' },
+      { pagePath: '/pages/agent/agent', text: '墨典AI', icon: 'ai' },
+      { pagePath: '/pages/functions/functions', text: '功能', icon: 'grid' },
+      { pagePath: '/pages/mine/mine', text: '我的', icon: 'user' },
     ],
   },
   methods: {

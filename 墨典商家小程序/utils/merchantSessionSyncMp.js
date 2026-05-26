@@ -10,10 +10,11 @@ const { writePlatformToken } = require('./platformTokensMp.js')
 const MEOO_ACTIVE_TENANT_ID = 'meoo_active_tenant_id'
 const MEOO_MERCHANT_DISPLAY_NAME = 'meoo_erp_merchant_display_name'
 
-const PROVIDERS = ['douyin', 'local_promotion', 'xhs_commercial']
+const PROVIDERS = ['douyin', 'kuaishou', 'local_promotion', 'xhs_commercial']
 
 const ACTIVE_ID_KEY = {
   douyin: 'meoo_active_douyin_binding_id',
+  kuaishou: 'meoo_active_kuaishou_binding_id',
   local_promotion: 'meoo_active_local_promotion_binding_id',
   xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
 }
@@ -24,6 +25,13 @@ const DOUYIN_KEYS = [
   'meoo_douyin_app_id',
   'meoo_douyin_merchant_id',
   'meoo_douyin_account_name',
+]
+
+const KUAISHOU_KEYS = [
+  'meoo_kuaishou_merchant_token',
+  'meoo_kuaishou_app_id',
+  'meoo_kuaishou_merchant_id',
+  'meoo_kuaishou_account_name',
 ]
 
 const LEGACY_BIND_KEY = {
@@ -87,9 +95,11 @@ function parseBindingRow(raw) {
       ? 'local_promotion'
       : raw.provider === 'xhs_commercial'
         ? 'xhs_commercial'
-        : raw.provider === 'douyin'
-          ? 'douyin'
-          : null
+        : raw.provider === 'kuaishou'
+          ? 'kuaishou'
+          : raw.provider === 'douyin'
+            ? 'douyin'
+            : null
   const sealed =
     typeof raw.sealed_credentials === 'string' ? raw.sealed_credentials.trim() : ''
   const merchantAccountId =
@@ -151,6 +161,15 @@ function clearDouyinLocal() {
   writePlatformToken('douyin', '')
 }
 
+function clearKuaishouLocal() {
+  for (const k of KUAISHOU_KEYS) {
+    try {
+      wx.removeStorageSync(k)
+    } catch (_) {}
+  }
+  writePlatformToken('kuaishou', '')
+}
+
 function applyDouyin(row, tenantId) {
   if (!row) {
     clearDouyinLocal()
@@ -164,6 +183,21 @@ function applyDouyin(row, tenantId) {
   const name = row.bindingLabel || row.accountDisplayName || row.merchantAccountId
   if (name) storageSet('meoo_douyin_account_name', name)
   writeActiveBindingId('douyin', tenantId, row.id)
+}
+
+function applyKuaishou(row, tenantId) {
+  if (!row) {
+    clearKuaishouLocal()
+    writeActiveBindingId('kuaishou', tenantId, null)
+    return
+  }
+  storageSet('meoo_kuaishou_merchant_token', row.sealedCredentials)
+  writePlatformToken('kuaishou', row.sealedCredentials)
+  if (row.clientKey) storageSet('meoo_kuaishou_app_id', row.clientKey)
+  storageSet('meoo_kuaishou_merchant_id', row.merchantAccountId)
+  const name = row.bindingLabel || row.accountDisplayName || row.merchantAccountId
+  if (name) storageSet('meoo_kuaishou_account_name', name)
+  writeActiveBindingId('kuaishou', tenantId, row.id)
 }
 
 function applyLocalPromotion(row, tenantId) {
@@ -228,6 +262,7 @@ function applyXhsCommercial(row, tenantId) {
 
 function clearPlatformSessionForAccountSwitch() {
   clearDouyinLocal()
+  clearKuaishouLocal()
   for (const p of ['local_promotion', 'xhs_commercial']) {
     const k = LEGACY_BIND_KEY[p]
     try {
@@ -241,6 +276,81 @@ function clearPlatformSessionForAccountSwitch() {
   }
   for (const plat of ['meituan', 'xiaohongshu', 'jd']) {
     writePlatformToken(plat, '')
+  }
+}
+
+/** @type {string} */
+let lastSyncError = ''
+
+function readBindingSnapshotFromStorage() {
+  function readName(tokenKey, nameKey, idKey) {
+    const tok = storageGet(tokenKey)
+    if (!tok) return { bound: false, accountName: '' }
+    const name = storageGet(nameKey) || storageGet(idKey)
+    return { bound: true, accountName: name || '已绑定' }
+  }
+  const lpRaw = storageGet(LEGACY_BIND_KEY.local_promotion)
+  let lp = { bound: false, accountName: '' }
+  if (lpRaw) {
+    try {
+      const o = JSON.parse(lpRaw)
+      lp = {
+        bound: Boolean(o && o.accessToken),
+        accountName: (o && (o.accountName || o.localAccountId)) || '已绑定',
+      }
+    } catch (_) {}
+  }
+  const xhsRaw = storageGet(LEGACY_BIND_KEY.xhs_commercial)
+  let xhs = { bound: false, accountName: '' }
+  if (xhsRaw) {
+    try {
+      const o = JSON.parse(xhsRaw)
+      xhs = {
+        bound: Boolean(o && o.accessToken),
+        accountName: (o && (o.accountName || o.advertiserId)) || '已绑定',
+      }
+    } catch (_) {}
+  }
+  return {
+    douyin: readName(
+      'meoo_douyin_merchant_token',
+      'meoo_douyin_account_name',
+      'meoo_douyin_merchant_id',
+    ),
+    kuaishou: readName(
+      'meoo_kuaishou_merchant_token',
+      'meoo_kuaishou_account_name',
+      'meoo_kuaishou_merchant_id',
+    ),
+    localPromotion: lp,
+    xhsCommercial: xhs,
+    meituan: readName('meoo_meituan_merchant_token', '', ''),
+    xiaohongshu: readName('meoo_xhs_merchant_token', '', ''),
+  }
+}
+
+function applyStoreIntel(row, tenantId) {
+  if (!row || typeof row !== 'object') return
+  const margin = row.margin_config
+  if (margin && typeof margin === 'object') {
+    storageSet(tenantScopedKey('meoo_store_margin_config_v1', tenantId), JSON.stringify(margin))
+    if (margin.margins && typeof margin.margins === 'object') {
+      storageSet(
+        tenantScopedKey('meoo_store_gross_margins_v1', tenantId),
+        JSON.stringify(margin.margins),
+      )
+    }
+  }
+  const items = Array.isArray(row.menu_items) ? row.menu_items : []
+  if (items.length) {
+    const menuRec = {
+      id: `menu-cloud-${tenantId}`,
+      storeName: typeof row.menu_store_name === 'string' ? row.menu_store_name : '',
+      images: [],
+      items,
+      updatedAt: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
+    }
+    storageSet(tenantScopedKey('meoo_store_menu_v1', tenantId), JSON.stringify(menuRec))
   }
 }
 
@@ -270,6 +380,7 @@ async function syncFromCloud(opts) {
 
   if (inflight) return inflight
 
+  lastSyncError = ''
   inflight = (async () => {
     try {
       const tenantId = await supabaseRest.fetchPrimaryTenantId()
@@ -284,17 +395,36 @@ async function syncFromCloud(opts) {
         if (merchantName) storageSet(MEOO_MERCHANT_DISPLAY_NAME, merchantName)
       } catch (_) {}
 
+      try {
+        const storeIntel = await supabaseRest.fetchTenantStoreIntel(tenantId)
+        if (storeIntel) applyStoreIntel(storeIntel, tenantId)
+      } catch (e) {
+        lastSyncError = (e && e.message) || lastSyncError || '同步门店情报失败'
+      }
+
       for (const provider of PROVIDERS) {
-        const rawRows = await supabaseRest.fetchMerchantBindings(tenantId, provider)
+        let rawRows = []
+        try {
+          rawRows = await supabaseRest.fetchMerchantBindings(tenantId, provider)
+        } catch (e) {
+          lastSyncError = (e && e.message) || '同步平台绑定失败'
+          continue
+        }
         const rows = (Array.isArray(rawRows) ? rawRows : [])
           .map((r) => parseBindingRow(r))
           .filter(Boolean)
+        if (!rows.length) continue
         const active = pickActive(rows, provider, tenantId)
+        if (!active) continue
         if (provider === 'douyin') applyDouyin(active, tenantId)
+        else if (provider === 'kuaishou') applyKuaishou(active, tenantId)
         else if (provider === 'local_promotion') applyLocalPromotion(active, tenantId)
         else if (provider === 'xhs_commercial') applyXhsCommercial(active, tenantId)
       }
       lastSyncAt = Date.now()
+    } catch (e) {
+      lastSyncError = (e && e.message) || '同步失败'
+      throw e
     } finally {
       inflight = null
     }
@@ -303,8 +433,14 @@ async function syncFromCloud(opts) {
   return inflight
 }
 
+function getLastSyncError() {
+  return lastSyncError
+}
+
 module.exports = {
   syncFromCloud,
   clearMerchantSessionLocal,
+  readBindingSnapshotFromStorage,
+  getLastSyncError,
   MEOO_ACTIVE_TENANT_ID,
 }

@@ -2,6 +2,9 @@ const config = require('./config.js')
 const api = require('./api.js')
 const devAuth = require('./devAuth.js')
 const registry = require('./aiModelRegistryMp.js')
+const merchantIntelMp = require('./merchantIntelMp.js')
+const exec = require('./aiAgentExecutionMp.js')
+const previewMp = require('./aiAgentPreviewMp.js')
 
 const AI_AGENT_SYSTEM_PROMPT = `你是「墨典 AI 智能体」，服务于本地生活商家 ERP。
 你可以帮助用户咨询问题，也可以生成商品创建、达人招募、评价处理、平台同步、异常分析、推广文案等任务方案。
@@ -95,12 +98,25 @@ function clearThread() {
 function devMockReply(userText) {
   const t = String(userText || '').trim()
   if (/商品|上架|团购/.test(t)) {
-    return '建议：「功能 → 商品 → 新建商品」按平台与类目创建；或使用语音录入生成草稿。'
+    return '建议：「功能 → 商品 → 新建商品」先选团购/外卖与平台再走类目流程。'
   }
-  if (/招募|达人/.test(t)) return '请打开「功能 → 运营 → 达人招募」。'
+  if (/招募|达人/.test(t))
+    return '打开「功能 → 运营 → 达人招募」进入与电脑端一致的五步流程；订单列表请点击「查看达人订单」。'
   if (/评论|差评/.test(t)) return '请打开「功能 → 运营 → 评论管理」。'
   if (/投流|广告/.test(t)) return '请打开「功能 → 投流 → 投流管理」。'
-  return '（开发预览）已收到。配置 MERCHANT_API_BASE_URL 并登录后可使用完整智能体。'
+  if (/方案|规划|推广|活动|618|抖音/.test(t)) {
+    return (
+      '（开发预览）活动方案等内容需走后端 AI。\n\n' +
+      '请：\n' +
+      '1. utils/config.local.js：MERCHANT_API_BASE_URL=http://127.0.0.1:5173（真机预览改为电脑的局域网 IP:5173）\n' +
+      '2. 电脑 cd web版/merchant-erp 并 npm run dev\n' +
+      '3.（二选一）在「我的」登录；或未登录时在 ERP 目录 .env.local 设 MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED=1（仅本地，生产勿开）并配置 MERCHANT_AI_QWEN_KEY 等后重启 dev\n' +
+      '4. 微信开发者工具：详情→本地设置→勾选「不校验合法域名...」'
+    )
+  }
+  return (
+    '（开发预览）未联调后端。请复制 config.local.example.js 为 utils/config.local.js，至少设置 MERCHANT_API_BASE_URL，并按上一条说明启动 ERP（或登录后使用云端地址）。'
+  )
 }
 
 function readFileDataUrl(filePath, mime) {
@@ -129,6 +145,22 @@ function authHeaders() {
   return h
 }
 
+function merchantApiFriendlyError(statusCode, body) {
+  const rawErr = typeof body?.error === 'string' ? body.error : ''
+  const rawDetail = typeof body?.detail === 'string' ? body.detail : ''
+  const rawMsg = typeof body?.message === 'string' ? body.message : ''
+  const code = Number(statusCode) || 0
+  if (code === 401 || rawErr === 'unauthorized')
+    return '服务端未放行：未检测到有效登录。请在「我的」登录；若为本地跳过登录调试，请在电脑 web版/merchant-erp/.env.local 写入 MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED=1 并重启 npm run dev（仅开发环境，上架勿开）。'
+  if (rawErr === 'tenant_not_found' || (rawDetail && rawDetail.includes('未找到租户')))
+    return rawDetail || '当前账号未关联商户租户，无法使用完整 AI。请使用已在后台绑定门店的账号登录。'
+  /** 服务端已返回可读说明 */
+  if (rawDetail) return rawDetail.length > 800 ? `${rawDetail.slice(0, 800)}…` : rawDetail
+  if (rawMsg) return rawMsg.length > 800 ? `${rawMsg.slice(0, 800)}…` : rawMsg
+  if (rawErr) return rawErr
+  return `请求失败（HTTP ${code || '?'}）`
+}
+
 function requestJson(path, data) {
   const base = apiBase()
   if (!base) return Promise.reject(new Error('未配置商家后台 API'))
@@ -144,12 +176,17 @@ function requestJson(path, data) {
           resolve(body)
           return
         }
-        const msg =
-          (body && (body.detail || body.error || body.message)) || `请求失败 ${res.statusCode}`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+        reject(new Error(merchantApiFriendlyError(res.statusCode, body || {})))
       },
       fail(err) {
-        reject(new Error((err && err.errMsg) || '网络异常'))
+        const em = err && typeof err.errMsg === 'string' ? err.errMsg : '网络异常'
+        const hb = apiBase()
+        let hint = ''
+        if (/fail|超时|超时|timed out|ECONNRESET|域名|ssl|certificate/i.test(em) && hb && /5173|:443/.test(hb)) {
+          hint =
+            ' 若调试本机 ERP：请先在本机启动 web版/merchant-erp（npm run dev）；真机请把 MERCHANT_API_BASE_URL 改为电脑局域网 IP，并在开发者工具勾选「不校验合法域名」。'
+        }
+        reject(new Error(em + hint))
       },
     })
   })
@@ -157,6 +194,9 @@ function requestJson(path, data) {
 
 function buildChatMessages(history, userLine, imageDataUrls) {
   const messages = [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }]
+  try {
+    messages.push({ role: 'system', content: merchantIntelMp.formatMerchantIntelContext() })
+  } catch (_) {}
   for (const m of history.slice(-20)) {
     if (m.role === 'user' || m.role === 'assistant') {
       messages.push({ role: m.role, content: m.content })
@@ -169,13 +209,17 @@ function buildChatMessages(history, userLine, imageDataUrls) {
 }
 
 async function postAiChatRequest(opts) {
-  if (devAuth.isDevSkipLogin()) {
-    return {
-      ok: true,
-      content: devMockReply(opts.userLine),
-      provider: 'dev',
-      model: 'preview',
+  const base = apiBase()
+  if (!base) {
+    if (devAuth.isDevSkipLogin()) {
+      return {
+        ok: true,
+        content: devMockReply(opts.userLine),
+        provider: 'dev',
+        model: 'preview',
+      }
     }
+    throw new Error('未配置 MERCHANT_API_BASE_URL，请在 utils/config.local.js 设置商家后台地址')
   }
   const parsed = registry.parseAiModelPickerKey(registry.effectiveChatPickerKey(opts.pickerKey))
   if (!parsed) throw new Error('模型配置无效')
@@ -299,6 +343,51 @@ async function sendAgentTurn(opts) {
       role: 'assistant',
       content: chatRes.content,
     },
+    rawAssistantContent: chatRes.content,
+  }
+}
+
+/**
+ * 一轮对话 + 方案确认/预览卡片（与 Web AiAgentContext 对齐）
+ */
+async function processAgentTurn(opts, executionState) {
+  const line =
+    String(opts.userLine || '').trim() ||
+    (opts.attachments && opts.attachments.length ? '请结合附图说明你的需求。' : '')
+  const state = executionState || exec.createAgentExecutionState()
+
+  if (exec.isExplicitExecutionIntent(line) && state.plan) {
+    const userMsg = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: line,
+    }
+    const previewMsgs = await previewMp.spawnParallelPreviews(state.plan)
+    return {
+      userMsg,
+      assistantMsgs: previewMsgs,
+      executionState: exec.createAgentExecutionState(),
+    }
+  }
+
+  const turn = await sendAgentTurn(opts)
+  const taskType = exec.inferTaskTypeFromText(line)
+  const raw = turn.rawAssistantContent || turn.assistantMsg.content
+  let display = exec.formatAssistantDisplayText(raw)
+  let nextState = state
+
+  if (exec.shouldDeferTaskPreview(line, raw, taskType)) {
+    const types = exec.inferTaskTypesFromCombinedContext(line, raw, taskType)
+    nextState = exec.storeDeferredPlan(state, line, raw, types)
+    display += exec.buildPlanExecutionConsultation(types)
+  }
+
+  turn.assistantMsg.content = display || '（无文本回复）'
+  delete turn.rawAssistantContent
+  return {
+    userMsg: turn.userMsg,
+    assistantMsgs: [turn.assistantMsg],
+    executionState: nextState,
   }
 }
 
@@ -355,6 +444,7 @@ module.exports = {
   saveThread,
   clearThread,
   sendAgentTurn,
+  processAgentTurn,
   readFileDataUrl,
   transcribeVoiceTempPath,
   inferTaskTypeFromText,

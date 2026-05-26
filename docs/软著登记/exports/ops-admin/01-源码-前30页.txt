@@ -1,0 +1,1619 @@
+墨典AI智能ERP运营管理平台 V1.0
+第 1 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+/* ===== FILE: 商家管理后台/src/App.tsx ===== */
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import OpsLoginPage from './ops/OpsLoginPage'
+import OpsRequireAuth from './ops/OpsRequireAuth'
+import OpsAdminLayout from './ops/OpsAdminLayout'
+import OpsAccountsPermissionsPage from './ops/pages/OpsAccountsPermissionsPage'
+import OpsHomePage from './ops/pages/OpsHomePage'
+import OpsAiModelsPage from './ops/pages/OpsAiModelsPage'
+import OpsCustomerDetailPage from './ops/pages/OpsCustomerDetailPage'
+import OpsAnnouncementsPage from './ops/pages/OpsAnnouncementsPage'
+import OpsCustomersListPage from './ops/pages/OpsCustomersListPage'
+import OpsRecruitmentOrdersPage from './ops/pages/OpsRecruitmentOrdersPage'
+import OpsMpRecruitmentOrdersPage from './ops/pages/OpsMpRecruitmentOrdersPage'
+import OpsTalentLibraryPage from './ops/pages/OpsTalentLibraryPage'
+import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
+import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<OpsLoginPage />} />
+        <Route
+          path="/"
+          element={
+            <OpsRequireAuth>
+              <OpsAdminLayout />
+            </OpsRequireAuth>
+          }
+        >
+          <Route index element={<OpsHomePage />} />
+          <Route path="customers" element={<OpsCustomersListPage />} />
+          <Route path="customers/:customerId" element={<OpsCustomerDetailPage />} />
+          <Route path="announcements" element={<OpsAnnouncementsPage />} />
+          <Route path="accounts" element={<OpsAccountsPermissionsPage />} />
+          <Route path="recruitment-orders" element={<OpsRecruitmentOrdersPage />} />
+          <Route path="mp-recruitment-orders" element={<OpsMpRecruitmentOrdersPage />} />
+          <Route path="talent-library" element={<OpsTalentLibraryPage />} />
+          <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
+          <Route path="ai-models" element={<OpsAiModelsPage />} />
+          <Route path="support" element={<OpsSupportWorkbenchPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
+
+
+/* ===== FILE: 商家管理后台/src/AppErrorBoundary.tsx ===== */
+
+墨典AI智能ERP运营管理平台 V1.0
+第 2 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+import { Component, type ErrorInfo, type ReactNode } from 'react'
+
+type Props = { children: ReactNode }
+type State = { error: Error | null }
+
+export default class AppErrorBoundary extends Component<Props, State> {
+  state: State = { error: null }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { error }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error('[OpsAdmin]', error, info.componentStack)
+  }
+
+  render(): ReactNode {
+    const { error } = this.state
+    if (error) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-950 p-6 text-center text-slate-100">
+          <h1 className="text-xl font-semibold text-white">运营管控台加载异常</h1>
+          <p className="max-w-lg text-sm text-slate-400">
+            请尝试硬刷新（Mac：Cmd+Shift+R）。若刚改过依赖或 Node 版本，请重启{' '}
+            <code className="rounded bg-slate-800 px-1 text-cyan-300">npm run dev</code>。
+          </p>
+          <pre className="max-h-[40vh] max-w-2xl overflow-auto rounded-lg border border-red-900/50 bg-slate-900 p-4 text-left text-xs text-red-300">
+            {error.stack ?? error.message}
+          </pre>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          >
+            重新加载
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/src/cn.ts ===== */
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+
+墨典AI智能ERP运营管理平台 V1.0
+第 3 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+
+/* ===== FILE: 商家管理后台/src/components/AiVendorCatalogAvatar.tsx ===== */
+import { useState } from 'react'
+import { cn } from '../cn'
+
+export type AiVendorCatalogAvatarProps = {
+  id: string
+  label: string
+  logoUrl?: string
+  size?: 'xs' | 'sm' | 'md'
+  className?: string
+  title?: string
+}
+
+const sizeClass: Record<NonNullable<AiVendorCatalogAvatarProps['size']>, string> = {
+  xs: 'h-4 w-4 text-[9px]',
+  sm: 'h-5 w-5 text-[10px]',
+  md: 'h-6 w-6 text-xs',
+}
+
+export default function AiVendorCatalogAvatar({
+  id,
+  label,
+  logoUrl,
+  size = 'sm',
+  className,
+  title,
+}: AiVendorCatalogAvatarProps) {
+  const [imgErr, setImgErr] = useState(false)
+  const tip = title ?? label
+  const dim = sizeClass[size]
+
+  if (logoUrl && !imgErr) {
+    return (
+      <img
+        src={logoUrl}
+        alt=""
+        title={tip}
+        draggable={false}
+        onError={() => setImgErr(true)}
+        className={cn('shrink-0 rounded-md object-contain ring-1 ring-white/10', dim, className)}
+      />
+    )
+  }
+
+  const letter = (label.trim().slice(0, 1) || id.slice(0, 1)).toUpperCase()
+  return (
+    <span
+
+墨典AI智能ERP运营管理平台 V1.0
+第 4 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      title={tip}
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-md bg-slate-700 font-bold text-slate-100 ring-1 ring-white/10',
+        dim,
+        className,
+      )}
+      aria-hidden
+    >
+      {letter}
+    </span>
+  )
+}
+
+
+/* ===== FILE: 商家管理后台/src/lib/brand.ts ===== */
+export const BRAND_LOGO_URL = '/logo.png'
+export const BRAND_FAVICON_URL = '/favicon.png'
+export const BRAND_NAME = '墨典AI智能ERP'
+
+
+/* ===== FILE: 商家管理后台/src/lib/opsSupportTemplates.ts ===== */
+const STORAGE_KEY = 'meoo_ops_support_reply_templates_v1'
+
+const DEFAULT_TEMPLATES = [
+  '您好，已收到您的问题，我们正在核实，请稍候。',
+  '如需协助，请补充门店名称、所在平台与大致发生时间，便于我们定位。',
+  '若涉及订单或对账，可留下联系电话，我们将尽快回访。',
+]
+
+export function readSupportReplyTemplates(): string[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw?.trim()) return [...DEFAULT_TEMPLATES]
+    const j = JSON.parse(raw) as unknown
+    if (!Array.isArray(j)) return [...DEFAULT_TEMPLATES]
+    const lines = j.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim())
+    return lines.length > 0 ? lines : [...DEFAULT_TEMPLATES]
+  } catch {
+    return [...DEFAULT_TEMPLATES]
+  }
+}
+
+export function writeSupportReplyTemplates(lines: string[]): void {
+  const cleaned = lines.map((x) => x.trim()).filter(Boolean)
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned.length > 0 ? cleaned : DEFAULT_TEMPLATES))
+  } catch {
+    /* ignore */
+  }
+}
+
+墨典AI智能ERP运营管理平台 V1.0
+第 5 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+
+/* ===== FILE: 商家管理后台/src/lib/supportRelay.ts ===== */
+export const SUPPORT_RELAY_SESSION_STORAGE_KEY = 'meoo_support_relay_sid'
+
+export type SupportRelayChatLine = {
+  type: 'chat'
+  sessionId: string
+  from: 'user' | 'bot' | 'agent' | 'system' | 'ops'
+  text: string
+  ts: number
+  id: string
+  /** HTTP 轮询时随消息带上，便于运营台展示 */
+  customerId?: string
+  enterpriseName?: string
+}
+
+/** 商家连接或更新资料时下发，供运营台展示客户名称与 ID */
+export type SupportRelaySessionMetaMessage = {
+  type: 'session_meta'
+  sessionId: string
+  /** 登录账户编号（如 DMF001） */
+  customerId?: string
+  /** 企业名称 tenants.name */
+  enterpriseName?: string
+}
+
+export type SupportRelayIdentifyMessage = {
+  type: 'identify'
+  role: 'merchant' | 'ops'
+  sessionId?: string
+  customerId?: string
+  enterpriseName?: string
+}
+
+/** 运营端请求按时间段导出（本机 dev 插件支持；外部网关可忽略） */
+export type SupportRelayExportQueryMessage = {
+  type: 'export_query'
+  exportId: string
+  startTs: number
+  endTs: number
+  /** 仅该会话；不传表示全部会话 */
+  sessionId?: string
+}
+
+export type SupportRelayExportResultMessage = {
+  type: 'export_result'
+  exportId: string
+  lines: SupportRelayChatLine[]
+}
+
+墨典AI智能ERP运营管理平台 V1.0
+第 6 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+const DEV_ONLINE_PATH = '/__meoo_support_online'
+
+export function getSupportRelayWsUrl(): string | null {
+  const raw = import.meta.env.VITE_SUPPORT_RELAY_WS
+  if (typeof raw === 'string' && raw.trim().length > 0) return raw.trim()
+  if (!import.meta.env.DEV) return null
+  if (typeof window !== 'undefined' && window.location?.host) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${proto}//${window.location.host}${DEV_ONLINE_PATH}`
+  }
+  return `ws://127.0.0.1:5174${DEV_ONLINE_PATH}`
+}
+
+function randomSid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `sid_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+export function getOrCreateSupportRelaySessionId(): string {
+  try {
+    const existing = localStorage.getItem(SUPPORT_RELAY_SESSION_STORAGE_KEY)
+    if (existing && existing.trim().length > 0) return existing.trim()
+    const sid = randomSid()
+    localStorage.setItem(SUPPORT_RELAY_SESSION_STORAGE_KEY, sid)
+    return sid
+  } catch {
+    return randomSid()
+  }
+}
+
+export function formatSupportRelayTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
+
+
+/* ===== FILE: 商家管理后台/src/main.tsx ===== */
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/aiVendorCatalogShared.ts ===== */
+
+墨典AI智能ERP运营管理平台 V1.0
+第 7 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+import type { AiVendorCatalogEntry } from './opsRegistryTypes.js'
+
+/** 抖音商品 AI assist 等本地网关已接上游的厂商（与展示目录区分） */
+export const DOUYIN_ASSIST_AI_VENDOR_IDS = ['minimax', 'qwen', 'doubao'] as const
+export type DouyinAssistAiVendorId = (typeof DOUYIN_ASSIST_AI_VENDOR_IDS)[number]
+
+const DOUYIN_ASSIST_ID_SET = new Set<string>(DOUYIN_ASSIST_AI_VENDOR_IDS as unknown as string[])
+
+export function isDouyinAssistAiVendorId(id: string): boolean {
+  return DOUYIN_ASSIST_ID_SET.has(id.trim().toLowerCase())
+}
+
+/** 系统设置 / 目录展示内置项（含仅走 ERP 智能体网关的厂商） */
+export const BUILTIN_AI_VENDOR_IDS = [
+  'minimax',
+  'qwen',
+  'doubao',
+  'openai',
+  'claude',
+  'deepseek',
+  'kimi',
+] as const
+export type BuiltinAiVendorId = (typeof BUILTIN_AI_VENDOR_IDS)[number]
+
+/** 磁盘 / 前端展示：合法的厂商 ID slug（ASCII，小写字母开头） */
+export function isValidAiVendorSlug(id: string): boolean {
+  return /^[a-z][a-z0-9_-]{1,47}$/.test(id)
+}
+
+/** 仅允许 https 或相对路径（商户 ERP 静态资源），避免 javascript: 等注入 */
+export function normalizeCatalogLogoUrl(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const t = raw.trim()
+  if (!t || t.length > 512) return undefined
+  if (t.startsWith('/')) {
+    if (t.startsWith('//')) return undefined
+    if (/[\s<>"'`]/.test(t)) return undefined
+    return t
+  }
+  try {
+    const u = new URL(t)
+    if (u.protocol !== 'https:') return undefined
+    return t
+  } catch {
+    return undefined
+  }
+}
+
+export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
+  {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 8 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    id: 'minimax',
+    label: 'MiniMax',
+    hint: 'platform.minimax.io · OpenAI 兼容',
+    logoUrl: '/ai-vendors/minimax.png',
+  },
+  {
+    id: 'qwen',
+    label: '通义千问',
+    hint: '阿里云 DashScope / 通义',
+    logoUrl: '/ai-vendors/qwen.png',
+  },
+  {
+    id: 'doubao',
+    label: '豆包',
+    hint: '火山引擎方舟 Ark',
+    logoUrl: '/ai-vendors/doubao.png',
+  },
+  {
+    id: 'openai',
+    label: 'OpenAI',
+    hint: 'ChatGPT / OpenAI API（智能体网关 /api/meoo-ai-chat）',
+    logoUrl: '/ai-vendors/openai.png',
+  },
+  {
+    id: 'claude',
+    label: 'Claude',
+    hint: 'Anthropic Messages API（智能体网关）',
+    logoUrl: '/ai-vendors/claude.png',
+  },
+  {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    hint: 'platform.deepseek.com（智能体网关）',
+    logoUrl: '/ai-vendors/deepseek.png',
+  },
+  {
+    id: 'kimi',
+    label: 'Kimi',
+    hint: 'Moonshot · OpenAI 兼容（智能体网关）',
+    logoUrl: '/ai-vendors/kimi.png',
+  },
+]
+
+const BUILTIN_ID_SET = new Set<string>(BUILTIN_AI_VENDOR_IDS)
+
+export function isBuiltinAiVendorId(id: string): boolean {
+  return BUILTIN_ID_SET.has(id)
+}
+
+/** 磁盘仅保存非内置条目；normalize 后与内置目录合并输出给客户端 */
+
+墨典AI智能ERP运营管理平台 V1.0
+第 9 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+export function mergeBuiltinAiVendorCatalog(custom: AiVendorCatalogEntry[] | undefined | null): AiVendorCatalogEntry[] {
+  const out: AiVendorCatalogEntry[] = BUILTIN_AI_VENDOR_ENTRIES.map((b) => ({ ...b }))
+  const seen = new Set<string>(BUILTIN_AI_VENDOR_IDS as unknown as string[])
+  const list = Array.isArray(custom) ? custom : []
+  for (const e of list) {
+    if (!e || typeof e.id !== 'string') continue
+    const id = e.id.trim().toLowerCase()
+    if (!isValidAiVendorSlug(id) || seen.has(id)) continue
+    if (isBuiltinAiVendorId(id)) continue
+    const label = typeof e.label === 'string' && e.label.trim() ? e.label.trim() : id
+    const hint = typeof e.hint === 'string' && e.hint.trim() ? e.hint.trim().slice(0, 280) : undefined
+    const logoUrl = normalizeCatalogLogoUrl(e.logoUrl)
+    seen.add(id)
+    out.push({ id, label: label.slice(0, 64), hint, ...(logoUrl ? { logoUrl } : {}) })
+  }
+  return out
+}
+
+/** 写入 registry.json 前去重，仅保留自定义厂商 */
+export function catalogCustomEntriesOnly(full: AiVendorCatalogEntry[]): AiVendorCatalogEntry[] {
+  return full.filter((e) => e && typeof e.id === 'string' && !isBuiltinAiVendorId(e.id.trim()))
+}
+
+export function slugifyAiVendorCandidate(label: string, suffix?: string): string {
+  let s = label
+    .trim()
+    .toLowerCase()
+    .replace(/[\s]+/g, '_')
+    .replace(/[^a-z0-9_-]+/g, '')
+    .replace(/^_+|_+$/g, '')
+  if (s.length < 2 || !/^[a-z]/.test(s)) {
+    s = `vendor_${suffix ?? `${Date.now()}`}`
+  }
+  if (!isValidAiVendorSlug(s)) {
+    return `vendor_${suffix ?? `${Date.now()}`}`
+  }
+  return s.slice(0, 48)
+}
+
+export function normalizeVendorKeysFromDisk(raw: unknown): Partial<Record<string, string>> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const o = raw as Record<string, unknown>
+  const out: Partial<Record<string, string>> = {}
+  for (const [k, v] of Object.entries(o)) {
+    if (!isValidAiVendorSlug(k)) continue
+    if (typeof v !== 'string') continue
+    const t = v.trim()
+    if (t) out[k] = t
+  }
+  return out
+
+墨典AI智能ERP运营管理平台 V1.0
+第 10 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/mpRecruitmentIceCore.ts ===== */
+import type {
+  RegistryFile,
+  RegistryIceVideoSlot,
+  RegistryMpRecruitmentApplicant,
+  RegistryMpRecruitmentOrder,
+} from './opsRegistryTypes.js'
+
+export function isIceMpOrder(mp: RegistryMpRecruitmentOrder): boolean {
+  return mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
+}
+
+export function iceSlotsFilledCount(mp: RegistryMpRecruitmentOrder): number {
+  return (mp.iceVideoSlots ?? []).filter((s) => s.assignedApplicantId?.trim()).length
+}
+
+export function iceSlotsPassedCount(mp: RegistryMpRecruitmentOrder): number {
+  const ids = new Set(
+    (mp.applicants ?? [])
+      .filter((a) => a.aiVerifyStatus === 'passed')
+      .map((a) => a.id),
+  )
+  return (mp.iceVideoSlots ?? []).filter((s) => s.assignedApplicantId && ids.has(s.assignedApplicantId!))
+    .length
+}
+
+export function isDouyinVideoUrl(raw: string): boolean {
+  const t = raw.trim()
+  if (!/^https?:\/\//i.test(t)) return false
+  try {
+    const u = new URL(t)
+    const host = u.hostname.toLowerCase()
+    return (
+      host.includes('douyin.com') ||
+      host.includes('iesdouyin.com') ||
+      host === 'v.douyin.com'
+    )
+  } catch {
+    return false
+  }
+}
+
+/** 简易 AI 核查：链接形态 + 非空路径（可后续接真实模型） */
+export function verifyDouyinPublishLink(url: string): { passed: boolean; note: string } {
+  if (!isDouyinVideoUrl(url)) {
+    return { passed: false, note: '请提交抖音视频作品链接（douyin.com）' }
+  }
+
+墨典AI智能ERP运营管理平台 V1.0
+第 11 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const t = url.trim()
+  if (t.length < 12) return { passed: false, note: '链接过短' }
+  return { passed: true, note: '链接格式符合抖音作品页' }
+}
+
+export function maybeAdvanceIceMpToSettlement(
+  mp: RegistryMpRecruitmentOrder,
+): RegistryMpRecruitmentOrder {
+  const slots = mp.iceVideoSlots ?? []
+  if (!slots.length) return mp
+  const allAssigned = slots.every((s) => s.assignedApplicantId?.trim())
+  const allPassed = slots.every((s) => {
+    const aid = s.assignedApplicantId?.trim()
+    if (!aid) return false
+    const app = (mp.applicants ?? []).find((a) => a.id === aid)
+    return app?.aiVerifyStatus === 'passed'
+  })
+  if (allAssigned && allPassed && mp.status !== 'done' && mp.status !== 'closed') {
+    return {
+      ...mp,
+      status: 'pending_settlement',
+      updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    }
+  }
+  return mp
+}
+
+export type ClaimIceMpResult =
+  | { ok: true; applicant: RegistryMpRecruitmentApplicant; needConfirm: true }
+  | { ok: true; applicant: RegistryMpRecruitmentApplicant; needConfirm: false; slot: RegistryIceVideoSlot }
+  | { ok: false; error: string; code?: string }
+
+/** 闭环第一步：认领任务，待达人确认接收（不立即分配成片） */
+export function claimIceMpRecruitment(
+  mp: RegistryMpRecruitmentOrder,
+  applicant: RegistryMpRecruitmentApplicant,
+): ClaimIceMpResult {
+  const slots = [...(mp.iceVideoSlots ?? [])]
+  if (!slots.length) return { ok: false, error: '云剪任务未配置成片', code: 'no_slots' }
+
+  const existing = (mp.applicants ?? []).find((a) => a.id === applicant.id)
+  if (existing) {
+    if (existing.taskStatus === 'confirmed' && existing.assignedIceSlotId) {
+      const slot = slots.find((s) => s.slotId === existing.assignedIceSlotId)
+      if (slot) {
+        return { ok: true, applicant: existing, needConfirm: false, slot }
+      }
+    }
+    if (existing.taskStatus === 'pending_confirm' || !existing.taskStatus) {
+      return { ok: true, applicant: existing, needConfirm: true }
+
+墨典AI智能ERP运营管理平台 V1.0
+第 12 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    }
+    if (existing.taskStatus === 'rejected') {
+      return { ok: false, error: '您已拒绝该任务，无法再次认领', code: 'rejected' }
+    }
+  }
+
+  const taken = slots.filter((s) => s.assignedApplicantId?.trim()).length
+  const pending = (mp.applicants ?? []).filter(
+    (a) => a.taskStatus === 'pending_confirm' && a.id !== applicant.id,
+  ).length
+  if (taken + pending >= slots.length) {
+    return { ok: false, error: '任务已满，暂无可用名额', code: 'slots_full' }
+  }
+
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const row: RegistryMpRecruitmentApplicant = {
+    ...applicant,
+    taskStatus: 'pending_confirm',
+    aiVerifyStatus: 'pending',
+    appliedAt: applicant.appliedAt || now,
+  }
+  return { ok: true, applicant: row, needConfirm: true }
+}
+
+export type ConfirmIceMpResult =
+  | { ok: true; applicant: RegistryMpRecruitmentApplicant; slot: RegistryIceVideoSlot }
+  | { ok: false; error: string; code?: string }
+
+/** 闭环第二步：确认接收并分配成片槽位 */
+export function confirmIceMpReceipt(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+): ConfirmIceMpResult {
+  const slots = [...(mp.iceVideoSlots ?? [])]
+  const applicants = [...(mp.applicants ?? [])]
+  const idx = applicants.findIndex((a) => a.id === applicantId)
+  if (idx < 0) return { ok: false, error: '未找到认领记录', code: 'not_found' }
+
+  const app = applicants[idx]!
+  if (app.taskStatus === 'rejected') return { ok: false, error: '任务已拒绝', code: 'rejected' }
+  if (app.taskStatus === 'confirmed' && app.assignedIceSlotId) {
+    const slot = slots.find((s) => s.slotId === app.assignedIceSlotId)
+    if (slot) return { ok: true, applicant: app, slot }
+  }
+  if (app.taskStatus !== 'pending_confirm' && app.taskStatus !== 'applied' && !app.taskStatus) {
+    return { ok: false, error: '当前状态不可确认接收', code: 'invalid_state' }
+  }
+
+  const existingSlot = slots.find((s) => s.assignedApplicantId === applicantId)
+  if (existingSlot) {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 13 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    const row = {
+      ...app,
+      taskStatus: 'confirmed' as const,
+      assignedIceSlotId: existingSlot.slotId,
+      assignedVideoDownloadUrl: existingSlot.downloadUrl,
+      assignedVideoLabel: existingSlot.label,
+    }
+    applicants[idx] = row
+    return { ok: true, applicant: row, slot: existingSlot }
+  }
+
+  const freeIdx = slots.findIndex((s) => !s.assignedApplicantId?.trim())
+  if (freeIdx < 0) return { ok: false, error: '成片名额已满', code: 'slots_full' }
+
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const slot = slots[freeIdx]!
+  slots[freeIdx] = { ...slot, assignedApplicantId: applicantId, assignedAt: now }
+  const row: RegistryMpRecruitmentApplicant = {
+    ...app,
+    taskStatus: 'confirmed',
+    assignedIceSlotId: slot.slotId,
+    assignedVideoDownloadUrl: slot.downloadUrl,
+    assignedVideoLabel: slot.label,
+    aiVerifyStatus: 'pending',
+  }
+  applicants[idx] = row
+  return { ok: true, applicant: row, slot: slots[freeIdx]! }
+}
+
+export function rejectIceMpTask(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
+  const applicants = [...(mp.applicants ?? [])]
+  const idx = applicants.findIndex((a) => a.id === applicantId)
+  if (idx < 0) return { ok: false, error: '未找到认领记录' }
+
+  const app = applicants[idx]!
+  let slots = [...(mp.iceVideoSlots ?? [])]
+  if (app.assignedIceSlotId) {
+    const si = slots.findIndex((s) => s.slotId === app.assignedIceSlotId)
+    if (si >= 0) {
+      slots[si] = {
+        ...slots[si]!,
+        assignedApplicantId: undefined,
+        assignedAt: undefined,
+      }
+    }
+  }
+
+
+墨典AI智能ERP运营管理平台 V1.0
+第 14 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  applicants[idx] = {
+    ...app,
+    taskStatus: 'rejected',
+    assignedIceSlotId: undefined,
+    assignedVideoDownloadUrl: undefined,
+    assignedVideoLabel: undefined,
+  }
+
+  return {
+    ok: true,
+    mp: {
+      ...mp,
+      applicants,
+      iceVideoSlots: slots,
+      updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    },
+  }
+}
+
+/** @deprecated 使用 claimIceMpRecruitment + confirmIceMpReceipt */
+export function applyIceMpRecruitment(
+  mp: RegistryMpRecruitmentOrder,
+  applicant: RegistryMpRecruitmentApplicant,
+): ConfirmIceMpResult {
+  const claim = claimIceMpRecruitment(mp, applicant)
+  if (!claim.ok) return claim
+  if (claim.needConfirm) {
+    const merged: RegistryMpRecruitmentOrder = {
+      ...mp,
+      applicants: upsertApplicant(mp.applicants, claim.applicant),
+    }
+    return confirmIceMpReceipt(merged, claim.applicant.id)
+  }
+  return { ok: true, applicant: claim.applicant, slot: claim.slot }
+}
+
+function upsertApplicant(
+  list: RegistryMpRecruitmentApplicant[] | undefined,
+  row: RegistryMpRecruitmentApplicant,
+): RegistryMpRecruitmentApplicant[] {
+  const applicants = [...(list ?? [])]
+  const i = applicants.findIndex((a) => a.id === row.id)
+  if (i >= 0) applicants[i] = row
+  else applicants.unshift(row)
+  return applicants
+}
+
+export function submitIceDouyinForApplicant(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+
+墨典AI智能ERP运营管理平台 V1.0
+第 15 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  douyinPublishUrl: string,
+): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
+  const url = douyinPublishUrl.trim()
+  const verify = verifyDouyinPublishLink(url)
+  if (!verify.passed) return { ok: false, error: verify.note }
+
+  const applicants = [...(mp.applicants ?? [])]
+  const idx = applicants.findIndex((a) => a.id === applicantId)
+  if (idx < 0) return { ok: false, error: '未找到报名记录' }
+
+  const app = applicants[idx]!
+  if (app.taskStatus !== 'confirmed') {
+    return { ok: false, error: '请先确认接收任务后再回传链接' }
+  }
+  if (!app.assignedIceSlotId) return { ok: false, error: '未分配云剪成片，请先确认接收' }
+
+  const slots = [...(mp.iceVideoSlots ?? [])]
+  const slotIdx = slots.findIndex((s) => s.slotId === app.assignedIceSlotId)
+  if (slotIdx < 0) return { ok: false, error: '成片槽位无效' }
+
+  applicants[idx] = {
+    ...app,
+    douyinPublishUrl: url,
+    aiVerifyStatus: 'passed',
+    aiVerifyNote: verify.note,
+    completedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+
+  let next: RegistryMpRecruitmentOrder = {
+    ...mp,
+    applicants,
+    iceVideoSlots: slots,
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+  next = maybeAdvanceIceMpToSettlement(next)
+  return { ok: true, mp: next }
+}
+
+export function handleIceMpApply(
+  mp: RegistryMpRecruitmentOrder,
+  row: RegistryMpRecruitmentApplicant,
+):
+  | { ok: true; mp: RegistryMpRecruitmentOrder; body: Record<string, unknown> }
+  | { ok: false; error: string; code?: string } {
+  const dup = (mp.applicants ?? []).find((a) => a.id === row.id)
+  if (dup?.taskStatus === 'confirmed' && dup.assignedVideoDownloadUrl) {
+    return {
+      ok: true,
+      mp,
+      body: {
+
+墨典AI智能ERP运营管理平台 V1.0
+第 16 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+        ok: true,
+        needConfirm: false,
+        taskStatus: 'confirmed',
+        assignedVideoDownloadUrl: dup.assignedVideoDownloadUrl,
+      },
+    }
+  }
+  if (dup?.taskStatus === 'pending_confirm') {
+    return {
+      ok: true,
+      mp,
+      body: { ok: true, needConfirm: true, taskStatus: 'pending_confirm' },
+    }
+  }
+  if (dup?.taskStatus === 'rejected') {
+    return { ok: false, error: '您已拒绝该任务', code: 'rejected' }
+  }
+
+  const claim = claimIceMpRecruitment(mp, row)
+  if (!claim.ok) return claim
+  const applicants = upsertApplicant(mp.applicants, claim.applicant)
+  const next: RegistryMpRecruitmentOrder = {
+    ...mp,
+    applicants,
+    status: mp.status === 'open' ? 'collecting' : mp.status,
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+  return {
+    ok: true,
+    mp: next,
+    body: { ok: true, needConfirm: true, taskStatus: 'pending_confirm' },
+  }
+}
+
+export function handleIceMpConfirm(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+  action: 'confirm' | 'reject',
+):
+  | { ok: true; mp: RegistryMpRecruitmentOrder; body: Record<string, unknown> }
+  | { ok: false; error: string; code?: string } {
+  if (action === 'reject') {
+    const rejected = rejectIceMpTask(mp, applicantId)
+    if (!rejected.ok) return rejected
+    return { ok: true, mp: rejected.mp, body: { ok: true, taskStatus: 'rejected' } }
+  }
+  const result = confirmIceMpReceipt(mp, applicantId)
+  if (!result.ok) return result
+  const applicants = upsertApplicant(mp.applicants, result.applicant)
+  const iceVideoSlots = mp.iceVideoSlots?.map((s) =>
+
+墨典AI智能ERP运营管理平台 V1.0
+第 17 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    s.slotId === result.slot.slotId ? result.slot : s,
+  )
+  const next: RegistryMpRecruitmentOrder = {
+    ...mp,
+    applicants,
+    iceVideoSlots,
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+  return {
+    ok: true,
+    mp: next,
+    body: {
+      ok: true,
+      taskStatus: 'confirmed',
+      assignedVideoDownloadUrl: result.applicant.assignedVideoDownloadUrl,
+      assignedVideoLabel: result.applicant.assignedVideoLabel,
+    },
+  }
+}
+
+export function patchRegistryMpOrder(
+  data: RegistryFile,
+  mpOrderId: string,
+  patch: Partial<RegistryMpRecruitmentOrder>,
+): RegistryFile | null {
+  const list = [...(data.mpRecruitmentOrders ?? [])]
+  const idx = list.findIndex((o) => o.id === mpOrderId)
+  if (idx < 0) return null
+  list[idx] = { ...list[idx]!, ...patch, updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }) }
+  return { ...data, mpRecruitmentOrders: list }
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/mpRecruitmentOpenCore.ts ===== */
+import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
+import { inferFulfillmentLoop } from './recruitmentLoop.js'
+
+export type ReviewOpenApplicantAction = 'shortlist' | 'approve' | 'reject'
+
+export function reviewOpenMpApplicant(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+  action: ReviewOpenApplicantAction,
+): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
+  if (inferFulfillmentLoop(mp) !== 'open') {
+    return { ok: false, error: '仅开环招募单支持报名反选' }
+  }
+  const applicants = [...(mp.applicants ?? [])]
+  const idx = applicants.findIndex((a) => a.id === applicantId)
+  if (idx < 0) return { ok: false, error: '未找到报名记录' }
+
+墨典AI智能ERP运营管理平台 V1.0
+第 18 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+  const nextStatus =
+    action === 'shortlist' ? 'shortlisted' : action === 'approve' ? 'approved' : 'rejected'
+  applicants[idx] = {
+    ...applicants[idx]!,
+    taskStatus: nextStatus,
+  }
+  return {
+    ok: true,
+    mp: {
+      ...mp,
+      applicants,
+      updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    },
+  }
+}
+
+export function openApplicantCounts(mp: RegistryMpRecruitmentOrder): {
+  total: number
+  pending: number
+  approved: number
+} {
+  const apps = mp.applicants ?? []
+  return {
+    total: apps.length,
+    pending: apps.filter((a) => !a.taskStatus || a.taskStatus === 'applied').length,
+    approved: apps.filter((a) => a.taskStatus === 'approved' || a.taskStatus === 'shortlisted').length,
+  }
+}
+
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/mpTalentMemberUpsert.ts ===== */
+import type { RegistryFile, RegistryMpTalentMember, RegistryMpTalentPlatformProfile } from './opsRegistryTypes.js'
+import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
+import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
+
+function profileToApplicant(
+  platform: string,
+  profile: RegistryMpTalentPlatformProfile,
+  contact: string,
+  wechatId: string,
+  province: string,
+  city: string,
+) {
+  const plat = normalizeRecruitmentPlatform(platform)
+  const nick = String(profile.platformNickname || '').trim()
+  const alipay = String(profile.alipayAccount || '').trim()
+  return {
+    id: `mbr-${Date.now()}`,
+
+墨典AI智能ERP运营管理平台 V1.0
+第 19 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    name: nick,
+    platform: plat,
+    platformAccount: String(profile.platformAccount || '').trim(),
+    platformNickname: nick,
+    profileLink: String(profile.profileLink || '').trim(),
+    followers: Math.max(0, profile.followers || 0),
+    douyinSalesLevel: plat === '抖音' ? profile.douyinSalesLevel : undefined,
+    contact: String(contact || '').trim(),
+    wechatId: String(wechatId || '').trim(),
+    quotePrice: String(profile.quotePrice || '').trim(),
+    alipayAccount: alipay,
+    paymentMethod: alipay ? `支付宝：${alipay}` : '支付宝',
+    province: String(province || '').trim() || undefined,
+    city: String(city || '').trim() || undefined,
+    appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+}
+
+export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalentMember): void {
+  const list = [...(data.mpTalentMembers ?? [])]
+  const wxKey = String(member.wxOpenId || member.wechatId || member.wxNickName || '')
+    .trim()
+    .toLowerCase()
+  const idx = list.findIndex((m) => {
+    const k = String(m.wxOpenId || m.wechatId || m.wxNickName || '')
+      .trim()
+      .toLowerCase()
+    return wxKey && k === wxKey
+  })
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const next: RegistryMpTalentMember = {
+    ...member,
+    id: idx >= 0 ? list[idx]!.id : member.id || `MTM-${Date.now()}`,
+    updatedAt: now,
+    registeredAt: idx >= 0 ? list[idx]!.registeredAt : member.registeredAt || now,
+  }
+  if (idx >= 0) list[idx] = next
+  else list.unshift(next)
+  data.mpTalentMembers = list.slice(0, 5000)
+
+  const contact = next.contact
+  const wechatId = next.wechatId
+  const province = String(next.province || '').trim()
+  const city = String(next.city || '').trim()
+  if (next.douyin?.platformAccount) {
+    upsertTalentLibraryFromApplicant(data, {
+      platform: '抖音',
+      applicant: profileToApplicant('抖音', next.douyin, contact, wechatId, province, city),
+      mpOrderId: '',
+      merchantOrderNo: '',
+
+墨典AI智能ERP运营管理平台 V1.0
+第 20 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    })
+  }
+  if (next.xiaohongshu?.platformAccount) {
+    upsertTalentLibraryFromApplicant(data, {
+      platform: '小红书',
+      applicant: profileToApplicant('小红书', next.xiaohongshu, contact, wechatId, province, city),
+      mpOrderId: '',
+      merchantOrderNo: '',
+    })
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/opsRegistryGatewayCore.ts ===== */
+/**
+ * Vercel：须留在运营台 src 内（勿引用仓库外 web版/merchant-erp），否则 Serverless 打包无该目录 → FUNCTION_INVOCATION_FAILED。
+ * 逻辑与 ERP `vite-plugins/opsRegistryGatewayCore.ts` 对齐；变更时请双端同步。
+ */
+import {
+  catalogCustomEntriesOnly,
+  mergeBuiltinAiVendorCatalog,
+  normalizeCatalogLogoUrl,
+  normalizeVendorKeysFromDisk,
+} from './aiVendorCatalogShared.js'
+import type {
+  AiVendorCatalogEntry,
+  RegistryAiModels,
+  RegistryFile,
+  RegistryMpRecruitmentOrder,
+  RegistryRecruitmentOrder,
+  RegistryTalentLibraryEntry,
+  RegistryScheduleRow,
+  RegistryTalentPoolRow,
+  RegistryTenant,
+  RegistryVideoSubmission,
+} from './opsRegistryTypes.js'
+import { normalizeRegistryVideoAi } from './registryVideoAiNormalize.js'
+
+function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVendorCatalogEntry[] {
+  const raw = parsed?.aiVendorCatalog
+  if (!Array.isArray(raw)) return []
+  const out: AiVendorCatalogEntry[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const id = typeof r.id === 'string' ? r.id.trim().toLowerCase() : ''
+    if (!id) continue
+    const label = typeof r.label === 'string' && r.label.trim() ? r.label.trim() : id
+    const hint = typeof r.hint === 'string' && r.hint.trim() ? r.hint.trim().slice(0, 280) : undefined
+    const logoUrl = normalizeCatalogLogoUrl(r.logoUrl)
+
+墨典AI智能ERP运营管理平台 V1.0
+第 21 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    out.push({ id, label: label.slice(0, 64), hint, ...(logoUrl ? { logoUrl } : {}) })
+  }
+  return catalogCustomEntriesOnly(out)
+}
+
+export const DEFAULT_AI: RegistryAiModels = {
+  /** 不固定运营侧「默认厂商」；ERP 在自动模式下按目录与已配置 Key 动态选择 */
+  textModel: 'auto',
+  imageModel: 'auto',
+  updatedAt: new Date(0).toISOString(),
+  lastWriter: 'erp',
+  controlledByOps: false,
+}
+
+export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): RegistryFile {
+  const tenants: RegistryTenant[] = Array.isArray(parsed?.tenants) ? (parsed!.tenants as RegistryTenant[]) : []
+  const ai: RegistryAiModels = { ...DEFAULT_AI }
+  if (parsed?.aiModels && typeof parsed.aiModels === 'object') {
+    const a = parsed.aiModels as Partial<RegistryAiModels>
+    if (typeof a.textModel === 'string' && a.textModel) ai.textModel = a.textModel
+    if (typeof a.imageModel === 'string' && a.imageModel) ai.imageModel = a.imageModel
+    if (typeof a.updatedAt === 'string' && a.updatedAt) ai.updatedAt = a.updatedAt
+    if (a.lastWriter === 'ops') ai.lastWriter = 'ops'
+    if (typeof a.controlledByOps === 'boolean') ai.controlledByOps = a.controlledByOps
+  }
+  const aiVendorCatalog = mergeBuiltinAiVendorCatalog(readCustomCatalogFromDisk(parsed))
+  const vendorKeys = normalizeVendorKeysFromDisk(parsed?.vendorKeys)
+  const vendorKeysUpdatedAt =
+    typeof parsed?.vendorKeysUpdatedAt === 'string' && parsed.vendorKeysUpdatedAt
+      ? parsed.vendorKeysUpdatedAt
+      : new Date(0).toISOString()
+  const vendorKeysWriter = parsed?.vendorKeysWriter === 'ops' ? 'ops' : 'erp'
+  const recruitmentOrders: RegistryRecruitmentOrder[] = Array.isArray(parsed?.recruitmentOrders)
+    ? (parsed!.recruitmentOrders as RegistryRecruitmentOrder[])
+    : []
+  const mpRecruitmentOrders: RegistryMpRecruitmentOrder[] = Array.isArray(parsed?.mpRecruitmentOrders)
+    ? (parsed!.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+    : []
+  const mpTalentMembers = Array.isArray(parsed?.mpTalentMembers) ? parsed!.mpTalentMembers : []
+  const talentLibraryEntries: RegistryTalentLibraryEntry[] = Array.isArray(parsed?.talentLibraryEntries)
+    ? (parsed!.talentLibraryEntries as RegistryTalentLibraryEntry[])
+    : []
+  const talentPoolCandidates: RegistryTalentPoolRow[] = Array.isArray(parsed?.talentPoolCandidates)
+    ? (parsed!.talentPoolCandidates as RegistryTalentPoolRow[])
+    : []
+  const recruitmentScheduleRows: RegistryScheduleRow[] = Array.isArray(parsed?.recruitmentScheduleRows)
+    ? (parsed!.recruitmentScheduleRows as RegistryScheduleRow[])
+    : []
+  const recruitmentVideoSubmissions: RegistryVideoSubmission[] = Array.isArray(parsed?.recruitmentVideoSubmissions)
+    ? (parsed!.recruitmentVideoSubmissions as RegistryVideoSubmission[])
+
+墨典AI智能ERP运营管理平台 V1.0
+第 22 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    : []
+  const videoAi = normalizeRegistryVideoAi(parsed?.videoAi)
+  const videoAiUpdatedAt =
+    typeof parsed?.videoAiUpdatedAt === 'string' && parsed.videoAiUpdatedAt
+      ? parsed.videoAiUpdatedAt
+      : new Date(0).toISOString()
+  const videoAiWriter = parsed?.videoAiWriter === 'ops' ? 'ops' : 'erp'
+  return {
+    tenants,
+    aiModels: ai,
+    aiVendorCatalog,
+    vendorKeys,
+    vendorKeysUpdatedAt,
+    vendorKeysWriter,
+    videoAi,
+    videoAiUpdatedAt,
+    videoAiWriter,
+    recruitmentOrders,
+    mpRecruitmentOrders,
+    mpTalentMembers,
+    talentLibraryEntries,
+    talentPoolCandidates,
+    recruitmentScheduleRows,
+    recruitmentVideoSubmissions,
+  }
+}
+
+export function registryForPersistentFile(data: RegistryFile): RegistryFile {
+  const vendorKeys = normalizeVendorKeysFromDisk(data.vendorKeys)
+  return {
+    ...data,
+    vendorKeys,
+    aiVendorCatalog: catalogCustomEntriesOnly(data.aiVendorCatalog ?? []),
+  }
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/opsRegistryTypes.ts ===== */
+export type RegistryTenantSource = 'erp' | 'ops_manual'
+
+/** 短视频：可灵 JWT + Seedance（方舟）接入绑定；由运营管控台维护。 */
+export type RegistryVideoAi = {
+  /** 可灵 Access Key（JWT iss） */
+  klingAccessKey?: string
+  klingSecretKey?: string
+  /** 如 https://api.klingai.com 或控制台提供的区域域 */
+  klingApiBase?: string
+  /** 与 MERCHANT_AI_ARK_VIDEO_ENDPOINTS：逗号分隔「别名|ep-xxxx」 */
+  arkVideoEndpoints?: string
+  /**
+
+墨典AI智能ERP运营管理平台 V1.0
+第 23 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+   * 可选：方舟视频专用 Key。留空时 ERP dev 服务端会回退注册表 vendorKeys.doubao
+   * 或服务端 MERCHANT_AI_DOUBAO_KEY（按合并策略）。
+   */
+  arkVideoApiKey?: string
+  /** 阿里云 ICE 云剪辑 AppId（IMS 控制台） */
+  iceAppId?: string
+  iceAccessKeyId?: string
+  iceAccessKeySecret?: string
+  /** 默认 cn-shanghai */
+  iceRegion?: string
+  /** 成片输出到点播时的 StorageLocation */
+  iceVodStorageLocation?: string
+  /** 成片输出到 OSS 时的 URL 前缀 */
+  iceOutputOssUrlPrefix?: string
+}
+
+/** 运营台可扩展的 AI 供应商目录项（磁盘仅存非内置条目，GET 网关会合并内置目录后再返回）。 */
+export type AiVendorCatalogEntry = {
+  id: string
+  label: string
+  hint?: string
+  /** 可选：HTTPS 图床地址，或商户 ERP 同域相对路径（如 `/ai-vendors/foo.svg`） */
+  logoUrl?: string
+}
+
+export type RegistryTenant = {
+  id: string
+  source: RegistryTenantSource
+  loginName: string
+  passwordHash?: string
+  merchantName: string
+  industry: string
+  registeredAt: string
+  accountStatus: 'normal' | 'disabled' | 'frozen'
+  trialDays: number
+  officialDays: number
+  trialEndsAt?: string
+  officialEndsAt?: string
+  updatedAt: string
+}
+
+export type VendorKeyModelId =
+  | 'minimax'
+  | 'qwen'
+  | 'doubao'
+  | 'openai'
+  | 'claude'
+  | 'deepseek'
+  | 'kimi'
+
+
+墨典AI智能ERP运营管理平台 V1.0
+第 24 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+/** 各厂商 Key；含内置目录及自定义 slug */
+export type RegistryVendorKeys = Partial<Record<string, string>>
+
+export type RegistryAiModels = {
+  textModel: string
+  imageModel: string
+  updatedAt: string
+  lastWriter: 'erp' | 'ops'
+  /** 运营台保存过模型或 Key 后为 true，ERP 仅拉取不下发覆盖 */
+  controlledByOps: boolean
+}
+
+export type RecruitmentOrderKind = 'recruitment' | 'recruitment_ice'
+
+/** 开环：报名→反选→寄样探店→审核发布；闭环：云剪成片直派→确认接收→发布回链 */
+export type RecruitmentFulfillmentLoop = 'open' | 'closed'
+
+export type MpRecruitmentHall = 'normal' | 'urgent' | 'ice'
+
+/** 达人报名/任务进度（开环反选 + 闭环确认接收） */
+export type MpApplicantTaskStatus =
+  | 'applied'
+  | 'pending_confirm'
+  | 'confirmed'
+  | 'rejected'
+  | 'shortlisted'
+  | 'approved'
+
+/** 云剪批量成片槽位：每位达人认领后分配一条下载链接 */
+export type RegistryIceVideoSlot = {
+  slotId: string
+  label: string
+  downloadUrl: string
+  iceJobId?: string
+  assignedApplicantId?: string
+  assignedAt?: string
+}
+
+/** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
+export type RegistryRecruitmentOrder = {
+  id: string
+  customerName: string
+  storeName: string
+  talentId: string
+  talentName: string
+  fans: number
+  accountType: string
+  coopTimes: number
+  createdAt: string
+  status: 'pending' | 'accepted' | 'done' | 'cancelled' | 'refunded'
+
+墨典AI智能ERP运营管理平台 V1.0
+第 25 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  serviceAmount: number
+  commissionPct: number
+  netAmount: number
+  storeAddress: string
+  category: string
+  /** 提需摘要（招募名、Brief 节选等） */
+  infoSummary?: string
+  /** 订单类型：常规招募 / 云剪批量招募投放 */
+  orderKind?: RecruitmentOrderKind
+  /** 运营接单方式：手动表格 / 小程序招募 / 云剪单 */
+  acceptMode?: 'manual' | 'miniprogram' | 'ice'
+  /** 关联的小程序招募单号（acceptMode=miniprogram|ice 时写入） */
+  linkedMpOrderId?: string
+  /** 下发小程序招募的平台（抖音 / 小红书） */
+  recruitmentPlatform?: '抖音' | '小红书'
+  /** 云剪成片数量（批量云剪派发达人投放时写入） */
+  iceVideoCount?: number
+  iceVideoSlots?: RegistryIceVideoSlot[]
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
+  /** 开环：商家是否选择自动发布小程序招募（运营仍可人工发布） */
+  autoPublishMp?: boolean
+}
+
+/** 小程序达人招募单（运营「小程序招募」接单后生成，供达人端小程序展示与报名） */
+export type RegistryMpRecruitmentApplicant = {
+  id: string
+  /** 兼容旧数据：等同 platformNickname */
+  name: string
+  platform: string
+  /** 抖音/小红书号 */
+  platformAccount?: string
+  /** 抖音/小红书昵称 */
+  platformNickname?: string
+  followers: number
+  /** 带货等级（抖音） */
+  douyinSalesLevel?: string
+  /** 联系方式（手机等） */
+  contact: string
+  wechatId?: string
+  /** 报价，如 ¥150 */
+  quotePrice?: string
+  /** 探店时间段，精确到小时，如 2026-05-20 14:00-16:00 */
+  visitTimeSlot?: string
+  /** 支付宝账号（结算） */
+  alipayAccount?: string
+  intro?: string
+  profileLink?: string
+  paymentMethod?: string
+  mpOrderId?: string
+  merchantOrderNo?: string
+
+墨典AI智能ERP运营管理平台 V1.0
+第 26 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  appliedAt: string
+  province?: string
+  city?: string
+  /** 云剪单：系统分配的成片槽位 */
+  assignedIceSlotId?: string
+  assignedVideoLabel?: string
+  assignedVideoDownloadUrl?: string
+  douyinPublishUrl?: string
+  aiVerifyStatus?: 'pending' | 'passed' | 'failed'
+  aiVerifyNote?: string
+  completedAt?: string
+  taskStatus?: MpApplicantTaskStatus
+}
+
+/** 墨典达人库（按平台+达人ID去重，报价等取最新报名） */
+export type RegistryTalentLibraryEntry = {
+  id: string
+  platform: '抖音' | '小红书'
+  platformAccount: string
+  platformNickname: string
+  profileLink: string
+  followers: number
+  douyinSalesLevel?: string
+  contact: string
+  wechatId: string
+  quotePrice: string
+  paymentMethod: string
+  alipayAccount?: string
+  visitTimeSlot?: string
+  updatedAt: string
+  lastMpOrderId?: string
+  lastMerchantOrderNo?: string
+  province?: string
+  city?: string
+}
+
+export type RegistryMpTalentPlatformProfile = {
+  platformAccount: string
+  platformNickname: string
+  profileLink: string
+  followers: number
+  douyinSalesLevel?: string
+  quotePrice: string
+  alipayAccount: string
+}
+
+export type RegistryMpTalentMember = {
+  id: string
+  memberType: 'douyin' | 'xiaohongshu' | 'both'
+  wxNickName: string
+
+墨典AI智能ERP运营管理平台 V1.0
+第 27 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  wxAvatarUrl: string
+  wxOpenId?: string
+  contact: string
+  wechatId: string
+  province?: string
+  city?: string
+  douyin?: RegistryMpTalentPlatformProfile
+  xiaohongshu?: RegistryMpTalentPlatformProfile
+  registeredAt: string
+  updatedAt: string
+}
+
+export type RegistryMpRecruitmentOrder = {
+  id: string
+  /** 商家达人招募订单号 */
+  sourceMerchantOrderId: string
+  customerName: string
+  storeName: string
+  /** 商家要求（由商家订单 infoSummary 自动填入） */
+  merchantRequirements: string
+  status: 'open' | 'collecting' | 'pending_settlement' | 'closed' | 'done'
+  createdAt: string
+  updatedAt: string
+  applicants?: RegistryMpRecruitmentApplicant[]
+  orderKind?: RecruitmentOrderKind
+  /** 达人端大厅：招募 / 急单 / 云剪任务 */
+  hall?: MpRecruitmentHall
+  iceVideoSlots?: RegistryIceVideoSlot[]
+  /** 列表/详情展示用（创建时从商家订单同步） */
+  title?: string
+  recruitmentInfo?: string
+  taskDetail?: string
+  platform?: string
+  fansRequirement?: string
+  budgetText?: string
+  recruitCount?: number
+  region?: string
+  category?: string
+  serviceAmount?: number
+  urgent?: boolean
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
+}
+
+/** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
+export type RegistryTalentPoolRow = {
+  id: string
+  name: string
+  platform: string
+  contentFormat: string
+  status: 'pending_confirm' | 'confirmed' | 'rejected' | 'communicating'
+
+墨典AI智能ERP运营管理平台 V1.0
+第 28 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  followers: number
+  niche: string
+  baseFee: number
+  bonus: number
+  schedulingConflict?: boolean
+  /** 运营台「已接单」上传招募表时写入，供 ERP 达人池按订单筛选 */
+  sourceRecruitmentOrderId?: string
+}
+
+/** AI 排期结果（dev 注册表，ERP 与管控台共用） */
+export type RegistryScheduleRow = {
+  id: string
+  time: string
+  talentName: string
+  storeName: string
+  tableNote: string
+}
+
+/** 达人视频审核（dev 注册表，由 API/上传同步写入） */
+export type RegistryVideoSubmission = {
+  id: string
+  author: string
+  title: string
+  status: 'pending' | 'passed' | 'rejected'
+  submittedAt: string
+  aiNote: string
+  thumbUrl?: string
+  duration?: string
+}
+
+export type RegistryFile = {
+  tenants: RegistryTenant[]
+  aiModels: RegistryAiModels
+  /** 各厂商 API Key（dev 落盘，生产勿提交仓库） */
+  vendorKeys: RegistryVendorKeys
+  vendorKeysUpdatedAt: string
+  vendorKeysWriter: 'erp' | 'ops'
+  /** 磁盘：仅追加型自定义厂商列表；网关 GET 会与内置目录合并写入此字段再给前端 */
+  aiVendorCatalog?: AiVendorCatalogEntry[]
+  /** 短视频/视频模型网关（运营台「AI模型」专区） */
+  videoAi?: RegistryVideoAi
+  videoAiUpdatedAt?: string
+  videoAiWriter?: 'erp' | 'ops'
+  recruitmentOrders?: RegistryRecruitmentOrder[]
+  mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  mpTalentMembers?: RegistryMpTalentMember[]
+  talentLibraryEntries?: RegistryTalentLibraryEntry[]
+  talentPoolCandidates?: RegistryTalentPoolRow[]
+  recruitmentScheduleRows?: RegistryScheduleRow[]
+  recruitmentVideoSubmissions?: RegistryVideoSubmission[]
+
+墨典AI智能ERP运营管理平台 V1.0
+第 29 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/recruitmentInfoFilter.ts ===== */
+/** 招募信息展示时排除的字段（不在小程序详情「招募信息」「任务详情」中展示） */
+export function shouldExcludeRecruitmentSegment(text: string): boolean {
+  const t = String(text || '').trim()
+  if (!t) return true
+  if (/^(模式|Brief|brief|预算金额)[:：]/i.test(t)) return true
+  if (/^(模式|Brief|brief|预算|桌数)[:：]/i.test(t)) return true
+  if (/^预算[¥￥]?/i.test(t)) return true
+  if (/^预算/i.test(t) && /[¥￥\d/]/.test(t)) return true
+  if (/^桌数/.test(t)) return true
+  return false
+}
+
+export function shouldShowRecruitmentInfoLine(line: string): boolean {
+  return !shouldExcludeRecruitmentSegment(line)
+}
+
+export function explodeAndFilterDisplayLines(text: string): string[] {
+  return String(text || '')
+    .split(/[\n\r；;]+/)
+    .map((s) => s.trim())
+    .filter((s) => s && !shouldExcludeRecruitmentSegment(s))
+}
+
+export function filterRecruitmentInfoLines(lines: string[]): string[] {
+  return lines.map((l) => l.trim()).filter((l) => shouldShowRecruitmentInfoLine(l))
+}
+
+export function filterRecruitmentInfoText(text: string): string {
+  return explodeAndFilterDisplayLines(text).join('\n')
+}
+
+export function filterTaskDetailText(text: string): string {
+  return explodeAndFilterDisplayLines(text).join('\n')
+}
+
+export function normalizeRecruitmentPlatform(raw: string | undefined): '抖音' | '小红书' {
+  const s = String(raw || '').trim()
+  if (s.includes('红')) return '小红书'
+  return '抖音'
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/recruitmentLegacyDemoOrders.ts ===== */
+import type { RegistryRecruitmentOrder } from './opsRegistryTypes.js'
+
+/** 旧版 mockData 写入注册表时的规范单号 */
+
+墨典AI智能ERP运营管理平台 V1.0
+第 30 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+const LEGACY_CANONICAL_IDS = new Set(['RO20260501001', 'RO20260428003', 'RO20260415002'])
+
+/** 与旧演示数据完全一致的客户|门店|达人（防 ID 变体漏网） */
+const LEGACY_FINGERPRINTS = new Set([
+  '蜀味火锅（春熙店）|春熙路旗舰店|美食探店喵',
+  '蜀味火锅（春熙店）|宽窄巷子店|成都吃货日记',
+  '轻医美·颜究所|总店|变美小课堂',
+])
+
+/**
+ * 将 R020260501001 规范为 RO20260501001（历史数据常用数字 0 代替字母 O）
+ */
+export function canonicalRecruitmentOrderId(id: string): string {
+  const s = id.trim()
+  const m = /^R0(\d{10,})$/.exec(s)
+  if (m) return `RO${m[1]}`
+  return s
+}
+
+export function isLegacyDemoRecruitmentOrder(o: RegistryRecruitmentOrder): boolean {
+  const raw = o.id.trim()
+  if (LEGACY_CANONICAL_IDS.has(raw)) return true
+  if (LEGACY_CANONICAL_IDS.has(canonicalRecruitmentOrderId(raw))) return true
+  const fp = `${o.customerName}|${o.storeName}|${o.talentName}`
+  return LEGACY_FINGERPRINTS.has(fp)
+}
+
+export function filterLegacyDemoRecruitmentOrders(orders: RegistryRecruitmentOrder[]): RegistryRecruitmentOrder[] {
+  return orders.filter((o) => !isLegacyDemoRecruitmentOrder(o))
+}
+
+
+/* ===== FILE: 商家管理后台/src/meooRegistryShared/recruitmentLoop.ts ===== */
+import type {
+  RegistryMpRecruitmentOrder,
+  RegistryRecruitmentOrder,
+  RecruitmentFulfillmentLoop,
+} from './opsRegistryTypes.js'
+
+export type { RecruitmentFulfillmentLoop }
+
+type LoopInferInput = {
+  orderKind?: RegistryRecruitmentOrder['orderKind']
+  hall?: RegistryMpRecruitmentOrder['hall']
+  fulfillmentLoop?: RecruitmentFulfillmentLoop
+}
+
+export function inferFulfillmentLoop(order: LoopInferInput): RecruitmentFulfillmentLoop {
+  if (order.fulfillmentLoop === 'open' || order.fulfillmentLoop === 'closed') {
+    return order.fulfillmentLoop
