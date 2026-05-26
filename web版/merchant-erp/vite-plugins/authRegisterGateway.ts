@@ -12,6 +12,7 @@ import {
   findAuthUserByPhone,
   phoneAlreadyRegistered,
   sendAuthSmsCode,
+  signInWithPasswordLoginName,
   verifyAuthSmsCode,
 } from './authSmsAuthShared.js'
 
@@ -61,6 +62,36 @@ export function authRegisterGatewayPlugin(): Plugin {
             })
           } catch (e) {
             json(res, 500, { ok: false, error: 'sms_send_failed', detail: String(e) })
+          }
+          return
+        }
+
+        if (url === '/api/meoo-auth-password-login') {
+          try {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { loginName?: string; password?: string }
+            const result = await signInWithPasswordLoginName(body.loginName ?? '', body.password ?? '')
+            if (!result.ok) {
+              const status =
+                result.error === 'invalid_credentials' ||
+                result.error === 'invalid_login_name' ||
+                result.error === 'invalid_password'
+                  ? 400
+                  : result.error === 'supabase_not_configured'
+                    ? 503
+                    : 500
+              json(res, status, { ok: false, error: result.error, message: result.message })
+              return
+            }
+            json(res, 200, {
+              ok: true,
+              access_token: result.access_token,
+              refresh_token: result.refresh_token,
+              expires_in: result.expires_in,
+              loginName: result.loginName,
+            })
+          } catch (e) {
+            json(res, 500, { ok: false, error: 'password_login_failed', detail: String(e) })
           }
           return
         }

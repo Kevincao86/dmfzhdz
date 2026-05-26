@@ -11,7 +11,7 @@
     <text class="hero-desc">{{hintBanner}}</text>
     <view class="hero-actions">
       <button class="mini-btn primary" size="mini" bindtap="goCreate">新建商品</button>
-      <button class="mini-btn ghost" size="mini" bindtap="goVoice">语音录入</button>
+      <button class="mini-btn secondary" size="mini" bindtap="onPullFromPlatform" loading="{{loading}}">刷新列表</button>
     </view>
   </view>
 
@@ -24,7 +24,6 @@
         bindtap="onTab"
         class="tab-pill {{activePlat === item.id ? 'tab-on' : ''}}"
       >
-        <text class="tab-short">{{item.short}}</text>
         <text class="tab-label">{{item.label}}</text>
       </view>
     </view>
@@ -55,13 +54,14 @@
     <view wx:if="{{note}}" class="note-strip">{{note}}</view>
     <view wx:if="{{displayItems.length === 0}}" class="state-card meoo-card">
       <text class="state-title">暂无商品</text>
-      <text class="state-text">该平台暂无商品，可点击「新建商品」创建，或使用语音录入生成草稿。</text>
+      <text class="state-text">该平台暂无商品或尚未从平台拉取。可点「刷新列表」从平台获取，或「新建商品」创建。</text>
     </view>
     <view wx:for="{{displayItems}}" wx:key="id" class="prod-card meoo-card">
       <view class="prod-top" bindtap="onOpenItem" data-id="{{item.id}}" data-name="{{item.name}}">
         <view class="prod-main">
           <text class="prod-name">{{item.name}}</text>
           <text class="prod-meta">{{item.platform}} · {{item.store}}</text>
+          <text class="prod-id">商品 ID：{{item.id}}</text>
         </view>
         <text class="prod-price">¥{{item.price}}</text>
       </view>
@@ -77,7 +77,7 @@
             catchtap="onSync"
             data-id="{{item.id}}"
           >
-            同步
+            同步至来客
           </button>
           <button class="mini-btn ghost" size="mini" bindtap="onOpenItem" data-id="{{item.id}}" data-name="{{item.name}}">
             编辑草稿

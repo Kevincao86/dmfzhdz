@@ -1,0 +1,19 @@
+<scroll-view scroll-y class="pay-scroll" enhanced show-scrollbar="{{false}}">
+  <text class="pay-back" bindtap="goBack">‹ 返回五步流程</text>
+
+  <view class="pay-card meoo-card">
+    <text class="pay-h1">结款账单</text>
+    <text class="pay-lead">
+      金额以财务与订单结算为准；确认后将生成打款单，便于后续对账与打款流程。（与电脑端占位页同源）
+    </text>
+
+    <view class="pay-row">
+      <text class="pay-k">应付（待订单服务汇总）</text>
+      <text class="pay-v">¥ —</text>
+    </view>
+
+    <button class="pay-btn" bindtap="onAck">确认打款</button>
+  </view>
+
+  <view class="pay-space" />
+</scroll-view>

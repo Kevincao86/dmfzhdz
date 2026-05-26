@@ -1,18 +1,38 @@
 const api = require('../../utils/api.js')
 const douyin = require('../../utils/douyinGoodsMp.js')
-const { PLATFORM_TABS } = require('../../utils/platformTokensMp.js')
+const listing = require('../../utils/productListingMp.js')
+const {
+  selectablePlatformRows,
+  findPlatformOption,
+} = require('../../utils/productCreatePlatformsMp.js')
 
 function labelsFromNodes(nodes) {
   if (!nodes || !nodes.length) return ['—']
   return nodes.map((n) => n.name)
 }
 
+function platformDisplayName(id) {
+  const o = findPlatformOption(id)
+  return o ? o.name : id
+}
+
 Page({
   data: {
-    step: 1,
+    phase: 'channel',
+    channelKind: '',
+    platformRows: [],
+    selectedPlatformIds: [],
+    confirmLine: '',
+    douyinStep: 1,
+
     err: '',
-    platform: 'douyin',
-    platforms: [],
+    genericPlatform: '',
+    genericTitle: '',
+    genericPriceYuan: '',
+    genericDesc: '',
+    genericSaving: false,
+    genericTip: '',
+
     catLoading: false,
     cat1Nodes: [],
     cat2Nodes: [],
@@ -27,60 +47,161 @@ Page({
     categoryId: '',
     typesLoading: false,
     productTypes: [],
+    /** @type {number|null} */
     productType: null,
     productName: '',
     priceYuan: '',
     originYuan: '',
     productDesc: '',
     headUrl: '',
+    auxThumbSlots: [{ url: '' }, { url: '' }, { url: '' }],
+    consumeValidDaysIndex: 3,
+    consumeValidDaysOptions: ['30', '90', '180', '360', '730'],
+    afterSaleLabels: ['随时退', '过期退', '不可退'],
+    afterSalePolicies: ['refund_anytime', 'refund_auto_expire', 'no_refund'],
+    afterSaleIndex: 0,
     stores: [],
     storesLoading: false,
     poiIds: [],
     uploading: false,
+    headUploading: false,
     saving: false,
     actionMsg: '',
     actionOk: false,
   },
 
-  onLoad() {
-    const platforms = PLATFORM_TABS.map((p) => ({
-      id: p.id,
-      label: p.label,
-      hint: p.id === 'douyin' ? '完整新建与提交审核' : '请使用商品列表查看',
-      disabled: p.id !== 'douyin',
-    }))
-    this.setData({ platforms })
-  },
+  onLoad() {},
 
   onShow() {
     if (!api.getAccessToken()) {
       wx.redirectTo({ url: '/pages/login/login' })
+      return
     }
+    const { phase, channelKind } = this.data
+    if (phase !== 'channel' && channelKind) this.refreshPlatformRows()
   },
 
-  onPickPlatform(e) {
+  onPickChannel(e) {
+    const kind = e.currentTarget.dataset.kind
+    if (kind !== 'groupbuy' && kind !== 'waimai') return
+    this.setData({
+      phase: 'pick',
+      channelKind: kind,
+      selectedPlatformIds: [],
+      err: '',
+    })
+    this.refreshPlatformRows()
+  },
+
+  refreshPlatformRows() {
+    const channelKind = this.data.channelKind
+    if (!channelKind) return
+    const platformRows = selectablePlatformRows(channelKind)
+    const selectedPlatformIds = (this.data.selectedPlatformIds || []).filter((id) => {
+      const r = platformRows.find((x) => x.id === id)
+      return r && r.selectable
+    })
+    this.setData({ platformRows, selectedPlatformIds })
+  },
+
+  onTogglePlatform(e) {
     const id = e.currentTarget.dataset.id
-    const hit = this.data.platforms.find((p) => p.id === id)
-    if (!hit || hit.disabled) {
-      wx.showToast({ title: '暂仅支持抖音来客', icon: 'none' })
-      return
-    }
-    this.setData({ platform: id, err: '' })
+    const hit = this.data.platformRows.find((r) => r.id === id)
+    if (!hit || !hit.selectable) return
+    const sel = [...this.data.selectedPlatformIds]
+    const i = sel.indexOf(id)
+    if (i >= 0) sel.splice(i, 1)
+    else sel.push(id)
+    this.setData({ selectedPlatformIds: sel, err: '' })
   },
 
-  onNextFromPlatform() {
-    if (this.data.platform !== 'douyin') {
-      this.setData({ err: '当前仅抖音来客支持完整新建流程' })
+  /** 第一步 → 校验仅单平台 → 第二步确认 */
+  onNextPick() {
+    const sel = this.data.selectedPlatformIds
+    if (!sel.length) {
+      wx.showToast({ title: '请选择一个已接通的平台', icon: 'none' })
       return
     }
-    if (!douyin.douyinToken()) {
-      this.setData({
-        err: '尚未绑定抖音来客，请在商家后台「设置」完成授权后重新打开小程序。',
+    if (sel.length > 1) {
+      wx.showToast({
+        title: '小程序每次仅能选择一个平台上品；多平台请用电脑端',
+        icon: 'none',
+        duration: 3200,
       })
       return
     }
-    this.setData({ step: 2, err: '' })
-    void this.loadCategoryTree()
+    const name = platformDisplayName(sel[0])
+    this.setData({ phase: 'confirm', confirmLine: `${name}`, err: '' })
+  },
+
+  onConfirmPlatforms() {
+    const sel = this.data.selectedPlatformIds
+    const id = sel[0]
+    if (!id) {
+      this.setData({ err: '未选择平台' })
+      return
+    }
+    if (id === 'douyin') {
+      if (!douyin.douyinToken()) {
+        this.setData({
+          err: '尚未绑定抖音来客，请在电脑端「系统设置」完成授权后重试。',
+        })
+        return
+      }
+      this.setData({ phase: 'douyin', douyinStep: 1, err: '' })
+      void this.loadCategoryTree()
+      return
+    }
+    this.setData({
+      phase: 'generic',
+      genericPlatform: id,
+      genericTitle: '',
+      genericPriceYuan: '',
+      genericDesc: '',
+      genericTip: '',
+      err: '',
+    })
+  },
+
+  onSaveGenericDraft() {
+    void this._saveGeneric()
+  },
+
+  async _saveGeneric() {
+    const platform = this.data.genericPlatform
+    const title = String(this.data.genericTitle || '').trim()
+    const price = Number.parseFloat(this.data.genericPriceYuan)
+    if (!title) {
+      wx.showToast({ title: '请填写商品名称', icon: 'none' })
+      return
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      wx.showToast({ title: '请填写有效售价（元）', icon: 'none' })
+      return
+    }
+    this.setData({ genericSaving: true, genericTip: '' })
+    const r = await listing.postPlatformProductDraft(platform, {
+      title,
+      priceYuan: price,
+      description: String(this.data.genericDesc || '').trim() || undefined,
+    })
+    this.setData({ genericSaving: false })
+    if (r.ok) {
+      const msg = r.draftId
+        ? `已提交草稿（${r.draftId}）${r.message ? ' ' + r.message : ''}`
+        : r.message || '已提交草稿'
+      this.setData({ genericTip: msg })
+      wx.showModal({
+        title: '提交成功',
+        content: msg,
+        showCancel: false,
+        success() {
+          wx.navigateBack({ delta: 1 })
+        },
+      })
+    } else {
+      wx.showModal({ title: '提交失败', content: r.message || '未知错误', showCancel: false })
+    }
   },
 
   async loadCategoryTree() {
@@ -154,14 +275,14 @@ Page({
   onNextFromCategory() {
     const cat3 = (this._cat3Nodes || [])[this.data.cat3Index]
     if (!cat3 || !cat3.category_id) {
-      this.setData({ err: '请选择完整三级类目' })
+      this.setData({ err: '请选择完整末级类目' })
       return
     }
     const cat1 = (this._cat1Nodes || [])[this.data.cat1Index]
     const cat2 = (this._cat2Nodes || [])[this.data.cat2Index]
     const path = [cat1 && cat1.name, cat2 && cat2.name, cat3.name].filter(Boolean).join(' / ')
     this.setData({
-      step: 3,
+      douyinStep: 2,
       err: '',
       categoryPath: path,
       categoryId: cat3.category_id,
@@ -177,15 +298,18 @@ Page({
       return
     }
     const types = r.types.filter((t) => t.eligible !== false)
+    const first = types[0] ? types[0].product_type : null
     this.setData({
       typesLoading: false,
       productTypes: types,
-      productType: types[0] ? types[0].product_type : null,
+      productType: Number.isFinite(first) ? first : null,
     })
   },
 
   onTypeChange(e) {
-    this.setData({ productType: Number(e.detail.value) })
+    const v = e.detail.value
+    const n = typeof v === 'string' ? Number.parseInt(v, 10) : Number(v)
+    this.setData({ productType: Number.isFinite(n) ? n : null })
   },
 
   onNextFromType() {
@@ -193,31 +317,63 @@ Page({
       this.setData({ err: '请选择商品类型' })
       return
     }
-    this.setData({ step: 4, err: '', actionMsg: '' })
+    this.setData({ douyinStep: 3, err: '', actionMsg: '' })
     void this.loadStores()
   },
 
   async loadStores() {
     this.setData({ storesLoading: true })
     const r = await douyin.fetchDouyinStores()
-    const stores = r.ok
-      ? r.items.map((s) => ({ ...s, checked: false }))
-      : []
+    const stores = r.ok ? r.items.map((s) => ({ ...s, checked: false })) : []
     this.setData({ storesLoading: false, stores })
-    if (!r.ok && stores.length === 0) {
-      this.setData({ err: r.message })
-    }
+    if (!r.ok && stores.length === 0) this.setData({ err: r.message })
   },
 
   onPrev() {
-    const step = Math.max(1, this.data.step - 1)
-    this.setData({ step, err: '' })
+    const { phase, douyinStep } = this.data
+    if (phase === 'generic') {
+      this.setData({ phase: 'confirm', genericTip: '', err: '' })
+      return
+    }
+    if (phase === 'confirm') {
+      this.setData({ phase: 'pick', err: '' })
+      return
+    }
+    if (phase === 'pick') {
+      this.setData({
+        phase: 'channel',
+        channelKind: '',
+        selectedPlatformIds: [],
+        platformRows: [],
+        err: '',
+      })
+      return
+    }
+    if (phase === 'douyin') {
+      if (douyinStep > 1) {
+        this.setData({ douyinStep: douyinStep - 1, err: '' })
+        return
+      }
+      this.setData({ phase: 'confirm', err: '' })
+      return
+    }
   },
 
   onField(e) {
     const k = e.currentTarget.dataset.k
     if (!k) return
     this.setData({ [k]: e.detail.value })
+  },
+
+  onAfterSaleChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const policies = this.data.afterSalePolicies
+    const safe = policies[idx] != null ? idx : 0
+    this.setData({ afterSaleIndex: safe })
+  },
+
+  onConsumeDaysChange(e) {
+    this.setData({ consumeValidDaysIndex: Number(e.detail.value) || 0 })
   },
 
   onPoiChange(e) {
@@ -236,9 +392,9 @@ Page({
       success: async (res) => {
         const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
         if (!path) return
-        this.setData({ uploading: true })
+        this.setData({ headUploading: true })
         const up = await douyin.uploadProductImage(path)
-        this.setData({ uploading: false })
+        this.setData({ headUploading: false })
         if (!up.ok) {
           wx.showToast({ title: up.message, icon: 'none' })
           return
@@ -248,7 +404,49 @@ Page({
     })
   },
 
+  onPickAux(e) {
+    const slot = Number(e.currentTarget.dataset.slot) || 0
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['image'],
+      success: async (res) => {
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) return
+        this.setData({ uploading: true })
+        const up = await douyin.uploadProductImage(path)
+        this.setData({ uploading: false })
+        if (!up.ok) {
+          wx.showToast({ title: up.message, icon: 'none' })
+          return
+        }
+        const slots = [...this.data.auxThumbSlots]
+        while (slots.length <= slot) slots.push({ url: '' })
+        slots[slot] = { url: up.url }
+        this.setData({ auxThumbSlots: slots })
+      },
+    })
+  },
+
+  onClearAux(e) {
+    const slot = Number(e.currentTarget.dataset.slot) || 0
+    const slots = this.data.auxThumbSlots.map((s, i) => (i === slot ? { url: '' } : s))
+    this.setData({ auxThumbSlots: slots })
+  },
+
+  auxUrlsFromSlots() {
+    return (this.data.auxThumbSlots || [])
+      .map((s) => String(s.url || '').trim())
+      .filter((u) => /^https?:\/\//i.test(u))
+  },
+
   async doSave(mode) {
+    const optDays = this.data.consumeValidDaysOptions
+    const idx = Math.min(optDays.length - 1, Math.max(0, this.data.consumeValidDaysIndex))
+    const consumeValidDays = optDays[idx] || '360'
+    const policies = this.data.afterSalePolicies
+    const pi = Math.min(policies.length - 1, Math.max(0, this.data.afterSaleIndex))
+    const afterSalePolicy = policies[pi] || 'refund_anytime'
+
     const detail = douyin.buildDefaultPayload({
       categoryId: this.data.categoryId,
       productType: this.data.productType,
@@ -258,6 +456,9 @@ Page({
       productDesc: this.data.productDesc,
       headUrl: this.data.headUrl,
       poiIds: this.data.poiIds,
+      auxUrls: this.auxUrlsFromSlots(),
+      consumeValidDays,
+      afterSalePolicy,
     })
     if (!detail) {
       this.setData({

@@ -133,6 +133,24 @@
   box-shadow: 0 8rpx 20rpx rgba(220, 38, 38, 0.2);
 }
 
+.plat-cyan {
+  border-color: transparent;
+  background: linear-gradient(145deg, #22d3ee, #0e7490);
+  box-shadow: 0 8rpx 20rpx rgba(14, 116, 144, 0.2);
+}
+
+.plat-blue {
+  border-color: transparent;
+  background: linear-gradient(145deg, #60a5fa, #2563eb);
+  box-shadow: 0 8rpx 20rpx rgba(37, 99, 235, 0.2);
+}
+
+.plat-slate {
+  border-color: transparent;
+  background: linear-gradient(145deg, #94a3b8, #475569);
+  box-shadow: 0 8rpx 18rpx rgba(71, 85, 105, 0.18);
+}
+
 .todo-card {
   margin-bottom: 16rpx;
 }

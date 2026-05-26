@@ -1,0 +1,40 @@
+<scroll-view scroll-y class="hub-scroll" enhanced show-scrollbar="{{false}}">
+  <view class="hub-strip">
+    <text class="hub-strip-title">达人招募</text>
+  </view>
+
+  <navigator url="/pages/recruit-flow/recruit-flow" class="hub-entry hub-entry-main" hover-class="hub-entry-hover">
+    <view class="hub-ico-wrap main"><text class="hub-ico-glyph">5</text></view>
+    <view class="hub-entry-body">
+      <text class="hub-entry-k">五步流程</text>
+      <text class="hub-entry-t">达人招募</text>
+    </view>
+    <text class="hub-chevron">›</text>
+  </navigator>
+
+  <navigator url="/pages/recruit-brief-wizard/recruit-brief-wizard" class="hub-entry" hover-class="hub-entry-hover">
+    <view class="hub-ico-wrap v1"><text class="hub-ico-glyph">Brief</text></view>
+    <view class="hub-entry-body">
+      <text class="hub-entry-t">AI达人Brief生成</text>
+    </view>
+    <text class="hub-chevron">›</text>
+  </navigator>
+
+  <navigator url="/pages/recruit-brief-records/recruit-brief-records" class="hub-entry" hover-class="hub-entry-hover">
+    <view class="hub-ico-wrap v2"><text class="hub-ico-glyph">记</text></view>
+    <view class="hub-entry-body">
+      <text class="hub-entry-t">Brief生成记录</text>
+    </view>
+    <text class="hub-chevron">›</text>
+  </navigator>
+
+  <navigator url="/pages/recruitment/recruitment" class="hub-entry" hover-class="hub-entry-hover">
+    <view class="hub-ico-wrap v3"><text class="hub-ico-glyph">订</text></view>
+    <view class="hub-entry-body">
+      <text class="hub-entry-t">查看达人订单</text>
+    </view>
+    <text class="hub-chevron">›</text>
+  </navigator>
+
+  <view class="hub-foot-space" />
+</scroll-view>

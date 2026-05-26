@@ -3,8 +3,9 @@ page {
   color: #1e293b;
   font-size: 28rpx;
   box-sizing: border-box;
-  --tab-bar-pad: calc(76rpx + env(safe-area-inset-bottom));
-  --agent-composer-offset: calc(76rpx + env(safe-area-inset-bottom));
+  /* 与 custom-tab-bar/index.wxss 内容区高度一致 */
+  --tab-bar-pad: calc(84rpx + env(safe-area-inset-bottom));
+  --agent-composer-offset: var(--tab-bar-pad);
 }
 
 /* 功能子页通用列表 */

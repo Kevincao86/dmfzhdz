@@ -93,9 +93,22 @@ function request(method, pathAndQuery, token, body) {
   })
 }
 
+async function fetchAuthUserId() {
+  const token = api.getAccessToken()
+  if (!token) return null
+  let sub = decodeJwtSub(token)
+  if (sub) return sub
+  try {
+    const user = await rawRequest('GET', '/auth/v1/user', token)
+    return user && typeof user.id === 'string' ? user.id : null
+  } catch (_) {
+    return null
+  }
+}
+
 async function fetchPrimaryTenantId() {
   const token = api.getAccessToken()
-  const sub = decodeJwtSub(token)
+  const sub = await fetchAuthUserId()
   if (!sub) throw new Error('登录状态异常，请重新登录')
   const rows = await request(
     'GET',
@@ -146,6 +159,18 @@ async function fetchTenantMembershipRow(tenantId) {
     'GET',
     `/rest/v1/tenants?id=eq.${tid}` +
       '&select=membership_plan,direct_ai_calls_used,service_expire_at,subscription_days,ops_gift_days,official_days',
+    token,
+  )
+  return rows && rows[0] ? rows[0] : null
+}
+
+async function fetchTenantStoreIntel(tenantId) {
+  const token = api.getAccessToken()
+  const tid = encodeURIComponent(String(tenantId || '').trim())
+  const rows = await request(
+    'GET',
+    `/rest/v1/tenant_store_intel?tenant_id=eq.${tid}` +
+      '&select=margin_config,menu_items,menu_store_name,menu_item_count,updated_at&limit=1',
     token,
   )
   return rows && rows[0] ? rows[0] : null
@@ -238,10 +263,12 @@ async function insertPaymentOrder(payload) {
 }
 
 module.exports = {
+  fetchAuthUserId,
   fetchPrimaryTenantId,
   fetchTenantMerchantName,
   fetchTenantWalletSummary,
   fetchTenantMembershipRow,
+  fetchTenantStoreIntel,
   fetchMerchantBindings,
   fetchSupportRelayMessages,
   insertSupportRelayMessage,

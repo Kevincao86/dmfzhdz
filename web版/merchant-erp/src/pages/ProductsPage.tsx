@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertCircle,
@@ -15,7 +16,8 @@ import {
   Wand2,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { pushLocalStoreIntelToCloud, upsertMarginConfigCloud } from '../lib/tenantStoreIntelCloud'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   postDouyinProductQualityAnalysis,
@@ -318,6 +320,12 @@ function persistMarginConfig(cfg: StoredMarginConfig) {
   } catch {
     /* ignore */
   }
+  if (supabaseConfigured && supabase) {
+    void upsertMarginConfigCloud(supabase, {
+      margins: cfg.margins,
+      industry: cfg.industry,
+    })
+  }
 }
 
 type MarginAdvisorOk = Extract<GrossMarginAdvisorResult, { ok: true }>
@@ -356,6 +364,11 @@ export default function ProductsPage() {
   const [displaySynced, setDisplaySynced] = useState<SyncedProduct[]>([])
   const [pickItems, setPickItems] = useState<PickRow[]>([])
   const initialMarginCfg = useMemo(() => loadStoredMarginConfig(), [])
+
+  useEffect(() => {
+    if (!supabaseConfigured || !supabase) return
+    void pushLocalStoreIntelToCloud(supabase)
+  }, [])
   const [margins, setMargins] = useState<StoreMargins>(() => initialMarginCfg.margins)
   const [marginIndustry, setMarginIndustry] = useState<MarginIndustry>(
     () => initialMarginCfg.industry,

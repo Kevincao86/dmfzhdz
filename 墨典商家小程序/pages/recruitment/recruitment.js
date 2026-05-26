@@ -79,11 +79,4 @@ Page({
     }
   },
 
-  goVoice() {
-    wx.navigateTo({ url: '/pages/recruit-voice/recruit-voice' })
-  },
-
-  goForm() {
-    wx.navigateTo({ url: '/pages/recruit-edit/recruit-edit' })
-  },
 })

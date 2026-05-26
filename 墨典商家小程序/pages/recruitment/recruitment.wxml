@@ -1,7 +1,15 @@
 <view class="rec-page">
-  <view class="meoo-card rec-actions">
-    <button class="meoo-btn-primary" bindtap="goVoice">语音录入招募</button>
-    <button class="meoo-btn-ghost rec-mt" bindtap="goForm">表单编辑并提交</button>
+  <view class="meoo-card rec-banner">
+    <text class="rec-banner-title">达人订单列表</text>
+    <text class="rec-banner-desc">
+      与电脑端运维注册表同源。发布新招募请先到「达人招募」按流程填写；表单提交会与电脑端同款数据汇聚。
+    </text>
+    <navigator url="/pages/recruit-flow/recruit-flow" class="rec-banner-link" hover-class="rec-banner-link-hover">
+      打开达人招募流程 ›
+    </navigator>
+    <navigator url="/pages/recruit-edit/recruit-edit" class="rec-banner-soft" hover-class="rec-banner-soft-hover">
+      直接去表单提交 ›
+    </navigator>
   </view>
 
   <view wx:if="{{unconfigured}}" class="rec-center meoo-hint">
@@ -18,6 +26,6 @@
       <text class="rec-row-sub">{{item.createdAt}} · {{item.statusLabel}}</text>
       <text class="rec-row-sum">{{item.infoSummary}}</text>
     </view>
-    <view wx:if="{{rows.length === 0}}" class="rec-center meoo-hint">暂无招募单，可先语音或表单提交。</view>
+    <view wx:if="{{rows.length === 0}}" class="rec-center meoo-hint">暂无订单。请从「达人招募」发布需求或在电脑端操作。</view>
   </block>
 </view>

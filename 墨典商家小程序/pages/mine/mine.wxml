@@ -11,6 +11,24 @@
     </view>
   </view>
 
+  <view class="bindings-card">
+    <view class="bindings-head">
+      <text class="bindings-title">平台绑定</text>
+      <text wx:if="{{bindingsLoading}}" class="bindings-meta">同步中…</text>
+    </view>
+    <text class="bindings-hint">{{bindingsHint}}</text>
+    <view wx:for="{{cloudPlatformRows}}" wx:key="id" class="binding-row">
+      <text class="binding-label">{{item.label}}</text>
+      <text class="binding-status binding-status-{{item.statusClass}}">{{item.statusText}}</text>
+    </view>
+    <view wx:if="{{webPlatformRows.length}}" class="bindings-divider"></view>
+    <text wx:if="{{webPlatformRows.length}}" class="bindings-sub">以下平台绑定仅存于电脑浏览器，换设备需重新授权</text>
+    <view wx:for="{{webPlatformRows}}" wx:key="id" class="binding-row">
+      <text class="binding-label">{{item.label}}</text>
+      <text class="binding-status binding-status-{{item.statusClass}}">{{item.statusText}}</text>
+    </view>
+  </view>
+
   <view class="menu-card">
     <view
       wx:for="{{menu}}"
@@ -29,6 +47,17 @@
     </view>
   </view>
 
-  <button class="logout-btn" bindtap="onLogout">退出登录</button>
+  <view class="logout-btn" bindtap="onLogout">退出登录</view>
   <view class="mine-footer-space"></view>
 </scroll-view>
+
+<view wx:if="{{showLogoutConfirm}}" class="logout-mask" catchtouchmove="true">
+  <view class="logout-dialog" catchtap="true">
+    <text class="logout-dialog-title">退出当前账号</text>
+    <text class="logout-dialog-desc">确定退出登录？</text>
+    <view class="logout-dialog-actions">
+      <view class="logout-dialog-btn ghost" bindtap="onCancelLogout">取消</view>
+      <view class="logout-dialog-btn primary" bindtap="onConfirmLogout">确定</view>
+    </view>
+  </view>
+</view>

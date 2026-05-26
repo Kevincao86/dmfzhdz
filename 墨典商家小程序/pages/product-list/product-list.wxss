@@ -74,6 +74,12 @@
   border: 1rpx solid rgba(148, 163, 184, 0.45) !important;
 }
 
+.mini-btn.secondary {
+  background: rgba(15, 118, 178, 0.1) !important;
+  color: #0369a1 !important;
+  border: 1rpx solid rgba(3, 105, 161, 0.25) !important;
+}
+
 .mini-btn.teal {
   background: rgba(13, 148, 136, 0.12) !important;
   color: #0f766e !important;
@@ -107,21 +113,15 @@
   border-color: transparent;
 }
 
-.tab-on .tab-short,
 .tab-on .tab-label {
   color: #f8fafc;
 }
 
-.tab-short {
-  font-size: 22rpx;
-  font-weight: 800;
-  color: #64748b;
-}
-
 .tab-label {
-  font-size: 22rpx;
+  font-size: 23rpx;
   color: #475569;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .search-wrap {
@@ -204,6 +204,14 @@
   font-size: 22rpx;
   color: #94a3b8;
   display: block;
+}
+
+.prod-id {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: #cbd5e1;
+  display: block;
+  font-family: ui-monospace, monospace;
 }
 
 .prod-price {

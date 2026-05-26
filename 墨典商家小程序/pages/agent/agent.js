@@ -1,5 +1,6 @@
 const api = require('../../utils/api.js')
 const aiAgent = require('../../utils/aiAgentMp.js')
+const execMp = require('../../utils/aiAgentExecutionMp.js')
 const registry = require('../../utils/aiModelRegistryMp.js')
 
 const FILTER_TABS = [
@@ -30,6 +31,7 @@ Page({
   },
 
   onLoad() {
+    this._executionState = execMp.createAgentExecutionState()
     this.recalcLayout()
     const allModelOptions = registry.listAiModelPickerOptions()
     this._allModelOptions = allModelOptions
@@ -64,8 +66,7 @@ Page({
       const sys = wx.getSystemInfoSync()
       const statusBarH = sys.statusBarHeight || 44
       const headerH = statusBarH + 48
-      const tabBarPx = Math.round((76 * sys.windowWidth) / 750) + (sys.safeAreaInsets?.bottom || 0)
-      const tabGapPx = Math.round((36 * sys.windowWidth) / 750)
+      const tabBarPx = Math.round((84 * sys.windowWidth) / 750) + (sys.safeAreaInsets?.bottom || 0)
       const dockPx = Math.round((120 * sys.windowWidth) / 750)
       const attachPx = this.data.attachments.length
         ? Math.round((88 * sys.windowWidth) / 750)
@@ -73,23 +74,28 @@ Page({
       this.setData({
         statusBarH,
         headerH,
-        scrollBottomPad: headerH + dockPx + attachPx + tabBarPx + tabGapPx + 28,
+        scrollBottomPad: headerH + dockPx + attachPx + tabBarPx + 16,
       })
     } catch (_) {}
   },
 
   onShow() {
     if (!api.isAuthed()) {
-      wx.redirectTo({ url: '/pages/login/login' })
+      api.goLogin()
       return
     }
-    try {
-      const app = getApp()
-      if (app && typeof app.syncMerchantSession === 'function') void app.syncMerchantSession()
-    } catch (_) {}
+    void (async () => {
+      try {
+        const app = getApp()
+        if (app && typeof app.syncMerchantSession === 'function') {
+          await app.syncMerchantSession({ force: true })
+        }
+      } catch (_) {}
+    })()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
+    this.recalcLayout()
   },
 
   syncModelPickers() {
@@ -147,6 +153,7 @@ Page({
 
   onNewChat() {
     aiAgent.clearThread()
+    this._executionState = execMp.createAgentExecutionState()
     this.setData({
       messages: [
         {
@@ -315,18 +322,23 @@ Page({
     })
     this.recalcLayout()
     try {
-      const turn = await aiAgent.sendAgentTurn({
-        userLine: text,
-        history: this.data.messages,
-        attachments,
-        pickerKey: this.data.modelPickerKey,
-        modelOptions: this._allModelOptions,
-      })
-      const messages = baseMessages.concat([turn.assistantMsg])
+      const turn = await aiAgent.processAgentTurn(
+        {
+          userLine: text,
+          history: this.data.messages,
+          attachments,
+          pickerKey: this.data.modelPickerKey,
+          modelOptions: this._allModelOptions,
+        },
+        this._executionState,
+      )
+      this._executionState = turn.executionState || execMp.createAgentExecutionState()
+      const messages = baseMessages.concat(turn.assistantMsgs || [])
       aiAgent.saveThread(messages)
+      const last = messages[messages.length - 1]
       this.setData({
         messages,
-        scrollTo: `msg-${turn.assistantMsg.id}`,
+        scrollTo: last ? `msg-${last.id}` : '',
       })
     } catch (e) {
       const errMsg = {
@@ -340,6 +352,23 @@ Page({
       })
     } finally {
       this.setData({ busy: false })
+    }
+  },
+
+  onConfirmPreview(e) {
+    const id = e.currentTarget.dataset.id
+    const taskType = e.currentTarget.dataset.task
+    const messages = (this.data.messages || []).map((m) =>
+      m.id === id ? Object.assign({}, m, { previewStatus: 'confirmed' }) : m,
+    )
+    this.setData({ messages })
+    aiAgent.saveThread(messages)
+    if (taskType === 'create_product') {
+      wx.showToast({ title: '请在「功能→商品」完善并提交', icon: 'none' })
+      return
+    }
+    if (taskType === 'recruit_influencer') {
+      wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
     }
   },
 })

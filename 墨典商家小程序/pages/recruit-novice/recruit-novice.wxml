@@ -1,0 +1,113 @@
+<scroll-view scroll-y class="nv-scroll">
+  <view class="nv-head">
+    <text class="nv-back" bindtap="backPick">返回版本选择</text>
+    <view class="nv-title-row">
+      <view class="nv-icon">✦</view>
+      <text class="nv-title">新手版 · AI 纯智能处理</text>
+    </view>
+    <text class="nv-sub">已绑定来客门店可多选；档位分配逻辑与 Web 新手版一致（当前为离线估算，与网页端无 AI 时的兜底相同）。</text>
+  </view>
+
+  <view class="nv-card meoo-card">
+    <text class="nv-lab">投放平台 <text class="req">*</text></text>
+    <view class="nv-chips">
+      <view
+        wx:for="{{platforms}}"
+        wx:for-index="pi"
+        wx:key="id"
+        data-i="{{pi}}"
+        bindtap="onPlatformTap"
+        class="nv-chip {{deliveryPlatformIdx === pi ? 'on' : ''}}"
+      >{{item.label}}</view>
+    </view>
+    <text wx:if="{{deliveryPlatformIdx === 1}}" class="nv-warn">小红书不展示达人佣金与抖音带货档位；运营接单后可下发小红书报名表单。</text>
+
+    <text class="nv-lab">探店门店 <text class="req">*</text><text class="nv-muted">（已绑定来客，可多选）</text></text>
+    <button class="nv-btn-store" bindtap="openStorePicker">选择门店</button>
+    <text wx:if="{{storesBoundHint}}" class="nv-warn">{{storesBoundHint}}</text>
+    <view wx:if="{{selectedStores.length}}" class="nv-tags">
+      <view wx:for="{{selectedStores}}" wx:key="id" class="nv-tag">
+        <text>{{item.name}}</text>
+        <text class="nv-tag-x" data-id="{{item.id}}" bindtap="removeStoreTap">×</text>
+      </view>
+    </view>
+    <text wx:else class="nv-muted-small">请点击「选择门店」勾选一家或多家中探店门店</text>
+
+    <text class="nv-lab">城市 <text class="req">*</text></text>
+    <input class="nv-input" value="{{city}}" bindinput="bindCity" placeholder="例如：成都" />
+
+    <text class="nv-lab">行业 <text class="req">*</text></text>
+    <picker mode="selector" range="{{industryOptions}}" value="{{industryIndex}}" bindchange="onIndustryPick">
+      <view class="nv-picker">{{industryOptions[industryIndex]}}</view>
+    </picker>
+
+    <text class="nv-lab">套餐 / 项目说明 <text class="req">*</text></text>
+    <input class="nv-input" value="{{packageNote}}" bindinput="bindPackage" placeholder="例如：双人火锅套餐、美甲单次体验…" />
+
+    <text class="nv-lab">总预算（元） <text class="req">*</text></text>
+    <input class="nv-input" type="digit" value="{{budget}}" bindinput="bindBudget" placeholder="请输入数字" />
+
+    <block wx:if="{{deliveryPlatformIdx === 0}}">
+      <text class="nv-lab">达人佣金（%） <text class="req">*</text></text>
+      <input class="nv-input" type="number" value="{{kolCommissionInput}}" bindinput="bindKolCommission" placeholder="例如 3" />
+      <text class="nv-muted-small">当前有效：{{kolCommissionInput}}%（0～80，仅数字）</text>
+    </block>
+
+    <text class="nv-lab">招募日期 <text class="req">*</text></text>
+    <picker mode="date" value="{{recruitStart}}" bindchange="bindRecruitStart">
+      <view class="nv-picker">开始：{{recruitStart || '选择日期'}}</view>
+    </picker>
+    <picker mode="date" value="{{recruitEnd}}" bindchange="bindRecruitEnd">
+      <view class="nv-picker nv-picker-mt">结束：{{recruitEnd || '选择日期'}}</view>
+    </picker>
+
+    <text class="nv-lab">探店日期 <text class="req">*</text></text>
+    <picker mode="date" value="{{visitStart}}" bindchange="bindVisitStart">
+      <view class="nv-picker">开始：{{visitStart || '选择日期'}}</view>
+    </picker>
+    <picker mode="date" value="{{visitEnd}}" bindchange="bindVisitEnd">
+      <view class="nv-picker nv-picker-mt">结束：{{visitEnd || '选择日期'}}</view>
+    </picker>
+
+    <block wx:if="{{deliveryPlatformIdx === 0}}">
+      <text class="nv-lab">档位偏好策略</text>
+      <picker mode="selector" range="{{strategies}}" range-key="lab" value="{{strategyIndex}}" bindchange="onStrategyPick">
+        <view class="nv-picker">{{strategies[strategyIndex].lab}}</view>
+      </picker>
+    </block>
+
+    <button class="nv-ai-btn" bindtap="runAllocation" loading="{{aiLoading}}">
+      {{deliveryPlatformIdx === 1 ? '估算小红书达人数' : 'AI 智能分配达人档位'}}
+    </button>
+    <text wx:if="{{aiErr}}" class="nv-err">{{aiErr}}</text>
+    <text wx:if="{{allocationText}}" class="nv-alloc">{{allocationText}}</text>
+
+    <view class="nv-foot-btns">
+      <button class="nv-cancel" bindtap="backPick">取消</button>
+      <button class="nv-submit" bindtap="onSubmit" loading="{{submitting}}" disabled="{{submitting}}">提交需求</button>
+    </view>
+  </view>
+
+  <view wx:if="{{storePickerOpen}}" class="nv-modal">
+    <view class="nv-modal-bg" bindtap="closeStorePicker"></view>
+    <view class="nv-modal-panel meoo-card">
+      <text class="nv-modal-title">选择门店</text>
+      <input class="nv-input" placeholder="搜索门店" value="{{storeSearch}}" bindinput="bindStoreSearch" />
+      <scroll-view scroll-y class="nv-modal-list">
+        <view
+          wx:for="{{displayStores}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="toggleStoreTap"
+          class="nv-store-row"
+        >
+          <text class="nv-store-name">{{item.name}}</text>
+          <text class="nv-store-addr">{{item.address}}</text>
+        </view>
+      </scroll-view>
+      <button class="nv-modal-ok" bindtap="confirmStorePicker">完成</button>
+    </view>
+  </view>
+
+  <view class="nv-bottom-space" />
+</scroll-view>

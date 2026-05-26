@@ -22,7 +22,7 @@ const core = {
   /**
    * true：跳过登录页，使用示意账号进入首页（仅本地/UI 设计用，上架前务必 false）。
    */
-  DEV_SKIP_LOGIN: true,
+  DEV_SKIP_LOGIN: false,
   /** 跳过登录时首页展示的门店/账户名 */
   DEV_SKIP_LOGIN_NAME: 'DMF001',
   SUPABASE_URL: host
@@ -31,7 +31,7 @@ const core = {
   SUPABASE_ANON_KEY: DEMO_ANON_KEY,
   TENANT_EMAIL_DOMAIN: 'users.meoo.test',
   VOICE_DRAFT_URL: '',
-  /** Web ERP 开发服务根地址（与 .env 中 VITE_MERCHANT_API_BASE_URL 一致），例：http://192.168.3.10:5173 */
+  /** Web ERP 开发服务根（与 vite .env VITE_MERCHANT_API_BASE_URL 一致）。必须配置：复制 utils/config.local.example.js → config.local.js。 */
   MERCHANT_API_BASE_URL: '',
 }
 

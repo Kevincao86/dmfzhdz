@@ -1,0 +1,35 @@
+<scroll-view scroll-y class="vid-scroll" enhanced show-scrollbar="{{false}}">
+  <text class="vid-back" bindtap="goBack">‹ 返回五步流程</text>
+  <text class="vid-h1">视频审核管理</text>
+
+  <view class="vid-stats">
+    <view class="vid-st meoo-card" wx:for="{{statItems}}" wx:key="k">
+      <text class="vid-st-l">{{item.label}}</text>
+      <text class="vid-st-v">{{item.v}}</text>
+    </view>
+  </view>
+
+  <view class="vid-panel meoo-card">
+    <block wx:if="{{!cards.length}}">
+      <view class="vid-empty">暂无待审核视频。生产环境由达人上传回调写入注册表后在此展示。</view>
+    </block>
+    <block wx:else>
+      <view wx:for="{{cards}}" wx:key="id" class="vid-card">
+        <view class="vid-thumb-row">
+          <image wx:if="{{item.thumbUrl}}" class="vid-thumb-img" mode="aspectFill" src="{{item.thumbUrl}}" />
+          <view wx:else class="vid-thumb-ph">封面</view>
+          <text class="vid-st-pill vid-st-{{item.status}}">{{statLabel[item.status]}}</text>
+        </view>
+        <text class="vid-author">{{item.author}}</text>
+        <text class="vid-title">{{item.title}}</text>
+        <text class="vid-sub">{{item.submittedAt}} · {{item.aiNote}}</text>
+        <view wx:if="{{item.status === 'pending'}}" class="vid-actions">
+          <button size="mini" type="primary" bindtap="onPass" data-id="{{item.id}}">通过</button>
+          <button size="mini" class="vid-reject" bindtap="onReject" data-id="{{item.id}}">驳回</button>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="vid-space" />
+</scroll-view>

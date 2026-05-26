@@ -1,6 +1,8 @@
 /**
  * 店铺菜单/价目表（按租户 localStorage；图片为 data URL，体积大时建议后续迁 Supabase Storage）。
  */
+import { supabase, supabaseConfigured } from './supabaseClient'
+import { upsertMenuItemsCloud } from './tenantStoreIntelCloud'
 import { tenantLocalKey } from './tenantLocalState'
 
 const BASE_KEY = 'meoo_store_menu_v1'
@@ -67,6 +69,9 @@ export function saveStoreMenuRecord(rec: StoreMenuRecord): void {
     window.localStorage.setItem(storageKey(), JSON.stringify({ ...rec, updatedAt: new Date().toISOString() }))
   } catch {
     /* quota */
+  }
+  if (supabaseConfigured && supabase) {
+    void upsertMenuItemsCloud(supabase, rec.items, rec.storeName)
   }
 }
 

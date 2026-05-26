@@ -9,6 +9,9 @@ supabase/.temp
 supabase/.env
 node_modules/
 
+# Vercel CLI（在仓库根目录 `vercel link` 时生成，勿提交）
+.vercel/
+
 # 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
 墨典商家小程序/utils/config.local.js
 墨典达人招募小程序/utils/config.local.js

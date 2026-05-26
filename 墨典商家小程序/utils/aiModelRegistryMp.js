@@ -1,54 +1,72 @@
 /**
  * 与 web modelRegistry.ts + tokenmixClient 对齐的智能体模型下拉（小程序侧静态副本）
  */
+/** 与 web tokenmixClient.ts TOKENMIX_FAMILY_CATALOG 一致 */
 const TOKENMIX_FAMILIES = [
   {
     id: 'openai',
-    label: 'OpenAI',
+    label: '墨典智能AI · 灵犀',
     models: [
-      { id: 'gpt-4o', label: 'GPT-4o' },
-      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
-      { id: 'o4-mini', label: 'o4-mini' },
+      { id: 'gpt-4o', label: '旗舰对话' },
+      { id: 'gpt-4o-mini', label: '轻量对话' },
+      { id: 'o4-mini', label: '深度推理' },
     ],
   },
   {
     id: 'claude',
-    label: 'Claude',
+    label: '墨典智能AI · 慧思',
     models: [
-      { id: 'claude-sonnet-4.6', label: 'Claude Sonnet 4.6' },
-      { id: 'claude-haiku-4.5', label: 'Claude Haiku 4.5' },
+      { id: 'claude-sonnet-4.6', label: '均衡旗舰' },
+      { id: 'claude-haiku-4.5', label: '迅捷轻量' },
+      { id: 'claude-opus-4.7', label: '顶配深度' },
     ],
   },
   {
     id: 'gemini',
-    label: 'Gemini',
+    label: '墨典智能AI · 星鉴',
     models: [
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash', label: '闪速对话' },
+      { id: 'gemini-2.5-pro', label: '专业对话' },
     ],
   },
   {
     id: 'grok',
-    label: 'Grok',
-    models: [{ id: 'grok-4.1-fast-non-reasoning', label: 'Grok 4.1 Fast' }],
+    label: '墨典智能AI · 破界',
+    models: [
+      { id: 'grok-4.1-fast-non-reasoning', label: '极速对话' },
+      { id: 'grok-4.1-fast-reasoning', label: '极速推理' },
+    ],
   },
 ]
 
 const DIRECT = [
   { provider: 'deepseek', label: 'DeepSeek', defaultModel: 'deepseek-chat', fallback: 'deepseek-reasoner' },
-  { provider: 'kimi', label: 'Kimi', defaultModel: 'moonshot-v1-8k', fallback: 'moonshot-v1-32k' },
+  { provider: 'kimi', label: 'Kimi / Moonshot', defaultModel: 'moonshot-v1-8k', fallback: 'moonshot-v1-32k' },
   { provider: 'minimax', label: 'MiniMax', defaultModel: 'MiniMax-M2', fallback: 'MiniMax-M2.1' },
 ]
 
-const QWEN = ['qwen-turbo', 'qwen-plus', 'qwen-max']
-const DOUBAO = ['doubao-pro-32k', 'doubao-seed-1-6-251015']
+const QWEN = [
+  { id: 'qwen-turbo', label: 'qwen-turbo' },
+  { id: 'qwen-plus', label: 'qwen-plus' },
+  { id: 'qwen-max', label: 'qwen-max' },
+]
+const DOUBAO = [
+  { id: 'doubao-pro-32k', label: 'doubao-pro-32k' },
+  { id: 'doubao-seed-1-6-251015', label: 'doubao-seed-1-6' },
+]
 
+/** 与 web modelRegistry.ts AGENT_TOKENMIX_T2I_BY_FAMILY 一致 */
 const T2I_BY_FAMILY = {
   openai: [
-    { id: 'gpt-image-1', label: 'GPT Image 1' },
-    { id: 'dall-e-3', label: 'DALL·E 3' },
+    { id: 'gpt-image-1', label: '绘境 Pro' },
+    { id: 'dall-e-3', label: '绘境 Classic' },
   ],
-  gemini: [{ id: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash（图像）' }],
+  claude: [{ id: 'claude-image-gen', label: '慧思绘境' }],
+  gemini: [
+    { id: 'gemini-2.5-flash-image', label: '星鉴绘境' },
+    { id: 'imagen-3', label: '星鉴绘境 Pro' },
+  ],
+  grok: [{ id: 'grok-image', label: '破界绘境' }],
 }
 
 const PICKER_KEY_STORAGE = 'meoo_ai_model_picker_key'
@@ -135,7 +153,7 @@ function listAiModelPickerOptions() {
         key: 'img::v::minimax',
         provider: 'minimax',
         model: 'image-01',
-        label: `${r.label} · 文生图（image-01）`,
+        label: `${r.label} · 文生图（image-01 · 首选 MiniMax）`,
         capability: 'image',
       })
     }
@@ -147,12 +165,12 @@ function listAiModelPickerOptions() {
     label: '通义千问 · 默认',
     capability: 'chat',
   })
-  for (const id of QWEN) {
+  for (const m of QWEN) {
     out.push({
-      key: `qwen::${id}`,
+      key: `qwen::${m.id}`,
       provider: 'qwen',
-      model: id,
-      label: `通义千问 · ${id}`,
+      model: m.id,
+      label: `通义千问 · ${m.label}`,
       capability: 'chat',
     })
   }
@@ -160,7 +178,7 @@ function listAiModelPickerOptions() {
     key: 'img::v::qwen',
     provider: 'qwen',
     model: 'wanx',
-    label: '通义千问 · 文生图（万相）',
+    label: '通义千问 · 文生图（万相 · 首选通义）',
     capability: 'image',
   })
   out.push({
@@ -170,12 +188,12 @@ function listAiModelPickerOptions() {
     label: '豆包 · 默认',
     capability: 'chat',
   })
-  for (const id of DOUBAO) {
+  for (const m of DOUBAO) {
     out.push({
-      key: `doubao::${id}`,
+      key: `doubao::${m.id}`,
       provider: 'doubao',
-      model: id,
-      label: `豆包 · ${id}`,
+      model: m.id,
+      label: `豆包 · ${m.label}`,
       capability: 'chat',
     })
   }
@@ -183,14 +201,14 @@ function listAiModelPickerOptions() {
     key: 'img::v::doubao',
     provider: 'doubao',
     model: 'seedream',
-    label: '豆包 · 文生图（Seedream）',
+    label: '豆包 · 文生图（Seedream · 首选豆包）',
     capability: 'image',
   })
   out.push({
     key: 'img::v::auto',
     provider: 'qwen',
     model: '',
-    label: '文生图 · 自动',
+    label: '文生图 · 自动（按环境变量轮询万相/豆包/MiniMax）',
     capability: 'image',
   })
   return out
@@ -277,9 +295,11 @@ function filterOptions(options, tab) {
   return options.filter((o) => o.capability === 'image')
 }
 
+/** 与 web AiAgentComposerBar shortModelLabel 一致 */
 function shortLabel(label) {
-  const head = String(label).split(/[·\-–|]/)[0].trim()
-  return head.length <= 8 ? head : `${head.slice(0, 7)}…`
+  const head = String(label).split(/[·\-–|]/)[0]?.trim() ?? String(label)
+  if (head.length <= 10) return head
+  return `${head.slice(0, 9)}…`
 }
 
 module.exports = {

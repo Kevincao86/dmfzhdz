@@ -13,4 +13,40 @@ async function appendRecruitmentOrder(order) {
   return merchantRequest('POST', '/api/ops-sync/recruitment-orders/append', { order })
 }
 
-module.exports = { fetchRegistry, appendRecruitmentOrder }
+async function setTalentPoolCandidates(candidates) {
+  const paths = ['/api/meoo-ops-talent-pool-set', '/api/ops-sync/talent-pool/set']
+  let lastErr = ''
+  for (const path of paths) {
+    try {
+      return await merchantRequest('POST', path, { candidates })
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr || 'talent-pool/set 失败')
+}
+
+async function setRecruitmentScheduleRows(rows) {
+  const paths = ['/api/meoo-ops-recruitment-schedule-set', '/api/ops-sync/recruitment-schedule/set']
+  let lastErr = ''
+  for (const path of paths) {
+    try {
+      return await merchantRequest('POST', path, { rows })
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr || 'schedule/set 失败')
+}
+
+async function setRecruitmentVideoSubmissions(videos) {
+  return merchantRequest('POST', '/api/ops-sync/recruitment-videos/set', { videos })
+}
+
+module.exports = {
+  fetchRegistry,
+  appendRecruitmentOrder,
+  setTalentPoolCandidates,
+  setRecruitmentScheduleRows,
+  setRecruitmentVideoSubmissions,
+}

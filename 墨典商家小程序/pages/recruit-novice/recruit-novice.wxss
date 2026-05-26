@@ -1,0 +1,286 @@
+.nv-scroll {
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 28rpx;
+  background: linear-gradient(180deg, #faf5ff 0%, #f8fafc 40%);
+}
+
+.nv-head {
+  margin-bottom: 20rpx;
+}
+
+.nv-back {
+  font-size: 26rpx;
+  color: #475569;
+}
+
+.nv-title-row {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.nv-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #fff;
+  font-size: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nv-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.nv-sub {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.nv-card {
+  padding-bottom: 32rpx !important;
+}
+
+.nv-lab {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 22rpx;
+  display: block;
+}
+
+.req {
+  color: #dc2626;
+}
+
+.nv-muted {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 22rpx;
+}
+
+.nv-muted-small {
+  font-size: 22rpx;
+  color: #94a3b8;
+  margin-top: 8rpx;
+  display: block;
+}
+
+.nv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.nv-chip {
+  padding: 12rpx 22rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid #e2e8f0;
+  font-size: 26rpx;
+  color: #475569;
+}
+
+.nv-chip.on {
+  border-color: #0284c7;
+  background: rgba(56, 189, 248, 0.12);
+  color: #0369a1;
+}
+
+.nv-warn {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #b45309;
+  display: block;
+}
+
+.nv-btn-store {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #1d4ed8;
+  border: 2rpx solid #bfdbfe;
+  border-radius: 14rpx;
+  background: #eff6ff;
+}
+
+.nv-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.nv-tag {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  font-size: 22rpx;
+  color: #0f172a;
+}
+
+.nv-tag-x {
+  color: #94a3b8;
+}
+
+.nv-input {
+  margin-top: 12rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #fff;
+  font-size: 26rpx;
+}
+
+.nv-picker {
+  margin-top: 12rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 26rpx;
+}
+
+.nv-picker-mt {
+  margin-top: 10rpx;
+}
+
+.nv-ai-btn {
+  margin-top: 28rpx;
+  border-radius: 999rpx;
+  border: none;
+  padding: 24rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(95deg, #7c3aed, #6366f1);
+}
+
+.nv-ai-btn::after {
+  border: none;
+}
+
+.nv-err {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #b91c1c;
+}
+
+.nv-alloc {
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: #0f766e;
+  line-height: 1.48;
+}
+
+.nv-foot-btns {
+  margin-top: 32rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.nv-cancel {
+  flex: 1;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  background: #fff;
+  border: 1rpx solid #cbd5e1;
+  color: #475569;
+}
+
+.nv-cancel::after {
+  border: none;
+}
+
+.nv-submit {
+  flex: 1.35;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  background: linear-gradient(95deg, #2563eb, #0891b2);
+  color: #fff;
+  border: none;
+}
+
+.nv-submit::after {
+  border: none;
+}
+
+.nv-modal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+}
+
+.nv-modal-bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.nv-modal-panel {
+  position: absolute;
+  left: 40rpx;
+  right: 40rpx;
+  top: 15vh;
+  bottom: 14vh;
+  padding: 24rpx !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.nv-modal-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  margin-bottom: 16rpx;
+}
+
+.nv-modal-list {
+  flex: 1;
+  margin-top: 14rpx;
+}
+
+.nv-store-row {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.nv-store-name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.nv-store-addr {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.nv-modal-ok {
+  margin-top: 16rpx;
+  border-radius: 999rpx;
+  background: #2563eb;
+  color: #fff;
+}
+
+.nv-bottom-space {
+  height: 40rpx;
+}
