@@ -96,7 +96,7 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
   }
 
   lines.push(
-    '任务要求：create_product / 文案 / 招募 / GEO / 投流优化等须优先使用上述情报；禁止让用户再报毛利率、完整菜单表、竞品名单（除非快照与接口均为空且用户未附图）。用户附图创建商品时，头图须以其参考图为第一优先级做图生图优化；无附图时才按菜单/竞品情报文生图。执行预览 JSON 须 confirmRequired: true。',
+    '补充说明：以上门店情报仅在用户讨论经营、商品、推广、招募等话题时作为背景参考；与当前问题无关时不要主动展开，也不得因缺少情报而拒绝回答一般性问题。涉及 ERP 写操作（create_product 等）时须优先使用上述情报，执行预览 JSON 须 confirmRequired: true；禁止让用户重复报毛利率、完整菜单或竞品名单（除非快照与接口均为空且用户未附图）。',
   )
 
   return lines.join('\n')

@@ -14,7 +14,7 @@ export type AiAgentPlanProfile = {
 }
 
 const BASE_WELCOME =
-  '你好，我是灵祺 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；涉及改商品、发招募单、报税、发布等操作会先展示预览，**需您确认后**才会调用业务接口。'
+  '你好，我是灵祺 AI 助手。你可以像普通 AI 一样问我任何问题；若在 ERP 里涉及改商品、发招募单、报税、发布等操作，会先展示预览，**需您确认后**才会调用业务接口。'
 
 const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话与文生图（每月直连调用 ${50} 次上限）；报税管理、GEO、竞对分析需升级会员。`,
@@ -54,8 +54,8 @@ export function buildAiAgentPlanProfile(plan: MembershipPlan): AiAgentPlanProfil
     welcome: WELCOME_BY_PLAN[plan],
     composerHint:
       plan === 'free'
-        ? '免费版：对话与生图可用；报税/GEO 等请升级会员'
-        : '选对话模型即可；生图需求将自动匹配文生图模型',
+        ? '可闲聊或问经营问题；报税/GEO 等需升级会员'
+        : '开放对话；选模型后可直接提问，生图需求将自动匹配文生图模型',
     shortcuts: shortcutsForPlan(plan),
     permissions: permissionsForPlan(plan),
   }

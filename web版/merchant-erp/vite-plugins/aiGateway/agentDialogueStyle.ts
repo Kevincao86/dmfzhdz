@@ -55,8 +55,8 @@ export function dialogueStyleAddonForPickerKey(pickerKey: string): string {
         return ''
     }
   }
-  if (parsed.provider === 'qwen') return '使用通义千问：中文为主，贴合餐饮/本地生活商家场景。'
-  if (parsed.provider === 'doubao') return '使用豆包：口语自然，像店长在跟店员交代。'
+  if (parsed.provider === 'qwen') return '使用通义千问：中文表达自然、清晰。'
+  if (parsed.provider === 'doubao') return '使用豆包：口语自然、易读。'
   if (parsed.provider === 'deepseek') return '使用 DeepSeek：简洁、逻辑清楚，少废话。'
   if (parsed.provider === 'kimi') return '使用 Kimi：长文也能收束，先结论后展开。'
   if (parsed.provider === 'minimax') return '使用 MiniMax：短句、好念，适合口播与活动话术。'
