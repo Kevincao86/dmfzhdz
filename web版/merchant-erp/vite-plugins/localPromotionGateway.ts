@@ -269,26 +269,9 @@ export async function handleLocalPromotionRoutes(
   if (!pathname.startsWith('/api/merchant/local-promotion/')) return false
 
   if (method === 'POST' && pathname === '/api/merchant/local-promotion/bind/test') {
-    const j = parseBody(bodyRaw)
-    const creds = credsFromBody(j)
-    if (!creds) {
-      json(res, 400, { ok: false, message: '请填写 Access Token 与本地推广告主 ID' })
-      return true
-    }
-    const pr = await oceanGet<{ list?: unknown[] }>(creds, '/open_api/v3.0/local/project/list/', {
-      local_account_id: creds.localAccountId,
-      page: '1',
-      page_size: '1',
-    })
-    if (!pr.ok) {
-      json(res, 200, {
-        ok: true,
-        demoMode: true,
-        message: '无法连接巨量本地推，当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。',
-      })
-      return true
-    }
-    json(res, 200, { ok: true, demoMode: false, message: '本地推授权校验通过' })
+    const { runLocalPromotionBindTest } = await import('../api/localPromotionBindTestCore.js')
+    const result = await runLocalPromotionBindTest(bodyRaw)
+    json(res, result.statusCode, result.body)
     return true
   }
 
