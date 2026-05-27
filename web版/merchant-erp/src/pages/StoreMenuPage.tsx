@@ -2,7 +2,7 @@ import { FileSpreadsheet, ImagePlus, Loader2, Save, Sparkles, Trash2, X } from '
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
-import { isMenuExcelFile, parseMenuExcelFile } from '../lib/parseMenuExcelFile'
+import { isMenuExcelFile, heuristicParseMenuRows, parseMenuExcelFile } from '../lib/parseMenuExcelFile'
 import {
   createEmptyStoreMenuRecord,
   loadStoreMenuRecord,
@@ -10,6 +10,8 @@ import {
   type StoreMenuItem,
   type StoreMenuRecord,
 } from '../lib/storeMenuStorage'
+import { loadMenuRecordFromCloud } from '../lib/tenantStoreIntelCloud'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { recognizeStoreMenuExcel, recognizeStoreMenuImage } from '../services/storeIntelApi'
 import { fetchStoresForPlatform } from '../services/merchantStoresApi'
 import type { DouyinStoreRow } from '../services/douyinMerchantApi'
@@ -38,9 +40,35 @@ export default function StoreMenuPage() {
   const excelRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const r = loadStoreMenuRecord()
-    setRecord(r ?? createEmptyStoreMenuRecord())
-    if (r?.poiId) setSelectedPoi(r.poiId)
+    const local = loadStoreMenuRecord()
+    const apply = (rec: StoreMenuRecord) => {
+      setRecord(rec)
+      if (rec.poiId) setSelectedPoi(rec.poiId)
+    }
+    if (!supabaseConfigured || !supabase) {
+      apply(local ?? createEmptyStoreMenuRecord())
+      return
+    }
+    void loadMenuRecordFromCloud(supabase).then((cloud) => {
+      const localItems = local?.items?.length ?? 0
+      const cloudItems = cloud?.items?.length ?? 0
+      const cloudNewer =
+        cloud?.updatedAt &&
+        local?.updatedAt &&
+        Date.parse(cloud.updatedAt) > Date.parse(local.updatedAt)
+      if (cloud && cloudItems > 0 && (localItems === 0 || cloudNewer)) {
+        const rec: StoreMenuRecord = {
+          ...(local ?? createEmptyStoreMenuRecord()),
+          items: cloud.items,
+          storeName: cloud.storeName ?? local?.storeName,
+          updatedAt: cloud.updatedAt ?? local?.updatedAt ?? new Date().toISOString(),
+        }
+        saveStoreMenuRecord(rec)
+        apply(rec)
+        return
+      }
+      apply(local ?? createEmptyStoreMenuRecord())
+    })
   }, [])
 
   useEffect(() => {
@@ -143,7 +171,18 @@ export default function StoreMenuPage() {
             : `已从工作表「${sheetName}」识别 ${r.items.length} 条并合并，共 ${mergedItems.length} 条`,
         )
       } else {
-        setToast(r.ok ? '未识别到有效条目，请检查表格是否含品名与价格列' : r.message)
+        const fallback = heuristicParseMenuRows(rows)
+        if (fallback.items.length) {
+          const mergedItems = mergeMenuItems(record.items, fallback.items)
+          persist({ ...record, items: mergedItems })
+          setToast(
+            r.ok
+              ? `AI 未识别到条目，已用本地规则解析 ${fallback.items.length} 条并合并，共 ${mergedItems.length} 条`
+              : `AI 识别暂不可用（${r.message}），已用本地规则解析 ${fallback.items.length} 条并合并，共 ${mergedItems.length} 条`,
+          )
+        } else {
+          setToast(r.ok ? '未识别到有效条目，请检查表格是否含品名与价格列' : r.message)
+        }
       }
     } catch (e) {
       setToast(e instanceof Error ? e.message : 'Excel 解析失败')

@@ -39,6 +39,15 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
       message?: unknown
       code?: unknown
     } | null
+    const rawText = text.trim()
+    if (
+      rawText.includes('An error occurred with your deployment') ||
+      rawText.includes('A server error has occurred')
+    ) {
+      throw new Error(
+        '服务端函数部署异常（Vercel）。请重新部署后再试；若仍失败，请联系管理员检查 /api/meoo-store-menu-excel-recognize 日志与 AI Key 配置。',
+      )
+    }
     const vercelCrash =
       res.status >= 500 &&
       (o?.code === 500 ||

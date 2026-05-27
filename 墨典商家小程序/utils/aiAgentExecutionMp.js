@@ -138,17 +138,46 @@ function formatAssistantDisplayText(content) {
 function parsePlanIntentLabels(assistantContent) {
   const c = String(assistantContent || '')
   const labels = []
-  const re = /(?:^|\n)\s*(?:\d+[.、]\s*)?(?:#{1,4}\s*)?([^\n：:]{2,24}(?:套餐|代金券|团购|方案))[^\n]*/gim
-  let m
-  while ((m = re.exec(c)) && labels.length < 6) {
-    const label = String(m[1] || '').trim()
-    if (label && !labels.includes(label)) labels.push(label)
+  const seen = new Set()
+
+  function push(label) {
+    const s = String(label || '').replace(/\*\*/g, '').trim().slice(0, 48)
+    if (s.length < 2 || seen.has(s) || /优惠券设计|达人招募|直播安排|费用分配/.test(s)) return
+    seen.add(s)
+    labels.push(s)
   }
+
+  const numberedTag =
+    /(?:^|\n)\s*(?:\d+[.、]|[-•]\s*)?\*{0,2}((?:主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)[^*\n：:]{0,10})\*{0,2}[：:]\s*\*{0,2}([^*\n*]{2,56})\*{0,2}/gi
+  let m
+  while ((m = numberedTag.exec(c)) && labels.length < 6) {
+    const tag = String(m[1] || '').trim()
+    const name = String(m[2] || '').trim()
+    if (/优惠券|达人|直播|招募/.test(tag)) continue
+    push(name && tag ? `${tag} · ${name}` : name || tag)
+  }
+
+  if (labels.length < 2) {
+    const generic =
+      /(?:^|\n)\s*(\d+)[.、]\s*\*{0,2}([^*\n：:]{2,20})\*{0,2}[：:]\s*\*{0,2}([^*\n*]{2,56})\*{0,2}/g
+    while ((m = generic.exec(c)) && labels.length < 6) {
+      const tag = String(m[2] || '').trim()
+      const name = String(m[3] || '').trim()
+      if (/优惠券|达人|直播|招募/.test(tag)) continue
+      push(name && tag ? `${tag} · ${name}` : name || tag)
+    }
+  }
+
+  const re = /(?:^|\n)\s*(?:\d+[.、]\s*)?(?:#{1,4}\s*)?([^\n：:]{2,24}(?:套餐|代金券|团购|方案|套装|组合))[^\n]*/gim
+  while ((m = re.exec(c)) && labels.length < 6) {
+    push(m[1])
+  }
+
   const priceRe = /(\d+(?:\.\d+)?)\s*元[^\n]{0,20}(?:套餐|餐|券|团购)/g
   while ((m = priceRe.exec(c)) && labels.length < 6) {
-    const label = m[0].replace(/\s+/g, '').slice(0, 24)
-    if (!labels.includes(label)) labels.push(label)
+    push(m[0].replace(/\s+/g, '').slice(0, 24))
   }
+
   return labels
 }
 
