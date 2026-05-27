@@ -1,4 +1,4 @@
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 37 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   content: '';
@@ -52,7 +52,7 @@
   display: flex;
   align-items: center;
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 38 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   justify-content: space-between;
@@ -85,7 +85,7 @@
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/pages/register/register.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/pages/register/register.js ===== */
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
@@ -106,7 +106,7 @@ function buildServerProfile(platform, profile) {
   const base = {
     platformAccount: String(profile.platformAccount || '').trim(),
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 39 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     platformNickname: String(profile.platformNickname || '').trim(),
@@ -160,7 +160,7 @@ Page({
         wechatId: cur.wechatId || '',
         douyin: { ...emptyPlatformProfile(), ...(cur.douyin || {}) },
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 40 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
         xiaohongshu: { ...emptyPlatformProfile(), ...(cur.xiaohongshu || {}) },
@@ -180,7 +180,7 @@ Page({
   },
   onGetWxProfile() {
     wx.getUserProfile({
-      desc: '用于注册墨典达人会员并展示头像昵称',
+      desc: '用于注册灵祺达人会员并展示头像昵称',
       success: (res) => {
         const u = res.userInfo || {}
         this.setData({
@@ -214,7 +214,7 @@ Page({
   },
   onDouyinLevelChange(e) {
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 41 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const i = Number(e.detail.value)
@@ -268,7 +268,7 @@ Page({
       registeredAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 42 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     }
@@ -302,13 +302,13 @@ Page({
 })
 
 
-/* ===== FILE: 墨典达人招募小程序/pages/register/register.json ===== */
+/* ===== FILE: 灵祺达人招募小程序/pages/register/register.json ===== */
 {
-  "navigationBarTitleText": "注册墨典达人会员"
+  "navigationBarTitleText": "注册灵祺达人会员"
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/pages/register/register.wxml ===== */
+/* ===== FILE: 灵祺达人招募小程序/pages/register/register.wxml ===== */
 <view class="page-shell page-with-bar">
   <view class="page-hero page-hero--compact">
     <text class="page-hero-title">{{editMode ? '完善会员资料' : '注册达人会员'}}</text>
@@ -322,7 +322,7 @@ Page({
     </view>
     <view class="wx-profile">
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 43 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
       <image class="wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
@@ -376,7 +376,7 @@ Page({
         </picker>
       </view>
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 44 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
       <view class="form-col">
@@ -430,7 +430,7 @@ Page({
     </view>
     <view class="form-row">
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 45 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
       <text class="form-label">{{xhsLabels.nickname}}</text>
@@ -462,7 +462,7 @@ Page({
 </view>
 
 
-/* ===== FILE: 墨典达人招募小程序/pages/register/register.wxss ===== */
+/* ===== FILE: 灵祺达人招募小程序/pages/register/register.wxss ===== */
 @import "../apply/apply.wxss";
 
 .wx-profile {
@@ -484,7 +484,7 @@ Page({
 .wx-avatar--ph {
   display: flex;
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 46 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   align-items: center;
@@ -538,7 +538,7 @@ Page({
 .type-chip.active .type-chip-label {
   color: #4338ca;
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 47 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -580,7 +580,7 @@ Page({
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/project.config.json ===== */
+/* ===== FILE: 灵祺达人招募小程序/project.config.json ===== */
 {
   "miniprogramRoot": "./",
   "compileType": "miniprogram",
@@ -592,7 +592,7 @@ Page({
     "minifyWXML": true,
     "compileWorklet": false,
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 48 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     "uglifyFileName": false,
@@ -623,7 +623,7 @@ Page({
   "editorSetting": {}
 }
 
-/* ===== FILE: 墨典达人招募小程序/project.private.config.json ===== */
+/* ===== FILE: 灵祺达人招募小程序/project.private.config.json ===== */
 {
   "libVersion": "3.16.0",
   "projectname": "%25E5%25A2%25A8%25E5%2585%25B8%25E8%25BE%25BE%25E4%25BA%25BA%25E6%258B%259B%25E5%258B%259F%25E5%25B0%258F%25E7%25A8%258B%25E5%25BA%258F",
@@ -646,11 +646,11 @@ Page({
   }
 }
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 49 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
-/* ===== FILE: 墨典达人招募小程序/utils/applyFormState.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/applyFormState.js ===== */
 const memberStore = require('./talentMember.js')
 const regionPicker = require('./regionPicker.js')
 
@@ -700,7 +700,7 @@ function applyFieldsFromMember(member, platform, douyinLevels) {
     platformAccount: prof.platformAccount || '',
     platformNickname: prof.platformNickname || '',
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 50 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     profileLink: prof.profileLink || '',
@@ -725,7 +725,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/chinaRegion.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/chinaRegion.js ===== */
 /** 省 / 市二级（供 picker 使用，直辖市仅含本级市） */
 const REGIONS = [
   { province: '北京市', cities: ['北京市'] },
@@ -754,7 +754,7 @@ const REGIONS = [
   },
   {
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 51 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     province: '黑龙江省',
@@ -808,7 +808,7 @@ const REGIONS = [
     province: '海南省',
     cities: ['海口市', '三亚市', '三沙市', '儋州市'],
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 52 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   },
@@ -862,7 +862,7 @@ function cityList(province) {
   return row ? [...row.cities] : []
 }
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 53 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -877,7 +877,7 @@ function validateRegion(province, city) {
 module.exports = { provinceList, cityList, validateRegion }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/config.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/config.js ===== */
 /**
  * MERCHANT_API_BASE_URL 与商家 ERP / 运营后台 dev 服务根地址一致（如 http://192.168.x.x:5173）
  */
@@ -901,14 +901,14 @@ try {
 module.exports = out
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/config.local.example.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/config.local.example.js ===== */
 /** 复制为 config.local.js（已 gitignore）后填写电脑端商家后台地址 */
 module.exports = {
   MERCHANT_API_BASE_URL: 'http://192.168.1.100:5173',
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/config.local.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/config.local.js ===== */
 /** 本地 dev：商家 ERP API（与 .meoo-dev-sync 注册表同源） */
 module.exports = {
   MERCHANT_API_BASE_URL: 'http://127.0.0.1:5173',
@@ -916,10 +916,10 @@ module.exports = {
 
 
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 54 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
-/* ===== FILE: 墨典达人招募小程序/utils/config.release.example.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/config.release.example.js ===== */
 /**
  * 生产环境 API 根地址（复制为 config.release.js 后提交，或仅在本地 config.local.js 填写同一 URL）。
  * 须为商家 ERP 的 Vercel HTTPS 域名（与仓库根 vercel.json 部署一致），末尾不要加 /。
@@ -932,7 +932,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/merchantApi.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/merchantApi.js ===== */
 const config = require('./config.js')
 
 function baseUrl() {
@@ -970,7 +970,7 @@ function merchantRequest(method, path, data) {
       fail(err) {
         reject(new Error((err && err.errMsg) || '网络异常'))
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 55 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
       },
@@ -981,7 +981,7 @@ function merchantRequest(method, path, data) {
 module.exports = { baseUrl, hasMerchantApi, merchantRequest }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/opsRegistryTalentMp.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/opsRegistryTalentMp.js ===== */
 const { merchantRequest } = require('./merchantApi.js')
 
 async function fetchRegistry() {
@@ -1024,7 +1024,7 @@ async function registerTalentMember(member) {
   ]
   let lastErr
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 56 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   for (const path of paths) {
@@ -1078,7 +1078,7 @@ async function confirmIceTask(mpOrderId, applicantId, action) {
 module.exports = {
   fetchRegistry,
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 57 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   applyToMpOrder,
@@ -1088,7 +1088,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/platformForm.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/platformForm.js ===== */
 const { labels, normalizePlatform } = require('./platformLabels.js')
 
 const DOUYIN_LEVELS = ['LV0', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7', '暂无等级']
@@ -1132,7 +1132,7 @@ function applicantFromProfile(platform, profile, extra) {
     visitTimeSlot: extra?.visitTimeSlot,
     province: String(extra?.province || '').trim() || undefined,
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 58 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     city: String(extra?.city || '').trim() || undefined,
@@ -1147,7 +1147,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/platformLabels.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/platformLabels.js ===== */
 function normalizePlatform(raw) {
   const s = String(raw || '').trim()
   if (s.includes('红')) return '小红书'
@@ -1177,7 +1177,7 @@ function labels(platform) {
 module.exports = { normalizePlatform, labels }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/recruitmentDisplay.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/recruitmentDisplay.js ===== */
 const {
   shouldExcludeRecruitmentSegment,
   filterRecruitmentInfoLines,
@@ -1186,7 +1186,7 @@ const {
   explodeAndFilterDisplayLines,
   normalizeRecruitmentPlatform,
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 59 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
 } = require('./recruitmentInfoFilter.js')
@@ -1240,7 +1240,7 @@ function enrichMpOrder(mp, merchant) {
   )
   const region =
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 60 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     mp.region || pickField(summary, '城市') || storeName || (merchant && merchant.storeAddress) || '—'
@@ -1294,7 +1294,7 @@ function enrichMpOrder(mp, merchant) {
   }
   if (!recruitmentInfo) {
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 61 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     recruitmentInfo = filterRecruitmentInfoText(mp.merchantRequirements || summary || '—')
@@ -1348,7 +1348,7 @@ function enrichRegistry(registry) {
   return mpList.map((mp) => {
     const merchant = findMerchantOrder(registry, mp.sourceMerchantOrderId)
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 62 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     return enrichMpOrder(mp, merchant)
@@ -1363,7 +1363,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/recruitmentInfoFilter.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/recruitmentInfoFilter.js ===== */
 /** 招募信息 / 任务详情展示时排除的片段（模式、Brief、预算、桌数等） */
 function shouldExcludeRecruitmentSegment(text) {
   const t = String(text || '').trim()
@@ -1402,7 +1402,7 @@ function filterTaskDetailText(text) {
 }
 
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 63 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
 function normalizeRecruitmentPlatform(raw) {
@@ -1422,7 +1422,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/recruitmentUrgent.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/recruitmentUrgent.js ===== */
 /** 判断小程序招募单是否归入「急单大厅」（运营创建时显式选择加急单） */
 function isUrgentMpOrder(mp) {
   return !!(mp && mp.urgent === true)
@@ -1436,7 +1436,7 @@ function isIceMpOrder(mp) {
 module.exports = { isUrgentMpOrder, isIceMpOrder }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/regionPicker.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/regionPicker.js ===== */
 const china = require('./chinaRegion.js')
 
 /** 初始化省/市 picker 状态 */
@@ -1456,7 +1456,7 @@ function setupRegionState(province, city) {
     provinceIndex,
     cityIndex,
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 64 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   }
@@ -1493,7 +1493,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典达人招募小程序/utils/talentMember.js ===== */
+/* ===== FILE: 灵祺达人招募小程序/utils/talentMember.js ===== */
 const STORAGE_KEY = 'meoo_talent_member_v1'
 
 const MEMBER_TYPES = {
@@ -1510,7 +1510,7 @@ function emptyPlatformProfile() {
     followers: '',
     douyinSalesLevel: '',
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 65 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
     quotePrice: '',
@@ -1542,7 +1542,7 @@ function clearMember() {
 }
 
 function memberTypeLabel(memberType) {
-  return MEMBER_TYPES[memberType]?.label || '墨典达人会员'
+  return MEMBER_TYPES[memberType]?.label || '灵祺达人会员'
 }
 
 function memberCoversPlatform(member, platform) {
@@ -1564,7 +1564,7 @@ module.exports = {
   MEMBER_TYPES,
   emptyPlatformProfile,
 
-墨典达人招募小程序软件 V1.0
+灵祺达人招募小程序软件 V1.0
 第 66 页 / 共 66 页（登记摘录）
 ————————————————————————————————————————————————————————————
   readMember,

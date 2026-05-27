@@ -1,4 +1,4 @@
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 330 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const hash = hashOpsPasswordSync(password)
@@ -52,7 +52,7 @@ export async function createOpsSubAccountInDb(
   const { error } = await admin.from('ops_staff_accounts').insert(row)
   if (error) return { ok: false, error: error.message }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 331 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   return { ok: true, account: rowToPublic(row) }
@@ -106,7 +106,7 @@ export async function deleteOpsSubAccountInDb(
   if (row.role === 'super_admin') return { ok: false, error: 'cannot_delete_master' }
   const { error } = await admin.from('ops_staff_accounts').delete().eq('id', id)
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 332 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (error) return { ok: false, error: error.message }
@@ -160,7 +160,7 @@ export async function requireSuperAdminSession(
   token: string,
   env: NodeJS.ProcessEnv,
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 333 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
 ): Promise<
@@ -214,7 +214,7 @@ export function registrySyncLiteReadSupabase():
     ''
   ).trim()
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 334 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (!supabaseUrl || !serviceRole) return { ok: false }
@@ -268,7 +268,7 @@ export async function handleRegistrySyncLitePost(
     res.status(out.status).send(payload)
   } catch (e) {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 335 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const msg = e instanceof Error ? e.message : String(e)
@@ -322,7 +322,7 @@ export async function opsTenantPatchAdmin(
   const giftProvided = typeof body.opsGiftDays === 'number' && Number.isFinite(body.opsGiftDays)
   if (giftProvided) {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 336 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const { data: tenant, error: loadErr } = await admin
@@ -376,7 +376,7 @@ export async function opsTenantResetPasswordAdmin(
   const password = rawPw.length >= 6 ? rawPw : '123456'
 
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 337 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const { data: members, error: me } = await admin
@@ -430,7 +430,7 @@ export async function opsTenantWalletLedgerAdmin(
       body: {
         ok: false,
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 338 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
         error: 'wallet_ledger_select_failed',
@@ -484,7 +484,7 @@ export async function opsTenantTokenmixAdmin(
     }
     const key =
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 339 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
       typeof data.tokenmix_api_key === 'string' && data.tokenmix_api_key.trim()
@@ -538,7 +538,7 @@ function bodyRaw(req: VercelRequest): string {
   if (req.body !== undefined && req.body !== null && typeof req.body === 'object')
     return JSON.stringify(req.body)
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 340 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   return '{}'
@@ -592,7 +592,7 @@ async function provisionWithServiceRole(
   }
   try {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 341 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
     payload = JSON.parse(rawBody) as typeof payload
@@ -646,7 +646,7 @@ async function provisionWithServiceRole(
     const detailRaw =
       createJson.msg ?? createJson.message ?? createJson.error_description ?? createText
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 342 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const msg = String(detailRaw).toLowerCase()
@@ -700,7 +700,7 @@ async function provisionWithServiceRole(
   })
 
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 343 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (!memRes.ok) {
@@ -754,7 +754,7 @@ async function forwardToProvisionEdge(
       method: 'POST',
       headers: {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 344 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
         'Content-Type': 'application/json',
@@ -808,7 +808,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const missingEnv: string[] = []
     if (!supabaseUrl) missingEnv.push('VITE_SUPABASE_URL 或 SUPABASE_URL')
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 345 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
     if (!serviceRole) missingEnv.push('SUPABASE_SERVICE_ROLE_KEY（不要用 VITE_ 前缀；变量须勾选 Production）')
@@ -862,7 +862,7 @@ export function sendOpsJson(res: VercelResponse, status: number, body: Record<st
     }
   }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 346 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -916,7 +916,7 @@ export default async function handler(req: Request): Promise<Response> {
   const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
   const text = typeof body.text === 'string' ? body.text.trim() : ''
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 347 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const id = typeof body.id === 'string' ? body.id.trim() : ''
@@ -970,7 +970,7 @@ export default async function handler(req: Request): Promise<Response> {
  */
 import { sendSupportMerchantMessageFeishu } from './supportFeishuNotify.js'
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 348 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -1024,7 +1024,7 @@ async function claimSupportFeishuNotify(
     })
     if (!r.ok) {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 349 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
       const detail = await r.text()
@@ -1078,7 +1078,7 @@ export default async function handler(req: Request): Promise<Response> {
     return json(401, { ok: false, error: 'unauthorized' })
   }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 350 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -1132,7 +1132,7 @@ export default async function handler(req: Request): Promise<Response> {
       from: row.from_role as 'user' | 'bot' | 'agent' | 'system' | 'ops',
       text: row.text,
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 351 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
       ts: row.ts,
@@ -1186,7 +1186,7 @@ async function feishuSign(timestamp: number, secret: string): Promise<string> {
   const bytes = new Uint8Array(sig)
   let binary = ''
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 352 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   for (const b of bytes) binary += String.fromCharCode(b)
@@ -1240,7 +1240,7 @@ export async function sendSupportMerchantMessageFeishu(payload: {
     let parsed: { code?: number; msg?: string } = {}
     try {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 353 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
       parsed = JSON.parse(raw) as typeof parsed
@@ -1294,7 +1294,7 @@ export type SendTenantAnnouncementInput = {
   body: string
   targetAll: boolean
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 354 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   tenantIds: string[]
@@ -1348,7 +1348,7 @@ async function fetchTenantIds(supabaseUrl: string, serviceKey: string): Promise<
   try {
     const rows = JSON.parse(text || '[]') as { id?: string }[]
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 355 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const ids = rows.map((x) => String(x.id ?? '')).filter(Boolean)
@@ -1402,7 +1402,7 @@ export async function sendTenantAnnouncement(
   })
   const insText = await insRes.text()
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 356 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (!insRes.ok) {
@@ -1456,7 +1456,7 @@ export async function listTenantAnnouncementsForOps(
   limit = 50,
 ): Promise<{ ok: true; rows: OpsAnnouncementListRow[] } | { ok: false; error: string; detail?: string }> {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 357 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const base = supabaseUrl.replace(/\/$/, '')
@@ -1510,7 +1510,7 @@ export function extendServiceExpireAtIso(
   addDays: number,
 ): string {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 358 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const days = clampEntitlementDays(addDays)
@@ -1564,7 +1564,7 @@ export function buildOpsGiftDaysPatch(input: {
   oldOpsGiftDays: number
   newOpsGiftDays: number
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 359 页 / 共 359 页（登记摘录）
 ————————————————————————————————————————————————————————————
   serviceExpireAt: string | null

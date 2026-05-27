@@ -73,7 +73,7 @@ export async function generateIceEditBriefAi(
   const r = await postDouyinGoodsAiAssist({
     model,
     action: 'operation_article',
-    product_name: '墨典AI云剪',
+    product_name: '灵祺AI云剪',
     title_draft: titleDraft,
   })
   if (!r.ok || !r.description?.trim()) {

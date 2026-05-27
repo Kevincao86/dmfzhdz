@@ -1,4 +1,4 @@
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1535 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const next = appendRecruitmentOrderForTenant(data, order, auth.tenantId, auth.userId)
@@ -52,7 +52,7 @@ function rawBody(req: VercelRequest): string {
   try {
     if (typeof req.body === 'string') return req.body
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1536 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
@@ -106,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const next = setRecruitmentScheduleRowsForTenant(data, auth.tenantId, rows)
     await io.save(next)
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1537 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     sendOpsJson(res, 200, { ok: true })
@@ -160,7 +160,7 @@ function rawBody(req: VercelRequest): string {
     if (typeof req.body === 'string') return req.body
     if (Buffer.isBuffer(req.body)) return req.body.toString('utf8')
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1538 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     if (req.body && typeof req.body === 'object') return JSON.stringify(req.body)
@@ -214,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const data = await io.load()
     const controlledByOps = lastWriter === 'ops' ? true : data.aiModels.controlledByOps
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1539 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     data.aiModels = {
@@ -268,7 +268,7 @@ function sendOpsJson(res: VercelResponse, status: number, body: Record<string, u
     try {
       if (!res.writableEnded && !res.headersSent) res.end()
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1540 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     } catch {
@@ -322,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1541 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     let payload: string
@@ -376,7 +376,7 @@ function sendOpsJson(res: VercelResponse, status: number, body: Record<string, u
     if (res.writableEnded || res.headersSent) return
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1542 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     res.status(status).send(JSON.stringify(body))
@@ -430,7 +430,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           hint: merchantSupabaseAdminEnvConfigureHint(missingParts),
         }),
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1543 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
       )
@@ -484,7 +484,7 @@ import {
 import { requireMerchantRegistryAuth } from '../src/lib/merchantRegistryAuth.js'
 import type { RegistryTalentPoolRow } from '../src/lib/opsRegistryTypes.js'
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1544 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 import { setTalentPoolCandidatesForTenant } from '../src/lib/registryTenantIsolation.js'
@@ -538,7 +538,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'supabase_admin_not_configured',
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1545 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
         missing: missingParts,
@@ -592,7 +592,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const urlStr = typeof req.url === 'string' ? req.url : ''
   const qIdx = urlStr.indexOf('?')
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1546 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const search = qIdx >= 0 ? urlStr.slice(qIdx) : ''
@@ -646,7 +646,7 @@ import {
   rawBody,
   sendMerchantJson,
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1547 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 } from './merchant/merchantGatewayShared.js'
@@ -700,7 +700,7 @@ function cors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1548 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -754,7 +754,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 405, { ok: false, message: 'method_not_allowed' })
     return
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1549 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   }
@@ -808,7 +808,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const tenantId = manage.tenant_id as string
 
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1550 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   let body: { action?: string; loginName?: string; password?: string; cloudUserId?: string }
@@ -862,7 +862,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       role: 'member',
     })
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1551 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -916,7 +916,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 200, { ok: true })
     return
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1552 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   }
@@ -970,7 +970,7 @@ export const config = { maxDuration: 60 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1553 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (handleMerchantApiOptions(req, res)) return
@@ -1024,7 +1024,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
  * Vercel：同源 `/api/merchant/*`（抖音来客、财务对账、评价占位等），与本地 Vite 共用 merchantApiGatewayCore。
  *
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1554 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
  * 注意：不要在文件顶层静态 import `merchantApiGatewayCore`。
@@ -1078,7 +1078,7 @@ function headersForNodeMocks(
 function pathOnlyFromRequestUrl(url: string): string {
   const raw = url.split('?')[0] ?? ''
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1555 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (raw.startsWith('http://') || raw.startsWith('https://')) {
@@ -1132,7 +1132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const parts = slugSegmentsFromRequest(req)
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1556 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const pathname = '/api/merchant/' + parts.join('/')
@@ -1186,7 +1186,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ...(bodyRaw ? { body: bodyRaw as unknown as Record<string, string> } : {}),
   })
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1557 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -1240,7 +1240,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
  */
 export { default, config } from '../../douyin-bind.js'
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1558 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -1294,7 +1294,7 @@ export function rawBody(req: VercelRequest): string {
     return '{}'
   }
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1559 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -1348,7 +1348,7 @@ export function rawBody(req: VercelRequest): string {
 
 export function flattenVercelHeaders(
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1560 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   h: VercelRequest['headers'],
@@ -1402,7 +1402,7 @@ export function handleMerchantApiOptions(req: VercelRequest, res: VercelResponse
 
 export async function runMerchantApiGatewayFromPath(
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1561 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
   req: VercelRequest,
@@ -1456,7 +1456,7 @@ export async function runMerchantApiGatewayFromPath(
     }
     const ctRaw = hdrs?.['content-type'] ?? hdrs?.['Content-Type']
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1562 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const ctLower = (typeof ctRaw === 'string' ? ctRaw : String(ctRaw ?? '')).toLowerCase()
@@ -1510,7 +1510,7 @@ export async function notifyFeishuRecruitmentOrderCreated(
       .join('\n'),
   )
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1563 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -1564,7 +1564,7 @@ export function notifyFeishuPaymentOrderCreated(payload: {
 }
 
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1564 页 / 共 1564 页（登记摘录）
 ————————————————————————————————————————————————————————————
 

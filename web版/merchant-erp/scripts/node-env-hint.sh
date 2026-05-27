@@ -4,7 +4,7 @@ set +e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 cd "$ROOT" || exit 1
 echo ""
-echo "=== merchant-erp 环境诊断（墨典）==="
+echo "=== merchant-erp 环境诊断（灵祺）==="
 echo "项目目录: $ROOT"
 echo ""
 

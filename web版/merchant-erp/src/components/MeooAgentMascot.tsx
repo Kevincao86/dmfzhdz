@@ -9,7 +9,7 @@ function resolveState(aiSending: boolean, inputDraft: string): MascotState {
 }
 
 /**
- * 墨典智能体输入区旁 SVG 卡通小人：待机打哈欠、输入时看输入框、生成中敲键盘。
+ * 灵祺智能体输入区旁 SVG 卡通小人：待机打哈欠、输入时看输入框、生成中敲键盘。
  */
 export function MeooAgentMascot({
   aiSending,
@@ -26,7 +26,7 @@ export function MeooAgentMascot({
     <div
       className={cn('relative flex w-[4.5rem] flex-col items-center select-none', className)}
       aria-hidden
-      title="墨典小助手"
+      title="灵祺小助手"
     >
       <div className="relative h-[5.25rem] w-[4.25rem]">
         <svg viewBox="0 0 68 84" className="h-full w-full drop-shadow-sm" fill="none">

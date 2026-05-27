@@ -11,7 +11,7 @@ export const XHS_COMMERCIAL_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'market', label: '一、小红书商业平台' },
     { id: 'advertiser', label: '二、广告主与授权' },
-    { id: 'erp', label: '三、墨典 ERP 绑定' },
+    { id: 'erp', label: '三、灵祺 ERP 绑定' },
   ],
   steps: [
     {
@@ -45,9 +45,9 @@ export const XHS_COMMERCIAL_BIND_GUIDE: BindGuideConfig = {
       ],
     },
   ],
-  erpPhaseLabel: '三、墨典 ERP 绑定',
+  erpPhaseLabel: '三、灵祺 ERP 绑定',
   erpStep: {
-    title: '在墨典 ERP 完成绑定',
+    title: '在灵祺 ERP 完成绑定',
     bullets: [
       '路径：系统设置 → 商业化后台 → 小红书聚光 · 种小草。',
       '点击「绑定说明书」查看本流程；填写授权密钥与广告主编号后保存。',

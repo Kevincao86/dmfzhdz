@@ -22,6 +22,6 @@ export const DOUYIN_BIND_GUIDE: BindGuideConfig = {
     imageAlt: s.imageAlt,
     note: s.note,
   })),
-  erpPhaseLabel: '三、墨典 ERP 绑定',
+  erpPhaseLabel: '三、灵祺 ERP 绑定',
   erpStep: DOUYIN_BIND_ERP_STEP,
 }

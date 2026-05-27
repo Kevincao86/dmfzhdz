@@ -73,10 +73,10 @@ export function draftExpiringAnnouncementCopy(
 
   const title =
     bucket === 5
-      ? '【墨典 ERP】会员总权益将在 5 日内到期，请及时续费'
+      ? '【灵祺 ERP】会员总权益将在 5 日内到期，请及时续费'
       : bucket === 3
-        ? '【墨典 ERP】会员总权益仅剩约 3 天，请尽快续费'
-        : '【墨典 ERP】会员总权益即将到期，请立即续费'
+        ? '【灵祺 ERP】会员总权益仅剩约 3 天，请尽快续费'
+        : '【灵祺 ERP】会员总权益即将到期，请立即续费'
 
   const samples = recipients
     .slice(0, 5)
@@ -88,9 +88,9 @@ export function draftExpiringAnnouncementCopy(
     })
     .join('\n')
 
-  const body = `尊敬的墨典商户，您好：
+  const body = `尊敬的灵祺商户，您好：
 
-系统检测到您的账户「会员总权益」将在 ${dayPhrase} 到期。到期后，GEO 分析、竞对分析、报税管理及高级 AI 能力可能受限或暂停，为避免影响日常经营，请尽快登录墨典 ERP：
+系统检测到您的账户「会员总权益」将在 ${dayPhrase} 到期。到期后，GEO 分析、竞对分析、报税管理及高级 AI 能力可能受限或暂停，为避免影响日常经营，请尽快登录灵祺 ERP：
 
 1. 打开「系统设置」→「订阅」
 2. 选择适合的会员方案并完成续费
@@ -100,7 +100,7 @@ ${n > 0 ? `本次提醒面向 ${n} 个账户，权益截止概况如下：\n${sa
 续费成功后，总权益时长将自动顺延。如需协助，请通过 ERP 右下角「在线客服」联系我们。
 
 感谢您的支持！
-—— 墨典运营团队`
+—— 灵祺运营团队`
 
   return { title, body }
 }

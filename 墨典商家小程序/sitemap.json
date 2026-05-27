@@ -1,4 +1,0 @@
-{
-  "desc": "墨典商家小程序",
-  "rules": [{ "action": "allow", "page": "*" }]
-}

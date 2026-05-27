@@ -214,7 +214,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     if (busy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
-        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
+        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
       )
       return
     }
@@ -226,7 +226,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       if (!files?.length || videoUploading || imageUploading || busy) return
       if (!cfg?.localUploadEnabled) {
         setErr(
-          '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
+          '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
         )
         return
       }
@@ -266,7 +266,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     if (busy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
-        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
+        '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
       )
       return
     }
@@ -462,7 +462,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const runOneClickImages = async () => {
     if (!cfg?.configured) {
-      setErr('墨典AI云剪服务未就绪')
+      setErr('灵祺AI云剪服务未就绪')
       return
     }
     if (!briefOk) {
@@ -492,7 +492,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     ])
     const pipe = await postIcePipeline({
       imageUrls,
-      projectName: `墨典AI云剪-${label}`.slice(0, 120),
+      projectName: `灵祺AI云剪-${label}`.slice(0, 120),
       editBrief: editBrief.trim(),
       width: aspect.width,
       height: aspect.height,
@@ -573,7 +573,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const runBatch = async () => {
     if (!cfg?.configured) {
-      setErr('墨典AI云剪服务未就绪，请联系运营在管控台配置 AppId 与 AccessKey。')
+      setErr('灵祺AI云剪服务未就绪，请联系运营在管控台配置 AppId 与 AccessKey。')
       return
     }
     if (!briefOk) {
@@ -618,7 +618,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         ])
         const pipe = await postIcePipeline({
           imageUrls,
-          projectName: `墨典AI云剪-${runLabel}`.slice(0, 120),
+          projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
           editBrief: brief,
           width: aspect.width,
           height: aspect.height,
@@ -656,7 +656,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           ])
           const pipe = await postIcePipeline({
             mediaUrl: job.mediaUrl,
-            projectName: `墨典AI云剪-${runLabel}`.slice(0, 120),
+            projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
             editBrief: brief,
             width: aspect.width,
             height: aspect.height,
@@ -689,7 +689,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         })
         const pipe = await postIcePipeline({
           mediaUrl: job.mediaUrl,
-          projectName: `墨典AI云剪-${job.label}`.slice(0, 120),
+          projectName: `灵祺AI云剪-${job.label}`.slice(0, 120),
           editBrief: brief,
           width: aspect.width,
           height: aspect.height,
@@ -729,7 +729,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-600 text-white">
               <Cloud className="h-5 w-5" />
             </span>
-            墨典AI云剪
+            灵祺AI云剪
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
             批量包装探店/带货短片：左侧填写<strong className="font-medium text-zinc-800">素材</strong>与
@@ -808,7 +808,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
                   <p className="font-medium">本地上传未开启</p>
                   <p className="mt-1 text-amber-900/90">
-                    需在运营管理后台「AI模型 → 短视频 API → 墨典AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方
+                    需在运营管理后台「AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀并保存，然后刷新本页。仍可粘贴下方
                     HTTPS 链接作为素材。
                   </p>
                 </div>
@@ -1272,7 +1272,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               </p>
             ) : batchGenerateEnabled && imageItems.length > 0 ? (
               <p className="border-t border-zinc-100 px-5 py-3 text-xs text-zinc-600">
-                已上传 {imageItems.length} 张多图，勾选批量后可点下方「提交墨典AI云剪」
+                已上传 {imageItems.length} 张多图，勾选批量后可点下方「提交灵祺AI云剪」
               </p>
             ) : null}
           </section>
@@ -1298,12 +1298,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               {busy ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  墨典AI云剪进行中…
+                  灵祺AI云剪进行中…
                 </>
               ) : (
                 <>
                   <Sparkles className="h-5 w-5" />
-                  提交墨典AI云剪
+                  提交灵祺AI云剪
                   {totalBatchRuns > 0
                     ? batchGenerateEnabled
                       ? `（约 ${totalBatchRuns} 条成片）`
@@ -1665,7 +1665,7 @@ function ConfigFootnote({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
   if (!cfg) return null
   return (
     <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-      墨典AI云剪由智能媒体服务提供算力；凭据由运营在管控台维护。
+      灵祺AI云剪由智能媒体服务提供算力；凭据由运营在管控台维护。
       {cfg.regionId ? ` 地域 ${cfg.regionId}。` : ''}
       {cfg.localUploadEnabled ? (
         <span className="mt-1 block text-zinc-600">

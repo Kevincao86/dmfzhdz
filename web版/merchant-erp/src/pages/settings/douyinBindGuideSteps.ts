@@ -13,7 +13,7 @@ export type DouyinBindGuideStep = {
 export const DOUYIN_BIND_GUIDE_PHASES = [
   { id: 'laike', label: '一、抖音来客' },
   { id: 'open', label: '二、抖音开放平台' },
-  { id: 'erp', label: '三、墨典 ERP 绑定' },
+  { id: 'erp', label: '三、灵祺 ERP 绑定' },
 ] as const
 
 export const DOUYIN_BIND_GUIDE_STEPS: DouyinBindGuideStep[] = [
@@ -40,7 +40,7 @@ export const DOUYIN_BIND_GUIDE_STEPS: DouyinBindGuideStep[] = [
     ],
     imageSrc: '/douyin-bind-guide/step-02-laike-service-auth.png',
     imageAlt: '抖音来客服务应用授权与商家自研服务',
-    note: '绑定后来客将与自研应用打通，方可由墨典 ERP 代调门店与商品等能力。',
+    note: '绑定后来客将与自研应用打通，方可由灵祺 ERP 代调门店与商品等能力。',
   },
   {
     id: 'console',
@@ -65,7 +65,7 @@ export const DOUYIN_BIND_GUIDE_STEPS: DouyinBindGuideStep[] = [
     ],
     imageSrc: '/douyin-bind-guide/step-04-create-life-app.png',
     imageAlt: '创建生活服务商家应用',
-    note: '每个主体可创建数量有限（如 1/10），请为墨典 ERP 单独保留一个正式应用。',
+    note: '每个主体可创建数量有限（如 1/10），请为灵祺 ERP 单独保留一个正式应用。',
   },
   {
     id: 'credentials',
@@ -99,17 +99,17 @@ export const DOUYIN_BIND_GUIDE_STEPS: DouyinBindGuideStep[] = [
     title: '配置服务器 IP 白名单',
     bullets: [
       '进入应用左侧「开发配置」→「服务器 IP 白名单」。',
-      '点击「添加白名单」，填入墨典 ERP 服务端请求抖音时的出口公网 IP。',
+      '点击「添加白名单」，填入灵祺 ERP 服务端请求抖音时的出口公网 IP。',
       '保存后列表中应出现已添加的 IP；若使用云厂商固定 EIP + 反代，须与运维配置的 DOUYIN_OPENAPI_BASE_URL 出口一致。',
     ],
     imageSrc: '/douyin-bind-guide/step-07-ip-whitelist.png',
     imageAlt: '服务器 IP 白名单配置',
-    note: '示例图中 IP 仅供格式参考；实际 IP 请向墨典实施或运维索取最新白名单地址。Vercel 等动态出口需通过固定 EIP 反代访问抖音。',
+    note: '示例图中 IP 仅供格式参考；实际 IP 请向灵祺实施或运维索取最新白名单地址。Vercel 等动态出口需通过固定 EIP 反代访问抖音。',
   },
 ]
 
 export const DOUYIN_BIND_ERP_STEP = {
-  title: '在墨典 ERP 完成绑定',
+  title: '在灵祺 ERP 完成绑定',
   bullets: [
     '路径：系统设置 → 商家版后台 → 抖音来客商家版。',
     '点击「绑定抖音来客」，在弹窗中填写：AppID、App Secret、商户 ID（即步骤 1 复制的来客账户 ID）。',

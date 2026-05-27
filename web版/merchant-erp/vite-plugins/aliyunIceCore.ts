@@ -207,7 +207,7 @@ export function buildIceUploadTargetConfig(
     return {
       ok: false,
       message:
-        '缺少 ICE 点播存储地址：请在运营台「AI模型 → 短视频 API → 墨典AI云剪」填写 StorageLocation（如 outin-***.oss-cn-shanghai.aliyuncs.com）。粘贴 HTTPS 链接或本地上传后提交云剪均需此项；仅填 OSS 成片前缀不够。',
+        '缺少 ICE 点播存储地址：请在运营台「AI模型 → 短视频 API → 灵祺AI云剪」填写 StorageLocation（如 outin-***.oss-cn-shanghai.aliyuncs.com）。粘贴 HTTPS 链接或本地上传后提交云剪均需此项；仅填 OSS 成片前缀不够。',
     }
   }
   let storageLocation = raw
@@ -484,7 +484,7 @@ export async function iceRunImagesPipeline(
         projectMetadata: JSON.stringify({
           Title: input.projectName.slice(0, 120),
           Description:
-            (input.editBrief.slice(0, 400) || '墨典AI云剪') +
+            (input.editBrief.slice(0, 400) || '灵祺AI云剪') +
             `；多图 ${urls.length} 张；已应用时间线：${plan.summary}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
@@ -551,7 +551,7 @@ export async function iceRunSinglePipeline(
         projectMetadata: JSON.stringify({
           Title: input.projectName.slice(0, 120),
           Description:
-            (input.editBrief.slice(0, 400) || '墨典AI云剪') + `；已应用时间线：${plan.summary}`,
+            (input.editBrief.slice(0, 400) || '灵祺AI云剪') + `；已应用时间线：${plan.summary}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
         source: 'OPENAPI',

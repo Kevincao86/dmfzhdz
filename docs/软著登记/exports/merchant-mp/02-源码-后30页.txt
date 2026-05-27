@@ -1,4 +1,4 @@
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 199 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (it.kind === 'mod') return `/pages/module-detail/module-detail?k=${it.key}`
@@ -27,7 +27,7 @@ function flattenItems() {
 module.exports = { FUNCTION_SECTIONS, itemUrl, flattenItems }
 
 
-/* ===== FILE: 墨典商家小程序/utils/meooPaymentTiers.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/meooPaymentTiers.js ===== */
 /** 与 web版 merchant-erp/src/lib/meooPaymentTiers.ts 档位保持一致 */
 
 module.exports = {
@@ -52,7 +52,7 @@ module.exports = {
     if (!Number.isFinite(n) || n <= 0) return null
     const cents = Math.round(n * 100)
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 200 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     return cents >= 1 ? cents : null
@@ -63,7 +63,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/merchantApi.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/merchantApi.js ===== */
 /**
  * 与 Web ERP 同源：`VITE_MERCHANT_API_BASE_URL`（开发一般为电脑局域网 IP + 端口，如 http://192.168.1.5:5173）
  * 需在 utils/config.js 或 config.local.js 配置 MERCHANT_API_BASE_URL，小程序写入的招募单才会进入与 Web 相同的 `.meoo-dev-sync` 注册表。
@@ -106,7 +106,7 @@ function merchantRequestAuth(method, path, opts) {
   }
   if (bearerToken) header.Authorization = `Bearer ${bearerToken}`
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 201 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   return new Promise((resolve, reject) => {
@@ -136,7 +136,7 @@ function merchantRequestAuth(method, path, opts) {
 module.exports = { baseUrl, hasMerchantApi, merchantRequest, merchantRequestAuth }
 
 
-/* ===== FILE: 墨典商家小程序/utils/merchantFeatureMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/merchantFeatureMp.js ===== */
 const merchantApi = require('./merchantApi.js')
 const { readPlatformToken, apiSegment, PLATFORM_TABS } = require('./platformTokensMp.js')
 
@@ -160,7 +160,7 @@ function financeHeaders() {
 }
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 202 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
 function financeRequestGet(path) {
@@ -214,7 +214,7 @@ async function fetchStoresForPlatform(platformId, keyword) {
     return { ok: false, message: `尚未绑定${label ? label.label : platformId}` }
   }
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 203 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const q = new URLSearchParams({ page: '1', pageSize: '50' })
@@ -268,7 +268,7 @@ async function fetchMarketingActivities(platformId, status) {
   for (const p of paths) {
     try {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 204 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
       const data = await merchantApi.merchantRequestAuth('GET', p, { bearerToken: token })
@@ -322,7 +322,7 @@ function readLocalPromotionCreds() {
 async function fetchLocalPromotions() {
   if (!merchantApi.hasMerchantApi()) {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 205 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     return { ok: false, message: '请配置商家后台 API 地址' }
@@ -376,7 +376,7 @@ async function fetchLocalClues(page) {
       phone: String(x.telephone || x.phone || ''),
       state: String(x.convert_state || x.state || '—'),
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 206 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
       createdAt: String(x.create_time || x.created_at || ''),
@@ -430,7 +430,7 @@ function pushNotification(item) {
     read: false,
   })
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 207 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   try {
@@ -451,7 +451,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/merchantSessionSyncMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/merchantSessionSyncMp.js ===== */
 /**
  * 登录后与 Web 商家后台同步租户级平台绑定（tenant_merchant_bindings）。
  * 抖音来客 / 巨量本地推 / 小红书聚光 与电脑端设置页写入云端的数据一致。
@@ -484,7 +484,7 @@ const LEGACY_BIND_KEY = {
   local_promotion: 'meoo_local_promotion_bind',
   xhs_commercial: 'meoo_xhs_commercial_bind',
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 208 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -538,7 +538,7 @@ function writeActiveBindingId(provider, tenantId, bindingId) {
 }
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 209 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
 /** @param {Record<string, unknown>} raw */
@@ -592,7 +592,7 @@ function unpackXhsCommercial(sealed) {
     return null
   }
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 210 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -646,7 +646,7 @@ function applyLocalPromotion(row, tenantId) {
     writeActiveBindingId('local_promotion', tenantId, null)
     try {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 211 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
       wx.removeStorageSync(legacyKey)
@@ -700,7 +700,7 @@ function clearPlatformSessionForAccountSwitch() {
   clearDouyinLocal()
   for (const p of ['local_promotion', 'xhs_commercial']) {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 212 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const k = LEGACY_BIND_KEY[p]
@@ -754,7 +754,7 @@ async function syncFromCloud(opts) {
       storageSet(MEOO_ACTIVE_TENANT_ID, tenantId)
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 213 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
       try {
@@ -788,7 +788,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/mpModules.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/mpModules.js ===== */
 /** module-detail 页文案（面向商户可读说明） */
 module.exports.MODULE_COPY = {
   store_info: {
@@ -808,7 +808,7 @@ module.exports.MODULE_COPY = {
     body: '与电脑端「创建商品」步骤对应。建议在小程序用「语音录入商品」生成草稿，再到编辑页补充；需要完整图形流程时请用电脑端操作。',
   },
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 214 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   recruitment: {
@@ -862,7 +862,7 @@ module.exports.MODULE_COPY = {
   settings: {
     navTitle: '系统设置',
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 215 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     body: '店铺授权（抖音 / 美团 / 小红书等）、子账号、订阅与权限与电脑端「系统设置」一致。涉及密钥与复杂表单的环节请在电脑端完成。',
@@ -870,7 +870,7 @@ module.exports.MODULE_COPY = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/opsRegistryMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/opsRegistryMp.js ===== */
 const { merchantRequest } = require('./merchantApi.js')
 
 /** @returns {Promise<any>} 完整注册表 JSON（含 recruitmentOrders） */
@@ -889,7 +889,7 @@ async function appendRecruitmentOrder(order) {
 module.exports = { fetchRegistry, appendRecruitmentOrder }
 
 
-/* ===== FILE: 墨典商家小程序/utils/platformTokensMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/platformTokensMp.js ===== */
 /**
  * 与 Web `merchantSession` / `platformTokens` 键名一致。
  * 抖音等凭证由 `merchantSessionSyncMp` 在登录后从 `tenant_merchant_bindings` 同步写入。
@@ -916,7 +916,7 @@ function readPlatformToken(/** @type {string} */ platformId) {
   try {
     return String(wx.getStorageSync(k) || '').trim()
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 216 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   } catch (_) {
@@ -957,7 +957,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/productListingMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/productListingMp.js ===== */
 const merchantApi = require('./merchantApi.js')
 const { readPlatformToken, apiSegment, PLATFORM_TABS } = require('./platformTokensMp.js')
 
@@ -970,7 +970,7 @@ function createPlatformLabel(id) {
  * 对齐 web版/merchant-erp/src/services/productListingApi.ts
  * @returns {Promise<{ok:true,items:any[],total:number,message?:string}|{ok:false,message:string}>}
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 217 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
  */
@@ -1024,7 +1024,7 @@ async function fetchMerchantProductList(/** @type {string} */ platform, opts) {
   }
 }
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 218 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -1048,7 +1048,7 @@ async function postMerchantProductSyncDouyin(/** @type {string} */ productId) {
 module.exports = { fetchMerchantProductList, postMerchantProductSyncDouyin, createPlatformLabel }
 
 
-/* ===== FILE: 墨典商家小程序/utils/reviewsMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/reviewsMp.js ===== */
 const merchantApi = require('./merchantApi.js')
 const { readPlatformToken } = require('./platformTokensMp.js')
 
@@ -1078,7 +1078,7 @@ async function fetchReviewsList(
 
 async function postReviewReply(
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 219 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   /** @type {'douyin'|'meituan'|'xhs'} */ platform,
@@ -1106,7 +1106,7 @@ async function postReviewReply(
 module.exports = { fetchReviewsList, postReviewReply }
 
 
-/* ===== FILE: 墨典商家小程序/utils/supabaseRest.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/supabaseRest.js ===== */
 const config = require('./config.js')
 const api = require('./api.js')
 const { decodeJwtSub } = require('./jwtDecode.js')
@@ -1132,7 +1132,7 @@ function baseUrl() {
     .replace(/\/$/, '')
 }
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 220 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -1186,7 +1186,7 @@ function rawRequest(method, pathAndQuery, tokenUse, body) {
       header: headers(tokenUse),
       data: body,
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 221 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
       success(res) {
@@ -1240,7 +1240,7 @@ async function fetchTenantWalletSummary(tenantId) {
   const token = api.getAccessToken()
   const trows = await request(
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 222 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     'GET',
@@ -1294,7 +1294,7 @@ function insertSupportRelayMessage(row) {
         url: `${baseUrl()}/rest/v1/support_relay_messages`,
         method: 'POST',
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 223 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
         header: Object.assign(headers(token), { Prefer: 'return=minimal' }),
@@ -1348,7 +1348,7 @@ async function insertPaymentOrder(payload) {
         header: Object.assign(headers(token), { Prefer: 'return=minimal' }),
         data: row,
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 224 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
         success(res) {
@@ -1378,7 +1378,7 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/supportRelayMp.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/supportRelayMp.js ===== */
 const rest = require('./supabaseRest.js')
 
 const SESSION_KEY = 'meoo_support_relay_sid'
@@ -1387,7 +1387,7 @@ const POLL_MS = 4000
 const DEFAULT_BOT = {
   id: 'welcome-bot',
   role: 'bot',
-  text: '您好，我是墨典智能助手，可解答常见问题。如需人工协助，请点击「转人工服务」。',
+  text: '您好，我是灵祺智能助手，可解答常见问题。如需人工协助，请点击「转人工服务」。',
   at: '',
   ts: 0,
 }
@@ -1402,7 +1402,7 @@ function getOrCreateSessionId() {
     if (existing && String(existing).trim()) return String(existing).trim()
     const sid = randomSid()
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 225 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     wx.setStorageSync(SESSION_KEY, sid)
@@ -1456,7 +1456,7 @@ function readCustomerMeta() {
   let enterpriseName = ''
   try {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 226 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     customerId = String(wx.getStorageSync('meoo_login_name') || '').trim()
@@ -1503,14 +1503,14 @@ module.exports = {
 }
 
 
-/* ===== FILE: 墨典商家小程序/utils/tenantAuth.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/tenantAuth.js ===== */
 const config = require('./config.js')
 
 /** 与 web版 merchant-erp src/lib/tenantAuthEmail.ts 逻辑一致 */
 function loginNameToTenantEmail(loginName) {
   const domain = config.TENANT_EMAIL_DOMAIN || 'users.meoo.test'
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 227 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const slug = String(loginName || '')
@@ -1524,7 +1524,7 @@ function loginNameToTenantEmail(loginName) {
 module.exports = { loginNameToTenantEmail }
 
 
-/* ===== FILE: 墨典商家小程序/utils/voiceDraft.js ===== */
+/* ===== FILE: 灵祺商家小程序/utils/voiceDraft.js ===== */
 const config = require('./config.js')
 
 /**
@@ -1564,7 +1564,7 @@ function requestVoiceDraft(moduleKey, tempFilePath) {
       },
       fail: reject,
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 228 页 / 共 228 页（登记摘录）
 ————————————————————————————————————————————————————————————
     })

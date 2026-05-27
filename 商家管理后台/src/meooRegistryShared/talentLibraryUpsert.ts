@@ -10,7 +10,7 @@ export function talentLibraryDedupeKey(platform: string, platformAccount: string
   return `${plat}::${platformAccount.trim().toLowerCase()}`
 }
 
-/** 报名成功后写入/更新墨典达人库（按平台+达人ID去重，报价取最新） */
+/** 报名成功后写入/更新灵祺达人库（按平台+达人ID去重，报价取最新） */
 export function upsertTalentLibraryFromApplicant(
   data: RegistryFile,
   opts: {

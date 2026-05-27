@@ -1,4 +1,4 @@
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 1 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 /* ===== FILE: 商家管理后台/src/App.tsx ===== */
@@ -52,7 +52,7 @@ export default function App() {
 
 /* ===== FILE: 商家管理后台/src/AppErrorBoundary.tsx ===== */
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 2 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 import { Component, type ErrorInfo, type ReactNode } from 'react'
@@ -106,7 +106,7 @@ import { twMerge } from 'tailwind-merge'
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 3 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -160,7 +160,7 @@ export default function AiVendorCatalogAvatar({
   return (
     <span
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 4 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       title={tip}
@@ -180,7 +180,7 @@ export default function AiVendorCatalogAvatar({
 /* ===== FILE: 商家管理后台/src/lib/brand.ts ===== */
 export const BRAND_LOGO_URL = '/logo.png'
 export const BRAND_FAVICON_URL = '/favicon.png'
-export const BRAND_NAME = '墨典AI智能ERP'
+export const BRAND_NAME = '灵祺AI智能ERP'
 
 
 /* ===== FILE: 商家管理后台/src/lib/opsSupportTemplates.ts ===== */
@@ -214,7 +214,7 @@ export function writeSupportReplyTemplates(lines: string[]): void {
   }
 }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 5 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -268,7 +268,7 @@ export type SupportRelayExportResultMessage = {
   lines: SupportRelayChatLine[]
 }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 6 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -322,7 +322,7 @@ createRoot(document.getElementById('root')!).render(
 
 /* ===== FILE: 商家管理后台/src/meooRegistryShared/aiVendorCatalogShared.ts ===== */
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 7 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 import type { AiVendorCatalogEntry } from './opsRegistryTypes.js'
@@ -376,7 +376,7 @@ export function normalizeCatalogLogoUrl(raw: unknown): string | undefined {
 export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
   {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 8 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     id: 'minimax',
@@ -430,7 +430,7 @@ export function isBuiltinAiVendorId(id: string): boolean {
 
 /** 磁盘仅保存非内置条目；normalize 后与内置目录合并输出给客户端 */
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 9 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 export function mergeBuiltinAiVendorCatalog(custom: AiVendorCatalogEntry[] | undefined | null): AiVendorCatalogEntry[] {
@@ -484,7 +484,7 @@ export function normalizeVendorKeysFromDisk(raw: unknown): Partial<Record<string
   }
   return out
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 10 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -538,7 +538,7 @@ export function verifyDouyinPublishLink(url: string): { passed: boolean; note: s
     return { passed: false, note: '请提交抖音视频作品链接（douyin.com）' }
   }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 11 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const t = url.trim()
@@ -592,7 +592,7 @@ export function claimIceMpRecruitment(
     if (existing.taskStatus === 'pending_confirm' || !existing.taskStatus) {
       return { ok: true, applicant: existing, needConfirm: true }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 12 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     }
@@ -646,7 +646,7 @@ export function confirmIceMpReceipt(
   const existingSlot = slots.find((s) => s.assignedApplicantId === applicantId)
   if (existingSlot) {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 13 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     const row = {
@@ -700,7 +700,7 @@ export function rejectIceMpTask(
   }
 
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 14 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   applicants[idx] = {
@@ -754,7 +754,7 @@ export function submitIceDouyinForApplicant(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 15 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   douyinPublishUrl: string,
@@ -808,7 +808,7 @@ export function handleIceMpApply(
       mp,
       body: {
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 16 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
         ok: true,
@@ -862,7 +862,7 @@ export function handleIceMpConfirm(
   const applicants = upsertApplicant(mp.applicants, result.applicant)
   const iceVideoSlots = mp.iceVideoSlots?.map((s) =>
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 17 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     s.slotId === result.slot.slotId ? result.slot : s,
@@ -916,7 +916,7 @@ export function reviewOpenMpApplicant(
   const idx = applicants.findIndex((a) => a.id === applicantId)
   if (idx < 0) return { ok: false, error: '未找到报名记录' }
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 18 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -970,7 +970,7 @@ function profileToApplicant(
   return {
     id: `mbr-${Date.now()}`,
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 19 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     name: nick,
@@ -1024,7 +1024,7 @@ export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalen
       mpOrderId: '',
       merchantOrderNo: '',
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 20 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     })
@@ -1078,7 +1078,7 @@ function readCustomCatalogFromDisk(parsed: Partial<RegistryFile> | null): AiVend
     const hint = typeof r.hint === 'string' && r.hint.trim() ? r.hint.trim().slice(0, 280) : undefined
     const logoUrl = normalizeCatalogLogoUrl(r.logoUrl)
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 21 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     out.push({ id, label: label.slice(0, 64), hint, ...(logoUrl ? { logoUrl } : {}) })
@@ -1132,7 +1132,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const recruitmentVideoSubmissions: RegistryVideoSubmission[] = Array.isArray(parsed?.recruitmentVideoSubmissions)
     ? (parsed!.recruitmentVideoSubmissions as RegistryVideoSubmission[])
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 22 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     : []
@@ -1186,7 +1186,7 @@ export type RegistryVideoAi = {
   arkVideoEndpoints?: string
   /**
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 23 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
    * 可选：方舟视频专用 Key。留空时 ERP dev 服务端会回退注册表 vendorKeys.doubao
@@ -1240,7 +1240,7 @@ export type VendorKeyModelId =
   | 'kimi'
 
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 24 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 /** 各厂商 Key；含内置目录及自定义 slug */
@@ -1294,7 +1294,7 @@ export type RegistryRecruitmentOrder = {
   createdAt: string
   status: 'pending' | 'accepted' | 'done' | 'cancelled' | 'refunded'
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 25 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   serviceAmount: number
@@ -1348,7 +1348,7 @@ export type RegistryMpRecruitmentApplicant = {
   mpOrderId?: string
   merchantOrderNo?: string
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 26 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   appliedAt: string
@@ -1365,7 +1365,7 @@ export type RegistryMpRecruitmentApplicant = {
   taskStatus?: MpApplicantTaskStatus
 }
 
-/** 墨典达人库（按平台+达人ID去重，报价等取最新报名） */
+/** 灵祺达人库（按平台+达人ID去重，报价等取最新报名） */
 export type RegistryTalentLibraryEntry = {
   id: string
   platform: '抖音' | '小红书'
@@ -1402,7 +1402,7 @@ export type RegistryMpTalentMember = {
   memberType: 'douyin' | 'xiaohongshu' | 'both'
   wxNickName: string
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 27 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   wxAvatarUrl: string
@@ -1456,7 +1456,7 @@ export type RegistryTalentPoolRow = {
   contentFormat: string
   status: 'pending_confirm' | 'confirmed' | 'rejected' | 'communicating'
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 28 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   followers: number
@@ -1510,7 +1510,7 @@ export type RegistryFile = {
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 29 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -1564,7 +1564,7 @@ import type { RegistryRecruitmentOrder } from './opsRegistryTypes.js'
 
 /** 旧版 mockData 写入注册表时的规范单号 */
 
-墨典AI智能ERP运营管理平台 V1.0
+灵祺AI智能ERP运营管理平台 V1.0
 第 30 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 const LEGACY_CANONICAL_IDS = new Set(['RO20260501001', 'RO20260428003', 'RO20260415002'])

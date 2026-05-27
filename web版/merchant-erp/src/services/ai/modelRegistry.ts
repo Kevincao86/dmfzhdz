@@ -73,7 +73,7 @@ export type AiModelPickerOption = {
   capability?: AiModelCapability
 }
 
-/** TokenMix 各家族下展示的「文生图」模型名（与 chat id 独立；出图仍由墨典服务端引擎执行） */
+/** TokenMix 各家族下展示的「文生图」模型名（与 chat id 独立；出图仍由灵祺服务端引擎执行） */
 const AGENT_TOKENMIX_T2I_BY_FAMILY: Partial<Record<AIModelFamily, readonly { id: string; label: string }[]>> = {
   openai: [
     { id: 'gpt-image-1', label: '绘境 Pro' },
@@ -153,7 +153,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
         key: 'img::b::deepseek::t2i',
         provider: 'deepseek',
         model: '',
-        label: `${r.label} · 文生图（墨典引擎）`,
+        label: `${r.label} · 文生图（灵祺引擎）`,
         capability: 'image',
       })
     }
@@ -162,7 +162,7 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
         key: 'img::b::kimi::t2i',
         provider: 'kimi',
         model: '',
-        label: `${r.label} · 文生图（墨典引擎）`,
+        label: `${r.label} · 文生图（灵祺引擎）`,
         capability: 'image',
       })
     }

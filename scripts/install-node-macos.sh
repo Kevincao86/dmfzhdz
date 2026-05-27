@@ -27,8 +27,8 @@ rm -rf "${LOCAL_ROOT}/${PKG}"
 tar -xzf "$TARBALL" -C "$LOCAL_ROOT"
 ln -sfn "${LOCAL_ROOT}/${PKG}" "${LOCAL_ROOT}/node-current"
 
-ZMARK_BEGIN="# >>> 墨典 Node (install-node-macos.sh) >>>"
-ZMARK_END="# <<< 墨典 Node <<<"
+ZMARK_BEGIN="# >>> 灵祺 Node (install-node-macos.sh) >>>"
+ZMARK_END="# <<< 灵祺 Node <<<"
 BLOCK="${ZMARK_BEGIN}
 export PATH=\"\${HOME}/.local/node-current/bin:\${PATH}\"
 ${ZMARK_END}"

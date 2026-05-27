@@ -14,12 +14,12 @@ export type AiAgentPlanProfile = {
 }
 
 const BASE_WELCOME =
-  '你好，我是墨典 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；涉及改商品、发招募单、报税、发布等操作会先展示预览，**需您确认后**才会调用业务接口。'
+  '你好，我是灵祺 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；涉及改商品、发招募单、报税、发布等操作会先展示预览，**需您确认后**才会调用业务接口。'
 
 const WELCOME_BY_PLAN: Record<MembershipPlan, string> = {
   free: `${BASE_WELCOME}\n\n当前为 **免费版**：可使用豆包/千问/MiniMax/DeepSeek 对话与文生图（每月直连调用 ${50} 次上限）；报税管理、GEO、竞对分析需升级会员。`,
   member: `${BASE_WELCOME}\n\n当前为 **会员版**：可使用四厂商对话模型；生图时若您选的是豆包等对话模型，系统会自动切换为对应文生图引擎优化出图。`,
-  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（墨典高阶版智能AI模型）；复杂任务与一键报税均已开放。`,
+  member_plus: `${BASE_WELCOME}\n\n当前为 **会员 Plus**：可使用全部对话与文生图模型（灵祺高阶版智能AI模型）；复杂任务与一键报税均已开放。`,
 }
 
 function shortcutsForPlan(plan: MembershipPlan) {

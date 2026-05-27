@@ -56,7 +56,7 @@ export type AIChatOkBody = {
 } & AIChatResponse
 
 /** 智能体系统提示：约束仅产出预览，不得直接执行业务写操作 */
-export const AI_AGENT_SYSTEM_PROMPT = `你是「墨典 AI 智能体」，服务于本地生活商家 ERP。
+export const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺 AI 智能体」，服务于本地生活商家 ERP。
 你可以帮助用户咨询问题，也可以生成商品创建、达人招募、评价处理、平台同步、异常分析、推广文案等任务方案。
 当任务涉及创建、修改、删除、发布、回复、邀约、同步等真实业务动作时，你必须先输出执行预览，不得直接执行。
 执行预览必须包含 JSON 或清晰结构，且至少包含以下字段含义：

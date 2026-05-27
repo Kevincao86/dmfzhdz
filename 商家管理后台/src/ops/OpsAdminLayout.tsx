@@ -38,7 +38,7 @@ const OPS_NAV: {
   { to: '/accounts', label: '账号与权限', icon: Shield, permission: 'staff_admin' },
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch, permission: 'recruitment_orders' },
   { to: '/mp-recruitment-orders', label: '小程序达人招募订单', icon: Smartphone, permission: 'mp_recruitment_orders' },
-  { to: '/talent-library', label: '墨典达人库', icon: Library, permission: 'talent_library' },
+  { to: '/talent-library', label: '灵祺达人库', icon: Library, permission: 'talent_library' },
   { to: '/ai-models', label: 'AI 模型', icon: Bot, permission: 'ai_models' },
   { to: '/support', label: '在线客服', icon: Headphones, permission: 'support' },
 ]

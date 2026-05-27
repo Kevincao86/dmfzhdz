@@ -46,7 +46,7 @@ export function buildErpRegistryTenant(): RegistryTenant | null {
   const primary = sorted.find((s) => s.jobRoleId === 'job_builtin_admin') ?? sorted[0]
 
   const merchantName =
-    window.localStorage.getItem(MEOO_MERCHANT_DISPLAY_NAME_KEY)?.trim() || '墨典 ERP 商户'
+    window.localStorage.getItem(MEOO_MERCHANT_DISPLAY_NAME_KEY)?.trim() || '灵祺 ERP 商户'
 
   const trialSnap = readTrialSnapshot()
   const now = new Date()

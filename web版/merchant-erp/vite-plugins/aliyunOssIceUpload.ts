@@ -1,5 +1,5 @@
 /**
- * 墨典AI云剪 — 本地上传至 OSS（运行时动态加载 ali-oss，避免 Vite 配置阶段加载）。
+ * 灵祺AI云剪 — 本地上传至 OSS（运行时动态加载 ali-oss，避免 Vite 配置阶段加载）。
  */
 import path from 'node:path'
 import type { AliyunIceConfig } from './aliyunIceCore.js'

@@ -285,7 +285,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           {mode === 'login'
-            ? '使用商家账号进入墨典AI智能ERP工作台'
+            ? '使用商家账号进入灵祺AI智能ERP工作台'
             : '填写信息完成注册，即可使用免费版'}
         </p>
       </div>
@@ -498,7 +498,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
               <input
                 id="meoo-reg-merchant"
                 className={inputClass}
-                placeholder="可输入汉字，如：墨典咖啡"
+                placeholder="可输入汉字，如：灵祺咖啡"
                 value={merchantName}
                 onChange={(e) => setMerchantName(e.target.value.slice(0, 30))}
               />

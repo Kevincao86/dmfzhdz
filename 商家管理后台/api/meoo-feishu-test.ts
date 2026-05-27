@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ? sceneRaw
       : 'recruitment'
 
-  const text = `墨典运营台 · 飞书通知测试\n场景：${scene}\n时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`
+  const text = `灵祺运营台 · 飞书通知测试\n场景：${scene}\n时间：${new Date().toLocaleString('zh-CN', { hour12: false })}`
   const r = await sendFeishuTextNotify(scene, text)
 
   sendOpsJson(res, r.ok || r.skipped ? 200 : 502, {

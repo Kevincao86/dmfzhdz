@@ -11,7 +11,7 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'ocean', label: '一、巨量引擎商业开放平台' },
     { id: 'account', label: '二、本地推广告主' },
-    { id: 'erp', label: '三、墨典 ERP 绑定' },
+    { id: 'erp', label: '三、灵祺 ERP 绑定' },
   ],
   steps: [
     {
@@ -51,13 +51,13 @@ export const LOCAL_PROMOTION_BIND_GUIDE: BindGuideConfig = {
       title: '应用编号（选填）',
       bullets: [
         '若实施要求备案应用编号，可在开放平台应用详情中复制，填入 ERP「应用编号（选填）」。',
-        '仅备注用途，不影响多数校验流程；以墨典实施说明为准。',
+        '仅备注用途，不影响多数校验流程；以灵祺实施说明为准。',
       ],
     },
   ],
-  erpPhaseLabel: '三、墨典 ERP 绑定',
+  erpPhaseLabel: '三、灵祺 ERP 绑定',
   erpStep: {
-    title: '在墨典 ERP 完成绑定',
+    title: '在灵祺 ERP 完成绑定',
     bullets: [
       '路径：系统设置 → 商业化后台 → 巨量本地推。',
       '点击「绑定说明书」查看本流程；点击「添加账号」或「去绑定」。',

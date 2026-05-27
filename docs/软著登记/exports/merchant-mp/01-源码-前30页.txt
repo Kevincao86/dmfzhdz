@@ -1,7 +1,7 @@
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 1 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-/* ===== FILE: 墨典商家小程序/app.js ===== */
+/* ===== FILE: 灵祺商家小程序/app.js ===== */
 const devAuth = require('./utils/devAuth.js')
 const sessionSync = require('./utils/merchantSessionSyncMp.js')
 
@@ -42,7 +42,7 @@ App({
 })
 
 
-/* ===== FILE: 墨典商家小程序/app.json ===== */
+/* ===== FILE: 灵祺商家小程序/app.json ===== */
 {
   "pages": [
     "pages/agent/agent",
@@ -52,7 +52,7 @@ App({
     "pages/home/home",
     "pages/dashboard/dashboard",
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 2 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     "pages/module-detail/module-detail",
@@ -80,7 +80,7 @@ App({
     "pages/support-chat/support-chat"
   ],
   "window": {
-    "navigationBarTitleText": "墨典商家",
+    "navigationBarTitleText": "灵祺商家",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f8fafc",
@@ -94,7 +94,7 @@ App({
     "list": [
       {
         "pagePath": "pages/agent/agent",
-        "text": "墨典AI"
+        "text": "灵祺AI"
       },
       {
         "pagePath": "pages/functions/functions",
@@ -106,7 +106,7 @@ App({
       }
     ]
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 3 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   },
@@ -123,7 +123,7 @@ App({
 }
 
 
-/* ===== FILE: 墨典商家小程序/app.wxss ===== */
+/* ===== FILE: 灵祺商家小程序/app.wxss ===== */
 page {
   background: #f3f6fb;
   color: #1e293b;
@@ -160,7 +160,7 @@ page {
 .mp-tab.active {
   color: #fff;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 4 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   background: linear-gradient(95deg, #0ea5e9, #06b6d4);
@@ -214,7 +214,7 @@ page {
   color: #94a3b8;
   display: block;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 5 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -268,7 +268,7 @@ page {
   border: 1rpx solid rgba(15, 23, 42, 0.06);
   border-radius: 24rpx;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 6 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   padding: 32rpx;
@@ -322,7 +322,7 @@ page {
   box-sizing: border-box;
   min-height: 100vh;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 7 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   background: linear-gradient(180deg, #eef6ff 0%, #f3f6fb 35%);
@@ -376,7 +376,7 @@ page {
   display: flex;
   align-items: center;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 8 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   justify-content: center;
@@ -422,15 +422,15 @@ page {
 }
 
 
-/* ===== FILE: 墨典商家小程序/custom-tab-bar/index.js ===== */
+/* ===== FILE: 灵祺商家小程序/custom-tab-bar/index.js ===== */
 Component({
   data: {
     selected: 0,
     list: [
-      { pagePath: '/pages/agent/agent', text: '墨典AI' },
+      { pagePath: '/pages/agent/agent', text: '灵祺AI' },
       { pagePath: '/pages/functions/functions', text: '功能' },
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 9 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       { pagePath: '/pages/mine/mine', text: '我的' },
@@ -447,13 +447,13 @@ Component({
 })
 
 
-/* ===== FILE: 墨典商家小程序/custom-tab-bar/index.json ===== */
+/* ===== FILE: 灵祺商家小程序/custom-tab-bar/index.json ===== */
 {
   "component": true
 }
 
 
-/* ===== FILE: 墨典商家小程序/custom-tab-bar/index.wxml ===== */
+/* ===== FILE: 灵祺商家小程序/custom-tab-bar/index.wxml ===== */
 <view class="tab-bar">
   <view
     wx:for="{{list}}"
@@ -467,7 +467,7 @@ Component({
 </view>
 
 
-/* ===== FILE: 墨典商家小程序/custom-tab-bar/index.wxss ===== */
+/* ===== FILE: 灵祺商家小程序/custom-tab-bar/index.wxss ===== */
 .tab-bar {
   position: fixed;
   left: 0;
@@ -484,7 +484,7 @@ Component({
 
 .tab-item {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 10 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   flex: 1;
@@ -505,7 +505,7 @@ Component({
 }
 
 
-/* ===== FILE: 墨典商家小程序/pages/activity-center/activity-center.js ===== */
+/* ===== FILE: 灵祺商家小程序/pages/activity-center/activity-center.js ===== */
 const api = require('../../utils/api.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 const { PLATFORM_TABS } = require('../../utils/platformTokensMp.js')
@@ -538,18 +538,18 @@ Page({
       items: r.ok ? r.items : [],
     })
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 11 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   },
 })
 
 
-/* ===== FILE: 墨典商家小程序/pages/activity-center/activity-center.json ===== */
+/* ===== FILE: 灵祺商家小程序/pages/activity-center/activity-center.json ===== */
 { "navigationBarTitleText": "活动中心" }
 
 
-/* ===== FILE: 墨典商家小程序/pages/activity-center/activity-center.wxml ===== */
+/* ===== FILE: 灵祺商家小程序/pages/activity-center/activity-center.wxml ===== */
 <view class="mp-page">
   <view class="mp-tabs">
     <view wx:for="{{tabs}}" wx:key="id" class="mp-tab {{platform === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onTab">{{item.label}}</view>
@@ -569,10 +569,10 @@ Page({
 </view>
 
 
-/* ===== FILE: 墨典商家小程序/pages/activity-center/activity-center.wxss ===== */
+/* ===== FILE: 灵祺商家小程序/pages/activity-center/activity-center.wxss ===== */
 
 
-/* ===== FILE: 墨典商家小程序/pages/ads-manage/ads-manage.js ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ads-manage/ads-manage.js ===== */
 const api = require('../../utils/api.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 
@@ -592,7 +592,7 @@ Page({
       loading: false,
       err: r.ok ? '' : r.message,
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 12 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       items: r.ok ? r.items : [],
@@ -601,11 +601,11 @@ Page({
 })
 
 
-/* ===== FILE: 墨典商家小程序/pages/ads-manage/ads-manage.json ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ads-manage/ads-manage.json ===== */
 { "navigationBarTitleText": "投流管理" }
 
 
-/* ===== FILE: 墨典商家小程序/pages/ads-manage/ads-manage.wxml ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ads-manage/ads-manage.wxml ===== */
 <view class="mp-page">
   <view class="mp-banner">巨量本地推投放计划，数据与商家后台投流模块同步。</view>
   <view wx:if="{{loading}}" class="mp-empty">加载中…</view>
@@ -622,10 +622,10 @@ Page({
 </view>
 
 
-/* ===== FILE: 墨典商家小程序/pages/ads-manage/ads-manage.wxss ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ads-manage/ads-manage.wxss ===== */
 
 
-/* ===== FILE: 墨典商家小程序/pages/agent/agent.js ===== */
+/* ===== FILE: 灵祺商家小程序/pages/agent/agent.js ===== */
 const api = require('../../utils/api.js')
 const aiAgent = require('../../utils/aiAgentMp.js')
 const registry = require('../../utils/aiModelRegistryMp.js')
@@ -646,7 +646,7 @@ Page({
     busy: false,
     scrollTo: '',
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 13 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     attachments: [],
@@ -683,7 +683,7 @@ Page({
             {
               id: 'welcome',
               role: 'assistant',
-              content: '你好，我是墨典 AI 智能体。输入文字或按住说话，右侧可切换模型。',
+              content: '你好，我是灵祺 AI 智能体。输入文字或按住说话，右侧可切换模型。',
             },
           ]
 
@@ -700,7 +700,7 @@ Page({
       const tabGapPx = Math.round((36 * sys.windowWidth) / 750)
       const dockPx = Math.round((120 * sys.windowWidth) / 750)
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 14 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       const attachPx = this.data.attachments.length
@@ -754,7 +754,7 @@ Page({
   },
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 15 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   onToggleModelMenu() {
@@ -808,7 +808,7 @@ Page({
     if (!text && !this.data.attachments.length) return
     this.setData({ input: '' })
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 16 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     void this.sendTurn(text)
@@ -862,7 +862,7 @@ Page({
             wx.showToast({ title: '读取失败', icon: 'none' })
           }
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 17 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
         }
@@ -916,7 +916,7 @@ Page({
   onVoiceEnd() {
     if (!this.data.recording) return
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 18 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     try {
@@ -970,7 +970,7 @@ Page({
       const turn = await aiAgent.sendAgentTurn({
         userLine: text,
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 19 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
         history: this.data.messages,
@@ -1001,14 +1001,14 @@ Page({
 })
 
 
-/* ===== FILE: 墨典商家小程序/pages/agent/agent.json ===== */
+/* ===== FILE: 灵祺商家小程序/pages/agent/agent.json ===== */
 {
   "navigationStyle": "custom",
   "usingComponents": {}
 }
 
 
-/* ===== FILE: 墨典商家小程序/pages/agent/agent.wxml ===== */
+/* ===== FILE: 灵祺商家小程序/pages/agent/agent.wxml ===== */
 <view class="agent-page">
   <view class="agent-header" style="padding-top: {{statusBarH}}px;">
     <view class="header-row">
@@ -1016,7 +1016,7 @@ Page({
         <text class="menu-glyph">≡</text>
       </view>
       <view class="header-center">
-        <text class="header-title">墨典 AI 智能体</text>
+        <text class="header-title">灵祺 AI 智能体</text>
       </view>
     </view>
   </view>
@@ -1024,7 +1024,7 @@ Page({
   <scroll-view
     scroll-y
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 20 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
     class="chat-scroll"
@@ -1078,7 +1078,7 @@ Page({
       <view class="bar-center">
         <block wx:if="{{inputMode === 'text'}}">
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 21 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
           <textarea
@@ -1132,7 +1132,7 @@ Page({
       <view class="sheet-head">
         <text class="sheet-title">模型</text>
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 22 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
         <view class="sheet-tabs">
@@ -1161,7 +1161,7 @@ Page({
 </view>
 
 
-/* ===== FILE: 墨典商家小程序/pages/agent/agent.wxss ===== */
+/* ===== FILE: 灵祺商家小程序/pages/agent/agent.wxss ===== */
 .agent-page {
   height: 100vh;
   background: #f8fafc;
@@ -1186,7 +1186,7 @@ Page({
 }
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 23 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 .menu-btn {
@@ -1240,7 +1240,7 @@ Page({
 .bubble {
   max-width: 86%;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 24 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   padding: 14rpx 18rpx;
@@ -1294,7 +1294,7 @@ Page({
   gap: 8rpx;
   margin-bottom: 8rpx;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 25 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   padding: 0 4rpx;
@@ -1348,7 +1348,7 @@ Page({
   align-items: center;
   justify-content: center;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 26 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   flex-shrink: 0;
@@ -1402,7 +1402,7 @@ Page({
   background: #f8fafc;
   border: 1rpx solid #e2e8f0;
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 27 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   display: flex;
@@ -1456,7 +1456,7 @@ Page({
 }
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 28 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 .model-sheet {
@@ -1510,7 +1510,7 @@ Page({
 }
 
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 29 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 .sheet-item {
@@ -1527,7 +1527,7 @@ Page({
 }
 
 
-/* ===== FILE: 墨典商家小程序/pages/ai-content/ai-content.js ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ai-content/ai-content.js ===== */
 const api = require('../../utils/api.js')
 const feature = require('../../utils/merchantFeatureMp.js')
 
@@ -1564,7 +1564,7 @@ Page({
       data: this.data.out,
       success() {
 
-墨典商家小程序软件 V1.0
+灵祺商家小程序软件 V1.0
 第 30 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
         wx.showToast({ title: '已复制' })
@@ -1574,11 +1574,11 @@ Page({
 })
 
 
-/* ===== FILE: 墨典商家小程序/pages/ai-content/ai-content.json ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ai-content/ai-content.json ===== */
 { "navigationBarTitleText": "AI 文章话题" }
 
 
-/* ===== FILE: 墨典商家小程序/pages/ai-content/ai-content.wxml ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ai-content/ai-content.wxml ===== */
 <scroll-view scroll-y class="mp-page" style="height:100vh">
   <view class="mp-tabs">
     <view class="mp-tab {{tab === 'article' ? 'active' : ''}}" data-t="article" bindtap="onTab">文章</view>
@@ -1595,11 +1595,11 @@ Page({
 </scroll-view>
 
 
-/* ===== FILE: 墨典商家小程序/pages/ai-content/ai-content.wxss ===== */
+/* ===== FILE: 灵祺商家小程序/pages/ai-content/ai-content.wxss ===== */
 .area { min-height: 200rpx; }
 
 
-/* ===== FILE: 墨典商家小程序/pages/dashboard/dashboard.js ===== */
+/* ===== FILE: 灵祺商家小程序/pages/dashboard/dashboard.js ===== */
 const api = require('../../utils/api.js')
 const merchant = require('../../utils/merchantApi.js')
 const dashboardMp = require('../../utils/dashboardMp.js')

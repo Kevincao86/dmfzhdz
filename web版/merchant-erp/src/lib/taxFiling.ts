@@ -175,7 +175,7 @@ export function buildTaxExportBlob(rows: TaxPlatformRow[], period: { label: stri
       orderCount: r.orderCount,
     })),
     totalVerifyYuan: rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
-    note: '本文件为墨典 ERP 报税辅助导出，正式申报请以各平台税务接口或主管税务机关要求为准。',
+    note: '本文件为灵祺 ERP 报税辅助导出，正式申报请以各平台税务接口或主管税务机关要求为准。',
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
 }
