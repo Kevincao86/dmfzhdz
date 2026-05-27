@@ -74,6 +74,48 @@ export async function upsertMarginConfigCloud(
   )
 }
 
+/** 从 Supabase 恢复菜单价目（localStorage 为空或切换设备时使用） */
+export async function loadMenuRecordFromCloud(
+  supabase: SupabaseClient,
+): Promise<{ items: StoreMenuItem[]; storeName?: string; updatedAt?: string } | null> {
+  const tenantId = await fetchPrimaryTenantId(supabase)
+  if (!tenantId) return null
+  const { data, error } = await supabase
+    .from('tenant_store_intel')
+    .select('menu_items, menu_store_name, updated_at')
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+  if (error || !data) return null
+  const raw = data.menu_items
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const items: StoreMenuItem[] = []
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const name = String(r.name ?? '').trim()
+    if (!name) continue
+    items.push({
+      name,
+      ...(typeof r.productCode === 'string' && r.productCode.trim()
+        ? { productCode: r.productCode.trim() }
+        : {}),
+      ...(typeof r.priceYuan === 'number' && Number.isFinite(r.priceYuan)
+        ? { priceYuan: r.priceYuan }
+        : {}),
+      ...(typeof r.category === 'string' && r.category.trim()
+        ? { category: r.category.trim() }
+        : {}),
+      ...(typeof r.note === 'string' && r.note.trim() ? { note: r.note.trim() } : {}),
+    })
+  }
+  if (items.length === 0) return null
+  return {
+    items,
+    storeName: typeof data.menu_store_name === 'string' ? data.menu_store_name.trim() : undefined,
+    updatedAt: typeof data.updated_at === 'string' ? data.updated_at : undefined,
+  }
+}
+
 export async function upsertMenuItemsCloud(
   supabase: SupabaseClient,
   menuItems: StoreMenuItem[],

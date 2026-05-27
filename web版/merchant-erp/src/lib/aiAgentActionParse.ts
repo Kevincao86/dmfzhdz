@@ -489,7 +489,119 @@ const PLAN_SLOT_PATTERNS: RegExp[] = [
   /组品[方案\s]*[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
   /(?:^|\n)\s*(?:方案|套餐)[一二三四五六1-6ABCD][：:\s、]*([^\n#*]{2,48})/gm,
   /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*([^\n：:]{2,36}(?:套装|组合|套餐|方案|组品))/gm,
+  /(?:^|\n)\s*\d+[.、]\s*(?:\*{0,2})?(?:主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)(?:\*{0,2})?[：:]\s*(?:\*{0,2})?([^*\n]{2,48})/gim,
+  /(?:^|\n)\s*\d+[.、]\s*(?:\*{0,2})([^*\n：:]{2,20})(?:\*{0,2})[：:]\s*(?:\*{0,2})?([^*\n]{2,48})/g,
 ]
+
+const NON_PRODUCT_PLAN_TAG_RE = /优惠券|代金券|达人|招募|探店|直播|费用分配|佣金|分佣|排期|预算分配/
+
+const NUMBERED_COMBO_TAG_RE =
+  /(?:^|\n)\s*(?:\d+[.、]|[-•]\s*)?\*{0,2}((?:主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)[^*\n：:]{0,10})\*{0,2}[：:]\s*\*{0,2}([^*\n*]{2,56})\*{0,2}/gi
+
+const NUMBERED_GENERIC_COLON_RE =
+  /(?:^|\n)\s*(\d+)[.、]\s*\*{0,2}([^*\n：:]{2,20})\*{0,2}[：:]\s*\*{0,2}([^*\n*]{2,56})\*{0,2}/g
+
+function slicePlanSectionBody(full: string, startIndex: number): string {
+  const rest = full.slice(startIndex)
+  const nextBreak = rest.search(
+    /(?:^|\n)\s*(?:\d+[.、]|[-•]\s*\*{0,2}(?:主推|套餐|限时|优惠券|达人|直播|#{1,4}\s))/m,
+  )
+  return (nextBreak > 0 ? rest.slice(0, nextBreak) : rest.slice(0, 500)).trim()
+}
+
+function isNonProductPlanTag(tag: string): boolean {
+  return NON_PRODUCT_PLAN_TAG_RE.test(tag.replace(/\*\*/g, '').trim())
+}
+
+/** 解析「1. **主推爆款：蓝牙耳机**」类推广/数码组品（与餐饮主/次套餐 Markdown 互补） */
+function parsePlanNumberedComboSections(
+  userBrief: string,
+  assistantContent: string,
+): CreateProductIntent[] | null {
+  const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
+  const intents: CreateProductIntent[] = []
+  const seen = new Set<string>()
+
+  const pushCombo = (tag: string, name: string, matchEnd: number, matchText: string) => {
+    const cleanTag = tag.replace(/\*\*/g, '').trim()
+    const cleanName = name.replace(/\*\*/g, '').trim()
+    if (cleanName.length < 2 || isNonProductPlanTag(cleanTag) || isNonProductPlanTag(cleanName)) return
+    const label =
+      cleanTag && !/^主推|套餐|限时|爆款|组合|引流|福利|加购|次推|形象/.test(cleanName)
+        ? `${cleanTag} · ${cleanName}`.slice(0, 48)
+        : cleanName.slice(0, 48)
+    if (label.length < 2 || seen.has(label) || isGiftThresholdLine(label)) return
+    seen.add(label)
+    const body = slicePlanSectionBody(full, matchEnd)
+    const priceYuan = parsePriceYuanFromText(body) ?? parsePriceYuanFromText(matchText)
+    intents.push({
+      key: `combo-${intents.length}`,
+      label,
+      brief: planIntentBrief(
+        full,
+        `团购套餐「${label}」${priceYuan != null ? `，参考售价约 ¥${priceYuan}` : ''}。本节要点：\n${body.slice(0, 900)}`,
+      ),
+      productType: inferProductTypeFromLabel(label, priceYuan),
+    })
+  }
+
+  NUMBERED_COMBO_TAG_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = NUMBERED_COMBO_TAG_RE.exec(full)) !== null) {
+    pushCombo(m[1], m[2], m.index + m[0].length, m[0])
+  }
+
+  if (intents.length < 2) {
+    NUMBERED_GENERIC_COLON_RE.lastIndex = 0
+    while ((m = NUMBERED_GENERIC_COLON_RE.exec(full)) !== null) {
+      pushCombo(m[2], m[3], m.index + m[0].length, m[0])
+    }
+  }
+
+  return intents.length > 0 ? intents.slice(0, 6) : null
+}
+
+function parsePlanSlotPatternsFromFull(full: string): CreateProductIntent[] | null {
+  const slots: CreateProductIntent[] = []
+  const seen = new Set<string>()
+
+  for (const re of PLAN_SLOT_PATTERNS) {
+    re.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = re.exec(full)) !== null) {
+      const rawLabel = (m[2] ?? m[1]).replace(/\*\*/g, '').trim().slice(0, 48)
+      if (rawLabel.length < 2 || seen.has(rawLabel) || isNonProductPlanTag(rawLabel)) continue
+      seen.add(rawLabel)
+      slots.push({
+        key: rawLabel,
+        label: rawLabel,
+        brief: planIntentBrief(full, `团购套餐「${rawLabel}」`),
+        productType: inferProductTypeFromLabel(rawLabel),
+      })
+    }
+  }
+
+  return slots.length > 0 ? slots.slice(0, 6) : null
+}
+
+function pickBestCreateProductIntents(
+  candidates: { source: string; intents: CreateProductIntent[] }[],
+): CreateProductIntent[] {
+  if (!candidates.length) return []
+  const priority: Record<string, number> = {
+    numbered: 5,
+    markdown: 4,
+    slots: 3,
+    json: 2,
+    menu: 1,
+    user: 0,
+  }
+  const sorted = [...candidates].sort((a, b) => {
+    if (b.intents.length !== a.intents.length) return b.intents.length - a.intents.length
+    return (priority[b.source] ?? 0) - (priority[a.source] ?? 0)
+  })
+  return sorted[0]!.intents.slice(0, 6)
+}
 
 const CN_PLAN_COUNT: Record<string, number> = {
   一: 1,
@@ -526,14 +638,16 @@ function userSpecifiedConcreteProducts(userBrief: string): boolean {
 
 function createProductIntentsFromStoreMenu(
   _userBrief: string,
-  _assistantContent: string | undefined,
+  assistantContent: string | undefined,
   full: string,
 ): CreateProductIntent[] | null {
   let planCount: number | undefined = parsePlanCountFromText(full)
   if (!planCount) {
-    if (!/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) return null
-    planCount = 2
+    const numbered = parsePlanNumberedComboSections(_userBrief, assistantContent ?? full)
+    if (numbered?.length) planCount = numbered.length
+    else if (/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) planCount = 2
   }
+  if (!planCount) return null
   const combos = buildMenuComboIntentLabels(planCount)
   if (!combos.length) return null
   return combos.map(({ label, menuHint }) => ({
@@ -720,11 +834,24 @@ export function parseCreateProductIntentsFromPlan(
   userBrief: string,
   assistantContent?: string,
 ): CreateProductIntent[] {
+  const candidates: { source: string; intents: CreateProductIntent[] }[] = []
+
   if (assistantContent?.trim()) {
     const fromMarkdown = parsePlanMarkdownProductSections(userBrief, assistantContent)
-    if (fromMarkdown?.length) return fromMarkdown
+    if (fromMarkdown?.length) candidates.push({ source: 'markdown', intents: fromMarkdown })
+
+    const fromNumbered = parsePlanNumberedComboSections(userBrief, assistantContent)
+    if (fromNumbered?.length) candidates.push({ source: 'numbered', intents: fromNumbered })
+
     const fromJson = parseCreateProductIntentsFromAgentJson(assistantContent, userBrief)
-    if (fromJson?.length) return fromJson
+    if (fromJson?.length) candidates.push({ source: 'json', intents: fromJson })
+
+    const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
+    const fromSlots = parsePlanSlotPatternsFromFull(full)
+    if (fromSlots?.length) candidates.push({ source: 'slots', intents: fromSlots })
+
+    const best = pickBestCreateProductIntents(candidates)
+    if (best.length) return best
   }
 
   const fromUser = parseCreateProductIntents(userBrief)
@@ -741,48 +868,39 @@ export function parseCreateProductIntentsFromPlan(
   }
 
   const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
-  const slots: CreateProductIntent[] = []
-  const seen = new Set<string>()
-
-  for (const re of PLAN_SLOT_PATTERNS) {
-    re.lastIndex = 0
-    let m: RegExpExecArray | null
-    while ((m = re.exec(full)) !== null) {
-      const label = m[1].replace(/\*\*/g, '').trim().slice(0, 48)
-      if (label.length < 2 || seen.has(label)) continue
-      seen.add(label)
-      slots.push({
-        key: label,
-        label,
-        brief: planIntentBrief(full, `团购套餐「${label}」`),
-        productType: 1,
-      })
-    }
+  if (fromUser.length > 1 || (fromUser.length === 1 && fromUser[0].key !== 'main')) {
+    candidates.push({ source: 'user', intents: fromUser })
   }
-
-  if (slots.length > 0) return slots.slice(0, 6)
-  if (fromUser.length > 1 || (fromUser.length === 1 && fromUser[0].key !== 'main')) return fromUser
 
   const planCount = parsePlanCountFromText(full)
   if (planCount && planCount > 1) {
     if (!userSpecifiedConcreteProducts(userBrief)) {
       const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
-      if (fromMenu?.length) return fromMenu
+      if (fromMenu?.length) candidates.push({ source: 'menu', intents: fromMenu })
+    } else {
+      candidates.push({
+        source: 'user',
+        intents: Array.from({ length: planCount }, (_, i) => ({
+          key: `plan-${i + 1}`,
+          label: `方案 ${i + 1}`,
+          brief: planIntentBrief(
+            full,
+            `第 ${i + 1} 个团购方案（共 ${planCount} 个，须相互区分售价与内容）`,
+          ),
+          productType: 1,
+        })),
+      })
     }
-    return Array.from({ length: planCount }, (_, i) => ({
-      key: `plan-${i + 1}`,
-      label: `方案 ${i + 1}`,
-      brief: planIntentBrief(
-        full,
-        `第 ${i + 1} 个团购方案（共 ${planCount} 个，须相互区分售价与内容）`,
-      ),
-      productType: 1,
-    }))
   }
+
   if (!userSpecifiedConcreteProducts(userBrief)) {
     const fromMenu = createProductIntentsFromStoreMenu(userBrief, assistantContent, full)
-    if (fromMenu?.length) return fromMenu
+    if (fromMenu?.length) candidates.push({ source: 'menu', intents: fromMenu })
   }
+
+  const best = pickBestCreateProductIntents(candidates)
+  if (best.length) return best
+
   return fromUser
 }
 

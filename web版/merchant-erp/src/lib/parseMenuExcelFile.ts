@@ -182,6 +182,120 @@ function pickMenuSheet(candidates: SheetCandidate[]): SheetCandidate {
   return ranked[0]!
 }
 
+export type HeuristicMenuParseResult = {
+  items: Array<{
+    name: string
+    productCode?: string
+    priceYuan?: number
+    category?: string
+    note?: string
+  }>
+}
+
+const HEADER_NAME = /名称|品名|商品名|菜品|项目|服务|product|name|title/i
+const HEADER_CODE = /编号|编码|sku|货号|条码|code/i
+const HEADER_PRICE = /价格|售价|单价|金额|price|amount/i
+const HEADER_CATEGORY = /分类|类别|品类|category|type/i
+const HEADER_NOTE = /备注|说明|note|remark/i
+
+function parsePriceCell(text: string): number | undefined {
+  const t = text.replace(/[,¥￥\s元]/g, '').trim()
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return undefined
+  const n = Number(t)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+function findHeaderMap(rows: string[][]): { headerIdx: number; map: Record<string, number> } | null {
+  for (let i = 0; i < Math.min(rows.length, 8); i++) {
+    const row = rows[i]!
+    const map: Record<string, number> = {}
+    row.forEach((cell, col) => {
+      const t = cell.trim()
+      if (!t) return
+      if (HEADER_NAME.test(t)) map.name = col
+      else if (HEADER_CODE.test(t)) map.code = col
+      else if (HEADER_PRICE.test(t)) map.price = col
+      else if (HEADER_CATEGORY.test(t)) map.category = col
+      else if (HEADER_NOTE.test(t)) map.note = col
+    })
+    if (map.name != null || map.price != null) {
+      if (map.name == null) {
+        const nameCol = row.findIndex(
+          (c, col) => looksLikeProductName(c) && col !== map.price && col !== map.code,
+        )
+        if (nameCol >= 0) map.name = nameCol
+      }
+      if (map.name != null || map.price != null) return { headerIdx: i, map }
+    }
+  }
+  return null
+}
+
+/** 表头/列位置规则本地解析，API 不可用时的兜底 */
+export function heuristicParseMenuRows(rows: string[][]): HeuristicMenuParseResult {
+  const refined = refineProductRows(rows)
+  const header = findHeaderMap(refined)
+  const items: HeuristicMenuParseResult['items'] = []
+  const start = header ? header.headerIdx + 1 : 0
+  let lastCategory = ''
+
+  for (let i = start; i < refined.length; i++) {
+    const row = refined[i]!.map((c) => String(c ?? '').trim())
+    if (!row.some((c) => c.length > 0)) continue
+    if (/合计|小计|总计|备注说明/.test(row.join(''))) continue
+
+    let name = ''
+    let productCode: string | undefined
+    let priceYuan: number | undefined
+    let category: string | undefined
+    let note: string | undefined
+
+    if (header) {
+      const { map } = header
+      if (map.name != null) name = row[map.name] ?? ''
+      if (map.code != null) {
+        const code = row[map.code] ?? ''
+        if (code && !isLinkOnlyToken(code)) productCode = code
+      }
+      if (map.price != null) priceYuan = parsePriceCell(row[map.price] ?? '')
+      if (map.category != null) {
+        const cat = row[map.category] ?? ''
+        if (cat) category = cat
+      }
+      if (map.note != null) note = row[map.note] ?? undefined
+    } else {
+      const prices = row.map(parsePriceCell).filter((p): p is number => p != null)
+      const names = row.filter(looksLikeProductName)
+      name = names.sort((a, b) => b.length - a.length)[0] ?? ''
+      priceYuan = prices[0]
+      const codes = row.filter((c) => c && !looksLikeProductName(c) && !parsePriceCell(c) && !isLinkOnlyToken(c))
+      if (codes[0] && /^\w[\w-]{2,}$/.test(codes[0])) productCode = codes[0]
+    }
+
+    if (!name) {
+      const onlyCat = row.filter((c) => c && !parsePriceCell(c) && !isLinkOnlyToken(c))
+      if (onlyCat.length === 1 && onlyCat[0]!.length <= 12 && !looksLikeProductName(onlyCat[0]!)) {
+        lastCategory = onlyCat[0]!
+        continue
+      }
+    }
+
+    if (!name || !looksLikeProductName(name)) continue
+    if (priceYuan == null && !productCode) continue
+
+    items.push({
+      name,
+      ...(productCode ? { productCode } : {}),
+      ...(priceYuan != null ? { priceYuan } : {}),
+      ...(category || lastCategory ? { category: category || lastCategory } : {}),
+      ...(note?.trim() ? { note: note.trim() } : {}),
+    })
+    if (items.length >= 200) break
+  }
+
+  return { items }
+}
+
 export async function parseMenuExcelFile(file: File): Promise<{
   rows: string[][]
   sheetName: string

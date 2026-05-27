@@ -142,6 +142,22 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-store-menu-excel-recognize.ts": {
+      "includeFiles": "{vite-plugins,src/lib,src/services}/**",
+      "maxDuration": 120
+    },
+    "api/meoo-store-menu-recognize.ts": {
+      "includeFiles": "{vite-plugins,src/lib,src/services}/**",
+      "maxDuration": 120
+    },
+    "api/meoo-competitor-analysis.ts": {
+      "includeFiles": "{vite-plugins,src/lib,src/services}/**",
+      "maxDuration": 120
+    },
+    "api/meoo-ai-product-plan.ts": {
+      "includeFiles": "{vite-plugins,src/lib,src/services}/**",
+      "maxDuration": 120
+    },
     "api/meoo-douyin-brands.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60

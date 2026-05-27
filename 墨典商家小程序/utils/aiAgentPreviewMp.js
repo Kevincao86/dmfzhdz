@@ -23,11 +23,12 @@ function createProductPreviewMessage(userBrief, assistantContent) {
   const labels = exec.parsePlanIntentLabels(assistantContent)
   const types = exec.inferTaskTypesFromCombinedContext(userBrief, assistantContent, undefined)
   const combined = types.includes('create_product') && types.includes('recruit_influencer')
+  const planLabels = labels.length > 0 ? labels : ['团购方案']
   const intro =
-    labels.length > 1
-      ? `【创建商品 · 独立预览】检测到 ${labels.length} 个方案。${intelLine}。请在本卡片确认。${combined ? '全部确认后将进入达人招募 Brief。' : ''}`
+    planLabels.length > 1
+      ? `【创建商品 · 独立预览】检测到 ${planLabels.length} 个组品方案（${planLabels.slice(0, 4).join('、')}${planLabels.length > 4 ? '…' : ''}）。${intelLine}。请在本卡片确认。${combined ? '全部确认后将进入达人招募 Brief。' : ''}`
       : `【创建商品 · 独立预览】将生成团购方案供核对。${intelLine}。请在本卡片确认。${combined ? '确认后将进入达人招募 Brief。' : ''}`
-  const productPlans = (labels.length ? labels : ['团购方案']).map((label, i) => ({
+  const productPlans = planLabels.map((label, i) => ({
     slotKey: `plan-${i}`,
     slotLabel: label,
     productName: label,
