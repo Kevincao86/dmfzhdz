@@ -11,7 +11,7 @@ export const KUAISHOU_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'open', label: '一、开放平台' },
     { id: 'capability', label: '二、能力与白名单' },
-    { id: 'erp', label: '三、墨典 ERP' },
+    { id: 'erp', label: '三、灵祺 ERP' },
   ],
   steps: [
     {
@@ -49,9 +49,9 @@ export const KUAISHOU_BIND_GUIDE: BindGuideConfig = {
       imageAlt: '商户 ID',
     },
   ],
-  erpPhaseLabel: '三、墨典 ERP 绑定',
+  erpPhaseLabel: '三、灵祺 ERP 绑定',
   erpStep: {
-    title: '在墨典 ERP 填写并绑定',
+    title: '在灵祺 ERP 填写并绑定',
     bullets: [
       '路径：系统设置 → 商家版后台 → 团购平台 → 快手团购。',
       '填写 App ID、App Secret、商户 account_id，点击「确认绑定」。',

@@ -223,7 +223,7 @@ export default function OpsAnnouncementsPage() {
           公告栏推送
         </h1>
         <p className="mt-1 text-sm text-slate-400">
-          向墨典 ERP 注册用户发送站内公告，商户在 ERP 右上角铃铛中查看。支持套餐即将结束预警、平台改动预警两类。
+          向灵祺 ERP 注册用户发送站内公告，商户在 ERP 右上角铃铛中查看。支持套餐即将结束预警、平台改动预警两类。
         </p>
       </div>
 

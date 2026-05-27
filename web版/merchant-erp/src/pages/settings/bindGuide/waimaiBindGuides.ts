@@ -9,7 +9,7 @@ export const ELEME_BIND_GUIDE_STEPS = [
   },
   {
     title: '3. 在本系统绑定',
-    body: '将 AppKey、AppSecret 填入墨典 ERP「商家版后台 → 外卖平台 → 淘宝闪购」并保存。',
+    body: '将 AppKey、AppSecret 填入灵祺 ERP「商家版后台 → 外卖平台 → 淘宝闪购」并保存。',
   },
   {
     title: '4. 配置服务端环境变量（可选）',
@@ -27,7 +27,7 @@ export const MEITUAN_WAIMAI_BIND_GUIDE_STEPS = [
     body: '记录 App Key、App Secret，以及外卖侧商户/开发者 ID（如有）。',
   },
   {
-    title: '3. 绑定墨典 ERP',
+    title: '3. 绑定灵祺 ERP',
     body: '在「商家版后台 → 外卖平台 → 美团外卖」填写凭据并绑定。',
   },
   {
@@ -46,7 +46,7 @@ export const JD_WAIMAI_BIND_GUIDE_STEPS = [
     body: '确保应用已开通门店、商品、订单、评价、营销等相关 API 权限。',
   },
   {
-    title: '3. 绑定墨典 ERP',
+    title: '3. 绑定灵祺 ERP',
     body: '在「商家版后台 → 外卖平台 → 京东外卖」完成绑定。',
   },
   {

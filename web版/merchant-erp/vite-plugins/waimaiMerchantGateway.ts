@@ -76,7 +76,7 @@ function demoStores(platform: WaimaiPlatformKey): unknown[] {
     {
       poi: {
         poi_id: `${platform}-demo-001`,
-        poi_name: `墨典演示·${label}南山店`,
+        poi_name: `灵祺演示·${label}南山店`,
         address: '广东省深圳市南山区科技园南路 88 号',
         city_name: '深圳市',
       },
@@ -84,7 +84,7 @@ function demoStores(platform: WaimaiPlatformKey): unknown[] {
     {
       poi: {
         poi_id: `${platform}-demo-002`,
-        poi_name: `墨典演示·${label}福田店`,
+        poi_name: `灵祺演示·${label}福田店`,
         address: '广东省深圳市福田区福华路 168 号',
         city_name: '深圳市',
       },
@@ -99,7 +99,7 @@ function demoProducts(platform: WaimaiPlatformKey) {
       id: `${platform}-sku-1001`,
       name: '招牌双人套餐（外卖）',
       price: 68,
-      store: `墨典演示·${label}南山店`,
+      store: `灵祺演示·${label}南山店`,
       status: '已上架',
       auditStatus: '审核通过',
       saleStatus: '售卖中',
@@ -110,7 +110,7 @@ function demoProducts(platform: WaimaiPlatformKey) {
       id: `${platform}-sku-1002`,
       name: '爆款盖饭',
       price: 28,
-      store: `墨典演示·${label}福田店`,
+      store: `灵祺演示·${label}福田店`,
       status: '已上架',
       auditStatus: '审核通过',
       saleStatus: '售卖中',
@@ -320,7 +320,7 @@ export async function handleWaimaiStoreDecorationGet(
       ? [
           {
             storeId: `${platform}-demo-001`,
-            storeName: `墨典演示·${PLATFORM_META[platform].label}`,
+            storeName: `灵祺演示·${PLATFORM_META[platform].label}`,
             headImage: '—',
             albumCount: 3,
             announcement: '欢迎下单',

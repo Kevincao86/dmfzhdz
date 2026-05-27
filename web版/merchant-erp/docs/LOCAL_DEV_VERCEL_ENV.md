@@ -6,13 +6,13 @@
 
 ## 报错：`cd: no such file or directory: web版/merchant-erp`
 
-说明当前目录不对。`web版/merchant-erp` 是**仓库内部**的子目录，必须从 **Git 项目根目录**（能看到 `web版`、`墨典商家小程序` 等文件夹的那一层的上级）进场。
+说明当前目录不对。`web版/merchant-erp` 是**仓库内部**的子目录，必须从 **Git 项目根目录**（能看到 `web版`、`灵祺商家小程序` 等文件夹的那一层的上级）进场。
 
-请先 `cd` 到你克隆下来的 **「墨典/项目」** 根路径，例如在终端里可先找到仓库：
+请先 `cd` 到你克隆下来的 **「灵祺/项目」** 根路径，例如在终端里可先找到仓库：
 
 ```bash
 # 将下面路径改成你电脑上「项目」文件夹的真实路径（不要停在 ~ 就直接 cd）
-cd "/Users/damowangOS/墨典AI智能ERP/墨典/项目"
+cd "/Users/damowangOS/灵祺AI智能ERP/灵祺/项目"
 
 # 确认存在（应有输出）
 ls web版/merchant-erp/package.json
@@ -34,7 +34,7 @@ npm run dev
 在**项目根目录**执行：
 
 ```bash
-cd "/你的路径/墨典AI智能ERP/墨典/项目"
+cd "/你的路径/灵祺AI智能ERP/灵祺/项目"
 npx vercel link
 ```
 

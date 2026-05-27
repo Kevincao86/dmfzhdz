@@ -1,5 +1,5 @@
 /**
- * 墨典 AI 智能体 / 运营助理 — 前端状态与后续接入真实 API 的契约（预留）。
+ * 灵祺 AI 智能体 / 运营助理 — 前端状态与后续接入真实 API 的契约（预留）。
  */
 
 /** 系统侧能力授权（后续与租户权限、OAuth 范围对齐） */
@@ -51,7 +51,7 @@ export const AI_TASK_TYPE_LABELS: Record<AiTaskType, string> = {
 /** 新对话 / 重置时的首条助手问候（与上下文初始态一致） */
 /** 默认问候；运行时由 {@link buildAiAgentPlanProfile} 按会员档位覆盖 */
 export const AI_AGENT_WELCOME_CONTENT =
-  '你好，我是墨典 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；涉及改商品、发招募单、报税、发布等操作会先展示预览，确认后再继续。'
+  '你好，我是灵祺 AI 助手。先在输入框右侧选好模型（对话或文生图），再描述任务；涉及改商品、发招募单、报税、发布等操作会先展示预览，确认后再继续。'
 
 /** 智能体首页与抽屉共用的快捷任务 */
 export const AI_AGENT_SHORTCUTS: { type: AiTaskType; label: string }[] = [

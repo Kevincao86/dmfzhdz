@@ -11,7 +11,7 @@ export const MEITUAN_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'portal', label: '一、美团技术服务合作中心' },
     { id: 'auth', label: '二、应用授权与门店' },
-    { id: 'erp', label: '三、墨典 ERP 绑定' },
+    { id: 'erp', label: '三、灵祺 ERP 绑定' },
   ],
   steps: [
     {
@@ -33,7 +33,7 @@ export const MEITUAN_BIND_GUIDE: BindGuideConfig = {
         '创建成功后进入应用详情，记录「AppID」与「App Secret」（密钥仅展示一次，请妥善保存）。',
         '确认应用已上线或处于可调用状态，并完成平台要求的签约/备案流程。',
       ],
-      note: '墨典 ERP 绑定弹窗中的「应用编号」「应用密钥」即对应此处信息。',
+      note: '灵祺 ERP 绑定弹窗中的「应用编号」「应用密钥」即对应此处信息。',
     },
     {
       id: 'scope',
@@ -56,9 +56,9 @@ export const MEITUAN_BIND_GUIDE: BindGuideConfig = {
       ],
     },
   ],
-  erpPhaseLabel: '三、墨典 ERP 绑定',
+  erpPhaseLabel: '三、灵祺 ERP 绑定',
   erpStep: {
-    title: '在墨典 ERP 完成绑定',
+    title: '在灵祺 ERP 完成绑定',
     bullets: [
       '路径：系统设置 → 商家版后台 → 大众点评商家版。',
       '点击「绑定说明书」可随时回看本流程；点击「绑定大众点评」填写应用编号、应用密钥。',

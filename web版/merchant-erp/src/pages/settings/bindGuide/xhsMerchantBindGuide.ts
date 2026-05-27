@@ -11,7 +11,7 @@ export const XHS_MERCHANT_BIND_GUIDE: BindGuideConfig = {
   phases: [
     { id: 'open', label: '一、小红书开放平台' },
     { id: 'shop', label: '二、店铺与能力' },
-    { id: 'erp', label: '三、墨典 ERP 绑定' },
+    { id: 'erp', label: '三、灵祺 ERP 绑定' },
   ],
   steps: [
     {
@@ -29,7 +29,7 @@ export const XHS_MERCHANT_BIND_GUIDE: BindGuideConfig = {
       phase: 'open',
       title: '创建应用并获取凭证',
       bullets: [
-        '新建「商家自研」或平台要求的应用类型，填写应用名称（如：墨典ERP对接）。',
+        '新建「商家自研」或平台要求的应用类型，填写应用名称（如：灵祺ERP对接）。',
         '在应用详情中复制「App ID」「App Secret」，对应 ERP 绑定弹窗中的应用编号与密钥。',
         '配置回调地址、IP 白名单等平台要求的安全项（按实施文档填写 ERP 服务端地址）。',
       ],
@@ -46,9 +46,9 @@ export const XHS_MERCHANT_BIND_GUIDE: BindGuideConfig = {
       note: '具体能力名称以小红书开放平台当前文档为准，开通后方可同步对应数据。',
     },
   ],
-  erpPhaseLabel: '三、墨典 ERP 绑定',
+  erpPhaseLabel: '三、灵祺 ERP 绑定',
   erpStep: {
-    title: '在墨典 ERP 完成绑定',
+    title: '在灵祺 ERP 完成绑定',
     bullets: [
       '路径：系统设置 → 商家版后台 → 小红书商家版。',
       '点击「绑定说明书」查看本流程；点击「绑定小红书」填写应用编号、应用密钥。',

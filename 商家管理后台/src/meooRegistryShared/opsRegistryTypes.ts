@@ -174,7 +174,7 @@ export type RegistryMpRecruitmentApplicant = {
   taskStatus?: MpApplicantTaskStatus
 }
 
-/** 墨典达人库（按平台+达人ID去重，报价等取最新报名） */
+/** 灵祺达人库（按平台+达人ID去重，报价等取最新报名） */
 export type RegistryTalentLibraryEntry = {
   id: string
   platform: '抖音' | '小红书'

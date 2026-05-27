@@ -191,7 +191,7 @@ export type RegistryMpTalentPlatformProfile = {
   alipayAccount: string
 }
 
-/** 达人招募小程序 · 墨典达人会员 */
+/** 达人招募小程序 · 灵祺达人会员 */
 export type RegistryMpTalentMember = {
   id: string
   memberType: 'douyin' | 'xiaohongshu' | 'both'

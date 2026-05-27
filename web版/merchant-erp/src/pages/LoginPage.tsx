@@ -118,7 +118,7 @@ export default function LoginPage() {
             />
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                MoDian · Local Life OS
+                LingQi · Local Life OS
               </p>
               <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                 <span className="text-slate-900">{BRAND_NAME_SHORT}</span>

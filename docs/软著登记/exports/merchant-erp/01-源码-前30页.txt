@@ -1,4 +1,4 @@
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 1 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 /* ===== FILE: web版/merchant-erp/src/App.tsx ===== */
@@ -52,7 +52,7 @@ export default function App() {
           }
         >
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 2 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
           <Route index element={<HomeDashboard />} />
@@ -106,7 +106,7 @@ export function cn(...inputs: ClassValue[]) {
 
 
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 3 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 /* ===== FILE: web版/merchant-erp/src/components/AiAgentComposerBar.tsx ===== */
@@ -160,7 +160,7 @@ function shortModelLabel(label: string): string {
   return `${head.slice(0, 9)}…`
 }
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 4 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -214,7 +214,7 @@ function AttachmentPreview({
     </div>
   )
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 5 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 }
@@ -268,7 +268,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
     setFilterOpen(false)
     setModelOpen(false)
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 6 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   }, [])
@@ -322,7 +322,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
   const rows = layout === 'centered' ? 4 : 2
   const disabled = aiSending
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 7 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const modelShort = shortModelLabel(currentModel?.label ?? '模型')
@@ -376,7 +376,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
                 onRemove={() => removeComposerAttachment(i)}
               />
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 8 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
             ))}
@@ -430,7 +430,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           <ImagePlus className="h-4 w-4" />
         </button>
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 9 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 
@@ -484,7 +484,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
 
           <div ref={modelWrapRef} className="relative">
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 10 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
             <button
@@ -538,7 +538,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
             type="button"
             className={cn(
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 11 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
               'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-white',
@@ -592,7 +592,7 @@ import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { useEffect, useRef, useState } from 'react'
 import { AiAgentComposerBar } from './AiAgentComposerBar'
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 12 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
@@ -646,7 +646,7 @@ export default function AiAgentDrawer() {
     requestAnimationFrame(() => {
       const el = listRef.current
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 13 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       if (el) el.scrollTop = el.scrollHeight
@@ -688,7 +688,7 @@ export default function AiAgentDrawer() {
                   </div>
                   <div className="min-w-0">
                     <h2 id="meoo-ai-agent-title" className="truncate text-base font-semibold tracking-tight">
-                      墨典 AI 助手
+                      灵祺 AI 助手
                     </h2>
                     <p className="text-xs text-indigo-100/95">可咨询问题，也可生成任务方案</p>
                   </div>
@@ -700,7 +700,7 @@ export default function AiAgentDrawer() {
                       ? ` · 可执行：${pageContext.suggestedTasks.join('、')}`
                       : ''}
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 14 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
                   </p>
@@ -754,7 +754,7 @@ export default function AiAgentDrawer() {
                     <button
                       key={s.type}
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 15 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
                       type="button"
@@ -808,7 +808,7 @@ export function AiAgentFloatingButton() {
   const { openDrawer, drawerOpen } = useAiAgent()
   if (drawerOpen) return null
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 16 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   return (
@@ -816,7 +816,7 @@ export function AiAgentFloatingButton() {
       type="button"
       onClick={() => openDrawer()}
       className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-slate-950 shadow-lg shadow-indigo-900/25 ring-2 ring-cyan-400/40 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
-      aria-label="打开墨典 AI 助手"
+      aria-label="打开灵祺 AI 助手"
       title="AI 助手"
     >
       <img src={BRAND_LOGO_URL} alt="" className="h-11 w-11 object-contain" />
@@ -862,7 +862,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           return (
             <div className={multi ? 'mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'mt-4'}>
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 17 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
               {productPlans.map((plan) => (
@@ -916,7 +916,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
           {m.recruitmentOrder ? (
             <AiAgentRecruitmentOrderDetailCard order={m.recruitmentOrder} />
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 18 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
           ) : null}
@@ -970,7 +970,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
             {timeStr ? <p className="text-[10px] text-slate-400">{timeStr}</p> : null}
           </div>
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 19 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
         </div>
@@ -1024,7 +1024,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
               className="text-[10px] font-medium text-indigo-600 hover:underline"
             >
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 20 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
               引用此条
@@ -1078,7 +1078,7 @@ export function AiAgentOverlayModal({ open, title, subtitle, onClose, children, 
             type="button"
             onClick={onClose}
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 21 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
             className="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
@@ -1132,7 +1132,7 @@ export function AiAgentPreviewActions({
   const taskType = previewMsg?.preview?.taskType ?? null
   const loading = isPreviewLoading(previewMessageId)
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 22 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   const confirming = isPreviewConfirming(previewMessageId)
@@ -1186,7 +1186,7 @@ export function AiAgentPreviewActions({
       ) : null}
 
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 23 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       <div className="flex flex-wrap gap-2">
@@ -1240,7 +1240,7 @@ export function AiAgentProductVisualPreview({
 }) {
   const label = slotLabel ?? plan.slotLabel
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 24 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
   if (plan.enrichStatus === 'loading') {
@@ -1294,7 +1294,7 @@ export function AiAgentProductVisualPreview({
       </div>
       {enrichErr ? <p className="text-center text-xs text-amber-700">{enrichErr}</p> : null}
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 25 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       <p className="text-center text-[11px] text-slate-500">
@@ -1348,7 +1348,7 @@ export function AiAgentRecruitmentOrderDetailCard({ order }: { order: AiRecruitm
           <dl className="grid gap-2 sm:grid-cols-2">
             <Row label="投放平台" value={order.platform} />
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 26 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
             <Row label="主推品" value={order.mainProductName} />
@@ -1402,7 +1402,7 @@ export function AiAgentRecruitmentOrderDetailCard({ order }: { order: AiRecruitm
           {order.tags.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 27 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
               {order.tags.map((tag) => (
@@ -1456,7 +1456,7 @@ function AllocationBlock({
             'rounded px-1.5 py-0.5 text-[10px] font-medium',
             order.allocation.source === 'ai' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700',
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 28 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
           )}
@@ -1510,7 +1510,7 @@ export function AiAgentRecruitmentVisualPreview({ brief }: { brief: AiRecruitmen
     try {
       await navigator.clipboard.writeText(text)
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 29 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       setCopyTip(`已复制版本 ${label}`)
@@ -1564,7 +1564,7 @@ export function AiAgentRecruitmentVisualPreview({ brief }: { brief: AiRecruitmen
         />
       </div>
 
-墨典AI智能ERP商家管理系统 V1.0
+灵祺AI智能ERP商家管理系统 V1.0
 第 30 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
       {brief.enrichError ? <p className="text-center text-xs text-amber-700">{brief.enrichError}</p> : null}

@@ -32,7 +32,7 @@ export async function dispatchIceBatchToRecruitmentOps(opts: {
   }
 
   const tenant = buildErpRegistryTenant()
-  const customerName = tenant?.merchantName ?? '墨典 ERP 商户'
+  const customerName = tenant?.merchantName ?? '灵祺 ERP 商户'
   const storeName = '云剪批量成片'
   const n = doneJobs.length
   const brief = editBrief.trim().slice(0, 500)

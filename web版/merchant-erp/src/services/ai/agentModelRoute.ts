@@ -37,7 +37,7 @@ export function dialogueStyleAddonForPickerKey(pickerKey: string): string {
     if (img.vendor === 'qwen') return '使用通义千问：中文表达自然，偏本地生活商家运营与短视频脚本。'
     if (img.vendor === 'doubao') return '使用豆包：口语化、接地气，适合门店老板快速读懂。'
     if (img.vendor === 'minimax') return '使用 MiniMax：简洁有力，适合口播与短文案。'
-    return '使用墨典内置生图引擎配套的对话风格：务实、可执行。'
+    return '使用灵祺内置生图引擎配套的对话风格：务实、可执行。'
   }
 
   const parsed = parseAiModelPickerKey(chatKey)

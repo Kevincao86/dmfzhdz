@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-ops-mp-talent-member-register — 达人招募小程序注册墨典达人会员。
+ * POST /api/meoo-ops-mp-talent-member-register — 达人招募小程序注册灵祺达人会员。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {

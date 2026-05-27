@@ -895,7 +895,7 @@ export default function ShortVideoOptimizationPage() {
           <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频AI处理</h1>
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择墨典视频模型与参数，再上传素材并描述需求即可。
+          参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择灵祺视频模型与参数，再上传素材并描述需求即可。
         </p>
       </header>
 
@@ -904,7 +904,7 @@ export default function ShortVideoOptimizationPage() {
           [
             { id: 'optimize' as const, label: '参考画面处理', icon: Video },
             { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
-            { id: 'cloud_batch' as const, label: '墨典AI云剪', icon: Cloud },
+            { id: 'cloud_batch' as const, label: '灵祺AI云剪', icon: Cloud },
           ] as const
         ).map((t) => {
           const Ico = t.icon

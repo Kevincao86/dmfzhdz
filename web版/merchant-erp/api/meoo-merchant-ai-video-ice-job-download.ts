@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   )
   const cfg = await loadIceGatewayConfig(process.cwd(), process.env as Record<string, string>)
   if (!cfg) {
-    sendMerchantJson(res, 503, { ok: false, message: '墨典AI云剪未配置' })
+    sendMerchantJson(res, 503, { ok: false, message: '灵祺AI云剪未配置' })
     return
   }
 

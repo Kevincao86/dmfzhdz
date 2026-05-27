@@ -20,7 +20,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
     if (error) {
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 p-6 text-center">
-          <h1 className="text-xl font-semibold text-gray-900">墨典 ERP 页面异常</h1>
+          <h1 className="text-xl font-semibold text-gray-900">灵祺 ERP 页面异常</h1>
           <p className="max-w-lg text-sm text-gray-600">
             页面加载时出现异常，可尝试硬刷新浏览器（Windows：Ctrl+Shift+R，Mac：Cmd+Shift+R）或稍后重试。开发环境若在更新代码或依赖后出现本页，可由技术人员查看下方错误信息并重载。
           </p>

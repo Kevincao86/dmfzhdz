@@ -19,7 +19,7 @@ export type TokenMixFamilyDef = {
 export const TOKENMIX_FAMILY_CATALOG: readonly TokenMixFamilyDef[] = [
   {
     id: 'openai',
-    label: '墨典智能AI · 灵犀',
+    label: '灵祺智能AI · 灵犀',
     models: [
       { id: 'gpt-4o', label: '旗舰对话' },
       { id: 'gpt-4o-mini', label: '轻量对话' },
@@ -28,7 +28,7 @@ export const TOKENMIX_FAMILY_CATALOG: readonly TokenMixFamilyDef[] = [
   },
   {
     id: 'claude',
-    label: '墨典智能AI · 慧思',
+    label: '灵祺智能AI · 慧思',
     models: [
       { id: 'claude-sonnet-4.6', label: '均衡旗舰' },
       { id: 'claude-haiku-4.5', label: '迅捷轻量' },
@@ -37,7 +37,7 @@ export const TOKENMIX_FAMILY_CATALOG: readonly TokenMixFamilyDef[] = [
   },
   {
     id: 'gemini',
-    label: '墨典智能AI · 星鉴',
+    label: '灵祺智能AI · 星鉴',
     models: [
       { id: 'gemini-2.5-flash', label: '闪速对话' },
       { id: 'gemini-2.5-pro', label: '专业对话' },
@@ -45,7 +45,7 @@ export const TOKENMIX_FAMILY_CATALOG: readonly TokenMixFamilyDef[] = [
   },
   {
     id: 'grok',
-    label: '墨典智能AI · 破界',
+    label: '灵祺智能AI · 破界',
     models: [
       { id: 'grok-4.1-fast-non-reasoning', label: '极速对话' },
       { id: 'grok-4.1-fast-reasoning', label: '极速推理' },

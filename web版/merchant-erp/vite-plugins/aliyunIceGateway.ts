@@ -143,7 +143,7 @@ export async function handleAliyunIceRoutes(input: {
       effectOptions: ICE_EFFECT_PRESETS,
       urlUploadRequiresVod: Boolean(cfg?.vodStorageLocation?.trim()),
       credentialNote:
-        '墨典AI云剪凭据由运营在「AI模型 → 短视频 API」维护。须填写 ICE 点播 StorageLocation（链接/本地上传提交云剪必填）；OSS 成片前缀用于本地上传与成片落盘。',
+        '灵祺AI云剪凭据由运营在「AI模型 → 短视频 API」维护。须填写 ICE 点播 StorageLocation（链接/本地上传提交云剪必填）；OSS 成片前缀用于本地上传与成片落盘。',
       docsUrl:
         'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview',
     })
@@ -369,7 +369,7 @@ export async function handleAliyunIceRoutes(input: {
     const effect =
       ICE_EFFECT_PRESETS.find((p) => p.label === presetLabel || p.id === presetLabel) ??
       ICE_EFFECT_PRESETS[0]
-    const projectName = String(parsed.projectName ?? '墨典AI云剪').trim().slice(0, 120)
+    const projectName = String(parsed.projectName ?? '灵祺AI云剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
     const out =
@@ -456,7 +456,7 @@ export async function handleAliyunIceRoutes(input: {
       return true
     }
     if (!cfg) {
-      json(res, 503, { ok: false, message: '墨典AI云剪未配置' })
+      json(res, 503, { ok: false, message: '灵祺AI云剪未配置' })
       return true
     }
     const inline = searchParams.get('inline') === '1'

@@ -1,0 +1,112 @@
+<view class="page-shell home-page">
+  <view class="page-hero">
+    <text class="page-hero-title">灵祺达人招募</text>
+    <text class="page-hero-sub">本地生活探店招募 · 发现优质商单机会</text>
+  </view>
+
+  <view class="card member-card" wx:if="{{member}}">
+    <view class="member-row" bindtap="goEditMember">
+      <image class="member-avatar" src="{{member.wxAvatarUrl}}" mode="aspectFill" wx:if="{{member.wxAvatarUrl}}" />
+      <view class="member-avatar member-avatar--ph" wx:else>
+        <text class="member-avatar-letter">我</text>
+      </view>
+      <view class="member-meta">
+        <text class="member-name">{{member.wxNickName}}</text>
+        <text class="member-tag">{{memberTypeLabel}}</text>
+        <text class="hint member-hint">点击完善达人资料</text>
+      </view>
+      <view class="member-chevron">›</view>
+    </view>
+  </view>
+
+  <view class="card member-card member-card--cta" wx:else>
+    <view class="cta-icon">✦</view>
+    <text class="cta-title">成为灵祺达人会员</text>
+    <text class="hint cta-desc">授权微信并填写平台资料，下次报名可一键同步</text>
+    <button class="btn-primary cta-btn" catchtap="goRegister">立即注册</button>
+  </view>
+
+  <view class="hall-wrap">
+    <view class="hall-tabs">
+      <view
+        class="hall-tab {{hallTab === 'normal' ? 'active' : ''}}"
+        data-tab="normal"
+        bindtap="onHallTab"
+      >
+        <text class="hall-tab-text">招募大厅</text>
+        <text class="hall-badge" wx:if="{{normalRows.length}}">{{normalRows.length}}</text>
+      </view>
+      <view
+        class="hall-tab hall-tab--urgent {{hallTab === 'urgent' ? 'active' : ''}}"
+        data-tab="urgent"
+        bindtap="onHallTab"
+      >
+        <text class="hall-tab-text">急单大厅</text>
+        <text class="hall-badge hall-badge--urgent" wx:if="{{urgentRows.length}}">{{urgentRows.length}}</text>
+      </view>
+      <view
+        class="hall-tab hall-tab--ice {{hallTab === 'ice' ? 'active' : ''}}"
+        data-tab="ice"
+        bindtap="onHallTab"
+      >
+        <text class="hall-tab-text">云剪任务</text>
+        <text class="hall-badge hall-badge--ice" wx:if="{{iceRows.length}}">{{iceRows.length}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{unconfigured}}" class="card state-empty">
+    <text class="state-empty-icon">⚙</text>
+    <text class="hint">尚未连接后台，请配置 MERCHANT_API_BASE_URL</text>
+  </view>
+
+  <view wx:elif="{{loading}}" class="card state-loading">
+    <view class="loading-dot-wrap">
+      <view class="loading-dot" />
+      <view class="loading-dot" />
+      <view class="loading-dot" />
+    </view>
+    <text class="hint" style="margin-top:20rpx;">加载招募中…</text>
+  </view>
+
+  <view wx:elif="{{err}}" class="card state-error state-empty">
+    <text class="state-empty-icon">!</text>
+    <text>{{err}}</text>
+  </view>
+
+  <block wx:else>
+    <view
+      wx:for="{{displayRows}}"
+      wx:key="id"
+      class="card job-card {{item.urgent ? 'job-card--urgent' : ''}}"
+      bindtap="goDetail"
+      data-id="{{item.id}}"
+      hover-class="job-card--hover"
+    >
+      <view class="job-card-top">
+        <text class="tag tag-blue">{{item.platform}}</text>
+        <text class="tag tag-urgent" wx:if="{{item.urgent}}">急单</text>
+        <text class="tag tag-ice" wx:elif="{{item.isIce}}">云剪</text>
+        <text class="tag tag-green" wx:else>{{item.statusLabel}}</text>
+      </view>
+      <text class="job-title">{{item.title}}</text>
+      <text class="merchant-name">{{item.merchantName}} · {{item.storeName}}</text>
+      <text class="hint job-meta">{{item.region}}</text>
+      <text class="hint job-summary">{{item.summary}}</text>
+      <view class="job-foot">
+        <text class="job-foot-left">{{item.applicantCount}} 人已报名</text>
+        <text class="job-foot-link">查看详情</text>
+      </view>
+    </view>
+
+    <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
+      <text class="state-empty-icon">{{hallTab === 'urgent' ? '⚡' : hallTab === 'ice' ? '🎬' : '📋'}}</text>
+      <text class="empty-title">{{hallTab === 'urgent' ? '暂无急单' : hallTab === 'ice' ? '暂无云剪任务' : '暂无招募'}}</text>
+      <text class="hint">
+        <block wx:if="{{hallTab === 'urgent'}}">急单含加急字样或高预算近期任务，请稍后再看</block>
+        <block wx:elif="{{hallTab === 'ice'}}">运营下发云剪单后展示，认领成片并回传抖音链接</block>
+        <block wx:else>运营发布小程序招募后将展示在此</block>
+      </text>
+    </view>
+  </block>
+</view>

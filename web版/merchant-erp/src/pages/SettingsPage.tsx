@@ -244,7 +244,7 @@ export default function SettingsPage() {
 
       <MeooPayQrModal
         open={subModalOpen}
-        title="订阅墨典 ERP"
+        title="订阅灵祺 ERP"
         mode="subscription"
         onClose={closeSubModal}
         onCompletedPayment={(p) => submitSubscriptionPaid(p)}

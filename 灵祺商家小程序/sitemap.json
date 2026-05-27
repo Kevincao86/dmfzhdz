@@ -1,0 +1,4 @@
+{
+  "desc": "灵祺商家小程序",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

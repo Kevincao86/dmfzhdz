@@ -651,7 +651,7 @@ export default function OpsAiModelsPage() {
             />
           </div>
           <div className="md:col-span-2 border-t border-slate-800 pt-4">
-            <p className="mb-3 text-xs font-medium text-cyan-400/90">墨典AI云剪 · 服务凭据</p>
+            <p className="mb-3 text-xs font-medium text-cyan-400/90">灵祺AI云剪 · 服务凭据</p>
             <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
               智能媒体服务云剪辑（ICE 2020-11-09）。商户 ERP 批量云剪经 BFF 调用，密钥仅存服务端与注册表。
             </p>
@@ -749,7 +749,7 @@ export default function OpsAiModelsPage() {
               <p className="mb-2 text-xs font-semibold text-cyan-200">
                 本地上传 · OSS 成片 URL 前缀
                 <span className="ml-2 rounded bg-cyan-900/80 px-1.5 py-0.5 text-[10px] font-medium text-cyan-100">
-                  商户「墨典AI云剪」必填
+                  商户「灵祺AI云剪」必填
                 </span>
               </p>
               <p className="mb-3 text-[11px] leading-relaxed text-slate-400">

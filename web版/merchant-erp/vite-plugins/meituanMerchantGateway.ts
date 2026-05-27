@@ -51,7 +51,7 @@ const DEMO_STORES: unknown[] = [
   {
     poi: {
       poi_id: 'mt-demo-001',
-      poi_name: '墨典演示门店·南山店',
+      poi_name: '灵祺演示门店·南山店',
       address: '广东省深圳市南山区科技园南路 88 号',
       city_name: '深圳市',
       district_name: '南山区',
@@ -62,7 +62,7 @@ const DEMO_STORES: unknown[] = [
   {
     poi: {
       poi_id: 'mt-demo-002',
-      poi_name: '墨典演示门店·福田店',
+      poi_name: '灵祺演示门店·福田店',
       address: '广东省深圳市福田区福华路 168 号',
       city_name: '深圳市',
       district_name: '福田区',
@@ -77,7 +77,7 @@ const DEMO_PRODUCTS = [
     id: 'mt-deal-1001',
     name: '双人招牌套餐',
     price: 128,
-    store: '墨典演示门店·南山店',
+    store: '灵祺演示门店·南山店',
     status: '已上架',
     auditStatus: '审核通过',
     saleStatus: '售卖中',
@@ -87,7 +87,7 @@ const DEMO_PRODUCTS = [
     id: 'mt-deal-1002',
     name: '100 元代金券',
     price: 88,
-    store: '墨典演示门店·福田店',
+    store: '灵祺演示门店·福田店',
     status: '已上架',
     auditStatus: '审核通过',
     saleStatus: '售卖中',
@@ -347,7 +347,7 @@ export async function handleMeituanStoresGet(
     json(res, 200, {
       items: slice,
       total,
-      accountName: isDemoSession(session) ? '墨典演示商户' : session.merchantId,
+      accountName: isDemoSession(session) ? '灵祺演示商户' : session.merchantId,
       tabCounts: { claimed: total, claiming: 0 },
       emptyHint: isDemoSession(session)
         ? '当前为演示门店；在美团技术服务合作中心申请门店查询能力并配置 MEITUAN_OPENAPI_BASE_URL、MEITUAN_STORE_LIST_PATH 后返回真实数据。'

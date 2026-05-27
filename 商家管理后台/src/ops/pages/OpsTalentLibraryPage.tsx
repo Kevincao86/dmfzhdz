@@ -45,7 +45,7 @@ export default function OpsTalentLibraryPage() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-white">墨典达人库</h1>
+        <h1 className="text-xl font-semibold text-white">灵祺达人库</h1>
         <p className="mt-1 text-sm text-slate-500">
           达人通过小程序报名后按平台与达人 ID 去重入库；报价、联系方式等以最新一次报名为准。
         </p>
