@@ -847,10 +847,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const attachRecruitmentBriefToPreview = useCallback(
     async (previewMsgId: string, userBrief: string, assistantContent?: string) => {
-      const target = messagesRef.current.find((m) => m.id === previewMsgId)
-      if (target?.preview?.taskType !== 'recruit_influencer') return
-
       const localBrief = buildLocalRecruitmentBriefPreview(userBrief, assistantContent)
+      patchPreviewRecruitmentBrief(
+        previewMsgId,
+        localBrief,
+        'Brief 预览已生成，正在 AI 优化文案…',
+      )
 
       try {
         const brief = await Promise.race([
@@ -933,9 +935,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         const next = [...prev, msg]
         messagesRef.current = next
         executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
+        queueMicrotask(() => {
+          void attachProductPlanToPreview(msg.id, userBrief, opts?.assistantContent)
+        })
         return next
       })
-      void attachProductPlanToPreview(msg.id, userBrief, opts?.assistantContent)
     },
     [attachProductPlanToPreview],
   )
@@ -968,9 +972,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         const next = [...prev, msg]
         messagesRef.current = next
         executionStateRef.current = syncStageAfterPreviewChange(executionStateRef.current, next)
+        queueMicrotask(() => {
+          void attachRecruitmentBriefToPreview(msg.id, userBrief, assistantContent)
+        })
         return next
       })
-      void attachRecruitmentBriefToPreview(msg.id, userBrief, assistantContent)
     },
     [attachRecruitmentBriefToPreview],
   )

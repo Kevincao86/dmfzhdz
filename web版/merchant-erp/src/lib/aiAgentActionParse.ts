@@ -585,6 +585,100 @@ function parsePlanNumberedComboSections(
   return intents.length > 0 ? intents.slice(0, 6) : null
 }
 
+function splitMarkdownTableCells(line: string): string[] {
+  const trimmed = line.trim()
+  if (!trimmed.includes('|')) return []
+  const parts = trimmed.split('|').map((c) => c.trim())
+  if (parts[0] === '') parts.shift()
+  if (parts[parts.length - 1] === '') parts.pop()
+  return parts
+}
+
+function isMarkdownTableSeparator(line: string): boolean {
+  const t = line.trim()
+  return t.includes('|') && t.includes('-') && /^[\s|:\-]+$/.test(t.replace(/-/g, ''))
+}
+
+function parsePriceYuanFromTableCell(text: string): number | undefined {
+  const fromSymbol = parsePriceYuanFromText(text)
+  if (fromSymbol != null) return fromSymbol
+  const m = text.replace(/%/g, '').match(/(\d+(?:\.\d+)?)\s*元?/)
+  if (!m) return undefined
+  const n = Number.parseFloat(m[1])
+  return Number.isFinite(n) && n > 0 && n < 100_000 ? n : undefined
+}
+
+/** 解析「具体组品」Markdown 表格（套餐名称 | 包含SKU | … | 团购价） */
+function parsePlanMarkdownTableComboRows(
+  userBrief: string,
+  assistantContent: string,
+): CreateProductIntent[] | null {
+  const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
+  const lines = full.split('\n')
+
+  let headerRow = -1
+  let nameCol = -1
+  let priceCol = -1
+  let groupPriceCol = -1
+
+  for (let i = 0; i < lines.length; i++) {
+    const cells = splitMarkdownTableCells(lines[i]!)
+    if (cells.length < 2) continue
+    const nameIdx = cells.findIndex((c) =>
+      /套餐名称|组合名称|组品名称|商品名称|套餐名/.test(c.replace(/\s/g, '')),
+    )
+    if (nameIdx < 0) continue
+    headerRow = i
+    nameCol = nameIdx
+    priceCol = cells.findIndex((c) => /^(?:定价|售价|单价|价格)$/.test(c.replace(/\s/g, '')))
+    groupPriceCol = cells.findIndex((c) => /团购价|团价|活动价/.test(c.replace(/\s/g, '')))
+    break
+  }
+
+  if (headerRow < 0 || nameCol < 0) return null
+
+  const intents: CreateProductIntent[] = []
+  const seen = new Set<string>()
+
+  for (let i = headerRow + 1; i < lines.length; i++) {
+    const line = lines[i]!.trim()
+    if (!line.includes('|')) break
+    if (isMarkdownTableSeparator(line)) continue
+
+    const cells = splitMarkdownTableCells(line)
+    if (cells.length <= nameCol) continue
+
+    const name = cells[nameCol]!.replace(/\*\*/g, '').trim()
+    if (name.length < 2) continue
+    if (/套餐名称|合计|小计|总计|备注|示例/.test(name)) continue
+    if (isNonProductPlanTag(name) || isGiftThresholdLine(name)) continue
+    if (seen.has(name)) continue
+    seen.add(name)
+
+    const priceCell =
+      groupPriceCol >= 0 && groupPriceCol < cells.length
+        ? cells[groupPriceCol]!
+        : priceCol >= 0 && priceCol < cells.length
+          ? cells[priceCol]!
+          : line
+    const priceYuan = parsePriceYuanFromTableCell(priceCell) ?? parsePriceYuanFromTableCell(line)
+    const skuHint =
+      cells.length > nameCol + 1 ? cells[nameCol + 1]!.replace(/\*\*/g, '').trim().slice(0, 120) : ''
+
+    intents.push({
+      key: `table-${intents.length}`,
+      label: name.slice(0, 48),
+      brief: planIntentBrief(
+        full,
+        `团购套餐「${name}」${priceYuan != null ? `，团购价约 ¥${priceYuan}` : ''}${skuHint ? `。包含：${skuHint}` : ''}。须按方案表格该行生成完整团购标题、售价、套餐项与说明。`,
+      ),
+      productType: inferProductTypeFromLabel(name, priceYuan),
+    })
+  }
+
+  return intents.length > 0 ? intents.slice(0, 6) : null
+}
+
 function parsePlanSlotPatternsFromFull(full: string): CreateProductIntent[] | null {
   const slots: CreateProductIntent[] = []
   const seen = new Set<string>()
@@ -613,6 +707,7 @@ function pickBestCreateProductIntents(
 ): CreateProductIntent[] {
   if (!candidates.length) return []
   const priority: Record<string, number> = {
+    table: 6,
     numbered: 5,
     markdown: 4,
     slots: 3,
@@ -667,9 +762,13 @@ function createProductIntentsFromStoreMenu(
 ): CreateProductIntent[] | null {
   let planCount: number | undefined = parsePlanCountFromText(full)
   if (!planCount) {
-    const numbered = parsePlanNumberedComboSections(_userBrief, assistantContent ?? full)
-    if (numbered?.length) planCount = numbered.length
-    else if (/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) planCount = 2
+    const tableRows = parsePlanMarkdownTableComboRows(_userBrief, assistantContent ?? full)
+    if (tableRows?.length) planCount = tableRows.length
+    else {
+      const numbered = parsePlanNumberedComboSections(_userBrief, assistantContent ?? full)
+      if (numbered?.length) planCount = numbered.length
+      else if (/组品|套餐|团购|方案|推广|组品方案|商品方案/.test(full)) planCount = 2
+    }
   }
   if (!planCount) return null
   const combos = buildMenuComboIntentLabels(planCount)
@@ -861,6 +960,9 @@ export function parseCreateProductIntentsFromPlan(
   const candidates: { source: string; intents: CreateProductIntent[] }[] = []
 
   if (assistantContent?.trim()) {
+    const fromTable = parsePlanMarkdownTableComboRows(userBrief, assistantContent)
+    if (fromTable?.length) candidates.push({ source: 'table', intents: fromTable })
+
     const fromMarkdown = parsePlanMarkdownProductSections(userBrief, assistantContent)
     if (fromMarkdown?.length) candidates.push({ source: 'markdown', intents: fromMarkdown })
 
