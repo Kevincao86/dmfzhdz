@@ -50,29 +50,45 @@ async function requestJson<T extends Record<string, unknown>>(
   }
 }
 
+function isInfraNotFoundMessage(message: string): boolean {
+  return /not_found|404\b|page could not be found|暂未开通|正在部署/i.test(message)
+}
+
 export async function testLocalPromotionBind(input: {
   appId: string
   accessToken: string
   localAccountId: string
 }): Promise<{ ok: true; demoMode: boolean; message: string } | { ok: false; message: string }> {
-  const r = await requestJson<{ demoMode?: boolean; message?: string }>(
+  const body = JSON.stringify({
+    access_token: input.accessToken,
+    local_account_id: input.localAccountId,
+  })
+  const paths = [
+    `${apiBase()}/api/meoo-local-promotion-bind-test`,
     `${apiBase()}/api/merchant/local-promotion/bind/test`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        access_token: input.accessToken,
-        local_account_id: input.localAccountId,
-      }),
-    },
-    '授权校验',
-  )
-  if (!r.ok) return r
-  return {
-    ok: true,
-    demoMode: Boolean(r.data.demoMode),
-    message: r.data.message ?? '绑定成功',
+  ]
+  let lastErr = '授权校验失败，请稍后重试。'
+  for (const url of paths) {
+    const r = await requestJson<{ demoMode?: boolean; message?: string }>(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      },
+      '授权校验',
+    )
+    if (r.ok) {
+      return {
+        ok: true,
+        demoMode: Boolean(r.data.demoMode),
+        message: r.data.message ?? '绑定成功',
+      }
+    }
+    lastErr = r.message
+    if (!isInfraNotFoundMessage(r.message)) break
   }
+  return { ok: false, message: lastErr }
 }
 
 export async function fetchLocalProjects(): Promise<
