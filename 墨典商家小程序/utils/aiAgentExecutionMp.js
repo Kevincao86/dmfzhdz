@@ -69,8 +69,29 @@ function parseAgentActionType(content) {
   if (!j) return undefined
   const at = String(j.actionType || j.action_type || '').trim()
   if (at === 'create_product' || at === 'create_product_batch') return 'create_product'
-  if (at === 'recruit_influencer' || at === 'recruit_talents') return 'recruit_influencer'
+  if (
+    at === 'recruit_influencer' ||
+    at === 'recruit_talents' ||
+    at === 'create_recruitment'
+  )
+    return 'recruit_influencer'
   return undefined
+}
+
+function collectAgentActionTypes(content) {
+  const found = new Set()
+  const c = String(content || '')
+  for (const re of [/\"actionType\"\s*:\s*\"([^\"]+)\"/gi, /\"action_type\"\s*:\s*\"([^\"]+)\"/gi]) {
+    re.lastIndex = 0
+    let m
+    while ((m = re.exec(c)) !== null) {
+      const t = parseAgentActionType(`{"actionType":"${m[1]}"}`)
+      if (t) found.add(t)
+    }
+  }
+  const single = parseAgentActionType(c)
+  if (single) found.add(single)
+  return [...found]
 }
 
 function looksLikePlanDocument(content) {
@@ -85,11 +106,11 @@ function looksLikePlanDocument(content) {
 function inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType) {
   const types = new Set()
   if (assistantContent) {
-    const agentAction = parseAgentActionType(assistantContent)
-    if (agentAction) types.add(agentAction)
+    for (const t of collectAgentActionTypes(assistantContent)) types.add(t)
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券/.test(c)) types.add('create_product')
-    if (/达人|招募|探店|种草|KOL|网红|达人合作|brief|Brief/.test(c)) types.add('recruit_influencer')
+    if (/达人|招募|探店|种草|KOL|网红|达人合作|brief|Brief|create_recruitment/.test(c))
+      types.add('recruit_influencer')
   }
 
   const userType = inferTaskTypeFromText(userText)
@@ -230,18 +251,9 @@ function taskTypesNeedingPreview(plan, messages) {
   return plan.taskTypes.filter((t) => !hasPendingPreviewForTask(messages, t))
 }
 
-/** 组合方案分步：先商品预览，商品确认后再达人招募 */
+/** 组合方案并行生成各自独立预览卡片 */
 function taskTypesForNextPreviewBatch(plan, messages) {
-  const needing = taskTypesNeedingPreview(plan, messages)
-  if (!needing.length) return []
-  const combined =
-    plan.taskTypes.includes('create_product') && plan.taskTypes.includes('recruit_influencer')
-  if (!combined) return needing
-  if (needing.includes('create_product') && !hasConfirmedPreviewForTask(messages, 'create_product')) {
-    return ['create_product']
-  }
-  if (needing.includes('recruit_influencer')) return ['recruit_influencer']
-  return needing
+  return taskTypesNeedingPreview(plan, messages)
 }
 
 function syncStageAfterPreviewChange(state, messages) {

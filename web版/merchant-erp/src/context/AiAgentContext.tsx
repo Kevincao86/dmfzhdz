@@ -1577,7 +1577,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
             const plan = executionStateRef.current.plan
             if (
-              okCount > 0 &&
               plan &&
               planIncludesRecruitInfluencer(plan) &&
               !hasPendingPreviewForTask(messagesRef.current, 'recruit_influencer') &&

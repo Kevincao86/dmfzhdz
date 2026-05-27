@@ -1,6 +1,7 @@
 /**
  * 与 web版/merchant-erp/src/config/nav.ts 模块对齐。
  * featuredOnly：仅在首页「特色功能」展示，不出现在下方宫格。
+ * mpHide：配合 utils/mpUiFlags.js 临时隐藏入口。
  */
 const SECTIONS = [
   {
@@ -17,6 +18,7 @@ const SECTIONS = [
         url: '/pages/wallet/wallet',
         title: '我的钱包',
         desc: '余额、账单与充值 / 退款申报',
+        mpHide: 'wallet',
       },
     ],
   },

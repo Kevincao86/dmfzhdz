@@ -8,11 +8,18 @@ const ACTION_TO_TASK: Record<string, AiTaskType> = {
   create_product: 'create_product',
   create_product_batch: 'create_product',
   recruit_influencer: 'recruit_influencer',
+  create_recruitment: 'recruit_influencer',
+  recruit_talents: 'recruit_influencer',
   handle_review: 'handle_review',
   sync_platform: 'sync_platform',
   analyze_exception: 'analyze_exception',
   generate_copywriting: 'generate_copywriting',
   file_tax: 'file_tax',
+}
+
+function mapActionTypeToTask(raw: string): AiTaskType | undefined {
+  const at = String(raw ?? '').trim()
+  return at ? ACTION_TO_TASK[at] : undefined
 }
 
 /** 从用户话术推断任务类型（与 scheduleTaskPreview 共用） */
@@ -57,7 +64,24 @@ export function parseAgentActionType(content: string): AiTaskType | undefined {
   const j = tryParseJsonObject(content)
   if (!j) return undefined
   const at = String(j.actionType ?? j.action_type ?? '').trim()
-  return ACTION_TO_TASK[at]
+  return mapActionTypeToTask(at)
+}
+
+/** 扫描全文多个 JSON 块中的 actionType（组合方案常含多段预览 JSON） */
+export function collectAgentActionTypes(content: string): AiTaskType[] {
+  const found = new Set<AiTaskType>()
+  const c = content || ''
+  for (const re of [/\"actionType\"\s*:\s*\"([^\"]+)\"/gi, /\"action_type\"\s*:\s*\"([^\"]+)\"/gi]) {
+    re.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = re.exec(c)) !== null) {
+      const t = mapActionTypeToTask(m[1] ?? '')
+      if (t) found.add(t)
+    }
+  }
+  const single = parseAgentActionType(c)
+  if (single) found.add(single)
+  return [...found]
 }
 
 /** 助手 JSON 是否要求用户先确认方案再进入执行预览 */
@@ -344,11 +368,11 @@ export function inferTaskTypesFromCombinedContext(
   const types = new Set<AiTaskType>()
 
   if (assistantContent) {
-    const agentAction = parseAgentActionType(assistantContent)
-    if (agentAction) types.add(agentAction)
+    for (const t of collectAgentActionTypes(assistantContent)) types.add(t)
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
-    if (/达人|招募|探店|种草|KOL|网红|达人合作|Brief|brief/.test(c)) types.add('recruit_influencer')
+    if (/达人|招募|探店|种草|KOL|网红|达人合作|Brief|brief|create_recruitment/.test(c))
+      types.add('recruit_influencer')
   }
 
   if (explicitTaskType && (isAgentShortcutTaskLine(userText) || !isPlanDesignQuery(userText))) {
