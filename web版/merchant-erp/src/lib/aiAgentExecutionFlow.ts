@@ -137,22 +137,12 @@ export function taskTypesNeedingPreview(
   return plan.taskTypes.filter((t) => !hasPendingPreviewForTask(messages, t))
 }
 
-/** 组合「商品+达人招募」时分步：先商品预览，商品确认后再招募预览 */
+/** 组合「商品+达人招募」时并行生成各自独立预览卡片（确认仍分卡片进行） */
 export function taskTypesForNextPreviewBatch(
   plan: AgentExecutionPlan,
   messages: AiAgentMessage[],
 ): AiTaskType[] {
-  const needing = taskTypesNeedingPreview(plan, messages)
-  if (!needing.length) return []
-  const combined =
-    plan.taskTypes.includes('create_product') &&
-    planIncludesRecruitInfluencer(plan)
-  if (!combined) return needing
-  if (needing.includes('create_product') && !hasConfirmedPreviewForTask(messages, 'create_product')) {
-    return ['create_product']
-  }
-  if (needing.includes('recruit_influencer')) return ['recruit_influencer']
-  return needing
+  return taskTypesNeedingPreview(plan, messages)
 }
 
 function isRecruitExecutionIntent(strippedLine: string): boolean {

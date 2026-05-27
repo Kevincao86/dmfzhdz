@@ -2,6 +2,58 @@ const api = require('../../utils/api.js')
 const devAuth = require('../../utils/devAuth.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const platformBindingsMp = require('../../utils/platformBindingsMp.js')
+const mpUi = require('../../utils/mpUiFlags.js')
+
+const BASE_MENU = [
+  {
+    id: 'notify',
+    title: '消息通知',
+    desc: '业务提醒与系统消息',
+    glyph: '讯',
+    tone: 'cyan',
+    url: '/pages/notifications/notifications',
+  },
+  {
+    id: 'wallet',
+    title: '我的钱包',
+    desc: '余额、充值与账单',
+    glyph: '钱',
+    tone: 'amber',
+    url: '/pages/wallet/wallet',
+  },
+  {
+    id: 'switch',
+    title: '切换账号',
+    desc: '使用其他门店账户登录',
+    glyph: '换',
+    tone: 'blue',
+    action: 'switch',
+  },
+  {
+    id: 'subscribe',
+    title: '订阅与会员',
+    desc: '加载会员版本中…',
+    glyph: '订',
+    tone: 'violet',
+    url: '/pages/subscription/subscription',
+  },
+  {
+    id: 'support',
+    title: '在线客服',
+    desc: '与商家管理后台坐席对话，消息互通',
+    glyph: '服',
+    tone: 'indigo',
+    url: '/pages/support-chat/support-chat',
+  },
+]
+
+function buildVisibleMenu() {
+  return BASE_MENU.filter((item) => {
+    if (item.id === 'wallet' && !mpUi.SHOW_WALLET) return false
+    if (item.id === 'subscribe' && !mpUi.SHOW_SUBSCRIPTION) return false
+    return true
+  })
+}
 
 Page({
   data: {
@@ -10,53 +62,13 @@ Page({
     planLabel: '',
     planPillClass: 'free',
     devMode: false,
+    showPlanBadge: mpUi.SHOW_SUBSCRIPTION,
     showLogoutConfirm: false,
     bindingsLoading: false,
     bindingsHint: '',
     cloudPlatformRows: [],
     webPlatformRows: [],
-    menu: [
-      {
-        id: 'notify',
-        title: '消息通知',
-        desc: '业务提醒与系统消息',
-        glyph: '讯',
-        tone: 'cyan',
-        url: '/pages/notifications/notifications',
-      },
-      {
-        id: 'wallet',
-        title: '我的钱包',
-        desc: '余额、充值与账单',
-        glyph: '钱',
-        tone: 'amber',
-        url: '/pages/wallet/wallet',
-      },
-      {
-        id: 'switch',
-        title: '切换账号',
-        desc: '使用其他门店账户登录',
-        glyph: '换',
-        tone: 'blue',
-        action: 'switch',
-      },
-      {
-        id: 'subscribe',
-        title: '订阅与会员',
-        desc: '加载会员版本中…',
-        glyph: '订',
-        tone: 'violet',
-        url: '/pages/subscription/subscription',
-      },
-      {
-        id: 'support',
-        title: '在线客服',
-        desc: '与商家管理后台坐席对话，消息互通',
-        glyph: '服',
-        tone: 'indigo',
-        url: '/pages/support-chat/support-chat',
-      },
-    ],
+    menu: buildVisibleMenu(),
   },
 
   onShow() {
@@ -111,14 +123,15 @@ Page({
   },
 
   patchSubscribeMenuDesc(desc) {
-    const menu = (this.data.menu || []).map((item) =>
+    if (!mpUi.SHOW_SUBSCRIPTION) return
+    const menu = buildVisibleMenu().map((item) =>
       item.id === 'subscribe' ? Object.assign({}, item, { desc }) : item,
     )
     this.setData({ menu })
   },
 
   async loadMembershipBadge() {
-    if (devAuth.isDevSkipLogin()) return
+    if (devAuth.isDevSkipLogin() || !mpUi.SHOW_SUBSCRIPTION) return
     try {
       const snap = await membershipMp.loadMembershipSnapshot()
       const plan = snap.ent.plan

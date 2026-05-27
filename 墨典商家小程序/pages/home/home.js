@@ -7,6 +7,7 @@ const tiers = require('../../utils/meooPaymentTiers.js')
 const dashboardMp = require('../../utils/dashboardMp.js')
 const { hasAnyPlatformToken } = require('../../utils/platformTokensMp.js')
 const { buildIconPages, buildFeaturedList } = require('../../utils/homeMenuFlat.js')
+const mpUi = require('../../utils/mpUiFlags.js')
 
 const DEFAULT_METRICS = [
   { value: '—', label: '可用余额', sub: '加载中…' },
@@ -19,6 +20,7 @@ Page({
     storeName: '墨典商家',
     statusText: '正常经营',
     balanceLoaded: false,
+    showWallet: mpUi.SHOW_WALLET,
     erpLinked: false,
     scoreLabel: '经营分',
     score: '—',
@@ -42,14 +44,18 @@ Page({
     ],
     todoTotal: 2,
     promos: [
-      {
-        key: 'p1',
-        size: 'large',
-        title: '我的钱包',
-        sub: '充值 · 订阅 · 账单',
-        url: '/pages/wallet/wallet',
-        theme: 'coral',
-      },
+      ...(mpUi.SHOW_WALLET
+        ? [
+            {
+              key: 'p1',
+              size: 'large',
+              title: '我的钱包',
+              sub: '充值 · 订阅 · 账单',
+              url: '/pages/wallet/wallet',
+              theme: 'coral',
+            },
+          ]
+        : []),
       {
         key: 'p2',
         size: 'small',
@@ -123,28 +129,42 @@ Page({
 
     try {
       const tid = await rest.fetchPrimaryTenantId()
-      const sum = await rest.fetchTenantWalletSummary(tid)
-      const yuan = tiers.formatYuanFromCents(sum.balanceCents)
-      score = `¥${yuan}`
-      scoreLabel = '可用余额'
-      scoreHint = '与电脑端「我的钱包」一致'
-      metrics[0] = { value: `¥${yuan}`, label: '可用余额', sub: '实时' }
-      balanceLoaded = true
-      dataBanner =
-        '钱包、流水已与电脑端一致。成交额等来自各平台店铺的数据，需先在电脑端完成店铺授权；达人招募还需连接电脑端商家后台网络。'
+      if (mpUi.SHOW_WALLET) {
+        const sum = await rest.fetchTenantWalletSummary(tid)
+        const yuan = tiers.formatYuanFromCents(sum.balanceCents)
+        score = `¥${yuan}`
+        scoreLabel = '可用余额'
+        scoreHint = '与电脑端「我的钱包」一致'
+        metrics[0] = { value: `¥${yuan}`, label: '可用余额', sub: '实时' }
+        balanceLoaded = true
+        dataBanner =
+          '钱包、流水已与电脑端一致。成交额等来自各平台店铺的数据，需先在电脑端完成店铺授权；达人招募还需连接电脑端商家后台网络。'
+      } else {
+        scoreLabel = '经营概览'
+        scoreHint = '请在电脑端查看完整经营数据'
+        metrics[0] = { value: '—', label: '经营分', sub: '电脑端查看' }
+        dataBanner = '成交额等来自各平台店铺的数据，需先在电脑端完成店铺授权；达人招募还需连接电脑端商家后台网络。'
+      }
 
       try {
         const tname = await rest.fetchTenantMerchantName(tid)
         if (tname && String(tname).trim()) this.setData({ storeName: String(tname).trim() })
       } catch (_) {}
     } catch (e) {
-      const msg = e && e.message ? String(e.message) : String(e)
-      scoreHint = '钱包暂不可用'
-      metrics[0] = { value: '—', label: '可用余额', sub: '请稍后再试或联系技术支持' }
-      dataBanner =
-        /does not exist|relation|schema/i.test(msg) || /Could not find/i.test(msg)
-          ? '钱包功能尚未在后台就绪，请联系技术支持完成数据初始化。'
-          : `暂时无法显示钱包：${msg.slice(0, 80)}`
+      if (!mpUi.SHOW_WALLET) {
+        scoreLabel = '经营概览'
+        scoreHint = '请在电脑端查看完整经营数据'
+        metrics[0] = { value: '—', label: '经营分', sub: '电脑端查看' }
+        dataBanner = '请在电脑端商家后台查看经营与财务数据。'
+      } else {
+        const msg = e && e.message ? String(e.message) : String(e)
+        scoreHint = '钱包暂不可用'
+        metrics[0] = { value: '—', label: '可用余额', sub: '请稍后再试或联系技术支持' }
+        dataBanner =
+          /does not exist|relation|schema/i.test(msg) || /Could not find/i.test(msg)
+            ? '钱包功能尚未在后台就绪，请联系技术支持完成数据初始化。'
+            : `暂时无法显示钱包：${msg.slice(0, 80)}`
+      }
     }
 
     metrics[1] = { value: '—', label: '成交额', sub: '近7日' }
@@ -188,6 +208,9 @@ Page({
       if (balanceLoaded) {
         dataBanner =
           '钱包已与电脑端一致。达人招募要与电脑端互通，请让技术人员在配置文件里填写您电脑上商家后台的访问地址（与手机同一局域网）。'
+      } else if (!mpUi.SHOW_WALLET) {
+        dataBanner =
+          '达人招募要与电脑端互通，请让技术人员在配置文件里填写您电脑上商家后台的访问地址（与手机同一局域网）。'
       }
     }
 

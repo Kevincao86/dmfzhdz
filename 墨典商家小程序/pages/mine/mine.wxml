@@ -4,7 +4,7 @@
     <view class="profile-text">
       <view class="profile-name-row">
         <text class="profile-name">{{storeName}}</text>
-        <text wx:if="{{planLabel}}" class="plan-pill plan-pill-{{planPillClass}}">{{planLabel}}</text>
+        <text wx:if="{{planLabel && showPlanBadge}}" class="plan-pill plan-pill-{{planPillClass}}">{{planLabel}}</text>
       </view>
       <text class="profile-sub">账户 {{loginName || '—'}}</text>
       <text wx:if="{{devMode}}" class="dev-pill">开发预览</text>

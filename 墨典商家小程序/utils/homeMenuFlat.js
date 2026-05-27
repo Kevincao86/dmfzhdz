@@ -2,6 +2,13 @@
  * 首页宫格：字形图标 + 浅色 UI；特色入口由 menu featuredOnly 单独展示。
  */
 const { SECTIONS } = require('./menu.js')
+const mpUi = require('./mpUiFlags.js')
+
+function isMenuItemVisible(it) {
+  if (it.mpHide === 'wallet' && !mpUi.SHOW_WALLET) return false
+  if (it.mpHide === 'subscription' && !mpUi.SHOW_SUBSCRIPTION) return false
+  return true
+}
 
 /** title -> { glyph, tone } */
 const GRID_VISUAL = {
@@ -46,7 +53,7 @@ function flattenMenuCells() {
   const cells = []
   for (const sec of SECTIONS) {
     for (const it of sec.items) {
-      if (it.featuredOnly) continue
+      if (it.featuredOnly || !isMenuItemVisible(it)) continue
       const v = visualFor(it.title)
       cells.push({
         title: it.title,
@@ -63,7 +70,7 @@ function buildFeaturedList() {
   const arr = []
   for (const sec of SECTIONS) {
     for (const it of sec.items) {
-      if (!it.featuredOnly) continue
+      if (!it.featuredOnly || !isMenuItemVisible(it)) continue
       const title = it.featuredTitle || it.title
       const desc = it.featuredShortDesc || '点击进入'
       arr.push({
