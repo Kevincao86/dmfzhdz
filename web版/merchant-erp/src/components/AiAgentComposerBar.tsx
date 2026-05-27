@@ -277,7 +277,7 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
           placeholder={
             modelFilter === 'image'
               ? '文生图：描述画面；图生图：先上传参考图/视频首帧再写修改要求…'
-              : '描述你想完成的任务；可上传图片或视频（视频将提取首帧供模型理解），也可粘贴截图…'
+              : '随便问：生活、学习、写作，或门店经营问题；可上传图片/视频…'
           }
           className={cn(
             'w-full resize-none border-0 bg-transparent px-0 py-0 text-[15px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0 disabled:opacity-50',
