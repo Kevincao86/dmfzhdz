@@ -335,32 +335,39 @@ export function isAgentShortcutTaskLine(text: string): boolean {
   return /^使用快捷任务：/.test(text.replace(/\[引用[\s\S]*?\n\n/, '').trim())
 }
 
-/** 从用户话术 + 助手方案推断需执行的任务类型 */
+/** 从用户话术 + 助手方案推断需执行的任务类型（允许多场景并存，不因 JSON actionType 只保留一项） */
 export function inferTaskTypesFromCombinedContext(
   userText: string,
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): AiTaskType[] {
+  const types = new Set<AiTaskType>()
+
   if (assistantContent) {
     const agentAction = parseAgentActionType(assistantContent)
-    if (agentAction) return [agentAction]
+    if (agentAction) types.add(agentAction)
+    const c = assistantContent
+    if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
+    if (/达人|招募|探店|种草|KOL|网红|达人合作|Brief|brief/.test(c)) types.add('recruit_influencer')
   }
 
   if (explicitTaskType && (isAgentShortcutTaskLine(userText) || !isPlanDesignQuery(userText))) {
-    return [explicitTaskType]
+    types.add(explicitTaskType)
   }
 
-  const types = new Set<AiTaskType>()
   const userType = inferTaskTypeFromText(userText)
   if (userType) types.add(userType)
 
-  if (assistantContent && looksLikePlanDocument(assistantContent)) {
-    const c = assistantContent
-    if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
-    if (/达人|招募|探店|种草|KOL|网红|达人合作/.test(c)) types.add('recruit_influencer')
-  }
+  return filterScenarioTaskTypes([...types])
+}
 
-  return [...types]
+/** 方案是否包含达人招募（taskTypes 或正文关键词） */
+export function planIncludesRecruitInfluencer(plan: {
+  taskTypes: AiTaskType[]
+  assistantContent: string
+}): boolean {
+  if (plan.taskTypes.includes('recruit_influencer')) return true
+  return /达人|招募|探店|种草|KOL|网红|达人合作|Brief|brief/.test(plan.assistantContent)
 }
 
 /** 方案设计完成后追加的执行确认引导语（按实际涉及场景生成，避免误提无关任务） */

@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const aiAgent = require('../../utils/aiAgentMp.js')
 const execMp = require('../../utils/aiAgentExecutionMp.js')
+const previewMp = require('../../utils/aiAgentPreviewMp.js')
 const registry = require('../../utils/aiModelRegistryMp.js')
 
 const FILTER_TABS = [
@@ -358,17 +359,52 @@ Page({
   onConfirmPreview(e) {
     const id = e.currentTarget.dataset.id
     const taskType = e.currentTarget.dataset.task
-    const messages = (this.data.messages || []).map((m) =>
+    let messages = (this.data.messages || []).map((m) =>
       m.id === id ? Object.assign({}, m, { previewStatus: 'confirmed' }) : m,
     )
+    this._executionState = execMp.syncStageAfterPreviewChange(this._executionState || execMp.createAgentExecutionState(), messages)
     this.setData({ messages })
     aiAgent.saveThread(messages)
+
     if (taskType === 'create_product') {
-      wx.showToast({ title: '请在「功能→商品」完善并提交', icon: 'none' })
+      const plan = this._executionState && this._executionState.plan
+      if (
+        plan &&
+        plan.taskTypes.includes('recruit_influencer') &&
+        !execMp.hasPendingPreviewForTask(messages, 'recruit_influencer') &&
+        !execMp.hasConfirmedPreviewForTask(messages, 'recruit_influencer')
+      ) {
+        wx.showLoading({ title: '生成招募预览…', mask: true })
+        void previewMp
+          .spawnRecruitPreviewAfterProductConfirm(plan)
+          .then((recruitMsgs) => {
+            wx.hideLoading()
+            if (!recruitMsgs.length) return
+            const intro = {
+              id: `a-${Date.now()}-recruit-intro`,
+              role: 'assistant',
+              content:
+                '商品方案已确认。接下来是达人招募 Brief 预览，请核对三版文案后在本卡片确认。',
+            }
+            messages = messages.concat([intro]).concat(recruitMsgs)
+            this._executionState = execMp.syncStageAfterPreviewChange(this._executionState, messages)
+            this.setData({ messages, scrollTo: `msg-${recruitMsgs[recruitMsgs.length - 1].id}` })
+            aiAgent.saveThread(messages)
+          })
+          .catch(() => {
+            wx.hideLoading()
+            wx.showToast({ title: '招募预览生成失败', icon: 'none' })
+          })
+      } else {
+        wx.showToast({ title: '商品方案已确认', icon: 'success' })
+      }
       return
     }
     if (taskType === 'recruit_influencer') {
-      wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
+      wx.showToast({ title: 'Brief 已确认', icon: 'success' })
+      setTimeout(() => {
+        wx.navigateTo({ url: '/pages/recruit-hub/recruit-hub' })
+      }, 400)
     }
   },
 })

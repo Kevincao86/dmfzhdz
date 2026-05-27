@@ -84,17 +84,16 @@ function looksLikePlanDocument(content) {
 
 function inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType) {
   const types = new Set()
-  const agentAction = assistantContent ? parseAgentActionType(assistantContent) : undefined
-  if (agentAction) return [agentAction]
+  if (assistantContent) {
+    const agentAction = parseAgentActionType(assistantContent)
+    if (agentAction) types.add(agentAction)
+    const c = assistantContent
+    if (/商品|套餐|组品|团购|上架|代金券/.test(c)) types.add('create_product')
+    if (/达人|招募|探店|种草|KOL|网红|达人合作|brief|Brief/.test(c)) types.add('recruit_influencer')
+  }
 
   const userType = inferTaskTypeFromText(userText)
   if (userType) types.add(userType)
-
-  if (assistantContent && looksLikePlanDocument(assistantContent)) {
-    const c = assistantContent
-    if (/商品|套餐|组品|团购|上架|代金券/.test(c)) types.add('create_product')
-    if (/达人|招募|探店|种草|KOL|网红|达人合作/.test(c)) types.add('recruit_influencer')
-  }
 
   if (explicitTaskType && !types.size) types.add(explicitTaskType)
   return [...types]
@@ -157,14 +156,145 @@ function createAgentExecutionState() {
   return { stage: 'idle', plan: null }
 }
 
+function canAcceptDeferredPlan(state) {
+  return state.stage === 'idle' || state.stage === 'awaiting_execute_confirm'
+}
+
 function storeDeferredPlan(state, userBrief, assistantContent, taskTypes) {
   const filtered = (taskTypes || []).filter((t) => TASK_LABELS[t])
   if (!filtered.length) return state
-  if (state.stage !== 'idle' && state.stage !== 'awaiting_execute_confirm') return state
+  if (!canAcceptDeferredPlan(state)) return state
   return {
     stage: 'awaiting_execute_confirm',
     plan: { userBrief, assistantContent, taskTypes: filtered },
   }
+}
+
+function markPreviewsActive(state) {
+  return Object.assign({}, state, { stage: 'previews_active' })
+}
+
+function isPendingPreviewMessage(m) {
+  return m && m.role === 'task_preview' && (m.previewStatus || 'pending') === 'pending'
+}
+
+function hasPendingPreviewForTask(messages, taskType) {
+  return (messages || []).some(
+    (m) => isPendingPreviewMessage(m) && m.preview && m.preview.taskType === taskType,
+  )
+}
+
+function hasConfirmedPreviewForTask(messages, taskType) {
+  return (messages || []).some(
+    (m) =>
+      m &&
+      m.role === 'task_preview' &&
+      m.previewStatus === 'confirmed' &&
+      m.preview &&
+      m.preview.taskType === taskType,
+  )
+}
+
+/** 计划中尚未展示待确认预览的场景 */
+function taskTypesNeedingPreview(plan, messages) {
+  if (!plan || !plan.taskTypes) return []
+  return plan.taskTypes.filter((t) => !hasPendingPreviewForTask(messages, t))
+}
+
+/** 组合方案分步：先商品预览，商品确认后再达人招募 */
+function taskTypesForNextPreviewBatch(plan, messages) {
+  const needing = taskTypesNeedingPreview(plan, messages)
+  if (!needing.length) return []
+  const combined =
+    plan.taskTypes.includes('create_product') && plan.taskTypes.includes('recruit_influencer')
+  if (!combined) return needing
+  if (needing.includes('create_product') && !hasConfirmedPreviewForTask(messages, 'create_product')) {
+    return ['create_product']
+  }
+  if (needing.includes('recruit_influencer')) return ['recruit_influencer']
+  return needing
+}
+
+function syncStageAfterPreviewChange(state, messages) {
+  const hasPending = (messages || []).some((m) => isPendingPreviewMessage(m))
+  if (hasPending) return markPreviewsActive(state)
+  const plan = state.plan
+  if (!plan) return state
+  const allConfirmed = plan.taskTypes.every((t) => hasConfirmedPreviewForTask(messages, t))
+  if (allConfirmed) return { stage: 'idle', plan: null }
+  if (state.stage === 'previews_active' || state.stage === 'awaiting_execute_confirm') {
+    return { stage: 'awaiting_execute_confirm', plan }
+  }
+  return state
+}
+
+function isRecruitExecutionIntent(text) {
+  return /确认执行达人招募|确认发布达人招募|执行达人招募|达人招募流程也发|发一下达人招募/.test(
+    stripQuote(text),
+  )
+}
+
+function recoverPlanFromMessages(messages) {
+  const list = messages || []
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i]
+    if (!m || m.role !== 'assistant') continue
+    const content = String(m.content || '')
+    if (!looksLikePlanDocument(content)) continue
+    let userBrief = ''
+    for (let j = i - 1; j >= 0; j--) {
+      if (list[j] && list[j].role === 'user') {
+        userBrief = stripQuote(list[j].content || '')
+        break
+      }
+    }
+    const taskTypes = inferTaskTypesFromCombinedContext(userBrief, content, undefined)
+    if (!taskTypes.length) continue
+    return { userBrief, assistantContent: content, taskTypes }
+  }
+  return null
+}
+
+function resolveExecutionUserMessage(state, messages, strippedLine) {
+  let plan = state.plan
+  if (!plan && (isExplicitExecutionIntent(strippedLine) || isRecruitExecutionIntent(strippedLine))) {
+    plan = recoverPlanFromMessages(messages)
+    if (plan) state = storeDeferredPlan(state, plan.userBrief, plan.assistantContent, plan.taskTypes)
+  }
+
+  if (
+    (state.stage === 'awaiting_execute_confirm' || state.stage === 'previews_active') &&
+    plan &&
+    (isExplicitExecutionIntent(strippedLine) || isRecruitExecutionIntent(strippedLine))
+  ) {
+    let taskTypes = taskTypesForNextPreviewBatch(plan, messages)
+    if (isRecruitExecutionIntent(strippedLine) && plan.taskTypes.includes('recruit_influencer')) {
+      if (!hasPendingPreviewForTask(messages, 'recruit_influencer')) {
+        taskTypes = ['recruit_influencer']
+      }
+    }
+    if (!taskTypes.length) {
+      return {
+        state,
+        action: 'none',
+        assistantLine: '当前方案下的场景预览已在对话中展示，请分别在对应卡片确认或修改。',
+      }
+    }
+    return {
+      state: markPreviewsActive(state),
+      action: 'spawn_previews',
+      plan,
+      taskTypes,
+      assistantLine:
+        taskTypes.length > 1
+          ? `好的，将为 ${taskTypes.length} 项场景生成独立预览，请分别在各自卡片确认。`
+          : taskTypes[0] === 'recruit_influencer'
+            ? '好的，正在生成达人招募 Brief 预览…'
+            : '好的，正在生成执行预览…',
+    }
+  }
+
+  return { state, action: 'none' }
 }
 
 function buildCombinedBrief(plan) {
@@ -179,12 +309,23 @@ module.exports = {
   inferTaskTypeFromText,
   isPlanDesignQuery,
   isExplicitExecutionIntent,
+  isRecruitExecutionIntent,
   inferTaskTypesFromCombinedContext,
+  hasCombinedProductAndRecruitPlan,
   shouldDeferTaskPreview,
   buildPlanExecutionConsultation,
   formatAssistantDisplayText,
   parsePlanIntentLabels,
   createAgentExecutionState,
+  canAcceptDeferredPlan,
   storeDeferredPlan,
+  markPreviewsActive,
+  hasPendingPreviewForTask,
+  hasConfirmedPreviewForTask,
+  taskTypesNeedingPreview,
+  taskTypesForNextPreviewBatch,
+  syncStageAfterPreviewChange,
+  recoverPlanFromMessages,
+  resolveExecutionUserMessage,
   buildCombinedBrief,
 }

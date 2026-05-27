@@ -31,6 +31,18 @@ export function hasPendingPreviewForTask(
   )
 }
 
+export function hasConfirmedPreviewForTask(
+  messages: AiAgentMessage[],
+  taskType: AiTaskType,
+): boolean {
+  return messages.some(
+    (m) =>
+      m.role === 'task_preview' &&
+      m.previewStatus === 'confirmed' &&
+      m.preview?.taskType === taskType,
+  )
+}
+
 export function isPreviewMessageLoading(m: AiAgentMessage): boolean {
   const p = m.preview
   if (!p) return false

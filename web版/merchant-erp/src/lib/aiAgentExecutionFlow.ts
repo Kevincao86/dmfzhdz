@@ -6,6 +6,7 @@
 import type { AiTaskType } from './aiAgentTypes'
 import {
   filterScenarioTaskTypes,
+  hasConfirmedPreviewForTask,
   hasPendingPreviewForTask,
 } from './aiAgentPreviewState'
 import type { AiAgentMessage } from './aiAgentTypes'
@@ -13,6 +14,7 @@ import {
   inferTaskTypesFromCombinedContext,
   isExplicitExecutionIntent,
   isUserDecliningProductImages,
+  planIncludesRecruitInfluencer,
 } from './aiAgentActionParse'
 
 export type AgentExecutionStage =
@@ -89,7 +91,7 @@ export function markPreviewsActive(state: AgentExecutionState): AgentExecutionSt
   return { ...state, stage: 'previews_active' }
 }
 
-/** 若全部待确认预览已处理完，回到 idle */
+/** 若全部待确认预览已处理完，且计划内各场景均已确认，才清空 plan */
 export function syncStageAfterPreviewChange(
   state: AgentExecutionState,
   messages: AiAgentMessage[],
@@ -98,8 +100,12 @@ export function syncStageAfterPreviewChange(
     (m) => m.role === 'task_preview' && (m.previewStatus ?? 'pending') === 'pending',
   )
   if (hasPending) return { ...state, stage: 'previews_active' }
+  const plan = state.plan
+  if (!plan) return state
+  const allConfirmed = plan.taskTypes.every((t) => hasConfirmedPreviewForTask(messages, t))
+  if (allConfirmed) return { stage: 'idle', plan: null }
   if (state.stage === 'previews_active' || state.stage === 'awaiting_product_images') {
-    return { ...state, stage: 'idle', plan: null }
+    return { stage: 'awaiting_execute_confirm', plan }
   }
   return state
 }
@@ -131,13 +137,67 @@ export function taskTypesNeedingPreview(
   return plan.taskTypes.filter((t) => !hasPendingPreviewForTask(messages, t))
 }
 
+/** 组合「商品+达人招募」时分步：先商品预览，商品确认后再招募预览 */
+export function taskTypesForNextPreviewBatch(
+  plan: AgentExecutionPlan,
+  messages: AiAgentMessage[],
+): AiTaskType[] {
+  const needing = taskTypesNeedingPreview(plan, messages)
+  if (!needing.length) return []
+  const combined =
+    plan.taskTypes.includes('create_product') &&
+    planIncludesRecruitInfluencer(plan)
+  if (!combined) return needing
+  if (needing.includes('create_product') && !hasConfirmedPreviewForTask(messages, 'create_product')) {
+    return ['create_product']
+  }
+  if (needing.includes('recruit_influencer')) return ['recruit_influencer']
+  return needing
+}
+
+function isRecruitExecutionIntent(strippedLine: string): boolean {
+  return /确认执行达人招募|确认发布达人招募|执行达人招募|达人招募流程也发|发一下达人招募/.test(
+    strippedLine.replace(/\[引用[\s\S]*?\n\n/, '').trim(),
+  )
+}
+
+/** 从对话历史恢复待执行方案（plan 被清空或页面刷新后仍可触发招募预览） */
+export function recoverPlanFromMessages(messages: AiAgentMessage[]): AgentExecutionPlan | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role !== 'assistant') continue
+    const content = m.content ?? ''
+    if (content.length < 80) continue
+    if (!/活动|方案|套餐|组品|达人|招募|推广|618/.test(content)) continue
+    let userBrief = ''
+    for (let j = i - 1; j >= 0; j--) {
+      if (messages[j]?.role === 'user') {
+        userBrief = messages[j].content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ?? ''
+        break
+      }
+    }
+    const taskTypes = filterScenarioTaskTypes(
+      inferTaskTypesFromCombinedContext(userBrief, content, undefined),
+    )
+    if (!taskTypes.length) continue
+    return { userBrief, assistantContent: content, taskTypes }
+  }
+  return null
+}
+
 export function resolveExecutionUserMessage(
   state: AgentExecutionState,
   messages: AiAgentMessage[],
   strippedLine: string,
   visionUrls: string[],
 ): ExecutionFlowResult {
-  const plan = state.plan
+  let plan = state.plan
+  if (!plan && (isExplicitExecutionIntent(strippedLine) || isRecruitExecutionIntent(strippedLine))) {
+    plan = recoverPlanFromMessages(messages)
+    if (plan) {
+      state = storeDeferredPlan(state, plan.userBrief, plan.assistantContent, plan.taskTypes)
+    }
+  }
 
   if (state.stage === 'awaiting_product_images' && plan) {
     if (
@@ -145,7 +205,7 @@ export function resolveExecutionUserMessage(
       isUserDecliningProductImages(strippedLine) ||
       isExplicitExecutionIntent(strippedLine)
     ) {
-      const taskTypes = taskTypesNeedingPreview(plan, messages)
+      const taskTypes = taskTypesForNextPreviewBatch(plan, messages)
       if (!taskTypes.length) {
         return { state: markPreviewsActive(state), action: { type: 'none' } }
       }
@@ -161,9 +221,14 @@ export function resolveExecutionUserMessage(
   if (
     (state.stage === 'awaiting_execute_confirm' || state.stage === 'previews_active') &&
     plan &&
-    isExplicitExecutionIntent(strippedLine)
+    (isExplicitExecutionIntent(strippedLine) || isRecruitExecutionIntent(strippedLine))
   ) {
-    const taskTypes = taskTypesNeedingPreview(plan, messages)
+    let taskTypes = taskTypesForNextPreviewBatch(plan, messages)
+    if (isRecruitExecutionIntent(strippedLine) && planIncludesRecruitInfluencer(plan)) {
+      if (!hasPendingPreviewForTask(messages, 'recruit_influencer')) {
+        taskTypes = ['recruit_influencer']
+      }
+    }
     if (!taskTypes.length) {
       return {
         state,
@@ -187,7 +252,9 @@ export function resolveExecutionUserMessage(
       assistantLine:
         taskTypes.length > 1
           ? `好的，将为 ${taskTypes.length} 项场景并行生成独立预览（${taskTypes.map(taskTypeLabel).join('、')}），请分别在各自卡片确认。`
-          : '好的，正在生成执行预览…',
+          : taskTypes[0] === 'recruit_influencer'
+            ? '好的，正在生成达人招募 Brief 预览…'
+            : '好的，正在生成执行预览…',
     }
   }
 

@@ -30,6 +30,7 @@ Page({
     err: '',
     infoHint: '',
     busy: false,
+    refreshing: false,
     submitLabel: '进入工作台',
     devSkip: false,
   },
@@ -61,6 +62,26 @@ Page({
     if (!devAuth.isDevSkipLogin()) return
     devAuth.applyDevSession()
     wx.switchTab({ url: '/pages/agent/agent' })
+  },
+
+  async onRefreshPage() {
+    if (this.data.refreshing) return
+    this._clearCooldownTimers()
+    this.setData({ busy: false, refreshing: true, err: '', infoHint: '' })
+    const token = api.getAccessToken()
+    const canEnter =
+      token && !(devAuth.isDevSkipLogin() && token === devAuth.DEV_TOKEN)
+    try {
+      if (canEnter) {
+        await this._goHome()
+        return
+      }
+      wx.reLaunch({ url: '/pages/login/login' })
+    } catch (_) {
+      wx.showToast({ title: '刷新失败，请稍后再试', icon: 'none' })
+    } finally {
+      this.setData({ refreshing: false })
+    }
   },
 
   _clearCooldownTimers() {
