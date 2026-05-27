@@ -39,12 +39,15 @@ import {
   parseAgentActionType,
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
+  planIncludesRecruitInfluencer,
   shouldDeferTaskPreview,
   summarizeAssistantContent,
 } from '../lib/aiAgentActionParse'
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import {
+  hasConfirmedPreviewForTask,
+  hasPendingPreviewForTask,
   isPreviewMessageLoading,
   listPendingPreviewMessages,
   patchPreviewStatusInMessages,
@@ -1571,6 +1574,24 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               messagesRef.current = next
               return next
             })
+
+            const plan = executionStateRef.current.plan
+            if (
+              okCount > 0 &&
+              plan &&
+              planIncludesRecruitInfluencer(plan) &&
+              !hasPendingPreviewForTask(messagesRef.current, 'recruit_influencer') &&
+              !hasConfirmedPreviewForTask(messagesRef.current, 'recruit_influencer')
+            ) {
+              appendAssistantLine(
+                '商品方案已确认。接下来是达人招募 Brief 预览，请核对三版文案后在本卡片确认。',
+              )
+              pushRecruitInfluencerPreview(
+                buildCombinedBrief(plan),
+                pageContext?.pageLabel,
+                plan.assistantContent,
+              )
+            }
           } catch {
             /* ignore */
           } finally {
@@ -1762,7 +1783,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
     },
-    [navigate, previewSubmitPlatforms, patchPreviewStatus],
+    [navigate, previewSubmitPlatforms, patchPreviewStatus, appendAssistantLine, pushRecruitInfluencerPreview, pageContext?.pageLabel],
   )
 
   const cancelPendingTask = useCallback(

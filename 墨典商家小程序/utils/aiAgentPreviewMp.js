@@ -1,6 +1,7 @@
 const exec = require('./aiAgentExecutionMp.js')
 const intelSnap = require('./merchantIntelSnapshotMp.js')
 const storeIntelApi = require('./storeIntelApiMp.js')
+const briefAi = require('./recruitmentBriefAiMp.js')
 
 function newId(prefix) {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
@@ -20,10 +21,12 @@ function buildPreviewShell(taskType, title) {
 function createProductPreviewMessage(userBrief, assistantContent) {
   const intelLine = intelSnap.statusLine()
   const labels = exec.parsePlanIntentLabels(assistantContent)
+  const types = exec.inferTaskTypesFromCombinedContext(userBrief, assistantContent, undefined)
+  const combined = types.includes('create_product') && types.includes('recruit_influencer')
   const intro =
     labels.length > 1
-      ? `【创建商品 · 独立预览】检测到 ${labels.length} 个方案。${intelLine}。请在本卡片确认。`
-      : `【创建商品 · 独立预览】将生成团购方案供核对。${intelLine}。请在本卡片确认。`
+      ? `【创建商品 · 独立预览】检测到 ${labels.length} 个方案。${intelLine}。请在本卡片确认。${combined ? '全部确认后将进入达人招募 Brief。' : ''}`
+      : `【创建商品 · 独立预览】将生成团购方案供核对。${intelLine}。请在本卡片确认。${combined ? '确认后将进入达人招募 Brief。' : ''}`
   const productPlans = (labels.length ? labels : ['团购方案']).map((label, i) => ({
     slotKey: `plan-${i}`,
     slotLabel: label,
@@ -135,7 +138,7 @@ async function enrichProductPreviewMessage(msg) {
   })
 }
 
-function enrichRecruitPreviewMessage(msg) {
+function localRecruitBriefFallback(msg) {
   const snap = intelSnap.loadSnapshot()
   const hint = [msg._userBrief, msg._assistantContent].filter(Boolean).join('\n').slice(0, 2000)
   const main = msg.preview.recruitmentBrief.mainProductName
@@ -148,30 +151,68 @@ function enrichRecruitPreviewMessage(msg) {
     `${base}\n\n版本 B：场景叙事，结合 ${tags.slice(0, 3).join('、')} 话题。`,
     `${base}\n\n版本 C：清单体「3 个理由必打卡」，结合 ${hint.slice(0, 120)}…`,
   ]
+  return { previews, enrichError: '' }
+}
+
+async function enrichRecruitPreviewMessage(msg) {
+  const snap = intelSnap.loadSnapshot()
+  const brief = msg.preview.recruitmentBrief
+  const mainName = brief.mainProductName
+  const tags = brief.tags || []
+  let previews = []
+  let enrichError = ''
+  try {
+    previews = await briefAi.generateThreeKolBriefsMp({
+      platformLabel: brief.platform || '抖音来客',
+      industry: snap.industryPath || '本地生活',
+      storeName: snap.storeName || '',
+      main: { name: mainName, priceYuan: 0 },
+      tags,
+    })
+  } catch (e) {
+    const fb = localRecruitBriefFallback(msg)
+    previews = fb.previews
+    enrichError = e instanceof Error ? e.message : String(e)
+  }
+  const note = enrichError
+    ? `\n\n（AI Brief 未完全生成，已展示离线模板：${enrichError.slice(0, 80)}）`
+    : ''
   return Object.assign({}, msg, {
-    content: `${msg.content}\n\n已生成三版达人 Brief，请核对后点击「确认执行」。`,
+    content: `${msg.content}\n\n已生成三版达人 Brief，请核对后点击「确认执行」。${note}`,
     preview: Object.assign({}, msg.preview, {
-      recruitmentBrief: Object.assign({}, msg.preview.recruitmentBrief, {
-        briefText: previews[0],
+      recruitmentBrief: Object.assign({}, brief, {
+        briefText: previews[0] || '',
         previews,
         enrichStatus: 'ready',
+        enrichError: enrichError || undefined,
       }),
     }),
   })
 }
 
-async function spawnParallelPreviews(plan) {
-  const combinedBrief = exec.buildCombinedBrief(plan)
+async function spawnPreviewsForTaskTypes(plan, taskTypes) {
+  const types = (taskTypes || []).filter((t) => plan.taskTypes.includes(t))
   const out = []
-  if (plan.taskTypes.includes('create_product')) {
+  if (types.includes('create_product')) {
     const m = createProductPreviewMessage(plan.userBrief, plan.assistantContent)
     out.push(await enrichProductPreviewMessage(m))
   }
-  if (plan.taskTypes.includes('recruit_influencer')) {
+  if (types.includes('recruit_influencer')) {
     const m = createRecruitPreviewMessage(plan.userBrief, plan.assistantContent)
-    out.push(enrichRecruitPreviewMessage(m))
+    out.push(await enrichRecruitPreviewMessage(m))
   }
   return out
+}
+
+async function spawnParallelPreviews(plan, taskTypes) {
+  const batch = taskTypes && taskTypes.length ? taskTypes : plan.taskTypes
+  return spawnPreviewsForTaskTypes(plan, batch)
+}
+
+async function spawnRecruitPreviewAfterProductConfirm(plan) {
+  if (!plan || !plan.taskTypes.includes('recruit_influencer')) return []
+  const m = createRecruitPreviewMessage(plan.userBrief, plan.assistantContent)
+  return [await enrichRecruitPreviewMessage(m)]
 }
 
 module.exports = {
@@ -180,4 +221,6 @@ module.exports = {
   enrichProductPreviewMessage,
   enrichRecruitPreviewMessage,
   spawnParallelPreviews,
+  spawnPreviewsForTaskTypes,
+  spawnRecruitPreviewAfterProductConfirm,
 }

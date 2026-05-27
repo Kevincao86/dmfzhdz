@@ -354,19 +354,49 @@ async function processAgentTurn(opts, executionState) {
   const line =
     String(opts.userLine || '').trim() ||
     (opts.attachments && opts.attachments.length ? '请结合附图说明你的需求。' : '')
-  const state = executionState || exec.createAgentExecutionState()
+  const history = opts.history || []
+  let state = executionState || exec.createAgentExecutionState()
 
-  if (exec.isExplicitExecutionIntent(line) && state.plan) {
+  const flow = exec.resolveExecutionUserMessage(state, history, line)
+  state = flow.state
+  if (flow.action === 'spawn_previews' && flow.plan && flow.taskTypes && flow.taskTypes.length) {
     const userMsg = {
       id: `u-${Date.now()}`,
       role: 'user',
       content: line,
     }
-    const previewMsgs = await previewMp.spawnParallelPreviews(state.plan)
+    const assistantMsgs = []
+    if (flow.assistantLine) {
+      assistantMsgs.push({
+        id: `a-${Date.now()}-line`,
+        role: 'assistant',
+        content: flow.assistantLine,
+      })
+    }
+    const previewMsgs = await previewMp.spawnPreviewsForTaskTypes(flow.plan, flow.taskTypes)
+    assistantMsgs.push(...previewMsgs)
     return {
       userMsg,
-      assistantMsgs: previewMsgs,
-      executionState: exec.createAgentExecutionState(),
+      assistantMsgs,
+      executionState: exec.syncStageAfterPreviewChange(state, history.concat([userMsg], assistantMsgs)),
+    }
+  }
+  if (flow.action === 'none' && flow.assistantLine) {
+    const userMsg = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content: line,
+    }
+    return {
+      userMsg,
+      assistantMsgs: [
+        {
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          content: flow.assistantLine,
+        },
+      ],
+      executionState: state,
     }
   }
 

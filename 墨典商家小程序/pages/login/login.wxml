@@ -146,6 +146,11 @@
         {{submitLabel}}
       </button>
 
+      <button class="refresh-btn" disabled="{{refreshing}}" loading="{{refreshing}}" bindtap="onRefreshPage">
+        刷新页面
+      </button>
+      <text class="refresh-hint">长时间未进入工作台时，可点此刷新并重试</text>
+
       <button wx:if="{{devSkip}}" class="dev-preview-btn" bindtap="onDevPreview">开发预览（跳过登录）</button>
     </view>
   </view>
