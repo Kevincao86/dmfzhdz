@@ -27,10 +27,8 @@ export function parseIceEditBriefPlan(
 ): IceBriefTimelinePlan {
   const brief = editBrief.trim()
   const imageCount = Math.max(0, opts.imageCount ?? 0)
-  const fallbackTotal =
-    imageCount > 1
-      ? Math.min(120, Math.max(3, opts.clipEndSec * imageCount))
-      : Math.min(120, Math.max(1, opts.clipEndSec))
+  /** clipEndSec：单视频为片段时长；多图时为「生成视频总时长」 */
+  const fallbackTotal = Math.min(120, Math.max(imageCount > 1 ? 3 : 1, opts.clipEndSec))
 
   const totalDurationSec = parseTotalDurationSec(brief, fallbackTotal)
   const openingSec = parseOpeningSec(brief, totalDurationSec)
@@ -107,36 +105,126 @@ function parseOpeningSec(brief: string, total: number): number {
   return 0
 }
 
-function extractTitleText(brief: string): string | undefined {
-  const bracket = brief.match(/【([^】]{2,40})】/)
-  if (bracket?.[1]) {
-    const t = bracket[1].replace(/^剪辑指令[·•\s]*/i, '').trim()
-    if (t.length >= 2) return t.slice(0, 36)
+const META_CAPTION_RE =
+  /剪辑文案|文案指令|云剪|整体定位|镜头与节奏|字幕与包装|关键帧|输出参数|BGM|背景音乐|画面特效|画幅|每张分配/i
+
+function isMetaCaptionText(text: string): boolean {
+  const t = text.replace(/\s+/g, ' ').trim()
+  if (t.length < 2) return true
+  if (META_CAPTION_RE.test(t)) return true
+  if (/^[一二三四五六七八九十百]+[、.．]?\s*[\u4e00-\u9fff]{2,8}$/.test(t)) return true
+  return false
+}
+
+function normalizeCaptionLine(raw: string): string | undefined {
+  const line = raw.replace(/\s+/g, ' ').trim().slice(0, 48)
+  if (line.length < 2 || isMetaCaptionText(line)) return undefined
+  return line
+}
+
+function extractQuotedCaptions(brief: string): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const m of brief.matchAll(/[「『"]([^」』"]{2,36})[」』"]/g)) {
+    const t = normalizeCaptionLine(m[1] ?? '')
+    if (t && !seen.has(t)) {
+      seen.add(t)
+      out.push(t)
+    }
   }
-  const first = brief
-    .split(/\n/)
-    .map((l) => l.trim())
-    .find((l) => l.length >= 4 && l.length <= 40 && !/^[一二三四五六七八九十]+[、.]/.test(l))
-  return first?.slice(0, 36)
+  return out.slice(0, 8)
+}
+
+function extractTitleText(brief: string): string | undefined {
+  const subtitles = extractSubtitleBlockLines(brief)
+  if (subtitles[0]) return subtitles[0].slice(0, 20)
+
+  for (const q of extractQuotedCaptions(brief)) {
+    if (q.length >= 2 && q.length <= 20) return q
+  }
+  const slogan = brief.match(/(?:Slogan|口号|品牌\s*Slogan|结尾号召)[：:]\s*([^\n]{2,36})/i)?.[1]
+  if (slogan) {
+    const t = normalizeCaptionLine(slogan)
+    if (t) return t.slice(0, 36)
+  }
+  const product = brief.match(/(?:突出|主打|主推|展示)[「『"]?([^」』"\n，,；;]{2,24})/)?.[1]
+  if (product) {
+    const t = normalizeCaptionLine(product)
+    if (t) return t.slice(0, 36)
+  }
+  return undefined
+}
+
+function extractSubtitleBlockLines(brief: string): string[] {
+  const block =
+    brief.match(/【字幕文案】([\s\S]*?)(?=【|$)/)?.[1] ??
+    brief.match(/(?:^|\n)字幕文案[：:]\s*\n([\s\S]*?)(?=\n【|\n[一二三四五六七八九十百]+[、.．]|$)/)?.[1]
+  if (!block?.trim()) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of block.split('\n')) {
+    const quoted = raw.match(/[「『"]([^」』"]{2,36})[」』"]/)
+    if (quoted?.[1]) {
+      const t = normalizeCaptionLine(quoted[1])
+      if (t && !seen.has(t)) {
+        seen.add(t)
+        out.push(t)
+        continue
+      }
+    }
+    const plain = raw.replace(/^[-•·\d.)\s图第张幅]+/, '').trim()
+    const t = normalizeCaptionLine(plain)
+    if (t && !seen.has(t)) {
+      seen.add(t)
+      out.push(t)
+    }
+  }
+  return out.slice(0, 8)
 }
 
 function extractSectionLines(brief: string): string[] {
   const out: string[] = []
+  const seen = new Set<string>()
+
+  const push = (raw: string) => {
+    const line = normalizeCaptionLine(raw)
+    if (!line || seen.has(line)) return
+    seen.add(line)
+    out.push(line)
+  }
+
+  for (const line of extractSubtitleBlockLines(brief)) push(line)
+  if (out.length >= 2) return out.slice(0, 8)
+
+  for (const q of extractQuotedCaptions(brief)) push(q)
+
   const parts = brief.split(/(?=[一二三四五六七八九十百]+[、.．])/)
   for (const part of parts) {
-    const m = part.match(/^[一二三四五六七八九十百]+[、.．]\s*([^\n；;]{2,56})/)
-    if (!m?.[1]) continue
-    const line = m[1]
-      .replace(/\s+/g, ' ')
-      .replace(/^[：:\s]+/, '')
-      .trim()
-      .slice(0, 48)
-    if (line.length >= 2) out.push(line)
+    const head = part.match(/^[一二三四五六七八九十百]+[、.．]\s*([^\n：:]{0,20})[：:]\s*([^\n]{4,80})/)
+    if (head?.[2]) {
+      push(head[2].split(/[；;。]/)[0] ?? head[2])
+      continue
+    }
+    const bodyLines = part
+      .split('\n')
+      .slice(1)
+      .map((l) => l.replace(/^[-•·]\s*/, '').trim())
+      .filter((l) => l.length >= 4 && l.length <= 48)
+    for (const line of bodyLines) {
+      push(line.split(/[；;。]/)[0] ?? line)
+      if (out.length >= 8) break
+    }
   }
-  if (out.length) return out.slice(0, 8)
+
+  const perImage = brief.matchAll(/(?:图|第)\s*(\d+)\s*[张幅][：:]\s*([^\n]{4,48})/g)
+  for (const m of perImage) {
+    push(m[2] ?? '')
+  }
+
   const slogans = brief.match(/(?:Slogan|口号|结尾|号召)[：:]\s*([^\n]{4,40})/i)
-  if (slogans?.[1]) out.push(slogans[1].trim())
-  return out
+  if (slogans?.[1]) push(slogans[1])
+
+  return out.slice(0, 8)
 }
 
 function computeImageDurations(

@@ -13,10 +13,14 @@ export type IceMaterialContext = {
 }
 
 function buildMaterialSummary(ctx: IceMaterialContext): string {
+  const durationLine =
+    ctx.imageUrls.length > 0
+      ? `生成视频总时长约：${ctx.clipEndSec} 秒`
+      : `单段取用时长约：${ctx.clipEndSec} 秒`
   const lines: string[] = [
     '【云剪素材概况】',
     `画幅：${ctx.aspectLabel}`,
-    `单段/每张时长约：${ctx.clipEndSec} 秒`,
+    durationLine,
     `画面特效：${ctx.preset}`,
     `图片素材 ${ctx.imageUrls.length} 张：`,
     ...ctx.imageUrls.map((u, i) => `  - 图${i + 1}：${ctx.imageLabels[i] ?? '素材'} · ${u}`),
@@ -61,10 +65,13 @@ export async function generateIceEditBriefAi(
 
   const titleDraft = [
     '请根据下列素材，推断商家发布短视频的意图（探店种草/带货转化/门店氛围/活动促销等），',
-    '并输出一段可直接交给阿里云智能媒体云剪的「剪辑文案指令」。',
-    '要求：竖屏短视频包装；必须写清「全片总时长」（如 10-12 秒，与商家输出参数接近）、前 3 秒吸睛、节奏与转场、字幕风格；',
-    '若为多图合成，用「一、二、三」分条写每段画面要点；结尾预留品牌 Slogan 或行动号召位。',
-    '只输出剪辑指令正文，不要 Markdown 标题，不要 JSON。',
+    '并输出可直接交给阿里云智能媒体云剪的「剪辑文案指令」。',
+    '结构要求：',
+    '1）先写【剪辑指令】：BGM、转场、节奏、色调等操作说明（这些文字不会上屏）；',
+    `2）再写【字幕文案】：列出各段要上屏的短句，用「」括起，每条 4-20 字，与图片/镜头对应；`,
+    `3）全片总时长约 ${ctx.clipEndSec} 秒，与商家输出参数一致；`,
+    '4）结尾可写 Slogan 或行动号召（同样放在【字幕文案】里）。',
+    '只输出正文，不要 Markdown 标题，不要 JSON。',
     '',
     buildMaterialSummary(ctx),
     visionNotes ? `\n【画面理解（AI）】\n${visionNotes}` : '',
