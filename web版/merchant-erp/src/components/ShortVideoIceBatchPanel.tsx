@@ -105,7 +105,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [imageItems, setImageItems] = useState<IceImageItem[]>([])
   const [editBrief, setEditBrief] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
-  const [busy, setBusy] = useState(false)
+  const [oneClickBusy, setOneClickBusy] = useState(false)
+  const [batchBusy, setBatchBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [videoUploading, setVideoUploading] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
@@ -151,16 +152,17 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
   const briefOk = editBrief.trim().length >= 4
   const mediaBusy = videoUploading || imageUploading
+  const anyBusy = oneClickBusy || batchBusy
   const canSubmit =
     cfg?.configured &&
     briefOk &&
-    !busy &&
+    !batchBusy &&
     !mediaBusy &&
     (pendingCount > 0 || imageBatchRuns > 0)
   const canOneClickImages =
-    cfg?.configured && imageItems.length > 0 && briefOk && !busy && !mediaBusy
+    cfg?.configured && imageItems.length > 0 && briefOk && !oneClickBusy && !batchBusy && !mediaBusy
   const canAiBrief =
-    !busy &&
+    !anyBusy &&
     !mediaBusy &&
     !briefAiLoading &&
     (imageItems.length > 0 || jobs.some((j) => !j.imageUrls?.length))
@@ -211,7 +213,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   }, [urlText])
 
   const openLocalFilePicker = useCallback(() => {
-    if (busy || mediaBusy) return
+    if (anyBusy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
         '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀（格式如 https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/），保存后刷新本页。',
@@ -219,11 +221,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     fileInputRef.current?.click()
-  }, [busy, mediaBusy, cfg?.localUploadEnabled])
+  }, [anyBusy, mediaBusy, cfg?.localUploadEnabled])
 
   const handleLocalFiles = useCallback(
     async (files: FileList | null) => {
-      if (!files?.length || videoUploading || imageUploading || busy) return
+      if (!files?.length || videoUploading || imageUploading || anyBusy) return
       if (!cfg?.localUploadEnabled) {
         setErr(
           '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
@@ -259,11 +261,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setHint(`已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`)
       }
     },
-    [videoUploading, imageUploading, busy, cfg?.localUploadEnabled],
+    [videoUploading, imageUploading, anyBusy, cfg?.localUploadEnabled],
   )
 
   const openImageFilePicker = useCallback(() => {
-    if (busy || mediaBusy) return
+    if (anyBusy || mediaBusy) return
     if (!cfg?.localUploadEnabled) {
       setErr(
         '本地上传尚未开启：请运营在「商家管理后台 → AI模型 → 短视频 API → 灵祺AI云剪」填写 OSS 成片 URL 前缀后保存，并刷新本页。',
@@ -271,11 +273,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     imageFileInputRef.current?.click()
-  }, [busy, mediaBusy, cfg?.localUploadEnabled])
+  }, [anyBusy, mediaBusy, cfg?.localUploadEnabled])
 
   const handleLocalImages = useCallback(
     async (files: FileList | null) => {
-      if (!files?.length || videoUploading || imageUploading || busy) return
+      if (!files?.length || videoUploading || imageUploading || anyBusy) return
       if (!cfg?.localUploadEnabled) {
         setErr('本地上传尚未开启，请先配置 OSS 前缀。')
         return
@@ -330,7 +332,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setHint(`已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。`)
       }
     },
-    [videoUploading, imageUploading, busy, cfg?.localUploadEnabled],
+    [videoUploading, imageUploading, anyBusy, cfg?.localUploadEnabled],
   )
 
   const runAiEditBrief = useCallback(async () => {
@@ -476,7 +478,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     const imageUrls = imageItems.map((x) => x.mediaUrl)
     const localId = newJobId()
     const label = `多图合成 · ${imageItems.length} 张`
-    setBusy(true)
+    setOneClickBusy(true)
     setErr(null)
     setHint(`正在将 ${imageItems.length} 张图片合成为一条成片…`)
     setJobs((prev) => [
@@ -501,7 +503,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
-      setBusy(false)
+      setOneClickBusy(false)
       return
     }
     patchJob(localId, {
@@ -510,7 +512,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       message: '多图合成 · 云端剪辑中…',
     })
     await pollJob(localId, pipe.jobId)
-    setBusy(false)
+    setOneClickBusy(false)
     setHint('多图一键成片已提交，请在右侧下载 MP4。')
   }
 
@@ -587,7 +589,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请先添加视频素材到队列，或上传多图并启用批量生成')
       return
     }
-    setBusy(true)
+    setBatchBusy(true)
     setErr(null)
     setHint(
       runImageBatch && pending.length === 0
@@ -712,7 +714,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       }
     }
 
-    setBusy(false)
+    setBatchBusy(false)
     setHint(
       batchGenerateEnabled
         ? `批量任务已处理完毕（共 ${totalBatchRuns} 条），请在右侧「成片输出」下载 MP4。`
@@ -798,7 +800,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 accept="video/mp4,video/quicktime,video/webm,video/*,.mp4,.mov,.m4v,.webm"
                 multiple
                 className="sr-only"
-                disabled={busy || mediaBusy}
+                disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
                   void handleLocalFiles(e.target.files)
                   e.target.value = ''
@@ -816,7 +818,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <label
                 htmlFor="ice-local-video-input"
                 role="button"
-                tabIndex={busy || mediaBusy ? -1 : 0}
+                tabIndex={anyBusy || mediaBusy ? -1 : 0}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
@@ -836,12 +838,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 onDrop={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  if (busy || mediaBusy) return
+                  if (anyBusy || mediaBusy) return
                   void handleLocalFiles(e.dataTransfer.files)
                 }}
                 className={cn(
                   'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 transition',
-                  busy || mediaBusy ? 'pointer-events-none opacity-60' : '',
+                  anyBusy || mediaBusy ? 'pointer-events-none opacity-60' : '',
                   cfg?.localUploadEnabled
                     ? 'border-orange-300 bg-orange-50/50 hover:border-orange-400 hover:bg-orange-50'
                     : 'border-zinc-300 bg-zinc-50 hover:border-amber-400 hover:bg-amber-50/40',
@@ -882,7 +884,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
               <textarea
                 value={urlText}
-                disabled={busy || mediaBusy}
+                disabled={anyBusy || mediaBusy}
                 onChange={(e) => setUrlText(e.target.value)}
                 placeholder={'https://your-cdn.com/shop-tour-01.mp4\nhttps://your-cdn.com/shop-tour-02.mp4'}
                 className="min-h-[88px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
@@ -890,7 +892,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || mediaBusy}
+                  disabled={anyBusy || mediaBusy}
                   onClick={addUrlsFromText}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
@@ -900,7 +902,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {lastResultUrl ? (
                   <button
                     type="button"
-                    disabled={busy || mediaBusy}
+                    disabled={anyBusy || mediaBusy}
                     onClick={appendLastResult}
                     className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
                   >
@@ -922,7 +924,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       <PhasePill phase={j.phase} />
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={anyBusy}
                         onClick={() => removeJob(j.id)}
                         className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600"
                         aria-label="移除"
@@ -947,7 +949,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 accept="image/jpeg,image/png,image/webp,image/gif,image/*,.jpg,.jpeg,.png,.webp,.gif"
                 multiple
                 className="sr-only"
-                disabled={busy || mediaBusy}
+                disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
                   void handleLocalImages(e.target.files)
                   e.target.value = ''
@@ -956,7 +958,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <label
                 htmlFor="ice-local-image-input"
                 role="button"
-                tabIndex={busy || mediaBusy ? -1 : 0}
+                tabIndex={anyBusy || mediaBusy ? -1 : 0}
                 onClick={(e) => {
                   if (!cfg?.localUploadEnabled) {
                     e.preventDefault()
@@ -970,7 +972,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 onDrop={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  if (busy || mediaBusy) return
+                  if (anyBusy || mediaBusy) return
                   const imgs = Array.from(e.dataTransfer.files).filter(isImageFile)
                   if (imgs.length === 0) {
                     setErr('请拖入 jpg/png/webp 等图片文件')
@@ -982,7 +984,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 }}
                 className={cn(
                   'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition',
-                  busy || mediaBusy ? 'pointer-events-none opacity-60' : '',
+                  anyBusy || mediaBusy ? 'pointer-events-none opacity-60' : '',
                   'border-violet-200 bg-violet-50/40 hover:border-violet-400 hover:bg-violet-50/70',
                 )}
               >
@@ -1021,7 +1023,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
               <textarea
                 value={imageUrlText}
-                disabled={busy || mediaBusy}
+                disabled={anyBusy || mediaBusy}
                 onChange={(e) => setImageUrlText(e.target.value)}
                 placeholder={'https://your-cdn.com/photo-01.jpg\nhttps://your-cdn.com/photo-02.png'}
                 className="min-h-[72px] w-full rounded-lg border border-violet-200 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
@@ -1029,7 +1031,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={busy || mediaBusy}
+                  disabled={anyBusy || mediaBusy}
                   onClick={addImageUrlsFromText}
                   className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm text-violet-900 hover:bg-violet-50 disabled:opacity-50"
                 >
@@ -1055,7 +1057,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                         />
                         <button
                           type="button"
-                          disabled={busy}
+                          disabled={anyBusy}
                           onClick={() => removeImageItem(img.id)}
                           className="absolute right-1 top-1 rounded bg-black/50 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
                           aria-label="移除图片"
@@ -1109,7 +1111,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             <div className="space-y-4 px-5 pb-5 pt-4">
               <textarea
                 value={editBrief}
-                disabled={busy || briefAiLoading}
+                disabled={anyBusy || briefAiLoading}
                 onChange={(e) => setEditBrief(e.target.value)}
                 placeholder={
                   '示例：竖屏探店短视频，前 3 秒抓眼球，整体轻快；突出「招牌牛肉面」与店内环境；结尾加品牌 Slogan 位；适合抖音发布。'
@@ -1134,7 +1136,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <Field label="画幅">
                     <select
                       value={aspectId}
-                      disabled={busy}
+                      disabled={anyBusy}
                       onChange={(e) => setAspectId(e.target.value as typeof aspectId)}
                       className="w-full rounded-md border border-zinc-300 bg-white px-2 py-2 text-sm"
                     >
@@ -1145,13 +1147,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       ))}
                     </select>
                   </Field>
-                  <Field label={imageItems.length > 0 ? '每张图片时长（秒）' : '取用时长（秒）'}>
+                  <Field label={imageItems.length > 0 ? '生成视频时长（秒）' : '取用时长（秒）'}>
                     <input
                       type="number"
                       min={1}
                       max={120}
                       value={clipEndSec}
-                      disabled={busy}
+                      disabled={anyBusy}
                       onChange={(e) => setClipEndSec(Number(e.target.value) || 10)}
                       className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
                     />
@@ -1159,7 +1161,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <Field label="画面特效">
                     <select
                       value={preset}
-                      disabled={busy}
+                      disabled={anyBusy}
                       onChange={(e) => setPreset(e.target.value)}
                       className="w-full rounded-md border border-zinc-300 bg-white px-2 py-2 text-sm"
                     >
@@ -1176,7 +1178,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               {imageItems.length > 0 ? (
                 <div className="space-y-3 border-t border-violet-100 pt-4">
                   <p className="text-xs text-violet-900">
-                    已选 <strong>{imageItems.length}</strong> 张图片，文案就绪后可合成一条竖屏 MP4。
+                    已选 <strong>{imageItems.length}</strong> 张图片，文案就绪后可合成一条约{' '}
+                    <strong>{clipEndSec}</strong> 秒的竖屏 MP4。
                   </p>
                   <button
                     type="button"
@@ -1184,7 +1187,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     onClick={() => void runOneClickImages()}
                     className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-violet-300 disabled:opacity-70 sm:w-auto"
                   >
-                    {busy ? (
+                    {oneClickBusy ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <Zap className="h-5 w-5" />
@@ -1209,7 +1212,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <input
                   type="checkbox"
                   checked={batchGenerateEnabled}
-                  disabled={busy || mediaBusy}
+                  disabled={anyBusy || mediaBusy}
                   onChange={(e) => setBatchGenerateEnabled(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-600 focus:ring-orange-500"
                 />
@@ -1231,14 +1234,14 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 <button
                   key={n}
                   type="button"
-                  disabled={busy || mediaBusy || !batchGenerateEnabled}
+                  disabled={anyBusy || mediaBusy || !batchGenerateEnabled}
                   onClick={() => setBatchGenerateCount(n)}
                   className={cn(
                     'rounded-lg border px-4 py-2 text-sm font-medium transition',
                     batchGenerateCount === n
                       ? 'border-orange-500 bg-orange-600 text-white shadow-sm'
                       : 'border-zinc-300 bg-white text-zinc-800 hover:border-orange-300 hover:bg-orange-50',
-                    (busy || mediaBusy) && 'cursor-not-allowed opacity-50',
+                    (anyBusy || mediaBusy) && 'cursor-not-allowed opacity-50',
                   )}
                 >
                   {n} 条
@@ -1295,7 +1298,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               onClick={() => void runBatch()}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-600 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {busy ? (
+              {batchBusy ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   灵祺AI云剪进行中…
@@ -1392,7 +1395,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     </a>
                   ) : null}
                 </div>
-              ) : busy ? (
+              ) : anyBusy ? (
                 <div className="mb-5 flex flex-col items-center justify-center rounded-xl border border-dashed border-orange-200 bg-white py-10 text-center">
                   <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
                   <p className="mt-3 text-sm font-medium text-zinc-800">云端剪辑中…</p>

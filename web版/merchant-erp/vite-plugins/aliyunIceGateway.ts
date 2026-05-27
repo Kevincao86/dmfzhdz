@@ -380,7 +380,7 @@ export async function handleAliyunIceRoutes(input: {
             editBrief,
             width,
             height,
-            secPerImage: Math.min(30, Math.max(0.5, clipEndSec)),
+            totalDurationSec: clipEndSec,
             effectId: effect.id,
           })
         : mediaUrl && /^https?:\/\//i.test(mediaUrl)

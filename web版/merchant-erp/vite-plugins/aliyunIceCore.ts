@@ -428,7 +428,8 @@ export async function iceRunImagesPipeline(
     editBrief: string
     width: number
     height: number
-    secPerImage: number
+    /** 多图合成时的成片总时长（秒），非单张停留时长 */
+    totalDurationSec: number
     effectId: string
   },
 ): Promise<
@@ -470,7 +471,7 @@ export async function iceRunImagesPipeline(
   }
 
   const plan = parseIceEditBriefPlan(input.editBrief, {
-    clipEndSec: input.secPerImage,
+    clipEndSec: input.totalDurationSec,
     imageCount: urls.length,
     effectId: input.effectId,
   })
