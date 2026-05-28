@@ -1,112 +1,185 @@
-<view class="page-shell home-page">
-  <view class="page-hero">
-    <text class="page-hero-title">灵祺达人招募</text>
-    <text class="page-hero-sub">本地生活探店招募 · 发现优质商单机会</text>
-  </view>
+<view class="home-page page-with-bar page-shell-fixed">
+  <!-- 顶部：品牌 + 搜索 -->
+  <view class="home-header">
+    <view class="home-header-inner" style="{{navInnerStyle}}">
+      <view class="brand-row" style="{{brandRowStyle}}">
+        <image
+          class="brand-logo"
+          style="{{brandLogoStyle}}"
+          src="/images/logo.png"
+          mode="aspectFit"
+        />
+        <view class="brand-text">
+          <text class="brand-title">灵祺达人招募</text>
+          <text class="brand-slogan">本地生活 · 探店种草 · 云剪直派</text>
+          <text class="brand-desc">商单透明报价 · 平台审核 · 达人安心接单</text>
+        </view>
+      </view>
 
-  <view class="card member-card" wx:if="{{member}}">
-    <view class="member-row" bindtap="goEditMember">
-      <image class="member-avatar" src="{{member.wxAvatarUrl}}" mode="aspectFill" wx:if="{{member.wxAvatarUrl}}" />
-      <view class="member-avatar member-avatar--ph" wx:else>
-        <text class="member-avatar-letter">我</text>
+      <view class="search-bar">
+        <text class="search-icon">⌕</text>
+        <input
+          class="search-input"
+          placeholder="搜索招募、门店、城市"
+          placeholder-class="search-ph"
+          value="{{searchKeyword}}"
+          bindinput="onSearchInput"
+        />
       </view>
-      <view class="member-meta">
-        <text class="member-name">{{member.wxNickName}}</text>
-        <text class="member-tag">{{memberTypeLabel}}</text>
-        <text class="hint member-hint">点击完善达人资料</text>
+
+      <view class="notice-pill" wx:if="{{todayCount > 0}}">
+        <text class="notice-dot"></text>
+        <text>今日新增招募 {{todayCount}} 条</text>
       </view>
-      <view class="member-chevron">›</view>
     </view>
   </view>
 
-  <view class="card member-card member-card--cta" wx:else>
-    <view class="cta-icon">✦</view>
-    <text class="cta-title">成为灵祺达人会员</text>
-    <text class="hint cta-desc">授权微信并填写平台资料，下次报名可一键同步</text>
-    <button class="btn-primary cta-btn" catchtap="goRegister">立即注册</button>
-  </view>
-
-  <view class="hall-wrap">
-    <view class="hall-tabs">
+  <!-- 大厅切换（独立白卡片，不与筛选条叠压） -->
+  <view class="home-toolbar">
+    <view class="hall-tabs-pro">
       <view
-        class="hall-tab {{hallTab === 'normal' ? 'active' : ''}}"
+        class="hall-tab-pro {{hallTab === 'normal' ? 'active' : ''}}"
         data-tab="normal"
         bindtap="onHallTab"
       >
-        <text class="hall-tab-text">招募大厅</text>
-        <text class="hall-badge" wx:if="{{normalRows.length}}">{{normalRows.length}}</text>
+        招募大厅
+        <text class="tab-count" wx:if="{{normalRows.length}}">{{normalRows.length}}</text>
       </view>
       <view
-        class="hall-tab hall-tab--urgent {{hallTab === 'urgent' ? 'active' : ''}}"
+        class="hall-tab-pro {{hallTab === 'urgent' ? 'active' : ''}}"
         data-tab="urgent"
         bindtap="onHallTab"
       >
-        <text class="hall-tab-text">急单大厅</text>
-        <text class="hall-badge hall-badge--urgent" wx:if="{{urgentRows.length}}">{{urgentRows.length}}</text>
+        急单大厅
       </view>
       <view
-        class="hall-tab hall-tab--ice {{hallTab === 'ice' ? 'active' : ''}}"
+        class="hall-tab-pro {{hallTab === 'ice' ? 'active' : ''}}"
         data-tab="ice"
         bindtap="onHallTab"
       >
-        <text class="hall-tab-text">云剪任务</text>
-        <text class="hall-badge hall-badge--ice" wx:if="{{iceRows.length}}">{{iceRows.length}}</text>
+        云剪任务
       </view>
     </view>
   </view>
 
-  <view wx:if="{{unconfigured}}" class="card state-empty">
-    <text class="state-empty-icon">⚙</text>
-    <text class="hint">尚未连接后台，请配置 MERCHANT_API_BASE_URL</text>
-  </view>
-
-  <view wx:elif="{{loading}}" class="card state-loading">
-    <view class="loading-dot-wrap">
-      <view class="loading-dot" />
-      <view class="loading-dot" />
-      <view class="loading-dot" />
-    </view>
-    <text class="hint" style="margin-top:20rpx;">加载招募中…</text>
-  </view>
-
-  <view wx:elif="{{err}}" class="card state-error state-empty">
-    <text class="state-empty-icon">!</text>
-    <text>{{err}}</text>
-  </view>
-
-  <block wx:else>
-    <view
-      wx:for="{{displayRows}}"
-      wx:key="id"
-      class="card job-card {{item.urgent ? 'job-card--urgent' : ''}}"
-      bindtap="goDetail"
-      data-id="{{item.id}}"
-      hover-class="job-card--hover"
-    >
-      <view class="job-card-top">
-        <text class="tag tag-blue">{{item.platform}}</text>
-        <text class="tag tag-urgent" wx:if="{{item.urgent}}">急单</text>
-        <text class="tag tag-ice" wx:elif="{{item.isIce}}">云剪</text>
-        <text class="tag tag-green" wx:else>{{item.statusLabel}}</text>
+  <!-- 筛选固定；仅下方列表可滚动 -->
+  <view class="home-filters">
+    <view class="filter-bar">
+      <view class="filter-cell">
+        <picker mode="selector" range="{{platformFilters}}" bindchange="onPlatformFilter">
+          <view class="filter-item">
+            <text class="filter-label">{{filterPlatform === '全部' ? '平台' : filterPlatform}}</text>
+            <text class="filter-arrow">▾</text>
+          </view>
+        </picker>
       </view>
-      <text class="job-title">{{item.title}}</text>
-      <text class="merchant-name">{{item.merchantName}} · {{item.storeName}}</text>
-      <text class="hint job-meta">{{item.region}}</text>
-      <text class="hint job-summary">{{item.summary}}</text>
-      <view class="job-foot">
-        <text class="job-foot-left">{{item.applicantCount}} 人已报名</text>
-        <text class="job-foot-link">查看详情</text>
+      <view class="filter-cell">
+        <picker mode="selector" range="{{cityFilters}}" bindchange="onCityFilter">
+          <view class="filter-item">
+            <text class="filter-label">{{filterCity === '全部' ? '城市' : filterCity}}</text>
+            <text class="filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="filter-cell">
+        <view
+          class="filter-item {{priceSelected.length ? 'filter-item--active' : ''}}"
+          bindtap="onOpenPriceSheet"
+        >
+          <text class="filter-label">{{priceFilterLabel}}</text>
+          <text class="filter-arrow">▾</text>
+        </view>
+      </view>
+      <view class="filter-cell">
+        <picker mode="selector" range="{{sortOptions}}" bindchange="onSortFilter">
+          <view class="filter-item {{sortBy !== '发布时间' ? 'filter-item--active' : ''}}">
+            <text class="filter-label">{{sortBy === '发布时间' ? '排序' : sortBy}}</text>
+            <text class="filter-arrow">▾</text>
+          </view>
+        </picker>
       </view>
     </view>
 
-    <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
-      <text class="state-empty-icon">{{hallTab === 'urgent' ? '⚡' : hallTab === 'ice' ? '🎬' : '📋'}}</text>
-      <text class="empty-title">{{hallTab === 'urgent' ? '暂无急单' : hallTab === 'ice' ? '暂无云剪任务' : '暂无招募'}}</text>
-      <text class="hint">
-        <block wx:if="{{hallTab === 'urgent'}}">急单含加急字样或高预算近期任务，请稍后再看</block>
-        <block wx:elif="{{hallTab === 'ice'}}">运营下发云剪单后展示，认领成片并回传抖音链接</block>
-        <block wx:else>运营发布小程序招募后将展示在此</block>
-      </text>
+    <view wx:if="{{unconfigured}}" class="card state-warn home-filters-warn">
+      <text class="hint">尚未连接后台，演示商单可预览；请配置 MERCHANT_API_BASE_URL</text>
     </view>
-  </block>
+  </view>
+
+  <scroll-view class="home-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{loading}}" class="card state-loading">
+      <view class="loading-dot-wrap">
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+      </view>
+      <text class="hint list-hint">加载招募中…</text>
+    </view>
+
+    <view wx:elif="{{err}}" class="card state-error">
+      <text>{{err}}</text>
+    </view>
+
+    <block wx:else>
+      <view
+        wx:for="{{displayRows}}"
+        wx:key="id"
+        class="job-card-compact"
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+        data-mock="{{item.isMock}}"
+        hover-class="job-card-compact--hover"
+      >
+        <text
+          wx:if="{{item.aiTag}}"
+          class="job-card-compact__ai-tag job-card-compact__ai-tag--{{item.aiTagTone}}"
+        >{{item.aiTag}}</text>
+        <text class="job-card-compact__ribbon job-card-compact__ribbon--demo" wx:if="{{item.isMock && !item.aiTag}}">演示</text>
+        <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">推荐</text>
+        <view class="job-card-compact__row">
+          <image class="job-card-compact__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+          <view class="job-card-compact__main">
+            <text class="job-card-compact__title">{{item.title}}</text>
+            <view class="job-card-compact__line2">
+              <text class="job-card-compact__tag">{{item.statusLabel}}</text>
+              <text class="job-card-compact__tag job-card-compact__tag--gray">报名{{item.applicantCount}}/{{item.recruitCount}}</text>
+              <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
+              <text class="job-card-compact__tag job-card-compact__tag--ice" wx:elif="{{item.isIce}}">云剪</text>
+              <text class="job-card-compact__price">{{item.budgetText}}</text>
+            </view>
+            <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
+        <text class="state-empty-icon">📋</text>
+        <text class="empty-title">暂无匹配招募</text>
+        <text class="hint">试试切换大厅或调整筛选条件</text>
+      </view>
+    </block>
+  </scroll-view>
+
+  <view class="price-sheet-mask" wx:if="{{showPriceSheet}}" bindtap="onClosePriceSheet">
+    <view class="price-sheet" catchtap="noopSheetTap">
+      <view class="price-sheet-head">
+        <text class="price-sheet-title">价格筛选（可多选）</text>
+        <text class="price-sheet-close" bindtap="onClosePriceSheet">×</text>
+      </view>
+      <view class="price-chip-grid">
+        <view
+          wx:for="{{priceBuckets}}"
+          wx:key="id"
+          class="price-chip {{item.selected ? 'price-chip--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTogglePrice"
+        >
+          {{item.label}}
+        </view>
+      </view>
+      <view class="price-sheet-foot">
+        <button class="price-sheet-reset" bindtap="onResetPrice">清空</button>
+        <button class="price-sheet-ok" bindtap="onConfirmPrice">确定</button>
+      </view>
+    </view>
+  </view>
 </view>

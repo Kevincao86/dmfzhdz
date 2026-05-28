@@ -6,6 +6,10 @@ const LAN_API_HOST = ''
 const host = LAN_API_HOST.trim()
 const core = {
   MERCHANT_API_BASE_URL: host ? `http://${host}:5173` : '',
+  SUPABASE_URL: '',
+  SUPABASE_ANON_KEY: '',
+  /** 达人身份：推荐 Tab 展示推荐达人并置顶我的信息（本地测试） */
+  MP_TEST_TALENT_ON_RECOMMEND: true,
 }
 
 let out = { ...core }

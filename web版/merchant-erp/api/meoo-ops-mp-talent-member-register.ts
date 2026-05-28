@@ -76,9 +76,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    upsertMpTalentMember(data, member)
+    const saved = upsertMpTalentMember(data, member)
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true, id: member.id })
+    sendOpsJson(res, 200, {
+      ok: true,
+      id: saved.id,
+      lingqiTalentId: saved.lingqiTalentId || null,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

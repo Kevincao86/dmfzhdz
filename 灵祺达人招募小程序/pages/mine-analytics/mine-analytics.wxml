@@ -1,0 +1,11 @@
+<view class="page-shell">
+  <view class="card metrics">
+    <view wx:for="{{stats}}" wx:key="label" class="metric-cell">
+      <text class="metric-label">{{item.label}}</text>
+      <text class="metric-value accent">{{item.value}}</text>
+    </view>
+  </view>
+  <view class="card">
+    <text class="hint">更多报名转化、曝光分析将在后续版本接入</text>
+  </view>
+</view>

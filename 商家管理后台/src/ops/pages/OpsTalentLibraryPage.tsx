@@ -47,7 +47,7 @@ export default function OpsTalentLibraryPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">灵祺达人库</h1>
         <p className="mt-1 text-sm text-slate-500">
-          达人通过小程序报名后按平台与达人 ID 去重入库；报价、联系方式等以最新一次报名为准。
+          达人填写平台资料或报名后按平台账号去重入库；灵祺达人 ID（LQ-D-xxxxxx）与平台账号一并展示。
         </p>
       </div>
 
@@ -84,7 +84,8 @@ export default function OpsTalentLibraryPage() {
           <table className="w-full min-w-[1200px] text-left text-sm">
             <thead className="border-b border-slate-800 text-[11px] font-semibold uppercase text-slate-500">
               <tr>
-                <th className="px-3 py-3">达人 ID</th>
+                <th className="px-3 py-3">灵祺达人 ID</th>
+                <th className="px-3 py-3">平台账号</th>
                 <th className="px-3 py-3">昵称</th>
                 <th className="px-3 py-3">省份</th>
                 <th className="px-3 py-3">城市</th>
@@ -100,13 +101,16 @@ export default function OpsTalentLibraryPage() {
             <tbody className="divide-y divide-slate-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={tab === '抖音' ? 11 : 10} className="px-3 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={tab === '抖音' ? 12 : 11} className="px-3 py-10 text-center text-sm text-slate-500">
                     暂无{tab}达人记录。小程序报名成功后将自动写入。
                   </td>
                 </tr>
               ) : (
                 rows.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-800/30">
+                    <td className="px-3 py-2 font-mono text-xs text-indigo-300">
+                      {e.lingqiTalentId || '—'}
+                    </td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-300">{e.platformAccount}</td>
                     <td className="px-3 py-2 text-slate-200">{e.platformNickname}</td>
                     <td className="px-3 py-2 text-slate-400">{e.province || '—'}</td>

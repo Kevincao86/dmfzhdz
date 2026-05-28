@@ -161,6 +161,8 @@ export type RegistryMpRecruitmentApplicant = {
 
 export type RegistryTalentLibraryEntry = {
   id: string
+  /** 灵祺固定达人身份 ID（LQ-D-xxxxxx） */
+  lingqiTalentId?: string
   platform: '抖音' | '小红书'
   platformAccount: string
   platformNickname: string
@@ -194,6 +196,8 @@ export type RegistryMpTalentPlatformProfile = {
 /** 达人招募小程序 · 灵祺达人会员 */
 export type RegistryMpTalentMember = {
   id: string
+  /** 灵祺固定达人身份 ID（LQ-D-xxxxxx），填写平台资料后分配 */
+  lingqiTalentId?: string
   memberType: 'douyin' | 'xiaohongshu' | 'both'
   wxNickName: string
   wxAvatarUrl: string
@@ -204,6 +208,27 @@ export type RegistryMpTalentMember = {
   city?: string
   douyin?: RegistryMpTalentPlatformProfile
   xiaohongshu?: RegistryMpTalentPlatformProfile
+  registeredAt: string
+  updatedAt: string
+}
+
+/** 达人招募小程序 · PR 用户（机构/个人发单方） */
+export type RegistryMpPrUser = {
+  id: string
+  /** 灵祺固定 PR 身份 ID（LQ-P-xxxxxx） */
+  lingqiPrId: string
+  accountType: 'company' | 'personal'
+  companyName?: string
+  personalName?: string
+  contactName?: string
+  contactPhone?: string
+  wechatId?: string
+  province?: string
+  city?: string
+  intro?: string
+  wxNickName?: string
+  wxAvatarUrl?: string
+  wxOpenId?: string
   registeredAt: string
   updatedAt: string
 }
@@ -289,6 +314,7 @@ export type RegistryFile = {
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
   mpTalentMembers?: RegistryMpTalentMember[]
+  mpPrUsers?: RegistryMpPrUser[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]

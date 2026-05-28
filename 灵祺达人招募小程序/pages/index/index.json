@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "灵祺达人招募"
+  "navigationStyle": "custom",
+  "navigationBarTitleText": "灵祺达人招募",
+  "disableScroll": true,
+  "usingComponents": {}
 }

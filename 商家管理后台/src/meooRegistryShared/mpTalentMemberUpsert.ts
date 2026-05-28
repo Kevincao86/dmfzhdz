@@ -1,4 +1,5 @@
 import type { RegistryFile, RegistryMpTalentMember, RegistryMpTalentPlatformProfile } from './opsRegistryTypes.js'
+import { allocateLingqiTalentId, memberHasPlatformInfo } from './lingqiIdentity.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
 
@@ -33,7 +34,7 @@ function profileToApplicant(
   }
 }
 
-export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalentMember): void {
+export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalentMember): RegistryMpTalentMember {
   const list = [...(data.mpTalentMembers ?? [])]
   const wxKey = String(member.wxOpenId || member.wechatId || member.wxNickName || '')
     .trim()
@@ -45,11 +46,17 @@ export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalen
     return wxKey && k === wxKey
   })
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const prev = idx >= 0 ? list[idx]! : null
+  let lingqiTalentId = prev?.lingqiTalentId || member.lingqiTalentId
+  if (memberHasPlatformInfo(member) && !lingqiTalentId) {
+    lingqiTalentId = allocateLingqiTalentId(data, lingqiTalentId)
+  }
   const next: RegistryMpTalentMember = {
     ...member,
-    id: idx >= 0 ? list[idx]!.id : member.id || `MTM-${Date.now()}`,
+    id: prev?.id || member.id || `MTM-${Date.now()}`,
+    lingqiTalentId: lingqiTalentId || prev?.lingqiTalentId,
     updatedAt: now,
-    registeredAt: idx >= 0 ? list[idx]!.registeredAt : member.registeredAt || now,
+    registeredAt: prev?.registeredAt || member.registeredAt || now,
   }
   if (idx >= 0) list[idx] = next
   else list.unshift(next)
@@ -59,20 +66,24 @@ export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalen
   const wechatId = next.wechatId
   const province = String(next.province || '').trim()
   const city = String(next.city || '').trim()
+  const libOpts = {
+    mpOrderId: '',
+    merchantOrderNo: '',
+    lingqiTalentId: next.lingqiTalentId,
+  }
   if (next.douyin?.platformAccount) {
     upsertTalentLibraryFromApplicant(data, {
       platform: '抖音',
       applicant: profileToApplicant('抖音', next.douyin, contact, wechatId, province, city),
-      mpOrderId: '',
-      merchantOrderNo: '',
+      ...libOpts,
     })
   }
   if (next.xiaohongshu?.platformAccount) {
     upsertTalentLibraryFromApplicant(data, {
       platform: '小红书',
       applicant: profileToApplicant('小红书', next.xiaohongshu, contact, wechatId, province, city),
-      mpOrderId: '',
-      merchantOrderNo: '',
+      ...libOpts,
     })
   }
+  return next
 }

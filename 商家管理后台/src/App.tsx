@@ -11,8 +11,10 @@ import OpsCustomersListPage from './ops/pages/OpsCustomersListPage'
 import OpsRecruitmentOrdersPage from './ops/pages/OpsRecruitmentOrdersPage'
 import OpsMpRecruitmentOrdersPage from './ops/pages/OpsMpRecruitmentOrdersPage'
 import OpsTalentLibraryPage from './ops/pages/OpsTalentLibraryPage'
+import OpsPrLibraryPage from './ops/pages/OpsPrLibraryPage'
 import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
+import OpsSupportMpWorkbenchPage from './ops/pages/OpsSupportMpWorkbenchPage'
 
 export default function App() {
   return (
@@ -35,9 +37,11 @@ export default function App() {
           <Route path="recruitment-orders" element={<OpsRecruitmentOrdersPage />} />
           <Route path="mp-recruitment-orders" element={<OpsMpRecruitmentOrdersPage />} />
           <Route path="talent-library" element={<OpsTalentLibraryPage />} />
+          <Route path="pr-library" element={<OpsPrLibraryPage />} />
           <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
-          <Route path="support" element={<OpsSupportWorkbenchPage />} />
+          <Route path="support" element={<OpsSupportWorkbenchPage channel="erp" />} />
+          <Route path="support-mp" element={<OpsSupportMpWorkbenchPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

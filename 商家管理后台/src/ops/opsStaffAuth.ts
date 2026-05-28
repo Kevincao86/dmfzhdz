@@ -25,8 +25,14 @@ export const OPS_PERMISSION_MODULES = [
   { key: 'recruitment_orders', label: '商家达人招募订单', pathPrefix: '/recruitment-orders' },
   { key: 'mp_recruitment_orders', label: '小程序达人招募订单', pathPrefix: '/mp-recruitment-orders' },
   { key: 'talent_library', label: '灵祺达人库', pathPrefix: '/talent-library' },
+  { key: 'pr_library', label: 'PR 用户库', pathPrefix: '/pr-library' },
   { key: 'ai_models', label: 'AI 模型', pathPrefix: '/ai-models' },
-  { key: 'support', label: '在线客服', pathPrefix: '/support' },
+  { key: 'support', label: '在线客服（ERP处理中心）', pathPrefix: '/support' },
+  {
+    key: 'support_mp',
+    label: '在线客服（小程序达人、PR处理中心）',
+    pathPrefix: '/support-mp',
+  },
 ] as const
 
 export type OpsPermissionKey = (typeof OPS_PERMISSION_MODULES)[number]['key']

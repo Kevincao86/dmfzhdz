@@ -302,11 +302,13 @@ export async function dispatchOpsRegistrySupabase(opts: {
         id?: string
         status?: RegistryMpRecruitmentOrder['status']
         applicants?: RegistryMpRecruitmentApplicant[]
+        order?: RegistryMpRecruitmentOrder
       }
       const id = (body.id ?? '').trim()
       const status = body.status
       const applicants = body.applicants
-      if (!id || (!status && !applicants)) {
+      const order = body.order
+      if (!id || (!status && !applicants && !order)) {
         return { status: 400, body: { ok: false, error: 'invalid_patch' } }
       }
       if (
@@ -324,12 +326,41 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!data.mpRecruitmentOrders || idx < 0) {
         return { status: 404, body: { ok: false, error: 'not_found' } }
       }
-      data.mpRecruitmentOrders[idx] = {
-        ...data.mpRecruitmentOrders[idx]!,
-        ...(status ? { status } : {}),
-        ...(applicants ? { applicants } : {}),
-        updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      const cur = data.mpRecruitmentOrders[idx]!
+      const now = new Date().toLocaleString('zh-CN', { hour12: false })
+      if (order && order.id === id) {
+        data.mpRecruitmentOrders[idx] = {
+          ...cur,
+          ...order,
+          id,
+          sourceMerchantOrderId: cur.sourceMerchantOrderId,
+          createdAt: cur.createdAt,
+          applicants: order.applicants ?? cur.applicants ?? [],
+          updatedAt: now,
+        }
+      } else {
+        data.mpRecruitmentOrders[idx] = {
+          ...cur,
+          ...(status ? { status } : {}),
+          ...(applicants ? { applicants } : {}),
+          updatedAt: now,
+        }
       }
+      await io.save(data)
+      return { status: 200, body: { ok: true } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/delete') {
+      const body = JSON.parse(bodyRaw || '{}') as { id?: string }
+      const id = (body.id ?? '').trim()
+      if (!id) return { status: 400, body: { ok: false, error: 'invalid_delete' } }
+      const data = await io.load()
+      const list = data.mpRecruitmentOrders ?? []
+      const next = list.filter((o) => o && o.id !== id)
+      if (next.length === list.length) {
+        return { status: 404, body: { ok: false, error: 'not_found' } }
+      }
+      data.mpRecruitmentOrders = next
       await io.save(data)
       return { status: 200, body: { ok: true } }
     }
@@ -483,9 +514,32 @@ export async function dispatchOpsRegistrySupabase(opts: {
         return { status: 400, body: { ok: false, error: 'contact_required' } }
       }
       const data = await io.load()
-      upsertMpTalentMember(data, member)
+      const saved = upsertMpTalentMember(data, member)
       await io.save(data)
-      return { status: 200, body: { ok: true, id: member.id } }
+      return {
+        status: 200,
+        body: { ok: true, id: saved.id, lingqiTalentId: saved.lingqiTalentId || null },
+      }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-pr-users/register') {
+      const body = JSON.parse(bodyRaw || '{}') as { prUser?: import('../meooRegistryShared/opsRegistryTypes.js').RegistryMpPrUser }
+      const prUser = body.prUser
+      if (!prUser || !prUser.accountType) {
+        return { status: 400, body: { ok: false, error: 'invalid_pr_user' } }
+      }
+      const org =
+        prUser.accountType === 'personal'
+          ? String(prUser.personalName || '').trim()
+          : String(prUser.companyName || '').trim()
+      if (!org) {
+        return { status: 400, body: { ok: false, error: 'org_required' } }
+      }
+      const data = await io.load()
+      const { upsertMpPrUser } = await import('../meooRegistryShared/mpPrUserUpsert.js')
+      const saved = upsertMpPrUser(data, prUser)
+      await io.save(data)
+      return { status: 200, body: { ok: true, id: saved.id, lingqiPrId: saved.lingqiPrId } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {

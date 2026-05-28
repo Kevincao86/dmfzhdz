@@ -1,0 +1,54 @@
+const { merchantRequest } = require('./merchantApi.js')
+
+async function postJson(paths, body) {
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await merchantRequest('POST', path, body)
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('接口不可用')
+}
+
+function updateMpRecruitmentOrder(order) {
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    { id: order.id, order },
+  )
+}
+
+function deleteMpRecruitmentOrder(mpOrderId) {
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-delete',
+      '/api/ops-sync/mp-recruitment-orders/delete',
+    ],
+    { id: mpOrderId },
+  )
+}
+
+function patchMpRecruitmentOrderStatus(mpOrderId, status) {
+  const id = String(mpOrderId || '').trim()
+  const s = String(status || '').trim()
+  if (!id || !s) return Promise.reject(new Error('参数无效'))
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    { id, status: s },
+  )
+}
+
+module.exports = {
+  updateMpRecruitmentOrder,
+  deleteMpRecruitmentOrder,
+  patchMpRecruitmentOrderStatus,
+}

@@ -37,8 +37,14 @@ function filterTaskDetailText(text) {
 
 function normalizeRecruitmentPlatform(raw) {
   const s = String(raw || '').trim()
-  if (s.includes('红')) return '小红书'
-  return '抖音'
+  if (!s) return '抖音'
+  if (s.includes('红') || s.includes('小红书')) return '小红书'
+  if (s.includes('点评') || s.includes('大众')) return '大众点评'
+  if (s.includes('快手')) return '快手'
+  if (s.includes('视频号')) return '微信视频号'
+  if (s.includes('美团')) return '美团'
+  if (s.includes('抖')) return '抖音'
+  return s
 }
 
 module.exports = {

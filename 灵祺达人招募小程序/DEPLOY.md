@@ -15,6 +15,7 @@ GitHub (dmfzhdz  monorepo)
     │                         GET  /api/meoo-ops-sync-registry
     │                         POST /api/meoo-ops-mp-recruitment-orders-apply
     │                         POST /api/meoo-ops-mp-talent-member-register
+    │                         POST /api/meoo-mp-recruitment-ai（商单 AI 标签 / 达人匹配）
     │
     └─ 灵祺达人招募小程序/  ──► 微信开发者工具「上传」──► 微信公众平台审核发布
               │
@@ -86,6 +87,16 @@ git push origin main
 与商家 Web、运营台共用同一 Supabase 项目即可。
 
 其他变量（抖音、AI 等）为商家 ERP 功能所用；**仅跑招募大厅**时上述两项是小程序相关 API 的最低要求。
+
+**商单 AI 标签 / 推荐匹配**（首页三大厅、推荐商单）需额外配置其一：
+
+| 变量 | 用途 |
+|------|------|
+| `MERCHANT_AI_DOUBAO_KEY` 或 `ARK_API_KEY` | 豆包（优先） |
+| `MERCHANT_AI_QWEN_KEY` 或 `DASHSCOPE_API_KEY` | 通义千问（备选） |
+| `MERCHANT_MP_AI_PROVIDER`（可选） | `doubao` 或 `qwen`，指定优先厂商 |
+
+未配置时列表仍展示，但使用本地规则标签（如「急单速报」「同城优选」），推荐页不按 AI 匹配度排序。
 
 ### 2.3 部署后自检
 

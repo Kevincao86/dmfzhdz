@@ -2,31 +2,45 @@ const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
 const platformForm = require('../../utils/platformForm.js')
-const { labels } = require('../../utils/platformLabels.js')
-
-const { MEMBER_TYPES, emptyPlatformProfile, writeMember } = memberStore
-const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
+const talentPlatforms = require('../../utils/talentPlatformProfiles.js')
 const regionPicker = require('../../utils/regionPicker.js')
+const talentChat = require('../../utils/talentChat.js')
+const participant = require('../../utils/participant.js')
+const wxAccount = require('../../utils/wxAccount.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
+
+const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
+const lingqiIdentity = require('../../utils/lingqiIdentity.js')
+const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
   return Number.parseInt(String(raw || '').replace(/,/g, ''), 10)
 }
 
-function buildServerProfile(platform, profile) {
+function buildServerProfile(platformName, profile) {
   const followers = parseFollowers(profile.followers)
+  const tags = Array.isArray(profile.accountTags) ? profile.accountTags : []
   const base = {
     platformAccount: String(profile.platformAccount || '').trim(),
     platformNickname: String(profile.platformNickname || '').trim(),
     profileLink: String(profile.profileLink || '').trim(),
     followers: Number.isFinite(followers) ? Math.max(0, followers) : 0,
     quotePrice: String(profile.quotePrice || '').trim(),
-    alipayAccount: String(profile.alipayAccount || '').trim(),
+    accountTags: tags,
+    talentGrade: String(profile.talentGrade || '').trim() || undefined,
   }
-  if (platform === '抖音') {
+  if (platformName === '抖音') {
     base.douyinSalesLevel = String(profile.douyinSalesLevel || '').trim() || undefined
   }
   return base
+}
+
+function syncUiFromProfiles(page, profiles, douyinLevelIndex) {
+  page.setData({
+    platformProfiles: profiles,
+    platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
+    douyinLevelIndex: douyinLevelIndex || 0,
+  })
 }
 
 Page({
@@ -34,47 +48,72 @@ Page({
     wxNickName: '',
     wxAvatarUrl: '',
     wxOpenId: '',
-    memberType: '',
-    memberTypeOptions: Object.values(MEMBER_TYPES),
     contact: '',
     wechatId: '',
-    douyin: emptyPlatformProfile(),
-    xiaohongshu: emptyPlatformProfile(),
-    douyinLabels: labels('抖音'),
-    xhsLabels: labels('小红书'),
+    alipayAccount: '',
+    platformProfiles: talentPlatforms.emptyAllProfiles(),
+    platformSections: [],
     douyinLevels: DOUYIN_LEVELS,
     douyinLevelIndex: 0,
     submitting: false,
-    editMode: false,
+    editMode: true,
     provinces: [],
     cities: [],
     province: '',
     city: '',
     provinceIndex: 0,
     cityIndex: 0,
+    lingqiTalentIdLabel: '',
   },
   onLoad(options) {
-    const edit = options && options.edit === '1'
-    const cur = memberStore.readMember()
+    const edit = !options || options.edit !== '0'
+    const cur = readMember()
+    const profiles = cur?.platformProfiles || talentPlatforms.emptyAllProfiles()
+    let douyinLevelIndex = 0
+    const dy = profiles.douyin
+    if (dy && dy.douyinSalesLevel) {
+      douyinLevelIndex = Math.max(0, DOUYIN_LEVELS.indexOf(dy.douyinSalesLevel))
+    }
     const region = setupRegionState(cur?.province, cur?.city)
-    const patch = { ...region, editMode: edit }
+    const patch = {
+      ...region,
+      editMode: edit,
+      platformProfiles: profiles,
+      platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
+      douyinLevelIndex,
+    }
     if (cur) {
+      patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(cur.lingqiTalentId)
       Object.assign(patch, {
         wxNickName: cur.wxNickName || '',
         wxAvatarUrl: cur.wxAvatarUrl || '',
         wxOpenId: cur.wxOpenId || '',
-        memberType: cur.memberType || '',
         contact: cur.contact || '',
         wechatId: cur.wechatId || '',
-        douyin: { ...emptyPlatformProfile(), ...(cur.douyin || {}) },
-        xiaohongshu: { ...emptyPlatformProfile(), ...(cur.xiaohongshu || {}) },
-        douyinLevelIndex: Math.max(
-          0,
-          DOUYIN_LEVELS.indexOf((cur.douyin && cur.douyin.douyinSalesLevel) || ''),
-        ),
+        alipayAccount: cur.alipayAccount || '',
+        platformProfiles: profiles,
+        platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
       })
     }
+    const wx = wxAccount.readWxAccount()
+    if (wx) {
+      Object.assign(patch, {
+        wxNickName: patch.wxNickName || wx.wxNickName || '',
+        wxAvatarUrl: patch.wxAvatarUrl || wx.wxAvatarUrl || '',
+        wxOpenId: patch.wxOpenId || wx.wxOpenId || '',
+      })
+      if (!patch.wechatId && wx.wxNickName) patch.wechatId = wx.wxNickName
+    }
     this.setData(patch)
+  },
+  onChooseAvatar(e) {
+    const url = e.detail?.avatarUrl
+    if (url) this.setData({ wxAvatarUrl: url })
+  },
+  onNicknameInput(e) {
+    const nick = e.detail.value || ''
+    this.setData({ wxNickName: nick })
+    if (!this.data.wechatId && nick) this.setData({ wechatId: nick })
   },
   onProvinceChange(e) {
     onProvincePick(this, e)
@@ -84,67 +123,75 @@ Page({
   },
   onGetWxProfile() {
     wx.getUserProfile({
-      desc: '用于注册灵祺达人会员并展示头像昵称',
+      desc: '用于展示头像昵称',
       success: (res) => {
         const u = res.userInfo || {}
-        this.setData({
-          wxNickName: u.nickName || '',
-          wxAvatarUrl: u.avatarUrl || '',
-        })
-        if (!this.data.wechatId && u.nickName) {
-          this.setData({ wechatId: u.nickName })
+        this.setData({ wxNickName: u.nickName || '', wxAvatarUrl: u.avatarUrl || '' })
+        if (!this.data.wechatId && u.nickName) this.setData({ wechatId: u.nickName })
+        if (u.nickName) {
+          wxAccount.writeWxAccount({ wxNickName: u.nickName, wxAvatarUrl: u.avatarUrl || '' })
         }
       },
-      fail: () => {
-        wx.showToast({ title: '需授权微信昵称头像', icon: 'none' })
-      },
+      fail: () => wx.showToast({ title: '请使用头像/昵称填写', icon: 'none' }),
     })
-  },
-  onPickMemberType(e) {
-    const id = e.currentTarget.dataset.id
-    if (!id) return
-    this.setData({ memberType: id })
   },
   onCommonField(e) {
     const k = e.currentTarget.dataset.k
     if (k) this.setData({ [k]: e.detail.value })
   },
+  onTogglePlatformEnable(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const profiles = { ...this.data.platformProfiles }
+    const cur = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}) }
+    cur.enabled = !!e.detail.value
+    profiles[id] = cur
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+  },
   onPlatformField(e) {
-    const platform = e.currentTarget.dataset.platform
+    const id = e.currentTarget.dataset.id
     const k = e.currentTarget.dataset.k
-    if (!platform || !k) return
-    const key = platform === 'xiaohongshu' ? 'xiaohongshu' : 'douyin'
-    this.setData({ [key]: { ...this.data[key], [k]: e.detail.value } })
+    if (!id || !k) return
+    const profiles = { ...this.data.platformProfiles }
+    profiles[id] = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}), [k]: e.detail.value }
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+  },
+  onAccountTagTap(e) {
+    const id = e.currentTarget.dataset.id
+    const name = e.currentTarget.dataset.name
+    if (!id || !name) return
+    const profiles = { ...this.data.platformProfiles }
+    const prof = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}) }
+    const tags = Array.isArray(prof.accountTags) ? [...prof.accountTags] : []
+    const idx = tags.indexOf(name)
+    if (idx >= 0) tags.splice(idx, 1)
+    else tags.push(name)
+    prof.accountTags = tags
+    profiles[id] = prof
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
   },
   onDouyinLevelChange(e) {
     const i = Number(e.detail.value)
-    this.setData({
-      douyinLevelIndex: i,
-      douyin: { ...this.data.douyin, douyinSalesLevel: DOUYIN_LEVELS[i] || '' },
-    })
-  },
-  needsDouyin() {
-    const t = this.data.memberType
-    return t === 'douyin' || t === 'both'
-  },
-  needsXhs() {
-    const t = this.data.memberType
-    return t === 'xiaohongshu' || t === 'both'
+    const profiles = { ...this.data.platformProfiles }
+    const dy = { ...talentPlatforms.emptyProfile(), ...(profiles.douyin || {}), enabled: true }
+    dy.douyinSalesLevel = DOUYIN_LEVELS[i] || ''
+    profiles.douyin = dy
+    syncUiFromProfiles(this, profiles, i)
   },
   validateAll() {
-    if (!String(this.data.wxNickName || '').trim()) return '请先授权获取微信昵称与头像'
-    if (!this.data.memberType) return '请选择达人类型'
+    if (!String(this.data.wxNickName || '').trim()) return '请填写微信昵称'
     if (!String(this.data.contact || '').trim()) return '请填写联系方式'
     if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
+    if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
     const regionErr = validateRegion(this.data.province, this.data.city)
     if (regionErr) return regionErr
-    if (this.needsDouyin()) {
-      const err = validatePlatformProfile('抖音', this.data.douyin)
-      if (err) return err
-    }
-    if (this.needsXhs()) {
-      const err = validatePlatformProfile('小红书', this.data.xiaohongshu)
-      if (err) return err
+    const profiles = this.data.platformProfiles || {}
+    const enabled = talentPlatforms.TALENT_PLATFORMS.filter((p) => profiles[p.id]?.enabled)
+    if (!enabled.length) return '请至少开启并填写一个平台资料'
+    for (const p of enabled) {
+      const plat = talentPlatforms.TALENT_PLATFORMS.find((x) => x.id === p.id)
+      const err = validatePlatformProfile(plat.name, profiles[p.id])
+      if (err) return `${plat.name}：${err}`
     }
     return null
   },
@@ -154,43 +201,69 @@ Page({
       wx.showToast({ title: errMsg, icon: 'none' })
       return
     }
-    const memberType = this.data.memberType
+    const profiles = this.data.platformProfiles
+    const prev = readMember()
     const member = {
-      id: `MTM-${Date.now()}`,
-      memberType,
+      id: (prev && prev.id) || `MTM-${Date.now()}`,
+      lingqiTalentId: (prev && prev.lingqiTalentId) || '',
+      memberType: talentPlatforms.inferLegacyMemberType(profiles),
       wxNickName: String(this.data.wxNickName || '').trim(),
       wxAvatarUrl: String(this.data.wxAvatarUrl || '').trim(),
       wxOpenId: String(this.data.wxOpenId || '').trim(),
       contact: String(this.data.contact || '').trim(),
       wechatId: String(this.data.wechatId || '').trim(),
+      alipayAccount: String(this.data.alipayAccount || '').trim(),
       province: String(this.data.province || '').trim(),
       city: String(this.data.city || '').trim(),
-      registeredAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      platformProfiles: profiles,
+      registeredAt: (prev && prev.registeredAt) || new Date().toLocaleString('zh-CN', { hour12: false }),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     }
-    if (memberType === 'douyin' || memberType === 'both') {
-      member.douyin = buildServerProfile('抖音', this.data.douyin)
-    }
-    if (memberType === 'xiaohongshu' || memberType === 'both') {
-      member.xiaohongshu = buildServerProfile('小红书', this.data.xiaohongshu)
+    if (profiles.douyin?.enabled) member.douyin = buildServerProfile('抖音', profiles.douyin)
+    if (profiles.xiaohongshu?.enabled) {
+      member.xiaohongshu = buildServerProfile('小红书', profiles.xiaohongshu)
     }
 
     this.setData({ submitting: true })
     try {
+      try {
+        await wxAccount.completeWxLogin({
+          wxNickName: member.wxNickName,
+          wxAvatarUrl: member.wxAvatarUrl,
+        })
+      } catch (_) {
+        wxAccount.writeWxAccount({
+          wxNickName: member.wxNickName,
+          wxAvatarUrl: member.wxAvatarUrl,
+        })
+      }
       writeMember(member)
+      if (talentChat.canChat()) {
+        try {
+          const part = participant.getCurrentParticipant()
+          part.memberSnapshot = member
+          part.participantKey = participant.talentParticipantKey(member)
+          part.displayName = member.wxNickName || '达人'
+          part.avatarUrl = member.wxAvatarUrl || ''
+          await talentChat.syncProfile(part)
+        } catch (_) {}
+      }
       if (merchant.hasMerchantApi()) {
         try {
-          await ops.registerTalentMember(member)
+          const reg = await ops.registerTalentMember(member)
+          if (reg && reg.lingqiTalentId) {
+            member.lingqiTalentId = reg.lingqiTalentId
+            writeMember(member)
+          }
         } catch (e) {
-          wx.showToast({
-            title: '已保存本机，云端同步失败',
-            icon: 'none',
-            duration: 2500,
-          })
+          wx.showToast({ title: '已保存本机，云端同步失败', icon: 'none', duration: 2500 })
         }
       }
-      wx.showToast({ title: '注册成功', icon: 'success' })
-      setTimeout(() => wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/index/index' }) }), 500)
+      this.setData({
+        lingqiTalentIdLabel: lingqiIdentity.formatTalentIdLabel(member.lingqiTalentId),
+      })
+      wx.showToast({ title: '已保存', icon: 'success' })
+      setTimeout(() => wx.navigateBack(), 500)
     } finally {
       this.setData({ submitting: false })
     }

@@ -134,4 +134,15 @@ function validateRegion(province, city) {
   return null
 }
 
-module.exports = { provinceList, cityList, validateRegion }
+/** 扁平化全部城市（招募城市多选用） */
+function allCitiesFlat() {
+  const out = []
+  for (const r of REGIONS) {
+    for (const c of r.cities) {
+      if (c && !out.includes(c)) out.push(c)
+    }
+  }
+  return out
+}
+
+module.exports = { provinceList, cityList, validateRegion, allCitiesFlat, REGIONS }

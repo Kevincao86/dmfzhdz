@@ -1,0 +1,46 @@
+<view class="page-shell">
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
+
+  <view
+    wx:for="{{rows}}"
+    wx:key="mpOrderId"
+    class="card pr-order-card"
+    bindtap="goApplicants"
+    data-id="{{item.mpOrderId}}"
+  >
+    <view class="pr-order-head">
+      <text class="title-lg">{{item.title || item.mpOrderId}}</text>
+      <text class="pr-order-status {{item.recruiting ? 'pr-order-status--on' : 'pr-order-status--off'}}">{{item.statusLabel}}</text>
+    </view>
+    <text class="hint">发布于 {{item.publishedAt}} · {{item.hallLabel}}</text>
+    <text class="hint pr-order-deadline">截止：{{item.deadlineDaysText}}</text>
+    <view class="pr-order-actions">
+      <text
+        wx:if="{{item.canToggleRecruit}}"
+        class="pr-order-action"
+        catchtap="onToggleStatus"
+        data-id="{{item.mpOrderId}}"
+        data-index="{{index}}"
+      >{{item.toggleActionLabel}}</text>
+      <text class="pr-order-action" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑</text>
+      <text class="pr-order-action" catchtap="onShare" data-index="{{index}}">分享</text>
+      <text class="pr-order-action pr-order-action--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</text>
+    </view>
+    <view class="pr-order-meta">
+      <text class="pr-order-badge">{{item.signupLabel}}</text>
+      <view class="pr-order-meta-right">
+        <text
+          class="pr-order-link"
+          catchtap="onDownload"
+          data-index="{{index}}"
+        >下载</text>
+        <text class="pr-order-link" catchtap="goApplicants" data-id="{{item.mpOrderId}}">查看报名 ›</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!loading && rows.length === 0}}" class="card state-empty">
+    <text class="hint">暂无发单，去「发招募」创建</text>
+  </view>
+</view>

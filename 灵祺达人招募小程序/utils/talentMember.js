@@ -1,36 +1,21 @@
 const STORAGE_KEY = 'meoo_talent_member_v1'
-
-const MEMBER_TYPES = {
-  douyin: { id: 'douyin', label: '抖音达人', platforms: ['抖音'] },
-  xiaohongshu: { id: 'xiaohongshu', label: '小红书达人', platforms: ['小红书'] },
-  both: { id: 'both', label: '双平台达人', platforms: ['抖音', '小红书'] },
-}
-
-function emptyPlatformProfile() {
-  return {
-    platformAccount: '',
-    platformNickname: '',
-    profileLink: '',
-    followers: '',
-    douyinSalesLevel: '',
-    quotePrice: '',
-    alipayAccount: '',
-  }
-}
+const talentPlatforms = require('./talentPlatformProfiles.js')
 
 function readMember() {
   try {
     const raw = wx.getStorageSync(STORAGE_KEY)
     if (!raw) return null
     const j = typeof raw === 'string' ? JSON.parse(raw) : raw
-    return j && j.memberType ? j : null
+    if (!j || (!j.platformProfiles && !j.memberType && !j.douyin)) return null
+    return talentPlatforms.migrateMember(j)
   } catch {
     return null
   }
 }
 
 function writeMember(member) {
-  wx.setStorageSync(STORAGE_KEY, JSON.stringify(member))
+  const migrated = talentPlatforms.migrateMember(member)
+  wx.setStorageSync(STORAGE_KEY, JSON.stringify(migrated))
 }
 
 function clearMember() {
@@ -41,32 +26,70 @@ function clearMember() {
   }
 }
 
-function memberTypeLabel(memberType) {
-  return MEMBER_TYPES[memberType]?.label || '灵祺达人会员'
+function hasFilledPlatform(member) {
+  if (!member || !member.platformProfiles) return false
+  return talentPlatforms.TALENT_PLATFORMS.some((p) =>
+    talentPlatforms.profileFilled(member.platformProfiles[p.id]),
+  )
+}
+
+function memberTypeLabel(member) {
+  return talentPlatforms.summaryLabel(member)
 }
 
 function memberCoversPlatform(member, platform) {
-  if (!member) return false
-  const p = String(platform || '').includes('红') ? '小红书' : '抖音'
-  const t = MEMBER_TYPES[member.memberType]
-  return t ? t.platforms.includes(p) : false
+  if (!member || !member.platformProfiles) return false
+  const id = talentPlatforms.platformIdFromName(platform)
+  return talentPlatforms.profileFilled(member.platformProfiles[id])
 }
 
 function platformProfileFromMember(member, platform) {
+  if (!memberCoversPlatform(member, platform)) return null
+  const id = talentPlatforms.platformIdFromName(platform)
+  const prof = member.platformProfiles[id]
+  if (!prof) return null
+  const { enabled, ...rest } = prof
+  return rest
+}
+
+/** 推荐列表展示：取第一个已填写的平台资料 */
+function primaryPlatformProfile(member) {
   if (!member) return null
-  const p = String(platform || '').includes('红') ? 'xiaohongshu' : 'douyin'
-  if (p === 'xiaohongshu') return member.xiaohongshu || null
-  return member.douyin || null
+  if (member.platformProfiles) {
+    for (const p of talentPlatforms.TALENT_PLATFORMS) {
+      const prof = member.platformProfiles[p.id]
+      if (talentPlatforms.profileFilled(prof)) {
+        return { platform: p.name, profile: prof }
+      }
+    }
+  }
+  if (member.douyin && String(member.douyin.platformAccount || member.douyin.platformNickname || '').trim()) {
+    return { platform: '抖音', profile: member.douyin }
+  }
+  if (
+    member.xiaohongshu &&
+    String(member.xiaohongshu.platformAccount || member.xiaohongshu.platformNickname || '').trim()
+  ) {
+    return { platform: '小红书', profile: member.xiaohongshu }
+  }
+  return null
+}
+
+/** @deprecated 使用 platformProfiles */
+function emptyPlatformProfile() {
+  const { enabled, ...rest } = talentPlatforms.emptyProfile()
+  return rest
 }
 
 module.exports = {
   STORAGE_KEY,
-  MEMBER_TYPES,
   emptyPlatformProfile,
   readMember,
   writeMember,
   clearMember,
+  hasFilledPlatform,
   memberTypeLabel,
   memberCoversPlatform,
   platformProfileFromMember,
+  primaryPlatformProfile,
 }

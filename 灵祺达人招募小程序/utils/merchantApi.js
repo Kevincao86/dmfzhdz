@@ -10,6 +10,31 @@ function hasMerchantApi() {
   return Boolean(baseUrl())
 }
 
+function parseResponseBody(data) {
+  if (data == null) return {}
+  if (typeof data === 'object') return data
+  if (typeof data === 'string') {
+    try {
+      return JSON.parse(data)
+    } catch {
+      return { message: data }
+    }
+  }
+  return {}
+}
+
+function formatHttpError(statusCode, data) {
+  const d = parseResponseBody(data)
+  const detail = String(d.detail || d.message || '').trim()
+  const code = String(d.error || `http_${statusCode}`).trim()
+  const hint = String(d.hint || '').trim()
+  if (detail && code !== detail) {
+    return hint ? `${detail}（${code}）— ${hint}` : `${detail}（${code}）`
+  }
+  if (hint) return `${code} — ${hint}`
+  return code || `请求失败 ${statusCode}`
+}
+
 function merchantRequest(method, path, data) {
   const b = baseUrl()
   if (!b) {
@@ -27,10 +52,7 @@ function merchantRequest(method, path, data) {
           resolve(res.data)
           return
         }
-        const msg =
-          (res.data && (res.data.error || res.data.message || res.data.detail)) ||
-          `请求失败 ${res.statusCode}`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
+        reject(new Error(formatHttpError(res.statusCode, res.data)))
       },
       fail(err) {
         reject(new Error((err && err.errMsg) || '网络异常'))

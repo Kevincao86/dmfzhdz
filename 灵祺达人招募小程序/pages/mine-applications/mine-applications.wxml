@@ -1,0 +1,11 @@
+<view class="page-shell">
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:for="{{rows}}" wx:key="mpOrderId" class="card" bindtap="goDetail" data-id="{{mpOrderId}}">
+    <text class="title-lg">{{item.title}}</text>
+    <text class="hint">报名于 {{item.appliedAt}}</text>
+    <text class="hint">状态：{{item.status}}</text>
+  </view>
+  <view wx:if="{{!loading && rows.length === 0}}" class="card state-empty">
+    <text class="hint">暂无报名记录</text>
+  </view>
+</view>

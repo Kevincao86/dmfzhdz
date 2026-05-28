@@ -3,11 +3,28 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
 const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
 const regionPicker = require('../../utils/regionPicker.js')
-const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
+const { setupRegionState, onProvincePick, onCityPick } = regionPicker
 const applyFormState = require('../../utils/applyFormState.js')
-const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
+const applicationsStore = require('../../utils/applicationsStore.js')
+const messagesStore = require('../../utils/messagesStore.js')
+const applyTemplates = require('../../utils/applyFormTemplates.js')
+const applyRuntime = require('../../utils/applyTemplateRuntime.js')
+const platformForm = require('../../utils/platformForm.js')
 
-const DOUYIN_LEVELS = ['LV0', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7', '暂无等级']
+const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
+const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
+
+function syncApplyRows(page) {
+  const d = page.data
+  const rows = (d.applyRowsRaw || []).map((row) => ({
+    ...row,
+    isCustom: row.bindKey.startsWith('custom_'),
+    fieldValue: row.bindKey.startsWith('custom_')
+      ? String((d.customFields && d.customFields[row.bindKey]) || '')
+      : String(d[row.bindKey] != null ? d[row.bindKey] : ''),
+  }))
+  page.setData({ applyRows: rows })
+}
 
 Page({
   data: {
@@ -15,12 +32,17 @@ Page({
     merchantOrderNo: '',
     platform: '抖音',
     labels: labels('抖音'),
+    templateName: '',
+    applyRowsRaw: [],
+    applyRows: [],
+    customFields: {},
     douyinLevels: DOUYIN_LEVELS,
     douyinLevelIndex: 0,
     platformAccount: '',
     platformNickname: '',
     profileLink: '',
     followers: '',
+    likesCollects: '',
     douyinSalesLevel: '',
     contact: '',
     wechatId: '',
@@ -48,6 +70,9 @@ Page({
       options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
     const platform = normalizePlatform(options && options.platform ? decodeURIComponent(options.platform) : '抖音')
     const isIceMode = options && options.ice === '1'
+    const templateId = options && options.templateId ? decodeURIComponent(options.templateId) : ''
+    const tpl = applyTemplates.getApplyConfigForMpOrder(mpOrderId, templateId)
+    const applyRowsRaw = applyTemplates.resolveApplyRows(tpl, platform, { isIceMode })
     const member = memberStore.readMember()
     const canSyncMember = memberSyncAvailable(member, platform)
     const patch = {
@@ -55,16 +80,21 @@ Page({
       merchantOrderNo,
       platform,
       labels: labels(platform),
+      templateName: tpl.name,
+      applyRowsRaw,
       hasMember: !!member,
       canSyncMember,
       syncMemberProfile: false,
-      memberTypeLabel: member ? memberStore.memberTypeLabel(member.memberType) : '',
+      memberTypeLabel: member ? memberStore.memberTypeLabel(member) : '',
+      isIceMode,
+      customFields: {},
       ...emptyApplyFields(DOUYIN_LEVELS),
+      likesCollects: '',
     }
     if (!patch.provinces?.length) {
       Object.assign(patch, setupRegionState('', ''))
     }
-    this.setData(patch)
+    this.setData(patch, () => syncApplyRows(this))
     if (!mpOrderId) {
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
     }
@@ -79,69 +109,66 @@ Page({
         this.setData({ syncMemberProfile: false })
         return
       }
-      this.setData({ syncMemberProfile: true, ...fields })
+      this.setData({ syncMemberProfile: true, ...fields }, () => syncApplyRows(this))
       return
     }
-    this.setData({
-      syncMemberProfile: false,
-      ...emptyApplyFields(DOUYIN_LEVELS),
-    })
+    this.setData(
+      {
+        syncMemberProfile: false,
+        customFields: {},
+        ...emptyApplyFields(DOUYIN_LEVELS),
+        likesCollects: '',
+      },
+      () => syncApplyRows(this),
+    )
   },
   goRegister() {
-    wx.navigateTo({ url: '/pages/register/register' })
+    wx.navigateTo({ url: '/pages/register/register?edit=1' })
   },
   onField(e) {
     const k = e.currentTarget.dataset.k
-    if (k) this.setData({ [k]: e.detail.value, syncMemberProfile: false })
+    const isCustom = e.currentTarget.dataset.custom === '1'
+    const v = e.detail.value
+    if (!k) return
+    if (isCustom) {
+      const customFields = { ...(this.data.customFields || {}), [k]: v }
+      this.setData({ customFields, syncMemberProfile: false }, () => syncApplyRows(this))
+    } else {
+      this.setData({ [k]: v, syncMemberProfile: false }, () => syncApplyRows(this))
+    }
   },
   onProvinceChange(e) {
     onProvincePick(this, e)
-    this.setData({ syncMemberProfile: false })
+    this.setData({ syncMemberProfile: false }, () => syncApplyRows(this))
   },
   onCityChange(e) {
     onCityPick(this, e)
-    this.setData({ syncMemberProfile: false })
+    this.setData({ syncMemberProfile: false }, () => syncApplyRows(this))
   },
   onDouyinLevelChange(e) {
     const i = Number(e.detail.value)
-    this.setData({
-      douyinLevelIndex: i,
-      douyinSalesLevel: DOUYIN_LEVELS[i] || '',
-      syncMemberProfile: false,
-    })
+    this.setData(
+      {
+        douyinLevelIndex: i,
+        douyinSalesLevel: DOUYIN_LEVELS[i] || '',
+        syncMemberProfile: false,
+      },
+      () => syncApplyRows(this),
+    )
   },
   onVisitDateChange(e) {
-    this.setData({ visitDate: e.detail.value })
+    this.setData({ visitDate: e.detail.value }, () => syncApplyRows(this))
   },
   onVisitTimeStartChange(e) {
-    this.setData({ visitTimeStart: e.detail.value })
+    this.setData({ visitTimeStart: e.detail.value }, () => syncApplyRows(this))
   },
   onVisitTimeEndChange(e) {
-    this.setData({ visitTimeEnd: e.detail.value })
+    this.setData({ visitTimeEnd: e.detail.value }, () => syncApplyRows(this))
   },
   validateForm() {
-    const lb = this.data.labels
-    if (!String(this.data.platformAccount || '').trim()) return `请填写${lb.accountId}`
-    if (!String(this.data.platformNickname || '').trim()) return `请填写${lb.nickname}`
-    if (!String(this.data.profileLink || '').trim()) return `请填写${lb.profileLink}`
-    const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
-    if (!Number.isFinite(followers) || followers <= 0) return '请填写有效粉丝数'
-    if (this.data.labels.showSalesLevel && !String(this.data.douyinSalesLevel || '').trim()) {
-      return '请选择抖音带货等级'
-    }
-    if (!String(this.data.contact || '').trim()) return '请填写联系方式'
-    if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
-    const regionErr = validateRegion(this.data.province, this.data.city)
-    if (regionErr) return regionErr
-    if (!this.data.isIceMode) {
-      if (!String(this.data.quotePrice || '').trim()) return '请填写报价'
-      if (!this.data.visitDate || !this.data.visitTimeStart || !this.data.visitTimeEnd) {
-        return '请选择探店日期与时间段'
-      }
-      if (this.data.visitTimeStart >= this.data.visitTimeEnd) return '探店结束时间须晚于开始时间'
-      if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
-    }
-    return null
+    return applyRuntime.validateApplyRows(this.data.applyRowsRaw, this.data, this.data.platform, {
+      isIceMode: this.data.isIceMode,
+    })
   },
   async onSubmit() {
     if (!merchant.hasMerchantApi()) {
@@ -154,41 +181,28 @@ Page({
       return
     }
 
-    const platformNickname = String(this.data.platformNickname || '').trim()
-    const visitTimeSlot = this.data.isIceMode
-      ? '云剪任务·无需探店'
-      : `${this.data.visitDate} ${this.data.visitTimeStart}-${this.data.visitTimeEnd}`
-    const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
-    const platform = this.data.platform
-    const alipayAccount = String(this.data.alipayAccount || '').trim()
-
     this.setData({ submitting: true })
     try {
       const applicantId = `app-${Date.now()}`
-      const applicant = {
-        id: applicantId,
-        name: platformNickname,
-        platform,
-        platformAccount: String(this.data.platformAccount || '').trim(),
-        platformNickname,
-        profileLink: String(this.data.profileLink || '').trim(),
-        followers: Math.max(0, followers),
-        douyinSalesLevel: this.data.labels.showSalesLevel
-          ? String(this.data.douyinSalesLevel || '').trim()
-          : undefined,
-        contact: String(this.data.contact || '').trim(),
-        wechatId: String(this.data.wechatId || '').trim(),
-        quotePrice: this.data.isIceMode ? '云剪' : String(this.data.quotePrice || '').trim(),
-        visitTimeSlot,
-        alipayAccount: this.data.isIceMode ? '' : alipayAccount,
-        paymentMethod: this.data.isIceMode ? '云剪任务' : `支付宝：${alipayAccount}`,
+      const applicant = applyRuntime.buildApplicantFromRows(this.data.applyRowsRaw, this.data, {
+        platform: this.data.platform,
+        isIceMode: this.data.isIceMode,
         mpOrderId: this.data.mpOrderId,
         merchantOrderNo: this.data.merchantOrderNo,
-        province: String(this.data.province || '').trim(),
-        city: String(this.data.city || '').trim(),
+        applicantId,
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      }
+      })
       await ops.applyToMpOrder(this.data.mpOrderId, applicant)
+      applicationsStore.addApplication({
+        mpOrderId: this.data.mpOrderId,
+        applicantId,
+        title: this.data.merchantOrderNo || this.data.mpOrderId,
+      })
+      messagesStore.pushNotification({
+        title: '报名已提交',
+        body: `您已报名 ${this.data.merchantOrderNo || this.data.mpOrderId}`,
+        category: 'business',
+      })
       if (this.data.isIceMode) {
         try {
           wx.setStorageSync(`meoo_ice_applicant_v1_${this.data.mpOrderId}`, applicantId)

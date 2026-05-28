@@ -7,4 +7,6 @@
  */
 module.exports = {
   MERCHANT_API_BASE_URL: 'https://your-merchant-erp.vercel.app',
+  /** 可选：微信 URL Link 或 H5 报名落地页，支持 {mpId} 占位符 */
+  MP_SHARE_APPLY_BASE_URL: '',
 }
