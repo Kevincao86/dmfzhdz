@@ -1,0 +1,51 @@
+<view class="page-shell pr-app-page">
+  <view class="pr-app-hero card--accent" wx:if="{{!loading && !err}}">
+    <text class="title-lg">{{title}}</text>
+    <text class="hint">大厅：{{hallLabel}} · 状态：{{status}}</text>
+    <text class="hint">已报名 {{applicants.length}} 人</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载报名列表…</text></view>
+  <view wx:if="{{err}}" class="card state-empty">
+    <text class="hint">{{err}}</text>
+  </view>
+
+  <view
+    wx:for="{{applicants}}"
+    wx:key="id"
+    class="card applicant-card"
+  >
+    <view class="applicant-head">
+      <text class="applicant-index">#{{item.index}}</text>
+      <text class="title-lg applicant-name">{{item.displayName}}</text>
+    </view>
+    <text class="hint">平台 {{item.displayPlatform}} · 粉丝 {{item.displayFollowers}}</text>
+    <text class="hint" wx:if="{{item.platformAccount}}">账号 {{item.platformAccount}}</text>
+    <text class="hint" wx:if="{{item.quotePrice}}">报价 {{item.quotePrice}}</text>
+    <text class="hint" wx:if="{{item.visitTimeSlot}}">探店 {{item.visitTimeSlot}}</text>
+    <text class="hint">联系 {{item.contact}} · 微信 {{item.wechatId}}</text>
+    <text class="hint">报名于 {{item.displayAppliedAt}}</text>
+    <view class="applicant-actions" catchtap="noop">
+      <button
+        wx:if="{{chatEnabled}}"
+        class="applicant-chat-btn"
+        size="mini"
+        loading="{{chattingId === item.id}}"
+        data-index="{{index}}"
+        catchtap="onChatApplicant"
+      >私信沟通</button>
+      <text class="applicant-tap-hint" bindtap="onCopyApplicant" data-index="{{index}}">复制资料</text>
+    </view>
+  </view>
+
+  <view wx:if="{{!loading && !err && applicants.length === 0}}" class="card state-empty">
+    <text class="hint">暂无达人报名，分享招募后等待达人提交</text>
+  </view>
+
+  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0}}">
+    <button class="btn-primary" loading="{{exporting}}" bindtap="onExportExcel">
+      下载 Excel
+    </button>
+    <text class="hint pr-app-footer-hint">生成 UTF-8 表格（.csv），可用 Excel / WPS 打开</text>
+  </view>
+</view>

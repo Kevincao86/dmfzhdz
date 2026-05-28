@@ -189,6 +189,40 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       return
     }
 
+    if (loc.pathname === '/api/meoo-mp-recruitment-ai') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const { runMpRecruitmentAiCore } = await import('./mpRecruitmentAiCore.js')
+        const out = await runMpRecruitmentAiCore(bodyRaw, env)
+        res.statusCode = out.status
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify(out.body))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify({ ok: false, error: 'mp_recruitment_ai_failed', detail: msg.slice(0, 800) }))
+      }
+      return
+    }
+
     if (loc.pathname === '/api/meoo-ai-chat') {
       const method = req.method ?? 'GET'
       if (method === 'OPTIONS') {

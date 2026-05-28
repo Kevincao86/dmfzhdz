@@ -551,7 +551,7 @@ export default function FloatingOnlineSupport({
                 <Headphones className="h-5 w-5 shrink-0 opacity-95" aria-hidden />
                 <div className="min-w-0">
                   <h2 id={panelId} className="truncate text-sm font-semibold">
-                    在线客服
+                    在线客服（ERP处理中心）
                   </h2>
                   <p className="truncate text-[11px] text-blue-100/90">
                     {humanMode ? '人工客服已接入' : connecting ? '接入中…' : '智能助手 · 可转人工'}
@@ -672,7 +672,7 @@ export default function FloatingOnlineSupport({
             'pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
             open ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700',
           )}
-          aria-label={open ? '关闭在线客服' : '打开在线客服'}
+          aria-label={open ? '关闭在线客服（ERP处理中心）' : '打开在线客服（ERP处理中心）'}
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
         >

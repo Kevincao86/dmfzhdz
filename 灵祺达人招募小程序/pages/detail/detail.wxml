@@ -51,15 +51,6 @@
       <view wx:for="{{view.recruitmentInfoLines}}" wx:key="*this" class="line-item">{{item}}</view>
     </view>
 
-    <view class="card">
-      <view class="section-head">
-        <view class="section-head-dot" />
-        <text class="section-title">任务详情</text>
-        <text class="btn-copy" bindtap="copyTask">复制全文</text>
-      </view>
-      <view wx:for="{{view.taskDetailLines}}" wx:key="*this" class="line-item">{{item}}</view>
-    </view>
-
     <view class="card card--flat">
       <view class="section-head">
         <view class="section-head-dot" />
@@ -140,6 +131,12 @@
 <view wx:if="{{view && !loading}}" class="bottom-bar">
   <button class="bottom-icon" open-type="share">分享</button>
   <button class="bottom-icon" bindtap="goHome">首页</button>
+  <button
+    wx:if="{{chatEnabled && prChatMeta}}"
+    class="btn-ghost bottom-cta bottom-cta--chat"
+    loading="{{contacting}}"
+    bindtap="contactPr"
+  >联系招募方</button>
   <button wx:if="{{!applied}}" class="btn-primary bottom-cta" bindtap="goApply">{{isIce ? '认领云剪任务' : '我要报名'}}</button>
-  <button wx:else class="btn-primary bottom-cta" open-type="share">邀请好友</button>
+  <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
 </view>

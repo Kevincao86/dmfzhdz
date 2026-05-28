@@ -107,7 +107,18 @@ function needsOpsReply(lines: SupportRelayChatLine[] | undefined): boolean {
   return lines[lines.length - 1]!.from !== 'ops'
 }
 
-export default function OpsSupportWorkbenchPage() {
+export type OpsSupportChannel = 'erp' | 'mp'
+
+function isMpSupportSession(sessionId: string): boolean {
+  const sid = String(sessionId || '').trim()
+  return /^lq-mp[-:]/i.test(sid) || /^mp[-_]/i.test(sid)
+}
+
+type OpsSupportWorkbenchPageProps = {
+  channel?: OpsSupportChannel
+}
+
+export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportWorkbenchPageProps) {
   const wsRef = useRef<WebSocket | null>(null)
   const selectedIdRef = useRef<string | null>(null)
   const [relayReady, setRelayReady] = useState(false)
@@ -362,14 +373,21 @@ export default function OpsSupportWorkbenchPage() {
     [sessions],
   )
 
+  const channelSessionIds = useMemo(() => {
+    return sessionIds.filter((id) => {
+      const mp = isMpSupportSession(id)
+      return channel === 'mp' ? mp : !mp
+    })
+  }, [sessionIds, channel])
+
   const filteredSessionIds = useMemo(() => {
-    if (listFilter !== 'unreplied') return sessionIds
-    return sessionIds.filter((id) => needsOpsReply(msgsBySession[id]))
-  }, [sessionIds, listFilter, msgsBySession])
+    if (listFilter !== 'unreplied') return channelSessionIds
+    return channelSessionIds.filter((id) => needsOpsReply(msgsBySession[id]))
+  }, [channelSessionIds, listFilter, msgsBySession])
 
   const unrepliedCount = useMemo(
-    () => sessionIds.filter((id) => needsOpsReply(msgsBySession[id])).length,
-    [sessionIds, msgsBySession],
+    () => channelSessionIds.filter((id) => needsOpsReply(msgsBySession[id])).length,
+    [channelSessionIds, msgsBySession],
   )
 
   const pickSession = useCallback((id: string) => {
@@ -567,8 +585,13 @@ export default function OpsSupportWorkbenchPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-white">在线客服</h1>
+        <h1 className="text-xl font-semibold text-white">
+          {channel === 'mp' ? '在线客服（小程序达人、PR处理中心）' : '在线客服（ERP处理中心）'}
+        </h1>
         <p className="mt-1 text-sm text-slate-500">
+          {channel === 'mp'
+            ? '承接达人招募小程序「小灵同学」等入口的会话（会话 ID 以 lq-mp- 或 mp- 开头）。'
+            : '承接商家 ERP 右下角在线客服的商户会话。'}
           开发环境可走 WebSocket（/__meoo_support_online）；生产可在 Supabase 表 support_relay_messages 上启用云端同步，并在本项目中配置{' '}
           <code className="rounded bg-black/30 px-1">VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN</code> 与 Vercel 服务端同名密钥及{' '}
           <code className="rounded bg-black/30 px-1">SUPABASE_SERVICE_ROLE_KEY</code>。
@@ -801,9 +824,11 @@ export default function OpsSupportWorkbenchPage() {
                 </div>
               </div>
               <div className="max-h-[min(28rem,70vh)] overflow-y-auto p-2">
-                {sessionIds.length === 0 ? (
+                {channelSessionIds.length === 0 ? (
                   <p className="px-2 py-6 text-center text-xs text-slate-500">
-                    暂无会话。打开商家 ERP 右下角在线客服并发消息后，将在此出现会话条目。
+                    {channel === 'mp'
+                      ? '暂无小程序会话。达人/PR 在招募小程序发起在线客服后将显示于此。'
+                      : '暂无会话。打开商家 ERP 右下角在线客服并发消息后，将在此出现会话条目。'}
                   </p>
                 ) : filteredSessionIds.length === 0 ? (
                   <p className="px-2 py-6 text-center text-xs text-slate-500">

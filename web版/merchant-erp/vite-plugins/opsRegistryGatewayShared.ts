@@ -15,6 +15,7 @@ import type {
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
   RegistryMpTalentMember,
+  RegistryMpPrUser,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -25,6 +26,12 @@ import type {
 } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
+import { upsertMpPrUser } from '../src/lib/mpPrUserUpsert.js'
+import {
+  deleteMpRecruitmentOrderFromSnapshot,
+  patchMpRecruitmentOrderInSnapshot,
+  type MpRecruitmentPatchBody,
+} from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
 import {
   handleIceMpApply,
   handleIceMpConfirm,
@@ -146,9 +153,12 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           !url.startsWith('/api/ops-sync') &&
           url !== '/api/meoo-ops-sync-registry' &&
           url !== '/api/meoo-ops-recruitment-orders-append' &&
+          url !== '/api/meoo-ops-mp-recruitment-orders-append' &&
           url !== '/api/meoo-ops-talent-pool-set' &&
           url !== '/api/meoo-ops-recruitment-schedule-set' &&
           url !== '/api/meoo-ops-mp-recruitment-orders-apply' &&
+          url !== '/api/meoo-ops-mp-recruitment-orders-patch' &&
+          url !== '/api/meoo-ops-mp-recruitment-orders-delete' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-talent-member-register'
@@ -517,7 +527,11 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/mp-recruitment-orders/append') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/append' ||
+              url === '/api/meoo-ops-mp-recruitment-orders-append')
+          ) {
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as { order?: RegistryMpRecruitmentOrder }
             const order = body.order
@@ -540,42 +554,36 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/mp-recruitment-orders/patch') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/patch' ||
+              url === '/api/meoo-ops-mp-recruitment-orders-patch')
+          ) {
             const raw = await readBody(req)
-            const body = JSON.parse(raw || '{}') as {
-              id?: string
-              status?: RegistryMpRecruitmentOrder['status']
-              applicants?: RegistryMpRecruitmentApplicant[]
-            }
-            const id = (body.id ?? '').trim()
-            const status = body.status
-            const applicants = body.applicants
-            if (!id || (!status && !applicants)) {
-              json(res, 400, { ok: false, error: 'invalid_patch' })
-              return
-            }
-            if (
-              status &&
-              status !== 'open' &&
-              status !== 'collecting' &&
-              status !== 'pending_settlement' &&
-              status !== 'closed' &&
-              status !== 'done'
-            ) {
-              json(res, 400, { ok: false, error: 'invalid_patch' })
-              return
-            }
+            const body = JSON.parse(raw || '{}') as MpRecruitmentPatchBody
             const data = ensureRegistry(viteRoot)
-            const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === id) ?? -1
-            if (!data.mpRecruitmentOrders || idx < 0) {
-              json(res, 404, { ok: false, error: 'not_found' })
+            const result = patchMpRecruitmentOrderInSnapshot(data, body)
+            if (!result.ok) {
+              json(res, result.status, { ok: false, error: result.error })
               return
             }
-            data.mpRecruitmentOrders[idx] = {
-              ...data.mpRecruitmentOrders[idx]!,
-              ...(status ? { status } : {}),
-              ...(applicants ? { applicants } : {}),
-              updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/delete' ||
+              url === '/api/meoo-ops-mp-recruitment-orders-delete')
+          ) {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { id?: string }
+            const data = ensureRegistry(viteRoot)
+            const result = deleteMpRecruitmentOrderFromSnapshot(data, body.id ?? '')
+            if (!result.ok) {
+              json(res, result.status, { ok: false, error: result.error })
+              return
             }
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
@@ -748,9 +756,36 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               return
             }
             const data = ensureRegistry(viteRoot)
-            upsertMpTalentMember(data, member)
+            const saved = upsertMpTalentMember(data, member)
             writeRegistry(viteRoot, data)
-            json(res, 200, { ok: true, id: member.id })
+            json(res, 200, {
+              ok: true,
+              id: saved.id,
+              lingqiTalentId: saved.lingqiTalentId || null,
+            })
+            return
+          }
+
+          if (method === 'POST' && url === '/api/ops-sync/mp-pr-users/register') {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { prUser?: RegistryMpPrUser }
+            const prUser = body.prUser
+            if (!prUser || !prUser.accountType) {
+              json(res, 400, { ok: false, error: 'invalid_pr_user' })
+              return
+            }
+            const org =
+              prUser.accountType === 'personal'
+                ? String(prUser.personalName || '').trim()
+                : String(prUser.companyName || '').trim()
+            if (!org) {
+              json(res, 400, { ok: false, error: 'org_required' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            const saved = upsertMpPrUser(data, prUser)
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, id: saved.id, lingqiPrId: saved.lingqiPrId })
             return
           }
 

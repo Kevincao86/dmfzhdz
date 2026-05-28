@@ -1,11 +1,43 @@
 {
-  "pages": ["pages/index/index", "pages/register/register", "pages/detail/detail", "pages/apply/apply"],
+  "pages": [
+    "pages/index/index",
+    "pages/recommend/recommend",
+    "pages/publish/publish",
+    "pages/messages/messages",
+    "pages/mine/mine",
+    "pages/register/register",
+    "pages/detail/detail",
+    "pages/apply/apply",
+    "pages/mine-applications/mine-applications",
+    "pages/mine-templates/mine-templates",
+    "pages/mine-template-edit/mine-template-edit",
+    "pages/mine-notifications/mine-notifications",
+    "pages/mine-analytics/mine-analytics",
+    "pages/mine-support/mine-support",
+    "pages/mine-pr-profile/mine-pr-profile",
+    "pages/mine-pr-orders/mine-pr-orders",
+    "pages/mine-pr-order-applicants/mine-pr-order-applicants",
+    "pages/chat/chat"
+  ],
   "window": {
     "navigationBarTitleText": "灵祺达人招募",
-    "navigationBarBackgroundColor": "#312e81",
+    "navigationBarBackgroundColor": "#4f46e5",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#eef2ff",
+    "backgroundColor": "#f4f3f8",
     "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#94a3b8",
+    "selectedColor": "#4f46e5",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/recommend/recommend", "text": "推荐" },
+      { "pagePath": "pages/publish/publish", "text": "发招募" },
+      { "pagePath": "pages/messages/messages", "text": "消息" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
   },
   "lazyCodeLoading": "requiredComponents"
 }

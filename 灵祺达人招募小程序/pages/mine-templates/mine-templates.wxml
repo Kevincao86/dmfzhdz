@@ -1,0 +1,19 @@
+<view class="page-shell">
+  <view class="card">
+    <button class="btn-primary" bindtap="onAdd">新建自定义模版</button>
+  </view>
+  <view wx:for="{{rows}}" wx:key="id" class="card">
+    <view class="tpl-head">
+      <text class="title-lg">{{item.name}}</text>
+    </view>
+    <text class="hint">{{item.fields.length}} 个字段</text>
+    <view class="tpl-actions">
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseTemplate">使用</button>
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onEdit">编辑</button>
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDelete">删除</button>
+    </view>
+  </view>
+  <view wx:if="{{!rows.length}}" class="card">
+    <text class="hint">暂无模版，点击上方按钮新建</text>
+  </view>
+</view>

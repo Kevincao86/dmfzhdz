@@ -1,0 +1,11 @@
+.tpl-head {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.tpl-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}

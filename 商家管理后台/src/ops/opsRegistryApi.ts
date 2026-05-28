@@ -123,6 +123,7 @@ export type RegistryMpRecruitmentApplicant = {
 
 export type RegistryTalentLibraryEntry = {
   id: string
+  lingqiTalentId?: string
   platform: '抖音' | '小红书'
   platformAccount: string
   platformNickname: string
@@ -140,6 +141,25 @@ export type RegistryTalentLibraryEntry = {
   lastMerchantOrderNo?: string
   province?: string
   city?: string
+}
+
+export type RegistryMpPrUser = {
+  id: string
+  lingqiPrId: string
+  accountType: 'company' | 'personal'
+  companyName?: string
+  personalName?: string
+  contactName?: string
+  contactPhone?: string
+  wechatId?: string
+  province?: string
+  city?: string
+  intro?: string
+  wxNickName?: string
+  wxAvatarUrl?: string
+  wxOpenId?: string
+  registeredAt: string
+  updatedAt: string
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -230,6 +250,7 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  mpPrUsers?: RegistryMpPrUser[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]

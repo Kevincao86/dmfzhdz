@@ -2,6 +2,31 @@
  * 商户 ERP Serverless（/api/*、Vite 网关）读 Supabase 注册表等管理接口时用。
  * 与前端 `VITE_SUPABASE_*` 不同：Service Role 仅应出现在 Vercel 环境变量中，勿写入前端包。
  */
+
+/** 官方本地 `supabase start` 固定 demo JWT（仅用于 127.0.0.1:54321，勿用于线上）。 */
+const LOCAL_SUPABASE_DEMO_SERVICE_ROLE =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+
+function isLocalSupabaseDemoUrl(supabaseUrl: string): boolean {
+  try {
+    const u = new URL(supabaseUrl)
+    const port = u.port || (u.protocol === 'https:' ? '443' : '80')
+    return (u.hostname === '127.0.0.1' || u.hostname === 'localhost') && port === '54321'
+  } catch {
+    return false
+  }
+}
+
+/** 本地 54321 未写 SUPABASE_SERVICE_ROLE_KEY 时使用 CLI 内置 demo JWT（与商家管理后台一致）。 */
+function effectiveServiceRoleKey(supabaseUrl: string, fromEnv: string): string {
+  const t = fromEnv.trim()
+  if (isLocalSupabaseDemoUrl(supabaseUrl)) {
+    if (process.env.SUPABASE_LOCAL_USE_PRINTED_SERVICE_ROLE === '1' && t) return t
+    return LOCAL_SUPABASE_DEMO_SERVICE_ROLE
+  }
+  return t
+}
+
 export type MerchantSupabaseAdminEnvParts = {
   supabaseUrl: string
   serviceRole: string
@@ -10,11 +35,12 @@ export type MerchantSupabaseAdminEnvParts = {
 
 export function readMerchantSupabaseAdminEnv(): MerchantSupabaseAdminEnvParts {
   const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
-  const serviceRole = (
+  const fromEnv = (
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
     process.env.SUPABASE_SERVICE_ROLE ??
     ''
   ).trim()
+  const serviceRole = effectiveServiceRoleKey(supabaseUrl, fromEnv)
   const missingParts: ('url' | 'serviceRole')[] = []
   if (!supabaseUrl) missingParts.push('url')
   if (!serviceRole) missingParts.push('serviceRole')

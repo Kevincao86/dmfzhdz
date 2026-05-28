@@ -1,0 +1,85 @@
+<view class="msg-page page-with-bar page-shell-fixed">
+  <view class="msg-nav" style="{{recHeadBandStyle}}">
+    <view class="msg-nav-inner" style="{{recHeadInnerStyle}}">
+      <text class="msg-nav-title">消息</text>
+      <text class="msg-nav-sub">{{identityHint}}</text>
+    </view>
+  </view>
+
+  <view class="msg-search-wrap">
+    <view class="msg-search">
+      <text class="msg-search-icon">⌕</text>
+      <input
+        class="msg-search-input"
+        placeholder="搜索会话、昵称"
+        value="{{searchKeyword}}"
+        bindinput="onSearchInput"
+      />
+    </view>
+  </view>
+
+  <view wx:if="{{!configured}}" class="msg-fixed-tip card">
+    <text class="hint">请配置 utils/config.local.js 的 MERCHANT_API_BASE_URL，并运行 web版/merchant-erp 的 npm run dev</text>
+    <text class="hint" style="display:block;margin-top:12rpx;">可选配置 SUPABASE_URL / SUPABASE_ANON_KEY 直连消息表</text>
+  </view>
+
+  <block wx:elif="{{loading}}">
+    <view class="msg-fixed-tip card state-loading">
+      <view class="loading-dot-wrap">
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+      </view>
+      <text class="hint list-hint">加载会话…</text>
+    </view>
+  </block>
+
+  <view wx:elif="{{err}}" class="msg-fixed-tip card state-error">
+    <text>{{err}}</text>
+    <button class="msg-retry-btn" bindtap="bootstrap">重试</button>
+  </view>
+
+  <scroll-view
+    wx:else
+    class="msg-list page-scroll-body"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    refresher-enabled="{{configured}}"
+    refresher-triggered="{{refreshing}}"
+    bindrefresherrefresh="onPullRefresh"
+  >
+    <view
+      wx:for="{{sessions}}"
+      wx:key="id"
+      class="msg-entry"
+      bindtap="openChat"
+      data-id="{{item.id}}"
+      data-name="{{item.peerName}}"
+      data-avatar="{{item.peerAvatar}}"
+    >
+      <image class="msg-entry-avatar" src="{{item.peerAvatar || '/images/logo.png'}}" mode="aspectFill" />
+      <view class="msg-entry-body">
+        <view class="msg-entry-top">
+          <text class="msg-entry-name">{{item.peerName}}</text>
+          <text class="msg-entry-time">{{item.timeText}}</text>
+        </view>
+        <view class="msg-entry-bottom">
+          <text class="msg-entry-preview">{{item.lastText || '暂无消息'}}</text>
+          <view class="msg-badge" wx:if="{{item.unread > 0}}">{{item.unread > 99 ? '99+' : item.unread}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{sessions.length === 0}}" class="msg-empty">
+      <text class="msg-empty-icon">💬</text>
+      <text class="empty-title">{{emptyTitle}}</text>
+      <text class="hint">{{emptyHint}}</text>
+    </view>
+
+    <view wx:if="{{showDevTest}}" class="msg-dev-bar">
+      <button class="msg-test-btn" bindtap="openTestDialog">打开测试对话（开发）</button>
+      <text class="msg-test-hint">PR 建会话后切达人身份可双向回复</text>
+    </view>
+  </scroll-view>
+</view>

@@ -1,0 +1,20 @@
+/* 灵祺 · 靛蓝暖色主题（与绿色 Logo 区分，整体偏商务稳重） */
+page {
+  --lq-primary: #6366f1;
+  --lq-primary-dark: #4f46e5;
+  --lq-accent: #f59e0b;
+  --lq-accent-deep: #d97706;
+  --lq-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --lq-gradient-deep: linear-gradient(165deg, #312e81 0%, #4f46e5 52%, #6366f1 100%);
+  --lq-bg: #f4f3f8;
+  --lq-surface: #ffffff;
+  --lq-card: #ffffff;
+  --lq-text: #1e1b2e;
+  --lq-text-secondary: #6b7280;
+  --lq-border: rgba(229, 231, 235, 0.95);
+  --lq-shadow: 0 12rpx 40rpx rgba(79, 70, 229, 0.08);
+  --lq-shadow-header: 0 12rpx 36rpx rgba(49, 46, 129, 0.18);
+  --lq-radius-lg: 28rpx;
+  --lq-radius-md: 20rpx;
+  --lq-header-pad-bottom: 28rpx;
+}

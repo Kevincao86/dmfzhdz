@@ -1,0 +1,59 @@
+<view class="chat-page">
+  <view class="chat-nav" style="{{navBarStyle}}">
+    <view class="chat-nav-inner" style="{{navInnerStyle}}">
+      <text class="chat-back" bindtap="onBack">‹</text>
+      <image class="chat-nav-avatar" src="{{peerAvatar || '/images/logo.png'}}" mode="aspectFill" />
+      <view class="chat-nav-meta">
+        <text class="chat-nav-name">{{peerName}}</text>
+        <text class="chat-nav-sub">{{statusSub}}</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view
+    class="chat-scroll"
+    scroll-y
+    scroll-into-view="{{scrollTo}}"
+    scroll-with-animation
+  >
+    <view
+      wx:for="{{messages}}"
+      wx:key="id"
+      id="msg-{{item.id}}"
+      class="bubble-row {{item.mine ? 'mine' : 'their'}}"
+    >
+      <image
+        wx:if="{{!item.mine}}"
+        class="bubble-avatar"
+        src="{{peerAvatar || '/images/logo.png'}}"
+        mode="aspectFill"
+      />
+      <view class="bubble {{item.mine ? 'bubble-mine' : 'bubble-their'}}">
+        <text class="bubble-text">{{item.text}}</text>
+        <text class="bubble-at">{{item.at}}</text>
+      </view>
+      <image
+        wx:if="{{item.mine}}"
+        class="bubble-avatar"
+        src="{{myAvatar || '/images/logo.png'}}"
+        mode="aspectFill"
+      />
+    </view>
+    <view class="scroll-pad"></view>
+  </scroll-view>
+
+  <view class="chat-composer">
+    <view class="composer-row">
+      <input
+        class="chat-input"
+        placeholder="输入消息…"
+        value="{{input}}"
+        bindinput="onInput"
+        confirm-type="send"
+        bindconfirm="onSend"
+        disabled="{{!ready}}"
+      />
+      <button class="send-btn" bindtap="onSend" disabled="{{!ready || !input}}">发送</button>
+    </view>
+  </view>
+</view>

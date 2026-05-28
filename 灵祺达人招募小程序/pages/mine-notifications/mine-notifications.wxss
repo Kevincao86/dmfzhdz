@@ -1,0 +1,73 @@
+.ntf-page {
+  padding: 24rpx 28rpx 48rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--lq-bg, #f5f6fa);
+}
+
+.ntf-empty {
+  margin-top: 80rpx;
+  text-align: center;
+  padding: 48rpx 32rpx;
+}
+
+.ntf-section {
+  margin-bottom: 28rpx;
+}
+
+.ntf-section-title {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--lq-text-secondary, #6b7280);
+  margin: 0 8rpx 16rpx;
+}
+
+.ntf-card {
+  margin-bottom: 16rpx;
+  padding: 24rpx;
+}
+
+.ntf-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.ntf-cat {
+  font-size: 20rpx;
+  font-weight: 700;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.ntf-cat--order {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.ntf-cat--business {
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.ntf-cat--system {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.ntf-time {
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.ntf-title {
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.ntf-body {
+  display: block;
+  line-height: 1.5;
+}

@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import { authRegisterGatewayPlugin } from './vite-plugins/authRegisterGateway'
 import { merchantApiMockPlugin } from './vite-plugins/merchantApiMock'
+import { mpTalentChatGatewayPlugin } from './vite-plugins/mpTalentChatGateway'
+import { mpRecruitApplyLandingPlugin } from './vite-plugins/mpRecruitApplyLandingPlugin'
 import { opsErpSyncGatewayPlugin } from './vite-plugins/opsErpSyncGateway'
 import { supportWsProxyToAdminPlugin } from './vite-plugins/supportWsProxyToAdmin'
 
@@ -20,7 +22,9 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       merchantApiMockPlugin(),
       authRegisterGatewayPlugin(),
+      mpRecruitApplyLandingPlugin(),
       opsErpSyncGatewayPlugin(),
+      mpTalentChatGatewayPlugin(),
       supportWsProxyToAdminPlugin({ adminHttpOrigin: adminOrigin }),
     ],
     /**

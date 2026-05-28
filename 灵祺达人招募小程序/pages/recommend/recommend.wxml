@@ -1,0 +1,260 @@
+<view class="rec-page page-with-bar page-shell-fixed">
+  <view class="rec-top">
+    <view class="rec-head-band" style="{{recHeadBandStyle}}">
+      <view class="rec-hero-deco rec-hero-deco--1" />
+      <view class="rec-head-inner" style="{{recHeadInnerStyle}}">
+        <image class="rec-head-logo" src="/images/logo.png" mode="aspectFit" />
+        <view class="rec-head-main">
+          <view class="rec-head-title-row">
+            <text class="rec-hero-title">{{isPrMode ? '优质达人推荐' : '优质商单推荐'}}</text>
+            <view class="rec-hero-badge">{{isPrMode ? 'HOT' : 'NEW'}}</view>
+          </view>
+          <text class="rec-hero-sub" wx:if="{{talentTestMode}}">预览 PR 端「推荐达人」列表 · 置顶您的达人资料</text>
+          <text class="rec-hero-sub" wx:elif="{{isPrMode}}">发现活跃达人 · 一键在线沟通</text>
+          <text class="rec-hero-sub" wx:else>优质 · 热门全国 · 同城匹配你的城市</text>
+          <text class="rec-head-meta" wx:if="{{!isPrMode && orderCityHint}}">{{orderCityHint}}</text>
+          <text class="rec-head-meta" wx:elif="{{isPrMode && prMatchHint}}">{{prMatchHint}}</text>
+          <text class="rec-head-meta" wx:elif="{{isPrMode}}">灵祺 LINGQI · 达人招募平台</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="rec-search-bar">
+      <text class="rec-search-icon">⌕</text>
+      <input
+        class="rec-search-input"
+        placeholder="{{isPrMode ? '搜索达人昵称、ID' : '搜索商单、门店、城市'}}"
+        placeholder-class="rec-search-ph"
+        value="{{searchKeyword}}"
+        confirm-type="search"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+      <text class="rec-search-clear" wx:if="{{searchKeyword}}" bindtap="onSearchClear">×</text>
+    </view>
+
+    <view class="rec-test-bar" wx:if="{{talentTestMode}}">
+      <text class="rec-test-bar__text">{{talentTestHint}}</text>
+      <text class="rec-test-bar__link" bindtap="goEditSelfProfile">去完善资料 ›</text>
+    </view>
+
+    <view class="rec-seg-bar" wx:if="{{isPrMode && prOrderCount > 0 && !talentTestMode}}">
+      <view
+        wx:for="{{talentSegments}}"
+        wx:key="id"
+        class="rec-seg-item {{talentSegment === item.id ? 'rec-seg-item--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onTalentSegment"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="rec-seg-bar" wx:if="{{!isPrMode}}">
+      <view
+        wx:for="{{orderSegments}}"
+        wx:key="id"
+        class="rec-seg-item {{orderSegment === item.id ? 'rec-seg-item--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onOrderSegment"
+      >
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="rec-filter-bar">
+      <view class="rec-filter-cell">
+        <picker mode="selector" range="{{platformFilters}}" bindchange="onPlatformFilter">
+          <view class="rec-filter-item {{filterPlatform !== '全部' ? 'rec-filter-item--on' : ''}}">
+            <text class="rec-filter-label">{{filterPlatform === '全部' ? '平台' : filterPlatform}}</text>
+            <text class="rec-filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="rec-filter-cell">
+        <picker mode="selector" range="{{cityFilters}}" bindchange="onCityFilter">
+          <view class="rec-filter-item {{filterCity !== '全部' ? 'rec-filter-item--on' : ''}}">
+            <text class="rec-filter-label">{{filterCity === '全部' ? '城市' : filterCity}}</text>
+            <text class="rec-filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <block wx:if="{{isPrMode}}">
+        <view class="rec-filter-cell">
+          <picker mode="selector" range="{{tagFilters}}" bindchange="onTagFilter">
+            <view class="rec-filter-item {{filterTag !== '全部' ? 'rec-filter-item--on' : ''}}">
+              <text class="rec-filter-label">{{filterTag === '全部' ? '标签' : filterTag}}</text>
+              <text class="rec-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <view class="rec-filter-cell">
+          <picker mode="selector" range="{{genderFilters}}" bindchange="onGenderFilter">
+            <view class="rec-filter-item {{filterGender !== '全部' ? 'rec-filter-item--on' : ''}}">
+              <text class="rec-filter-label">{{filterGender === '全部' ? '性别' : filterGender}}</text>
+              <text class="rec-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <view class="rec-filter-cell">
+          <picker mode="selector" range="{{statusFilters}}" bindchange="onStatusFilter">
+            <view class="rec-filter-item {{filterStatus !== '全部' ? 'rec-filter-item--on' : ''}}">
+              <text class="rec-filter-label">{{filterStatus === '全部' ? '筛选' : filterStatus}}</text>
+              <text class="rec-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+      </block>
+      <view class="rec-filter-cell" wx:else>
+        <view
+          class="rec-filter-item {{priceSelected.length ? 'rec-filter-item--on' : ''}}"
+          bindtap="onOpenPriceSheet"
+        >
+          <text class="rec-filter-label">{{priceFilterLabel}}</text>
+          <text class="rec-filter-arrow">▾</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{loading}}" class="rec-state card state-loading">
+      <view class="loading-dot-wrap">
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+      </view>
+      <text class="hint list-hint">{{isPrMode ? '加载达人中…' : '加载商单中…'}}</text>
+    </view>
+
+    <view wx:elif="{{err}}" class="rec-state card state-error">
+      <text>{{err}}</text>
+    </view>
+
+    <block wx:elif="{{isPrMode}}">
+    <view
+      wx:for="{{displayRows}}"
+      wx:key="id"
+      class="talent-card-compact {{item.isPreview ? 'talent-card-compact--preview' : ''}} {{item.isSelfTest ? 'talent-card-compact--self' : ''}}"
+    >
+      <text class="talent-preview-tag" wx:if="{{item.isSelfTest}}">我的</text>
+      <text class="talent-preview-tag" wx:elif="{{item.isPreview}}">预览</text>
+      <text
+        wx:if="{{item.aiTag && !item.isPreview}}"
+        class="talent-ai-tag talent-ai-tag--{{item.aiTagTone}}"
+      >{{item.aiTag}}</text>
+      <text class="talent-match-ribbon" wx:if="{{item.matchScore >= 55 && !item.isPreview}}">匹配{{item.matchScore}}%</text>
+      <view class="talent-card-compact__row">
+        <view class="talent-avatar-wrap">
+          <image class="talent-avatar" src="{{item.avatar || '/images/logo.png'}}" mode="aspectFill" />
+          <view class="talent-online-dot" wx:if="{{item.online}}" />
+        </view>
+        <view class="talent-card-compact__main">
+          <view class="talent-line1">
+            <text class="talent-nick">{{item.name}}</text>
+            <view class="talent-platform-pill">
+              <image class="talent-platform-icon" src="{{item.platformIcon}}" mode="aspectFit" />
+              <text>{{item.platform}}</text>
+            </view>
+          </view>
+          <view class="talent-line2">
+            <text class="talent-meta talent-meta--match" wx:if="{{item.matchScore >= 55}}">匹配 {{item.matchScore}}%</text>
+            <text class="talent-meta-sep" wx:if="{{item.matchScore >= 55}}">·</text>
+            <text class="talent-meta">粉 {{item.followers}}</text>
+            <text class="talent-meta-sep">·</text>
+            <text class="talent-meta talent-meta--grade">{{item.salesGrade}}</text>
+          </view>
+          <view class="talent-line3" wx:if="{{item.tags.length || item.region || item.chatMutual || item.favorited}}">
+            <text class="talent-tag" wx:for="{{item.tags}}" wx:key="*this" wx:for-item="tg">{{tg}}</text>
+            <text class="talent-tag talent-tag--muted" wx:if="{{item.region}}">{{item.region}}</text>
+            <text class="talent-status-tag talent-status-tag--chat" wx:if="{{item.chatMutual}}">已沟通</text>
+            <text class="talent-status-tag talent-status-tag--fav" wx:if="{{item.favorited}}">已收藏</text>
+          </view>
+        </view>
+        <view class="talent-card-actions">
+          <view
+            class="talent-fav-star {{item.favorited ? 'talent-fav-star--on' : ''}}"
+            catchtap="onToggleFavorite"
+            data-id="{{item.id}}"
+            aria-role="button"
+            aria-label="{{item.favorited ? '取消收藏' : '收藏达人'}}"
+          >
+            <text class="talent-fav-star-glyph">★</text>
+          </view>
+          <button class="talent-chat-mini" data-id="{{item.id}}" bindtap="onChatTap" hover-class="talent-chat-mini--hover">
+            沟通
+          </button>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{listEmptyHint}}" class="rec-foot-hint">
+      <text class="hint">{{listEmptyHint}}</text>
+    </view>
+    </block>
+
+    <block wx:else>
+    <view
+      wx:for="{{orderDisplayRows}}"
+      wx:key="id"
+      class="job-card-compact"
+      bindtap="goOrderDetail"
+      data-id="{{item.id}}"
+      data-mock="{{item.isMock}}"
+      hover-class="job-card-compact--hover"
+    >
+      <text
+        wx:if="{{item.aiTag}}"
+        class="job-card-compact__ai-tag job-card-compact__ai-tag--{{item.aiTagTone}}"
+      >{{item.aiTag}}</text>
+      <text class="job-card-compact__ribbon job-card-compact__ribbon--demo" wx:if="{{item.isMock && !item.aiTag}}">演示</text>
+      <text class="job-card-compact__ribbon" wx:elif="{{item.aiMatch && !item.aiTag}}">AI荐</text>
+      <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">优质</text>
+      <view class="job-card-compact__row">
+        <image class="job-card-compact__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+        <view class="job-card-compact__main">
+          <text class="job-card-compact__title">{{item.title}}</text>
+            <view class="job-card-compact__line2">
+              <text class="job-card-compact__tag" wx:if="{{item.matchScore >= 60}}">匹配{{item.matchScore}}%</text>
+              <text class="job-card-compact__tag">{{item.statusLabel}}</text>
+              <text class="job-card-compact__tag job-card-compact__tag--gray">报名{{item.applicantCount}}/{{item.recruitCount}}</text>
+            <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
+            <text class="job-card-compact__price">{{item.budgetText}}</text>
+          </view>
+          <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{orderEmptyHint}}" class="rec-foot-hint">
+      <text class="hint">{{orderEmptyHint}}</text>
+    </view>
+    </block>
+  </scroll-view>
+
+  <view
+    class="price-sheet-mask"
+    wx:if="{{showPriceSheet && !isPrMode}}"
+    bindtap="onClosePriceSheet"
+  >
+    <view class="price-sheet" catchtap="noopSheetTap">
+      <view class="price-sheet-head">
+        <text class="price-sheet-title">价格筛选（可多选）</text>
+        <text class="price-sheet-close" bindtap="onClosePriceSheet">×</text>
+      </view>
+      <view class="price-chip-grid">
+        <view
+          wx:for="{{priceBuckets}}"
+          wx:key="id"
+          class="price-chip {{item.selected ? 'price-chip--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTogglePrice"
+        >
+          {{item.label}}
+        </view>
+      </view>
+      <view class="price-sheet-foot">
+        <button class="price-sheet-reset" bindtap="onResetPrice">清空</button>
+        <button class="price-sheet-ok" bindtap="onConfirmPrice">确定</button>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,7 +1,7 @@
 <view class="page-shell page-with-bar">
   <view class="page-hero page-hero--compact">
-    <text class="page-hero-title">{{editMode ? '完善会员资料' : '注册达人会员'}}</text>
-    <text class="page-hero-sub">填写一次，报名时可一键同步</text>
+    <text class="page-hero-title">我的信息</text>
+    <text class="page-hero-sub">按平台填写达人资料，报名时可一键同步</text>
   </view>
 
   <view class="card">
@@ -10,32 +10,22 @@
       <text class="section-title">微信信息</text>
     </view>
     <view class="wx-profile">
-      <image class="wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
-      <view class="wx-avatar wx-avatar--ph" wx:else>
-        <text class="wx-avatar-txt">微信</text>
-      </view>
+      <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+        <view class="wx-avatar wx-avatar--ph" wx:else>
+          <text class="wx-avatar-txt">头像</text>
+        </view>
+      </button>
       <view class="wx-meta">
-        <text class="wx-name">{{wxNickName || '未授权'}}</text>
-        <text class="hint">用于身份展示</text>
-      </view>
-    </view>
-    <button class="btn-wx" bindtap="onGetWxProfile">获取微信昵称与头像</button>
-  </view>
-
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">达人类型</text>
-    </view>
-    <view class="type-grid">
-      <view
-        wx:for="{{memberTypeOptions}}"
-        wx:key="id"
-        class="type-chip {{memberType === item.id ? 'active' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onPickMemberType"
-      >
-        <text class="type-chip-label">{{item.label}}</text>
+        <input
+          class="wx-nick-input"
+          type="nickname"
+          placeholder="点击输入微信昵称"
+          value="{{wxNickName}}"
+          bindinput="onNicknameInput"
+        />
+        <text class="hint">用于登录与身份展示</text>
+        <text class="wx-identity-id" wx:if="{{lingqiTalentIdLabel}}">{{lingqiTalentIdLabel}}</text>
       </view>
     </view>
   </view>
@@ -47,93 +37,159 @@
     </view>
     <view class="form-row">
       <text class="form-label">手机号 / 联系方式</text>
-      <input class="input" type="number" placeholder="便于商家联系" value="{{contact}}" data-k="contact" bindinput="onCommonField" />
+      <input
+        class="input"
+        type="number"
+        placeholder="便于商家联系"
+        value="{{contact}}"
+        data-k="contact"
+        bindinput="onCommonField"
+      />
     </view>
     <view class="form-row">
       <text class="form-label">微信号</text>
       <input class="input" placeholder="与商家沟通" value="{{wechatId}}" data-k="wechatId" bindinput="onCommonField" />
     </view>
+    <view class="form-row">
+      <text class="form-label">支付宝账号</text>
+      <input
+        class="input"
+        placeholder="用于结算打款，全平台共用"
+        value="{{alipayAccount}}"
+        data-k="alipayAccount"
+        bindinput="onCommonField"
+      />
+    </view>
     <view class="form-row form-row-inline">
       <view class="form-col">
         <text class="form-label">省份</text>
         <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
-          <view class="picker-val">{{province || '请选择'}}</view>
+          <view class="picker-val {{province ? '' : 'picker-val--placeholder'}}">{{province || '请选择省份'}}</view>
         </picker>
       </view>
       <view class="form-col">
         <text class="form-label">城市</text>
         <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
-          <view class="picker-val">{{city || '请选择'}}</view>
+          <view class="picker-val {{city ? '' : 'picker-val--placeholder'}}">{{city || '请选择城市'}}</view>
         </picker>
       </view>
     </view>
   </view>
 
-  <view class="card apply-form" wx:if="{{memberType === 'douyin' || memberType === 'both'}}">
-    <view class="platform-head platform-head--dy">抖音达人资料</view>
-    <view class="form-row">
-      <text class="form-label">{{douyinLabels.accountId}}</text>
-      <input class="input" placeholder="抖音号" value="{{douyin.platformAccount}}" data-platform="douyin" data-k="platformAccount" bindinput="onPlatformField" />
+  <view class="card apply-form platform-card" wx:for="{{platformSections}}" wx:key="id">
+    <view class="platform-card-head">
+      <image class="platform-card-icon" src="{{item.icon}}" mode="aspectFit" />
+      <text class="platform-card-title">{{item.name}}</text>
+      <switch
+        class="platform-card-switch"
+        checked="{{item.enabled}}"
+        color="#6366f1"
+        data-id="{{item.id}}"
+        bindchange="onTogglePlatformEnable"
+      />
     </view>
-    <view class="form-row">
-      <text class="form-label">{{douyinLabels.nickname}}</text>
-      <input class="input" placeholder="昵称" value="{{douyin.platformNickname}}" data-platform="douyin" data-k="platformNickname" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">{{douyinLabels.profileLink}}</text>
-      <input class="input" placeholder="主页链接" value="{{douyin.profileLink}}" data-platform="douyin" data-k="profileLink" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">粉丝数</text>
-      <input class="input" type="number" value="{{douyin.followers}}" data-platform="douyin" data-k="followers" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">带货等级</text>
-      <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
-        <view class="picker-val">{{douyin.douyinSalesLevel || '请选择'}}</view>
-      </picker>
-    </view>
-    <view class="form-row">
-      <text class="form-label">默认报价（元）</text>
-      <input class="input" type="digit" value="{{douyin.quotePrice}}" data-platform="douyin" data-k="quotePrice" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">支付宝账号</text>
-      <input class="input" value="{{douyin.alipayAccount}}" data-platform="douyin" data-k="alipayAccount" bindinput="onPlatformField" />
-    </view>
-  </view>
 
-  <view class="card apply-form" wx:if="{{memberType === 'xiaohongshu' || memberType === 'both'}}">
-    <view class="platform-head platform-head--xhs">小红书达人资料</view>
-    <view class="form-row">
-      <text class="form-label">{{xhsLabels.accountId}}</text>
-      <input class="input" placeholder="小红书号" value="{{xiaohongshu.platformAccount}}" data-platform="xiaohongshu" data-k="platformAccount" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">{{xhsLabels.nickname}}</text>
-      <input class="input" placeholder="昵称" value="{{xiaohongshu.platformNickname}}" data-platform="xiaohongshu" data-k="platformNickname" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">{{xhsLabels.profileLink}}</text>
-      <input class="input" placeholder="主页链接" value="{{xiaohongshu.profileLink}}" data-platform="xiaohongshu" data-k="profileLink" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">粉丝数</text>
-      <input class="input" type="number" value="{{xiaohongshu.followers}}" data-platform="xiaohongshu" data-k="followers" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">默认报价（元）</text>
-      <input class="input" type="digit" value="{{xiaohongshu.quotePrice}}" data-platform="xiaohongshu" data-k="quotePrice" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">支付宝账号</text>
-      <input class="input" value="{{xiaohongshu.alipayAccount}}" data-platform="xiaohongshu" data-k="alipayAccount" bindinput="onPlatformField" />
-    </view>
+    <block wx:if="{{item.enabled}}">
+      <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.accountId}}</text>
+        <input
+          class="input"
+          placeholder="请填写"
+          value="{{item.profile.platformAccount}}"
+          data-id="{{item.id}}"
+          data-k="platformAccount"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.nickname}}</text>
+        <input
+          class="input"
+          placeholder="请填写"
+          value="{{item.profile.platformNickname}}"
+          data-id="{{item.id}}"
+          data-k="platformNickname"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.profileLink}}</text>
+        <input
+          class="input"
+          placeholder="请填写主页链接"
+          value="{{item.profile.profileLink}}"
+          data-id="{{item.id}}"
+          data-k="profileLink"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.followersLabel}}</text>
+        <input
+          class="input"
+          type="number"
+          placeholder="请填写粉丝数"
+          value="{{item.profile.followers}}"
+          data-id="{{item.id}}"
+          data-k="followers"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row" wx:if="{{item.showSalesLevel}}">
+        <text class="form-label">抖音带货等级</text>
+        <picker mode="selector" range="{{douyinLevels}}" value="{{item.douyinLevelIndex}}" bindchange="onDouyinLevelChange">
+          <view class="picker-val {{item.profile.douyinSalesLevel ? '' : 'picker-val--placeholder'}}">
+            {{item.profile.douyinSalesLevel || '请选择带货等级'}}
+          </view>
+        </picker>
+      </view>
+      <view class="form-row" wx:if="{{item.showTalentGrade}}">
+        <text class="form-label">快手达人等级</text>
+        <input
+          class="input"
+          placeholder="如 Lv3 带货达人"
+          value="{{item.profile.talentGrade}}"
+          data-id="{{item.id}}"
+          data-k="talentGrade"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">默认报价（元）</text>
+        <input
+          class="input"
+          type="digit"
+          placeholder="请填写报价"
+          value="{{item.profile.quotePrice}}"
+          data-id="{{item.id}}"
+          data-k="quotePrice"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">账号标签</text>
+        <text class="form-hint">与发招募需求标签一致，可多选</text>
+        <view class="account-tag-grid">
+          <view
+            wx:for="{{item.tagGrid}}"
+            wx:for-item="tag"
+            wx:key="name"
+            class="account-tag-chip {{tag.on ? 'account-tag-chip--on' : ''}}"
+            data-id="{{item.id}}"
+            data-name="{{tag.name}}"
+            bindtap="onAccountTagTap"
+          >
+            {{tag.name}}
+          </view>
+        </view>
+      </view>
+    </block>
   </view>
 
   <view class="card submit-wrap">
     <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
-      {{editMode ? '保存资料' : '完成注册'}}
+      保存资料
     </button>
   </view>
 </view>

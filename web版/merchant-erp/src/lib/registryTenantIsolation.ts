@@ -1,5 +1,6 @@
 import type {
   RegistryFile,
+  RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -112,7 +113,14 @@ export function filterRegistrySnapshotForMerchant(authTenantId: string, file: Re
   }
 }
 
-/** 未登录或无法识别租户时：不返回任何招募/达人数据 */
+/** 达人招募小程序大厅可读：开放中的小程序招募单 */
+export function mpRecruitmentOrdersForTalentHall(file: RegistryFile) {
+  return (file.mpRecruitmentOrders ?? []).filter(
+    (o) => o && (o.status === 'open' || o.status === 'collecting'),
+  )
+}
+
+/** 未登录或无法识别租户时：隐藏商户侧招募；保留小程序招募大厅公开单 */
 export function stripRegistryRecruitmentForAnonymous(file: RegistryFile): RegistryFile {
   return {
     ...file,
@@ -120,7 +128,7 @@ export function stripRegistryRecruitmentForAnonymous(file: RegistryFile): Regist
     recruitmentScheduleRows: [],
     recruitmentVideoSubmissions: [],
     talentPoolCandidates: [],
-    mpRecruitmentOrders: [],
+    mpRecruitmentOrders: mpRecruitmentOrdersForTalentHall(file),
     talentLibraryEntries: [],
     mpTalentMembers: [],
   }

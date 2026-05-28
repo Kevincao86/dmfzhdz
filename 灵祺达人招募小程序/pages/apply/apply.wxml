@@ -9,7 +9,7 @@
       <view class="sync-icon-wrap">⇄</view>
       <view class="sync-text">
         <text class="sync-title">同步会员资料</text>
-        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料（探店时间需重选）</text>
+        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料（空白必填输入框需手动填写）</text>
       </view>
       <switch checked="{{syncMemberProfile}}" color="#6366f1" bindchange="onSyncMemberChange" />
     </view>
@@ -22,113 +22,74 @@
 
   <view class="card tip-card" wx:else>
     <text class="hint">未注册也可直接报名。 </text>
-    <text class="link-text" bindtap="goRegister">注册会员</text>
+    <text class="link-text" bindtap="goRegister">完善我的信息</text>
     <text class="hint"> 后可下次一键同步。</text>
   </view>
 
   <view class="card apply-form">
     <view class="section-head">
       <view class="section-head-dot" />
-      <text class="section-title">达人信息</text>
+      <text class="section-title">达人报名信息</text>
     </view>
 
-    <view class="form-row">
-      <text class="form-label">{{labels.accountId}}</text>
-      <input class="input" placeholder="请输入平台 ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">{{labels.nickname}}</text>
-      <input class="input" placeholder="平台昵称" value="{{platformNickname}}" data-k="platformNickname" bindinput="onField" />
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">{{labels.profileLink}}</text>
-      <input class="input" placeholder="主页链接" value="{{profileLink}}" data-k="profileLink" bindinput="onField" />
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">粉丝数</text>
-      <input class="input" type="number" placeholder="如 20000" value="{{followers}}" data-k="followers" bindinput="onField" />
-    </view>
-
-    <view class="form-row" wx:if="{{labels.showSalesLevel}}">
-      <text class="form-label">带货等级（抖音）</text>
-      <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
-        <view class="picker-val">{{douyinSalesLevel || '请选择'}}</view>
-      </picker>
-    </view>
-  </view>
-
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">联系与地域</text>
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">联系方式</text>
-      <input class="input" type="number" placeholder="手机号" value="{{contact}}" data-k="contact" bindinput="onField" />
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">微信号</text>
-      <input class="input" placeholder="便于商家联系" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
-    </view>
-
-    <view class="form-row form-row-inline">
-      <view class="form-col">
-        <text class="form-label">省份</text>
+    <block wx:for="{{applyRows}}" wx:key="id">
+      <view class="form-row" wx:if="{{item.bindKey === 'province'}}">
+        <text class="form-label">省份{{item.required ? ' *' : ''}}</text>
         <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
-          <view class="picker-val">{{province || '请选择'}}</view>
+          <view class="picker-val {{province ? '' : 'picker-val--placeholder'}}">{{province || '请选择省份'}}</view>
         </picker>
       </view>
-      <view class="form-col">
-        <text class="form-label">城市</text>
+
+      <view class="form-row" wx:elif="{{item.bindKey === 'city'}}">
+        <text class="form-label">城市{{item.required ? ' *' : ''}}</text>
         <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
-          <view class="picker-val">{{city || '请选择'}}</view>
+          <view class="picker-val {{city ? '' : 'picker-val--placeholder'}}">{{city || '请选择城市'}}</view>
         </picker>
       </view>
-    </view>
-  </view>
 
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">报价与探店</text>
-    </view>
+      <view class="form-row" wx:elif="{{item.isPicker}}">
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+        <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
+          <view class="picker-val {{douyinSalesLevel ? '' : 'picker-val--placeholder'}}">
+            {{douyinSalesLevel || '请选择'}}
+          </view>
+        </picker>
+      </view>
 
-    <view class="form-row">
-      <text class="form-label">报价（元）</text>
-      <input class="input" type="digit" placeholder="您的报价" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
-    </view>
+      <view class="form-row" wx:elif="{{item.isDate}}">
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+        <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
+          <view class="picker-val {{visitDate ? '' : 'picker-val--placeholder'}}">{{visitDate || '选择日期'}}</view>
+        </picker>
+      </view>
 
-    <view class="form-row">
-      <text class="form-label">探店日期</text>
-      <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
-        <view class="picker-val">{{visitDate || '选择日期'}}</view>
-      </picker>
-    </view>
-
-    <view class="form-row form-row-inline">
-      <view class="form-col">
-        <text class="form-label">开始</text>
+      <view class="form-row" wx:elif="{{item.isTime && item.bindKey === 'visitTimeStart'}}">
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
         <picker mode="time" value="{{visitTimeStart}}" bindchange="onVisitTimeStartChange">
-          <view class="picker-val">{{visitTimeStart || '时:分'}}</view>
+          <view class="picker-val {{visitTimeStart ? '' : 'picker-val--placeholder'}}">{{visitTimeStart || '时:分'}}</view>
         </picker>
       </view>
-      <view class="form-col">
-        <text class="form-label">结束</text>
-        <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
-          <view class="picker-val">{{visitTimeEnd || '时:分'}}</view>
-        </picker>
-      </view>
-    </view>
 
-    <view class="form-row">
-      <text class="form-label">支付宝账号</text>
-      <input class="input" placeholder="用于结算打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
-    </view>
+      <view class="form-row" wx:elif="{{item.isTime && item.bindKey === 'visitTimeEnd'}}">
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+        <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
+          <view class="picker-val {{visitTimeEnd ? '' : 'picker-val--placeholder'}}">{{visitTimeEnd || '时:分'}}</view>
+        </picker>
+      </view>
+
+      <view class="form-row" wx:else>
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+        <input
+          class="input"
+          type="{{item.type === 'number' || item.type === 'digit' ? 'digit' : 'text'}}"
+          placeholder="{{item.placeholder}}"
+          value="{{item.isCustom ? customFields[item.bindKey] : item.fieldValue}}"
+          data-k="{{item.bindKey}}"
+          data-custom="{{item.isCustom ? '1' : '0'}}"
+          bindinput="onField"
+        />
+      </view>
+    </block>
   </view>
 
   <view class="card card--flat submit-wrap">

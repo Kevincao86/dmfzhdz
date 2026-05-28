@@ -1,6 +1,8 @@
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
+const userProfile = require('../../utils/userProfile.js')
+const chat = require('../../utils/talentChat.js')
 const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
 
 Page({
@@ -20,6 +22,10 @@ Page({
     icePendingConfirm: false,
     iceRejected: false,
     iceConfirming: false,
+    applyTemplateId: '',
+    chatEnabled: false,
+    prChatMeta: null,
+    contacting: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -93,9 +99,21 @@ Page({
         }
       }
       const iceApplied = Boolean(iceApplicantId)
+      const applyTemplateId =
+        (mp.mpPublishMeta && mp.mpPublishMeta.applyFormTemplateId) || ''
+      const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+      const prChatMeta = meta.prParticipantKey
+        ? {
+            prParticipantKey: meta.prParticipantKey,
+            prDisplayName: meta.prDisplayName || view.merchantName || '招募方',
+          }
+        : null
       this.setData({
         view,
         loading: false,
+        applyTemplateId,
+        chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
+        prChatMeta,
         isIce,
         iceApplicantId,
         assignedVideoUrl,
@@ -203,6 +221,47 @@ Page({
   goHome() {
     wx.reLaunch({ url: '/pages/index/index' })
   },
+  async contactPr() {
+    const meta = this.data.prChatMeta
+    if (!meta || !meta.prParticipantKey) {
+      wx.showToast({ title: '该单暂不支持私信', icon: 'none' })
+      return
+    }
+    if (!chat.canChat()) {
+      wx.showModal({
+        title: '未连接后台',
+        content: '请配置 MERCHANT_API_BASE_URL 后使用私信。',
+        showCancel: false,
+      })
+      return
+    }
+    if (userProfile.readIdentity() !== 'talent') {
+      wx.showModal({
+        title: '请切换达人身份',
+        content: '达人身份可在商单详情联系招募方。',
+        showCancel: false,
+      })
+      return
+    }
+    this.setData({ contacting: true })
+    wx.showLoading({ title: '连接中' })
+    try {
+      await chat.syncProfile()
+      const sessionId = await chat.ensureSessionWithPr(meta)
+      wx.hideLoading()
+      wx.navigateTo({
+        url:
+          `/pages/chat/chat?sessionId=${encodeURIComponent(sessionId)}` +
+          `&peerName=${encodeURIComponent(meta.prDisplayName || '招募方')}` +
+          `&peerAvatar=`,
+      })
+    } catch (e) {
+      wx.hideLoading()
+      wx.showToast({ title: String(e.message || '无法发起会话').slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ contacting: false })
+    }
+  },
   goApply() {
     const v = this.data.view
     if (!v || !this.data.id) return
@@ -212,15 +271,10 @@ Page({
       `platform=${encodeURIComponent(v.platform || '抖音')}`,
     ]
     if (this.data.isIce) q.push('ice=1')
+    if (this.data.applyTemplateId) {
+      q.push(`templateId=${encodeURIComponent(this.data.applyTemplateId)}`)
+    }
     wx.navigateTo({ url: `/pages/apply/apply?${q.join('&')}` })
-  },
-  copyTask() {
-    const v = this.data.view
-    if (!v) return
-    wx.setClipboardData({
-      data: v.taskDetail || '',
-      success: () => wx.showToast({ title: '已复制任务详情', icon: 'success' }),
-    })
   },
   copyOrderNo() {
     const v = this.data.view

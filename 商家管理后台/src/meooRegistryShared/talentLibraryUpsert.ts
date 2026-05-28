@@ -10,7 +10,6 @@ export function talentLibraryDedupeKey(platform: string, platformAccount: string
   return `${plat}::${platformAccount.trim().toLowerCase()}`
 }
 
-/** 报名成功后写入/更新灵祺达人库（按平台+达人ID去重，报价取最新） */
 export function upsertTalentLibraryFromApplicant(
   data: RegistryFile,
   opts: {
@@ -18,6 +17,7 @@ export function upsertTalentLibraryFromApplicant(
     applicant: RegistryMpRecruitmentApplicant
     mpOrderId: string
     merchantOrderNo: string
+    lingqiTalentId?: string
   },
 ): void {
   const account = String(opts.applicant.platformAccount || '').trim()
@@ -30,8 +30,12 @@ export function upsertTalentLibraryFromApplicant(
   const alipay = String(opts.applicant.alipayAccount || '').trim()
   const paymentMethod = alipay ? `支付宝：${alipay}` : '支付宝'
 
+  const lingqiTalentId =
+    String(opts.lingqiTalentId || '').trim() ||
+    (idx >= 0 ? list[idx]!.lingqiTalentId : undefined)
   const next: RegistryTalentLibraryEntry = {
     id: idx >= 0 ? list[idx]!.id : `TL-${Date.now()}`,
+    lingqiTalentId: lingqiTalentId || undefined,
     platform: plat,
     platformAccount: account,
     platformNickname: opts.applicant.platformNickname || opts.applicant.name,

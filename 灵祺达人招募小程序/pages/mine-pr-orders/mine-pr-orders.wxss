@@ -1,0 +1,90 @@
+.pr-order-card {
+  position: relative;
+}
+
+.pr-order-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.pr-order-head .title-lg {
+  flex: 1;
+  min-width: 0;
+}
+
+.pr-order-status {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.pr-order-status--on {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.pr-order-status--off {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.pr-order-deadline {
+  display: block;
+  margin-top: 8rpx;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.pr-order-actions {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-top: 16rpx;
+}
+
+.pr-order-action {
+  font-size: 26rpx;
+  color: var(--lq-primary, #6366f1);
+  font-weight: 600;
+  padding: 8rpx 0;
+}
+
+.pr-order-action--danger {
+  color: #dc2626;
+}
+
+.pr-order-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.pr-order-badge {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark, #4f46e5);
+  background: #eef2ff;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+}
+
+.pr-order-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.pr-order-link {
+  font-size: 26rpx;
+  color: var(--lq-primary, #6366f1);
+  font-weight: 600;
+}

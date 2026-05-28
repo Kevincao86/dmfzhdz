@@ -1,0 +1,585 @@
+<template name="pubLifeBg">
+  <view class="pub-life-bg" aria-hidden="true">
+    <view class="pub-life-blob pub-life-blob--1"></view>
+    <view class="pub-life-blob pub-life-blob--2"></view>
+    <view class="pub-life-blob pub-life-blob--3"></view>
+    <text class="pub-life-ico pub-life-ico--1">🍜</text>
+    <text class="pub-life-ico pub-life-ico--2">☕</text>
+    <text class="pub-life-ico pub-life-ico--3">🏪</text>
+    <text class="pub-life-ico pub-life-ico--4">📍</text>
+    <text class="pub-life-ico pub-life-ico--5">🎬</text>
+    <text class="pub-life-ico pub-life-ico--6">🛍️</text>
+  </view>
+</template>
+
+<view class="pub-page pub-page--{{step}}">
+  <!-- 选择模式 -->
+  <block wx:if="{{step === 'mode'}}">
+    <view class="pub-screen">
+      <template is="pubLifeBg" />
+    <view class="pub-hero" style="{{heroHeadStyle}}">
+      <text class="pub-hero-title">选择招募模式</text>
+      <text class="pub-hero-sub">探店 · 品宣 · 云剪</text>
+    </view>
+    <view class="pub-mode-list">
+      <view wx:for="{{recruitModes}}" wx:key="id" class="pub-mode-card" data-id="{{item.id}}" bindtap="onSelectMode">
+        <text class="pub-mode-name">{{item.label}}</text>
+        <text class="pub-mode-sub">{{item.sub}}</text>
+        <text class="pub-mode-arrow">›</text>
+      </view>
+    </view>
+    </view>
+  </block>
+
+  <!-- 填写表单（主界面） -->
+  <block wx:elif="{{step === 'form' && !pickerView}}">
+    <view class="pub-screen">
+      <template is="pubLifeBg" />
+    <view class="pub-form-layout">
+      <view class="pub-form-head" style="{{formHeadStyle}}">
+        <text class="pub-back" bindtap="onBackToMode">‹ 返回</text>
+        <view class="pub-form-head-main">
+          <text class="pub-form-title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
+          <text class="pub-form-badge">{{recruitModeLabel}}</text>
+        </view>
+      </view>
+      <scroll-view
+        class="pub-form-scroll"
+        scroll-y
+        enable-flex
+        scroll-into-view="{{scrollIntoView}}"
+        scroll-with-animation
+      >
+        <view class="pub-form-body">
+          <view class="pub-field" id="field-delivery-window">
+            <text class="pub-label">投放窗口 *</text>
+            <view class="pub-window-row">
+              <view
+                wx:for="{{deliveryWindows}}"
+                wx:key="id"
+                class="pub-window-opt {{form.deliveryWindow === item.id ? 'pub-window-opt--on' : ''}}"
+                data-id="{{item.id}}"
+                bindtap="onDeliveryWindowTap"
+              >
+                <text class="pub-window-opt-name">{{item.label}}</text>
+                <text class="pub-window-opt-sub">{{item.sub}}</text>
+              </view>
+            </view>
+          </view>
+          <view class="pub-field" id="field-signup-deadline" wx:if="{{showSignupDeadline}}">
+            <text class="pub-label">招募报名截止时间 *</text>
+            <view class="pub-deadline-row">
+              <picker class="pub-deadline-pick" mode="date" value="{{signupDeadlineDate}}" start="{{todayDate}}" bindchange="onSignupDeadlineDate">
+                <view class="pub-select pub-select--half">
+                  <text class="pub-select-text {{signupDeadlineDate ? '' : 'pub-select-text--ph'}}">{{signupDeadlineDate || '选择日期'}}</text>
+                  <text class="pub-select-arrow">›</text>
+                </view>
+              </picker>
+              <picker class="pub-deadline-pick" mode="time" value="{{signupDeadlineTime}}" bindchange="onSignupDeadlineTime">
+                <view class="pub-select pub-select--half">
+                  <text class="pub-select-text">{{signupDeadlineTime || '23:59'}}</text>
+                  <text class="pub-select-arrow">›</text>
+                </view>
+              </picker>
+            </view>
+          </view>
+          <view class="pub-field pub-field--hint" wx:if="{{!showSignupDeadline}}">
+            <text class="pub-label">招募报名截止</text>
+            <text class="pub-urgent-deadline-hint">急单大厅：发布后 24 小时内截止报名（无需填写）</text>
+          </view>
+          <view class="pub-field" id="field-title">
+            <text class="pub-label">招募标题 *</text>
+            <input class="pub-input" placeholder="如：春季火锅探店招募" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
+          </view>
+          <view class="pub-field" id="field-platform">
+            <text class="pub-label">招募平台 *</text>
+            <view class="pub-select" data-view="platform" bindtap="openPicker">
+              <text class="pub-select-text {{platformPlaceholder ? 'pub-select-text--ph' : ''}}">{{platformDisplayText}}</text>
+              <text class="pub-select-arrow">›</text>
+            </view>
+          </view>
+          <view class="pub-field" id="field-city">
+            <text class="pub-label">招募城市 *</text>
+            <view class="pub-select" data-view="city" bindtap="openPicker">
+              <text class="pub-select-text {{cityPlaceholder ? 'pub-select-text--ph' : ''}}">{{cityDisplayText}}</text>
+              <text class="pub-select-arrow">›</text>
+            </view>
+          </view>
+          <view class="pub-field" id="field-tag">
+            <text class="pub-label">需求达人标签 *</text>
+            <text class="pub-label-hint">最多 2 个，不可重复</text>
+            <view class="pub-select" data-view="tag" bindtap="openPicker">
+              <text class="pub-select-text {{tagsPlaceholder ? 'pub-select-text--ph' : ''}}">{{tagsDisplayText}}</text>
+              <text class="pub-select-arrow">›</text>
+            </view>
+          </view>
+          <view class="pub-field" id="field-fans">
+            <text class="pub-label">达人粉丝要求 *</text>
+            <view class="pub-radio-pair pub-radio-pair--fans">
+              <view
+                class="pub-radio-opt {{form.fansLimitMode === 'unlimited' ? 'pub-radio-opt--on' : ''}}"
+                data-mode="unlimited"
+                bindtap="onFansLimitModeTap"
+              >不限</view>
+              <view
+                class="pub-radio-opt {{form.fansLimitMode === 'limit' ? 'pub-radio-opt--on' : ''}}"
+                data-mode="limit"
+                bindtap="onFansLimitModeTap"
+              >限制</view>
+            </view>
+            <view class="pub-fans-limit-row" wx:if="{{form.fansLimitMode === 'limit'}}">
+              <text class="pub-fans-limit-k">粉丝 ≥</text>
+              <input
+                class="pub-input pub-input--fans-min"
+                placeholder="如：10000 或 1万"
+                value="{{form.fansMin}}"
+                bindinput="onFansMinInput"
+              />
+            </view>
+          </view>
+          <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel}}">
+            <text class="pub-label">达人带货等级 *</text>
+            <view class="pub-select" data-view="reqLevel" bindtap="openPicker">
+              <text class="pub-select-text">{{levelDisplayText}}</text>
+              <text class="pub-select-arrow">›</text>
+            </view>
+          </view>
+          <view class="pub-field" id="field-fee">
+            <text class="pub-label">费用模式 *</text>
+            <view class="pub-select" data-view="fee" bindtap="openPicker">
+              <text class="pub-select-text {{feePlaceholder ? 'pub-select-text--ph' : ''}}">{{feeTypeLabel}}</text>
+              <text class="pub-select-arrow">›</text>
+            </view>
+          </view>
+          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'fixed'}}">
+            <text class="pub-label">一口价金额 *</text>
+            <input class="pub-input" type="digit" placeholder="请填写，0 代表置换" value="{{form.fixedPrice}}" data-key="fixedPrice" bindinput="onFieldInput" />
+          </view>
+          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'self_quote'}}">
+            <text class="pub-label">可接受报价区间 *</text>
+            <view class="pub-range-row">
+              <input class="pub-input pub-input--range" type="digit" placeholder="最低" value="{{form.selfQuoteMin}}" data-key="selfQuoteMin" bindinput="onFieldInput" />
+              <text class="pub-range-sep">-</text>
+              <input class="pub-input pub-input--range" type="digit" placeholder="最高" value="{{form.selfQuoteMax}}" data-key="selfQuoteMax" bindinput="onFieldInput" />
+            </view>
+            <text class="pub-label-hint">如 0-2000，单位为元</text>
+          </view>
+          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'level_tier'}}">
+            <text class="pub-fee-panel-title">请继续设置费用阶梯</text>
+            <view class="pub-tier-card" id="field-tier-lv-{{tierIdx}}" wx:for="{{form.levelTiers}}" wx:key="id" wx:for-index="tierIdx">
+              <view class="pub-tier-del" data-index="{{tierIdx}}" bindtap="onRemoveLevelTier">🗑</view>
+              <view class="pub-tier-row pub-select pub-select--in" data-index="{{tierIdx}}" bindtap="openTierLevelPicker">
+                <text class="pub-tier-k">达人等级</text>
+                <text class="pub-tier-v {{item.levelsText === '请选择等级' ? 'pub-select-text--ph' : ''}}">{{item.levelsText}}</text>
+                <text class="pub-select-arrow">›</text>
+              </view>
+              <view class="pub-tier-row">
+                <text class="pub-tier-k">达人价格</text>
+                <input class="pub-tier-input" type="digit" placeholder="请填写 | 0代表置换" value="{{item.price}}" data-index="{{tierIdx}}" data-field="price" bindinput="onTierFieldInput" />
+              </view>
+            </view>
+            <view class="pub-add-tier" bindtap="onAddLevelTier">+ 添加阶梯</view>
+          </view>
+          <view class="pub-fee-panel" wx:if="{{form.feeTypeId === 'fans_tier'}}">
+            <text class="pub-fee-panel-title">粉丝阶梯费用</text>
+            <view class="pub-tier-card" id="field-tier-fans-{{tierIdx}}" wx:for="{{form.fansTiers}}" wx:key="id" wx:for-index="tierIdx">
+              <view class="pub-tier-del" data-index="{{tierIdx}}" bindtap="onRemoveFansTier">🗑</view>
+              <view class="pub-tier-row pub-select pub-select--in" data-index="{{tierIdx}}" bindtap="openFansTierPicker">
+                <text class="pub-tier-k">粉丝档位</text>
+                <text class="pub-tier-v {{!item.fansRange ? 'pub-select-text--ph' : ''}}">{{item.fansRangeText}}</text>
+                <text class="pub-select-arrow">›</text>
+              </view>
+              <view class="pub-tier-row">
+                <text class="pub-tier-k">达人价格</text>
+                <input class="pub-tier-input" type="digit" placeholder="请填写 | 0代表置换" value="{{item.price}}" data-index="{{tierIdx}}" data-field="price" bindinput="onFansTierFieldInput" />
+              </view>
+            </view>
+            <view class="pub-add-tier" bindtap="onAddFansTier">+ 添加阶梯</view>
+          </view>
+          <view class="pub-field">
+            <text class="pub-label">佣金 CPS（%）</text>
+            <input class="pub-input" type="digit" placeholder="选填" value="{{form.cpsPercent}}" data-key="cpsPercent" bindinput="onFieldInput" />
+          </view>
+          <view class="pub-field" id="field-recruit-count">
+            <text class="pub-label">招募人数 *</text>
+            <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
+          </view>
+          <view class="pub-field" id="field-recruit-detail">
+            <text class="pub-label">招募详情 *</text>
+            <textarea
+              class="pub-textarea"
+              placeholder="合作要求、交付内容、档期说明、注意事项等"
+              value="{{form.recruitDetail}}"
+              data-key="recruitDetail"
+              bindinput="onFieldInput"
+              maxlength="2000"
+              show-confirm-bar="{{false}}"
+            />
+          </view>
+          <view class="pub-field" wx:if="{{recruitMode === 'ice'}}">
+            <text class="pub-label">云剪成片链接 *</text>
+            <input class="pub-input" placeholder="https://…mp4" value="{{form.iceVideoUrl}}" data-key="iceVideoUrl" bindinput="onFieldInput" />
+          </view>
+          <view class="pub-field" id="field-apply-form">
+            <text class="pub-label">达人报名必填信息 *</text>
+            <view class="pub-select" data-view="applyForm" bindtap="openPicker">
+              <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
+              <text class="pub-select-arrow">›</text>
+            </view>
+          </view>
+          <view class="pub-form-submit">
+            <button class="btn-primary pub-create-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onCreate">{{isEditMode ? '保存修改' : '创建招募'}}</button>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+    </view>
+  </block>
+
+  <!-- 全屏：招募平台 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'platform'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">招募平台</text>
+      </view>
+      <scroll-view class="pub-full-scroll" scroll-y>
+        <view class="pub-full-body">
+          <view
+            wx:for="{{platforms}}"
+            wx:key="*this"
+            class="pub-full-opt {{form.platform === item ? 'pub-full-opt--on' : ''}}"
+            data-platform="{{item}}"
+            bindtap="onPlatformPick"
+          >{{item}}</view>
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <!-- 全屏：达人标签 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'tag'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">需求达人标签</text>
+      </view>
+      <view class="pub-pick-main">
+        <text class="pub-full-hint">最多可选 2 个</text>
+        <view class="pub-full-card pub-full-card--fit">
+          <view class="pub-tag-grid pub-tag-grid--pick">
+            <view
+              wx:for="{{tagGrid}}"
+              wx:key="name"
+              class="pub-tag-cell {{item.on ? 'pub-tag-cell--on' : ''}} {{item.disabled ? 'pub-tag-cell--dis' : ''}}"
+              data-name="{{item.name}}"
+              bindtap="onTagTap"
+            >{{item.name}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="pub-full-foot">
+        <button class="btn-primary pub-full-btn" bindtap="confirmTagPicker">确认</button>
+      </view>
+    </view>
+  </block>
+
+  <!-- 全屏：招募城市 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'city'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">招募城市</text>
+      </view>
+      <scroll-view class="pub-full-scroll" scroll-y>
+        <view class="pub-full-body">
+          <text class="pub-full-hint">可多选城市；选「全国」则不限地域</text>
+          <view class="pub-full-card pub-full-card--pad">
+            <view class="pub-city-national" bindtap="onCityNational">全国</view>
+            <view class="pub-city-search">
+              <input
+                class="pub-city-search-input"
+                placeholder="搜索省、市"
+                placeholder-class="pub-city-search-ph"
+                value="{{cityKeyword}}"
+                bindinput="onCityKeyword"
+              />
+            </view>
+            <view class="pub-city-dual-head">
+              <text class="pub-city-dual-lbl">省</text>
+              <text class="pub-city-dual-lbl">市（勾选多选）</text>
+            </view>
+            <view class="pub-city-dual pub-city-dual--full">
+              <scroll-view class="pub-city-prov-scroll" scroll-y>
+                <view
+                  wx:for="{{cityProvinceRows}}"
+                  wx:key="name"
+                  class="pub-city-prov-item {{item.active ? 'pub-city-prov-item--on' : ''}}"
+                  data-name="{{item.name}}"
+                  bindtap="onCityProvinceTap"
+                >{{item.name}}</view>
+              </scroll-view>
+              <scroll-view class="pub-city-list-scroll" scroll-y>
+                <view
+                  wx:for="{{cityCheckGrid}}"
+                  wx:key="name"
+                  class="pub-city-check-row"
+                  data-name="{{item.name}}"
+                  bindtap="onCityCheckTap"
+                >
+                  <text class="pub-city-check-box {{item.on ? 'pub-city-check-box--on' : ''}}">{{item.on ? '✓' : ''}}</text>
+                  <text class="pub-city-check-name">{{item.name}}</text>
+                </view>
+                <view wx:if="{{!cityCheckGrid.length}}" class="pub-city-empty">暂无匹配城市</view>
+              </scroll-view>
+            </view>
+            <view class="pub-city-chips" wx:if="{{citySelectedChips.length}}">
+              <view wx:for="{{citySelectedChips}}" wx:key="name" class="pub-city-chip">
+                <text>{{item.name}}</text>
+                <text class="pub-chip-x" data-name="{{item.name}}" bindtap="onRemoveCityChip">×</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="pub-full-foot">
+        <button class="btn-primary pub-full-btn" bindtap="confirmCityPicker">确认</button>
+      </view>
+    </view>
+  </block>
+
+  <!-- 全屏：带货等级 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'reqLevel'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">达人带货等级</text>
+      </view>
+      <view class="pub-pick-main">
+        <text class="pub-full-hint">请选择等级（可多选）</text>
+        <view class="pub-full-card pub-full-card--fit">
+          <view class="pub-level-grid pub-level-grid--pick">
+            <view
+              wx:for="{{reqLevelGrid}}"
+              wx:key="name"
+              class="pub-level-cell {{item.on ? 'pub-level-cell--on' : ''}}"
+              data-name="{{item.name}}"
+              bindtap="onReqLevelTap"
+            >{{item.name}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="pub-full-foot">
+        <button class="btn-primary pub-full-btn" bindtap="confirmReqLevelPicker">确认</button>
+      </view>
+    </view>
+  </block>
+
+  <!-- 全屏：费用模式 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'fee'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">请选择费用模式</text>
+      </view>
+      <scroll-view class="pub-full-scroll" scroll-y>
+        <view class="pub-full-body">
+          <view
+            wx:for="{{feeTypes}}"
+            wx:key="id"
+            class="pub-fee-row pub-full-fee-row {{form.feeTypeId === item.id ? 'pub-full-fee-row--on' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onFeeSelect"
+          >
+            <view class="pub-fee-radio {{form.feeTypeId === item.id ? 'pub-fee-radio--on' : ''}}" />
+            <view class="pub-fee-text">
+              <text class="pub-fee-label">{{item.label}}</text>
+              <text class="pub-fee-desc">{{item.desc}}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <!-- 全屏：阶梯等级 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'tierLevel'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">达人等级</text>
+      </view>
+      <view class="pub-pick-main">
+        <text class="pub-full-hint">可多选，各阶梯不可重复</text>
+        <view class="pub-full-card pub-full-card--fit">
+          <view class="pub-level-grid pub-level-grid--pick">
+            <view
+              wx:for="{{tierLevelGrid}}"
+              wx:key="name"
+              class="pub-level-cell {{item.on ? 'pub-level-cell--on' : ''}} {{item.disabled ? 'pub-level-cell--dis' : ''}}"
+              data-name="{{item.name}}"
+              bindtap="onTierLevelTap"
+            >{{item.name}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="pub-full-foot">
+        <button class="btn-primary pub-full-btn" bindtap="confirmTierLevelPicker">确认</button>
+      </view>
+    </view>
+  </block>
+
+  <!-- 全屏：粉丝档位 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'fansTier'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">粉丝档位</text>
+      </view>
+      <scroll-view class="pub-full-scroll" scroll-y>
+        <view class="pub-full-body">
+          <view
+            wx:for="{{fansTierPickerRanges}}"
+            wx:key="*this"
+            class="pub-full-opt"
+            data-range="{{item}}"
+            bindtap="onFansRangeTap"
+          >{{item}}</view>
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <!-- 全屏：达人报名必填信息 -->
+  <block wx:elif="{{step === 'form' && pickerView === 'applyForm'}}">
+    <view class="pub-full pub-full--pick pub-full--apply-form">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">达人报名信息</text>
+      </view>
+      <scroll-view class="pub-full-scroll" scroll-y>
+        <view class="pub-full-body pub-apply-body">
+          <text class="pub-full-hint" wx:if="{{applyFormEditorMode === 'template'}}">模版：{{applyFormTemplateName}}</text>
+          <text class="pub-full-hint" wx:else>新建报名项 · 前 3 项随招募平台自动更名</text>
+          <view class="pub-full-card pub-full-card--pad">
+            <view class="tpl-field-row" wx:for="{{applyFormEditorRows}}" wx:key="id">
+              <view class="tpl-field-type">
+                <text class="tpl-field-type-txt">{{item.typeIcon}}</text>
+                <text class="tpl-field-type-label">{{item.type === 'number' || item.type === 'digit' ? '数字' : '文本'}}</text>
+              </view>
+              <view class="tpl-field-main">
+                <text class="tpl-field-label">{{item.displayLabel}}</text>
+                <view class="tpl-field-req">
+                  <text class="tpl-field-req-txt">必填</text>
+                  <switch
+                    class="tpl-req-switch"
+                    checked="{{item.required}}"
+                    color="#2563eb"
+                    disabled="{{item.locked}}"
+                    data-id="{{item.id}}"
+                    bindchange="onApplyToggleRequired"
+                  />
+                </view>
+              </view>
+              <view class="tpl-field-actions">
+                <view class="tpl-field-btn" data-id="{{item.id}}" bindtap="onApplyEditField">编辑</view>
+                <view
+                  wx:if="{{item.deletable}}"
+                  class="tpl-field-btn tpl-field-btn--danger"
+                  data-id="{{item.id}}"
+                  bindtap="onApplyDeleteField"
+                >删除</view>
+              </view>
+            </view>
+            <view class="tpl-add-btn" bindtap="onApplyAddCustomField">+ 自定义其他报名项</view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="tpl-edit-footer pub-apply-footer">
+        <button class="btn-secondary tpl-footer-btn" bindtap="onApplyFormPreview">预览</button>
+        <button class="btn-primary tpl-footer-btn" bindtap="onApplyFormConfirm">确认</button>
+      </view>
+    </view>
+    <view class="tpl-modal-mask" wx:if="{{showFieldModal}}" bindtap="onCloseFieldModal" />
+    <view class="tpl-modal" wx:if="{{showFieldModal}}">
+      <text class="tpl-modal-title">编辑报名项</text>
+      <view class="form-row" wx:if="{{canEditLabel}}">
+        <text class="form-label">名称</text>
+        <input class="input" value="{{editLabel}}" bindinput="onEditLabelInput" />
+      </view>
+      <view class="form-row" wx:else>
+        <text class="form-label">名称</text>
+        <text class="tpl-modal-readonly">{{editLabel}}</text>
+      </view>
+      <view class="form-row">
+        <text class="form-label">占位提示</text>
+        <input class="input" placeholder="选填" value="{{editPlaceholder}}" bindinput="onEditPlaceholderInput" />
+      </view>
+      <view class="form-row tpl-modal-req">
+        <text class="form-label">必填</text>
+        <switch class="tpl-req-switch" checked="{{editRequired}}" color="#2563eb" bindchange="onEditRequiredChange" />
+      </view>
+      <view class="tpl-modal-actions">
+        <button class="btn-secondary" bindtap="onCloseFieldModal">取消</button>
+        <button class="btn-primary" bindtap="onConfirmFieldEdit">确定</button>
+      </view>
+    </view>
+    <view class="tpl-modal-mask" wx:if="{{showApplyPreview}}" bindtap="onCloseApplyPreview" />
+    <view class="tpl-preview-sheet" wx:if="{{showApplyPreview}}">
+      <view class="tpl-preview-head">
+        <text class="tpl-preview-title">报名预览</text>
+        <text class="tpl-preview-sub">平台 {{applyFormPreviewPlatform}}</text>
+        <view class="tpl-preview-close" bindtap="onCloseApplyPreview">关闭</view>
+      </view>
+      <scroll-view scroll-y class="tpl-preview-scroll">
+        <view class="form-row" wx:for="{{applyPreviewRows}}" wx:key="id">
+          <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+          <view class="picker-val picker-val--placeholder">{{item.placeholder || '请填写'}}</view>
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <view class="tpl-modal-mask" wx:if="{{showApplyTplPicker && step === 'form'}}" bindtap="onCloseApplyTplPicker" />
+  <view class="pub-apply-tpl-modal" wx:if="{{showApplyTplPicker && step === 'form'}}">
+    <text class="pub-apply-tpl-modal-title">使用我的模版</text>
+    <scroll-view scroll-y class="pub-apply-tpl-modal-scroll">
+      <view
+        wx:for="{{customTemplateList}}"
+        wx:key="id"
+        class="pub-apply-tpl-modal-item"
+        data-id="{{item.id}}"
+        bindtap="onPickApplyTplFromModal"
+      >
+        <text class="pub-apply-tpl-modal-name">{{item.name}}</text>
+        <text class="pub-apply-tpl-modal-sub">{{item.fields.length}} 个字段</text>
+      </view>
+    </scroll-view>
+    <button class="btn-secondary pub-apply-tpl-modal-cancel" bindtap="onCloseApplyTplPicker">取消</button>
+  </view>
+
+  <!-- 创建成功 -->
+  <block wx:elif="{{step === 'done'}}">
+    <view class="pub-screen pub-screen--done">
+      <template is="pubLifeBg" />
+    <view class="pub-done-wrap">
+      <view class="pub-done">
+        <view class="pub-done-icon">✓</view>
+        <text class="pub-done-title">招募已创建</text>
+        <text class="pub-done-sub">{{createdOrder.title}}</text>
+        <button class="btn-primary pub-done-btn" open-type="share">分享招募</button>
+        <button class="btn-ghost pub-done-btn" bindtap="onCopyGroupShare">分享群聊（复制招募信息）</button>
+        <button class="btn-secondary pub-done-btn" bindtap="onFinish">完成创建</button>
+      </view>
+    </view>
+    </view>
+  </block>
+</view>

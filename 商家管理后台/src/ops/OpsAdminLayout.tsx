@@ -10,6 +10,7 @@ import {
   Shield,
   Smartphone,
   UserSearch,
+  Users,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -39,8 +40,15 @@ const OPS_NAV: {
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch, permission: 'recruitment_orders' },
   { to: '/mp-recruitment-orders', label: '小程序达人招募订单', icon: Smartphone, permission: 'mp_recruitment_orders' },
   { to: '/talent-library', label: '灵祺达人库', icon: Library, permission: 'talent_library' },
+  { to: '/pr-library', label: 'PR 用户库', icon: Users, permission: 'pr_library' },
   { to: '/ai-models', label: 'AI 模型', icon: Bot, permission: 'ai_models' },
-  { to: '/support', label: '在线客服', icon: Headphones, permission: 'support' },
+  { to: '/support', label: '在线客服（ERP处理中心）', icon: Headphones, permission: 'support' },
+  {
+    to: '/support-mp',
+    label: '在线客服（小程序达人、PR处理中心）',
+    icon: Headphones,
+    permission: 'support_mp',
+  },
 ]
 
 function navVisible(session: OpsSession, item: (typeof OPS_NAV)[number]): boolean {
