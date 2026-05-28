@@ -147,16 +147,18 @@ async function callLlm(
   system: string,
   user: string,
 ): Promise<string> {
-  const res = await routeAiChat({
-    provider,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-    temperature: 0.25,
-    stream: false,
-    taskType: 'general',
-  })
+  const res = await routeAiChat(
+    {
+      provider,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.25,
+      stream: false,
+    },
+    env,
+  )
   return String(res.content || '').trim()
 }
 

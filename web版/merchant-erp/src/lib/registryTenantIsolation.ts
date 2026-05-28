@@ -1,6 +1,5 @@
 import type {
   RegistryFile,
-  RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
