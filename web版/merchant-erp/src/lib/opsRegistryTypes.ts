@@ -340,3 +340,6 @@ export type RegistryFile = {
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
 }
+
+/** 与 `RegistryFile` 同构：注册表快照读写（Supabase ops_registry_snapshot） */
+export type RegistrySnapshot = RegistryFile
