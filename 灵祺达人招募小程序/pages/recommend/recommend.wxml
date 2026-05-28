@@ -1,8 +1,11 @@
 <view class="rec-page page-with-bar page-shell-fixed">
   <view class="rec-top">
-    <view class="rec-head-band" style="{{recHeadBandStyle}}">
-      <view class="rec-hero-deco rec-hero-deco--1" />
-      <view class="rec-head-inner" style="{{recHeadInnerStyle}}">
+    <view class="rec-head-band lq-hero-header" style="{{recHeadBandStyle}}">
+      <view class="lq-hero-bg lq-hero-bg--rec" aria-hidden="true">
+        <image class="lq-hero-bg__pattern" src="/images/hero-bg-pattern.png" mode="aspectFill" />
+        <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
+      </view>
+      <view class="rec-head-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">
         <image class="rec-head-logo" src="/images/logo.png" mode="aspectFit" />
         <view class="rec-head-main">
           <view class="rec-head-title-row">
@@ -14,7 +17,7 @@
           <text class="rec-hero-sub" wx:else>优质 · 热门全国 · 同城匹配你的城市</text>
           <text class="rec-head-meta" wx:if="{{!isPrMode && orderCityHint}}">{{orderCityHint}}</text>
           <text class="rec-head-meta" wx:elif="{{isPrMode && prMatchHint}}">{{prMatchHint}}</text>
-          <text class="rec-head-meta" wx:elif="{{isPrMode}}">灵祺 LINGQI · 达人招募平台</text>
+          <text class="rec-head-meta" wx:elif="{{isPrMode}}">灵祺 LINGQI · 撮合平台</text>
         </view>
       </view>
     </view>
@@ -38,11 +41,11 @@
       <text class="rec-test-bar__link" bindtap="goEditSelfProfile">去完善资料 ›</text>
     </view>
 
-    <view class="rec-seg-bar" wx:if="{{isPrMode && prOrderCount > 0 && !talentTestMode}}">
+    <view class="rec-seg-bar lq-gradient-tabs" wx:if="{{isPrMode && prOrderCount > 0 && !talentTestMode}}">
       <view
         wx:for="{{talentSegments}}"
         wx:key="id"
-        class="rec-seg-item {{talentSegment === item.id ? 'rec-seg-item--on' : ''}}"
+        class="rec-seg-item lq-gradient-tabs__item {{talentSegment === item.id ? 'rec-seg-item--on lq-gradient-tabs__item--on' : ''}}"
         data-id="{{item.id}}"
         bindtap="onTalentSegment"
       >
@@ -50,11 +53,11 @@
       </view>
     </view>
 
-    <view class="rec-seg-bar" wx:if="{{!isPrMode}}">
+    <view class="rec-seg-bar lq-gradient-tabs" wx:if="{{!isPrMode}}">
       <view
         wx:for="{{orderSegments}}"
         wx:key="id"
-        class="rec-seg-item {{orderSegment === item.id ? 'rec-seg-item--on' : ''}}"
+        class="rec-seg-item lq-gradient-tabs__item {{orderSegment === item.id ? 'rec-seg-item--on lq-gradient-tabs__item--on' : ''}}"
         data-id="{{item.id}}"
         bindtap="onOrderSegment"
       >
@@ -217,13 +220,26 @@
               <text class="job-card-compact__tag" wx:if="{{item.matchScore >= 60}}">匹配{{item.matchScore}}%</text>
               <text class="job-card-compact__tag">{{item.statusLabel}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--gray">报名{{item.applicantCount}}/{{item.recruitCount}}</text>
-            <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
-            <text class="job-card-compact__price">{{item.budgetText}}</text>
+              <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
+            </view>
+            <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay.kind === 'tiers'}}">
+              <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
+              <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>
+              <view class="job-card-compact__fee-chips">
+                <text
+                  wx:for="{{item.budgetDisplay.chips}}"
+                  wx:key="label"
+                  wx:for-item="chip"
+                  class="job-card-compact__tier-chip"
+                >{{chip.label}} {{chip.price}}</text>
+                <text wx:if="{{item.budgetDisplay.moreCount > 0}}" class="job-card-compact__tier-more">+{{item.budgetDisplay.moreCount}}档</text>
+              </view>
+            </view>
+            <text wx:else class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
+            <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
           </view>
-          <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
         </view>
       </view>
-    </view>
     <view wx:if="{{orderEmptyHint}}" class="rec-foot-hint">
       <text class="hint">{{orderEmptyHint}}</text>
     </view>

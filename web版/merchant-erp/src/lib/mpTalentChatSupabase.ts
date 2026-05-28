@@ -22,6 +22,7 @@ export type MpChatSessionRow = {
   talent_name: string
   pr_name: string
   talent_avatar: string | null
+  pr_avatar: string | null
   last_text: string
   last_ts: number
   talent_unread: number
@@ -126,6 +127,14 @@ export async function sendMessage(
   if (error) throw new Error(error.message)
 }
 
+function isEnsureSessionRpcMissing(err: { message?: string; code?: string }): boolean {
+  const m = String(err?.message || '')
+  return (
+    err?.code === 'PGRST202' ||
+    /Could not find the function|schema cache|42883/i.test(m)
+  )
+}
+
 export async function ensureSession(
   sb: SupabaseClient,
   input: {
@@ -136,9 +145,10 @@ export async function ensureSession(
     talentName: string
     prName: string
     talentAvatar?: string
+    prAvatar?: string
   },
 ): Promise<string> {
-  const { data, error } = await sb.rpc('mp_talent_chat_ensure_session', {
+  const rpc7 = {
     p_talent_key: input.talentKey,
     p_pr_key: input.prKey,
     p_talent_secret: input.talentSecret,
@@ -146,8 +156,30 @@ export async function ensureSession(
     p_talent_name: input.talentName,
     p_pr_name: input.prName,
     p_talent_avatar: input.talentAvatar ?? null,
-  })
-  if (error) throw new Error(error.message)
+  }
+  const rpc8 = { ...rpc7, p_pr_avatar: input.prAvatar ?? null }
+
+  let { data, error } = await sb.rpc('mp_talent_chat_ensure_session', rpc8)
+  if (error && isEnsureSessionRpcMissing(error)) {
+    const legacy = await sb.rpc('mp_talent_chat_ensure_session', rpc7)
+    if (legacy.error) throw new Error(legacy.error.message)
+    data = legacy.data
+    if (String(input.prAvatar || '').trim()) {
+      try {
+        await upsertParticipant(sb, {
+          participantKey: input.prKey,
+          role: 'pr',
+          deviceSecret: input.prSecret,
+          displayName: input.prName,
+          avatarUrl: input.prAvatar,
+        })
+      } catch {
+        /* 旧库无 pr_avatar 列时仍可用 participants.avatar_url */
+      }
+    }
+  } else if (error) {
+    throw new Error(error.message)
+  }
   return String(data)
 }
 
@@ -163,6 +195,23 @@ export async function markSessionRead(
     p_secret: deviceSecret,
   })
   if (error) throw new Error(error.message)
+}
+
+export async function readParticipantProfile(
+  sb: SupabaseClient,
+  participantKey: string,
+): Promise<{ displayName: string; avatarUrl: string } | null> {
+  const { data, error } = await sb
+    .from('mp_talent_chat_participants')
+    .select('display_name, avatar_url')
+    .eq('participant_key', participantKey)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  if (!data) return null
+  return {
+    displayName: String(data.display_name || '').trim(),
+    avatarUrl: String(data.avatar_url || '').trim(),
+  }
 }
 
 export async function readParticipantSecret(

@@ -47,8 +47,22 @@ function patchMpRecruitmentOrderStatus(mpOrderId, status) {
   )
 }
 
+function patchSelectedApplicantIds(mpOrderId, selectedApplicantIds) {
+  const id = String(mpOrderId || '').trim()
+  const ids = Array.isArray(selectedApplicantIds) ? selectedApplicantIds : []
+  if (!id) return Promise.reject(new Error('参数无效'))
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    { id, selectedApplicantIds: ids },
+  )
+}
+
 module.exports = {
   updateMpRecruitmentOrder,
   deleteMpRecruitmentOrder,
   patchMpRecruitmentOrderStatus,
+  patchSelectedApplicantIds,
 }

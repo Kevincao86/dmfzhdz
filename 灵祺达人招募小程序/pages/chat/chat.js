@@ -79,8 +79,17 @@ Page({
     }
     try {
       await chat.syncProfile()
-      const rows = await chat.fetchMessages(this._sessionId, 0)
       const me = participant.getCurrentParticipant()
+      const sessions = await chat.listSessions(me)
+      const cur = (sessions || []).find((s) => String(s.id) === String(this._sessionId))
+      if (cur) {
+        const peer = participant.peerDisplay(cur, me.participantKey)
+        this.setData({
+          peerName: peer.name,
+          peerAvatar: peer.avatar || this.data.peerAvatar,
+        })
+      }
+      const rows = await chat.fetchMessages(this._sessionId, 0)
       this.setMessages(chat.mergeMessages([], rows), me.role)
       await chat.markRead(this._sessionId)
       this.setData({ ready: true, statusSub: '消息已同步' })

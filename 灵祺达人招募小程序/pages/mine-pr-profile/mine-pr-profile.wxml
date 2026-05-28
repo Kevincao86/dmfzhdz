@@ -1,11 +1,23 @@
 <view class="page-shell apply-form">
-  <view class="card" wx:if="{{form.wxNickName}}">
+  <view class="card">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">微信信息</text>
+    </view>
     <view class="wx-profile">
-      <image class="wx-avatar" src="{{form.wxAvatarUrl}}" mode="aspectFill" wx:if="{{form.wxAvatarUrl}}" />
-      <view class="wx-avatar wx-avatar--ph" wx:else><text class="wx-avatar-txt">微信</text></view>
+      <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="wx-avatar" src="{{form.wxAvatarUrl}}" mode="aspectFill" wx:if="{{form.wxAvatarUrl}}" />
+        <view class="wx-avatar wx-avatar--ph" wx:else><text class="wx-avatar-txt">头像</text></view>
+      </button>
       <view class="wx-meta">
-        <text class="wx-name">{{form.wxNickName}}</text>
-        <text class="hint">已绑定微信账号</text>
+        <input
+          class="wx-nick-input"
+          type="nickname"
+          placeholder="点击输入微信昵称"
+          value="{{form.wxNickName}}"
+          bindinput="onNicknameInput"
+        />
+        <text class="hint">用于登录与身份展示</text>
         <text class="wx-identity-id" wx:if="{{lingqiPrIdLabel}}">{{lingqiPrIdLabel}}</text>
       </view>
     </view>
@@ -16,15 +28,15 @@
       <view class="section-head-dot" />
       <text class="section-title">主体类型</text>
     </view>
-    <view class="type-grid">
+    <view class="type-switch">
       <view
         wx:for="{{accountTypes}}"
         wx:key="id"
-        class="type-chip {{form.accountType === item.id ? 'active' : ''}}"
+        class="type-switch-item {{form.accountType === item.id ? 'active' : ''}}"
         data-id="{{item.id}}"
         bindtap="onPickAccountType"
       >
-        <text class="type-chip-label">{{item.label}}</text>
+        <text class="type-switch-label">{{item.label}}</text>
       </view>
     </view>
     <view class="form-row" wx:if="{{form.accountType === 'personal'}}">
@@ -57,7 +69,13 @@
     </view>
     <view class="form-row">
       <text class="form-label">微信号</text>
-      <input class="input" data-k="wechatId" value="{{form.wechatId}}" bindinput="onField" />
+      <input
+        class="input"
+        data-k="wechatId"
+        value="{{form.wechatId}}"
+        placeholder="请填写微信号（非微信昵称）"
+        bindinput="onField"
+      />
     </view>
     <view class="form-row">
       <text class="form-label">省份</text>

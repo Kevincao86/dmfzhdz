@@ -6,7 +6,7 @@ import { isMenuExcelFile, heuristicParseMenuRows, parseMenuExcelFile } from '../
 import {
   createEmptyStoreMenuRecord,
   loadStoreMenuRecord,
-  saveStoreMenuRecord,
+  saveStoreMenuRecordAsync,
   type StoreMenuItem,
   type StoreMenuRecord,
 } from '../lib/storeMenuStorage'
@@ -39,7 +39,7 @@ export default function StoreMenuPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const excelRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
+  const hydrateMenu = useCallback(() => {
     const local = loadStoreMenuRecord()
     const apply = (rec: StoreMenuRecord) => {
       setRecord(rec)
@@ -52,24 +52,44 @@ export default function StoreMenuPage() {
     void loadMenuRecordFromCloud(supabase).then((cloud) => {
       const localItems = local?.items?.length ?? 0
       const cloudItems = cloud?.items?.length ?? 0
-      const cloudNewer =
-        cloud?.updatedAt &&
-        local?.updatedAt &&
-        Date.parse(cloud.updatedAt) > Date.parse(local.updatedAt)
-      if (cloud && cloudItems > 0 && (localItems === 0 || cloudNewer)) {
+      const localTime = Date.parse(local?.updatedAt || '') || 0
+      const cloudTime = Date.parse(cloud?.updatedAt || '') || 0
+      const pickCloud =
+        cloud &&
+        cloudItems > 0 &&
+        (localItems === 0 || cloudTime > localTime || cloudItems > localItems)
+      if (pickCloud) {
         const rec: StoreMenuRecord = {
           ...(local ?? createEmptyStoreMenuRecord()),
           items: cloud.items,
           storeName: cloud.storeName ?? local?.storeName,
           updatedAt: cloud.updatedAt ?? local?.updatedAt ?? new Date().toISOString(),
+          images: local?.images ?? [],
         }
-        saveStoreMenuRecord(rec)
+        void saveStoreMenuRecordAsync(rec).then((r) => {
+          if (!r.ok) setToast(`本地已恢复 ${cloudItems} 条，云端同步失败：${r.message}`)
+        })
         apply(rec)
         return
       }
       apply(local ?? createEmptyStoreMenuRecord())
     })
   }, [])
+
+  useEffect(() => {
+    hydrateMenu()
+    const onTenant = () => hydrateMenu()
+    const onCloudErr = (e: Event) => {
+      const msg = (e as CustomEvent<string>).detail
+      if (msg) setToast(String(msg).slice(0, 120))
+    }
+    window.addEventListener('meoo-active-tenant-changed', onTenant)
+    window.addEventListener('meoo-store-menu-cloud-error', onCloudErr)
+    return () => {
+      window.removeEventListener('meoo-active-tenant-changed', onTenant)
+      window.removeEventListener('meoo-store-menu-cloud-error', onCloudErr)
+    }
+  }, [hydrateMenu])
 
   useEffect(() => {
     void fetchStoresForPlatform('douyin', { page: 1, pageSize: 50, relationType: '0' }).then((res) => {
@@ -80,7 +100,7 @@ export default function StoreMenuPage() {
   const selectedStore = stores.find((s) => s.id === selectedPoi)
 
   const persist = useCallback(
-    (next: StoreMenuRecord) => {
+    (next: StoreMenuRecord, opts?: { quiet?: boolean }) => {
       const merged = {
         ...next,
         poiId: selectedPoi || next.poiId,
@@ -88,7 +108,11 @@ export default function StoreMenuPage() {
         updatedAt: new Date().toISOString(),
       }
       setRecord(merged)
-      saveStoreMenuRecord(merged)
+      void saveStoreMenuRecordAsync(merged).then((r) => {
+        if (!r.ok && !opts?.quiet) {
+          setToast(`保存失败：${r.message}`)
+        }
+      })
     },
     [selectedPoi, selectedStore?.name],
   )
@@ -290,8 +314,15 @@ export default function StoreMenuPage() {
           <button
             type="button"
             onClick={() => {
-              persist(record)
-              setToast('已保存')
+              void saveStoreMenuRecordAsync({
+                ...record,
+                poiId: selectedPoi || record.poiId,
+                storeName: selectedStore?.name ?? record.storeName,
+                updatedAt: new Date().toISOString(),
+              }).then((r) => {
+                if (r.ok) setToast(`已保存 ${record.items.length} 条价目到本账号与云端`)
+                else setToast(`保存失败：${r.message}`)
+              })
             }}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >

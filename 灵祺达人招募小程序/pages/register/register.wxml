@@ -48,7 +48,13 @@
     </view>
     <view class="form-row">
       <text class="form-label">微信号</text>
-      <input class="input" placeholder="与商家沟通" value="{{wechatId}}" data-k="wechatId" bindinput="onCommonField" />
+      <input
+        class="input"
+        placeholder="请填写微信号（非微信昵称）"
+        value="{{wechatId}}"
+        data-k="wechatId"
+        bindinput="onCommonField"
+      />
     </view>
     <view class="form-row">
       <text class="form-label">支付宝账号</text>

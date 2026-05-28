@@ -93,6 +93,56 @@ function markNotificationsRead() {
   markMessagesRead()
 }
 
+const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
+
+function readInboxSeenSet() {
+  try {
+    const raw = wx.getStorageSync(INBOX_SEEN_KEY)
+    const list = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return new Set(Array.isArray(list) ? list.map(String) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function markInboxSeen(ids) {
+  const set = readInboxSeenSet()
+  for (const id of ids || []) set.add(String(id))
+  try {
+    wx.setStorageSync(INBOX_SEEN_KEY, JSON.stringify([...set].slice(-500)))
+  } catch (_) {}
+}
+
+/** 合并 registry 站内信（达人身份） */
+function inboxRowsForTalentMember(reg, talentMemberId) {
+  const mid = String(talentMemberId || '').trim()
+  if (!mid || !reg) return []
+  const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+  const seen = readInboxSeenSet()
+  return inbox
+    .filter((row) => row && String(row.talentMemberId || '').trim() === mid)
+    .map((row) => ({
+      id: row.id,
+      title: row.title || '通知',
+      body: row.body || '',
+      category: normalizeCategory(row.category),
+      categoryLabel: CATEGORY_LABELS[normalizeCategory(row.category)],
+      createdAt: row.createdAt || '',
+      read: !!row.read || seen.has(String(row.id)),
+      fromRegistry: true,
+    }))
+    .sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+}
+
+function mergeRegistryInboxForTalent(reg, talentMemberId) {
+  const remote = inboxRowsForTalentMember(reg, talentMemberId)
+  if (!remote.length) return readAllNotificationRows()
+  const local = readAllNotificationRows()
+  const remoteIds = new Set(remote.map((r) => r.id))
+  const rest = local.filter((r) => !remoteIds.has(r.id))
+  return [...remote, ...rest].sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+}
+
 module.exports = {
   CATEGORY_LABELS,
   readMessages,
@@ -103,4 +153,7 @@ module.exports = {
   unreadNotificationCount,
   markMessagesRead,
   markNotificationsRead,
+  inboxRowsForTalentMember,
+  mergeRegistryInboxForTalent,
+  markInboxSeen,
 }

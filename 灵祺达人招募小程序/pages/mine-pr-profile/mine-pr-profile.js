@@ -4,6 +4,7 @@ const lingqiIdentity = require('../../utils/lingqiIdentity.js')
 const userProfile = require('../../utils/userProfile.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const regionPicker = require('../../utils/regionPicker.js')
+const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const ACCOUNT_TYPES = [
@@ -45,7 +46,6 @@ Page({
     if (wx) {
       form.wxNickName = form.wxNickName || wx.wxNickName
       form.wxAvatarUrl = form.wxAvatarUrl || wx.wxAvatarUrl
-      if (!form.wechatId && wx.wxNickName) form.wechatId = wx.wxNickName
     }
     const region = setupRegionState(form.province, form.city)
     this.setData({
@@ -59,6 +59,19 @@ Page({
   onField(e) {
     const k = e.currentTarget.dataset.k
     if (k) this.setData({ [`form.${k}`]: e.detail.value })
+  },
+  onChooseAvatar(e) {
+    const url = e.detail?.avatarUrl
+    if (!url) return
+    this.setData({ 'form.wxAvatarUrl': url })
+    wxAccount.writeWxAccount({
+      wxNickName: this.data.form.wxNickName || wxAccount.readWxAccount()?.wxNickName || '',
+      wxAvatarUrl: url,
+    })
+  },
+  onNicknameInput(e) {
+    const nick = e.detail.value || ''
+    this.setData({ 'form.wxNickName': nick })
   },
   onPickAccountType(e) {
     const id = e.currentTarget.dataset.id
@@ -122,6 +135,7 @@ Page({
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     }
     userProfile.writePrProfile(saved)
+    let cloudWarn = ''
     if (merchant.hasMerchantApi()) {
       try {
         const prUser = {
@@ -148,14 +162,13 @@ Page({
           userProfile.writePrProfile(saved)
         }
       } catch (_) {
-        wx.showToast({ title: '已保存本机，云端同步失败', icon: 'none', duration: 2500 })
+        cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
       }
     }
     this.setData({
       form: saved,
       lingqiPrIdLabel: lingqiIdentity.formatPrIdLabel(saved.lingqiPrId),
     })
-    wx.showToast({ title: '已保存', icon: 'success' })
-    setTimeout(() => wx.navigateBack(), 400)
+    notifySavedAndBack(cloudWarn)
   },
 })

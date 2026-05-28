@@ -92,6 +92,101 @@ export async function createIceSourceUploadPlan(
 }
 
 /** 服务端写入 OSS（商户端经 BFF 上传，无需 Bucket 配置浏览器 CORS） */
+function isLocalOrPrivateUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    const h = u.hostname.toLowerCase()
+    if (h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) return true
+    if (/^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true
+    return false
+  } catch {
+    return true
+  }
+}
+
+function urlOnIceOssBucket(url: string, ossPrefix: ParsedOssPrefix): boolean {
+  try {
+    const u = new URL(url)
+    return (
+      u.hostname.startsWith(`${ossPrefix.bucket}.oss-`) ||
+      u.hostname === `${ossPrefix.bucket}.oss-${ossPrefix.region}.aliyuncs.com`
+    )
+  } catch {
+    return false
+  }
+}
+
+function extFromContentType(ct: string): string {
+  const s = ct.toLowerCase()
+  if (s.includes('png')) return '.png'
+  if (s.includes('webp')) return '.webp'
+  if (s.includes('gif')) return '.gif'
+  return '.jpg'
+}
+
+/**
+ * 将外链图片转存到 ICE 可读的 OSS（解决 RegisterMediaInfo InputFile is bad）。
+ */
+export async function ensureIcePublicImageUrls(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  urls: string[],
+): Promise<{ ok: true; urls: string[] } | { ok: false; message: string }> {
+  const ossPrefix = resolveIceOssUploadPrefix(cfg, env)
+  if (!ossPrefix) {
+    return {
+      ok: false,
+      message:
+        '未配置 OSS：请在运营台填写 OSS 成片 URL 前缀，多图成片需将素材写入该 Bucket。',
+    }
+  }
+  const out: string[] = []
+  for (let i = 0; i < urls.length; i++) {
+    const raw = String(urls[i] || '').trim()
+    if (!/^https?:\/\//i.test(raw)) {
+      return { ok: false, message: `第 ${i + 1} 张图片地址无效，请重新上传` }
+    }
+    if (isLocalOrPrivateUrl(raw)) {
+      return {
+        ok: false,
+        message: `第 ${i + 1} 张图片为内网地址，请使用「本地上传」而非粘贴开发环境链接`,
+      }
+    }
+    if (urlOnIceOssBucket(raw, ossPrefix)) {
+      out.push(raw)
+      continue
+    }
+    try {
+      const res = await fetch(raw, { redirect: 'follow', signal: AbortSignal.timeout(45000) })
+      if (!res.ok) {
+        return {
+          ok: false,
+          message: `第 ${i + 1} 张图片无法访问（HTTP ${res.status}），请确认链接公网可读`,
+        }
+      }
+      const ct = (res.headers.get('content-type') || 'image/jpeg').split(';')[0]!.trim()
+      if (!/^image\//i.test(ct)) {
+        return { ok: false, message: `第 ${i + 1} 张链接不是有效图片` }
+      }
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (!buf.length) {
+        return { ok: false, message: `第 ${i + 1} 张图片内容为空` }
+      }
+      const put = await putIceSourceObject(cfg, env, {
+        fileName: `ice-mirror-${Date.now()}-${i}${extFromContentType(ct)}`,
+        contentType: ct,
+        buffer: buf,
+      })
+      if (!put.ok) return put
+      out.push(put.mediaUrl)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: `第 ${i + 1} 张图片转存失败：${msg}` }
+    }
+  }
+  return { ok: true, urls: out }
+}
+
 export async function putIceSourceObject(
   cfg: AliyunIceConfig,
   env: Record<string, string | undefined>,

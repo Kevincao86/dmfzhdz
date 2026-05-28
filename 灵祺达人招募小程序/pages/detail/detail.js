@@ -26,6 +26,7 @@ Page({
     chatEnabled: false,
     prChatMeta: null,
     contacting: false,
+    isPr: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -35,6 +36,7 @@ Page({
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
   onShow() {
+    this.setData({ isPr: userProfile.readIdentity() === 'pr' })
     if (this.data.id) this.syncIceApplicantFromStorage()
   },
   syncIceApplicantFromStorage() {
@@ -48,7 +50,7 @@ Page({
   onShareAppMessage() {
     const v = this.data.view
     return {
-      title: v ? v.title : '灵祺达人招募',
+      title: v ? v.title : '灵祺撮合平台',
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
   },
@@ -106,11 +108,14 @@ Page({
         ? {
             prParticipantKey: meta.prParticipantKey,
             prDisplayName: meta.prDisplayName || view.merchantName || '招募方',
+            prWxNickName: meta.prWxNickName || '',
+            prWxAvatarUrl: meta.prWxAvatarUrl || '',
           }
         : null
       this.setData({
         view,
         loading: false,
+        isPr: userProfile.readIdentity() === 'pr',
         applyTemplateId,
         chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
         prChatMeta,
@@ -263,6 +268,10 @@ Page({
     }
   },
   goApply() {
+    if (this.data.isPr) {
+      wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
+      return
+    }
     const v = this.data.view
     if (!v || !this.data.id) return
     const q = [

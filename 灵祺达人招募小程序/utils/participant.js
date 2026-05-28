@@ -62,13 +62,17 @@ function getCurrentParticipant() {
   const secret = getDeviceSecret()
   if (identity === 'pr') {
     const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
-    const name = String(pr.contactName || pr.companyName || '').trim() || 'PR'
+    const wxNick = String(pr.wxNickName || '').trim()
+    const name =
+      wxNick ||
+      String(pr.contactName || pr.companyName || pr.personalName || '').trim() ||
+      'PR'
     return {
       role: 'pr',
       participantKey: prParticipantKey(pr),
       deviceSecret: secret,
       displayName: name,
-      avatarUrl: '',
+      avatarUrl: String(pr.wxAvatarUrl || '').trim(),
       memberSnapshot: pr,
     }
   }
@@ -87,16 +91,27 @@ function getCurrentParticipant() {
   }
 }
 
+function peerDisplay(session, myKey) {
+  if (!session) return { name: '会话', avatar: '' }
+  const iAmTalent = session.talent_key === myKey
+  if (iAmTalent) {
+    return {
+      name: String(session.pr_name || '').trim() || 'PR',
+      avatar: String(session.pr_avatar || '').trim(),
+    }
+  }
+  return {
+    name: String(session.talent_name || '').trim() || '达人',
+    avatar: String(session.talent_avatar || '').trim(),
+  }
+}
+
 function peerLabel(session, myKey) {
-  if (!session) return '会话'
-  if (session.talent_key === myKey) return session.pr_name || 'PR'
-  return session.talent_name || '达人'
+  return peerDisplay(session, myKey).name
 }
 
 function peerAvatar(session, myKey) {
-  if (!session) return ''
-  if (session.talent_key === myKey) return ''
-  return session.talent_avatar || ''
+  return peerDisplay(session, myKey).avatar
 }
 
 function unreadForMe(session, myKey) {
@@ -113,6 +128,7 @@ module.exports = {
   talentParticipantKey,
   prParticipantKey,
   bootstrapTalentSecret,
+  peerDisplay,
   peerLabel,
   peerAvatar,
   unreadForMe,

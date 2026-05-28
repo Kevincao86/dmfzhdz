@@ -1,6 +1,12 @@
 <view class="msg-page page-with-bar page-shell-fixed">
-  <view class="msg-nav" style="{{recHeadBandStyle}}">
-    <view class="msg-nav-inner" style="{{recHeadInnerStyle}}">
+  <view class="msg-nav lq-hero-header" style="{{recHeadBandStyle}}">
+    <view class="lq-hero-bg" aria-hidden="true">
+      <image class="lq-hero-bg__pattern" src="/images/hero-bg-pattern.png" mode="aspectFill" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
+      <view class="lq-hero-bg__mesh" />
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--pin">沟通</text>
+    </view>
+    <view class="msg-nav-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">
       <text class="msg-nav-title">消息</text>
       <text class="msg-nav-sub">{{identityHint}}</text>
     </view>

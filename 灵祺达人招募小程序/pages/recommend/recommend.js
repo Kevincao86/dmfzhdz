@@ -34,6 +34,7 @@ const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食',
 const GENDER_FILTERS = ['全部', '男', '女']
 const STATUS_FILTERS = ['全部', '已沟通', '已收藏']
 const ORDER_SEGMENTS = [
+  { id: 'match', label: '为你匹配' },
   { id: 'quality', label: '优质' },
   { id: 'hot', label: '热门全国' },
   { id: 'city', label: '同城匹配' },
@@ -200,6 +201,7 @@ function matchOrderSearch(row, keyword) {
 }
 
 function matchOrderSegment(row, segment, talentCity) {
+  if (segment === 'match') return true
   if (segment === 'quality') return row.recommended || row.urgent || (row.priceAmount || 0) >= 1000
   if (segment === 'city') {
     if (!talentCity) return false
@@ -234,7 +236,7 @@ Page({
     tagFilters: TAG_FILTERS,
     genderFilters: GENDER_FILTERS,
     statusFilters: STATUS_FILTERS,
-    orderSegment: 'quality',
+    orderSegment: 'match',
     orderSegments: ORDER_SEGMENTS,
     talentCity: '',
     orderCityHint: '',
@@ -290,7 +292,9 @@ Page({
       talentTestMode,
       talentTestHint,
       talentCity,
-      orderCityHint: talentCity ? `已按「${talentCity}」匹配同城商单` : '完善达人资料后可匹配同城商单',
+      orderCityHint: talentCity
+        ? '已按您的资料智能匹配商单，高契合优先展示'
+        : '完善达人资料后，将为您智能匹配并置顶高契合商单',
       prMatchHint: talentTestMode ? talentTestHint : '',
     })
     if (userProfile.readIdentity() === 'pr') {
@@ -517,24 +521,23 @@ Page({
         aiTagSource: 'local',
       }))
     }
-    rows = [...mocks, ...real]
+    const highMatch = real.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
+    const highIds = new Set(highMatch.map((r) => r.id))
+    const otherReal = real.filter((r) => !highIds.has(r.id))
+    rows = [...highMatch, ...otherReal, ...mocks]
     if (segment === 'hot' && !member) {
-      rows.sort((a, b) => {
-        if (a.isMock) return -1
-        if (b.isMock) return 1
+      real.sort((a, b) => {
         const d = (b.applicantCount || 0) - (a.applicantCount || 0)
         if (d !== 0) return d
         return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
       })
+      rows = [...real, ...mocks]
     } else if (segment === 'quality' && !member) {
-      const sorted = listFilters.sortRecruitmentRows(
-        rows.filter((r) => !r.isMock),
-        '价格从高到低',
-      )
-      rows = [...mocks, ...sorted]
-    } else if (!member) {
-      const sorted = listFilters.sortRecruitmentRows(rows.filter((r) => !r.isMock), '发布时间')
-      rows = [...mocks, ...sorted]
+      real = listFilters.sortRecruitmentRows(real, '价格从高到低')
+      rows = [...real, ...mocks]
+    } else if (!member && segment !== 'match') {
+      real = listFilters.sortRecruitmentRows(real, '发布时间')
+      rows = [...real, ...mocks]
     }
     let orderEmptyHint = ''
     if (!rows.length) {

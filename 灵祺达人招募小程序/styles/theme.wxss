@@ -1,20 +1,40 @@
-/* 灵祺 · 靛蓝暖色主题（与绿色 Logo 区分，整体偏商务稳重） */
+/* 灵祺 · 靛紫活力主题（渐变顶栏 + 标签渐变） */
 page {
   --lq-primary: #6366f1;
   --lq-primary-dark: #4f46e5;
-  --lq-accent: #f59e0b;
-  --lq-accent-deep: #d97706;
-  --lq-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  --lq-gradient-deep: linear-gradient(165deg, #312e81 0%, #4f46e5 52%, #6366f1 100%);
-  --lq-bg: #f4f3f8;
+  --lq-primary-deep: #4338ca;
+  --lq-primary-soft: #818cf8;
+  --lq-primary-50: #eef2ff;
+  --lq-primary-100: #e0e7ff;
+  --lq-accent: #fbbf24;
+  --lq-accent-deep: #f59e0b;
+  --lq-violet: #8b5cf6;
+  --lq-magenta: #a855f7;
+  --lq-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #a855f7 100%);
+  --lq-gradient-header: linear-gradient(
+    145deg,
+    #312e81 0%,
+    #4f46e5 32%,
+    #6366f1 58%,
+    #7c3aed 82%,
+    #9333ea 100%
+  );
+  --lq-gradient-deep: linear-gradient(165deg, #3730a3 0%, #4f46e5 45%, #6366f1 100%);
+  --lq-gradient-tab: linear-gradient(135deg, #4f46e5 0%, #6366f1 42%, #8b5cf6 78%, #a855f7 100%);
+  --lq-gradient-tab-track: linear-gradient(90deg, #e0e7ff 0%, #f5f3ff 45%, #fef3c7 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f8f7ff 100%);
+  --lq-bg: #f0eff6;
   --lq-surface: #ffffff;
   --lq-card: #ffffff;
   --lq-text: #1e1b2e;
-  --lq-text-secondary: #6b7280;
-  --lq-border: rgba(229, 231, 235, 0.95);
-  --lq-shadow: 0 12rpx 40rpx rgba(79, 70, 229, 0.08);
-  --lq-shadow-header: 0 12rpx 36rpx rgba(49, 46, 129, 0.18);
-  --lq-radius-lg: 28rpx;
-  --lq-radius-md: 20rpx;
-  --lq-header-pad-bottom: 28rpx;
+  --lq-text-secondary: #64748b;
+  --lq-border: rgba(199, 196, 220, 0.9);
+  --lq-shadow: 0 10rpx 36rpx rgba(79, 70, 229, 0.1);
+  --lq-shadow-card: 0 8rpx 28rpx rgba(67, 56, 202, 0.08);
+  --lq-shadow-header: 0 16rpx 48rpx rgba(49, 46, 129, 0.22);
+  --lq-shadow-tab: 0 8rpx 20rpx rgba(99, 102, 241, 0.32);
+  --lq-radius-lg: 32rpx;
+  --lq-radius-md: 24rpx;
+  --lq-radius-sm: 16rpx;
+  --lq-header-pad-bottom: 32rpx;
 }

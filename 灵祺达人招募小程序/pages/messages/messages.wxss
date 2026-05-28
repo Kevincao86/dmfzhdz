@@ -1,4 +1,5 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/hero-deco.wxss';
 
 .msg-page {
   background: var(--lq-bg);
@@ -11,8 +12,11 @@
 }
 
 .msg-nav {
-  background: var(--lq-gradient-deep);
-  padding-bottom: 16rpx;
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 20rpx;
+  border-radius: 0 0 36rpx 36rpx;
+  box-shadow: var(--lq-shadow-header);
 }
 
 .msg-nav-inner {
@@ -58,7 +62,7 @@
   width: 100%;
   height: 72rpx;
   line-height: 72rpx;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--lq-gradient);
   color: #fff;
   font-size: 28rpx;
   font-weight: 700;
@@ -145,7 +149,7 @@
   align-items: center;
   justify-content: center;
   font-size: 40rpx;
-  background: #eef2ff;
+  background: var(--lq-primary-50);
 }
 
 .msg-entry-body {

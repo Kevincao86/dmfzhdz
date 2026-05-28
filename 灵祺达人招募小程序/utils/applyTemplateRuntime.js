@@ -1,5 +1,7 @@
 const { labels } = require('./platformLabels.js')
 const { validateRegion } = require('./regionPicker.js')
+const memberStore = require('./talentMember.js')
+const talentPlatforms = require('./talentPlatformProfiles.js')
 
 function getValue(data, row) {
   if (!row.bindKey.startsWith('custom_')) return data[row.bindKey]
@@ -97,6 +99,25 @@ function buildApplicantFromRows(rows, data, meta) {
     applicant.quotePrice = applicant.quotePrice || '云剪'
   }
   if (Object.keys(customFields).length) applicant.customFields = customFields
+  const member = memberStore.readMember()
+  if (member) {
+    if (member.wxAvatarUrl) {
+      applicant.avatar = String(member.wxAvatarUrl).trim()
+      applicant.wxAvatarUrl = applicant.avatar
+    }
+    const pid = talentPlatforms.platformIdFromName(platform)
+    const prof = member.platformProfiles && member.platformProfiles[pid]
+    if (prof) {
+      const tags = Array.isArray(prof.accountTags) ? prof.accountTags : []
+      if (tags.length) applicant.accountTags = [...tags]
+      if (!applicant.douyinSalesLevel && lb.showSalesLevel && prof.douyinSalesLevel) {
+        applicant.douyinSalesLevel = String(prof.douyinSalesLevel).trim()
+      }
+      if (!applicant.talentGrade && lb.showTalentGrade && prof.talentGrade) {
+        applicant.talentGrade = String(prof.talentGrade).trim()
+      }
+    }
+  }
   return applicant
 }
 

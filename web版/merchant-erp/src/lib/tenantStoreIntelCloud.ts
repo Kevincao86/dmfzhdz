@@ -120,12 +120,14 @@ export async function upsertMenuItemsCloud(
   supabase: SupabaseClient,
   menuItems: StoreMenuItem[],
   storeName?: string,
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const tenantId = await fetchPrimaryTenantId(supabase)
-  if (!tenantId) return
+  if (!tenantId) {
+    return { ok: false, message: '当前账号未关联商户租户，价目无法同步云端' }
+  }
   const marginCfg = readStoreMarginConfig()
   const items = menuItemsForCloud(menuItems)
-  await supabase.from('tenant_store_intel').upsert(
+  const { error } = await supabase.from('tenant_store_intel').upsert(
     {
       tenant_id: tenantId,
       margin_config: {
@@ -139,4 +141,6 @@ export async function upsertMenuItemsCloud(
     },
     { onConflict: 'tenant_id' },
   )
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
 }

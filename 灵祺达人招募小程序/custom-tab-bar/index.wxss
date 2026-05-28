@@ -1,3 +1,5 @@
+@import '../styles/theme.wxss';
+
 .tab-bar {
   position: fixed;
   left: 0;
@@ -7,9 +9,10 @@
   align-items: center;
   justify-content: space-around;
   padding: 6rpx 12rpx calc(6rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.97);
-  border-top: 1rpx solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 -4rpx 24rpx rgba(79, 70, 229, 0.05);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1rpx solid var(--lq-border, rgba(210, 212, 230, 0.88));
+  box-shadow: 0 -6rpx 24rpx rgba(90, 96, 140, 0.06);
   z-index: 999;
   height: calc(96rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
@@ -68,7 +71,7 @@
 }
 
 .tab-item.active .tab-icon-wrap {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.14) 0%, rgba(99, 102, 241, 0.06) 100%);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.1) 100%);
 }
 
 .tab-text {
@@ -93,7 +96,7 @@
   height: 88rpx;
   margin-top: -28rpx;
   border-radius: 50%;
-  background: linear-gradient(145deg, #6366f1 0%, #7c3aed 50%, #a855f7 100%);
+  background: var(--lq-gradient, linear-gradient(145deg, #9aa1e8 0%, #b4b9f0 100%));
   box-shadow: 0 10rpx 28rpx rgba(79, 70, 229, 0.35);
   display: flex;
   align-items: center;
@@ -206,7 +209,7 @@
 }
 
 .tab-icon.is-active .ico-star {
-  background: linear-gradient(160deg, #818cf8 0%, #4f46e5 100%);
+  background: linear-gradient(160deg, #a5acd8 0%, #7279d9 100%);
 }
 
 /* 消息 */

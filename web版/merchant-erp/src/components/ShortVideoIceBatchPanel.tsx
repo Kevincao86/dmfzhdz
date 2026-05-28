@@ -476,6 +476,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const badUrl = imageUrls.find((u) => /localhost|127\.0\.0\.1|blob:/i.test(u))
+    if (badUrl) {
+      setErr('图片须为公网可访问地址，请使用「本地上传」写入 OSS 后再成片')
+      return
+    }
     const localId = newJobId()
     const label = `多图合成 · ${imageItems.length} 张`
     setOneClickBusy(true)
@@ -584,6 +589,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     }
     const pending = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
     const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const badUrl = imageUrls.find((u) => /localhost|127\.0\.0\.1|blob:/i.test(u))
+    if (badUrl) {
+      setErr('图片须为公网可访问地址，请使用「本地上传」写入 OSS 后再批量剪辑')
+      return
+    }
     const runImageBatch = batchGenerateEnabled && imageUrls.length > 0
     if (pending.length === 0 && !runImageBatch) {
       setErr('请先添加视频素材到队列，或上传多图并启用批量生成')
@@ -1091,7 +1101,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <RequiredMark />
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  描述节奏、字幕、氛围与卖点（建议写明总时长如 10–12 秒、前 3 秒吸睛等）。提交时将解析文案并写入云剪时间线（时长分配、章节字幕、转场），与右侧输出参数共同生效。
+                  先设置下方输出参数，再填写或由 AI 生成剪辑文案。提交时按参数解析时间线（时长、字幕、转场）。
                 </p>
               </div>
               <button
@@ -1109,29 +1119,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               </button>
             </div>
             <div className="space-y-4 px-5 pb-5 pt-4">
-              <textarea
-                value={editBrief}
-                disabled={anyBusy || briefAiLoading}
-                onChange={(e) => setEditBrief(e.target.value)}
-                placeholder={
-                  '示例：竖屏探店短视频，前 3 秒抓眼球，整体轻快；突出「招牌牛肉面」与店内环境；结尾加品牌 Slogan 位；适合抖音发布。'
-                }
-                className={cn(
-                  'min-h-[120px] w-full rounded-lg border px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
-                  briefOk || !editBrief
-                    ? 'border-zinc-300 focus:border-orange-500 focus:ring-orange-500/20'
-                    : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
-                )}
-              />
-              {!briefOk && editBrief.length > 0 ? (
-                <p className="flex items-center gap-1 text-xs text-amber-700">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  指令过短，请至少输入 4 个字
+              <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/40 px-4 py-3">
+                <p className="mb-3 text-xs font-medium text-violet-900">输出参数</p>
+                <p className="mb-3 text-[11px] leading-relaxed text-violet-800/90">
+                  请先确认画幅、时长与特效，再使用「AI 生成文案」；生成结果将按此处参数编写指令。
                 </p>
-              ) : null}
-
-              <div className="rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 px-4 py-3">
-                <p className="mb-3 text-xs font-medium text-zinc-700">输出参数（选填）</p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Field label="画幅">
                     <select
@@ -1174,6 +1166,27 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   </Field>
                 </div>
               </div>
+
+              <textarea
+                value={editBrief}
+                disabled={anyBusy || briefAiLoading}
+                onChange={(e) => setEditBrief(e.target.value)}
+                placeholder={
+                  '示例：竖屏探店短视频，前 3 秒抓眼球，整体轻快；突出「招牌牛肉面」与店内环境；结尾加品牌 Slogan 位；适合抖音发布。'
+                }
+                className={cn(
+                  'min-h-[120px] w-full rounded-lg border px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
+                  briefOk || !editBrief
+                    ? 'border-zinc-300 focus:border-orange-500 focus:ring-orange-500/20'
+                    : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
+                )}
+              />
+              {!briefOk && editBrief.length > 0 ? (
+                <p className="flex items-center gap-1 text-xs text-amber-700">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  指令过短，请至少输入 4 个字
+                </p>
+              ) : null}
 
               {imageItems.length > 0 ? (
                 <div className="space-y-3 border-t border-violet-100 pt-4">

@@ -120,6 +120,24 @@ async function appendMpRecruitmentOrder(order) {
   throw lastErr || new Error('发布招募接口不可用')
 }
 
+async function appendTalentInbox(entries) {
+  const paths = [
+    '/api/meoo-ops-mp-talent-inbox-append',
+    '/api/ops-sync/mp-talent-inbox/append',
+  ]
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await merchantRequest('POST', path, { entries })
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('站内信接口不可用')
+}
+
 module.exports = {
   fetchRegistry,
   applyToMpOrder,
@@ -128,4 +146,5 @@ module.exports = {
   submitIceDouyin,
   confirmIceTask,
   appendMpRecruitmentOrder,
+  appendTalentInbox,
 }

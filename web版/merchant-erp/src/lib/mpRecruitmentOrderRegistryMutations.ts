@@ -9,6 +9,7 @@ export type MpRecruitmentPatchBody = {
   status?: RegistryMpRecruitmentOrder['status']
   applicants?: RegistryMpRecruitmentApplicant[]
   order?: RegistryMpRecruitmentOrder
+  selectedApplicantIds?: string[]
 }
 
 export function patchMpRecruitmentOrderInSnapshot(
@@ -19,8 +20,11 @@ export function patchMpRecruitmentOrderInSnapshot(
   const order = body.order
   const status = body.status
   const applicants = body.applicants
+  const selectedApplicantIds = body.selectedApplicantIds
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
-  if (!order && !status && !applicants) return { ok: false, error: 'invalid_patch', status: 400 }
+  if (!order && !status && !applicants && !selectedApplicantIds) {
+    return { ok: false, error: 'invalid_patch', status: 400 }
+  }
   if (
     status &&
     status !== 'open' &&
@@ -52,6 +56,13 @@ export function patchMpRecruitmentOrderInSnapshot(
       ...cur,
       ...(status ? { status } : {}),
       ...(applicants ? { applicants } : {}),
+      ...(selectedApplicantIds
+        ? {
+            selectedApplicantIds: selectedApplicantIds
+              .map((x) => String(x || '').trim())
+              .filter(Boolean),
+          }
+        : {}),
       updatedAt: now,
     }
   }

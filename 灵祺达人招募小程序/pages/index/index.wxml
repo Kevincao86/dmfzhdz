@@ -1,7 +1,19 @@
 <view class="home-page page-with-bar page-shell-fixed">
   <!-- 顶部：品牌 + 搜索 -->
-  <view class="home-header">
-    <view class="home-header-inner" style="{{navInnerStyle}}">
+  <view class="home-header lq-hero-header">
+    <view class="lq-hero-bg" aria-hidden="true">
+      <image class="lq-hero-bg__pattern" src="/images/hero-bg-pattern.png" mode="aspectFill" />
+      <view class="lq-hero-bg__mesh" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
+      <view class="lq-hero-bg__ring lq-hero-bg__ring--1" />
+      <view class="lq-hero-bg__ring lq-hero-bg__ring--2" />
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--spark">✦</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--clip">云剪</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--shop">探店</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--pin">本地生活</text>
+    </view>
+    <view class="home-header-inner lq-hero-header__inner" style="{{navInnerStyle}}">
       <view class="brand-row" style="{{brandRowStyle}}">
         <image
           class="brand-logo"
@@ -10,7 +22,7 @@
           mode="aspectFit"
         />
         <view class="brand-text">
-          <text class="brand-title">灵祺达人招募</text>
+          <text class="brand-title">灵祺撮合平台</text>
           <text class="brand-slogan">本地生活 · 探店种草 · 云剪直派</text>
           <text class="brand-desc">商单透明报价 · 平台审核 · 达人安心接单</text>
         </view>
@@ -36,24 +48,24 @@
 
   <!-- 大厅切换（独立白卡片，不与筛选条叠压） -->
   <view class="home-toolbar">
-    <view class="hall-tabs-pro">
+    <view class="hall-tabs-pro lq-gradient-tabs">
       <view
-        class="hall-tab-pro {{hallTab === 'normal' ? 'active' : ''}}"
+        class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'normal' ? 'lq-gradient-tabs__item--on active' : ''}}"
         data-tab="normal"
         bindtap="onHallTab"
       >
         招募大厅
-        <text class="tab-count" wx:if="{{normalRows.length}}">{{normalRows.length}}</text>
+        <text class="tab-count lq-gradient-tabs__count" wx:if="{{normalRows.length}}">{{normalRows.length}}</text>
       </view>
       <view
-        class="hall-tab-pro {{hallTab === 'urgent' ? 'active' : ''}}"
+        class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'urgent' ? 'lq-gradient-tabs__item--on active' : ''}}"
         data-tab="urgent"
         bindtap="onHallTab"
       >
         急单大厅
       </view>
       <view
-        class="hall-tab-pro {{hallTab === 'ice' ? 'active' : ''}}"
+        class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'ice' ? 'lq-gradient-tabs__item--on active' : ''}}"
         data-tab="ice"
         bindtap="onHallTab"
       >
@@ -144,8 +156,21 @@
               <text class="job-card-compact__tag job-card-compact__tag--gray">报名{{item.applicantCount}}/{{item.recruitCount}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
               <text class="job-card-compact__tag job-card-compact__tag--ice" wx:elif="{{item.isIce}}">云剪</text>
-              <text class="job-card-compact__price">{{item.budgetText}}</text>
             </view>
+            <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay.kind === 'tiers'}}">
+              <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
+              <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>
+              <view class="job-card-compact__fee-chips">
+                <text
+                  wx:for="{{item.budgetDisplay.chips}}"
+                  wx:key="label"
+                  wx:for-item="chip"
+                  class="job-card-compact__tier-chip"
+                >{{chip.label}} {{chip.price}}</text>
+                <text wx:if="{{item.budgetDisplay.moreCount > 0}}" class="job-card-compact__tier-more">+{{item.budgetDisplay.moreCount}}档</text>
+              </view>
+            </view>
+            <text wx:else class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
             <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
           </view>
         </view>

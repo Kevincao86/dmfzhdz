@@ -16,7 +16,7 @@
     <view class="card detail-hero">
       <view class="detail-hero-top">
         <view class="order-no" bindtap="copyOrderNo">
-          订单 {{view.merchantOrderNo}}
+          招募单号 {{view.merchantOrderNo}}
           <text class="order-copy">复制</text>
         </view>
         <text class="merchant-name">{{view.merchantName}} · {{view.storeName}}</text>
@@ -129,14 +129,27 @@
 </view>
 
 <view wx:if="{{view && !loading}}" class="bottom-bar">
-  <button class="bottom-icon" open-type="share">分享</button>
-  <button class="bottom-icon" bindtap="goHome">首页</button>
-  <button
-    wx:if="{{chatEnabled && prChatMeta}}"
-    class="btn-ghost bottom-cta bottom-cta--chat"
-    loading="{{contacting}}"
-    bindtap="contactPr"
-  >联系招募方</button>
-  <button wx:if="{{!applied}}" class="btn-primary bottom-cta" bindtap="goApply">{{isIce ? '认领云剪任务' : '我要报名'}}</button>
-  <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
+  <view class="bottom-bar__tools">
+    <button class="bottom-icon" open-type="share">分享</button>
+    <button class="bottom-icon" bindtap="goHome">首页</button>
+  </view>
+  <view class="bottom-bar__actions">
+    <button
+      wx:if="{{chatEnabled && prChatMeta}}"
+      class="btn-ghost bottom-cta"
+      loading="{{contacting}}"
+      bindtap="contactPr"
+    >联系招募方</button>
+    <button
+      wx:if="{{!applied && !isPr}}"
+      class="btn-primary bottom-cta"
+      bindtap="goApply"
+    >{{isIce ? '认领云剪' : '我要报名'}}</button>
+    <button
+      wx:if="{{!applied && isPr}}"
+      class="btn-secondary bottom-cta bottom-cta--muted"
+      bindtap="goApply"
+    >请切换达人身份再报名</button>
+    <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
+  </view>
 </view>

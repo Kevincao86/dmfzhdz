@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { loadEnv, type Plugin } from 'vite'
 import { handleMpTalentChatBody, type MpTalentChatBody } from '../src/lib/mpTalentChatHandler.js'
+import { handleMpSupportRelayBody, type MpSupportRelayBody } from '../src/lib/mpSupportRelayHandler.js'
 
 /** Vite dev 中间件读 process.env；将 .env.local 合并进去（与 merchantApiMock 一致）。 */
 function applyViteEnvToProcess(env: Record<string, string>) {
@@ -29,7 +30,29 @@ function json(res: ServerResponse, status: number, data: Record<string, unknown>
   res.end(JSON.stringify(data))
 }
 
-/** 本地 Vite dev：POST /api/meoo-ops-mp-talent-chat → Supabase */
+async function handleMpApiRoute(
+  url: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<boolean> {
+  if (url === '/api/meoo-ops-mp-talent-chat') {
+    const raw = await readBody(req)
+    const body = JSON.parse(raw || '{}') as MpTalentChatBody
+    const out = await handleMpTalentChatBody(body)
+    json(res, out.status, out.data)
+    return true
+  }
+  if (url === '/api/meoo-ops-mp-support-relay') {
+    const raw = await readBody(req)
+    const body = JSON.parse(raw || '{}') as MpSupportRelayBody
+    const out = await handleMpSupportRelayBody(body)
+    json(res, out.status, out.data)
+    return true
+  }
+  return false
+}
+
+/** 本地 Vite dev：达人招募小程序 API → Supabase */
 export function mpTalentChatGatewayPlugin(): Plugin {
   return {
     name: 'mp-talent-chat-gateway',
@@ -39,7 +62,9 @@ export function mpTalentChatGatewayPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = (req.url ?? '').split('?')[0]
-        if (url !== '/api/meoo-ops-mp-talent-chat') return next()
+        if (url !== '/api/meoo-ops-mp-talent-chat' && url !== '/api/meoo-ops-mp-support-relay') {
+          return next()
+        }
 
         const method = req.method ?? 'GET'
         if (method === 'OPTIONS') {
@@ -52,15 +77,13 @@ export function mpTalentChatGatewayPlugin(): Plugin {
         }
 
         try {
-          const raw = await readBody(req)
-          const body = JSON.parse(raw || '{}') as MpTalentChatBody
-          const out = await handleMpTalentChatBody(body)
-          json(res, out.status, out.data)
+          const handled = await handleMpApiRoute(url, req, res)
+          if (!handled) json(res, 404, { ok: false, error: 'not_found' })
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e)
           json(res, 500, {
             ok: false,
-            error: 'meoo_ops_mp_talent_chat_failed',
+            error: 'meoo_ops_mp_api_failed',
             detail: msg.slice(0, 800),
           })
         }

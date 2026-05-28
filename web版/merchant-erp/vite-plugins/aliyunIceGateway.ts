@@ -372,10 +372,25 @@ export async function handleAliyunIceRoutes(input: {
     const projectName = String(parsed.projectName ?? '灵祺AI云剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 
+    let pipelineImageUrls = imageUrls
+    if (imageUrls.length > 0) {
+      const { ensureIcePublicImageUrls } = await import('./aliyunOssIceUpload.js')
+      const normalized = await ensureIcePublicImageUrls(
+        cfg,
+        rawEnv as Record<string, string | undefined>,
+        imageUrls,
+      )
+      if (!normalized.ok) {
+        json(res, 400, { ok: false, message: normalized.message, step: 'normalize_images' })
+        return true
+      }
+      pipelineImageUrls = normalized.urls
+    }
+
     const out =
-      imageUrls.length > 0
+      pipelineImageUrls.length > 0
         ? await iceRunImagesPipeline(cfg, {
-            imageUrls,
+            imageUrls: pipelineImageUrls,
             projectName,
             editBrief,
             width,

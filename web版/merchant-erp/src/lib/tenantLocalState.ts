@@ -24,6 +24,7 @@ const EXTRA_LOCAL_KEYS = [
   'meoo_last_recruitment_submit',
   'meoo_recruitment_create_draft_v1',
   'meoo_store_menu_v1',
+  'meoo_store_menu_items_v1',
   'meoo_competitor_reports_v1',
   'meoo_competitor_selected_poi_v1',
 ] as const
@@ -49,6 +50,9 @@ export function setActiveTenantStorageId(tenantId: string | null): void {
   try {
     if (tenantId?.trim()) sessionStorage.setItem(MEOO_ACTIVE_TENANT_ID_KEY, tenantId.trim())
     else sessionStorage.removeItem(MEOO_ACTIVE_TENANT_ID_KEY)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('meoo-active-tenant-changed', { detail: tenantId }))
+    }
   } catch {
     /* ignore */
   }

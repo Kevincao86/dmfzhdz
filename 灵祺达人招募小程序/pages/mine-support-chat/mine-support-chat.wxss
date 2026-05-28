@@ -1,0 +1,139 @@
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f1f5f9;
+}
+
+.status-bar {
+  flex-shrink: 0;
+  padding: 20rpx 24rpx;
+  background: linear-gradient(95deg, #4f46e5, #7c3aed);
+  color: #fff;
+}
+
+.status-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  display: block;
+}
+
+.status-sub {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  opacity: 0.9;
+  display: block;
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 20rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.scroll-pad {
+  height: 24rpx;
+}
+
+.bubble-row {
+  display: flex;
+  margin-bottom: 20rpx;
+}
+
+.bubble-row.mine {
+  justify-content: flex-end;
+}
+
+.bubble-row.their {
+  justify-content: flex-start;
+}
+
+.bubble {
+  max-width: 78%;
+  padding: 18rpx 22rpx;
+  border-radius: 20rpx;
+}
+
+.bubble-user {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  border-bottom-right-radius: 6rpx;
+}
+
+.bubble-bot,
+.bubble-agent,
+.bubble-ops {
+  background: #fff;
+  color: #0f172a;
+  border: 1rpx solid #e2e8f0;
+  border-bottom-left-radius: 6rpx;
+}
+
+.bubble-system {
+  background: #fef3c7;
+  color: #92400e;
+  border-bottom-left-radius: 6rpx;
+}
+
+.bubble-text {
+  font-size: 28rpx;
+  line-height: 1.5;
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble-at {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  opacity: 0.65;
+}
+
+.composer {
+  flex-shrink: 0;
+  padding: 16rpx 20rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1rpx solid #e2e8f0;
+}
+
+.human-btn {
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: 1rpx solid #c7d2fe;
+  border-radius: 16rpx;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.chat-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 20rpx;
+  background: #f8fafc;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+}
+
+.send-btn {
+  flex-shrink: 0;
+  padding: 0 28rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 26rpx;
+  background: linear-gradient(95deg, #6366f1, #4f46e5);
+  color: #fff;
+  border-radius: 16rpx;
+  border: none;
+}
+
+.send-btn[disabled] {
+  opacity: 0.45;
+}
