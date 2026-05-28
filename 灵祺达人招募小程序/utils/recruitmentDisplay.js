@@ -5,6 +5,7 @@ const {
   filterTaskDetailText,
   explodeAndFilterDisplayLines,
   normalizeRecruitmentPlatform,
+  isMerchantSyncedMpOrder,
 } = require('./recruitmentInfoFilter.js')
 
 function pickField(summary, key) {
@@ -42,46 +43,62 @@ function findMerchantOrder(registry, sourceMerchantOrderId) {
 
 /** 合并小程序单 + 商家订单，输出详情页/列表展示结构 */
 function enrichMpOrder(mp, merchant) {
-  const summary = merchant
-    ? String(merchant.infoSummary || '').trim()
-    : String(mp.merchantRequirements || '').trim()
-  const customerName = mp.customerName || (merchant && merchant.customerName) || '—'
-  const storeName = mp.storeName || (merchant && merchant.storeName) || '—'
-  const merchantOrderNo = mp.sourceMerchantOrderId || (merchant && merchant.id) || '—'
+  const merchantSynced = isMerchantSyncedMpOrder(mp)
+  const linkedMerchant = merchantSynced ? null : merchant
+  const summary = linkedMerchant
+    ? String(linkedMerchant.infoSummary || '').trim()
+    : String(mp.merchantRequirements || mp.recruitmentInfo || '').trim()
+  const customerName =
+    mp.customerName ||
+    (linkedMerchant && linkedMerchant.customerName) ||
+    mp.title ||
+    '—'
+  const storeName = mp.storeName || (linkedMerchant && linkedMerchant.storeName) || '—'
+  /** 达人端统一展示小程序招募单号，不暴露商家 ERP 内部单号 */
+  const merchantOrderNo = mp.id || '—'
   const platform = normalizeRecruitmentPlatform(
     mp.platform ||
-      merchant?.recruitmentPlatform ||
-      (merchant && merchant.accountType && merchant.accountType !== '—' ? merchant.accountType : '') ||
+      linkedMerchant?.recruitmentPlatform ||
+      (linkedMerchant && linkedMerchant.accountType && linkedMerchant.accountType !== '—'
+        ? linkedMerchant.accountType
+        : '') ||
       '抖音',
   )
   const region =
-    mp.region || pickField(summary, '城市') || storeName || (merchant && merchant.storeAddress) || '—'
+    mp.region ||
+    pickField(summary, '城市') ||
+    storeName ||
+    (linkedMerchant && linkedMerchant.storeAddress) ||
+    '—'
   const category =
-    mp.category || pickField(summary, '行业') || (merchant && merchant.category) || '本地生活'
+    mp.category || pickField(summary, '行业') || (linkedMerchant && linkedMerchant.category) || '本地生活'
   const serviceAmount =
     mp.serviceAmount != null
       ? mp.serviceAmount
-      : merchant
-        ? Math.max(0, merchant.serviceAmount || 0)
+      : linkedMerchant
+        ? Math.max(0, linkedMerchant.serviceAmount || 0)
         : 0
   const budgetText =
     mp.budgetText || (serviceAmount > 0 ? `¥${serviceAmount.toLocaleString('zh-CN')}` : '面议')
   const recruitCount =
     mp.recruitCount ||
-    (merchant ? parseRecruitCount(summary, merchant.fans) : 0) ||
-    (merchant && merchant.fans > 0 ? merchant.fans : 1)
+    (linkedMerchant ? parseRecruitCount(summary, linkedMerchant.fans) : 0) ||
+    (linkedMerchant && linkedMerchant.fans > 0 ? linkedMerchant.fans : 1)
   const fansRequirement =
     mp.fansRequirement ||
-    (merchant && merchant.fans >= 5000
-      ? `≥${merchant.fans.toLocaleString('zh-CN')}`
+    (linkedMerchant && linkedMerchant.fans >= 5000
+      ? `≥${linkedMerchant.fans.toLocaleString('zh-CN')}`
       : '≥5000')
 
-  let title = mp.title
+  let title = String(mp.title || '').trim()
   if (!title) {
     title =
-      region && category
+      region && category && region !== '—'
         ? `${region}${category}${platform}招募`
         : `${customerName}·${storeName}达人招募`
+  }
+  if (merchantSynced && title.length > 48) {
+    title = title.slice(0, 48)
   }
 
   let recruitmentInfo = mp.recruitmentInfo ? filterRecruitmentInfoText(mp.recruitmentInfo) : ''

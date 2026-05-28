@@ -1,5 +1,8 @@
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
+const merchant = require('../../utils/merchantApi.js')
 const memberStore = require('../../utils/talentMember.js')
+const ops = require('../../utils/opsRegistryTalentMp.js')
+const participant = require('../../utils/participant.js')
 const userProfile = require('../../utils/userProfile.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const wxAccount = require('../../utils/wxAccount.js')
@@ -44,7 +47,9 @@ Page({
     wxLoggedIn: false,
     profileIncomplete: false,
     avatarUrl: '',
+    profileNick: '',
     displayName: '灵祺用户',
+    profileSaving: false,
     displaySub: '微信登录后使用完整功能',
     identityIdLine: '',
     menus: TALENT_MENUS,
@@ -75,30 +80,29 @@ Page({
     const wxLoggedIn = !!wx
 
     let avatarUrl = ''
-    let displayName = '灵祺用户'
+    let profileNick = ''
     let displaySub = '微信登录后使用完整功能'
 
     if (wx) {
       avatarUrl = wx.wxAvatarUrl || ''
-      displayName = wx.wxNickName
+      profileNick = wx.wxNickName || ''
     }
 
     if (identity === 'talent') {
-      if (member?.wxNickName) {
-        displayName = member.wxNickName
-        avatarUrl = member.wxAvatarUrl || avatarUrl
-      }
+      if (member?.wxNickName) profileNick = member.wxNickName
+      if (member?.wxAvatarUrl) avatarUrl = member.wxAvatarUrl
       displaySub = member
         ? memberStore.memberTypeLabel(member)
         : wxLoggedIn
           ? '完善多平台资料，报名更便捷'
           : '达人 · 发现优质商单'
     } else if (identity === 'pr') {
-      const prName = userProfile.prDisplayName(prProfile)
-      if (prName) displayName = prName
-      displaySub = userProfile.prDisplaySub(prProfile)
+      if (prProfile?.wxNickName) profileNick = prProfile.wxNickName
       if (prProfile?.wxAvatarUrl) avatarUrl = prProfile.wxAvatarUrl
+      displaySub = userProfile.prDisplaySub(prProfile)
     }
+
+    const displayName = profileNick || '灵祺用户'
 
     let identityIdLine = ''
     if (identity === 'talent' && member?.lingqiTalentId) {
@@ -118,6 +122,7 @@ Page({
       wxLoggedIn,
       profileIncomplete,
       avatarUrl,
+      profileNick,
       displayName,
       displaySub,
       identityIdLine,
@@ -187,6 +192,110 @@ Page({
     setTabBarHidden(this, false)
   },
   noopSheetTap() {},
+  noopProfileTap() {},
+  onProfileNickInput(e) {
+    this.setData({ profileNick: e.detail.value || '' })
+  },
+  async onProfileChooseAvatar(e) {
+    if (!this.ensureWxLoggedIn()) return
+    const url = e.detail?.avatarUrl
+    if (!url) return
+    this.setData({ avatarUrl: url })
+    await this.persistProfileDisplay(this.data.profileNick, url)
+  },
+  async onProfileNickBlur() {
+    if (!this.data.wxLoggedIn || this.data.profileSaving) return
+    const nick = String(this.data.profileNick || '').trim()
+    const prev = String(this.data.displayName || '').trim()
+    if (!nick || nick === prev) return
+    await this.persistProfileDisplay(nick, this.data.avatarUrl)
+  },
+  async persistProfileDisplay(nick, avatarUrl) {
+    if (this.data.profileSaving) return false
+    const n = String(nick ?? this.data.profileNick ?? '').trim()
+    const av = String(avatarUrl ?? this.data.avatarUrl ?? '').trim()
+    if (!n) {
+      wx.showToast({ title: '请填写昵称', icon: 'none' })
+      return false
+    }
+    if (!wxAccount.isWxLoggedIn()) {
+      this.onOpenWxLoginSheet()
+      return false
+    }
+    this.setData({ profileSaving: true })
+    try {
+      wxAccount.writeWxAccount({ wxNickName: n, wxAvatarUrl: av })
+      const identity = userProfile.readIdentity()
+      const ts = new Date().toLocaleString('zh-CN', { hour12: false })
+      if (identity === 'talent') {
+        const prev = memberStore.readMember()
+        if (prev) {
+          const member = { ...prev, wxNickName: n, wxAvatarUrl: av, updatedAt: ts }
+          memberStore.writeMember(member)
+          if (merchant.hasMerchantApi() && member.contact) {
+            try {
+              const reg = await ops.registerTalentMember(member)
+              if (reg?.lingqiTalentId) {
+                member.lingqiTalentId = reg.lingqiTalentId
+                memberStore.writeMember(member)
+              }
+            } catch (_) {}
+          }
+        }
+      } else {
+        const prev = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+        const saved = { ...prev, wxNickName: n, wxAvatarUrl: av, updatedAt: ts }
+        userProfile.writePrProfile(saved)
+        if (merchant.hasMerchantApi() && String(saved.contactPhone || '').trim()) {
+          try {
+            const reg = await ops.registerPrUser({
+              id: saved.id || `MPR-${Date.now()}`,
+              lingqiPrId: saved.lingqiPrId || '',
+              accountType: saved.accountType,
+              companyName: saved.companyName || '',
+              personalName: saved.personalName || '',
+              contactName: saved.contactName || '',
+              contactPhone: saved.contactPhone || '',
+              wechatId: saved.wechatId || '',
+              province: saved.province || '',
+              city: saved.city || '',
+              intro: saved.intro || '',
+              wxNickName: n,
+              wxAvatarUrl: av,
+              registeredAt: saved.registeredAt || ts,
+              updatedAt: ts,
+            })
+            if (reg?.lingqiPrId) {
+              saved.lingqiPrId = reg.lingqiPrId
+              saved.id = reg.id || saved.id
+              userProfile.writePrProfile(saved)
+            }
+          } catch (_) {}
+        }
+      }
+      try {
+        const chat = require('../../utils/talentChat.js')
+        if (chat.canChat()) {
+          const part = participant.getCurrentParticipant()
+          part.displayName = n
+          part.avatarUrl = av
+          if (part.memberSnapshot) {
+            part.memberSnapshot = { ...part.memberSnapshot, wxNickName: n, wxAvatarUrl: av }
+          }
+          await chat.syncProfile(part)
+        }
+      } catch (_) {}
+      this.refresh()
+      try {
+        const chat = require('../../utils/talentChat.js')
+        if (chat.canChat()) void chat.syncProfile()
+      } catch (_) {}
+      wx.showToast({ title: '已更新', icon: 'success', duration: 1200 })
+      return true
+    } finally {
+      this.setData({ profileSaving: false })
+    }
+  },
   onPickIdentity(e) {
     const id = e.currentTarget.dataset.id
     this.setData({ showIdentitySheet: false })

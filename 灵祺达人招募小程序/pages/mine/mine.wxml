@@ -1,23 +1,50 @@
 <view class="mine-page page-with-bar page-shell-fixed">
-  <view class="mine-header">
-    <view class="mine-header-inner" style="{{headerInnerStyle}}">
-      <view class="profile-row" bindtap="goEditProfile">
-        <image
-          class="profile-avatar"
-          src="{{avatarUrl}}"
-          mode="aspectFill"
-          wx:if="{{avatarUrl}}"
-        />
-        <view class="profile-avatar profile-avatar--ph" wx:else>
-          <image class="profile-avatar-logo" src="/images/logo.png" mode="aspectFit" />
+  <view class="mine-header lq-hero-header">
+    <view class="lq-hero-bg lq-hero-bg--mine" aria-hidden="true">
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
+    </view>
+    <view class="mine-header-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
+      <view class="profile-row">
+        <button
+          wx:if="{{wxLoggedIn}}"
+          class="profile-avatar-btn"
+          open-type="chooseAvatar"
+          bindchooseavatar="onProfileChooseAvatar"
+          catchtap="noopProfileTap"
+        >
+          <image
+            class="profile-avatar"
+            src="{{avatarUrl}}"
+            mode="aspectFill"
+            wx:if="{{avatarUrl}}"
+          />
+          <view class="profile-avatar profile-avatar--ph" wx:else>
+            <image class="profile-avatar-logo" src="/images/logo.png" mode="aspectFit" />
+          </view>
+        </button>
+        <view wx:else class="profile-avatar-wrap" bindtap="onOpenWxLoginSheet">
+          <image
+            class="profile-avatar"
+            src="{{avatarUrl}}"
+            mode="aspectFill"
+            wx:if="{{avatarUrl}}"
+          />
+          <view class="profile-avatar profile-avatar--ph" wx:else>
+            <image class="profile-avatar-logo" src="/images/logo.png" mode="aspectFit" />
+          </view>
         </view>
         <view class="profile-meta">
           <view class="profile-name-row">
-            <text class="profile-name">{{displayName}}</text>
-            <view class="identity-switch-btn" catchtap="onOpenIdentitySheet">
-              <text class="identity-switch-label">{{identityLabel}}</text>
-              <text class="identity-switch-arrow">▾</text>
-            </view>
+            <input
+              wx:if="{{wxLoggedIn}}"
+              class="profile-nick-input"
+              type="nickname"
+              placeholder="点击输入昵称"
+              value="{{profileNick}}"
+              bindinput="onProfileNickInput"
+              bindblur="onProfileNickBlur"
+            />
+            <text wx:else class="profile-name">{{displayName}}</text>
           </view>
           <text class="profile-sub">{{displaySub}}</text>
           <text class="profile-identity-id" wx:if="{{identityIdLine}}">{{identityIdLine}}</text>
@@ -26,7 +53,12 @@
             <text class="profile-badge profile-badge--muted" wx:elif="{{identity === 'talent' && profileIncomplete}}">资料未完善</text>
           </view>
         </view>
-        <text class="profile-edit">›</text>
+        <text class="profile-edit" bindtap="goEditProfile">›</text>
+      </view>
+      <view class="identity-switch-btn" catchtap="onOpenIdentitySheet">
+        <text class="identity-switch-hint">身份切换</text>
+        <text class="identity-switch-label">{{identityLabel}}</text>
+        <text class="identity-switch-arrow">▾</text>
       </view>
     </view>
   </view>

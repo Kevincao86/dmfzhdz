@@ -4,6 +4,7 @@ const CSV_HEADERS = [
   '平台',
   '平台账号',
   '粉丝数',
+  '达人标签',
   '带货等级',
   '报价',
   '探店时间',
@@ -23,6 +24,11 @@ function escapeCsvCell(v) {
   return s
 }
 
+function formatAccountTags(a) {
+  const tags = Array.isArray(a.accountTags) ? a.accountTags : []
+  return tags.map((t) => String(t || '').trim()).filter(Boolean).join('、')
+}
+
 function applicantRowCells(a, index) {
   return [
     index + 1,
@@ -30,7 +36,8 @@ function applicantRowCells(a, index) {
     a.platform || '',
     a.platformAccount || '',
     a.followers != null ? a.followers : '',
-    a.douyinSalesLevel || '',
+    formatAccountTags(a),
+    a.displaySalesLevel || a.douyinSalesLevel || '',
     a.quotePrice || '',
     a.visitTimeSlot || '',
     a.province || '',
@@ -57,6 +64,16 @@ function safeFileName(mpOrderId) {
   return `招募报名_${id}_${Date.now()}.csv`
 }
 
+/** 微信 API 失败对象 → 可读文案 */
+function formatExportError(err) {
+  if (!err) return '导出失败'
+  if (err instanceof Error && err.message) return String(err.message)
+  if (typeof err === 'string') return err
+  if (err.errMsg) return String(err.errMsg).replace(/^setClipboardData:fail\s*/i, '')
+  if (err.message) return String(err.message)
+  return '导出失败，请稍后重试'
+}
+
 function exportApplicantsExcel(applicants, mpOrderId) {
   const list = Array.isArray(applicants) ? applicants : []
   if (!list.length) {
@@ -81,12 +98,15 @@ function exportApplicantsExcel(applicants, mpOrderId) {
             wx.setClipboardData({
               data: csv,
               success: () => resolve({ filePath, mode: 'clipboard' }),
-              fail: reject,
+              fail: (clipErr) => {
+                // 文件已写入；部分环境无法打开 csv / 剪贴板受限
+                resolve({ filePath, mode: 'saved', hint: formatExportError(clipErr) })
+              },
             })
           },
         })
       },
-      fail: reject,
+      fail: (wErr) => reject(new Error(formatExportError(wErr))),
     })
   })
 }
@@ -94,4 +114,5 @@ function exportApplicantsExcel(applicants, mpOrderId) {
 module.exports = {
   applicantsToCsv,
   exportApplicantsExcel,
+  formatExportError,
 }

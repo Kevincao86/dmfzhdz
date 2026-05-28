@@ -8,8 +8,8 @@ const core = {
   MERCHANT_API_BASE_URL: host ? `http://${host}:5173` : '',
   SUPABASE_URL: '',
   SUPABASE_ANON_KEY: '',
-  /** 达人身份：推荐 Tab 展示推荐达人并置顶我的信息（本地测试） */
-  MP_TEST_TALENT_ON_RECOMMEND: true,
+  /** 仅开发调试：true 时达人推荐 Tab 临时预览 PR「推荐达人」UI（勿在生产开启） */
+  MP_TEST_TALENT_ON_RECOMMEND: false,
 }
 
 let out = { ...core }

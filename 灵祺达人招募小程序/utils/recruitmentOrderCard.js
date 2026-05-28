@@ -1,4 +1,5 @@
 const display = require('./recruitmentDisplay.js')
+const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
 const { isUrgentMpOrder, isIceMpOrder } = require('./recruitmentUrgent.js')
 const listFilters = require('./recruitmentListFilters.js')
 
@@ -40,6 +41,10 @@ function mapMpOrderRow(mp, reg) {
     region: view.region,
     category: view.category || '本地生活',
     budgetText: view.budgetText || '面议',
+    budgetDisplay: budgetDisplayUtil.buildBudgetDisplay(
+      view.budgetText || '面议',
+      mp.mpPublishMeta,
+    ),
     fansRequirement: view.fansRequirement || '不限',
     summary: view.summaryShort,
     applicantCount: view.applicantCount,

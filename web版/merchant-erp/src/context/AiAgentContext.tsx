@@ -57,6 +57,7 @@ import {
   loadMerchantBriefProductPicks,
   pickBriefMainAndSecondary,
 } from '../lib/merchantBriefCatalog'
+import { fetchDailyAssistReply } from '../lib/agentDailyAssist'
 import { tenantLocalKey } from '../lib/tenantLocalState'
 import {
   loadMerchantIntelSnapshot,
@@ -1356,6 +1357,23 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           setAiSending(true)
           try {
             const strippedLine = line.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+            if (
+              !visionUrls.length &&
+              !attachments.length &&
+              strippedLine &&
+              !pq
+            ) {
+              const dailyReply = await fetchDailyAssistReply(strippedLine, ac.signal)
+              if (dailyReply) {
+                const assistantMsg = createAgentMessage('assistant', dailyReply)
+                setMessages((prev) => {
+                  const next = [...prev, assistantMsg]
+                  messagesRef.current = next
+                  return next
+                })
+                return
+              }
+            }
             if (tryHandleExecutionFlow(strippedLine, visionUrls, pageContext?.pageLabel)) {
               return
             }

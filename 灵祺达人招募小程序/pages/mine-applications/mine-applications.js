@@ -1,6 +1,7 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const merchant = require('../../utils/merchantApi.js')
+const appDisplay = require('../../utils/applicationDisplay.js')
 
 Page({
   data: {
@@ -13,7 +14,15 @@ Page({
   async load() {
     const local = applicationsStore.readApplications()
     if (!merchant.hasMerchantApi()) {
-      this.setData({ rows: local, loading: false })
+      this.setData({
+        rows: local.map((a) => ({
+          ...a,
+          title: a.title || a.mpOrderId,
+          statusLabel: '—',
+          platformIcon: '/images/platforms/douyin.png',
+        })),
+        loading: false,
+      })
       return
     }
     this.setData({ loading: true })
@@ -21,16 +30,20 @@ Page({
       const reg = await ops.fetchRegistry()
       const mpList = reg.mpRecruitmentOrders || []
       const enriched = local.map((a) => {
-        const mp = mpList.find((o) => o.id === a.mpOrderId)
-        return {
-          ...a,
-          title: a.title || mp?.title || mp?.recruitmentInfo?.slice(0, 24) || a.mpOrderId,
-          status: mp?.status || 'unknown',
-        }
+        const mp = mpList.find((o) => o && o.id === a.mpOrderId)
+        return appDisplay.enrichTalentApplicationRow(a, mp, reg)
       })
       this.setData({ rows: enriched, loading: false })
     } catch {
-      this.setData({ rows: local, loading: false })
+      this.setData({
+        rows: local.map((a) => ({
+          ...a,
+          title: a.title || a.mpOrderId,
+          statusLabel: '—',
+          platformIcon: '/images/platforms/douyin.png',
+        })),
+        loading: false,
+      })
     }
   },
   goDetail(e) {

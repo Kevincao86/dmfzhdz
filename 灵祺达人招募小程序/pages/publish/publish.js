@@ -46,6 +46,7 @@ const {
   newLevelTier,
   newFansTier,
 } = publishOpts
+const { buildCompactBudgetText } = require('../../utils/recruitmentBudgetDisplay.js')
 
 /** 子页确认后滚动回表单对应字段 */
 const PICKER_FIELD_ANCHOR = {
@@ -849,16 +850,11 @@ Page({
     return null
   },
   buildBudgetText(f) {
+    return buildCompactBudgetText(f, feeTypeLabel)
+  },
+  buildBudgetDetailText(f) {
     const cps = String(f.cpsPercent || '').trim()
     const prefix = cps ? `CPS ${cps}% · ` : ''
-    if (f.feeTypeId === 'fixed') return `${prefix}一口价 ¥${f.fixedPrice}`
-    if (f.feeTypeId === 'exchange_only') return `${prefix}纯置换`
-    if (f.feeTypeId === 'self_quote') {
-      const min = String(f.selfQuoteMin ?? '').trim()
-      const max = String(f.selfQuoteMax ?? '').trim()
-      const range = min || max ? `${min || '0'}-${max || '∞'}` : '面议'
-      return `${prefix}自报价 ${range}`
-    }
     if (f.feeTypeId === 'level_tier') {
       const parts = (f.levelTiers || []).map((t) => `${(t.levels || []).join('+')} ¥${t.price}`)
       return `${prefix}等级阶梯 ${parts.join(' / ')}`
@@ -867,7 +863,7 @@ Page({
       const parts = (f.fansTiers || []).map((t) => `${t.fansRange} ¥${t.price}`)
       return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
     }
-    return feeTypeLabel(f.feeTypeId)
+    return this.buildBudgetText(f)
   },
   buildRegionText(f) {
     if (f.cityNational) return '全国'
@@ -912,7 +908,7 @@ Page({
     }
     if (String(f.cpsPercent || '').trim()) lines.push(`佣金CPS：${f.cpsPercent}%`)
     else lines.push('佣金CPS：未设置')
-    lines.push(`酬劳摘要：${this.buildBudgetText(f)}`)
+    lines.push(`酬劳摘要：${this.buildBudgetDetailText(f)}`)
     lines.push(`招募详情：${String(f.recruitDetail || '').trim()}`)
     if (mode.hall === 'ice' && String(f.iceVideoUrl || '').trim()) {
       lines.push(`云剪成片链接：${String(f.iceVideoUrl).trim()}`)
@@ -961,34 +957,35 @@ Page({
       category: mode.category,
       publisherIdentity: 'pr',
       publisherTemplateId: 'publish-wizard-v2',
-      mpPublishMeta: {
-        prParticipantKey: participant.prParticipantKey(
-          userProfile.readPrProfile() || userProfile.emptyPrProfile(),
-        ),
-        prDisplayName: userProfile.prDisplayName(
-          userProfile.readPrProfile() || userProfile.emptyPrProfile(),
-        ),
-        deliveryWindow: f.deliveryWindow,
-        recruitMode: mode.id,
-        signupDeadline: deadline,
-        fansLimitMode: f.fansLimitMode,
-        fansMin: f.fansMin,
-        talentTags: f.talentTags,
-        douyinSalesLevels: f.platform === '抖音' ? f.douyinSalesLevels : [],
-        feeTypeId: f.feeTypeId,
-        fixedPrice: f.fixedPrice,
-        selfQuoteMin: f.selfQuoteMin,
-        selfQuoteMax: f.selfQuoteMax,
-        levelTiers: f.levelTiers,
-        fansTiers: f.fansTiers,
-        cpsPercent: f.cpsPercent,
-        recruitDetail: f.recruitDetail,
-        cityNational: !!f.cityNational,
-        cities: f.selectedCities || [],
-        applyFormTemplateId: f.applyFormTemplateId,
-        applyFormTemplateName: f.applyFormTemplateName || '',
-        applyFormFields: f.applyFormFields || [],
-      },
+      mpPublishMeta: (() => {
+        const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+        return {
+          prParticipantKey: participant.prParticipantKey(pr),
+          prDisplayName: userProfile.prDisplayName(pr),
+          prWxNickName: String(pr.wxNickName || '').trim(),
+          prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
+          deliveryWindow: f.deliveryWindow,
+          recruitMode: mode.id,
+          signupDeadline: deadline,
+          fansLimitMode: f.fansLimitMode,
+          fansMin: f.fansMin,
+          talentTags: f.talentTags,
+          douyinSalesLevels: f.platform === '抖音' ? f.douyinSalesLevels : [],
+          feeTypeId: f.feeTypeId,
+          fixedPrice: f.fixedPrice,
+          selfQuoteMin: f.selfQuoteMin,
+          selfQuoteMax: f.selfQuoteMax,
+          levelTiers: f.levelTiers,
+          fansTiers: f.fansTiers,
+          cpsPercent: f.cpsPercent,
+          recruitDetail: f.recruitDetail,
+          cityNational: !!f.cityNational,
+          cities: f.selectedCities || [],
+          applyFormTemplateId: f.applyFormTemplateId,
+          applyFormTemplateName: f.applyFormTemplateName || '',
+          applyFormFields: f.applyFormFields || [],
+        }
+      })(),
     }
     if (mode.hall === 'ice') {
       order.orderKind = 'recruitment_ice'
@@ -1078,7 +1075,7 @@ Page({
   },
   onShareAppMessage() {
     const order = this.data.createdOrder
-    if (!order) return { title: '灵祺达人招募', path: '/pages/index/index' }
+    if (!order) return { title: '灵祺撮合平台', path: '/pages/index/index' }
     return {
       title: this.data.shareTitle || order.title,
       path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,

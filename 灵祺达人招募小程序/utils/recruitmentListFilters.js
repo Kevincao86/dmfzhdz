@@ -120,8 +120,11 @@ function sortRecruitmentRows(rows, sortBy) {
   return list
 }
 
+const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
+
 function buildMockRecruitmentRow(partial) {
   const now = Date.now()
+  const budgetText = partial && partial.budgetText != null ? partial.budgetText : '¥1,280'
   return {
     id: 'MOCK-DEMO-RECRUIT-001',
     isMock: true,
@@ -134,7 +137,8 @@ function buildMockRecruitmentRow(partial) {
     platformIcon: '/images/platforms/douyin.png',
     region: '上海',
     category: '餐饮美食',
-    budgetText: '¥1,280',
+    budgetText,
+    budgetDisplay: budgetDisplayUtil.buildBudgetDisplay(budgetText, null),
     fansRequirement: '≥1万',
     summary: '双人套餐探店，需出镜口播+环境展示',
     applicantCount: 2,

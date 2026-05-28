@@ -1,0 +1,9 @@
+@import '../../styles/theme.wxss';
+@import '../../styles/application-cards.wxss';
+
+.empty-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  margin: 12rpx 0 8rpx;
+}

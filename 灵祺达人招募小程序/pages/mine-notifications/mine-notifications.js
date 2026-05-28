@@ -1,4 +1,8 @@
 const messagesStore = require('../../utils/messagesStore.js')
+const ops = require('../../utils/opsRegistryTalentMp.js')
+const merchant = require('../../utils/merchantApi.js')
+const talentMember = require('../../utils/talentMember.js')
+const userProfile = require('../../utils/userProfile.js')
 
 const SECTION_ORDER = [
   { id: 'order', title: '订单通知' },
@@ -21,8 +25,21 @@ Page({
     sections: [],
     totalCount: 0,
   },
-  onShow() {
-    const rows = messagesStore.readNotifications()
+  async onShow() {
+    let rows = messagesStore.readNotifications()
+    if (userProfile.readIdentity() === 'talent' && merchant.hasMerchantApi()) {
+      try {
+        const member = talentMember.readMember()
+        if (member && member.id) {
+          const reg = await ops.fetchRegistry()
+          rows = messagesStore.mergeRegistryInboxForTalent(reg, member.id)
+          const unseen = rows.filter((r) => r.fromRegistry && !r.read).map((r) => r.id)
+          if (unseen.length) messagesStore.markInboxSeen(unseen)
+        }
+      } catch (_) {
+        /* 使用本地通知 */
+      }
+    }
     messagesStore.markNotificationsRead()
     const pages = getCurrentPages()
     const mine = pages.length >= 2 ? pages[pages.length - 2] : null

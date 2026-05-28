@@ -5,7 +5,7 @@ const listFilters = require('../../utils/recruitmentListFilters.js')
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
-const { exportApplicantsExcel } = require('../../utils/mpApplicantsExport.js')
+const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -176,10 +176,17 @@ Page({
       const res = await exportApplicantsExcel(applicants, row.mpOrderId)
       if (res.mode === 'clipboard') {
         wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
+      } else if (res.mode === 'saved') {
+        wx.showModal({
+          title: '表格已生成',
+          content: 'CSV 已保存到本机。若无法自动打开，可将表格内容粘贴到 Excel / WPS。',
+          showCancel: false,
+          confirmText: '知道了',
+        })
       }
     } catch (err) {
       wx.showToast({
-        title: String(err && err.message ? err.message : err).slice(0, 36),
+        title: formatExportError(err).slice(0, 36),
         icon: 'none',
       })
     } finally {

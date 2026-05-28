@@ -9,10 +9,16 @@ Page({
     ],
   },
   onContact() {
-    wx.showModal({
-      title: '小灵同学',
-      content: '在线客服即将接入；可先通过 ERP 商家端「在线支持」联系运营。',
-      showCancel: false,
-    })
+    const relay = require('../../utils/supportRelayMp.js')
+    if (!relay.canSupport()) {
+      wx.showModal({
+        title: '联系客服',
+        content:
+          '请在 utils/config.local.js 配置 MERCHANT_API_BASE_URL（与私信相同，指向 merchant-erp 开发地址，如 http://本机IP:5173），并确保 ERP 的 .env.local 已配置 Supabase；也可直接配置 SUPABASE_URL + SUPABASE_ANON_KEY。',
+        showCancel: false,
+      })
+      return
+    }
+    wx.navigateTo({ url: '/pages/mine-support-chat/mine-support-chat' })
   },
 })

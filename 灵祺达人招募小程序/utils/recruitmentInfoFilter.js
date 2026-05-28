@@ -8,7 +8,19 @@ function shouldExcludeRecruitmentSegment(text) {
   if (/^预算/i.test(t) && /[¥￥\d/]/.test(t)) return true
   if (/^桌数/.test(t)) return true
   if (/^【[^】]*AI[^】]*】/.test(t) && /模式|Brief|预算|桌数/.test(t)) return true
+  if (/^商家订单|^ERP|^MO-|linkedMp|infoSummary|talentId|管控台|注册表/i.test(t)) return true
+  if (/sourceMerchant|merchantOrderId/i.test(t)) return true
   return false
+}
+
+/** 是否运营/商家后台同步的小程序单（非 PR 在小程序内发布） */
+function isMerchantSyncedMpOrder(mp) {
+  if (!mp || typeof mp !== 'object') return false
+  if (mp.publisherIdentity === 'pr') return false
+  if (mp.publisherIdentity === 'merchant') return true
+  const sid = String(mp.sourceMerchantOrderId || '').trim()
+  if (!sid) return false
+  return !/^MP-(RO|ICE|USER)-/i.test(sid)
 }
 
 function shouldShowRecruitmentInfoLine(line) {
@@ -55,4 +67,5 @@ module.exports = {
   filterRecruitmentInfoText,
   filterTaskDetailText,
   normalizeRecruitmentPlatform,
+  isMerchantSyncedMpOrder,
 }

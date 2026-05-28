@@ -197,6 +197,8 @@ Page({
         mpOrderId: this.data.mpOrderId,
         applicantId,
         title: this.data.merchantOrderNo || this.data.mpOrderId,
+        platform: this.data.platform,
+        appliedAt: applicant.appliedAt,
       })
       messagesStore.pushNotification({
         title: '报名已提交',

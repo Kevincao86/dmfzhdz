@@ -1,3 +1,5 @@
+@import '../../styles/theme.wxss';
+
 /* 详情页补充样式（表单基础见 app.wxss） */
 .detail-hero {
   margin-top: 16rpx;
@@ -7,7 +9,7 @@
 .detail-hero-top {
   margin: -32rpx -32rpx 0;
   padding: 28rpx 32rpx 24rpx;
-  background: linear-gradient(135deg, #1e293b 0%, #4338ca 100%);
+  background: var(--lq-gradient-deep);
 }
 
 .detail-hero-top .order-no {
@@ -40,7 +42,7 @@
 .region-value {
   font-size: 30rpx;
   font-weight: 600;
-  color: #4f46e5;
+  color: var(--lq-primary-dark);
 }
 
 .success-title {
@@ -70,7 +72,7 @@
   width: 6rpx;
   height: 28rpx;
   border-radius: 3rpx;
-  background: #8b5cf6;
+  background: var(--lq-primary);
 }
 
 .platform-head--dy::before {

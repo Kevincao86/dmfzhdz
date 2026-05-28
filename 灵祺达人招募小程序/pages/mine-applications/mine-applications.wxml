@@ -1,11 +1,42 @@
-<view class="page-shell">
-  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
-  <view wx:for="{{rows}}" wx:key="mpOrderId" class="card" bindtap="goDetail" data-id="{{mpOrderId}}">
-    <text class="title-lg">{{item.title}}</text>
-    <text class="hint">报名于 {{item.appliedAt}}</text>
-    <text class="hint">状态：{{item.status}}</text>
+<view class="app-list-page page-shell">
+  <view wx:if="{{loading}}" class="card state-loading">
+    <text class="hint">加载报名记录…</text>
   </view>
+
+  <view
+    wx:for="{{rows}}"
+    wx:key="mpOrderId"
+    class="app-card app-card--tap"
+    bindtap="goDetail"
+    data-id="{{item.mpOrderId}}"
+  >
+    <view class="app-card__head">
+      <image class="app-card__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+      <view class="app-card__main">
+        <text class="app-card__title">{{item.title}}</text>
+        <text class="app-card__sub">{{item.merchantName}} · {{item.storeName}}</text>
+      </view>
+    </view>
+    <view class="app-card__tags">
+      <text class="app-card__tag app-card__tag--status">{{item.statusLabel}}</text>
+      <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
+      <text class="app-card__tag">{{item.platform}}</text>
+    </view>
+    <view class="app-card__meta-grid">
+      <text class="app-card__meta-item">酬劳 {{item.budgetText}}</text>
+      <text class="app-card__meta-item">地区 {{item.region}}</text>
+      <text class="app-card__meta-item">报名 {{item.appliedAt}}</text>
+      <text class="app-card__meta-item" wx:if="{{item.merchantOrderNo}}">单号 {{item.merchantOrderNo}}</text>
+    </view>
+    <view class="app-card__foot">
+      <text>查看商单详情</text>
+      <text class="app-card__link">›</text>
+    </view>
+  </view>
+
   <view wx:if="{{!loading && rows.length === 0}}" class="card state-empty">
-    <text class="hint">暂无报名记录</text>
+    <text class="state-empty-icon">📋</text>
+    <text class="empty-title">暂无报名记录</text>
+    <text class="hint">在招募大厅报名后，将在此展示商单与报名状态</text>
   </view>
 </view>

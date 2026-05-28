@@ -5,6 +5,7 @@ import {
   listSessions,
   listPrMutualTalentKeys,
   markSessionRead,
+  readParticipantProfile,
   readParticipantSecret,
   sendMessage,
   upsertParticipant,
@@ -54,6 +55,7 @@ export type MpTalentChatBody = {
   talentName?: string
   prName?: string
   talentAvatar?: string
+  prAvatar?: string
 }
 
 export async function handleMpTalentChatBody(
@@ -183,6 +185,7 @@ export async function handleMpTalentChatBody(
       role: 'pr',
       deviceSecret: prSecret,
       displayName: String(body.prName || '').trim() || 'PR',
+      avatarUrl: body.prAvatar,
     })
     const sessionId = await ensureSession(sb, {
       talentKey,
@@ -192,6 +195,7 @@ export async function handleMpTalentChatBody(
       talentName: String(body.talentName || '').trim(),
       prName: String(body.prName || '').trim(),
       talentAvatar: body.talentAvatar,
+      prAvatar: body.prAvatar,
     })
     return { status: 200, data: { ok: true, sessionId } }
   }
@@ -221,14 +225,16 @@ export async function handleMpTalentChatBody(
         },
       }
     }
+    const prProf = await readParticipantProfile(sb, prKey)
     const sessionId = await ensureSession(sb, {
       talentKey,
       prKey,
       talentSecret,
       prSecret,
       talentName: String(body.talentName || '').trim(),
-      prName: String(body.prName || '').trim(),
+      prName: String(body.prName || prProf?.displayName || '').trim() || 'PR',
       talentAvatar: body.talentAvatar,
+      prAvatar: prProf?.avatarUrl,
     })
     return { status: 200, data: { ok: true, sessionId } }
   }

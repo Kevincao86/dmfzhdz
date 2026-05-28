@@ -56,8 +56,11 @@ function formatChatError(err) {
   if (/supabase_admin_not_configured/i.test(msg)) {
     return '商家后台未配置 Supabase：请在 merchant-erp 的 .env.local 填写 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后重启 npm run dev'
   }
-  if (/schema cache|PGRST202|could not find the function/i.test(msg)) {
-    return 'Supabase 接口缓存未刷新：Dashboard → Settings → API → Reload schema；或确保 MERCHANT_API_BASE_URL 可访问'
+  if (/schema cache|PGRST202|could not find the function|mp_talent_chat_ensure_session/i.test(msg)) {
+    return (
+      'Supabase 缺少私信函数 mp_talent_chat_ensure_session（8 参数）。请在 SQL Editor 执行迁移 ' +
+      '20260530150000_mp_talent_chat_pr_avatar_column.sql（或 20260530140000 全文），然后 Dashboard → Settings → API → Reload schema'
+    )
   }
   if (/尚未配置后台|url not in domain|request:fail/i.test(msg)) {
     return `${msg}（请检查 config.local.js 的 MERCHANT_API_BASE_URL 与「不校验合法域名」）`
@@ -204,11 +207,12 @@ async function ensureSessionRpc(input) {
       talentName: input.talentName,
       prName: input.prName,
       talentAvatar: input.talentAvatar,
+      prAvatar: input.prAvatar,
     })
     return data.sessionId
   }
   if (supabase.hasSupabase()) {
-    const id = await viaSupabaseRpc('mp_talent_chat_ensure_session', {
+    const rpc7 = {
       p_talent_key: input.talentKey,
       p_pr_key: input.prKey,
       p_talent_secret: input.talentSecret,
@@ -216,8 +220,19 @@ async function ensureSessionRpc(input) {
       p_talent_name: input.talentName || '达人',
       p_pr_name: input.prName || 'PR',
       p_talent_avatar: input.talentAvatar || null,
-    })
-    return String(id)
+    }
+    try {
+      const id = await viaSupabaseRpc('mp_talent_chat_ensure_session', {
+        ...rpc7,
+        p_pr_avatar: input.prAvatar || null,
+      })
+      return String(id)
+    } catch (e) {
+      const msg = String((e && e.message) || e)
+      if (!/Could not find the function|PGRST202|schema cache/i.test(msg)) throw e
+      const id = await viaSupabaseRpc('mp_talent_chat_ensure_session', rpc7)
+      return String(id)
+    }
   }
   throw new Error('未配置消息通道')
 }
@@ -239,6 +254,7 @@ async function ensureSessionWithTalent(talent) {
     talentName: talent.name || '达人',
     prName: me.displayName,
     talentAvatar: talent.avatar || '',
+    prAvatar: me.avatarUrl || '',
     callerKey: me.participantKey,
     callerSecret: me.deviceSecret,
   })
@@ -264,8 +280,9 @@ async function ensureSessionWithPr(pr) {
     talentKey: me.participantKey,
     prKey,
     talentName: me.displayName,
-    prName: String(pr.prDisplayName || pr.prName || '招募方').trim() || 'PR',
+    prName: String(pr.prWxNickName || pr.prDisplayName || pr.prName || '招募方').trim() || 'PR',
     talentAvatar: me.avatarUrl || '',
+    prAvatar: String(pr.prWxAvatarUrl || '').trim() || undefined,
   })
   return data.sessionId
 }

@@ -11,6 +11,7 @@ const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionP
 
 const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
+const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
 const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
@@ -102,7 +103,6 @@ Page({
         wxAvatarUrl: patch.wxAvatarUrl || wx.wxAvatarUrl || '',
         wxOpenId: patch.wxOpenId || wx.wxOpenId || '',
       })
-      if (!patch.wechatId && wx.wxNickName) patch.wechatId = wx.wxNickName
     }
     this.setData(patch)
   },
@@ -113,7 +113,6 @@ Page({
   onNicknameInput(e) {
     const nick = e.detail.value || ''
     this.setData({ wxNickName: nick })
-    if (!this.data.wechatId && nick) this.setData({ wechatId: nick })
   },
   onProvinceChange(e) {
     onProvincePick(this, e)
@@ -127,7 +126,6 @@ Page({
       success: (res) => {
         const u = res.userInfo || {}
         this.setData({ wxNickName: u.nickName || '', wxAvatarUrl: u.avatarUrl || '' })
-        if (!this.data.wechatId && u.nickName) this.setData({ wechatId: u.nickName })
         if (u.nickName) {
           wxAccount.writeWxAccount({ wxNickName: u.nickName, wxAvatarUrl: u.avatarUrl || '' })
         }
@@ -238,6 +236,7 @@ Page({
         })
       }
       writeMember(member)
+      let cloudWarn = ''
       if (talentChat.canChat()) {
         try {
           const part = participant.getCurrentParticipant()
@@ -255,15 +254,14 @@ Page({
             member.lingqiTalentId = reg.lingqiTalentId
             writeMember(member)
           }
-        } catch (e) {
-          wx.showToast({ title: '已保存本机，云端同步失败', icon: 'none', duration: 2500 })
+        } catch (_) {
+          cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
         }
       }
       this.setData({
         lingqiTalentIdLabel: lingqiIdentity.formatTalentIdLabel(member.lingqiTalentId),
       })
-      wx.showToast({ title: '已保存', icon: 'success' })
-      setTimeout(() => wx.navigateBack(), 500)
+      notifySavedAndBack(cloudWarn)
     } finally {
       this.setData({ submitting: false })
     }

@@ -259,6 +259,25 @@ export type RegistryMpRecruitmentOrder = {
   /** 急单大厅展示 */
   urgent?: boolean
   fulfillmentLoop?: RecruitmentFulfillmentLoop
+  /** 报名截止（发招募写入） */
+  deadline?: string
+  /** PR 反选达人 applicant.id 列表 */
+  selectedApplicantIds?: string[]
+  mpPublishMeta?: Record<string, unknown>
+  /** pr：小程序发招募；merchant：商家/运营后台同步 */
+  publisherIdentity?: 'pr' | 'merchant'
+}
+
+/** 达人招募小程序 · 站内信（registry 同步，达人端拉取） */
+export type RegistryMpTalentInboxItem = {
+  id: string
+  talentMemberId: string
+  title: string
+  body: string
+  category: 'order' | 'business' | 'system'
+  mpOrderId?: string
+  createdAt: string
+  read?: boolean
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
@@ -313,6 +332,7 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  mpTalentInbox?: RegistryMpTalentInboxItem[]
   mpTalentMembers?: RegistryMpTalentMember[]
   mpPrUsers?: RegistryMpPrUser[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]

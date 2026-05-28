@@ -1,11 +1,13 @@
 /**
- * 店铺菜单/价目表（按租户 localStorage；图片为 data URL，体积大时建议后续迁 Supabase Storage）。
+ * 店铺菜单/价目表（按租户 localStorage + Supabase tenant_store_intel 双写）。
+ * 价目条目单独键保存，避免大图 data URL 撑爆 quota 导致条目丢失。
  */
 import { supabase, supabaseConfigured } from './supabaseClient'
 import { upsertMenuItemsCloud } from './tenantStoreIntelCloud'
-import { tenantLocalKey } from './tenantLocalState'
+import { tenantLocalKey, getActiveTenantStorageId } from './tenantLocalState'
 
 const BASE_KEY = 'meoo_store_menu_v1'
+const ITEMS_BASE_KEY = 'meoo_store_menu_items_v1'
 
 export type StoreMenuItem = {
   name: string
@@ -31,8 +33,19 @@ export type StoreMenuRecord = {
   updatedAt: string
 }
 
+type StoreMenuItemsPayload = {
+  items: StoreMenuItem[]
+  poiId?: string
+  storeName?: string
+  updatedAt: string
+}
+
 function storageKey(): string {
   return tenantLocalKey(BASE_KEY)
+}
+
+function itemsStorageKey(): string {
+  return tenantLocalKey(ITEMS_BASE_KEY)
 }
 
 function parseStoreMenuRaw(raw: string | null): StoreMenuRecord | null {
@@ -50,29 +63,161 @@ function parseStoreMenuRaw(raw: string | null): StoreMenuRecord | null {
   }
 }
 
-export function loadStoreMenuRecord(): StoreMenuRecord | null {
+function parseItemsPayload(raw: string | null): StoreMenuItemsPayload | null {
+  if (!raw) return null
   try {
-    const keyed = parseStoreMenuRaw(window.localStorage.getItem(storageKey()))
-    if (keyed) return keyed
-    // 兼容未挂租户 id 时写入的全局键
-    if (storageKey() !== BASE_KEY) {
-      return parseStoreMenuRaw(window.localStorage.getItem(BASE_KEY))
+    const j = JSON.parse(raw) as StoreMenuItemsPayload
+    if (!j || !Array.isArray(j.items)) return null
+    return {
+      items: j.items,
+      poiId: j.poiId,
+      storeName: j.storeName,
+      updatedAt: j.updatedAt || new Date().toISOString(),
     }
-    return null
   } catch {
     return null
   }
 }
 
-export function saveStoreMenuRecord(rec: StoreMenuRecord): void {
+function findBestTenantMenuFromStorage(): StoreMenuRecord | null {
+  const tid = getActiveTenantStorageId()
+  let best: StoreMenuRecord | null = null
+  let bestScore = 0
   try {
-    window.localStorage.setItem(storageKey(), JSON.stringify({ ...rec, updatedAt: new Date().toISOString() }))
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i)
+      if (!k) continue
+      if (tid && k === itemsStorageKey()) {
+        const p = parseItemsPayload(window.localStorage.getItem(k))
+        if (p && p.items.length > bestScore) {
+          bestScore = p.items.length
+          best = {
+            ...createEmptyStoreMenuRecord(p.poiId, p.storeName),
+            items: p.items,
+            poiId: p.poiId,
+            storeName: p.storeName,
+            updatedAt: p.updatedAt,
+          }
+        }
+      }
+      if (k.startsWith(`${ITEMS_BASE_KEY}@`) || k === ITEMS_BASE_KEY) {
+        const p = parseItemsPayload(window.localStorage.getItem(k))
+        if (p && p.items.length > bestScore) {
+          bestScore = p.items.length
+          best = {
+            ...createEmptyStoreMenuRecord(p.poiId, p.storeName),
+            items: p.items,
+            poiId: p.poiId,
+            storeName: p.storeName,
+            updatedAt: p.updatedAt,
+          }
+        }
+      }
+      if (k.startsWith(`${BASE_KEY}@`) || k === BASE_KEY) {
+        const r = parseStoreMenuRaw(window.localStorage.getItem(k))
+        const n = r?.items?.length ?? 0
+        if (r && n > bestScore) {
+          bestScore = n
+          best = r
+        }
+      }
+    }
   } catch {
-    /* quota */
+    /* ignore */
+  }
+  return best
+}
+
+function mergeRecordWithItemsPayload(
+  base: StoreMenuRecord | null,
+  payload: StoreMenuItemsPayload | null,
+): StoreMenuRecord | null {
+  if (!payload?.items.length) return base
+  if (!base) {
+    return {
+      ...createEmptyStoreMenuRecord(payload.poiId, payload.storeName),
+      items: payload.items,
+      updatedAt: payload.updatedAt,
+    }
+  }
+  const baseTime = Date.parse(base.updatedAt || '') || 0
+  const payTime = Date.parse(payload.updatedAt || '') || 0
+  const usePayloadItems = base.items.length === 0 || payTime >= baseTime
+  if (!usePayloadItems) return base
+  return {
+    ...base,
+    items: payload.items,
+    poiId: payload.poiId ?? base.poiId,
+    storeName: payload.storeName ?? base.storeName,
+    updatedAt: payload.updatedAt,
+  }
+}
+
+export function loadStoreMenuRecord(): StoreMenuRecord | null {
+  try {
+    const itemsPayload = parseItemsPayload(window.localStorage.getItem(itemsStorageKey()))
+    let keyed = parseStoreMenuRaw(window.localStorage.getItem(storageKey()))
+    keyed = mergeRecordWithItemsPayload(keyed, itemsPayload)
+    if (keyed?.items?.length) return keyed
+
+    if (storageKey() !== BASE_KEY) {
+      const legacyItems = parseItemsPayload(window.localStorage.getItem(ITEMS_BASE_KEY))
+      let legacy = parseStoreMenuRaw(window.localStorage.getItem(BASE_KEY))
+      legacy = mergeRecordWithItemsPayload(legacy, legacyItems)
+      if (legacy?.items?.length) return legacy
+      const any = findBestTenantMenuFromStorage()
+      if (any?.items?.length) return any
+    }
+    return keyed
+  } catch {
+    return findBestTenantMenuFromStorage()
+  }
+}
+
+function writeItemsPayload(rec: StoreMenuRecord): void {
+  const payload: StoreMenuItemsPayload = {
+    items: rec.items,
+    poiId: rec.poiId,
+    storeName: rec.storeName,
+    updatedAt: rec.updatedAt,
+  }
+  window.localStorage.setItem(itemsStorageKey(), JSON.stringify(payload))
+}
+
+export type SaveStoreMenuResult = { ok: true } | { ok: false; message: string }
+
+export function saveStoreMenuRecord(rec: StoreMenuRecord): SaveStoreMenuResult {
+  const merged = { ...rec, updatedAt: new Date().toISOString() }
+  try {
+    writeItemsPayload(merged)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `价目保存失败：${msg}` }
+  }
+  try {
+    window.localStorage.setItem(storageKey(), JSON.stringify(merged))
+  } catch {
+    /* 大图可能超限；条目已写入 items 键 */
   }
   if (supabaseConfigured && supabase) {
-    void upsertMenuItemsCloud(supabase, rec.items, rec.storeName)
+    void upsertMenuItemsCloud(supabase, merged.items, merged.storeName).then((r) => {
+      if (!r.ok && typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('meoo-store-menu-cloud-error', { detail: r.message }),
+        )
+      }
+    })
   }
+  return { ok: true }
+}
+
+export async function saveStoreMenuRecordAsync(rec: StoreMenuRecord): Promise<SaveStoreMenuResult> {
+  const local = saveStoreMenuRecord(rec)
+  if (!local.ok) return local
+  if (!supabaseConfigured || !supabase) return { ok: true }
+  const cloud = await upsertMenuItemsCloud(supabase, rec.items, rec.storeName)
+  if (!cloud.ok) return { ok: false, message: cloud.message }
+  return { ok: true }
 }
 
 export function createEmptyStoreMenuRecord(poiId?: string, storeName?: string): StoreMenuRecord {

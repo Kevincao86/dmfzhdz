@@ -7,6 +7,7 @@ import type { Plugin } from 'vite'
 import { loadEnv } from 'vite'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { handleMerchantApiGatewayCore } from './merchantApiGatewayCore.js'
+import { buildWeatherDailyReply } from '../src/lib/agentDailyInfoWeather.js'
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -258,6 +259,39 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.setHeader('Access-Control-Allow-Origin', '*')
         res.end(JSON.stringify({ ok: false, error: 'meoo_ai_chat_failed', detail: msg.slice(0, 800) }))
+      }
+      return
+    }
+
+    if (loc.pathname === '/api/meoo-agent-daily-info') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, message: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const body = JSON.parse(bodyRaw || '{}') as { city?: string; dayOffset?: number }
+        const out = await buildWeatherDailyReply(body)
+        res.statusCode = out.ok ? 200 : 502
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify(out.ok ? { ok: true, reply: out.reply } : { ok: false, message: out.message }))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 502
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, message: msg.slice(0, 200) }))
       }
       return
     }

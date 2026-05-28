@@ -14,16 +14,17 @@
     "pages/mine-notifications/mine-notifications",
     "pages/mine-analytics/mine-analytics",
     "pages/mine-support/mine-support",
+    "pages/mine-support-chat/mine-support-chat",
     "pages/mine-pr-profile/mine-pr-profile",
     "pages/mine-pr-orders/mine-pr-orders",
     "pages/mine-pr-order-applicants/mine-pr-order-applicants",
     "pages/chat/chat"
   ],
   "window": {
-    "navigationBarTitleText": "灵祺达人招募",
+    "navigationBarTitleText": "灵祺撮合平台",
     "navigationBarBackgroundColor": "#4f46e5",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f4f3f8",
+    "backgroundColor": "#f0eff6",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
