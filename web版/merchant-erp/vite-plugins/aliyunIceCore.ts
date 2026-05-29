@@ -48,15 +48,62 @@ export type AliyunIceConfig = {
   outputOssUrlPrefix?: string
 }
 
-function createClient(cfg: AliyunIceConfig): InstanceType<typeof IceClient> {
+const ICE_DEFAULT_CONNECT_TIMEOUT_MS = 30_000
+const ICE_DEFAULT_READ_TIMEOUT_MS = 90_000
+
+function iceSdkTimeouts(env?: Record<string, string | undefined>): {
+  connectTimeout: number
+  readTimeout: number
+} {
+  const connect = Number(env?.ALIYUN_ICE_CONNECT_TIMEOUT_MS ?? env?.ICE_CONNECT_TIMEOUT_MS)
+  const read = Number(env?.ALIYUN_ICE_READ_TIMEOUT_MS ?? env?.ICE_READ_TIMEOUT_MS)
+  return {
+    connectTimeout:
+      Number.isFinite(connect) && connect >= 5_000 ? Math.min(connect, 120_000) : ICE_DEFAULT_CONNECT_TIMEOUT_MS,
+    readTimeout:
+      Number.isFinite(read) && read >= 10_000 ? Math.min(read, 300_000) : ICE_DEFAULT_READ_TIMEOUT_MS,
+  }
+}
+
+function createClient(
+  cfg: AliyunIceConfig,
+  env?: Record<string, string | undefined>,
+): InstanceType<typeof IceClient> {
+  const { connectTimeout, readTimeout } = iceSdkTimeouts(env)
   return new IceClient(
     new $OpenApiUtil.Config({
       accessKeyId: cfg.accessKeyId,
       accessKeySecret: cfg.accessKeySecret,
       regionId: cfg.regionId,
       endpoint: `ice.${cfg.regionId}.aliyuncs.com`,
+      connectTimeout,
+      readTimeout,
     }),
   )
+}
+
+export function isIceTransientNetworkError(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('connecttimeout') ||
+    m.includes('connection timeout') ||
+    m.includes('etimedout') ||
+    m.includes('econnreset') ||
+    m.includes('socket hang up') ||
+    m.includes('network error') ||
+    m.includes('fetch failed')
+  )
+}
+
+function formatIceClientError(e: unknown, cfg: AliyunIceConfig): string {
+  const raw = e instanceof Error ? e.message : String(e)
+  if (isIceTransientNetworkError(raw)) {
+    return (
+      `${raw}。查询 ICE（${cfg.regionId}）网络超时：请稍后点「继续查询」；` +
+      `若部署在 Vercel 海外区域，建议在 Project → Functions → Region 选香港(hkg1)或新加坡(sin1)，或将 API 迁至国内服务器。`
+    )
+  }
+  return raw
 }
 
 function bodyOf(res: { body?: Record<string, unknown> }): Record<string, unknown> | undefined {
@@ -644,6 +691,7 @@ export async function iceResolveJobDownloadUrl(
 export async function iceGetProducingJob(
   cfg: AliyunIceConfig,
   jobId: string,
+  env?: Record<string, string | undefined>,
 ): Promise<
   | {
       ok: true
@@ -654,33 +702,47 @@ export async function iceGetProducingJob(
       progress?: number
       message?: string
     }
-  | { ok: false; message: string }
+  | { ok: false; message: string; transient?: boolean }
 > {
-  const client = createClient(cfg)
-  try {
-    const res = await client.getMediaProducingJob(new GetMediaProducingJobRequest({ jobId }))
-    const job = bodyOf(res)?.mediaProducingJob as Record<string, unknown> | undefined
-    if (!job) return { ok: false, message: '未找到剪辑任务' }
-    const status = String(job.status ?? job.Status ?? '')
-    const st = status.toLowerCase()
-    const done = st === 'success'
-    const failed = st === 'failed'
-    const downloadUrl = done ? await iceResolveJobDownloadUrl(client, cfg, job) : undefined
-    return {
-      ok: true,
-      status,
-      done,
-      failed,
-      downloadUrl,
-      progress:
-        typeof job.progress === 'number'
-          ? job.progress
-          : typeof job.Progress === 'number'
-            ? job.Progress
-            : undefined,
-      message: readIceJobString(job, 'message', 'Message'),
+  const client = createClient(cfg, env)
+  const maxAttempts = 5
+  let lastMsg = ''
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await client.getMediaProducingJob(new GetMediaProducingJobRequest({ jobId }))
+      const job = bodyOf(res)?.mediaProducingJob as Record<string, unknown> | undefined
+      if (!job) return { ok: false, message: '未找到剪辑任务' }
+      const status = String(job.status ?? job.Status ?? '')
+      const st = status.toLowerCase()
+      const done = st === 'success'
+      const failed = st === 'failed'
+      const downloadUrl = done ? await iceResolveJobDownloadUrl(client, cfg, job) : undefined
+      return {
+        ok: true,
+        status,
+        done,
+        failed,
+        downloadUrl,
+        progress:
+          typeof job.progress === 'number'
+            ? job.progress
+            : typeof job.Progress === 'number'
+              ? job.Progress
+              : undefined,
+        message: readIceJobString(job, 'message', 'Message'),
+      }
+    } catch (e) {
+      lastMsg = formatIceClientError(e, cfg)
+      if (!isIceTransientNetworkError(lastMsg) || attempt >= maxAttempts - 1) {
+        return {
+          ok: false,
+          message: lastMsg,
+          transient: isIceTransientNetworkError(lastMsg),
+        }
+      }
+      await sleep(1500 * (attempt + 1))
     }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
+  return { ok: false, message: lastMsg || '查询剪辑任务失败', transient: true }
 }

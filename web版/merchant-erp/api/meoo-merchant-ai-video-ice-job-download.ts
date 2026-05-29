@@ -36,7 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const payload = await fetchIceJobDownloadBuffer(cfg, jobId)
+  const payload = await fetchIceJobDownloadBuffer(
+    cfg,
+    jobId,
+    process.env as Record<string, string | undefined>,
+  )
   if (!payload.ok) {
     sendMerchantJson(res, payload.status, { ok: false, message: payload.message })
     return

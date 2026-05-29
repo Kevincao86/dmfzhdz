@@ -419,11 +419,30 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...patch } : j)))
   }
 
+  const resumePollJob = async (localJobId: string, iceJobId: string) => {
+    patchJob(localJobId, { phase: 'polling', message: '继续查询云端剪辑状态…' })
+    setErr(null)
+    const ok = await pollJob(localJobId, iceJobId)
+    if (ok) setHint('成片已就绪，可在右侧下载。')
+  }
+
   const pollJob = async (localJobId: string, iceJobId: string): Promise<boolean> => {
     for (let i = 0; i < POLL_MAX; i++) {
       const st = await fetchIceJobStatus(iceJobId)
       if (!st.ok) {
-        patchJob(localJobId, { phase: 'failed', message: st.message })
+        const transient =
+          /connecttimeout|超时|继续查询|network error/i.test(st.message ?? '') ||
+          /查询失败 HTTP 502/i.test(st.message ?? '')
+        patchJob(localJobId, {
+          phase: transient ? 'polling' : 'failed',
+          message: transient
+            ? `${st.message ?? '查询超时'}（将自动重试）`
+            : st.message,
+        })
+        if (transient) {
+          await new Promise((r) => setTimeout(r, POLL_MS))
+          continue
+        }
         return false
       }
       if (st.failed) {
@@ -1470,6 +1489,18 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>
                             ) : null}
+                          </div>
+                        ) : null}
+                        {j.phase === 'failed' && j.exportId ? (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() => void resumePollJob(j.id, j.exportId!)}
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-orange-300 bg-orange-50 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100"
+                            >
+                              <Loader2 className="h-3.5 w-3.5" />
+                              继续查询（任务可能仍在云端）
+                            </button>
                           </div>
                         ) : null}
                       </li>

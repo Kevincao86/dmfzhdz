@@ -83,8 +83,9 @@ export type IceJobDownloadPayload =
 export async function fetchIceJobDownloadBuffer(
   cfg: AliyunIceConfig,
   jobId: string,
+  env?: Record<string, string | undefined>,
 ): Promise<IceJobDownloadPayload> {
-  const st = await iceGetProducingJob(cfg, jobId)
+  const st = await iceGetProducingJob(cfg, jobId, env)
   if (!st.ok) return { ok: false, status: 502, message: st.message }
   if (!st.downloadUrl) {
     return { ok: false, status: 404, message: '成片地址尚未生成' }
@@ -429,8 +430,23 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 400, { ok: false, message: '缺少 id 查询参数' })
       return true
     }
-    const st = await iceGetProducingJob(cfg, jobId)
+    const envMap = rawEnv as Record<string, string | undefined>
+    const st = await iceGetProducingJob(cfg, jobId, envMap)
     if (!st.ok) {
+      if (st.transient) {
+        json(res, 200, {
+          ok: true,
+          status: 'Processing',
+          progress: undefined,
+          done: false,
+          failed: false,
+          outputPending: false,
+          message:
+            st.message ||
+            '查询 ICE 状态暂时超时，云端任务可能仍在进行，请稍后在任务列表点「继续查询」。',
+        })
+        return true
+      }
       json(res, 502, { ok: false, message: st.message })
       return true
     }
@@ -475,7 +491,7 @@ export async function handleAliyunIceRoutes(input: {
       return true
     }
     const inline = searchParams.get('inline') === '1'
-    const payload = await fetchIceJobDownloadBuffer(cfg, jobId)
+    const payload = await fetchIceJobDownloadBuffer(cfg, jobId, rawEnv as Record<string, string | undefined>)
     if (!payload.ok) {
       json(res, payload.status, { ok: false, message: payload.message })
       return true
