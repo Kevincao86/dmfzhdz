@@ -63,7 +63,13 @@ export async function findAuthUserByPhone(
   let page = 1
   const perPage = 200
   while (page <= 20) {
-    const res = await fetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, { headers })
+    let res: Response
+    try {
+      res = await fetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, { headers })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new Error(`无法连接认证服务 ${base}：${msg}`)
+    }
     const text = await res.text()
     if (!res.ok) return null
     let parsed: { users?: Record<string, unknown>[] } = {}

@@ -98,11 +98,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
       return
     }
-    if (await phoneAlreadyRegistered(phone)) {
-      sendJson(res, 409, {
+    try {
+      if (await phoneAlreadyRegistered(phone)) {
+        sendJson(res, 409, {
+          ok: false,
+          error: 'phone_exists',
+          message: '该手机号已注册，请直接登录',
+        })
+        return
+      }
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e)
+      sendJson(res, 502, {
         ok: false,
-        error: 'phone_exists',
-        message: '该手机号已注册，请直接登录',
+        error: 'auth_unreachable',
+        message:
+          '注册服务无法连接 api.mofangdianai.com。请确认 Vercel 已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY（ECS 生成的 JWT）并 Redeploy。',
+        detail,
       })
       return
     }
@@ -116,13 +128,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     })
     if (!result.ok) {
       const status =
-        result.error === 'login_exists' ? 409 : result.error === 'supabase_admin_not_configured' ? 503 : 400
+        result.error === 'login_exists'
+          ? 409
+          : result.error === 'supabase_admin_not_configured'
+            ? 503
+            : result.error === 'auth_unreachable'
+              ? 502
+              : 400
       const message =
         result.error === 'login_exists'
           ? '该登录名已被注册'
           : result.error === 'supabase_admin_not_configured'
             ? '注册服务未配置 SUPABASE_SERVICE_ROLE_KEY，请联系管理员'
-            : '注册失败，请稍后重试'
+            : result.error === 'auth_unreachable'
+              ? '注册服务无法连接 api.mofangdianai.com，请检查 Vercel 环境变量 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy'
+              : result.error === 'auth_create_failed'
+                ? '创建账号失败，请稍后重试'
+                : result.error === 'tenant_insert_failed'
+                  ? '创建租户失败，请联系管理员检查数据库权限'
+                  : '注册失败，请稍后重试'
       sendJson(res, status, { ok: false, error: result.error, message, detail: result.detail })
       return
     }
@@ -132,10 +156,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       tenantId: result.tenantId,
     })
   } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
+    const fetchUnreachable = /fetch failed|failed to fetch|econnrefused|enotfound|etimedout|socket/i.test(
+      detail,
+    )
     sendJson(res, 500, {
       ok: false,
       error: 'register_failed',
-      detail: e instanceof Error ? e.message : String(e),
+      message: fetchUnreachable
+        ? '注册服务无法连接认证 API（api.mofangdianai.com）。请检查 Vercel 的 SUPABASE_URL、SUPABASE_SERVICE_ROLE_KEY 是否与 ECS 一致并已 Redeploy；ECS GoTrue 需配置 GOTRUE_JWT_ADMIN_ROLES=service_role。'
+        : '注册失败，请稍后重试',
+      detail,
     })
   }
 }

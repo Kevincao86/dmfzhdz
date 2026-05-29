@@ -13,6 +13,7 @@ import {
   registerMerchantAccount,
   sendAuthSms,
 } from '../../lib/tenantRegisterApi'
+import { toUserFacingError } from '../../lib/userFacingError'
 
 type AuthMode = 'login' | 'register'
 type LoginMethod = 'password' | 'sms'
@@ -257,7 +258,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         confirmPassword,
       })
       if (!r.ok) {
-        onErr(r.message ?? r.detail ?? '注册失败')
+        onErr(toUserFacingError(r.message ?? r.detail ?? r.error, '注册'))
         return
       }
       setLoginName(ln)

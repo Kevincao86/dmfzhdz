@@ -23,8 +23,14 @@ export type SmsLoginResult = {
   loginName?: string
 }
 
+/** 注册/登录 API：默认同源 Vercel；设 VITE_ERP_AUTH_API_BASE 则走 ECS（如 https://api.mofangdianai.com/erp-api） */
+function erpAuthApiUrl(path: string): string {
+  const base = (import.meta.env.VITE_ERP_AUTH_API_BASE ?? '').trim().replace(/\/$/, '')
+  return base ? `${base}${path}` : path
+}
+
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
-  const res = await fetch('/api/meoo-auth-sms-send', {
+  const res = await fetch(erpAuthApiUrl('/api/meoo-auth-sms-send'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone }),
@@ -54,7 +60,7 @@ export async function registerMerchantAccount(body: {
   password: string
   confirmPassword: string
 }): Promise<RegisterResult> {
-  const res = await fetch('/api/meoo-auth-register', {
+  const res = await fetch(erpAuthApiUrl('/api/meoo-auth-register'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -64,7 +70,7 @@ export async function registerMerchantAccount(body: {
     return {
       ok: false,
       error: j.error ?? `http_${res.status}`,
-      message: j.message,
+      message: j.message ?? j.detail ?? (res.status === 500 ? '服务器内部错误' : undefined),
       detail: j.detail,
     }
   }
@@ -75,7 +81,7 @@ export async function loginWithSmsCode(body: {
   phone: string
   smsCode: string
 }): Promise<SmsLoginResult> {
-  const res = await fetch('/api/meoo-auth-sms-login', {
+  const res = await fetch(erpAuthApiUrl('/api/meoo-auth-sms-login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
