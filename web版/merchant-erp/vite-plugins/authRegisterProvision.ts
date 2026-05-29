@@ -50,21 +50,27 @@ export async function provisionMerchantTenant(body: {
     'Content-Type': 'application/json',
   }
 
-  const createRes = await fetch(`${base}/auth/v1/admin/users`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      email,
-      password,
-      email_confirm: true,
-      phone: body.phone ? `+86${body.phone}` : undefined,
-      user_metadata: {
-        login_name: loginName,
-        merchant_name: merchantName,
-        phone: body.phone ?? '',
-      },
-    }),
-  })
+  let createRes: Response
+  try {
+    createRes = await fetch(`${base}/auth/v1/admin/users`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        email,
+        password,
+        email_confirm: true,
+        phone: body.phone ? `+86${body.phone}` : undefined,
+        user_metadata: {
+          login_name: loginName,
+          merchant_name: merchantName,
+          phone: body.phone ?? '',
+        },
+      }),
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: 'auth_unreachable', detail: `无法连接 ${base}/auth/v1：${msg}` }
+  }
 
   const createText = await createRes.text()
   let createJson: { id?: string; user?: { id?: string }; msg?: string; message?: string } = {}
@@ -92,6 +98,9 @@ export async function provisionMerchantTenant(body: {
       account_status: 'normal',
       membership_plan: 'free',
     }),
+  }).catch((e: unknown) => {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`无法连接 REST API ${base}/rest/v1/tenants：${msg}`)
   })
   const tenantText = await tenantRes.text()
   let tenantRows: { id: string }[] = []
