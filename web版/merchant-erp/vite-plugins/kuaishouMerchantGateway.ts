@@ -99,11 +99,13 @@ import {
   openKuaishouSessionCredentials,
 } from '../api/merchant/kuaishou/bindShared.js'
 import { mockDouyinProductStore } from './mockDouyinProductStore.js'
-import { createClient } from '@supabase/supabase-js'
 import {
-  merchantSupabaseAdminEnvConfigureHint,
-  readMerchantSupabaseAdminEnv,
-} from './merchantSupabaseAdminEnv.js'
+  MERCHANT_PRODUCT_IMAGE_MAX_BYTES,
+  merchantProductImageStorageConfigured,
+  merchantProductImageStorageMissingMessage,
+  productImageDemoFallbackAllowed,
+  uploadMerchantProductImage,
+} from './merchantProductImageStorage.js'
 
 export { runKuaishouMerchantBind }
 
@@ -5300,14 +5302,6 @@ function douyinGoodsSaveRetryMaxAttempts(): number {
   return 3
 }
 
-const MERCHANT_PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
-
-function productImageDemoFallbackAllowed(): boolean {
-  const a = process.env.MERCHANT_PRODUCT_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase()
-  const b = process.env.MERCHANT_KUAISHOU_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase()
-  return a === '1' || a === 'true' || b === '1' || b === 'true'
-}
-
 function demoImageUploadFallback(
   res: ServerResponse,
   mimeType: string,
@@ -5324,7 +5318,7 @@ function demoImageUploadFallback(
       url: `data:${safeMime};base64,${contentBase64}`,
       mimeType: safeMime,
       message:
-        '演示回退（MERCHANT_PRODUCT_IMAGE_UPLOAD_DEMO_FALLBACK）：内联 data URL。生产请配置 Supabase Storage 并关闭演示变量。',
+        '演示回退（MERCHANT_PRODUCT_IMAGE_UPLOAD_DEMO_FALLBACK）：内联 data URL。生产请配置 OSS 或 Supabase Storage 并关闭演示变量。',
     })
     return
   }
@@ -5336,69 +5330,8 @@ function demoImageUploadFallback(
   })
 }
 
-function merchantProductImageSupabaseBucket(): string {
-  return (process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET ?? '').trim()
-}
-
-function merchantProductImageStoragePrefix(): string {
-  const p = (process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_PREFIX ?? 'douyin-goods').trim().replace(/^\/+|\/+$/g, '')
-  return p || 'douyin-goods'
-}
-
-function extFromMimeAndName(mime: string, name: string): string {
-  const m = mime.toLowerCase()
-  if (m.includes('png')) return 'png'
-  if (m.includes('webp')) return 'webp'
-  if (m.includes('gif')) return 'gif'
-  if (m.includes('bmp')) return 'bmp'
-  if (m.includes('jpeg') || m.includes('jpg')) return 'jpg'
-  const base = name.split(/[/\\]/).pop() ?? ''
-  const hit = /\.([a-z0-9]{1,8})$/i.exec(base)
-  if (hit && /^[a-z0-9]+$/i.test(hit[1]!)) return hit[1]!.toLowerCase()
-  return 'jpg'
-}
-
-async function uploadMerchantProductImageToSupabase(params: {
-  merchantId: string
-  buf: Buffer
-  safeMime: string
-  originalName: string
-}): Promise<{ publicUrl: string; objectPath: string }> {
-  const bucket = merchantProductImageSupabaseBucket()
-  if (!bucket) throw new Error('MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET 未配置')
-
-  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
-  if (missingParts.length > 0) {
-    throw new Error(`Supabase 服务端密钥不齐：${missingParts.join(', ')}`)
-  }
-
-  const admin = createClient(supabaseUrl, serviceRole, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-
-  const safeMid = params.merchantId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'merchant'
-  const ext = extFromMimeAndName(params.safeMime, params.originalName)
-  const objectPath = `${merchantProductImageStoragePrefix()}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
-
-  const { error } = await admin.storage.from(bucket).upload(objectPath, params.buf, {
-    contentType: params.safeMime,
-    upsert: false,
-    cacheControl: 'public, max-age=604800',
-  })
-  if (error) {
-    throw new Error(error.message || 'storage.upload 失败')
-  }
-
-  const { data: pub } = admin.storage.from(bucket).getPublicUrl(objectPath)
-  const publicUrl = pub.publicUrl?.trim() ?? ''
-  if (!/^https:\/\//i.test(publicUrl)) {
-    throw new Error('getPublicUrl 未返回 https：请将桶设为 Public bucket，或为 storage.objects 配置匿名可读策略')
-  }
-  return { publicUrl, objectPath }
-}
-
 /**
- * 商品图上传：写入 **Supabase Storage** 公开桶，返回 **https** 直链供 goods/save（需 Vercel 配置 MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET + SUPABASE_SERVICE_ROLE_KEY）。
+ * 商品图上传：优先 **阿里云 OSS**，备选 Supabase Storage；返回 **https** 直链供 goods/save。
  */
 export async function handleKuaishouGoodsImageUploadPost(
   req: IncomingMessage,
@@ -5464,26 +5397,17 @@ export async function handleKuaishouGoodsImageUploadPost(
       ? mimeType.trim().toLowerCase()
       : 'image/jpeg'
 
-  const bucket = merchantProductImageSupabaseBucket()
-  const adminParts = readMerchantSupabaseAdminEnv()
-  const missingSupabase = !bucket || adminParts.missingParts.length > 0
-
-  if (missingSupabase) {
+  if (!merchantProductImageStorageConfigured()) {
     if (productImageDemoFallbackAllowed()) {
       demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
       return
     }
-    const lines: string[] = [
-      '商品图上传已改为 Supabase Storage：请在 Vercel 配置 MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET（公开桶名），并确保已配置 VITE_SUPABASE_URL 或 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY；桶须对公网可读以便快手拉取图片。',
-    ]
-    if (!bucket) lines.push('· 缺少 MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET')
-    if (adminParts.missingParts.length) lines.push(merchantSupabaseAdminEnvConfigureHint(adminParts.missingParts))
-    json(res, 503, { message: lines.join('\n') })
+    json(res, 503, { message: merchantProductImageStorageMissingMessage() })
     return
   }
 
   try {
-    const { publicUrl, objectPath } = await uploadMerchantProductImageToSupabase({
+    const { publicUrl, objectPath, storage, bucket } = await uploadMerchantProductImage({
       merchantId: session.merchantId,
       buf,
       safeMime,
@@ -5492,7 +5416,7 @@ export async function handleKuaishouGoodsImageUploadPost(
     json(res, 200, {
       url: publicUrl,
       mimeType: safeMime,
-      storage: 'supabase',
+      storage,
       bucket,
       object_path: objectPath,
     })
@@ -5503,7 +5427,7 @@ export async function handleKuaishouGoodsImageUploadPost(
       return
     }
     json(res, 502, {
-      message: `Supabase Storage 上传失败：${msg.slice(0, 900)}。请检查桶策略（INSERT 允许 service_role）、对象大小与 MIME；公开读可参考 Dashboard → Storage → 桶 → Public bucket。`,
+      message: `商品图上传失败：${msg.slice(0, 900)}。请检查 OSS Bucket 公共读、AccessKey 权限与对象大小。`,
     })
   }
 }
