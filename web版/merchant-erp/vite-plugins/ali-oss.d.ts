@@ -30,5 +30,6 @@ declare module 'ali-oss' {
       uploadId: string,
       parts: { number: number; etag: string }[],
     ): Promise<unknown>
+    delete(name: string): Promise<unknown>
   }
 }

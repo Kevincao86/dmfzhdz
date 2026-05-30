@@ -63,8 +63,9 @@ export default function LoginPage() {
 
     const fromLogout = (location.state as { fromLogout?: boolean } | null)?.fromLogout
     if (fromLogout) {
-      void supabase.auth.getSession().then(({ data }) => {
-        if (data.session) void supabase.auth.signOut()
+      const sb = supabase
+      void sb.auth.getSession().then(({ data }) => {
+        if (data.session) void sb.auth.signOut()
       })
       return
     }
