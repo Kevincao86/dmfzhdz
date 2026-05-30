@@ -1,10 +1,11 @@
 /**
- * 运营台轮询 Supabase 客服消息（service_role，仅服务端 Edge）。
+ * 运营台轮询 Supabase 客服消息（service_role，Node 运行时以便稳定访问 ECS）。
  * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
  */
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { sendSupportMerchantMessageFeishu } from './supportFeishuNotify.js'
 
-export const config = { runtime: 'edge' }
+export const config = { maxDuration: 30 }
 
 type DbRow = {
   session_id: string
@@ -16,11 +17,9 @@ type DbRow = {
   client_msg_id: string
 }
 
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  })
+function sendJson(res: VercelResponse, status: number, body: unknown): void {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.status(status).send(JSON.stringify(body))
 }
 
 function serviceHeaders(serviceRole: string) {
@@ -85,37 +84,42 @@ async function notifyNewMerchantSupportMessages(
   }
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'GET') {
-    return json(405, { ok: false, error: 'method_not_allowed' })
+    sendJson(res, 405, { ok: false, error: 'method_not_allowed' })
+    return
   }
 
   const expected = process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim()
   if (!expected) {
-    return json(503, {
+    sendJson(res, 503, {
       ok: false,
       error: 'support_poll_not_configured',
       hint: '配置 Vercel 环境变量 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY（及 SUPABASE_URL / VITE_SUPABASE_URL）。',
     })
+    return
   }
 
-  const auth = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')?.trim()
+  const auth = String(req.headers.authorization ?? '')
+    .replace(/^Bearer\s+/i, '')
+    .trim()
   if (auth !== expected) {
-    return json(401, { ok: false, error: 'unauthorized' })
+    sendJson(res, 401, { ok: false, error: 'unauthorized' })
+    return
   }
 
   const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!supabaseUrl || !serviceRole) {
-    return json(503, {
+    sendJson(res, 503, {
       ok: false,
       error: 'supabase_service_not_configured',
       hint: '在商家管理后台 Vercel 项目中配置 SUPABASE_SERVICE_ROLE_KEY 与 SUPABASE_URL（或 VITE_SUPABASE_URL）。',
     })
+    return
   }
 
-  const url = new URL(req.url)
-  const sinceRaw = url.searchParams.get('sinceTs')
+  const sinceRaw = typeof req.query.sinceTs === 'string' ? req.query.sinceTs : undefined
   const sinceTs = sinceRaw ? Number(sinceRaw) : 0
   const headers = serviceHeaders(serviceRole)
 
@@ -129,7 +133,8 @@ export default async function handler(req: Request): Promise<Response> {
       )
       if (!r.ok) {
         const t = await r.text()
-        return json(502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+        sendJson(res, 502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+        return
       }
       rows = ((await r.json()) as DbRow[]).reverse()
     } else {
@@ -139,7 +144,8 @@ export default async function handler(req: Request): Promise<Response> {
       )
       if (!r.ok) {
         const t = await r.text()
-        return json(502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+        sendJson(res, 502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+        return
       }
       rows = (await r.json()) as DbRow[]
     }
@@ -159,9 +165,9 @@ export default async function handler(req: Request): Promise<Response> {
       enterpriseName: row.enterprise_name ?? undefined,
     }))
 
-    return json(200, { ok: true, messages })
+    sendJson(res, 200, { ok: true, messages })
   } catch (e) {
-    return json(502, {
+    sendJson(res, 502, {
       ok: false,
       error: 'support_poll_failed',
       detail: e instanceof Error ? e.message : String(e),

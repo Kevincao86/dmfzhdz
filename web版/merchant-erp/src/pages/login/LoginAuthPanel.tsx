@@ -3,8 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
-import { clearTenantScopedBrowserState, setActiveTenantStorageId } from '../../lib/tenantLocalState'
-import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
+import { clearTenantScopedBrowserState } from '../../lib/tenantLocalState'
 import {
   isCnMobileValid,
   isLoginNameValid,
@@ -114,8 +113,6 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         return
       }
       clearTenantScopedBrowserState()
-      const tid = await fetchPrimaryTenantId(supabase)
-      setActiveTenantStorageId(tid)
       onLoginSuccess()
     } finally {
       setBusy(false)
@@ -151,10 +148,6 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       const ok = await applySessionTokens(r.access_token, r.refresh_token)
       if (ok) {
         clearTenantScopedBrowserState()
-        if (supabase) {
-          const tid = await fetchPrimaryTenantId(supabase)
-          setActiveTenantStorageId(tid)
-        }
         onLoginSuccess()
       }
     } finally {

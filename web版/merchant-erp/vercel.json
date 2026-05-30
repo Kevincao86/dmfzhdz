@@ -118,6 +118,10 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-product-image-storage-ping.ts": {
+      "includeFiles": "{vite-plugins,src/lib}/**",
+      "maxDuration": 30
+    },
     "api/meoo-douyin-goods-ai-assist.ts": {
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 300

@@ -155,6 +155,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
   const useHttpPoll = !relayUrl && Boolean(httpPollToken)
   const maxPollTsRef = useRef(0)
   const [httpPollReady, setHttpPollReady] = useState(false)
+  const [httpPollError, setHttpPollError] = useState<string | null>(null)
   const channelReady = relayUrl ? relayReady : useHttpPoll ? httpPollReady : false
 
   useEffect(() => {
@@ -216,12 +217,24 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
         const res = await fetch(`/api/support-poll?sinceTs=${since}`, {
           headers: { Authorization: `Bearer ${httpPollToken}` },
         })
-        if (!res.ok) return
-        const data = (await res.json()) as {
+        const data = (await res.json().catch(() => null)) as {
           ok?: boolean
+          error?: string
+          detail?: string
+          hint?: string
           messages?: SupportRelayChatLine[]
+        } | null
+        if (!res.ok || !data?.ok) {
+          const parts = [
+            data?.error ? `error=${data.error}` : `HTTP ${res.status}`,
+            data?.detail?.trim(),
+            data?.hint?.trim(),
+          ].filter(Boolean)
+          setHttpPollError(parts.join(' · ') || `轮询失败 HTTP ${res.status}`)
+          return
         }
-        if (!data.ok || !Array.isArray(data.messages)) return
+        if (!Array.isArray(data.messages)) return
+        setHttpPollError(null)
         setHttpPollReady(true)
         const initialSince = since
         for (const raw of data.messages) {
@@ -627,15 +640,25 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
       {useHttpPoll ? (
         <div
           className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${
-            httpPollReady
-              ? 'border-emerald-900/40 bg-emerald-950/30 text-emerald-100/90'
-              : 'border-slate-700 bg-slate-900 text-slate-300'
+            httpPollError
+              ? 'border-amber-900/40 bg-amber-950/40 text-amber-100/90'
+              : httpPollReady
+                ? 'border-emerald-900/40 bg-emerald-950/30 text-emerald-100/90'
+                : 'border-slate-700 bg-slate-900 text-slate-300'
           }`}
         >
-          {httpPollReady ? <Wifi className="h-4 w-4 shrink-0" /> : <WifiOff className="h-4 w-4 shrink-0" />}
-          {httpPollReady
-            ? '云端会话同步已启用（HTTP 轮询 Supabase，约每 2 秒刷新）'
-            : '正在连接云端会话接口… 请确认 Vercel 已配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。'}
+          {httpPollError ? (
+            <WifiOff className="h-4 w-4 shrink-0" />
+          ) : httpPollReady ? (
+            <Wifi className="h-4 w-4 shrink-0" />
+          ) : (
+            <WifiOff className="h-4 w-4 shrink-0" />
+          )}
+          {httpPollError
+            ? `云端会话轮询异常：${httpPollError}。请确认 Vercel 已配置 SUPABASE_URL=https://mofangdianai.com 与 ECS service_role，并访问 /api/meoo-support-relay-ping 诊断。`
+            : httpPollReady
+              ? '云端会话同步已启用（HTTP 轮询 Supabase，约每 2 秒刷新）'
+              : '正在连接云端会话接口… 请确认 Vercel 已配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。'}
         </div>
       ) : null}
 

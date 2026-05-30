@@ -9,7 +9,7 @@
  */
 module.exports = {
   /** 正式/真机：与微信「服务器域名」一致 */
-  MERCHANT_API_BASE_URL: 'https://www.mofangdianai.com',
+  MERCHANT_API_BASE_URL: 'https://cs.mofangdianai.com',
   SUPABASE_URL: 'https://rborqkadhtwxqoaskddy.supabase.co',
   // SUPABASE_ANON_KEY: '从 Supabase Dashboard → API → anon public 复制',
   DEV_SKIP_LOGIN: false,

@@ -21,6 +21,12 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
     /** 已收到 Auth 管道至少一次回调（含 INITIAL_SESSION），避免仅用 getSession 竞态 */
     const heardFromAuthRef = { current: false }
 
+    void sb.auth.getSession().then(({ data }) => {
+      if (heardFromAuthRef.current) return
+      setHasSession(Boolean(data.session))
+      setReady(true)
+    })
+
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       heardFromAuthRef.current = true
       setHasSession(Boolean(session))
@@ -33,7 +39,7 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
         setHasSession(Boolean(data.session))
         setReady(true)
       })
-    }, 320)
+    }, 80)
 
     return () => {
       heardFromAuthRef.current = true

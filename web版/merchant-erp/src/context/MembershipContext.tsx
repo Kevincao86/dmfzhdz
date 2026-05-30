@@ -35,8 +35,8 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<MembershipPlan>('free')
   const [directUsed, setDirectUsed] = useState(0)
   const [tokenMixBound, setTokenMixBound] = useState(false)
-  /** 仅首屏拉取权益时阻塞路由；后续刷新不遮挡设置页/订阅弹窗 */
-  const [loading, setLoading] = useState(true)
+  /** 仅首屏拉取权益时短暂阻塞；默认 free 先渲染，后台刷新 membership */
+  const [loading, setLoading] = useState(false)
   const reload = useCallback(async (_opts?: { silent?: boolean }) => {
     const client = supabase
     if (!supabaseConfigured || !client) {

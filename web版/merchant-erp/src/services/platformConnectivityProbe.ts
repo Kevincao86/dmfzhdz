@@ -4,11 +4,42 @@ import { hydrateKuaishouBindingsFromCloud } from '../lib/merchantKuaishouCloudBi
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { getDouyinStores } from './douyinMerchantApi'
 import { getKuaishouStores } from './kuaishouMerchantApi'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
 /** 短时间内重复进入首页 / 商品页等共用一次探测结果，减轻抖音 shop/query 频控压力 */
 const PROBE_CACHE_TTL_MS = 120_000
+
+/** 首页软探测：有本地凭证即视为已连接，避免门店列表接口阻塞整页（用户点「刷新连通」时仍走完整探测） */
+const PROBE_FAST_TOKEN_ONLY = true
+/** 云端 binding 恢复最长等待，超时则用本地 session 继续探测 */
+const HYDRATE_MAX_WAIT_MS = 3_500
+/** connection-check / 完整门店探测的单项超时 */
+const PROBE_ITEM_TIMEOUT_MS = 8_000
+
+function withProbeTimeout<T>(promise: Promise<T>, ms = PROBE_ITEM_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error('probe_timeout')), ms)
+    }),
+  ])
+}
+
+async function hydrateBindingsFromCloudWithBudget(client: SupabaseClient) {
+  try {
+    await withProbeTimeout(
+      Promise.all([
+        hydrateDouyinBindingsFromCloud(client),
+        hydrateKuaishouBindingsFromCloud(client),
+      ]),
+      HYDRATE_MAX_WAIT_MS,
+    )
+  } catch {
+    /* 云端 binding 恢复慢/失败时仍用本地 session 探测 */
+  }
+}
 
 function merchantUrl(path: string): string {
   const b = apiBase().replace(/\/$/, '')
@@ -67,13 +98,15 @@ let probeInFlight: Promise<PlatformConnectivityRow[]> | null = null
 
 async function checkBearerGateway(path: string, token: string): Promise<boolean> {
   try {
-    const res = await fetch(merchantUrl(path), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const res = await withProbeTimeout(
+      fetch(merchantUrl(path), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+    )
     if (!res.ok) return false
     const data = (await res.json()) as { ok?: unknown }
     return data.ok === true
@@ -96,7 +129,7 @@ function douyinStoreErrorLooksLikeAuthFailure(message: string): boolean {
   return false
 }
 
-async function probeDouyinConnectivity(lastChecked: string): Promise<PlatformConnectivityRow> {
+async function probeDouyinConnectivity(lastChecked: string, deep = false): Promise<PlatformConnectivityRow> {
   let douyin: PlatformConnectivityRow = {
     id: 'douyin',
     name: '抖音来客',
@@ -107,12 +140,19 @@ async function probeDouyinConnectivity(lastChecked: string): Promise<PlatformCon
   const dyMid = readMerchantSession('meoo_douyin_merchant_id')
   if (!dyTok) return douyin
 
-  const r = await getDouyinStores({
-    accessToken: dyTok,
-    page: 1,
-    pageSize: 1,
-    merchantId: dyMid ?? undefined,
-  })
+  if (PROBE_FAST_TOKEN_ONLY && !deep) {
+    return { ...douyin, status: 'connected', lastChecked: formatNow() }
+  }
+
+  const r = await withProbeTimeout(
+    getDouyinStores({
+      accessToken: dyTok,
+      page: 1,
+      pageSize: 1,
+      merchantId: dyMid ?? undefined,
+      clientTimeoutMs: PROBE_ITEM_TIMEOUT_MS,
+    }),
+  ).catch((): { ok: false; message: string } => ({ ok: false, message: 'probe_timeout' }))
   const checkedAt = formatNow()
   if (r.ok) {
     return { ...douyin, status: 'connected', lastChecked: checkedAt }
@@ -124,7 +164,7 @@ async function probeDouyinConnectivity(lastChecked: string): Promise<PlatformCon
   return { ...douyin, status: 'connected', lastChecked: checkedAt }
 }
 
-async function probeKuaishouConnectivity(lastChecked: string): Promise<PlatformConnectivityRow> {
+async function probeKuaishouConnectivity(lastChecked: string, deep = false): Promise<PlatformConnectivityRow> {
   let kuaishou: PlatformConnectivityRow = {
     id: 'kuaishou',
     name: '快手团购',
@@ -135,12 +175,19 @@ async function probeKuaishouConnectivity(lastChecked: string): Promise<PlatformC
   const ksMid = readMerchantSession('meoo_kuaishou_merchant_id')
   if (!ksTok) return kuaishou
 
-  const r = await getKuaishouStores({
-    accessToken: ksTok,
-    page: 1,
-    pageSize: 1,
-    merchantId: ksMid ?? undefined,
-  })
+  if (PROBE_FAST_TOKEN_ONLY && !deep) {
+    return { ...kuaishou, status: 'connected', lastChecked: formatNow() }
+  }
+
+  const r = await withProbeTimeout(
+    getKuaishouStores({
+      accessToken: ksTok,
+      page: 1,
+      pageSize: 1,
+      merchantId: ksMid ?? undefined,
+      clientTimeoutMs: PROBE_ITEM_TIMEOUT_MS,
+    }),
+  ).catch((): { ok: false; message: string } => ({ ok: false, message: 'probe_timeout' }))
   const checkedAt = formatNow()
   if (r.ok) {
     return { ...kuaishou, status: 'connected', lastChecked: checkedAt }
@@ -151,18 +198,17 @@ async function probeKuaishouConnectivity(lastChecked: string): Promise<PlatformC
   return { ...kuaishou, status: 'connected', lastChecked: checkedAt }
 }
 
-async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow[]> {
+async function probeMerchantPlatformsUncached(deep = false): Promise<PlatformConnectivityRow[]> {
   if (supabaseConfigured && supabase) {
     try {
       const {
         data: { session },
       } = await supabase.auth.getSession()
       if (session?.user) {
-        await hydrateDouyinBindingsFromCloud(supabase)
-        await hydrateKuaishouBindingsFromCloud(supabase)
+        await hydrateBindingsFromCloudWithBudget(supabase)
       }
     } catch {
-      /* 云端绑定恢复失败时仍用本地 session 探测 */
+      /* 云端 binding 恢复失败时仍用本地 session 探测 */
     }
   }
 
@@ -175,44 +221,42 @@ async function probeMerchantPlatformsUncached(): Promise<PlatformConnectivityRow
     lastChecked,
   }
 
-  const douyin = await probeDouyinConnectivity(lastChecked)
-  const kuaishou = await probeKuaishouConnectivity(lastChecked)
-
-  const mtTok = readMerchantSession('meoo_meituan_merchant_token')
-  let meituan: PlatformConnectivityRow = {
-    id: 'meituan',
-    name: '美团点评',
-    status: 'error',
-    lastChecked,
-  }
-  if (mtTok) {
-    const ok = await checkBearerGateway('/api/merchant/meituan/connection-check', mtTok)
-    meituan = {
-      ...meituan,
-      status: ok ? 'connected' : 'error',
-      lastChecked: formatNow(),
-    }
-  }
-
-  const xhsTok = readMerchantSession('meoo_xhs_merchant_token')
-  let xiaohongshu: PlatformConnectivityRow = {
-    id: 'xiaohongshu',
-    name: '小红书',
-    status: 'error',
-    lastChecked,
-  }
-  if (xhsTok) {
-    const ok = await checkBearerGateway('/api/merchant/xhs/connection-check', xhsTok)
-    xiaohongshu = {
-      ...xiaohongshu,
-      status: ok ? 'connected' : 'error',
-      lastChecked: formatNow(),
-    }
-  }
-
-  const eleme = await probeWaimai('eleme', '淘宝闪购')
-  const meituanWaimai = await probeWaimai('meituan_waimai', '美团外卖')
-  const jdWaimai = await probeWaimai('jd_waimai', '京东外卖')
+  const [douyin, kuaishou, meituan, xiaohongshu, eleme, meituanWaimai, jdWaimai] =
+    await Promise.all([
+      probeDouyinConnectivity(lastChecked, deep),
+      probeKuaishouConnectivity(lastChecked, deep),
+      (async () => {
+        const mtTok = readMerchantSession('meoo_meituan_merchant_token')
+        let row: PlatformConnectivityRow = {
+          id: 'meituan',
+          name: '美团点评',
+          status: 'error',
+          lastChecked,
+        }
+        if (mtTok) {
+          const ok = await checkBearerGateway('/api/merchant/meituan/connection-check', mtTok)
+          row = { ...row, status: ok ? 'connected' : 'error', lastChecked: formatNow() }
+        }
+        return row
+      })(),
+      (async () => {
+        const xhsTok = readMerchantSession('meoo_xhs_merchant_token')
+        let row: PlatformConnectivityRow = {
+          id: 'xiaohongshu',
+          name: '小红书',
+          status: 'error',
+          lastChecked,
+        }
+        if (xhsTok) {
+          const ok = await checkBearerGateway('/api/merchant/xhs/connection-check', xhsTok)
+          row = { ...row, status: ok ? 'connected' : 'error', lastChecked: formatNow() }
+        }
+        return row
+      })(),
+      probeWaimai('eleme', '淘宝闪购'),
+      probeWaimai('meituan_waimai', '美团外卖'),
+      probeWaimai('jd_waimai', '京东外卖'),
+    ])
 
   return [
     douyin,
@@ -251,7 +295,7 @@ export async function probeMerchantPlatforms(
   }
 
   if (force) {
-    const rows = await probeMerchantPlatformsUncached()
+    const rows = await probeMerchantPlatformsUncached(true)
     probeCache = { rows: cloneRows(rows), at: Date.now(), sig: connectivitySessionSig() }
     return cloneRows(rows)
   }
@@ -261,7 +305,7 @@ export async function probeMerchantPlatforms(
   }
 
   const run = async (): Promise<PlatformConnectivityRow[]> => {
-    const rows = await probeMerchantPlatformsUncached()
+    const rows = await probeMerchantPlatformsUncached(false)
     probeCache = { rows: cloneRows(rows), at: Date.now(), sig: connectivitySessionSig() }
     return rows
   }

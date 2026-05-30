@@ -6,7 +6,7 @@ set -euo pipefail
 
 CONF="/etc/nginx/sites-available/meoo-internal-api"
 if [[ ! -f /etc/nginx/sites-available/meoo-api ]]; then
-  echo "未找到 meoo-api，请先完成 api.mofangdianai.com 的 Nginx 配置"
+  echo "未找到 meoo-api，请先完成 mofangdianai.com 的 Nginx 配置"
   exit 1
 fi
 

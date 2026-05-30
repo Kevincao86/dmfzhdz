@@ -46,10 +46,26 @@ export type MerchantProductImageOssEnv = {
   accessKeySecret: string
 }
 
+/** ali-oss 需要 `oss-cn-shanghai` 形式；勿写成 `shanghai` 或 `oss-shanghai`。 */
 function normalizeOssRegion(raw: string): string {
-  const t = raw.trim()
+  const t = raw.trim().toLowerCase()
   if (!t) return 'oss-cn-shanghai'
-  return /^oss-/i.test(t) ? t.toLowerCase() : `oss-${t.toLowerCase()}`
+  const core = t.replace(/^oss-/, '')
+  const cityAlias: Record<string, string> = {
+    shanghai: 'cn-shanghai',
+    hangzhou: 'cn-hangzhou',
+    beijing: 'cn-beijing',
+    shenzhen: 'cn-shenzhen',
+    qingdao: 'cn-qingdao',
+    zhangjiakou: 'cn-zhangjiakou',
+    huhehaote: 'cn-huhehaote',
+  }
+  const normalized = cityAlias[core] ?? core
+  return normalized.startsWith('cn-') || normalized.startsWith('us-') || normalized.startsWith('ap-')
+    ? `oss-${normalized}`
+    : /^oss-/.test(t)
+      ? t
+      : `oss-${normalized}`
 }
 
 export function readMerchantProductImageOssEnv(): MerchantProductImageOssEnv | null {
