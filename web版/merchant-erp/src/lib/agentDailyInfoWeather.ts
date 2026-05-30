@@ -20,6 +20,68 @@ export type DailyWeatherInput = {
   dayOffset?: number
 }
 
+function wmoWeatherZh(code: number): string {
+  if (code === 0) return '晴'
+  if (code <= 3) return '多云'
+  if (code <= 48) return '雾'
+  if (code <= 57) return '毛毛雨'
+  if (code <= 67) return '雨'
+  if (code <= 77) return '雪'
+  if (code <= 82) return '阵雨'
+  if (code <= 86) return '阵雪'
+  if (code >= 95) return '雷雨'
+  return '阴'
+}
+
+async function buildWeatherFromOpenMeteo(
+  city: string,
+  dayOffset: number,
+  dayLabel: string,
+  cityCn: string,
+): Promise<{ ok: true; reply: string } | { ok: false; message: string }> {
+  const geoRes = await fetch(
+    `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh`,
+    { headers: { 'User-Agent': 'MeooERP-Agent/1.0' }, signal: AbortSignal.timeout(10000) },
+  )
+  if (!geoRes.ok) return { ok: false, message: `Open-Meteo 地理编码 HTTP ${geoRes.status}` }
+  const geo = (await geoRes.json()) as { results?: Array<{ latitude: number; longitude: number; name?: string }> }
+  const hit = geo.results?.[0]
+  if (!hit) return { ok: false, message: '未找到城市坐标' }
+
+  const fcRes = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${hit.latitude}&longitude=${hit.longitude}` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+      `&forecast_days=3&timezone=auto`,
+    { headers: { 'User-Agent': 'MeooERP-Agent/1.0' }, signal: AbortSignal.timeout(10000) },
+  )
+  if (!fcRes.ok) return { ok: false, message: `Open-Meteo 预报 HTTP ${fcRes.status}` }
+  const fc = (await fcRes.json()) as {
+    daily?: {
+      weather_code?: number[]
+      temperature_2m_max?: number[]
+      temperature_2m_min?: number[]
+      precipitation_probability_max?: number[]
+    }
+  }
+  const d = fc.daily
+  const idx = Math.min(dayOffset, (d?.weather_code?.length ?? 1) - 1)
+  const desc = wmoWeatherZh(d?.weather_code?.[idx] ?? 3)
+  const hi = d?.temperature_2m_max?.[idx] ?? '—'
+  const lo = d?.temperature_2m_min?.[idx] ?? '—'
+  const rain = d?.precipitation_probability_max?.[idx] ?? 0
+  const place = hit.name || cityCn
+
+  const reply = [
+    `${place}${dayLabel}天气：${desc}。`,
+    `气温约 ${lo}～${hi}°C，降水概率约 ${rain}%。`,
+    dayOffset === 0
+      ? '如需其它城市，可在问题里写上城市名，例如「上海明天天气」。'
+      : '以上为公开气象数据参考，出行前建议再看一眼本地天气预报。',
+  ].join('')
+
+  return { ok: true, reply }
+}
+
 export async function buildWeatherDailyReply(
   input: DailyWeatherInput,
 ): Promise<{ ok: true; reply: string } | { ok: false; message: string }> {
@@ -35,6 +97,8 @@ export async function buildWeatherDailyReply(
       signal: AbortSignal.timeout(12000),
     })
     if (!wRes.ok) {
+      const fallback = await buildWeatherFromOpenMeteo(city, dayOffset, dayLabel, cityCn)
+      if (fallback.ok) return fallback
       return { ok: false, message: `天气源 HTTP ${wRes.status}` }
     }
     const data = (await wRes.json()) as {
@@ -80,6 +144,11 @@ export async function buildWeatherDailyReply(
     return { ok: true, reply }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const fallback = await buildWeatherFromOpenMeteo(city, dayOffset, dayLabel, cityCn).catch(() => ({
+      ok: false as const,
+      message: msg.slice(0, 200),
+    }))
+    if (fallback.ok) return fallback
     return { ok: false, message: msg.slice(0, 200) }
   }
 }

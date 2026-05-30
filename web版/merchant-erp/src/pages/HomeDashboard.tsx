@@ -112,6 +112,7 @@ type DashBundle = Awaited<ReturnType<typeof fetchHomeDashboardByPlatforms>>
 
 export default function HomeDashboard() {
   const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(false)
   const [timeOpen, setTimeOpen] = useState(false)
   const [timeKey, setTimeKey] = useState<(typeof TIME_FILTERS)[number]['value']>('realtime')
   const [detailId, setDetailId] = useState<PlatformId | null>(null)
@@ -121,8 +122,12 @@ export default function HomeDashboard() {
 
   useEffect(() => {
     let cancelled = false
+    const paintTimer = window.setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 2_000)
+
     ;(async () => {
-      setLoading(true)
+      setStatsLoading(true)
       try {
         const probe = await probeMerchantPlatforms()
         if (cancelled) return
@@ -145,11 +150,16 @@ export default function HomeDashboard() {
           setDashBundle(null)
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          window.clearTimeout(paintTimer)
+          setLoading(false)
+          setStatsLoading(false)
+        }
       }
     })()
     return () => {
       cancelled = true
+      window.clearTimeout(paintTimer)
     }
   }, [timeKey])
 
@@ -208,9 +218,16 @@ export default function HomeDashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-96 flex-col items-center justify-center gap-3 text-slate-500">
-        <div className="h-9 w-9 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
-        <span className="text-sm font-medium">加载经营数据…</span>
+      <div className="space-y-8">
+        <div className="flex h-24 flex-col items-center justify-center gap-3 text-slate-500">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+          <span className="text-sm font-medium">加载经营数据…</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4 opacity-60 xl:grid-cols-6 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-slate-100" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -228,7 +245,7 @@ export default function HomeDashboard() {
           <p className="mt-1 text-sm text-slate-600">本地生活全渠道经营概览</p>
         </div>
         <span className="rounded-full border border-slate-200/90 bg-white/80 px-4 py-1.5 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm">
-          更新于 {new Date().toLocaleString('zh-CN')}
+          {statsLoading ? '正在刷新数据…' : `更新于 ${new Date().toLocaleString('zh-CN')}`}
         </span>
       </div>
 

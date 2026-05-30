@@ -31,13 +31,6 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
   })
 }
 
-function cors(res: ServerResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-}
-
-/** Vercel handler 使用 res.status(n).send/end；Node ServerResponse 需适配 */
 function adaptVercelResponse(res: ServerResponse): ServerResponse & {
   status: (code: number) => { send: (body: string) => void; end: () => void }
 } {
@@ -60,7 +53,6 @@ function adaptVercelResponse(res: ServerResponse): ServerResponse & {
 
 http
   .createServer(async (req, res) => {
-    cors(res)
     const vercelRes = adaptVercelResponse(res)
     const path = (req.url ?? '').split('?')[0]
     if (req.method === 'OPTIONS') {

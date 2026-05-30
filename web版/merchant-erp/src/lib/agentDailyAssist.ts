@@ -102,7 +102,6 @@ export async function fetchDailyAssistReply(
 
   const city = extractCity(text)
   const offset = dayOffset(text)
-  const dayLabel = offset === 0 ? '今天' : offset === 1 ? '明天' : '后天'
 
   try {
     const res = await fetch('/api/meoo-agent-daily-info', {
@@ -117,18 +116,15 @@ export async function fetchDailyAssistReply(
       return `${prefix}${j.reply}`.trim()
     }
     if (!res.ok && j.message) {
-      return `${dayLabel}${city === 'Beijing' ? '北京' : '当地'}天气暂时查询失败（${j.message}）。${dateOnly || formatLocalDateReply(text) || ''}`.trim()
+      // 天气 BFF 失败时不阻断对话，交还给大模型作答
+      return null
     }
   } catch {
-    /* fallback below */
+    /* fall through to LLM */
   }
 
-  const fallbackDate = formatLocalDateReply(text)
-  if (/天气|气温|下雨/.test(text)) {
-    return (
-      `${dayLabel}天气服务暂不可用，请稍后在系统天气 App 查看。` +
-      (fallbackDate ? `\n${fallbackDate}` : '')
-    ).trim()
+  if (/天气|气温|下雨|降雨|下雪|预报|几度|冷不冷|热不热|穿什么|带伞/.test(text)) {
+    return null
   }
-  return fallbackDate
+  return formatLocalDateReply(text)
 }

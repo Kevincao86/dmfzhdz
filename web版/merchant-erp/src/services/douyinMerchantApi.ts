@@ -25,9 +25,9 @@ const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | un
 const DOUYIN_BIND_CLIENT_TIMEOUT_MS = 70_000
 const DOUYIN_STORES_CLIENT_TIMEOUT_MS = 65_000
 
-function storesFetchTimeoutSignal(): { signal: AbortSignal; clear: () => void } {
+function storesFetchTimeoutSignal(timeoutMs = DOUYIN_STORES_CLIENT_TIMEOUT_MS): { signal: AbortSignal; clear: () => void } {
   const ctrl = new AbortController()
-  const id = window.setTimeout(() => ctrl.abort(), DOUYIN_STORES_CLIENT_TIMEOUT_MS)
+  const id = window.setTimeout(() => ctrl.abort(), timeoutMs)
   return { signal: ctrl.signal, clear: () => window.clearTimeout(id) }
 }
 
@@ -247,6 +247,8 @@ export async function getDouyinStores(params: {
   businessStatusFilter?: 'all' | 'open' | 'rest' | 'closed'
   /** 门店品牌关键词 */
   storeBrand?: string
+  /** 连通性软探测等场景可缩短客户端超时（默认 65s） */
+  clientTimeoutMs?: number
 }): Promise<DouyinStoresResult> {
   const q = new URLSearchParams({
     page: String(params.page),
@@ -282,7 +284,9 @@ export async function getDouyinStores(params: {
   const storePaths = ['/api/meoo-douyin-stores', '/api/merchant/douyin/stores'] as const
   let res: Response | null = null
   let rawText = ''
-  const { signal, clear: clearStoresTimer } = storesFetchTimeoutSignal()
+  const { signal, clear: clearStoresTimer } = storesFetchTimeoutSignal(
+    params.clientTimeoutMs ?? DOUYIN_STORES_CLIENT_TIMEOUT_MS,
+  )
   try {
     for (const p of storePaths) {
       let r: Response

@@ -1,52 +1,64 @@
 /**
- * 运营台通过 HTTP 发送客服回复，写入 Supabase（service_role）。
+ * 运营台通过 HTTP 发送客服回复，写入 Supabase（service_role，Node 运行时）。
  */
-export const config = { runtime: 'edge' }
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-function json(status: number, body: unknown) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  })
+export const config = { maxDuration: 30 }
+
+function sendJson(res: VercelResponse, status: number, body: unknown): void {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.status(status).send(JSON.stringify(body))
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {
-    return json(405, { ok: false, error: 'method_not_allowed' })
+    sendJson(res, 405, { ok: false, error: 'method_not_allowed' })
+    return
   }
 
   const expected = process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim()
   if (!expected) {
-    return json(503, {
+    sendJson(res, 503, {
       ok: false,
       error: 'support_send_not_configured',
       hint: '配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。',
     })
+    return
   }
 
-  const auth = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')?.trim()
+  const auth = String(req.headers.authorization ?? '')
+    .replace(/^Bearer\s+/i, '')
+    .trim()
   if (auth !== expected) {
-    return json(401, { ok: false, error: 'unauthorized' })
+    sendJson(res, 401, { ok: false, error: 'unauthorized' })
+    return
   }
 
   const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!supabaseUrl || !serviceRole) {
-    return json(503, { ok: false, error: 'supabase_service_not_configured' })
+    sendJson(res, 503, { ok: false, error: 'supabase_service_not_configured' })
+    return
   }
 
   let body: { sessionId?: string; text?: string; id?: string }
   try {
-    body = (await req.json()) as { sessionId?: string; text?: string; id?: string }
+    body = (typeof req.body === 'object' && req.body !== null ? req.body : JSON.parse(String(req.body ?? '{}'))) as {
+      sessionId?: string
+      text?: string
+      id?: string
+    }
   } catch {
-    return json(400, { ok: false, error: 'invalid_json' })
+    sendJson(res, 400, { ok: false, error: 'invalid_json' })
+    return
   }
 
   const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : ''
   const text = typeof body.text === 'string' ? body.text.trim() : ''
   const id = typeof body.id === 'string' ? body.id.trim() : ''
   if (!sessionId || !text || !id) {
-    return json(400, { ok: false, error: 'missing_fields' })
+    sendJson(res, 400, { ok: false, error: 'missing_fields' })
+    return
   }
 
   const row = {
@@ -74,12 +86,13 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (!r.ok) {
       const t = await r.text()
-      return json(502, { ok: false, error: 'supabase_insert_failed', detail: t.slice(0, 500) })
+      sendJson(res, 502, { ok: false, error: 'supabase_insert_failed', detail: t.slice(0, 500) })
+      return
     }
 
-    return json(200, { ok: true })
+    sendJson(res, 200, { ok: true })
   } catch (e) {
-    return json(502, {
+    sendJson(res, 502, {
       ok: false,
       error: 'support_send_failed',
       detail: e instanceof Error ? e.message : String(e),

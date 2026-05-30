@@ -1,20 +1,26 @@
-# 追加到 /etc/nginx/sites-available/meoo-api 的 server { } 内（api.mofangdianai.com HTTPS 块）
+# 追加到 /etc/nginx/sites-available/meoo-api 的 server { } 内（mofangdianai.com HTTPS 块）
 #
 # 1) 先 ECS 上运行: bash scripts/ecs-setup-internal-api-proxy.sh
 #    bash scripts/ecs-run-auth-api.sh  （或 systemd，见下）
 # 2) 把下面 location 粘贴进 meoo-api 的 server 块，然后 sudo nginx -t && sudo systemctl reload nginx
 # 3) Vercel 环境变量增加:
-#    VITE_ERP_AUTH_API_BASE=https://api.mofangdianai.com/erp-api
+#    VITE_ERP_AUTH_API_BASE=https://mofangdianai.com/erp-api
 #    Redeploy 前端
 
     location /erp-api/ {
+        proxy_hide_header Access-Control-Allow-Origin;
+        proxy_hide_header Access-Control-Allow-Methods;
+        proxy_hide_header Access-Control-Allow-Headers;
+
         if ($request_method = OPTIONS) {
             add_header Access-Control-Allow-Origin *;
             add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
             add_header Access-Control-Allow-Headers "Content-Type";
             return 204;
         }
-        # CORS 由 Auth API (3001) 响应头提供；此处不要再 add_header，否则会与 upstream 重复成 "*, *"
+        add_header Access-Control-Allow-Origin * always;
+        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type" always;
 
         proxy_pass http://127.0.0.1:3001/api/;
         proxy_http_version 1.1;

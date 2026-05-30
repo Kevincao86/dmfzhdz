@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type TenantGateResult = { ok: true } | { ok: false; message: string }
 
-const DEFAULT_GATE_TIMEOUT_MS = 12_000
+const DEFAULT_GATE_TIMEOUT_MS = 5_000
 /** 登录/跳转首屏时 getSession 可能晚一拍于 SIGNED_IN，短暂重试避免误判未登录并 signOut */
 const GET_SESSION_RETRY_MS = 150
 const GET_SESSION_RETRY_ATTEMPTS = 12

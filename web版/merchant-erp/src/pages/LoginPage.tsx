@@ -42,7 +42,11 @@ export default function LoginPage() {
   const [infoHint, setInfoHint] = useState<string | null>(null)
 
   useEffect(() => {
-    const st = (location.state ?? null) as { authMessage?: string; infoHint?: string } | null
+    const st = (location.state ?? null) as {
+      authMessage?: string
+      infoHint?: string
+      fromLogout?: boolean
+    } | null
     if (!st?.authMessage && !st?.infoHint) return
     if (st.authMessage) {
       setErr(st.authMessage)
@@ -51,20 +55,25 @@ export default function LoginPage() {
       setInfoHint(st.infoHint)
       setErr(null)
     }
-    navigate(location.pathname, { replace: true, state: {} })
+    navigate(location.pathname, { replace: true, state: { fromLogout: st.fromLogout } })
   }, [location.key, location.pathname, navigate])
 
   useEffect(() => {
-    if (!supabaseConfigured || !supabase) {
-      navigate('/', { replace: true })
+    if (!supabaseConfigured || !supabase) return
+
+    const fromLogout = (location.state as { fromLogout?: boolean } | null)?.fromLogout
+    if (fromLogout) {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) void supabase.auth.signOut()
+      })
       return
     }
+
     const sb = supabase
     void sb.auth.getSession().then(({ data }) => {
-      if (!data.session) return
-      navigate('/', { replace: true })
+      if (data.session) navigate('/', { replace: true })
     })
-  }, [navigate])
+  }, [navigate, location.state])
 
   if (!supabaseConfigured) {
     return (

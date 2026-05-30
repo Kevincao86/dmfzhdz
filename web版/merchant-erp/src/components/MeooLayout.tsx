@@ -119,21 +119,27 @@ export default function MeooLayout() {
     )
   }
 
-  /** 切换商户主账号：登出后进入登录页；未启用云端时跳转本地子账号管理 */
-  const handleSwitchAccount = () => {
+  /** 切换商户主账号 / 退出：清本地态、登出 Supabase，进入登录页（勿被 LoginPage 自动跳回首页） */
+  const signOutAndGoLogin = (infoHint?: string) => {
     setUserOpen(false)
     void (async () => {
+      clearTenantScopedBrowserState()
       if (supabaseConfigured && supabase) {
-        clearTenantScopedBrowserState()
         await supabase.auth.signOut()
-        navigate('/login', {
-          replace: true,
-          state: { infoHint: '已退出当前账号，请输入其他商户账户名与密码登录' },
-        })
-        return
       }
-      navigate({ pathname: '/settings', search: 'tab=accounts' })
+      navigate('/login', {
+        replace: true,
+        state: { fromLogout: true, infoHint },
+      })
     })()
+  }
+
+  const handleSwitchAccount = () => {
+    signOutAndGoLogin('已退出当前账号，请输入其他商户账户名与密码登录')
+  }
+
+  const handleLogout = () => {
+    signOutAndGoLogin()
   }
 
   const sidebarWidth = collapsed ? 'w-16' : 'w-64'
@@ -409,17 +415,7 @@ export default function MeooLayout() {
                     <div className="border-t border-slate-100 py-1">
                       <button
                         type="button"
-                        onClick={() => {
-                          setUserOpen(false)
-                          void (async () => {
-                            if (supabase) {
-                              await supabase.auth.signOut()
-                              navigate('/login')
-                              return
-                            }
-                            window.location.reload()
-                          })()
-                        }}
+                        onClick={() => void handleLogout()}
                         className="flex w-full items-center px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
                       >
                         <LogOut className="mr-3 h-4 w-4" />

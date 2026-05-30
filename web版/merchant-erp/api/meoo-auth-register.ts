@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'auth_unreachable',
         message:
-          '注册服务无法连接 api.mofangdianai.com。请确认 Vercel 已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY（ECS 生成的 JWT）并 Redeploy。',
+          '注册服务无法连接 mofangdianai.com。请确认 Vercel 已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY（ECS 生成的 JWT）并 Redeploy。',
         detail,
       })
       return
@@ -141,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           : result.error === 'supabase_admin_not_configured'
             ? '注册服务未配置 SUPABASE_SERVICE_ROLE_KEY，请联系管理员'
             : result.error === 'auth_unreachable'
-              ? '注册服务无法连接 api.mofangdianai.com，请检查 Vercel 环境变量 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy'
+              ? '注册服务无法连接 mofangdianai.com，请检查 Vercel 环境变量 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy'
               : result.error === 'auth_create_failed'
                 ? '创建账号失败，请稍后重试'
                 : result.error === 'tenant_insert_failed'
@@ -164,7 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ok: false,
       error: 'register_failed',
       message: fetchUnreachable
-        ? '注册服务无法连接认证 API（api.mofangdianai.com）。请检查 Vercel 的 SUPABASE_URL、SUPABASE_SERVICE_ROLE_KEY 是否与 ECS 一致并已 Redeploy；ECS GoTrue 需配置 GOTRUE_JWT_ADMIN_ROLES=service_role。'
+        ? '注册服务无法连接认证 API（mofangdianai.com）。请检查 Vercel 的 SUPABASE_URL、SUPABASE_SERVICE_ROLE_KEY 是否与 ECS 一致并已 Redeploy；ECS GoTrue 需配置 GOTRUE_JWT_ADMIN_ROLES=service_role。'
         : '注册失败，请稍后重试',
       detail,
     })
