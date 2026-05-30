@@ -37,9 +37,31 @@ function cors(res: ServerResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 }
 
+/** Vercel handler 使用 res.status(n).send/end；Node ServerResponse 需适配 */
+function adaptVercelResponse(res: ServerResponse): ServerResponse & {
+  status: (code: number) => { send: (body: string) => void; end: () => void }
+} {
+  const r = res as ServerResponse & {
+    status: (code: number) => { send: (body: string) => void; end: () => void }
+  }
+  r.status = (code: number) => {
+    r.statusCode = code
+    return {
+      send: (body: string) => {
+        r.end(body)
+      },
+      end: () => {
+        r.end()
+      },
+    }
+  }
+  return r
+}
+
 http
   .createServer(async (req, res) => {
     cors(res)
+    const vercelRes = adaptVercelResponse(res)
     const path = (req.url ?? '').split('?')[0]
     if (req.method === 'OPTIONS') {
       res.statusCode = 204
@@ -58,7 +80,7 @@ http
       const vercelReq = Object.assign(req, {
         body: bodyBuf.length ? bodyBuf.toString('utf8') : undefined,
       })
-      await handler(vercelReq, res)
+      await handler(vercelReq, vercelRes)
     } catch (e) {
       res.statusCode = 500
       res.setHeader('Content-Type', 'application/json; charset=utf-8')

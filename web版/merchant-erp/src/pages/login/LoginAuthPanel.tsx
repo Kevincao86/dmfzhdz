@@ -173,7 +173,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     try {
       const r = await sendAuthSms(mobile)
       if (!r.ok) {
-        onErr(r.message ?? r.error ?? '验证码发送失败')
+        onErr(toUserFacingError(r.message ?? r.error, '验证码发送'))
         return
       }
       setSmsCooldown(60)
@@ -199,7 +199,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     try {
       const r = await sendAuthSms(mobile)
       if (!r.ok) {
-        onErr(r.message ?? r.error ?? '验证码发送失败')
+        onErr(toUserFacingError(r.message ?? r.error, '验证码发送'))
         return
       }
       setLoginSmsCooldown(60)

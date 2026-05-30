@@ -26,7 +26,15 @@ export type SmsLoginResult = {
 /** 注册/登录 API：默认同源 Vercel；设 VITE_ERP_AUTH_API_BASE 则走 ECS（如 https://api.mofangdianai.com/erp-api） */
 function erpAuthApiUrl(path: string): string {
   const base = (import.meta.env.VITE_ERP_AUTH_API_BASE ?? '').trim().replace(/\/$/, '')
-  return base ? `${base}${path}` : path
+  if (!base) return path
+  // 短信发送仍走当前站点 Vercel /api（阿里云已在 Vercel 配置）
+  if (path === '/api/meoo-auth-sms-send') {
+    if (typeof window !== 'undefined') return `${window.location.origin}${path}`
+    return path
+  }
+  // Nginx: /erp-api/ → :3001/api/ ，故此处不要再带 /api 前缀
+  const name = path.replace(/^\/api\//, '')
+  return `${base}/${name}`
 }
 
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
