@@ -1,0 +1,19 @@
+[Unit]
+Description=Meoo ERP Auth API (register/login on ECS)
+After=network.target meoo-gotrue.service meoo-postgrest.service nginx.service
+Wants=meoo-gotrue.service meoo-postgrest.service
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/app/web版/merchant-erp
+EnvironmentFile=/home/admin/stack/auth-api.env
+Environment=AUTH_API_PORT=3001
+ExecStart=/usr/bin/npx --yes tsx scripts/ecs-auth-api-server.ts
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
