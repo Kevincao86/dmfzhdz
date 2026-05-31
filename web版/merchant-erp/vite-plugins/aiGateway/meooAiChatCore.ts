@@ -19,6 +19,12 @@ import { buildServerMerchantIntelContext } from '../merchantIntelServerCore.js'
 
 const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
 
+function bearerJwt(authHeader: string | undefined): string | undefined {
+  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : undefined
+}
+
 export async function runMeooAiChatCore(
   bodyRaw: string,
   authHeader: string | undefined,
@@ -68,19 +74,14 @@ export async function runMeooAiChatCore(
   }
 
   let chatEnv = env
-  try {
-    const access = await assertAiChatAccess(user.id, provider, env)
-    if (!access.ok) {
-      return {
-        status: access.status,
-        body: { ok: false, error: access.error, detail: access.detail },
-      }
+  const access = await assertAiChatAccess(user.id, provider, env, bearerJwt(authHeader))
+  if (!access.ok) {
+    return {
+      status: access.status,
+      body: { ok: false, error: access.error, detail: access.detail },
     }
-    chatEnv = access.envForChat
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { status: 503, body: { ok: false, error: 'access_check_failed', detail: msg.slice(0, 400) } }
   }
+  chatEnv = access.envForChat
 
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined

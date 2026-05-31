@@ -13,7 +13,7 @@ export type PresetAvatar = {
   style: AvatarStyle
   tag: string
   gradient: string
-  /** 公开预览图（Unsplash / DiceBear 等） */
+  /** 公开预览图（本地 JPG 缩略图或 DiceBear 卡通头像） */
   previewUrl: string
   gender: '男' | '女'
 }
@@ -73,7 +73,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '商务男声',
     gender: '男',
     gradient: 'from-slate-600 to-slate-800',
-    previewUrl: '/digital-human/avatars/av-real-1.png',
+    previewUrl: '/digital-human/avatars/av-real-1.jpg',
   },
   {
     id: 'av-real-2',
@@ -82,7 +82,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '亲和女声',
     gender: '女',
     gradient: 'from-rose-400 to-orange-400',
-    previewUrl: '/digital-human/avatars/av-real-2.png',
+    previewUrl: '/digital-human/avatars/av-real-2.jpg',
   },
   {
     id: 'av-real-3',
@@ -91,7 +91,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '新闻播报',
     gender: '男',
     gradient: 'from-blue-600 to-indigo-700',
-    previewUrl: '/digital-human/avatars/av-real-3.png',
+    previewUrl: '/digital-human/avatars/av-real-3.jpg',
   },
   {
     id: 'av-real-4',
@@ -100,7 +100,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '种草达人',
     gender: '女',
     gradient: 'from-pink-500 to-rose-500',
-    previewUrl: '/digital-human/avatars/av-real-4.png',
+    previewUrl: '/digital-human/avatars/av-real-4.jpg',
   },
   {
     id: 'av-real-5',
@@ -109,7 +109,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '阳光男声',
     gender: '男',
     gradient: 'from-sky-500 to-blue-600',
-    previewUrl: '/digital-human/avatars/av-real-5.png',
+    previewUrl: '/digital-human/avatars/av-real-5.jpg',
   },
   {
     id: 'av-real-6',
@@ -118,7 +118,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '门店店长',
     gender: '女',
     gradient: 'from-teal-500 to-emerald-600',
-    previewUrl: '/digital-human/avatars/av-real-6.png',
+    previewUrl: '/digital-human/avatars/av-real-6.jpg',
   },
   {
     id: 'av-real-7',
@@ -127,7 +127,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '沉稳讲解',
     gender: '男',
     gradient: 'from-zinc-600 to-stone-700',
-    previewUrl: '/digital-human/avatars/av-real-7.png',
+    previewUrl: '/digital-human/avatars/av-real-7.jpg',
   },
   {
     id: 'av-real-8',
@@ -136,7 +136,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '活力女声',
     gender: '女',
     gradient: 'from-fuchsia-500 to-purple-600',
-    previewUrl: '/digital-human/avatars/av-real-8.png',
+    previewUrl: '/digital-human/avatars/av-real-8.jpg',
   },
   {
     id: 'av-real-9',
@@ -145,7 +145,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '探店 Vlog',
     gender: '男',
     gradient: 'from-amber-600 to-orange-700',
-    previewUrl: '/digital-human/avatars/av-real-9.png',
+    previewUrl: '/digital-human/avatars/av-real-9.jpg',
   },
   {
     id: 'av-real-10',
@@ -154,7 +154,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '温柔客服',
     gender: '女',
     gradient: 'from-indigo-400 to-violet-500',
-    previewUrl: '/digital-human/avatars/av-real-10.png',
+    previewUrl: '/digital-human/avatars/av-real-10.jpg',
   },
   {
     id: 'av-real-11',
@@ -163,7 +163,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '团购带货',
     gender: '男',
     gradient: 'from-cyan-600 to-blue-700',
-    previewUrl: '/digital-human/avatars/av-real-11.png',
+    previewUrl: '/digital-human/avatars/av-real-11.jpg',
   },
   {
     id: 'av-real-12',
@@ -172,7 +172,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '美妆护肤',
     gender: '女',
     gradient: 'from-rose-500 to-pink-600',
-    previewUrl: '/digital-human/avatars/av-real-12.png',
+    previewUrl: '/digital-human/avatars/av-real-12.jpg',
   },
   {
     id: 'cartoon-1',

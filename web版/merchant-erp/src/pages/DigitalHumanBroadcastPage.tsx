@@ -278,6 +278,9 @@ export default function DigitalHumanBroadcastPage() {
           src={selectedAvatar.previewUrl}
           alt={selectedAvatar.name}
           referrerPolicy="no-referrer"
+          decoding="async"
+          width={400}
+          height={500}
           className="h-full w-full object-cover"
         />
       ) : (
@@ -442,6 +445,10 @@ export default function DigitalHumanBroadcastPage() {
                                   src={av.previewUrl}
                                   alt={av.name}
                                   referrerPolicy="no-referrer"
+                                  loading="lazy"
+                                  decoding="async"
+                                  width={400}
+                                  height={500}
                                   className="h-full w-full object-cover"
                                 />
                               ) : (

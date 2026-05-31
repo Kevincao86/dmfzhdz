@@ -20,6 +20,18 @@ function currentUsageMonth(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
+function supabaseBase(env: Record<string, string>): string {
+  return (env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+}
+
+function serviceRoleKey(env: Record<string, string>): string {
+  return (env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE ?? '').trim()
+}
+
+function anonKey(env: Record<string, string>): string {
+  return (env.SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_ANON_KEY ?? '').trim()
+}
+
 function serviceRoleHeaders(serviceKey: string): Record<string, string> {
   return {
     apikey: serviceKey,
@@ -29,21 +41,36 @@ function serviceRoleHeaders(serviceKey: string): Record<string, string> {
   }
 }
 
-export async function loadTenantAiContextForUser(
+function userJwtHeaders(anon: string, jwt: string): Record<string, string> {
+  return {
+    apikey: anon,
+    Authorization: `Bearer ${jwt}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  }
+}
+
+function parseTenantRow(
+  tenantId: string,
+  row: Record<string, unknown> | undefined,
+  tokenmixApiKey: string | null,
+): TenantAiContext | null {
+  if (!row) return null
+  return {
+    tenantId,
+    plan: normalizeMembershipPlan(row.membership_plan),
+    tokenmixApiKey,
+    directAiCallsUsed: Math.max(0, Math.floor(Number(row.direct_ai_calls_used) || 0)),
+    directAiUsageMonth:
+      typeof row.direct_ai_usage_month === 'string' ? row.direct_ai_usage_month : null,
+  }
+}
+
+async function fetchTenantIdForUser(
+  base: string,
   userId: string,
-  env: Record<string, string>,
-): Promise<TenantAiContext | null> {
-  const supabaseUrl = (env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
-  const serviceRole = (
-    env.SUPABASE_SERVICE_ROLE_KEY ??
-    env.SUPABASE_SERVICE_ROLE ??
-    ''
-  ).trim()
-  if (!supabaseUrl || !serviceRole || !userId) return null
-
-  const base = supabaseUrl.replace(/\/$/, '')
-  const headers = serviceRoleHeaders(serviceRole)
-
+  headers: Record<string, string>,
+): Promise<string | null> {
   const memUrl = `${base}/rest/v1/tenant_members?select=tenant_id&user_id=eq.${encodeURIComponent(userId)}&order=created_at.asc&limit=1`
   const memRes = await fetch(memUrl, { headers: { ...headers, Prefer: 'return=representation' } })
   if (!memRes.ok) return null
@@ -54,33 +81,86 @@ export async function loadTenantAiContextForUser(
     return null
   }
   const tenantId = memRows?.[0]?.tenant_id
-  if (!tenantId) return null
+  return tenantId ? String(tenantId) : null
+}
 
-  const selectCols =
-    'id,membership_plan,tokenmix_api_key,direct_ai_calls_used,direct_ai_usage_month'
-  const tUrl = `${base}/rest/v1/tenants?select=${encodeURIComponent(selectCols)}&id=eq.${encodeURIComponent(tenantId)}&limit=1`
-  const tRes = await fetch(tUrl, { headers: { ...headers, Prefer: 'return=representation' } })
-  if (!tRes.ok) return null
-  let trows: Record<string, unknown>[]
+async function loadTenantAiContextViaServiceRole(
+  userId: string,
+  env: Record<string, string>,
+): Promise<TenantAiContext | null> {
+  const base = supabaseBase(env)
+  const serviceRole = serviceRoleKey(env)
+  if (!base || !serviceRole || !userId) return null
+
   try {
-    trows = JSON.parse(await tRes.text()) as Record<string, unknown>[]
+    const headers = serviceRoleHeaders(serviceRole)
+    const tenantId = await fetchTenantIdForUser(base, userId, headers)
+    if (!tenantId) return null
+
+    const selectCols =
+      'id,membership_plan,tokenmix_api_key,direct_ai_calls_used,direct_ai_usage_month'
+    const tUrl = `${base}/rest/v1/tenants?select=${encodeURIComponent(selectCols)}&id=eq.${encodeURIComponent(tenantId)}&limit=1`
+    const tRes = await fetch(tUrl, { headers: { ...headers, Prefer: 'return=representation' } })
+    if (!tRes.ok) return null
+    let trows: Record<string, unknown>[]
+    try {
+      trows = JSON.parse(await tRes.text()) as Record<string, unknown>[]
+    } catch {
+      return null
+    }
+    const row = trows?.[0]
+    const tokenmixApiKey =
+      typeof row?.tokenmix_api_key === 'string' && row.tokenmix_api_key.trim()
+        ? row.tokenmix_api_key.trim()
+        : null
+    return parseTenantRow(tenantId, row, tokenmixApiKey)
   } catch {
     return null
   }
-  const row = trows?.[0]
-  if (!row) return null
+}
 
-  return {
-    tenantId,
-    plan: normalizeMembershipPlan(row.membership_plan),
-    tokenmixApiKey:
-      typeof row.tokenmix_api_key === 'string' && row.tokenmix_api_key.trim()
-        ? row.tokenmix_api_key.trim()
-        : null,
-    directAiCallsUsed: Math.max(0, Math.floor(Number(row.direct_ai_calls_used) || 0)),
-    directAiUsageMonth:
-      typeof row.direct_ai_usage_month === 'string' ? row.direct_ai_usage_month : null,
+/** 与浏览器 MembershipContext 相同：用户 JWT + anon，经 RLS 读 membership_plan（不含 tokenmix_api_key） */
+async function loadTenantAiContextViaUserJwt(
+  userId: string,
+  userJwt: string,
+  env: Record<string, string>,
+): Promise<TenantAiContext | null> {
+  const base = supabaseBase(env)
+  const anon = anonKey(env)
+  if (!base || !anon || !userId || !userJwt) return null
+
+  try {
+    const headers = userJwtHeaders(anon, userJwt)
+    const tenantId = await fetchTenantIdForUser(base, userId, headers)
+    if (!tenantId) return null
+
+    const selectCols = 'id,membership_plan,direct_ai_calls_used,direct_ai_usage_month'
+    const tUrl = `${base}/rest/v1/tenants?select=${encodeURIComponent(selectCols)}&id=eq.${encodeURIComponent(tenantId)}&limit=1`
+    const tRes = await fetch(tUrl, { headers: { ...headers, Prefer: 'return=representation' } })
+    if (!tRes.ok) return null
+    let trows: Record<string, unknown>[]
+    try {
+      trows = JSON.parse(await tRes.text()) as Record<string, unknown>[]
+    } catch {
+      return null
+    }
+    return parseTenantRow(tenantId, trows?.[0], null)
+  } catch {
+    return null
   }
+}
+
+export async function loadTenantAiContextForUser(
+  userId: string,
+  env: Record<string, string>,
+  userJwt?: string,
+): Promise<TenantAiContext | null> {
+  const viaService = await loadTenantAiContextViaServiceRole(userId, env)
+  if (viaService) return viaService
+  if (userJwt) {
+    return loadTenantAiContextViaUserJwt(userId, userJwt, env)
+  }
+  return null
 }
 
 export type AiAccessCheck =
@@ -91,13 +171,14 @@ export async function assertAiChatAccess(
   userId: string,
   provider: string,
   env: Record<string, string>,
+  userJwt?: string,
 ): Promise<AiAccessCheck> {
   const allowUnauth = (env.MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED ?? '').trim() === '1'
   if (allowUnauth && userId === 'dev-unauthenticated') {
     return { ok: true, envForChat: env }
   }
 
-  const ctx = await loadTenantAiContextForUser(userId, env)
+  const ctx = await loadTenantAiContextForUser(userId, env, userJwt)
   if (!ctx) {
     return { ok: false, status: 403, error: 'tenant_not_found', detail: '未找到租户，无法调用 AI' }
   }
@@ -166,30 +247,31 @@ async function incrementDirectAiUsage(
   currentUsed: number,
   env: Record<string, string>,
 ): Promise<{ ok: boolean; detail?: string }> {
-  const supabaseUrl = (env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
-  const serviceRole = (
-    env.SUPABASE_SERVICE_ROLE_KEY ??
-    env.SUPABASE_SERVICE_ROLE ??
-    ''
-  ).trim()
-  if (!supabaseUrl || !serviceRole) return { ok: true }
+  const base = supabaseBase(env)
+  const serviceRole = serviceRoleKey(env)
+  if (!base || !serviceRole) return { ok: true }
 
   const patch = {
     direct_ai_calls_used: currentUsed + 1,
     direct_ai_usage_month: month,
     updated_at: new Date().toISOString(),
   }
-  const url = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}`
-  const r = await fetch(url, {
-    method: 'PATCH',
-    headers: serviceRoleHeaders(serviceRole),
-    body: JSON.stringify(patch),
-  })
-  if (!r.ok) {
-    const t = await r.text()
-    return { ok: false, detail: t.slice(0, 300) }
+  const url = `${base}/rest/v1/tenants?id=eq.${encodeURIComponent(tenantId)}`
+  try {
+    const r = await fetch(url, {
+      method: 'PATCH',
+      headers: serviceRoleHeaders(serviceRole),
+      body: JSON.stringify(patch),
+    })
+    if (!r.ok) {
+      const t = await r.text()
+      return { ok: false, detail: t.slice(0, 300) }
+    }
+    return { ok: true }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, detail: msg.slice(0, 300) }
   }
-  return { ok: true }
 }
 
 export { buildTenantEntitlements, normalizeMembershipPlan }

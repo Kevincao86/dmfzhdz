@@ -14,4 +14,4 @@ node_modules/
 
 # 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
 灵祺商家小程序/utils/config.local.js
-灵祺达人招募小程序/utils/config.local.js
+灵祺达人撮合小程序/utils/config.local.js

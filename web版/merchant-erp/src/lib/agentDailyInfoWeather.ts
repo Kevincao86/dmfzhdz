@@ -91,15 +91,16 @@ export async function buildWeatherDailyReply(
   const cityCn = CITY_CN[city] || city
 
   try {
+    const openMeteoFirst = await buildWeatherFromOpenMeteo(city, dayOffset, dayLabel, cityCn)
+    if (openMeteoFirst.ok) return openMeteoFirst
+
     const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1&lang=zh`
     const wRes = await fetch(url, {
       headers: { 'User-Agent': 'MeooERP-Agent/1.0' },
       signal: AbortSignal.timeout(12000),
     })
     if (!wRes.ok) {
-      const fallback = await buildWeatherFromOpenMeteo(city, dayOffset, dayLabel, cityCn)
-      if (fallback.ok) return fallback
-      return { ok: false, message: `天气源 HTTP ${wRes.status}` }
+      return { ok: false, message: openMeteoFirst.message || `天气源 HTTP ${wRes.status}` }
     }
     const data = (await wRes.json()) as {
       current_condition?: Array<{
