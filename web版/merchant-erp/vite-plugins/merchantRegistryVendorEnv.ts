@@ -1,5 +1,6 @@
 /**
- * 将运营台注册表 vendorKeys 合并进服务端 MerchantAiEnv（非空 Vercel 环境变量优先）。
+ * 将运营台注册表 vendorKeys 合并进服务端 MerchantAiEnv。
+ * 运营台保存的 Key **优先于** Vercel/ECS 环境变量（避免旧 env 盖住新 Key 导致 401）。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -9,10 +10,24 @@ import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
-function fillIfEmpty(out: MerchantAiEnv, envKey: string, val: string | undefined): void {
-  const v = val?.trim()
+/** 去掉 Bearer 前缀、引号、零宽字符等常见粘贴错误 */
+export function sanitizeVendorApiKey(raw: string | undefined): string {
+  if (typeof raw !== 'string') return ''
+  let v = raw.replace(/[\u200b-\u200d\ufeff]/g, '').trim()
+  if (/^bearer\s+/i.test(v)) v = v.replace(/^bearer\s+/i, '').trim()
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim()
+  }
+  return v
+}
+
+/** 注册表有值时覆盖 env（运营台为唯一配置源） */
+function setFromRegistry(out: MerchantAiEnv, envKey: string, val: string | undefined): void {
+  const v = sanitizeVendorApiKey(val)
   if (!v) return
-  if (String(out[envKey] ?? '').trim()) return
   out[envKey] = v
 }
 
@@ -23,33 +38,33 @@ export function applyRegistryVendorKeysToMerchantEnv(
   const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(rawVendorKeys))
 
   const tm = expanded.tokenmix
-  if (tm) fillIfEmpty(out, 'TOKENMIX_API_KEY', tm)
+  if (tm) setFromRegistry(out, 'TOKENMIX_API_KEY', tm)
 
   const minimax = expanded.minimax
   if (minimax) {
-    fillIfEmpty(out, 'MERCHANT_AI_MINIMAX_KEY', minimax)
-    fillIfEmpty(out, 'MINIMAX_API_KEY', minimax)
+    setFromRegistry(out, 'MERCHANT_AI_MINIMAX_KEY', minimax)
+    setFromRegistry(out, 'MINIMAX_API_KEY', minimax)
   }
 
   const qwen = expanded.qwen
   if (qwen) {
-    fillIfEmpty(out, 'MERCHANT_AI_QWEN_KEY', qwen)
-    fillIfEmpty(out, 'DASHSCOPE_API_KEY', qwen)
+    setFromRegistry(out, 'MERCHANT_AI_QWEN_KEY', qwen)
+    setFromRegistry(out, 'DASHSCOPE_API_KEY', qwen)
   }
 
   const doubao = expanded.doubao
   if (doubao) {
-    fillIfEmpty(out, 'MERCHANT_AI_DOUBAO_KEY', doubao)
-    fillIfEmpty(out, 'ARK_API_KEY', doubao)
+    setFromRegistry(out, 'MERCHANT_AI_DOUBAO_KEY', doubao)
+    setFromRegistry(out, 'ARK_API_KEY', doubao)
   }
 
   const deepseek = expanded.deepseek
-  if (deepseek) fillIfEmpty(out, 'DEEPSEEK_API_KEY', deepseek)
+  if (deepseek) setFromRegistry(out, 'DEEPSEEK_API_KEY', deepseek)
 
   const kimi = expanded.kimi
   if (kimi) {
-    fillIfEmpty(out, 'MOONSHOT_API_KEY', kimi)
-    fillIfEmpty(out, 'MERCHANT_AI_KIMI_KEY', kimi)
+    setFromRegistry(out, 'MOONSHOT_API_KEY', kimi)
+    setFromRegistry(out, 'MERCHANT_AI_KIMI_KEY', kimi)
   }
 }
 
