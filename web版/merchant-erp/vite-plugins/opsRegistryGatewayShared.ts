@@ -8,6 +8,7 @@ import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../src/lib/aiVendorCatalogShared.js'
+import { expandVendorKeysForRegistrySave } from '../src/lib/aiVendorKeysShared.js'
 import { filterLegacyDemoRecruitmentOrders } from '../src/lib/recruitmentLegacyDemoOrders.js'
 import type {
   AiVendorCatalogEntry,
@@ -344,16 +345,16 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
             const data = ensureRegistry(viteRoot)
-            const next: RegistryVendorKeys = { ...data.vendorKeys }
+            const merged: RegistryVendorKeys = { ...data.vendorKeys }
             const patch = body.keys && typeof body.keys === 'object' ? body.keys : {}
             for (const [id, v] of Object.entries(patch)) {
               if (!isValidAiVendorSlug(id)) continue
               if (v === undefined) continue
               const t = typeof v === 'string' ? v.trim() : ''
-              if (t) next[id] = t
-              else delete next[id]
+              if (t) merged[id] = t
+              else delete merged[id]
             }
-            data.vendorKeys = next
+            data.vendorKeys = expandVendorKeysForRegistrySave(merged)
             if (body.aiVendorCatalog !== undefined) {
               data.aiVendorCatalog = mergeBuiltinAiVendorCatalog(
                 Array.isArray(body.aiVendorCatalog) ? body.aiVendorCatalog : [],

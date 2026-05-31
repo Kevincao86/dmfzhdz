@@ -8,6 +8,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
+import { applyRegistryVendorKeysToMerchantEnv } from './merchantRegistryVendorEnv.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
   DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
@@ -96,6 +97,7 @@ export function mergeVideoAiMerchantEnv(
     if (!fs.existsSync(registryPath)) return out
     const reg = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as Partial<RegistryFile>
     applyRegistrySliceToVideoAiEnv(out, reg)
+    applyRegistryVendorKeysToMerchantEnv(out, reg.vendorKeys)
   } catch {
     return out
   }
@@ -119,6 +121,7 @@ export async function mergeVideoAiMerchantEnvWithSnapshot(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     applyRegistrySliceToVideoAiEnv(out, { videoAi: data.videoAi, vendorKeys: data.vendorKeys })
+    applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
   } catch {
     /* 未配 Supabase 或快照不可读时保留 .env / 本地 registry 结果 */
   }

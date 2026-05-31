@@ -17,6 +17,13 @@ import {
   normalizeCatalogLogoUrl,
   slugifyAiVendorCandidate,
 } from '../../meooRegistryShared/aiVendorCatalogShared'
+import {
+  TOKENMIX_LINKED_VENDOR_IDS,
+  TOKENMIX_VENDOR_ID,
+  expandVendorKeysForRegistrySave,
+  isTokenmixLinkedVendor,
+  resolveVendorKeyForDisplay,
+} from '../../meooRegistryShared/aiVendorKeysShared'
 import { cn } from '../../cn'
 import AiVendorCatalogAvatar from '../../components/AiVendorCatalogAvatar'
 import {
@@ -82,7 +89,7 @@ export default function OpsAiModelsPage() {
       setUpdatedAt(reg.aiModels.updatedAt)
       setControlled(!!reg.aiModels.controlledByOps)
       if (!editingVendorKeysRef.current) {
-        setKeys({ ...reg.vendorKeys })
+        setKeys(expandVendorKeysForRegistrySave({ ...reg.vendorKeys }))
         setVkAt(reg.vendorKeysUpdatedAt)
       }
       if (!editingVideoAiRef.current) {
@@ -108,17 +115,31 @@ export default function OpsAiModelsPage() {
     return () => window.clearInterval(t)
   }, [pull])
 
+  const buildVendorKeysPayload = (): RegistryVendorKeys => {
+    const payloadKeys: RegistryVendorKeys = {}
+    for (const e of catalogFull) {
+      const v = keys[e.id]
+      if (typeof v === 'string') payloadKeys[e.id] = v
+    }
+    return expandVendorKeysForRegistrySave(payloadKeys)
+  }
+
+  const patchVendorKeyField = (id: string, value: string) => {
+    setKeys((prev) => {
+      const next: RegistryVendorKeys = { ...prev, [id]: value }
+      if (id === TOKENMIX_VENDOR_ID) {
+        for (const linked of TOKENMIX_LINKED_VENDOR_IDS) next[linked] = value
+      }
+      return next
+    })
+  }
+
   const saveAll = async () => {
     setSaving(true)
     setHint(null)
     try {
-      const payloadKeys: RegistryVendorKeys = {}
-      for (const e of catalogFull) {
-        const v = keys[e.id]
-        if (typeof v === 'string') payloadKeys[e.id] = v
-      }
       await postVendorKeys({
-        keys: payloadKeys,
+        keys: buildVendorKeysPayload(),
         aiVendorCatalog: catalogCustomEntriesOnly(catalogFull),
         lastWriter: 'ops',
       })
@@ -136,13 +157,8 @@ export default function OpsAiModelsPage() {
     setSaving(true)
     setHint(null)
     try {
-      const payloadKeys: RegistryVendorKeys = {}
-      for (const e of catalogFull) {
-        const v = keys[e.id]
-        if (typeof v === 'string') payloadKeys[e.id] = v
-      }
       await postVendorKeys({
-        keys: payloadKeys,
+        keys: buildVendorKeysPayload(),
         aiVendorCatalog: catalogCustomEntriesOnly(catalogFull),
         lastWriter: 'ops',
       })
@@ -436,11 +452,18 @@ export default function OpsAiModelsPage() {
         <p className="mb-4 text-xs text-slate-500">
           与原先 ERP 弹窗一致：点击<strong className="text-slate-400">编辑</strong>后可录入或清空各厂商 Key，
           <strong className="text-slate-400">保存</strong>
-          后写入注册表并由 ERP 拉取（dev）。生产请接入密钥管理系统；勿将真实 Key 提交 Git。
+          后写入注册表并由 ERP 拉取（dev）。OpenAI / Claude / Gemini / Grok 与
+          <strong className="text-slate-400"> TokenMix </strong>
+          共用同一 Key，只需填写 TokenMix 栏。生产请接入密钥管理系统；勿将真实 Key 提交 Git。
         </p>
         <p className="text-xs text-slate-600">Key 更新时间：{vkAt ? new Date(vkAt).toLocaleString('zh-CN') : '—'}</p>
         <div className="mt-4 space-y-4">
-          {catalogFull.map((k) => (
+          {catalogFull.map((k) => {
+            const linkedReadOnly =
+              editingVendorKeys && isTokenmixLinkedVendor(k.id) && k.id !== TOKENMIX_VENDOR_ID
+            const displayKey = resolveVendorKeyForDisplay(keys, k.id)
+            const saved = displayKey.length > 0
+            return (
             <div key={k.id}>
               <div className="mb-1 flex items-center justify-between gap-2">
                 <label className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-slate-300">
@@ -464,25 +487,30 @@ export default function OpsAiModelsPage() {
               <input
                 type="password"
                 autoComplete="off"
-                readOnly={!editingVendorKeys}
-                disabled={loading}
-                value={editingVendorKeys ? (keys[k.id] ?? '') : ''}
-                onChange={(e) => setKeys((prev) => ({ ...prev, [k.id]: e.target.value }))}
+                readOnly={!editingVendorKeys || linkedReadOnly}
+                disabled={loading || linkedReadOnly}
+                value={editingVendorKeys ? displayKey : ''}
+                onChange={(e) => patchVendorKeyField(k.id, e.target.value)}
                 placeholder={
-                  (keys[k.id] ?? '').trim() && !editingVendorKeys
+                  saved && !editingVendorKeys
                     ? '已保存 · 请点击区块上方「编辑」修改'
-                    : '留空表示清除该厂商 Key'
+                    : linkedReadOnly
+                      ? '与 TokenMix 栏同步，请在 TokenMix 行填写'
+                      : '留空表示清除该厂商 Key'
                 }
                 className={cn(
                   'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600',
-                  !editingVendorKeys && 'cursor-default opacity-80',
+                  (!editingVendorKeys || linkedReadOnly) && 'cursor-default opacity-80',
                 )}
               />
-              {!editingVendorKeys && (keys[k.id] ?? '').trim() ? (
+              {!editingVendorKeys && saved ? (
                 <p className="mt-1 text-[11px] text-emerald-500/90">密钥已保存在注册表中。</p>
               ) : null}
-              {!editingVendorKeys && !(keys[k.id] ?? '').trim() ? (
+              {!editingVendorKeys && !saved ? (
                 <p className="mt-1 text-[11px] text-slate-600">此项尚未配置密钥。</p>
+              ) : null}
+              {linkedReadOnly ? (
+                <p className="mt-1 text-[11px] text-amber-500/80">与 TokenMix 共用 Key，仅编辑上方 TokenMix 栏即可。</p>
               ) : null}
               <p className="mt-1 text-[11px] text-slate-500">
                 {k.hint?.trim() ?? 'ERP 会使用此 Key；非内置网关厂商需在 merchant-erp 扩展上游后方可实际推理。'}
@@ -505,7 +533,7 @@ export default function OpsAiModelsPage() {
                 </div>
               ) : null}
             </div>
-          ))}
+          )})}
         </div>
       </section>
 

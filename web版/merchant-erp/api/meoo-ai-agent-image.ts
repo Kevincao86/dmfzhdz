@@ -70,7 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const tokenmixImageModel =
     typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
 
-  const env0 = process.env as Record<string, string>
+  const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+    '../vite-plugins/merchantRegistryVendorEnv.js'
+  )
+  const env0 = await mergeMerchantAiEnvWithRegistrySnapshot(
+    process.cwd(),
+    process.env as Record<string, string>,
+  )
   const accessProvider =
     imageRoute === 'tokenmix'
       ? 'tokenmix'

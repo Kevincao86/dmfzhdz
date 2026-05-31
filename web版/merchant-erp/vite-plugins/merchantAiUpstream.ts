@@ -7,6 +7,7 @@
 import type { ServerResponse } from 'node:http'
 
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
+import { isTokenmixLinkedVendor } from '../src/lib/aiVendorKeysShared.js'
 import {
   buildProductImageUserLine,
   extractMainProductFromListingTitle,
@@ -591,12 +592,12 @@ function pickKey(
   }
 }
 
-/** 商品文案类：直连厂商 Key；openai/claude 经 TOKENMIX；gemini 同 TokenMix */
+/** 商品文案类：直连厂商 Key；openai/claude/gemini/grok 经 TokenMix */
 function textVendorKeyInfo(env: MerchantAiEnv, vendor: string): { key: string | null; label: string } {
   const e = env as Record<string, string | undefined>
   const tokenmix = (e.TOKENMIX_API_KEY ?? '').trim() || null
-  if (vendor === 'gemini' || vendor === 'openai' || vendor === 'claude') {
-    return { key: tokenmix, label: 'TOKENMIX_API_KEY' }
+  if (isTokenmixLinkedVendor(vendor)) {
+    return { key: tokenmix, label: 'TOKENMIX_API_KEY（运营台 TokenMix 栏）' }
   }
   return pickKey(env, vendor)
 }
@@ -1332,7 +1333,8 @@ const VENDOR_LABEL: Record<string, string> = {
   minimax: 'MiniMax',
   qwen: '通义千问（DashScope）',
   doubao: '豆包（火山 Ark）',
-  gemini: 'Gemini',
+  gemini: 'Gemini（TokenMix）',
+  grok: 'Grok（TokenMix）',
   deepseek: 'DeepSeek',
   kimi: 'Kimi / Moonshot',
   openai: 'OpenAI',
@@ -1342,7 +1344,7 @@ const VENDOR_LABEL: Record<string, string> = {
 function normalizeAiModelPreserveCustom(raw: unknown): string {
   const s = String(raw ?? 'qwen').trim().toLowerCase()
   if (!s) return 'qwen'
-  if (s === 'gemini') return 'gemini'
+  if (s === 'gemini' || s === 'grok') return s
   if (isDouyinAssistAiVendorId(s)) return s
   if (s === 'deepseek' || s === 'kimi' || s === 'openai' || s === 'claude') return s
   if (isValidAiVendorSlug(s)) return s
@@ -1352,7 +1354,7 @@ function normalizeAiModelPreserveCustom(raw: unknown): string {
 /** 商品 AI 文案：尊重手选 deepseek/kimi/openai/claude（须已配置对应 Key） */
 function resolveGoodsAssistTextModel(requestedVendor: string, env: MerchantAiEnv): string {
   const s = normalizeAiModelPreserveCustom(requestedVendor)
-  if (s === 'gemini') return 'gemini'
+  if (s === 'gemini' || s === 'grok') return s
   if (isDouyinAssistAiVendorId(s)) return s
   if ((s === 'deepseek' || s === 'kimi' || s === 'openai' || s === 'claude') && textVendorKeyInfo(env, s).key) {
     return s

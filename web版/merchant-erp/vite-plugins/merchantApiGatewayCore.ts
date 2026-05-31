@@ -514,7 +514,9 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           json(res, 400, { ok: false, message: '请求体须为 JSON' })
           return true
         }
-        await handleDouyinGoodsAiAssist(res, body, env)
+        const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
+        await handleDouyinGoodsAiAssist(res, body, aiEnv)
         return true
       }
 
@@ -623,7 +625,9 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           json(res, 400, { ok: false, message: '请求体须为 JSON' })
           return true
         }
-        await handleDouyinGoodsAiAssist(res, body, env)
+        const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
+        await handleDouyinGoodsAiAssist(res, body, aiEnv)
         return true
       }
 
