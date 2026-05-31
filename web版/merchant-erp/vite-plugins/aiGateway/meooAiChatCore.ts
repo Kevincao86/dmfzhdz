@@ -185,6 +185,17 @@ export async function runMeooAiChatCore(
       status: 'error',
       detail: msg.slice(0, 500),
     })
-    return { status: 502, body: { ok: false, error: 'upstream_error', detail: msg.slice(0, 800) } }
+    const authHint = /401|invalid api key|invalid authentication|2049/i.test(msg)
+      ? '上游返回 401：请在运营台「AI 模型」重新保存 MiniMax/Kimi 密钥（勿填 TokenMix Key）；并删除 Vercel/ECS 中过期的 MINIMAX_API_KEY、MOONSHOT_API_KEY 环境变量后重启 auth-api。'
+      : undefined
+    return {
+      status: 502,
+      body: {
+        ok: false,
+        error: 'upstream_error',
+        detail: msg.slice(0, 800),
+        ...(authHint ? { hint: authHint } : {}),
+      },
+    }
   }
 }

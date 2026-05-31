@@ -50,7 +50,7 @@ export const DIRECT_MODEL_REGISTRY: readonly DirectModelRegistryEntry[] = [
     label: 'MiniMax',
     defaultBaseUrl: 'https://api.minimax.io/v1',
     primaryEndpoint: 'POST /chat/completions（OpenAI 兼容）',
-    defaultModel: 'MiniMax-M2',
+    defaultModel: 'MiniMax-M2.7',
     fallbackModel: 'MiniMax-M2.1',
   },
 ] as const
