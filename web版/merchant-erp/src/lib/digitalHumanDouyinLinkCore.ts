@@ -6,6 +6,7 @@ import { merchantAgentChatFromMessages } from '../../vite-plugins/merchantAiUpst
 
 export type DouyinLinkParseInput = {
   url: string
+  tenantId?: string
 }
 
 export type DouyinLinkParseResult =
@@ -163,6 +164,7 @@ async function generateLinkParseContent(
   prompt: string,
   env: Record<string, string>,
   authHeader?: string,
+  tenantIdHint?: string,
 ): Promise<{ ok: true; content: string } | { ok: false; message: string }> {
   let user: Awaited<ReturnType<typeof verifyBearerJwt>>
   try {
@@ -183,7 +185,7 @@ async function generateLinkParseContent(
 
   let lastErr = 'AI 解析失败，请稍后重试'
   for (const { vendor, model } of candidates) {
-    const access = await assertAiChatAccess(user.id, vendor, env, jwt)
+    const access = await assertAiChatAccess(user.id, vendor, env, jwt, tenantIdHint)
     if (!access.ok) {
       lastErr = access.detail || access.error || lastErr
       continue
@@ -239,7 +241,7 @@ export async function runDouyinLinkParseCore(
 
 若元信息不足，请根据链接与常见抖音探店/团购短视频结构合理推断，但仍要具体可执行。`
 
-  const aiOut = await generateLinkParseContent(prompt, env, authHeader)
+  const aiOut = await generateLinkParseContent(prompt, env, authHeader, input.tenantId?.trim())
   if (!aiOut.ok) {
     return { ok: false, message: aiOut.message }
   }

@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { url?: string }
+  let body: { url?: string; tenantId?: string }
   try {
     const raw =
       typeof req.body === 'string'
@@ -33,14 +33,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         : req.body && typeof req.body === 'object'
           ? JSON.stringify(req.body)
           : ''
-    body = JSON.parse(raw || '{}') as { url?: string }
+    body = JSON.parse(raw || '{}') as { url?: string; tenantId?: string }
   } catch {
     sendJson(res, 400, { ok: false, message: 'invalid_json' })
     return
   }
 
   const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
-  const out = await runDouyinLinkParseCore({ url: String(body.url ?? '') }, process.env as Record<string, string>, auth)
+  const out = await runDouyinLinkParseCore(
+    { url: String(body.url ?? ''), tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined },
+    process.env as Record<string, string>,
+    auth,
+  )
   if (!out.ok) {
     sendJson(res, 422, { ok: false, message: out.message })
     return

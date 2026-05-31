@@ -74,7 +74,13 @@ export async function runMeooAiChatCore(
   }
 
   let chatEnv = env
-  const access = await assertAiChatAccess(user.id, provider, env, bearerJwt(authHeader))
+  const access = await assertAiChatAccess(
+    user.id,
+    provider,
+    env,
+    bearerJwt(authHeader),
+    typeof parsed.tenantId === 'string' ? parsed.tenantId.trim() : undefined,
+  )
   if (!access.ok) {
     return {
       status: access.status,
