@@ -12,11 +12,14 @@ export function isDouyinAssistAiVendorId(id: string): boolean {
 
 /** 系统设置 / 目录展示内置项（含仅走 ERP 智能体网关的厂商） */
 export const BUILTIN_AI_VENDOR_IDS = [
+  'tokenmix',
   'minimax',
   'qwen',
   'doubao',
   'openai',
   'claude',
+  'gemini',
+  'grok',
   'deepseek',
   'kimi',
 ] as const
@@ -48,6 +51,12 @@ export function normalizeCatalogLogoUrl(raw: unknown): string | undefined {
 
 export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
   {
+    id: 'tokenmix',
+    label: 'TokenMix',
+    hint: 'OpenAI / Claude / Gemini / Grok 智能体网关共用此 Key（/api/meoo-ai-chat）；下方四栏自动同步，无需单独填写。',
+    logoUrl: '/ai-vendors/openai.png',
+  },
+  {
     id: 'minimax',
     label: 'MiniMax',
     hint: 'platform.minimax.io · OpenAI 兼容',
@@ -68,14 +77,26 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
   {
     id: 'openai',
     label: 'OpenAI',
-    hint: 'ChatGPT / OpenAI API（智能体网关 /api/meoo-ai-chat）',
+    hint: '共用 TokenMix Key（智能体 /api/meoo-ai-chat）',
     logoUrl: '/ai-vendors/openai.png',
   },
   {
     id: 'claude',
     label: 'Claude',
-    hint: 'Anthropic Messages API（智能体网关）',
+    hint: '共用 TokenMix Key（智能体 /api/meoo-ai-chat）',
     logoUrl: '/ai-vendors/claude.png',
+  },
+  {
+    id: 'gemini',
+    label: 'Gemini',
+    hint: '共用 TokenMix Key；商品文案手选 Gemini 时亦走 TokenMix',
+    logoUrl: '/ai-vendors/gemini.png',
+  },
+  {
+    id: 'grok',
+    label: 'Grok',
+    hint: '共用 TokenMix Key（智能体 /api/meoo-ai-chat）',
+    logoUrl: '/ai-vendors/openai.png',
   },
   {
     id: 'deepseek',

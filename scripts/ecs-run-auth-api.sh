@@ -9,6 +9,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ERP="$ROOT/web版/merchant-erp"
+OPS_ADMIN="$ROOT/商家管理后台"
 ENV_FILE="$HOME/stack/auth-api.env"
 PORT="${AUTH_API_PORT:-3001}"
 
@@ -77,8 +78,18 @@ for k in ALIBABA_CLOUD_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_SECRET ALIYUN_DYPN
 done
 
 cd "$ERP"
-if [[ ! -d node_modules ]]; then
+if [[ ! -d node_modules/@supabase/supabase-js ]]; then
   npm ci
+fi
+
+# 从 商家管理后台/api 加载的 handler 会在该目录向上解析 node_modules
+if [[ ! -e "$OPS_ADMIN/node_modules/@supabase/supabase-js" ]]; then
+  if [[ -d "$ERP/node_modules/@supabase/supabase-js" ]]; then
+    ln -sfn "$(cd "$ERP" && pwd)/node_modules" "$OPS_ADMIN/node_modules"
+    echo "已链接 $OPS_ADMIN/node_modules -> merchant-erp/node_modules"
+  elif [[ -f "$OPS_ADMIN/package.json" ]]; then
+    (cd "$OPS_ADMIN" && npm ci)
+  fi
 fi
 
 echo "启动 Auth API :$PORT（env: $ENV_FILE）"

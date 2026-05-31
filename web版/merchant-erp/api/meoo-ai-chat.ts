@@ -21,7 +21,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const bodyRaw = rawBody(req)
     const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
     const { runMeooAiChatCore } = await import('../vite-plugins/aiGateway/meooAiChatCore.js')
-    const out = await runMeooAiChatCore(bodyRaw, auth, process.env as Record<string, string>)
+    const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+      '../vite-plugins/merchantRegistryVendorEnv.js'
+    )
+    const env = await mergeMerchantAiEnvWithRegistrySnapshot(
+      process.cwd(),
+      process.env as Record<string, string>,
+    )
+    const out = await runMeooAiChatCore(bodyRaw, auth, env)
     try {
       JSON.stringify(out.body)
     } catch (ser) {

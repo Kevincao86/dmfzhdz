@@ -3,6 +3,7 @@
  * 供独立 Vercel 路由与 dispatch 共用，避免 POST 冷启动拉整包租户/招聘逻辑导致 FUNCTION_INVOCATION_FAILED。
  */
 import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../meooRegistryShared/aiVendorCatalogShared.js'
+import { expandVendorKeysForRegistrySave } from '../meooRegistryShared/aiVendorKeysShared.js'
 import type {
   AiVendorCatalogEntry,
   RegistryVendorKeys,
@@ -31,16 +32,16 @@ export async function opsRegistrySupabaseSaveVendorKeys(
   }
   const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
   const data = await io.load()
-  const next: RegistryVendorKeys = { ...data.vendorKeys }
   const patch = body.keys && typeof body.keys === 'object' ? body.keys : {}
+  const merged: RegistryVendorKeys = { ...data.vendorKeys }
   for (const [id, v] of Object.entries(patch)) {
     if (!isValidAiVendorSlug(id)) continue
     if (v === undefined) continue
     const t = typeof v === 'string' ? v.trim() : ''
-    if (t) next[id] = t
-    else delete next[id]
+    if (t) merged[id] = t
+    else delete merged[id]
   }
-  data.vendorKeys = next
+  data.vendorKeys = expandVendorKeysForRegistrySave(merged)
   if (body.aiVendorCatalog !== undefined) {
     data.aiVendorCatalog = mergeBuiltinAiVendorCatalog(
       Array.isArray(body.aiVendorCatalog) ? body.aiVendorCatalog : [],
