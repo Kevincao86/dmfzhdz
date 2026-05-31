@@ -1,17 +1,26 @@
 /**
- * ECS 本机 Auth API（注册/短信/登录），供 Nginx 反代 /erp-api/
+ * ECS 本机 API（Auth + 运营客服轮询），供 Nginx 反代 /erp-api/
  */
 import http from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { URL } from 'node:url'
 import registerHandler from '../api/meoo-auth-register.ts'
 import smsSendHandler from '../api/meoo-auth-sms-send.ts'
 import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
+import supportPollHandler from '../../../商家管理后台/api/support-poll.ts'
+import supportOpsSendHandler from '../../../商家管理后台/api/support-ops-send.ts'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
 type VercelLikeHandler = (
-  req: IncomingMessage & { method?: string; url?: string; body?: unknown },
+  req: IncomingMessage & {
+    method?: string
+    url?: string
+    body?: unknown
+    query?: Record<string, string | string[]>
+    headers?: IncomingMessage['headers']
+  },
   res: ServerResponse,
 ) => Promise<void>
 
@@ -20,6 +29,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-sms-send': smsSendHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-login': smsLoginHandler as VercelLikeHandler,
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
+  '/api/support-poll': supportPollHandler as VercelLikeHandler,
+  '/api/support-ops-send': supportOpsSendHandler as VercelLikeHandler,
 }
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
@@ -51,12 +62,25 @@ function adaptVercelResponse(res: ServerResponse): ServerResponse & {
   return r
 }
 
+function parseRequestUrl(req: IncomingMessage): { path: string; query: Record<string, string> } {
+  const raw = req.url ?? '/'
+  const u = new URL(raw.includes('://') ? raw : `http://127.0.0.1${raw.startsWith('/') ? raw : `/${raw}`}`)
+  const query: Record<string, string> = {}
+  u.searchParams.forEach((v, k) => {
+    query[k] = v
+  })
+  return { path: u.pathname, query }
+}
+
 http
   .createServer(async (req, res) => {
     const vercelRes = adaptVercelResponse(res)
-    const path = (req.url ?? '').split('?')[0]
+    const { path, query } = parseRequestUrl(req)
     if (req.method === 'OPTIONS') {
       res.statusCode = 204
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       res.end()
       return
     }
@@ -69,9 +93,16 @@ http
     }
     try {
       const bodyBuf = req.method === 'POST' ? await readBody(req) : Buffer.alloc(0)
-      const vercelReq = Object.assign(req, {
-        body: bodyBuf.length ? bodyBuf.toString('utf8') : undefined,
-      })
+      let body: unknown = undefined
+      if (bodyBuf.length) {
+        const text = bodyBuf.toString('utf8')
+        try {
+          body = JSON.parse(text) as unknown
+        } catch {
+          body = text
+        }
+      }
+      const vercelReq = Object.assign(req, { body, query, headers: req.headers })
       await handler(vercelReq, vercelRes)
     } catch (e) {
       res.statusCode = 500
@@ -79,12 +110,12 @@ http
       res.end(
         JSON.stringify({
           ok: false,
-          error: 'auth_api_server_error',
+          error: 'ecs_internal_api_error',
           detail: e instanceof Error ? e.message : String(e),
         }),
       )
     }
   })
   .listen(PORT, '127.0.0.1', () => {
-    console.log(`[ecs-auth-api] http://127.0.0.1:${PORT}`)
+    console.log(`[ecs-internal-api] http://127.0.0.1:${PORT} (auth + support-poll)`)
   })

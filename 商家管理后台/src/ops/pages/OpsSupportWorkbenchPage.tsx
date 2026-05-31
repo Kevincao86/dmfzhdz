@@ -18,6 +18,7 @@ import {
   type SupportRelayExportResultMessage,
   type SupportRelaySessionMetaMessage,
 } from '../../lib/supportRelay'
+import { supportOpsSendUrl, supportPollUrl } from '../../lib/supportOpsHttpApi'
 
 type SessionRow = { lastText: string; lastTs: number; unread: number }
 
@@ -214,7 +215,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
       if (cancelled) return
       try {
         const since = maxPollTsRef.current
-        const res = await fetch(`/api/support-poll?sinceTs=${since}`, {
+        const res = await fetch(supportPollUrl(since), {
           headers: { Authorization: `Bearer ${httpPollToken}` },
         })
         const data = (await res.json().catch(() => null)) as {
@@ -565,7 +566,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
 
     if (useHttpPoll && httpPollToken) {
       void (async () => {
-        const res = await fetch('/api/support-ops-send', {
+        const res = await fetch(supportOpsSendUrl(), {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${httpPollToken}`,
@@ -655,7 +656,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
             <WifiOff className="h-4 w-4 shrink-0" />
           )}
           {httpPollError
-            ? `云端会话轮询异常：${httpPollError}。请确认 Vercel 已配置 SUPABASE_URL=https://mofangdianai.com 与 ECS service_role，并访问 /api/meoo-ops-ping?check=support 诊断。`
+            ? `云端会话轮询异常：${httpPollError}。若含 fetch failed，请在 Vercel 增加 VITE_MEEO_SUPPORT_OPS_API_BASE=https://mofangdianai.com/erp-api 并确认 ECS auth-api 已挂载 support-poll。`
             : httpPollReady
               ? '云端会话同步已启用（HTTP 轮询 Supabase，约每 2 秒刷新）'
               : '正在连接云端会话接口… 请确认 Vercel 已配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。'}

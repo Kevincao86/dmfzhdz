@@ -7,6 +7,7 @@ import MeooLayout from './components/MeooLayout'
 import RequireSupabaseAuth from './components/RequireSupabaseAuth'
 import AiAgentPage from './pages/AiAgentPage'
 import AiOperationContentPage from './pages/AiOperationContentPage'
+import DigitalHumanBroadcastPage from './pages/DigitalHumanBroadcastPage'
 import ShortVideoOptimizationPage from './pages/ShortVideoOptimizationPage'
 import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
 import GeoPage from './pages/GeoPage'
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
           <Route path="ai-operation/content" element={<AiOperationContentPage />} />
           <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
+          <Route path="ai-operation/digital-human" element={<DigitalHumanBroadcastPage />} />
           <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
           <Route path="leads" element={<LocalPromotionLeadsPage />} />
           <Route path="finance" element={<FinanceReconcilePage />} />

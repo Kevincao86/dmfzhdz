@@ -42,7 +42,20 @@ export async function runMeooAiChatCore(
     user = await verifyBearerJwt(authHeader, env)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return { status: 503, body: { ok: false, error: 'auth_lookup_failed', detail: msg.slice(0, 400) } }
+    const hint = /fetch failed|ECONNREFUSED|ETIMEDOUT|ENOTFOUND/i.test(msg)
+      ? '请在商户 ERP 的 Vercel 环境变量配置 SUPABASE_JWT_SECRET（与 ECS JWT_SECRET 相同），并 Redeploy。'
+      : msg === 'supabase_anon_not_configured'
+        ? '请配置 SUPABASE_ANON_KEY（或与 VITE_SUPABASE_ANON_KEY 相同）。'
+        : undefined
+    return {
+      status: 503,
+      body: {
+        ok: false,
+        error: 'auth_lookup_failed',
+        detail: msg.slice(0, 400),
+        ...(hint ? { hint } : {}),
+      },
+    }
   }
   if (!user) {
     return { status: 401, body: { ok: false, error: 'unauthorized' } }
