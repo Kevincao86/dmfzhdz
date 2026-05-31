@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
 import { registryEntry } from '../../../src/services/ai/modelRegistry.js'
+import { looksLikeMinimaxJwtKey } from '../../merchantRegistryVendorEnv.js'
 import {
   minimaxChatBaseCandidates,
   minimaxChatModelCandidates,
@@ -25,6 +26,11 @@ export async function chatMinimax(req: AIChatRequest, env: Record<string, string
   const apiKey = resolveMinimaxApiKey(env)
   if (!apiKey) {
     throw new Error('MINIMAX_API_KEY 未配置（请在运营台「AI 模型」填写 MiniMax 密钥）')
+  }
+  if (looksLikeMinimaxJwtKey(apiKey)) {
+    throw new Error(
+      'MiniMax Key 形如 JWT(eyJ…)，OpenAI 兼容对话需使用平台「接口密钥」页的 sk- 开头 Key；JWT 会报 2049 invalid api key',
+    )
   }
   const reg = registryEntry('minimax')
   const models = minimaxChatModelCandidates(env, req.model, reg?.defaultModel)
