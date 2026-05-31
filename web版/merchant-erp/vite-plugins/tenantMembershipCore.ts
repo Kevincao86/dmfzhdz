@@ -83,6 +83,8 @@ function tenantIdHintFromJwt(userJwt: string): string | null {
   }
 }
 
+let lastTenantLookupHttpError = ''
+
 async function fetchTenantIdForUser(
   base: string,
   userId: string,
@@ -92,8 +94,17 @@ async function fetchTenantIdForUser(
   const filters = [`user_id=eq.${encodeURIComponent(userId)}`]
   if (tenantIdHint) filters.push(`tenant_id=eq.${encodeURIComponent(tenantIdHint)}`)
   const memUrl = `${base}/rest/v1/tenant_members?select=tenant_id&${filters.join('&')}&order=created_at.asc&limit=1`
-  const memRes = await fetch(memUrl, { headers: { ...headers, Prefer: 'return=representation' } })
-  if (!memRes.ok) return null
+  let memRes: Response
+  try {
+    memRes = await fetch(memUrl, { headers: { ...headers, Prefer: 'return=representation' } })
+  } catch (e) {
+    lastTenantLookupHttpError = e instanceof Error ? e.message : String(e)
+    return null
+  }
+  if (!memRes.ok) {
+    lastTenantLookupHttpError = `tenant_members HTTP ${memRes.status}: ${(await memRes.text()).slice(0, 200)}`
+    return null
+  }
   let memRows: { tenant_id?: string }[]
   try {
     memRows = JSON.parse(await memRes.text()) as typeof memRows
@@ -198,26 +209,26 @@ export async function loadTenantAiContextForUser(
   userJwt?: string,
   tenantIdHint?: string,
 ): Promise<TenantAiContext | null> {
+  lastTenantLookupHttpError = ''
   const hint = tenantIdHint?.trim() || undefined
 
-  /** 1) 用户 JWT（与浏览器 RLS 一致，Vercel 上最可靠） */
+  /** 1) Service Role（ECS / 公网 PostgREST；服务端查租户最稳） */
+  const viaService = await loadTenantAiContextViaServiceRole(userId, env, hint)
+  if (viaService) return viaService
+
+  /** 2) 用户 JWT + RLS（与浏览器一致） */
   if (userJwt) {
     const viaJwt = await loadTenantAiContextViaUserJwt(userId, userJwt, env, hint)
     if (viaJwt) {
       if (viaJwt.plan !== 'member_plus') return viaJwt
-      const viaService = await loadTenantAiContextViaServiceRole(userId, env, viaJwt.tenantId)
-      if (viaService?.tokenmixApiKey) {
-        return { ...viaJwt, tokenmixApiKey: viaService.tokenmixApiKey }
+      const viaService2 = await loadTenantAiContextViaServiceRole(userId, env, viaJwt.tenantId)
+      if (viaService2?.tokenmixApiKey) {
+        return { ...viaJwt, tokenmixApiKey: viaService2.tokenmixApiKey }
       }
       return viaJwt
     }
   }
 
-  /** 2) Service Role（读 tokenmix_api_key、递增用量） */
-  const viaService = await loadTenantAiContextViaServiceRole(userId, env, hint)
-  if (viaService) return viaService
-
-  /** 3) 再试 JWT（无 hint） */
   if (userJwt && hint) {
     return loadTenantAiContextViaUserJwt(userId, userJwt, env)
   }
@@ -233,8 +244,17 @@ function tenantNotFoundDetail(env: Record<string, string>): string {
   const base = supabaseBase(env)
   const anon = anonKey(env)
   const serviceRole = serviceRoleKey(env)
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT/i.test(lastTenantLookupHttpError)) {
+    return `无法连接 Supabase（${lastTenantLookupHttpError.slice(0, 120)}）。请将智能体请求走 ECS：浏览器配置 VITE_ERP_AUTH_API_BASE=https://mofangdianai.com/erp-api，且 Vercel 勿将 SUPABASE_URL 设为 127.0.0.1。`
+  }
+  if (lastTenantLookupHttpError) {
+    return `租户查询失败：${lastTenantLookupHttpError.slice(0, 200)}。请确认 ${base || 'SUPABASE_URL'} 可访问且 tenant_members 有记录。`
+  }
   if (!base) {
-    return '未找到租户，无法调用 AI。请在 Vercel 配置 SUPABASE_URL（或与 VITE_SUPABASE_URL 相同）并 Redeploy。'
+    return '未找到租户，无法调用 AI。请在 Vercel 配置 SUPABASE_URL=https://mofangdianai.com（勿用 127.0.0.1）并 Redeploy。'
+  }
+  if (base.includes('127.0.0.1') || base.includes('localhost')) {
+    return '未找到租户：服务端 SUPABASE_URL 指向本机地址，Vercel 无法访问。请改为 https://mofangdianai.com 或改走 erp-api 智能体接口。'
   }
   if (!anon && !serviceRole) {
     return '未找到租户，无法调用 AI。请在 Vercel 配置 SUPABASE_ANON_KEY 或 SUPABASE_SERVICE_ROLE_KEY 并 Redeploy。'
