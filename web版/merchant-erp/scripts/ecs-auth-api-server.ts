@@ -10,6 +10,13 @@ import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/support-poll.ts'
 import supportOpsSendHandler from '../../../商家管理后台/api/support-ops-send.ts'
+import tenantsListHandler from '../../../商家管理后台/api/meoo-supabase-tenants-list.ts'
+import tenantsPatchHandler from '../../../商家管理后台/api/meoo-supabase-tenants-patch.ts'
+import tenantsResetPwdHandler from '../../../商家管理后台/api/meoo-supabase-tenants-reset-password.ts'
+import paymentOrdersListHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-list.ts'
+import paymentOrdersVerifyHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-verify.ts'
+import paymentOrdersConfirmHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-confirm.ts'
+import tenantsTokenmixHandler from '../../../商家管理后台/api/meoo-supabase-tenants-tokenmix.ts'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -31,6 +38,13 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,
   '/api/support-ops-send': supportOpsSendHandler as VercelLikeHandler,
+  '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,
+  '/api/meoo-supabase-tenants-patch': tenantsPatchHandler as VercelLikeHandler,
+  '/api/meoo-supabase-tenants-reset-password': tenantsResetPwdHandler as VercelLikeHandler,
+  '/api/meoo-supabase-payment-orders-list': paymentOrdersListHandler as VercelLikeHandler,
+  '/api/meoo-supabase-payment-orders-verify': paymentOrdersVerifyHandler as VercelLikeHandler,
+  '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,
+  '/api/meoo-supabase-tenants-tokenmix': tenantsTokenmixHandler as VercelLikeHandler,
 }
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
@@ -117,5 +131,5 @@ http
     }
   })
   .listen(PORT, '127.0.0.1', () => {
-    console.log(`[ecs-internal-api] http://127.0.0.1:${PORT} (auth + support-poll)`)
+    console.log(`[ecs-internal-api] http://127.0.0.1:${PORT} (auth + support + ops-supabase)`)
   })
