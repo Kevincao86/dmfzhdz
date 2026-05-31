@@ -9,6 +9,8 @@ import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { handleMerchantApiGatewayCore } from './merchantApiGatewayCore.js'
 import { buildWeatherDailyReply } from '../src/lib/agentDailyInfoWeather.js'
 import { runDouyinLinkParseCore } from '../src/lib/digitalHumanDouyinLinkCore.js'
+import { runDigitalHumanTtsCore } from '../src/lib/digitalHumanTtsCore.js'
+import { mergeMerchantAiEnvWithRegistrySnapshot } from './merchantRegistryVendorEnv.js'
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -317,7 +319,57 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         const bodyRaw = await readBody(req as IncomingMessage)
         const body = JSON.parse(bodyRaw || '{}') as { url?: string }
         const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
-        const out = await runDouyinLinkParseCore({ url: String(body.url ?? '') }, env, auth)
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
+        const out = await runDouyinLinkParseCore({ url: String(body.url ?? '') }, aiEnv, auth)
+        res.statusCode = out.ok ? 200 : 422
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify(out.ok ? out : { ok: false, message: out.message }))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 502
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, message: msg.slice(0, 400) }))
+      }
+      return
+    }
+
+    if (loc.pathname === '/api/meoo-digital-human-tts') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, message: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const body = JSON.parse(bodyRaw || '{}') as {
+          text?: string
+          voicePresetId?: string
+          speechRate?: number
+          speechPitch?: number
+        }
+        const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
+        const out = await runDigitalHumanTtsCore(
+          {
+            text: String(body.text ?? ''),
+            voicePresetId: String(body.voicePresetId ?? ''),
+            speechRate: typeof body.speechRate === 'number' ? body.speechRate : undefined,
+            speechPitch: typeof body.speechPitch === 'number' ? body.speechPitch : undefined,
+          },
+          aiEnv,
+          auth,
+        )
         res.statusCode = out.ok ? 200 : 422
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.setHeader('Access-Control-Allow-Origin', '*')

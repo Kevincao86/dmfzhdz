@@ -22,9 +22,17 @@ export type VoicePreset = {
   id: string
   label: string
   gender: '男' | '女'
+  /** 身份类型，与形象 tag 一致 */
+  persona: string
+  /** 绑定的形象 id；克隆音色等通用项为空 */
+  avatarId?: string
   dialect?: string
   rate: number
   pitch: number
+  /** 浏览器 TTS 在同性别语音池中的分散索引（0–20） */
+  voiceIndex: number
+  /** MiniMax 等云端 TTS 系统音色 id（与形象性别/人设一一对应） */
+  cloudVoiceId?: string
 }
 
 export type DigitalHumanDraft = {
@@ -257,15 +265,90 @@ export const PRESET_AVATARS: PresetAvatar[] = [
   },
 ]
 
-export const VOICE_PRESETS: VoicePreset[] = [
-  { id: 'v-f-std', label: '标准女声', gender: '女', rate: 1, pitch: 1 },
-  { id: 'v-m-std', label: '标准男声', gender: '男', rate: 1, pitch: 0.95 },
-  { id: 'v-f-soft', label: '温柔女声', gender: '女', rate: 0.92, pitch: 1.05 },
-  { id: 'v-m-deep', label: '磁性男声', gender: '男', rate: 0.88, pitch: 0.85 },
-  { id: 'v-sc', label: '四川话（方言）', gender: '女', dialect: '四川', rate: 1, pitch: 1 },
-  { id: 'v-yue', label: '粤语（方言）', gender: '男', dialect: '粤语', rate: 1, pitch: 1 },
-  { id: 'v-clone', label: '我的克隆音色', gender: '女', rate: 1, pitch: 1 },
-]
+/** 21 个形象 → MiniMax 中文系统音色（性别与 persona 对齐，21 套互不重复） */
+const AVATAR_CLOUD_VOICE_IDS: Record<string, string> = {
+  'av-real-1': 'Chinese (Mandarin)_Reliable_Executive',
+  'av-real-2': 'Chinese (Mandarin)_Warm_Girl',
+  'av-real-3': 'Chinese (Mandarin)_News_Anchor',
+  'av-real-4': 'Chinese (Mandarin)_Sweet_Lady',
+  'av-real-5': 'Chinese (Mandarin)_Unrestrained_Young_Man',
+  'av-real-6': 'Chinese (Mandarin)_Mature_Woman',
+  'av-real-7': 'Chinese (Mandarin)_Sincere_Adult',
+  'av-real-8': 'Chinese (Mandarin)_Crisp_Girl',
+  'av-real-9': 'Chinese (Mandarin)_Southern_Young_Man',
+  'av-real-10': 'Chinese (Mandarin)_Soft_Girl',
+  'av-real-11': 'Chinese (Mandarin)_Male_Announcer',
+  'av-real-12': 'Chinese (Mandarin)_IntellectualGirl',
+  'cartoon-1': 'Chinese (Mandarin)_Warm-HeartedGirl',
+  'cartoon-2': 'Chinese (Mandarin)_ExplorativeGirl',
+  'cartoon-3': 'Chinese (Mandarin)_Laid_BackGirl',
+  'cartoon-4': 'Chinese (Mandarin)_Pure-hearted_Boy',
+  'cartoon-5': 'Chinese (Mandarin)_Wise_Women',
+  'cartoon-6': 'Chinese (Mandarin)_Humorous_Elder',
+  'cartoon-7': 'Chinese (Mandarin)_Warm_Bestie',
+  'cartoon-8': 'Chinese (Mandarin)_Gentle_Youth',
+  'cartoon-9': 'Chinese (Mandarin)_Warm-HeartedAunt',
+}
+
+/** 21 个形象各自独立的语速 / 音调微调（接近 1.0，避免机械感） */
+const AVATAR_VOICE_TUNING: Record<string, { rate: number; pitch: number; dialect?: string }> = {
+  'av-real-1': { rate: 0.94, pitch: 0.96 },
+  'av-real-2': { rate: 1.0, pitch: 1.02 },
+  'av-real-3': { rate: 0.92, pitch: 0.94 },
+  'av-real-4': { rate: 1.02, pitch: 1.03 },
+  'av-real-5': { rate: 1.04, pitch: 0.98 },
+  'av-real-6': { rate: 0.98, pitch: 1.02 },
+  'av-real-7': { rate: 0.93, pitch: 0.95 },
+  'av-real-8': { rate: 1.05, pitch: 1.04 },
+  'av-real-9': { rate: 1.05, pitch: 0.99 },
+  'av-real-10': { rate: 0.96, pitch: 1.04 },
+  'av-real-11': { rate: 1.03, pitch: 0.97 },
+  'av-real-12': { rate: 0.98, pitch: 1.03 },
+  'cartoon-1': { rate: 1.0, pitch: 1.05 },
+  'cartoon-2': { rate: 1.02, pitch: 1.03 },
+  'cartoon-3': { rate: 1.06, pitch: 1.06 },
+  'cartoon-4': { rate: 1.04, pitch: 1.0 },
+  'cartoon-5': { rate: 0.98, pitch: 1.06 },
+  'cartoon-6': { rate: 1.06, pitch: 1.02 },
+  'cartoon-7': { rate: 1.03, pitch: 1.04 },
+  'cartoon-8': { rate: 1.04, pitch: 0.98 },
+  'cartoon-9': { rate: 1.0, pitch: 1.02 },
+}
+
+/** 21 个形象 → 21 套专属音色（voiceIndex 在同性别池内递增，保证男女声分离） */
+export const AVATAR_VOICE_PRESETS: VoicePreset[] = (() => {
+  let maleVoiceIndex = 0
+  let femaleVoiceIndex = 0
+  return PRESET_AVATARS.map((av) => {
+    const tune = AVATAR_VOICE_TUNING[av.id] ?? { rate: 1, pitch: 1 }
+    const voiceIndex = av.gender === '男' ? maleVoiceIndex++ : femaleVoiceIndex++
+    return {
+      id: `v-${av.id}`,
+      label: `${av.name} · ${av.tag}`,
+      gender: av.gender,
+      persona: av.tag,
+      avatarId: av.id,
+      dialect: tune.dialect,
+      rate: tune.rate,
+      pitch: tune.pitch,
+      voiceIndex,
+      cloudVoiceId: AVATAR_CLOUD_VOICE_IDS[av.id],
+    }
+  })
+})()
+
+const VOICE_CLONE_PRESET: VoicePreset = {
+  id: 'v-clone',
+  label: '我的克隆音色',
+  gender: '女',
+  persona: '克隆',
+  rate: 1,
+  pitch: 1,
+  voiceIndex: 0,
+}
+
+/** 全部可选音色：21 套形象专属 + 克隆 */
+export const VOICE_PRESETS: VoicePreset[] = [...AVATAR_VOICE_PRESETS, VOICE_CLONE_PRESET]
 
 export const BACKGROUND_OPTIONS = [
   { id: 'studio', label: '演播室' },
@@ -289,8 +372,10 @@ export const SUBTITLE_STYLES = [
 ]
 
 export function defaultDraft(): DigitalHumanDraft {
+  const first = PRESET_AVATARS[0]
+  const voice = first ? voiceSettingsForAvatar(first) : voiceSettingsForAvatar(PRESET_AVATARS[0]!)
   return {
-    avatarId: PRESET_AVATARS[0]?.id ?? null,
+    avatarId: first?.id ?? null,
     customAvatarDataUrl: null,
     avatarKind: 'preset',
     outfit: '商务正装',
@@ -303,9 +388,9 @@ export function defaultDraft(): DigitalHumanDraft {
     douyinLinkUrl: '',
     motionInstructions: '',
     audioFileName: null,
-    voiceId: VOICE_PRESETS[0]?.id ?? 'v-f-std',
-    speechRate: 1,
-    speechPitch: 1,
+    voiceId: voice.voiceId,
+    speechRate: voice.speechRate,
+    speechPitch: voice.speechPitch,
     subtitleEnabled: true,
     subtitleStyle: 'bottom-white',
     greenScreen: false,
@@ -391,4 +476,32 @@ export function resolveDigitalHumanPreviewScript(draft: DigitalHumanDraft, avata
   if (custom.length >= 8) return custom
   if (avatar) return avatarDemoScript(avatar)
   return '您好，欢迎了解我们的本地生活精选内容。完成口播文案后，可生成更贴合的动态预览。'
+}
+
+/** 按形象 id 取专属音色（21 套一对一） */
+export function matchVoicePresetForAvatar(avatar: PresetAvatar): VoicePreset {
+  return AVATAR_VOICE_PRESETS.find((v) => v.avatarId === avatar.id) ?? AVATAR_VOICE_PRESETS[0]!
+}
+
+export function voicePresetById(voiceId: string): VoicePreset | undefined {
+  return VOICE_PRESETS.find((v) => v.id === voiceId)
+}
+
+/** 当前形象可选音色：专属音色 + 克隆 */
+export function voiceOptionsForAvatar(avatar: PresetAvatar | null): VoicePreset[] {
+  if (!avatar) return VOICE_PRESETS
+  const paired = matchVoicePresetForAvatar(avatar)
+  const clone = VOICE_PRESETS.find((v) => v.id === 'v-clone')
+  return clone ? [paired, clone] : [paired]
+}
+
+export function voiceSettingsForAvatar(
+  avatar: PresetAvatar,
+): Pick<DigitalHumanDraft, 'voiceId' | 'speechRate' | 'speechPitch'> {
+  const preset = matchVoicePresetForAvatar(avatar)
+  return {
+    voiceId: preset.id,
+    speechRate: preset.rate,
+    speechPitch: preset.pitch,
+  }
 }

@@ -1,8 +1,8 @@
 /**
- * POST /api/meoo-digital-human-douyin-link — 抖音链接 → 口播文案 + 动作指令
+ * POST /api/meoo-digital-human-tts — 数字人口播云端试听（MiniMax 神经语音）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { runDouyinLinkParseCore } from '../src/lib/digitalHumanDouyinLinkCore.js'
+import { runDigitalHumanTtsCore } from '../src/lib/digitalHumanTtsCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -25,7 +25,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { url?: string; tenantId?: string }
+  let body: {
+    text?: string
+    voicePresetId?: string
+    speechRate?: number
+    speechPitch?: number
+    tenantId?: string
+  }
   try {
     const raw =
       typeof req.body === 'string'
@@ -33,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         : req.body && typeof req.body === 'object'
           ? JSON.stringify(req.body)
           : ''
-    body = JSON.parse(raw || '{}') as { url?: string; tenantId?: string }
+    body = JSON.parse(raw || '{}') as typeof body
   } catch {
     sendJson(res, 400, { ok: false, message: 'invalid_json' })
     return
@@ -47,8 +53,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     process.cwd(),
     process.env as Record<string, string>,
   )
-  const out = await runDouyinLinkParseCore(
-    { url: String(body.url ?? ''), tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined },
+  const out = await runDigitalHumanTtsCore(
+    {
+      text: String(body.text ?? ''),
+      voicePresetId: String(body.voicePresetId ?? ''),
+      speechRate: typeof body.speechRate === 'number' ? body.speechRate : undefined,
+      speechPitch: typeof body.speechPitch === 'number' ? body.speechPitch : undefined,
+      tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined,
+    },
     env,
     auth,
   )

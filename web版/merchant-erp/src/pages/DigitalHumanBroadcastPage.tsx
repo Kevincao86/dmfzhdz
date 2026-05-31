@@ -35,7 +35,13 @@ import {
   VOICE_PRESETS,
   workTitleFromDraft,
   resolveDigitalHumanPreviewScript,
+  voiceSettingsForAvatar,
+  voiceOptionsForAvatar,
+  voicePresetById,
+  matchVoicePresetForAvatar,
 } from '../lib/digitalHumanBroadcast'
+import { warmSpeechVoices } from '../lib/digitalHumanTts'
+import { playDigitalHumanSpeech, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 
@@ -68,6 +74,7 @@ export default function DigitalHumanBroadcastPage() {
   const [linkSourceTitle, setLinkSourceTitle] = useState<string | null>(null)
   const [avatarFilter, setAvatarFilter] = useState<'all' | AvatarStyle>('all')
   const [ttsPlaying, setTtsPlaying] = useState(false)
+  const [ttsBusy, setTtsBusy] = useState(false)
   const [sidebarPreviewPlaying, setSidebarPreviewPlaying] = useState(false)
   const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
@@ -81,9 +88,16 @@ export default function DigitalHumanBroadcastPage() {
     () => PRESET_AVATARS.find((a) => a.id === draft.avatarId) ?? null,
     [draft.avatarId],
   )
-  const selectedVoice = useMemo(
-    () => VOICE_PRESETS.find((v) => v.id === draft.voiceId) ?? VOICE_PRESETS[0],
-    [draft.voiceId],
+  const selectedVoice = useMemo(() => {
+    const hit = voicePresetById(draft.voiceId)
+    if (hit) return hit
+    if (selectedAvatar) return matchVoicePresetForAvatar(selectedAvatar)
+    return VOICE_PRESETS[0]
+  }, [draft.voiceId, selectedAvatar])
+
+  const voiceSelectOptions = useMemo(
+    () => voiceOptionsForAvatar(selectedAvatar),
+    [selectedAvatar],
   )
 
   const filteredAvatars = useMemo(() => {
@@ -104,16 +118,33 @@ export default function DigitalHumanBroadcastPage() {
 
   useEffect(() => {
     return () => {
-      window.speechSynthesis?.cancel()
+      stopDigitalHumanSpeech()
     }
   }, [])
 
   useEffect(() => {
-    window.speechSynthesis?.cancel()
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
+    warmSpeechVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', warmSpeechVoices)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', warmSpeechVoices)
+  }, [])
+
+  useEffect(() => {
+    stopDigitalHumanSpeech()
     setTtsPlaying(false)
+    setTtsBusy(false)
     setSidebarPreviewPlaying(false)
     setSidebarPreviewLine(null)
   }, [draft.avatarId, draft.customAvatarDataUrl])
+
+  /** 旧版通用音色 id 或形象切换后，自动对齐 21 套专属音色 */
+  useEffect(() => {
+    if (!selectedAvatar) return
+    if (draft.voiceId === 'v-clone') return
+    const paired = matchVoicePresetForAvatar(selectedAvatar)
+    if (draft.voiceId === paired.id) return
+    setDraft((d) => ({ ...d, ...voiceSettingsForAvatar(selectedAvatar) }))
+  }, [selectedAvatar, draft.voiceId])
 
   useEffect(() => {
     const job = works.find((w) => w.status === 'rendering' || w.status === 'queued')
@@ -217,68 +248,66 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const stopAllSpeech = () => {
-    window.speechSynthesis?.cancel()
+    stopDigitalHumanSpeech()
     setTtsPlaying(false)
+    setTtsBusy(false)
     setSidebarPreviewPlaying(false)
     setSidebarPreviewLine(null)
   }
 
-  const pickSpeechVoice = (utterance: SpeechSynthesisUtterance) => {
-    if (typeof window === 'undefined') return
-    const voices = window.speechSynthesis.getVoices()
-    const gender = selectedAvatar?.gender
-    const zh = voices.filter((v) => v.lang.startsWith('zh'))
-    if (!zh.length) return
-    if (gender === '女') {
-      const hit = zh.find((v) => /女|female|xiaoxiao|ting|hui|li|ya/i.test(v.name))
-      if (hit) utterance.voice = hit
-    } else if (gender === '男') {
-      const hit = zh.find((v) => /男|male|kang|yun|wei|feng/i.test(v.name))
-      if (hit) utterance.voice = hit
-    }
-  }
-
-  const speakPreviewText = (text: string, mode: 'sidebar' | 'tts'): boolean => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setToast('当前浏览器不支持语音试听')
-      return false
-    }
+  const speakPreviewText = async (text: string, mode: 'sidebar' | 'tts'): Promise<boolean> => {
     const trimmed = text.trim()
     if (!trimmed) {
       setToast('暂无可播放的口播内容')
       return false
     }
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(trimmed.slice(0, 500))
-    u.lang = 'zh-CN'
-    u.rate = draft.speechRate * (selectedVoice?.rate ?? 1)
-    u.pitch = draft.speechPitch * (selectedVoice?.pitch ?? 1)
-    pickSpeechVoice(u)
-    u.onstart = () => {
-      if (mode === 'sidebar') {
-        setSidebarPreviewPlaying(true)
-        setSidebarPreviewLine(trimmed.split(/\n/)[0]?.slice(0, 36) ?? trimmed.slice(0, 36))
-        setTtsPlaying(false)
-      } else {
-        setTtsPlaying(true)
-        setSidebarPreviewPlaying(false)
-        setSidebarPreviewLine(null)
-      }
+    setTtsBusy(true)
+    const out = await playDigitalHumanSpeech(
+      trimmed,
+      {
+        preset: selectedVoice,
+        speechRate: draft.speechRate,
+        speechPitch: draft.speechPitch,
+        mode,
+      },
+      {
+        onStart: (m, previewLine) => {
+          setTtsBusy(false)
+          if (m === 'sidebar') {
+            setSidebarPreviewPlaying(true)
+            setSidebarPreviewLine(previewLine)
+            setTtsPlaying(false)
+          } else {
+            setTtsPlaying(true)
+            setSidebarPreviewPlaying(false)
+            setSidebarPreviewLine(null)
+          }
+        },
+        onEnd: (m) => {
+          if (m === 'sidebar') setSidebarPreviewPlaying(false)
+          else setTtsPlaying(false)
+          setTtsBusy(false)
+        },
+        onError: (m) => {
+          if (m === 'sidebar') setSidebarPreviewPlaying(false)
+          else setTtsPlaying(false)
+          setTtsBusy(false)
+        },
+      },
+    )
+    setTtsBusy(false)
+    if (!out.ok) {
+      setToast(out.message ?? '语音试听失败')
+      return false
     }
-    u.onend = () => {
-      if (mode === 'sidebar') setSidebarPreviewPlaying(false)
-      else setTtsPlaying(false)
+    if (out.source === 'browser' && selectedVoice?.cloudVoiceId) {
+      setToast('云端语音不可用，已改用浏览器试听（音质较弱）')
     }
-    u.onerror = () => {
-      if (mode === 'sidebar') setSidebarPreviewPlaying(false)
-      else setTtsPlaying(false)
-    }
-    window.speechSynthesis.speak(u)
     return true
   }
 
   const playSidebarPreview = () => {
-    if (sidebarPreviewPlaying) {
+    if (sidebarPreviewPlaying || ttsBusy) {
       stopAllSpeech()
       return
     }
@@ -291,7 +320,7 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const playTtsPreview = () => {
-    if (ttsPlaying) {
+    if (ttsPlaying || ttsBusy) {
       stopAllSpeech()
       return
     }
@@ -519,7 +548,13 @@ export default function DigitalHumanBroadcastPage() {
                           <button
                             key={av.id}
                             type="button"
-                            onClick={() => patchDraft({ avatarId: av.id, customAvatarDataUrl: null })}
+                            onClick={() =>
+                              patchDraft({
+                                avatarId: av.id,
+                                customAvatarDataUrl: null,
+                                ...voiceSettingsForAvatar(av),
+                              })
+                            }
                             className={cn(
                               'rounded-xl border p-2 text-left transition hover:shadow-md',
                               draft.avatarId === av.id
@@ -793,7 +828,12 @@ export default function DigitalHumanBroadcastPage() {
                   )}
 
                   <div className="rounded-xl border border-slate-200 p-4">
-                    <p className="mb-3 text-sm font-medium text-slate-800">语音合成（TTS）与克隆</p>
+                    <p className="mb-3 text-sm font-medium text-slate-800">
+                      语音合成（TTS）与克隆
+                      <span className="ml-2 text-xs font-normal text-slate-500">
+                        试听优先 MiniMax 神经语音，与形象性别绑定
+                      </span>
+                    </p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="text-sm">
                         <span className="mb-1 block text-slate-600">音色</span>
@@ -803,7 +843,7 @@ export default function DigitalHumanBroadcastPage() {
                           className="w-full rounded-lg border border-slate-200 px-3 py-2"
                           disabled={draft.driveMode === 'audio'}
                         >
-                          {VOICE_PRESETS.map((v) => (
+                          {voiceSelectOptions.map((v) => (
                             <option key={v.id} value={v.id}>
                               {v.label}
                               {v.dialect ? ` · ${v.dialect}` : ''}
@@ -814,12 +854,18 @@ export default function DigitalHumanBroadcastPage() {
                       <div className="flex items-end gap-2">
                         <button
                           type="button"
-                          onClick={ttsPlaying ? stopTtsPreview : playTtsPreview}
-                          disabled={draft.driveMode === 'audio' || !draft.script.trim()}
+                          onClick={ttsPlaying || ttsBusy ? stopTtsPreview : playTtsPreview}
+                          disabled={draft.driveMode === 'audio' || (!draft.script.trim() && !ttsPlaying && !ttsBusy)}
                           className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-900 py-2 text-sm text-white disabled:opacity-50"
                         >
-                          {ttsPlaying ? <Pause className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                          {ttsPlaying ? '停止试听' : 'TTS 试听'}
+                          {ttsBusy ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : ttsPlaying ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Volume2 className="h-4 w-4" />
+                          )}
+                          {ttsBusy ? '合成中…' : ttsPlaying ? '停止试听' : 'TTS 试听'}
                         </button>
                       </div>
                     </div>
@@ -961,7 +1007,7 @@ export default function DigitalHumanBroadcastPage() {
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    合成前快速预览口型与字幕布局（浏览器 TTS 模拟，非最终成片）。
+                    合成前快速预览口型与字幕布局（云端神经 TTS 试听，非最终高清成片）。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative rounded-2xl bg-slate-900 p-2">
@@ -1106,8 +1152,13 @@ export default function DigitalHumanBroadcastPage() {
                     </span>
                   </div>
                   <p className="mt-2 text-center text-sm">{selectedAvatar?.name ?? '自定义'}</p>
+                  {selectedAvatar ? (
+                    <p className="mt-0.5 text-center text-[11px] text-violet-300">
+                      专属音色 · {matchVoicePresetForAvatar(selectedAvatar).label}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-center text-[11px] text-slate-400">
-                    {sidebarPreviewPlaying ? '播放中 · 再次点击停止' : '点击预览 · 动态画面含声音'}
+                    {sidebarPreviewPlaying ? '播放中 · 再次点击停止' : ttsBusy ? '语音合成中…' : '点击预览 · 动态画面含声音'}
                   </p>
                   {sidebarPreviewPlaying && sidebarPreviewLine ? (
                     <p className="mt-2 line-clamp-2 rounded-lg bg-black/35 px-2 py-1.5 text-center text-[11px] leading-relaxed text-white/90">
