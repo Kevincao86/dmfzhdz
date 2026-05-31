@@ -3,8 +3,10 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
+  formatMerchantProductImageOssError,
   merchantProductImageStorageConfigured,
   merchantProductImageStorageMissingMessage,
+  merchantProductImageStoragePrefix,
   readMerchantProductImageOssEnv,
 } from '../vite-plugins/merchantProductImageStorage.js'
 import { merchantDouyinSessionSecret } from './douyin-bind.js'
@@ -33,12 +35,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           region: oss.region,
           hasAccessKeyId: !!oss.accessKeyId,
           hasAccessKeySecret: !!oss.accessKeySecret,
+          prefix: merchantProductImageStoragePrefix(),
         }
       : null,
     douyinSessionSecretConfigured: !!merchantDouyinSessionSecret(),
     hint:
       mode === 'oss'
-        ? 'OSS 环境变量已识别；若上传仍失败，多为 AccessKey 权限、Bucket 区域不匹配或 Bucket 非公共读。'
+        ? 'OSS 环境变量已识别；若上传报 bucket acl，多为 RAM 缺少 oss:PutObject（douyin-goods/*），不是前端问题。'
         : merchantProductImageStorageMissingMessage(),
     checks: {} as Record<string, unknown>,
   }
@@ -50,13 +53,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     const { default: OSS } = await import('ali-oss')
+    const endpoint = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
     const client = new OSS({
       region: oss.region,
       accessKeyId: oss.accessKeyId,
       accessKeySecret: oss.accessKeySecret,
       bucket: oss.bucket,
+      secure: true,
+      ...(endpoint ? { endpoint } : {}),
+      ...(process.env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
     })
-    const probeKey = `${(process.env.MERCHANT_PRODUCT_IMAGE_OSS_PREFIX ?? 'douyin-goods').replace(/^\/+|\/+$/g, '') || 'douyin-goods'}/.meoo-storage-ping.txt`
+    const probeKey = `${merchantProductImageStoragePrefix()}/.meoo-storage-ping.txt`
     await client.put(probeKey, Buffer.from('ping', 'utf8'), {
       headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
     })
@@ -69,15 +76,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 200, { ...out, ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    ;(out.checks as Record<string, unknown>).putProbe = { ok: false, error: msg.slice(0, 500) }
+    const detail = formatMerchantProductImageOssError(msg)
+    ;(out.checks as Record<string, unknown>).putProbe = { ok: false, error: detail.slice(0, 800) }
     sendJson(res, 502, {
       ...out,
       ok: false,
-      error: msg.slice(0, 500),
-      hint:
-        /signature/i.test(msg)
-          ? '签名不匹配：请核对 AccessKey ID/Secret 是否成对、Bucket 地域是否与 MERCHANT_PRODUCT_IMAGE_OSS_REGION 一致（如 oss-cn-shanghai）。'
-          : out.hint,
+      error: detail.slice(0, 800),
+      hint: /bucket acl|access denied/i.test(msg)
+        ? 'RAM 子账号需授权 oss:PutObject 到 modianningbo/douyin-goods/*；勿把 Supabase 桶名填进 MERCHANT_PRODUCT_IMAGE_OSS_BUCKET。'
+        : out.hint,
     })
   }
 }

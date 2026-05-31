@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPPORT_RELAY_WS?: string
   /** 与 Vercel 环境变量 MEOO_SUPPORT_OPS_HTTP_TOKEN 相同；启用在线客服云端 HTTP 轮询（需迁移 support_relay_messages） */
   readonly VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN?: string
+  /** Vercel 出站连不上 ECS 时设为 https://mofangdianai.com/erp-api（浏览器直连 ECS 轮询） */
+  readonly VITE_MEEO_SUPPORT_OPS_API_BASE?: string
   /** 启用后「手动创建客户」会先调 Supabase Edge Function 开通租户与 Auth 用户 */
   readonly VITE_SUPABASE_URL?: string
   /** 与 ERP、Edge Function 一致；默认 users.meoo.test */

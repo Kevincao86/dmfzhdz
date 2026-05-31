@@ -5,6 +5,9 @@ declare module 'ali-oss' {
       accessKeyId: string
       accessKeySecret: string
       bucket: string
+      secure?: boolean
+      endpoint?: string
+      authorizationV4?: boolean
     })
     signatureUrl(
       name: string,

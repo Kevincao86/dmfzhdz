@@ -3,12 +3,15 @@
  */
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { parseOssUrlPrefix } from './aliyunOssIceParse.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from './merchantSupabaseAdminEnv.js'
 
 export const MERCHANT_PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+/** 私有 Bucket 时返回给前端的签名 URL 有效期（秒）；抖音拉图需在此窗口内完成审核或配置 Bucket 公共读前缀 */
+export const MERCHANT_PRODUCT_IMAGE_SIGNED_URL_EXPIRES_SEC = 7 * 24 * 3600
 
 export function productImageDemoFallbackAllowed(): boolean {
   const a = process.env.MERCHANT_PRODUCT_IMAGE_UPLOAD_DEMO_FALLBACK?.trim().toLowerCase()
@@ -69,16 +72,6 @@ function normalizeOssRegion(raw: string): string {
 }
 
 export function readMerchantProductImageOssEnv(): MerchantProductImageOssEnv | null {
-  const bucket = (
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET ??
-    process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET ??
-    ''
-  ).trim()
-  const region = normalizeOssRegion(
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_REGION ??
-      process.env.ALIYUN_ICE_OUTPUT_OSS_REGION ??
-      'oss-cn-shanghai',
-  )
   const accessKeyId = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ??
     process.env.ALIYUN_ICE_ACCESS_KEY_ID ??
@@ -91,8 +84,45 @@ export function readMerchantProductImageOssEnv(): MerchantProductImageOssEnv | n
     process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ??
     ''
   ).trim()
-  if (!bucket || !accessKeyId || !accessKeySecret) return null
+  if (!accessKeyId || !accessKeySecret) return null
+
+  const explicitBucket = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET ?? '').trim()
+  const iceParsed = parseOssUrlPrefix(
+    (
+      process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ??
+      process.env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX ??
+      ''
+    ).trim(),
+  )
+  const bucket = explicitBucket || iceParsed?.bucket || ''
+  const region = normalizeOssRegion(
+    process.env.MERCHANT_PRODUCT_IMAGE_OSS_REGION?.trim() ||
+      (iceParsed ? `oss-${iceParsed.region}` : '') ||
+      process.env.ALIYUN_ICE_OUTPUT_OSS_REGION ||
+      'oss-cn-shanghai',
+  )
+  if (!bucket) return null
   return { bucket, region, accessKeyId, accessKeySecret }
+}
+
+export function formatMerchantProductImageOssError(raw: string): string {
+  const msg = raw.trim()
+  if (/bucket acl|access denied|accessdenied|403/i.test(msg)) {
+    return [
+      msg,
+      'AccessKey 可能缺少 oss:PutObject 权限，或 Bucket 已禁用 ACL 但当前账号无权写入。',
+      '请在 RAM 为子账号授权（Resource 改成你的 Bucket）：',
+      '  oss:PutObject、oss:GetObject → acs:oss:*:*:modianningbo/douyin-goods/*',
+      '若抖音需长期拉图，请在 OSS 控制台为 douyin-goods/* 配置 Bucket 策略允许匿名 GetObject（公共读前缀）。',
+    ].join(' ')
+  }
+  if (/signature|does not match/i.test(msg)) {
+    return `${msg} 请核对 AccessKey ID/Secret 成对，且 MERCHANT_PRODUCT_IMAGE_OSS_REGION 与 Bucket 地域一致（如 oss-cn-shanghai）。`
+  }
+  if (/nosuchbucket|bucket does not exist/i.test(msg)) {
+    return `${msg} 请检查 MERCHANT_PRODUCT_IMAGE_OSS_BUCKET 是否为真实 OSS 桶名（勿填 Supabase Storage 桶名）。`
+  }
+  return msg
 }
 
 export function merchantProductImageOssConfigured(): boolean {
@@ -150,36 +180,74 @@ function buildObjectPath(merchantId: string, safeMime: string, originalName: str
   return `${merchantProductImageStoragePrefix()}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
 }
 
+async function createMerchantProductImageOssClient(cfg: MerchantProductImageOssEnv) {
+  const { default: OSS } = await import('ali-oss')
+  const endpoint = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
+  return new OSS({
+    region: cfg.region,
+    accessKeyId: cfg.accessKeyId,
+    accessKeySecret: cfg.accessKeySecret,
+    bucket: cfg.bucket,
+    secure: true,
+    ...(endpoint ? { endpoint } : {}),
+    ...(process.env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
+  })
+}
+
+function buildOssVirtualHostUrl(cfg: MerchantProductImageOssEnv, objectPath: string): string {
+  return `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${objectPath}`
+}
+
+async function resolveOssObjectPublicUrl(
+  client: Awaited<ReturnType<typeof createMerchantProductImageOssClient>>,
+  cfg: MerchantProductImageOssEnv,
+  objectPath: string,
+): Promise<{ publicUrl: string; accessMode: 'public' | 'signed' }> {
+  const virtualUrl = buildOssVirtualHostUrl(cfg, objectPath)
+  const preferPublic = process.env.MERCHANT_PRODUCT_IMAGE_OSS_PUBLIC_URL !== '0'
+  if (preferPublic) {
+    try {
+      const r = await fetch(virtualUrl, { method: 'HEAD' })
+      if (r.ok) return { publicUrl: virtualUrl, accessMode: 'public' }
+    } catch {
+      /* fall through to signed URL */
+    }
+  }
+  const signed = client.signatureUrl(objectPath, {
+    expires: MERCHANT_PRODUCT_IMAGE_SIGNED_URL_EXPIRES_SEC,
+  })
+  if (!/^https:\/\//i.test(signed)) {
+    throw new Error('OSS 签名 URL 生成失败')
+  }
+  return { publicUrl: signed, accessMode: 'signed' }
+}
+
 async function uploadMerchantProductImageToOss(params: {
   merchantId: string
   buf: Buffer
   safeMime: string
   originalName: string
-}): Promise<{ publicUrl: string; objectPath: string; bucket: string }> {
+}): Promise<{ publicUrl: string; objectPath: string; bucket: string; accessMode: 'public' | 'signed' }> {
   const cfg = readMerchantProductImageOssEnv()
   if (!cfg) throw new Error('OSS 未配置')
 
   const objectPath = buildObjectPath(params.merchantId, params.safeMime, params.originalName)
-  const { default: OSS } = await import('ali-oss')
-  const client = new OSS({
-    region: cfg.region,
-    accessKeyId: cfg.accessKeyId,
-    accessKeySecret: cfg.accessKeySecret,
-    bucket: cfg.bucket,
-  })
+  const client = await createMerchantProductImageOssClient(cfg)
 
-  await client.put(objectPath, params.buf, {
-    headers: {
-      'Content-Type': params.safeMime,
-      'Cache-Control': 'public, max-age=604800',
-    },
-  })
-
-  const publicUrl = `https://${cfg.bucket}.${cfg.region}.aliyuncs.com/${objectPath}`
-  if (!/^https:\/\//i.test(publicUrl)) {
-    throw new Error('OSS 公开 URL 生成失败：请确认 Bucket 为公共读')
+  try {
+    await client.put(objectPath, params.buf, {
+      headers: {
+        'Content-Type': params.safeMime,
+        'Cache-Control': 'public, max-age=604800',
+      },
+    })
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e)
+    throw new Error(formatMerchantProductImageOssError(raw))
   }
-  return { publicUrl, objectPath, bucket: cfg.bucket }
+
+  const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath)
+  return { publicUrl, objectPath, bucket: cfg.bucket, accessMode }
 }
 
 async function uploadMerchantProductImageToSupabase(params: {
@@ -224,7 +292,13 @@ export async function uploadMerchantProductImage(params: {
   buf: Buffer
   safeMime: string
   originalName: string
-}): Promise<{ publicUrl: string; objectPath: string; storage: 'oss' | 'supabase'; bucket: string }> {
+}): Promise<{
+  publicUrl: string
+  objectPath: string
+  storage: 'oss' | 'supabase'
+  bucket: string
+  accessMode?: 'public' | 'signed'
+}> {
   const mode = merchantProductImageStorageConfigured()
   if (mode === 'oss') {
     const r = await uploadMerchantProductImageToOss(params)

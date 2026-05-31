@@ -5407,7 +5407,7 @@ export async function handleKuaishouGoodsImageUploadPost(
   }
 
   try {
-    const { publicUrl, objectPath, storage, bucket } = await uploadMerchantProductImage({
+    const { publicUrl, objectPath, storage, bucket, accessMode } = await uploadMerchantProductImage({
       merchantId: session.merchantId,
       buf,
       safeMime,
@@ -5419,6 +5419,7 @@ export async function handleKuaishouGoodsImageUploadPost(
       storage,
       bucket,
       object_path: objectPath,
+      ...(accessMode ? { access_mode: accessMode } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -5427,7 +5428,7 @@ export async function handleKuaishouGoodsImageUploadPost(
       return
     }
     json(res, 502, {
-      message: `商品图上传失败：${msg.slice(0, 900)}。请检查 OSS Bucket 公共读、AccessKey 权限与对象大小。`,
+      message: `商品图上传失败：${msg.slice(0, 1200)}`,
     })
   }
 }
