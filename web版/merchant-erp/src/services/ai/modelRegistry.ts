@@ -40,7 +40,7 @@ export const DIRECT_MODEL_REGISTRY: readonly DirectModelRegistryEntry[] = [
   {
     provider: 'kimi',
     label: 'Kimi / Moonshot',
-    defaultBaseUrl: 'https://api.moonshot.ai/v1',
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
     primaryEndpoint: 'POST /chat/completions',
     defaultModel: 'moonshot-v1-8k',
     fallbackModel: 'moonshot-v1-32k',

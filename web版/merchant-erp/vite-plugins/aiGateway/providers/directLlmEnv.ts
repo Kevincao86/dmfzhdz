@@ -1,0 +1,83 @@
+/** 直连厂商 Key / Base URL（与运营台 vendorKeys、MERCHANT_AI_* 对齐） */
+
+export function resolveMinimaxApiKey(env: Record<string, string>): string {
+  return (env.MINIMAX_API_KEY ?? env.MERCHANT_AI_MINIMAX_KEY ?? '').trim()
+}
+
+export function resolveMoonshotApiKey(env: Record<string, string>): string {
+  return (env.MOONSHOT_API_KEY ?? env.MERCHANT_AI_KIMI_KEY ?? env.KIMI_API_KEY ?? '').trim()
+}
+
+/** 国内 Key 通常走 moonshot.cn；国际走 moonshot.ai */
+export function moonshotChatBaseCandidates(env: Record<string, string>): string[] {
+  const custom = (env.KIMI_BASE_URL ?? env.MOONSHOT_BASE_URL ?? '').trim().replace(/\/$/, '')
+  const out: string[] = []
+  const add = (u: string) => {
+    const t = u.trim().replace(/\/$/, '')
+    if (t && !out.includes(t)) out.push(t)
+  }
+  if (custom) add(custom)
+  add('https://api.moonshot.cn/v1')
+  add('https://api.moonshot.ai/v1')
+  return out
+}
+
+export function minimaxChatBaseCandidates(env: Record<string, string>): string[] {
+  const custom = (env.MINIMAX_BASE_URL ?? env.MERCHANT_AI_MINIMAX_CHAT_BASE ?? '')
+    .trim()
+    .replace(/\/$/, '')
+  const out: string[] = []
+  const add = (u: string) => {
+    const t = u.trim().replace(/\/$/, '')
+    if (t && !out.includes(t)) out.push(t)
+  }
+  if (custom) {
+    add(custom.includes('/chat/completions') ? custom.replace(/\/chat\/completions.*$/, '') : custom)
+  }
+  add('https://api.minimaxi.com/v1')
+  add('https://api.minimax.io/v1')
+  return out
+}
+
+export function moonshotChatModelCandidates(
+  env: Record<string, string>,
+  reqModel?: string,
+): string[] {
+  const out: string[] = []
+  const add = (m: string) => {
+    const t = m.trim()
+    if (t && !out.includes(t)) out.push(t)
+  }
+  if (reqModel?.trim()) add(reqModel.trim())
+  const envModel = (env.KIMI_MODEL ?? env.MOONSHOT_MODEL ?? '').trim()
+  if (envModel) add(envModel)
+  for (const m of ['moonshot-v1-8k', 'moonshot-v1-32k', 'kimi-latest']) add(m)
+  return out.length ? out : ['moonshot-v1-8k']
+}
+
+export function minimaxChatModelCandidates(
+  env: Record<string, string>,
+  reqModel?: string,
+  regDefault?: string,
+): string[] {
+  const out: string[] = []
+  const add = (m: string) => {
+    const t = m.trim()
+    if (t && !out.includes(t)) out.push(t)
+  }
+  if (reqModel?.trim()) add(reqModel.trim())
+  const envModel = (env.MINIMAX_MODEL ?? env.MERCHANT_AI_MINIMAX_CHAT_MODEL ?? '').trim()
+  if (envModel) add(envModel)
+  if (regDefault?.trim()) add(regDefault.trim())
+  for (const m of [
+    'MiniMax-M2.7',
+    'MiniMax-M2.5',
+    'MiniMax-M2.1',
+    'MiniMax-M2',
+    'abab6.5-chat',
+    'abab6.5s-chat',
+  ]) {
+    add(m)
+  }
+  return out.length ? out : ['MiniMax-M2.7']
+}
