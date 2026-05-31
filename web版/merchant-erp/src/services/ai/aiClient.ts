@@ -116,7 +116,7 @@ export async function postAiChat(
         }
         if (res.status === 502 || /502\s+Bad\s+Gateway/i.test(trimmed)) {
           lastErr =
-            'erp-api 502（ECS auth-api 未运行）。仅部署 Vercel 无法修复；请 SSH 登录 ECS 执行：cd ~/app && git pull && bash scripts/ecs-fix-erp-api-502.sh'
+            'erp-api 502（ECS auth-api 未运行）。SSH 执行：cd ~/app/web版/merchant-erp && git pull && bash scripts/ecs-fix-erp-api-502.sh'
           continue
         }
         throw new Error(trimmed || `HTTP ${res.status}`)
