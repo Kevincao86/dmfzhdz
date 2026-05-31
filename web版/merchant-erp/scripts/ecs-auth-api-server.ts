@@ -16,6 +16,10 @@ import tenantsResetPwdHandler from '../../../商家管理后台/api/meoo-supabas
 import paymentOrdersListHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-list.ts'
 import paymentOrdersVerifyHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-verify.ts'
 import paymentOrdersConfirmHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-confirm.ts'
+import opsSyncRegistryGetHandler from '../../../商家管理后台/api/meoo-ops-sync-registry.ts'
+import opsSyncVendorKeysHandler from '../../../商家管理后台/api/ops-sync/vendor-keys.ts'
+import opsSyncAiHandler from '../../../商家管理后台/api/ops-sync/ai.ts'
+import opsSyncVideoAiHandler from '../../../商家管理后台/api/ops-sync/video-ai.ts'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -43,6 +47,12 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-supabase-payment-orders-list': paymentOrdersListHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-verify': paymentOrdersVerifyHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,
+  /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
+  '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
+  '/api/ops-sync/registry': opsSyncRegistryGetHandler as VercelLikeHandler,
+  '/api/ops-sync/vendor-keys': opsSyncVendorKeysHandler as VercelLikeHandler,
+  '/api/ops-sync/ai': opsSyncAiHandler as VercelLikeHandler,
+  '/api/ops-sync/video-ai': opsSyncVideoAiHandler as VercelLikeHandler,
   // tokenmix 依赖 @supabase/supabase-js（须在 商家管理后台/node_modules）；ECS 仅走 Vercel /api/meoo-supabase-tenants-tokenmix
 }
 

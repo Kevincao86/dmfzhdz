@@ -94,6 +94,7 @@ fi
 
 echo "启动 Auth API :$PORT（env: $ENV_FILE）"
 echo "测试: curl -sS http://127.0.0.1:$PORT/api/meoo-auth-ping"
+echo "注册表: curl -sS http://127.0.0.1:$PORT/api/meoo-ops-sync-registry | head -c 200"
 
 set -a
 # shellcheck disable=SC1090
