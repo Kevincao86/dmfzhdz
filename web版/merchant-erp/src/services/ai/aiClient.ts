@@ -1,32 +1,10 @@
 /**
- * 浏览器侧：优先当前站点同源（Vercel /api/meoo-ai-chat），再尝试 VITE_MERCHANT_API_BASE_URL，避免误指商家管理后台旧网关。
+ * 智能体：优先 ECS /erp-api（本机 Supabase + 运营台注册表 Key），再回退当前站点 Vercel /api。
  */
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
+import { merchantErpApiCandidates } from '../../lib/merchantErpApiBase'
 import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
 import type { AIChatOkBody, AIChatRequest, AIChatResponse } from './types'
-
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
-
-function aiChatFetchUrlCandidates(path: string): string[] {
-  const out: string[] = []
-  const add = (u: string) => {
-    const t = u.trim()
-    if (!t || out.includes(t)) return
-    out.push(t)
-  }
-  const p = path.startsWith('/') ? path : `/${path}`
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    try {
-      add(new URL(p, window.location.origin).href)
-    } catch {
-      /* ignore */
-    }
-  }
-  const b = apiBase().replace(/\/$/, '')
-  if (b) add(`${b}${p}`)
-  if (out.length === 0) add(p)
-  return out
-}
 
 export function isAiRequestAborted(e: unknown): boolean {
   if (e instanceof DOMException && e.name === 'AbortError') return true
@@ -48,7 +26,11 @@ async function tenantIdForApi(): Promise<string | undefined> {
   return tid ?? undefined
 }
 
-/** 优先扁平路由 + 同源，避免生产环境深层路径或旧 API 基址落到 SPA */
+function aiChatFetchUrlCandidates(path: string): string[] {
+  return merchantErpApiCandidates(path)
+}
+
+/** 优先扁平路由 + erp-api，避免生产环境 Vercel 查不到租户 */
 export async function postAiChat(
   req: AIChatRequest,
   opts?: { signal?: AbortSignal },
@@ -69,15 +51,21 @@ export async function postAiChat(
       if (opts?.signal?.aborted) {
         throw new DOMException('Aborted', 'AbortError')
       }
-      const res = await fetch(target, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          ...req,
-          ...(tenantId ? { tenantId } : {}),
-        }),
-        signal: opts?.signal,
-      })
+      let res: Response
+      try {
+        res = await fetch(target, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...req,
+            ...(tenantId ? { tenantId } : {}),
+          }),
+          signal: opts?.signal,
+        })
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+        continue
+      }
       const text = await res.text()
       let json: unknown = null
       try {
@@ -123,7 +111,12 @@ export async function postAiChat(
         const trimmed = text?.trim() ?? ''
         if (/MODULE_NOT_FOUND|Cannot find module/i.test(trimmed)) {
           throw new Error(
-            `智能体服务端模块加载失败（HTTP ${res.status}）。请重新部署并确认 Vercel 环境变量（SUPABASE_URL、TOKENMIX_API_KEY 等）已配置。${trimmed.slice(0, 200)}`,
+            `智能体服务端模块加载失败（HTTP ${res.status}）。请重新部署并确认 ECS auth-api 与 Vercel 环境变量已配置。${trimmed.slice(0, 200)}`,
+          )
+        }
+        if (/502\s+Bad\s+Gateway/i.test(trimmed)) {
+          throw new Error(
+            'erp-api 返回 502：请在 ECS 执行 bash scripts/ecs-fix-erp-api-502.sh 安装 systemd 常驻 auth-api。',
           )
         }
         throw new Error(trimmed || `HTTP ${res.status}`)
@@ -152,14 +145,10 @@ export type AiAgentNativeImageOk =
 
 export type AiAgentNativeImageErr = { ok: false; message: string }
 
-/**
- * 智能体文生图：POST /api/meoo-ai-agent-image（builtin：万相/豆包/MiniMax；TokenMix：OpenAI 兼容 images/generations）。
- */
 export async function postAiAgentNativeImage(
   prompt: string,
   opts?: {
     preferredVendor?: 'qwen' | 'doubao' | 'minimax'
-    /** data URL 或厂商可接受的图片 URL，走图生图时传入 */
     referenceImageDataUrl?: string
     imageRoute?: 'builtin' | 'tokenmix'
     tokenmixImageModel?: string
@@ -167,6 +156,7 @@ export async function postAiAgentNativeImage(
   },
 ): Promise<AiAgentNativeImageOk | AiAgentNativeImageErr> {
   const token = await bearer()
+  const tenantId = await tenantIdForApi()
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -182,18 +172,26 @@ export async function postAiAgentNativeImage(
   if (opts?.imageRoute === 'tokenmix') body.image_route = 'tokenmix'
   const tim = opts?.tokenmixImageModel?.trim()
   if (tim) body.tokenmix_image_model = tim
+  if (tenantId) body.tenantId = tenantId
+
   for (const p of tryPaths) {
     const targets = aiChatFetchUrlCandidates(p)
     for (const target of targets) {
       if (opts?.signal?.aborted) {
         throw new DOMException('Aborted', 'AbortError')
       }
-      const res = await fetch(target, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: opts?.signal,
-      })
+      let res: Response
+      try {
+        res = await fetch(target, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: opts?.signal,
+        })
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+        continue
+      }
       const text = await res.text()
       let json: unknown = null
       try {
