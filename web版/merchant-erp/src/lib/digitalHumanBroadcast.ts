@@ -350,3 +350,45 @@ export function workTitleFromDraft(d: DigitalHumanDraft): string {
   const av = PRESET_AVATARS.find((a) => a.id === d.avatarId)
   return av ? `${av.name} · 口播` : '未命名口播'
 }
+
+/** 形象侧栏预览：无口播文案时使用各角色的默认试听台词 */
+export function avatarDemoScript(avatar: PresetAvatar): string {
+  const byId: Record<string, string> = {
+    'av-real-1':
+      '大家好，我是晓晨。今天给大家推荐一款本地生活团购好物，品质靠谱、性价比很高，欢迎到店体验。',
+    'av-real-2':
+      '嗨，我是悦然。这条视频带你看看我们店里的招牌套餐，新客还有专属优惠，记得点赞收藏哦。',
+    'av-real-3':
+      '各位观众好，我是明哲。接下来为您播报今日门店活动详情，优惠力度大，名额有限，先到先得。',
+    'av-real-4':
+      '姐妹们好呀，我是诗涵。这款真的超级种草，我自己也在用，现在下单还有团购价，别错过啦。',
+    'av-real-5':
+      '嘿，我是俊杰。周末不知道吃什么？来我们店，环境好、分量足，线上团购更划算。',
+    'av-real-6':
+      '您好，我是婉清，本店店长。感谢一直支持我们的老顾客，新季菜单已上线，欢迎来店品尝。',
+    'av-real-7':
+      '大家好，我是浩然。下面用三分钟讲清楚这款产品的核心卖点和适用场景，帮您快速做决定。',
+    'av-real-8':
+      '哈喽，我是思琪。今天探店 vlog 走起，这家宝藏小店必须安利给你们，链接在下方团购里。',
+    'av-real-9':
+      '我是子墨，带你云探店。环境、口味、服务我都替你们看过了，结论就一句话：值得冲。',
+    'av-real-10':
+      '您好，我是静雯。如有任何订单或预约问题，都可以私信我，我会第一时间为您解答。',
+    'av-real-11':
+      '家人们好，我是嘉伟。今日团购爆款上线，库存不多，手慢无，赶紧点击下方链接下单。',
+    'av-real-12':
+      'Hi，我是雨桐。换季护肤别踩雷，今天这支好物亲测有效，敏感肌也可以放心尝试。',
+  }
+  if (byId[avatar.id]) return byId[avatar.id]
+  if (avatar.style === 'cartoon') {
+    return `嗨，我是${avatar.name}，${avatar.tag}。一起发现本地生活好店好货，记得关注我哦。`
+  }
+  return `您好，我是${avatar.name}，${avatar.tag}。欢迎了解我们的精选团购与到店优惠。`
+}
+
+export function resolveDigitalHumanPreviewScript(draft: DigitalHumanDraft, avatar: PresetAvatar | null): string {
+  const custom = draft.script.trim()
+  if (custom.length >= 8) return custom
+  if (avatar) return avatarDemoScript(avatar)
+  return '您好，欢迎了解我们的本地生活精选内容。完成口播文案后，可生成更贴合的动态预览。'
+}

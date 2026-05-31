@@ -34,6 +34,7 @@ import {
   upsertDigitalHumanWork,
   VOICE_PRESETS,
   workTitleFromDraft,
+  resolveDigitalHumanPreviewScript,
 } from '../lib/digitalHumanBroadcast'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
@@ -67,6 +68,8 @@ export default function DigitalHumanBroadcastPage() {
   const [linkSourceTitle, setLinkSourceTitle] = useState<string | null>(null)
   const [avatarFilter, setAvatarFilter] = useState<'all' | AvatarStyle>('all')
   const [ttsPlaying, setTtsPlaying] = useState(false)
+  const [sidebarPreviewPlaying, setSidebarPreviewPlaying] = useState(false)
+  const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
   const [renderJobId, setRenderJobId] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -98,6 +101,19 @@ export default function DigitalHumanBroadcastPage() {
     const t = window.setTimeout(() => setToast(null), 3200)
     return () => window.clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel()
+    }
+  }, [])
+
+  useEffect(() => {
+    window.speechSynthesis?.cancel()
+    setTtsPlaying(false)
+    setSidebarPreviewPlaying(false)
+    setSidebarPreviewLine(null)
+  }, [draft.avatarId, draft.customAvatarDataUrl])
 
   useEffect(() => {
     const job = works.find((w) => w.status === 'rendering' || w.status === 'queued')
@@ -200,9 +216,83 @@ export default function DigitalHumanBroadcastPage() {
     }
   }
 
-  const playTtsPreview = () => {
+  const stopAllSpeech = () => {
+    window.speechSynthesis?.cancel()
+    setTtsPlaying(false)
+    setSidebarPreviewPlaying(false)
+    setSidebarPreviewLine(null)
+  }
+
+  const pickSpeechVoice = (utterance: SpeechSynthesisUtterance) => {
+    if (typeof window === 'undefined') return
+    const voices = window.speechSynthesis.getVoices()
+    const gender = selectedAvatar?.gender
+    const zh = voices.filter((v) => v.lang.startsWith('zh'))
+    if (!zh.length) return
+    if (gender === '女') {
+      const hit = zh.find((v) => /女|female|xiaoxiao|ting|hui|li|ya/i.test(v.name))
+      if (hit) utterance.voice = hit
+    } else if (gender === '男') {
+      const hit = zh.find((v) => /男|male|kang|yun|wei|feng/i.test(v.name))
+      if (hit) utterance.voice = hit
+    }
+  }
+
+  const speakPreviewText = (text: string, mode: 'sidebar' | 'tts'): boolean => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       setToast('当前浏览器不支持语音试听')
+      return false
+    }
+    const trimmed = text.trim()
+    if (!trimmed) {
+      setToast('暂无可播放的口播内容')
+      return false
+    }
+    window.speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(trimmed.slice(0, 500))
+    u.lang = 'zh-CN'
+    u.rate = draft.speechRate * (selectedVoice?.rate ?? 1)
+    u.pitch = draft.speechPitch * (selectedVoice?.pitch ?? 1)
+    pickSpeechVoice(u)
+    u.onstart = () => {
+      if (mode === 'sidebar') {
+        setSidebarPreviewPlaying(true)
+        setSidebarPreviewLine(trimmed.split(/\n/)[0]?.slice(0, 36) ?? trimmed.slice(0, 36))
+        setTtsPlaying(false)
+      } else {
+        setTtsPlaying(true)
+        setSidebarPreviewPlaying(false)
+        setSidebarPreviewLine(null)
+      }
+    }
+    u.onend = () => {
+      if (mode === 'sidebar') setSidebarPreviewPlaying(false)
+      else setTtsPlaying(false)
+    }
+    u.onerror = () => {
+      if (mode === 'sidebar') setSidebarPreviewPlaying(false)
+      else setTtsPlaying(false)
+    }
+    window.speechSynthesis.speak(u)
+    return true
+  }
+
+  const playSidebarPreview = () => {
+    if (sidebarPreviewPlaying) {
+      stopAllSpeech()
+      return
+    }
+    if (!draft.avatarId && !draft.customAvatarDataUrl) {
+      setToast('请先选择数字人形象')
+      return
+    }
+    const text = resolveDigitalHumanPreviewScript(draft, selectedAvatar)
+    speakPreviewText(text, 'sidebar')
+  }
+
+  const playTtsPreview = () => {
+    if (ttsPlaying) {
+      stopAllSpeech()
       return
     }
     const text = draft.script.trim()
@@ -210,20 +300,11 @@ export default function DigitalHumanBroadcastPage() {
       setToast('请先输入口播文案')
       return
     }
-    window.speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(text.slice(0, 500))
-    u.lang = 'zh-CN'
-    u.rate = draft.speechRate * (selectedVoice?.rate ?? 1)
-    u.pitch = draft.speechPitch * (selectedVoice?.pitch ?? 1)
-    u.onstart = () => setTtsPlaying(true)
-    u.onend = () => setTtsPlaying(false)
-    u.onerror = () => setTtsPlaying(false)
-    window.speechSynthesis.speak(u)
+    speakPreviewText(text, 'tts')
   }
 
   const stopTtsPreview = () => {
-    window.speechSynthesis?.cancel()
-    setTtsPlaying(false)
+    stopAllSpeech()
   }
 
   const canNext = (): boolean => {
@@ -262,14 +343,21 @@ export default function DigitalHumanBroadcastPage() {
     setToast(`已载入作品「${w.title}」继续编辑`)
   }
 
-  const renderAvatarPreview = (large = false) => {
+  const renderAvatarPreview = (large = false, animated = false) => {
     const box = cn(
       'relative flex items-center justify-center overflow-hidden rounded-2xl border border-white/20 shadow-inner',
       large ? 'aspect-[9/16] max-h-[420px] w-full max-w-[240px]' : 'h-32 w-24',
+      animated && 'dh-preview-live border-violet-400/60',
     )
     if (draft.customAvatarDataUrl) {
       return (
-        <img src={draft.customAvatarDataUrl} alt="" className={cn(box, 'object-cover')} />
+        <div className={box}>
+          <img
+            src={draft.customAvatarDataUrl}
+            alt=""
+            className={cn('h-full w-full object-cover', animated && 'dh-preview-live-img')}
+          />
+        </div>
       )
     }
     if (selectedAvatar) {
@@ -281,7 +369,7 @@ export default function DigitalHumanBroadcastPage() {
           decoding="async"
           width={400}
           height={500}
-          className="h-full w-full object-cover"
+          className={cn('h-full w-full object-cover', animated && 'dh-preview-live-img')}
         />
       ) : (
         <User className={large ? 'h-20 w-20 opacity-90' : 'h-10 w-10 opacity-90'} />
@@ -993,8 +1081,41 @@ export default function DigitalHumanBroadcastPage() {
               </div>
               <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white shadow-sm">
                 <p className="text-xs text-slate-400">当前形象</p>
-                <div className="mt-3 flex justify-center">{renderAvatarPreview()}</div>
-                <p className="mt-2 text-center text-sm">{selectedAvatar?.name ?? '自定义'}</p>
+                <button
+                  type="button"
+                  onClick={playSidebarPreview}
+                  disabled={!selectedAvatar && !draft.customAvatarDataUrl}
+                  className="group mt-3 w-full disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={sidebarPreviewPlaying ? '停止预览' : '播放动态口播预览'}
+                >
+                  <div className="relative mx-auto flex justify-center">
+                    {renderAvatarPreview(false, sidebarPreviewPlaying)}
+                    <span
+                      className={cn(
+                        'absolute inset-0 flex items-center justify-center rounded-2xl transition',
+                        sidebarPreviewPlaying ? 'bg-black/25' : 'bg-black/0 group-hover:bg-black/20',
+                      )}
+                    >
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg">
+                        {sidebarPreviewPlaying ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Play className="ml-0.5 h-4 w-4" />
+                        )}
+                      </span>
+                    </span>
+                  </div>
+                  <p className="mt-2 text-center text-sm">{selectedAvatar?.name ?? '自定义'}</p>
+                  <p className="mt-1 text-center text-[11px] text-slate-400">
+                    {sidebarPreviewPlaying ? '播放中 · 再次点击停止' : '点击预览 · 动态画面含声音'}
+                  </p>
+                  {sidebarPreviewPlaying && sidebarPreviewLine ? (
+                    <p className="mt-2 line-clamp-2 rounded-lg bg-black/35 px-2 py-1.5 text-center text-[11px] leading-relaxed text-white/90">
+                      {sidebarPreviewLine}
+                      {sidebarPreviewLine.length >= 36 ? '…' : ''}
+                    </p>
+                  ) : null}
+                </button>
               </div>
             </aside>
           </div>

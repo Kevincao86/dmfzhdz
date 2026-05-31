@@ -90,3 +90,32 @@ body {
 .ui-hints-scope .ui-hint-block {
   display: none !important;
 }
+
+@keyframes dh-preview-pan {
+  0%,
+  100% {
+    transform: scale(1.02) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: scale(1.1) translate3d(0, -1.5%, 0);
+  }
+}
+
+@keyframes dh-preview-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(167, 139, 250, 0.12);
+  }
+}
+
+.dh-preview-live {
+  animation: dh-preview-glow 2.4s ease-in-out infinite;
+}
+
+.dh-preview-live-img {
+  animation: dh-preview-pan 5s ease-in-out infinite;
+  transform-origin: center center;
+}
