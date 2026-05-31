@@ -655,7 +655,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
             <WifiOff className="h-4 w-4 shrink-0" />
           )}
           {httpPollError
-            ? `云端会话轮询异常：${httpPollError}。请确认 Vercel 已配置 SUPABASE_URL=https://mofangdianai.com 与 ECS service_role，并访问 /api/meoo-support-relay-ping 诊断。`
+            ? `云端会话轮询异常：${httpPollError}。请确认 Vercel 已配置 SUPABASE_URL=https://mofangdianai.com 与 ECS service_role，并访问 /api/meoo-ops-ping?check=support 诊断。`
             : httpPollReady
               ? '云端会话同步已启用（HTTP 轮询 Supabase，约每 2 秒刷新）'
               : '正在连接云端会话接口… 请确认 Vercel 已配置 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY。'}
