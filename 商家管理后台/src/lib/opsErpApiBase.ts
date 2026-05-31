@@ -1,0 +1,84 @@
+/**
+ * 运营管控台访问 ECS 反代 /erp-api（Vercel 服务端无法出站访问 ECS 时，由浏览器直连）。
+ */
+export function normalizeOpsErpApiBase(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, '')
+  if (!trimmed) return ''
+  if (/api\.mofangdianai\.com/i.test(trimmed)) {
+    return 'https://mofangdianai.com/erp-api'
+  }
+  try {
+    const u = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+    if (u.hostname === 'api.mofangdianai.com') {
+      return 'https://mofangdianai.com/erp-api'
+    }
+    if (u.hostname === 'mofangdianai.com' && !u.pathname.startsWith('/erp-api')) {
+      const tail = u.pathname === '/' ? '' : u.pathname
+      u.pathname = `/erp-api${tail}`
+    }
+    return u.toString().replace(/\/$/, '')
+  } catch {
+    return ''
+  }
+}
+
+/** 构建时 env 或生产默认 https://mofangdianai.com/erp-api */
+export function opsErpApiBase(): string {
+  const fromEnv = normalizeOpsErpApiBase(
+    (import.meta.env.VITE_MEEO_SUPPORT_OPS_API_BASE as string | undefined) ??
+      (import.meta.env.VITE_MEEO_OPS_API_BASE as string | undefined) ??
+      '',
+  )
+  if (fromEnv) return fromEnv
+  if (import.meta.env.PROD) return 'https://mofangdianai.com/erp-api'
+  return ''
+}
+
+/** /api/meoo-* → https://mofangdianai.com/erp-api/meoo-*；无 base 时返回同源 path */
+export function opsErpApiUrl(apiPath: string): string {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const base = opsErpApiBase()
+  if (!base) {
+    if (typeof window !== 'undefined') return `${window.location.origin}${path}`
+    return path
+  }
+  const rel = path.replace(/^\/api\//, '')
+  return new URL(rel, `${base.replace(/\/$/, '')}/`).href
+}
+
+export function opsErpApiCandidates(apiPath: string): string[] {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  const base = opsErpApiBase()
+  if (base) add(opsErpApiUrl(path))
+  if (typeof window !== 'undefined') {
+    add(`${window.location.origin}${path}`)
+  } else if (!base) {
+    add(path)
+  }
+  return urls
+}
+
+/** 优先 ECS erp-api，失败再回退运营台同源 /api（Vercel 可能仍 fetch failed） */
+export async function fetchOpsErpApi(apiPath: string, init?: RequestInit): Promise<Response> {
+  const candidates = opsErpApiCandidates(apiPath)
+  let last: unknown
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      const res = await fetch(candidates[i]!, init)
+      const retry =
+        !res.ok &&
+        (res.status >= 502 || res.status === 0) &&
+        i < candidates.length - 1
+      if (!retry) return res
+    } catch (e) {
+      last = e
+      if (i < candidates.length - 1) continue
+      throw e
+    }
+  }
+  throw last instanceof Error ? last : new Error('fetch failed')
+}

@@ -1,5 +1,6 @@
-/** 同源 /api/ops-supabase/*：由商家管理后台 Vite 服务端用 Service Role 访问 Supabase */
+/** 线上优先浏览器直连 ECS /erp-api（Vercel 函数无法访问 mofangdianai.com） */
 
+import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 import type { RegistryTenant } from './opsRegistryApi'
 
 function parseJsonBody(raw: string): Record<string, unknown> {
@@ -47,7 +48,7 @@ export async function fetchSupabaseTenantsForOps(): Promise<
     return { ok: false, error: 'not_configured' }
   }
   /** api 根路径单文件，避免 Vercel 在 ops-supabase 深层目录打包崩溃 */
-  const res = await fetch('/api/meoo-supabase-tenants-list')
+  const res = await fetchOpsErpApi('/api/meoo-supabase-tenants-list')
   const raw = await res.text()
   const j = parseJsonBody(raw) as {
     ok?: boolean
@@ -184,7 +185,7 @@ export async function patchSupabaseTenant(body: {
   membershipPlan?: 'free' | 'member' | 'member_plus'
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
   /** 扁平路径，避免 Vercel 深层目录 + supabase-js 打包崩溃（与 meoo-supabase-tenants-list 一致） */
-  const res = await fetch('/api/meoo-supabase-tenants-patch', {
+  const res = await fetchOpsErpApi('/api/meoo-supabase-tenants-patch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -208,7 +209,7 @@ export async function resetSupabaseTenantAuthPassword(
   tenantId: string,
   password = '123456',
 ): Promise<{ ok: boolean; error?: string; detail?: string }> {
-  const res = await fetch('/api/meoo-supabase-tenants-reset-password', {
+  const res = await fetchOpsErpApi('/api/meoo-supabase-tenants-reset-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: tenantId, password }),

@@ -103,7 +103,7 @@ export default function OpsCustomersListPage() {
       setSyncHint(
         import.meta.env.DEV
           ? '无法读取注册表（请重启商家管理后台 dev，并确认项目根可写 .meoo-dev-sync）'
-          : '本地注册表不可用（线上客户列表以 Supabase 为准；若仍为空请检查运营台 API /api/meoo-supabase-tenants-list 与密钥配置）。',
+          : '本地注册表不可用（线上客户列表以 Supabase 为准；数据经 https://mofangdianai.com/erp-api/meoo-supabase-tenants-list 拉取，请确认 ECS auth-api 已启动）。',
       )
     }
 

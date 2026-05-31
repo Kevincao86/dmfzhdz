@@ -247,8 +247,12 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
         if (initialSince === 0 && maxPollTsRef.current === 0) {
           maxPollTsRef.current = Date.now()
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        setHttpPollError(
+          e instanceof Error
+            ? `${e.message}（请确认 ECS auth-api 与 https://mofangdianai.com/erp-api/support-poll 可访问）`
+            : '轮询网络异常',
+        )
       }
     }
 

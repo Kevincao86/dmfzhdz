@@ -1,3 +1,5 @@
+import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+
 export type OpsPaymentOrderRow = {
   id: string
   tenant_id: string
@@ -23,7 +25,7 @@ export async function fetchOpsPaymentOrders(): Promise<
   { ok: true; rows: OpsPaymentOrderRow[] } | { ok: false; error: string; hint?: string }
 > {
   /** 扁平路径，避免 ops-supabase/payment-orders-list + supabase-js 在 Vercel 上崩溃 */
-  const res = await fetch('/api/meoo-supabase-payment-orders-list')
+  const res = await fetchOpsErpApi('/api/meoo-supabase-payment-orders-list')
   const j = (await res.json().catch(() => ({}))) as {
     ok?: boolean
     rows?: OpsPaymentOrderRow[]
@@ -40,7 +42,7 @@ export async function verifyOpsPaymentOrder(body: {
   id: string
   verified_amount_cents: number
 }): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch('/api/meoo-supabase-payment-orders-verify', {
+  const res = await fetchOpsErpApi('/api/meoo-supabase-payment-orders-verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -51,7 +53,7 @@ export async function verifyOpsPaymentOrder(body: {
 }
 
 export async function confirmOpsPaymentOrder(body: { id: string }): Promise<{ ok: boolean; error?: string }> {
-  const res = await fetch('/api/meoo-supabase-payment-orders-confirm', {
+  const res = await fetchOpsErpApi('/api/meoo-supabase-payment-orders-confirm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

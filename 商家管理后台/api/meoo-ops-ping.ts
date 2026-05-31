@@ -81,11 +81,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ;(out.supportRelay as Record<string, unknown>).latestMessages = JSON.parse(text)
     sendJson(res, 200, out)
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
     out.ok = false
     ;(out.supportRelay as Record<string, unknown>).tableSelect = {
       ok: false,
-      error: e instanceof Error ? e.message : String(e),
+      error: msg,
     }
-    sendJson(res, 502, out)
+    sendJson(res, 502, {
+      ...out,
+      hint:
+        /fetch failed/i.test(msg)
+          ? 'Vercel 无法访问 ECS。运营台请配置 VITE_MEEO_SUPPORT_OPS_API_BASE=https://mofangdianai.com/erp-api 并 Redeploy；客户列表/客服改由浏览器直连 ECS。'
+          : undefined,
+    })
   }
 }
