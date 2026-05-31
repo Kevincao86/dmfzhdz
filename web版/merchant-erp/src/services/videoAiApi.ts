@@ -1,5 +1,7 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+
 export type VideoAiBackendConfig = {
   klingConfigured: boolean
   arkKeyConfigured: boolean
@@ -52,8 +54,9 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
   const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
   let lastNetworkErr = ''
   for (const p of paths) {
+    for (const url of merchantApiFetchUrls(p)) {
     try {
-      const res = await fetch(p)
+      const res = await fetch(url)
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
       if (res.status === 404) continue
@@ -67,6 +70,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
       if (res.ok && j && typeof j.klingConfigured === 'boolean') return j
     } catch (e) {
       lastNetworkErr = e instanceof Error ? e.message : String(e)
+    }
     }
   }
   if (lastNetworkErr) {

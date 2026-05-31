@@ -1,4 +1,6 @@
-/** 阿里云 ICE 云剪辑 — 经商户 BFF 代理 */
+/** 阿里云 ICE 云剪辑 — 经商户 BFF 代理（生产优先 ECS /erp-api 读运营台 videoAi） */
+
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export type AliyunIceCloudConfig = {
   configured: boolean
@@ -35,10 +37,27 @@ export type IceJobStatus =
   | { ok: false; message: string }
 
 /** 成片下载/预览代理（勿用 ICE 返回的 OSS 直链） */
-export function iceJobDownloadProxyPath(jobId: string, inline = false): string {
+export function iceJobDownloadProxyPaths(jobId: string, inline = false): string[] {
   const q = new URLSearchParams({ id: jobId })
   if (inline) q.set('inline', '1')
-  return `/api/meoo-merchant-ai-video-ice-job-download?${q.toString()}`
+  const qs = q.toString()
+  const paths = [
+    `/api/meoo-merchant-ai-video-ice-job-download?${qs}`,
+    `/api/meoo-merchant-ai-video-openshot-export-download?${qs}`,
+    `/api/merchant/ai/video/ice/job-download?${qs}`,
+  ]
+  const urls: string[] = []
+  for (const p of paths) {
+    for (const u of merchantApiFetchUrls(p)) {
+      if (!urls.includes(u)) urls.push(u)
+    }
+  }
+  return urls
+}
+
+/** @deprecated 使用 iceJobDownloadProxyPaths */
+export function iceJobDownloadProxyPath(jobId: string, inline = false): string {
+  return iceJobDownloadProxyPaths(jobId, inline)[0] ?? `/api/meoo-merchant-ai-video-ice-job-download?id=${jobId}`
 }
 
 export function iceExportFileName(label: string): string {
@@ -50,11 +69,7 @@ export function iceExportFileName(label: string): string {
  * 经 BFF 拉取成片 Blob 再触发下载（可校验非空并展示错误；避免直链 0 字节空文件）。
  */
 export async function downloadIceExportFile(jobId: string, label: string): Promise<void> {
-  const paths = [
-    iceJobDownloadProxyPath(jobId),
-    `/api/meoo-merchant-ai-video-openshot-export-download?id=${encodeURIComponent(jobId)}`,
-    `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}`,
-  ]
+  const paths = iceJobDownloadProxyPaths(jobId)
   let lastErr = '下载失败'
   for (const p of paths) {
     try {
@@ -152,13 +167,15 @@ const PIPELINE_PATHS = [
 
 export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig | null> {
   for (const p of CONFIG_PATHS) {
-    try {
-      const res = await fetch(p)
-      if (res.status === 404) continue
-      const j = await parseJson<AliyunIceCloudConfig>(res)
-      if (res.ok && j && typeof j.configured === 'boolean') return j
-    } catch {
-      /* next */
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url)
+        if (res.status === 404) continue
+        const j = await parseJson<AliyunIceCloudConfig>(res)
+        if (res.ok && j && typeof j.configured === 'boolean') return j
+      } catch {
+        /* next */
+      }
     }
   }
   return null
@@ -174,8 +191,9 @@ export async function postIceUploadInit(body: {
   sizeBytes: number
 }): Promise<IceUploadInitResult> {
   for (const p of UPLOAD_INIT_PATHS) {
+    for (const url of merchantApiFetchUrls(p)) {
     try {
-      const res = await fetch(p, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify(body),
@@ -189,6 +207,7 @@ export async function postIceUploadInit(body: {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       return { ok: false, message: msg }
+    }
     }
   }
   return { ok: false, message: '本地上传接口未部署' }
@@ -210,21 +229,23 @@ async function postJsonPaths<T extends { ok: boolean; message?: string }>(
   body: unknown,
 ): Promise<T | { ok: false; message: string }> {
   for (const p of paths) {
-    try {
-      const res = await fetch(p, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(body),
-      })
-      const j = await parseJson<T & { message?: string }>(res)
-      if (res.status === 404) continue
-      if (!res.ok || !j || !('ok' in j) || !j.ok) {
-        return { ok: false, message: j?.message ?? `请求失败 HTTP ${res.status}` }
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(body),
+        })
+        const j = await parseJson<T & { message?: string }>(res)
+        if (res.status === 404) continue
+        if (!res.ok || !j || !('ok' in j) || !j.ok) {
+          return { ok: false, message: j?.message ?? `请求失败 HTTP ${res.status}` }
+        }
+        return j as T
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { ok: false, message: msg }
       }
-      return j as T
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: msg }
     }
   }
   return { ok: false, message: '本地上传接口未部署' }
@@ -395,21 +416,23 @@ export async function postIcePipeline(body: {
   presetLengthSec?: number
 }): Promise<IcePipelineResult> {
   for (const p of PIPELINE_PATHS) {
-    try {
-      const res = await fetch(p, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(body),
-      })
-      const j = await parseJson<IcePipelineResult & { message?: string }>(res)
-      if (res.status === 404) continue
-      if (!res.ok || !j?.ok) {
-        return { ok: false, message: j?.message ?? `云剪提交失败 HTTP ${res.status}` }
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body: JSON.stringify(body),
+        })
+        const j = await parseJson<IcePipelineResult & { message?: string }>(res)
+        if (res.status === 404) continue
+        if (!res.ok || !j?.ok) {
+          return { ok: false, message: j?.message ?? `云剪提交失败 HTTP ${res.status}` }
+        }
+        return j as IcePipelineResult
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { ok: false, message: msg }
       }
-      return j as IcePipelineResult
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: msg }
     }
   }
   return { ok: false, message: '云剪辑接口未部署' }
@@ -423,17 +446,19 @@ export async function fetchIceJobStatus(jobId: string): Promise<IceJobStatus> {
     `/api/merchant/ai/video/openshot/export?id=${encodeURIComponent(jobId)}`,
   ]
   for (const p of paths) {
-    try {
-      const res = await fetch(p)
-      if (res.status === 404) continue
-      const j = await parseJson<IceJobStatus & { message?: string }>(res)
-      if (!res.ok || !j?.ok) {
-        return { ok: false, message: j?.message ?? `查询失败 HTTP ${res.status}` }
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url)
+        if (res.status === 404) continue
+        const j = await parseJson<IceJobStatus & { message?: string }>(res)
+        if (!res.ok || !j?.ok) {
+          return { ok: false, message: j?.message ?? `查询失败 HTTP ${res.status}` }
+        }
+        return j
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { ok: false, message: msg }
       }
-      return j
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: msg }
     }
   }
   return { ok: false, message: '任务状态接口未部署' }
@@ -447,9 +472,16 @@ export async function fetchIceExportPreviewUrl(jobId: string): Promise<string> {
     `/api/merchant/ai/video/ice/job-download?id=${encodeURIComponent(jobId)}&inline=1`,
     `/api/merchant/ai/video/openshot/export-download?id=${encodeURIComponent(jobId)}&inline=1`,
   ]
+  const urls: string[] = []
   for (const p of paths) {
+    for (const u of merchantApiFetchUrls(p)) {
+      if (!urls.includes(u)) urls.push(u)
+    }
+  }
+  for (let i = 0; i < urls.length; i += 1) {
+    const url = urls[i]!
     try {
-      const res = await fetch(p)
+      const res = await fetch(url)
       if (res.status === 404) continue
       const ct = (res.headers.get('content-type') ?? '').toLowerCase()
       if (!res.ok) {
@@ -469,7 +501,7 @@ export async function fetchIceExportPreviewUrl(jobId: string): Promise<string> {
       }
       return URL.createObjectURL(blob)
     } catch (e) {
-      if (p === paths[paths.length - 1]) throw e
+      if (i === urls.length - 1) throw e
     }
   }
   throw new Error('预览接口未部署')

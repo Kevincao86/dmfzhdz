@@ -146,17 +146,20 @@ export function mergeAliyunIceConfig(
     iceOutputOssUrlPrefix?: string
   },
 ): AliyunIceConfig | null {
-  const appId = reg?.iceAppId?.trim() || fromEnv.appId || ''
-  const accessKeyId = reg?.iceAccessKeyId?.trim() || fromEnv.accessKeyId || ''
-  const accessKeySecret = reg?.iceAccessKeySecret?.trim() || fromEnv.accessKeySecret || ''
+  /** 运营台 videoAi 优先（与 vendorKeys 一致，避免 Vercel 空 env 盖住注册表） */
+  const appId = (reg?.iceAppId?.trim() || fromEnv.appId || '').trim()
+  const accessKeyId = (reg?.iceAccessKeyId?.trim() || fromEnv.accessKeyId || '').trim()
+  const accessKeySecret = (reg?.iceAccessKeySecret?.trim() || fromEnv.accessKeySecret || '').trim()
   if (!appId || !accessKeyId || !accessKeySecret) return null
+  const vod = reg?.iceVodStorageLocation?.trim() || fromEnv.vodStorageLocation
+  const oss = reg?.iceOutputOssUrlPrefix?.trim() || fromEnv.outputOssUrlPrefix
   return {
     appId,
     accessKeyId,
     accessKeySecret,
     regionId: reg?.iceRegion?.trim() || fromEnv.regionId || 'cn-shanghai',
-    vodStorageLocation: reg?.iceVodStorageLocation?.trim() || fromEnv.vodStorageLocation,
-    outputOssUrlPrefix: reg?.iceOutputOssUrlPrefix?.trim() || fromEnv.outputOssUrlPrefix,
+    vodStorageLocation: vod,
+    outputOssUrlPrefix: oss,
   }
 }
 
