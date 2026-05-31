@@ -114,10 +114,10 @@ export async function postAiChat(
             `智能体服务端模块加载失败（HTTP ${res.status}）。请重新部署并确认 ECS auth-api 与 Vercel 环境变量已配置。${trimmed.slice(0, 200)}`,
           )
         }
-        if (/502\s+Bad\s+Gateway/i.test(trimmed)) {
-          throw new Error(
-            'erp-api 返回 502：请在 ECS 执行 bash scripts/ecs-fix-erp-api-502.sh 安装 systemd 常驻 auth-api。',
-          )
+        if (res.status === 502 || /502\s+Bad\s+Gateway/i.test(trimmed)) {
+          lastErr =
+            'erp-api 502（ECS auth-api 未运行）。仅部署 Vercel 无法修复；请 SSH 登录 ECS 执行：cd ~/app && git pull && bash scripts/ecs-fix-erp-api-502.sh'
+          continue
         }
         throw new Error(trimmed || `HTTP ${res.status}`)
       }
