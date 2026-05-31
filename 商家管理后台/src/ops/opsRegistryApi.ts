@@ -297,6 +297,11 @@ export async function fetchRegistry(): Promise<RegistryFile> {
       const res = await fetchOpsErpApi(path, { method: 'GET' })
       const text = await res.text()
       if (!res.ok) {
+        if (/502\s+Bad\s+Gateway/i.test(text) || res.status === 502) {
+          throw new Error(
+            'erp-api 返回 502：ECS 上 auth-api 未常驻。请 SSH 执行 bash scripts/ecs-fix-erp-api-502.sh（安装 systemd）后，再 Redeploy 运营台。',
+          )
+        }
         try {
           const j = JSON.parse(text) as {
             error?: string
@@ -310,6 +315,11 @@ export async function fetchRegistry(): Promise<RegistryFile> {
           if (e instanceof Error && e.message && !e.message.startsWith('Unexpected')) throw e
         }
         const snippet = text.trim().slice(0, 280)
+        if (snippet.startsWith('<')) {
+          throw new Error(
+            `注册表 HTTP ${res.status}（网关 HTML 错误页）。请在 ECS 执行 ecs-fix-erp-api-502.sh 并确认 https://mofangdianai.com/erp-api/meoo-ops-sync-registry 可访问。`,
+          )
+        }
         throw new Error(snippet || mapHttpError(res.status))
       }
       try {
