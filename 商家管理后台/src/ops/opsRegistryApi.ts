@@ -188,6 +188,8 @@ export type RegistryMpRecruitmentOrder = {
   /** 加急单 → 达人端急单大厅；否则招募大厅 */
   urgent?: boolean
   fulfillmentLoop?: 'open' | 'closed'
+  /** 发布方身份：商家 ERP 创建为 merchant；PR 小程序创建为 pr */
+  publisherIdentity?: 'pr' | 'merchant'
 }
 
 export type RegistryTalentPoolRow = {

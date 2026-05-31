@@ -272,6 +272,8 @@ export type RegistryMpRecruitmentOrder = {
   serviceAmount?: number
   urgent?: boolean
   fulfillmentLoop?: RecruitmentFulfillmentLoop
+  /** 发布方身份：商家 ERP 创建为 merchant；PR 小程序创建为 pr */
+  publisherIdentity?: 'pr' | 'merchant'
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
