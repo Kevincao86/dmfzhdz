@@ -66,6 +66,32 @@ export function authRegisterGatewayPlugin(): Plugin {
           return
         }
 
+        if (url === '/api/meoo-auth-sms-verify') {
+          try {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { phone?: string; smsCode?: string }
+            const phone = normalizeCnMobile(body.phone ?? '')
+            const smsCode = String(body.smsCode ?? '').trim()
+            if (!phone) {
+              json(res, 400, { ok: false, error: 'invalid_phone', message: '请输入有效大陆手机号' })
+              return
+            }
+            if (!/^\d{6}$/.test(smsCode)) {
+              json(res, 400, { ok: false, error: 'invalid_sms_code', message: '请输入 6 位验证码' })
+              return
+            }
+            const valid = await verifyAuthSmsCode(phone, smsCode, viteRoot, { skipRemoteFallback: true })
+            if (!valid) {
+              json(res, 200, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+              return
+            }
+            json(res, 200, { ok: true })
+          } catch (e) {
+            json(res, 500, { ok: false, error: 'sms_verify_failed', detail: String(e) })
+          }
+          return
+        }
+
         if (url === '/api/meoo-auth-password-login') {
           try {
             const raw = await readBody(req)

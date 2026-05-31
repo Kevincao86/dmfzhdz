@@ -6,6 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
 import registerHandler from '../api/meoo-auth-register.ts'
 import smsSendHandler from '../api/meoo-auth-sms-send.ts'
+import smsVerifyHandler from '../api/meoo-auth-sms-verify.ts'
 import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/support-poll.ts'
@@ -43,6 +44,7 @@ type VercelLikeHandler = (
 const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-register': registerHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-send': smsSendHandler as VercelLikeHandler,
+  '/api/meoo-auth-sms-verify': smsVerifyHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-login': smsLoginHandler as VercelLikeHandler,
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,

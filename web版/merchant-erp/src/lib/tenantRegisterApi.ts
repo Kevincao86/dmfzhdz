@@ -26,10 +26,6 @@ export type SmsLoginResult = {
   loginName?: string
 }
 
-function sameOriginAuthApiUrl(path: string): string {
-  if (typeof window !== 'undefined') return `${window.location.origin}${path}`
-  return path
-}
 
 /** 注册/登录：与智能体一致，生产优先 ECS /erp-api（Vercel 连不上自建 Supabase） */
 function erpAuthApiCandidates(path: string): string[] {
@@ -40,6 +36,7 @@ async function postAuthJson<T extends Record<string, unknown>>(
   path: string,
   body: unknown,
   action: string,
+  retryStatuses: number[] = [],
 ): Promise<{ res: Response; json: T } | { ok: false; error: string; message: string }> {
   const candidates = erpAuthApiCandidates(path)
   let lastMessage = `${action}失败，请稍后重试。`
@@ -53,6 +50,12 @@ async function postAuthJson<T extends Record<string, unknown>>(
         body: JSON.stringify(body),
       })
       const json = (await res.json().catch(() => ({}))) as T
+      if (!res.ok && retryStatuses.includes(res.status) && i < candidates.length - 1) {
+        lastMessage =
+          (typeof json === 'object' && json && 'message' in json && String(json.message)) ||
+          lastMessage
+        continue
+      }
       return { res, json }
     } catch (e) {
       lastMessage = toUserFacingError(e, action)
@@ -64,16 +67,17 @@ async function postAuthJson<T extends Record<string, unknown>>(
 }
 
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
-  // 短信发送始终走当前站点 Vercel /api（阿里云已在 Vercel 配置）
-  const res = await fetch(sameOriginAuthApiUrl('/api/meoo-auth-sms-send'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone }),
-  })
-  const j = (await res.json().catch(() => ({}))) as SmsSendResult & {
-    message?: string
-    detail?: string
+  // 与注册/登录一致：优先 ECS；503 时回退同源 Vercel（Aliyun 密钥常在 Vercel）
+  const posted = await postAuthJson<SmsSendResult & { message?: string; detail?: string; devCode?: string }>(
+    '/api/meoo-auth-sms-send',
+    { phone },
+    '发送验证码',
+    [502, 503, 504],
+  )
+  if (!('res' in posted)) {
+    return posted
   }
+  const { res, json: j } = posted
   if (!res.ok) {
     return {
       ok: false,

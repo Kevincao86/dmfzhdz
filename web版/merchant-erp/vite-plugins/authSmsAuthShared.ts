@@ -27,10 +27,63 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
   }
 }
 
-export async function verifyAuthSmsCode(phone: string, code: string, viteRoot?: string): Promise<boolean> {
+function authVerifyPublicBases(): string[] {
+  const raw = [
+    process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
+    process.env.MEOO_AUTH_API_PUBLIC_BASE,
+    // ECS 无阿里云密钥时，回退至已配置 Aliyun 的 Vercel 站点核验（与 send 端一致）
+    'https://mofangdianai.com',
+  ]
+  const bases: string[] = []
+  for (const item of raw) {
+    const b = String(item ?? '')
+      .trim()
+      .replace(/\/$/, '')
+    if (b && !bases.includes(b)) bases.push(b)
+  }
+  return bases
+}
+
+/** ECS 注册/登录核验：本机未配 Aliyun 时，委托公网 verify 端点（验证码由 Aliyun 托管，与发送端同服即可） */
+async function verifyAuthSmsCodeViaPublicApi(phone: string, code: string): Promise<boolean | null> {
+  const secret = (process.env.MEOO_AUTH_INTERNAL_SECRET ?? '').trim()
+  for (const base of authVerifyPublicBases()) {
+    try {
+      const res = await fetch(`${base}/api/meoo-auth-sms-verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(secret ? { 'X-Meoo-Internal-Auth': secret } : {}),
+        },
+        body: JSON.stringify({ phone, smsCode: code }),
+      })
+      if (!res.ok) continue
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean }
+      if (j.ok === true) return true
+      if (j.ok === false) return false
+    } catch {
+      /* try next base */
+    }
+  }
+  return null
+}
+
+export type VerifyAuthSmsOptions = { skipRemoteFallback?: boolean }
+
+export async function verifyAuthSmsCode(
+  phone: string,
+  code: string,
+  viteRoot?: string,
+  opts?: VerifyAuthSmsOptions,
+): Promise<boolean> {
   if (aliyunSmsConfigured()) {
     const r = await checkAliyunSmsVerifyCode(phone, code)
     return r.ok
+  }
+  if (!opts?.skipRemoteFallback) {
+    const remote = await verifyAuthSmsCodeViaPublicApi(phone, code)
+    if (remote === true) return true
+    if (remote === false) return false
   }
   return verifySmsCode(phone, code, viteRoot)
 }

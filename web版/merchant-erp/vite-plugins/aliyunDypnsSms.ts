@@ -85,6 +85,16 @@ export async function sendAliyunSmsVerifyCode(
   }
 }
 
+function isVerifyPassBody(body: Record<string, unknown> | undefined): boolean {
+  if (!body) return false
+  const model = (body.Model ?? body.model) as Record<string, unknown> | undefined
+  const result = String(model?.VerifyResult ?? model?.verifyResult ?? '').trim()
+  if (result === 'PASS') return true
+  if (result === 'UNKNOWN') return false
+  // 兼容旧解析：无 VerifyResult 时仍看 Code（阿里云文档要求以 VerifyResult 为准）
+  return isOkBody(body)
+}
+
 export async function checkAliyunSmsVerifyCode(
   phone: string,
   code: string,
@@ -98,10 +108,15 @@ export async function checkAliyunSmsVerifyCode(
   try {
     const res = await client.checkSmsVerifyCode(req)
     const body = (res.body ?? res) as Record<string, unknown>
-    if (isOkBody(body)) {
+    if (isVerifyPassBody(body)) {
       return { ok: true }
     }
-    return { ok: false, message: apiMessage(body) }
+    const model = (body?.Model ?? body?.model) as Record<string, unknown> | undefined
+    const verifyResult = String(model?.VerifyResult ?? model?.verifyResult ?? '').trim()
+    if (verifyResult === 'UNKNOWN') {
+      return { ok: false, message: '验证码错误' }
+    }
+    return { ok: false, message: apiMessage(body) || '验证码错误或已过期' }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }
