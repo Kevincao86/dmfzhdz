@@ -574,8 +574,8 @@ function pickKey(
       }
     case 'minimax':
       return {
-        key: (e.MERCHANT_AI_MINIMAX_KEY ?? e.MINIMAX_API_KEY ?? '').trim() || null,
-        label: 'MERCHANT_AI_MINIMAX_KEY（或 MINIMAX_API_KEY）',
+        key: (e.MINIMAX_API_KEY ?? e.MERCHANT_AI_MINIMAX_KEY ?? '').trim() || null,
+        label: 'MINIMAX_API_KEY（运营台 MiniMax 栏）',
       }
     case 'deepseek':
       return {
@@ -584,8 +584,8 @@ function pickKey(
       }
     case 'kimi':
       return {
-        key: (e.MOONSHOT_API_KEY ?? '').trim() || null,
-        label: 'MOONSHOT_API_KEY',
+        key: (e.MOONSHOT_API_KEY ?? e.MERCHANT_AI_KIMI_KEY ?? e.KIMI_API_KEY ?? '').trim() || null,
+        label: 'MOONSHOT_API_KEY（运营台 Kimi 栏）',
       }
     default:
       return { key: null, label: 'MERCHANT_AI_*' }

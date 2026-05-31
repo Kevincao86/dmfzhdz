@@ -47,7 +47,10 @@ export function applyRegistryVendorKeysToMerchantEnv(
   if (deepseek) fillIfEmpty(out, 'DEEPSEEK_API_KEY', deepseek)
 
   const kimi = expanded.kimi
-  if (kimi) fillIfEmpty(out, 'MOONSHOT_API_KEY', kimi)
+  if (kimi) {
+    fillIfEmpty(out, 'MOONSHOT_API_KEY', kimi)
+    fillIfEmpty(out, 'MERCHANT_AI_KIMI_KEY', kimi)
+  }
 }
 
 function mergeVendorKeysFromLocalRegistry(viteRoot: string | undefined, out: MerchantAiEnv): void {
@@ -62,7 +65,7 @@ function mergeVendorKeysFromLocalRegistry(viteRoot: string | undefined, out: Mer
   }
 }
 
-/** 商品文案 / 智能体：合并运营台 vendorKeys（本地 registry + Supabase 快照）。 */
+/** 商品文案 / 智能体 / 数字人 TTS：合并运营台 vendorKeys（本地 registry.json + ECS PostgREST 注册表）。 */
 export async function mergeMerchantAiEnvWithRegistrySnapshot(
   viteRoot: string | undefined,
   base: MerchantAiEnv,
@@ -77,7 +80,7 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     const data = await io.load()
     applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
   } catch {
-    /* 未配 Supabase 或快照不可读 */
+    /* 未配 ECS PostgREST 或注册表不可读 */
   }
   return out
 }

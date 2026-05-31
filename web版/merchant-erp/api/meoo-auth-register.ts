@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'auth_unreachable',
         message:
-          '注册服务无法连接 mofangdianai.com。请确认 Vercel 已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY（ECS 生成的 JWT）并 Redeploy。',
+          '注册服务无法连接数据库。请确认 ECS auth-api 已运行（systemctl status meoo-auth-api），或 Vercel 已配置 SUPABASE_URL=https://mofangdianai.com 与 SUPABASE_SERVICE_ROLE_KEY。',
         detail,
       })
       return

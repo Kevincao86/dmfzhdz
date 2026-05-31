@@ -1,3 +1,4 @@
+import { merchantErpApiCandidates } from './merchantErpApiBase'
 import { toUserFacingError } from './userFacingError'
 
 export type SmsSendResult = {
@@ -25,64 +26,14 @@ export type SmsLoginResult = {
   loginName?: string
 }
 
-/** 勿用 api.mofangdianai.com（常无 DNS）；统一为 mofangdianai.com 的 /erp-api 或 /api */
-function normalizeErpAuthApiBase(raw: string): string {
-  const trimmed = raw.trim().replace(/\/$/, '')
-  if (!trimmed) return ''
-  if (/api\.mofangdianai\.com/i.test(trimmed) && !trimmed.includes('mofangdianai.com/erp-api')) {
-    return 'https://mofangdianai.com/erp-api'
-  }
-  try {
-    const u = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
-    if (u.hostname === 'api.mofangdianai.com') {
-      return 'https://mofangdianai.com/erp-api'
-    }
-    return u.toString().replace(/\/$/, '')
-  } catch {
-    return ''
-  }
-}
-
 function sameOriginAuthApiUrl(path: string): string {
   if (typeof window !== 'undefined') return `${window.location.origin}${path}`
   return path
 }
 
-/** 拼接认证 API，避免 `api.xxx.com` + `meoo-auth-register` 变成非法主机名 */
-function buildErpAuthRequestUrl(base: string, apiPath: string): string {
-  const b = base.replace(/\/$/, '')
-  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
-  if (b.endsWith('/erp-api')) {
-    const rel = path.replace(/^\/api\//, '')
-    return new URL(rel, `${b}/`).href
-  }
-  return new URL(path, `${b}/`).href
-}
-
-/** 注册/登录 API：优先当前站点 /api（Vercel），再 ECS /erp-api，最后主站 mofangdianai.com */
+/** 注册/登录：与智能体一致，生产优先 ECS /erp-api（Vercel 连不上自建 Supabase） */
 function erpAuthApiCandidates(path: string): string[] {
-  const urls: string[] = []
-  const add = (u: string) => {
-    if (u && !urls.includes(u)) urls.push(u)
-  }
-
-  add(sameOriginAuthApiUrl(path))
-
-  const base = normalizeErpAuthApiBase(import.meta.env.VITE_ERP_AUTH_API_BASE ?? '')
-  if (base) add(buildErpAuthRequestUrl(base, path))
-
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname
-    if (host !== 'mofangdianai.com' && host !== 'www.mofangdianai.com') {
-      add(`https://mofangdianai.com${path}`)
-    }
-  }
-
-  return urls
-}
-
-function erpAuthApiUrl(path: string): string {
-  return erpAuthApiCandidates(path)[0] ?? path
+  return merchantErpApiCandidates(path)
 }
 
 async function postAuthJson<T extends Record<string, unknown>>(
@@ -211,5 +162,5 @@ export function isCnMobileValid(phone: string): boolean {
 
 /** @internal 供单测或排障 */
 export function resolveErpAuthApiUrl(path: string): string {
-  return erpAuthApiUrl(path)
+  return erpAuthApiCandidates(path)[0] ?? path
 }
