@@ -71,6 +71,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     checks.restRoot = { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 
+  try {
+    const snapRes = await fetch(`${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=id`, { headers })
+    checks.opsRegistrySnapshot = { status: snapRes.status, ok: snapRes.ok }
+  } catch (e) {
+    checks.opsRegistrySnapshot = { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+
   const allOk =
     (checks.authHealth as { ok?: boolean })?.ok !== false &&
     (checks.adminUsers as { ok?: boolean })?.ok === true

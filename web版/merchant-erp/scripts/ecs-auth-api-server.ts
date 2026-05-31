@@ -16,10 +16,13 @@ import tenantsResetPwdHandler from '../../../商家管理后台/api/meoo-supabas
 import paymentOrdersListHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-list.ts'
 import paymentOrdersVerifyHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-verify.ts'
 import paymentOrdersConfirmHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-confirm.ts'
-import opsSyncRegistryGetHandler from '../../../商家管理后台/api/meoo-ops-sync-registry.ts'
-import opsSyncVendorKeysHandler from '../../../商家管理后台/api/ops-sync/vendor-keys.ts'
-import opsSyncAiHandler from '../../../商家管理后台/api/ops-sync/ai.ts'
-import opsSyncVideoAiHandler from '../../../商家管理后台/api/ops-sync/video-ai.ts'
+import opsSyncRegistryGetHandler from '../api/meoo-ops-registry-ops-get.ts'
+import opsSyncVendorKeysHandler from '../api/meoo-ops-sync-vendor-keys.ts'
+import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
+import opsSyncVideoAiHandler from '../api/meoo-ops-sync-video-ai.ts'
+
+/** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
+export const ECS_AUTH_API_ROUTE_REVISION = '20260529-registry-erp'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -92,7 +95,9 @@ function parseRequestUrl(req: IncomingMessage): { path: string; query: Record<st
   u.searchParams.forEach((v, k) => {
     query[k] = v
   })
-  return { path: u.pathname, query }
+  let path = u.pathname
+  if (path.length > 1 && path.endsWith('/')) path = path.replace(/\/+$/, '')
+  return { path, query }
 }
 
 http
@@ -111,7 +116,15 @@ http
     if (!handler) {
       res.statusCode = 404
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
-      res.end(JSON.stringify({ ok: false, error: 'not_found', path }))
+      res.end(
+        JSON.stringify({
+          ok: false,
+          error: 'not_found',
+          path,
+          revision: ECS_AUTH_API_ROUTE_REVISION,
+          hint: '请在 ECS 执行: cd ~/app && git pull && bash scripts/ecs-run-auth-api.sh（或 systemctl restart meoo-auth-api）',
+        }),
+      )
       return
     }
     try {
@@ -140,5 +153,8 @@ http
     }
   })
   .listen(PORT, '127.0.0.1', () => {
-    console.log(`[ecs-internal-api] http://127.0.0.1:${PORT} (auth + support + ops-supabase)`)
+    const n = Object.keys(routes).length
+    console.log(
+      `[ecs-internal-api] http://127.0.0.1:${PORT} revision=${ECS_AUTH_API_ROUTE_REVISION} routes=${n} (含 meoo-ops-sync-registry)`,
+    )
   })

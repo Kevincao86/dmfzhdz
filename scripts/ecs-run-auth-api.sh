@@ -95,6 +95,7 @@ fi
 echo "启动 Auth API :$PORT（env: $ENV_FILE）"
 echo "测试: curl -sS http://127.0.0.1:$PORT/api/meoo-auth-ping"
 echo "注册表: curl -sS http://127.0.0.1:$PORT/api/meoo-ops-sync-registry | head -c 200"
+echo "（应看到 vendorKeys 等 JSON；若 not_found 说明旧进程仍在跑，请先 pkill -f ecs-auth-api-server 再执行本脚本）"
 
 set -a
 # shellcheck disable=SC1090
