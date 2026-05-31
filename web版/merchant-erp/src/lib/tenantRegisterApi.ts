@@ -1,3 +1,5 @@
+import { toUserFacingError } from './userFacingError'
+
 export type SmsSendResult = {
   ok: boolean
   message?: string
@@ -23,22 +25,96 @@ export type SmsLoginResult = {
   loginName?: string
 }
 
-/** 注册/登录 API：默认同源 Vercel；设 VITE_ERP_AUTH_API_BASE 则走 ECS（如 https://mofangdianai.com/erp-api） */
-function erpAuthApiUrl(path: string): string {
-  const base = (import.meta.env.VITE_ERP_AUTH_API_BASE ?? '').trim().replace(/\/$/, '')
-  if (!base) return path
-  // 短信发送仍走当前站点 Vercel /api（阿里云已在 Vercel 配置）
-  if (path === '/api/meoo-auth-sms-send') {
-    if (typeof window !== 'undefined') return `${window.location.origin}${path}`
-    return path
+/** 勿用 api.mofangdianai.com（常无 DNS）；统一为 mofangdianai.com 的 /erp-api 或 /api */
+function normalizeErpAuthApiBase(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, '')
+  if (!trimmed) return ''
+  if (/api\.mofangdianai\.com/i.test(trimmed) && !trimmed.includes('mofangdianai.com/erp-api')) {
+    return 'https://mofangdianai.com/erp-api'
   }
-  // Nginx: /erp-api/ → :3001/api/ ，故此处不要再带 /api 前缀
-  const name = path.replace(/^\/api\//, '')
-  return `${base}/${name}`
+  try {
+    const u = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`)
+    if (u.hostname === 'api.mofangdianai.com') {
+      return 'https://mofangdianai.com/erp-api'
+    }
+    return u.toString().replace(/\/$/, '')
+  } catch {
+    return ''
+  }
+}
+
+function sameOriginAuthApiUrl(path: string): string {
+  if (typeof window !== 'undefined') return `${window.location.origin}${path}`
+  return path
+}
+
+/** 拼接认证 API，避免 `api.xxx.com` + `meoo-auth-register` 变成非法主机名 */
+function buildErpAuthRequestUrl(base: string, apiPath: string): string {
+  const b = base.replace(/\/$/, '')
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  if (b.endsWith('/erp-api')) {
+    const rel = path.replace(/^\/api\//, '')
+    return new URL(rel, `${b}/`).href
+  }
+  return new URL(path, `${b}/`).href
+}
+
+/** 注册/登录 API：优先当前站点 /api（Vercel），再 ECS /erp-api，最后主站 mofangdianai.com */
+function erpAuthApiCandidates(path: string): string[] {
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+
+  add(sameOriginAuthApiUrl(path))
+
+  const base = normalizeErpAuthApiBase(import.meta.env.VITE_ERP_AUTH_API_BASE ?? '')
+  if (base) add(buildErpAuthRequestUrl(base, path))
+
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host !== 'mofangdianai.com' && host !== 'www.mofangdianai.com') {
+      add(`https://mofangdianai.com${path}`)
+    }
+  }
+
+  return urls
+}
+
+function erpAuthApiUrl(path: string): string {
+  return erpAuthApiCandidates(path)[0] ?? path
+}
+
+async function postAuthJson<T extends Record<string, unknown>>(
+  path: string,
+  body: unknown,
+  action: string,
+): Promise<{ res: Response; json: T } | { ok: false; error: string; message: string }> {
+  const candidates = erpAuthApiCandidates(path)
+  let lastMessage = `${action}失败，请稍后重试。`
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const url = candidates[i]!
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = (await res.json().catch(() => ({}))) as T
+      return { res, json }
+    } catch (e) {
+      lastMessage = toUserFacingError(e, action)
+      if (i < candidates.length - 1) continue
+    }
+  }
+
+  return { ok: false, error: 'network_error', message: lastMessage }
 }
 
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
-  const res = await fetch(erpAuthApiUrl('/api/meoo-auth-sms-send'), {
+  // 短信发送始终走当前站点 Vercel /api（阿里云已在 Vercel 配置）
+  const res = await fetch(sameOriginAuthApiUrl('/api/meoo-auth-sms-send'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone }),
@@ -68,12 +144,15 @@ export async function registerMerchantAccount(body: {
   password: string
   confirmPassword: string
 }): Promise<RegisterResult> {
-  const res = await fetch(erpAuthApiUrl('/api/meoo-auth-register'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const j = (await res.json().catch(() => ({}))) as RegisterResult & { message?: string; detail?: string }
+  const posted = await postAuthJson<RegisterResult & { message?: string; detail?: string }>(
+    '/api/meoo-auth-register',
+    body,
+    '注册',
+  )
+  if (!('res' in posted)) {
+    return posted
+  }
+  const { res, json: j } = posted
   if (!res.ok) {
     return {
       ok: false,
@@ -89,12 +168,15 @@ export async function loginWithSmsCode(body: {
   phone: string
   smsCode: string
 }): Promise<SmsLoginResult> {
-  const res = await fetch(erpAuthApiUrl('/api/meoo-auth-sms-login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const j = (await res.json().catch(() => ({}))) as SmsLoginResult & { message?: string; detail?: string }
+  const posted = await postAuthJson<SmsLoginResult & { message?: string; detail?: string }>(
+    '/api/meoo-auth-sms-login',
+    body,
+    '登录',
+  )
+  if (!('res' in posted)) {
+    return posted
+  }
+  const { res, json: j } = posted
   if (!res.ok) {
     return {
       ok: false,
@@ -125,4 +207,9 @@ export function isMerchantShortNameValid(name: string): boolean {
 
 export function isCnMobileValid(phone: string): boolean {
   return /^1\d{10}$/.test(String(phone || '').replace(/\D/g, ''))
+}
+
+/** @internal 供单测或排障 */
+export function resolveErpAuthApiUrl(path: string): string {
+  return erpAuthApiUrl(path)
 }
