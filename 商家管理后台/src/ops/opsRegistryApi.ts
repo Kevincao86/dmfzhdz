@@ -1,6 +1,8 @@
 /**
  * Dev：本机 Vite 插件直接读写「项目根/.meoo-dev-sync」注册表，与 ERP 共用。
+ * 线上：浏览器优先经 ECS /erp-api 读写 Supabase 快照（Vercel Function 无法访问 ECS）。
  */
+import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 export type RegistryTenantSource = 'erp' | 'ops_manual' | 'supabase'
 
 export type RegistryTenant = {
@@ -273,7 +275,7 @@ async function postRegistrySync(
   let lastRes: Response | undefined
   let lastJ: Record<string, unknown> = {}
   for (const path of paths) {
-    const res = await fetch(path, {
+    const res = await fetchOpsErpApi(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -292,7 +294,7 @@ export async function fetchRegistry(): Promise<RegistryFile> {
   let lastErr: Error | undefined
   for (const path of paths) {
     try {
-      const res = await fetch(path)
+      const res = await fetchOpsErpApi(path)
       const text = await res.text()
       if (!res.ok) {
         try {
@@ -381,11 +383,7 @@ export async function postAiModels(body: {
   imageModel: string
   lastWriter: 'ops'
 }): Promise<void> {
-  const res = await fetch('/api/ops-sync/ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const { res } = await postRegistrySync(['/api/ops-sync/ai'], body)
   if (!res.ok) throw new Error(mapHttpError(res.status))
 }
 
@@ -395,10 +393,9 @@ export async function postVendorKeys(body: {
   aiVendorCatalog?: AiVendorCatalogEntry[]
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
-  const res = await fetch('/api/ops-sync/vendor-keys', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, lastWriter: body.lastWriter ?? 'ops' }),
+  const { res } = await postRegistrySync(['/api/ops-sync/vendor-keys'], {
+    ...body,
+    lastWriter: body.lastWriter ?? 'ops',
   })
   if (!res.ok) throw new Error(mapHttpError(res.status))
 }
@@ -407,10 +404,9 @@ export async function postVideoAiBindings(body: {
   videoAi: RegistryVideoAi
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
-  const res = await fetch('/api/ops-sync/video-ai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, lastWriter: body.lastWriter ?? 'ops' }),
+  const { res } = await postRegistrySync(['/api/ops-sync/video-ai'], {
+    ...body,
+    lastWriter: body.lastWriter ?? 'ops',
   })
   if (!res.ok) throw new Error(mapHttpError(res.status))
 }
