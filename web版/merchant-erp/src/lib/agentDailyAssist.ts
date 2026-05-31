@@ -1,6 +1,8 @@
 /**
- * 智能体日常问答：天气、日期星期等（走同源 BFF，不占用大模型「无法联网」话术）。
+ * 智能体日常问答：天气、日期星期等（走 BFF，优先 ECS /erp-api，无需大模型联网）。
  */
+
+import { merchantErpApiCandidates } from './merchantErpApiBase'
 
 const CITY_ALIASES: Record<string, string> = {
   北京: 'Beijing',
@@ -104,18 +106,22 @@ export async function fetchDailyAssistReply(
   const offset = dayOffset(text)
 
   try {
-    const res = await fetch('/api/meoo-agent-daily-info', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ city, dayOffset: offset, query: text.slice(0, 200) }),
-      signal,
-    })
-    const j = (await res.json()) as { ok?: boolean; reply?: string; message?: string }
-    if (res.ok && j.ok && j.reply) {
-      const prefix = dateOnly && /星期|几号/.test(text) ? `${dateOnly}\n` : ''
-      return `${prefix}${j.reply}`.trim()
+    let lastMsg = ''
+    for (const target of merchantErpApiCandidates('/api/meoo-agent-daily-info')) {
+      const res = await fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city, dayOffset: offset, query: text.slice(0, 200) }),
+        signal,
+      })
+      const j = (await res.json()) as { ok?: boolean; reply?: string; message?: string }
+      if (res.ok && j.ok && j.reply) {
+        const prefix = dateOnly && /星期|几号/.test(text) ? `${dateOnly}\n` : ''
+        return `${prefix}${j.reply}`.trim()
+      }
+      if (j.message) lastMsg = j.message
     }
-    if (!res.ok && j.message) {
+    if (lastMsg) {
       // 天气 BFF 失败时不阻断对话，交还给大模型作答
       return null
     }

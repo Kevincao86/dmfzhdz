@@ -27,6 +27,7 @@ import type {
 import {
   briefProductNameHint,
   buildPlanExecutionConsultation,
+  isPlanOrNineScenarioQuery,
   coerceAgentDisplayError,
   coerceAgentTextField,
   formatAssistantDisplayText,
@@ -1248,7 +1249,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
             ? formatAssistantDisplayText(res.content)
             : formatAssistantDisplayText(rawSummary ?? res.content)
 
-        if (deferPreview) {
+        if (deferPreview && isPlanOrNineScenarioQuery(trimmed)) {
           const taskTypes = inferDeferredTaskTypes(trimmed, res.content, taskType ?? inferTaskTypeFromText(trimmed))
           if (taskTypes.length && canAcceptDeferredPlan(executionStateRef.current)) {
             executionStateRef.current = storeDeferredPlan(

@@ -491,7 +491,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
 
       if (method === 'POST' && pathname === '/api/merchant/douyin/goods/image/upload') {
         const bodyRaw = await bodyReader()
-        await handleDouyinGoodsImageUploadPost(req, res, bodyRaw)
+        await handleDouyinGoodsImageUploadPost(req, res, bodyRaw, { viteRoot })
         return true
       }
 
@@ -602,7 +602,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
 
       if (method === 'POST' && pathname === '/api/merchant/kuaishou/goods/image/upload') {
         const bodyRaw = await bodyReader()
-        await handleKuaishouGoodsImageUploadPost(req, res, bodyRaw)
+        await handleKuaishouGoodsImageUploadPost(req, res, bodyRaw, { viteRoot })
         return true
       }
 
