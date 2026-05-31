@@ -21,6 +21,11 @@ export async function chatKimi(req: AIChatRequest, env: Record<string, string>):
   if (!apiKey) {
     throw new Error('MOONSHOT_API_KEY 未配置（请在运营台「AI 模型」填写 Kimi / Moonshot 密钥）')
   }
+  if (!apiKey.startsWith('sk-')) {
+    throw new Error(
+      'Kimi Key 应以 sk- 开头（请在 platform.moonshot.cn 复制 API Key，勿填 TokenMix 或其它平台密钥）',
+    )
+  }
   const models = moonshotChatModelCandidates(env, req.model)
   const bases = moonshotChatBaseCandidates(env)
   const messages = toMessages(req.messages)

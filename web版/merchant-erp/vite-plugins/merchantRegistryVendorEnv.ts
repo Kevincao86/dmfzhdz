@@ -10,7 +10,7 @@ import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
-/** 去掉 Bearer 前缀、引号、零宽字符等常见粘贴错误 */
+/** 去掉 Bearer 前缀、引号、JSON 包裹、多行粘贴等常见错误 */
 export function sanitizeVendorApiKey(raw: string | undefined): string {
   if (typeof raw !== 'string') return ''
   let v = raw.replace(/[\u200b-\u200d\ufeff]/g, '').trim()
@@ -21,7 +21,31 @@ export function sanitizeVendorApiKey(raw: string | undefined): string {
   ) {
     v = v.slice(1, -1).trim()
   }
+  if (v.startsWith('{')) {
+    try {
+      const o = JSON.parse(v) as Record<string, unknown>
+      const nested =
+        o.api_key ?? o.apiKey ?? o.key ?? o.token ?? o.secret ?? o.access_token
+      if (typeof nested === 'string' && nested.trim()) v = nested.trim()
+    } catch {
+      /* 非 JSON */
+    }
+  }
+  if (v.includes('\n')) {
+    const line =
+      v
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.length >= 16 && !l.startsWith('{')) ?? v.split('\n')[0]?.trim()
+    if (line) v = line
+  }
   return v
+}
+
+/** MiniMax OpenAI 兼容接口需 sk- 类 Key；平台若只下发 eyJ JWT，会 2049 */
+export function looksLikeMinimaxJwtKey(key: string): boolean {
+  const k = key.trim()
+  return k.startsWith('eyJ') && k.length > 80
 }
 
 /** 注册表有值时覆盖 env（运营台为唯一配置源） */
