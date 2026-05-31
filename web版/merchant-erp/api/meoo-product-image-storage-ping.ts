@@ -7,6 +7,7 @@ import {
   merchantProductImageStorageConfigured,
   merchantProductImageStorageMissingMessage,
   merchantProductImageStoragePrefix,
+  merchantProductImageStoragePrefixCandidates,
   readMerchantProductImageOssEnv,
 } from '../vite-plugins/merchantProductImageStorage.js'
 import { merchantDouyinSessionSecret } from './douyin-bind.js'
@@ -63,16 +64,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ...(endpoint ? { endpoint } : {}),
       ...(process.env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
     })
-    const probeKey = `${merchantProductImageStoragePrefix()}/.meoo-storage-ping.txt`
-    await client.put(probeKey, Buffer.from('ping', 'utf8'), {
-      headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
-    })
-    try {
-      await client.delete(probeKey)
-    } catch {
-      /* ignore cleanup failure */
+    const prefixCandidates = merchantProductImageStoragePrefixCandidates()
+    const attempts: Array<{ prefix: string; ok: boolean; objectKey?: string; error?: string }> = []
+    let successKey: string | null = null
+
+    for (const prefix of prefixCandidates) {
+      const probeKey = `${prefix}/.meoo-storage-ping.txt`
+      try {
+        await client.put(probeKey, Buffer.from('ping', 'utf8'), {
+          headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
+        })
+        try {
+          await client.delete(probeKey)
+        } catch {
+          /* ignore cleanup failure */
+        }
+        attempts.push({ prefix, ok: true, objectKey: probeKey })
+        successKey = probeKey
+        break
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        attempts.push({ prefix, ok: false, error: msg.slice(0, 300) })
+      }
     }
-    ;(out.checks as Record<string, unknown>).putProbe = { ok: true, objectKey: probeKey }
+
+    if (!successKey) {
+      const last = attempts[attempts.length - 1]
+      const msg = last?.error ?? 'put failed'
+      const detail = formatMerchantProductImageOssError(msg)
+      ;(out.checks as Record<string, unknown>).putProbe = { ok: false, attempts }
+      sendJson(res, 502, {
+        ...out,
+        ok: false,
+        error: detail.slice(0, 800),
+        hint: /bucket acl|access denied/i.test(msg)
+          ? 'RAM 可能只授权了云剪目录（如 meoo-out/*）。可删除 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或改为 meoo-out/douyin-goods 后 Redeploy。'
+          : out.hint,
+      })
+      return
+    }
+
+    ;(out.checks as Record<string, unknown>).putProbe = { ok: true, objectKey: successKey, attempts }
     sendJson(res, 200, { ...out, ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -82,9 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ...out,
       ok: false,
       error: detail.slice(0, 800),
-      hint: /bucket acl|access denied/i.test(msg)
-        ? 'RAM 子账号需授权 oss:PutObject 到 modianningbo/douyin-goods/*；勿把 Supabase 桶名填进 MERCHANT_PRODUCT_IMAGE_OSS_BUCKET。'
-        : out.hint,
+      hint: out.hint,
     })
   }
 }

@@ -148,7 +148,7 @@ export function readMerchantProductImageOssEnv(): MerchantProductImageOssEnv | n
 
 export function formatMerchantProductImageOssError(raw: string): string {
   const msg = raw.trim()
-  if (/bucket acl|access denied|accessdenied|403/i.test(msg)) {
+  if (isOssBucketAclError(msg)) {
     return [
       msg,
       'AccessKey 可能缺少 oss:PutObject 权限，或 Bucket 已禁用 ACL 但当前账号无权写入。',
@@ -215,10 +215,15 @@ function extFromMimeAndName(mime: string, name: string): string {
   return 'jpg'
 }
 
-function buildObjectPath(merchantId: string, safeMime: string, originalName: string): string {
+function buildObjectPath(
+  keyPrefix: string,
+  merchantId: string,
+  safeMime: string,
+  originalName: string,
+): string {
   const safeMid = merchantId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80) || 'merchant'
   const ext = extFromMimeAndName(safeMime, originalName)
-  return `${merchantProductImageStoragePrefix()}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
+  return `${normalizeOssKeyPrefix(keyPrefix)}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
 }
 
 async function createMerchantProductImageOssClient(cfg: MerchantProductImageOssEnv) {
@@ -272,23 +277,30 @@ async function uploadMerchantProductImageToOss(params: {
   const cfg = readMerchantProductImageOssEnv()
   if (!cfg) throw new Error('OSS 未配置')
 
-  const objectPath = buildObjectPath(params.merchantId, params.safeMime, params.originalName)
   const client = await createMerchantProductImageOssClient(cfg)
+  const prefixCandidates = merchantProductImageStoragePrefixCandidates()
+  let lastErr = 'OSS 上传失败'
 
-  try {
-    await client.put(objectPath, params.buf, {
-      headers: {
-        'Content-Type': params.safeMime,
-        'Cache-Control': 'public, max-age=604800',
-      },
-    })
-  } catch (e) {
-    const raw = e instanceof Error ? e.message : String(e)
-    throw new Error(formatMerchantProductImageOssError(raw))
+  for (let i = 0; i < prefixCandidates.length; i++) {
+    const keyPrefix = prefixCandidates[i]!
+    const objectPath = buildObjectPath(keyPrefix, params.merchantId, params.safeMime, params.originalName)
+    try {
+      await client.put(objectPath, params.buf, {
+        headers: {
+          'Content-Type': params.safeMime,
+          'Cache-Control': 'public, max-age=604800',
+        },
+      })
+      const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath)
+      return { publicUrl, objectPath, bucket: cfg.bucket, accessMode }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      const canRetry = i < prefixCandidates.length - 1 && isOssBucketAclError(lastErr)
+      if (!canRetry) break
+    }
   }
 
-  const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath)
-  return { publicUrl, objectPath, bucket: cfg.bucket, accessMode }
+  throw new Error(formatMerchantProductImageOssError(lastErr))
 }
 
 async function uploadMerchantProductImageToSupabase(params: {
@@ -309,7 +321,12 @@ async function uploadMerchantProductImageToSupabase(params: {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const objectPath = buildObjectPath(params.merchantId, params.safeMime, params.originalName)
+  const objectPath = buildObjectPath(
+    merchantProductImageStoragePrefix(),
+    params.merchantId,
+    params.safeMime,
+    params.originalName,
+  )
 
   const { error } = await admin.storage.from(bucket).upload(objectPath, params.buf, {
     contentType: params.safeMime,
