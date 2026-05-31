@@ -1,8 +1,8 @@
 /**
- * Vercel：/api/ops-sync/* 注册表（Supabase ops_registry_snapshot），与 ERP 拉取同源。
+ * Vercel：/api/ops-sync/* — 注册表 GET/写 Key 等已改 307 至 erp-api；其余仍走 dispatch。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from '../meooRegistrySnapshotIo.js'
+import { redirectRegistryToErpApi, sendErpApiRedirectCors } from '../opsErpApiRedirect.js'
 import { sendOpsJson } from '../safeOpsJson.js'
 
 export const config = { maxDuration: 60 }
@@ -58,6 +58,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const bodyRaw =
       method === 'POST' || method === 'PUT' || method === 'PATCH' ? rawBody(req) : ''
 
+    if (method === 'GET' && urlPath === '/api/ops-sync/registry') {
+      redirectRegistryToErpApi(res, '/api/meoo-ops-sync-registry')
+      return
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/vendor-keys') {
+      redirectRegistryToErpApi(res, '/api/ops-sync/vendor-keys')
+      return
+    }
+    if (method === 'POST' && urlPath === '/api/ops-sync/ai') {
+      redirectRegistryToErpApi(res, '/api/ops-sync/ai')
+      return
+    }
+    if (method === 'POST' && urlPath === '/api/ops-sync/video-ai') {
+      redirectRegistryToErpApi(res, '/api/ops-sync/video-ai')
+      return
+    }
+
     const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
     const serviceRole = (
       process.env.SUPABASE_SERVICE_ROLE_KEY ??
@@ -77,26 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const { createRegistrySnapshotIoFetch } = await import('../meooRegistrySnapshotIo.js')
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-
-    if (method === 'GET' && urlPath === '/api/ops-sync/registry') {
-      const data = await loadRegistrySnapshotForGet(io)
-      let payload: string
-      try {
-        payload = JSON.stringify(data)
-      } catch (stringifyErr) {
-        const hint = stringifyErr instanceof Error ? stringifyErr.message : String(stringifyErr)
-        payload = JSON.stringify({
-          ok: false,
-          error: 'registry_response_not_serializable',
-          detail: hint.slice(0, 400),
-        })
-        res.status(500).send(payload)
-        return
-      }
-      res.status(200).send(payload)
-      return
-    }
 
     /** 动态加载：避免 GET /registry 冷启动拖入整份 dispatch（含 node:crypto 等）→ FUNCTION_INVOCATION_FAILED / OOM */
     const { dispatchOpsRegistrySupabase } = await import('../../src/ops/opsRegistrySupabaseDispatch.js')
@@ -123,11 +123,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(out.status).send(payload)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    sendErpApiRedirectCors(res)
     sendOpsJson(res, 500, {
       ok: false,
       error: 'ops_sync_handler_failed',
       detail: msg.slice(0, 800),
-      hint: '请查看 Vercel Function Logs；常见原因：未执行迁移 ops_registry_snapshot、缺少 SUPABASE_SERVICE_ROLE_KEY。',
+      hint:
+        '注册表读写请经 https://mofangdianai.com/erp-api ；请 Redeploy 运营台并确认 ECS auth-api 已运行（git pull + ecs-run-auth-api.sh）。',
     })
   }
 }
