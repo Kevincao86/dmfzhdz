@@ -3,7 +3,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
-import { parseOssUrlPrefix } from './aliyunOssIceParse.js'
+import { parseOssUrlPrefix, type ParsedOssPrefix } from './aliyunOssIceParse.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
@@ -27,15 +27,56 @@ export function productImageDemoFallbackAllowed(): boolean {
   )
 }
 
-export function merchantProductImageStoragePrefix(): string {
-  const p = (
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_PREFIX ??
-    process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_PREFIX ??
-    'douyin-goods'
+function normalizeOssKeyPrefix(raw: string): string {
+  return raw.trim().replace(/^\/+|\/+$/g, '')
+}
+
+function readIceOssUrlPrefix(): ParsedOssPrefix | null {
+  return parseOssUrlPrefix(
+    (
+      process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ??
+      process.env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX ??
+      ''
+    ).trim(),
   )
-    .trim()
-    .replace(/^\/+|\/+$/g, '')
-  return p || 'douyin-goods'
+}
+
+/** 云剪 RAM 常只授权 meoo-out/*；未显式配置时默认写到该目录下的 douyin-goods。 */
+export function merchantProductImageStoragePrefix(): string {
+  const explicit = normalizeOssKeyPrefix(
+    process.env.MERCHANT_PRODUCT_IMAGE_OSS_PREFIX ??
+      process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_PREFIX ??
+      '',
+  )
+  if (explicit) return explicit
+
+  const ice = readIceOssUrlPrefix()
+  if (ice?.keyPrefix) {
+    return `${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`
+  }
+  return 'douyin-goods'
+}
+
+/** 上传失败时按顺序尝试的前缀（主前缀 + 云剪目录回退）。 */
+export function merchantProductImageStoragePrefixCandidates(): string[] {
+  const primary = merchantProductImageStoragePrefix()
+  const out: string[] = []
+  const add = (p: string) => {
+    const n = normalizeOssKeyPrefix(p)
+    if (n && !out.includes(n)) out.push(n)
+  }
+  add(primary)
+
+  const ice = readIceOssUrlPrefix()
+  if (ice?.keyPrefix) {
+    add(`${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`)
+  }
+  add('douyin-goods')
+  return out
+}
+
+function isOssBucketAclError(msg: string): boolean {
+  return /bucket acl|access denied|accessdenied|403/i.test(msg)
 }
 
 export function merchantProductImageSupabaseBucket(): string {
