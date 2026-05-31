@@ -4,11 +4,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   formatMerchantProductImageOssError,
-  merchantProductImageStorageConfigured,
   merchantProductImageStorageMissingMessage,
   merchantProductImageStoragePrefix,
   merchantProductImageStoragePrefixCandidates,
   readMerchantProductImageOssEnv,
+  resolveMerchantProductImageEnv,
 } from '../vite-plugins/merchantProductImageStorage.js'
 import { merchantDouyinSessionSecret } from './douyin-bind.js'
 
@@ -25,36 +25,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const mode = merchantProductImageStorageConfigured()
-  const oss = readMerchantProductImageOssEnv()
+  const env = await resolveMerchantProductImageEnv({ viteRoot: process.cwd() })
+  const storageMode = readMerchantProductImageOssEnv(env)
+    ? 'oss'
+    : (process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET ?? '').trim()
+      ? 'supabase'
+      : null
+  const oss = readMerchantProductImageOssEnv(env)
   const out: Record<string, unknown> = {
-    ok: mode === 'oss',
-    storageMode: mode,
+    ok: storageMode === 'oss',
+    storageMode,
     oss: oss
       ? {
           bucket: oss.bucket,
           region: oss.region,
           hasAccessKeyId: !!oss.accessKeyId,
           hasAccessKeySecret: !!oss.accessKeySecret,
-          prefix: merchantProductImageStoragePrefix(),
+          prefix: merchantProductImageStoragePrefix(env),
+          prefixCandidates: merchantProductImageStoragePrefixCandidates(env),
+          iceOutputPrefix: env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ?? null,
         }
       : null,
     douyinSessionSecretConfigured: !!merchantDouyinSessionSecret(),
     hint:
-      mode === 'oss'
-        ? 'OSS 环境变量已识别；若上传报 bucket acl，多为 RAM 缺少 oss:PutObject（douyin-goods/*），不是前端问题。'
+      storageMode === 'oss'
+        ? 'OSS 已识别（含运营注册表 videoAi）；若上传报 bucket acl，多为 RAM 缺少 oss:PutObject（优先 meoo-out/douyin-goods）。'
         : merchantProductImageStorageMissingMessage(),
     checks: {} as Record<string, unknown>,
   }
 
-  if (mode !== 'oss' || !oss) {
+  if (storageMode !== 'oss' || !oss) {
     sendJson(res, 503, out)
     return
   }
 
   try {
     const { default: OSS } = await import('ali-oss')
-    const endpoint = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
+    const endpoint = (env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
     const client = new OSS({
       region: oss.region,
       accessKeyId: oss.accessKeyId,
@@ -62,9 +69,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       bucket: oss.bucket,
       secure: true,
       ...(endpoint ? { endpoint } : {}),
-      ...(process.env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
+      ...(env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
     })
-    const prefixCandidates = merchantProductImageStoragePrefixCandidates()
+    const prefixCandidates = merchantProductImageStoragePrefixCandidates(env)
     const attempts: Array<{ prefix: string; ok: boolean; objectKey?: string; error?: string }> = []
     let successKey: string | null = null
 
@@ -91,14 +98,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (!successKey) {
       const last = attempts[attempts.length - 1]
       const msg = last?.error ?? 'put failed'
-      const detail = formatMerchantProductImageOssError(msg)
+      const detail = formatMerchantProductImageOssError(msg, env)
       ;(out.checks as Record<string, unknown>).putProbe = { ok: false, attempts }
       sendJson(res, 502, {
         ...out,
         ok: false,
         error: detail.slice(0, 800),
         hint: /bucket acl|access denied/i.test(msg)
-          ? 'RAM 可能只授权了云剪目录（如 meoo-out/*）。可删除 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或改为 meoo-out/douyin-goods 后 Redeploy。'
+          ? 'RAM 可能只授权了云剪目录（如 meoo-out/*）。可删除 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或在运营台填写 ICE 成片 OSS 前缀后 Redeploy。'
           : out.hint,
       })
       return
@@ -108,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 200, { ...out, ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    const detail = formatMerchantProductImageOssError(msg)
+    const detail = formatMerchantProductImageOssError(msg, env)
     ;(out.checks as Record<string, unknown>).putProbe = { ok: false, error: detail.slice(0, 800) }
     sendJson(res, 502, {
       ...out,

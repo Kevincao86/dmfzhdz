@@ -22,9 +22,10 @@ import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
 import opsSyncVideoAiHandler from '../api/meoo-ops-sync-video-ai.ts'
 import meooAiChatHandler from '../api/meoo-ai-chat.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
+import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260531-ai-erp-api'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260531-agent-daily-info'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -60,6 +61,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/ops-sync/video-ai': opsSyncVideoAiHandler as VercelLikeHandler,
   '/api/meoo-ai-chat': meooAiChatHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
+  '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
   '/api/meoo-erp-api-health': async (_req, res) => {
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json; charset=utf-8')

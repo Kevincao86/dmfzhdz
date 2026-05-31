@@ -324,6 +324,16 @@ export function formatAssistantDisplayText(content: string): string {
   return s.trim()
 }
 
+/** 用户是否在请求方案 / 九大场景（才展示「确认执行」引导与推迟预览） */
+export function isPlanOrNineScenarioQuery(text: string): boolean {
+  const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  if (!x) return false
+  if (isAgentShortcutTaskLine(x)) return true
+  if (/9\s*大\s*场景|九大场景|九\s*大/.test(x)) return true
+  if (/方案/.test(x)) return true
+  return isPlanDesignQuery(x)
+}
+
 /** 用户是否在请求方案/规划类设计（先出方案，再确认执行） */
 export function isPlanDesignQuery(text: string): boolean {
   const x = text.replace(/\[引用[\s\S]*?\n\n/, '').trim()
@@ -359,15 +369,16 @@ export function isAgentShortcutTaskLine(text: string): boolean {
   return /^使用快捷任务：/.test(text.replace(/\[引用[\s\S]*?\n\n/, '').trim())
 }
 
-/** 从用户话术 + 助手方案推断需执行的任务类型（允许多场景并存，不因 JSON actionType 只保留一项） */
+/** 从用户话术 + 助手方案推断需执行的任务类型（允许多场景并存，不因助手寒暄误识别） */
 export function inferTaskTypesFromCombinedContext(
   userText: string,
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): AiTaskType[] {
   const types = new Set<AiTaskType>()
+  const planIntent = isPlanOrNineScenarioQuery(userText)
 
-  if (assistantContent) {
+  if (assistantContent && planIntent) {
     for (const t of collectAgentActionTypes(assistantContent)) types.add(t)
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
@@ -375,7 +386,7 @@ export function inferTaskTypesFromCombinedContext(
       types.add('recruit_influencer')
   }
 
-  if (explicitTaskType && (isAgentShortcutTaskLine(userText) || !isPlanDesignQuery(userText))) {
+  if (explicitTaskType && (isAgentShortcutTaskLine(userText) || planIntent)) {
     types.add(explicitTaskType)
   }
 
@@ -1036,6 +1047,7 @@ export function hasCombinedProductAndRecruitPlan(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
+  if (!isPlanOrNineScenarioQuery(userText) && !isExplicitExecutionIntent(userText)) return false
   const types = inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType)
   return types.includes('create_product') && types.includes('recruit_influencer')
 }
@@ -1046,11 +1058,12 @@ export function shouldDeferTaskPreview(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
+  if (parseAgentActionType(assistantContent ?? '')) return false
+  if (isExplicitExecutionIntent(userText)) return true
+  if (!isPlanOrNineScenarioQuery(userText)) return false
   if (hasCombinedProductAndRecruitPlan(userText, assistantContent, explicitTaskType)) return true
   if (assistantContent && parseAgentConfirmRequired(assistantContent)) return true
-  if (parseAgentActionType(assistantContent ?? '')) return false
-  if (isExplicitExecutionIntent(userText)) return false
-  if (explicitTaskType && !isPlanDesignQuery(userText)) return false
+  if (explicitTaskType && !isPlanDesignQuery(userText) && !isAgentShortcutTaskLine(userText)) return false
   if (isPlanDesignQuery(userText)) return true
   if (assistantContent && looksLikePlanDocument(assistantContent)) return true
   return false

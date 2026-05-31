@@ -4,10 +4,28 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { parseOssUrlPrefix, type ParsedOssPrefix } from './aliyunOssIceParse.js'
+import type { MerchantAiEnv } from './merchantAiUpstream.js'
+import { mergeVideoAiMerchantEnvWithSnapshot } from './merchantVideoAiGateway.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from './merchantSupabaseAdminEnv.js'
+
+export type MerchantProductImageStorageContext = {
+  viteRoot?: string
+  env?: Record<string, string | undefined>
+}
+
+/** 与云剪同源：合并 .env、本地 registry.json、Supabase ops_registry_snapshot 中的 videoAi。 */
+export async function resolveMerchantProductImageEnv(
+  ctx?: MerchantProductImageStorageContext,
+): Promise<Record<string, string | undefined>> {
+  const base = { ...process.env, ...ctx?.env } as MerchantAiEnv
+  return (await mergeVideoAiMerchantEnvWithSnapshot(
+    ctx?.viteRoot ?? process.cwd(),
+    base,
+  )) as Record<string, string | undefined>
+}
 
 export const MERCHANT_PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 /** 私有 Bucket 时返回给前端的签名 URL 有效期（秒）；抖音拉图需在此窗口内完成审核或配置 Bucket 公共读前缀 */
@@ -31,46 +49,52 @@ function normalizeOssKeyPrefix(raw: string): string {
   return raw.trim().replace(/^\/+|\/+$/g, '')
 }
 
-function readIceOssUrlPrefix(): ParsedOssPrefix | null {
+function readIceOssUrlPrefix(env: Record<string, string | undefined>): ParsedOssPrefix | null {
   return parseOssUrlPrefix(
     (
-      process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ??
-      process.env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX ??
+      env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ??
+      env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX ??
       ''
     ).trim(),
   )
 }
 
-/** 云剪 RAM 常只授权 meoo-out/*；未显式配置时默认写到该目录下的 douyin-goods。 */
-export function merchantProductImageStoragePrefix(): string {
-  const explicit = normalizeOssKeyPrefix(
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_PREFIX ??
-      process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_PREFIX ??
-      '',
-  )
-  if (explicit) return explicit
+function underIceDouyinGoodsPrefix(env: Record<string, string | undefined>): string | null {
+  const ice = readIceOssUrlPrefix(env)
+  if (!ice?.keyPrefix) return null
+  return `${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`
+}
 
-  const ice = readIceOssUrlPrefix()
-  if (ice?.keyPrefix) {
-    return `${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`
+/** 云剪 RAM 常只授权 meoo-out/*；未显式配置时默认写到该目录下的 douyin-goods。 */
+export function merchantProductImageStoragePrefix(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): string {
+  const explicit = normalizeOssKeyPrefix(
+    env.MERCHANT_PRODUCT_IMAGE_OSS_PREFIX ?? env.MERCHANT_PRODUCT_IMAGE_SUPABASE_PREFIX ?? '',
+  )
+  const underIce = underIceDouyinGoodsPrefix(env)
+  if (explicit) {
+    if (explicit === 'douyin-goods' && underIce) return underIce
+    return explicit
   }
+  if (underIce) return underIce
   return 'douyin-goods'
 }
 
 /** 上传失败时按顺序尝试的前缀（主前缀 + 云剪目录回退）。 */
-export function merchantProductImageStoragePrefixCandidates(): string[] {
-  const primary = merchantProductImageStoragePrefix()
+export function merchantProductImageStoragePrefixCandidates(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): string[] {
+  const primary = merchantProductImageStoragePrefix(env)
   const out: string[] = []
   const add = (p: string) => {
     const n = normalizeOssKeyPrefix(p)
     if (n && !out.includes(n)) out.push(n)
   }
+  const underIce = underIceDouyinGoodsPrefix(env)
+  if (underIce && underIce !== primary) add(underIce)
   add(primary)
-
-  const ice = readIceOssUrlPrefix()
-  if (ice?.keyPrefix) {
-    add(`${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`)
-  }
+  if (underIce) add(underIce)
   add('douyin-goods')
   return out
 }
@@ -112,49 +136,54 @@ function normalizeOssRegion(raw: string): string {
       : `oss-${normalized}`
 }
 
-export function readMerchantProductImageOssEnv(): MerchantProductImageOssEnv | null {
+export function readMerchantProductImageOssEnv(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): MerchantProductImageOssEnv | null {
   const accessKeyId = (
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ??
-    process.env.ALIYUN_ICE_ACCESS_KEY_ID ??
-    process.env.ALIBABA_CLOUD_ACCESS_KEY_ID ??
+    env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ??
+    env.ALIYUN_ICE_ACCESS_KEY_ID ??
+    env.ALIBABA_CLOUD_ACCESS_KEY_ID ??
     ''
   ).trim()
   const accessKeySecret = (
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET ??
-    process.env.ALIYUN_ICE_ACCESS_KEY_SECRET ??
-    process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ??
+    env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET ??
+    env.ALIYUN_ICE_ACCESS_KEY_SECRET ??
+    env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ??
     ''
   ).trim()
   if (!accessKeyId || !accessKeySecret) return null
 
-  const explicitBucket = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET ?? '').trim()
-  const iceParsed = parseOssUrlPrefix(
-    (
-      process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ??
-      process.env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX ??
-      ''
-    ).trim(),
-  )
+  const explicitBucket = (env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET ?? '').trim()
+  const iceParsed = readIceOssUrlPrefix(env)
   const bucket = explicitBucket || iceParsed?.bucket || ''
   const region = normalizeOssRegion(
-    process.env.MERCHANT_PRODUCT_IMAGE_OSS_REGION?.trim() ||
+    env.MERCHANT_PRODUCT_IMAGE_OSS_REGION?.trim() ||
       (iceParsed ? `oss-${iceParsed.region}` : '') ||
-      process.env.ALIYUN_ICE_OUTPUT_OSS_REGION ||
+      env.ALIYUN_ICE_OUTPUT_OSS_REGION ||
+      env.ALIYUN_ICE_REGION ||
       'oss-cn-shanghai',
   )
   if (!bucket) return null
   return { bucket, region, accessKeyId, accessKeySecret }
 }
 
-export function formatMerchantProductImageOssError(raw: string): string {
+export function formatMerchantProductImageOssError(raw: string, env?: Record<string, string | undefined>): string {
   const msg = raw.trim()
   if (isOssBucketAclError(msg)) {
+    const bucket =
+      readMerchantProductImageOssEnv(env)?.bucket ||
+      readIceOssUrlPrefix(env ?? (process.env as Record<string, string | undefined>))?.bucket ||
+      'your-bucket'
+    const preferredPrefix = merchantProductImageStoragePrefix(
+      env ?? (process.env as Record<string, string | undefined>),
+    )
     return [
       msg,
       'AccessKey 可能缺少 oss:PutObject 权限，或 Bucket 已禁用 ACL 但当前账号无权写入。',
+      '云剪 RAM 通常只授权 meoo-out/*：请删除 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或在运营台填写 ICE 成片 OSS 前缀后 Redeploy。',
       '请在 RAM 为子账号授权（Resource 改成你的 Bucket）：',
-      '  oss:PutObject、oss:GetObject → acs:oss:*:*:modianningbo/douyin-goods/*',
-      '若抖音需长期拉图，请在 OSS 控制台为 douyin-goods/* 配置 Bucket 策略允许匿名 GetObject（公共读前缀）。',
+      `  oss:PutObject、oss:GetObject → acs:oss:*:*:${bucket}/${preferredPrefix}/*`,
+      `若抖音需长期拉图，请在 OSS 控制台为 ${preferredPrefix}/* 配置 Bucket 策略允许匿名 GetObject（公共读前缀）。`,
     ].join(' ')
   }
   if (/signature|does not match/i.test(msg)) {
@@ -166,8 +195,17 @@ export function formatMerchantProductImageOssError(raw: string): string {
   return msg
 }
 
-export function merchantProductImageOssConfigured(): boolean {
-  return readMerchantProductImageOssEnv() !== null
+export function merchantProductImageOssConfigured(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): boolean {
+  return readMerchantProductImageOssEnv(env) !== null
+}
+
+export async function merchantProductImageOssConfiguredWithRegistry(
+  ctx?: MerchantProductImageStorageContext,
+): Promise<boolean> {
+  const env = await resolveMerchantProductImageEnv(ctx)
+  return merchantProductImageOssConfigured(env)
 }
 
 export function merchantProductImageSupabaseConfigured(): boolean {
@@ -176,10 +214,19 @@ export function merchantProductImageSupabaseConfigured(): boolean {
   return readMerchantSupabaseAdminEnv().missingParts.length === 0
 }
 
-export function merchantProductImageStorageConfigured(): 'oss' | 'supabase' | null {
-  if (merchantProductImageOssConfigured()) return 'oss'
+export function merchantProductImageStorageConfigured(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+): 'oss' | 'supabase' | null {
+  if (merchantProductImageOssConfigured(env)) return 'oss'
   if (merchantProductImageSupabaseConfigured()) return 'supabase'
   return null
+}
+
+export async function merchantProductImageStorageConfiguredWithRegistry(
+  ctx?: MerchantProductImageStorageContext,
+): Promise<'oss' | 'supabase' | null> {
+  const env = await resolveMerchantProductImageEnv(ctx)
+  return merchantProductImageStorageConfigured(env)
 }
 
 export function merchantProductImageStorageMissingMessage(): string {
@@ -226,9 +273,12 @@ function buildObjectPath(
   return `${normalizeOssKeyPrefix(keyPrefix)}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
 }
 
-async function createMerchantProductImageOssClient(cfg: MerchantProductImageOssEnv) {
+async function createMerchantProductImageOssClient(
+  cfg: MerchantProductImageOssEnv,
+  env: Record<string, string | undefined>,
+) {
   const { default: OSS } = await import('ali-oss')
-  const endpoint = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
+  const endpoint = (env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
   return new OSS({
     region: cfg.region,
     accessKeyId: cfg.accessKeyId,
@@ -236,7 +286,7 @@ async function createMerchantProductImageOssClient(cfg: MerchantProductImageOssE
     bucket: cfg.bucket,
     secure: true,
     ...(endpoint ? { endpoint } : {}),
-    ...(process.env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
+    ...(env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
   })
 }
 
@@ -248,9 +298,10 @@ async function resolveOssObjectPublicUrl(
   client: Awaited<ReturnType<typeof createMerchantProductImageOssClient>>,
   cfg: MerchantProductImageOssEnv,
   objectPath: string,
+  env: Record<string, string | undefined>,
 ): Promise<{ publicUrl: string; accessMode: 'public' | 'signed' }> {
   const virtualUrl = buildOssVirtualHostUrl(cfg, objectPath)
-  const preferPublic = process.env.MERCHANT_PRODUCT_IMAGE_OSS_PUBLIC_URL !== '0'
+  const preferPublic = env.MERCHANT_PRODUCT_IMAGE_OSS_PUBLIC_URL !== '0'
   if (preferPublic) {
     try {
       const r = await fetch(virtualUrl, { method: 'HEAD' })
@@ -268,17 +319,20 @@ async function resolveOssObjectPublicUrl(
   return { publicUrl: signed, accessMode: 'signed' }
 }
 
-async function uploadMerchantProductImageToOss(params: {
-  merchantId: string
-  buf: Buffer
-  safeMime: string
-  originalName: string
-}): Promise<{ publicUrl: string; objectPath: string; bucket: string; accessMode: 'public' | 'signed' }> {
-  const cfg = readMerchantProductImageOssEnv()
+async function uploadMerchantProductImageToOss(
+  params: {
+    merchantId: string
+    buf: Buffer
+    safeMime: string
+    originalName: string
+  },
+  env: Record<string, string | undefined>,
+): Promise<{ publicUrl: string; objectPath: string; bucket: string; accessMode: 'public' | 'signed' }> {
+  const cfg = readMerchantProductImageOssEnv(env)
   if (!cfg) throw new Error('OSS 未配置')
 
-  const client = await createMerchantProductImageOssClient(cfg)
-  const prefixCandidates = merchantProductImageStoragePrefixCandidates()
+  const client = await createMerchantProductImageOssClient(cfg, env)
+  const prefixCandidates = merchantProductImageStoragePrefixCandidates(env)
   let lastErr = 'OSS 上传失败'
 
   for (let i = 0; i < prefixCandidates.length; i++) {
@@ -291,7 +345,7 @@ async function uploadMerchantProductImageToOss(params: {
           'Cache-Control': 'public, max-age=604800',
         },
       })
-      const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath)
+      const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath, env)
       return { publicUrl, objectPath, bucket: cfg.bucket, accessMode }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
@@ -300,15 +354,18 @@ async function uploadMerchantProductImageToOss(params: {
     }
   }
 
-  throw new Error(formatMerchantProductImageOssError(lastErr))
+  throw new Error(formatMerchantProductImageOssError(lastErr, env))
 }
 
-async function uploadMerchantProductImageToSupabase(params: {
-  merchantId: string
-  buf: Buffer
-  safeMime: string
-  originalName: string
-}): Promise<{ publicUrl: string; objectPath: string; bucket: string }> {
+async function uploadMerchantProductImageToSupabase(
+  params: {
+    merchantId: string
+    buf: Buffer
+    safeMime: string
+    originalName: string
+  },
+  env: Record<string, string | undefined>,
+): Promise<{ publicUrl: string; objectPath: string; bucket: string }> {
   const bucket = merchantProductImageSupabaseBucket()
   if (!bucket) throw new Error('MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET 未配置')
 
@@ -322,7 +379,7 @@ async function uploadMerchantProductImageToSupabase(params: {
   })
 
   const objectPath = buildObjectPath(
-    merchantProductImageStoragePrefix(),
+    merchantProductImageStoragePrefix(env),
     params.merchantId,
     params.safeMime,
     params.originalName,
@@ -345,25 +402,29 @@ async function uploadMerchantProductImageToSupabase(params: {
   return { publicUrl, objectPath, bucket }
 }
 
-export async function uploadMerchantProductImage(params: {
-  merchantId: string
-  buf: Buffer
-  safeMime: string
-  originalName: string
-}): Promise<{
+export async function uploadMerchantProductImage(
+  params: {
+    merchantId: string
+    buf: Buffer
+    safeMime: string
+    originalName: string
+  },
+  ctx?: MerchantProductImageStorageContext,
+): Promise<{
   publicUrl: string
   objectPath: string
   storage: 'oss' | 'supabase'
   bucket: string
   accessMode?: 'public' | 'signed'
 }> {
-  const mode = merchantProductImageStorageConfigured()
+  const env = await resolveMerchantProductImageEnv(ctx)
+  const mode = merchantProductImageStorageConfigured(env)
   if (mode === 'oss') {
-    const r = await uploadMerchantProductImageToOss(params)
+    const r = await uploadMerchantProductImageToOss(params, env)
     return { ...r, storage: 'oss' }
   }
   if (mode === 'supabase') {
-    const r = await uploadMerchantProductImageToSupabase(params)
+    const r = await uploadMerchantProductImageToSupabase(params, env)
     return { ...r, storage: 'supabase' }
   }
   throw new Error('商品图存储未配置')

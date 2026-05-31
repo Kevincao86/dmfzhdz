@@ -32,31 +32,43 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
+function mergeRegistryVideoAiParts(...parts: RegistryVideoAi[]): RegistryVideoAi {
+  const out: RegistryVideoAi = {}
+  for (const part of parts) {
+    for (const [k, v] of Object.entries(part)) {
+      const t = typeof v === 'string' ? v.trim() : ''
+      if (t) (out as Record<string, string>)[k] = t
+    }
+  }
+  return out
+}
+
 async function loadRegistryVideoAi(viteRoot?: string): Promise<RegistryVideoAi> {
-  let reg: RegistryVideoAi = {}
+  let fromFile: RegistryVideoAi = {}
   if (viteRoot) {
     const registryPath = path.join(path.resolve(viteRoot, '..', '..'), '.meoo-dev-sync', 'registry.json')
     try {
       if (fs.existsSync(registryPath)) {
         const parsed = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as { videoAi?: unknown }
-        reg = normalizeRegistryVideoAi(parsed.videoAi)
+        fromFile = normalizeRegistryVideoAi(parsed.videoAi)
       }
     } catch {
       /* ignore */
     }
   }
+  let fromSnap: RegistryVideoAi = {}
   const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
   if (supabaseUrl && serviceRole) {
     try {
       const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await io.load()
-      reg = normalizeRegistryVideoAi(data.videoAi)
+      fromSnap = normalizeRegistryVideoAi(data.videoAi)
     } catch {
       /* ignore */
     }
   }
-  return reg
+  return mergeRegistryVideoAiParts(fromFile, fromSnap)
 }
 
 async function resolveIceConfig(

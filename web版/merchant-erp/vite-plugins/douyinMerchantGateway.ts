@@ -101,7 +101,7 @@ import {
 import { mockDouyinProductStore } from './mockDouyinProductStore.js'
 import {
   MERCHANT_PRODUCT_IMAGE_MAX_BYTES,
-  merchantProductImageStorageConfigured,
+  merchantProductImageStorageConfiguredWithRegistry,
   merchantProductImageStorageMissingMessage,
   productImageDemoFallbackAllowed,
   uploadMerchantProductImage,
@@ -5337,6 +5337,7 @@ export async function handleDouyinGoodsImageUploadPost(
   req: IncomingMessage,
   res: ServerResponse,
   bodyRaw: string,
+  opts?: { viteRoot?: string },
 ): Promise<void> {
   const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
   if (!auth) {
@@ -5397,7 +5398,7 @@ export async function handleDouyinGoodsImageUploadPost(
       ? mimeType.trim().toLowerCase()
       : 'image/jpeg'
 
-  if (!merchantProductImageStorageConfigured()) {
+  if (!(await merchantProductImageStorageConfiguredWithRegistry({ viteRoot: opts?.viteRoot }))) {
     if (productImageDemoFallbackAllowed()) {
       demoImageUploadFallback(res, safeMime, contentBase64, approxBytes)
       return
@@ -5407,12 +5408,15 @@ export async function handleDouyinGoodsImageUploadPost(
   }
 
   try {
-    const { publicUrl, objectPath, storage, bucket, accessMode } = await uploadMerchantProductImage({
-      merchantId: session.merchantId,
-      buf,
-      safeMime,
-      originalName: fileName,
-    })
+    const { publicUrl, objectPath, storage, bucket, accessMode } = await uploadMerchantProductImage(
+      {
+        merchantId: session.merchantId,
+        buf,
+        safeMime,
+        originalName: fileName,
+      },
+      { viteRoot: opts?.viteRoot },
+    )
     json(res, 200, {
       url: publicUrl,
       mimeType: safeMime,
