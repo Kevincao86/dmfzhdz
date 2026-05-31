@@ -17,6 +17,10 @@
       "includeFiles": "web版/merchant-erp/{vite-plugins,src}/**",
       "maxDuration": 120
     },
+    "api/meoo-digital-human-douyin-link.ts": {
+      "includeFiles": "web版/merchant-erp/{vite-plugins,src}/**",
+      "maxDuration": 120
+    },
     "api/meoo-merchant-ai-video-seedance-start.ts": {
       "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
       "maxDuration": 120
