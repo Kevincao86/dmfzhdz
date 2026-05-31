@@ -56,6 +56,17 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/ops-sync/vendor-keys': opsSyncVendorKeysHandler as VercelLikeHandler,
   '/api/ops-sync/ai': opsSyncAiHandler as VercelLikeHandler,
   '/api/ops-sync/video-ai': opsSyncVideoAiHandler as VercelLikeHandler,
+  '/api/meoo-erp-api-health': async (_req, res) => {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.end(
+      JSON.stringify({
+        ok: true,
+        revision: ECS_AUTH_API_ROUTE_REVISION,
+        routes: Object.keys(routes).length,
+      }),
+    )
+  },
   // tokenmix 依赖 @supabase/supabase-js（须在 商家管理后台/node_modules）；ECS 仅走 Vercel /api/meoo-supabase-tenants-tokenmix
 }
 
@@ -100,15 +111,19 @@ function parseRequestUrl(req: IncomingMessage): { path: string; query: Record<st
   return { path, query }
 }
 
+function applyErpApiCors(res: ServerResponse): void {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+}
+
 http
   .createServer(async (req, res) => {
     const vercelRes = adaptVercelResponse(res)
+    applyErpApiCors(res)
     const { path, query } = parseRequestUrl(req)
     if (req.method === 'OPTIONS') {
       res.statusCode = 204
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
       res.end()
       return
     }

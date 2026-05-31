@@ -92,14 +92,34 @@ if [[ ! -e "$OPS_ADMIN/node_modules/@supabase/supabase-js" ]]; then
   fi
 fi
 
-echo "启动 Auth API :$PORT（env: $ENV_FILE）"
-echo "测试: curl -sS http://127.0.0.1:$PORT/api/meoo-auth-ping"
-echo "注册表: curl -sS http://127.0.0.1:$PORT/api/meoo-ops-sync-registry | head -c 200"
-echo "（应看到 vendorKeys 等 JSON；若 not_found 说明旧进程仍在跑，请先 pkill -f ecs-auth-api-server 再执行本脚本）"
+pkill -f ecs-auth-api-server 2>/dev/null || true
+sleep 1
+
+if [[ -f /etc/systemd/system/meoo-auth-api.service ]]; then
+  echo "检测到 systemd 服务 meoo-auth-api，使用 systemctl 启动（SSH 断开也不会 502）…"
+  sudo systemctl daemon-reload
+  sudo systemctl enable meoo-auth-api
+  sudo systemctl restart meoo-auth-api
+  sleep 2
+  if curl -sf "http://127.0.0.1:$PORT/api/meoo-auth-ping" >/dev/null; then
+    echo "OK: systemd meoo-auth-api 已在 :$PORT 运行"
+    curl -sS "http://127.0.0.1:$PORT/api/meoo-ops-sync-registry" | head -c 200
+    echo
+    echo "公网自测: curl -sSI https://mofangdianai.com/erp-api/meoo-erp-api-health | head"
+    exit 0
+  fi
+  echo "systemd 启动失败，查看: sudo journalctl -u meoo-auth-api -n 40 --no-pager"
+  exit 1
+fi
+
+echo "未安装 systemd 单元。强烈建议执行: bash scripts/ecs-install-auth-api-systemd.sh"
+echo "否则 SSH 关闭后 Nginx /erp-api 会出现 502 Bad Gateway。"
+echo "下面以前台方式启动（仅调试用，勿关闭本终端）…"
 
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
 
+export AUTH_API_PORT="$PORT"
 exec npx --yes tsx scripts/ecs-auth-api-server.ts
