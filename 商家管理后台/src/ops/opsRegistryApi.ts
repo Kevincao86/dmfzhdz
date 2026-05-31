@@ -294,7 +294,7 @@ export async function fetchRegistry(): Promise<RegistryFile> {
   let lastErr: Error | undefined
   for (const path of paths) {
     try {
-      const res = await fetchOpsErpApi(path)
+      const res = await fetchOpsErpApi(path, { method: 'GET' })
       const text = await res.text()
       if (!res.ok) {
         try {

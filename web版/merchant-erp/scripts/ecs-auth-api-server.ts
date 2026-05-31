@@ -115,6 +115,7 @@ http
     const handler = routes[path]
     if (!handler) {
       res.statusCode = 404
+      res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
       res.end(
         JSON.stringify({
@@ -142,6 +143,7 @@ http
       await handler(vercelReq, vercelRes)
     } catch (e) {
       res.statusCode = 500
+      res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Content-Type', 'application/json; charset=utf-8')
       res.end(
         JSON.stringify({

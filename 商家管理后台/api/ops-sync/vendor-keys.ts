@@ -1,12 +1,21 @@
 /**
- * POST /api/ops-sync/vendor-keys — 独立入口，不经过含 node:crypto 的 dispatch，降低 FUNCTION_INVOCATION_FAILED。
+ * POST /api/ops-sync/vendor-keys — 307 到 ECS erp-api（保存各厂商 Key）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { handleRegistrySyncLitePost, opsRegistrySyncLiteFnConfig } from '../opsSyncRegistryLitePost.js'
-import { opsRegistrySupabaseSaveVendorKeys } from '../../src/ops/opsRegistrySupabaseAiWrites.js'
+import { redirectRegistryToErpApi, sendErpApiRedirectCors } from '../opsErpApiRedirect.js'
 
-export const config = opsRegistrySyncLiteFnConfig
+export const config = { maxDuration: 10 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  await handleRegistrySyncLitePost(req, res, opsRegistrySupabaseSaveVendorKeys)
+  sendErpApiRedirectCors(res)
+  if (req.method === 'OPTIONS') {
+    res.status(204).end()
+    return
+  }
+  if (req.method === 'POST') {
+    redirectRegistryToErpApi(res, '/api/ops-sync/vendor-keys')
+    return
+  }
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.status(405).send(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
 }

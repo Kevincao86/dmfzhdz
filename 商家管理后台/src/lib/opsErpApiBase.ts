@@ -42,8 +42,20 @@ export function opsErpApiUrl(apiPath: string): string {
     if (typeof window !== 'undefined') return `${window.location.origin}${path}`
     return path
   }
-  const rel = path.replace(/^\/api\//, '')
-  return new URL(rel, `${base.replace(/\/$/, '')}/`).href
+  const rel = path.replace(/^\/api\//, '').replace(/^\//, '')
+  return `${base.replace(/\/$/, '')}/${rel}`
+}
+
+/** 注册表读写 URL 列表：生产优先直连 erp-api，其次同源 307 跳转 */
+export function opsRegistryApiUrls(apiPath: string): string[] {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const urls: string[] = []
+  const erp = opsErpApiUrl(path)
+  if (erp) urls.push(erp)
+  if (typeof window !== 'undefined') {
+    urls.push(`${window.location.origin}${path}`)
+  }
+  return [...new Set(urls.filter(Boolean))]
 }
 
 export function opsErpApiCandidates(apiPath: string): string[] {
@@ -62,13 +74,18 @@ export function opsErpApiCandidates(apiPath: string): string[] {
   return urls
 }
 
-/** 优先 ECS erp-api，失败再回退运营台同源 /api（Vercel 可能仍 fetch failed） */
+/** 优先 ECS erp-api，失败再回退运营台同源 /api（注册表等同源会 307 至 erp-api） */
 export async function fetchOpsErpApi(apiPath: string, init?: RequestInit): Promise<Response> {
-  const candidates = opsErpApiCandidates(apiPath)
+  const registryLike =
+    apiPath.includes('ops-sync') ||
+    apiPath.includes('meoo-ops-sync-registry') ||
+    apiPath.includes('vendor-keys') ||
+    apiPath.includes('video-ai')
+  const candidates = registryLike ? opsRegistryApiUrls(apiPath) : opsErpApiCandidates(apiPath)
   let last: unknown
   for (let i = 0; i < candidates.length; i++) {
     try {
-      const res = await fetch(candidates[i]!, init)
+      const res = await fetch(candidates[i]!, { ...init, cache: 'no-store' })
       const retry =
         !res.ok &&
         (res.status >= 502 || res.status === 0) &&
@@ -77,7 +94,10 @@ export async function fetchOpsErpApi(apiPath: string, init?: RequestInit): Promi
     } catch (e) {
       last = e
       if (i < candidates.length - 1) continue
-      throw e
+      const hint = registryLike
+        ? `（已尝试 ${candidates.join(' → ')}；请确认 ECS auth-api 与 https://mofangdianai.com/erp-api 可访问）`
+        : ''
+      throw new Error(`${e instanceof Error ? e.message : String(e)}${hint}`)
     }
   }
   throw last instanceof Error ? last : new Error('fetch failed')

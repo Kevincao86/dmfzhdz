@@ -101,7 +101,7 @@ export default function OpsAiModelsPage() {
       setHint(
         detail
           ? `注册表请求失败：${detail}`
-          : '无法读写注册表：本地请重启 npm run dev 并确保项目根可写 .meoo-dev-sync；线上请配置 VITE_MEEO_OPS_API_BASE=https://mofangdianai.com/erp-api 并 Redeploy，确认 ECS auth-api 已运行（bash scripts/ecs-run-auth-api.sh）且 Supabase 已迁移 ops_registry_snapshot。',
+          : '无法读写注册表：请确认 https://mofangdianai.com/erp-api/meoo-ops-sync-registry 在浏览器可打开 JSON；ECS 执行 git pull && pkill -f ecs-auth-api-server; bash scripts/ecs-run-auth-api.sh；Vercel 运营台 Redeploy。',
       )
       setCatalogFull((prev) => (prev.length > 0 ? prev : mergeBuiltinAiVendorCatalog([])))
     } finally {
