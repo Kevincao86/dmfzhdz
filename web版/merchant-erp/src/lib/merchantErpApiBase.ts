@@ -36,9 +36,20 @@ export function merchantErpApiBase(): string {
 
 export function buildMerchantErpApiUrl(base: string, apiPath: string): string {
   const b = base.replace(/\/$/, '')
-  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  let path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  let query = ''
+  const qIdx = path.indexOf('?')
+  if (qIdx >= 0) {
+    query = path.slice(qIdx)
+    path = path.slice(0, qIdx)
+  }
   const rel = path.replace(/^\/api\//, '')
-  return `${b}/${rel}`
+  return `${b}/${rel}${query}`
+}
+
+/** 同一 API 路径：erp-api 优先，再同源 Vercel（保留 ?query） */
+export function merchantApiFetchUrls(apiPathWithOptionalQuery: string): string[] {
+  return merchantErpApiCandidates(apiPathWithOptionalQuery)
 }
 
 /** 生产默认 erp-api 优先，再同源 Vercel（避免 tenant_not_found / 密钥未合并） */

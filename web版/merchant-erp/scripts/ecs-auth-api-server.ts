@@ -24,9 +24,20 @@ import opsSyncVideoAiHandler from '../api/meoo-ops-sync-video-ai.ts'
 import meooAiChatHandler from '../api/meoo-ai-chat.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
+import iceConfigHandler from '../api/meoo-merchant-ai-video-ice-config.ts'
+import iceOpenshotConfigHandler from '../api/meoo-merchant-ai-video-openshot-config.ts'
+import iceUploadInitHandler from '../api/meoo-merchant-ai-video-ice-upload-init.ts'
+import iceUploadHandler from '../api/meoo-merchant-ai-video-ice-upload.ts'
+import iceMultipartHandler from '../api/meoo-merchant-ai-video-ice-multipart.ts'
+import icePipelineHandler from '../api/meoo-merchant-ai-video-ice-pipeline.ts'
+import iceOpenshotPipelineHandler from '../api/meoo-merchant-ai-video-openshot-pipeline.ts'
+import iceJobHandler from '../api/meoo-merchant-ai-video-ice-job.ts'
+import iceJobDownloadHandler from '../api/meoo-merchant-ai-video-ice-job-download.ts'
+import iceOpenshotExportDownloadHandler from '../api/meoo-merchant-ai-video-openshot-export-download.ts'
+import iceOpenshotExportHandler from '../api/meoo-merchant-ai-video-openshot-export.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260531-agent-daily-info'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260601-ice-erp-api'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -64,6 +75,19 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ai-chat': meooAiChatHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
+  /** 灵祺AI云剪：读运营台 videoAi 注册表，须走 ECS 勿仅靠 Vercel */
+  '/api/meoo-merchant-ai-video-ice-config': iceConfigHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-openshot-config': iceOpenshotConfigHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-upload-init': iceUploadInitHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-upload': iceUploadHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-multipart': iceMultipartHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-pipeline': icePipelineHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-openshot-pipeline': iceOpenshotPipelineHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-job': iceJobHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-openshot-export': iceOpenshotExportHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-ice-job-download': iceJobDownloadHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-openshot-export-download':
+    iceOpenshotExportDownloadHandler as VercelLikeHandler,
   '/api/meoo-erp-api-health': async (_req, res) => {
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
