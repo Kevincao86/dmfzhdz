@@ -34,6 +34,7 @@ export type AIChatRequest = {
   stream?: boolean
   taskType?: AiTaskType
   /** 智能体下拉 key，用于服务端拼接对应该模型的对话风格（不改变实际路由模型） */
+  agentPickerKey?: string
   /** 客户端已知租户 id 时传入，便于 Vercel 服务端经 RLS 校验（与 MembershipContext 一致） */
   tenantId?: string
 }
