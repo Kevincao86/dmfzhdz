@@ -2,6 +2,7 @@
  * 浏览器侧：优先当前站点同源（Vercel /api/meoo-ai-chat），再尝试 VITE_MERCHANT_API_BASE_URL，避免误指商家管理后台旧网关。
  */
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
+import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
 import type { AIChatOkBody, AIChatRequest, AIChatResponse } from './types'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -41,12 +42,19 @@ async function bearer(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
+async function tenantIdForApi(): Promise<string | undefined> {
+  if (!supabaseConfigured || !supabase) return undefined
+  const tid = await fetchPrimaryTenantId(supabase)
+  return tid ?? undefined
+}
+
 /** 优先扁平路由 + 同源，避免生产环境深层路径或旧 API 基址落到 SPA */
 export async function postAiChat(
   req: AIChatRequest,
   opts?: { signal?: AbortSignal },
 ): Promise<AIChatResponse> {
   const token = await bearer()
+  const tenantId = await tenantIdForApi()
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -64,7 +72,10 @@ export async function postAiChat(
       const res = await fetch(target, {
         method: 'POST',
         headers,
-        body: JSON.stringify(req),
+        body: JSON.stringify({
+          ...req,
+          ...(tenantId ? { tenantId } : {}),
+        }),
         signal: opts?.signal,
       })
       const text = await res.text()

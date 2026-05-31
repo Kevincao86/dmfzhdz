@@ -1,4 +1,5 @@
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { fetchPrimaryTenantId } from '../lib/tenantBilling'
 import { toUserFacingError } from '../lib/userFacingError'
 
 export type DouyinLinkParseResponse =
@@ -20,6 +21,12 @@ async function bearer(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
+async function tenantIdForApi(): Promise<string | undefined> {
+  if (!supabaseConfigured || !supabase) return undefined
+  const tid = await fetchPrimaryTenantId(supabase)
+  return tid ?? undefined
+}
+
 function parseResponseBody(text: string): DouyinLinkParseResponse | null {
   if (!text.trim()) return null
   try {
@@ -34,6 +41,8 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
   if (!token) {
     return { ok: false, message: '请先登录后再使用链接抓取' }
   }
+
+  const tenantId = await tenantIdForApi()
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -54,7 +63,10 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
         const res = await fetch(target, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ url: url.trim() }),
+          body: JSON.stringify({
+            url: url.trim(),
+            ...(tenantId ? { tenantId } : {}),
+          }),
         })
         const text = await res.text()
         const j = parseResponseBody(text)

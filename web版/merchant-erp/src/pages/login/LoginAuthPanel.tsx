@@ -260,6 +260,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       switchMode('login')
       setLoginMethod('password')
       onInfoHint(r.message ?? '注册成功，请登录')
+    } catch (e) {
+      onErr(toUserFacingError(e, '注册'))
     } finally {
       setBusy(false)
     }

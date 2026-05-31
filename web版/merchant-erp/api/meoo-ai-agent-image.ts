@@ -42,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     reference_image?: unknown
     image_route?: unknown
     tokenmix_image_model?: unknown
+    tenantId?: unknown
   }
   try {
     body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -76,7 +77,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       : preferredVendor ?? 'qwen'
   const userJwt =
     typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : undefined
-  const access = await assertAiChatAccess(user.id, accessProvider, env0, userJwt)
+  const access = await assertAiChatAccess(
+    user.id,
+    accessProvider,
+    env0,
+    userJwt,
+    typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
+  )
   if (!access.ok) {
     sendMerchantJson(res, access.status, {
       ok: false,
