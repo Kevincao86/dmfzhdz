@@ -9,7 +9,7 @@
     "minifyWXML": true,
     "compileWorklet": false,
     "uglifyFileName": false,
-    "uploadWithSourceMap": true,
+    "uploadWithSourceMap": false,
     "enhance": false,
     "packNpmManually": false,
     "packNpmRelationList": [],
@@ -25,12 +25,29 @@
       "outputPath": ""
     }
   },
-  "appid": "wx52319de04a847ae0",
+  "appid": "wxd3da81937eb72241",
   "projectname": "meoo-talent-recruit-mp",
   "libVersion": "3.16.0",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "value": "README.md",
+        "type": "file"
+      },
+      {
+        "value": "DEPLOY.md",
+        "type": "file"
+      },
+      {
+        "value": ".example.js",
+        "type": "suffix"
+      },
+      {
+        "value": "utils/config.local.js",
+        "type": "file"
+      }
+    ],
     "include": []
   },
   "editorSetting": {}

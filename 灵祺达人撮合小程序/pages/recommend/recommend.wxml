@@ -2,7 +2,7 @@
   <view class="rec-top">
     <view class="rec-head-band lq-hero-header" style="{{recHeadBandStyle}}">
       <view class="lq-hero-bg lq-hero-bg--rec" aria-hidden="true">
-        <image class="lq-hero-bg__pattern" src="/images/hero-bg-pattern.png" mode="aspectFill" />
+        <view class="lq-hero-bg__pattern" />
         <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
       </view>
       <view class="rec-head-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">

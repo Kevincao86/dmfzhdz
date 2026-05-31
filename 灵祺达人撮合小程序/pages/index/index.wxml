@@ -2,7 +2,7 @@
   <!-- 顶部：品牌 + 搜索 -->
   <view class="home-header lq-hero-header">
     <view class="lq-hero-bg" aria-hidden="true">
-      <image class="lq-hero-bg__pattern" src="/images/hero-bg-pattern.png" mode="aspectFill" />
+      <view class="lq-hero-bg__pattern" />
       <view class="lq-hero-bg__mesh" />
       <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
       <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />

@@ -74,7 +74,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     imageRoute === 'tokenmix'
       ? 'tokenmix'
       : preferredVendor ?? 'qwen'
-  const access = await assertAiChatAccess(user.id, accessProvider, env0)
+  const userJwt =
+    typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : undefined
+  const access = await assertAiChatAccess(user.id, accessProvider, env0, userJwt)
   if (!access.ok) {
     sendMerchantJson(res, access.status, {
       ok: false,

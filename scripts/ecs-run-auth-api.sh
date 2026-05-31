@@ -19,23 +19,34 @@ fi
 
 # shellcheck disable=SC1091
 source "$HOME/stack/db-credentials.txt"
+export JWT_SECRET POSTGRES_PASSWORD
 
 if ! command -v python3 >/dev/null; then
   echo "需要 python3"
   exit 1
 fi
 
-read -r ANON_KEY SERVICE_KEY <<EOF
-$(python3 <<PY
+pip3 install PyJWT 2>/dev/null || true
+
+python3 <<'PY'
 import jwt, time, os
 secret = os.environ["JWT_SECRET"]
 now = int(time.time())
 exp = now + 10 * 365 * 24 * 3600
-print(jwt.encode({"role":"anon","iss":"supabase","iat":now,"exp":exp}, secret, algorithm="HS256"))
-print(jwt.encode({"role":"service_role","iss":"supabase","iat":now,"exp":exp}, secret, algorithm="HS256"))
+anon = jwt.encode({"role": "anon", "iss": "supabase", "iat": now, "exp": exp}, secret, algorithm="HS256")
+service = jwt.encode({"role": "service_role", "iss": "supabase", "iat": now, "exp": exp}, secret, algorithm="HS256")
+open("/tmp/meoo-anon.key", "w").write(anon)
+open("/tmp/meoo-service.key", "w").write(service)
 PY
-)
-EOF
+
+ANON_KEY="$(cat /tmp/meoo-anon.key)"
+SERVICE_KEY="$(cat /tmp/meoo-service.key)"
+rm -f /tmp/meoo-anon.key /tmp/meoo-service.key
+
+if [[ -z "$ANON_KEY" || -z "$SERVICE_KEY" ]]; then
+  echo "生成 anon/service_role JWT 失败，请确认 db-credentials.txt 含 JWT_SECRET 且已 export"
+  exit 1
+fi
 
 PREV_SUPPORT_TOKEN=""
 if [[ -f "$ENV_FILE" ]]; then
