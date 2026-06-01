@@ -1261,6 +1261,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                 thinking: ev.text,
                 content: r?.content ?? '',
               }))
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === placeholder.id ? { ...m, thinkingText: ev.text } : m,
+                ),
+              )
             }
             if (ev.event === 'content') {
               const displayPartial = formatAssistantDisplayText(ev.text)
@@ -1270,7 +1275,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               }))
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === placeholder.id ? { ...m, content: displayPartial } : m,
+                  m.id === placeholder.id
+                    ? { ...m, content: displayPartial || ev.text.trim() }
+                    : m,
                 ),
               )
             }
@@ -1278,8 +1285,8 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         })
 
         setStreamingReply(null)
-        const { answer: streamAnswer } = splitAssistantStreamView(res.content)
-        const visibleRaw = streamAnswer.trim() || res.content.trim()
+        const { thinking, answer } = splitAssistantStreamView(res.content)
+        const visibleRaw = answer.trim() || res.content.trim()
         const deferPreview = shouldDeferTaskPreview(
           trimmed,
           visibleRaw,
@@ -1290,6 +1297,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           deferPreview || isPlanDesignQuery(trimmed)
             ? formatAssistantDisplayText(visibleRaw)
             : formatAssistantDisplayText(rawSummary ?? visibleRaw)
+        if (!display.trim()) {
+          display = formatAssistantDisplayText(thinking.trim() || res.content.trim())
+        }
 
         if (deferPreview && isPlanOrNineScenarioQuery(trimmed)) {
           const taskTypes = inferDeferredTaskTypes(trimmed, res.content, taskType ?? inferTaskTypeFromText(trimmed))
@@ -1307,7 +1317,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         setMessages((prev) => {
           const next = prev.map((m) =>
             m.id === placeholder.id
-              ? { ...m, content: display, isStreaming: false }
+              ? {
+                  ...m,
+                  content: display,
+                  thinkingText: thinking.trim() || m.thinkingText,
+                  isStreaming: false,
+                }
               : m,
           )
           messagesRef.current = next

@@ -4,7 +4,6 @@ import { AiAgentComposerBar } from '../components/AiAgentComposerBar'
 import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
 import { AiAgentPreviewActions } from '../components/AiAgentPreviewActions'
 import { AiAgentThinkingIndicator } from '../components/AiAgentThinkingIndicator'
-import { AiAgentThinkingLive } from '../components/AiAgentThinkingLive'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 
@@ -201,10 +200,7 @@ export default function AiAgentPage() {
                     ) : null}
                   </div>
                 ))}
-                {streamingReply?.thinking?.trim() ? (
-                  <AiAgentThinkingLive text={streamingReply.thinking} />
-                ) : null}
-                {aiSending && !streamingReply?.content.trim() && !streamingReply?.thinking?.trim() ? (
+                {aiSending && !messages.some((m) => m.isStreaming) ? (
                   <AiAgentThinkingIndicator />
                 ) : null}
               </div>

@@ -1,4 +1,4 @@
-import { splitAssistantStreamView } from '../../src/lib/assistantThinkingText.js'
+import { resolveAssistantVisibleText, splitAssistantStreamView } from '../../src/lib/assistantThinkingText.js'
 import {
   buildAuditPayload,
   forwardAuditToMerchantAdmin,
@@ -56,7 +56,8 @@ export async function runMeooAiChatStream(
     const view = splitAssistantStreamView(rawContent)
     const thinking = [reasoningAcc, view.thinking].filter(Boolean).join('\n\n').trim()
     if (thinking) write({ event: 'thinking', text: thinking })
-    if (view.answer) write({ event: 'content', text: view.answer })
+    const answer = resolveAssistantVisibleText(rawContent) || view.answer.trim()
+    if (answer) write({ event: 'content', text: answer })
   }
 
   try {
@@ -88,7 +89,7 @@ export async function runMeooAiChatStream(
     })
     write({
       event: 'done',
-      content: res.content,
+      content: resolveAssistantVisibleText(res.content) || res.content,
       provider: res.provider,
       model: res.model,
     })
