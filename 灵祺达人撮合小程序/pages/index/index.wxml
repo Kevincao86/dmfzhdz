@@ -128,7 +128,7 @@
     </view>
 
     <view wx:elif="{{err}}" class="card state-error">
-      <text>{{err}}</text>
+      <text class="err-detail">{{err}}</text>
     </view>
 
     <block wx:else>
