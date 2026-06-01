@@ -3,7 +3,8 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import type { RegistryFile } from './opsRegistryTypes.js'
+import type { RegistryFile, RegistryVideoAi } from './opsRegistryTypes.js'
+import { normalizeRegistryVideoAi } from './registryVideoAiNormalize.js'
 import { readMerchantSupabaseAdminEnv } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 import {
   createRegistrySnapshotIoFetch,
@@ -97,14 +98,51 @@ async function loadRegistryViaErpApi(): Promise<RegistryFile | null> {
   return null
 }
 
+function iceVideoAiCredentialsComplete(v: RegistryVideoAi | undefined): boolean {
+  const n = normalizeRegistryVideoAi(v)
+  return !!(
+    n.iceAppId?.trim() &&
+    n.iceAccessKeyId?.trim() &&
+    n.iceAccessKeySecret?.trim()
+  )
+}
+
+/** Supabase 与 erp-api 快照合并：字段取非空；DB 缺 ICE 三要素时用 erp-api 补齐（Vercel 云 Supabase 常为空）。 */
+function mergeRegistrySnapshotsPreferComplete(a: RegistryFile, b: RegistryFile): RegistryFile {
+  const va = normalizeRegistryVideoAi(a.videoAi)
+  const vb = normalizeRegistryVideoAi(b.videoAi)
+  const videoAi: RegistryVideoAi =
+    !iceVideoAiCredentialsComplete(va) && iceVideoAiCredentialsComplete(vb)
+      ? { ...va, ...vb }
+      : { ...vb, ...va }
+
+  const vendorKeys: Partial<Record<string, string>> = { ...(b.vendorKeys ?? {}) }
+  for (const [k, v] of Object.entries(a.vendorKeys ?? {})) {
+    if (typeof v === 'string' && v.trim()) vendorKeys[k] = v.trim()
+  }
+  for (const [k, v] of Object.entries(b.vendorKeys ?? {})) {
+    if (typeof v === 'string' && v.trim() && !vendorKeys[k]?.trim()) vendorKeys[k] = v.trim()
+  }
+
+  return {
+    ...a,
+    ...b,
+    videoAi,
+    vendorKeys,
+    vendorKeysUpdatedAt: a.vendorKeysUpdatedAt ?? b.vendorKeysUpdatedAt,
+    videoAiUpdatedAt: a.videoAiUpdatedAt ?? b.videoAiUpdatedAt,
+  }
+}
+
 /** Vercel / ECS 商品图、云剪等合并注册表时的统一加载顺序。 */
 export async function loadRegistrySnapshotForServer(
   viteRoot?: string,
 ): Promise<RegistryFile | null> {
   const local = loadLocalRegistryFile(viteRoot)
   const fromDb = await loadRegistryViaSupabase()
-  if (fromDb) return fromDb
   const fromErp = await loadRegistryViaErpApi()
+  if (fromDb && fromErp) return mergeRegistrySnapshotsPreferComplete(fromDb, fromErp)
+  if (fromDb) return fromDb
   if (fromErp) return fromErp
   return local
 }
