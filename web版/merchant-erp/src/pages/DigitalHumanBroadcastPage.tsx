@@ -301,7 +301,12 @@ export default function DigitalHumanBroadcastPage() {
       return false
     }
     if (out.source === 'browser' && selectedVoice?.cloudVoiceId) {
-      setToast('云端语音不可用，已改用浏览器试听（音质较弱）')
+      const why = out.cloudFallbackReason?.trim()
+      setToast(
+        why
+          ? `云端 MiniMax 语音未生效：${why}（已改用浏览器试听，音质偏机械）`
+          : '云端 MiniMax 语音未生效，已改用浏览器试听（音质偏机械）。请确认 ECS 已部署 meoo-digital-human-tts 且运营台已保存 MiniMax Key',
+      )
     }
     return true
   }
