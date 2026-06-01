@@ -26,6 +26,13 @@ const DOUYIN_HOST =
 const MOBILE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 
+const DOUYIN_FETCH_HEADERS = {
+  'User-Agent': MOBILE_UA,
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'zh-CN,zh;q=0.9',
+  Referer: 'https://www.douyin.com/',
+} as const
+
 export function isDouyinShareUrl(raw: string): boolean {
   const t = raw.trim()
   if (!t) return false
@@ -76,13 +83,6 @@ export function extractDouyinVideoId(url: string): string | null {
   return m?.[1] ?? null
 }
 
-/** iesdouyin 分享页 SSR 含 videoInfoRes，比 douyin.com 反爬页更易解析 */
-function preferIesdouyinShareFetchUrl(url: string, videoId: string | null): string {
-  if (videoId) return `https://www.iesdouyin.com/share/video/${videoId}/`
-  if (/iesdouyin\.com/i.test(url)) return url
-  return url
-}
-
 type DouyinAwemeItem = {
   desc?: string
   video_text?: string | null
@@ -117,16 +117,85 @@ function parseJsonObjectFromScriptPrefix(raw: string): unknown | null {
   }
 }
 
+function findAwemeItemInUnknown(node: unknown): DouyinAwemeItem | null {
+  if (!node || typeof node !== 'object') return null
+  if (Array.isArray(node)) {
+    for (const el of node) {
+      const hit = findAwemeItemInUnknown(el)
+      if (hit) return hit
+    }
+    return null
+  }
+  const o = node as Record<string, unknown>
+  if (Array.isArray(o.item_list)) {
+    const first = o.item_list[0]
+    if (first && typeof first === 'object' && (first as DouyinAwemeItem).video) {
+      return first as DouyinAwemeItem
+    }
+  }
+  const videoInfoRes = o.videoInfoRes
+  if (videoInfoRes && typeof videoInfoRes === 'object') {
+    const list = (videoInfoRes as { item_list?: DouyinAwemeItem[] }).item_list
+    if (list?.[0]?.video) return list[0]
+  }
+  for (const v of Object.values(o)) {
+    const hit = findAwemeItemInUnknown(v)
+    if (hit) return hit
+  }
+  return null
+}
+
 function parseRouterDataAwemeItem(html: string): DouyinAwemeItem | null {
   const m = /window\._ROUTER_DATA\s*=\s*(\{[\s\S]*)/.exec(html)
   if (!m?.[1]) return null
   const root = parseJsonObjectFromScriptPrefix(m[1])
   if (!root || typeof root !== 'object') return null
   const loader = (root as { loaderData?: Record<string, unknown> }).loaderData
-  if (!loader || typeof loader !== 'object') return null
-  const page = loader['video_(id)/page'] as { videoInfoRes?: { item_list?: DouyinAwemeItem[] } } | undefined
-  const item = page?.videoInfoRes?.item_list?.[0]
-  return item && typeof item === 'object' ? item : null
+  if (loader && typeof loader === 'object') {
+    const fromLoader = findAwemeItemInUnknown(loader)
+    if (fromLoader) return fromLoader
+  }
+  return findAwemeItemInUnknown(root)
+}
+
+function extractDouyinVideoIdFromHtml(html: string): string | null {
+  const ogUrl = pickMetaContent(html, 'og:url')
+  if (ogUrl) {
+    const fromOg = extractDouyinVideoId(ogUrl)
+    if (fromOg) return fromOg
+  }
+  const patterns = [
+    /"aweme_id"\s*:\s*"(\d{10,})"/,
+    /"itemId"\s*:\s*"(\d{10,})"/,
+    /"item_id"\s*:\s*"(\d{10,})"/,
+    /\/video\/(\d{10,})/,
+    /modal_id=(\d{10,})/,
+    /item_id=(\d{10,})/,
+  ]
+  for (const re of patterns) {
+    const hit = re.exec(html)
+    if (hit?.[1]) return hit[1]
+  }
+  return null
+}
+
+function extractPlayUrlFromHtml(html: string): string | null {
+  const blob = html
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/')
+  const patterns = [
+    /"play_addr"\s*:\s*\{[\s\S]{0,400}?"url_list"\s*:\s*\[\s*"((?:\\.|[^"\\])*)"/,
+    /"download_addr"\s*:\s*\{[\s\S]{0,400}?"url_list"\s*:\s*\[\s*"((?:\\.|[^"\\])*)"/,
+    /"playApi"\s*:\s*"((?:\\.|[^"\\])*)"/,
+  ]
+  for (const re of patterns) {
+    const hit = re.exec(blob)
+    if (!hit?.[1]) continue
+    const raw = unescapeJsonString(hit[1]).trim()
+    if (!/^https?:\/\//i.test(raw)) continue
+    return raw.replace(/\/playwm\//, '/play/')
+  }
+  return null
 }
 
 function stripDouyinMetaBoilerplate(raw: string): string {
@@ -367,27 +436,116 @@ async function resolveMediaUrlForAsr(playUrl: string, env: Record<string, string
   return direct
 }
 
-async function resolveDouyinShareUrl(url: string): Promise<string> {
-  if (!/v\.douyin\.com/i.test(url)) return url
+type DouyinLinkTarget = {
+  url: string
+  videoId: string | null
+  shortLinkUnresolved: boolean
+}
+
+function isDouyinHomepageUrl(url: string): boolean {
   try {
-    const res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: { 'User-Agent': MOBILE_UA, Accept: 'text/html,application/xhtml+xml' },
-      signal: AbortSignal.timeout(15_000),
-    })
-    const finalUrl = res.url?.trim()
-    if (finalUrl) {
+    const u = new URL(url)
+    return /(?:^|\.)douyin\.com$/i.test(u.hostname) && (u.pathname === '/' || u.pathname === '')
+  } catch {
+    return false
+  }
+}
+
+async function resolveDouyinLinkTarget(inputUrl: string): Promise<DouyinLinkTarget> {
+  let url = inputUrl
+  let videoId = extractDouyinVideoId(url)
+  let shortLinkUnresolved = false
+
+  if (/v\.douyin\.com/i.test(url)) {
+    let current = url
+    for (let step = 0; step < 8; step++) {
       try {
-        if (DOUYIN_HOST.test(new URL(finalUrl).hostname)) return finalUrl
+        const res = await fetch(current, {
+          redirect: 'manual',
+          headers: DOUYIN_FETCH_HEADERS,
+          signal: AbortSignal.timeout(12_000),
+        })
+        const loc = res.headers.get('location')
+        if (loc && res.status >= 300 && res.status < 400) {
+          current = new URL(loc, current).toString()
+          videoId = extractDouyinVideoId(current) ?? videoId
+          if (videoId) {
+            url = current
+            break
+          }
+          continue
+        }
+        if (res.status === 200) {
+          const html = await res.text()
+          videoId = extractDouyinVideoIdFromHtml(html) ?? extractDouyinVideoId(current) ?? videoId
+          url = videoId ? current : url
+          break
+        }
+        break
       } catch {
-        /* ignore */
+        break
       }
     }
-  } catch {
-    /* 短链解析失败仍用原链接 */
+
+    if (!videoId) {
+      try {
+        const res = await fetch(inputUrl, {
+          redirect: 'follow',
+          headers: DOUYIN_FETCH_HEADERS,
+          signal: AbortSignal.timeout(15_000),
+        })
+        const finalUrl = res.url?.trim() || inputUrl
+        url = finalUrl
+        videoId = extractDouyinVideoId(finalUrl) ?? videoId
+        if (!videoId && res.ok) {
+          const html = await res.text()
+          videoId = extractDouyinVideoIdFromHtml(html) ?? videoId
+        }
+        if (!videoId && isDouyinHomepageUrl(finalUrl)) {
+          shortLinkUnresolved = true
+        }
+      } catch {
+        shortLinkUnresolved = true
+      }
+    }
+  } else {
+    try {
+      const res = await fetch(url, {
+        redirect: 'follow',
+        headers: DOUYIN_FETCH_HEADERS,
+        signal: AbortSignal.timeout(15_000),
+      })
+      url = res.url?.trim() || url
+      videoId = extractDouyinVideoId(url) ?? videoId
+      if (!videoId && res.ok) {
+        const html = await res.text()
+        videoId = extractDouyinVideoIdFromHtml(html) ?? videoId
+      }
+    } catch {
+      /* keep original */
+    }
   }
-  return url
+
+  return { url, videoId, shortLinkUnresolved }
+}
+
+async function fetchIesdouyinItemById(awemeId: string): Promise<DouyinAwemeItem | null> {
+  const apiUrl = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?reflow_source=reflow_page&item_ids=${encodeURIComponent(awemeId)}`
+  try {
+    const res = await fetch(apiUrl, {
+      headers: {
+        ...DOUYIN_FETCH_HEADERS,
+        Accept: 'application/json, text/plain, */*',
+      },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return null
+    const j = (await res.json()) as { status_code?: number; item_list?: DouyinAwemeItem[] }
+    if (j.status_code !== 0 || !j.item_list?.[0]) return null
+    return j.item_list[0]
+  } catch {
+    return null
+  }
 }
 
 function decodeHtmlEntities(s: string): string {
@@ -464,10 +622,7 @@ async function tryExtractDouyinPageContent(url: string): Promise<DouyinPageExtra
   try {
     const res = await fetch(url, {
       redirect: 'follow',
-      headers: {
-        'User-Agent': MOBILE_UA,
-        Accept: 'text/html,application/xhtml+xml',
-      },
+      headers: DOUYIN_FETCH_HEADERS,
       signal: AbortSignal.timeout(12_000),
     })
     if (!res.ok) return empty
@@ -481,12 +636,70 @@ async function tryExtractDouyinPageContent(url: string): Promise<DouyinPageExtra
     const caption =
       extractEmbeddedDouyinCaption(html) ??
       (awemeItem?.desc ? stripDouyinMetaBoilerplate(awemeItem.desc) : null)
-    const playUrl = pickDouyinPlayUrl(awemeItem)
+    const playUrl = pickDouyinPlayUrl(awemeItem) ?? extractPlayUrlFromHtml(html)
     const videoDurationMs = awemeItem?.video?.duration ?? null
     return { title, description, caption, awemeItem, playUrl, videoDurationMs }
   } catch {
     return empty
   }
+}
+
+function mergeDouyinPageExtract(a: DouyinPageExtract, b: DouyinPageExtract): DouyinPageExtract {
+  return {
+    title: a.title ?? b.title,
+    description: a.description ?? b.description,
+    caption: a.caption ?? b.caption,
+    awemeItem: a.awemeItem ?? b.awemeItem,
+    playUrl: a.playUrl ?? b.playUrl,
+    videoDurationMs: a.videoDurationMs ?? b.videoDurationMs,
+  }
+}
+
+function collectDouyinFetchUrls(normalizedUrl: string, videoId: string | null): string[] {
+  const out: string[] = []
+  const push = (u: string | null | undefined) => {
+    if (!u || out.includes(u)) return
+    out.push(u)
+  }
+  if (videoId) {
+    push(`https://www.iesdouyin.com/share/video/${videoId}/`)
+    push(`https://www.douyin.com/video/${videoId}`)
+  }
+  push(normalizedUrl)
+  return out
+}
+
+async function loadDouyinMediaContext(
+  normalizedUrl: string,
+  videoId: string | null,
+): Promise<DouyinPageExtract> {
+  const empty: DouyinPageExtract = {
+    title: null,
+    description: null,
+    caption: null,
+    awemeItem: null,
+    playUrl: null,
+    videoDurationMs: null,
+  }
+  let page = empty
+  for (const fetchUrl of collectDouyinFetchUrls(normalizedUrl, videoId)) {
+    page = mergeDouyinPageExtract(page, await tryExtractDouyinPageContent(fetchUrl))
+    if (page.playUrl && page.awemeItem) break
+  }
+  if (!page.playUrl && videoId) {
+    const item = await fetchIesdouyinItemById(videoId)
+    if (item) {
+      page = mergeDouyinPageExtract(page, {
+        title: null,
+        description: null,
+        caption: item.desc ? stripDouyinMetaBoilerplate(item.desc) : null,
+        awemeItem: item,
+        playUrl: pickDouyinPlayUrl(item),
+        videoDurationMs: item.video?.duration ?? null,
+      })
+    }
+  }
+  return page
 }
 
 function parseAiJsonBlock(text: string): { script?: string; motionInstructions?: string } | null {
@@ -631,17 +844,31 @@ export async function runDouyinLinkParseCore(
     }
   }
 
-  const resolvedUrl = await resolveDouyinShareUrl(extracted)
-  const normalizedUrl = normalizeDouyinShareUrl(resolvedUrl) ?? extracted
+  const resolved = await resolveDouyinLinkTarget(extracted)
+  const normalizedUrl = normalizeDouyinShareUrl(resolved.url) ?? extracted
+  const videoId = resolved.videoId ?? extractDouyinVideoId(normalizedUrl)
 
-  const videoId = extractDouyinVideoId(normalizedUrl)
-  const fetchUrl = preferIesdouyinShareFetchUrl(normalizedUrl, videoId)
-  const page = await tryExtractDouyinPageContent(fetchUrl)
+  if (resolved.shortLinkUnresolved && !videoId) {
+    return {
+      ok: false,
+      message:
+        '短链无法在服务端解析为视频页（抖音常限制服务器访问）。请在抖音 App 打开该视频 → 分享 → 复制链接，粘贴含 /video/数字/ 的完整链接后再抓取。',
+    }
+  }
+
+  const page = await loadDouyinMediaContext(normalizedUrl, videoId)
 
   const durationMs = page.videoDurationMs ?? 0
   const asrKey = readDashScopeAsrKey(env)
 
   if (!page.playUrl) {
+    if (/v\.douyin\.com/i.test(extracted)) {
+      return {
+        ok: false,
+        message:
+          '未能解析该视频播放地址。请改用浏览器中复制的完整链接（https://www.douyin.com/video/数字），或改用手动输入/文本驱动。',
+      }
+    }
     return {
       ok: false,
       message: '未能解析该视频播放地址，请换链接或改用手动输入/文本驱动',

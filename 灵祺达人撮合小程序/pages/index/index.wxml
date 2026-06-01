@@ -113,7 +113,7 @@
     </view>
 
     <view wx:if="{{unconfigured}}" class="card state-warn home-filters-warn">
-      <text class="hint">尚未连接后台，演示商单可预览；请配置 MERCHANT_API_BASE_URL</text>
+      <text class="hint">尚未连接后台，演示商单可预览；请在 utils/config.release.js 填写 MERCHANT_API_BASE_URL 后重新上传体验版</text>
     </view>
   </view>
 
