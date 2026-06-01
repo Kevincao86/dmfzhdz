@@ -91,16 +91,29 @@ export function minimaxChatModelCandidates(
   if (reqModel?.trim()) add(reqModel.trim())
   const envModel = (env.MINIMAX_MODEL ?? env.MERCHANT_AI_MINIMAX_CHAT_MODEL ?? '').trim()
   if (envModel) add(envModel)
+
+  const apiKey = resolveMinimaxApiKey(env)
+  const region = (env.MINIMAX_REGION ?? '').trim().toLowerCase()
+  const cnDomestic = region === 'cn' || apiKey.startsWith('sk-api-')
+  const intlFirst = region === 'intl' || region === 'io'
+
   if (regDefault?.trim()) add(regDefault.trim())
-  for (const m of [
-    'MiniMax-M2.7',
-    'MiniMax-M2.5',
-    'MiniMax-M2.1',
-    'MiniMax-M2',
-    'abab6.5-chat',
-    'abab6.5s-chat',
-  ]) {
-    add(m)
+
+  if (cnDomestic && !intlFirst) {
+    /** 国内 sk-api- Key 在 api.minimaxi.com 上优先 abab 系列，M2.x 常报 401/2061 */
+    for (const m of [
+      'abab6.5s-chat',
+      'abab6.5-chat',
+      'abab6.5t-chat',
+      'abab5.5s-chat',
+      'MiniMax-Text-01',
+    ]) {
+      add(m)
+    }
+    for (const m of ['MiniMax-M2.1', 'MiniMax-M2.7', 'MiniMax-M2.5', 'MiniMax-M2']) add(m)
+  } else {
+    for (const m of ['MiniMax-M2.7', 'MiniMax-M2.5', 'MiniMax-M2.1', 'MiniMax-M2']) add(m)
+    for (const m of ['abab6.5s-chat', 'abab6.5-chat', 'abab6.5t-chat', 'abab5.5s-chat']) add(m)
   }
-  return out.length ? out : ['MiniMax-M2.7']
+  return out.length ? out : [cnDomestic && !intlFirst ? 'abab6.5s-chat' : 'MiniMax-M2.7']
 }
