@@ -112,6 +112,12 @@ export function describeMergedAiVendorKeys(
 }
 
 /** 注册表有值时覆盖 env（运营台为唯一配置源） */
+function stripDirectLlmEnvKeys(out: MerchantAiEnv): void {
+  for (const k of DIRECT_LLM_ENV_KEYS) {
+    delete out[k]
+  }
+}
+
 function setFromRegistry(out: MerchantAiEnv, envKey: string, val: string | undefined): void {
   const v = sanitizeVendorApiKey(val)
   if (!v) return
@@ -181,9 +187,24 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
+    const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(data.vendorKeys))
+    const registryHasDirect =
+      !!(expanded.kimi?.trim() || expanded.minimax?.trim() || expanded.tokenmix?.trim())
+    if (registryHasDirect) {
+      stripDirectLlmEnvKeys(out)
+    }
     applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
-  } catch {
-    /* 未配 ECS PostgREST 或注册表不可读 */
+    const va = data.videoAi
+    if (va && typeof va === 'object') {
+      const region = va as { minimaxRegion?: string; kimiRegion?: string }
+      const mr = (region.minimaxRegion ?? '').trim().toLowerCase()
+      const kr = (region.kimiRegion ?? '').trim().toLowerCase()
+      if (mr === 'cn' || mr === 'intl' || mr === 'io') out.MINIMAX_REGION = mr === 'io' ? 'intl' : mr
+      if (kr === 'cn' || kr === 'intl' || kr === 'ai') out.KIMI_REGION = kr === 'ai' ? 'intl' : kr
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[mergeMerchantAiEnv] registry snapshot load failed:', msg.slice(0, 300))
   }
   return out
 }

@@ -26,6 +26,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const env = await resolveMerchantProductImageEnv({ viteRoot: process.cwd() })
+  let registryVideoAiLoaded = false
+  try {
+    const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
+    const reg = await loadRegistrySnapshotForServer(process.cwd())
+    registryVideoAiLoaded = !!(reg?.videoAi && typeof reg.videoAi === 'object')
+  } catch {
+    /* ignore */
+  }
   const storageMode = readMerchantProductImageOssEnv(env)
     ? 'oss'
     : (process.env.MERCHANT_PRODUCT_IMAGE_SUPABASE_BUCKET ?? '').trim()
@@ -44,8 +52,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           prefix: merchantProductImageStoragePrefix(env),
           prefixCandidates: merchantProductImageStoragePrefixCandidates(env),
           iceOutputPrefix: env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ?? null,
+          accessKeyIdTail: oss.accessKeyId.slice(-4),
+          ossAuthV4: (env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 ?? '').trim() || 'default-off-like-ice',
         }
       : null,
+    registryVideoAiLoaded,
     douyinSessionSecretConfigured: !!merchantDouyinSessionSecret(),
     hint:
       storageMode === 'oss'
@@ -62,37 +73,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const { default: OSS } = await import('ali-oss')
     const endpoint = (env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
-    const client = new OSS({
-      region: oss.region,
-      accessKeyId: oss.accessKeyId,
-      accessKeySecret: oss.accessKeySecret,
-      bucket: oss.bucket,
-      secure: true,
-      ...(endpoint ? { endpoint } : {}),
-      ...(env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
-    })
     const prefixCandidates = merchantProductImageStoragePrefixCandidates(env)
-    const attempts: Array<{ prefix: string; ok: boolean; objectKey?: string; error?: string }> = []
+    const attempts: Array<{
+      prefix: string
+      ok: boolean
+      objectKey?: string
+      error?: string
+      authV4?: boolean
+    }> = []
     let successKey: string | null = null
 
-    for (const prefix of prefixCandidates) {
-      const probeKey = `${prefix}/.meoo-storage-ping.txt`
-      try {
-        await client.put(probeKey, Buffer.from('ping', 'utf8'), {
-          headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
-        })
+    const runProbe = async (useV4: boolean) => {
+      const client = new OSS({
+        region: oss.region,
+        accessKeyId: oss.accessKeyId,
+        accessKeySecret: oss.accessKeySecret,
+        bucket: oss.bucket,
+        secure: true,
+        ...(endpoint ? { endpoint } : {}),
+        ...(useV4 ? { authorizationV4: true } : {}),
+      })
+      for (const prefix of prefixCandidates) {
+        const probeKey = `${prefix}/.meoo-storage-ping.txt`
         try {
-          await client.delete(probeKey)
-        } catch {
-          /* ignore cleanup failure */
+          await client.put(probeKey, Buffer.from('ping', 'utf8'), {
+            headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
+          })
+          try {
+            await client.delete(probeKey)
+          } catch {
+            /* ignore cleanup failure */
+          }
+          attempts.push({ prefix, ok: true, objectKey: probeKey, authV4: useV4 })
+          successKey = probeKey
+          return true
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          attempts.push({ prefix, ok: false, error: msg.slice(0, 300), authV4: useV4 })
         }
-        attempts.push({ prefix, ok: true, objectKey: probeKey })
-        successKey = probeKey
-        break
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        attempts.push({ prefix, ok: false, error: msg.slice(0, 300) })
       }
+      return false
+    }
+
+    if (!(await runProbe(false))) {
+      await runProbe(true)
     }
 
     if (!successKey) {

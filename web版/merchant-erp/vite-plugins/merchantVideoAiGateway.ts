@@ -26,7 +26,7 @@ import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 
-/** 将注册表中的 videoAi / vendorKeys 合入 env：非空 env 优先生效（与本地 registry.json 规则一致）。 */
+/** 将注册表中的 videoAi / vendorKeys 合入 env。ICE/OSS 以运营台为准（覆盖 Vercel 旧 env）；其余项 env 非空时保留。 */
 function applyRegistrySliceToVideoAiEnv(
   out: MerchantAiEnv,
   reg: Partial<Pick<RegistryFile, 'videoAi' | 'vendorKeys'>>,
@@ -42,16 +42,21 @@ function applyRegistrySliceToVideoAiEnv(
     ;(out as Record<string, string>)[key] = v
   }
 
+  const setFromRegistry = (key: string, val: string | undefined) => {
+    const v = val?.trim()
+    if (!v) return
+    ;(out as Record<string, string>)[key] = v
+  }
+
   fill('KLING_ACCESS_KEY', vx.klingAccessKey)
   fill('KLING_SECRET_KEY', vx.klingSecretKey)
   fill('KLING_API_BASE', vx.klingApiBase)
-  fill('ALIYUN_ICE_APP_ID', vx.iceAppId)
-  fill('ALIYUN_ICE_ACCESS_KEY_ID', vx.iceAccessKeyId)
-  fill('ALIYUN_ICE_ACCESS_KEY_SECRET', vx.iceAccessKeySecret)
-  fill('ALIYUN_ICE_REGION', vx.iceRegion)
-  fill('ALIYUN_ICE_VOD_STORAGE_LOCATION', vx.iceVodStorageLocation)
-  const iceOut = vx.iceOutputOssUrlPrefix?.trim()
-  if (iceOut) out.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX = iceOut
+  setFromRegistry('ALIYUN_ICE_APP_ID', vx.iceAppId)
+  setFromRegistry('ALIYUN_ICE_ACCESS_KEY_ID', vx.iceAccessKeyId)
+  setFromRegistry('ALIYUN_ICE_ACCESS_KEY_SECRET', vx.iceAccessKeySecret)
+  setFromRegistry('ALIYUN_ICE_REGION', vx.iceRegion)
+  setFromRegistry('ALIYUN_ICE_VOD_STORAGE_LOCATION', vx.iceVodStorageLocation)
+  setFromRegistry('ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX', vx.iceOutputOssUrlPrefix)
 
   const envEp = String(
     out.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ?? out.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ?? '',
