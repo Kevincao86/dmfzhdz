@@ -181,15 +181,19 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
   const out: MerchantAiEnv = { ...base }
   sanitizeMerchantAiEnvInPlace(out)
   mergeVendorKeysFromLocalRegistry(viteRoot, out)
-  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
-  if (!supabaseUrl || !serviceRole) return out
   try {
-    const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
+    const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
+    const data = await loadRegistrySnapshotForServer(viteRoot)
+    if (!data) return out
     const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(data.vendorKeys))
     const registryHasDirect =
-      !!(expanded.kimi?.trim() || expanded.minimax?.trim() || expanded.tokenmix?.trim())
+      !!(
+        expanded.qwen?.trim() ||
+        expanded.doubao?.trim() ||
+        expanded.kimi?.trim() ||
+        expanded.minimax?.trim() ||
+        expanded.tokenmix?.trim()
+      )
     if (registryHasDirect) {
       stripDirectLlmEnvKeys(out)
     }

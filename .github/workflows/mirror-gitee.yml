@@ -1,0 +1,29 @@
+# push 到 GitHub main 后，自动镜像到 Gitee（备用：Agent 只推 origin 时 Gitee 仍会更新）
+# 一次性配置：GitHub 仓库 Settings → Secrets → GITEE_PRIVATE_TOKEN
+
+name: Mirror main to Gitee
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  mirror:
+    if: github.repository == 'Kevincao86/dmfzhdz'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_PRIVATE_TOKEN }}
+        run: |
+          if [[ -z "$GITEE_TOKEN" ]]; then
+            echo "跳过：未配置 GITEE_PRIVATE_TOKEN secret"
+            exit 0
+          fi
+          git remote add gitee "https://oauth2:${GITEE_TOKEN}@gitee.com/linqierp/linqierp.git" 2>/dev/null || \
+            git remote set-url gitee "https://oauth2:${GITEE_TOKEN}@gitee.com/linqierp/linqierp.git"
+          git push gitee HEAD:main

@@ -1,8 +1,6 @@
 /** 抖音链接解析 → 口播文案 + 动作指令（服务端 / dev 中间件共用） */
 
-import { verifyBearerJwt } from '../../vite-plugins/aiGateway/authSupabase.js'
-import { assertAiChatAccess } from '../../vite-plugins/tenantMembershipCore.js'
-import { merchantAgentChatFromMessages } from '../../vite-plugins/merchantAiUpstream.js'
+import { runMeooAiChatCore } from '../../vite-plugins/aiGateway/meooAiChatCore.js'
 
 export type DouyinLinkParseInput = {
   url: string
@@ -136,71 +134,66 @@ function parseAiJsonBlock(text: string): { script?: string; motionInstructions?:
   return null
 }
 
-function bearerJwt(authHeader?: string): string | undefined {
-  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length).trim()
-    : undefined
-}
-
 function formatLinkParseAiError(raw: string): string {
   const t = raw.trim()
   if (!t) return 'AI 解析失败，请稍后重试'
-  if (/fetch failed|failed to fetch|econnrefused|enotfound|etimedout/i.test(t)) {
-    return '无法连接 AI 服务。请确认已登录，并在 Vercel 配置 MERCHANT_AI_DOUBAO_KEY 或 MERCHANT_AI_QWEN_KEY（及 SUPABASE_JWT_SECRET）。'
+  if (/fetch failed|failed to fetch|econnrefused|enotfound|etimedout|502|erp-api/i.test(t)) {
+    return '无法连接 AI 服务。请确认已登录；AI Key 请在商家管理后台「AI 模型」保存（与智能体共用），并优先经 ECS erp-api 访问。'
   }
   if (/unauthorized|invalid_jwt|auth_lookup|supabase_anon/i.test(t)) {
-    return '登录已失效或鉴权未配置。请重新登录；若仍失败请联系管理员检查 SUPABASE_JWT_SECRET。'
+    return '登录已失效。请重新登录；若仍失败请检查 ECS/Vercel 的 SUPABASE_JWT_SECRET 与运营台配置。'
   }
-  if (/tenant_not_found|plan_model_restricted|tokenmix/i.test(t)) {
+  if (/tenant_not_found/i.test(t)) {
+    return '未找到租户，无法调用 AI。请确认账号已完成商户注册；生产环境请走 erp-api（勿将 SUPABASE_URL 指到 127.0.0.1）。'
+  }
+  if (/plan_model_restricted|free_ai_quota|tokenmix_not_configured/i.test(t)) {
     return t
   }
-  if (/未配置.*API Key/i.test(t)) {
-    return t
+  if (/未配置.*API Key|not_configured|401|invalid api key/i.test(t)) {
+    return t.includes('运营') ? t : `${t} 请在商家管理后台配置通义/豆包/MiniMax Key 后重试。`
   }
   return t.slice(0, 400)
 }
 
+const LINK_PARSE_AI_PROVIDERS: Array<{ provider: 'qwen' | 'doubao' | 'minimax'; model?: string }> = [
+  { provider: 'qwen', model: 'qwen-plus' },
+  { provider: 'doubao' },
+  { provider: 'minimax' },
+]
+
+/** 与 /api/meoo-ai-chat 同源：运营台 vendorKeys + 租户权益 + routeAiChat */
 async function generateLinkParseContent(
   prompt: string,
   env: Record<string, string>,
   authHeader?: string,
   tenantIdHint?: string,
 ): Promise<{ ok: true; content: string } | { ok: false; message: string }> {
-  let user: Awaited<ReturnType<typeof verifyBearerJwt>>
-  try {
-    user = await verifyBearerJwt(authHeader, env)
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, message: formatLinkParseAiError(msg) }
-  }
-  if (!user) {
-    return { ok: false, message: '请先登录后再使用链接抓取' }
-  }
-
-  const jwt = bearerJwt(authHeader)
-  const candidates: Array<{ vendor: 'doubao' | 'qwen'; model?: string }> = [
-    { vendor: 'doubao' },
-    { vendor: 'qwen', model: 'qwen-plus' },
-  ]
-
+  const system = 'You are a helpful assistant that outputs strict JSON only.'
   let lastErr = 'AI 解析失败，请稍后重试'
-  for (const { vendor, model } of candidates) {
-    const access = await assertAiChatAccess(user.id, vendor, env, jwt, tenantIdHint)
-    if (!access.ok) {
-      lastErr = access.detail || access.error || lastErr
-      continue
+
+  for (const { provider, model } of LINK_PARSE_AI_PROVIDERS) {
+    const bodyRaw = JSON.stringify({
+      provider,
+      ...(model ? { model } : {}),
+      ...(tenantIdHint ? { tenantId: tenantIdHint } : {}),
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
+    })
+    const out = await runMeooAiChatCore(bodyRaw, authHeader, env)
+    if (out.status === 200 && out.body.ok === true && typeof out.body.content === 'string') {
+      const text = out.body.content.trim()
+      if (text) return { ok: true, content: text }
     }
-    try {
-      const { text } = await merchantAgentChatFromMessages(
-        access.envForChat,
-        vendor,
-        model,
-        'You are a helpful assistant that outputs strict JSON only.',
-        prompt,
-      )
-      if (text.trim()) return { ok: true, content: text.trim() }
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+    const parts = [
+      typeof out.body.error === 'string' ? out.body.error : '',
+      typeof out.body.detail === 'string' ? out.body.detail : '',
+      typeof out.body.hint === 'string' ? out.body.hint : '',
+    ].filter(Boolean)
+    if (parts.length) lastErr = parts.join(' — ')
+    if (out.status === 401) {
+      return { ok: false, message: '请先登录后再使用链接抓取' }
     }
   }
 
