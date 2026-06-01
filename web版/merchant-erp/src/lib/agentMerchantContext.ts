@@ -3,9 +3,10 @@
  */
 import {
   competitorReportSummary,
-  latestCompetitorReportForPoi,
+  competitorDisplayLabel,
+  latestCompetitorReportForTarget,
   loadCompetitorReports,
-  loadSelectedCompetitorStore,
+  loadSelectedCompetitorTarget,
 } from './competitorStorage'
 import { loadStoreMenuRecord, menuItemsSummary } from './storeMenuStorage'
 import { readStoreMarginConfig } from './storeMarginsRead'
@@ -28,8 +29,8 @@ export type MerchantIntelSnapshot = {
 export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
   const marginCfg = readStoreMarginConfig()
   const menu = loadStoreMenuRecord()
-  const sel = loadSelectedCompetitorStore()
-  const cmp = sel?.poiId ? latestCompetitorReportForPoi(sel.poiId) : null
+  const sel = loadSelectedCompetitorTarget()
+  const cmp = latestCompetitorReportForTarget(sel)
   const fallbackCmp =
     !cmp && loadCompetitorReports()[0] ? competitorReportSummary(loadCompetitorReports()[0]) : undefined
   const items = menu?.items ?? []
@@ -37,7 +38,7 @@ export function loadMerchantIntelSnapshot(): MerchantIntelSnapshot {
   const menuSummary = items.length ? menuItemsSummary(items, 40) : undefined
 
   return {
-    storeName: sel?.storeName ?? menu?.storeName,
+    storeName: (sel ? competitorDisplayLabel(sel) : undefined) ?? menu?.storeName,
     menuItemCount: items.length,
     menuImageCount: images.length,
     menuSummary,

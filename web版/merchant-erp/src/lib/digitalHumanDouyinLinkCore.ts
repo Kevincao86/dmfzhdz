@@ -15,8 +15,8 @@ export type DouyinLinkParseResult =
       sourceTitle: string | null
       script: string
       motionInstructions: string
-      /** page=页面抓取原文；ai_extract=AI 在抓取信息基础上还原 */
-      scriptSource: 'page' | 'ai_extract'
+      /** page=发布文案；asr=视频音频识别；ai_extract=AI 还原 */
+      scriptSource: 'page' | 'asr' | 'ai_extract'
     }
   | { ok: false; message: string }
 
@@ -56,7 +56,7 @@ export function extractDouyinUrlFromText(raw: string): string | null {
   if (!t) return null
 
   const urlMatch = t.match(
-    /https?:\/\/(?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?|(?:www\.)?douyin\.com\/[^\s\u4e00-\u9fff「」【】]+)/i,
+    /https?:\/\/(?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?|(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff「」【】]+)/i,
   )
   if (urlMatch?.[0]) {
     let u = urlMatch[0].replace(/[/，。！？、；：'"）】\]>]+$/u, '')
@@ -74,6 +74,237 @@ export function extractDouyinVideoId(url: string): string | null {
     /[?&]item_id=(\d+)/.exec(url) ??
     /\/share\/video\/(\d+)/.exec(url)
   return m?.[1] ?? null
+}
+
+/** iesdouyin 分享页 SSR 含 videoInfoRes，比 douyin.com 反爬页更易解析 */
+function preferIesdouyinShareFetchUrl(url: string, videoId: string | null): string {
+  if (videoId) return `https://www.iesdouyin.com/share/video/${videoId}/`
+  if (/iesdouyin\.com/i.test(url)) return url
+  return url
+}
+
+type DouyinAwemeItem = {
+  desc?: string
+  video_text?: string | null
+  chapter_list?: Array<{ title?: string; desc?: string; content?: string }> | null
+  video?: { duration?: number; play_addr?: { url_list?: string[] } }
+}
+
+function parseJsonObjectFromScriptPrefix(raw: string): unknown | null {
+  let depth = 0
+  let end = -1
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]
+    if (c === '{') depth++
+    else if (c === '}') {
+      depth--
+      if (depth === 0) {
+        end = i + 1
+        break
+      }
+    }
+  }
+  if (end <= 0) return null
+  try {
+    return JSON.parse(raw.slice(0, end)) as unknown
+  } catch {
+    return null
+  }
+}
+
+function parseRouterDataAwemeItem(html: string): DouyinAwemeItem | null {
+  const m = /window\._ROUTER_DATA\s*=\s*(\{[\s\S]*)/.exec(html)
+  if (!m?.[1]) return null
+  const root = parseJsonObjectFromScriptPrefix(m[1])
+  if (!root || typeof root !== 'object') return null
+  const loader = (root as { loaderData?: Record<string, unknown> }).loaderData
+  if (!loader || typeof loader !== 'object') return null
+  const page = loader['video_(id)/page'] as { videoInfoRes?: { item_list?: DouyinAwemeItem[] } } | undefined
+  const item = page?.videoInfoRes?.item_list?.[0]
+  return item && typeof item === 'object' ? item : null
+}
+
+function stripDouyinMetaBoilerplate(raw: string): string {
+  let t = normalizeCaptionText(raw)
+  const dash = t.indexOf(' - ')
+  if (dash > 0) {
+    const tail = t.slice(dash + 3)
+    if (/发布在抖音|来抖音，记录美好生活|已经收获了/.test(tail)) {
+      t = t.slice(0, dash).trim()
+    }
+  }
+  return t.replace(/#\S+/g, '').replace(/\s{2,}/g, ' ').trim()
+}
+
+function pickDouyinPlayUrl(item: DouyinAwemeItem | null): string | null {
+  const list = item?.video?.play_addr?.url_list
+  const raw = list?.find((u) => /^https?:\/\//i.test(u)) ?? null
+  if (!raw) return null
+  return raw.replace(/\/playwm\//, '/play/')
+}
+
+function collectAwemeCaptionCandidates(item: DouyinAwemeItem | null): string[] {
+  if (!item) return []
+  const out: string[] = []
+  const push = (s: string | null | undefined) => {
+    const t = s ? stripDouyinMetaBoilerplate(s) : ''
+    if (t.length >= 8 && !out.includes(t)) out.push(t)
+  }
+  push(item.video_text ?? undefined)
+  for (const ch of item.chapter_list ?? []) {
+    push(ch.content)
+    push(ch.desc)
+    push(ch.title)
+  }
+  push(item.desc)
+  return out
+}
+
+const MAX_DOUYIN_VIDEO_MS = 120_000
+
+function readDashScopeAsrKey(env: Record<string, string>): string {
+  return (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
+}
+
+function extractAsrTextFromPayload(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return ''
+  const o = payload as Record<string, unknown>
+  const direct = o.text ?? o.transcript
+  if (typeof direct === 'string' && direct.trim()) return direct.trim()
+
+  const transcripts = o.transcripts
+  if (Array.isArray(transcripts)) {
+    const parts = transcripts
+      .map((t) => {
+        if (!t || typeof t !== 'object') return ''
+        const row = t as Record<string, unknown>
+        if (typeof row.text === 'string') return row.text
+        const sentences = row.sentences
+        if (Array.isArray(sentences)) {
+          return sentences
+            .map((s) => (s && typeof s === 'object' ? String((s as { text?: string }).text ?? '') : ''))
+            .filter(Boolean)
+            .join('')
+        }
+        return ''
+      })
+      .filter(Boolean)
+    if (parts.length) return parts.join('\n').trim()
+  }
+
+  const results = o.results
+  if (Array.isArray(results)) {
+    for (const r of results) {
+      const t = extractAsrTextFromPayload(r)
+      if (t) return t
+    }
+  }
+
+  const output = o.output
+  if (output && typeof output === 'object') {
+    const t = extractAsrTextFromPayload(output)
+    if (t) return t
+  }
+
+  return ''
+}
+
+async function pollDashScopeAsrTask(
+  taskId: string,
+  apiKey: string,
+  baseUrl: string,
+): Promise<string | null> {
+  const deadline = Date.now() + 45_000
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1500))
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'X-DashScope-Async': 'enable',
+        },
+        signal: AbortSignal.timeout(12_000),
+      })
+      if (!res.ok) continue
+      const j = (await res.json()) as Record<string, unknown>
+      const output = j.output as Record<string, unknown> | undefined
+      const status = String(output?.task_status ?? j.task_status ?? '').toUpperCase()
+      if (status === 'FAILED') return null
+      if (status !== 'SUCCEEDED' && status !== 'SUCCESS') continue
+
+      const result = output?.result as Record<string, unknown> | undefined
+      const transcriptionUrl =
+        (typeof result?.transcription_url === 'string' && result.transcription_url) ||
+        (typeof output?.transcription_url === 'string' && output.transcription_url) ||
+        null
+      if (transcriptionUrl) {
+        const tr = await fetch(transcriptionUrl, { signal: AbortSignal.timeout(15_000) })
+        if (tr.ok) {
+          const payload = (await tr.json()) as unknown
+          const text = extractAsrTextFromPayload(payload)
+          if (text.length >= 8) return text
+        }
+      }
+
+      const inline = extractAsrTextFromPayload(j)
+      if (inline.length >= 8) return inline
+    } catch {
+      /* retry */
+    }
+  }
+  return null
+}
+
+async function transcribeDouyinVideoViaDashScope(
+  fileUrl: string,
+  env: Record<string, string>,
+): Promise<string | null> {
+  const apiKey = readDashScopeAsrKey(env)
+  if (!apiKey) return null
+
+  const baseUrl = 'https://dashscope.aliyuncs.com'
+  const models = ['paraformer-v2', 'fun-asr', 'qwen3-asr-flash-filetrans']
+
+  for (const model of models) {
+    try {
+      const input =
+        model === 'qwen3-asr-flash-filetrans'
+          ? { file_url: fileUrl }
+          : { file_urls: [fileUrl] }
+
+      const res = await fetch(`${baseUrl}/api/v1/services/audio/asr/transcription`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'X-DashScope-Async': 'enable',
+        },
+        body: JSON.stringify({
+          model,
+          input,
+          parameters: { channel_id: [0], enable_itn: true },
+        }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      if (!res.ok) continue
+      const j = (await res.json()) as Record<string, unknown>
+      const output = j.output as Record<string, unknown> | undefined
+      const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
+      if (!taskId) continue
+      const text = await pollDashScopeAsrTask(taskId, apiKey, baseUrl)
+      if (text && text.length >= 8) return text
+    } catch {
+      /* try next model */
+    }
+  }
+  return null
+}
+
+async function transcribeDouyinVideoAudio(
+  playUrl: string,
+  env: Record<string, string>,
+): Promise<string | null> {
+  return transcribeDouyinVideoViaDashScope(playUrl, env)
 }
 
 async function resolveDouyinShareUrl(url: string): Promise<string> {
@@ -156,9 +387,20 @@ type DouyinPageExtract = {
   title: string | null
   description: string | null
   caption: string | null
+  awemeItem: DouyinAwemeItem | null
+  playUrl: string | null
+  videoDurationMs: number | null
 }
 
 async function tryExtractDouyinPageContent(url: string): Promise<DouyinPageExtract> {
+  const empty: DouyinPageExtract = {
+    title: null,
+    description: null,
+    caption: null,
+    awemeItem: null,
+    playUrl: null,
+    videoDurationMs: null,
+  }
   try {
     const res = await fetch(url, {
       redirect: 'follow',
@@ -168,26 +410,43 @@ async function tryExtractDouyinPageContent(url: string): Promise<DouyinPageExtra
       },
       signal: AbortSignal.timeout(12_000),
     })
-    if (!res.ok) return { title: null, description: null, caption: null }
+    if (!res.ok) return empty
     const html = await res.text()
+    const awemeItem = parseRouterDataAwemeItem(html)
     const title = pickMetaContent(html, 'og:title') ?? pickMetaContent(html, 'twitter:title')
     const description =
       pickMetaContent(html, 'og:description') ??
       pickMetaContent(html, 'description') ??
       pickMetaContent(html, 'twitter:description')
-    const caption = extractEmbeddedDouyinCaption(html)
-    return { title, description, caption }
+    const caption =
+      extractEmbeddedDouyinCaption(html) ??
+      (awemeItem?.desc ? stripDouyinMetaBoilerplate(awemeItem.desc) : null)
+    const playUrl = pickDouyinPlayUrl(awemeItem)
+    const videoDurationMs = awemeItem?.video?.duration ?? null
+    return { title, description, caption, awemeItem, playUrl, videoDurationMs }
   } catch {
-    return { title: null, description: null, caption: null }
+    return empty
   }
 }
 
 function pickBestScriptFromPage(page: DouyinPageExtract): string | null {
-  const candidates = [page.caption, page.description, page.title]
-    .map((s) => (s ? normalizeCaptionText(s) : ''))
-    .filter((s) => s.length >= 12 && !/^抖音$/i.test(s) && !/^@\S+$/.test(s))
+  const awemeCandidates = collectAwemeCaptionCandidates(page.awemeItem)
+  const metaDesc = page.description ? stripDouyinMetaBoilerplate(page.description) : ''
+  const embedded = page.caption ? stripDouyinMetaBoilerplate(page.caption) : ''
+
+  const candidates = [...awemeCandidates, embedded, metaDesc]
+    .map((s) => normalizeCaptionText(s))
+    .filter((s) => {
+      if (s.length < 12) return false
+      if (/^抖音$/i.test(s)) return false
+      if (/^@\S+$/.test(s)) return false
+      if (page.title && s === normalizeCaptionText(page.title)) return false
+      if (/发布在抖音|来抖音，记录美好生活/.test(s)) return false
+      return true
+    })
+
   if (!candidates.length) return null
-  return candidates.sort((a, b) => b.length - a.length)[0] ?? null
+  return [...new Set(candidates)].sort((a, b) => b.length - a.length)[0] ?? null
 }
 
 function parseAiJsonBlock(text: string): { script?: string; motionInstructions?: string } | null {
@@ -330,18 +589,19 @@ async function extractScriptAndMotionWithAi(
   | { script: string; motionInstructions: string }
   | { ok: false; message: string }
 > {
-  const prompt = `你是短视频口播文案还原助手。用户给出抖音短视频链接及页面抓取到的原始信息，请**提取/还原原视频口播文案**，禁止编造视频中不存在的产品、价格或情节。
+  const prompt = `你是短视频口播文案还原助手。用户给出抖音短视频链接及页面抓取到的原始信息，请**从视频口播/字幕信息还原原文**，禁止使用页面标题、发布文案(desc)或 meta 描述代替口播。
 
 链接：${normalizedUrl}
 视频ID：${videoId ?? '未知'}
-页面标题：${page.title ?? '未抓取到'}
-页面描述/字幕：${page.description ?? '未抓取到'}
-嵌入 Caption：${page.caption ?? '未抓取到'}
+页面标题（勿当作口播）：${page.title ?? '未抓取到'}
+发布文案 desc（勿直接照搬，通常只是标题/引流语）：${page.awemeItem?.desc ?? page.description ?? '未抓取到'}
+嵌入字幕/文案：${page.caption ?? '未抓取到'}
+章节信息：${page.awemeItem?.chapter_list?.map((c) => c.title || c.desc || c.content).filter(Boolean).join('；') || '无'}
 
 规则：
-1. script 必须基于上述抓取信息还原，优先保留原文措辞，仅做标点与分段整理（\\n 分段）
-2. 不得改写成另一篇全新种草稿；若信息不足以还原口播，script 留空并在 motionInstructions 写 "insufficient_source"
-3. motionInstructions 仅描述数字人动作/镜头/表情时间轴，不要重复口播全文
+1. script 必须是视频中人物实际说出的口播内容，优先更长、更完整的句子；若仅有短引流句而无口播信息，script 留空并在 motionInstructions 写 "insufficient_source"
+2. 不得把「还在为…发愁吗」「点击链接」类发布标题当作完整口播
+3. motionInstructions 仅描述数字人动作/镜头/表情时间轴
 
 请严格输出 JSON（不要 markdown）：
 {"script":"...","motionInstructions":"..."}`
@@ -393,8 +653,52 @@ export async function runDouyinLinkParseCore(
   const normalizedUrl = normalizeDouyinShareUrl(resolvedUrl) ?? extracted
 
   const videoId = extractDouyinVideoId(normalizedUrl)
-  const page = await tryExtractDouyinPageContent(normalizedUrl)
+  const fetchUrl = preferIesdouyinShareFetchUrl(normalizedUrl, videoId)
+  const page = await tryExtractDouyinPageContent(fetchUrl)
+
+  const durationMs = page.videoDurationMs ?? 0
+  const canAsr =
+    Boolean(page.playUrl) &&
+    (durationMs <= 0 || durationMs <= MAX_DOUYIN_VIDEO_MS) &&
+    Boolean(readDashScopeAsrKey(env))
+
+  if (canAsr && page.playUrl) {
+    const asrScript = await transcribeDouyinVideoAudio(page.playUrl, env)
+    if (asrScript && asrScript.length >= 12) {
+      const motionInstructions = await inferMotionInstructionsFromScript(
+        asrScript,
+        env,
+        authHeader,
+        input.tenantId?.trim(),
+      )
+      return {
+        ok: true,
+        normalizedUrl,
+        videoId,
+        sourceTitle: page.title,
+        script: asrScript,
+        motionInstructions,
+        scriptSource: 'asr',
+      }
+    }
+  }
+
   const pageScript = pickBestScriptFromPage(page)
+  const postCaption = page.awemeItem?.desc ? stripDouyinMetaBoilerplate(page.awemeItem.desc) : ''
+
+  if (
+    canAsr &&
+    pageScript &&
+    postCaption &&
+    normalizeCaptionText(pageScript) === normalizeCaptionText(postCaption) &&
+    pageScript.length < 80
+  ) {
+    return {
+      ok: false,
+      message:
+        '未能识别视频口播（当前仅抓到发布标题/引流文案）。请确认 ECS/Vercel 已配置通义 ASR（MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY），或改用手动输入/文本驱动',
+    }
+  }
 
   if (pageScript && pageScript.length >= 12) {
     const motionInstructions = await inferMotionInstructionsFromScript(

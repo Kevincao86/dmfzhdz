@@ -23,6 +23,33 @@ function mapActionTypeToTask(raw: string): AiTaskType | undefined {
   return at ? ACTION_TO_TASK[at] : undefined
 }
 
+/** 行业/趋势类讨论（含「达人」但非发起招募执行） */
+export function isInformationalKolDiscussion(t: string): boolean {
+  const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  if (
+    /招募|探店|种草|brief|Brief|达人招募|找达人|安排达人|帮我招|招达人|探店计划|达人合作方案|达人矩阵|达人预算/.test(
+      x,
+    )
+  ) {
+    return false
+  }
+  return (
+    /达人/.test(x) &&
+    /数量|增长|趋势|规模|市场|行情|预测|全国|未来|多少|占比|统计|会增加|将增加|展望|研究报告|行业|生态|经济/.test(
+      x,
+    )
+  )
+}
+
+/** 用户是否在请求达人招募/探店（非泛泛提到「达人」） */
+export function isRecruitInfluencerUserIntent(t: string): boolean {
+  const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  if (isInformationalKolDiscussion(x)) return false
+  return /招募|探店|种草|brief|Brief|探店笔记|达人招募|找达人|网红招募|达人合作|达人方案|达人预算|安排达人|帮我招|招达人|探店计划|达人矩阵/.test(
+    x,
+  )
+}
+
 /** 从用户话术推断任务类型（与 scheduleTaskPreview 共用） */
 export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
@@ -33,7 +60,7 @@ export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   ) {
     return 'create_product'
   }
-  if (/达人|招募|探店|brief|Brief|种草|探店笔记/.test(x)) return 'recruit_influencer'
+  if (isRecruitInfluencerUserIntent(x)) return 'recruit_influencer'
   if (/差评|评价|评论/.test(x)) return 'handle_review'
   if (/分析|原因|异常/.test(x)) return 'analyze_exception'
   if (/同步|失败/.test(x)) return 'sync_platform'
@@ -384,7 +411,7 @@ export function inferTaskTypesFromCombinedContext(
     for (const t of collectAgentActionTypes(assistantContent)) types.add(t)
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
-    if (/达人|招募|探店|种草|KOL|网红|达人合作|Brief|brief|create_recruitment/.test(c))
+    if (/招募|探店|种草|达人招募|达人合作|Brief|brief|create_recruitment|探店计划|达人矩阵|达人预算/.test(c))
       types.add('recruit_influencer')
   }
 
@@ -404,7 +431,40 @@ export function planIncludesRecruitInfluencer(plan: {
   assistantContent: string
 }): boolean {
   if (plan.taskTypes.includes('recruit_influencer')) return true
-  return /达人|招募|探店|种草|KOL|网红|达人合作|Brief|brief/.test(plan.assistantContent)
+  const c = plan.assistantContent
+  return /招募|探店|种草|达人招募|达人合作|Brief|brief|create_recruitment|探店计划|达人矩阵|达人预算/.test(c)
+}
+
+/** 是否应自动弹出达人招募执行预览（须用户场景/执行意图或方案内结构化 JSON） */
+export function shouldAutoRecruitInfluencerPreview(
+  userText: string,
+  assistantContent?: string,
+): boolean {
+  if (isAgentShortcutTaskLine(userText)) return true
+  if (isRecruitInfluencerUserIntent(userText)) return true
+  if (isExplicitExecutionIntent(userText)) return true
+  if (!assistantContent?.trim()) return false
+  if (parseAgentActionType(assistantContent) !== 'recruit_influencer') return false
+  return isPlanOrNineScenarioQuery(userText) || isExplicitExecutionIntent(userText)
+}
+
+/** 推断是否应自动生成任务预览（避免闲聊误触发） */
+export function resolveAutoTaskPreviewType(
+  userText: string,
+  assistantContent?: string,
+  explicitTaskType?: AiTaskType,
+): AiTaskType | undefined {
+  if (explicitTaskType) return explicitTaskType
+  const fromJson = assistantContent ? parseAgentActionType(assistantContent) : undefined
+  if (fromJson === 'recruit_influencer' && !shouldAutoRecruitInfluencerPreview(userText, assistantContent)) {
+    return undefined
+  }
+  if (fromJson) return fromJson
+  const fromUser = inferTaskTypeFromText(userText)
+  if (fromUser === 'recruit_influencer' && !shouldAutoRecruitInfluencerPreview(userText, assistantContent)) {
+    return undefined
+  }
+  return fromUser
 }
 
 /** 方案设计完成后追加的执行确认引导语（按实际涉及场景生成，避免误提无关任务） */

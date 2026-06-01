@@ -142,6 +142,11 @@ export async function analyzeCompetitors(body: {
   industryPath?: string
   industryName?: string
   menuSummary?: string
+  /** brand：连锁品牌统筹分析 */
+  analysisMode?: 'store' | 'brand'
+  brandName?: string
+  storeCount?: number
+  storeLocations?: string
 }): Promise<
   | {
       ok: true

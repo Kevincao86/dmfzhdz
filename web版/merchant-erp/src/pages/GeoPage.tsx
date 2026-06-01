@@ -45,10 +45,18 @@ import {
 } from '../lib/geoModuleSpec'
 import { readMerchantSession } from '../lib/merchantSession'
 import {
+  GeoOptimizationRoadmap,
+  GeoScoreTrendCard,
+  GeoStoreBreakdownTable,
+} from '../components/geo/GeoOverviewEnhancements'
+import { loadGeoScoreSnapshot, saveGeoScoreSnapshot } from '../lib/geoPersist'
+import {
   buildGeoScoreContextPayload,
   computeDeterministicGeoFromStores,
   DEFAULT_GEO_QUERY_SAMPLES,
 } from '../lib/geoScoresFromDouyinRows'
+import { computePerStoreGeoDiagnostics } from '../lib/geoStoreDiagnostics'
+import { listChainBrandOptions } from '../lib/storeBrandGroup'
 import {
   GEO_TEXT_AI_MODEL_OPTIONS,
   coerceGeoTextAiModel,
@@ -58,6 +66,7 @@ import {
 } from '../services/douyinAiAssistApi'
 import {
   fetchAllDouyinClaimedStoresPages,
+  getDouyinMerchantBrands,
   getDouyinStoreDetail,
   getDouyinStores,
   type DouyinStoreRow,
@@ -166,9 +175,14 @@ export default function GeoPage() {
   const [tab, setTabState] = useState<GeoTabId>(initialTab)
   const pendingScrollRef = useRef<string | null>(null)
   const [healthBusy, setHealthBusy] = useState(false)
+  const [healthReport, setHealthReport] = useState<string | null>(null)
   const [lastCheckAt, setLastCheckAt] = useState<string | null>(() =>
     new Date().toLocaleString('zh-CN', { hour12: false }),
   )
+  const [savedSnapshot, setSavedSnapshot] = useState(() => loadGeoScoreSnapshot())
+  const [apiBrandOptions, setApiBrandOptions] = useState<
+    Array<{ brandId: string; brandName: string }>
+  >([])
 
   const [aiModelUiTick, setAiModelUiTick] = useState(0)
   const [consultQuestion, setConsultQuestion] = useState(
@@ -216,6 +230,25 @@ export default function GeoPage() {
       if (cancelled || !r.ok) return
       setPickerRows(r.items)
       setAccountNameFromApi((prev) => r.accountName ?? prev)
+      const chains = listChainBrandOptions(
+        r.items.map((x) => ({
+          id: x.id,
+          name: x.name,
+          address: x.address,
+          brandName: x.brandName,
+        })),
+      )
+      if (chains[0] && !brandKeyword.trim()) {
+        setBrandKeyword(chains[0].brandName)
+      }
+    })()
+    void (async () => {
+      const br = await getDouyinMerchantBrands({
+        accessToken: tok,
+        merchantId: readMerchantSession('meoo_douyin_merchant_id') ?? undefined,
+        pageSize: 50,
+      })
+      if (!cancelled && br.ok) setApiBrandOptions(br.items)
     })()
     return () => {
       cancelled = true
@@ -315,21 +348,41 @@ export default function GeoPage() {
     [navigate, setTab],
   )
 
-  const runHealthCheck = useCallback(() => {
-    setHealthBusy(true)
-    window.setTimeout(() => {
-      setHealthBusy(false)
-      setLastCheckAt(new Date().toLocaleString('zh-CN', { hour12: false }))
-    }, 1200)
-  }, [])
-
   const scopeDisplayName = useMemo(() => {
     if (activeStores.length === 0) return '（尚未拉取门店）'
     if (geoScope === 'single') return activeStores[0]?.name ?? '单店'
     if (geoScope === 'brand' && brandKeyword.trim())
-      return `品牌关键词「${brandKeyword.trim()}」· ${activeStores.length} 店`
+      return `品牌「${brandKeyword.trim()}」· ${activeStores.length} 店`
     return `抖音来客已认领 · ${activeStores.length} 店`
   }, [activeStores, geoScope, brandKeyword])
+
+  const brandSelectOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const out: Array<{ value: string; label: string }> = []
+    const add = (name: string, suffix: string) => {
+      const v = name.trim()
+      if (!v || seen.has(v.toLowerCase())) return
+      seen.add(v.toLowerCase())
+      out.push({ value: v, label: `${v}${suffix}` })
+    }
+    for (const b of apiBrandOptions) add(b.brandName, ' · 来客品牌')
+    for (const g of listChainBrandOptions(
+      pickerRows.map((x) => ({
+        id: x.id,
+        name: x.name,
+        address: x.address,
+        brandName: x.brandName,
+      })),
+    )) {
+      add(g.brandName, ` · ${g.storeCount} 家门店`)
+    }
+    return out.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hans-CN'))
+  }, [apiBrandOptions, pickerRows])
+
+  const storeDiagnostics = useMemo(
+    () => computePerStoreGeoDiagnostics(activeStores),
+    [activeStores],
+  )
 
   const hasScore = Boolean(liveMetrics)
   const viewInputs = liveMetrics?.inputs ?? {
@@ -339,6 +392,46 @@ export default function GeoPage() {
   }
   const viewHealth = liveMetrics?.healthScore ?? 0
   const viewLastMs = liveMetrics?.lastStructuredContentUpdateMs ?? Date.now()
+
+  const runHealthCheck = useCallback(() => {
+    setHealthBusy(true)
+    window.setTimeout(() => {
+      if (!liveMetrics || activeStores.length === 0) {
+        setHealthReport('请先在页顶完成「同步来客并 AI 综合评分」，再运行效果体检。')
+      } else {
+        const uncovered = querySamples.filter((q) => !q.covered).map((q) => q.q)
+        const perStore = computePerStoreGeoDiagnostics(activeStores)
+        const weak = perStore.filter((s) => s.completenessPercent < 85)
+        const stale = CONTENT_FRESHNESS.triggerTodoRule(viewLastMs)
+        const lines = [
+          `综合健康分 ${viewHealth}/${GEO_HEALTH_SCORE.fullScore}（${scoreSource === 'ai' ? 'AI' : '规则'}）。`,
+          `信息完整度 ${viewInputs.infoCompletenessPercent}%，问法覆盖 ${viewInputs.questionCoveragePercent}%，内容新鲜度 ${viewInputs.contentFreshnessPercent}%。`,
+          stale
+            ? `来客数据已超过 ${CONTENT_FRESHNESS.healthyDays} 天未更新，建议重新同步。`
+            : '来客数据在健康周期内有更新。',
+          weak.length
+            ? `信息薄弱门店：${weak.map((s) => `${s.name}(${s.completenessPercent}%)`).join('、')}`
+            : '各店基础字段完整度良好。',
+          uncovered.length
+            ? `待覆盖问法：${uncovered.slice(0, 5).join('；')}${uncovered.length > 5 ? '…' : ''}`
+            : '高频问法在事实侧均已覆盖。',
+          scoreRationale ? `评估摘要：${scoreRationale.slice(0, 280)}` : '',
+        ]
+        setHealthReport(lines.filter(Boolean).join('\n'))
+      }
+      setHealthBusy(false)
+      setLastCheckAt(new Date().toLocaleString('zh-CN', { hour12: false }))
+    }, 500)
+  }, [
+    liveMetrics,
+    activeStores,
+    querySamples,
+    viewHealth,
+    viewInputs,
+    viewLastMs,
+    scoreSource,
+    scoreRationale,
+  ])
 
   const syncAndScore = useCallback(async () => {
     const tok = readDouyinToken()
@@ -421,6 +514,7 @@ export default function GeoPage() {
         setQuerySamples(
           aiRes.payload.covered_queries?.length ? aiRes.payload.covered_queries : detRef.querySamples,
         )
+        persistGeoSnapshot(inputs, 'ai', aiRes.payload.rationale_zh)
       } else {
         setLiveMetrics({
           inputs: detRef.inputs,
@@ -434,6 +528,32 @@ export default function GeoPage() {
         )
         setAiTodosFromModel([])
         setQuerySamples(detRef.querySamples)
+        persistGeoSnapshot(detRef.inputs, 'deterministic', m.slice(0, 400))
+      }
+
+      function persistGeoSnapshot(
+        snapInputs: GeoHealthInputs,
+        source: 'ai' | 'deterministic',
+        rationale?: string,
+      ) {
+        const scopeLabel =
+          geoScope === 'single' && rows[0]
+            ? rows[0].name
+            : geoScope === 'brand' && brandKeyword.trim()
+              ? `品牌「${brandKeyword.trim()}」· ${rows.length} 店`
+              : `抖音来客已认领 · ${rows.length} 店`
+        saveGeoScoreSnapshot({
+          savedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+          scope: geoScope,
+          brandKeyword: geoScope === 'brand' ? brandKeyword.trim() || undefined : undefined,
+          scopeLabel,
+          storeCount: rows.length,
+          healthScore: computeGeoHealthScore(snapInputs),
+          inputs: snapInputs,
+          scoreSource: source,
+          scoreRationale: rationale,
+        })
+        setSavedSnapshot(loadGeoScoreSnapshot())
       }
     } finally {
       setScoreBusy(false)
@@ -670,13 +790,31 @@ export default function GeoPage() {
           </div>
           {geoScope === 'brand' ? (
             <div className="min-w-[12rem] flex-1">
-              <label className="block text-xs font-medium text-gray-500">品牌关键词</label>
-              <input
-                value={brandKeyword}
-                onChange={(e) => setBrandKeyword(e.target.value)}
-                placeholder="与店铺信息「门店品牌」筛选一致"
-                className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm text-gray-900"
-              />
+              <label className="block text-xs font-medium text-gray-500">选择品牌</label>
+              {brandSelectOptions.length > 0 ? (
+                <select
+                  value={brandKeyword}
+                  onChange={(e) => setBrandKeyword(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2 py-2 text-sm text-gray-900"
+                >
+                  <option value="">请选择连锁品牌…</option>
+                  {brandSelectOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={brandKeyword}
+                  onChange={(e) => setBrandKeyword(e.target.value)}
+                  placeholder="输入品牌名，与来客「门店品牌」一致"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm text-gray-900"
+                />
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                连锁门店将按品牌聚合评分与待办；单店仍可选「指定单店」。
+              </p>
             </div>
           ) : null}
           {geoScope === 'single' ? (
@@ -788,6 +926,10 @@ export default function GeoPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <GeoScoreTrendCard snapshot={savedSnapshot} />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {kpiCards.map((c) => (
               <button
@@ -811,6 +953,9 @@ export default function GeoPage() {
               </button>
             ))}
           </div>
+
+          <GeoOptimizationRoadmap healthScore={hasScore ? viewHealth : 0} />
+          <GeoStoreBreakdownTable rows={storeDiagnostics} />
 
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -1151,6 +1296,12 @@ export default function GeoPage() {
               FAQ、门店摘要、活动要点等结构化片段，便于大模型在回答用户时引用一致口径。
             </p>
             <p className="mt-2 text-xs text-gray-500">{AI_ADAPTATION_RULE}</p>
+            {hasScore && CONTENT_FRESHNESS.triggerTodoRule(viewLastMs) ? (
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                内容新鲜度预警：来客数据已超过 {CONTENT_FRESHNESS.healthyDays}{' '}
+                天未更新，请同步门店并更新 FAQ / 活动要点。
+              </p>
+            ) : null}
           </div>
           <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 text-sm text-gray-800">
             <p className="font-medium text-indigo-900">内容库类型</p>
@@ -1285,11 +1436,18 @@ export default function GeoPage() {
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <ul className="space-y-3 text-sm text-gray-800">
-              <li className="flex gap-2 border-l-4 border-emerald-400 pl-3">
-                「服务热情，上菜快」— 精选评价摘要（示例）
-              </li>
+              {hasScore && viewInputs.questionCoveragePercent >= 60 ? (
+                <li className="flex gap-2 border-l-4 border-emerald-400 pl-3">
+                  问法覆盖率达 {viewInputs.questionCoveragePercent}%：可将评论中的高频好评词（如服务、环境）沉淀为 GEO
+                  口碑短语，写入门店公告或内容库。
+                </li>
+              ) : (
+                <li className="flex gap-2 border-l-4 border-amber-400 pl-3">
+                  问法覆盖偏低：先补全营业/停车等事实字段，再从评论管理提炼 3–5 条可引用好评摘要。
+                </li>
+              )}
               <li className="flex gap-2 border-l-4 border-blue-400 pl-3">
-                商家回复率 98%（近 30 天，示例指标）
+                在「评价管理」维护回复模板与精选评价，作为 AI 回答时的信任背书（与 GEO 问法覆盖联动）。
               </li>
             </ul>
             <button
@@ -1383,16 +1541,16 @@ export default function GeoPage() {
               <li>{EFFECT_CHECK_FEATURE.exposureEffect}</li>
               <li>{EFFECT_CHECK_FEATURE.optimizeSuggestion}</li>
             </ul>
-            <h3 className="mt-6 font-semibold text-gray-900">快速结论（示例）</h3>
-            <ul className="ui-hint-block mt-3 list-inside list-disc space-y-1 text-sm text-gray-700">
-              <li>门店头图与停车字段仍为优先修复项</li>
-              <li>问法「有没有停车位」尚未与内容库对齐</li>
-              <li>
-                {CONTENT_FRESHNESS.triggerTodoRule(viewLastMs)
-                  ? '来客侧数据同步已超过 7 天窗口，新鲜度待提升'
-                  : '来客数据在健康周期内有更新，新鲜度良好'}
-              </li>
-            </ul>
+            <h3 className="mt-6 font-semibold text-gray-900">体检结论</h3>
+            {healthReport ? (
+              <pre className="ui-hint-block mt-3 whitespace-pre-wrap font-sans text-sm text-gray-800">
+                {healthReport}
+              </pre>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500">
+                点击「运行效果体检」将根据当前评分、各店完整度与问法覆盖生成结论（需先完成同步评分）。
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setTab('overview')}

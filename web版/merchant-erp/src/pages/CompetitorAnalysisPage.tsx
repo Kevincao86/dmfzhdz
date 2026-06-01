@@ -1,15 +1,17 @@
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { DouyinStorePickerTrigger, type DouyinStoreRow } from '../components/store/DouyinStorePickerModal'
+import CompetitorTargetPicker from '../components/store/CompetitorTargetPicker'
 import {
-  latestCompetitorReportForPoi,
+  competitorDisplayLabel,
+  competitorReportKeyForTarget,
+  latestCompetitorReportForTarget,
   loadCompetitorReports,
-  loadSelectedCompetitorStore,
+  loadSelectedCompetitorTarget,
   saveCompetitorReport,
-  saveSelectedCompetitorStore,
+  saveSelectedCompetitorTarget,
   type CompetitorReport,
-  type SelectedStoreRef,
+  type CompetitorTarget,
 } from '../lib/competitorStorage'
 import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
 import {
@@ -19,55 +21,45 @@ import {
 import { analyzeCompetitors } from '../services/storeIntelApi'
 
 export default function CompetitorAnalysisPage() {
-  const [selected, setSelected] = useState<SelectedStoreRef | null>(null)
+  const [target, setTarget] = useState<CompetitorTarget | null>(null)
   const [report, setReport] = useState<CompetitorReport | null>(null)
   const [history, setHistory] = useState<CompetitorReport[]>([])
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const boundIndustry = resolveCompetitorAnalysisIndustry(selected?.storeName)
+  const industryNameForResolve =
+    target?.mode === 'brand' ? target.brandName : target?.storeName
+  const boundIndustry = resolveCompetitorAnalysisIndustry(industryNameForResolve)
 
   useEffect(() => {
-    setSelected(loadSelectedCompetitorStore())
+    const t = loadSelectedCompetitorTarget()
+    setTarget(t)
     setHistory(loadCompetitorReports())
+    setReport(latestCompetitorReportForTarget(t))
   }, [])
 
-  useEffect(() => {
-    if (selected?.poiId) {
-      setReport(latestCompetitorReportForPoi(selected.poiId))
-    }
-  }, [selected?.poiId])
-
-  const onSelectStore = (poiId: string | null, row: DouyinStoreRow | null): boolean | void => {
-    if (!poiId) {
-      setSelected(null)
-      saveSelectedCompetitorStore(null)
-      setReport(null)
-      setErr(null)
-      return
-    }
-    if (!row?.address?.trim()) {
-      setErr('所选门店缺少地址，请换一家带地址的门店')
-      return false
-    }
-    const ref: SelectedStoreRef = {
-      poiId: row.id,
-      storeName: row.name,
-      address: row.address.trim(),
-    }
-    setSelected(ref)
-    saveSelectedCompetitorStore(ref)
-    setReport(latestCompetitorReportForPoi(row.id))
+  const onSelectTarget = (next: CompetitorTarget | null) => {
+    setTarget(next)
+    saveSelectedCompetitorTarget(next)
+    setReport(latestCompetitorReportForTarget(next))
     setErr(null)
   }
 
   const runAnalysis = useCallback(async () => {
-    if (!selected?.address) {
-      setErr('请先选择带地址的门店')
+    if (!target) {
+      setErr('请先选择门店或品牌')
+      return
+    }
+    const address =
+      target.mode === 'brand' ? target.anchorAddress : target.address
+    if (!address?.trim()) {
+      setErr('所选目标缺少可用地址，请换一家带地址的门店或品牌')
       return
     }
     setLoading(true)
     setErr(null)
-    const industry = resolveCompetitorAnalysisIndustry(selected.storeName)
+    const industry = resolveCompetitorAnalysisIndustry(
+      target.mode === 'brand' ? target.brandName : target.storeName,
+    )
     if (!industry.path) {
       setLoading(false)
       setErr('请先在「商品 → 门店毛利配置」中选择经营类目（如 购物 > 商超便利 或 购物 > 数码家电），再进行分析')
@@ -75,25 +67,39 @@ export default function CompetitorAnalysisPage() {
     }
     const menu = loadStoreMenuRecord()
     const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 30) : ''
+    const displayName =
+      target.mode === 'brand' ? target.brandName : target.storeName
     const r = await analyzeCompetitors({
-      storeName: selected.storeName,
-      address: selected.address,
-      city: selected.city,
+      storeName: displayName,
+      address: address.trim(),
+      city: target.mode === 'brand' ? target.anchorCity : target.city,
       industryPath: industry.path,
       industryName: industry.name,
       industryHint: industry.path,
       menuSummary: menuSummary || undefined,
+      analysisMode: target.mode,
+      brandName: target.mode === 'brand' ? target.brandName : undefined,
+      storeCount: target.mode === 'brand' ? target.storeCount : undefined,
+      storeLocations:
+        target.mode === 'brand'
+          ? target.stores
+              .map((s) => `${s.storeName}：${s.address}${s.city ? `（${s.city}）` : ''}`)
+              .join('\n')
+          : undefined,
     })
     setLoading(false)
     if (!r.ok) {
       setErr(r.message)
       return
     }
+    const reportKey = competitorReportKeyForTarget(target)
     const next: CompetitorReport = {
       id: `cmp-${Date.now()}`,
-      poiId: selected.poiId,
-      storeName: selected.storeName,
-      address: selected.address,
+      poiId: reportKey,
+      storeName: displayName,
+      address: address.trim(),
+      brandName: target.mode === 'brand' ? target.brandName : undefined,
+      storeCount: target.mode === 'brand' ? target.storeCount : undefined,
       industryHint: industry.path,
       analyzedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       summary: r.summary,
@@ -103,14 +109,14 @@ export default function CompetitorAnalysisPage() {
     saveCompetitorReport(next)
     setReport(next)
     setHistory(loadCompetitorReports())
-  }, [selected])
+  }, [target])
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <h1 className="erp-page-title">竞争对手分析</h1>
         <p className="mt-1 text-sm text-gray-500">
-          根据所选门店地址与
+          根据所选门店或<strong className="font-medium text-gray-700">连锁品牌</strong>与
           <Link to="/store/menu" className="mx-1 text-indigo-600 underline">
             菜单价目表
           </Link>
@@ -123,26 +129,34 @@ export default function CompetitorAnalysisPage() {
       </div>
 
       <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div>
-          <DouyinStorePickerTrigger
-            label="选择门店"
-            value={selected?.poiId ?? null}
-            valueLabel={
-              selected
-                ? `${selected.storeName}${selected.address ? ` — ${selected.address.slice(0, 36)}` : ''}`
-                : ''
-            }
-            placeholder="请选择已认领门店"
-            pickerTitle="选择门店"
-            onChange={onSelectStore}
-          />
-        </div>
+        <CompetitorTargetPicker value={target} onChange={onSelectTarget} disabled={loading} />
 
-        {selected && (
+        {target && (
           <p className="text-sm text-gray-600">
-            当前：<span className="font-medium text-gray-900">{selected.storeName}</span>
+            当前：
+            <span className="font-medium text-gray-900">{competitorDisplayLabel(target)}</span>
+            {target.mode === 'brand' ? (
+              <span className="ml-1 text-xs text-indigo-600">· 品牌统筹分析</span>
+            ) : null}
             <br />
-            {selected.address}
+            {target.mode === 'brand' ? (
+              <>
+                <span className="text-xs text-gray-500">
+                  统筹地址（参考 {target.anchorStoreName ?? '首店'}）：{target.anchorAddress}
+                </span>
+                <br />
+                <span className="text-xs text-gray-500">
+                  含分店：
+                  {target.stores
+                    .slice(0, 4)
+                    .map((s) => s.storeName)
+                    .join('、')}
+                  {target.stores.length > 4 ? ` 等 ${target.storeCount} 家` : ''}
+                </span>
+              </>
+            ) : (
+              target.address
+            )}
             <br />
             <span className="text-xs text-gray-500">
               分析类目：
@@ -165,12 +179,12 @@ export default function CompetitorAnalysisPage() {
 
         <button
           type="button"
-          disabled={loading || !selected}
+          disabled={loading || !target}
           onClick={() => void runAnalysis()}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {loading ? '分析中…' : '开始周边竞品分析'}
+          {loading ? '分析中…' : target?.mode === 'brand' ? '开始品牌周边竞品分析' : '开始周边竞品分析'}
         </button>
 
         {err && (
@@ -186,6 +200,11 @@ export default function CompetitorAnalysisPage() {
             <h2 className="text-sm font-semibold text-violet-900">最新分析报告</h2>
             <span className="text-xs text-gray-500">{report.analyzedAt}</span>
           </div>
+          {report.brandName && report.storeCount && report.storeCount > 1 ? (
+            <p className="text-xs font-medium text-violet-800">
+              分析范围：{report.brandName} · {report.storeCount} 家门店（品牌统筹）
+            </p>
+          ) : null}
           <p className="text-sm leading-relaxed text-gray-800">{report.summary}</p>
           {report.industryHint && (
             <p className="text-xs text-gray-500">分析类目：{report.industryHint}</p>
@@ -212,7 +231,9 @@ export default function CompetitorAnalysisPage() {
                   ) : null}
                   {c.hotProducts && c.hotProducts.length > 0 ? (
                     <div className="mt-2 rounded-md border border-amber-100 bg-amber-50/60 px-2 py-1.5">
-                      <p className="text-[11px] font-medium text-amber-900">热销团购/外卖（推断，供 AI 组品参考）</p>
+                      <p className="text-[11px] font-medium text-amber-900">
+                        热销团购/外卖（推断，供 AI 组品参考）
+                      </p>
                       <ul className="mt-1 space-y-0.5 text-xs text-amber-950">
                         {c.hotProducts.slice(0, 6).map((p, j) => (
                           <li key={j}>
@@ -267,14 +288,16 @@ export default function CompetitorAnalysisPage() {
                   className="text-left hover:text-indigo-600"
                   onClick={() => setReport(h)}
                 >
-                  {h.storeName} · {h.analyzedAt}
+                  {h.brandName && h.storeCount && h.storeCount > 1
+                    ? `${h.brandName}（${h.storeCount}店）`
+                    : h.storeName}{' '}
+                  · {h.analyzedAt}
                 </button>
               </li>
             ))}
           </ul>
         </div>
       )}
-
     </div>
   )
 }

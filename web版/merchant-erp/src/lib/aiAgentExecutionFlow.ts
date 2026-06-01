@@ -12,7 +12,9 @@ import {
 import type { AiAgentMessage } from './aiAgentTypes'
 import {
   inferTaskTypesFromCombinedContext,
+  isAgentShortcutTaskLine,
   isExplicitExecutionIntent,
+  isPlanOrNineScenarioQuery,
   isUserDecliningProductImages,
   planIncludesRecruitInfluencer,
 } from './aiAgentActionParse'
@@ -165,6 +167,14 @@ export function recoverPlanFromMessages(messages: AiAgentMessage[]): AgentExecut
         userBrief = messages[j].content?.replace(/\[引用[\s\S]*?\n\n/, '').trim() ?? ''
         break
       }
+    }
+    if (
+      userBrief &&
+      !isPlanOrNineScenarioQuery(userBrief) &&
+      !isExplicitExecutionIntent(userBrief) &&
+      !isAgentShortcutTaskLine(userBrief)
+    ) {
+      continue
     }
     const taskTypes = filterScenarioTaskTypes(
       inferTaskTypesFromCombinedContext(userBrief, content, undefined),

@@ -42,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
       res.setHeader('Cache-Control', 'no-cache, no-transform')
       res.setHeader('Connection', 'keep-alive')
+      res.setHeader('X-Accel-Buffering', 'no')
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.statusCode = 200
       await runMeooAiChatStream(bodyRaw, auth, env, (payload) => {

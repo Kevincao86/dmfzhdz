@@ -33,6 +33,7 @@ import {
   formatAssistantDisplayText,
   hasCombinedProductAndRecruitPlan,
   inferTaskTypeFromText,
+  resolveAutoTaskPreviewType,
   isPlanDesignQuery,
   parseComboLinesFromApi,
   parsePriceYuanFromApi,
@@ -1144,10 +1145,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return
       if (hasCombinedProductAndRecruitPlan(trimmed, assistantContent, explicitTaskType)) return
 
-      const taskType =
-        explicitTaskType ??
-        inferTaskTypeFromText(trimmed) ??
-        (assistantContent ? parseAgentActionType(assistantContent) : undefined)
+      const taskType = resolveAutoTaskPreviewType(trimmed, assistantContent, explicitTaskType)
       if (!taskType) return
       if (isPlanDesignQuery(trimmed) && !parseAgentActionType(assistantContent ?? '')) return
 
