@@ -11,6 +11,7 @@ export type DouyinLinkParseResponse =
       sourceTitle: string | null
       script: string
       motionInstructions: string
+      scriptSource?: 'page' | 'ai_extract'
     }
   | { ok: false; message: string }
 
