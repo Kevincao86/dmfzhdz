@@ -5,7 +5,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
-import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 import type { RegistryVideoAi } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import {
@@ -32,43 +31,23 @@ function json(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body))
 }
 
-function mergeRegistryVideoAiParts(...parts: RegistryVideoAi[]): RegistryVideoAi {
-  const out: RegistryVideoAi = {}
-  for (const part of parts) {
-    for (const [k, v] of Object.entries(part)) {
-      const t = typeof v === 'string' ? v.trim() : ''
-      if (t) (out as Record<string, string>)[k] = t
-    }
-  }
-  return out
-}
-
 async function loadRegistryVideoAi(viteRoot?: string): Promise<RegistryVideoAi> {
-  let fromFile: RegistryVideoAi = {}
-  if (viteRoot) {
-    const registryPath = path.join(path.resolve(viteRoot, '..', '..'), '.meoo-dev-sync', 'registry.json')
-    try {
-      if (fs.existsSync(registryPath)) {
-        const parsed = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as { videoAi?: unknown }
-        fromFile = normalizeRegistryVideoAi(parsed.videoAi)
-      }
-    } catch {
-      /* ignore */
-    }
+  try {
+    const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
+    const data = await loadRegistrySnapshotForServer(viteRoot)
+    if (data?.videoAi) return normalizeRegistryVideoAi(data.videoAi)
+  } catch {
+    /* fallback local dev file */
   }
-  let fromSnap: RegistryVideoAi = {}
-  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
-  if (supabaseUrl && serviceRole) {
-    try {
-      const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
-      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-      const data = await io.load()
-      fromSnap = normalizeRegistryVideoAi(data.videoAi)
-    } catch {
-      /* ignore */
-    }
+  if (!viteRoot) return {}
+  const registryPath = path.join(path.resolve(viteRoot, '..', '..'), '.meoo-dev-sync', 'registry.json')
+  try {
+    if (!fs.existsSync(registryPath)) return {}
+    const parsed = JSON.parse(fs.readFileSync(registryPath, 'utf8')) as { videoAi?: unknown }
+    return normalizeRegistryVideoAi(parsed.videoAi)
+  } catch {
+    return {}
   }
-  return mergeRegistryVideoAiParts(fromFile, fromSnap)
 }
 
 async function resolveIceConfig(

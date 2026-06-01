@@ -41,7 +41,7 @@ import digitalHumanTtsHandler from '../api/meoo-digital-human-tts.ts'
 import digitalHumanDouyinLinkHandler from '../api/meoo-digital-human-douyin-link.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260601-ai-vendor-keys-fix'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260601-ice-registry-merge'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
