@@ -25,7 +25,7 @@
   </view>
 
   <view wx:if="{{!configured}}" class="msg-fixed-tip card">
-    <text class="hint">请配置 utils/config.local.js 的 MERCHANT_API_BASE_URL，并运行 web版/merchant-erp 的 npm run dev</text>
+    <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL 与 SUPABASE_URL（与 ECS 一致）</text>
     <text class="hint" style="display:block;margin-top:12rpx;">可选配置 SUPABASE_URL / SUPABASE_ANON_KEY 直连消息表</text>
   </view>
 
