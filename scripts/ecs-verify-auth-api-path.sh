@@ -5,7 +5,10 @@
 set -euo pipefail
 
 ROOT="${HOME}/app"
-ERP="$ROOT/web版/merchant-erp"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=ecs-resolve-erp-path.sh
+source "$SCRIPT_DIR/ecs-resolve-erp-path.sh"
+ERP="$(ecs_resolve_erp_dir "$ROOT")"
 PORT="${AUTH_API_PORT:-3001}"
 
 echo "== 磁盘 =="

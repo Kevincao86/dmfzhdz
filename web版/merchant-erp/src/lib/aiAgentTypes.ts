@@ -187,6 +187,8 @@ export type AiAgentMessage = {
   previewStatus?: AiPreviewStatus
   /** 任务完成摘要（仅 task_result） */
   resultSummary?: string
+  /** 流式回复生成中（占位气泡） */
+  isStreaming?: boolean
   /** 达人招募确认后的订单明细（仅 task_result） */
   recruitmentOrder?: AiRecruitmentOrderDetail
 }

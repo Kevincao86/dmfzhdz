@@ -5,12 +5,14 @@ import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
 import { clearTenantScopedBrowserState } from '../../lib/tenantLocalState'
+import { editionLabel, isPartnerEdition } from '../../lib/appEdition'
 import {
   isCnMobileValid,
   isLoginNameValid,
   isMerchantShortNameValid,
   loginWithSmsCode,
   registerMerchantAccount,
+  registerPartnerAccount,
   sendAuthSms,
 } from '../../lib/tenantRegisterApi'
 import { toUserFacingError } from '../../lib/userFacingError'
@@ -32,6 +34,7 @@ type Props = {
 }
 
 export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLoginSuccess }: Props) {
+  const partnerMode = isPartnerEdition()
   const [mode, setMode] = useState<AuthMode>('login')
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('password')
   const [busy, setBusy] = useState(false)
@@ -221,7 +224,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       return
     }
     if (!isMerchantShortNameValid(mn)) {
-      onErr('商家简称 2–30 字，可输入汉字、字母或数字')
+      onErr(partnerMode ? '服务商简称 2–30 字' : '商家简称 2–30 字，可输入汉字、字母或数字')
       return
     }
     if (!isCnMobileValid(mobile)) {
@@ -243,14 +246,23 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
 
     setBusy(true)
     try {
-      const r = await registerMerchantAccount({
-        loginName: ln,
-        merchantName: mn,
-        phone: mobile,
-        smsCode: smsCode.trim(),
-        password: regPassword,
-        confirmPassword,
-      })
+      const r = partnerMode
+        ? await registerPartnerAccount({
+            loginName: ln,
+            partnerName: mn,
+            phone: mobile,
+            smsCode: smsCode.trim(),
+            password: regPassword,
+            confirmPassword,
+          })
+        : await registerMerchantAccount({
+            loginName: ln,
+            merchantName: mn,
+            phone: mobile,
+            smsCode: smsCode.trim(),
+            password: regPassword,
+            confirmPassword,
+          })
       if (!r.ok) {
         onErr(toUserFacingError(r.message ?? r.detail ?? r.error, '注册'))
         return
@@ -282,7 +294,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           {mode === 'login'
-            ? '使用商家账号进入灵祺AI智能ERP工作台'
+            ? `使用${editionLabel()}账号进入灵祺AI智能ERP工作台`
             : '填写信息完成注册，即可使用免费版'}
         </p>
       </div>
@@ -318,9 +330,11 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         <p className="pb-4 text-xs leading-relaxed text-slate-500 lg:hidden">
           {mode === 'login'
             ? loginMethod === 'password'
-              ? '使用登录名与密码进入商家工作台。'
+              ? `使用登录名与密码进入${editionLabel()}工作台。`
               : '使用注册手机号与短信验证码登录。'
-            : '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。'}
+            : partnerMode
+              ? '填写服务商信息并完成手机验证，注册后可绑定平台服务商身份与客户商家。'
+              : '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。'}
         </p>
       </div>
 
@@ -489,7 +503,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             </div>
             <div>
               <label className={labelClass} htmlFor="meoo-reg-merchant">
-                商家名简称
+                {partnerMode ? '服务商简称' : '商家名简称'}
               </label>
               <input
                 id="meoo-reg-merchant"

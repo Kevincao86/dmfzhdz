@@ -26,6 +26,7 @@ export async function provisionMerchantTenant(body: {
   merchantName: string
   phone?: string
   trialDays?: number
+  edition?: 'merchant' | 'partner'
 }): Promise<{ ok: true; tenantId: string; userId: string; email: string } | { ok: false; error: string; detail?: string }> {
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   if (missingParts.length > 0) {
@@ -97,6 +98,7 @@ export async function provisionMerchantTenant(body: {
       official_days: officialDays,
       account_status: 'normal',
       membership_plan: 'free',
+      edition: body.edition === 'partner' ? 'partner' : 'merchant',
     }),
   }).catch((e: unknown) => {
     const msg = e instanceof Error ? e.message : String(e)

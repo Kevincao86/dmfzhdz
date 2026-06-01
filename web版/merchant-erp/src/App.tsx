@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AiAgentProvider } from './context/AiAgentContext'
+import { PartnerClientProvider } from './context/PartnerClientContext'
 import { MembershipProvider } from './context/MembershipContext'
 import RequireMembershipFeature from './components/RequireMembershipFeature'
 import MembershipPlanSync from './components/MembershipPlanSync'
@@ -34,6 +35,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <MembershipProvider>
+      <PartnerClientProvider>
       <AiAgentProvider>
         <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -84,6 +86,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </AiAgentProvider>
+      </PartnerClientProvider>
       </MembershipProvider>
     </BrowserRouter>
   )

@@ -2204,6 +2204,90 @@ export async function merchantChatCompletion(
 /**
  * 智能体网关（/api/meoo-ai-chat）：多轮对话压平为 system + user，可选覆盖模型 id（否则读 env 默认）。
  */
+function flattenAgentMessages(messages: import('../src/services/ai/types.js').AIMessage[]): {
+  system: string
+  user: string
+} {
+  const sys: string[] = []
+  const dial: string[] = []
+  for (const m of messages) {
+    if (m.role === 'system') sys.push(m.content)
+    else if (m.role === 'user') dial.push(`用户：${m.content}`)
+    else if (m.role === 'assistant') dial.push(`助手：${m.content}`)
+    else if (m.role === 'tool') dial.push(`工具：${m.content}`)
+    else dial.push(`${m.role}：${m.content}`)
+  }
+  return {
+    system: sys.join('\n\n').trim() || 'You are a helpful assistant.',
+    user: dial.join('\n\n').trim() || '（空）',
+  }
+}
+
+/** 通义 / 豆包智能体：OpenAI 兼容流式 */
+export async function streamBuiltinAgentChatFromMessages(
+  env: MerchantAiEnv,
+  vendor: 'doubao' | 'qwen',
+  modelOverride: string | undefined,
+  messages: import('../src/services/ai/types.js').AIMessage[],
+  onDelta: (d: import('./aiGateway/openAiCompatStream.js').OpenAiStreamDelta) => void,
+  signal?: AbortSignal,
+): Promise<{ modelUsed: string }> {
+  const { openAiCompatChatStream } = await import('./aiGateway/openAiCompatStream.js')
+  const { system, user } = flattenAgentMessages(messages)
+  const { key } = pickKey(env, vendor)
+  if (!key) {
+    throw new Error(
+      `未配置 ${vendor === 'doubao' ? '豆包' : '通义千问'} API Key。请在环境变量中设置 MERCHANT_AI_DOUBAO_KEY / MERCHANT_AI_QWEN_KEY。`,
+    )
+  }
+  const mo = modelOverride?.trim()
+  let eff: MerchantAiEnv = env
+  if (mo) {
+    eff =
+      vendor === 'doubao'
+        ? { ...env, MERCHANT_AI_DOUBAO_CHAT_MODEL: mo }
+        : { ...env, MERCHANT_AI_QWEN_CHAT_MODEL: mo }
+  }
+  const oaiMessages = [
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
+  ]
+  if (vendor === 'qwen') {
+    const model = qwenChatModelId(eff)
+    for await (const d of openAiCompatChatStream({
+      url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+      apiKey: key,
+      model,
+      messages: oaiMessages,
+      temperature: 0.65,
+      signal,
+    })) {
+      if (d.reasoning || d.content) onDelta(d)
+    }
+    return { modelUsed: model }
+  }
+  const url = `${doubaoArkApiV3Root(eff)}/chat/completions`
+  let lastErr: Error | null = null
+  for (const mid of doubaoChatModelCandidates(eff)) {
+    try {
+      for await (const d of openAiCompatChatStream({
+        url,
+        apiKey: key,
+        model: mid,
+        messages: oaiMessages,
+        temperature: 0.65,
+        signal,
+      })) {
+        if (d.reasoning || d.content) onDelta(d)
+      }
+      return { modelUsed: mid }
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    }
+  }
+  throw lastErr ?? new Error('豆包流式对话失败')
+}
+
 export async function merchantAgentChatFromMessages(
   env: MerchantAiEnv,
   vendor: 'doubao' | 'qwen',

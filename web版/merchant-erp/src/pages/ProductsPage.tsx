@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { pushLocalStoreIntelToCloud, upsertMarginConfigCloud } from '../lib/tenantStoreIntelCloud'
+import { getActiveTenantStorageId } from '../lib/tenantLocalState'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   postDouyinProductQualityAnalysis,
@@ -367,7 +368,13 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) return
-    void pushLocalStoreIntelToCloud(supabase)
+    const sync = () => {
+      if (!getActiveTenantStorageId()) return
+      void pushLocalStoreIntelToCloud(supabase)
+    }
+    sync()
+    window.addEventListener('meoo-active-tenant-changed', sync)
+    return () => window.removeEventListener('meoo-active-tenant-changed', sync)
   }, [])
   const [margins, setMargins] = useState<StoreMargins>(() => initialMarginCfg.margins)
   const [marginIndustry, setMarginIndustry] = useState<MarginIndustry>(

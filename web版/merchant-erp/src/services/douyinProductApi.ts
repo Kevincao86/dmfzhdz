@@ -5,6 +5,7 @@
  * @see https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save
  */
 
+import { defaultGoodsQueryType } from '../lib/appEdition'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -836,12 +837,20 @@ export async function getDouyinGoodsProductOnlineQuery(params: {
   base.set('count', String(count))
   if (params.cursor) base.set('cursor', params.cursor)
 
+  const editionDefaultGqt = defaultGoodsQueryType()
   const explicitGqt = params.goods_query_type?.trim()
   let onlineHits: DouyinOnlineProductHit[] = []
   let httpErr: string | undefined
   let bizErr: string | undefined
 
-  if (explicitGqt) {
+  if (editionDefaultGqt) {
+    const q = new URLSearchParams(base.toString())
+    q.set('goods_query_type', explicitGqt || editionDefaultGqt)
+    const r = await fetchOnlineQueryHits(q)
+    onlineHits = r.hits
+    httpErr = r.httpErr
+    bizErr = r.bizErr
+  } else if (explicitGqt) {
     const q = new URLSearchParams(base.toString())
     q.set('goods_query_type', explicitGqt || '2')
     const r = await fetchOnlineQueryHits(q)

@@ -4,7 +4,9 @@
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { merchantErpApiCandidates } from '../../lib/merchantErpApiBase'
 import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
-import type { AIChatOkBody, AIChatRequest, AIChatResponse } from './types'
+import type { AIChatOkBody, AIChatRequest, AIChatResponse, AIChatStreamEvent } from './types'
+
+export type { AIChatStreamEvent }
 
 export function isAiRequestAborted(e: unknown): boolean {
   if (e instanceof DOMException && e.name === 'AbortError') return true
@@ -128,6 +130,191 @@ export async function postAiChat(
         throw new Error(trimmed || `HTTP ${res.status}`)
       }
       lastErr = text.slice(0, 200)
+    }
+  }
+  throw new Error(lastErr || 'ai_chat_unavailable')
+}
+
+function parseAiChatSseLine(line: string): AIChatStreamEvent | null {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('data:')) return null
+  const payload = trimmed.slice(5).trim()
+  if (!payload) return null
+  try {
+    const j = JSON.parse(payload) as AIChatStreamEvent & { event?: string }
+    if (
+      j.event === 'thinking' &&
+      typeof (j as { text?: string }).text === 'string'
+    ) {
+      return { event: 'thinking', text: (j as { text: string }).text }
+    }
+    if (j.event === 'content' && typeof (j as { text?: string }).text === 'string') {
+      return { event: 'content', text: (j as { text: string }).text }
+    }
+    if (
+      j.event === 'done' &&
+      typeof (j as { content?: string }).content === 'string' &&
+      typeof (j as { provider?: string }).provider === 'string'
+    ) {
+      return {
+        event: 'done',
+        content: (j as { content: string }).content,
+        provider: (j as { provider: AIChatResponse['provider'] }).provider,
+        model: String((j as { model?: string }).model ?? ''),
+      }
+    }
+    if (j.event === 'error') {
+      const o = j as { error?: string; detail?: string; hint?: string }
+      return {
+        event: 'error',
+        error: String(o.error ?? 'upstream_error'),
+        detail: o.detail,
+        hint: o.hint,
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+/** 智能体流式对话（SSE）；onEvent 可多次收到 thinking / content，最终以 done 结束 */
+export async function streamAiChat(
+  req: AIChatRequest,
+  handlers: {
+    onEvent: (ev: AIChatStreamEvent) => void
+    signal?: AbortSignal
+  },
+): Promise<AIChatResponse> {
+  const token = await bearer()
+  const tenantId = await tenantIdForApi()
+  const headers: Record<string, string> = {
+    Accept: 'text/event-stream',
+    'Content-Type': 'application/json',
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const body = JSON.stringify({
+    ...req,
+    stream: true,
+    ...(tenantId ? { tenantId } : {}),
+  })
+
+  const tryPaths = ['/api/meoo-ai-chat', '/api/ai/chat']
+  let lastErr = 'no_response'
+  for (const p of tryPaths) {
+    const targets = aiChatFetchUrlCandidates(p)
+    for (const target of targets) {
+      if (handlers.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
+      let res: Response
+      try {
+        res = await fetch(target, {
+          method: 'POST',
+          headers,
+          body,
+          signal: handlers.signal,
+        })
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+        continue
+      }
+
+      const ct = res.headers.get('content-type') ?? ''
+      if (!res.ok) {
+        const text = await res.text()
+        if (res.status !== 404) {
+          let detail = text.slice(0, 400)
+          try {
+            const j = JSON.parse(text) as { detail?: string; error?: string }
+            detail = [j.error, j.detail].filter(Boolean).join(' — ') || detail
+          } catch {
+            /* keep */
+          }
+          throw new Error(detail || `HTTP ${res.status}`)
+        }
+        lastErr = text.slice(0, 200)
+        continue
+      }
+
+      if (!ct.includes('text/event-stream') || !res.body) {
+        const text = await res.text()
+        try {
+          const j = JSON.parse(text) as AIChatOkBody
+          if (j.ok && j.content) {
+            handlers.onEvent({ event: 'content', text: j.content })
+            handlers.onEvent({
+              event: 'done',
+              content: j.content,
+              provider: j.provider,
+              model: j.model,
+            })
+            return {
+              provider: j.provider,
+              model: j.model,
+              content: j.content,
+              raw: j.raw,
+              usage: j.usage,
+            }
+          }
+        } catch {
+          /* fall through */
+        }
+        lastErr = 'stream_not_supported'
+        continue
+      }
+
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ''
+      let final: AIChatResponse | null = null
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += dec.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop() ?? ''
+          for (const line of lines) {
+            const ev = parseAiChatSseLine(line)
+            if (!ev) continue
+            handlers.onEvent(ev)
+            if (ev.event === 'error') {
+              const parts = [ev.error, ev.detail, ev.hint].filter(Boolean)
+              throw new Error(parts.join(' — ') || ev.error)
+            }
+            if (ev.event === 'done') {
+              final = {
+                provider: ev.provider,
+                model: ev.model,
+                content: ev.content,
+              }
+            }
+          }
+        }
+        if (buf.trim()) {
+          const ev = parseAiChatSseLine(buf)
+          if (ev) {
+            handlers.onEvent(ev)
+            if (ev.event === 'error') {
+              const parts = [ev.error, ev.detail, ev.hint].filter(Boolean)
+              throw new Error(parts.join(' — ') || ev.error)
+            }
+            if (ev.event === 'done') {
+              final = {
+                provider: ev.provider,
+                model: ev.model,
+                content: ev.content,
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock()
+      }
+      if (!final) throw new Error('流式对话未收到完成事件')
+      return final
     }
   }
   throw new Error(lastErr || 'ai_chat_unavailable')

@@ -1,36 +1,40 @@
+import { splitAssistantStreamView } from '../../src/lib/assistantThinkingText.js'
 import {
-  logAiChatServerLine,
-  forwardAuditToMerchantAdmin,
   buildAuditPayload,
+  forwardAuditToMerchantAdmin,
+  logAiChatServerLine,
   summarizeText,
 } from './auditLog.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
-import { routeAiChat } from './chatRouter.js'
+import { routeAiChatStream } from './chatStreamRouter.js'
 import { prepareMeooAiChat } from './meooAiChatPrepare.js'
 import {
   describeDirectLlmKeyDebug,
   formatDirectLlmKeyDebugHint,
 } from './directLlmKeyDebug.js'
 
-export async function runMeooAiChatCore(
+export type MeooAiChatSsePayload =
+  | { event: 'thinking'; text: string }
+  | { event: 'content'; text: string }
+  | { event: 'done'; content: string; provider: string; model: string }
+  | { event: 'error'; error: string; detail?: string; hint?: string }
+
+export async function runMeooAiChatStream(
   bodyRaw: string,
   authHeader: string | undefined,
   env: Record<string, string>,
-): Promise<{ status: number; body: Record<string, unknown> }> {
-  let wantsStream = false
-  try {
-    const peek = JSON.parse(bodyRaw || '{}') as { stream?: boolean }
-    wantsStream = peek.stream === true
-  } catch {
-    return { status: 400, body: { ok: false, error: 'invalid_json' } }
-  }
-  if (wantsStream) {
-    return { status: 400, body: { ok: false, error: 'use_sse_stream', detail: 'stream=true 须走 SSE 响应' } }
-  }
-
+  write: (payload: MeooAiChatSsePayload) => void,
+  signal?: AbortSignal,
+): Promise<void> {
   const prep = await prepareMeooAiChat(bodyRaw, authHeader, env)
   if (!prep.ok) {
-    return { status: prep.status, body: prep.body }
+    write({
+      event: 'error',
+      error: String(prep.body.error ?? 'request_failed'),
+      detail: typeof prep.body.detail === 'string' ? prep.body.detail : undefined,
+      hint: typeof prep.body.hint === 'string' ? prep.body.hint : undefined,
+    })
+    return
   }
 
   const { user, req, chatEnv, env: fullEnv } = prep
@@ -45,17 +49,29 @@ export async function runMeooAiChatCore(
     taskType: req.taskType ?? null,
   })
 
+  let rawContent = ''
+  let reasoningAcc = ''
+
+  const publishView = () => {
+    const view = splitAssistantStreamView(rawContent)
+    const thinking = [reasoningAcc, view.thinking].filter(Boolean).join('\n\n').trim()
+    if (thinking) write({ event: 'thinking', text: thinking })
+    if (view.answer) write({ event: 'content', text: view.answer })
+  }
+
   try {
-    const res = await routeAiChat(req, chatEnv)
-    /** 勿把 SDK 完整 raw 对象写入 HTTP 响应：常含循环引用，JSON.stringify 会抛错导致 Vercel 500 */
-    const okBody: Record<string, unknown> = {
-      ok: true,
-      provider: res.provider,
-      model: res.model,
-      content: res.content,
-    }
+    const res = await routeAiChatStream(
+      req,
+      chatEnv,
+      (d) => {
+        if (d.reasoning) reasoningAcc += d.reasoning
+        if (d.content) rawContent += d.content
+        publishView()
+      },
+      signal,
+    )
+
     const usageSafe = sanitizeTokenUsage(res.usage)
-    if (usageSafe) okBody.usage = usageSafe
     void forwardAuditToMerchantAdmin({
       env: fullEnv,
       body: buildAuditPayload({ user, req, res, status: 'ok' }),
@@ -70,11 +86,17 @@ export async function runMeooAiChatCore(
       tokenUsage: usageSafe ?? null,
       status: 'ok',
     })
-    return { status: 200, body: okBody }
+    write({
+      event: 'done',
+      content: res.content,
+      provider: res.provider,
+      model: res.model,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    const provider = req.provider
     let registryKeys: unknown = null
-    if (req.provider === 'kimi' || req.provider === 'minimax') {
+    if (provider === 'kimi' || provider === 'minimax') {
       try {
         const { readMerchantSupabaseAdminEnv } = await import('../merchantSupabaseAdminEnv.js')
         const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
@@ -83,25 +105,20 @@ export async function runMeooAiChatCore(
           registryKeys = (await createRegistrySnapshotIoFetch(supabaseUrl, serviceRole).load()).vendorKeys
         }
       } catch {
-        /* 诊断用，失败不阻断 */
+        /* noop */
       }
     }
     const keyDebug =
-      req.provider === 'kimi' || req.provider === 'minimax'
-        ? describeDirectLlmKeyDebug(req.provider, chatEnv, registryKeys)
+      provider === 'kimi' || provider === 'minimax'
+        ? describeDirectLlmKeyDebug(provider, chatEnv, registryKeys)
         : null
     const detailWithDebug =
       keyDebug && /401|invalid api key|invalid authentication|2049/i.test(msg)
-        ? `${msg.slice(0, 600)} ${formatDirectLlmKeyDebugHint(req.provider as 'kimi' | 'minimax', keyDebug)}`
+        ? `${msg.slice(0, 600)} ${formatDirectLlmKeyDebugHint(provider as 'kimi' | 'minimax', keyDebug)}`
         : msg.slice(0, 800)
     void forwardAuditToMerchantAdmin({
       env: fullEnv,
-      body: buildAuditPayload({
-        user,
-        req,
-        status: 'error',
-        error: msg,
-      }),
+      body: buildAuditPayload({ user, req, status: 'error', error: msg }),
     })
     logAiChatServerLine({
       phase: 'error',
@@ -114,17 +131,13 @@ export async function runMeooAiChatCore(
       detail: msg.slice(0, 500),
     })
     const authHint = /401|invalid api key|invalid authentication|2049|JWT|TokenMix Key 与/i.test(msg)
-      ? '上游 401：请核对运营台 Key 前缀（MiniMax/Kimi 均须 sk-，勿 eyJ JWT）；国内/国际域名须与账号一致。ECS 执行 git pull && sudo systemctl restart meoo-auth-api。探测：GET /erp-api/meoo-ai-vendor-keys-probe（Bearer MEOO_SUPPORT_OPS_HTTP_TOKEN）。'
+      ? '上游 401：请核对运营台 Key 与 ECS auth-api。'
       : undefined
-    return {
-      status: 502,
-      body: {
-        ok: false,
-        error: 'upstream_error',
-        detail: detailWithDebug,
-        ...(keyDebug ? { keyDebug } : {}),
-        ...(authHint ? { hint: authHint } : {}),
-      },
-    }
+    write({
+      event: 'error',
+      error: 'upstream_error',
+      detail: detailWithDebug,
+      ...(authHint ? { hint: authHint } : {}),
+    })
   }
 }

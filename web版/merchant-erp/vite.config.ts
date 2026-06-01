@@ -17,6 +17,11 @@ export default defineConfig(({ mode }) => {
     (env.VITE_MERCHANT_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:5174'
 
   return {
+    define: {
+      'import.meta.env.VITE_APP_EDITION': JSON.stringify(
+        env.VITE_APP_EDITION ?? (mode === 'partner' ? 'partner' : 'merchant'),
+      ),
+    },
     plugins: [
       react(),
       tailwindcss(),
@@ -32,7 +37,7 @@ export default defineConfig(({ mode }) => {
      * 勿用 `host: true`：在 Cursor 内置终端等环境可能触发 networkInterfaces 崩溃；局域网用：`npm run dev -- --host 0.0.0.0`
      */
     server: {
-      port: 5173,
+      port: mode === 'partner' ? 5175 : 5173,
       strictPort: true,
       host: '127.0.0.1',
     },

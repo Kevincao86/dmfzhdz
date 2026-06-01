@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # 在 ECS 上运行商户注册相关 /api（连本机 GoTrue/PostgREST，不依赖 Vercel 出站）
 # 用法：
-#   cd ~/app && git pull
+#   bash ~/app/scripts/ecs-git-pull-main.sh   # 拉 main（ECS 通常只有 origin，无 gitee 远程名）
 #   bash scripts/ecs-setup-internal-api-proxy.sh   # 首次
 #   bash scripts/ecs-run-auth-api.sh
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ERP="$ROOT/web版/merchant-erp"
+# shellcheck source=ecs-resolve-erp-path.sh
+source "$ROOT/scripts/ecs-resolve-erp-path.sh"
+ERP="$(ecs_resolve_erp_dir "$ROOT")"
 OPS_ADMIN="$ROOT/商家管理后台"
 ENV_FILE="$HOME/stack/auth-api.env"
 PORT="${AUTH_API_PORT:-3001}"
@@ -58,7 +60,12 @@ cat >"$ENV_FILE" <<EOF
 SUPABASE_URL=http://127.0.0.1:8888
 VITE_SUPABASE_URL=http://127.0.0.1:8888
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE_KEY
+SUPABASE_ANON_KEY=$ANON_KEY
 VITE_SUPABASE_ANON_KEY=$ANON_KEY
+# /api/meoo-ai-chat、数字人口播链接解析等：本地验签商户 JWT，避免出站 /auth/v1/user 失败
+SUPABASE_JWT_SECRET=$JWT_SECRET
+JWT_SECRET=$JWT_SECRET
+GOTRUE_JWT_SECRET=$JWT_SECRET
 EOF
 
 if [[ -n "${MEOO_SUPPORT_OPS_HTTP_TOKEN:-}" ]]; then
@@ -103,12 +110,18 @@ if [[ -f /etc/systemd/system/meoo-auth-api.service ]]; then
   sleep 2
   if curl -sf "http://127.0.0.1:$PORT/api/meoo-auth-ping" >/dev/null; then
     echo "OK: systemd meoo-auth-api 已在 :$PORT 运行"
-    curl -sS "http://127.0.0.1:$PORT/api/meoo-ops-sync-registry" | head -c 200
+    curl -sS "http://127.0.0.1:$PORT/api/meoo-erp-api-health" | head -c 280
     echo
     echo "公网自测: curl -sSI https://mofangdianai.com/erp-api/meoo-erp-api-health | head"
     exit 0
   fi
-  echo "systemd 启动失败，查看: sudo journalctl -u meoo-auth-api -n 40 --no-pager"
+  echo "systemd 启动失败。最近日志："
+  sudo journalctl -u meoo-auth-api -n 40 --no-pager 2>/dev/null || true
+  echo ""
+  echo "建议依次执行:"
+  echo "  bash $ROOT/scripts/ecs-verify-auth-api-path.sh"
+  echo "  cd $ERP && npm ci"
+  echo "  bash $ROOT/scripts/ecs-install-auth-api-systemd.sh"
   exit 1
 fi
 

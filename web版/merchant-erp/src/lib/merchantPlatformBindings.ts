@@ -2,6 +2,7 @@
  * 租户级多平台、多账号绑定（Supabase tenant_merchant_bindings）
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { platformBindingRole } from './appEdition'
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { readMerchantSession, writeMerchantSession } from './merchantSession'
 import { tenantLocalKey } from './tenantLocalState'
@@ -103,6 +104,7 @@ export async function listMerchantBindings(
     )
     .eq('tenant_id', tenantId)
     .eq('provider', provider)
+    .eq('binding_role', platformBindingRole())
     .order('updated_at', { ascending: false })
   if (error || !data) return []
   return data
@@ -131,6 +133,7 @@ export async function upsertMerchantBinding(
   const row = {
     tenant_id: tenantId,
     provider: input.provider,
+    binding_role: platformBindingRole(),
     merchant_account_id: merchantAccountId,
     sealed_credentials: input.sealedCredentials.trim(),
     client_key: input.clientKey?.trim() || null,

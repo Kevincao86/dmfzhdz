@@ -67,6 +67,7 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
       if (j?.ok) return j
       if (j && !j.ok && j.message) {
         lastMsg = j.message
+        if (res.ok || res.status === 422) return j
         continue
       }
       if (res.status === 404) {

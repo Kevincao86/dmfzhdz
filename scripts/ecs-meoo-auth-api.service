@@ -1,7 +1,7 @@
 [Unit]
 Description=Meoo ERP Auth API (register/login on ECS)
-After=network.target meoo-gotrue.service meoo-postgrest.service nginx.service
-Wants=meoo-gotrue.service meoo-postgrest.service
+After=network.target
+Wants=meoo-gotrue.service meoo-postgrest.service nginx.service
 
 [Service]
 Type=simple

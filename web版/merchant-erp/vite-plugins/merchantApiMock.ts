@@ -246,6 +246,30 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       try {
         const bodyRaw = await readBody(req as IncomingMessage)
         const auth = req.headers['authorization']
+        let wantsStream = false
+        try {
+          const peek = JSON.parse(bodyRaw || '{}') as { stream?: boolean }
+          wantsStream = peek.stream === true
+        } catch {
+          wantsStream = false
+        }
+        if (wantsStream) {
+          const { runMeooAiChatStream } = await import('./aiGateway/meooAiChatStream.js')
+          res.statusCode = 200
+          res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+          res.setHeader('Cache-Control', 'no-cache, no-transform')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          await runMeooAiChatStream(
+            bodyRaw,
+            typeof auth === 'string' ? auth : undefined,
+            env,
+            (payload) => {
+              if (!res.writableEnded) res.write(`data: ${JSON.stringify(payload)}\n\n`)
+            },
+          )
+          if (!res.writableEnded) res.end()
+          return
+        }
         const { runMeooAiChatCore } = await import('./aiGateway/meooAiChatCore.js')
         const out = await runMeooAiChatCore(
           bodyRaw,
@@ -317,10 +341,17 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       }
       try {
         const bodyRaw = await readBody(req as IncomingMessage)
-        const body = JSON.parse(bodyRaw || '{}') as { url?: string }
+        const body = JSON.parse(bodyRaw || '{}') as { url?: string; tenantId?: string }
         const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
         const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
-        const out = await runDouyinLinkParseCore({ url: String(body.url ?? '') }, aiEnv, auth)
+        const out = await runDouyinLinkParseCore(
+          {
+            url: String(body.url ?? ''),
+            tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined,
+          },
+          aiEnv,
+          auth,
+        )
         res.statusCode = out.ok ? 200 : 422
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
         res.setHeader('Access-Control-Allow-Origin', '*')
