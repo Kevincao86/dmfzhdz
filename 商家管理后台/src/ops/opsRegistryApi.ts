@@ -403,11 +403,14 @@ export async function postVendorKeys(body: {
   aiVendorCatalog?: AiVendorCatalogEntry[]
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
-  const { res } = await postRegistrySync(['/api/ops-sync/vendor-keys'], {
+  const { res, j } = await postRegistrySync(['/api/ops-sync/vendor-keys'], {
     ...body,
     lastWriter: body.lastWriter ?? 'ops',
   })
-  if (!res.ok) throw new Error(mapHttpError(res.status))
+  if (!res.ok) {
+    const detail = typeof j.detail === 'string' ? j.detail.trim() : ''
+    throw new Error(detail || mapHttpError(res.status))
+  }
 }
 
 export async function postVideoAiBindings(body: {

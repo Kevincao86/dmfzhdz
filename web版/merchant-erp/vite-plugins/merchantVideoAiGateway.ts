@@ -51,7 +51,8 @@ function applyRegistrySliceToVideoAiEnv(
   fill('ALIYUN_ICE_ACCESS_KEY_SECRET', vx.iceAccessKeySecret)
   fill('ALIYUN_ICE_REGION', vx.iceRegion)
   fill('ALIYUN_ICE_VOD_STORAGE_LOCATION', vx.iceVodStorageLocation)
-  fill('ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX', vx.iceOutputOssUrlPrefix)
+  const iceOut = vx.iceOutputOssUrlPrefix?.trim()
+  if (iceOut) out.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX = iceOut
 
   const envEp = String(
     out.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ?? out.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ?? '',
@@ -114,16 +115,15 @@ export async function mergeVideoAiMerchantEnvWithSnapshot(
   base: MerchantAiEnv,
 ): Promise<MerchantAiEnv> {
   const out = mergeVideoAiMerchantEnv(viteRoot, base)
-  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
-  if (!supabaseUrl || !serviceRole) return out
   try {
-    const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
-    applyRegistrySliceToVideoAiEnv(out, { videoAi: data.videoAi, vendorKeys: data.vendorKeys })
-    applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
+    const { loadRegistrySnapshotForServer } = await import('../src/lib/registrySnapshotServerLoad.js')
+    const data = await loadRegistrySnapshotForServer(viteRoot)
+    if (data) {
+      applyRegistrySliceToVideoAiEnv(out, { videoAi: data.videoAi, vendorKeys: data.vendorKeys })
+      applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
+    }
   } catch {
-    /* 未配 Supabase 或快照不可读时保留 .env / 本地 registry 结果 */
+    /* 未配 Supabase / erp-api 不可达时保留 .env / 本地 registry 结果 */
   }
   return out
 }

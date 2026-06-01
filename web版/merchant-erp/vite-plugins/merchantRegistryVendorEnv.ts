@@ -7,8 +7,23 @@ import path from 'node:path'
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
 import { expandVendorKeysForRegistrySave } from '../src/lib/aiVendorKeysShared.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
+import { vendorKeyFingerprint } from '../src/lib/aiVendorKeyValidate.js'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
+
+const DIRECT_LLM_ENV_KEYS = [
+  'TOKENMIX_API_KEY',
+  'MINIMAX_API_KEY',
+  'MERCHANT_AI_MINIMAX_KEY',
+  'MOONSHOT_API_KEY',
+  'MERCHANT_AI_KIMI_KEY',
+  'KIMI_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'DASHSCOPE_API_KEY',
+  'MERCHANT_AI_QWEN_KEY',
+  'ARK_API_KEY',
+  'MERCHANT_AI_DOUBAO_KEY',
+] as const
 
 /** 去掉 Bearer 前缀、引号、JSON 包裹、多行粘贴等常见错误 */
 export function sanitizeVendorApiKey(raw: string | undefined): string {
@@ -42,10 +57,58 @@ export function sanitizeVendorApiKey(raw: string | undefined): string {
   return v
 }
 
-/** MiniMax OpenAI 兼容接口需 sk- 类 Key；平台若只下发 eyJ JWT，会 2049 */
+/** MiniMax / Kimi 勿用 JWT；平台「创建密钥」若下发 eyJ 会 401/2049 */
 export function looksLikeMinimaxJwtKey(key: string): boolean {
   const k = key.trim()
-  return k.startsWith('eyJ') && k.length > 80
+  return k.startsWith('eyJ')
+}
+
+/** 合并前清洗 process.env 中的直连 Key（引号、Bearer 前缀等） */
+export function sanitizeMerchantAiEnvInPlace(out: MerchantAiEnv): void {
+  for (const k of DIRECT_LLM_ENV_KEYS) {
+    const raw = out[k]
+    if (typeof raw !== 'string' || !raw.trim()) continue
+    const cleaned = sanitizeVendorApiKey(raw)
+    if (cleaned) out[k] = cleaned
+    else delete out[k]
+  }
+}
+
+export type AiVendorKeyDiag = {
+  vendor: string
+  configured: boolean
+  fingerprint: string
+  source: 'registry' | 'env' | 'none'
+}
+
+/** 诊断：实际生效 Key 来源（不含完整密钥） */
+export function describeMergedAiVendorKeys(
+  base: MerchantAiEnv,
+  registryKeys: unknown,
+): AiVendorKeyDiag[] {
+  const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(registryKeys))
+  const pick = (
+    vendor: string,
+    registryVal: string | undefined,
+    envKeys: string[],
+  ): AiVendorKeyDiag => {
+    const reg = sanitizeVendorApiKey(registryVal)
+    if (reg) {
+      return { vendor, configured: true, fingerprint: vendorKeyFingerprint(reg), source: 'registry' }
+    }
+    for (const ek of envKeys) {
+      const fromEnv = sanitizeVendorApiKey(base[ek])
+      if (fromEnv) {
+        return { vendor, configured: true, fingerprint: vendorKeyFingerprint(fromEnv), source: 'env' }
+      }
+    }
+    return { vendor, configured: false, fingerprint: '(empty)', source: 'none' }
+  }
+  return [
+    pick('kimi', expanded.kimi, ['MOONSHOT_API_KEY', 'MERCHANT_AI_KIMI_KEY', 'KIMI_API_KEY']),
+    pick('minimax', expanded.minimax, ['MINIMAX_API_KEY', 'MERCHANT_AI_MINIMAX_KEY']),
+    pick('tokenmix', expanded.tokenmix, ['TOKENMIX_API_KEY']),
+  ]
 }
 
 /** 注册表有值时覆盖 env（运营台为唯一配置源） */
@@ -110,6 +173,7 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
   base: MerchantAiEnv,
 ): Promise<MerchantAiEnv> {
   const out: MerchantAiEnv = { ...base }
+  sanitizeMerchantAiEnvInPlace(out)
   mergeVendorKeysFromLocalRegistry(viteRoot, out)
   const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
   if (!supabaseUrl || !serviceRole) return out

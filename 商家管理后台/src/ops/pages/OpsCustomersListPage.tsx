@@ -2,6 +2,7 @@ import { BarChart3, Download, Eye, KeyRound, Link2, Pencil, Plus, Snowflake, Use
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
+import SecretInput from '../../components/SecretInput'
 import type { CustomerAccountStatus, OpsCustomer } from '../mockData'
 import { tenantsToCustomers } from '../mapRegistryTenant'
 import { postProvisionTenant } from '../provisionTenantApi'
@@ -685,8 +686,7 @@ export default function OpsCustomersListPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs text-slate-400">密码</label>
-                <input
-                  type="password"
+                <SecretInput
                   autoComplete="new-password"
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
@@ -859,8 +859,7 @@ export default function OpsCustomersListPage() {
             <h2 className="mb-2 text-lg font-semibold text-white">Tokenmix 绑定</h2>
             <p className="mb-3 text-xs text-slate-500">{tokenmixBindCustomer.companyName}</p>
             <label className="mb-1 block text-xs text-slate-400">API 密钥</label>
-            <input
-              type="password"
+            <SecretInput
               autoComplete="off"
               value={tokenmixKeyDraft}
               onChange={(e) => setTokenmixKeyDraft(e.target.value)}

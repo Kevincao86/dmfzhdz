@@ -26,6 +26,7 @@ import {
 } from '../../meooRegistryShared/aiVendorKeysShared'
 import { cn } from '../../cn'
 import AiVendorCatalogAvatar from '../../components/AiVendorCatalogAvatar'
+import SecretInput from '../../components/SecretInput'
 import {
   fetchRegistry,
   postAiModels,
@@ -165,8 +166,9 @@ export default function OpsAiModelsPage() {
       await postAiModels({ textModel: 'auto', imageModel: 'auto', lastWriter: 'ops' })
       await pull()
       setEditingVendorKeys(false)
-    } catch {
-      setHint('各厂商 Key 保存失败：请确认本后台 dev 可写注册表。')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.trim() : ''
+      setHint(msg || '各厂商 Key 保存失败：请确认本后台 dev 可写注册表。')
     } finally {
       setSaving(false)
     }
@@ -484,8 +486,7 @@ export default function OpsAiModelsPage() {
                   </button>
                 ) : null}
               </div>
-              <input
-                type="password"
+              <SecretInput
                 autoComplete="off"
                 readOnly={!editingVendorKeys || linkedReadOnly}
                 disabled={loading || linkedReadOnly}
@@ -583,8 +584,7 @@ export default function OpsAiModelsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs text-slate-400">可灵 Access Key（JWT iss）</label>
-            <input
-              type="password"
+            <SecretInput
               autoComplete="off"
               readOnly={!editingVideoAi}
               disabled={loading}
@@ -603,8 +603,7 @@ export default function OpsAiModelsPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs text-slate-400">可灵 Secret Key（JWT 签名）</label>
-            <input
-              type="password"
+            <SecretInput
               autoComplete="off"
               readOnly={!editingVideoAi}
               disabled={loading}
@@ -660,8 +659,7 @@ export default function OpsAiModelsPage() {
             <label className="mb-1 block text-xs text-slate-400">
               方舟视频专用 API Key（可选；留空则由商户网关使用上方「豆包」Key）
             </label>
-            <input
-              type="password"
+            <SecretInput
               autoComplete="off"
               readOnly={!editingVideoAi}
               disabled={loading}
@@ -724,8 +722,7 @@ export default function OpsAiModelsPage() {
               </div>
               <div>
                 <label className="mb-1 block text-xs text-slate-400">AccessKey Secret</label>
-                <input
-                  type="password"
+                <SecretInput
                   autoComplete="off"
                   readOnly={!editingVideoAi}
                   disabled={loading}

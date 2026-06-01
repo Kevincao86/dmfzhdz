@@ -1,5 +1,6 @@
 import { KeyRound, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import SecretInput from '../../components/SecretInput'
 import { cn } from '../../cn'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import {
@@ -398,8 +399,7 @@ export default function SubAccountsPanel() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">密码（至少 6 位）</label>
-                <input
-                  type="password"
+                <SecretInput
                   value={form.password}
                   onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -408,8 +408,7 @@ export default function SubAccountsPanel() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">确认密码</label>
-                <input
-                  type="password"
+                <SecretInput
                   value={form.confirm}
                   onChange={(e) => setForm((f) => ({ ...f, confirm: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -471,8 +470,7 @@ export default function SubAccountsPanel() {
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">新密码（至少 6 位）</label>
-                <input
-                  type="password"
+                <SecretInput
                   value={resetPwd.password}
                   onChange={(e) => setResetPwd((f) => ({ ...f, password: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -481,8 +479,7 @@ export default function SubAccountsPanel() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">确认新密码</label>
-                <input
-                  type="password"
+                <SecretInput
                   value={resetPwd.confirm}
                   onChange={(e) => setResetPwd((f) => ({ ...f, confirm: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"

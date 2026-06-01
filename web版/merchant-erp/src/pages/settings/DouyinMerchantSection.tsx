@@ -1,4 +1,5 @@
-import { BookOpen, Eye, EyeOff, Search, User } from 'lucide-react'
+import { BookOpen, Search, User } from 'lucide-react'
+import SecretInput from '../../components/SecretInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
@@ -92,7 +93,6 @@ export default function DouyinMerchantSection() {
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
   /** true = 密文；与按钮图标「当前可执行动作」一致：遮罩时显示眼睛=点击显示明文 */
-  const [secretMasked, setSecretMasked] = useState(true)
   const [boundMerchantId, setBoundMerchantId] = useState(() => readMerchantSession(META_MERCHANT_ID) ?? '')
   const [boundAccountName, setBoundAccountName] = useState(() => readMerchantSession(META_ACCOUNT_NAME) ?? '')
   const [bindLabel, setBindLabel] = useState('')
@@ -193,10 +193,6 @@ export default function DouyinMerchantSection() {
       setBoundAccountName('')
     }
   }, [accessToken])
-
-  useEffect(() => {
-    if (!bindOpen) setSecretMasked(true)
-  }, [bindOpen])
 
   const loadStores = useCallback(
     async (opts?: {
@@ -895,28 +891,13 @@ export default function DouyinMerchantSection() {
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   App Secret
                 </label>
-                <div className="relative">
-                  <input
-                    type={secretMasked ? 'password' : 'text'}
-                    autoComplete="new-password"
-                    value={appSecret}
-                    onChange={(e) => setAppSecret(e.target.value)}
-                    placeholder="开放平台 App Secret"
-                    className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setSecretMasked((m) => !m)}
-                    className="absolute right-1 top-1/2 flex h-8 w-9 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                    aria-label={secretMasked ? '显示密钥' : '隐藏密钥'}
-                  >
-                    {secretMasked ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <EyeOff className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
+                <SecretInput
+                  autoComplete="new-password"
+                  value={appSecret}
+                  onChange={(e) => setAppSecret(e.target.value)}
+                  placeholder="开放平台 App Secret"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">

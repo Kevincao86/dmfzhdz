@@ -3,6 +3,7 @@
  */
 import { isValidAiVendorSlug, mergeBuiltinAiVendorCatalog } from '../src/lib/aiVendorCatalogShared.js'
 import { expandVendorKeysForRegistrySave } from '../src/lib/aiVendorKeysShared.js'
+import { validateRegistryVendorKey } from '../src/lib/aiVendorKeyValidate.js'
 import type {
   AiVendorCatalogEntry,
   RegistryVendorKeys,
@@ -10,6 +11,7 @@ import type {
 } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import type { RegistrySnapshotIo } from '../src/lib/registrySnapshotIoFetch.js'
+import { sanitizeVendorApiKey } from './merchantRegistryVendorEnv.js'
 
 export async function opsRegistrySupabaseSaveVendorKeys(
   io: RegistrySnapshotIo,
@@ -36,9 +38,16 @@ export async function opsRegistrySupabaseSaveVendorKeys(
   for (const [id, v] of Object.entries(patch)) {
     if (!isValidAiVendorSlug(id)) continue
     if (v === undefined) continue
-    const t = typeof v === 'string' ? v.trim() : ''
-    if (t) merged[id] = t
-    else delete merged[id]
+    const t = typeof v === 'string' ? sanitizeVendorApiKey(v) : ''
+    if (!t) {
+      delete merged[id]
+      continue
+    }
+    const err = validateRegistryVendorKey(id, t)
+    if (err) {
+      return { status: 400, body: { ok: false, error: 'invalid_vendor_key', vendor: id, detail: err } }
+    }
+    merged[id] = t
   }
   data.vendorKeys = expandVendorKeysForRegistrySave(merged)
   if (body.aiVendorCatalog !== undefined) {

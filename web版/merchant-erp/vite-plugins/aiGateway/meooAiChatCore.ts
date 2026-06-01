@@ -185,8 +185,8 @@ export async function runMeooAiChatCore(
       status: 'error',
       detail: msg.slice(0, 500),
     })
-    const authHint = /401|invalid api key|invalid authentication|2049/i.test(msg)
-      ? '上游返回 401：请在运营台「AI 模型」重新保存 MiniMax/Kimi 密钥（勿填 TokenMix Key）；并删除 Vercel/ECS 中过期的 MINIMAX_API_KEY、MOONSHOT_API_KEY 环境变量后重启 auth-api。'
+    const authHint = /401|invalid api key|invalid authentication|2049|JWT|TokenMix Key 与/i.test(msg)
+      ? '上游返回 401：MiniMax 需 sk- 接口密钥（非 eyJ JWT）；Kimi 需 moonshot.cn 的 sk- Key。请在运营台「AI 模型」重新保存；删除 Vercel/ECS 过期 MINIMAX_API_KEY/MOONSHOT_API_KEY 后重启 auth-api。诊断：GET /erp-api/meoo-ai-vendor-keys-diag（Bearer MEOO_SUPPORT_OPS_HTTP_TOKEN）。'
       : undefined
     return {
       status: 502,

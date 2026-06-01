@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import SecretInput from '../../components/SecretInput'
 import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
@@ -399,9 +400,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                   <label className={labelClass} htmlFor="meoo-login-pw">
                     密码
                   </label>
-                  <input
+                  <SecretInput
                     id="meoo-login-pw"
-                    type="password"
                     className={inputClass}
                     autoComplete="current-password"
                     placeholder="至少 6 位"
@@ -540,9 +540,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
               <label className={labelClass} htmlFor="meoo-reg-pw">
                 密码
               </label>
-              <input
+              <SecretInput
                 id="meoo-reg-pw"
-                type="password"
                 className={inputClass}
                 autoComplete="new-password"
                 placeholder="至少 6 位"
@@ -554,9 +553,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
               <label className={labelClass} htmlFor="meoo-reg-pw2">
                 确认密码
               </label>
-              <input
+              <SecretInput
                 id="meoo-reg-pw2"
-                type="password"
                 className={inputClass}
                 autoComplete="new-password"
                 placeholder="再次输入密码"

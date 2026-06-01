@@ -1,16 +1,20 @@
-import { ArrowLeft, FileText, MessageSquare, Store, Users, Wallet } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { ArrowLeft, ChevronRight, FileText, MessageSquare, Store, Users, Wallet } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { cn } from '../../cn'
 import type { CustomerAccountStatus, OpsCustomer } from '../mockData'
 import { registryTenantToOpsCustomer } from '../mapRegistryTenant'
+import type { TenantUsageMetrics } from '../opsTenantUsageStats'
 import { fetchRegistry, type RegistryTenant } from '../opsRegistryApi'
 import {
   fetchSupabaseTenantsForOps,
+  fetchTenantInsightsForOps,
   fetchTenantWalletLedgerForOps,
+  type OpsTenantSupportSessionSummary,
   type OpsWalletLedgerRow,
   supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
+import { formatSupportRelayTime } from '../../lib/supportRelay'
 
 function payLabel(s: OpsCustomer['payStatus']): string {
   if (s === 'paid') return '已付费'
@@ -38,6 +42,10 @@ function sourceLabel(t: RegistryTenant): string {
 
 function yuanFromCents(cents: number): string {
   return (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function normMerchantName(name: string): string {
+  return name.trim().toLowerCase()
 }
 
 async function loadMergedTenants(): Promise<RegistryTenant[]> {
@@ -69,6 +77,10 @@ export default function OpsCustomerDetailPage() {
   const [ledgerRows, setLedgerRows] = useState<OpsWalletLedgerRow[]>([])
   const [ledgerLoading, setLedgerLoading] = useState(false)
   const [ledgerErr, setLedgerErr] = useState<string | null>(null)
+  const [supportSessions, setSupportSessions] = useState<OpsTenantSupportSessionSummary[]>([])
+  const [insightsErr, setInsightsErr] = useState<string | null>(null)
+  const [usageMetrics, setUsageMetrics] = useState<TenantUsageMetrics | null>(null)
+  const [recruitStats, setRecruitStats] = useState({ recruitCount: 0, orderCount: 0 })
 
   const reload = useCallback(async () => {
     if (!customerId) {
@@ -79,6 +91,55 @@ export default function OpsCustomerDetailPage() {
       const merged = await loadMergedTenants()
       const hit = merged.find((x) => x.id === customerId)
       setTenant(hit ?? null)
+
+      if (hit) {
+        try {
+          const reg = await fetchRegistry()
+          const merchantKey = normMerchantName(hit.merchantName)
+          const erpOrders = (reg.recruitmentOrders ?? []).filter(
+            (o) => normMerchantName(o.customerName) === merchantKey,
+          )
+          const mpOrders = (reg.mpRecruitmentOrders ?? []).filter(
+            (o) => normMerchantName(o.customerName) === merchantKey,
+          )
+          const talentSet = new Set<string>()
+          for (const o of erpOrders) {
+            if (o.talentName?.trim()) talentSet.add(o.talentName.trim())
+          }
+          for (const o of mpOrders) {
+            for (const a of o.applicants ?? []) {
+              if (a.name?.trim()) talentSet.add(a.name.trim())
+            }
+          }
+          setRecruitStats({
+            recruitCount: talentSet.size,
+            orderCount: erpOrders.length + mpOrders.length,
+          })
+        } catch {
+          setRecruitStats({ recruitCount: 0, orderCount: 0 })
+        }
+
+        if (hit.source === 'supabase') {
+          const insights = await fetchTenantInsightsForOps({
+            tenantId: hit.id,
+            loginName: hit.loginName,
+            merchantName: hit.merchantName,
+          })
+          if (insights.ok) {
+            setSupportSessions(insights.supportSessions)
+            setUsageMetrics(insights.usage)
+            setInsightsErr(null)
+          } else {
+            setSupportSessions([])
+            setUsageMetrics(null)
+            setInsightsErr(insights.hint ?? insights.error)
+          }
+        } else {
+          setSupportSessions([])
+          setUsageMetrics(null)
+          setInsightsErr(null)
+        }
+      }
     } catch {
       setTenant(null)
     }
@@ -105,6 +166,15 @@ export default function OpsCustomerDetailPage() {
     setLedgerRows(r.rows)
   }, [customerId, tenant])
 
+  const c = useMemo(() => {
+    if (!tenant) return null
+    return registryTenantToOpsCustomer(tenant, {
+      usage: usageMetrics ?? undefined,
+      talentRecruitCount: recruitStats.recruitCount,
+      talentOrderCount: recruitStats.orderCount,
+    })
+  }, [tenant, usageMetrics, recruitStats])
+
   if (tenant === undefined) {
     return (
       <div className="mx-auto max-w-lg p-8 text-center text-sm text-slate-500">
@@ -113,7 +183,7 @@ export default function OpsCustomerDetailPage() {
     )
   }
 
-  if (!tenant) {
+  if (!tenant || !c) {
     return (
       <div className="mx-auto max-w-lg rounded-xl border border-slate-800 bg-slate-900 p-8 text-center">
         <p className="text-slate-400">
@@ -125,8 +195,6 @@ export default function OpsCustomerDetailPage() {
       </div>
     )
   }
-
-  const c = registryTenantToOpsCustomer(tenant)
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -256,10 +324,15 @@ export default function OpsCustomerDetailPage() {
 
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-200">使用数据看板</h2>
-          <p className="text-xs text-slate-500">近 7/30 天登录趋势、模块使用频次（演示占位）</p>
+          <p className="text-xs text-slate-500">
+            汇总注册、资料更新、Auth 登录、钱包流水与 ERP 在线客服消息（日/周/月活为近 24h / 7 / 30 天内是否有活跃，取 0 或 1）
+          </p>
+          {insightsErr ? (
+            <p className="mt-2 text-xs text-amber-400/90">云端明细暂不可用：{insightsErr}</p>
+          ) : null}
           <ul className="mt-3 space-y-1 text-sm text-slate-400">
             <li>首登：{c.firstLoginAt}</li>
-            <li>最近登录：{c.lastLoginAt}</li>
+            <li>最近活跃：{c.lastLoginAt}</li>
             <li>活跃天数：{c.activeDays}</li>
             <li>
               日活 / 周活 / 月活：{c.dau} / {c.wau} / {c.mau}
@@ -324,9 +397,36 @@ export default function OpsCustomerDetailPage() {
             <MessageSquare className="h-4 w-4 text-sky-400" />
             客服会话记录
           </h2>
-          <p className="text-sm text-slate-500">
-            历史在线客服对话可按客户 / 时间 / 关键词检索；会话存储与坐席分配对接 IM 网关后启用。
-          </p>
+          {tenant.source !== 'supabase' ? (
+            <p className="text-sm text-slate-500">仅 Supabase 租户可查询 ERP 在线客服会话。</p>
+          ) : supportSessions.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              暂无匹配的 ERP 客服会话。商户在 ERP 右下角「在线客服」发消息后将出现在此。
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-800 rounded-lg border border-slate-800">
+              {supportSessions.map((s) => (
+                <li key={s.sessionId}>
+                  <Link
+                    to={`/support?session=${encodeURIComponent(s.sessionId)}`}
+                    className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-slate-800/50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-slate-200">{s.lastText || '（无消息摘要）'}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {new Date(s.lastTs).toLocaleString('zh-CN', { hour12: false })}
+                        {' · '}
+                        {formatSupportRelayTime(s.lastTs)}
+                        {' · '}
+                        {s.messageCount} 条
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
 

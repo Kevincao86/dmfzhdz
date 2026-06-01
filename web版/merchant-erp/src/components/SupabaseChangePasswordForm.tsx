@@ -1,4 +1,5 @@
 import { KeyRound, Loader2 } from 'lucide-react'
+import SecretInput from './SecretInput'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
@@ -113,9 +114,8 @@ export default function SupabaseChangePasswordForm() {
           <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={curId}>
             当前密码
           </label>
-          <input
+          <SecretInput
             id={curId}
-            type="password"
             autoComplete="current-password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
@@ -126,9 +126,8 @@ export default function SupabaseChangePasswordForm() {
           <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={newId}>
             新密码
           </label>
-          <input
+          <SecretInput
             id={newId}
-            type="password"
             autoComplete="new-password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
@@ -139,9 +138,8 @@ export default function SupabaseChangePasswordForm() {
           <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor={cnfId}>
             确认新密码
           </label>
-          <input
+          <SecretInput
             id={cnfId}
-            type="password"
             autoComplete="new-password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}

@@ -23,6 +23,7 @@ import {
   opsTenantTokenmixAdmin,
   opsTenantWalletLedgerAdmin,
 } from '../api/opsTenantsMutationsBackend'
+import { opsTenantInsightsAdmin } from '../api/opsTenantInsightsBackend'
 
 /** 官方本地 `supabase start` 固定 demo JWT（仅用于 127.0.0.1:54321，勿用于线上）。 */
 const LOCAL_SUPABASE_DEMO_SERVICE_ROLE =
@@ -304,6 +305,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
         const isOpsSupabaseRoute =
           isTenantListPath(urlPath) ||
           urlPath === '/api/ops-supabase/tenants/wallet-ledger' ||
+          urlPath === '/api/ops-supabase/tenants/insights' ||
           urlPath === '/api/ops-supabase/tenants/patch' ||
           urlPath === '/api/ops-supabase/tenants/reset-password' ||
           isMeooTenantsPatchPath(urlPath) ||
@@ -325,6 +327,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
           if (
             (isTenantListPath(urlPath) && method === 'GET') ||
             (urlPath === '/api/ops-supabase/tenants/wallet-ledger' && method === 'GET') ||
+            (urlPath === '/api/ops-supabase/tenants/insights' && method === 'GET') ||
             (isPaymentOrdersListPath(urlPath) && method === 'GET') ||
             (isMeooTenantsPatchPath(urlPath) && method === 'POST') ||
             (isMeooTenantsResetPasswordPath(urlPath) && method === 'POST') ||
@@ -434,6 +437,50 @@ export function opsSupabaseAdminPlugin(): Plugin {
               return
             }
             json(res, 200, { ok: true, rows: lr.rows })
+            return
+          }
+
+          if (method === 'GET' && urlPath === '/api/ops-supabase/tenants/insights') {
+            if (!effectiveKey) {
+              json(res, 503, {
+                ok: false,
+                error: 'supabase_admin_not_configured',
+                hint:
+                  '使用看板与客服会话摘要需要 Service Role：请在 .env.local 配置 SUPABASE_SERVICE_ROLE_KEY',
+              })
+              return
+            }
+            let tenantId = ''
+            let loginName = ''
+            let merchantName = ''
+            try {
+              const u = new URL(reqUrl, 'http://vite.local')
+              tenantId = u.searchParams.get('tenant_id')?.trim() ?? ''
+              loginName = u.searchParams.get('login_name')?.trim() ?? ''
+              merchantName = u.searchParams.get('merchant_name')?.trim() ?? ''
+            } catch {
+              /* ignore */
+            }
+            const admin = createClient(supabaseUrl, effectiveKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            })
+            const ir = await opsTenantInsightsAdmin(
+              admin,
+              tenantId,
+              loginName,
+              merchantName,
+              {
+                apikey: effectiveKey,
+                Authorization: `Bearer ${effectiveKey}`,
+                Accept: 'application/json',
+              },
+              supabaseUrl,
+            )
+            if (!ir.ok) {
+              json(res, ir.status, ir.body)
+              return
+            }
+            json(res, 200, { ok: true, usage: ir.usage, supportSessions: ir.supportSessions })
             return
           }
 

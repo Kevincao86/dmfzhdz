@@ -2,6 +2,7 @@ import { Plus, Shield, Trash2, UserCog } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { cn } from '../../cn'
+import SecretInput from '../../components/SecretInput'
 import {
   createOpsSubAccount,
   deleteOpsSubAccount,
@@ -329,8 +330,7 @@ export default function OpsAccountsPermissionsPage() {
               <label className="mb-1 block text-xs text-slate-500">
                 {editing ? '新密码（留空不修改）' : '登录密码'}
               </label>
-              <input
-                type="password"
+              <SecretInput
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
