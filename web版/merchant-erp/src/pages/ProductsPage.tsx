@@ -368,9 +368,10 @@ export default function ProductsPage() {
 
   useEffect(() => {
     if (!supabaseConfigured || !supabase) return
+    const client = supabase
     const sync = () => {
       if (!getActiveTenantStorageId()) return
-      void pushLocalStoreIntelToCloud(supabase)
+      void pushLocalStoreIntelToCloud(client)
     }
     sync()
     window.addEventListener('meoo-active-tenant-changed', sync)
