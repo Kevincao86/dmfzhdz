@@ -17,6 +17,19 @@ export type DouyinLinkParseResponse =
 
 const API_PATH = '/api/meoo-digital-human-douyin-link'
 
+/** 链接解析：优先同源 Vercel（push 即部署），ECS erp-api 作备用 */
+function douyinLinkApiCandidates(): string[] {
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  if (typeof window !== 'undefined') {
+    add(`${window.location.origin}${API_PATH}`)
+  }
+  for (const u of merchantErpApiCandidates(API_PATH)) add(u)
+  return urls
+}
+
 async function bearer(): Promise<string | null> {
   if (!supabaseConfigured || !supabase) return null
   const { data } = await supabase.auth.getSession()
@@ -53,7 +66,8 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
   }
 
   let lastMsg = '链接解析失败，请稍后重试'
-  for (const target of merchantErpApiCandidates(API_PATH)) {
+  let lastFail: DouyinLinkParseResponse | null = null
+  for (const target of douyinLinkApiCandidates()) {
     try {
       const res = await fetch(target, {
         method: 'POST',
@@ -68,7 +82,10 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
       if (j?.ok) return j
       if (j && !j.ok && j.message) {
         lastMsg = j.message
-        if (res.ok || res.status === 422) return j
+        lastFail = j
+        // 422 可能是 ECS 旧版本；继续尝试下一候选（如同源 Vercel API）
+        if (res.status === 422) continue
+        if (res.ok) return j
         continue
       }
       if (res.status === 404) {
@@ -85,5 +102,6 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
     }
   }
 
+  if (lastFail) return lastFail
   return { ok: false, message: toUserFacingError(lastMsg, '链接解析') }
 }
