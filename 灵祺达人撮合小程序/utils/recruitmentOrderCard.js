@@ -1,6 +1,7 @@
 const display = require('./recruitmentDisplay.js')
 const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
 const { isUrgentMpOrder, isIceMpOrder } = require('./recruitmentUrgent.js')
+const { isMerchantSyncedMpOrder } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
 
 const STATUS_LABEL = {
@@ -28,6 +29,8 @@ function mapMpOrderRow(mp, reg) {
   const priceAmount = listFilters.resolvePriceAmount(mp, view)
   const publishedAtMs = listFilters.resolvePublishedMs(mp)
   const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
+  const hideBudget = isMerchantSyncedMpOrder(mp)
+  const budgetText = hideBudget ? '' : view.budgetText || '面议'
   return {
     id: mp.id,
     isMock: false,
@@ -40,11 +43,11 @@ function mapMpOrderRow(mp, reg) {
     platformIcon: platformIcon(platform),
     region: view.region,
     category: view.category || '本地生活',
-    budgetText: view.budgetText || '面议',
-    budgetDisplay: budgetDisplayUtil.buildBudgetDisplay(
-      view.budgetText || '面议',
-      mp.mpPublishMeta,
-    ),
+    hideBudget,
+    budgetText,
+    budgetDisplay: hideBudget
+      ? null
+      : budgetDisplayUtil.buildBudgetDisplay(budgetText, mp.mpPublishMeta),
     fansRequirement: view.fansRequirement || '不限',
     summary: view.summaryShort,
     applicantCount: view.applicantCount,

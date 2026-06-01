@@ -1,6 +1,10 @@
 const config = require('./config.js')
 
-const WX_NET = { enableHttp2: false, enableQuic: false }
+const WX_NET = {
+  enableHttp2: false,
+  enableQuic: false,
+  useHighPerformanceMode: false,
+}
 
 function baseUrl() {
   return String(config.SUPABASE_URL || '')

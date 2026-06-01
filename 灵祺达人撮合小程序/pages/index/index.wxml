@@ -157,7 +157,7 @@
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
               <text class="job-card-compact__tag job-card-compact__tag--ice" wx:elif="{{item.isIce}}">云剪</text>
             </view>
-            <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay.kind === 'tiers'}}">
+            <view class="job-card-compact__fee" wx:if="{{!item.hideBudget && item.budgetDisplay.kind === 'tiers'}}">
               <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
               <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>
               <view class="job-card-compact__fee-chips">
@@ -170,7 +170,7 @@
                 <text wx:if="{{item.budgetDisplay.moreCount > 0}}" class="job-card-compact__tier-more">+{{item.budgetDisplay.moreCount}}档</text>
               </view>
             </view>
-            <text wx:else class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
+            <text wx:elif="{{!item.hideBudget}}" class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
             <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
           </view>
         </view>
