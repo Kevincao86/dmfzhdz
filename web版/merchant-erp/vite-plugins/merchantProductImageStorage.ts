@@ -1,6 +1,7 @@
 /**
  * 商户商品图上传：优先阿里云 OSS（与云剪同 Bucket 时可共用 AccessKey），备选 Supabase Storage。
  */
+/// <reference path="./ali-oss.d.ts" />
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { parseOssUrlPrefix, type ParsedOssPrefix } from './aliyunOssIceParse.js'
