@@ -1,5 +1,5 @@
 import type { AiTaskType } from './aiAgentTypes'
-import { stripAssistantThinkingBlocks } from './assistantThinkingText'
+import { resolveAssistantVisibleText } from './assistantThinkingText'
 import { AI_TASK_TYPE_LABELS } from './aiAgentTypes'
 import { filterScenarioTaskTypes } from './aiAgentPreviewState'
 import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
@@ -316,7 +316,7 @@ export function parsePriceYuanFromApi(raw: unknown): number | undefined {
 /** 去除助手回复中的 Markdown 装饰符（#、* 等），便于对话区整洁展示 */
 export function formatAssistantDisplayText(content: string): string {
   if (!content?.trim()) return content
-  let s = stripAssistantThinkingBlocks(content)
+  let s = resolveAssistantVisibleText(content)
   s = s.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
   s = s.replace(/^#{1,6}\s+/gm, '')
   s = s.replace(/\*\*([^*]+)\*\*/g, '$1')

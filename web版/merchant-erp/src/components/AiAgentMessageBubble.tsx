@@ -3,6 +3,7 @@ import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 import type { AiAgentMessage } from '../lib/aiAgentTypes'
 import { formatAssistantDisplayText } from '../lib/aiAgentActionParse'
+import { AiAgentThinkingLive } from './AiAgentThinkingLive'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import { AiAgentProductVisualPreview } from './AiAgentProductVisualPreview'
 import { AiAgentRecruitmentVisualPreview } from './AiAgentRecruitmentVisualPreview'
@@ -94,6 +95,10 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
   const imgs = m.imageUrls?.filter(Boolean) ?? []
   const videos = m.videoUrls?.filter(Boolean) ?? []
   const timeStr = formatBubbleTime(m.createdAt)
+  const displayText = m.content?.trim() ?? ''
+  const thinkingText = m.thinkingText?.trim() ?? ''
+  const showThinking = !isUser && !isSystem && !displayText && Boolean(thinkingText)
+  const showBody = Boolean(displayText) || showThinking || imgs.length > 0
 
   if (isUser) {
     return (
@@ -144,6 +149,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
   return (
     <div className="flex justify-start">
       <div className="w-full">
+        {showBody ? (
         <div
           className={cn(
             'rounded-2xl rounded-bl-md px-4 py-3 text-[13px] leading-relaxed shadow-sm',
@@ -154,6 +160,7 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
                 : 'border border-slate-200/80 bg-slate-50/95 text-slate-800 ring-1 ring-slate-200/40',
           )}
         >
+          {showThinking ? <AiAgentThinkingLive text={thinkingText} className="!justify-start" /> : null}
           {imgs.length > 0 ? (
             <div className="mb-2 flex flex-wrap gap-2">
               {imgs.map((src, i) => (
@@ -170,12 +177,13 @@ export function AiAgentMessageBubble({ m }: { m: AiAgentMessage }) {
               ))}
             </div>
           ) : null}
-          {m.content ? (
-            <p className="whitespace-pre-wrap">
-              {formatAssistantDisplayText(m.content)}
-            </p>
+          {displayText ? (
+            <p className="whitespace-pre-wrap">{displayText}</p>
           ) : null}
         </div>
+        ) : m.isStreaming ? (
+          <AiAgentThinkingLive text={thinkingText || '思考中…'} />
+        ) : null}
         {m.role === 'assistant' ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <button

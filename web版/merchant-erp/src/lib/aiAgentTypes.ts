@@ -189,6 +189,8 @@ export type AiAgentMessage = {
   resultSummary?: string
   /** 流式回复生成中（占位气泡） */
   isStreaming?: boolean
+  /** 模型思考过程（流式/完成后可选展示） */
+  thinkingText?: string
   /** 达人招募确认后的订单明细（仅 task_result） */
   recruitmentOrder?: AiRecruitmentOrderDetail
 }

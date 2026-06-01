@@ -6,7 +6,6 @@ import { AiAgentComposerBar } from './AiAgentComposerBar'
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
 import { AiAgentPreviewActions } from './AiAgentPreviewActions'
 import { AiAgentThinkingIndicator } from './AiAgentThinkingIndicator'
-import { AiAgentThinkingLive } from './AiAgentThinkingLive'
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
 import type { AiPermissionId } from '../lib/aiAgentTypes'
@@ -186,10 +185,7 @@ export default function AiAgentDrawer() {
                   ) : null}
                 </div>
               ))}
-              {streamingReply?.thinking?.trim() ? (
-                <AiAgentThinkingLive text={streamingReply.thinking} />
-              ) : null}
-              {aiSending && !streamingReply?.content.trim() && !streamingReply?.thinking?.trim() ? (
+              {aiSending && !messages.some((m) => m.isStreaming) ? (
                 <AiAgentThinkingIndicator />
               ) : null}
             </div>
