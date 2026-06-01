@@ -439,14 +439,6 @@ Page({
       wx.switchTab({ url: '/pages/index/index' })
       return
     }
-    try {
-      const wxAcc = require('../../utils/wxAccount.js')
-      if (!wxAcc.isWxLoggedIn()) {
-        wx.showToast({ title: '请先在「我的」完成微信登录', icon: 'none' })
-        wx.switchTab({ url: '/pages/mine/mine' })
-        return
-      }
-    } catch (_) {}
     setTabBarForPage(this, '/pages/publish/publish')
     applyPublishSafeHead(this)
     this.syncTabBarOverlay()
@@ -529,10 +521,18 @@ Page({
       createdOrder: null,
     })
     this.syncDisplayFields()
+    this.syncTabBarOverlay()
+  },
+  onBackFromMode() {
+    wx.switchTab({ url: '/pages/index/index' })
   },
   onSelectMode(e) {
     const mode = modeById(e.currentTarget.dataset.id)
     if (!mode) return
+    if (mode.disabled) {
+      wx.showToast({ title: '云剪任务功能搭建中', icon: 'none' })
+      return
+    }
     const today = defaultSignupDate()
     this.setData({
       step: 'form',
@@ -1005,7 +1005,24 @@ Page({
       groupCopyText: shareCopy.buildGroupCopyText(order, prProfile),
     }
   },
+  ensureWxLoginBeforePublish() {
+    try {
+      const wxAcc = require('../../utils/wxAccount.js')
+      if (wxAcc.isWxLoggedIn()) return true
+    } catch (_) {}
+    wx.showModal({
+      title: '需要微信登录',
+      content: '发布招募前请先在「我的」完成微信昵称登录。',
+      confirmText: '去登录',
+      cancelText: '稍后',
+      success: (r) => {
+        if (r.confirm) wx.switchTab({ url: '/pages/mine/mine' })
+      },
+    })
+    return false
+  },
   async onCreate() {
+    if (!this.ensureWxLoginBeforePublish()) return
     const err = this.validate()
     if (err) {
       wx.showToast({ title: err, icon: 'none' })

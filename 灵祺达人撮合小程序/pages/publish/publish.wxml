@@ -18,14 +18,22 @@
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
+      <text class="pub-hero-back" bindtap="onBackFromMode">‹ 返回</text>
       <text class="pub-hero-title">选择招募模式</text>
       <text class="pub-hero-sub">探店 · 品宣 · 云剪</text>
     </view>
     <view class="pub-mode-list">
-      <view wx:for="{{recruitModes}}" wx:key="id" class="pub-mode-card" data-id="{{item.id}}" bindtap="onSelectMode">
+      <view
+        wx:for="{{recruitModes}}"
+        wx:key="id"
+        class="pub-mode-card {{item.disabled ? 'pub-mode-card--disabled' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onSelectMode"
+      >
         <text class="pub-mode-name">{{item.label}}</text>
         <text class="pub-mode-sub">{{item.sub}}</text>
-        <text class="pub-mode-arrow">›</text>
+        <text wx:if="{{item.disabled}}" class="pub-mode-badge">搭建中</text>
+        <text wx:else class="pub-mode-arrow">›</text>
       </view>
     </view>
     </view>

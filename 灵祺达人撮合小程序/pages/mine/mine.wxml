@@ -78,53 +78,7 @@
       bindtap="onMenuTap"
     >
       <view class="menu-icon-wrap menu-icon-wrap--{{item.icon}}">
-        <view class="menu-blob" aria-hidden="true">
-          <view class="menu-blob-shine"></view>
-          <view class="menu-blob-glow"></view>
-        </view>
-        <view class="menu-glyph menu-glyph--{{item.icon}}">
-          <block wx:if="{{item.icon === 'info'}}">
-            <view class="glyph-user">
-              <view class="glyph-user-head"></view>
-              <view class="glyph-user-body"></view>
-            </view>
-          </block>
-          <block wx:elif="{{item.icon === 'list'}}">
-            <view class="glyph-list">
-              <view class="glyph-list-bar"></view>
-              <view class="glyph-list-bar glyph-list-bar--2"></view>
-              <view class="glyph-list-bar glyph-list-bar--3"></view>
-            </view>
-          </block>
-          <block wx:elif="{{item.icon === 'tpl'}}">
-            <view class="glyph-tpl">
-              <view class="glyph-tpl-back"></view>
-              <view class="glyph-tpl-front"></view>
-            </view>
-          </block>
-          <block wx:elif="{{item.icon === 'bell'}}">
-            <view class="glyph-bell">
-              <view class="glyph-bell-knob"></view>
-              <view class="glyph-bell-top"></view>
-              <view class="glyph-bell-clapper"></view>
-            </view>
-          </block>
-          <block wx:elif="{{item.icon === 'chart'}}">
-            <view class="glyph-chart">
-              <view class="glyph-chart-bar glyph-chart-bar--1"></view>
-              <view class="glyph-chart-bar glyph-chart-bar--2"></view>
-              <view class="glyph-chart-bar glyph-chart-bar--3"></view>
-            </view>
-          </block>
-          <block wx:else>
-            <view class="glyph-support">
-              <view class="glyph-support-bubble">
-                <text class="glyph-support-q">?</text>
-                <view class="glyph-support-tail"></view>
-              </view>
-            </view>
-          </block>
-        </view>
+        <text class="menu-emoji">{{item.emoji}}</text>
       </view>
       <view class="menu-body">
         <text class="menu-label">{{item.label}}</text>
@@ -154,7 +108,9 @@
         data-id="talent"
         bindtap="onPickIdentity"
       >
-        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent"></view>
+        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent">
+          <text class="id-sheet-opt-emoji">🎭</text>
+        </view>
         <view class="id-sheet-opt-body">
           <text class="id-sheet-opt-title">达人</text>
           <text class="id-sheet-opt-sub">浏览商单、报名招募、管理个人资料</text>
@@ -166,7 +122,9 @@
         data-id="pr"
         bindtap="onPickIdentity"
       >
-        <view class="id-sheet-opt-icon id-sheet-opt-icon--pr"></view>
+        <view class="id-sheet-opt-icon id-sheet-opt-icon--pr">
+          <text class="id-sheet-opt-emoji">💼</text>
+        </view>
         <view class="id-sheet-opt-body">
           <text class="id-sheet-opt-title">PR</text>
           <text class="id-sheet-opt-sub">发布招募、管理发单与达人沟通</text>

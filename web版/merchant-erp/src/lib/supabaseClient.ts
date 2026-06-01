@@ -5,6 +5,14 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabaseConfigured = Boolean(url?.trim() && anon?.trim())
 
+/** 登录页提示：构建时未注入的 VITE_ 变量（仅前端可见项） */
+export function missingSupabaseClientEnvKeys(): string[] {
+  const missing: string[] = []
+  if (!url?.trim()) missing.push('VITE_SUPABASE_URL')
+  if (!anon?.trim()) missing.push('VITE_SUPABASE_ANON_KEY')
+  return missing
+}
+
 export const supabase = supabaseConfigured
   ? createClient(url!, anon!, {
       auth: {

@@ -86,4 +86,14 @@ else
   exit 1
 fi
 
-echo "完成。请刷新商户 ERP AI 智能体。"
+echo "== 5) 小程序 API 路由（非 404 即可） =="
+MP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+  "https://mofangdianai.com/erp-api/meoo-ops-mp-recruitment-orders-apply" \
+  -H 'Content-Type: application/json' -d '{}' 2>/dev/null || echo 000)"
+echo "meoo-ops-mp-recruitment-orders-apply HTTP $MP_CODE (期望 400/503，勿 404)"
+if [[ "$MP_CODE" == "404" ]]; then
+  echo "FAIL: 小程序报名接口未挂载，请确认 revision 含 mp-routes 且已 restart meoo-auth-api"
+  exit 1
+fi
+
+echo "完成。请刷新商户 ERP AI 智能体；小程序可去掉 Vercel 合法域名（若已全走 ECS）。"

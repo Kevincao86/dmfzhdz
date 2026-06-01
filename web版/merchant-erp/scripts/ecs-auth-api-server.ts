@@ -39,9 +39,21 @@ import iceOpenshotExportDownloadHandler from '../api/meoo-merchant-ai-video-open
 import iceOpenshotExportHandler from '../api/meoo-merchant-ai-video-openshot-export.ts'
 import digitalHumanTtsHandler from '../api/meoo-digital-human-tts.ts'
 import digitalHumanDouyinLinkHandler from '../api/meoo-digital-human-douyin-link.ts'
+import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-apply.ts'
+import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
+import mpRecruitmentPatchHandler from '../api/meoo-ops-mp-recruitment-orders-patch.ts'
+import mpRecruitmentDeleteHandler from '../api/meoo-ops-mp-recruitment-orders-delete.ts'
+import mpTalentMemberRegisterHandler from '../api/meoo-ops-mp-talent-member-register.ts'
+import mpPrUserRegisterHandler from '../api/meoo-ops-mp-pr-user-register.ts'
+import mpTalentChatHandler from '../api/meoo-ops-mp-talent-chat.ts'
+import mpSupportRelayHandler from '../api/meoo-ops-mp-support-relay.ts'
+import mpRecruitmentIceSubmitHandler from '../api/meoo-ops-mp-recruitment-ice-submit.ts'
+import mpRecruitmentIceConfirmHandler from '../api/meoo-ops-mp-recruitment-ice-confirm.ts'
+import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
+import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260601-ai-chat-sse'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260601-mp-routes'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -97,6 +109,19 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-ice-job-download': iceJobDownloadHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-openshot-export-download':
     iceOpenshotExportDownloadHandler as VercelLikeHandler,
+  /** 灵祺达人招募小程序（与 Vercel 根 api/ 同名路由） */
+  '/api/meoo-ops-mp-recruitment-orders-apply': mpRecruitmentApplyHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-orders-append': mpRecruitmentAppendHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-orders-patch': mpRecruitmentPatchHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-orders-delete': mpRecruitmentDeleteHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-talent-member-register': mpTalentMemberRegisterHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-pr-user-register': mpPrUserRegisterHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-talent-chat': mpTalentChatHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-support-relay': mpSupportRelayHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-ice-submit': mpRecruitmentIceSubmitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-ice-confirm': mpRecruitmentIceConfirmHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
+  '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
   '/api/meoo-erp-api-health': async (_req, res) => {
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json; charset=utf-8')

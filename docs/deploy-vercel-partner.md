@@ -36,6 +36,22 @@
 - **`VITE_APP_EDITION`**: 不设置或 `merchant`
 - **`VITE_PEER_EDITION_LOGIN_URL`**: 服务商版登录 URL，如 `https://你的服务商域名/login`
 
+## 故障：打开 fws 显示「登录服务未配置」
+
+说明 **服务商 Vercel 项目构建时未注入** `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`（前端打包进静态 JS，不是运行时配置）。
+
+**处理步骤：**
+
+1. 打开 **商家版** Vercel 项目（cs.mofangdianai.com）→ Settings → Environment Variables，记下：
+   - `VITE_SUPABASE_URL`（或 `SUPABASE_URL`）
+   - `VITE_SUPABASE_ANON_KEY`（或 `SUPABASE_ANON_KEY`）
+   - `VITE_ERP_AUTH_API_BASE`（若有）
+2. 在 **服务商版** Vercel 项目（fws.mofangdianai.com）→ 同样位置 **新增同名变量**（Production + Preview）。
+3. 确认另有：`VITE_APP_EDITION=partner`、`VITE_PEER_EDITION_LOGIN_URL=https://cs.mofangdianai.com/login`
+4. Deployments → 对最新部署 **Redeploy**（必须重新构建，只改 DNS 无效）。
+
+本地模板见 `web版/merchant-erp/.env.partner.example`。CI 构建已加 `scripts/assert-partner-build-env.mjs`，缺变量时 Vercel 构建会直接失败并打印缺项。
+
 ## 登录页切换
 
 - 商家站点击「切换到服务商版」→ 打开 `VITE_PEER_EDITION_LOGIN_URL`
