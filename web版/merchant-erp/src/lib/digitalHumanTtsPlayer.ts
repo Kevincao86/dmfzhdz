@@ -77,7 +77,13 @@ export async function playDigitalHumanSpeech(
     mode: DigitalHumanTtsMode
   },
   callbacks: DigitalHumanTtsCallbacks,
-): Promise<{ ok: boolean; source: 'cloud' | 'browser'; message?: string }> {
+): Promise<{
+  ok: boolean
+  source: 'cloud' | 'browser'
+  message?: string
+  /** 云端失败原因（回退浏览器时用于提示） */
+  cloudFallbackReason?: string
+}> {
   stopDigitalHumanSpeech()
 
   const trimmed = text.trim()
@@ -87,6 +93,8 @@ export async function playDigitalHumanSpeech(
 
   const previewLine = trimmed.split(/\n/)[0]?.slice(0, 36) ?? trimmed.slice(0, 36)
   const canUseCloud = Boolean(opts.preset?.cloudVoiceId && opts.preset.id !== 'v-clone')
+
+  let cloudFallbackReason: string | undefined
 
   if (canUseCloud && opts.preset) {
     const cloud = await synthesizeDigitalHumanSpeech({
@@ -117,6 +125,8 @@ export async function playDigitalHumanSpeech(
         const msg = e instanceof Error ? e.message : String(e)
         callbacks.onError?.(opts.mode, msg)
       }
+    } else {
+      cloudFallbackReason = cloud.message
     }
   }
 
@@ -131,5 +141,5 @@ export async function playDigitalHumanSpeech(
   if (!browserOk) {
     return { ok: false, source: 'browser', message: '当前浏览器不支持语音试听' }
   }
-  return { ok: true, source: 'browser' }
+  return { ok: true, source: 'browser', cloudFallbackReason }
 }

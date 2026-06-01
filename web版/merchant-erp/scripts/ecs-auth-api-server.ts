@@ -37,9 +37,11 @@ import iceJobHandler from '../api/meoo-merchant-ai-video-ice-job.ts'
 import iceJobDownloadHandler from '../api/meoo-merchant-ai-video-ice-job-download.ts'
 import iceOpenshotExportDownloadHandler from '../api/meoo-merchant-ai-video-openshot-export-download.ts'
 import iceOpenshotExportHandler from '../api/meoo-merchant-ai-video-openshot-export.ts'
+import digitalHumanTtsHandler from '../api/meoo-digital-human-tts.ts'
+import digitalHumanDouyinLinkHandler from '../api/meoo-digital-human-douyin-link.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260601-ice-erp-api'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260601-dh-tts-erp-api'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -79,6 +81,9 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
+  /** 数字人口播：MiniMax 神经 TTS 试听、抖音链接文案（须合并运营台 vendorKeys） */
+  '/api/meoo-digital-human-tts': digitalHumanTtsHandler as VercelLikeHandler,
+  '/api/meoo-digital-human-douyin-link': digitalHumanDouyinLinkHandler as VercelLikeHandler,
   /** 灵祺AI云剪：读运营台 videoAi 注册表，须走 ECS 勿仅靠 Vercel */
   '/api/meoo-merchant-ai-video-ice-config': iceConfigHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-openshot-config': iceOpenshotConfigHandler as VercelLikeHandler,

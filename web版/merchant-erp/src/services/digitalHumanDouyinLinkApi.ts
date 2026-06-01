@@ -1,3 +1,4 @@
+import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { fetchPrimaryTenantId } from '../lib/tenantBilling'
 import { toUserFacingError } from '../lib/userFacingError'
@@ -13,7 +14,7 @@ export type DouyinLinkParseResponse =
     }
   | { ok: false; message: string }
 
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
+const API_PATH = '/api/meoo-digital-human-douyin-link'
 
 async function bearer(): Promise<string | null> {
   if (!supabaseConfigured || !supabase) return null
@@ -50,43 +51,35 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
     Authorization: `Bearer ${token}`,
   }
 
-  const paths = ['/api/meoo-digital-human-douyin-link']
-  const bases = [typeof window !== 'undefined' ? window.location.origin : '', apiBase().replace(/\/$/, '')].filter(
-    Boolean,
-  )
-
   let lastMsg = '链接解析失败，请稍后重试'
-  for (const base of bases.length ? bases : ['']) {
-    for (const p of paths) {
-      const target = base ? `${base}${p}` : p
-      try {
-        const res = await fetch(target, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            url: url.trim(),
-            ...(tenantId ? { tenantId } : {}),
-          }),
-        })
-        const text = await res.text()
-        const j = parseResponseBody(text)
-        if (j?.ok) return j
-        if (j && !j.ok && j.message) {
-          lastMsg = j.message
-          continue
-        }
-        if (res.status === 404) {
-          lastMsg = '链接解析接口未部署，请联系管理员更新线上环境'
-          continue
-        }
-        if (!res.ok) {
-          lastMsg = text.includes('<!doctype') || text.includes('<html')
-            ? '链接解析接口未就绪，请确认已部署最新版本'
-            : `请求失败 HTTP ${res.status}`
-        }
-      } catch (e) {
-        lastMsg = e instanceof Error ? e.message : String(e)
+  for (const target of merchantErpApiCandidates(API_PATH)) {
+    try {
+      const res = await fetch(target, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          url: url.trim(),
+          ...(tenantId ? { tenantId } : {}),
+        }),
+      })
+      const text = await res.text()
+      const j = parseResponseBody(text)
+      if (j?.ok) return j
+      if (j && !j.ok && j.message) {
+        lastMsg = j.message
+        continue
       }
+      if (res.status === 404) {
+        lastMsg = '链接解析接口未部署，请在 ECS 更新 meoo-auth-api'
+        continue
+      }
+      if (!res.ok) {
+        lastMsg = text.includes('<!doctype') || text.includes('<html')
+          ? '链接解析接口未就绪，请确认已部署最新版本'
+          : `请求失败 HTTP ${res.status}`
+      }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
     }
   }
 

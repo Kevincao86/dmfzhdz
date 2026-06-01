@@ -31,13 +31,37 @@ function minimaxT2aModel(env: Record<string, string>): string {
 }
 
 function minimaxT2aUrls(env: Record<string, string>): string[] {
-  const custom = (env.MERCHANT_AI_MINIMAX_T2A_BASE ?? '').trim().replace(/\/$/, '')
-  if (custom) return [`${custom}/t2a_v2`]
-  return [
-    'https://api.minimaxi.com/v1/t2a_v2',
-    'https://api-bj.minimaxi.com/v1/t2a_v2',
-    'https://api.minimax.io/v1/t2a_v2',
-  ]
+  const custom = (env.MERCHANT_AI_MINIMAX_T2A_BASE ?? env.MINIMAX_BASE_URL ?? '')
+    .trim()
+    .replace(/\/$/, '')
+  const key = (env.MINIMAX_API_KEY ?? env.MERCHANT_AI_MINIMAX_KEY ?? '').trim()
+  const region = (env.MINIMAX_REGION ?? '').trim().toLowerCase()
+  const cnFirst = region === 'cn' || key.startsWith('sk-api-')
+  const intlFirst = region === 'intl' || region === 'io'
+  const out: string[] = []
+  const add = (host: string) => {
+    const base = host.replace(/\/$/, '')
+    const url = base.includes('/t2a') ? base : `${base}/t2a_v2`
+    if (!out.includes(url)) out.push(url)
+  }
+  if (custom) {
+    add(custom.includes('/v1') ? custom : `${custom}/v1`)
+    return out
+  }
+  if (intlFirst) {
+    add('https://api.minimax.io/v1')
+    add('https://api.minimaxi.com/v1')
+    add('https://api-bj.minimaxi.com/v1')
+  } else if (cnFirst) {
+    add('https://api.minimaxi.com/v1')
+    add('https://api-bj.minimaxi.com/v1')
+    add('https://api.minimax.io/v1')
+  } else {
+    add('https://api.minimaxi.com/v1')
+    add('https://api-bj.minimaxi.com/v1')
+    add('https://api.minimax.io/v1')
+  }
+  return out
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -148,6 +172,13 @@ export async function runDigitalHumanTtsCore(
     return {
       ok: false,
       message: '未配置 MiniMax 语音 Key。请在商家管理后台「管控台 · AI模型」保存 MiniMax Key。',
+    }
+  }
+  if (apiKey.startsWith('eyJ')) {
+    return {
+      ok: false,
+      message:
+        'MiniMax 语音 Key 不能填 JWT（eyJ 开头）。请在 platform.minimaxi.com 或 platform.minimax.io「接口密钥」复制 sk- 开头 Key。',
     }
   }
 
