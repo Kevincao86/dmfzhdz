@@ -1,5 +1,7 @@
 const chat = require('./talentChat.js')
 const participant = require('./participant.js')
+const talentMember = require('./talentMember.js')
+const userProfile = require('./userProfile.js')
 
 const POLL_MS = chat.POLL_MS || 2500
 
@@ -88,6 +90,9 @@ function syncBarFromGlobal() {
 
 function start() {
   stop()
+  const member = talentMember.readMember()
+  const pr = userProfile.readPrProfile()
+  if (!member && !pr) return
   void refreshNow()
   pollTimer = setInterval(() => {
     void refreshNow()

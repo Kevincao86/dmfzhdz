@@ -749,11 +749,8 @@ function formatLinkParseAiError(raw: string): string {
   return t.slice(0, 400)
 }
 
-const LINK_PARSE_AI_PROVIDERS: Array<{ provider: 'qwen' | 'doubao' | 'minimax'; model?: string }> = [
-  { provider: 'qwen', model: 'qwen-plus' },
-  { provider: 'doubao' },
-  { provider: 'minimax' },
-]
+/** 链接口播解析固定走豆包（与智能体同源 Key） */
+const LINK_PARSE_AI_PROVIDERS: Array<{ provider: 'doubao'; model?: string }> = [{ provider: 'doubao' }]
 
 /** 与 /api/meoo-ai-chat 同源：运营台 vendorKeys + 租户权益 + routeAiChat */
 async function generateLinkParseContent(
@@ -831,6 +828,74 @@ ${script}
   return motion.trim() || defaultMotionInstructions()
 }
 
+function parseScriptFromAi(content: string): string {
+  const parsed = parseAiJsonBlock(content)
+  if (parsed?.script?.trim()) return parsed.script.trim()
+  const scriptMatch = /"script"\s*:\s*"((?:\\.|[^"\\])*)"/s.exec(content)
+  if (scriptMatch?.[1]) return unescapeJsonString(scriptMatch[1]).trim()
+  return ''
+}
+
+async function extractScriptAndMotionWithDoubao(
+  page: DouyinPageExtract,
+  normalizedUrl: string,
+  videoId: string | null,
+  rawUserText: string,
+  env: Record<string, string>,
+  authHeader?: string,
+  tenantIdHint?: string,
+): Promise<
+  | { script: string; motionInstructions: string }
+  | { ok: false; message: string }
+> {
+  const prompt = `你是抖音短视频口播还原助手（豆包）。用户粘贴了分享链接或口令，请结合链接与页面抓取信息，还原视频中人物**实际说出**的口播原文。
+
+用户粘贴原文：
+${rawUserText.trim()}
+
+解析链接：${normalizedUrl}
+视频ID：${videoId ?? '未知'}
+页面标题（勿当作口播）：${page.title ?? '未抓取到'}
+发布文案 desc（勿直接照搬，多为标题/引流）：${page.awemeItem?.desc ?? page.description ?? '未抓取到'}
+嵌入字幕/文案：${page.caption ?? '未抓取到'}
+章节信息：${page.awemeItem?.chapter_list?.map((c) => c.title || c.desc || c.content).filter(Boolean).join('；') || '无'}
+
+规则：
+1. script 必须是口播正文，优先长句、完整表达；仅有「长按复制」「打开抖音」等分享口令而无口播时，script 留空
+2. 不得把发布标题、话题标签、引流句当作完整口播
+3. motionInstructions 写数字人动作/镜头/表情时间轴
+
+请严格输出 JSON（不要 markdown）：
+{"script":"...","motionInstructions":"..."}`
+
+  const aiOut = await generateLinkParseContent(prompt, env, authHeader, tenantIdHint)
+  if (!aiOut.ok) return { ok: false, message: aiOut.message }
+
+  const content = aiOut.content
+  let script = parseScriptFromAi(content)
+  let motionInstructions = parseMotionFromAi(content)
+
+  if (/insufficient_source/i.test(motionInstructions) || /insufficient_source/i.test(content)) {
+    return {
+      ok: false,
+      message: '豆包未能从该链接还原口播，请换完整视频链接或改用手动输入/文本驱动',
+    }
+  }
+
+  if (script.length < 12) {
+    return {
+      ok: false,
+      message: '豆包未能还原有效口播文案，请换链接或改用手动输入/文本驱动',
+    }
+  }
+
+  if (!motionInstructions || /insufficient/i.test(motionInstructions)) {
+    motionInstructions = await inferMotionInstructionsFromScript(script, env, authHeader, tenantIdHint)
+  }
+
+  return { script, motionInstructions }
+}
+
 export async function runDouyinLinkParseCore(
   input: DouyinLinkParseInput,
   env: Record<string, string>,
@@ -848,76 +913,62 @@ export async function runDouyinLinkParseCore(
   const normalizedUrl = normalizeDouyinShareUrl(resolved.url) ?? extracted
   const videoId = resolved.videoId ?? extractDouyinVideoId(normalizedUrl)
 
-  if (resolved.shortLinkUnresolved && !videoId) {
-    return {
-      ok: false,
-      message:
-        '短链无法在服务端解析为视频页（抖音常限制服务器访问）。请在抖音 App 打开该视频 → 分享 → 复制链接，粘贴含 /video/数字/ 的完整链接后再抓取。',
-    }
-  }
-
   const page = await loadDouyinMediaContext(normalizedUrl, videoId)
 
   const durationMs = page.videoDurationMs ?? 0
   const asrKey = readDashScopeAsrKey(env)
+  const tenantIdHint = input.tenantId?.trim()
 
-  if (!page.playUrl) {
-    if (/v\.douyin\.com/i.test(extracted)) {
+  if (page.playUrl && asrKey) {
+    if (durationMs > MAX_DOUYIN_VIDEO_MS) {
+      const mins = Math.ceil(durationMs / 60_000)
+      const maxMins = Math.floor(MAX_DOUYIN_VIDEO_MS / 60_000)
       return {
         ok: false,
-        message:
-          '未能解析该视频播放地址。请改用浏览器中复制的完整链接（https://www.douyin.com/video/数字），或改用手动输入/文本驱动。',
+        message: `视频约 ${mins} 分钟，超过当前支持的 ${maxMins} 分钟上限。请换更短视频或改用手动输入/文本驱动`,
       }
     }
-    return {
-      ok: false,
-      message: '未能解析该视频播放地址，请换链接或改用手动输入/文本驱动',
+
+    const asrScript = await transcribeDouyinVideoAudio(page.playUrl, env, durationMs)
+    if (asrScript && asrScript.length >= 12) {
+      const motionInstructions = await inferMotionInstructionsFromScript(
+        asrScript,
+        env,
+        authHeader,
+        tenantIdHint,
+      )
+      return {
+        ok: true,
+        normalizedUrl,
+        videoId,
+        sourceTitle: page.title,
+        script: asrScript,
+        motionInstructions,
+        scriptSource: 'asr',
+      }
     }
   }
 
-  if (!asrKey) {
-    return {
-      ok: false,
-      message:
-        '未配置通义 ASR（MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY）。链接驱动仅支持从视频音频识别口播，不会使用发布标题代替。',
-    }
+  const aiResult = await extractScriptAndMotionWithDoubao(
+    page,
+    normalizedUrl,
+    videoId,
+    input.url,
+    env,
+    authHeader,
+    tenantIdHint,
+  )
+  if ('ok' in aiResult) {
+    return { ok: false, message: aiResult.message }
   }
-
-  if (durationMs > MAX_DOUYIN_VIDEO_MS) {
-    const mins = Math.ceil(durationMs / 60_000)
-    const maxMins = Math.floor(MAX_DOUYIN_VIDEO_MS / 60_000)
-    return {
-      ok: false,
-      message: `视频约 ${mins} 分钟，超过当前支持的 ${maxMins} 分钟上限。请换更短视频或改用手动输入/文本驱动`,
-    }
-  }
-
-  const asrScript = await transcribeDouyinVideoAudio(page.playUrl, env, durationMs)
-  if (asrScript && asrScript.length >= 12) {
-    const motionInstructions = await inferMotionInstructionsFromScript(
-      asrScript,
-      env,
-      authHeader,
-      input.tenantId?.trim(),
-    )
-    return {
-      ok: true,
-      normalizedUrl,
-      videoId,
-      sourceTitle: page.title,
-      script: asrScript,
-      motionInstructions,
-      scriptSource: 'asr',
-    }
-  }
-
-  const postCaption = page.awemeItem?.desc ? stripDouyinMetaBoilerplate(page.awemeItem.desc) : ''
-  const hint = postCaption
-    ? `（页面发布文案为：「${postCaption.slice(0, 36)}${postCaption.length > 36 ? '…' : ''}」，不会当作口播使用）`
-    : ''
 
   return {
-    ok: false,
-    message: `未能从视频音频识别出口播文案，请确认链接可播放、通义 ASR 可用，或改用手动输入/文本驱动${hint}`,
+    ok: true,
+    normalizedUrl,
+    videoId,
+    sourceTitle: page.title,
+    script: aiResult.script,
+    motionInstructions: aiResult.motionInstructions.trim() || defaultMotionInstructions(),
+    scriptSource: 'ai_extract',
   }
 }
