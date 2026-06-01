@@ -126,11 +126,14 @@ Page({
       } else if (/ssl|certificate|证书/i.test(msg)) {
         hint = 'HTTPS 证书校验失败，请确认域名证书有效。\n\n' + msg
       } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
+        const hallUrl = merchant.resolveMerchantApiUrl('/api/meoo-ops-mp-hall-registry')
         hint =
-          '浏览器能打开 JSON，但微信仍 reset 时：\n' +
-          '1）公众平台 → 服务器域名 → downloadFile 合法域名 也填 https://mofangdianai.com（与 request 相同）；\n' +
-          '2）删除小程序后重扫最新体验版（已自动改用 downloadFile 拉取注册表）；\n' +
-          '3）ECS 执行 sudo bash ~/app/scripts/ecs-fix-wechat-https-443.sh 关闭 http2。\n\n' +
+          '浏览器能开、微信仍 reset：请在 ECS 执行\n' +
+          'sudo bash ~/app/scripts/ecs-fix-wechat-cronet-tls.sh\n' +
+          'cd ~/app && git pull && bash scripts/ecs-fix-erp-api-502.sh\n' +
+          '然后上传新体验版。大厅优先拉轻量接口：\n' +
+          (hallUrl || '') +
+          '\n\n' +
           msg
       }
       if (apiBase && !hint.includes(apiBase)) {

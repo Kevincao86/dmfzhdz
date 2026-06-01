@@ -47,14 +47,24 @@ function resolveMerchantApiUrl(path) {
   return `${b}${p}`
 }
 
-/** 部分机型 Cronet + HTTP/2 会对 ECS 握手 reset；浏览器正常时关闭 http2 */
-const WX_NET = { enableHttp2: false, enableQuic: false }
+/** 微信 Cronet：关 http2/quic/高性能模式，贴近 Safari 握手 */
+const WX_NET = {
+  enableHttp2: false,
+  enableQuic: false,
+  useHighPerformanceMode: false,
+}
+
+const WX_HEADERS = {
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  'User-Agent':
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0',
+}
 
 function isTransientNetError(errMsg) {
   return /reset|errcode:-101|cronet_error|timeout|超时/i.test(String(errMsg || ''))
 }
 
-/** 微信对 wx.request 易 reset 时，downloadFile 走另一通道（须配置 downloadFile 合法域名） */
 function merchantGetViaDownload(url) {
   return new Promise((resolve, reject) => {
     wx.downloadFile({
@@ -99,7 +109,7 @@ function wxRequestPromise(url, m, data) {
       method: m,
       timeout: 120000,
       ...WX_NET,
-      header: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      header: WX_HEADERS,
       data: m === 'GET' ? undefined : data,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -131,7 +141,7 @@ function merchantRequest(method, path, data, attempt = 0) {
         if (isTransientNetError(dlMsg) || isTransientNetError(reqMsg)) {
           return merchantRequest(m, path, data, 1)
         }
-        throw new Error(`${dlMsg}；${reqMsg}`)
+        throw new Error(`[download] ${dlMsg}；[request] ${reqMsg}`)
       })
     })
   }
