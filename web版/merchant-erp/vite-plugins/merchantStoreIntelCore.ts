@@ -562,6 +562,10 @@ export async function runCompetitorAnalysisCore(
     industryPath?: string
     industryName?: string
     menuSummary?: string
+    analysisMode?: 'store' | 'brand'
+    brandName?: string
+    storeCount?: number
+    storeLocations?: string
   }
   try {
     body = JSON.parse(bodyRaw || '{}') as typeof body
@@ -579,6 +583,10 @@ export async function runCompetitorAnalysisCore(
   const boundIndustry = industryPath || industryName
   const menuSummary = String(body.menuSummary ?? '').trim()
   const city = String(body.city ?? '').trim()
+  const analysisMode = body.analysisMode === 'brand' ? 'brand' : 'store'
+  const brandName = String(body.brandName ?? '').trim()
+  const storeCount = Number(body.storeCount ?? 0)
+  const storeLocations = String(body.storeLocations ?? '').trim()
 
   const industryRules = boundIndustry
     ? `【硬性规则 · 商家已绑定经营类目】
@@ -599,13 +607,27 @@ ${industryRules}
   "suggestions": ["给该门店的经营建议1","建议2"]
 }`
 
+  const brandBlock =
+    analysisMode === 'brand' && brandName
+      ? [
+          `【连锁品牌统筹】品牌名：${brandName}；在营门店约 ${storeCount > 0 ? storeCount : '多'} 家。`,
+          storeLocations ? `各分店区位（供推断商圈重叠与竞品辐射）：\n${storeLocations.slice(0, 3500)}` : '',
+          '请以品牌维度分析：周边主要竞品格局、品牌间定价带差异、各店可共用的组品与招募策略；summary 中说明「按品牌统筹，参考统筹地址与各分店区位」。',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : ''
+
   const userPrompt = [
-    `门店：${storeName}（店名仅供参考，行业以绑定类目为准）`,
-    `地址：${address}${city ? `（${city}）` : ''}`,
+    analysisMode === 'brand' && brandName
+      ? `品牌：${brandName}（连锁统筹，店名仅供参考，行业以绑定类目为准）`
+      : `门店：${storeName}（店名仅供参考，行业以绑定类目为准）`,
+    `统筹/参考地址：${address}${city ? `（${city}）` : ''}`,
+    brandBlock,
     boundIndustry
       ? `【绑定经营类目 · 必须遵守】${boundIndustry}${industryName && industryName !== industryPath ? `（${industryName}）` : ''}`
       : '',
-    menuSummary ? `本店菜单摘要：\n${menuSummary}` : '',
+    menuSummary ? `本店/品牌菜单摘要：\n${menuSummary}` : '',
     boundIndustry
       ? '请严格按绑定经营类目分析周边同业竞品与定价带，禁止输出跨行业竞品（尤其禁止茶饮/咖啡等）。为每个竞品推断 2–4 个符合其业态的团购/外卖热销商品（含大致售价），并给出差异化建议。'
       : '请分析周边竞争对手与定价带，并为每个竞品推断 2–4 个当地常见的团购/外卖热销商品（含大致售价），供后续 AI 组品参考；并给出上架团购时的差异化建议。',

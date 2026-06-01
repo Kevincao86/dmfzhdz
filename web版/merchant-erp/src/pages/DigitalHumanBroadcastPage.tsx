@@ -240,9 +240,11 @@ export default function DigitalHumanBroadcastPage() {
       })
       setLinkSourceTitle(res.sourceTitle)
       const src =
-        res.scriptSource === 'page'
-          ? '已从视频页面抓取口播原文'
-          : '已根据页面信息还原口播'
+        res.scriptSource === 'asr'
+          ? '已从视频音频识别口播文案'
+          : res.scriptSource === 'page'
+            ? '已从视频发布文案抓取（请核对是否为完整口播）'
+            : '已根据页面信息还原口播'
       setToast(
         res.sourceTitle
           ? `${src}（${res.sourceTitle.slice(0, 20)}…），请核对后再下一步`
@@ -733,7 +735,7 @@ export default function DigitalHumanBroadcastPage() {
                       <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
                         <p className="text-sm font-medium text-violet-900">抖音短视频 · 链接驱动</p>
                         <p className="mt-1 text-xs text-violet-700">
-                          粘贴分享链接，系统抓取视频页描述/字幕作为口播原文，并推断动作指令；不会直接提交合成，请核对后再点「下一步」。
+                          粘贴分享链接，系统优先从视频音频识别口播（通义 ASR），并推断动作指令；不会直接提交合成，请核对后再点「下一步」。
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <input

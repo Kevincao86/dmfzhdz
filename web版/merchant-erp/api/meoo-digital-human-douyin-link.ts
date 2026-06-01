@@ -4,7 +4,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { runDouyinLinkParseCore } from '../src/lib/digitalHumanDouyinLinkCore.js'
 
-export const config = { maxDuration: 60 }
+export const config = { maxDuration: 120 }
 
 function sendJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')

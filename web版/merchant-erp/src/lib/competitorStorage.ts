@@ -4,7 +4,8 @@
 import { tenantLocalKey } from './tenantLocalState'
 
 const BASE_KEY = 'meoo_competitor_reports_v1'
-const SELECTED_POI_KEY = 'meoo_competitor_selected_poi_v1'
+const SELECTED_KEY = 'meoo_competitor_selected_target_v1'
+const LEGACY_POI_KEY = 'meoo_competitor_selected_poi_v1'
 
 export type CompetitorHotProduct = {
   name: string
@@ -24,9 +25,13 @@ export type CompetitorEntry = {
 
 export type CompetitorReport = {
   id: string
+  /** store: 单店 poiId；brand: `brand:${brandKey}` */
   poiId: string
   storeName: string
   address: string
+  /** brand 模式下记录品牌名 */
+  brandName?: string
+  storeCount?: number
   industryHint?: string
   analyzedAt: string
   summary: string
@@ -34,6 +39,26 @@ export type CompetitorReport = {
   suggestions: string[]
 }
 
+export type CompetitorTarget =
+  | {
+      mode: 'store'
+      poiId: string
+      storeName: string
+      address: string
+      city?: string
+    }
+  | {
+      mode: 'brand'
+      brandKey: string
+      brandName: string
+      storeCount: number
+      stores: Array<{ poiId: string; storeName: string; address: string; city?: string }>
+      anchorAddress: string
+      anchorCity?: string
+      anchorStoreName?: string
+    }
+
+/** @deprecated 兼容旧引用 */
 export type SelectedStoreRef = {
   poiId: string
   storeName: string
@@ -41,12 +66,25 @@ export type SelectedStoreRef = {
   city?: string
 }
 
+export function competitorReportKeyForTarget(t: CompetitorTarget): string {
+  return t.mode === 'brand' ? `brand:${t.brandKey}` : t.poiId
+}
+
+export function competitorDisplayLabel(t: CompetitorTarget): string {
+  if (t.mode === 'brand') return `${t.brandName}（${t.storeCount} 家门店）`
+  return t.storeName
+}
+
 function reportsKey(): string {
   return tenantLocalKey(BASE_KEY)
 }
 
 function selectedKey(): string {
-  return tenantLocalKey(SELECTED_POI_KEY)
+  return tenantLocalKey(SELECTED_KEY)
+}
+
+function legacySelectedKey(): string {
+  return tenantLocalKey(LEGACY_POI_KEY)
 }
 
 export function loadCompetitorReports(): CompetitorReport[] {
@@ -76,30 +114,85 @@ export function latestCompetitorReportForPoi(poiId: string): CompetitorReport | 
   return loadCompetitorReports().find((r) => r.poiId === id) ?? null
 }
 
-export function loadSelectedCompetitorStore(): SelectedStoreRef | null {
+export function latestCompetitorReportForTarget(t: CompetitorTarget | null): CompetitorReport | null {
+  if (!t) return null
+  return latestCompetitorReportForPoi(competitorReportKeyForTarget(t))
+}
+
+function parseLegacyStore(raw: string): CompetitorTarget | null {
   try {
-    const raw = window.localStorage.getItem(selectedKey())
-    if (!raw) return null
     const j = JSON.parse(raw) as SelectedStoreRef
-    return j?.poiId ? j : null
+    if (!j?.poiId || !j.address?.trim()) return null
+    return {
+      mode: 'store',
+      poiId: j.poiId,
+      storeName: j.storeName,
+      address: j.address.trim(),
+      city: j.city?.trim(),
+    }
   } catch {
     return null
   }
 }
 
-export function saveSelectedCompetitorStore(ref: SelectedStoreRef | null): void {
+export function loadSelectedCompetitorTarget(): CompetitorTarget | null {
   try {
-    if (!ref?.poiId) window.localStorage.removeItem(selectedKey())
-    else window.localStorage.setItem(selectedKey(), JSON.stringify(ref))
+    const raw = window.localStorage.getItem(selectedKey())
+    if (raw) {
+      const j = JSON.parse(raw) as CompetitorTarget
+      if (j?.mode === 'brand' && j.brandKey && j.brandName && j.anchorAddress?.trim()) return j
+      if (j?.mode === 'store' && j.poiId && j.address?.trim()) return j
+    }
+    const legacy = window.localStorage.getItem(legacySelectedKey())
+    if (legacy) return parseLegacyStore(legacy)
+    return null
+  } catch {
+    return null
+  }
+}
+
+export function saveSelectedCompetitorTarget(ref: CompetitorTarget | null): void {
+  try {
+    if (!ref) {
+      window.localStorage.removeItem(selectedKey())
+      return
+    }
+    window.localStorage.setItem(selectedKey(), JSON.stringify(ref))
   } catch {
     /* ignore */
   }
 }
 
+/** @deprecated 使用 loadSelectedCompetitorTarget */
+export function loadSelectedCompetitorStore(): SelectedStoreRef | null {
+  const t = loadSelectedCompetitorTarget()
+  if (!t || t.mode !== 'store') return null
+  return { poiId: t.poiId, storeName: t.storeName, address: t.address, city: t.city }
+}
+
+/** @deprecated 使用 saveSelectedCompetitorTarget */
+export function saveSelectedCompetitorStore(ref: SelectedStoreRef | null): void {
+  if (!ref?.poiId) {
+    saveSelectedCompetitorTarget(null)
+    return
+  }
+  saveSelectedCompetitorTarget({
+    mode: 'store',
+    poiId: ref.poiId,
+    storeName: ref.storeName,
+    address: ref.address,
+    city: ref.city,
+  })
+}
+
 export function competitorReportSummary(r: CompetitorReport | null, maxCompetitors = 8): string {
   if (!r) return ''
+  const scope =
+    r.brandName && r.storeCount && r.storeCount > 1
+      ? `品牌：${r.brandName}（${r.storeCount} 店，统筹分析）`
+      : `门店：${r.storeName}（${r.address}）`
   const lines = [
-    `门店：${r.storeName}（${r.address}）`,
+    scope,
     r.industryHint ? `行业：${r.industryHint}` : '',
     `摘要：${r.summary}`,
     ...r.competitors.slice(0, maxCompetitors).map((c, i) => {

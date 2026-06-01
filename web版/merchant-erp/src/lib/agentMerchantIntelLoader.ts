@@ -10,7 +10,8 @@ import {
 import {
   competitorReportSummary,
   loadCompetitorReports,
-  loadSelectedCompetitorStore,
+  competitorReportKeyForTarget,
+  loadSelectedCompetitorTarget,
   saveCompetitorReport,
   type CompetitorReport,
 } from './competitorStorage'
@@ -179,28 +180,42 @@ async function maybeRefreshCompetitorReport(
   base: MerchantIntelSnapshot,
 ): Promise<{ summary?: string; note?: string }> {
   if (base.competitorSummary) return { summary: base.competitorSummary }
-  const sel = loadSelectedCompetitorStore()
-  if (!sel?.address?.trim()) {
-    return { note: '竞品：未选分析门店，请到「运营 → 竞争对手分析」选择门店并分析' }
+  const sel = loadSelectedCompetitorTarget()
+  if (!sel) {
+    return { note: '竞品：未选分析门店/品牌，请到「运营 → 竞争对手分析」选择并分析' }
   }
-  const industry = resolveCompetitorAnalysisIndustry(sel.storeName)
+  const address = sel.mode === 'brand' ? sel.anchorAddress : sel.address
+  if (!address?.trim()) {
+    return { note: '竞品：未选分析门店/品牌，请到「运营 → 竞争对手分析」选择并分析' }
+  }
+  const label = sel.mode === 'brand' ? sel.brandName : sel.storeName
+  const industry = resolveCompetitorAnalysisIndustry(label)
   const menuSummary = base.menuSummary
   try {
     const r = await analyzeCompetitors({
-      storeName: sel.storeName,
-      address: sel.address,
-      city: sel.city,
+      storeName: label,
+      address,
+      city: sel.mode === 'brand' ? sel.anchorCity : sel.city,
       industryPath: industry.path || undefined,
       industryName: industry.name || undefined,
       industryHint: industry.path || undefined,
       menuSummary,
+      analysisMode: sel.mode,
+      brandName: sel.mode === 'brand' ? sel.brandName : undefined,
+      storeCount: sel.mode === 'brand' ? sel.storeCount : undefined,
+      storeLocations:
+        sel.mode === 'brand'
+          ? sel.stores.map((s) => `${s.storeName}：${s.address}`).join('\n')
+          : undefined,
     })
     if (!r.ok) return { note: `竞品：/api/meoo-competitor-analysis 失败 — ${r.message}` }
     const report: CompetitorReport = {
       id: `cmp-agent-${Date.now()}`,
-      poiId: sel.poiId,
-      storeName: sel.storeName,
-      address: sel.address,
+      poiId: competitorReportKeyForTarget(sel),
+      storeName: label,
+      address,
+      brandName: sel.mode === 'brand' ? sel.brandName : undefined,
+      storeCount: sel.mode === 'brand' ? sel.storeCount : undefined,
       industryHint: industry.path || r.industryHint,
       analyzedAt: new Date().toISOString(),
       summary: r.summary,

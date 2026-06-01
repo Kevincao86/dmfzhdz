@@ -258,6 +258,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
           res.statusCode = 200
           res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
           res.setHeader('Cache-Control', 'no-cache, no-transform')
+          res.setHeader('X-Accel-Buffering', 'no')
           res.setHeader('Access-Control-Allow-Origin', '*')
           await runMeooAiChatStream(
             bodyRaw,

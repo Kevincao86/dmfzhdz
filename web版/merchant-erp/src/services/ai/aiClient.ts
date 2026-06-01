@@ -178,6 +178,30 @@ function parseAiChatSseLine(line: string): AIChatStreamEvent | null {
   return null
 }
 
+/** 上游未部署 SSE 时（旧 erp-api 返回 stream_not_implemented）改走非流式 JSON */
+function shouldFallbackNonStreamAi(err: string): boolean {
+  return /stream_not_implemented|stream_not_supported|use_sse_stream/i.test(err)
+}
+
+async function completeAiChatViaNonStream(
+  req: AIChatRequest,
+  handlers: {
+    onEvent: (ev: AIChatStreamEvent) => void
+    signal?: AbortSignal
+  },
+): Promise<AIChatResponse> {
+  const { stream: _omit, ...plain } = req
+  const res = await postAiChat(plain, { signal: handlers.signal })
+  handlers.onEvent({ event: 'content', text: res.content })
+  handlers.onEvent({
+    event: 'done',
+    content: res.content,
+    provider: res.provider,
+    model: res.model,
+  })
+  return res
+}
+
 /** 智能体流式对话（SSE）；onEvent 可多次收到 thinking / content，最终以 done 结束 */
 export async function streamAiChat(
   req: AIChatRequest,
@@ -226,11 +250,17 @@ export async function streamAiChat(
         const text = await res.text()
         if (res.status !== 404) {
           let detail = text.slice(0, 400)
+          let errCode = ''
           try {
             const j = JSON.parse(text) as { detail?: string; error?: string }
+            errCode = typeof j.error === 'string' ? j.error : ''
             detail = [j.error, j.detail].filter(Boolean).join(' — ') || detail
           } catch {
             /* keep */
+          }
+          if (shouldFallbackNonStreamAi(errCode) || shouldFallbackNonStreamAi(detail)) {
+            lastErr = errCode || detail
+            continue
           }
           throw new Error(detail || `HTTP ${res.status}`)
         }
@@ -316,6 +346,9 @@ export async function streamAiChat(
       if (!final) throw new Error('流式对话未收到完成事件')
       return final
     }
+  }
+  if (shouldFallbackNonStreamAi(lastErr)) {
+    return completeAiChatViaNonStream(req, handlers)
   }
   throw new Error(lastErr || 'ai_chat_unavailable')
 }
