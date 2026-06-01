@@ -22,6 +22,7 @@ import FloatingOnlineSupport from './FloatingOnlineSupport'
 import TenantAnnouncementBell from './TenantAnnouncementBell'
 import TenantUrgentAnnouncementModal from './TenantUrgentAnnouncementModal'
 import { TenantAnnouncementProvider } from '../context/TenantAnnouncementContext'
+import PartnerClientScopeBar from './PartnerClientScopeBar'
 import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
 import { useAiAgent } from '../context/AiAgentContext'
@@ -334,6 +335,7 @@ export default function MeooLayout() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <PartnerClientScopeBar />
             <TenantAnnouncementBell />
 
             <div className="relative">

@@ -5,6 +5,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=ecs-resolve-erp-path.sh
+source "$ROOT/scripts/ecs-resolve-erp-path.sh"
+ERP="$(ecs_resolve_erp_dir "$ROOT")"
 SERVICE_NAME=meoo-auth-api
 UNIT_SRC="$ROOT/scripts/ecs-meoo-auth-api.service"
 UNIT_DST="/etc/systemd/system/${SERVICE_NAME}.service"
@@ -20,7 +23,7 @@ if [[ ! -f "$HOME/stack/auth-api.env" ]]; then
   exit 1
 fi
 
-ERP="$ROOT/web版/merchant-erp"
+echo "merchant-erp 路径: $ERP"
 if [[ ! -d "$ERP/node_modules" ]]; then
   (cd "$ERP" && npm ci)
 fi
@@ -33,6 +36,7 @@ EXPECTED_REVISION="$(
 echo "磁盘代码 revision=${EXPECTED_REVISION:-unknown}"
 
 sudo cp "$UNIT_SRC" "$UNIT_DST"
+sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=$ERP|" "$UNIT_DST"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 

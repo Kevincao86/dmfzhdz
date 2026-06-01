@@ -133,7 +133,7 @@ import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
 import {
   isAiRequestAborted,
   postAiAgentNativeImage,
-  postAiChat,
+  streamAiChat,
   type AiAgentNativeImageOk,
 } from '../services/ai/aiClient'
 import { MAX_AI_CHAT_IMAGE_ATTACHMENTS, type AIMessage } from '../services/ai/types'
@@ -268,6 +268,8 @@ type AiAgentContextValue = {
   modelPickerOptions: ReturnType<typeof listAiModelPickerOptionsForPlan>
   agentProfile: ReturnType<typeof buildAiAgentPlanProfile>
   aiSending: boolean
+  /** 流式思考区（有正文后 UI 自动隐藏） */
+  streamingReply: { thinking: string; content: string } | null
   /** 终止当前进行中的对话/生图请求 */
   stopAiGeneration: () => void
   /** 主输入区待发送的图片/视频（最多 8 个） */
@@ -392,6 +394,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     defaultAiModelPickerKeyForPlan('free'),
   )
   const [aiSending, setAiSending] = useState(false)
+  const [streamingReply, setStreamingReply] = useState<{
+    thinking: string
+    content: string
+  } | null>(null)
   const [taskConfirming, setTaskConfirming] = useState(false)
   const aiRunAbortRef = useRef<AbortController | null>(null)
   const merchantIntelCacheRef = useRef<{
@@ -1226,18 +1232,51 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         if (parsed.provider === 'tokenmix' && !chatModel) {
           chatModel = defaultModelIdForFamily(parsed.modelFamily)
         }
-        const res = await postAiChat(
-          {
-            provider: parsed.provider,
-            model: chatModel || undefined,
-            ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
-            messages: history,
-            ...(imageDataUrls.length ? { imageDataUrls } : {}),
-            taskType,
-            agentPickerKey: userPickerKey,
+        const placeholder = createAgentMessage('assistant', '')
+        placeholder.isStreaming = true
+        setStreamingReply({ thinking: '', content: '' })
+        setMessages((prev) => {
+          const next = [...prev, placeholder]
+          messagesRef.current = next
+          return next
+        })
+
+        const streamReq = {
+          provider: parsed.provider,
+          model: chatModel || undefined,
+          ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
+          messages: history,
+          ...(imageDataUrls.length ? { imageDataUrls } : {}),
+          taskType,
+          agentPickerKey: userPickerKey,
+          stream: true as const,
+        }
+
+        const res = await streamAiChat(streamReq, {
+          signal,
+          onEvent: (ev) => {
+            if (ev.event === 'thinking') {
+              setStreamingReply((r) => ({
+                thinking: ev.text,
+                content: r?.content ?? '',
+              }))
+            }
+            if (ev.event === 'content') {
+              const displayPartial = formatAssistantDisplayText(ev.text)
+              setStreamingReply((r) => ({
+                thinking: r?.thinking ?? '',
+                content: ev.text,
+              }))
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === placeholder.id ? { ...m, content: displayPartial } : m,
+                ),
+              )
+            }
           },
-          { signal },
-        )
+        })
+
+        setStreamingReply(null)
         const deferPreview = shouldDeferTaskPreview(
           trimmed,
           res.content,
@@ -1262,9 +1301,12 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const assistantMsg = createAgentMessage('assistant', display)
         setMessages((prev) => {
-          const next = [...prev, assistantMsg]
+          const next = prev.map((m) =>
+            m.id === placeholder.id
+              ? { ...m, content: display, isStreaming: false }
+              : m,
+          )
           messagesRef.current = next
           return next
         })
@@ -1277,14 +1319,21 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           )
         }
       } catch (e) {
+        setStreamingReply(null)
         if (isAiRequestAborted(e)) {
+          setMessages((prev) => {
+            const next = prev.filter((m) => !m.isStreaming)
+            messagesRef.current = next
+            return next
+          })
           appendStoppedMessage()
           return
         }
         const msg = e instanceof Error ? e.message : String(e)
         setMessages((prev) => {
+          const withoutPlaceholder = prev.filter((m) => !m.isStreaming)
           const next = [
-            ...prev,
+            ...withoutPlaceholder,
             createAgentMessage(
               'assistant',
               `暂时连不上助手服务。请确认已登录；若仍失败，请联系管理员检查智能助手配置。详情：${msg}`,
@@ -1294,6 +1343,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           return next
         })
       } finally {
+        setStreamingReply(null)
         if (ownsRun && ac) endAiRun(ac)
       }
     },
@@ -1433,6 +1483,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     },
     [
       aiSending,
+      streamingReply,
       stopAiGeneration,
       pendingComposerAttachments,
       pageContext?.pageLabel,
@@ -1989,6 +2040,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerOptions,
       agentProfile,
       aiSending,
+      streamingReply,
       stopAiGeneration,
       pendingComposerAttachments,
       addComposerMediaFiles,
@@ -2029,6 +2081,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       modelPickerOptions,
       agentProfile,
       aiSending,
+      streamingReply,
       stopAiGeneration,
       pendingPreviewLoading,
       taskConfirming,
@@ -2043,6 +2096,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       startNewChat,
       resumeArchivedSession,
       sidebarActiveArchiveId,
+      streamingReply,
     ],
   )
 

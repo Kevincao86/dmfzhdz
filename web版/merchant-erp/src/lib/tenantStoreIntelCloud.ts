@@ -33,8 +33,7 @@ export async function pushLocalStoreIntelToCloud(
   if (!tenantId) return { ok: false, message: '当前账号未关联商户租户' }
 
   const marginCfg = readStoreMarginConfig()
-  const menu = loadStoreMenuRecord()
-  const menuItems = menuItemsForCloud(menu?.items ?? [])
+  const { items: menuItems, storeName } = await resolveMenuForCloudUpsert(supabase, tenantId)
 
   const row = {
     tenant_id: tenantId,
@@ -43,7 +42,7 @@ export async function pushLocalStoreIntelToCloud(
       industry: marginCfg.industry,
     },
     menu_items: menuItems,
-    menu_store_name: menu?.storeName?.trim() || null,
+    menu_store_name: storeName,
     menu_item_count: menuItems.length,
     updated_at: new Date().toISOString(),
   }
@@ -59,14 +58,13 @@ export async function upsertMarginConfigCloud(
 ): Promise<void> {
   const tenantId = await fetchPrimaryTenantId(supabase)
   if (!tenantId) return
-  const menu = loadStoreMenuRecord()
-  const menuItems = menuItemsForCloud(menu?.items ?? [])
+  const { items: menuItems, storeName } = await resolveMenuForCloudUpsert(supabase, tenantId)
   await supabase.from('tenant_store_intel').upsert(
     {
       tenant_id: tenantId,
       margin_config: marginConfig,
       menu_items: menuItems,
-      menu_store_name: menu?.storeName?.trim() || null,
+      menu_store_name: storeName,
       menu_item_count: menuItems.length,
       updated_at: new Date().toISOString(),
     },
@@ -80,6 +78,13 @@ export async function loadMenuRecordFromCloud(
 ): Promise<{ items: StoreMenuItem[]; storeName?: string; updatedAt?: string } | null> {
   const tenantId = await fetchPrimaryTenantId(supabase)
   if (!tenantId) return null
+  return loadMenuRecordFromCloudForTenant(supabase, tenantId)
+}
+
+async function loadMenuRecordFromCloudForTenant(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<{ items: StoreMenuItem[]; storeName?: string; updatedAt?: string } | null> {
   const { data, error } = await supabase
     .from('tenant_store_intel')
     .select('menu_items, menu_store_name, updated_at')
@@ -114,6 +119,24 @@ export async function loadMenuRecordFromCloud(
     storeName: typeof data.menu_store_name === 'string' ? data.menu_store_name.trim() : undefined,
     updatedAt: typeof data.updated_at === 'string' ? data.updated_at : undefined,
   }
+}
+
+/** 本地菜单尚未就绪时保留云端已有价目，避免毛利同步等操作误清空 menu_items */
+async function resolveMenuForCloudUpsert(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<{ items: StoreMenuItem[]; storeName: string | null }> {
+  const menu = loadStoreMenuRecord()
+  let items = menuItemsForCloud(menu?.items ?? [])
+  let storeName = menu?.storeName?.trim() || null
+  if (items.length === 0) {
+    const cloud = await loadMenuRecordFromCloudForTenant(supabase, tenantId)
+    if (cloud?.items.length) {
+      items = menuItemsForCloud(cloud.items)
+      storeName = cloud.storeName ?? storeName
+    }
+  }
+  return { items, storeName }
 }
 
 export async function upsertMenuItemsCloud(

@@ -20,7 +20,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     const bodyRaw = rawBody(req)
     const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
-    const { runMeooAiChatCore } = await import('../vite-plugins/aiGateway/meooAiChatCore.js')
     const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
       '../vite-plugins/merchantRegistryVendorEnv.js'
     )
@@ -28,6 +27,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       process.cwd(),
       process.env as Record<string, string>,
     )
+
+    let wantsStream = false
+    try {
+      const peek = JSON.parse(bodyRaw || '{}') as { stream?: boolean }
+      wantsStream = peek.stream === true
+    } catch {
+      sendMerchantJson(res, 400, { ok: false, error: 'invalid_json' })
+      return
+    }
+
+    if (wantsStream) {
+      const { runMeooAiChatStream } = await import('../vite-plugins/aiGateway/meooAiChatStream.js')
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-cache, no-transform')
+      res.setHeader('Connection', 'keep-alive')
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.statusCode = 200
+      await runMeooAiChatStream(bodyRaw, auth, env, (payload) => {
+        if (!res.writableEnded) res.write(`data: ${JSON.stringify(payload)}\n\n`)
+      })
+      if (!res.writableEnded) res.end()
+      return
+    }
+
+    const { runMeooAiChatCore } = await import('../vite-plugins/aiGateway/meooAiChatCore.js')
     const out = await runMeooAiChatCore(bodyRaw, auth, env)
     try {
       JSON.stringify(out.body)

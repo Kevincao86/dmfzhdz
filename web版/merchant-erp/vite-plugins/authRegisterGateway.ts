@@ -249,6 +249,79 @@ export function authRegisterGatewayPlugin(): Plugin {
           return
         }
 
+        if (url === '/api/meoo-auth-register-partner') {
+          try {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              loginName?: string
+              partnerName?: string
+              merchantName?: string
+              phone?: string
+              smsCode?: string
+              password?: string
+              confirmPassword?: string
+            }
+            const loginName = (body.loginName ?? '').trim()
+            const partnerName = (body.partnerName ?? body.merchantName ?? '').trim()
+            const phone = normalizeCnMobile(body.phone ?? '')
+            const smsCode = String(body.smsCode ?? '').trim()
+            const password = body.password ?? ''
+            const confirmPassword = body.confirmPassword ?? password
+
+            if (!isValidLoginName(loginName)) {
+              json(res, 400, { ok: false, error: 'invalid_login_name', message: '登录名须为 4–32 位字母或数字' })
+              return
+            }
+            if (!isValidMerchantShortName(partnerName)) {
+              json(res, 400, { ok: false, error: 'invalid_partner_name', message: '服务商简称 2–30 字' })
+              return
+            }
+            if (!phone) {
+              json(res, 400, { ok: false, error: 'invalid_phone' })
+              return
+            }
+            if (!/^\d{6}$/.test(smsCode)) {
+              json(res, 400, { ok: false, error: 'invalid_sms_code' })
+              return
+            }
+            if (password.length < 6) {
+              json(res, 400, { ok: false, error: 'invalid_password', message: '密码至少 6 位' })
+              return
+            }
+            if (password !== confirmPassword) {
+              json(res, 400, { ok: false, error: 'password_mismatch' })
+              return
+            }
+            if (!(await verifyAuthSmsCode(phone, smsCode, viteRoot))) {
+              json(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
+              return
+            }
+            if (await phoneAlreadyRegistered(phone)) {
+              json(res, 409, { ok: false, error: 'phone_exists', message: '该手机号已注册，请直接登录' })
+              return
+            }
+
+            const result = await provisionMerchantTenant({
+              loginName,
+              password,
+              merchantName: partnerName,
+              phone,
+              trialDays: 0,
+              edition: 'partner',
+            })
+            if (!result.ok) {
+              const status =
+                result.error === 'login_exists' ? 409 : result.error === 'supabase_admin_not_configured' ? 503 : 400
+              json(res, status, { ok: false, error: result.error, message: '注册失败', detail: result.detail })
+              return
+            }
+            json(res, 200, { ok: true, message: '服务商注册成功，请登录', tenantId: result.tenantId })
+          } catch (e) {
+            json(res, 500, { ok: false, error: 'register_failed', detail: String(e) })
+          }
+          return
+        }
+
         return next()
       })
     },

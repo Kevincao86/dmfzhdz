@@ -119,6 +119,41 @@ export async function registerMerchantAccount(body: {
   return { ok: j.ok !== false, message: j.message }
 }
 
+export async function registerPartnerAccount(body: {
+  loginName: string
+  partnerName: string
+  phone: string
+  smsCode: string
+  password: string
+  confirmPassword: string
+}): Promise<RegisterResult> {
+  const posted = await postAuthJson<RegisterResult & { message?: string; detail?: string }>(
+    '/api/meoo-auth-register-partner',
+    {
+      loginName: body.loginName,
+      partnerName: body.partnerName,
+      phone: body.phone,
+      smsCode: body.smsCode,
+      password: body.password,
+      confirmPassword: body.confirmPassword,
+    },
+    '注册',
+  )
+  if (!('res' in posted)) {
+    return posted
+  }
+  const { res, json: j } = posted
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: j.error ?? `http_${res.status}`,
+      message: j.message ?? j.detail,
+      detail: j.detail,
+    }
+  }
+  return { ok: j.ok !== false, message: j.message }
+}
+
 export async function loginWithSmsCode(body: {
   phone: string
   smsCode: string

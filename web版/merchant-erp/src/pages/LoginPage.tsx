@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, MapPin, Sparkles, Store, Users, Zap } from 'lucide-react'
 import { cn } from '../cn'
+import EditionSwitchLink from '../components/EditionSwitchLink'
+import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import LoginAuthPanel from './login/LoginAuthPanel'
@@ -120,6 +122,9 @@ export default function LoginPage() {
 
       <div className="relative z-10 mx-auto w-full max-w-[1440px] px-6 py-8 sm:px-10 lg:px-12 lg:py-10 xl:px-16">
         <header className="relative z-20 mb-6 lg:mb-8">
+          <div className="absolute right-0 top-0 z-30">
+            <EditionSwitchLink />
+          </div>
           <div className="flex items-center gap-3">
             <img
               src={BRAND_LOGO_URL}
@@ -139,7 +144,9 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-[15px]">
-            面向本地生活商家的智能经营系统：多平台门店、达人招募、投流与财务对账，一站协同。
+            {isPartnerEdition()
+              ? '面向本地生活服务商的代运营工作台：绑定服务商身份与客户商家，多平台商品与门店一站管理。'
+              : '面向本地生活商家的智能经营系统：多平台门店、达人招募、投流与财务对账，一站协同。'}
           </p>
         </header>
 
@@ -211,7 +218,7 @@ export default function LoginPage() {
               <div className="mb-6 lg:hidden">
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/50 px-3 py-1 text-[11px] font-semibold text-cyan-800 shadow-sm backdrop-blur-sm">
                   <Zap className="h-3 w-3" aria-hidden />
-                  商家工作台
+                  {editionLabel()}工作台
                 </div>
               </div>
 

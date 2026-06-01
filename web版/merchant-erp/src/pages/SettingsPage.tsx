@@ -7,6 +7,7 @@ import {
   Shield,
   Store,
   Users,
+  UserCircle2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -43,7 +44,10 @@ import {
   MEITUAN_WAIMAI_BIND_GUIDE_STEPS,
 } from './settings/bindGuide/waimaiBindGuides'
 import { useMembership } from '../context/MembershipContext'
+import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
+import PartnerClientsSection from './settings/PartnerClientsSection'
+import { PartnerDouyinApiSection, PartnerKuaishouApiSection } from './settings/apiDocsPartnerContent'
 
 type VerifyItem = {
   id: string
@@ -65,7 +69,7 @@ const VERIFY_INITIAL: VerifyItem[] = [
 /** 恢复「核销系统」页签与对接区块时改为 true */
 const SHOW_VERIFY_SYSTEM_TAB = false
 
-const ALL_TABS = [
+const MERCHANT_TABS = [
   { id: 'platforms' as const, label: '平台连接', icon: Link2 },
   { id: 'commercial' as const, label: '商业化后台', icon: Megaphone },
   { id: 'verify' as const, label: '核销系统', icon: ScanLine },
@@ -74,6 +78,18 @@ const ALL_TABS = [
   { id: 'permissions' as const, label: '权限设置', icon: Shield },
   { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
 ] as const
+
+const PARTNER_TABS = [
+  { id: 'platforms' as const, label: '平台连接', icon: Link2 },
+  { id: 'commercial' as const, label: '商业化后台', icon: Megaphone },
+  { id: 'merchant' as const, label: '服务商平台', icon: Store },
+  { id: 'partner_clients' as const, label: '客户商家', icon: UserCircle2 },
+  { id: 'accounts' as const, label: '账号管理', icon: Users },
+  { id: 'permissions' as const, label: '权限设置', icon: Shield },
+  { id: 'subscription' as const, label: '订阅', icon: CalendarDays },
+] as const
+
+const ALL_TABS = isPartnerEdition() ? PARTNER_TABS : MERCHANT_TABS
 
 const TABS = SHOW_VERIFY_SYSTEM_TAB ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'verify')
 
@@ -238,7 +254,9 @@ export default function SettingsPage() {
         <span className="absolute left-0 top-1 h-[calc(100%-4px)] w-1 rounded-full bg-gradient-to-b from-cyan-500 to-teal-500" aria-hidden />
         <h1 className="erp-page-title">系统设置</h1>
         <p className="mt-1.5 text-sm text-slate-600">
-          管理平台连接、商业化投放、商家后台、账号权限与订阅
+          {isPartnerEdition()
+            ? `${editionLabel()}：绑定服务商身份、代运营客户商家账号、账号权限与订阅`
+            : '管理平台连接、商业化投放、商家后台、账号权限与订阅'}
         </p>
       </div>
 
@@ -471,12 +489,28 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {tab === 'partner_clients' && isPartnerEdition() && <PartnerClientsSection />}
+
           {tab === 'merchant' && (
             <div className="space-y-10">
+              {isPartnerEdition() ? (
+                <div className="rounded-lg border border-cyan-100 bg-cyan-50/60 px-4 py-3 text-sm text-cyan-950">
+                  <PartnerDouyinApiSection />
+                  <div className="mt-6">
+                    <PartnerKuaishouApiSection />
+                  </div>
+                </div>
+              ) : null}
               <section className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900">团购平台</h3>
-                  <p className="text-sm text-gray-500">抖音来客、快手团购、美团点评、小红书等到店团购经营授权</p>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    {isPartnerEdition() ? '服务商平台身份' : '团购平台'}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {isPartnerEdition()
+                      ? '绑定您在抖音、快手等平台的服务商应用与授权（非客户商家账号）'
+                      : '抖音来客、快手团购、美团点评、小红书等到店团购经营授权'}
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {MERCHANT_BACKEND_PLATFORMS.map((p) => (

@@ -137,8 +137,14 @@ function parseAiJsonBlock(text: string): { script?: string; motionInstructions?:
 function formatLinkParseAiError(raw: string): string {
   const t = raw.trim()
   if (!t) return 'AI 解析失败，请稍后重试'
-  if (/fetch failed|failed to fetch|econnrefused|enotfound|etimedout|502|erp-api/i.test(t)) {
-    return '无法连接 AI 服务。请确认已登录；AI Key 请在商家管理后台「AI 模型」保存（与智能体共用），并优先经 ECS erp-api 访问。'
+  if (/auth_lookup_failed|supabase_anon_not_configured/i.test(t)) {
+    return '无法校验登录态。请在 ECS auth-api 配置 SUPABASE_JWT_SECRET（与 ~/stack/db-credentials.txt 中 JWT_SECRET 一致），商户前端 Vercel 也需配置同名 SUPABASE_JWT_SECRET 后 Redeploy。'
+  }
+  if (/tokenmix_not_configured|未配置.*api key|not_configured|no.*key/i.test(t) && !/fetch failed/i.test(t)) {
+    return '未配置可用 AI 密钥。请在商家管理后台「AI 模型」保存通义（千问）/ 豆包 / MiniMax 至少一项（与智能体共用），保存后无需改商户端。'
+  }
+  if (/fetch failed|failed to fetch|econnrefused|enotfound|etimedout|502|erp-api|503/i.test(t)) {
+    return '无法连接 AI 服务。请确认已登录；AI Key 请在商家管理后台「AI 模型」保存（与智能体共用），并确认 ECS 已启动 meoo-auth-api（https://mofangdianai.com/erp-api/meoo-erp-api-health）。'
   }
   if (/unauthorized|invalid_jwt|auth_lookup|supabase_anon/i.test(t)) {
     return '登录已失效。请重新登录；若仍失败请检查 ECS/Vercel 的 SUPABASE_JWT_SECRET 与运营台配置。'
@@ -190,10 +196,17 @@ async function generateLinkParseContent(
       typeof out.body.error === 'string' ? out.body.error : '',
       typeof out.body.detail === 'string' ? out.body.detail : '',
       typeof out.body.hint === 'string' ? out.body.hint : '',
+      typeof out.body.message === 'string' ? out.body.message : '',
     ].filter(Boolean)
     if (parts.length) lastErr = parts.join(' — ')
     if (out.status === 401) {
       return { ok: false, message: '请先登录后再使用链接抓取' }
+    }
+    if (out.status === 503 && /auth_lookup_failed/i.test(lastErr)) {
+      return {
+        ok: false,
+        message: formatLinkParseAiError(lastErr),
+      }
     }
   }
 

@@ -30,7 +30,7 @@ export type AIChatRequest = {
   /** 本回合用户随附截图（data URL，最多 8 张）；由网关拼进多模态消息 */
   imageDataUrls?: string[]
   temperature?: number
-  /** 预留：当前网关实现为非流式；stream=true 时返回 501 */
+  /** true 时走 SSE（/api/meoo-ai-chat）；智能体默认开启 */
   stream?: boolean
   taskType?: AiTaskType
   /** 智能体下拉 key，用于服务端拼接对应该模型的对话风格（不改变实际路由模型） */
@@ -56,6 +56,13 @@ export type AIChatErrorBody = {
 export type AIChatOkBody = {
   ok: true
 } & AIChatResponse
+
+/** /api/meoo-ai-chat SSE 事件（stream=true） */
+export type AIChatStreamEvent =
+  | { event: 'thinking'; text: string }
+  | { event: 'content'; text: string }
+  | { event: 'done'; content: string; provider: AIProvider; model: string }
+  | { event: 'error'; error: string; detail?: string; hint?: string }
 
 /** 智能体系统提示：开放对话 + ERP 写操作须预览确认 */
 export const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺 AI 智能体」，嵌入灵祺 AI 智能 ERP，同时也是开放型通用对话助手。

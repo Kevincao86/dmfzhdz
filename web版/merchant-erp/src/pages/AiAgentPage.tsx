@@ -4,6 +4,7 @@ import { AiAgentComposerBar } from '../components/AiAgentComposerBar'
 import { AiAgentMessageBubble } from '../components/AiAgentMessageBubble'
 import { AiAgentPreviewActions } from '../components/AiAgentPreviewActions'
 import { AiAgentThinkingIndicator } from '../components/AiAgentThinkingIndicator'
+import { AiAgentThinkingLive } from '../components/AiAgentThinkingLive'
 import { useAiAgent } from '../context/AiAgentContext'
 import { cn } from '../cn'
 
@@ -22,6 +23,7 @@ export default function AiAgentPage() {
     openDrawer,
     applyShortcut,
     aiSending,
+    streamingReply,
     isPreviewLoading,
     isPreviewConfirming,
     archivedSessions,
@@ -44,7 +46,7 @@ export default function AiAgentPage() {
       const el = scrollRef.current
       if (el) el.scrollTop = el.scrollHeight
     })
-  }, [messages, hasChat, aiSending])
+  }, [messages, hasChat, aiSending, streamingReply])
 
   return (
     <div
@@ -199,7 +201,12 @@ export default function AiAgentPage() {
                     ) : null}
                   </div>
                 ))}
-                {aiSending ? <AiAgentThinkingIndicator /> : null}
+                {streamingReply?.thinking?.trim() && !streamingReply.content.trim() ? (
+                  <AiAgentThinkingLive text={streamingReply.thinking} />
+                ) : null}
+                {aiSending && !streamingReply?.content.trim() && !streamingReply?.thinking?.trim() ? (
+                  <AiAgentThinkingIndicator />
+                ) : null}
               </div>
             </div>
 

@@ -11,6 +11,7 @@ import {
   type StoreMenuRecord,
 } from '../lib/storeMenuStorage'
 import { loadMenuRecordFromCloud } from '../lib/tenantStoreIntelCloud'
+import { getActiveTenantStorageId } from '../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { recognizeStoreMenuExcel, recognizeStoreMenuImage } from '../services/storeIntelApi'
 import { fetchStoresForPlatform } from '../services/merchantStoresApi'
@@ -40,6 +41,9 @@ export default function StoreMenuPage() {
   const excelRef = useRef<HTMLInputElement>(null)
 
   const hydrateMenu = useCallback(() => {
+    if (supabaseConfigured && !getActiveTenantStorageId()) {
+      return
+    }
     const local = loadStoreMenuRecord()
     const apply = (rec: StoreMenuRecord) => {
       setRecord(rec)

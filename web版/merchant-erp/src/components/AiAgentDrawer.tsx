@@ -6,6 +6,7 @@ import { AiAgentComposerBar } from './AiAgentComposerBar'
 import { AiAgentMessageBubble } from './AiAgentMessageBubble'
 import { AiAgentPreviewActions } from './AiAgentPreviewActions'
 import { AiAgentThinkingIndicator } from './AiAgentThinkingIndicator'
+import { AiAgentThinkingLive } from './AiAgentThinkingLive'
 import { cn } from '../cn'
 import { useAiAgent } from '../context/AiAgentContext'
 import type { AiPermissionId } from '../lib/aiAgentTypes'
@@ -43,6 +44,7 @@ export default function AiAgentDrawer() {
     isPreviewLoading,
     isPreviewConfirming,
     aiSending,
+    streamingReply,
     agentProfile,
   } = useAiAgent()
 
@@ -55,7 +57,7 @@ export default function AiAgentDrawer() {
       const el = listRef.current
       if (el) el.scrollTop = el.scrollHeight
     })
-  }, [drawerOpen, messages, aiSending])
+  }, [drawerOpen, messages, aiSending, streamingReply])
 
   return (
     <AnimatePresence>
@@ -184,7 +186,12 @@ export default function AiAgentDrawer() {
                   ) : null}
                 </div>
               ))}
-              {aiSending ? <AiAgentThinkingIndicator /> : null}
+              {streamingReply?.thinking?.trim() && !streamingReply.content.trim() ? (
+                <AiAgentThinkingLive text={streamingReply.thinking} />
+              ) : null}
+              {aiSending && !streamingReply?.content.trim() && !streamingReply?.thinking?.trim() ? (
+                <AiAgentThinkingIndicator />
+              ) : null}
             </div>
 
             <footer className="shrink-0 border-t border-slate-100 bg-white p-3">
