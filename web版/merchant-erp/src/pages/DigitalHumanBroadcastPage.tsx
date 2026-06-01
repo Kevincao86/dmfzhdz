@@ -239,7 +239,15 @@ export default function DigitalHumanBroadcastPage() {
         douyinLinkUrl: res.normalizedUrl,
       })
       setLinkSourceTitle(res.sourceTitle)
-      setToast(res.sourceTitle ? `已抓取「${res.sourceTitle.slice(0, 24)}…」并生成文案` : '已生成口播文案与动作指令')
+      const src =
+        res.scriptSource === 'page'
+          ? '已从视频页面抓取口播原文'
+          : '已根据页面信息还原口播'
+      setToast(
+        res.sourceTitle
+          ? `${src}（${res.sourceTitle.slice(0, 20)}…），请核对后再下一步`
+          : `${src}，请核对口播与动作指令后再下一步`,
+      )
     } catch (e) {
       setToast(e instanceof Error ? e.message : '链接解析失败')
     } finally {
@@ -725,7 +733,7 @@ export default function DigitalHumanBroadcastPage() {
                       <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
                         <p className="text-sm font-medium text-violet-900">抖音短视频 · 链接驱动</p>
                         <p className="mt-1 text-xs text-violet-700">
-                          粘贴分享链接，系统自动抓取视频信息并生成口播文案与动作指令（AI Key 与智能体共用，在商家管理后台配置）。
+                          粘贴分享链接，系统抓取视频页描述/字幕作为口播原文，并推断动作指令；不会直接提交合成，请核对后再点「下一步」。
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <input
@@ -741,7 +749,7 @@ export default function DigitalHumanBroadcastPage() {
                             className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                           >
                             {linkBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                            抓取并生成
+                            抓取文案
                           </button>
                         </div>
                         {linkSourceTitle ? (
