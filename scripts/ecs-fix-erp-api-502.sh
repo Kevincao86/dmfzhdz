@@ -8,7 +8,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ERP="$ROOT/web版/merchant-erp"
 PORT="${AUTH_API_PORT:-3001}"
-MIN_REVISION="20260531-ai-erp-api"
+MIN_REVISION="$(
+  grep -E "ECS_AUTH_API_ROUTE_REVISION\s*=" "$ERP/scripts/ecs-auth-api-server.ts" \
+    | head -1 \
+    | sed -E "s/.*'([^']+)'.*/\1/"
+)"
+echo "期望 revision=${MIN_REVISION:-unknown}"
 
 echo "== 0) 拉取最新代码（含 meoo-ai-chat 路由） =="
 if [[ -d "$ROOT/.git" ]]; then
@@ -18,8 +23,10 @@ else
 fi
 
 echo "== 1) 停止旧进程 =="
-pkill -f ecs-auth-api-server 2>/dev/null || true
-sleep 1
+sudo systemctl stop meoo-auth-api 2>/dev/null || true
+sudo pkill -f 'tsx.*ecs-auth-api-server' 2>/dev/null || true
+sudo pkill -f ecs-auth-api-server 2>/dev/null || true
+sleep 2
 
 echo "== 2) 生成 env（若缺失）并安装 systemd =="
 if [[ ! -f "$HOME/stack/auth-api.env" ]]; then
