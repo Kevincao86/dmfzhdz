@@ -23,7 +23,7 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ -n "$(git status --porcelain)" ]]; then
+if [[ -n "$(git status --porcelain -uno)" ]]; then
   echo "WARN: 工作区有未提交改动，请先 commit"
   git status -sb
   exit 1

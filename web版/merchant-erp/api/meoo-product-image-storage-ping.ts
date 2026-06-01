@@ -1,6 +1,7 @@
 /**
  * GET /api/meoo-product-image-storage-ping — 诊断商品图 OSS/Storage 是否在 Vercel 运行时生效
  */
+/// <reference path="../vite-plugins/ali-oss.d.ts" />
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   formatMerchantProductImageOssError,
