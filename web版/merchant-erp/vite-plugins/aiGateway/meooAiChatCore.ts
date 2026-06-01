@@ -16,6 +16,10 @@ import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChat } from './chatRouter.js'
 import { assertAiChatAccess } from '../tenantMembershipCore.js'
 import { buildServerMerchantIntelContext } from '../merchantIntelServerCore.js'
+import {
+  describeDirectLlmKeyDebug,
+  formatDirectLlmKeyDebugHint,
+} from './directLlmKeyDebug.js'
 
 const ALLOWED = new Set<string>(['tokenmix', 'deepseek', 'kimi', 'minimax', 'qwen', 'doubao'])
 
@@ -166,6 +170,27 @@ export async function runMeooAiChatCore(
     return { status: 200, body: okBody }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    let registryKeys: unknown = null
+    if (provider === 'kimi' || provider === 'minimax') {
+      try {
+        const { readMerchantSupabaseAdminEnv } = await import('../merchantSupabaseAdminEnv.js')
+        const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
+        if (supabaseUrl && serviceRole) {
+          const { createRegistrySnapshotIoFetch } = await import('../../src/lib/registrySnapshotIoFetch.js')
+          registryKeys = (await createRegistrySnapshotIoFetch(supabaseUrl, serviceRole).load()).vendorKeys
+        }
+      } catch {
+        /* 诊断用，失败不阻断 */
+      }
+    }
+    const keyDebug =
+      provider === 'kimi' || provider === 'minimax'
+        ? describeDirectLlmKeyDebug(provider, chatEnv, registryKeys)
+        : null
+    const detailWithDebug =
+      keyDebug && /401|invalid api key|invalid authentication|2049/i.test(msg)
+        ? `${msg.slice(0, 600)} ${formatDirectLlmKeyDebugHint(provider as 'kimi' | 'minimax', keyDebug)}`
+        : msg.slice(0, 800)
     void forwardAuditToMerchantAdmin({
       env,
       body: buildAuditPayload({
@@ -186,14 +211,15 @@ export async function runMeooAiChatCore(
       detail: msg.slice(0, 500),
     })
     const authHint = /401|invalid api key|invalid authentication|2049|JWT|TokenMix Key 与/i.test(msg)
-      ? '上游返回 401：MiniMax 需 sk- 接口密钥（非 eyJ JWT）；Kimi 需 moonshot.cn 的 sk- Key。请在运营台「AI 模型」重新保存；删除 Vercel/ECS 过期 MINIMAX_API_KEY/MOONSHOT_API_KEY 后重启 auth-api。诊断：GET /erp-api/meoo-ai-vendor-keys-diag（Bearer MEOO_SUPPORT_OPS_HTTP_TOKEN）。'
+      ? '上游 401：请核对运营台 Key 前缀（MiniMax/Kimi 均须 sk-，勿 eyJ JWT）；国内/国际域名须与账号一致。ECS 执行 git pull && sudo systemctl restart meoo-auth-api。探测：GET /erp-api/meoo-ai-vendor-keys-probe（Bearer MEOO_SUPPORT_OPS_HTTP_TOKEN）。'
       : undefined
     return {
       status: 502,
       body: {
         ok: false,
         error: 'upstream_error',
-        detail: msg.slice(0, 800),
+        detail: detailWithDebug,
+        ...(keyDebug ? { keyDebug } : {}),
         ...(authHint ? { hint: authHint } : {}),
       },
     }

@@ -1,16 +1,15 @@
-import OpenAI from 'openai'
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
 import { assertDistinctFromTokenMix, looksLikeJwtCredential } from '../../../src/lib/aiVendorKeyValidate.js'
-import { registryEntry } from '../../../src/services/ai/modelRegistry.js'
 import { looksLikeMinimaxJwtKey } from '../../merchantRegistryVendorEnv.js'
 import {
   minimaxChatBaseCandidates,
   minimaxChatModelCandidates,
   resolveMinimaxApiKey,
 } from './directLlmEnv.js'
+import { openAiCompatChatFetch, type OpenAiCompatMessage } from './openAiCompatibleFetch.js'
+import { registryEntry } from '../../../src/services/ai/modelRegistry.js'
 
-/** 纯文本消息映射（与历史稳定版本一致）；截图等多模态仅走 TokenMix。 */
-function toMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatCompletionMessageParam[] {
+function toMessages(messages: AIChatRequest['messages']): OpenAiCompatMessage[] {
   return messages.map((m) => {
     if (m.role === 'tool') return { role: 'user', content: `[tool]\n${m.content}` }
     if (m.role === 'system') return { role: 'system', content: m.content }
@@ -19,18 +18,14 @@ function toMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatComple
   })
 }
 
-function isAuthError(err: Error | null): boolean {
-  return !!err?.message?.match(/401|2049|invalid api key|invalid authentication/i)
+function isAuthError(msg: string): boolean {
+  return /401|2049|invalid api key|invalid authentication/i.test(msg)
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-/**
- * MiniMax OpenAI 兼容 Chat Completions。
- * @see https://platform.minimax.io/docs/api-reference/text-chat-openai
- */
 export async function chatMinimax(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
   const apiKey = resolveMinimaxApiKey(env)
   if (!apiKey) {
@@ -49,32 +44,29 @@ export async function chatMinimax(req: AIChatRequest, env: Record<string, string
   const temperature = req.temperature ?? 1
 
   const attempt = async (): Promise<AIChatResponse | null> => {
-    let lastErr: Error | null = null
+    let lastErr = 'MiniMax: 请求失败'
     for (const baseURL of bases) {
-      const client = new OpenAI({ apiKey, baseURL: `${baseURL.replace(/\/$/, '')}/` })
       for (const model of models) {
         try {
-          const completion = await client.chat.completions.create({
+          const completion = await openAiCompatChatFetch({
+            baseURL,
+            apiKey,
             model,
             messages,
             temperature,
-            stream: false,
           })
-          const msg = completion.choices[0]?.message?.content
           return {
             provider: 'minimax',
-            model: completion.model ?? model,
-            content: typeof msg === 'string' ? msg : '',
-            raw: completion as unknown as Record<string, unknown>,
-            usage: completion.usage as unknown as Record<string, unknown>,
+            model: completion.model,
+            content: completion.content,
+            raw: completion.raw,
           }
         } catch (e) {
-          lastErr = e instanceof Error ? e : new Error(String(e))
+          lastErr = e instanceof Error ? e.message : String(e)
         }
       }
     }
-    if (lastErr) throw lastErr
-    return null
+    throw new Error(`MiniMax: ${lastErr}`)
   }
 
   try {
@@ -82,8 +74,8 @@ export async function chatMinimax(req: AIChatRequest, env: Record<string, string
     if (first) return first
     throw new Error('MiniMax: 请求失败')
   } catch (e) {
-    const err = e instanceof Error ? e : new Error(String(e))
-    if (!isAuthError(err)) throw err
+    const err = e instanceof Error ? e.message : String(e)
+    if (!isAuthError(err)) throw e instanceof Error ? e : new Error(err)
     await sleep(2000)
     try {
       const retry = await attempt()
@@ -92,6 +84,8 @@ export async function chatMinimax(req: AIChatRequest, env: Record<string, string
       const msg = retryErr instanceof Error ? retryErr.message : String(retryErr)
       throw new Error(`MiniMax: ${msg}`)
     }
-    throw new Error(`MiniMax: ${err.message}`)
+    const regionHint =
+      '国内账号用 platform.minimaxi.com 的 sk- Key + api.minimaxi.com；国际用 platform.minimax.io + api.minimax.io'
+    throw new Error(`MiniMax: ${err}（${regionHint}）`)
   }
 }

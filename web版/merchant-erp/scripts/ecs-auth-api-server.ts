@@ -23,6 +23,7 @@ import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
 import opsSyncVideoAiHandler from '../api/meoo-ops-sync-video-ai.ts'
 import meooAiChatHandler from '../api/meoo-ai-chat.ts'
 import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
+import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
 import iceConfigHandler from '../api/meoo-merchant-ai-video-ice-config.ts'
@@ -75,6 +76,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/ops-sync/video-ai': opsSyncVideoAiHandler as VercelLikeHandler,
   '/api/meoo-ai-chat': meooAiChatHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-diag': meooAiVendorKeysDiagHandler as VercelLikeHandler,
+  '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
   /** 灵祺AI云剪：读运营台 videoAi 注册表，须走 ECS 勿仅靠 Vercel */

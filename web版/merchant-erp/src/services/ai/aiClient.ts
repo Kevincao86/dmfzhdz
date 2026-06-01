@@ -91,12 +91,18 @@ export async function postAiChat(
             detail?: string
             hint?: string
             message?: string
+            keyDebug?: { fingerprint?: string; source?: string; looksLikeJwt?: boolean }
           }
           const code = typeof o.error === 'string' ? o.error.trim() : ''
           const detail = typeof o.detail === 'string' ? o.detail.trim() : ''
           const hint = typeof o.hint === 'string' ? o.hint.trim() : ''
           const topMsg = typeof o.message === 'string' ? o.message.trim() : ''
-          const parts = [code, detail, hint, topMsg].filter(Boolean)
+          const dbg = o.keyDebug
+          const dbgLine =
+            dbg?.fingerprint
+              ? `Key诊断：${dbg.fingerprint}，来源=${dbg.source ?? '?'}，JWT=${dbg.looksLikeJwt ? '是' : '否'}`
+              : ''
+          const parts = [code, detail, dbgLine, hint, topMsg].filter(Boolean)
           if (parts.length) throw new Error(parts.join(' — '))
           if (o.error && typeof o.error === 'object' && o.error !== null) {
             const nest = o.error as { message?: string; code?: string | number }

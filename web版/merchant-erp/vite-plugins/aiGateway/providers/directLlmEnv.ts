@@ -11,14 +11,25 @@ export function resolveMoonshotApiKey(env: Record<string, string>): string {
 /** 国内 Key 通常走 moonshot.cn；国际走 moonshot.ai */
 export function moonshotChatBaseCandidates(env: Record<string, string>): string[] {
   const custom = (env.KIMI_BASE_URL ?? env.MOONSHOT_BASE_URL ?? '').trim().replace(/\/$/, '')
+  const region = (env.KIMI_REGION ?? env.MOONSHOT_REGION ?? '').trim().toLowerCase()
+  const cnFirst = region === 'cn' || region === 'moonshot.cn'
+  const intlFirst = region === 'intl' || region === 'ai' || region === 'moonshot.ai'
   const out: string[] = []
   const add = (u: string) => {
     const t = u.trim().replace(/\/$/, '')
     if (t && !out.includes(t)) out.push(t)
   }
   if (custom) add(custom)
-  add('https://api.moonshot.cn/v1')
-  add('https://api.moonshot.ai/v1')
+  if (intlFirst) {
+    add('https://api.moonshot.ai/v1')
+    add('https://api.moonshot.cn/v1')
+  } else if (cnFirst) {
+    add('https://api.moonshot.cn/v1')
+    add('https://api.moonshot.ai/v1')
+  } else {
+    add('https://api.moonshot.cn/v1')
+    add('https://api.moonshot.ai/v1')
+  }
   return out
 }
 

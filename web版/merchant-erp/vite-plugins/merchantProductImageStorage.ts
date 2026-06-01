@@ -89,6 +89,21 @@ function underIceDouyinGoodsPrefix(env: Record<string, string | undefined>): str
   return first ? `${first}/douyin-goods` : null
 }
 
+/** 与云剪本地上传一致：RAM 常仅授权 `{prefix}/source/*`。 */
+function iceSourceDouyinGoodsPrefixes(env: Record<string, string | undefined>): string[] {
+  const out: string[] = []
+  const add = (p: string) => {
+    const n = normalizeOssKeyPrefix(p)
+    if (n && !out.includes(n)) out.push(n)
+  }
+  const ice = readIceOssUrlPrefix(env)
+  if (ice?.keyPrefix) add(`${ice.keyPrefix}/source/douyin-goods`)
+  for (const kp of iceObjectKeyPrefixes(env)) {
+    add(`${kp}/source/douyin-goods`)
+  }
+  return out
+}
+
 /** 云剪 RAM 常只授权 meoo-out/*；未显式配置时默认写到该目录下的 douyin-goods。 */
 export function merchantProductImageStoragePrefix(
   env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
@@ -115,6 +130,8 @@ export function merchantProductImageStoragePrefixCandidates(
     const n = normalizeOssKeyPrefix(p)
     if (n && !out.includes(n)) out.push(n)
   }
+
+  for (const p of iceSourceDouyinGoodsPrefixes(env)) add(p)
 
   const underIce = underIceDouyinGoodsPrefix(env)
   if (underIce) add(underIce)
@@ -317,12 +334,22 @@ function buildObjectPath(
   return `${normalizeOssKeyPrefix(keyPrefix)}/${safeMid}/${Date.now()}-${randomUUID()}.${ext}`
 }
 
+function productImageOssUseAuthV4(env: Record<string, string | undefined>): boolean {
+  const raw = (env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 ?? '').trim().toLowerCase()
+  if (raw === '1' || raw === 'true') return true
+  if (raw === '0' || raw === 'false') return false
+  /** 与云剪 ali-oss 客户端默认一致；避免 V4 签名与 RAM/Bucket 策略不匹配导致 bucket acl */
+  return false
+}
+
 async function createMerchantProductImageOssClient(
   cfg: MerchantProductImageOssEnv,
   env: Record<string, string | undefined>,
+  opts?: { authorizationV4?: boolean },
 ) {
   const { default: OSS } = await import('ali-oss')
   const endpoint = (env.MERCHANT_PRODUCT_IMAGE_OSS_ENDPOINT ?? '').trim()
+  const useV4 = opts?.authorizationV4 ?? productImageOssUseAuthV4(env)
   return new OSS({
     region: cfg.region,
     accessKeyId: cfg.accessKeyId,
@@ -330,7 +357,7 @@ async function createMerchantProductImageOssClient(
     bucket: cfg.bucket,
     secure: true,
     ...(endpoint ? { endpoint } : {}),
-    ...(env.MERCHANT_PRODUCT_IMAGE_OSS_AUTH_V4 !== '0' ? { authorizationV4: true } : {}),
+    ...(useV4 ? { authorizationV4: true } : {}),
   })
 }
 
@@ -375,28 +402,35 @@ async function uploadMerchantProductImageToOss(
   const cfg = readMerchantProductImageOssEnv(env)
   if (!cfg) throw new Error('OSS 未配置')
 
-  const client = await createMerchantProductImageOssClient(cfg, env)
   const prefixCandidates = merchantProductImageStoragePrefixCandidates(env)
   let lastErr = 'OSS 上传失败'
 
-  for (let i = 0; i < prefixCandidates.length; i++) {
-    const keyPrefix = prefixCandidates[i]!
-    const objectPath = buildObjectPath(keyPrefix, params.merchantId, params.safeMime, params.originalName)
-    try {
-      await client.put(objectPath, params.buf, {
-        headers: {
-          'Content-Type': params.safeMime,
-          'Cache-Control': 'public, max-age=604800',
-        },
-      })
-      const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath, env)
-      return { publicUrl, objectPath, bucket: cfg.bucket, accessMode }
-    } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
-      const canRetry = i < prefixCandidates.length - 1 && isOssBucketAclError(lastErr)
-      if (!canRetry) break
+  const tryPut = async (useV4: boolean) => {
+    const client = await createMerchantProductImageOssClient(cfg, env, { authorizationV4: useV4 })
+    for (let i = 0; i < prefixCandidates.length; i++) {
+      const keyPrefix = prefixCandidates[i]!
+      const objectPath = buildObjectPath(keyPrefix, params.merchantId, params.safeMime, params.originalName)
+      try {
+        await client.put(objectPath, params.buf, {
+          headers: {
+            'Content-Type': params.safeMime,
+            'Cache-Control': 'public, max-age=604800',
+          },
+        })
+        const { publicUrl, accessMode } = await resolveOssObjectPublicUrl(client, cfg, objectPath, env)
+        return { publicUrl, objectPath, bucket: cfg.bucket, accessMode }
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
+        const canRetry = i < prefixCandidates.length - 1 && isOssBucketAclError(lastErr)
+        if (!canRetry) break
+      }
     }
+    return null
   }
+
+  const primaryV4 = productImageOssUseAuthV4(env)
+  const hit = (await tryPut(primaryV4)) ?? (primaryV4 ? await tryPut(false) : await tryPut(true))
+  if (hit) return hit
 
   throw new Error(formatMerchantProductImageOssError(lastErr, env))
 }

@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
 import { assertDistinctFromTokenMix, looksLikeJwtCredential } from '../../../src/lib/aiVendorKeyValidate.js'
 import {
@@ -6,9 +5,9 @@ import {
   moonshotChatModelCandidates,
   resolveMoonshotApiKey,
 } from './directLlmEnv.js'
+import { openAiCompatChatFetch, type OpenAiCompatMessage } from './openAiCompatibleFetch.js'
 
-/** 纯文本消息映射（与历史稳定版本一致）；截图等多模态仅走 TokenMix。 */
-function toMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatCompletionMessageParam[] {
+function toMessages(messages: AIChatRequest['messages']): OpenAiCompatMessage[] {
   return messages.map((m) => {
     if (m.role === 'tool') return { role: 'user', content: `[tool]\n${m.content}` }
     if (m.role === 'system') return { role: 'system', content: m.content }
@@ -17,8 +16,8 @@ function toMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatComple
   })
 }
 
-function isAuthError(err: Error | null): boolean {
-  return !!err?.message?.match(/401|invalid authentication/i)
+function isAuthError(msg: string): boolean {
+  return /401|invalid authentication/i.test(msg)
 }
 
 function sleep(ms: number): Promise<void> {
@@ -47,31 +46,29 @@ export async function chatKimi(req: AIChatRequest, env: Record<string, string>):
   const temperature = req.temperature ?? 0.6
 
   const attempt = async (): Promise<AIChatResponse | null> => {
-    let lastErr: Error | null = null
+    let lastErr = 'Kimi: 请求失败'
     for (const baseURL of bases) {
-      const client = new OpenAI({ apiKey, baseURL: `${baseURL.replace(/\/$/, '')}/` })
       for (const model of models) {
         try {
-          const completion = await client.chat.completions.create({
+          const completion = await openAiCompatChatFetch({
+            baseURL,
+            apiKey,
             model,
             messages,
             temperature,
           })
-          const msg = completion.choices[0]?.message?.content
           return {
             provider: 'kimi',
-            model: completion.model ?? model,
-            content: typeof msg === 'string' ? msg : '',
-            raw: completion as unknown as Record<string, unknown>,
-            usage: completion.usage as unknown as Record<string, unknown>,
+            model: completion.model,
+            content: completion.content,
+            raw: completion.raw,
           }
         } catch (e) {
-          lastErr = e instanceof Error ? e : new Error(String(e))
+          lastErr = e instanceof Error ? e.message : String(e)
         }
       }
     }
-    if (lastErr) throw lastErr
-    return null
+    throw new Error(`Kimi: ${lastErr}`)
   }
 
   try {
@@ -79,23 +76,16 @@ export async function chatKimi(req: AIChatRequest, env: Record<string, string>):
     if (first) return first
     throw new Error('Kimi: 请求失败')
   } catch (e) {
-    const err = e instanceof Error ? e : new Error(String(e))
-    if (!isAuthError(err)) {
-      const hint = err.message?.includes('401')
-        ? '（请确认运营台 Kimi 密钥有效，国内 Key 通常使用 api.moonshot.cn）'
-        : ''
-      throw new Error(`Kimi: ${err.message}${hint}`)
-    }
+    const err = e instanceof Error ? e.message : String(e)
+    if (!isAuthError(err)) throw e instanceof Error ? e : new Error(err)
     await sleep(1500)
     try {
       const retry = await attempt()
       if (retry) return retry
     } catch (retryErr) {
       const msg = retryErr instanceof Error ? retryErr.message : String(retryErr)
-      throw new Error(`Kimi: ${msg}（请确认运营台 Kimi 密钥有效，国内 Key 通常使用 api.moonshot.cn）`)
+      throw new Error(`Kimi: ${msg}（国内 Key 用 api.moonshot.cn，国际用 api.moonshot.ai）`)
     }
-    throw new Error(
-      `Kimi: ${err.message}（请确认运营台 Kimi 密钥有效，国内 Key 通常使用 api.moonshot.cn）`,
-    )
+    throw new Error(`Kimi: ${err}（国内 Key 用 api.moonshot.cn，国际用 api.moonshot.ai）`)
   }
 }
