@@ -221,7 +221,7 @@ export default function DigitalHumanBroadcastPage() {
   const fetchFromDouyinLink = async () => {
     const url = draft.douyinLinkUrl.trim()
     if (!url) {
-      setToast('请先粘贴抖音短视频分享链接')
+      setToast('请先粘贴抖音分享口令或链接')
       return
     }
     setLinkBusy(true)
@@ -733,13 +733,13 @@ export default function DigitalHumanBroadcastPage() {
                       <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
                         <p className="text-sm font-medium text-violet-900">抖音短视频 · 链接驱动</p>
                         <p className="mt-1 text-xs text-violet-700">
-                          粘贴分享链接，系统将从视频音频识别口播（通义 ASR），不会使用发布标题；并推断动作指令。请核对后再点「下一步」。
+                          直接粘贴抖音「分享」复制的<strong>整段口令</strong>即可，系统会自动识别其中的链接；再从视频音频识别口播（通义 ASR），不会使用发布标题，并推断动作指令。请核对后再点「下一步」。
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <input
                             value={draft.douyinLinkUrl}
                             onChange={(e) => patchDraft({ douyinLinkUrl: e.target.value })}
-                            placeholder="https://www.douyin.com/video/数字… 或 v.douyin.com 短链"
+                            placeholder="粘贴抖音分享口令（含「复制打开抖音」整段文案）"
                             className="min-w-[240px] flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm"
                           />
                           <button

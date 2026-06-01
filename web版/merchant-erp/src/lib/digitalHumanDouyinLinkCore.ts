@@ -57,21 +57,88 @@ export function normalizeDouyinShareUrl(raw: string): string | null {
   }
 }
 
-/** 从抖音分享口令中提取 https 链接（用户常粘贴整段文案而非纯 URL） */
-export function extractDouyinUrlFromText(raw: string): string | null {
-  const t = raw.trim()
-  if (!t) return null
+export type DouyinShareExtract = {
+  /** 从口令/文本中识别到的 https 链接（已规范化） */
+  url: string | null
+  /** 口令或链接里直接出现的视频 aweme_id */
+  videoId: string | null
+}
 
-  const urlMatch = t.match(
-    /https?:\/\/(?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?|(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff「」【】]+)/i,
-  )
-  if (urlMatch?.[0]) {
-    let u = urlMatch[0].replace(/[/，。！？、；：'"）】\]>]+$/u, '')
-    if (/v\.douyin\.com/i.test(u) && !u.endsWith('/')) u += '/'
-    return u
+function cleanExtractedDouyinUrl(raw: string): string {
+  let u = raw.trim()
+  u = u.replace(/[/，。！？、；：'"）】\]>]+$/u, '')
+  if (!/^https?:\/\//i.test(u)) u = `https://${u.replace(/^\/+/, '')}`
+  try {
+    const parsed = new URL(u)
+    if (!DOUYIN_HOST.test(parsed.hostname)) return u
+    parsed.hash = ''
+    u = parsed.toString()
+  } catch {
+    /* keep cleaned string */
+  }
+  if (/v\.douyin\.com/i.test(u) && !u.endsWith('/')) u += '/'
+  return u
+}
+
+function scoreDouyinUrlCandidate(url: string): number {
+  if (extractDouyinVideoId(url)) return 100
+  if (/\/share\/video\//i.test(url)) return 90
+  if (/v\.douyin\.com/i.test(url)) return 50
+  if (isDouyinUserProfileUrl(url)) return 10
+  if (/douyin\.com|iesdouyin\.com/i.test(url)) return 40
+  return 0
+}
+
+/** 从整段分享口令中提取视频 ID（若文案里直接带有 /video/ 或 modal_id 等） */
+export function extractDouyinVideoIdFromShareText(raw: string): string | null {
+  const patterns = [
+    /\/video\/(\d{15,22})/,
+    /\/share\/video\/(\d{15,22})/,
+    /[?&](?:modal_id|item_id|aweme_id)=(\d{15,22})/,
+    /(?:modal_id|item_id|aweme_id)\s*[=:]\s*(\d{15,22})/,
+  ]
+  for (const re of patterns) {
+    const m = re.exec(raw)
+    if (m?.[1]) return m[1]
+  }
+  return null
+}
+
+/** 从抖音分享口令/整段文案中提取链接与视频 ID（用户通常粘贴整段而非纯 URL） */
+export function extractDouyinShareFromText(raw: string): DouyinShareExtract {
+  const t = raw.trim()
+  if (!t) return { url: null, videoId: null }
+
+  const videoId = extractDouyinVideoIdFromShareText(t)
+  const candidates: string[] = []
+
+  const httpsRe =
+    /https?:\/\/(?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?|(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff「」【】《》]+)/gi
+  for (const m of t.matchAll(httpsRe)) {
+    if (m[0]) candidates.push(cleanExtractedDouyinUrl(m[0]))
   }
 
-  return normalizeDouyinShareUrl(t)
+  const bareRe =
+    /(?:^|[\s「」【】《】])((?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?)|(?:(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff「」【】《》]+))/gi
+  for (const m of t.matchAll(bareRe)) {
+    if (m[1]) candidates.push(cleanExtractedDouyinUrl(m[1]))
+  }
+
+  const normalizedDirect = normalizeDouyinShareUrl(t)
+  if (normalizedDirect) candidates.push(normalizedDirect)
+
+  const unique = [...new Set(candidates.filter(Boolean))]
+  if (unique.length === 0) {
+    return { url: videoId ? `https://www.douyin.com/video/${videoId}` : null, videoId }
+  }
+
+  unique.sort((a, b) => scoreDouyinUrlCandidate(b) - scoreDouyinUrlCandidate(a))
+  return { url: unique[0] ?? null, videoId }
+}
+
+/** @deprecated 请优先使用 extractDouyinShareFromText */
+export function extractDouyinUrlFromText(raw: string): string | null {
+  return extractDouyinShareFromText(raw).url
 }
 
 export function extractDouyinVideoId(url: string): string | null {
@@ -436,10 +503,13 @@ async function resolveMediaUrlForAsr(playUrl: string, env: Record<string, string
   return direct
 }
 
+type DouyinLinkKind = 'video' | 'user_profile' | 'homepage' | 'unknown'
+
 type DouyinLinkTarget = {
   url: string
   videoId: string | null
   shortLinkUnresolved: boolean
+  linkKind: DouyinLinkKind
 }
 
 function isDouyinHomepageUrl(url: string): boolean {
@@ -449,6 +519,38 @@ function isDouyinHomepageUrl(url: string): boolean {
   } catch {
     return false
   }
+}
+
+function isDouyinUserProfileUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    if (!/(?:^|\.)?(?:douyin\.com|iesdouyin\.com)$/i.test(u.hostname)) return false
+    return /\/share\/user\//i.test(u.pathname) || /\/user\//i.test(u.pathname)
+  } catch {
+    return /share\/user|iesdouyin\.com\/share\/user/i.test(url)
+  }
+}
+
+function classifyDouyinLinkKind(url: string, videoId: string | null): DouyinLinkKind {
+  if (videoId) return 'video'
+  if (isDouyinUserProfileUrl(url)) return 'user_profile'
+  if (isDouyinHomepageUrl(url)) return 'homepage'
+  return 'unknown'
+}
+
+function douyinLinkKindErrorMessage(
+  kind: DouyinLinkKind,
+  shortLinkUnresolved: boolean,
+  extractedUrl: string,
+): string | null {
+  const prefix = extractedUrl ? `已从分享口令识别链接：${extractedUrl}。` : ''
+  if (kind === 'user_profile') {
+    return `${prefix}该链接跳转到达人主页（非视频页），无法提取口播。请在抖音打开目标视频后再点「分享」复制口令；或改用手动输入/文本驱动。`
+  }
+  if (kind === 'homepage' || shortLinkUnresolved) {
+    return `${prefix}短链未能解析到具体视频（已跳转到抖音首页或无效页）。请换一条视频分享口令重试，或改用手动输入/文本驱动。`
+  }
+  return null
 }
 
 async function resolveDouyinLinkTarget(inputUrl: string): Promise<DouyinLinkTarget> {
@@ -470,6 +572,10 @@ async function resolveDouyinLinkTarget(inputUrl: string): Promise<DouyinLinkTarg
           current = new URL(loc, current).toString()
           videoId = extractDouyinVideoId(current) ?? videoId
           if (videoId) {
+            url = current
+            break
+          }
+          if (isDouyinUserProfileUrl(current)) {
             url = current
             break
           }
@@ -526,7 +632,8 @@ async function resolveDouyinLinkTarget(inputUrl: string): Promise<DouyinLinkTarg
     }
   }
 
-  return { url, videoId, shortLinkUnresolved }
+  const linkKind = classifyDouyinLinkKind(url, videoId)
+  return { url, videoId, shortLinkUnresolved, linkKind }
 }
 
 async function fetchIesdouyinItemById(awemeId: string): Promise<DouyinAwemeItem | null> {
@@ -901,19 +1008,40 @@ export async function runDouyinLinkParseCore(
   env: Record<string, string>,
   authHeader?: string,
 ): Promise<DouyinLinkParseResult> {
-  const extracted = extractDouyinUrlFromText(input.url)
+  const share = extractDouyinShareFromText(input.url)
+  const extracted =
+    share.url ?? (share.videoId ? `https://www.douyin.com/video/${share.videoId}` : null)
   if (!extracted) {
     return {
       ok: false,
-      message: '未识别到抖音链接。请粘贴分享链接（含 https://v.douyin.com/…），或整段分享口令。',
+      message:
+        '未从分享口令中识别到抖音链接。请粘贴抖音「分享」复制的整段文案（含 https://v.douyin.com/… 或 /video/ 链接），或改用手动输入/文本驱动。',
     }
   }
 
   const resolved = await resolveDouyinLinkTarget(extracted)
-  const normalizedUrl = normalizeDouyinShareUrl(resolved.url) ?? extracted
-  const videoId = resolved.videoId ?? extractDouyinVideoId(normalizedUrl)
+  let normalizedUrl = normalizeDouyinShareUrl(resolved.url) ?? extracted
+  let videoId = share.videoId ?? resolved.videoId ?? extractDouyinVideoId(normalizedUrl)
+  let linkKind: DouyinLinkKind = videoId ? 'video' : resolved.linkKind
+
+  if (videoId && (linkKind === 'user_profile' || isDouyinUserProfileUrl(normalizedUrl))) {
+    normalizedUrl = `https://www.douyin.com/video/${videoId}`
+    linkKind = 'video'
+  }
+
+  const kindError = douyinLinkKindErrorMessage(linkKind, resolved.shortLinkUnresolved, extracted)
+  if (kindError) {
+    return { ok: false, message: kindError }
+  }
 
   const page = await loadDouyinMediaContext(normalizedUrl, videoId)
+
+  if (!videoId && !page.playUrl) {
+    return {
+      ok: false,
+      message: `已从分享口令识别链接：${extracted}。未能获取视频地址，请确认分享的是视频口令（非达人主页），或改用手动输入/文本驱动。`,
+    }
+  }
 
   const durationMs = page.videoDurationMs ?? 0
   const asrKey = readDashScopeAsrKey(env)
