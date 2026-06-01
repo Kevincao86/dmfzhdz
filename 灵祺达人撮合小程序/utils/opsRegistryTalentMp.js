@@ -1,7 +1,11 @@
 const { merchantRequest } = require('./merchantApi.js')
 
 async function fetchRegistry() {
-  const paths = ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
+  const paths = [
+    '/api/meoo-ops-mp-hall-registry',
+    '/api/meoo-ops-sync-registry',
+    '/api/ops-sync/registry',
+  ]
   let lastErr
   for (const path of paths) {
     try {

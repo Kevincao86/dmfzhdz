@@ -51,9 +51,10 @@ import mpRecruitmentIceSubmitHandler from '../api/meoo-ops-mp-recruitment-ice-su
 import mpRecruitmentIceConfirmHandler from '../api/meoo-ops-mp-recruitment-ice-confirm.ts'
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
+import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260601-mp-routes'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260601-mp-hall'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -84,6 +85,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,
   /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-hall-registry': mpHallRegistryHandler as VercelLikeHandler,
   '/api/ops-sync/registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/ops-sync/vendor-keys': opsSyncVendorKeysHandler as VercelLikeHandler,
   '/api/ops-sync/ai': opsSyncAiHandler as VercelLikeHandler,
