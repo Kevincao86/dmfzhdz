@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BarChart3, MapPin, Sparkles, Store, Users, Zap } from 'lucide-react'
 import { cn } from '../cn'
-import EditionSwitchLink from '../components/EditionSwitchLink'
 import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
@@ -122,9 +121,6 @@ export default function LoginPage() {
 
       <div className="relative z-10 mx-auto w-full max-w-[1440px] px-6 py-8 sm:px-10 lg:px-12 lg:py-10 xl:px-16">
         <header className="relative z-20 mb-6 lg:mb-8">
-          <div className="absolute right-0 top-0 z-30">
-            <EditionSwitchLink />
-          </div>
           <div className="flex items-center gap-3">
             <img
               src={BRAND_LOGO_URL}

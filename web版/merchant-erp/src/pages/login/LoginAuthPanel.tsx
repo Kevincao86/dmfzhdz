@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import EditionSwitchLink from '../../components/EditionSwitchLink'
 import SecretInput from '../../components/SecretInput'
 import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
@@ -287,8 +288,11 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     'shrink-0 rounded-xl border border-white/70 bg-white/60 px-3 py-3 text-xs font-semibold text-cyan-700 backdrop-blur-sm hover:bg-white/80 disabled:opacity-50 sm:px-4 sm:text-sm'
 
   return (
-    <div className="w-full">
-      <div className="mb-6 hidden lg:block">
+    <div className="relative w-full">
+      <div className="absolute right-0 top-0 z-10">
+        <EditionSwitchLink />
+      </div>
+      <div className="mb-6 hidden pr-[7.5rem] lg:block">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">
           {mode === 'login' ? '欢迎登录' : '欢迎注册'}
         </h2>
@@ -298,7 +302,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             : '填写信息完成注册，即可使用免费版'}
         </p>
       </div>
-      <div className="mb-6 border-b border-white/50">
+      <div className="mb-6 border-b border-white/50 pr-[7.5rem] pt-0.5">
         <div className="flex gap-8">
           <button
             type="button"
