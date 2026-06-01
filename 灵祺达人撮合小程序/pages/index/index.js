@@ -71,6 +71,9 @@ Page({
   onShow() {
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
+    if (merchant.baseUrl()) {
+      console.log('[mp] MERCHANT_API_BASE_URL=', merchant.baseUrl())
+    }
     this.loadList()
   },
   async loadList() {
@@ -89,6 +92,7 @@ Page({
       return
     }
     this.setData({ loading: true, err: '', unconfigured: false })
+    const apiBase = merchant.baseUrl()
     try {
       const reg = await ops.fetchRegistry()
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
@@ -111,10 +115,30 @@ Page({
       this.applyFilters()
     } catch (e) {
       const msg = String(e.message || e)
-      const hint =
-        msg.includes('fail') || msg.includes('网络') || msg.includes('domain')
-          ? '无法连接后台：请检查微信公众平台 request 合法域名含 mofangdianai.com，且 utils/config.release.js 已填写 MERCHANT_API_BASE_URL 后重新上传'
-          : msg
+      const registryUrl = merchant.resolveMerchantApiUrl('/api/meoo-ops-sync-registry')
+      let hint = msg
+      if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
+        hint =
+          '微信未放行该域名。request 合法域名请填：https://mofangdianai.com（与控制台要求一致，末尾勿加分号）。保存后等 10 分钟并删除小程序再扫体验版。\n\n' +
+          msg
+      } else if (/timeout|超时/i.test(msg)) {
+        hint = '请求超时（注册表较大或网络慢）。\n\n' + msg
+      } else if (/ssl|certificate|证书/i.test(msg)) {
+        hint = 'HTTPS 证书校验失败，请确认域名证书有效。\n\n' + msg
+      } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
+        hint =
+          '浏览器能打开 JSON，但微信仍 reset 时：\n' +
+          '1）公众平台 → 服务器域名 → downloadFile 合法域名 也填 https://mofangdianai.com（与 request 相同）；\n' +
+          '2）删除小程序后重扫最新体验版（已自动改用 downloadFile 拉取注册表）；\n' +
+          '3）ECS 执行 sudo bash ~/app/scripts/ecs-fix-wechat-https-443.sh 关闭 http2。\n\n' +
+          msg
+      }
+      if (apiBase && !hint.includes(apiBase)) {
+        hint += `\n\nAPI 根地址：${apiBase}`
+      }
+      if (registryUrl && !hint.includes(registryUrl)) {
+        hint += `\n注册表：${registryUrl}`
+      }
       this.setData({
         loading: false,
         err: hint,

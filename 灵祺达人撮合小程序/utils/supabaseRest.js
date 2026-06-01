@@ -1,5 +1,7 @@
 const config = require('./config.js')
 
+const WX_NET = { enableHttp2: false, enableQuic: false }
+
 function baseUrl() {
   return String(config.SUPABASE_URL || '')
     .trim()
@@ -27,6 +29,7 @@ function rpc(name, args) {
     wx.request({
       url: `${baseUrl()}/rest/v1/rpc/${name}`,
       method: 'POST',
+      ...WX_NET,
       header: headers(),
       data: args,
       success(res) {
@@ -63,6 +66,7 @@ function insertSupportRelayMessage(row) {
     wx.request({
       url: `${baseUrl()}/rest/v1/support_relay_messages`,
       method: 'POST',
+      ...WX_NET,
       header: Object.assign(headers(), { Prefer: 'return=minimal' }),
       data: row,
       success(res) {
