@@ -155,7 +155,7 @@ cp config.local.example.js config.local.js
 | 类型 | 建议域名 |
 |------|----------|
 | request 合法域名 | `https://mofangdianai.com` |
-| uploadFile / downloadFile | 同上 `https://mofangdianai.com` |
+| uploadFile / downloadFile | **必须**同上 `https://mofangdianai.com`（招募大厅 GET 在 `wx.request` reset 时会走 `downloadFile` 备用通道） |
 | DNS 预解析 | `mofangdianai.com` |
 
 `MERCHANT_API_BASE_URL` 填 **`https://mofangdianai.com/erp-api`**（小程序会自动把 `/api/xxx` 拼成 `/erp-api/xxx`）。
@@ -171,6 +171,25 @@ cd ~/app
 bash scripts/ecs-git-pull-main.sh    # 或 git pull --ff-only
 bash scripts/ecs-fix-erp-api-502.sh  # 拉代码、重启 meoo-auth-api、探活
 ```
+
+### 3.2.1 体验版仍 `ERR_CONNECTION_RESET`（-101）
+
+这与微信合法域名、重新上传**无关**，是 **`https://mofangdianai.com` 公网 443/TLS** 问题（商家 Web 在 `cs.mofangdianai.com`，可以正常而小程序仍失败）。
+
+**手机 Safari** 打开：
+
+```text
+https://mofangdianai.com/erp-api/meoo-ops-sync-registry
+```
+
+- 打不开 / 一直转圈 → 在 ECS 执行（**只修 Nginx/证书，不动商家 Vercel**）：
+
+```bash
+cd ~/app && git pull
+sudo bash scripts/ecs-fix-wechat-https-443.sh
+```
+
+- 能打开大段 JSON → 再删除小程序、重扫**最新体验版**二维码。
 
 确认：
 

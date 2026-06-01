@@ -47,18 +47,60 @@ function resolveMerchantApiUrl(path) {
   return `${b}${p}`
 }
 
-function merchantRequest(method, path, data) {
-  const b = baseUrl()
-  if (!b) {
-    return Promise.reject(new Error('尚未配置后台地址'))
-  }
-  const url = resolveMerchantApiUrl(path)
+/** 部分机型 Cronet + HTTP/2 会对 ECS 握手 reset；浏览器正常时关闭 http2 */
+const WX_NET = { enableHttp2: false, enableQuic: false }
+
+function isTransientNetError(errMsg) {
+  return /reset|errcode:-101|cronet_error|timeout|超时/i.test(String(errMsg || ''))
+}
+
+/** 微信对 wx.request 易 reset 时，downloadFile 走另一通道（须配置 downloadFile 合法域名） */
+function merchantGetViaDownload(url) {
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url,
+      timeout: 120000,
+      ...WX_NET,
+      success(res) {
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          reject(new Error(`download:${res.statusCode} → ${url}`))
+          return
+        }
+        wx.getFileSystemManager().readFile({
+          filePath: res.tempFilePath,
+          encoding: 'utf-8',
+          success(fileRes) {
+            try {
+              resolve(JSON.parse(String(fileRes.data || '')))
+            } catch {
+              reject(new Error(`JSON 解析失败 → ${url}`))
+            }
+          },
+          fail(e) {
+            reject(new Error((e && e.errMsg) || '读下载文件失败'))
+          },
+        })
+      },
+      fail(err) {
+        reject(new Error((err && err.errMsg) || '下载失败'))
+      },
+    })
+  })
+}
+
+function shouldPreferDownloadForGet(url) {
+  return /mofangdianai\.com/i.test(url)
+}
+
+function wxRequestPromise(url, m, data) {
   return new Promise((resolve, reject) => {
     wx.request({
       url,
-      method,
+      method: m,
+      timeout: 120000,
+      ...WX_NET,
       header: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      data: method === 'GET' ? undefined : data,
+      data: m === 'GET' ? undefined : data,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
@@ -67,10 +109,43 @@ function merchantRequest(method, path, data) {
         reject(new Error(formatHttpError(res.statusCode, res.data)))
       },
       fail(err) {
-        reject(new Error((err && err.errMsg) || '网络异常'))
+        reject(new Error(`${(err && err.errMsg) || '网络异常'} → ${url}`))
       },
     })
   })
 }
 
-module.exports = { baseUrl, hasMerchantApi, merchantRequest }
+function merchantRequest(method, path, data, attempt = 0) {
+  const b = baseUrl()
+  if (!b) {
+    return Promise.reject(new Error('尚未配置后台地址'))
+  }
+  const url = resolveMerchantApiUrl(path)
+  const m = String(method || 'GET').toUpperCase()
+
+  if (m === 'GET' && attempt === 0 && shouldPreferDownloadForGet(url)) {
+    return merchantGetViaDownload(url).catch((dlErr) => {
+      const dlMsg = String(dlErr && dlErr.message ? dlErr.message : dlErr)
+      return wxRequestPromise(url, m, data).catch((reqErr) => {
+        const reqMsg = String(reqErr && reqErr.message ? reqErr.message : reqErr)
+        if (isTransientNetError(dlMsg) || isTransientNetError(reqMsg)) {
+          return merchantRequest(m, path, data, 1)
+        }
+        throw new Error(`${dlMsg}；${reqMsg}`)
+      })
+    })
+  }
+
+  return wxRequestPromise(url, m, data).catch((err) => {
+    const errMsg = String(err && err.message ? err.message : err)
+    if (m === 'GET' && attempt === 0 && isTransientNetError(errMsg)) {
+      return merchantGetViaDownload(url).catch(() => merchantRequest(m, path, data, 1))
+    }
+    if (attempt < 1 && isTransientNetError(errMsg)) {
+      return merchantRequest(m, path, data, 1)
+    }
+    throw err
+  })
+}
+
+module.exports = { baseUrl, hasMerchantApi, merchantRequest, resolveMerchantApiUrl }
