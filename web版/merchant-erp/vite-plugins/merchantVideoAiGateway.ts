@@ -24,7 +24,6 @@ import {
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
-import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 
 /** 将注册表中的 videoAi / vendorKeys 合入 env：非空 env 优先生效（与本地 registry.json 规则一致）。 */

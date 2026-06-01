@@ -87,5 +87,5 @@ export function registryTenantToOpsCustomer(
 }
 
 export function tenantsToCustomers(tenants: RegistryTenant[]): OpsCustomer[] {
-  return tenants.map(registryTenantToOpsCustomer)
+  return tenants.map((t) => registryTenantToOpsCustomer(t))
 }
