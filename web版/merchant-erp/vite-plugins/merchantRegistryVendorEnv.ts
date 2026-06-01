@@ -9,7 +9,6 @@ import { expandVendorKeysForRegistrySave } from '../src/lib/aiVendorKeysShared.j
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import { vendorKeyFingerprint } from '../src/lib/aiVendorKeyValidate.js'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
-import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
 const DIRECT_LLM_ENV_KEYS = [
   'TOKENMIX_API_KEY',
