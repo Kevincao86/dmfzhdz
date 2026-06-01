@@ -1,5 +1,6 @@
 import type { OpsCustomer } from './mockData'
 import type { RegistryTenant } from './opsRegistryApi'
+import { computeTenantUsageMetrics, type TenantUsageMetrics } from './opsTenantUsageStats'
 
 const PLAN_ZH: Record<string, string> = {
   free: '免费版',
@@ -22,11 +23,26 @@ function planExpireLine(t: RegistryTenant): string {
   return parts.join('；') || '—'
 }
 
-export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
+export function registryTenantToOpsCustomer(
+  t: RegistryTenant,
+  opts?: {
+    usage?: TenantUsageMetrics
+    talentRecruitCount?: number
+    talentOrderCount?: number
+    storeCount?: number
+    storeStatusSummary?: string
+  },
+): OpsCustomer {
   const tag =
     t.source === 'erp' ? 'ERP 同步' : t.source === 'supabase' ? 'Supabase' : '运营创建'
   const loginLabel = String(t.loginName ?? '—').trim() || '—'
   const merchantLabel = String(t.merchantName ?? '—').trim() || '—'
+  const usage =
+    opts?.usage ??
+    computeTenantUsageMetrics({
+      createdAt: t.registeredAt,
+      updatedAt: t.updatedAt,
+    })
   return {
     id: t.id,
     companyName: merchantLabel,
@@ -53,16 +69,16 @@ export function registryTenantToOpsCustomer(t: RegistryTenant): OpsCustomer {
     })(),
     planExpireAt: planExpireLine(t),
     payStatus: t.accountStatus === 'normal' ? 'paid' : t.accountStatus === 'frozen' ? 'overdue' : 'unpaid',
-    firstLoginAt: '—',
-    lastLoginAt: fmt(t.updatedAt),
-    activeDays: 0,
-    dau: 0,
-    wau: 0,
-    mau: 0,
-    storeCount: 0,
-    storeStatusSummary: '—',
-    talentRecruitCount: 0,
-    talentOrderCount: 0,
+    firstLoginAt: usage.firstLoginAt,
+    lastLoginAt: usage.lastLoginAt,
+    activeDays: usage.activeDays,
+    dau: usage.dau,
+    wau: usage.wau,
+    mau: usage.mau,
+    storeCount: opts?.storeCount ?? 0,
+    storeStatusSummary: opts?.storeStatusSummary ?? '—',
+    talentRecruitCount: opts?.talentRecruitCount ?? 0,
+    talentOrderCount: opts?.talentOrderCount ?? 0,
     walletBalanceYuan:
       typeof t.walletBalanceCents === 'number' && Number.isFinite(t.walletBalanceCents)
         ? Math.round((t.walletBalanceCents / 100) * 100) / 100

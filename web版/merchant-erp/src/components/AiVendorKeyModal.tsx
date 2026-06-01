@@ -1,6 +1,7 @@
 import { KeyRound, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiVendorCatalogAvatar from './AiVendorCatalogAvatar'
+import SecretInput from './SecretInput'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import type { AiModelId } from '../services/douyinAiAssistApi'
@@ -123,8 +124,7 @@ export default function AiVendorKeyModal({
                 <AiVendorCatalogAvatar id={current.id} label={current.label} logoUrl={current.logoUrl} size="sm" />
                 {current.label} API Key
               </label>
-              <input
-                type="password"
+              <SecretInput
                 autoComplete="off"
                 value={draft[current.id] ?? ''}
                 onChange={(e) => setDraft((d) => ({ ...d, [current.id]: e.target.value }))}

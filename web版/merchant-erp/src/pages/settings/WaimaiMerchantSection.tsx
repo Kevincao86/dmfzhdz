@@ -1,5 +1,6 @@
-import { BookOpen, Eye, EyeOff, ExternalLink } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { BookOpen, ExternalLink } from 'lucide-react'
+import SecretInput from '../../components/SecretInput'
+import { useCallback, useState } from 'react'
 import {
   getMerchantPlatform,
   type MerchantPlatformId,
@@ -47,14 +48,9 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
   const [extraId, setExtraId] = useState('')
   const [bindSubmitting, setBindSubmitting] = useState(false)
   const [bindError, setBindError] = useState<string | null>(null)
-  const [secretMasked, setSecretMasked] = useState(true)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
-
-  useEffect(() => {
-    if (!bindOpen) setSecretMasked(true)
-  }, [bindOpen])
 
   const persistAuto = (v: boolean) => {
     writeSession(`${meta.tokenSessionKey}_auto`, v ? '1' : '0')
@@ -203,20 +199,12 @@ export default function WaimaiMerchantSection({ platformId, guideSteps }: Props)
             <label className="block text-sm">
               <span className="text-gray-600">App Secret</span>
               <div className="relative mt-1">
-                <input
-                  type={secretMasked ? 'password' : 'text'}
+                <SecretInput
                   value={appSecret}
                   onChange={(e) => setAppSecret(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
                   autoComplete="new-password"
                 />
-                <button
-                  type="button"
-                  onClick={() => setSecretMasked((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
-                >
-                  {secretMasked ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                </button>
               </div>
             </label>
             <label className="block text-sm sm:col-span-2">

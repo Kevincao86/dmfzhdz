@@ -9,6 +9,7 @@ import {
   WifiOff,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { cn } from '../../cn'
 import { readSupportReplyTemplates, writeSupportReplyTemplates } from '../../lib/opsSupportTemplates'
 import {
@@ -120,6 +121,8 @@ type OpsSupportWorkbenchPageProps = {
 }
 
 export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportWorkbenchPageProps) {
+  const [searchParams] = useSearchParams()
+  const deepLinkSession = (searchParams.get('session') ?? '').trim()
   const wsRef = useRef<WebSocket | null>(null)
   const selectedIdRef = useRef<string | null>(null)
   const [relayReady, setRelayReady] = useState(false)
@@ -407,6 +410,13 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
     () => channelSessionIds.filter((id) => needsOpsReply(msgsBySession[id])).length,
     [channelSessionIds, msgsBySession],
   )
+
+  useEffect(() => {
+    if (!deepLinkSession) return
+    if (channel === 'erp' && isMpSupportSession(deepLinkSession)) return
+    if (channel === 'mp' && !isMpSupportSession(deepLinkSession)) return
+    setSelectedId(deepLinkSession)
+  }, [deepLinkSession, channel])
 
   const pickSession = useCallback((id: string) => {
     setSelectedId(id)

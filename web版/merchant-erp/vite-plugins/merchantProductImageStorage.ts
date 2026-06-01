@@ -50,19 +50,43 @@ function normalizeOssKeyPrefix(raw: string): string {
 }
 
 function readIceOssUrlPrefix(env: Record<string, string | undefined>): ParsedOssPrefix | null {
-  return parseOssUrlPrefix(
-    (
-      env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX ??
-      env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX ??
-      ''
-    ).trim(),
-  )
+  const candidates = [
+    env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX,
+    env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX,
+    env.MERCHANT_PRODUCT_IMAGE_ICE_OSS_URL_PREFIX,
+  ]
+  for (const raw of candidates) {
+    const parsed = parseOssUrlPrefix(String(raw ?? '').trim())
+    if (parsed) return parsed
+  }
+  return null
+}
+
+/** 云剪 RAM 常见授权目录；运营台未填 OSS URL 前缀时用作商品图回退。 */
+const DEFAULT_ICE_OBJECT_KEY_PREFIXES = ['meoo-out', 'meoo_out'] as const
+
+function iceObjectKeyPrefixes(env: Record<string, string | undefined>): string[] {
+  const out: string[] = []
+  const add = (p: string) => {
+    const n = normalizeOssKeyPrefix(p)
+    if (n && !out.includes(n)) out.push(n)
+  }
+  add(env.MERCHANT_PRODUCT_IMAGE_OSS_ICE_SUBPREFIX ?? '')
+  const ice = readIceOssUrlPrefix(env)
+  if (ice?.keyPrefix) add(ice.keyPrefix)
+  if (readMerchantProductImageOssEnv(env)) {
+    for (const p of DEFAULT_ICE_OBJECT_KEY_PREFIXES) add(p)
+  }
+  return out
 }
 
 function underIceDouyinGoodsPrefix(env: Record<string, string | undefined>): string | null {
   const ice = readIceOssUrlPrefix(env)
-  if (!ice?.keyPrefix) return null
-  return `${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`
+  if (ice?.keyPrefix) {
+    return `${normalizeOssKeyPrefix(ice.keyPrefix)}/douyin-goods`
+  }
+  const first = iceObjectKeyPrefixes(env)[0]
+  return first ? `${first}/douyin-goods` : null
 }
 
 /** 云剪 RAM 常只授权 meoo-out/*；未显式配置时默认写到该目录下的 douyin-goods。 */
@@ -81,7 +105,7 @@ export function merchantProductImageStoragePrefix(
   return 'douyin-goods'
 }
 
-/** 上传失败时按顺序尝试的前缀（主前缀 + 云剪目录回退）。 */
+/** 上传失败时按顺序尝试的前缀（云剪目录优先，避免 RAM 仅授权 meoo-out/* 时先写根目录 douyin-goods）。 */
 export function merchantProductImageStoragePrefixCandidates(
   env: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
 ): string[] {
@@ -91,11 +115,19 @@ export function merchantProductImageStoragePrefixCandidates(
     const n = normalizeOssKeyPrefix(p)
     if (n && !out.includes(n)) out.push(n)
   }
+
   const underIce = underIceDouyinGoodsPrefix(env)
-  if (underIce && underIce !== primary) add(underIce)
-  add(primary)
   if (underIce) add(underIce)
-  add('douyin-goods')
+
+  for (const kp of iceObjectKeyPrefixes(env)) {
+    add(`${kp}/douyin-goods`)
+  }
+
+  if (primary) add(primary)
+
+  const hasNestedDouyinGoods = out.some((p) => p.includes('/') && p.endsWith('douyin-goods'))
+  if (!hasNestedDouyinGoods) add('douyin-goods')
+
   return out
 }
 
@@ -177,13 +209,25 @@ export function formatMerchantProductImageOssError(raw: string, env?: Record<str
     const preferredPrefix = merchantProductImageStoragePrefix(
       env ?? (process.env as Record<string, string | undefined>),
     )
+    const nested = merchantProductImageStoragePrefixCandidates(
+      env ?? (process.env as Record<string, string | undefined>),
+    ).filter((p) => p.includes('/'))
+    const ramHint =
+      nested.length > 0
+        ? `云剪 RAM 通常只授权 ${nested[0].split('/')[0]}/*：请删除 Vercel 中的 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或在运营台填写 ICE 成片 OSS 前缀（如 https://${bucket}.oss-cn-shanghai.aliyuncs.com/meoo-out/）后 Redeploy。`
+        : '云剪 RAM 通常只授权 meoo-out/*：请删除 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或在运营台填写 ICE 成片 OSS 前缀后 Redeploy。'
     return [
       msg,
       'AccessKey 可能缺少 oss:PutObject 权限，或 Bucket 已禁用 ACL 但当前账号无权写入。',
-      '云剪 RAM 通常只授权 meoo-out/*：请删除 MERCHANT_PRODUCT_IMAGE_OSS_PREFIX=douyin-goods，或在运营台填写 ICE 成片 OSS 前缀后 Redeploy。',
+      ramHint,
       '请在 RAM 为子账号授权（Resource 改成你的 Bucket）：',
-      `  oss:PutObject、oss:GetObject → acs:oss:*:*:${bucket}/${preferredPrefix}/*`,
-      `若抖音需长期拉图，请在 OSS 控制台为 ${preferredPrefix}/* 配置 Bucket 策略允许匿名 GetObject（公共读前缀）。`,
+      ...nested.slice(0, 2).map(
+        (p) => `  oss:PutObject、oss:GetObject → acs:oss:*:*:${bucket}/${p}/*`,
+      ),
+      ...(nested.length === 0
+        ? [`  oss:PutObject、oss:GetObject → acs:oss:*:*:${bucket}/${preferredPrefix}/*`]
+        : []),
+      `若抖音需长期拉图，请在 OSS 控制台为商品图目录配置 Bucket 策略允许匿名 GetObject（公共读前缀）。`,
     ].join(' ')
   }
   if (/signature|does not match/i.test(msg)) {

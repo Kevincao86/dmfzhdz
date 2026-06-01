@@ -59,7 +59,7 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
   {
     id: 'minimax',
     label: 'MiniMax',
-    hint: 'platform.minimax.io · OpenAI 兼容',
+    hint: 'platform.minimaxi.com（国内）或 platform.minimax.io（国际）· OpenAI 兼容；须填「接口密钥」页 sk- 开头 Key，勿填 eyJ JWT（会 2049）',
     logoUrl: '/ai-vendors/minimax.png',
   },
   {
@@ -107,7 +107,7 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
   {
     id: 'kimi',
     label: 'Kimi',
-    hint: 'Moonshot · OpenAI 兼容（智能体网关）',
+    hint: 'platform.moonshot.cn · OpenAI 兼容；须 sk- 开头 API Key（国内 .cn / 国际 .ai 账号不通用）',
     logoUrl: '/ai-vendors/kimi.png',
   },
 ]

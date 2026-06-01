@@ -107,6 +107,59 @@ export async function fetchTenantWalletLedgerForOps(
   return { ok: true, rows: Array.isArray(j.rows) ? j.rows : [] }
 }
 
+export type OpsTenantSupportSessionSummary = {
+  sessionId: string
+  lastText: string
+  lastTs: number
+  messageCount: number
+  enterpriseName?: string
+  customerId?: string
+}
+
+export async function fetchTenantInsightsForOps(input: {
+  tenantId: string
+  loginName: string
+  merchantName: string
+}): Promise<
+  | {
+      ok: true
+      usage: import('./opsTenantUsageStats').TenantUsageMetrics
+      supportSessions: OpsTenantSupportSessionSummary[]
+    }
+  | { ok: false; error: string; hint?: string }
+> {
+  if (!supabaseOpsAvailableOnClient()) {
+    return { ok: false, error: 'not_configured' }
+  }
+  const q = new URLSearchParams({
+    tenant_id: input.tenantId,
+    login_name: input.loginName,
+    merchant_name: input.merchantName,
+  })
+  const res = await fetch(`/api/ops-supabase/tenants/insights?${q}`)
+  const raw = await res.text()
+  const j = parseJsonBody(raw) as {
+    ok?: boolean
+    usage?: import('./opsTenantUsageStats').TenantUsageMetrics
+    supportSessions?: OpsTenantSupportSessionSummary[]
+    error?: string
+    hint?: string
+    detail?: string
+  }
+  if (!res.ok || !j.ok || !j.usage) {
+    return {
+      ok: false,
+      error: (typeof j.error === 'string' && j.error) || `http_${res.status}`,
+      hint: typeof j.hint === 'string' ? j.hint : typeof j.detail === 'string' ? j.detail : undefined,
+    }
+  }
+  return {
+    ok: true,
+    usage: j.usage,
+    supportSessions: Array.isArray(j.supportSessions) ? j.supportSessions : [],
+  }
+}
+
 export function supabaseRowsToRegistryTenants(rows: SupabaseTenantRow[]): RegistryTenant[] {
   const now = new Date().toISOString()
   return rows

@@ -22,10 +22,14 @@ export function moonshotChatBaseCandidates(env: Record<string, string>): string[
   return out
 }
 
-export function minimaxChatBaseCandidates(env: Record<string, string>): string[] {
+export function minimaxChatBaseCandidates(env: Record<string, string>, apiKey?: string): string[] {
   const custom = (env.MINIMAX_BASE_URL ?? env.MERCHANT_AI_MINIMAX_CHAT_BASE ?? '')
     .trim()
     .replace(/\/$/, '')
+  const key = (apiKey ?? resolveMinimaxApiKey(env)).trim()
+  const region = (env.MINIMAX_REGION ?? '').trim().toLowerCase()
+  const cnFirst = region === 'cn' || key.startsWith('sk-api-')
+  const intlFirst = region === 'intl' || region === 'io'
   const out: string[] = []
   const add = (u: string) => {
     const t = u.trim().replace(/\/$/, '')
@@ -34,8 +38,16 @@ export function minimaxChatBaseCandidates(env: Record<string, string>): string[]
   if (custom) {
     add(custom.includes('/chat/completions') ? custom.replace(/\/chat\/completions.*$/, '') : custom)
   }
-  add('https://api.minimaxi.com/v1')
-  add('https://api.minimax.io/v1')
+  if (intlFirst) {
+    add('https://api.minimax.io/v1')
+    add('https://api.minimaxi.com/v1')
+  } else if (cnFirst) {
+    add('https://api.minimaxi.com/v1')
+    add('https://api.minimax.io/v1')
+  } else {
+    add('https://api.minimaxi.com/v1')
+    add('https://api.minimax.io/v1')
+  }
   return out
 }
 

@@ -2,6 +2,7 @@ import { BookOpen } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MerchantPlatformAccountsPanel from '../../components/settings/MerchantPlatformAccountsPanel'
+import SecretInput from '../../components/SecretInput'
 import { useMembership } from '../../context/MembershipContext'
 import { cn } from '../../cn'
 import {
@@ -271,8 +272,7 @@ export default function LocalPromotionSection() {
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-xs text-slate-600">授权密钥（必填）</label>
-              <input
-                type="password"
+              <SecretInput
                 value={accessToken}
                 onChange={(e) => setAccessToken(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"

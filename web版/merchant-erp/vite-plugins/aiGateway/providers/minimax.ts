@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/types.js'
+import { assertDistinctFromTokenMix, looksLikeJwtCredential } from '../../../src/lib/aiVendorKeyValidate.js'
 import { registryEntry } from '../../../src/services/ai/modelRegistry.js'
 import { looksLikeMinimaxJwtKey } from '../../merchantRegistryVendorEnv.js'
 import {
@@ -18,6 +19,14 @@ function toMessages(messages: AIChatRequest['messages']): OpenAI.Chat.ChatComple
   })
 }
 
+function isAuthError(err: Error | null): boolean {
+  return !!err?.message?.match(/401|2049|invalid api key|invalid authentication/i)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /**
  * MiniMax OpenAI 兼容 Chat Completions。
  * @see https://platform.minimax.io/docs/api-reference/text-chat-openai
@@ -27,40 +36,62 @@ export async function chatMinimax(req: AIChatRequest, env: Record<string, string
   if (!apiKey) {
     throw new Error('MINIMAX_API_KEY 未配置（请在运营台「AI 模型」填写 MiniMax 密钥）')
   }
-  if (looksLikeMinimaxJwtKey(apiKey)) {
+  if (looksLikeMinimaxJwtKey(apiKey) || looksLikeJwtCredential(apiKey)) {
     throw new Error(
       'MiniMax Key 形如 JWT(eyJ…)，OpenAI 兼容对话需使用平台「接口密钥」页的 sk- 开头 Key；JWT 会报 2049 invalid api key',
     )
   }
+  assertDistinctFromTokenMix('MiniMax', apiKey, env.TOKENMIX_API_KEY)
   const reg = registryEntry('minimax')
   const models = minimaxChatModelCandidates(env, req.model, reg?.defaultModel)
-  const bases = minimaxChatBaseCandidates(env)
+  const bases = minimaxChatBaseCandidates(env, apiKey)
   const messages = toMessages(req.messages)
   const temperature = req.temperature ?? 1
 
-  let lastErr: Error | null = null
-  for (const baseURL of bases) {
-    const client = new OpenAI({ apiKey, baseURL: `${baseURL.replace(/\/$/, '')}/` })
-    for (const model of models) {
-      try {
-        const completion = await client.chat.completions.create({
-          model,
-          messages,
-          temperature,
-          stream: false,
-        })
-        const msg = completion.choices[0]?.message?.content
-        return {
-          provider: 'minimax',
-          model: completion.model ?? model,
-          content: typeof msg === 'string' ? msg : '',
-          raw: completion as unknown as Record<string, unknown>,
-          usage: completion.usage as unknown as Record<string, unknown>,
+  const attempt = async (): Promise<AIChatResponse | null> => {
+    let lastErr: Error | null = null
+    for (const baseURL of bases) {
+      const client = new OpenAI({ apiKey, baseURL: `${baseURL.replace(/\/$/, '')}/` })
+      for (const model of models) {
+        try {
+          const completion = await client.chat.completions.create({
+            model,
+            messages,
+            temperature,
+            stream: false,
+          })
+          const msg = completion.choices[0]?.message?.content
+          return {
+            provider: 'minimax',
+            model: completion.model ?? model,
+            content: typeof msg === 'string' ? msg : '',
+            raw: completion as unknown as Record<string, unknown>,
+            usage: completion.usage as unknown as Record<string, unknown>,
+          }
+        } catch (e) {
+          lastErr = e instanceof Error ? e : new Error(String(e))
         }
-      } catch (e) {
-        lastErr = e instanceof Error ? e : new Error(String(e))
       }
     }
+    if (lastErr) throw lastErr
+    return null
   }
-  throw new Error(`MiniMax: ${lastErr?.message ?? '请求失败'}`)
+
+  try {
+    const first = await attempt()
+    if (first) return first
+    throw new Error('MiniMax: 请求失败')
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e))
+    if (!isAuthError(err)) throw err
+    await sleep(2000)
+    try {
+      const retry = await attempt()
+      if (retry) return retry
+    } catch (retryErr) {
+      const msg = retryErr instanceof Error ? retryErr.message : String(retryErr)
+      throw new Error(`MiniMax: ${msg}`)
+    }
+    throw new Error(`MiniMax: ${err.message}`)
+  }
 }
