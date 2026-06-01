@@ -725,7 +725,7 @@ export default function DigitalHumanBroadcastPage() {
                       <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
                         <p className="text-sm font-medium text-violet-900">抖音短视频 · 链接驱动</p>
                         <p className="mt-1 text-xs text-violet-700">
-                          粘贴分享链接，系统自动抓取视频信息并生成口播文案与动作指令（需配置 AI 模型）。
+                          粘贴分享链接，系统自动抓取视频信息并生成口播文案与动作指令（AI Key 与智能体共用，在商家管理后台配置）。
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <input

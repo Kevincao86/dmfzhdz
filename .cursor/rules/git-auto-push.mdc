@@ -1,0 +1,17 @@
+---
+description: 代码 commit 后自动推送到 GitHub 与 Gitee
+alwaysApply: true
+---
+
+# Git 自动推送（双远程）
+
+完成代码修改并 **commit** 后，除非用户明确说「不要推送」，必须尝试推送到 `origin` 与 `gitee`：
+
+```bash
+bash scripts/git-push-both.sh
+```
+
+- 使用 `required_permissions: ["all"]` 执行
+- 若失败且报 `Permission denied (publickey)`，提示用户 **仅需执行一次**：`bash scripts/setup-git-push-once.sh` 并在 `.cursor/git-push.local.env` 填入 `GITHUB_TOKEN` 与 `GITEE_TOKEN`
+- 不要修改 git config、不要 force push
+- 推送成功后简要告知 commit hash 与两个远程均已更新
