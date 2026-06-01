@@ -739,7 +739,7 @@ export default function DigitalHumanBroadcastPage() {
                           <input
                             value={draft.douyinLinkUrl}
                             onChange={(e) => patchDraft({ douyinLinkUrl: e.target.value })}
-                            placeholder="https://v.douyin.com/… 或完整视频页链接"
+                            placeholder="https://www.douyin.com/video/数字… 或 v.douyin.com 短链"
                             className="min-w-[240px] flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm"
                           />
                           <button

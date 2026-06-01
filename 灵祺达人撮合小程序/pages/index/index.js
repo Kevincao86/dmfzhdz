@@ -112,8 +112,8 @@ Page({
     } catch (e) {
       const msg = String(e.message || e)
       const hint =
-        msg.includes('fail') || msg.includes('网络')
-          ? '无法连接后台，请确认已运行 npm run dev，且 config.local.js 中 MERCHANT_API_BASE_URL 正确'
+        msg.includes('fail') || msg.includes('网络') || msg.includes('domain')
+          ? '无法连接后台：请检查微信公众平台 request 合法域名含 mofangdianai.com，且 utils/config.release.js 已填写 MERCHANT_API_BASE_URL 后重新上传'
           : msg
       this.setData({
         loading: false,
