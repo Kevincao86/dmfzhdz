@@ -5,7 +5,7 @@
   "description": "灵祺AI智能ERP · 服务商版（与 merchant-erp 同源，独立端口与会话）",
   "scripts": {
     "dev": "npm run dev:partner --prefix ../merchant-erp",
-    "build": "npm run build:partner --prefix ../merchant-erp",
+    "build": "npm run build:partner --prefix ../merchant-erp && node scripts/sync-dist.mjs",
     "install-deps": "npm ci --prefix ../merchant-erp"
   }
 }

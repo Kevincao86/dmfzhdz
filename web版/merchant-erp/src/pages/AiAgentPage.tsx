@@ -201,7 +201,7 @@ export default function AiAgentPage() {
                     ) : null}
                   </div>
                 ))}
-                {streamingReply?.thinking?.trim() && !streamingReply.content.trim() ? (
+                {streamingReply?.thinking?.trim() ? (
                   <AiAgentThinkingLive text={streamingReply.thinking} />
                 ) : null}
                 {aiSending && !streamingReply?.content.trim() && !streamingReply?.thinking?.trim() ? (

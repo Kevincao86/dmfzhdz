@@ -44,6 +44,7 @@ import {
   shouldDeferTaskPreview,
   summarizeAssistantContent,
 } from '../lib/aiAgentActionParse'
+import { splitAssistantStreamView } from '../lib/assistantThinkingText'
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
 import { listProductPlansFromPreview } from '../lib/aiAgentProductPlans'
 import {
@@ -1277,16 +1278,18 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         })
 
         setStreamingReply(null)
+        const { answer: streamAnswer } = splitAssistantStreamView(res.content)
+        const visibleRaw = streamAnswer.trim() || res.content.trim()
         const deferPreview = shouldDeferTaskPreview(
           trimmed,
-          res.content,
+          visibleRaw,
           taskType ?? inferTaskTypeFromText(trimmed),
         )
-        const rawSummary = summarizeAssistantContent(res.content)
+        const rawSummary = summarizeAssistantContent(visibleRaw)
         let display =
           deferPreview || isPlanDesignQuery(trimmed)
-            ? formatAssistantDisplayText(res.content)
-            : formatAssistantDisplayText(rawSummary ?? res.content)
+            ? formatAssistantDisplayText(visibleRaw)
+            : formatAssistantDisplayText(rawSummary ?? visibleRaw)
 
         if (deferPreview && isPlanOrNineScenarioQuery(trimmed)) {
           const taskTypes = inferDeferredTaskTypes(trimmed, res.content, taskType ?? inferTaskTypeFromText(trimmed))

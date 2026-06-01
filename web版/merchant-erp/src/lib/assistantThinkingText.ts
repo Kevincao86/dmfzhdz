@@ -40,6 +40,7 @@ export function stripAssistantThinkingBlocks(s: string): string {
   for (let i = 0; i < 12; i++) {
     const prev = t
     t = t
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/[\s\S]*?<\/think>/gi, '')
       .replace(/<think>[\s\S]*?<\/redacted_thinking>/gi, '')
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
@@ -50,7 +51,7 @@ export function stripAssistantThinkingBlocks(s: string): string {
     if (t === prev) break
   }
   t = t
-    .replace(/[\s\S]*$/gi, '')
+    .replace(/<think>[\s\S]*$/gi, '')
     .replace(/<think>[\s\S]*$/gi, '')
     .replace(/<thinking>[\s\S]*$/gi, '')
     .replace(/<reasoning>[\s\S]*$/gi, '')
