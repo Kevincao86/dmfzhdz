@@ -4,7 +4,7 @@ import { BarChart3, MapPin, Sparkles, Store, Users, Zap } from 'lucide-react'
 import { cn } from '../cn'
 import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
-import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { supabase, supabaseConfigured, missingSupabaseClientEnvKeys } from '../lib/supabaseClient'
 import LoginAuthPanel from './login/LoginAuthPanel'
 import { PosterPgyTechArt } from './login/LoginPosterArt'
 
@@ -78,11 +78,40 @@ export default function LoginPage() {
   }, [navigate, location.state])
 
   if (!supabaseConfigured) {
+    const missing = missingSupabaseClientEnvKeys()
+    const site = isPartnerEdition() ? '服务商版（fws）' : '商家版'
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#f5f7fb] px-6 py-8 text-center">
         <h1 className="text-lg font-semibold text-slate-800">登录服务未配置</h1>
         <p className="max-w-md text-sm leading-relaxed text-slate-500">
-          当前环境缺少商户登录所需配置，请联系管理员或在部署环境中补全相关环境变量后重启服务。
+          当前 {site} 前端构建时未注入 Supabase 登录配置。请在对应 Vercel 项目的 Environment
+          Variables 中补全下列变量（Production 与 Preview 建议一致），保存后重新 Deploy。
+        </p>
+        {missing.length > 0 ? (
+          <ul className="max-w-md list-inside list-disc text-left text-sm text-slate-600">
+            {missing.map((k) => (
+              <li key={k}>
+                <code className="text-xs text-slate-800">{k}</code>
+              </li>
+            ))}
+            <li>
+              <code className="text-xs text-slate-800">VITE_ERP_AUTH_API_BASE</code>
+              <span className="text-slate-500">（建议 </span>
+              <code className="text-xs">https://mofangdianai.com/erp-api</code>
+              <span className="text-slate-500">）</span>
+            </li>
+            {isPartnerEdition() ? (
+              <li>
+                <code className="text-xs text-slate-800">VITE_APP_EDITION</code>
+                <span className="text-slate-500"> = </span>
+                <code className="text-xs">partner</code>
+              </li>
+            ) : null}
+          </ul>
+        ) : null}
+        <p className="max-w-md text-xs text-slate-400">
+          值请与商家站 cs.mofangdianai.com 项目中的同名变量保持一致；详见仓库{' '}
+          <code className="text-slate-600">docs/deploy-vercel-partner.md</code>。
         </p>
       </div>
     )

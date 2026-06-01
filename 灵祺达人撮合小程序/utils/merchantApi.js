@@ -35,12 +35,24 @@ function formatHttpError(statusCode, data) {
   return code || `请求失败 ${statusCode}`
 }
 
+/** ECS /erp-api 与 Web 商家端一致：基址含 erp-api 时去掉路径前缀 /api/ */
+function resolveMerchantApiUrl(path) {
+  const b = baseUrl()
+  if (!b) return ''
+  const p = path.startsWith('/') ? path : `/${path}`
+  if (/\/erp-api\/?$/i.test(b) || b.includes('/erp-api/')) {
+    const rel = p.replace(/^\/api\//, '')
+    return `${b.replace(/\/$/, '')}/${rel}`
+  }
+  return `${b}${p}`
+}
+
 function merchantRequest(method, path, data) {
   const b = baseUrl()
   if (!b) {
     return Promise.reject(new Error('尚未配置后台地址'))
   }
-  const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
+  const url = resolveMerchantApiUrl(path)
   return new Promise((resolve, reject) => {
     wx.request({
       url,

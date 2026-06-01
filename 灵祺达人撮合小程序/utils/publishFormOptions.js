@@ -8,7 +8,7 @@ const DELIVERY_WINDOWS = [
 const RECRUIT_MODES = [
   { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal', category: '探店' },
   { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal', category: '品宣' },
-  { id: 'ice', label: '云剪任务', sub: '成片直派 · 闭环交付', hall: 'ice', category: '云剪' },
+  { id: 'ice', label: '云剪任务', sub: '功能搭建中', hall: 'ice', category: '云剪', disabled: true },
 ]
 
 const PLATFORMS = ['抖音', '小红书', '大众点评', '快手', '微信视频号']
