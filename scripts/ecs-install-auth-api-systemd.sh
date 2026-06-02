@@ -5,6 +5,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=ecs-resolve-admin-home.sh
+source "$ROOT/scripts/ecs-resolve-admin-home.sh"
 # shellcheck source=ecs-resolve-erp-path.sh
 source "$ROOT/scripts/ecs-resolve-erp-path.sh"
 ERP="$(ecs_resolve_erp_dir "$ROOT")"
@@ -13,7 +15,8 @@ UNIT_SRC="$ROOT/scripts/ecs-meoo-auth-api.service"
 UNIT_DST="/etc/systemd/system/${SERVICE_NAME}.service"
 
 if [[ "$(id -un)" != "admin" ]]; then
-  echo "请用 admin 用户执行（或调整 service 里的 User/路径）"
+  echo "请用 admin 用户执行（当前=$(id -un) HOME=$HOME）。勿 sudo bash 本脚本。"
+  echo "  su - admin -c 'cd ~/app && bash scripts/ecs-install-auth-api-systemd.sh'"
   exit 1
 fi
 
