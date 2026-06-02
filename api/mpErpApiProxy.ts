@@ -1,4 +1,4 @@
-/** ECS / 本地 dev：与仓库根 api/mpErpApiProxy.ts 逻辑一致（勿从根 api re-export，避免 tsc 拉取 @vercel/node） */
+/** Vercel 根 api/ 内：转发 ECS erp-api（避免经 web版 路径 re-export 导致构建失败） */
 
 const FETCH_TIMEOUT_MS = 25_000
 

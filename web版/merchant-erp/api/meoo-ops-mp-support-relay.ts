@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-ops-mp-support-relay — 达人招募在线客服（Vercel 网关 → ECS erp-api）
+ * POST /api/meoo-ops-mp-support-relay — 达人招募在线客服（Vercel → ECS erp-api）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { proxyPostErpApi } from '../src/lib/mpErpApiProxy.js'
