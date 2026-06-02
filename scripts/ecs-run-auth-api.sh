@@ -110,7 +110,8 @@ if [[ -f /etc/systemd/system/meoo-auth-api.service ]]; then
   sleep 2
   if curl -sf "http://127.0.0.1:$PORT/api/meoo-auth-ping" >/dev/null; then
     echo "OK: systemd meoo-auth-api 已在 :$PORT 运行"
-    curl -sS "http://127.0.0.1:$PORT/api/meoo-erp-api-health" | head -c 280
+    H="$(curl -sS "http://127.0.0.1:$PORT/api/meoo-erp-api-health")"
+    echo "${H}" | head -c 280
     echo
     echo "公网自测: curl -sSI https://mofangdianai.com/erp-api/meoo-erp-api-health | head"
     exit 0
