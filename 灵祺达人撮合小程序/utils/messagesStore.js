@@ -94,6 +94,7 @@ function markNotificationsRead() {
 }
 
 const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
+const talentInboxMatch = require('./talentInboxMatch.js')
 
 function readInboxSeenSet() {
   try {
@@ -113,14 +114,14 @@ function markInboxSeen(ids) {
   } catch (_) {}
 }
 
-/** 合并 registry 站内信（达人身份） */
-function inboxRowsForTalentMember(reg, talentMemberId) {
-  const mid = String(talentMemberId || '').trim()
-  if (!mid || !reg) return []
+/** 合并 registry 站内信（达人：会员 id / 手机号 / 账号 / 报名 id 匹配） */
+function inboxRowsForTalent(reg, member) {
+  if (!reg || !member) return []
   const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+  const keys = talentInboxMatch.talentMatchKeys(member)
   const seen = readInboxSeenSet()
   return inbox
-    .filter((row) => row && String(row.talentMemberId || '').trim() === mid)
+    .filter((row) => talentInboxMatch.inboxRowMatchesTalent(row, keys, member))
     .map((row) => ({
       id: row.id,
       title: row.title || '通知',
@@ -134,13 +135,17 @@ function inboxRowsForTalentMember(reg, talentMemberId) {
     .sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
 }
 
-function mergeRegistryInboxForTalent(reg, talentMemberId) {
-  const remote = inboxRowsForTalentMember(reg, talentMemberId)
-  if (!remote.length) return readAllNotificationRows()
+function mergeRegistryInboxForTalent(reg, member) {
+  const selectionRows = talentInboxMatch.buildSelectionNoticeRows(reg, member)
+  for (let i = 0; i < selectionRows.length; i++) {
+    talentInboxMatch.markSelectionNoticeSent(selectionRows[i].dedupeKey)
+  }
+  const remote = inboxRowsForTalent(reg, member)
+  const merged = [...selectionRows, ...remote]
   const local = readAllNotificationRows()
-  const remoteIds = new Set(remote.map((r) => r.id))
+  const remoteIds = new Set(merged.map((r) => r.id))
   const rest = local.filter((r) => !remoteIds.has(r.id))
-  return [...remote, ...rest].sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+  return [...merged, ...rest].sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
 }
 
 module.exports = {
@@ -153,7 +158,9 @@ module.exports = {
   unreadNotificationCount,
   markMessagesRead,
   markNotificationsRead,
-  inboxRowsForTalentMember,
+  inboxRowsForTalent,
+  /** @deprecated 使用 inboxRowsForTalent */
+  inboxRowsForTalentMember: inboxRowsForTalent,
   mergeRegistryInboxForTalent,
   markInboxSeen,
 }

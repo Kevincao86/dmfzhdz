@@ -129,6 +129,31 @@ function wxRequestPromise(url, m, data) {
   })
 }
 
+function isRealDevice() {
+  try {
+    return wx.getSystemInfoSync().platform !== 'devtools'
+  } catch {
+    return true
+  }
+}
+
+function runGetWithFallback(url) {
+  const tryRequest = () =>
+    wxRequestPromise(url, 'GET', undefined).catch((err) => {
+      const errMsg = String(err && err.message ? err.message : err)
+      if (!isTransientNetError(errMsg)) throw err
+      return merchantGetViaDownload(url)
+    })
+
+  const tryDownloadFirst = () =>
+    merchantGetViaDownload(url).catch(() => tryRequest())
+
+  if (shouldTryDownloadFallback(url) && isRealDevice()) {
+    return tryDownloadFirst()
+  }
+  return tryRequest()
+}
+
 function merchantRequest(method, path, data, attempt = 0) {
   const b = baseUrl()
   if (!b) {
@@ -137,19 +162,12 @@ function merchantRequest(method, path, data, attempt = 0) {
   const url = resolveMerchantApiUrl(path)
   const m = String(method || 'GET').toUpperCase()
 
-  const runGet = () =>
-    wxRequestPromise(url, m, data).catch((err) => {
-      const errMsg = String(err && err.message ? err.message : err)
-      if (m !== 'GET' || attempt > 0 || !shouldTryDownloadFallback(url)) throw err
-      if (!isTransientNetError(errMsg)) throw err
-      return merchantGetViaDownload(url).catch((dlErr) => {
-        if (attempt < 1) return merchantRequest(m, path, data, 1)
-        const dlMsg = String(dlErr && dlErr.message ? dlErr.message : dlErr)
-        throw new Error(`[request] ${errMsg}；[download] ${dlMsg}`)
-      })
+  if (m === 'GET') {
+    return runGetWithFallback(url).catch((err) => {
+      if (attempt < 1) return merchantRequest(m, path, data, 1)
+      throw err
     })
-
-  if (m === 'GET') return runGet()
+  }
 
   return wxRequestPromise(url, m, data).catch((err) => {
     const errMsg = String(err && err.message ? err.message : err)

@@ -1,15 +1,15 @@
 const { merchantRequest } = require('./merchantApi.js')
 const registryCache = require('./registryCache.js')
+const registryRest = require('./registryRestGateway.js')
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
 function isRetryableRegistryError(msg) {
-  return /404|not_found|reset|errcode:-101|cronet|timeout|超时|request:fail|download:fail|网络异常/i.test(
+  return /404|not_found|reset|errcode:-101|cronet|timeout|超时|request:fail|download:fail|网络异常|registry_rest/i.test(
     String(msg || ''),
   )
 }
 
-async function fetchRegistry() {
-  // 体积小优先（微信 reset 偶发与响应体/握手有关）；全量作回退
+async function fetchRegistryViaErpApi() {
   const paths = [
     '/api/meoo-ops-mp-hall-registry',
     '/api/meoo-ops-sync-registry',
@@ -25,9 +25,30 @@ async function fetchRegistry() {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
       if (!isRetryableRegistryError(msg)) throw e
-      console.warn('[mp] fetchRegistry retry next path after:', path, msg.slice(0, 120))
+      console.warn('[mp] fetchRegistry erp-api retry next path after:', path, msg.slice(0, 120))
     }
   }
+  throw lastErr || new Error('erp-api 无法拉取招募大厅')
+}
+
+async function fetchRegistry() {
+  // 手机微信 Cronet 对 /erp-api/ 常 reset；/rest/v1 与私信同源
+  try {
+    const data = await registryRest.fetchHallRegistryViaRest()
+    registryCache.save(data, `rest:${registryRest.RPC_NAME}`)
+    return data
+  } catch (restErr) {
+    const restMsg = String(restErr && restErr.message ? restErr.message : restErr)
+    console.warn('[mp] fetchRegistry rest → erp-api:', restMsg.slice(0, 160))
+  }
+
+  let lastErr
+  try {
+    return await fetchRegistryViaErpApi()
+  } catch (e) {
+    lastErr = e
+  }
+
   const cached = registryCache.load({ allowStale: true })
   if (cached && cached.data) {
     const when = registryCache.formatSavedAt(cached.savedAt)
