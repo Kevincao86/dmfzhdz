@@ -33,6 +33,18 @@
       "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
       "maxDuration": 60
     },
+    "api/meoo-ops-mp-hall-registry.ts": {
+      "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-ops-mp-talent-chat.ts": {
+      "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
+    "api/meoo-ops-mp-support-relay.ts": {
+      "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
+      "maxDuration": 60
+    },
     "api/**/*.ts": {
       "includeFiles": "web版/merchant-erp/{vite-plugins,src/lib}/**",
       "maxDuration": 60
