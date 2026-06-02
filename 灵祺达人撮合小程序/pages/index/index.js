@@ -165,16 +165,19 @@ Page({
       } else if (/httpDNSServiceId|httpdns/i.test(msg)) {
         hint =
           '已关闭 HttpDNS，请重新上传体验版（构建号含 no-httpdns）。若仍见本提示说明仍是旧包。\n\n' + msg
+      } else if (/ecs_proxy|fetch failed|meoo_ops_mp_hall_registry_failed|erp_proxy/i.test(msg)) {
+        hint =
+          'ECS 或 Vercel 代拉失败。请在 ECS：sudo bash ~/app/scripts/ecs-fix-mp-api-public.sh；' +
+          'Vercel 环境变量 MEOO_ERP_API_HOST_IP=139.196.42.5 后重新部署 cs.mofangdianai.com。\n\n' +
+          msg
       } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
         const stale = registryCache.load({ allowStale: true })
         const attemptLines =
           e && Array.isArray(e.attempts) && e.attempts.length ? `\n${e.attempts.join('\n')}\n` : ''
         hint = stale
           ? '网络仍被微信重置，但应已显示离线列表；若整页空白请删除小程序后重扫体验码。\n\n' + msg
-          : '手机微信直连 mofangdianai.com 会连接重置。体验版已改走 Vercel 网关：\n' +
-            `${registryCs.hallRegistryUrl()}\n` +
-            '请确认：① 微信 request 合法域名含 https://cs.mofangdianai.com；' +
-            '② 商家 Web（Vercel）已重新部署；③ 上传最新体验版并删除小程序重扫。' +
+          : '直连 ECS 被重置时将自动改走 cs 网关。请确认：① 合法域名含 https://mofangdianai.com 与 https://cs.mofangdianai.com；' +
+            `② 网关 ${registryCs.hallRegistryUrl()} 已部署；③ 体验版构建号 mp-20260603-proxy-https。` +
             attemptLines +
             '\n' +
             msg
@@ -194,6 +197,10 @@ Page({
         iceRows: [],
         displayRows: [],
       })
+    } finally {
+      if (this.data.loading) {
+        this.setData({ loading: false })
+      }
     }
   },
   applyFilters() {

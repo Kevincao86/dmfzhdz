@@ -54,7 +54,7 @@ import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260601-mp-hall'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260603-mp-hall-direct'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 

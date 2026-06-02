@@ -7,16 +7,16 @@ const CHAT_PATH = '/api/meoo-ops-mp-talent-chat'
 
 async function chatRequest(payload) {
   let lastErr
-  if (mpGateway.hasGateway()) {
+  if (merchant.hasMerchantApi()) {
     try {
-      return await mpGateway.gatewayPost(CHAT_PATH, payload)
+      return await merchant.merchantRequest('POST', CHAT_PATH, payload)
     } catch (e) {
       lastErr = e
     }
   }
-  if (merchant.hasMerchantApi()) {
+  if (mpGateway.hasGateway()) {
     try {
-      return await merchant.merchantRequest('POST', CHAT_PATH, payload)
+      return await mpGateway.gatewayPost(CHAT_PATH, payload)
     } catch (e) {
       lastErr = e
     }
@@ -55,7 +55,10 @@ function formatChatError(err) {
     return 'ECS 数据库表未就绪：请执行迁移 20260528100000_mp_talent_chat.sql'
   }
   if (/fetch failed|ECONNREFUSED|erp_proxy|ecs_proxy/i.test(msg)) {
-    return '无法连接 ECS 消息服务，请稍后点「重试」。'
+    return (
+      'ECS 或 Vercel 网关暂不可用。请在 ECS 执行：sudo bash ~/app/scripts/ecs-fix-mp-api-public.sh；' +
+      '并重新部署 cs.mofangdianai.com（Vercel 需 MEOO_ERP_API_HOST_IP=139.196.42.5）。再上传体验版后点「重试」。'
+    )
   }
   if (/pr_not_ready/i.test(msg)) {
     return '招募方尚未在小程序「消息」页登录过，请稍后再试，或由 PR 在报名列表点击「私信沟通」先发起会话'
@@ -67,13 +70,14 @@ function formatChatError(err) {
   }
   if (/url not in domain|不在.*合法域名|domain list/i.test(msg)) {
     return (
-      '微信未放行接口域名。request 合法域名须含 https://cs.mofangdianai.com。\n\n' + msg
+      '微信未放行接口域名。request 合法域名须含 https://mofangdianai.com 与 https://cs.mofangdianai.com。\n\n' +
+      msg
     )
   }
   if (/reset|errcode:-101|cronet_error/i.test(msg)) {
     return (
-      '网络连接被重置。请确认体验版构建号 mp-20260602-ecs-only、合法域名含 cs.mofangdianai.com，' +
-      '并删除小程序重扫；ECS 需执行 ecs-fix-wechat-https-443.sh。\n\n' +
+      '网络连接被重置。请确认体验版构建号 mp-20260603-proxy-https、合法域名含 mofangdianai.com 与 cs.mofangdianai.com，' +
+      '删除小程序重扫；ECS 执行 ecs-fix-mp-api-public.sh。\n\n' +
       msg
     )
   }

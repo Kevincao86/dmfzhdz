@@ -34,7 +34,19 @@ async function fetchRegistryViaErpApi() {
 async function fetchRegistry() {
   const attempts = []
 
-  // 1) Vercel 子域：服务端代拉 ECS（手机微信直连 mofangdianai.com 整域 reset）
+  // 1) 直连 ECS erp-api（config.release MERCHANT_API_BASE_URL）
+  let lastErr
+  try {
+    const data = await fetchRegistryViaErpApi()
+    registryCache.save(data, 'erp-api:hall-registry')
+    return data
+  } catch (e) {
+    lastErr = e
+    attempts.push(`[erp-api] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
+    console.warn('[mp] fetchRegistry erp-api failed', attempts[attempts.length - 1])
+  }
+
+  // 2) Vercel cs 网关（服务端 node:https 代拉 ECS，规避手机对根域 reset）
   try {
     const data = await registryCs.fetchHallRegistryViaCsGateway()
     registryCache.save(data, 'cs:meoo-ops-mp-hall-registry')
@@ -42,15 +54,6 @@ async function fetchRegistry() {
   } catch (e) {
     attempts.push(`[cs] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
     console.warn('[mp] fetchRegistry cs gateway failed', attempts[attempts.length - 1])
-  }
-
-  // 2) 同网关再试 erp-api 路径（CS 基址下 /api/meoo-ops-sync-registry 等）
-  let lastErr
-  try {
-    return await fetchRegistryViaErpApi()
-  } catch (e) {
-    lastErr = e
-    attempts.push(`[erp-api] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
   }
 
   const cached = registryCache.load({ allowStale: true })
