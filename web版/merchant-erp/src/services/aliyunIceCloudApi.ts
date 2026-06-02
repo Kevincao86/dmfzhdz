@@ -1,6 +1,6 @@
 /** 阿里云 ICE 云剪辑 — 经商户 BFF 代理（生产优先 ECS /erp-api 读运营台 videoAi） */
 
-import { merchantApiFetchUrls, merchantErpApiCandidates } from '../lib/merchantErpApiBase'
+import { merchantApiFetchUrls, merchantErpApiCandidates, merchantErpApiBase, buildMerchantErpApiUrl } from '../lib/merchantErpApiBase'
 
 export type AliyunIceCloudConfig = {
   configured: boolean
@@ -159,35 +159,42 @@ const UPLOAD_MULTIPART_PATHS = [
 const ICE_CLIENT_CHUNK_BYTES = 2 * 1024 * 1024
 
 const ICE_CONFIG_FETCH_TIMEOUT_MS = 20_000
-const ICE_UPLOAD_INIT_TIMEOUT_MS = 25_000
-const ICE_UPLOAD_BODY_TIMEOUT_MS = 180_000
-/** OSS 直传失败则快速回退 ECS 服务端写入（避免 CORS 挂起数分钟） */
-const ICE_OSS_PUT_TIMEOUT_MS = 45_000
+const ICE_UPLOAD_INIT_TIMEOUT_MS = 12_000
+const ICE_UPLOAD_BODY_TIMEOUT_MS = 120_000
+/** OSS 直传失败则快速回退服务端写入 */
+const ICE_OSS_PUT_TIMEOUT_MS = 18_000
 
 /** 本会话内 OSS 直传已失败过则跳过后续直传（Bucket CORS 通常对所有文件一致） */
 let iceOssDirectDisabledForSession = false
 
-/** 上传 init：ECS erp-api 优先（与运营台 OSS 配置同源），再试同源 Vercel */
-function iceUploadInitFetchUrls(apiPath: string): string[] {
-  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
-  const urls: string[] = []
-  const add = (u: string) => {
-    if (u && !urls.includes(u)) urls.push(u)
-  }
-  for (const u of merchantErpApiCandidates(path)) add(u)
-  if (typeof window !== 'undefined') {
-    add(`${window.location.origin}${path}`)
-  }
-  return urls
+/** 配置接口实际命中的后端：ECS 有 ICE 凭据，Vercel 通常无 */
+let iceConfigBackend: 'ecs' | 'same-origin' | null = null
+
+function isEcsErpApiUrl(url: string): boolean {
+  return /\/erp-api\//i.test(url) || /mofangdianai\.com\/erp-api/i.test(url)
 }
 
-/** 服务端转存 OSS：ECS 优先，同源 Vercel 兜底（ECS 不可用时仍可上传） */
+function rememberIceConfigBackend(url: string): void {
+  if (isEcsErpApiUrl(url)) iceConfigBackend = 'ecs'
+  else if (typeof window !== 'undefined' && url.startsWith(window.location.origin)) {
+    iceConfigBackend = 'same-origin'
+  }
+}
+
+/** 上传 API：配置来自 ECS 时仅走 ECS（Vercel 无 ICE 凭据，回退只会空耗超时） */
 function iceUploadServerFetchUrls(apiPath: string): string[] {
   const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
   const urls: string[] = []
   const add = (u: string) => {
     if (u && !urls.includes(u)) urls.push(u)
   }
+
+  if (iceConfigBackend === 'ecs') {
+    const base = merchantErpApiBase()
+    if (base) add(buildMerchantErpApiUrl(base, path))
+    return urls
+  }
+
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   for (const u of merchantErpApiCandidates(path)) {
     if (origin && u.startsWith(origin)) continue
@@ -195,6 +202,11 @@ function iceUploadServerFetchUrls(apiPath: string): string[] {
   }
   if (origin) add(`${origin}${path}`)
   return urls
+}
+
+/** 上传 init：与 iceUploadServerFetchUrls 同源策略一致 */
+function iceUploadInitFetchUrls(apiPath: string): string[] {
+  return iceUploadServerFetchUrls(apiPath)
 }
 
 async function fetchWithTimeout(
@@ -231,7 +243,10 @@ export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig 
         const res = await fetchWithTimeout(url, {}, ICE_CONFIG_FETCH_TIMEOUT_MS)
         if (res.status === 404) continue
         const j = await parseJson<AliyunIceCloudConfig>(res)
-        if (res.ok && j && typeof j.configured === 'boolean') return j
+        if (res.ok && j && typeof j.configured === 'boolean') {
+          if (j.localUploadEnabled) rememberIceConfigBackend(url)
+          return j
+        }
         lastErr = j ? '配置响应异常' : `HTTP ${res.status}`
       } catch (e) {
         lastErr = e instanceof Error ? e.message : String(e)
@@ -302,6 +317,10 @@ async function postJsonPathsServer<T extends { ok: boolean; message?: string }>(
   timeoutMs = ICE_UPLOAD_BODY_TIMEOUT_MS,
 ): Promise<T | { ok: false; message: string }> {
   let lastMsg = '本地上传接口未就绪，请确认 ECS 已部署 meoo-auth-api 或刷新后重试'
+  if (iceConfigBackend === 'ecs') {
+    lastMsg =
+      'ECS 上传接口不可用：请在服务器执行 cd ~/app && bash scripts/ecs-git-pull-main.sh && sudo systemctl restart meoo-auth-api'
+  }
   for (const p of paths) {
     for (const url of iceUploadServerFetchUrls(p)) {
       try {
@@ -488,15 +507,24 @@ async function uploadIceDirectOss(
   return { ok: true, mediaUrl: init.mediaUrl, label }
 }
 
+function isIceImageUploadFile(file: File): boolean {
+  return file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name)
+}
+
 /**
  * 本地上传至 OSS。
- * 1. 浏览器直传 OSS（最快；本会话首次失败后跳过后续直传）
- * 2. 回退 ECS → 同源 Vercel 服务端写入 OSS
+ * - 图片：直写 ECS→OSS（跳过浏览器直传，避免 OSS CORS 挂起）
+ * - 视频：先 OSS 直传，失败再服务端写入
  */
 export async function uploadIceLocalMediaFile(
   file: File,
   opts?: { onProgress?: (p: IceUploadProgress) => void },
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  if (isIceImageUploadFile(file)) {
+    opts?.onProgress?.({ loaded: 0, total: file.size, percent: 10, phase: 'server' })
+    return uploadIceViaServer(file, opts?.onProgress)
+  }
+
   opts?.onProgress?.({ loaded: 0, total: file.size, percent: 1, phase: 'direct' })
 
   let directFail: { ok: false; message: string } | null = null

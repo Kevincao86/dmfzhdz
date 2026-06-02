@@ -307,11 +307,18 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           setImageUploadProgress({
             index: i + 1,
             total: list.length,
-            percent: 2,
+            percent: 8,
             fileName: raw.name,
             phase: 'encode',
           })
           const file = await compressIceImageIfNeeded(raw)
+          setImageUploadProgress({
+            index: i + 1,
+            total: list.length,
+            percent: 10,
+            fileName: raw.name,
+            phase: 'server',
+          })
           const r = await uploadIceLocalMediaFile(file, {
             onProgress: (p) => {
               setImageUploadProgress({
