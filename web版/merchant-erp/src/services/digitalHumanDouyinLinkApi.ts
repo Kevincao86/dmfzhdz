@@ -83,8 +83,8 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
       if (j && !j.ok && j.message) {
         lastMsg = j.message
         lastFail = j
-        // 422 可能是 ECS 旧版本；继续尝试下一候选（如同源 Vercel API）
-        if (res.status === 422) continue
+        // 422：已得到有效业务错误则直接返回（同源 API 优先，避免 ECS 旧版本覆盖新提示）
+        if (res.status === 422) return j
         if (res.ok) return j
         continue
       }

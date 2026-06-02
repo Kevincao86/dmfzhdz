@@ -72,6 +72,7 @@ export default function DigitalHumanBroadcastPage() {
   const [aiBusy, setAiBusy] = useState(false)
   const [linkBusy, setLinkBusy] = useState(false)
   const [linkSourceTitle, setLinkSourceTitle] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const [avatarFilter, setAvatarFilter] = useState<'all' | AvatarStyle>('all')
   const [ttsPlaying, setTtsPlaying] = useState(false)
   const [ttsBusy, setTtsBusy] = useState(false)
@@ -226,9 +227,11 @@ export default function DigitalHumanBroadcastPage() {
     }
     setLinkBusy(true)
     setLinkSourceTitle(null)
+    setLinkError(null)
     try {
       const res = await parseDouyinLinkForDigitalHuman(url)
       if (!res.ok) {
+        setLinkError(res.message || '链接解析失败')
         setToast(res.message || '链接解析失败')
         return
       }
@@ -735,6 +738,9 @@ export default function DigitalHumanBroadcastPage() {
                         <p className="mt-1 text-xs text-violet-700">
                           直接粘贴抖音「分享」复制的<strong>整段口令</strong>即可，系统会自动识别其中的链接；再从视频音频识别口播（通义 ASR），不会使用发布标题，并推断动作指令。请核对后再点「下一步」。
                         </p>
+                        <p className="mt-1 text-xs text-violet-600">
+                          注意：须在<strong>视频播放页</strong>点分享（勿用搜索页「查看TA的更多作品」类口令，该类链接指向达人主页，无法提取口播）。
+                        </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <input
                             value={draft.douyinLinkUrl}
@@ -752,6 +758,11 @@ export default function DigitalHumanBroadcastPage() {
                             抓取文案
                           </button>
                         </div>
+                        {linkError ? (
+                          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                            {linkError}
+                          </p>
+                        ) : null}
                         {linkSourceTitle ? (
                           <p className="mt-2 text-xs text-slate-600">来源：{linkSourceTitle}</p>
                         ) : null}
