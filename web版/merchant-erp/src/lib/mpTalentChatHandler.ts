@@ -18,11 +18,11 @@ import {
 
 function chatErrorResponse(e: unknown): { status: number; data: Record<string, unknown> } {
   const msg = e instanceof Error ? e.message : String(e)
-  const hint = /fetch failed|ECONNREFUSED|54321/i.test(msg)
-    ? '本地 Supabase 未启动：先开 Docker，在项目根目录执行 supabase start；或把 .env.local 改为云端项目的 SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY'
+  const hint = /fetch failed|ECONNREFUSED|8888|54321/i.test(msg)
+    ? 'ECS 本机 API 未响应：请执行 sudo systemctl restart meoo-postgrest && sudo systemctl restart meoo-auth-api（或 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh）'
     : /Could not find|PGRST202|schema cache|does not exist|42P01/i.test(msg)
-      ? '请确认已在当前 Supabase 项目执行迁移 20260528100000_mp_talent_chat.sql，并在 Dashboard → Settings → API → Reload schema'
-      : '请核对 merchant-erp .env.local 的 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 与迁移是否为同一项目'
+      ? 'ECS 数据库缺少私信表/函数：bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
+      : 'ECS auth-api 数据库连接异常，请检查 ~/stack/auth-api.env 与 PostgREST 服务'
   return {
     status: 500,
     data: {

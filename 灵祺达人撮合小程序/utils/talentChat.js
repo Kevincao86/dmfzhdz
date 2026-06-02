@@ -1,11 +1,27 @@
 const merchant = require('./merchantApi.js')
-const supabase = require('./supabaseRest.js')
+const mpGateway = require('./mpGateway.js')
 const participant = require('./participant.js')
 
 const POLL_MS = 2500
+const CHAT_PATH = '/api/meoo-ops-mp-talent-chat'
 
-function chatRequest(payload) {
-  return merchant.merchantRequest('POST', '/api/meoo-ops-mp-talent-chat', payload)
+async function chatRequest(payload) {
+  let lastErr
+  if (mpGateway.hasGateway()) {
+    try {
+      return await mpGateway.gatewayPost(CHAT_PATH, payload)
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  if (merchant.hasMerchantApi()) {
+    try {
+      return await merchant.merchantRequest('POST', CHAT_PATH, payload)
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  throw lastErr || new Error('未配置消息服务（config.release 中 MERCHANT_API_BASE_URL）')
 }
 
 function throwApiError(data) {
@@ -24,26 +40,6 @@ async function viaApi(payload) {
   return data
 }
 
-/** 生产仅走 ECS erp-api；仅未配 MERCHANT_API 时（本地）才尝试直连 /rest/v1 */
-async function chatDual(apiCall, sbCall) {
-  if (merchant.hasMerchantApi()) {
-    return apiCall()
-  }
-  if (sbCall && supabase.hasSupabase()) {
-    return sbCall()
-  }
-  throw new Error('未配置 MERCHANT_API_BASE_URL（请使用 https://mofangdianai.com/erp-api）')
-}
-
-async function viaSupabaseRpc(name, args) {
-  return supabase.rpc(name, args)
-}
-
-/** 已配置 ERP 时优先走 service_role API，避免 anon 直连 RPC 权限/缓存问题 */
-function useMerchantChannel() {
-  return merchant.hasMerchantApi()
-}
-
 function sanitizeSnapshot(s) {
   if (!s || typeof s !== 'object') return null
   try {
@@ -56,208 +52,118 @@ function sanitizeSnapshot(s) {
 function formatChatError(err) {
   const msg = String((err && err.message) || err || '未知错误')
   if (/42P01|relation .* does not exist|undefined table/i.test(msg)) {
-    return '数据库表未就绪：请确认已执行迁移 20260528100000_mp_talent_chat.sql'
+    return 'ECS 数据库表未就绪：请执行迁移 20260528100000_mp_talent_chat.sql'
   }
-  if (/fetch failed|ECONNREFUSED|54321/i.test(msg)) {
-    return '无法连接后台数据库：请在 ECS 执行 bash scripts/ecs-run-auth-api.sh 与 ecs-fix-erp-api-502.sh'
-  }
-  if (/supabase_admin_not_configured/i.test(msg)) {
-    return 'ECS 消息接口未就绪：请在服务器执行 bash ~/app/scripts/ecs-run-auth-api.sh（生成 auth-api.env 含 SERVICE_ROLE），再 bash ~/app/scripts/ecs-fix-erp-api-502.sh'
+  if (/fetch failed|ECONNREFUSED|erp_proxy|ecs_proxy/i.test(msg)) {
+    return '无法连接 ECS 消息服务，请稍后点「重试」。'
   }
   if (/pr_not_ready/i.test(msg)) {
     return '招募方尚未在小程序「消息」页登录过，请稍后再试，或由 PR 在报名列表点击「私信沟通」先发起会话'
   }
-  if (/meoo_ops_mp_talent_chat_failed|chat_supabase_error/i.test(msg)) {
-    if (/\.env\.local|npm run dev|127\.0\.0\.1:54321/i.test(msg)) {
-      return '本地开发：请启动 merchant-erp npm run dev 并配置 .env.local 中的 Supabase'
-    }
-    const inner = msg
-      .replace(/^meoo_ops_mp_talent_chat_failed\s*/i, '')
-      .replace(/^chat_supabase_error\s*/i, '')
-      .trim()
-    if (inner && inner.length > 8 && !/^meoo_ops|chat_supabase$/i.test(inner)) return inner
-    return '消息服务连接失败，请稍后重试。若持续失败请在 ECS 执行 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
+  if (/meoo_ops_mp_talent_chat_failed/i.test(msg)) {
+    const inner = msg.replace(/^meoo_ops_mp_talent_chat_failed\s*/i, '').trim()
+    if (inner && inner.length > 8) return inner
+    return '消息服务暂时不可用，请稍后点「重试」。'
   }
-  if (/schema cache|PGRST202|could not find the function|mp_talent_chat_ensure_session/i.test(msg)) {
+  if (/url not in domain|不在.*合法域名|domain list/i.test(msg)) {
     return (
-      'ECS 数据库缺少私信函数。请在 ECS 执行：bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
+      '微信未放行接口域名。request 合法域名须含 https://cs.mofangdianai.com。\n\n' + msg
     )
   }
-  if (/尚未配置后台|url not in domain|request:fail/i.test(msg)) {
-    return `${msg}（请检查 config.local.js 的 MERCHANT_API_BASE_URL 与「不校验合法域名」）`
+  if (/reset|errcode:-101|cronet_error/i.test(msg)) {
+    return (
+      '网络连接被重置。请确认体验版构建号 mp-20260602-ecs-only、合法域名含 cs.mofangdianai.com，' +
+      '并删除小程序重扫；ECS 需执行 ecs-fix-wechat-https-443.sh。\n\n' +
+      msg
+    )
+  }
+  if (/request:fail|尚未配置后台/i.test(msg)) {
+    return `网络请求失败，请稍后点「重试」。\n\n${msg}`
   }
   return msg
 }
 
 function canChat() {
-  return merchant.hasMerchantApi()
+  return merchant.hasMerchantApi() || mpGateway.hasGateway()
 }
 
 async function syncProfile(p) {
   const part = p || participant.getCurrentParticipant()
   const snap = sanitizeSnapshot(part.memberSnapshot)
-  await chatDual(
-    () =>
-      viaApi({
-        action: 'sync_profile',
-        participantKey: part.participantKey,
-        deviceSecret: part.deviceSecret,
-        role: part.role,
-        displayName: part.displayName,
-        avatarUrl: part.avatarUrl,
-        memberSnapshot: snap,
-      }),
-    () =>
-      viaSupabaseRpc('mp_talent_chat_upsert_participant', {
-        p_key: part.participantKey,
-        p_role: part.role,
-        p_secret: part.deviceSecret,
-        p_display_name: part.displayName,
-        p_avatar_url: part.avatarUrl || null,
-        p_member_snapshot: snap,
-      }),
-  )
+  await viaApi({
+    action: 'sync_profile',
+    participantKey: part.participantKey,
+    deviceSecret: part.deviceSecret,
+    role: part.role,
+    displayName: part.displayName,
+    avatarUrl: part.avatarUrl,
+    memberSnapshot: snap,
+  })
 }
 
 async function listSessions(part) {
   const p = part || participant.getCurrentParticipant()
-  return chatDual(
-    async () => {
-      const data = await viaApi({
-        action: 'list_sessions',
-        participantKey: p.participantKey,
-        deviceSecret: p.deviceSecret,
-      })
-      return data.sessions || []
-    },
-    async () => {
-      const rows = await viaSupabaseRpc('mp_talent_chat_list_sessions', {
-        p_key: p.participantKey,
-        p_secret: p.deviceSecret,
-      })
-      return Array.isArray(rows) ? rows : []
-    },
-  )
+  const data = await viaApi({
+    action: 'list_sessions',
+    participantKey: p.participantKey,
+    deviceSecret: p.deviceSecret,
+  })
+  return data.sessions || []
 }
 
 async function fetchMessages(sessionId, sinceTs, part) {
   const p = part || participant.getCurrentParticipant()
-  return chatDual(
-    async () => {
-      const data = await viaApi({
-        action: 'fetch_messages',
-        sessionId,
-        participantKey: p.participantKey,
-        deviceSecret: p.deviceSecret,
-        sinceTs: sinceTs || 0,
-      })
-      return data.messages || []
-    },
-    async () => {
-      const rows = await viaSupabaseRpc('mp_talent_chat_fetch_messages', {
-        p_session_id: sessionId,
-        p_key: p.participantKey,
-        p_secret: p.deviceSecret,
-        p_since_ts: sinceTs || 0,
-      })
-      return Array.isArray(rows) ? rows : []
-    },
-  )
+  const data = await viaApi({
+    action: 'fetch_messages',
+    sessionId,
+    participantKey: p.participantKey,
+    deviceSecret: p.deviceSecret,
+    sinceTs: sinceTs || 0,
+  })
+  return data.messages || []
 }
 
 async function sendMessage(sessionId, text, clientMsgId, part) {
   const p = part || participant.getCurrentParticipant()
   const ts = Date.now()
-  await chatDual(
-    () =>
-      viaApi({
-        action: 'send_message',
-        sessionId,
-        participantKey: p.participantKey,
-        deviceSecret: p.deviceSecret,
-        fromRole: p.role,
-        text,
-        clientMsgId,
-        ts,
-      }),
-    () =>
-      viaSupabaseRpc('mp_talent_chat_send_message', {
-        p_session_id: sessionId,
-        p_key: p.participantKey,
-        p_secret: p.deviceSecret,
-        p_from_role: p.role,
-        p_text: text,
-        p_client_msg_id: clientMsgId,
-        p_ts: ts,
-      }),
-  )
+  await viaApi({
+    action: 'send_message',
+    sessionId,
+    participantKey: p.participantKey,
+    deviceSecret: p.deviceSecret,
+    fromRole: p.role,
+    text,
+    clientMsgId,
+    ts,
+  })
   return ts
 }
 
 async function markRead(sessionId, part) {
   const p = part || participant.getCurrentParticipant()
-  await chatDual(
-    () =>
-      viaApi({
-        action: 'mark_read',
-        sessionId,
-        participantKey: p.participantKey,
-        deviceSecret: p.deviceSecret,
-      }),
-    () =>
-      viaSupabaseRpc('mp_talent_chat_mark_read', {
-        p_session_id: sessionId,
-        p_key: p.participantKey,
-        p_secret: p.deviceSecret,
-      }),
-  )
-}
-
-async function ensureSessionViaSupabase(input) {
-  const rpc7 = {
-    p_talent_key: input.talentKey,
-    p_pr_key: input.prKey,
-    p_talent_secret: input.talentSecret,
-    p_pr_secret: input.prSecret,
-    p_talent_name: input.talentName || '达人',
-    p_pr_name: input.prName || 'PR',
-    p_talent_avatar: input.talentAvatar || null,
-  }
-  try {
-    const id = await viaSupabaseRpc('mp_talent_chat_ensure_session', {
-      ...rpc7,
-      p_pr_avatar: input.prAvatar || null,
-    })
-    return String(id)
-  } catch (e) {
-    const msg = String((e && e.message) || e)
-    if (!/Could not find the function|PGRST202|schema cache/i.test(msg)) throw e
-    const id = await viaSupabaseRpc('mp_talent_chat_ensure_session', rpc7)
-    return String(id)
-  }
+  await viaApi({
+    action: 'mark_read',
+    sessionId,
+    participantKey: p.participantKey,
+    deviceSecret: p.deviceSecret,
+  })
 }
 
 async function ensureSessionRpc(input) {
-  const sessionId = await chatDual(
-    async () => {
-      const data = await viaApi({
-        action: 'ensure_session',
-        participantKey: input.callerKey || input.prKey,
-        deviceSecret: input.callerSecret || input.prSecret,
-        talentKey: input.talentKey,
-        prKey: input.prKey,
-        talentSecret: input.talentSecret,
-        prSecret: input.prSecret,
-        talentName: input.talentName,
-        prName: input.prName,
-        talentAvatar: input.talentAvatar,
-        prAvatar: input.prAvatar,
-      })
-      return data.sessionId
-    },
-    () => ensureSessionViaSupabase(input),
-  )
-  return String(sessionId)
+  const data = await viaApi({
+    action: 'ensure_session',
+    participantKey: input.callerKey || input.prKey,
+    deviceSecret: input.callerSecret || input.prSecret,
+    talentKey: input.talentKey,
+    prKey: input.prKey,
+    talentSecret: input.talentSecret,
+    prSecret: input.prSecret,
+    talentName: input.talentName,
+    prName: input.prName,
+    talentAvatar: input.talentAvatar,
+    prAvatar: input.prAvatar,
+  })
+  return String(data.sessionId)
 }
 
 async function ensureSessionWithTalent(talent) {
@@ -283,20 +189,6 @@ async function ensureSessionWithTalent(talent) {
   })
 }
 
-async function ensureSessionFromTalentViaSupabase(me, prKey, pr) {
-  const id = await viaSupabaseRpc('mp_talent_chat_ensure_session_from_talent', {
-    p_talent_key: me.participantKey,
-    p_talent_secret: me.deviceSecret,
-    p_pr_key: prKey,
-    p_talent_name: me.displayName || '达人',
-    p_pr_name: String(pr.prWxNickName || pr.prDisplayName || pr.prName || '招募方').trim() || 'PR',
-    p_talent_avatar: me.avatarUrl || null,
-    p_pr_avatar: String(pr.prWxAvatarUrl || '').trim() || null,
-  })
-  return String(id)
-}
-
-/** 达人向发单 PR 发起私信（需订单 meta 含 prParticipantKey） */
 async function ensureSessionWithPr(pr) {
   const me = participant.getCurrentParticipant()
   if (me.role !== 'talent') {
@@ -305,9 +197,6 @@ async function ensureSessionWithPr(pr) {
   const prKey = String(pr.prParticipantKey || pr.prKey || '').trim()
   if (!prKey) {
     throw new Error('该招募单暂未绑定 PR 私信，请稍后再试')
-  }
-  if (!merchant.hasMerchantApi()) {
-    throw new Error('请配置 MERCHANT_API_BASE_URL（ECS erp-api）')
   }
   const prName = String(pr.prWxNickName || pr.prDisplayName || pr.prName || '招募方').trim() || 'PR'
   const data = await viaApi({
@@ -321,7 +210,7 @@ async function ensureSessionWithPr(pr) {
     talentAvatar: me.avatarUrl || '',
     prAvatar: String(pr.prWxAvatarUrl || '').trim() || undefined,
   })
-  return data.sessionId
+  return String(data.sessionId)
 }
 
 function totalUnreadCount(sessions, myKey) {
@@ -343,34 +232,21 @@ function sessionHasMutualMessages(msgs) {
 
 function isMissingMutualRpcError(err) {
   const msg = String((err && err.message) || err || '')
-  return /PGRST202|could not find the function|schema cache|mp_talent_chat_pr_mutual/i.test(msg)
+  return /PGRST202|could not find the function|schema cache|mp_talent_chat_pr_mutual|unknown_action/i.test(msg)
 }
 
-/** PR：双方均发过消息的达人 participant_key（如 talent_xxx） */
 async function listMutualTalentKeysForPr(part) {
   const p = part || participant.getCurrentParticipant()
   if (p.role !== 'pr') return []
-  if (useMerchantChannel()) {
-    try {
-      const data = await viaApi({
-        action: 'mutual_talent_keys',
-        participantKey: p.participantKey,
-        deviceSecret: p.deviceSecret,
-      })
-      return Array.isArray(data.talentKeys) ? data.talentKeys.map(String) : []
-    } catch (e) {
-      if (!isMissingMutualRpcError(e)) throw e
-    }
-  } else if (supabase.hasSupabase()) {
-    try {
-      const rows = await viaSupabaseRpc('mp_talent_chat_pr_mutual_talent_keys', {
-        p_key: p.participantKey,
-        p_secret: p.deviceSecret,
-      })
-      return Array.isArray(rows) ? rows.map(String) : []
-    } catch (e) {
-      if (!isMissingMutualRpcError(e)) throw e
-    }
+  try {
+    const data = await viaApi({
+      action: 'mutual_talent_keys',
+      participantKey: p.participantKey,
+      deviceSecret: p.deviceSecret,
+    })
+    return Array.isArray(data.talentKeys) ? data.talentKeys.map(String) : []
+  } catch (e) {
+    if (!isMissingMutualRpcError(e)) throw e
   }
   const sessions = await listSessions(p)
   const keys = []
@@ -453,17 +329,15 @@ function testPrSecret() {
   }
 }
 
-/** 本地一键打开测试对话框（PR 建会话，达人用同 sessionId 回复） */
 async function openTestChatDialog() {
   const userProfile = require('./userProfile.js')
-  const participant = require('./participant.js')
   if (!canChat()) {
-    throw new Error('请先配置 config.local.js 的 MERCHANT_API_BASE_URL，并启动 merchant-erp npm run dev')
+    throw new Error('请先配置 MERCHANT_API_BASE_URL（开发者工具可用 config.local.js 指向本机 merchant-erp）')
   }
   const identity = userProfile.readIdentity()
   let sessionId = ''
   let peerName = ''
-  let peerAvatar = '/images/logo.png'
+  const peerAvatar = '/images/logo.png'
 
   if (identity === 'pr') {
     const prSecret = testPrSecret()

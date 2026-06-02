@@ -28,6 +28,13 @@ sudo sed -i -E 's/listen ([0-9]+) ssl http2/listen \1 ssl/g' "$SITE"
 sudo sed -i -E 's/listen ([0-9]+) http2/listen \1/g' "$SITE"
 sudo sed -i 's/ssl_protocols.*/    ssl_protocols TLSv1.2;/' "$SITE"
 sudo grep -q ssl_session_tickets "$SITE" || sudo sed -i '/ssl_protocols/a\    ssl_session_tickets off;' "$SITE"
+# 微信 Cronet 常见兼容套件（避免仅 TLS1.3 / 现代套件导致握手 reset）
+if ! sudo grep -q 'ssl_ciphers.*ECDHE-RSA-AES128-GCM' "$SITE"; then
+  sudo sed -i '/ssl_session_tickets/a\    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:AES128-GCM-SHA256:AES128-SHA256:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!RC4;\n    ssl_prefer_server_ciphers on;' "$SITE"
+fi
+if ! sudo grep -q 'ssl_buffer_size' "$SITE"; then
+  sudo sed -i '/ssl_prefer_server_ciphers/a\    ssl_buffer_size 4k;' "$SITE"
+fi
 sudo sed -i "s|ssl_certificate .*fullchain.pem|ssl_certificate ${SSL}/fullchain.pem|g" "$SITE"
 sudo sed -i "s|ssl_certificate_key .*privkey.pem|ssl_certificate_key ${SSL}/privkey.pem|g" "$SITE"
 

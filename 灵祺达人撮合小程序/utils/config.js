@@ -18,15 +18,10 @@ try {
   if (rel && typeof rel === 'object') Object.assign(out, rel)
 } catch (_) {}
 
-/** 仅开发者工具模拟器使用 config.local；真机调试/体验版/正式版勿用 127.0.0.1 覆盖生产地址 */
-function shouldApplyLocalConfig(loc) {
-  const base = String(loc.MERCHANT_API_BASE_URL || '').trim()
-  if (!base) return true
-  const isLoopback = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(base)
-  if (!isLoopback) return true
+/** 仅微信开发者工具使用 config.local；真机/体验版/正式版一律用 config.release（避免本机或旧根域覆盖 CS 网关） */
+function shouldApplyLocalConfig() {
   try {
-    const sys = wx.getSystemInfoSync()
-    return sys.platform === 'devtools'
+    return wx.getSystemInfoSync().platform === 'devtools'
   } catch {
     return false
   }
@@ -34,10 +29,10 @@ function shouldApplyLocalConfig(loc) {
 
 try {
   const loc = require('./config.local.js')
-  if (loc && typeof loc === 'object' && shouldApplyLocalConfig(loc)) {
+  if (loc && typeof loc === 'object' && shouldApplyLocalConfig()) {
     Object.assign(out, loc)
-  } else if (loc && String(loc.MERCHANT_API_BASE_URL || '').trim()) {
-    console.warn('[config] 真机/体验版已忽略 config.local.js 中的本机地址，使用 config.release.js')
+  } else if (loc && (loc.MERCHANT_API_BASE_URL || loc.SUPABASE_URL || loc.MP_REGISTRY_GATEWAY_BASE_URL)) {
+    console.warn('[config] 真机/体验版已忽略 config.local.js，使用 config.release.js')
   }
 } catch (_) {}
 

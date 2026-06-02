@@ -1,6 +1,5 @@
 const { merchantRequest } = require('./merchantApi.js')
 const registryCache = require('./registryCache.js')
-const registryRest = require('./registryRestGateway.js')
 const registryCs = require('./registryCsGateway.js')
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
@@ -45,17 +44,7 @@ async function fetchRegistry() {
     console.warn('[mp] fetchRegistry cs gateway failed', attempts[attempts.length - 1])
   }
 
-  // 2) PostgREST RPC（同根域，真机可能仍 reset）
-  try {
-    const data = await registryRest.fetchHallRegistryViaRest()
-    registryCache.save(data, `rest:${registryRest.RPC_NAME}`)
-    return data
-  } catch (e) {
-    attempts.push(`[rest] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
-    console.warn('[mp] fetchRegistry rest failed', attempts[attempts.length - 1])
-  }
-
-  // 3) 直连 erp-api
+  // 2) 同网关再试 erp-api 路径（CS 基址下 /api/meoo-ops-sync-registry 等）
   let lastErr
   try {
     return await fetchRegistryViaErpApi()

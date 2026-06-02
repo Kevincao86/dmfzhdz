@@ -25,8 +25,7 @@
   </view>
 
   <view wx:if="{{!configured}}" class="msg-fixed-tip card">
-    <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL 与 SUPABASE_URL（与 ECS 一致）</text>
-    <text class="hint" style="display:block;margin-top:12rpx;">可选配置 SUPABASE_URL / SUPABASE_ANON_KEY 直连消息表</text>
+    <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL（体验版为 https://cs.mofangdianai.com，经网关访问 ECS erp-api）</text>
   </view>
 
   <block wx:elif="{{loading}}">

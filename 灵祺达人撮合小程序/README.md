@@ -48,14 +48,12 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 
 ## PR ↔ 达人私信（Supabase）
 
-本地消息 Tab 若报「无法连接 Supabase」：检查 `web版/merchant-erp/.env.local` 的 `SUPABASE_URL` 是否可达。  
-- **本地库**：`http://127.0.0.1:54321` 需先启动 Docker，在项目根执行 `supabase start`，并执行迁移 `20260528100000_mp_talent_chat.sql`。  
-- **云端库**：填写与迁移相同的 `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`，重启 `npm run dev`。
+消息/大厅/报名均经 **ECS erp-api**（体验版经 `https://cs.mofangdianai.com` 网关）。本地调试在 `config.local.js` 填 `MERCHANT_API_BASE_URL`（如 `http://本机IP:5173` 或直连 `https://mofangdianai.com/erp-api`），并确保 ECS 或本地 `npm run dev` 已挂载 `meoo-ops-mp-*` 路由。
 
 - 消息 Tab：微信风格会话列表 + 聊天页（`pages/messages`、`pages/chat`）
 - 数据表：`mp_talent_chat_participants` / `mp_talent_chat_sessions` / `mp_talent_chat_messages`（迁移 `20260528100000_mp_talent_chat.sql`）
 - API：`POST /api/meoo-ops-mp-talent-chat`（`sync_profile` / `list_sessions` / `ensure_session` / `ensure_session_from_talent` / `fetch_messages` / `send_message` / `mark_read`）
-- 可选直连：在 `config.local.js` 配置 `SUPABASE_URL` + `SUPABASE_ANON_KEY` 走 RPC；聊天页 2.5s 轮询同步（表已加入 Realtime publication）
+- 勿在 `config.release.js` 配置 `SUPABASE_URL`；数据已全部在 ECS PostgreSQL，由 erp-api 读写
 - **PR**：推荐达人「沟通」、报名列表「私信沟通」、消息 Tab 会话列表
 - **达人**：商单详情「联系招募方」（新发单含 `prParticipantKey`）、消息 Tab 回复 PR
 - Tab「消息」角标为私信未读合计；`MP_CHAT_DEV_TEST: true` 可显示本地测试对话入口

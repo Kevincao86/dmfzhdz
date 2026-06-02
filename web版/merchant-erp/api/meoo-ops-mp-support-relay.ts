@@ -1,8 +1,8 @@
 /**
- * POST /api/meoo-ops-mp-support-relay — 达人招募小程序在线客服（Supabase support_relay_messages）
+ * POST /api/meoo-ops-mp-support-relay — 达人招募在线客服（Vercel 网关 → ECS erp-api）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { handleMpSupportRelayBody, type MpSupportRelayBody } from '../src/lib/mpSupportRelayHandler.js'
+import { proxyPostErpApi } from '../src/lib/mpErpApiProxy.js'
 
 export const config = { maxDuration: 60 }
 
@@ -40,16 +40,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: MpSupportRelayBody
+    let body: Record<string, unknown>
     try {
-      body = JSON.parse(rawBody(req) || '{}') as MpSupportRelayBody
+      body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
 
-    const out = await handleMpSupportRelayBody(body)
-    sendOpsJson(res, out.status, out.data)
+    try {
+      const out = await proxyPostErpApi('/api/meoo-ops-mp-support-relay', body)
+      sendOpsJson(res, out.status, out.data)
+    } catch (proxyErr) {
+      const proxyMsg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr)
+      sendOpsJson(res, 503, {
+        ok: false,
+        error: 'meoo_ops_mp_support_relay_failed',
+        detail: `ecs_proxy: ${proxyMsg}`.slice(0, 800),
+      })
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

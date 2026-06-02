@@ -5,6 +5,7 @@ const chat = require('../../utils/talentChat.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
 const heroMeta = require('../../utils/mpOrderHeroMeta.js')
 const selection = require('../../utils/mpApplicantSelection.js')
+const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 
 Page({
@@ -212,13 +213,16 @@ Page({
       const entries = []
       const skipped = []
       for (const a of selected) {
-        const talentMemberId = selection.resolveTalentMemberId(a, reg)
-        if (!talentMemberId) {
+        const target = talentInboxMatch.resolveTalentInboxTarget(a, reg)
+        if (!target.talentMemberId) {
           skipped.push(a.displayName || a.id)
           continue
         }
         entries.push({
-          talentMemberId,
+          talentMemberId: target.talentMemberId,
+          contact: target.contact,
+          platformAccount: target.platformAccount,
+          applicantId: target.applicantId,
           mpOrderId: this.data.mpOrderId,
           category: 'business',
           title: '恭喜入选招募',
@@ -226,7 +230,7 @@ Page({
         })
       }
       if (!entries.length) {
-        wx.showToast({ title: '所选达人未绑定会员资料', icon: 'none' })
+        wx.showToast({ title: '所选达人缺少手机号或平台账号', icon: 'none' })
         return
       }
       await ops.appendTalentInbox(entries)

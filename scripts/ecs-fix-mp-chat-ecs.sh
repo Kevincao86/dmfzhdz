@@ -23,9 +23,16 @@ do
   fi
 done
 
-if systemctl is-active --quiet meoo-postgrest 2>/dev/null; then
-  echo "== 3) 重启 PostgREST =="
-  sudo systemctl restart meoo-postgrest
+echo "== 3) PostgREST（127.0.0.1:8888，私信依赖） =="
+if systemctl list-unit-files 2>/dev/null | grep -q meoo-postgrest; then
+  sudo systemctl restart meoo-postgrest || true
+  sleep 2
+  curl -sf -m 5 "http://127.0.0.1:8888/rest/v1/" -o /dev/null \
+    && echo "OK: PostgREST :8888" \
+    || echo "WARN: PostgREST 未响应，请检查: sudo systemctl status meoo-postgrest"
+else
+  echo "WARN: 未找到 meoo-postgrest 服务，请确认 ECS 内部 API 代理已安装"
+  bash "$ROOT/scripts/ecs-setup-internal-api-proxy.sh" 2>/dev/null || true
 fi
 
 echo "== 4) 重启 auth-api + Nginx 探活 =="

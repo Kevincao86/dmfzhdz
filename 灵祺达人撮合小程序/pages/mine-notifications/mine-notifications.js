@@ -35,10 +35,10 @@ Page({
     if (userProfile.readIdentity() === 'talent' && merchant.hasMerchantApi()) {
       try {
         const member = talentMember.readMember()
-        if (member && member.id) {
+        if (member && (member.id || member.contact)) {
           const reg = await ops.fetchRegistry()
-          rows = messagesStore.mergeRegistryInboxForTalent(reg, member.id)
-          const unseen = rows.filter((r) => r.fromRegistry && !r.read).map((r) => r.id)
+          rows = messagesStore.mergeRegistryInboxForTalent(reg, member)
+          const unseen = rows.filter((r) => (r.fromRegistry || r.fromSelection) && !r.read).map((r) => r.id)
           if (unseen.length) messagesStore.markInboxSeen(unseen)
         }
       } catch (_) {

@@ -34,7 +34,14 @@ export type MerchantSupabaseAdminEnvParts = {
 }
 
 export function readMerchantSupabaseAdminEnv(): MerchantSupabaseAdminEnvParts {
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+  const supabaseUrl = (
+    process.env.MEOO_SUPABASE_ADMIN_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    process.env.SUPABASE_URL ??
+    ''
+  )
+    .trim()
+    .replace(/\/$/, '')
   const fromEnv = (
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
     process.env.SUPABASE_SERVICE_ROLE ??
