@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="灵祺 · 本地生活 Merchant AI Agent + 可验证达人履约网络 · 种子轮 500万" />
+  <title>灵祺 · 商业计划书 | 种子轮 500万</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+SC:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="cursor-glow" aria-hidden="true"></div>
+  <canvas id="hero-particles" aria-hidden="true"></canvas>
+
+  <header class="top-bar" id="top-bar">
+    <a href="#hero" class="logo">
+      <span class="logo-mark">灵祺</span>
+      <span class="logo-sub">种子轮 · 商业计划书</span>
+    </a>
+    <nav class="nav-links" aria-label="章节导航">
+      <button type="button" data-section="hero">首页</button>
+      <button type="button" data-section="market">市场</button>
+      <button type="button" data-section="solution">方案</button>
+      <button type="button" data-section="product">产品</button>
+      <button type="button" data-section="business">商业</button>
+      <button type="button" data-section="region">杭甬温</button>
+      <button type="button" data-section="fund">融资</button>
+    </nav>
+    <div class="top-actions">
+      <button type="button" class="btn-ghost" id="btn-investor-mode" title="高亮关键投资指标">
+        <span class="icon">◆</span> 投资人模式
+      </button>
+      <button type="button" class="btn-ghost" id="btn-theme" title="切换主题">☀</button>
+      <button type="button" class="btn-primary" id="btn-roadshow">▶ 路演播放</button>
+    </div>
+  </header>
+
+  <aside class="section-rail" id="section-rail" aria-label="快速跳转"></aside>
+
+  <main>
+    <!-- HERO -->
+    <section class="section hero" id="hero" data-section="hero">
+      <div class="hero-badge anim-in">种子轮 · 保密文件</div>
+      <h1 class="hero-title anim-in">
+        <span class="line">灵祺</span>
+        <span class="line accent">商业计划书</span>
+      </h1>
+      <p class="hero-tagline anim-in">
+        本地生活 <strong>Merchant AI Agent</strong> + <strong>可验证达人履约网络</strong>
+      </p>
+      <div class="hero-stats anim-in">
+        <div class="stat-card pulse" data-count="500" data-suffix="万">
+          <span class="stat-val">0</span><span class="stat-unit">万</span>
+          <span class="stat-label">融资金额</span>
+        </div>
+        <div class="stat-card" data-count="3" data-suffix="家">
+          <span class="stat-val">0</span><span class="stat-unit">家</span>
+          <span class="stat-label">灰测商户</span>
+        </div>
+        <div class="stat-card" data-count="24" data-suffix="个月">
+          <span class="stat-val">0</span><span class="stat-unit">个月</span>
+          <span class="stat-label">资金跑道</span>
+        </div>
+        <div class="stat-card cities">
+          <span class="stat-val">杭甬温</span>
+          <span class="stat-label">浙江金三角</span>
+        </div>
+      </div>
+      <div class="hero-cta anim-in">
+        <button type="button" class="btn-xl primary" data-section="fund">查看融资用途</button>
+        <button type="button" class="btn-xl outline" id="btn-copy-pitch">复制投资一句话</button>
+        <button type="button" class="btn-xl ghost" data-toggle="engines">双引擎拆解 ▾</button>
+      </div>
+      <div class="hero-engines hidden" id="engines-panel">
+        <div class="engine-card">
+          <h3>Merchant AI Agent</h3>
+          <ul>
+            <li>自然语言组品、达人招募 Brief</li>
+            <li>评价回复、推广方案生成</li>
+            <li>先预览确认，再写入 ERP</li>
+          </ul>
+        </div>
+        <div class="engine-card">
+          <h3>可验证达人履约网络</h3>
+          <ul>
+            <li>开环探店 + 云剪闭环全链路</li>
+            <li>成片确认 → 回链 → AI 核查</li>
+            <li>可追踪、可对账、可复盘</li>
+          </ul>
+        </div>
+      </div>
+      <div class="scroll-hint">向下探索 ↓</div>
+    </section>
+
+    <!-- MILESTONES -->
+    <section class="section goals-strip" id="goals">
+      <h2 class="section-kicker investor-highlight">融资诉求与未来里程碑 · 本轮 500 万</h2>
+      <p class="goals-tagline">12 个月 <strong>2 万</strong> 付费门店 · 24 个月 <strong>10 万</strong> 付费门店</p>
+      <div class="goals-grid">
+        <div class="goal-item"><span class="goal-num" data-count="6000">0</span><span>M6 门店落地</span></div>
+        <div class="goal-item"><span class="goal-num" data-count="20000">0</span><span>M12 付费门店</span></div>
+        <div class="goal-item"><span class="goal-num" data-count="100000">0</span><span>M24 付费门店</span></div>
+        <div class="goal-item"><span class="goal-num" data-count="1000" data-prefix="≥">0</span><span>M12 MRR（万/月）</span></div>
+        <div class="goal-item"><span class="goal-num" data-count="5000" data-prefix="≥">0</span><span>M24 MRR（万/月）</span></div>
+      </div>
+    </section>
+
+    <section class="section milestone-section" id="milestones">
+      <div class="section-head">
+        <span class="kicker">里程碑</span>
+        <h2>节点路径 · M3 → M24</h2>
+        <p>点击节点查看业务目标与资金投向</p>
+      </div>
+      <div class="milestone-track">
+        <button type="button" class="ms-node active" data-ms="m3">
+          <span class="ms-badge">M3</span>
+          <span class="ms-title">主链路打通</span>
+        </button>
+        <button type="button" class="ms-node" data-ms="m6">
+          <span class="ms-badge">M6</span>
+          <span class="ms-title">6,000 店</span>
+        </button>
+        <button type="button" class="ms-node" data-ms="m12">
+          <span class="ms-badge">M12</span>
+          <span class="ms-title">2 万店 · MRR 1000万</span>
+        </button>
+        <button type="button" class="ms-node" data-ms="m24">
+          <span class="ms-badge">M24</span>
+          <span class="ms-title">10 万店 · MRR 5000万</span>
+        </button>
+      </div>
+      <div class="milestone-detail investor-highlight" id="milestone-detail">
+        <h3>M3 · 平台与 SaaS 主链路打通</h3>
+        <p class="ms-biz">商家 ERP、达人小程序、服务商版与 /erp-api 一体化可用；灰测能力产品化。</p>
+        <p class="ms-fund"><strong>资金投向 ¥220 万</strong> — 研发核心系统（AI 智能体、履约自动化、稳定性）</p>
+      </div>
+    </section>
+
+    <!-- MARKET -->
+    <section class="section" id="market" data-section="market">
+      <div class="section-head">
+        <span class="kicker">02</span>
+        <h2>市场与痛点</h2>
+        <p>本地生活数字化转型的巨大机遇 · 杭甬温 SAM 8,000–15,000 家</p>
+      </div>
+      <div class="market-chart-wrap">
+        <div class="chart-title">本地生活市场规模趋势（亿元）</div>
+        <div class="chart-stage" id="market-chart-stage">
+          <svg class="growth-curve-svg" id="market-growth-curve" viewBox="0 0 520 200" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="curveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#7c5cff"/>
+                <stop offset="100%" stop-color="#ff6b35"/>
+              </linearGradient>
+              <linearGradient id="curveAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#7c5cff"/>
+                <stop offset="100%" stop-color="transparent"/>
+              </linearGradient>
+            </defs>
+            <path id="market-curve-area" fill="url(#curveAreaGrad)" opacity="0"/>
+            <path id="market-curve-path" fill="none" stroke="url(#curveGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="bar-chart" id="market-chart">
+            <div class="bar" data-val="1200" data-year="2023"><span></span><label>2023</label></div>
+            <div class="bar" data-val="1800" data-year="2024"><span></span><label>2024</label></div>
+            <div class="bar" data-val="2400" data-year="2025E"><span></span><label>2025E</label></div>
+            <div class="bar" data-val="3200" data-year="2026E"><span></span><label>2026E</label></div>
+            <div class="bar" data-val="4500" data-year="2027E"><span></span><label>2027E</label></div>
+          </div>
+        </div>
+        <button type="button" class="btn-action-play" id="btn-animate-chart">▶ 播放增长动画</button>
+      </div>
+      <div class="pain-grid">
+        <article class="pain-card" tabindex="0">
+          <div class="pain-card-inner">
+            <div class="pain-face pain-front">
+              <span class="pain-num">01</span>
+              <h3>不会操盘</h3>
+              <p class="pain-before">依赖代运营 PPT，缺乏可持续工具</p>
+              <button type="button" class="flip-btn">翻转看解法</button>
+            </div>
+            <div class="pain-face pain-back">
+              <span class="pain-num">01</span>
+              <h3>灵祺解法</h3>
+              <p class="pain-solution">AI 智能体 + 门店情报 + 九大经营场景</p>
+              <button type="button" class="flip-btn">返回痛点</button>
+            </div>
+          </div>
+        </article>
+        <article class="pain-card" tabindex="0">
+          <div class="pain-card-inner">
+            <div class="pain-face pain-front">
+              <span class="pain-num">02</span>
+              <h3>达人难管</h3>
+              <p class="pain-before">通告群、私聊、无统一状态</p>
+              <button type="button" class="flip-btn">翻转看解法</button>
+            </div>
+            <div class="pain-face pain-back">
+              <span class="pain-num">02</span>
+              <h3>灵祺解法</h3>
+              <p class="pain-solution">注册表 + 小程序大厅/急单/云剪</p>
+              <button type="button" class="flip-btn">返回痛点</button>
+            </div>
+          </div>
+        </article>
+        <article class="pain-card" tabindex="0">
+          <div class="pain-card-inner">
+            <div class="pain-face pain-front">
+              <span class="pain-num">03</span>
+              <h3>履约不可证</h3>
+              <p class="pain-before">截图、口头确认</p>
+              <button type="button" class="flip-btn">翻转看解法</button>
+            </div>
+            <div class="pain-face pain-back">
+              <span class="pain-num">03</span>
+              <h3>灵祺解法</h3>
+              <p class="pain-solution">云剪回链 + AI 核查；开环审稿结款</p>
+              <button type="button" class="flip-btn">返回痛点</button>
+            </div>
+          </div>
+        </article>
+        <article class="pain-card" tabindex="0">
+          <div class="pain-card-inner">
+            <div class="pain-face pain-front">
+              <span class="pain-num">04</span>
+              <h3>多客户代运营难</h3>
+              <p class="pain-before">表格切换客户</p>
+              <button type="button" class="flip-btn">翻转看解法</button>
+            </div>
+            <div class="pain-face pain-back">
+              <span class="pain-num">04</span>
+              <h3>灵祺解法</h3>
+              <p class="pain-solution">服务商版多租户与客户绑定</p>
+              <button type="button" class="flip-btn">返回痛点</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- SOLUTION -->
+    <section class="section dark-panel" id="solution" data-section="solution">
+      <div class="section-head light">
+        <span class="kicker">03</span>
+        <h2>双引擎解决方案</h2>
+        <p>AI 智能体 × 可验证履约网络</p>
+      </div>
+      <div class="tab-switcher" role="tablist">
+        <button type="button" role="tab" class="active" data-tab="flow">架构流</button>
+        <button type="button" role="tab" data-tab="agent">AI Agent</button>
+        <button type="button" role="tab" data-tab="network">履约网络</button>
+      </div>
+      <div class="tab-panels">
+        <div class="tab-panel active" id="tab-flow">
+          <div class="architecture">
+            <div class="arch-box agent">
+              <h4>Merchant AI Agent</h4>
+              <p>对话 → 方案/Brief → 预览确认 → ERP 写入</p>
+            </div>
+            <div class="arch-arrow">↓ 招募单 / 商品 / 活动</div>
+            <div class="arch-box network">
+              <h4>可验证达人履约网络</h4>
+              <div class="arch-lanes">
+                <span>开环：报名 → 反选 → 探店 → 审稿 → 结款</span>
+                <span>闭环：成片 → 确认 → 回链 → AI 核查 → 结算</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-agent">
+          <ol class="feature-list">
+            <li><strong>开放对话 + ERP 专有能力</strong> — 经营类需求自动走预览确认</li>
+            <li><strong>本地生活规则内嵌</strong> — 团购佣金 1%–5%、组品可落地正文</li>
+            <li><strong>多场景并行预览</strong> — 商品与招募分卡片，避免误执行</li>
+          </ol>
+        </div>
+        <div class="tab-panel" id="tab-network">
+          <ol class="feature-list">
+            <li><strong>单一事实来源</strong> — ops_registry_snapshot 驱动全端</li>
+            <li><strong>开环探店</strong> — 到店体验 + 达人自发创作</li>
+            <li><strong>云剪闭环</strong> — 发布回链 + AI 核查为可验证锚点</li>
+          </ol>
+        </div>
+      </div>
+      <blockquote class="invest-quote investor-highlight">
+        我们是商户的 <em>AI 经营操作系统</em>，并用 <em>可验证履约网络</em> 锁住达人合作数据与结算依据。
+      </blockquote>
+    </section>
+
+    <!-- PRODUCT -->
+    <section class="section" id="product" data-section="product">
+      <div class="section-head">
+        <span class="kicker">04</span>
+        <h2>产品体系 · 已交付能力</h2>
+        <p>仓库与生产环境已灰测/上线，非 PPT 路线图</p>
+      </div>
+      <div class="product-tabs">
+        <button type="button" class="active" data-product="matrix">产品矩阵</button>
+        <button type="button" data-product="erp">商家 ERP</button>
+        <button type="button" data-product="mp">达人小程序</button>
+        <button type="button" data-product="ip">软著合规</button>
+      </div>
+      <div class="product-content">
+        <div class="product-panel active" data-panel="matrix">
+          <div class="matrix-grid">
+            <div class="matrix-card"><span class="tag live">灰测+生产</span><h4>灵祺 AI 智能 ERP（商家版）</h4><p>Web · 商户</p></div>
+            <div class="matrix-card"><span class="tag build">已构建</span><h4>灵祺 AI 智能 ERP（服务商版）</h4><p>Web · 代运营</p></div>
+            <div class="matrix-card"><span class="tag live">生产</span><h4>商家/运营管理后台</h4><p>Web · 运营/内部</p></div>
+            <div class="matrix-card"><span class="tag beta">体验版灰测</span><h4>灵祺达人撮合小程序</h4><p>微信 · 达人/PR</p></div>
+            <div class="matrix-card"><span class="tag build">已构建</span><h4>商家/服务商版本管理小程序</h4><p>微信 · 商户/代运营</p></div>
+            <div class="matrix-card"><span class="tag live">生产</span><h4>PR 管理后台 Web</h4><p>Web · PR/运营</p></div>
+            <div class="matrix-card"><span class="tag live">生产</span><h4>统一 API / 数据</h4><p>ECS + Supabase</p></div>
+          </div>
+        </div>
+        <div class="product-panel" data-panel="erp">
+          <ul class="chip-list">
+            <li>AI 智能体：组品、招募、评价、推广</li>
+            <li>店铺/商品：多平台团购、菜单、装修</li>
+            <li>运营中心：达人招募、活动、竞对、ICE 云剪</li>
+            <li>投流/线索：对账、报税、数字人口播</li>
+          </ul>
+        </div>
+        <div class="product-panel" data-panel="mp">
+          <ul class="chip-list">
+            <li>招募大厅 · 急单大厅 · 云剪任务</li>
+            <li>报名、会员、PR 发单、推荐达人</li>
+            <li>PR ↔ 达人私信（双通道 API）</li>
+          </ul>
+        </div>
+        <div class="product-panel" data-panel="ip">
+          <p>软著：灵祺 AI 智能 ERP 商家管理系统 V1.0</p>
+          <p>软著：灵祺达人招募小程序软件 V1.0</p>
+          <p>AI 写操作强制预览确认 — ToB 合同与审计友好</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUSINESS -->
+    <section class="section" id="business" data-section="business">
+      <div class="section-head">
+        <span class="kicker">05</span>
+        <h2>商业模式与单位经济</h2>
+      </div>
+      <div class="biz-layout">
+        <div class="revenue-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>收入来源</th><th>定价</th><th>客户</th></tr></thead>
+            <tbody>
+              <tr><td>SaaS 订阅</td><td>¥3,980–19,800/年</td><td>直客商户</td></tr>
+              <tr><td>履约服务费</td><td>¥10–50/单</td><td>有招募商户</td></tr>
+              <tr><td>达人/PR 会员注册费</td><td>¥9.9/月/人</td><td>达人/PR（AI 智能优先匹配商单/达人）</td></tr>
+              <tr><td>服务商席位</td><td>¥1.98–4.98万/年</td><td>代运营</td></tr>
+              <tr><td>AI 增值包</td><td>加价 15–30%</td><td>高用量商户</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="unit-econ">
+          <div class="econ-card investor-highlight"><span>M12 MRR</span><strong>≥1,000 万/月</strong></div>
+          <div class="econ-card investor-highlight"><span>M24 MRR</span><strong>≥5,000 万/月</strong></div>
+          <div class="econ-card"><span>SaaS 毛利率</span><strong>75–85%</strong></div>
+          <div class="econ-card"><span>履约毛利率</span><strong>35–50%</strong></div>
+          <div class="econ-card"><span>LTV/CAC</span><strong>≥3x</strong></div>
+        </div>
+        <div class="revenue-mix">
+          <h4>收入占比（目标态）</h4>
+          <div class="donut-legend" id="revenue-donut">
+            <svg viewBox="0 0 120 120" class="donut-svg">
+              <circle cx="60" cy="60" r="48" class="donut-bg"/>
+              <circle cx="60" cy="60" r="48" class="donut-seg seg-saas" data-pct="45"/>
+              <circle cx="60" cy="60" r="48" class="donut-seg seg-fee" data-pct="35"/>
+              <circle cx="60" cy="60" r="48" class="donut-seg seg-partner" data-pct="20"/>
+            </svg>
+            <ul>
+              <li data-seg="saas">订阅 45%</li>
+              <li data-seg="fee">履约 35%</li>
+              <li data-seg="partner">服务商 20%</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="compete-wrap">
+        <h3>竞争差异化 · 雷达对比</h3>
+        <div class="radar-controls">
+          <label><input type="range" min="0" max="100" value="92" data-axis="0" /> AI 智能化</label>
+          <label><input type="range" min="0" max="100" value="88" data-axis="1" /> ERP 集成</label>
+          <label><input type="range" min="0" max="100" value="95" data-axis="2" /> 履约验证</label>
+          <label><input type="range" min="0" max="100" value="80" data-axis="3" /> 跨平台</label>
+          <label><input type="range" min="0" max="100" value="85" data-axis="4" /> 易用性</label>
+          <button type="button" class="btn-ghost" id="btn-reset-radar">重置灵祺优势</button>
+        </div>
+        <canvas id="radar-chart" width="400" height="400"></canvas>
+      </div>
+    </section>
+
+    <!-- REGION -->
+    <section class="section dark-panel" id="region" data-section="region">
+      <div class="section-head light">
+        <span class="kicker">06</span>
+        <h2>区域战略 · 杭甬温金三角</h2>
+      </div>
+      <div class="city-switcher">
+        <button type="button" class="city-btn active" data-city="ningbo">宁波</button>
+        <button type="button" class="city-btn" data-city="wenzhou">温州</button>
+        <button type="button" class="city-btn" data-city="hangzhou">杭州</button>
+      </div>
+      <div class="city-panel active" data-city-panel="ningbo">
+        <h3>灰测大本营</h3>
+        <p>灰测大本营 · M6 前标杆案例 · 经服务商批量导入冲刺 6,000 店</p>
+      </div>
+      <div class="city-panel" data-city-panel="wenzhou">
+        <h3>民营商户渗透</h3>
+        <p>绑定 2–3 家代运营 · 每家导入 10+ 商户 · 服务商版规模化获客</p>
+      </div>
+      <div class="city-panel" data-city-panel="hangzhou">
+        <h3>品牌与人才窗口</h3>
+        <p>品牌活动、平台生态对接、商户沙龙与达人见面会</p>
+      </div>
+      <div class="timeline">
+        <button type="button" class="tl-node active" data-tl="q1">Q1-Q2 宁波</button>
+        <button type="button" class="tl-node" data-tl="q3">Q3 温州</button>
+        <button type="button" class="tl-node" data-tl="q4">Q4 杭州</button>
+        <button type="button" class="tl-node" data-tl="y2">Y2 溢出</button>
+      </div>
+      <p class="tl-desc" id="tl-desc">宁波深耕：10 家标杆 + 50 家付费，云剪闭环案例视频与 PDF</p>
+    </section>
+
+    <!-- PROGRESS -->
+    <section class="section" id="progress">
+      <div class="section-head">
+        <span class="kicker">07</span>
+        <h2>当前进展 · 灰测验证</h2>
+      </div>
+      <div class="progress-grid">
+        <div class="prog-card"><span class="prog-val">3</span><span>灰测门店 → M6 目标 6,000</span></div>
+        <div class="prog-card done"><span>ECS /erp-api</span><span>50+ 路由 · 已完成</span></div>
+        <div class="prog-card done"><span>运营同步招募单</span><span>大厅策略 · 已完成</span></div>
+        <div class="prog-card wip"><span>消息双通道</span><span>Supabase + ERP · 进行中</span></div>
+      </div>
+      <div class="verify-list">
+        <label><input type="checkbox" /> 商户愿用 AI 完成首次组品+招募</label>
+        <label><input type="checkbox" /> 云剪单均时长 &lt; 人工 50%</label>
+        <label><input type="checkbox" /> 报名→回链转化 ≥ 微信群 2x</label>
+        <label><input type="checkbox" /> M6 达成 6,000 店落地</label>
+        <label><input type="checkbox" /> M12 MRR ≥1,000 万</label>
+        <label><input type="checkbox" checked /> 主链路上线无重大事故</label>
+      </div>
+    </section>
+
+    <!-- FUND -->
+    <section class="section fund-section" id="fund" data-section="fund">
+      <div class="section-head">
+        <span class="kicker">08</span>
+        <h2>融资用途 · 500 万</h2>
+        <p>24 个月跑道 · M3→M24 与资金投向一一对应</p>
+      </div>
+      <div class="fund-layout">
+        <div class="fund-chart" id="fund-chart">
+          <button type="button" class="fund-slice active" data-fund="rd" data-pct="44" data-amt="220" data-ms="M3">
+            <span class="slice-pct">44%</span><span>研发核心系统 · M3</span>
+          </button>
+          <button type="button" class="fund-slice" data-fund="delivery" data-pct="30" data-amt="150" data-ms="M6">
+            <span class="slice-pct">30%</span><span>交付与运营 · M6</span>
+          </button>
+          <button type="button" class="fund-slice" data-fund="market" data-pct="16" data-amt="80" data-ms="M12">
+            <span class="slice-pct">16%</span><span>市场销售 · M12</span>
+          </button>
+          <button type="button" class="fund-slice" data-fund="reserve" data-pct="10" data-amt="50" data-ms="M24">
+            <span class="slice-pct">10%</span><span>储备金 · M24</span>
+          </button>
+        </div>
+        <div class="fund-detail" id="fund-detail">
+          <h3>研发核心系统 · ¥220 万（M3）</h3>
+          <p>AI 智能体、ERP/小程序/服务商版主链路、云资源与系统稳定性。</p>
+          <p class="team-size">种子期团队 10–12 人：研发 4–5 · 产品运营 2 · BD 2–3 · 创始人 2</p>
+        </div>
+      </div>
+      <div class="finance-chart">
+        <h3>MRR 与年化营收（万元）</h3>
+        <div class="fin-chart-stage">
+          <svg class="growth-curve-svg fin-curve-svg" id="fin-growth-curve" viewBox="0 0 400 180" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="finCurveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#7c5cff"/>
+                <stop offset="100%" stop-color="#f5c542"/>
+              </linearGradient>
+            </defs>
+            <path id="fin-curve-path" fill="none" stroke="url(#finCurveGrad)" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+          <div class="fin-bars">
+          <div class="fin-group" data-y="m6" data-val="3600"><span class="fin-total">3,600</span><div class="fin-stack"><i class="sub" style="--h:60%"></i><i class="fee" style="--h:40%"></i></div><label>M6 年化</label></div>
+          <div class="fin-group" data-y="m12" data-val="12000"><span class="fin-total">12000</span><div class="fin-stack"><i class="sub" style="--h:45%"></i><i class="fee" style="--h:40%"></i><i class="partner" style="--h:15%"></i></div><label>M12</label></div>
+          <div class="fin-group" data-y="m24" data-val="60000"><span class="fin-total">60000</span><div class="fin-stack"><i class="sub" style="--h:40%"></i><i class="fee" style="--h:42%"></i><i class="partner" style="--h:18%"></i></div><label>M24</label></div>
+        </div>
+        </div>
+        <p class="fin-note">M12：MRR ≥1,000 万/月 · M24：MRR ≥5,000 万/月（年化 = MRR×12 示意）</p>
+        <button type="button" class="btn-action-play" id="btn-fin-animate">▶ 播放增长动画</button>
+      </div>
+    </section>
+
+    <!-- TEAM & RISK -->
+    <section class="section" id="team">
+      <div class="section-head">
+        <span class="kicker">09</span>
+        <h2>团队 · 风险 · 联系</h2>
+      </div>
+      <div class="team-advantage">
+        <h3>团队优势 · 复合型本地生活战队</h3>
+        <div class="advantage-grid">
+          <article class="advantage-card">
+            <span class="adv-icon">✦</span>
+            <h4>研发 · 技术驱动</h4>
+            <p>核心成员具备头部互联网产品与技术架构经验；商家 ERP、达人小程序、PR 后台与 ECS API 已灰测/生产验证。</p>
+          </article>
+          <article class="advantage-card">
+            <span class="adv-icon">✦</span>
+            <h4>管理销售 · 业绩导向</h4>
+            <p>深耕本地生活区域拓展与服务商渠道；杭甬温地推 + 代运营批量导入，可复制获客 SOP。</p>
+          </article>
+          <article class="advantage-card">
+            <span class="adv-icon">✦</span>
+            <h4>行业积累 · 5 年+</h4>
+            <p>平均 5 年以上本地生活实战，洞察商户操盘、达人履约与 ROI 归因痛点；灰测门店真实反馈驱动产品迭代。</p>
+          </article>
+        </div>
+      </div>
+      <div class="team-grid">
+        <div class="team-card featured"><span class="avatar">曹</span><h4>创始人 · 曹鑫淼</h4><p>CEO / 产品 · 战略、融资、商户 BD · 宁波灰测大本营</p></div>
+        <div class="team-card"><span class="avatar">C</span><h4>CTO</h4><p>架构、AI 与交付 · ERP+小程序已验证</p></div>
+        <div class="team-card"><span class="avatar">C</span><h4>COO / 运营</h4><p>达人供给、履约 SLA · 云剪闭环 SOP</p></div>
+        <div class="team-card"><span class="avatar">商</span><h4>商务负责人</h4><p>服务商与连锁 · 温州/宁波</p></div>
+      </div>
+      <div class="roi-section investor-highlight">
+        <h3>ROI 预估 · 商户可感知的投入产出</h3>
+        <p class="roi-lead">参考智慧店长 BP 模型，结合灵祺 AI 运营 + 可验证履约，让每家付费门店看到清晰 ROI 闭环。</p>
+        <div class="roi-grid">
+          <div class="roi-card"><span>单店 ARPU（目标）</span><strong>¥500–600/月</strong></div>
+          <div class="roi-card"><span>AI 运营提效</span><strong>GMV +15–25%</strong></div>
+          <div class="roi-card"><span>LTV / CAC</span><strong>≥3x → 4x</strong></div>
+          <div class="roi-card"><span>月流失率目标</span><strong>≤1%</strong></div>
+        </div>
+        <div class="funnel-strip">
+          <span>线索获取</span><i>→</i><span>免费试用</span><i>→</i><span>付费门店</span><i>→</i><span>续费扩店</span>
+          <p class="funnel-note">抖音本地推 · 服务商导入 · 区域沙龙 · 真实履约效果驱动续费</p>
+        </div>
+        <div class="delivery-kpi">
+          <div class="kpi-pill"><strong>1 天</strong><span>上线交付</span></div>
+          <div class="kpi-pill"><strong>≥90%</strong><span>内容通过率</span></div>
+          <div class="kpi-pill"><strong>≤48h</strong><span>异常响应</span></div>
+          <div class="kpi-pill"><strong>≤1%</strong><span>月流失</span></div>
+        </div>
+      </div>
+      <div class="risk-accordion">
+        <details open><summary>灰测样本仅 3 家 <span class="risk high">高</span></summary><p>6 个月内扩至 15 家并固化案例；数据真实不夸大</p></details>
+        <details><summary>平台政策变化 <span class="risk mid">中</span></summary><p>定位编排层，不替代平台交易与资金</p></details>
+        <details><summary>AI 误操作 <span class="risk mid">中</span></summary><p>预览确认 + 分场景卡片（已上线）</p></details>
+        <details><summary>达人供给不足 <span class="risk mid">中</span></summary><p>小程序 + 会员 + PR；区域见面会</p></details>
+      </div>
+      <div class="contact-cta">
+        <button type="button" class="btn-xl primary" id="btn-contact">预约路演 / 获取完整材料</button>
+        <p class="confidential">保密声明：本文档仅供特定投资人阅览，未经授权不得复制或传播。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>灵祺 AI · 本地生活 Merchant AI Agent</span>
+    <span>© 灵祺 · 保密文件</span>
+  </footer>
+
+  <div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-box modal-contact">
+      <button type="button" class="modal-close" data-close aria-label="关闭">×</button>
+      <h3 id="modal-title">预约路演 / 获取完整材料</h3>
+      <div class="contact-block" id="modal-contact-body">
+        <div class="contact-founder-card">
+          <span class="founder-kicker">创始人</span>
+          <h3>曹鑫淼</h3>
+          <a href="tel:15757468650" class="founder-phone">15757468650</a>
+          <p class="contact-hint">路演预约 · 完整 BP 与产品演示（商家 ERP + 达人小程序 + PR 后台）</p>
+        </div>
+        <div class="wechat-qr-card">
+          <div class="qr-glow"></div>
+          <img src="assets/wechat-qr.png" width="200" height="200" alt="微信扫码添加好友" />
+          <p class="qr-caption">微信扫码添加好友</p>
+          <span class="qr-sub">抖音经理曹 · 浙江宁波</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
