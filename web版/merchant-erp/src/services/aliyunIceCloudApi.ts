@@ -1,6 +1,6 @@
 /** 阿里云 ICE 云剪辑 — 经商户 BFF 代理（生产优先 ECS /erp-api 读运营台 videoAi） */
 
-import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { merchantApiFetchUrls, merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 
 export type AliyunIceCloudConfig = {
   configured: boolean
@@ -159,21 +159,34 @@ const UPLOAD_MULTIPART_PATHS = [
 const ICE_CLIENT_CHUNK_BYTES = 2 * 1024 * 1024
 
 const ICE_CONFIG_FETCH_TIMEOUT_MS = 20_000
-const ICE_UPLOAD_INIT_TIMEOUT_MS = 45_000
-const ICE_UPLOAD_BODY_TIMEOUT_MS = 120_000
-const ICE_OSS_PUT_TIMEOUT_MS = 180_000
+const ICE_UPLOAD_INIT_TIMEOUT_MS = 25_000
+const ICE_UPLOAD_BODY_TIMEOUT_MS = 180_000
+/** OSS 直传失败则快速回退 ECS 服务端写入（避免 CORS 挂起数分钟） */
+const ICE_OSS_PUT_TIMEOUT_MS = 45_000
 
-/** 云剪本地上传：优先同源 API（避免 ECS erp-api 挂起导致 0% 卡住），配置读取仍走 erp-api 优先 */
-function iceUploadApiFetchUrls(apiPath: string): string[] {
+/** 上传 init：ECS erp-api 优先（与运营台 OSS 配置同源），再试同源 Vercel */
+function iceUploadInitFetchUrls(apiPath: string): string[] {
   const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
   const urls: string[] = []
   const add = (u: string) => {
     if (u && !urls.includes(u)) urls.push(u)
   }
+  for (const u of merchantErpApiCandidates(path)) add(u)
   if (typeof window !== 'undefined') {
     add(`${window.location.origin}${path}`)
   }
-  for (const u of merchantApiFetchUrls(path)) add(u)
+  return urls
+}
+
+/** 服务端转存 OSS：仅走 ECS（避免 Vercel Base64 中转极慢） */
+function iceUploadServerOnlyFetchUrls(apiPath: string): string[] {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const urls: string[] = []
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  for (const u of merchantErpApiCandidates(path)) {
+    if (origin && u.startsWith(origin)) continue
+    if (!urls.includes(u)) urls.push(u)
+  }
   return urls
 }
 
@@ -233,7 +246,7 @@ export async function postIceUploadInit(body: {
 }): Promise<IceUploadInitResult> {
   let lastMsg = '上传初始化失败，请稍后重试'
   for (const p of UPLOAD_INIT_PATHS) {
-    for (const url of iceUploadApiFetchUrls(p)) {
+    for (const url of iceUploadInitFetchUrls(p)) {
       try {
         const res = await fetchWithTimeout(
           url,
@@ -260,24 +273,30 @@ export async function postIceUploadInit(body: {
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buf)
-  const chunk = 0x8000
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
-  }
-  return btoa(binary)
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result
+      if (typeof dataUrl !== 'string') {
+        reject(new Error('读取文件失败'))
+        return
+      }
+      const comma = dataUrl.indexOf(',')
+      resolve(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl)
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'))
+    reader.readAsDataURL(blob)
+  })
 }
 
-async function postJsonPaths<T extends { ok: boolean; message?: string }>(
+async function postJsonPathsEcs<T extends { ok: boolean; message?: string }>(
   paths: readonly string[],
   body: unknown,
   timeoutMs = ICE_UPLOAD_BODY_TIMEOUT_MS,
 ): Promise<T | { ok: false; message: string }> {
-  let lastMsg = '本地上传接口未部署'
+  let lastMsg = '本地上传接口未就绪，请确认 ECS 已部署 meoo-auth-api'
   for (const p of paths) {
-    for (const url of iceUploadApiFetchUrls(p)) {
+    for (const url of iceUploadServerOnlyFetchUrls(p)) {
       try {
         const res = await fetchWithTimeout(
           url,
@@ -303,15 +322,35 @@ async function postJsonPaths<T extends { ok: boolean; message?: string }>(
   return { ok: false, message: lastMsg }
 }
 
+async function postJsonPaths<T extends { ok: boolean; message?: string }>(
+  paths: readonly string[],
+  body: unknown,
+  timeoutMs = ICE_UPLOAD_BODY_TIMEOUT_MS,
+): Promise<T | { ok: false; message: string }> {
+  return postJsonPathsEcs<T>(paths, body, timeoutMs)
+}
+
 async function uploadIceViaServer(
   file: File,
+  onProgress?: (p: IceUploadProgress) => void,
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
   const contentType = defaultContentType(file)
   const label = file.name.replace(/\.[^.]+$/, '') || file.name
+  const report = (percent: number) => {
+    onProgress?.({
+      loaded: Math.round((file.size * percent) / 100),
+      total: file.size,
+      percent: Math.min(99, Math.max(3, percent)),
+    })
+  }
+
+  report(8)
 
   if (file.size <= ICE_CLIENT_CHUNK_BYTES) {
+    report(15)
     const contentBase64 = await blobToBase64(file)
-    const r = await postJsonPaths<{
+    report(45)
+    const r = await postJsonPathsEcs<{
       ok: true
       mediaUrl: string
       label?: string
@@ -321,10 +360,11 @@ async function uploadIceViaServer(
       contentBase64,
     })
     if (!r.ok) return r
+    report(100)
     return { ok: true, mediaUrl: r.mediaUrl, label: r.label ?? label }
   }
 
-  const init = await postJsonPaths<{
+  const init = await postJsonPathsEcs<{
     ok: true
     uploadId: string
     objectKey: string
@@ -340,11 +380,13 @@ async function uploadIceViaServer(
 
   const parts: { partNumber: number; etag: string }[] = []
   for (let i = 0; i < init.partCount; i++) {
+    report(10 + Math.round(((i + 0.35) / init.partCount) * 75))
     const start = i * init.partSize
     const end = Math.min(start + init.partSize, file.size)
     const slice = file.slice(start, end)
     const contentBase64 = await blobToBase64(slice)
-    const part = await postJsonPaths<{ ok: true; etag: string; partNumber: number }>(
+    report(10 + Math.round(((i + 0.75) / init.partCount) * 75))
+    const part = await postJsonPathsEcs<{ ok: true; etag: string; partNumber: number }>(
       UPLOAD_MULTIPART_PATHS,
       {
         step: 'part',
@@ -358,7 +400,7 @@ async function uploadIceViaServer(
     parts.push({ partNumber: i + 1, etag: part.etag })
   }
 
-  const done = await postJsonPaths<{
+  const done = await postJsonPathsEcs<{
     ok: true
     mediaUrl: string
     label?: string
@@ -370,6 +412,7 @@ async function uploadIceViaServer(
     parts,
   })
   if (!done.ok) return done
+  report(100)
   return { ok: true, mediaUrl: done.mediaUrl, label: done.label ?? label }
 }
 
@@ -440,7 +483,8 @@ async function uploadIceDirectOss(
 
 /**
  * 本地上传至 OSS。
- * 优先浏览器直传（快）；失败时回退经 BFF Base64 中转（Vercel 单请求约 ≤2MB，大图会分片多次往返，较慢）。
+ * 1. 浏览器直传 OSS（最快，45s 内无进展则放弃）
+ * 2. 回退 ECS 服务端直写 OSS（不经 Vercel Base64，大图分片）
  */
 export async function uploadIceLocalMediaFile(
   file: File,
@@ -451,12 +495,9 @@ export async function uploadIceLocalMediaFile(
   const direct = await uploadIceDirectOss(file, opts?.onProgress)
   if (direct.ok) return direct
 
-  opts?.onProgress?.({ loaded: 0, total: file.size, percent: 2 })
-  const viaServer = await uploadIceViaServer(file)
-  if (viaServer.ok) {
-    opts?.onProgress?.({ loaded: file.size, total: file.size, percent: 100 })
-    return viaServer
-  }
+  opts?.onProgress?.({ loaded: 0, total: file.size, percent: 3 })
+  const viaServer = await uploadIceViaServer(file, opts?.onProgress)
+  if (viaServer.ok) return viaServer
 
   return {
     ok: false,
