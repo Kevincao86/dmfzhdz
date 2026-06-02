@@ -36,7 +36,7 @@ import {
 import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
-import { compressIceImageIfNeeded } from '../lib/iceImageUploadCompress'
+import { compressIceImageForUpload } from '../lib/iceImageUploadCompress'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -311,7 +311,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             fileName: raw.name,
             phase: 'encode',
           })
-          const file = await compressIceImageIfNeeded(raw)
+          const file = await compressIceImageForUpload(raw)
           setImageUploadProgress({
             index: i + 1,
             total: list.length,
