@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-ops-mp-talent-chat — 达人招募私信（Vercel 仅作网关，转发 ECS erp-api）
+ * POST /api/meoo-ops-mp-talent-chat — 达人招募私信（Vercel → ECS erp-api）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { proxyPostErpApi } from '../src/lib/mpErpApiProxy.js'
@@ -57,7 +57,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'meoo_ops_mp_talent_chat_failed',
         detail: `ecs_proxy: ${proxyMsg}`.slice(0, 800),
-        hint: '请确认 ECS meoo-auth-api 已启动（bash ~/app/scripts/ecs-fix-erp-api-502.sh）',
       })
     }
   } catch (e) {

@@ -1,5 +1,5 @@
 /**
- * GET /api/meoo-ops-mp-hall-registry — 达人招募大厅（Vercel 仅作网关，转发 ECS erp-api）
+ * GET /api/meoo-ops-mp-hall-registry — 达人招募大厅（Vercel → ECS erp-api）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { proxyGetErpApi } from '../src/lib/mpErpApiProxy.js'
@@ -45,7 +45,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           ok: false,
           error: 'meoo_ops_mp_hall_registry_failed',
           detail: `ecs_proxy: ${proxyMsg.slice(0, 400)}`,
-          hint: '请确认 ECS 已执行 ecs-fix-erp-api-502.sh 且公网 https://mofangdianai.com/erp-api 可访问',
         }),
       )
     }

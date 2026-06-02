@@ -186,18 +186,6 @@
       "includeFiles": "{vite-plugins,src/lib}/**",
       "maxDuration": 300
     },
-    "api/meoo-ops-mp-hall-registry.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-ops-mp-talent-chat.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
-    "api/meoo-ops-mp-support-relay.ts": {
-      "includeFiles": "{vite-plugins,src/lib}/**",
-      "maxDuration": 60
-    },
     "api/meoo-mp-recruitment-ai.ts": {
       "includeFiles": "{vite-plugins,src}/**",
       "maxDuration": 90
