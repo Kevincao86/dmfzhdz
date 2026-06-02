@@ -1,8 +1,12 @@
 /**
- * POST /api/meoo-ops-mp-support-relay — 达人招募在线客服（Vercel → ECS erp-api）
+ * POST /api/meoo-ops-mp-support-relay
+ * - ECS：handleMpSupportRelayBody
+ * - Vercel：代拉 ECS
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { proxyPostErpApi } from '../src/lib/mpErpApiProxy.js'
+import { isVercelServerless } from '../src/lib/mpErpRuntime.js'
+import { handleMpSupportRelayBody, type MpSupportRelayBody } from '../src/lib/mpSupportRelayHandler.js'
 
 export const config = { maxDuration: 60 }
 
@@ -48,20 +52,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    try {
+    if (isVercelServerless()) {
       const out = await proxyPostErpApi('/api/meoo-ops-mp-support-relay', body)
       sendOpsJson(res, out.status, out.data)
-    } catch (proxyErr) {
-      const proxyMsg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr)
-      sendOpsJson(res, 503, {
-        ok: false,
-        error: 'meoo_ops_mp_support_relay_failed',
-        detail: `ecs_proxy: ${proxyMsg}`.slice(0, 800),
-      })
+      return
     }
+
+    const out = await handleMpSupportRelayBody(body as MpSupportRelayBody)
+    sendOpsJson(res, out.status, out.data)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    sendOpsJson(res, 500, {
+    sendOpsJson(res, isVercelServerless() ? 503 : 500, {
       ok: false,
       error: 'meoo_ops_mp_support_relay_failed',
       detail: msg.slice(0, 800),

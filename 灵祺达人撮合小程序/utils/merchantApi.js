@@ -100,11 +100,15 @@ function merchantGetViaDownload(url) {
   })
 }
 
-/** 仅根域 mofangdianai.com 需 Cronet 规避；Vercel 子域 cs.* 走常规 request */
+/** 根域 / api 子域走 download 优先；cs.* 走常规 request */
 function shouldUseCronetWorkaround(url) {
   try {
-    const u = new URL(url)
-    return u.hostname === 'mofangdianai.com' || u.hostname === 'www.mofangdianai.com'
+    const h = new URL(url).hostname
+    return (
+      h === 'mofangdianai.com' ||
+      h === 'www.mofangdianai.com' ||
+      h === 'api.mofangdianai.com'
+    )
   } catch {
     return /mofangdianai\.com/i.test(String(url || ''))
   }
@@ -116,13 +120,21 @@ function merchantGetUrl(url) {
   return runGetWithFallback(u)
 }
 
+function requestTimeoutMs(url) {
+  try {
+    const host = new URL(String(url || '')).hostname
+    if (/cs\.mofangdianai\.com/i.test(host)) return 35000
+  } catch (_) {}
+  return 120000
+}
+
 function wxRequestPromise(url, m, data) {
   const isGet = String(m || 'GET').toUpperCase() === 'GET'
   return new Promise((resolve, reject) => {
     wx.request({
       url,
       method: m,
-      timeout: 120000,
+      timeout: requestTimeoutMs(url),
       ...WX_NET,
       header: isGet ? WX_HEADERS_GET : WX_HEADERS_JSON,
       data: isGet ? undefined : data,
