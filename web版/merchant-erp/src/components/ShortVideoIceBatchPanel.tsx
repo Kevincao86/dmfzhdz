@@ -115,7 +115,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     total: number
     percent: number
     fileName: string
+    phase?: 'direct' | 'server' | 'encode'
   } | null>(null)
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null)
   const [materialTab, setMaterialTab] = useState<'video' | 'images'>('video')
   const [briefAiLoading, setBriefAiLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -290,6 +292,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setImageUploading(true)
       setMaterialTab('images')
       setErr(null)
+      setImageUploadError(null)
       const list = Array.from(files).filter(isImageFile)
       if (list.length === 0) {
         setErr('请选择 jpg/png/webp 等图片文件')
@@ -297,14 +300,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         return
       }
       let added = 0
+      let lastFail: string | null = null
       try {
         for (let i = 0; i < list.length; i++) {
           const raw = list[i]!
           setImageUploadProgress({
             index: i + 1,
             total: list.length,
-            percent: 0,
+            percent: 2,
             fileName: raw.name,
+            phase: 'encode',
           })
           const file = await compressIceImageIfNeeded(raw)
           const r = await uploadIceLocalMediaFile(file, {
@@ -314,12 +319,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 total: list.length,
                 percent: p.percent,
                 fileName: raw.name,
+                phase: p.phase,
               })
             },
           })
           if (!r.ok) {
+            lastFail = r.message
+            setImageUploadError(r.message)
             setErr(r.message)
-            continue
+            break
           }
           setImageItems((prev) => [
             ...prev,
@@ -333,13 +341,19 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           added += 1
         }
       } catch (e) {
-        setErr(e instanceof Error ? e.message : '图片上传失败')
+        const msg = e instanceof Error ? e.message : '图片上传失败'
+        lastFail = msg
+        setImageUploadError(msg)
+        setErr(msg)
       } finally {
         setImageUploadProgress(null)
         setImageUploading(false)
       }
       if (added > 0) {
+        setImageUploadError(null)
         setHint(`已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。`)
+      } else if (lastFail) {
+        setHint(null)
       }
     },
     [videoUploading, imageUploading, anyBusy, cfg?.localUploadEnabled],
@@ -981,6 +995,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
               {materialTab === 'images' ? (
                 <>
+              {imageUploadError && !imageUploading ? (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs leading-relaxed text-red-900">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">图片上传失败</p>
+                    <p className="mt-1">{imageUploadError}</p>
+                  </div>
+                </div>
+              ) : null}
               <input
                 id="ice-local-image-input"
                 ref={imageFileInputRef}
@@ -990,8 +1013,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 className="sr-only"
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
-                  void handleLocalImages(e.target.files)
+                  const picked = e.target.files
                   e.target.value = ''
+                  void handleLocalImages(picked)
                 }}
               />
               <label
@@ -1032,7 +1056,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
                     <span className="text-sm font-medium text-zinc-800">
                       {imageUploadProgress
-                        ? `上传中 ${imageUploadProgress.index}/${imageUploadProgress.total} · ${imageUploadProgress.percent}%`
+                        ? `上传中 ${imageUploadProgress.index}/${imageUploadProgress.total} · ${imageUploadProgress.percent}%${
+                            imageUploadProgress.phase === 'server'
+                              ? ' · 服务端写入'
+                              : imageUploadProgress.phase === 'encode'
+                                ? ' · 准备中'
+                                : imageUploadProgress.phase === 'direct'
+                                  ? ' · 直传 OSS'
+                                  : ''
+                          }`
                         : '图片上传中…'}
                     </span>
                     {imageUploadProgress ? (
