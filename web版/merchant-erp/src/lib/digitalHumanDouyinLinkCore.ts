@@ -1047,6 +1047,14 @@ export async function runDouyinLinkParseCore(
   const asrKey = readDashScopeAsrKey(env)
   const tenantIdHint = input.tenantId?.trim()
 
+  if (page.playUrl && !asrKey) {
+    return {
+      ok: false,
+      message:
+        '已解析到视频，但未配置通义 ASR Key（MERCHANT_AI_QWEN_KEY / DASHSCOPE_API_KEY）。请在商家管理后台「AI 模型」保存通义 Key，或在 ECS/Vercel 环境变量配置后重试。',
+    }
+  }
+
   if (page.playUrl && asrKey) {
     if (durationMs > MAX_DOUYIN_VIDEO_MS) {
       const mins = Math.ceil(durationMs / 60_000)
@@ -1073,6 +1081,13 @@ export async function runDouyinLinkParseCore(
         script: asrScript,
         motionInstructions,
         scriptSource: 'asr',
+      }
+    }
+    if (page.playUrl) {
+      return {
+        ok: false,
+        message:
+          '已从视频解析到播放地址，但通义 ASR 未能识别出有效口播（可能无旁白或音频过短）。请换链接、改用手动输入，或检查通义 Key 与额度。',
       }
     }
   }
