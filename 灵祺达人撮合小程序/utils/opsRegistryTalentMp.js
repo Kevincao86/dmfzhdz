@@ -1,6 +1,7 @@
 const { merchantRequest } = require('./merchantApi.js')
 const registryCache = require('./registryCache.js')
 const registryRest = require('./registryRestGateway.js')
+const registryCs = require('./registryCsGateway.js')
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
 function isRetryableRegistryError(msg) {
@@ -32,21 +33,35 @@ async function fetchRegistryViaErpApi() {
 }
 
 async function fetchRegistry() {
-  // 手机微信 Cronet 对 /erp-api/ 常 reset；/rest/v1 与私信同源
+  const attempts = []
+
+  // 1) Vercel 子域：服务端代拉 ECS（手机微信直连 mofangdianai.com 整域 reset）
+  try {
+    const data = await registryCs.fetchHallRegistryViaCsGateway()
+    registryCache.save(data, 'cs:meoo-ops-mp-hall-registry')
+    return data
+  } catch (e) {
+    attempts.push(`[cs] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
+    console.warn('[mp] fetchRegistry cs gateway failed', attempts[attempts.length - 1])
+  }
+
+  // 2) PostgREST RPC（同根域，真机可能仍 reset）
   try {
     const data = await registryRest.fetchHallRegistryViaRest()
     registryCache.save(data, `rest:${registryRest.RPC_NAME}`)
     return data
-  } catch (restErr) {
-    const restMsg = String(restErr && restErr.message ? restErr.message : restErr)
-    console.warn('[mp] fetchRegistry rest → erp-api:', restMsg.slice(0, 160))
+  } catch (e) {
+    attempts.push(`[rest] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
+    console.warn('[mp] fetchRegistry rest failed', attempts[attempts.length - 1])
   }
 
+  // 3) 直连 erp-api
   let lastErr
   try {
     return await fetchRegistryViaErpApi()
   } catch (e) {
     lastErr = e
+    attempts.push(`[erp-api] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
   }
 
   const cached = registryCache.load({ allowStale: true })
@@ -61,9 +76,12 @@ async function fetchRegistry() {
     err.fromCache = true
     err.cacheStale = Boolean(cached.stale)
     err.cachedData = cached.data
+    err.attempts = attempts
     throw err
   }
-  throw lastErr || new Error('无法拉取招募大厅数据')
+  const err = lastErr || new Error('无法拉取招募大厅数据')
+  err.attempts = attempts
+  throw err
 }
 
 async function applyToMpOrder(mpOrderId, applicant) {

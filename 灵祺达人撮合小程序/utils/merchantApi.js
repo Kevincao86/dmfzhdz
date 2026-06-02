@@ -100,9 +100,20 @@ function merchantGetViaDownload(url) {
   })
 }
 
-/** 仅 wx.request 仍失败时再试 downloadFile（部分机型 download 先走反而 reset） */
-function shouldTryDownloadFallback(url) {
-  return /mofangdianai\.com/i.test(url)
+/** 仅根域 mofangdianai.com 需 Cronet 规避；Vercel 子域 cs.* 走常规 request */
+function shouldUseCronetWorkaround(url) {
+  try {
+    const u = new URL(url)
+    return u.hostname === 'mofangdianai.com' || u.hostname === 'www.mofangdianai.com'
+  } catch {
+    return /mofangdianai\.com/i.test(String(url || ''))
+  }
+}
+
+function merchantGetUrl(url) {
+  const u = String(url || '').trim()
+  if (!u) return Promise.reject(new Error('缺少请求 URL'))
+  return runGetWithFallback(u)
 }
 
 function wxRequestPromise(url, m, data) {
@@ -148,7 +159,7 @@ function runGetWithFallback(url) {
   const tryDownloadFirst = () =>
     merchantGetViaDownload(url).catch(() => tryRequest())
 
-  if (shouldTryDownloadFallback(url) && isRealDevice()) {
+  if (shouldUseCronetWorkaround(url) && isRealDevice()) {
     return tryDownloadFirst()
   }
   return tryRequest()
@@ -178,4 +189,4 @@ function merchantRequest(method, path, data, attempt = 0) {
   })
 }
 
-module.exports = { baseUrl, hasMerchantApi, merchantRequest, resolveMerchantApiUrl }
+module.exports = { baseUrl, hasMerchantApi, merchantRequest, merchantGetUrl, resolveMerchantApiUrl }
