@@ -169,10 +169,9 @@ Page({
         const stale = registryCache.load({ allowStale: true })
         hint = stale
           ? '网络仍被微信重置，但应已显示离线列表；若整页空白请删除小程序后重扫体验码。\n\n' + msg
-          : '本地无离线缓存（昨晚若为未带缓存的旧版，成功时未写入；或缓存已超 7 天）。\n' +
-            '须在 ECS 修复微信 TLS 后，用微信成功打开大厅一次。\n' +
-            'ECS：sudo bash ~/app/scripts/ecs-fix-wechat-cronet-tls.sh\n' +
-            '然后 bash ~/app/scripts/ecs-fix-erp-api-502.sh\n\n' +
+          : '手机微信对 /erp-api 可能连接重置。体验版已优先走 /rest/v1 拉取大厅；若仍失败，请在 ECS 仅执行一次 SQL 迁移（不改 Nginx）：\n' +
+            'bash ~/app/scripts/ecs-apply-supabase-migration.sh 20260602110000_mp_talent_hall_registry.sql\n' +
+            '然后上传最新体验版并删除小程序重扫。\n\n' +
             msg
       }
       if (apiBase && !hint.includes(apiBase)) {

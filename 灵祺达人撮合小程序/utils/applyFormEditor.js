@@ -191,6 +191,33 @@ function applyFormSummary(fields, platform) {
   return `${rows.length} 项 · 必填 ${req} 项`
 }
 
+function promptTemplateName(defaultName, onConfirm) {
+  const fallback = String(defaultName || '我的报名模版').trim() || '我的报名模版'
+  wx.showModal({
+    title: '保存到我的模版',
+    content: fallback,
+    editable: true,
+    placeholderText: '我的报名模版',
+    confirmText: '保存',
+    cancelText: '取消',
+    success: (r) => {
+      if (!r.confirm) return
+      const name = String(r.content != null ? r.content : fallback).trim() || fallback
+      onConfirm(name)
+    },
+  })
+}
+
+function saveFieldsToLibrary(page, id, name) {
+  const saved = templates.saveCustomTemplate({
+    id: id || templates.newCustomTemplateId(),
+    name,
+    fields: page.data.applyFormFields,
+  })
+  templates.setActiveTemplateId(saved.id)
+  return saved
+}
+
 function confirmApplyFormEditor(page, onDone) {
   const err = templates.validateTemplateFields(page.data.applyFormFields)
   if (err) {
@@ -198,47 +225,29 @@ function confirmApplyFormEditor(page, onDone) {
     return
   }
   const mode = page.data.applyFormEditorMode
-  const tplId = page.data.applyFormTemplateId || ''
-  const tplName = page.data.applyFormTemplateName || ''
+  const tplId = String(page.data.applyFormTemplateId || '').trim()
+  const defaultName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
+
+  const complete = (templateId, templateName, toastTitle) => {
+    finish(page, templateId, templateName, () => {
+      wx.showToast({ title: toastTitle, icon: 'success', duration: 1500 })
+      setTimeout(() => {
+        if (typeof onDone === 'function') onDone()
+      }, 320)
+    })
+  }
+
+  // 使用已有模版：写回「我的模版」并回到招募信息
   if (mode === 'template' && tplId) {
-    finish(page, tplId, tplName, onDone)
+    const saved = saveFieldsToLibrary(page, tplId, defaultName)
+    complete(saved.id, saved.name, '模版已更新')
     return
   }
-  wx.showModal({
-    title: '保存模版',
-    content: '是否将当前报名项保存为「我的模版」？',
-    confirmText: '保存',
-    cancelText: '不保存',
-    success: (r) => {
-      if (r.confirm) {
-        wx.showModal({
-          title: '模版名称',
-          editable: true,
-          placeholderText: '我的报名模版',
-          content: page.data.applyFormTemplateName || '我的报名模版',
-          success: (nameRes) => {
-            if (nameRes.confirm) {
-              const name = String(nameRes.content || page.data.applyFormTemplateName || '我的报名模版').trim()
-              if (!name) {
-                wx.showToast({ title: '请填写模版名称', icon: 'none' })
-                return
-              }
-              const saved = templates.saveCustomTemplate({
-                id: templates.newCustomTemplateId(),
-                name,
-                fields: page.data.applyFormFields,
-              })
-              templates.setActiveTemplateId(saved.id)
-              finish(page, saved.id, saved.name, onDone)
-              return
-            }
-            finish(page, page.data.applyFormTemplateId, page.data.applyFormTemplateName, onDone)
-          },
-        })
-        return
-      }
-      finish(page, page.data.applyFormTemplateId, page.data.applyFormTemplateName, onDone)
-    },
+
+  // 新建报名项：保存为新模版（避免嵌套 showModal，真机第二层弹窗易失效）
+  promptTemplateName(defaultName, (name) => {
+    const saved = saveFieldsToLibrary(page, '', name)
+    complete(saved.id, saved.name, '已保存到我的模版')
   })
 }
 

@@ -70,7 +70,19 @@ Page({
       const chat = require('../../utils/talentChat.js')
       if (chat.canChat()) await chat.syncProfile()
     } catch (_) {}
-    this.refresh()
+    try {
+      this.refresh()
+    } catch (e) {
+      console.error('[mine] refresh', e)
+      this.setData({
+        identity: 'talent',
+        identityLabel: '达人',
+        menus: TALENT_MENUS,
+        displayName: '灵祺用户',
+        displaySub: '页面加载异常，请删除小程序后重试',
+      })
+      wx.showToast({ title: '我的页加载失败', icon: 'none' })
+    }
   },
   refresh() {
     const identity = userProfile.readIdentity()

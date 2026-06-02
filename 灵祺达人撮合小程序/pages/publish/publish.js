@@ -290,13 +290,13 @@ Page({
   },
   openApplyFormEditorNew() {
     const platform = this.data.form.platform
-    const tpl = applyTemplates.emptyCustomTemplate('')
+    const tpl = applyTemplates.emptyCustomTemplate('我的报名模版')
     this.setData(
       {
         pickerView: 'applyForm',
         applyFormEditorMode: 'new',
-        applyFormTemplateId: '',
-        applyFormTemplateName: '新建报名项',
+        applyFormTemplateId: tpl.id,
+        applyFormTemplateName: tpl.name,
         applyFormFields: tpl.fields.map((f) => ({ ...f })),
         applyTemplateList: applyTemplates.listCustomTemplates(),
       },
