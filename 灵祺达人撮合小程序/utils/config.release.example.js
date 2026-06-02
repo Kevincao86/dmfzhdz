@@ -1,19 +1,10 @@
 /**
- * 生产环境 API 根地址（复制为 config.release.js 后提交，或仅在本地 config.local.js 填写）。
- * 末尾不要加 /。
- *
- * 阿里云 ECS（推荐，与商家 Web 共用）：
- *   MERCHANT_API_BASE_URL: 'https://mofangdianai.com/erp-api'
- *   SUPABASE_URL: 'https://mofangdianai.com'   // 自建 Supabase 反代，与商家站一致
- *   SUPABASE_ANON_KEY: '<与商家 Vercel/ECS 相同的 anon key>'
- *
- * 仍用 Vercel 根部署时：
- *   MERCHANT_API_BASE_URL: 'https://dmfweb.vercel.app'
+ * 生产环境（复制为 config.release.js）。
+ * 体验版/正式版 API 走 cs.mofangdianai.com（Vercel 网关 → ECS erp-api），勿配 SUPABASE_URL。
  */
 module.exports = {
-  MERCHANT_API_BASE_URL: 'https://mofangdianai.com/erp-api',
-  SUPABASE_URL: 'https://mofangdianai.com',
-  SUPABASE_ANON_KEY: '',
-  /** 可选：微信 URL Link 或 H5 报名落地页，支持 {mpId} 占位符 */
+  MERCHANT_API_BASE_URL: 'https://cs.mofangdianai.com',
+  MP_GATEWAY_BASE_URL: 'https://cs.mofangdianai.com',
+  MP_REGISTRY_GATEWAY_BASE_URL: 'https://cs.mofangdianai.com',
   MP_SHARE_APPLY_BASE_URL: '',
 }

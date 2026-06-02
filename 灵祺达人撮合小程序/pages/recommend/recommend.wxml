@@ -219,6 +219,7 @@
             <view class="job-card-compact__line2">
               <text class="job-card-compact__tag" wx:if="{{item.matchScore >= 60}}">匹配{{item.matchScore}}%</text>
               <text class="job-card-compact__tag">{{item.statusLabel}}</text>
+              <text class="job-card-compact__tag job-card-compact__tag--hot" wx:if="{{item.overRecruitHot}}">🔥 爆满</text>
               <text class="job-card-compact__tag job-card-compact__tag--gray">报名{{item.applicantCount}}/{{item.recruitCount}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
             </view>

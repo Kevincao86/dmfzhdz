@@ -14,7 +14,7 @@ Page({
       wx.showModal({
         title: '联系客服',
         content:
-          '请在 utils/config.local.js 配置 MERCHANT_API_BASE_URL（与私信相同，指向 merchant-erp 开发地址，如 http://本机IP:5173），并确保 ERP 的 .env.local 已配置 Supabase；也可直接配置 SUPABASE_URL + SUPABASE_ANON_KEY。',
+          '请在 utils/config.local.js 配置 MERCHANT_API_BASE_URL（与私信相同，如 http://本机IP:5173 或 https://cs.mofangdianai.com），由 ECS erp-api 提供客服接口。',
         showCancel: false,
       })
       return

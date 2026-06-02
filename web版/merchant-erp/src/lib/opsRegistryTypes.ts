@@ -276,6 +276,10 @@ export type RegistryMpTalentInboxItem = {
   body: string
   category: 'order' | 'business' | 'system'
   mpOrderId?: string
+  /** 与报名手机号一致时达人端可匹配（无会员 id 时） */
+  contact?: string
+  platformAccount?: string
+  applicantId?: string
   createdAt: string
   read?: boolean
 }

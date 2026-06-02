@@ -1,8 +1,8 @@
 /**
- * POST /api/meoo-ops-mp-talent-chat — 达人招募小程序 PR↔达人私信（Supabase）
+ * POST /api/meoo-ops-mp-talent-chat — 达人招募私信（Vercel 仅作网关，转发 ECS erp-api）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { handleMpTalentChatBody, type MpTalentChatBody } from '../src/lib/mpTalentChatHandler.js'
+import { proxyPostErpApi } from '../src/lib/mpErpApiProxy.js'
 
 export const config = { maxDuration: 60 }
 
@@ -40,16 +40,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: MpTalentChatBody
+    let body: Record<string, unknown>
     try {
-      body = JSON.parse(rawBody(req) || '{}') as MpTalentChatBody
+      body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
 
-    const out = await handleMpTalentChatBody(body)
-    sendOpsJson(res, out.status, out.data)
+    try {
+      const out = await proxyPostErpApi('/api/meoo-ops-mp-talent-chat', body)
+      sendOpsJson(res, out.status, out.data)
+    } catch (proxyErr) {
+      const proxyMsg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr)
+      sendOpsJson(res, 503, {
+        ok: false,
+        error: 'meoo_ops_mp_talent_chat_failed',
+        detail: `ecs_proxy: ${proxyMsg}`.slice(0, 800),
+        hint: '请确认 ECS meoo-auth-api 已启动（bash ~/app/scripts/ecs-fix-erp-api-502.sh）',
+      })
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

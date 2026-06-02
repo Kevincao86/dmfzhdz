@@ -31,6 +31,9 @@ function mapMpOrderRow(mp, reg) {
   const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
   const hideBudget = isMerchantSyncedMpOrder(mp)
   const budgetText = hideBudget ? '' : view.budgetText || '面议'
+  const applicantCount = view.applicantCount || 0
+  const recruitCap = listFilters.parseRecruitCountFromMp(mp)
+  const overRecruitHot = recruitCap > 0 && applicantCount > recruitCap
   return {
     id: mp.id,
     isMock: false,
@@ -50,8 +53,9 @@ function mapMpOrderRow(mp, reg) {
       : budgetDisplayUtil.buildBudgetDisplay(budgetText, mp.mpPublishMeta),
     fansRequirement: view.fansRequirement || '不限',
     summary: view.summaryShort,
-    applicantCount: view.applicantCount,
-    recruitCount: view.recruitCount || '不限',
+    applicantCount,
+    recruitCount: recruitCap > 0 ? recruitCap : view.recruitCount || '不限',
+    overRecruitHot,
     urgent,
     isIce: isIceMpOrder(mp),
     recommended: urgent || view.applicantCount >= 3 || priceAmount >= 1000,

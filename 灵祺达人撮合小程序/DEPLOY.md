@@ -81,12 +81,13 @@ git push origin main
 
 | 变量 | 用途 |
 |------|------|
-| `SUPABASE_URL` 或 `VITE_SUPABASE_URL` | Supabase 项目 URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | 读写 `ops_registry_snapshot`（**仅服务端**，勿暴露到小程序） |
+| `MEOO_ERP_API_BASE` 或 `VITE_ERP_AUTH_API_BASE`（可选） | 小程序网关（`meoo-ops-mp-*`）服务端转发目标，默认 `https://mofangdianai.com/erp-api` |
 
-与商家 Web、运营台共用同一 Supabase 项目即可。
+**达人招募小程序**不再经 Vercel 读 Supabase/PostgREST；`meoo-ops-mp-hall-registry`、`meoo-ops-mp-talent-chat` 等仅 **转发 ECS erp-api**。须保证 ECS 公网 HTTPS 与 `meoo-auth-api` 正常（见 §3.2.1）。
 
-其他变量（抖音、AI 等）为商家 ERP 功能所用；**仅跑招募大厅**时上述两项是小程序相关 API 的最低要求。
+商家 Web 登录等仍可在 Vercel 配置 `VITE_SUPABASE_URL`（指向 ECS 自建库地址），与小程序无关。
+
+其他变量（抖音、AI 等）为商家 ERP 功能所用。
 
 **商单 AI 标签 / 推荐匹配**（首页三大厅、推荐商单）需额外配置其一：
 
@@ -154,13 +155,13 @@ cp config.local.example.js config.local.js
 
 | 类型 | 建议域名 |
 |------|----------|
-| request 合法域名 | `https://mofangdianai.com` |
-| uploadFile / downloadFile | **必须**同上 `https://mofangdianai.com`（招募大厅 GET 在 `wx.request` reset 时会走 `downloadFile` 备用通道） |
-| DNS 预解析 | `mofangdianai.com` |
+| request 合法域名 | **`https://cs.mofangdianai.com`**（体验版 API 统一走 Vercel 网关） |
+| uploadFile / downloadFile | 若仍用根域静态资源可保留 `https://mofangdianai.com`；仅 API 时通常只需 `cs` |
+| DNS 预解析 | `cs.mofangdianai.com` |
 
-`MERCHANT_API_BASE_URL` 填 **`https://mofangdianai.com/erp-api`**（小程序会自动把 `/api/xxx` 拼成 `/erp-api/xxx`）。
+`config.release.js` 中 `MERCHANT_API_BASE_URL` 为 **`https://cs.mofangdianai.com`**（路径 `/api/meoo-ops-*`）。**真机/体验版不会读取 `config.local.js`**，避免被本机或旧根域覆盖。
 
-若私信/客服走直连 Supabase（配置了 `SUPABASE_URL`），request 域名必须是 **`https://mofangdianai.com`**（走 `/rest/v1/`），不要只填云端 `*.supabase.co`，除非仍用旧配置。
+小程序 **勿** 在 `config.release.js` 配置 `SUPABASE_URL`；私信/大厅/报名均走 `https://cs.mofangdianai.com/api/meoo-ops-*` → ECS。
 
 #### ECS 服务器上（SSH 一次性 / 发版后）
 
@@ -174,7 +175,7 @@ bash scripts/ecs-fix-erp-api-502.sh  # 拉代码、重启 meoo-auth-api、探活
 
 ### 3.2.1 体验版仍 `ERR_CONNECTION_RESET`（-101）
 
-这与微信合法域名、重新上传**无关**，是 **`https://mofangdianai.com` 公网 443/TLS** 问题（商家 Web 在 `cs.mofangdianai.com`，可以正常而小程序仍失败）。
+体验版应只请求 **`https://cs.mofangdianai.com`**。若仍报错，常见原因：① 未删小程序重扫（旧包仍直连根域）；② Vercel 未 Redeploy；③ **ECS 根域 TLS** 未修好导致 Vercel 服务端代拉 `mofangdianai.com` 失败（表现为 CS 接口 503）。
 
 **手机 Safari** 打开：
 
@@ -246,7 +247,7 @@ ECS 已拉取含 `20260601-mp-routes` 的代码并执行 `bash scripts/ecs-fix-e
 ## 五、发布检查清单
 
 - [ ] GitHub `main` 已推送，Vercel 最近一次部署 **Ready**
-- [ ] Vercel 已配置 `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] Vercel 已 Redeploy；ECS `curl https://mofangdianai.com/erp-api/meoo-erp-api-health` 正常
 - [ ] `curl` 自检 registry / apply 非 404
 - [ ] `config.release.js` 或本地 `config.local.js` 已填生产 `MERCHANT_API_BASE_URL`
 - [ ] 微信公众平台 **request 合法域名** 已添加

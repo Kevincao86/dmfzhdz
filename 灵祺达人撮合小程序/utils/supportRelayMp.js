@@ -1,5 +1,4 @@
 const merchant = require('./merchantApi.js')
-const rest = require('./supabaseRest.js')
 const lingqiIdentity = require('./lingqiIdentity.js')
 const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
@@ -31,8 +30,8 @@ function canSupport() {
 
 function formatSupportError(err) {
   const msg = String((err && err.message) || err || '未知错误')
-  if (/supabase_admin_not_configured/i.test(msg)) {
-    return 'ECS 客服接口未就绪：请执行 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
+  if (/supabase_admin|ecs_proxy|erp_proxy/i.test(msg)) {
+    return 'ECS 客服接口未就绪：请执行 bash ~/app/scripts/ecs-fix-erp-api-502.sh'
   }
   if (/support_relay|42P01|does not exist/i.test(msg)) {
     return '请确认已执行 support_relay_messages 相关数据库迁移'
@@ -155,16 +154,12 @@ function readCustomerMeta() {
 
 async function fetchSessionMessages(sessionId) {
   const gfp = getOrCreateGuestFingerprint()
-  if (useMerchantChannel()) {
-    const data = await relayApi({
-      action: 'fetch_messages',
-      sessionId,
-      guestFingerprint: gfp,
-    })
-    return mergeMessages([], data.messages || [])
-  }
-  const rows = await rest.fetchSupportRelaySession(sessionId, gfp)
-  return mergeMessages([], rows)
+  const data = await relayApi({
+    action: 'fetch_messages',
+    sessionId,
+    guestFingerprint: gfp,
+  })
+  return mergeMessages([], data.messages || [])
 }
 
 async function sendChatLine(from, text, id, sessionId) {
@@ -179,21 +174,17 @@ async function sendChatLine(from, text, id, sessionId) {
     client_msg_id: id,
     guest_fingerprint: getOrCreateGuestFingerprint(),
   }
-  if (useMerchantChannel()) {
-    await relayApi({
-      action: 'send_message',
-      sessionId,
-      guestFingerprint: row.guest_fingerprint,
-      fromRole: from,
-      text,
-      clientMsgId: id,
-      ts: row.ts,
-      customerId: meta.customerId,
-      enterpriseName: meta.enterpriseName,
-    })
-    return { ok: true }
-  }
-  await rest.insertSupportRelayMessage(row)
+  await relayApi({
+    action: 'send_message',
+    sessionId,
+    guestFingerprint: row.guest_fingerprint,
+    fromRole: from,
+    text,
+    clientMsgId: id,
+    ts: row.ts,
+    customerId: meta.customerId,
+    enterpriseName: meta.enterpriseName,
+  })
   return { ok: true }
 }
 

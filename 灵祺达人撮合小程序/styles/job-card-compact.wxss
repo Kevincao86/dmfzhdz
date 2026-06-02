@@ -138,6 +138,11 @@
   background: #f3f2f7;
 }
 
+.job-card-compact__tag--hot {
+  color: #c2410c;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+}
+
 .job-card-compact__price {
   font-size: 24rpx;
   font-weight: 700;

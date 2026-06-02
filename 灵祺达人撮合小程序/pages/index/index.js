@@ -156,7 +156,7 @@ Page({
       let hint = msg
       if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
         hint =
-          '微信未放行该域名。request 合法域名请填：https://mofangdianai.com（与控制台要求一致，末尾勿加分号）。保存后等 10 分钟并删除小程序再扫体验版。\n\n' +
+          '微信未放行该域名。request 合法域名请填：https://cs.mofangdianai.com（末尾勿加分号）。保存后等 10 分钟并删除小程序再扫体验版。\n\n' +
           msg
       } else if (/timeout|超时/i.test(msg)) {
         hint = '请求超时（注册表较大或网络慢）。\n\n' + msg

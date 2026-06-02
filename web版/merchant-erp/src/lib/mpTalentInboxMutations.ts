@@ -6,6 +6,9 @@ export type MpTalentInboxEntryInput = {
   body: string
   category?: 'order' | 'business' | 'system'
   mpOrderId?: string
+  contact?: string
+  platformAccount?: string
+  applicantId?: string
 }
 
 export function appendMpTalentInboxInSnapshot(
@@ -30,6 +33,9 @@ export function appendMpTalentInboxInSnapshot(
       category:
         row.category === 'order' || row.category === 'system' ? row.category : 'business',
       mpOrderId: row.mpOrderId ? String(row.mpOrderId).trim() : undefined,
+      contact: row.contact ? String(row.contact).trim() : undefined,
+      platformAccount: row.platformAccount ? String(row.platformAccount).trim() : undefined,
+      applicantId: row.applicantId ? String(row.applicantId).trim() : undefined,
       createdAt: now,
       read: false,
     })

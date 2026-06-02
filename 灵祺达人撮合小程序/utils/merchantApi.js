@@ -189,4 +189,18 @@ function merchantRequest(method, path, data, attempt = 0) {
   })
 }
 
-module.exports = { baseUrl, hasMerchantApi, merchantRequest, merchantGetUrl, resolveMerchantApiUrl }
+function merchantPostUrl(url, data) {
+  const u = String(url || '').trim()
+  if (!u) return Promise.reject(new Error('缺少请求 URL'))
+  return wxRequestPromise(u, 'POST', data || {})
+}
+
+module.exports = {
+  baseUrl,
+  hasMerchantApi,
+  merchantRequest,
+  merchantGetUrl,
+  merchantPostUrl,
+  resolveMerchantApiUrl,
+  isRealDevice,
+}
