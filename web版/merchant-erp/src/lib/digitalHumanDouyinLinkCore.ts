@@ -345,6 +345,15 @@ function extractAsrTextFromPayload(payload: unknown): string {
   return ''
 }
 
+function readAsrPollBudgetMs(env: Record<string, string>, videoDurationMs?: number | null): number {
+  const onVercel = Boolean(env.VERCEL || process.env.VERCEL)
+  if (onVercel) return 38_000
+  return Math.min(
+    120_000,
+    Math.max(55_000, Math.round((videoDurationMs ?? 60_000) * 0.25) + 35_000),
+  )
+}
+
 async function pollDashScopeAsrTask(
   taskId: string,
   apiKey: string,
@@ -352,8 +361,11 @@ async function pollDashScopeAsrTask(
   pollMs = 120_000,
 ): Promise<string | null> {
   const deadline = Date.now() + pollMs
+  let waited = 0
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 1500))
+    const delay = waited < 10_000 ? 800 : 1500
+    await new Promise((r) => setTimeout(r, delay))
+    waited += delay
     try {
       const res = await fetch(`${baseUrl}/api/v1/tasks/${encodeURIComponent(taskId)}`, {
         headers: {
@@ -401,7 +413,7 @@ async function transcribeDouyinVideoViaDashScope(
   if (!apiKey) return null
 
   const baseUrl = 'https://dashscope.aliyuncs.com'
-  const models = ['paraformer-v2', 'fun-asr', 'qwen3-asr-flash-filetrans']
+  const models = ['qwen3-asr-flash-filetrans', 'paraformer-v2', 'fun-asr']
 
   for (const model of models) {
     try {
@@ -443,12 +455,22 @@ async function transcribeDouyinVideoAudio(
   env: Record<string, string>,
   videoDurationMs?: number | null,
 ): Promise<string | null> {
-  const pollMs = Math.min(
-    180_000,
-    Math.max(90_000, Math.round((videoDurationMs ?? 60_000) * 0.35) + 45_000),
-  )
-  const mediaUrl = await resolveMediaUrlForAsr(playUrl, env)
-  return transcribeDouyinVideoViaDashScope(mediaUrl, env, pollMs)
+  const pollMs = readAsrPollBudgetMs(env, videoDurationMs)
+  const direct = playUrl.replace(/\/playwm\//, '/play/')
+
+  let text = await transcribeDouyinVideoViaDashScope(direct, env, pollMs)
+  if (text && text.length >= 12) return text
+
+  const onVercel = Boolean(env.VERCEL || process.env.VERCEL)
+  if (!onVercel) {
+    const mediaUrl = await resolveMediaUrlForAsr(playUrl, env)
+    if (mediaUrl !== direct) {
+      text = await transcribeDouyinVideoViaDashScope(mediaUrl, env, pollMs)
+      if (text && text.length >= 12) return text
+    }
+  }
+
+  return text && text.length >= 8 ? text : null
 }
 
 async function downloadDouyinMediaBuffer(playUrl: string): Promise<Buffer | null> {
@@ -1081,13 +1103,6 @@ export async function runDouyinLinkParseCore(
         script: asrScript,
         motionInstructions,
         scriptSource: 'asr',
-      }
-    }
-    if (page.playUrl) {
-      return {
-        ok: false,
-        message:
-          '已从视频解析到播放地址，但通义 ASR 未能识别出有效口播（可能无旁白或音频过短）。请换链接、改用手动输入，或检查通义 Key 与额度。',
       }
     }
   }

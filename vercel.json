@@ -19,7 +19,7 @@
     },
     "api/meoo-digital-human-douyin-link.ts": {
       "includeFiles": "web版/merchant-erp/{vite-plugins,src}/**",
-      "maxDuration": 120
+      "maxDuration": 300
     },
     "api/meoo-digital-human-tts.ts": {
       "includeFiles": "web版/merchant-erp/{vite-plugins,src}/**",

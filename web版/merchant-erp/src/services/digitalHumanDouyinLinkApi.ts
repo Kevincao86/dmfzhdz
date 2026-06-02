@@ -16,18 +16,26 @@ export type DouyinLinkParseResponse =
   | { ok: false; message: string }
 
 const API_PATH = '/api/meoo-digital-human-douyin-link'
+const LINK_PARSE_FETCH_TIMEOUT_MS = 180_000
 
-/** 链接解析：优先同源 Vercel（push 即部署），ECS erp-api 作备用 */
+/** 链接解析含 ASR，优先 ECS（无 60s Serverless 上限），同源 Vercel 作备用 */
 function douyinLinkApiCandidates(): string[] {
   const urls: string[] = []
   const add = (u: string) => {
     if (u && !urls.includes(u)) urls.push(u)
   }
+  for (const u of merchantErpApiCandidates(API_PATH)) add(u)
   if (typeof window !== 'undefined') {
     add(`${window.location.origin}${API_PATH}`)
   }
-  for (const u of merchantErpApiCandidates(API_PATH)) add(u)
   return urls
+}
+
+function isLinkParseTimeoutResponse(status: number, text: string): boolean {
+  return (
+    status === 504 ||
+    /FUNCTION_INVOCATION_TIMEOUT|deployment.*timeout|超时/i.test(text)
+  )
 }
 
 async function bearer(): Promise<string | null> {
@@ -69,23 +77,34 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
   let lastFail: DouyinLinkParseResponse | null = null
   for (const target of douyinLinkApiCandidates()) {
     try {
-      const res = await fetch(target, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          url: url.trim(),
-          ...(tenantId ? { tenantId } : {}),
-        }),
-      })
+      const ctrl = new AbortController()
+      const timer = window.setTimeout(() => ctrl.abort(), LINK_PARSE_FETCH_TIMEOUT_MS)
+      let res: Response
+      try {
+        res = await fetch(target, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            url: url.trim(),
+            ...(tenantId ? { tenantId } : {}),
+          }),
+          signal: ctrl.signal,
+        })
+      } finally {
+        window.clearTimeout(timer)
+      }
       const text = await res.text()
       const j = parseResponseBody(text)
       if (j?.ok) return j
       if (j && !j.ok && j.message) {
         lastMsg = j.message
         lastFail = j
-        // 422：已得到有效业务错误则直接返回（同源 API 优先，避免 ECS 旧版本覆盖新提示）
         if (res.status === 422) return j
         if (res.ok) return j
+        continue
+      }
+      if (isLinkParseTimeoutResponse(res.status, text)) {
+        lastMsg = '链接解析超时，正在尝试备用服务…'
         continue
       }
       if (res.status === 404) {
@@ -98,7 +117,8 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
           : `请求失败 HTTP ${res.status}`
       }
     } catch (e) {
-      lastMsg = e instanceof Error ? e.message : String(e)
+      const msg = e instanceof Error ? e.message : String(e)
+      lastMsg = /abort/i.test(msg) ? '链接解析超时，请稍后重试或改用手动输入' : msg
     }
   }
 
