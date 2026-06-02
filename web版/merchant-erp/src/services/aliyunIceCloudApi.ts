@@ -158,6 +158,44 @@ const UPLOAD_MULTIPART_PATHS = [
 /** 与后端 ICE_UPLOAD_CHUNK_BYTES 一致：超过则走分片经 BFF 上传 */
 const ICE_CLIENT_CHUNK_BYTES = 2 * 1024 * 1024
 
+const ICE_CONFIG_FETCH_TIMEOUT_MS = 20_000
+const ICE_UPLOAD_INIT_TIMEOUT_MS = 45_000
+const ICE_UPLOAD_BODY_TIMEOUT_MS = 120_000
+const ICE_OSS_PUT_TIMEOUT_MS = 180_000
+
+/** 云剪本地上传：优先同源 API（避免 ECS erp-api 挂起导致 0% 卡住），配置读取仍走 erp-api 优先 */
+function iceUploadApiFetchUrls(apiPath: string): string[] {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  if (typeof window !== 'undefined') {
+    add(`${window.location.origin}${path}`)
+  }
+  for (const u of merchantApiFetchUrls(path)) add(u)
+  return urls
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const ctrl = new AbortController()
+  const timer = window.setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal })
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`请求超时（${Math.round(timeoutMs / 1000)}s），请检查网络或稍后重试`)
+    }
+    throw e
+  } finally {
+    window.clearTimeout(timer)
+  }
+}
+
 const PIPELINE_PATHS = [
   '/api/meoo-merchant-ai-video-ice-pipeline',
   '/api/meoo-merchant-ai-video-openshot-pipeline',
@@ -166,18 +204,21 @@ const PIPELINE_PATHS = [
 ] as const
 
 export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig | null> {
+  let lastErr: string | null = null
   for (const p of CONFIG_PATHS) {
     for (const url of merchantApiFetchUrls(p)) {
       try {
-        const res = await fetch(url)
+        const res = await fetchWithTimeout(url, {}, ICE_CONFIG_FETCH_TIMEOUT_MS)
         if (res.status === 404) continue
         const j = await parseJson<AliyunIceCloudConfig>(res)
         if (res.ok && j && typeof j.configured === 'boolean') return j
-      } catch {
-        /* next */
+        lastErr = j ? '配置响应异常' : `HTTP ${res.status}`
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e)
       }
     }
   }
+  if (lastErr) console.warn('[ice-config]', lastErr)
   return null
 }
 
@@ -190,27 +231,32 @@ export async function postIceUploadInit(body: {
   contentType: string
   sizeBytes: number
 }): Promise<IceUploadInitResult> {
+  let lastMsg = '上传初始化失败，请稍后重试'
   for (const p of UPLOAD_INIT_PATHS) {
-    for (const url of merchantApiFetchUrls(p)) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(body),
-      })
-      const j = await parseJson<IceUploadInitResult & { message?: string }>(res)
-      if (res.status === 404) continue
-      if (!res.ok || !j?.ok) {
-        return { ok: false, message: j?.message ?? `上传初始化失败 HTTP ${res.status}` }
+    for (const url of iceUploadApiFetchUrls(p)) {
+      try {
+        const res = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(body),
+          },
+          ICE_UPLOAD_INIT_TIMEOUT_MS,
+        )
+        const j = await parseJson<IceUploadInitResult & { message?: string }>(res)
+        if (res.status === 404) continue
+        if (!res.ok || !j?.ok) {
+          lastMsg = j?.message ?? `上传初始化失败 HTTP ${res.status}`
+          continue
+        }
+        return j as IceUploadInitResult
+      } catch (e) {
+        lastMsg = e instanceof Error ? e.message : String(e)
       }
-      return j as IceUploadInitResult
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: msg }
-    }
     }
   }
-  return { ok: false, message: '本地上传接口未部署' }
+  return { ok: false, message: lastMsg }
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -227,28 +273,34 @@ async function blobToBase64(blob: Blob): Promise<string> {
 async function postJsonPaths<T extends { ok: boolean; message?: string }>(
   paths: readonly string[],
   body: unknown,
+  timeoutMs = ICE_UPLOAD_BODY_TIMEOUT_MS,
 ): Promise<T | { ok: false; message: string }> {
+  let lastMsg = '本地上传接口未部署'
   for (const p of paths) {
-    for (const url of merchantApiFetchUrls(p)) {
+    for (const url of iceUploadApiFetchUrls(p)) {
       try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json; charset=utf-8' },
-          body: JSON.stringify(body),
-        })
+        const res = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(body),
+          },
+          timeoutMs,
+        )
         const j = await parseJson<T & { message?: string }>(res)
         if (res.status === 404) continue
         if (!res.ok || !j || !('ok' in j) || !j.ok) {
-          return { ok: false, message: j?.message ?? `请求失败 HTTP ${res.status}` }
+          lastMsg = j?.message ?? `请求失败 HTTP ${res.status}`
+          continue
         }
         return j as T
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        return { ok: false, message: msg }
+        lastMsg = e instanceof Error ? e.message : String(e)
       }
     }
   }
-  return { ok: false, message: '本地上传接口未部署' }
+  return { ok: false, message: lastMsg }
 }
 
 async function uploadIceViaServer(
@@ -338,6 +390,7 @@ function putFileToPresignedUrl(
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', uploadUrl)
+    xhr.timeout = ICE_OSS_PUT_TIMEOUT_MS
     xhr.setRequestHeader('Content-Type', contentType)
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable || !onProgress) return
@@ -356,6 +409,11 @@ function putFileToPresignedUrl(
         ok: false,
         message:
           '浏览器无法直传 OSS（多为 Bucket 未配置 CORS）。将自动改走服务端上传，体积较大时会更慢。',
+      })
+    xhr.ontimeout = () =>
+      resolve({
+        ok: false,
+        message: 'OSS 直传超时，将改走服务端上传。',
       })
     xhr.send(file)
   })
@@ -388,11 +446,17 @@ export async function uploadIceLocalMediaFile(
   file: File,
   opts?: { onProgress?: (p: IceUploadProgress) => void },
 ): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+  opts?.onProgress?.({ loaded: 0, total: file.size, percent: 1 })
+
   const direct = await uploadIceDirectOss(file, opts?.onProgress)
   if (direct.ok) return direct
 
+  opts?.onProgress?.({ loaded: 0, total: file.size, percent: 2 })
   const viaServer = await uploadIceViaServer(file)
-  if (viaServer.ok) return viaServer
+  if (viaServer.ok) {
+    opts?.onProgress?.({ loaded: file.size, total: file.size, percent: 100 })
+    return viaServer
+  }
 
   return {
     ok: false,

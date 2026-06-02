@@ -235,28 +235,33 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setVideoUploading(true)
       setErr(null)
       let added = 0
-      for (const file of Array.from(files)) {
-        if (!isVideoFile(file)) {
-          setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
-          continue
+      try {
+        for (const file of Array.from(files)) {
+          if (!isVideoFile(file)) {
+            setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
+            continue
+          }
+          const r = await uploadIceLocalMediaFile(file)
+          if (!r.ok) {
+            setErr(r.message)
+            continue
+          }
+          setJobs((prev) => [
+            ...prev,
+            {
+              id: newJobId(),
+              label: r.label.slice(0, 40),
+              mediaUrl: r.mediaUrl,
+              phase: 'pending' as const,
+            },
+          ])
+          added += 1
         }
-        const r = await uploadIceLocalMediaFile(file)
-        if (!r.ok) {
-          setErr(r.message)
-          continue
-        }
-        setJobs((prev) => [
-          ...prev,
-          {
-            id: newJobId(),
-            label: r.label.slice(0, 40),
-            mediaUrl: r.mediaUrl,
-            phase: 'pending' as const,
-          },
-        ])
-        added += 1
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '视频上传失败')
+      } finally {
+        setVideoUploading(false)
       }
-      setVideoUploading(false)
       if (added > 0) {
         setHint(`已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`)
       }
@@ -292,42 +297,47 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         return
       }
       let added = 0
-      for (let i = 0; i < list.length; i++) {
-        const raw = list[i]!
-        setImageUploadProgress({
-          index: i + 1,
-          total: list.length,
-          percent: 0,
-          fileName: raw.name,
-        })
-        const file = await compressIceImageIfNeeded(raw)
-        const r = await uploadIceLocalMediaFile(file, {
-          onProgress: (p) => {
-            setImageUploadProgress({
-              index: i + 1,
-              total: list.length,
-              percent: p.percent,
-              fileName: raw.name,
-            })
-          },
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          continue
+      try {
+        for (let i = 0; i < list.length; i++) {
+          const raw = list[i]!
+          setImageUploadProgress({
+            index: i + 1,
+            total: list.length,
+            percent: 0,
+            fileName: raw.name,
+          })
+          const file = await compressIceImageIfNeeded(raw)
+          const r = await uploadIceLocalMediaFile(file, {
+            onProgress: (p) => {
+              setImageUploadProgress({
+                index: i + 1,
+                total: list.length,
+                percent: p.percent,
+                fileName: raw.name,
+              })
+            },
+          })
+          if (!r.ok) {
+            setErr(r.message)
+            continue
+          }
+          setImageItems((prev) => [
+            ...prev,
+            {
+              id: newJobId(),
+              label: r.label.slice(0, 32),
+              mediaUrl: r.mediaUrl,
+              previewUrl: r.mediaUrl,
+            },
+          ])
+          added += 1
         }
-        setImageItems((prev) => [
-          ...prev,
-          {
-            id: newJobId(),
-            label: r.label.slice(0, 32),
-            mediaUrl: r.mediaUrl,
-            previewUrl: r.mediaUrl,
-          },
-        ])
-        added += 1
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '图片上传失败')
+      } finally {
+        setImageUploadProgress(null)
+        setImageUploading(false)
       }
-      setImageUploadProgress(null)
-      setImageUploading(false)
       if (added > 0) {
         setHint(`已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。`)
       }
