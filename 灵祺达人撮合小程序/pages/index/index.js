@@ -1,6 +1,6 @@
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const registryCache = require('../../utils/registryCache.js')
+const registryCs = require('../../utils/registryCsGateway.js')
 const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -167,11 +167,16 @@ Page({
           '已关闭 HttpDNS，请重新上传体验版（构建号含 no-httpdns）。若仍见本提示说明仍是旧包。\n\n' + msg
       } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
         const stale = registryCache.load({ allowStale: true })
+        const attemptLines =
+          e && Array.isArray(e.attempts) && e.attempts.length ? `\n${e.attempts.join('\n')}\n` : ''
         hint = stale
           ? '网络仍被微信重置，但应已显示离线列表；若整页空白请删除小程序后重扫体验码。\n\n' + msg
-          : '手机微信对 /erp-api 可能连接重置。体验版已优先走 /rest/v1 拉取大厅；若仍失败，请在 ECS 仅执行一次 SQL 迁移（不改 Nginx）：\n' +
-            'bash ~/app/scripts/ecs-apply-supabase-migration.sh 20260602110000_mp_talent_hall_registry.sql\n' +
-            '然后上传最新体验版并删除小程序重扫。\n\n' +
+          : '手机微信直连 mofangdianai.com 会连接重置。体验版已改走 Vercel 网关：\n' +
+            `${registryCs.hallRegistryUrl()}\n` +
+            '请确认：① 微信 request 合法域名含 https://cs.mofangdianai.com；' +
+            '② 商家 Web（Vercel）已重新部署；③ 上传最新体验版并删除小程序重扫。' +
+            attemptLines +
+            '\n' +
             msg
       }
       if (apiBase && !hint.includes(apiBase)) {
