@@ -160,7 +160,7 @@ const ICE_CLIENT_CHUNK_BYTES = 2 * 1024 * 1024
 
 const ICE_CONFIG_FETCH_TIMEOUT_MS = 20_000
 const ICE_UPLOAD_INIT_TIMEOUT_MS = 12_000
-const ICE_UPLOAD_BODY_TIMEOUT_MS = 120_000
+const ICE_UPLOAD_BODY_TIMEOUT_MS = 75_000
 /** OSS 直传失败则快速回退服务端写入 */
 const ICE_OSS_PUT_TIMEOUT_MS = 18_000
 
@@ -311,10 +311,66 @@ async function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
+async function xhrPostJson<T extends { ok: boolean; message?: string }>(
+  url: string,
+  body: unknown,
+  timeoutMs: number,
+  onUploadProgress?: (sentRatio: number) => void,
+): Promise<
+  | { kind: 'ok'; data: T }
+  | { kind: 'err'; message: string; status: number }
+> {
+  const payload = JSON.stringify(body)
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.timeout = timeoutMs
+    xhr.setRequestHeader('Content-Type', 'application/json; charset=utf-8')
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onUploadProgress) onUploadProgress(e.loaded / e.total)
+    }
+    xhr.onload = () => {
+      let j: (T & { message?: string }) | null = null
+      try {
+        j = JSON.parse(xhr.responseText) as T & { message?: string }
+      } catch {
+        j = null
+      }
+      if (xhr.status === 404) {
+        resolve({ kind: 'err', message: '404', status: 404 })
+        return
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && j?.ok) {
+        resolve({ kind: 'ok', data: j as T })
+        return
+      }
+      resolve({
+        kind: 'err',
+        message: j?.message ?? `请求失败 HTTP ${xhr.status}`,
+        status: xhr.status,
+      })
+    }
+    xhr.onerror = () =>
+      resolve({
+        kind: 'err',
+        message: 'ECS 连接被重置，请在服务器重启 meoo-auth-api',
+        status: 0,
+      })
+    xhr.ontimeout = () =>
+      resolve({
+        kind: 'err',
+        message: `上传超时（${Math.round(timeoutMs / 1000)}s），ECS 写入 OSS 过慢`,
+        status: 0,
+      })
+    xhr.send(payload)
+  })
+}
+
 async function postJsonPathsServer<T extends { ok: boolean; message?: string }>(
   paths: readonly string[],
   body: unknown,
   timeoutMs = ICE_UPLOAD_BODY_TIMEOUT_MS,
+  onUploadProgress?: (sentRatio: number) => void,
 ): Promise<T | { ok: false; message: string }> {
   let lastMsg = '本地上传接口未就绪，请确认 ECS 已部署 meoo-auth-api 或刷新后重试'
   if (iceConfigBackend === 'ecs') {
@@ -323,26 +379,10 @@ async function postJsonPathsServer<T extends { ok: boolean; message?: string }>(
   }
   for (const p of paths) {
     for (const url of iceUploadServerFetchUrls(p)) {
-      try {
-        const res = await fetchWithTimeout(
-          url,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json; charset=utf-8' },
-            body: JSON.stringify(body),
-          },
-          timeoutMs,
-        )
-        const j = await parseJson<T & { message?: string }>(res)
-        if (res.status === 404) continue
-        if (!res.ok || !j || !('ok' in j) || !j.ok) {
-          lastMsg = j?.message ?? `请求失败 HTTP ${res.status}`
-          continue
-        }
-        return j as T
-      } catch (e) {
-        lastMsg = e instanceof Error ? e.message : String(e)
-      }
+      const r = await xhrPostJson<T>(url, body, timeoutMs, onUploadProgress)
+      if (r.kind === 'ok') return r.data
+      if (r.status === 404) continue
+      lastMsg = r.message
     }
   }
   return { ok: false, message: lastMsg }
@@ -373,11 +413,16 @@ async function uploadIceViaServer(
       ok: true
       mediaUrl: string
       label?: string
-    }>(UPLOAD_SERVER_PATHS, {
-      fileName: file.name,
-      contentType,
-      contentBase64,
-    })
+    }>(
+      UPLOAD_SERVER_PATHS,
+      {
+        fileName: file.name,
+        contentType,
+        contentBase64,
+      },
+      ICE_UPLOAD_BODY_TIMEOUT_MS,
+      (ratio) => report(45 + Math.round(ratio * 50), 'server'),
+    )
     if (!r.ok) return r
     report(100)
     return { ok: true, mediaUrl: r.mediaUrl, label: r.label ?? label }
@@ -414,6 +459,12 @@ async function uploadIceViaServer(
         partNumber: i + 1,
         contentBase64,
       },
+      ICE_UPLOAD_BODY_TIMEOUT_MS,
+      (ratio) =>
+        report(
+          10 + Math.round(((i + 0.75 + ratio * 0.2) / init.partCount) * 75),
+          'server',
+        ),
     )
     if (!part.ok) return part
     parts.push({ partNumber: i + 1, etag: part.etag })
