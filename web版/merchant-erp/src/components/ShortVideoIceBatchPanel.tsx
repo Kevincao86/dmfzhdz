@@ -283,7 +283,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   }, [anyBusy, mediaBusy, cfg?.localUploadEnabled])
 
   const handleLocalImages = useCallback(
-    async (files: FileList | null) => {
+    async (files: FileList | File[] | null) => {
       if (!files?.length || videoUploading || imageUploading || anyBusy) return
       if (!cfg?.localUploadEnabled) {
         setErr('本地上传尚未开启，请先配置 OSS 前缀。')
@@ -1013,7 +1013,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 className="sr-only"
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
-                  const picked = e.target.files
+                  // 须先复制为数组再清空 input，否则 Chrome 会清空 FileList 导致静默失败
+                  const picked = e.target.files ? Array.from(e.target.files) : []
                   e.target.value = ''
                   void handleLocalImages(picked)
                 }}
@@ -1043,7 +1044,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   }
                   const dt = new DataTransfer()
                   for (const f of imgs) dt.items.add(f)
-                  void handleLocalImages(dt.files)
+                  void handleLocalImages(Array.from(dt.files))
                 }}
                 className={cn(
                   'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition',
