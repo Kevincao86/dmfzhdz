@@ -1,6 +1,15 @@
 const { merchantRequest } = require('./merchantApi.js')
+const registryCache = require('./registryCache.js')
+
+/** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
+function isRetryableRegistryError(msg) {
+  return /404|not_found|reset|errcode:-101|cronet|timeout|超时|request:fail|download:fail|网络异常/i.test(
+    String(msg || ''),
+  )
+}
 
 async function fetchRegistry() {
+  // 体积小优先（微信 reset 偶发与响应体/握手有关）；全量作回退
   const paths = [
     '/api/meoo-ops-mp-hall-registry',
     '/api/meoo-ops-sync-registry',
@@ -9,12 +18,29 @@ async function fetchRegistry() {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('GET', path)
+      const data = await merchantRequest('GET', path)
+      registryCache.save(data, path)
+      return data
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
+      if (!isRetryableRegistryError(msg)) throw e
+      console.warn('[mp] fetchRegistry retry next path after:', path, msg.slice(0, 120))
     }
+  }
+  const cached = registryCache.load({ allowStale: true })
+  if (cached && cached.data) {
+    const when = registryCache.formatSavedAt(cached.savedAt)
+    const ageHint = registryCache.formatAgeHint(cached.ageMs)
+    const err = new Error(
+      cached.stale
+        ? `网络暂不可用，已使用 ${when}（${ageHint}）的离线缓存，数据可能不是最新`
+        : `网络暂不可用，已使用 ${when} 的缓存数据`,
+    )
+    err.fromCache = true
+    err.cacheStale = Boolean(cached.stale)
+    err.cachedData = cached.data
+    throw err
   }
   throw lastErr || new Error('无法拉取招募大厅数据')
 }
@@ -56,7 +82,10 @@ async function registerTalentMember(member) {
 }
 
 async function registerPrUser(prUser) {
-  const paths = ['/api/meoo-ops-mp-pr-user-register', '/api/ops-sync/mp-pr-users/register']
+  const paths = [
+    '/api/meoo-ops-mp-pr-user-register',
+    '/api/ops-sync/mp-pr-users/register',
+  ]
   let lastErr
   for (const path of paths) {
     try {
@@ -121,7 +150,7 @@ async function appendMpRecruitmentOrder(order) {
       if (!/404|not_found/i.test(msg)) throw e
     }
   }
-  throw lastErr || new Error('发布招募接口不可用')
+  throw lastErr || new Error('发单接口不可用')
 }
 
 async function appendTalentInbox(entries) {

@@ -47,18 +47,20 @@ function resolveMerchantApiUrl(path) {
   return `${b}${p}`
 }
 
-/** 微信 Cronet：关 http2/quic/高性能模式，贴近 Safari 握手 */
+/** 微信 Cronet：关 http2/quic/高性能模式。勿开 enableHttpDNS（须公众平台配置 serviceId，否则 invalid httpDNSServiceId） */
 const WX_NET = {
   enableHttp2: false,
   enableQuic: false,
   useHighPerformanceMode: false,
 }
 
-const WX_HEADERS = {
+const WX_HEADERS_GET = {
+  Accept: 'application/json',
+}
+
+const WX_HEADERS_JSON = {
   Accept: 'application/json',
   'Content-Type': 'application/json',
-  'User-Agent':
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0',
 }
 
 function isTransientNetError(errMsg) {
@@ -98,19 +100,21 @@ function merchantGetViaDownload(url) {
   })
 }
 
-function shouldPreferDownloadForGet(url) {
+/** 仅 wx.request 仍失败时再试 downloadFile（部分机型 download 先走反而 reset） */
+function shouldTryDownloadFallback(url) {
   return /mofangdianai\.com/i.test(url)
 }
 
 function wxRequestPromise(url, m, data) {
+  const isGet = String(m || 'GET').toUpperCase() === 'GET'
   return new Promise((resolve, reject) => {
     wx.request({
       url,
       method: m,
       timeout: 120000,
       ...WX_NET,
-      header: WX_HEADERS,
-      data: m === 'GET' ? undefined : data,
+      header: isGet ? WX_HEADERS_GET : WX_HEADERS_JSON,
+      data: isGet ? undefined : data,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
@@ -133,24 +137,22 @@ function merchantRequest(method, path, data, attempt = 0) {
   const url = resolveMerchantApiUrl(path)
   const m = String(method || 'GET').toUpperCase()
 
-  if (m === 'GET' && attempt === 0 && shouldPreferDownloadForGet(url)) {
-    return merchantGetViaDownload(url).catch((dlErr) => {
-      const dlMsg = String(dlErr && dlErr.message ? dlErr.message : dlErr)
-      return wxRequestPromise(url, m, data).catch((reqErr) => {
-        const reqMsg = String(reqErr && reqErr.message ? reqErr.message : reqErr)
-        if (isTransientNetError(dlMsg) || isTransientNetError(reqMsg)) {
-          return merchantRequest(m, path, data, 1)
-        }
-        throw new Error(`[download] ${dlMsg}；[request] ${reqMsg}`)
+  const runGet = () =>
+    wxRequestPromise(url, m, data).catch((err) => {
+      const errMsg = String(err && err.message ? err.message : err)
+      if (m !== 'GET' || attempt > 0 || !shouldTryDownloadFallback(url)) throw err
+      if (!isTransientNetError(errMsg)) throw err
+      return merchantGetViaDownload(url).catch((dlErr) => {
+        if (attempt < 1) return merchantRequest(m, path, data, 1)
+        const dlMsg = String(dlErr && dlErr.message ? dlErr.message : dlErr)
+        throw new Error(`[request] ${errMsg}；[download] ${dlMsg}`)
       })
     })
-  }
+
+  if (m === 'GET') return runGet()
 
   return wxRequestPromise(url, m, data).catch((err) => {
     const errMsg = String(err && err.message ? err.message : err)
-    if (m === 'GET' && attempt === 0 && isTransientNetError(errMsg)) {
-      return merchantGetViaDownload(url).catch(() => merchantRequest(m, path, data, 1))
-    }
     if (attempt < 1 && isTransientNetError(errMsg)) {
       return merchantRequest(m, path, data, 1)
     }

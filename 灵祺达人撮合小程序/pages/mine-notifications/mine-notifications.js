@@ -24,8 +24,13 @@ Page({
   data: {
     sections: [],
     totalCount: 0,
+    emptyHint: '',
   },
-  async onShow() {
+  async onPullDownRefresh() {
+    await this.loadRows()
+    wx.stopPullDownRefresh()
+  },
+  async loadRows() {
     let rows = messagesStore.readNotifications()
     if (userProfile.readIdentity() === 'talent' && merchant.hasMerchantApi()) {
       try {
@@ -47,6 +52,13 @@ Page({
     this.setData({
       sections: buildSections(rows),
       totalCount: rows.length,
+      emptyHint:
+        rows.length === 0
+          ? 'PR 通知入选后，请下拉刷新；入口在「我的 → 消息通知」（不是底部「消息」）'
+          : '',
     })
+  },
+  async onShow() {
+    await this.loadRows()
   },
 })

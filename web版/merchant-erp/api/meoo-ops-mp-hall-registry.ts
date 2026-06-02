@@ -54,6 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       (o) => o && refIds.has(String(o.id || '')),
     )
 
+    const mpTalentInbox = (data.mpTalentInbox ?? []).slice(0, 400)
+    const mpTalentMembers = data.mpTalentMembers ?? []
+
     res.status(200).send(
       JSON.stringify({
         ok: true,
@@ -61,6 +64,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         recruitmentOrders,
         recruitmentScheduleRows: [],
         recruitmentVideoSubmissions: [],
+        mpTalentInbox,
+        mpTalentMembers,
       }),
     )
   } catch (e) {

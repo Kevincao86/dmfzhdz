@@ -193,6 +193,18 @@ Page({
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
       await ops.applyToMpOrder(this.data.mpOrderId, applicant)
+      const member = memberStore.readMember()
+      if (member && String(member.wxNickName || '').trim() && String(member.contact || '').trim()) {
+        try {
+          const regRes = await ops.registerTalentMember(member)
+          if (regRes && regRes.id) {
+            member.id = regRes.id
+            memberStore.writeMember(member)
+          }
+        } catch (regErr) {
+          console.warn('[apply] registerTalentMember', regErr)
+        }
+      }
       applicationsStore.addApplication({
         mpOrderId: this.data.mpOrderId,
         applicantId,

@@ -26,13 +26,13 @@ function useMerchantChannel() {
 }
 
 function canSupport() {
-  return useMerchantChannel() || rest.hasSupabase()
+  return useMerchantChannel()
 }
 
 function formatSupportError(err) {
   const msg = String((err && err.message) || err || '未知错误')
   if (/supabase_admin_not_configured/i.test(msg)) {
-    return '商家 ERP 未配置 Supabase：请在 merchant-erp/.env.local 填写 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后重启 npm run dev'
+    return 'ECS 客服接口未就绪：请执行 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
   }
   if (/support_relay|42P01|does not exist/i.test(msg)) {
     return '请确认已执行 support_relay_messages 相关数据库迁移'

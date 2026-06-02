@@ -24,21 +24,15 @@ async function viaApi(payload) {
   return data
 }
 
-/** 体验版/生产：优先 Supabase anon（不依赖 ECS service_role），失败再试 erp-api */
+/** 生产仅走 ECS erp-api；仅未配 MERCHANT_API 时（本地）才尝试直连 /rest/v1 */
 async function chatDual(apiCall, sbCall) {
-  const attempts = []
-  if (supabase.hasSupabase()) attempts.push(sbCall)
-  if (merchant.hasMerchantApi()) attempts.push(apiCall)
-  if (!attempts.length) throw new Error('未配置消息服务（SUPABASE 或 MERCHANT_API_BASE_URL）')
-  let lastErr
-  for (let i = 0; i < attempts.length; i++) {
-    try {
-      return await attempts[i]()
-    } catch (e) {
-      lastErr = e
-    }
+  if (merchant.hasMerchantApi()) {
+    return apiCall()
   }
-  throw lastErr
+  if (sbCall && supabase.hasSupabase()) {
+    return sbCall()
+  }
+  throw new Error('未配置 MERCHANT_API_BASE_URL（请使用 https://mofangdianai.com/erp-api）')
 }
 
 async function viaSupabaseRpc(name, args) {
@@ -65,10 +59,13 @@ function formatChatError(err) {
     return '数据库表未就绪：请确认已执行迁移 20260528100000_mp_talent_chat.sql'
   }
   if (/fetch failed|ECONNREFUSED|54321/i.test(msg)) {
-    return '无法连接 Supabase：若 .env.local 为 127.0.0.1:54321，请先启动 Docker 并在项目根执行 supabase start；或改为云端 SUPABASE_URL + SERVICE_ROLE_KEY（与已执行迁移的项目一致）'
+    return '无法连接后台数据库：请在 ECS 执行 bash scripts/ecs-run-auth-api.sh 与 ecs-fix-erp-api-502.sh'
   }
   if (/supabase_admin_not_configured/i.test(msg)) {
-    return '消息接口暂不可用：服务端未配置 Supabase 管理密钥。体验版已尝试直连 Supabase，请确认 config.release.js 中 SUPABASE_URL / ANON_KEY 与 ECS 一致。'
+    return 'ECS 消息接口未就绪：请在服务器执行 bash ~/app/scripts/ecs-run-auth-api.sh（生成 auth-api.env 含 SERVICE_ROLE），再 bash ~/app/scripts/ecs-fix-erp-api-502.sh'
+  }
+  if (/pr_not_ready/i.test(msg)) {
+    return '招募方尚未在小程序「消息」页登录过，请稍后再试，或由 PR 在报名列表点击「私信沟通」先发起会话'
   }
   if (/meoo_ops_mp_talent_chat_failed|chat_supabase_error/i.test(msg)) {
     if (/\.env\.local|npm run dev|127\.0\.0\.1:54321/i.test(msg)) {
@@ -79,12 +76,11 @@ function formatChatError(err) {
       .replace(/^chat_supabase_error\s*/i, '')
       .trim()
     if (inner && inner.length > 8 && !/^meoo_ops|chat_supabase$/i.test(inner)) return inner
-    return '消息服务连接失败，请稍后重试或检查网络（需已配置 Supabase 私信迁移）'
+    return '消息服务连接失败，请稍后重试。若持续失败请在 ECS 执行 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
   }
   if (/schema cache|PGRST202|could not find the function|mp_talent_chat_ensure_session/i.test(msg)) {
     return (
-      'Supabase 缺少私信函数 mp_talent_chat_ensure_session（8 参数）。请在 SQL Editor 执行迁移 ' +
-      '20260530150000_mp_talent_chat_pr_avatar_column.sql（或 20260530140000 全文），然后 Dashboard → Settings → API → Reload schema'
+      'ECS 数据库缺少私信函数。请在 ECS 执行：bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
     )
   }
   if (/尚未配置后台|url not in domain|request:fail/i.test(msg)) {
@@ -94,7 +90,7 @@ function formatChatError(err) {
 }
 
 function canChat() {
-  return merchant.hasMerchantApi() || supabase.hasSupabase()
+  return merchant.hasMerchantApi()
 }
 
 async function syncProfile(p) {
@@ -287,6 +283,19 @@ async function ensureSessionWithTalent(talent) {
   })
 }
 
+async function ensureSessionFromTalentViaSupabase(me, prKey, pr) {
+  const id = await viaSupabaseRpc('mp_talent_chat_ensure_session_from_talent', {
+    p_talent_key: me.participantKey,
+    p_talent_secret: me.deviceSecret,
+    p_pr_key: prKey,
+    p_talent_name: me.displayName || '达人',
+    p_pr_name: String(pr.prWxNickName || pr.prDisplayName || pr.prName || '招募方').trim() || 'PR',
+    p_talent_avatar: me.avatarUrl || null,
+    p_pr_avatar: String(pr.prWxAvatarUrl || '').trim() || null,
+  })
+  return String(id)
+}
+
 /** 达人向发单 PR 发起私信（需订单 meta 含 prParticipantKey） */
 async function ensureSessionWithPr(pr) {
   const me = participant.getCurrentParticipant()
@@ -297,29 +306,22 @@ async function ensureSessionWithPr(pr) {
   if (!prKey) {
     throw new Error('该招募单暂未绑定 PR 私信，请稍后再试')
   }
-  if (!merchant.hasMerchantApi() && !supabase.hasSupabase()) {
-    throw new Error('请配置 MERCHANT_API_BASE_URL 或 SUPABASE_URL')
+  if (!merchant.hasMerchantApi()) {
+    throw new Error('请配置 MERCHANT_API_BASE_URL（ECS erp-api）')
   }
-  if (merchant.hasMerchantApi()) {
-    try {
-      const data = await viaApi({
-        action: 'ensure_session_from_talent',
-        participantKey: me.participantKey,
-        deviceSecret: me.deviceSecret,
-        talentKey: me.participantKey,
-        prKey,
-        talentName: me.displayName,
-        prName: String(pr.prWxNickName || pr.prDisplayName || pr.prName || '招募方').trim() || 'PR',
-        talentAvatar: me.avatarUrl || '',
-        prAvatar: String(pr.prWxAvatarUrl || '').trim() || undefined,
-      })
-      return data.sessionId
-    } catch (e) {
-      const msg = String((e && e.message) || e)
-      if (!supabase.hasSupabase() || !/supabase_admin|service_role|503/i.test(msg)) throw e
-    }
-  }
-  throw new Error('联系招募方需服务端消息接口，请确认 ECS auth-api 已配置 SUPABASE_SERVICE_ROLE_KEY')
+  const prName = String(pr.prWxNickName || pr.prDisplayName || pr.prName || '招募方').trim() || 'PR'
+  const data = await viaApi({
+    action: 'ensure_session_from_talent',
+    participantKey: me.participantKey,
+    deviceSecret: me.deviceSecret,
+    talentKey: me.participantKey,
+    prKey,
+    talentName: me.displayName,
+    prName,
+    talentAvatar: me.avatarUrl || '',
+    prAvatar: String(pr.prWxAvatarUrl || '').trim() || undefined,
+  })
+  return data.sessionId
 }
 
 function totalUnreadCount(sessions, myKey) {

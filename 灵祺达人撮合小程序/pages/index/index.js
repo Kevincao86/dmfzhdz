@@ -1,5 +1,7 @@
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
+const registryCache = require('../../utils/registryCache.js')
+const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const orderCard = require('../../utils/recruitmentOrderCard.js')
@@ -64,9 +66,11 @@ Page({
     urgentRows: [],
     iceRows: [],
     displayRows: [],
+    mpBuildId: mpBuild.ID,
   },
   onLoad() {
     applyNavLayout(this)
+    console.log('[mp] build', mpBuild.ID)
   },
   onShow() {
     setTabBarForPage(this, '/pages/index/index')
@@ -76,6 +80,28 @@ Page({
     }
     this.loadList()
   },
+  applyRegistryRows(reg, banner) {
+    const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+    const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
+    const mapped = openList.map((mp) => orderCard.mapMpOrderRow(mp, reg))
+    const iceRows = mapped.filter((r) => r.isIce)
+    const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
+    const realNormal = mapped.filter((r) => !r.urgent && !r.isIce)
+    const normalRows =
+      realNormal.length > 0 ? realNormal : [listFilters.buildMockRecruitmentRow()]
+    const allForCity = [...normalRows, ...urgentRows, ...iceRows]
+    this.setData({
+      normalRows,
+      urgentRows,
+      iceRows,
+      cityFilters: hallFilters.buildCityFilterOptions(allForCity),
+      todayCount: openList.length,
+      loading: false,
+      err: String(banner || ''),
+    })
+    this.applyFilters()
+  },
+
   async loadList() {
     if (!merchant.hasMerchantApi()) {
       const mockOnly = [listFilters.buildMockRecruitmentRow()]
@@ -91,29 +117,40 @@ Page({
       this.applyFilters()
       return
     }
-    this.setData({ loading: true, err: '', unconfigured: false })
+    this.setData({ unconfigured: false })
     const apiBase = merchant.baseUrl()
+    let showedOffline = false
+    let offlineBanner = ''
+    const offline = registryCache.load({ allowStale: true })
+    if (offline && offline.data) {
+      showedOffline = true
+      offlineBanner = `离线展示：${registryCache.formatSavedAt(offline.savedAt)}（${registryCache.formatAgeHint(offline.ageMs)}），正在尝试刷新…`
+      this.applyRegistryRows(offline.data, offlineBanner)
+    } else {
+      this.setData({ loading: true, err: '' })
+    }
+    let cacheWarn = ''
     try {
-      const reg = await ops.fetchRegistry()
-      const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-      const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
-      const mapped = openList.map((mp) => orderCard.mapMpOrderRow(mp, reg))
-      const iceRows = mapped.filter((r) => r.isIce)
-      const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-      const realNormal = mapped.filter((r) => !r.urgent && !r.isIce)
-      const normalRows =
-        realNormal.length > 0 ? realNormal : [listFilters.buildMockRecruitmentRow()]
-      const allForCity = [...normalRows, ...urgentRows, ...iceRows]
-      this.setData({
-        normalRows,
-        urgentRows,
-        iceRows,
-        cityFilters: hallFilters.buildCityFilterOptions(allForCity),
-        todayCount: openList.length,
-        loading: false,
-      })
-      this.applyFilters()
+      let reg
+      try {
+        reg = await ops.fetchRegistry()
+      } catch (e) {
+        if (e && e.fromCache && e.cachedData) {
+          reg = e.cachedData
+          cacheWarn = String(e.message || '已使用本地缓存')
+        } else {
+          throw e
+        }
+      }
+      this.applyRegistryRows(reg, cacheWarn)
     } catch (e) {
+      if (showedOffline) {
+        this.setData({
+          loading: false,
+          err: `${offlineBanner}\n刷新失败（仍显示离线数据）`,
+        })
+        return
+      }
       const msg = String(e.message || e)
       const registryUrl = merchant.resolveMerchantApiUrl('/api/meoo-ops-sync-registry')
       let hint = msg
@@ -125,16 +162,18 @@ Page({
         hint = '请求超时（注册表较大或网络慢）。\n\n' + msg
       } else if (/ssl|certificate|证书/i.test(msg)) {
         hint = 'HTTPS 证书校验失败，请确认域名证书有效。\n\n' + msg
-      } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
-        const hallUrl = merchant.resolveMerchantApiUrl('/api/meoo-ops-mp-hall-registry')
+      } else if (/httpDNSServiceId|httpdns/i.test(msg)) {
         hint =
-          '浏览器能开、微信仍 reset：请在 ECS 执行\n' +
-          'sudo bash ~/app/scripts/ecs-fix-wechat-cronet-tls.sh\n' +
-          'cd ~/app && git pull && bash scripts/ecs-fix-erp-api-502.sh\n' +
-          '然后上传新体验版。大厅优先拉轻量接口：\n' +
-          (hallUrl || '') +
-          '\n\n' +
-          msg
+          '已关闭 HttpDNS，请重新上传体验版（构建号含 no-httpdns）。若仍见本提示说明仍是旧包。\n\n' + msg
+      } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
+        const stale = registryCache.load({ allowStale: true })
+        hint = stale
+          ? '网络仍被微信重置，但应已显示离线列表；若整页空白请删除小程序后重扫体验码。\n\n' + msg
+          : '本地无离线缓存（昨晚若为未带缓存的旧版，成功时未写入；或缓存已超 7 天）。\n' +
+            '须在 ECS 修复微信 TLS 后，用微信成功打开大厅一次。\n' +
+            'ECS：sudo bash ~/app/scripts/ecs-fix-wechat-cronet-tls.sh\n' +
+            '然后 bash ~/app/scripts/ecs-fix-erp-api-502.sh\n\n' +
+            msg
       }
       if (apiBase && !hint.includes(apiBase)) {
         hint += `\n\nAPI 根地址：${apiBase}`
@@ -142,6 +181,7 @@ Page({
       if (registryUrl && !hint.includes(registryUrl)) {
         hint += `\n注册表：${registryUrl}`
       }
+      hint += `\n\n体验版构建：${mpBuild.ID}`
       this.setData({
         loading: false,
         err: hint,

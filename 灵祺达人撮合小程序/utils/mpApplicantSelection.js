@@ -1,4 +1,5 @@
 const talentPlatforms = require('./talentPlatformProfiles.js')
+const talentMember = require('./talentMember.js')
 const mpOrderRegistryOps = require('./mpOrderRegistryOps.js')
 
 const LOCAL_KEY_PREFIX = 'meoo_mp_selected_v1_'
@@ -42,9 +43,26 @@ function filterSelectedApplicants(applicants, selectedIds) {
   return (applicants || []).filter((a) => a && a.id && set.has(String(a.id)))
 }
 
+function applicantMatchesLocalMember(applicant, member) {
+  if (!applicant || !member) return false
+  if (member.id && applicant.talentMemberId) {
+    return String(member.id).trim() === String(applicant.talentMemberId).trim()
+  }
+  const contact = String(member.contact || '').trim()
+  if (contact && String(applicant.contact || '').trim() === contact) return true
+  const plat = talentPlatforms.platformIdFromName(applicant.platform || '抖音')
+  const prof = member.platformProfiles && member.platformProfiles[plat]
+  const account = prof && String(prof.platformAccount || '').trim().toLowerCase()
+  return !!(account && String(applicant.platformAccount || '').trim().toLowerCase() === account)
+}
+
 function resolveTalentMemberId(applicant, reg) {
   const a = applicant || {}
   if (a.talentMemberId) return String(a.talentMemberId).trim()
+  const member = talentMember.readMember()
+  if (member && member.id && applicantMatchesLocalMember(a, member)) {
+    return String(member.id).trim()
+  }
   const members = Array.isArray(reg?.mpTalentMembers) ? reg.mpTalentMembers : []
   const account = String(a.platformAccount || '').trim().toLowerCase()
   const contact = String(a.contact || '').trim()
@@ -77,5 +95,6 @@ module.exports = {
   stampApplicantsSelected,
   filterSelectedApplicants,
   resolveTalentMemberId,
+  applicantMatchesLocalMember,
   persistSelectedIds,
 }

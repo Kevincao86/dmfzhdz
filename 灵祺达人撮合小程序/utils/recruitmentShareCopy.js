@@ -55,6 +55,13 @@ function formatShareRecruitmentInfo(info) {
       if (feeMode === '纯置换' && /纯置换/.test(line)) continue
       if (feeMode === '一口价' && /一口价|¥/.test(line)) continue
     }
+    const detailMatch = line.match(/^招募详情[:：]\s*(.*)$/)
+    if (detailMatch) {
+      out.push('招募详情：')
+      const body = String(detailMatch[1] || '').trim()
+      if (body) out.push(body)
+      continue
+    }
     out.push(line)
   }
   return out.join('\n')
