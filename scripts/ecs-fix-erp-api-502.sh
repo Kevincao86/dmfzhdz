@@ -58,7 +58,8 @@ echo
 if ! echo "$HEALTH_LOCAL" | grep -q "$MIN_REVISION"; then
   echo "WARN: 本机 revision 未含 $MIN_REVISION，请确认 git pull 成功并: sudo systemctl restart meoo-auth-api"
 fi
-curl -sS "http://127.0.0.1:${PORT}/api/meoo-ops-sync-registry" | head -c 120
+REG_SAMPLE="$(curl -sS "http://127.0.0.1:${PORT}/api/meoo-ops-sync-registry")"
+echo "${REG_SAMPLE}" | head -c 120
 echo
 
 echo "== 4) 公网探活（经 Nginx） =="

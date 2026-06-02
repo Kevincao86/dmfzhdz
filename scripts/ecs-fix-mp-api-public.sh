@@ -43,13 +43,15 @@ echo "== B) auth-api systemd / 502（admin HOME，勿 sudo） =="
 bash "$ROOT/scripts/ecs-fix-erp-api-502.sh"
 
 echo "== C) 本机 erp-api =="
-if ! curl -sf "http://127.0.0.1:3001/api/meoo-erp-api-health" | head -c 160; then
+HEALTH_LOCAL="$(curl -sf "http://127.0.0.1:3001/api/meoo-erp-api-health" || true)"
+if [[ -z "$HEALTH_LOCAL" ]]; then
   echo
   echo "FAIL: :3001 无响应。执行:"
   echo "  bash scripts/ecs-run-auth-api.sh"
   echo "  sudo journalctl -u meoo-auth-api -n 50 --no-pager"
   exit 1
 fi
+echo "${HEALTH_LOCAL}" | head -c 160
 echo
 
 echo "== D) 公网 HTTPS（curl 可能因 LibreSSL/ALPN 误报 reset，以 Node 为准） =="
