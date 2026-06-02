@@ -329,14 +329,6 @@ async function postJsonPathsServer<T extends { ok: boolean; message?: string }>(
   return { ok: false, message: lastMsg }
 }
 
-async function postJsonPaths<T extends { ok: boolean; message?: string }>(
-  paths: readonly string[],
-  body: unknown,
-  timeoutMs = ICE_UPLOAD_BODY_TIMEOUT_MS,
-): Promise<T | { ok: false; message: string }> {
-  return postJsonPathsServer<T>(paths, body, timeoutMs)
-}
-
 async function uploadIceViaServer(
   file: File,
   onProgress?: (p: IceUploadProgress) => void,
