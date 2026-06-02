@@ -101,6 +101,7 @@ function buildApplicantFromRows(rows, data, meta) {
   if (Object.keys(customFields).length) applicant.customFields = customFields
   const member = memberStore.readMember()
   if (member) {
+    if (member.id) applicant.talentMemberId = String(member.id).trim()
     if (member.wxAvatarUrl) {
       applicant.avatar = String(member.wxAvatarUrl).trim()
       applicant.wxAvatarUrl = applicant.avatar

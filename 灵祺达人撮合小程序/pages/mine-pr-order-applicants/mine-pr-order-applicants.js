@@ -234,6 +234,12 @@ Page({
         title: skipped.length ? `已通知 ${entries.length} 人` : '通知已发送',
         icon: 'success',
       })
+      wx.showModal({
+        title: '已写入站内信',
+        content:
+          '达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。请让对方下拉刷新该页。',
+        showCancel: false,
+      })
       if (skipped.length) {
         setTimeout(() => {
           wx.showModal({

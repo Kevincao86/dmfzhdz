@@ -45,7 +45,7 @@ Page({
       this.setData({
         identityHint: '达人 · 与招募方私信',
         emptyTitle: '暂无招募方会话',
-        emptyHint: '在商单详情点击「联系招募方」，或等待 PR 主动联系',
+        emptyHint: 'PR 审核通过您的报名后，可在商单详情「联系招募方」',
       })
     }
   },

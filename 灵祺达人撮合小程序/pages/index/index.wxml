@@ -129,6 +129,7 @@
 
     <view wx:elif="{{err}}" class="card state-error">
       <text class="err-detail">{{err}}</text>
+      <text class="err-build" wx:if="{{mpBuildId}}">构建 {{mpBuildId}}</text>
     </view>
 
     <block wx:else>

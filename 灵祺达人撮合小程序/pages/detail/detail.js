@@ -3,6 +3,7 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
 const userProfile = require('../../utils/userProfile.js')
 const chat = require('../../utils/talentChat.js')
+const contactGate = require('../../utils/talentContactPrGate.js')
 const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
 
 Page({
@@ -27,6 +28,9 @@ Page({
     prChatMeta: null,
     contacting: false,
     isPr: false,
+    canContactPr: false,
+    contactPrPending: false,
+    mpOrder: null,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -112,13 +116,18 @@ Page({
             prWxAvatarUrl: meta.prWxAvatarUrl || '',
           }
         : null
+      const gate = contactGate.evaluate(mp, id)
+      const hasApplied = this.data.applied || iceApplied || gate.hasApplication
       this.setData({
         view,
         loading: false,
+        mpOrder: mp,
         isPr: userProfile.readIdentity() === 'pr',
         applyTemplateId,
         chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
         prChatMeta,
+        canContactPr: gate.canContact,
+        contactPrPending: hasApplied && prChatMeta && !gate.canContact,
         isIce,
         iceApplicantId,
         assignedVideoUrl,
@@ -126,7 +135,7 @@ Page({
         iceVerified,
         icePendingConfirm,
         iceRejected,
-        applied: this.data.applied || iceApplied,
+        applied: hasApplied,
       })
     } catch (e) {
       const msg = String(e.message || e)
@@ -226,10 +235,27 @@ Page({
   goHome() {
     wx.reLaunch({ url: '/pages/index/index' })
   },
+  onContactPrPending() {
+    const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
+    wx.showModal({
+      title: '暂无法联系招募方',
+      content: gate.message || '请先报名并等待招募方 PR 审核通过',
+      showCancel: false,
+    })
+  },
   async contactPr() {
     const meta = this.data.prChatMeta
     if (!meta || !meta.prParticipantKey) {
       wx.showToast({ title: '该单暂不支持私信', icon: 'none' })
+      return
+    }
+    const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
+    if (!gate.canContact) {
+      wx.showModal({
+        title: '暂无法联系招募方',
+        content: gate.message || '请先报名并等待招募方 PR 审核通过',
+        showCancel: false,
+      })
       return
     }
     if (!chat.canChat()) {
@@ -262,7 +288,12 @@ Page({
       })
     } catch (e) {
       wx.hideLoading()
-      wx.showToast({ title: String(e.message || '无法发起会话').slice(0, 36), icon: 'none' })
+      const tip = chat.formatChatError(e)
+      wx.showModal({
+        title: '无法联系招募方',
+        content: tip,
+        showCancel: false,
+      })
     } finally {
       this.setData({ contacting: false })
     }

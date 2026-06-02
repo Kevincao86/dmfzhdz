@@ -81,10 +81,14 @@
         </view>
         <view class="step-item">
           <text class="step-num">3</text>
-          <text class="step-body">商家反选通过后确认探店排期</text>
+          <text class="step-body">招募方 PR 在报名列表「确认选择」您（审核通过）</text>
         </view>
         <view class="step-item">
           <text class="step-num">4</text>
+          <text class="step-body">审核通过后可「联系招募方」，并确认探店排期</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">5</text>
           <text class="step-body">完成内容发布，按约定结算</text>
         </view>
       </view>
@@ -123,7 +127,8 @@
 
     <view class="card card--success" wx:elif="{{applied && !isIce}}">
       <text class="success-title">✓ 报名已提交</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">订单 {{view.merchantOrderNo}}，请耐心等待反选结果。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:if="{{canContactPr}}">PR 已通过您的报名，可联系招募方沟通排期。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:else>订单 {{view.merchantOrderNo}}，请等待招募方 PR 审核；通过后可联系招募方。</text>
     </view>
   </block>
 </view>
@@ -135,11 +140,16 @@
   </view>
   <view class="bottom-bar__actions">
     <button
-      wx:if="{{chatEnabled && prChatMeta}}"
+      wx:if="{{chatEnabled && prChatMeta && canContactPr}}"
       class="btn-ghost bottom-cta"
       loading="{{contacting}}"
       bindtap="contactPr"
     >联系招募方</button>
+    <button
+      wx:elif="{{chatEnabled && prChatMeta && contactPrPending}}"
+      class="btn-ghost bottom-cta bottom-cta--muted"
+      bindtap="onContactPrPending"
+    >待 PR 审核</button>
     <button
       wx:if="{{!applied && !isPr}}"
       class="btn-primary bottom-cta"

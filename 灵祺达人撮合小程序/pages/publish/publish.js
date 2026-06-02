@@ -909,7 +909,9 @@ Page({
     if (String(f.cpsPercent || '').trim()) lines.push(`佣金CPS：${f.cpsPercent}%`)
     else lines.push('佣金CPS：未设置')
     lines.push(`酬劳摘要：${this.buildBudgetDetailText(f)}`)
-    lines.push(`招募详情：${String(f.recruitDetail || '').trim()}`)
+    lines.push('招募详情：')
+    const recruitDetail = String(f.recruitDetail || '').trim()
+    if (recruitDetail) lines.push(recruitDetail)
     if (mode.hall === 'ice' && String(f.iceVideoUrl || '').trim()) {
       lines.push(`云剪成片链接：${String(f.iceVideoUrl).trim()}`)
     }
