@@ -312,14 +312,19 @@ main { position: relative; z-index: 1; }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Goals strip */
+/* Goals strip — 与 .section / 里程碑同宽齐平 */
 .goals-strip {
   min-height: auto;
+  padding-top: 3rem;
+  padding-bottom: 2.5rem;
+}
+.goals-strip-inner {
+  width: 100%;
+  box-sizing: border-box;
   background: linear-gradient(90deg, rgba(124, 92, 255, 0.12), rgba(255, 107, 53, 0.12));
   border-radius: var(--radius);
-  margin: 0 1.5rem 2rem;
-  max-width: calc(1200px - 3rem);
-  padding: 2rem;
+  padding: 2rem 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 .section-kicker { font-size: 0.85rem; color: var(--gold); font-weight: 700; margin: 0 0 1rem; }
 .goals-tagline {
@@ -384,9 +389,15 @@ main { position: relative; z-index: 1; }
 .fin-note { font-size: 0.8rem; color: var(--muted); margin: 0.75rem 0; text-align: center; }
 .goals-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 1.5rem;
   text-align: center;
+}
+@media (max-width: 900px) {
+  .goals-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 520px) {
+  .goals-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .goal-num {
   display: block;
