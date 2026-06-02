@@ -8,7 +8,7 @@
     "test:support-merge": "node scripts/support-relay-merge-test.mjs",
     "dev": "node scripts/ensure-vite-dev.mjs --host 127.0.0.1",
     "dev:partner": "node scripts/ensure-vite-dev.mjs --host 127.0.0.1 --port 5175 --mode partner",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/copy-bp-to-dist.mjs",
     "build:partner": "node scripts/assert-partner-build-env.mjs && tsc -b && vite build --mode partner --outDir dist-partner",
     "lint": "eslint .",
     "preview": "vite preview"
