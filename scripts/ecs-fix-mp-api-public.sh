@@ -1,23 +1,55 @@
 #!/usr/bin/env bash
 # 小程序公网 API 一键修复：Nginx 443（微信 Cronet）+ auth-api 502 + 公网 health
-# ECS Workbench:
-#   cd ~/app && git pull && sudo bash scripts/ecs-fix-mp-api-public.sh
+# ECS Workbench（务必用 admin，勿 sudo 整脚本）:
+#   cd ~/app && git pull
+#   bash scripts/ecs-fix-mp-api-public.sh
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=ecs-resolve-admin-home.sh
+source "$ROOT/scripts/ecs-resolve-admin-home.sh"
+
 DOMAIN="${1:-mofangdianai.com}"
 HEALTH="https://${DOMAIN}/erp-api/meoo-erp-api-health"
 HALL="https://${DOMAIN}/erp-api/meoo-ops-mp-hall-registry"
+CREDS="$HOME/stack/db-credentials.txt"
+
+if [[ "$(id -un)" != "admin" && "$(id -un)" != "root" ]]; then
+  echo "请用 admin 登录 ECS 后执行: bash scripts/ecs-fix-mp-api-public.sh"
+  exit 1
+fi
+
+if [[ "$(id -un)" == "root" && "${HOME:-}" == "/root" ]]; then
+  echo "检测到 root 且 HOME=/root。请勿: sudo bash scripts/ecs-fix-mp-api-public.sh"
+  echo "请改为: su - admin  或 Workbench 用 admin 执行:"
+  echo "  cd ~/app && bash scripts/ecs-fix-mp-api-public.sh"
+  exit 1
+fi
+
+echo "使用 HOME=$HOME"
+
+if [[ ! -f "$CREDS" ]]; then
+  echo "缺少 $CREDS — auth-api 无法生成 ~/stack/auth-api.env"
+  echo "若 stack 在别的用户下，请: ls -la /home/admin/stack/"
+  echo "恢复方式：从 ECS 备份找回 db-credentials.txt，或参考 scripts/supabase-cloud-to-ecs-migrate.sh 重建 stack。"
+  exit 1
+fi
 
 echo "== A) Nginx / TLS（微信 Cronet，勿 http2） =="
 sudo bash "$ROOT/scripts/ecs-fix-wechat-https-443.sh" "$DOMAIN"
 
-echo "== B) auth-api systemd / 502 =="
+echo "== B) auth-api systemd / 502（admin HOME，勿 sudo） =="
 bash "$ROOT/scripts/ecs-fix-erp-api-502.sh"
 
 echo "== C) 本机 erp-api =="
-curl -sf "http://127.0.0.1:3001/api/meoo-erp-api-health" | head -c 160
+if ! curl -sf "http://127.0.0.1:3001/api/meoo-erp-api-health" | head -c 160; then
+  echo
+  echo "FAIL: :3001 无响应。执行:"
+  echo "  bash scripts/ecs-run-auth-api.sh"
+  echo "  sudo journalctl -u meoo-auth-api -n 50 --no-pager"
+  exit 1
+fi
 echo
 
 echo "== D) 公网 HTTPS（curl 可能因 LibreSSL/ALPN 误报 reset，以 Node 为准） =="

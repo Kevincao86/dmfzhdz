@@ -6,7 +6,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=ecs-resolve-admin-home.sh
+source "$ROOT/scripts/ecs-resolve-admin-home.sh"
 ERP="$ROOT/web版/merchant-erp"
+
+if [[ ! -f "$HOME/stack/db-credentials.txt" ]]; then
+  echo "缺少 $HOME/stack/db-credentials.txt（当前用户=$(id -un) HOME=$HOME）"
+  echo "勿使用: sudo bash scripts/ecs-fix-erp-api-502.sh"
+  echo "请用 admin 执行: cd ~/app && bash scripts/ecs-fix-erp-api-502.sh"
+  exit 1
+fi
 PORT="${AUTH_API_PORT:-3001}"
 MIN_REVISION="$(
   grep -E "ECS_AUTH_API_ROUTE_REVISION\s*=" "$ERP/scripts/ecs-auth-api-server.ts" \
