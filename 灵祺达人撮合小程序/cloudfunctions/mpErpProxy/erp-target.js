@@ -6,6 +6,7 @@ module.exports = {
   ip: '139.196.42.5',
   host: 'mofangdianai.com',
   https: true,
-  /** 证书/SNI 异常时改为 true（仅备案期 IP 直连） */
+  /** 备用口 18780（勿用 8000=Supabase）。防火墙放行后按 scripts/ecs-nginx-erp-api-18780.snippet 配置 */
+  altPort: 18780,
   insecure: false,
 }
