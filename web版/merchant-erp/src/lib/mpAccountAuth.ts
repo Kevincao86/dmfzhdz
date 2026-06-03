@@ -85,13 +85,13 @@ export function newScanTicket(): string {
 }
 
 export async function wxCodeToOpenId(code: string): Promise<{ openid: string; session_key?: string }> {
+  if (process.env.MP_AUTH_DEV_MODE === 'true' && code) {
+    const openid = `dev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
+    return { openid }
+  }
   const appId = String(process.env.MP_WECHAT_APPID || process.env.WX_APPID || '').trim()
   const secret = String(process.env.MP_WECHAT_SECRET || process.env.WX_SECRET || '').trim()
   if (!appId || !secret) {
-    if (process.env.MP_AUTH_DEV_MODE === 'true' && code) {
-      const openid = `dev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
-      return { openid }
-    }
     throw new Error('wx_not_configured')
   }
   const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(secret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`

@@ -9,6 +9,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ECS_HOST="${ECS_HOST:-admin@139.196.42.5}"
 MIGRATION_RLS="20260603190000_ops_registry_snapshot_rls_service_role.sql"
+MIGRATION_DISABLE="20260603210000_ops_registry_snapshot_disable_rls_ecs.sql"
 MIGRATION_TABLE="20260511140000_ops_registry_snapshot.sql"
 
 load_auth_env() {
@@ -53,6 +54,9 @@ run_local() {
     apply_sql "$ROOT/supabase/migrations/$MIGRATION_TABLE" || true
   fi
   apply_sql "$ROOT/supabase/migrations/$MIGRATION_RLS"
+  if [[ -f "$ROOT/supabase/migrations/$MIGRATION_DISABLE" ]]; then
+    apply_sql "$ROOT/supabase/migrations/$MIGRATION_DISABLE"
+  fi
   if [[ -f "$ROOT/supabase/migrations/20260511160000_ops_registry_snapshot_grants.sql" ]]; then
     apply_sql "$ROOT/supabase/migrations/20260511160000_ops_registry_snapshot_grants.sql" || true
   fi
