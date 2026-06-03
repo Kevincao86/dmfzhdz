@@ -2,7 +2,7 @@
  * 达人/PR 统一账号：一微信 openid 仅一条 mp_accounts；Web 与小程序共用会话 token。
  */
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
-import type { RegistryFile, RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
+import type { RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
