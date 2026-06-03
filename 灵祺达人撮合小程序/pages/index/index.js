@@ -73,14 +73,14 @@ Page({
     this.primeHallPlaceholder()
   },
   primeHallPlaceholder() {
-    const mockOnly = [listFilters.buildMockRecruitmentRow()]
+    const placeholder = listFilters.mergeHallDisplayRows([])
     this.setData({
       loading: false,
       err: '',
-      normalRows: mockOnly,
+      normalRows: placeholder,
       urgentRows: [],
       iceRows: [],
-      cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
+      cityFilters: hallFilters.buildCityFilterOptions(placeholder),
     })
     this.applyFilters()
   },
@@ -101,10 +101,10 @@ Page({
     const mapped = openList.map((mp) => orderCard.mapMpOrderRow(mp, reg))
     const iceRows = mapped.filter((r) => r.isIce)
     const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-    const realNormal = mapped.filter((r) => !r.urgent && !r.isIce)
-    const normalRows =
-      realNormal.length > 0 ? realNormal : [listFilters.buildMockRecruitmentRow()]
-    const allForCity = [...normalRows, ...urgentRows, ...iceRows]
+    /** 招募大厅：全部非云剪开放单（含急单），与推荐页一致；急单/云剪 Tab 仍为子集 */
+    const hallNonIce = mapped.filter((r) => !r.isIce)
+    const normalRows = listFilters.mergeHallDisplayRows(hallNonIce)
+    const allForCity = [...mapped]
     this.setData({
       normalRows,
       urgentRows,
@@ -121,7 +121,7 @@ Page({
     const loadTok = (this._loadSeq = (this._loadSeq || 0) + 1)
     const hasRows = (this.data.normalRows || []).length > 0
     if (!api.hasApi()) {
-      const mockOnly = [listFilters.buildMockRecruitmentRow()]
+      const mockOnly = listFilters.mergeHallDisplayRows([])
       this.setData({
         unconfigured: true,
         loading: false,
@@ -146,7 +146,7 @@ Page({
     const watchdog = setTimeout(() => {
       if (this._loadSeq !== loadTok) return
       if (!this.data.loading) return
-      const mockOnly = [listFilters.buildMockRecruitmentRow()]
+      const mockOnly = listFilters.mergeHallDisplayRows([])
       this.setData({
         loading: false,
         err: '加载超时，请下拉刷新',
@@ -193,7 +193,7 @@ Page({
         }
         hint = '网络不稳定，请删除小程序后重新扫码'
       }
-      const mockOnly = [listFilters.buildMockRecruitmentRow()]
+      const mockOnly = listFilters.mergeHallDisplayRows([])
       this.setData({
         loading: false,
         err: hint,

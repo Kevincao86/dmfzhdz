@@ -63,6 +63,7 @@
         bindtap="onHallTab"
       >
         急单大厅
+        <text class="tab-count lq-gradient-tabs__count" wx:if="{{urgentRows.length}}">{{urgentRows.length}}</text>
       </view>
       <view
         class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'ice' ? 'lq-gradient-tabs__item--on active' : ''}}"
