@@ -1,4 +1,4 @@
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
@@ -74,8 +74,8 @@ Page({
   onShow() {
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
-    if (merchant.baseUrl()) {
-      console.log('[mp] MERCHANT_API_BASE_URL=', merchant.baseUrl())
+    if (api.base()) {
+      console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
     this.loadList()
   },
@@ -102,7 +102,7 @@ Page({
   },
 
   async loadList() {
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       const mockOnly = [listFilters.buildMockRecruitmentRow()]
       this.setData({
         unconfigured: true,
@@ -117,7 +117,7 @@ Page({
       return
     }
     this.setData({ unconfigured: false })
-    const apiBase = merchant.baseUrl()
+    const apiBase = api.base()
     let showedOffline = false
     let offlineBanner = ''
     const offline = registryCache.load({ allowStale: true })
@@ -151,7 +151,7 @@ Page({
         return
       }
       const msg = String(e.message || e)
-      const registryUrl = merchant.resolveMerchantApiUrl('/api/meoo-ops-sync-registry')
+      const registryUrl = api.apiUrl('/api/meoo-ops-sync-registry')
       let hint = msg
       if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
         hint =
@@ -171,10 +171,10 @@ Page({
         const stale = registryCache.load({ allowStale: true })
         const attemptLines =
           e && Array.isArray(e.attempts) && e.attempts.length ? `\n${e.attempts.join('\n')}\n` : ''
-        const build = merchant.MP_BUILD_ID || 'mp-20260604-ecs-only'
+        const build = api.BUILD_ID || 'mp-20260606-ecs-clean'
         hint = stale
           ? '网络仍被重置，但应已显示离线列表；删小程序重扫体验码。\n\n' + msg
-          : `请确认：① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-fix-mp-wechat-login.sh；③ 体验版 ${build}。` +
+          : `请确认：① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-mp-minimal.sh；③ 体验版 ${build}。` +
             attemptLines +
             '\n' +
             msg

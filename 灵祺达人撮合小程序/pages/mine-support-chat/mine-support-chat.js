@@ -36,7 +36,7 @@ Page({
     if (!relay.canSupport()) {
       this.setData({
         ready: false,
-        statusSub: '请在 config.local.js 配置 MERCHANT_API_BASE_URL 或 Supabase',
+        statusSub: '请在 config.release.js 配置 MERCHANT_API_BASE_URL（ECS）',
       })
       return
     }

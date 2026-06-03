@@ -1,4 +1,4 @@
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
 const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
@@ -171,7 +171,7 @@ Page({
     })
   },
   async onSubmit() {
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       wx.showToast({ title: '未配置后台地址', icon: 'none' })
       return
     }

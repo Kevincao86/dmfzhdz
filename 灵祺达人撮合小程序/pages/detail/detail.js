@@ -1,4 +1,4 @@
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -59,7 +59,7 @@ Page({
     }
   },
   async loadOrder(id) {
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       this.setData({ loading: false, err: '未配置后台地址' })
       return
     }
@@ -151,7 +151,7 @@ Page({
   copyDownloadUrl() {
     const url = this.data.assignedVideoUrl
     if (!url) return
-    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
+    const full = url.startsWith('http') ? url : `${api.base()}${url}`
     wx.setClipboardData({
       data: full,
       success: () => wx.showToast({ title: '下载链接已复制', icon: 'success' }),
@@ -163,7 +163,7 @@ Page({
       wx.showToast({ title: '请先认领任务', icon: 'none' })
       return
     }
-    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
+    const full = url.startsWith('http') ? url : `${api.base()}${url}`
     wx.setClipboardData({
       data: full,
       success: () =>

@@ -1,4 +1,4 @@
-const merchant = require('./merchantApi.js')
+const api = require('./api.js')
 const memberStore = require('./talentMember.js')
 const applicationsStore = require('./applicationsStore.js')
 const orderCard = require('./recruitmentOrderCard.js')
@@ -95,7 +95,7 @@ function chunk(list, size) {
 }
 
 async function postAi(body) {
-  return merchant.merchantRequest('POST', '/api/meoo-mp-recruitment-ai', body)
+  return api.post('/api/meoo-mp-recruitment-ai', body)
 }
 
 async function fetchTagItems(orders) {
@@ -193,7 +193,7 @@ async function enrichOrderTags(rows, opts) {
   const list = (rows || []).filter((r) => r && r.id)
   const talentCity = (opts && opts.talentCity) || ''
   const withLocal = applyTagMap(list, {}, talentCity)
-  if (!merchant.hasMerchantApi() || !list.length) return withLocal
+  if (!api.hasApi() || !list.length) return withLocal
 
   const cache = readCache(TAG_CACHE_KEY)
   const missing = []
@@ -221,7 +221,7 @@ async function enrichOrderMatches(rows, member) {
   const list = (rows || []).filter((r) => r && r.id && !r.isMock)
   const talent = talentProfileFromMember(member)
   const talentCity = talent && talent.city ? talent.city : ''
-  if (!merchant.hasMerchantApi() || !list.length) {
+  if (!api.hasApi() || !list.length) {
     return applyMatchMap(list, {}, talentCity)
   }
 
@@ -404,7 +404,7 @@ async function enrichTalentMatchesForPr(talents, reg) {
       aiTagSource: 'none',
     }))
   }
-  if (!merchant.hasMerchantApi() || !list.length) {
+  if (!api.hasApi() || !list.length) {
     return applyTalentMatchMap(list, {}, orderPayloads)
   }
 

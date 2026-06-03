@@ -1,5 +1,5 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
 const chat = require('../../utils/talentChat.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
@@ -62,7 +62,7 @@ Page({
   async loadOrder() {
     const { mpOrderId } = this.data
     if (!mpOrderId) return
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       this.setData({ loading: false, err: '未配置后台地址，无法拉取报名' })
       return
     }

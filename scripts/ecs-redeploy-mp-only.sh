@@ -51,7 +51,7 @@ do
 done
 
 echo "== 4) Nginx 443 握手（TLS1.2+1.3，/erp-api） =="
-bash "$ROOT/scripts/ecs-fix-mp-443-handshake-definitive.sh" "$DOMAIN"
+bash "$ROOT/scripts/ecs-mp-minimal.sh" "$DOMAIN"
 
 if ! grep -q 'mp-cronet-ping' /etc/nginx/sites-available/meoo-api 2>/dev/null; then
   echo "WARN: Nginx 无 mp-cronet-ping 静态位，将依赖 auth-api 路由"
@@ -81,5 +81,5 @@ echo
 
 echo ""
 echo "OK: 小程序 ECS 栈已重装（仅 mp 相关）。"
-echo "请本机上传体验版 BUILD_ID=mp-20260606-tls13-post，微信合法域名仅 https://${DOMAIN}"
+echo "请本机上传体验版 BUILD_ID=mp-20260606-ecs-clean，微信合法域名仅 https://${DOMAIN}"
 echo "若手机微信仍 reset、Safari 通：bash scripts/ecs-diagnose-wechat-cronet-reset.sh"

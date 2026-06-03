@@ -1,5 +1,5 @@
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const memberStore = require('../../utils/talentMember.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const participant = require('../../utils/participant.js')
@@ -244,7 +244,7 @@ Page({
         if (prev) {
           const member = { ...prev, wxNickName: n, wxAvatarUrl: av, updatedAt: ts }
           memberStore.writeMember(member)
-          if (merchant.hasMerchantApi() && member.contact) {
+          if (api.hasApi() && member.contact) {
             try {
               const reg = await ops.registerTalentMember(member)
               if (reg?.lingqiTalentId) {
@@ -258,7 +258,7 @@ Page({
         const prev = userProfile.readPrProfile() || userProfile.emptyPrProfile()
         const saved = { ...prev, wxNickName: n, wxAvatarUrl: av, updatedAt: ts }
         userProfile.writePrProfile(saved)
-        if (merchant.hasMerchantApi() && String(saved.contactPhone || '').trim()) {
+        if (api.hasApi() && String(saved.contactPhone || '').trim()) {
           try {
             const reg = await ops.registerPrUser({
               id: saved.id || `MPR-${Date.now()}`,

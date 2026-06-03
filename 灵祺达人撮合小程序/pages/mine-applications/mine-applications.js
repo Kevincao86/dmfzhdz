@@ -1,6 +1,6 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
 
 Page({
@@ -13,7 +13,7 @@ Page({
   },
   async load() {
     const local = applicationsStore.readApplications()
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       this.setData({
         rows: local.map((a) => ({
           ...a,

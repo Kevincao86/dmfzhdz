@@ -30,11 +30,10 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 
 ## 生产部署（仅 ECS，无 Supabase 云 / 无 Vercel）
 
-👉 **[ECS-小程序专用部署.md](./ECS-小程序专用部署.md)**
+👉 **[ECS.md](./ECS.md)**
 
-- API 唯一入口：`https://mofangdianai.com/erp-api`（ECS `meoo-auth-api`）
-- `utils/config.release.js` 已固定上述地址；勿使用 `cs.mofangdianai.com` 或 `*.supabase.co`
-- 旧文档 [DEPLOY.md](./DEPLOY.md) 含 Vercel 说明，**小程序已不再使用**
+- API：`https://mofangdianai.com/erp-api`
+- 网络层：`utils/ecs.js` + `utils/api.js` + `utils/auth.js`（无 Vercel / Supabase 云 / 网关）
 
 ## 分享路径
 
@@ -52,7 +51,7 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 
 ## PR ↔ 达人私信
 
-消息/大厅/报名/登录均经 **ECS erp-api**（`utils/mpEcsClient.js`）。
+消息/大厅/报名/登录均经 **ECS erp-api**（`utils/ecs.js`）。
 
 - 消息 Tab：微信风格会话列表 + 聊天页（`pages/messages`、`pages/chat`）
 - 数据：ECS PostgreSQL（非 Supabase 云）

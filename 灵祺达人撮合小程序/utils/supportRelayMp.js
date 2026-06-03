@@ -1,4 +1,4 @@
-const merchant = require('./merchantApi.js')
+const api = require('./api.js')
 const lingqiIdentity = require('./lingqiIdentity.js')
 const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
@@ -21,7 +21,7 @@ function randomPart() {
 }
 
 function useMerchantChannel() {
-  return merchant.hasMerchantApi()
+  return api.hasApi()
 }
 
 function canSupport() {
@@ -43,7 +43,7 @@ function formatSupportError(err) {
 }
 
 async function relayApi(payload) {
-  const data = await merchant.merchantRequest('POST', '/api/meoo-ops-mp-support-relay', payload)
+  const data = await api.post('/api/meoo-ops-mp-support-relay', payload)
   if (!data || data.ok === false) {
     const parts = [data && data.detail, data && data.hint, data && data.error].filter(Boolean)
     throw new Error(parts.join(' — ') || '请求失败')

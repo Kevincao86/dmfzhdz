@@ -1,6 +1,6 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
 
 Page({
@@ -15,7 +15,7 @@ Page({
     const published = applicationsStore.readPublishedOrders()
     const identity = userProfile.identityLabel(userProfile.readIdentity())
     let openOrders = 0
-    if (merchant.hasMerchantApi()) {
+    if (api.hasApi()) {
       try {
         const reg = await ops.fetchRegistry()
         openOrders = (reg.mpRecruitmentOrders || []).filter(

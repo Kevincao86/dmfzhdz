@@ -1,6 +1,6 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -59,7 +59,7 @@ Page({
       this.setData({ rows: [], loading: false, err: '' })
       return
     }
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       this.setData({
         rows: local.map((item) => mapRow(item, null)),
         loading: false,
@@ -129,7 +129,7 @@ Page({
       wx.showToast({ title: '当前状态不可切换', icon: 'none' })
       return
     }
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       wx.showToast({ title: '未配置后台地址', icon: 'none' })
       return
     }
@@ -203,7 +203,7 @@ Page({
       confirmColor: '#dc2626',
       success: async (res) => {
         if (!res.confirm) return
-        if (!merchant.hasMerchantApi()) {
+        if (!api.hasApi()) {
           applicationsStore.removePublishedOrder(id)
           wx.showToast({ title: '已从本地移除', icon: 'none' })
           this.load()
