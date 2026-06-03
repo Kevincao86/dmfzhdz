@@ -1,14 +1,36 @@
 #!/usr/bin/env bash
 # 探活招募大厅接口（只应返回 mpRecruitmentOrders 数组）
-# ECS: bash ~/app/scripts/ecs-verify-mp-hall-registry.sh
+# ECS admin: cd ~/app && bash scripts/ecs-verify-mp-hall-registry.sh
 
 set -euo pipefail
 
-echo "=== :3001 直连 ==="
-curl -sS -m 25 http://127.0.0.1:3001/api/meoo-ops-mp-hall-registry | head -c 400
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PORT="${AUTH_API_PORT:-3001}"
+
+if [[ "$(id -un)" != "admin" ]]; then
+  echo "请用 admin 执行（勿 sudo 整条命令）"
+  exit 1
+fi
+
+if ! curl -sf -m 3 "http://127.0.0.1:${PORT}/api/meoo-auth-ping" >/dev/null 2>&1; then
+  echo "=== :${PORT} 未监听，先修复 auth-api ==="
+  bash "$ROOT/scripts/ecs-ensure-auth-api.sh"
+  echo ""
+fi
+
+echo "=== :${PORT} 直连 meoo-ops-mp-hall-registry ==="
+BODY="$(curl -sS -m 25 "http://127.0.0.1:${PORT}/api/meoo-ops-mp-hall-registry" || true)"
+echo "${BODY}" | head -c 500
 echo ""
 
+if ! echo "$BODY" | grep -q 'mpRecruitmentOrders'; then
+  echo "FAIL: 响应不含 mpRecruitmentOrders"
+  echo "  sudo journalctl -u meoo-auth-api -n 40 --no-pager"
+  exit 1
+fi
+
 echo "=== Nginx /erp-api ==="
-curl -sS -m 25 -H "Host: 139.196.42.5" http://127.0.0.1/erp-api/meoo-ops-mp-hall-registry | head -c 400
+NGX="$(curl -sS -m 25 -H "Host: 139.196.42.5" "http://127.0.0.1/erp-api/meoo-ops-mp-hall-registry" || true)"
+echo "${NGX}" | head -c 500
 echo ""
-echo "期望 JSON 含 mpRecruitmentOrders 数组；若 502：sudo systemctl restart meoo-auth-api"
+echo "OK: 招募大厅接口可用。请上传体验版并部署云函数 mpErpProxy。"
