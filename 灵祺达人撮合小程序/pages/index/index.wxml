@@ -119,7 +119,11 @@
   </view>
 
   <scroll-view class="home-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-    <view wx:if="{{loading}}" class="card state-loading">
+    <view wx:if="{{err && displayRows.length}}" class="card state-warn home-refresh-hint">
+      <text class="hint">{{err}}</text>
+    </view>
+
+    <view wx:if="{{loading && !displayRows.length}}" class="card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />
         <view class="loading-dot" />
@@ -128,11 +132,11 @@
       <text class="list-hint">加载中</text>
     </view>
 
-    <view wx:elif="{{err}}" class="card state-error">
+    <view wx:elif="{{err && !displayRows.length}}" class="card state-error">
       <text class="err-detail">{{err}}</text>
     </view>
 
-    <block wx:else>
+    <block wx:if="{{displayRows.length || (!loading && !err)}}">
       <view
         wx:for="{{displayRows}}"
         wx:key="id"

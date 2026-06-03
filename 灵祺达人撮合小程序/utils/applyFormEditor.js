@@ -231,9 +231,22 @@ function confirmApplyFormEditor(page, onDone) {
     return
   }
 
+  const tplId = String(page.data.applyFormTemplateId || '').trim()
+  const tplName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
+
+  // 使用模版：直接应用并返回发单页，不再弹出「保存到我的模版」
+  if (page.data.applyFormEditorMode === 'template' && tplId) {
+    finish(page, tplId, tplName, () => {
+      page.setData({ applyFormLibrarySaved: false })
+      wx.showToast({ title: '已应用报名模版', icon: 'success', duration: 1500 })
+      setTimeout(() => {
+        if (typeof onDone === 'function') onDone()
+      }, 320)
+    })
+    return
+  }
+
   if (page.data.applyFormLibrarySaved) {
-    const tplId = String(page.data.applyFormTemplateId || '').trim()
-    const tplName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
     finish(page, tplId, tplName, () => {
       page.setData({ applyFormLibrarySaved: false })
       wx.showToast({ title: '已更新报名信息', icon: 'success', duration: 1500 })
@@ -244,8 +257,7 @@ function confirmApplyFormEditor(page, onDone) {
     return
   }
 
-  const tplId = String(page.data.applyFormTemplateId || '').trim()
-  const defaultName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
+  const defaultName = tplName
 
   promptTemplateName(defaultName, (name) => {
     const saved = saveFieldsToLibrary(page, tplId, name)

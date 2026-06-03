@@ -24,9 +24,13 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 if [[ -n "$(git status --porcelain -uno)" ]]; then
-  echo "WARN: 工作区有未提交改动，请先 commit"
+  echo "WARN: 工作区有未提交改动（仍将推送已提交的 commit）"
   git status -sb
-  exit 1
+fi
+AHEAD="$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)"
+if [[ "${AHEAD:-0}" -eq 0 ]]; then
+  echo "本地 main 与 @{u} 无待推送 commit，跳过 push"
+  exit 0
 fi
 
 echo "当前 HEAD:"

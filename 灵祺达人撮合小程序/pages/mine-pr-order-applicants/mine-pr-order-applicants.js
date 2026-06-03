@@ -258,6 +258,8 @@ Page({
           title: '恭喜入选招募',
           body: `您已被 PR 选入「${title}」（单号 ${this.data.orderNo}）。请扫码加入项目群，二维码见下图。`,
           imageUrl: qr,
+          noticeType: 'selection',
+          pinned: true,
         })
       }
       if (!entries.length) {
