@@ -7,7 +7,6 @@ function erpApiBases(): string[] {
     process.env.MEOO_ERP_API_BASE,
     process.env.VITE_ERP_AUTH_API_BASE,
     process.env.ERP_AUTH_API_BASE,
-    'https://api.mofangdianai.com/erp-api',
     'https://mofangdianai.com/erp-api',
   ]
   const out: string[] = []
