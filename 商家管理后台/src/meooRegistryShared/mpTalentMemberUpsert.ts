@@ -36,14 +36,12 @@ function profileToApplicant(
 
 export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalentMember): RegistryMpTalentMember {
   const list = [...(data.mpTalentMembers ?? [])]
-  const wxKey = String(member.wxOpenId || member.wechatId || member.wxNickName || '')
-    .trim()
-    .toLowerCase()
+  const openId = String(member.wxOpenId || '').trim()
+  const wxKey = openId || String(member.wechatId || member.wxNickName || '').trim().toLowerCase()
   const idx = list.findIndex((m) => {
-    const k = String(m.wxOpenId || m.wechatId || m.wxNickName || '')
-      .trim()
-      .toLowerCase()
-    return wxKey && k === wxKey
+    if (openId && String(m.wxOpenId || '').trim() === openId) return true
+    const k = String(m.wechatId || m.wxNickName || '').trim().toLowerCase()
+    return wxKey && !openId && k === wxKey
   })
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const prev = idx >= 0 ? list[idx]! : null

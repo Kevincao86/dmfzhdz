@@ -128,15 +128,16 @@ function requestTimeoutMs(url) {
   return 120000
 }
 
-function wxRequestPromise(url, m, data) {
+function wxRequestPromise(url, m, data, extraHeader = {}) {
   const isGet = String(m || 'GET').toUpperCase() === 'GET'
+  const header = { ...(isGet ? WX_HEADERS_GET : WX_HEADERS_JSON), ...extraHeader }
   return new Promise((resolve, reject) => {
     wx.request({
       url,
       method: m,
       timeout: requestTimeoutMs(url),
       ...WX_NET,
-      header: isGet ? WX_HEADERS_GET : WX_HEADERS_JSON,
+      header,
       data: isGet ? undefined : data,
       success(res) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -177,25 +178,32 @@ function runGetWithFallback(url) {
   return tryRequest()
 }
 
-function merchantRequest(method, path, data, attempt = 0) {
+function merchantRequest(method, path, data, attemptOrOpts = 0) {
   const b = baseUrl()
   if (!b) {
     return Promise.reject(new Error('尚未配置后台地址'))
+  }
+  let attempt = 0
+  let extraHeader = {}
+  if (typeof attemptOrOpts === 'number') attempt = attemptOrOpts
+  else if (attemptOrOpts && typeof attemptOrOpts === 'object') {
+    attempt = Number(attemptOrOpts.attempt) || 0
+    extraHeader = attemptOrOpts.header || {}
   }
   const url = resolveMerchantApiUrl(path)
   const m = String(method || 'GET').toUpperCase()
 
   if (m === 'GET') {
     return runGetWithFallback(url).catch((err) => {
-      if (attempt < 1) return merchantRequest(m, path, data, 1)
+      if (attempt < 1) return merchantRequest(m, path, data, { attempt: 1, header: extraHeader })
       throw err
     })
   }
 
-  return wxRequestPromise(url, m, data).catch((err) => {
+  return wxRequestPromise(url, m, data, extraHeader).catch((err) => {
     const errMsg = String(err && err.message ? err.message : err)
     if (attempt < 1 && isTransientNetError(errMsg)) {
-      return merchantRequest(m, path, data, 1)
+      return merchantRequest(m, path, data, { attempt: 1, header: extraHeader })
     }
     throw err
   })

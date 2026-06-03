@@ -1,0 +1,24 @@
+<view class="page">
+  <view class="card">
+    <text class="title">灵祺撮合平台</text>
+    <text class="sub">一微信一账号 · 与履约 Web 后台互通</text>
+
+    <view class="tabs">
+      <view class="tab {{tab==='wx'?'on':''}}" bindtap="onTabWx">微信登录</view>
+      <view class="tab {{tab==='pwd'?'on':''}}" bindtap="onTabPwd">账号密码</view>
+    </view>
+
+    <block wx:if="{{tab==='wx'}}">
+      <button class="btn primary" loading="{{loading}}" bindtap="onWxLogin">微信一键登录</button>
+      <text class="hint">使用当前微信身份，不可重复注册多个账号</text>
+    </block>
+
+    <block wx:else>
+      <input class="input" placeholder="登录名" value="{{loginName}}" bindinput="onLoginName" />
+      <input class="input" password placeholder="密码（≥6位）" value="{{password}}" bindinput="onPassword" />
+      <button class="btn primary" loading="{{loading}}" bindtap="onPwdLogin">登录</button>
+    </block>
+
+    <text class="err" wx:if="{{err}}">{{err}}</text>
+  </view>
+</view>

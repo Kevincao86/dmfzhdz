@@ -1,0 +1,445 @@
+/**
+ * 达人/PR 统一账号：一微信 openid 仅一条 mp_accounts；Web 与小程序共用会话 token。
+ */
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
+import type { RegistryFile, RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
+import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
+import { upsertMpPrUser } from './mpPrUserUpsert.js'
+import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+
+export type MpAccountRole = 'talent' | 'pr'
+
+export type MpAccountRow = {
+  id: string
+  openid: string | null
+  login_name: string | null
+  password_hash: string | null
+  password_salt: string | null
+  active_role: MpAccountRole
+  lingqi_talent_id: string | null
+  lingqi_pr_id: string | null
+  registry_member_id: string | null
+  registry_pr_id: string | null
+  wx_nick_name: string | null
+  wx_avatar_url: string | null
+}
+
+type SupabaseRest = {
+  get: (path: string) => Promise<Response>
+  post: (path: string, body: unknown) => Promise<Response>
+  patch: (path: string, body: unknown) => Promise<Response>
+}
+
+const SESSION_DAYS = 14
+const SCAN_TTL_SEC = 300
+
+export function createMpAuthRest(supabaseUrl: string, serviceRole: string): SupabaseRest {
+  return restClient(supabaseUrl, serviceRole)
+}
+
+function restClient(supabaseUrl: string, serviceRole: string): SupabaseRest {
+  const base = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`
+  const headers = {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  }
+  return {
+    get: (path) => fetch(`${base}${path}`, { headers: { ...headers, Prefer: 'return=representation' } }),
+    post: (path, body) =>
+      fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) }),
+    patch: (path, body) =>
+      fetch(`${base}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) }),
+  }
+}
+
+function pepper(): string {
+  return (
+    process.env.MP_AUTH_PEPPER ||
+    process.env.MERCHANT_AUTH_PEPPER ||
+    'meoo-mp-auth-dev-pepper-change-in-prod'
+  )
+}
+
+export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const s = salt || randomBytes(16).toString('hex')
+  const hash = scryptSync(password + pepper(), s, 32).toString('hex')
+  return { hash, salt: s }
+}
+
+export function verifyPassword(password: string, hash: string, salt: string): boolean {
+  const next = scryptSync(password + pepper(), salt, 32)
+  const prev = Buffer.from(hash, 'hex')
+  if (prev.length !== next.length) return false
+  return timingSafeEqual(prev, next)
+}
+
+export function newSessionToken(): string {
+  return randomBytes(32).toString('hex')
+}
+
+export function newScanTicket(): string {
+  return `scan_${randomBytes(16).toString('hex')}`
+}
+
+export async function wxCodeToOpenId(code: string): Promise<{ openid: string; session_key?: string }> {
+  const appId = String(process.env.MP_WECHAT_APPID || process.env.WX_APPID || '').trim()
+  const secret = String(process.env.MP_WECHAT_SECRET || process.env.WX_SECRET || '').trim()
+  if (!appId || !secret) {
+    if (process.env.MP_AUTH_DEV_MODE === 'true' && code) {
+      const openid = `dev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
+      return { openid }
+    }
+    throw new Error('wx_not_configured')
+  }
+  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(secret)}&js_code=${encodeURIComponent(code)}&grant_type=authorization_code`
+  const res = await fetch(url)
+  const data = (await res.json()) as { openid?: string; session_key?: string; errcode?: number; errmsg?: string }
+  if (!data.openid) {
+    throw new Error(data.errmsg || `wx_code2session_${data.errcode ?? 'fail'}`)
+  }
+  return { openid: data.openid, session_key: data.session_key }
+}
+
+async function findAccountByOpenId(rest: SupabaseRest, openid: string): Promise<MpAccountRow | null> {
+  const q = `/mp_accounts?openid=eq.${encodeURIComponent(openid)}&limit=1`
+  const res = await rest.get(q)
+  if (!res.ok) return null
+  const rows = (await res.json()) as MpAccountRow[]
+  return rows[0] ?? null
+}
+
+async function findAccountByLoginName(rest: SupabaseRest, loginName: string): Promise<MpAccountRow | null> {
+  const q = `/mp_accounts?login_name=eq.${encodeURIComponent(loginName)}&limit=1`
+  const res = await rest.get(q)
+  if (!res.ok) return null
+  const rows = (await res.json()) as MpAccountRow[]
+  return rows[0] ?? null
+}
+
+async function findAccountById(rest: SupabaseRest, id: string): Promise<MpAccountRow | null> {
+  const res = await rest.get(`/mp_accounts?id=eq.${encodeURIComponent(id)}&limit=1`)
+  if (!res.ok) return null
+  const rows = (await res.json()) as MpAccountRow[]
+  return rows[0] ?? null
+}
+
+async function insertAccount(rest: SupabaseRest, row: Record<string, unknown>): Promise<MpAccountRow> {
+  const res = await rest.post('/mp_accounts', row)
+  if (!res.ok) {
+    const t = await res.text()
+    if (/duplicate|unique/i.test(t)) throw new Error('account_already_exists')
+    throw new Error(`mp_account_insert_${res.status}:${t.slice(0, 200)}`)
+  }
+  const rows = (await res.json()) as MpAccountRow[]
+  return rows[0]!
+}
+
+async function updateAccount(rest: SupabaseRest, id: string, patch: Record<string, unknown>): Promise<void> {
+  const res = await rest.patch(`/mp_accounts?id=eq.${encodeURIComponent(id)}`, {
+    ...patch,
+    updated_at: new Date().toISOString(),
+  })
+  if (!res.ok) throw new Error(`mp_account_update_${res.status}`)
+}
+
+async function createSession(rest: SupabaseRest, accountId: string): Promise<string> {
+  const token = newSessionToken()
+  const expires = new Date(Date.now() + SESSION_DAYS * 86400_000).toISOString()
+  const res = await rest.post('/mp_auth_sessions', { token, account_id: accountId, expires_at: expires })
+  if (!res.ok) throw new Error('session_create_failed')
+  return token
+}
+
+export async function resolveSession(
+  rest: SupabaseRest,
+  token: string,
+): Promise<{ account: MpAccountRow; token: string } | null> {
+  const t = String(token || '').trim()
+  if (!t) return null
+  const res = await rest.get(
+    `/mp_auth_sessions?token=eq.${encodeURIComponent(t)}&select=token,account_id,expires_at&limit=1`,
+  )
+  if (!res.ok) return null
+  const rows = (await res.json()) as { token: string; account_id: string; expires_at: string }[]
+  const row = rows[0]
+  if (!row || new Date(row.expires_at).getTime() < Date.now()) return null
+  const account = await findAccountById(rest, row.account_id)
+  if (!account) return null
+  return { account, token: t }
+}
+
+export function accountToClientPayload(account: MpAccountRow) {
+  return {
+    accountId: account.id,
+    openid: account.openid,
+    loginName: account.login_name,
+    activeRole: account.active_role,
+    lingqiTalentId: account.lingqi_talent_id,
+    lingqiPrId: account.lingqi_pr_id,
+    wxNickName: account.wx_nick_name,
+    wxAvatarUrl: account.wx_avatar_url,
+    hasPassword: Boolean(account.password_hash),
+  }
+}
+
+async function syncRegistryMember(
+  supabaseUrl: string,
+  serviceRole: string,
+  account: MpAccountRow,
+  member: RegistryMpTalentMember,
+): Promise<RegistryMpTalentMember> {
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  if (account.openid) {
+    const dup = (data.mpTalentMembers ?? []).find(
+      (m) => m.wxOpenId === account.openid && m.id !== account.registry_member_id,
+    )
+    if (dup) throw new Error('openid_talent_conflict')
+  }
+  const saved = upsertMpTalentMember(data, {
+    ...member,
+    wxOpenId: account.openid || member.wxOpenId,
+    id: account.registry_member_id || member.id,
+    lingqiTalentId: account.lingqi_talent_id || member.lingqiTalentId,
+  })
+  await io.save(data)
+  return saved
+}
+
+async function syncRegistryPr(
+  supabaseUrl: string,
+  serviceRole: string,
+  account: MpAccountRow,
+  pr: RegistryMpPrUser,
+): Promise<RegistryMpPrUser> {
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  if (account.openid) {
+    const dup = (data.mpPrUsers ?? []).find(
+      (u) => u.wxOpenId === account.openid && u.id !== account.registry_pr_id,
+    )
+    if (dup) throw new Error('openid_pr_conflict')
+  }
+  const saved = upsertMpPrUser(data, {
+    ...pr,
+    wxOpenId: account.openid || pr.wxOpenId,
+    id: account.registry_pr_id || pr.id,
+    lingqiPrId: account.lingqi_pr_id || pr.lingqiPrId,
+  })
+  await io.save(data)
+  return saved
+}
+
+export type MpAuthWxLoginInput = {
+  code: string
+  role?: MpAccountRole
+  wxNickName?: string
+  wxAvatarUrl?: string
+  /** 首次登录可携带注册资料 */
+  registerTalent?: RegistryMpTalentMember
+  registerPr?: RegistryMpPrUser
+}
+
+export async function mpAuthWxLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  input: MpAuthWxLoginInput,
+): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const { openid } = await wxCodeToOpenId(input.code)
+  let account = await findAccountByOpenId(rest, openid)
+  let isNew = false
+  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+
+  if (!account) {
+    isNew = true
+    account = await insertAccount(rest, {
+      openid,
+      active_role: role,
+      wx_nick_name: input.wxNickName || '',
+      wx_avatar_url: input.wxAvatarUrl || '',
+    })
+  } else if (input.wxNickName || input.wxAvatarUrl) {
+    await updateAccount(rest, account.id, {
+      wx_nick_name: input.wxNickName || account.wx_nick_name,
+      wx_avatar_url: input.wxAvatarUrl || account.wx_avatar_url,
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+
+  if (role === 'talent' && input.registerTalent && !account.lingqi_talent_id) {
+    const saved = await syncRegistryMember(supabaseUrl, serviceRole, account, input.registerTalent)
+    await updateAccount(rest, account.id, {
+      lingqi_talent_id: saved.lingqiTalentId,
+      registry_member_id: saved.id,
+      active_role: 'talent',
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+  if (role === 'pr' && input.registerPr && !account.lingqi_pr_id) {
+    const saved = await syncRegistryPr(supabaseUrl, serviceRole, account, input.registerPr)
+    await updateAccount(rest, account.id, {
+      lingqi_pr_id: saved.lingqiPrId,
+      registry_pr_id: saved.id,
+      active_role: 'pr',
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+
+  const token = await createSession(rest, account.id)
+  return { token, account, isNew }
+}
+
+export async function mpAuthPasswordLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  loginName: string,
+  password: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const name = String(loginName || '').trim().toLowerCase()
+  if (!name || !password) throw new Error('invalid_credentials')
+  const account = await findAccountByLoginName(rest, name)
+  if (!account?.password_hash || !account.password_salt) throw new Error('invalid_credentials')
+  if (!verifyPassword(password, account.password_hash, account.password_salt)) {
+    throw new Error('invalid_credentials')
+  }
+  const token = await createSession(rest, account.id)
+  return { token, account }
+}
+
+export async function mpAuthSetPassword(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  loginName: string,
+  password: string,
+): Promise<void> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const name = String(loginName || '').trim().toLowerCase()
+  if (!name || password.length < 6) throw new Error('invalid_password')
+  const existing = await findAccountByLoginName(rest, name)
+  if (existing && existing.id !== accountId) throw new Error('login_name_taken')
+  const { hash, salt } = hashPassword(password)
+  await updateAccount(rest, accountId, {
+    login_name: name,
+    password_hash: hash,
+    password_salt: salt,
+  })
+}
+
+export async function mpAuthSwitchRole(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  role: MpAccountRole,
+): Promise<MpAccountRow> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const account = await findAccountById(rest, accountId)
+  if (!account) throw new Error('account_not_found')
+  if (role === 'talent' && !account.lingqi_talent_id) throw new Error('talent_profile_required')
+  if (role === 'pr' && !account.lingqi_pr_id) throw new Error('pr_profile_required')
+  await updateAccount(rest, accountId, { active_role: role })
+  return (await findAccountById(rest, accountId))!
+}
+
+export async function mpAuthScanCreate(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<{ ticket: string; expiresAt: string; qrPayload: string; pollUrl: string }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const ticket = newScanTicket()
+  const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
+  const res = await rest.post('/mp_wx_scan_tickets', {
+    ticket,
+    status: 'pending',
+    expires_at: expiresAt,
+  })
+  if (!res.ok) throw new Error('scan_ticket_create_failed')
+  const appId = process.env.MP_WECHAT_APPID || 'wx_APPID_PENDING'
+  const qrPayload = `lingqi://wx-scan-login?ticket=${ticket}&appid=${appId}`
+  return {
+    ticket,
+    expiresAt,
+    qrPayload,
+    pollUrl: `/api/meoo-ops-mp-auth?action=scan_poll&ticket=${ticket}`,
+  }
+}
+
+export async function mpAuthScanPoll(
+  supabaseUrl: string,
+  serviceRole: string,
+  ticket: string,
+): Promise<{
+  status: string
+  token?: string
+  account?: ReturnType<typeof accountToClientPayload>
+  message?: string
+}> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const res = await rest.get(
+    `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}&limit=1`,
+  )
+  if (!res.ok) return { status: 'error', message: 'ticket_lookup_failed' }
+  const rows = (await res.json()) as {
+    status: string
+    expires_at: string
+    session_token: string | null
+    account_id: string | null
+  }[]
+  const row = rows[0]
+  if (!row) return { status: 'expired' }
+  if (new Date(row.expires_at).getTime() < Date.now()) return { status: 'expired' }
+  if (row.status === 'confirmed' && row.session_token && row.account_id) {
+    const account = await findAccountById(rest, row.account_id)
+    if (account) {
+      return {
+        status: 'confirmed',
+        token: row.session_token,
+        account: accountToClientPayload(account),
+      }
+    }
+  }
+  if (row.status === 'pending') {
+    return {
+      status: 'pending',
+      message:
+        process.env.MP_WECHAT_APPID
+          ? '请使用微信扫描二维码'
+          : '扫码登录接口已就绪；开放平台资质配置后可完成确认（当前为 pending）',
+    }
+  }
+  return { status: row.status }
+}
+
+/** 开发/联调：模拟小程序扫码确认（生产由微信回调替换） */
+export async function mpAuthScanConfirmDev(
+  supabaseUrl: string,
+  serviceRole: string,
+  ticket: string,
+  code: string,
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const { token, account } = await mpAuthWxLogin(supabaseUrl, serviceRole, { code })
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(ticket)}`, {
+    status: 'confirmed',
+    openid: account.openid,
+    account_id: account.id,
+    session_token: token,
+  })
+  return { token, account }
+}
+
+export async function assertOpenIdNotRegistered(
+  supabaseUrl: string,
+  serviceRole: string,
+  openid: string,
+  exceptAccountId?: string,
+): Promise<void> {
+  if (!openid) return
+  const rest = restClient(supabaseUrl, serviceRole)
+  const acc = await findAccountByOpenId(rest, openid)
+  if (acc && acc.id !== exceptAccountId) throw new Error('wx_already_registered')
+}

@@ -20,6 +20,13 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 1. 复制 `utils/config.local.example.js` 为 `utils/config.local.js`
 2. 填写 `MERCHANT_API_BASE_URL`（与 Web 商家 ERP 相同，如 `http://局域网IP:5173`）
 3. 微信开发者工具打开本目录 → 详情 → 本地设置 → 勾选「不校验合法域名」
+4. 启动页为 `pages/login/login`：支持 **微信一键登录** 与 **账号密码登录**（与「灵祺达人履约管理后台」互通）
+
+## 统一账号（一微信一账号）
+
+- 登录走 `POST /api/meoo-ops-mp-auth`（`wx_login` / `password_login`）
+- 服务端表 `mp_accounts`：`openid` 唯一，绑定唯一 `lingqiTalentId` / `lingqiPrId`
+- 详见仓库 `灵祺达人履约管理后台/README.md`
 
 ## 生产部署
 
