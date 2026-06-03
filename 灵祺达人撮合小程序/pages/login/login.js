@@ -98,8 +98,10 @@ Page({
         hint = '服务端未配置微信密钥，请联系管理员'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
         hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
+      } else if (/23505|duplicate key/i.test(msg)) {
+        hint = '注册表 id 冲突（将改为 PATCH 更新）。ECS：git pull && sudo systemctl restart meoo-auth-api，再点登录'
       } else if (/row-level security|ops_registry_snapshot|42501/i.test(msg)) {
-        hint = `注册表写入被拒：${msg.slice(0, 120)}\n\nECS：bash scripts/ecs-fix-ops-registry-rls.sh && bash scripts/ecs-verify-mp-wx-login-path.sh`
+        hint = `注册表权限：${msg.slice(0, 80)}\n\nECS：bash scripts/ecs-fix-mp-open-all-permissions.sh`
       } else if (api.isNetReset(msg)) {
         const build = api.BUILD_ID
         hint =
