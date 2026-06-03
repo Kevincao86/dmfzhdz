@@ -49,13 +49,13 @@ function nodeNeedsWsShim(): boolean {
 }
 
 export function createMpTalentChatAdmin(url: string, serviceRole: string): SupabaseClient {
-  // ECS auth-api 为 Node 20：@supabase/supabase-js 要求注入 ws，否则 createClient 即抛错
-  const globalOpts = nodeNeedsWsShim()
-    ? { WebSocket: WebSocketImpl as unknown as typeof WebSocket }
-    : {}
+  // Node < 22 须 realtime.transport=ws（global.WebSocket 无效，见 @supabase/realtime-js）
+  const realtime = nodeNeedsWsShim()
+    ? { transport: WebSocketImpl as unknown as typeof WebSocket }
+    : undefined
   return createClient(url, serviceRole, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: globalOpts,
+    ...(realtime ? { realtime } : {}),
   })
 }
 
