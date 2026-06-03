@@ -5,8 +5,12 @@
 module.exports = {
   ip: '139.196.42.5',
   host: 'mofangdianai.com',
+  tlsSni: 'mofangdianai.com',
+  useIpHost: true,
+  /** 腾讯云 → 轻量：443 常 reset，优先 80 + Host=IP（须 Nginx 80-ip snippet） */
+  http80IpOnly: true,
   https: true,
-  /** 备用口 18780（勿用 8000=Supabase）。防火墙放行后按 scripts/ecs-nginx-erp-api-18780.snippet 配置 */
-  altPort: 18780,
+  httpsIpOnly: true,
+  altPort: 0,
   insecure: false,
 }
