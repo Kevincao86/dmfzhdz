@@ -30,8 +30,8 @@ function canSupport() {
 
 function formatSupportError(err) {
   const msg = String((err && err.message) || err || '未知错误')
-  if (/supabase_admin|ecs_proxy|erp_proxy/i.test(msg)) {
-    return 'ECS 客服接口未就绪：请执行 bash ~/app/scripts/ecs-fix-erp-api-502.sh'
+  if (/admin_not_configured|ecs_proxy|erp_proxy/i.test(msg)) {
+    return 'ECS 客服接口未就绪：请执行 bash ~/app/scripts/ecs-redeploy-mp-only.sh'
   }
   if (/support_relay|42P01|does not exist/i.test(msg)) {
     return '请确认已执行 support_relay_messages 相关数据库迁移'

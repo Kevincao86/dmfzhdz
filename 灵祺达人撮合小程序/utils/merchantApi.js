@@ -1,14 +1,14 @@
 /**
- * 兼容旧页面 require；实现已迁至 ecsApi.js（仅 ECS erp-api）。
+ * 兼容层：页面继续 require merchantApi，实现统一走 mpEcsClient
  */
-const ecs = require('./ecsApi.js')
+const mp = require('./mpEcsClient.js')
 
 function baseUrl() {
-  return ecs.erpBase()
+  return mp.erpBase()
 }
 
 function hasMerchantApi() {
-  return ecs.hasEcsApi()
+  return !!mp.erpBase()
 }
 
 function erpApiBaseList() {
@@ -17,27 +17,21 @@ function erpApiBaseList() {
 }
 
 function resolveMerchantApiUrl(path) {
-  return ecs.resolveUrl(path)
+  return mp.toUrl(path)
 }
 
 function merchantRequest(method, path, data, attemptOrOpts = 0) {
-  let extraHeader = {}
-  if (attemptOrOpts && typeof attemptOrOpts === 'object') {
-    extraHeader = attemptOrOpts.header || {}
-  }
-  return ecs.ecsRequest(method, path, data, { header: extraHeader })
+  const headers =
+    attemptOrOpts && typeof attemptOrOpts === 'object' ? attemptOrOpts.header || {} : {}
+  return mp.call({ method, path, body: data, headers })
 }
 
 function merchantGetUrl(url) {
-  const u = String(url || '').trim()
-  if (!u) return Promise.reject(new Error('缺少请求 URL'))
-  return ecs.fetchJsonWithRetry(u, 'GET', undefined, {})
+  return mp.getJson(String(url || '').trim())
 }
 
 function merchantPostUrl(url, data, extraHeader = {}) {
-  const u = String(url || '').trim()
-  if (!u) return Promise.reject(new Error('缺少请求 URL'))
-  return ecs.fetchJsonWithRetry(u, 'POST', data || {}, extraHeader)
+  return mp.postJson(String(url || '').trim(), data || {}, extraHeader)
 }
 
 module.exports = {
@@ -48,7 +42,7 @@ module.exports = {
   merchantGetUrl,
   merchantPostUrl,
   resolveMerchantApiUrl,
-  isRealDevice: ecs.isRealDevice,
-  isTransientNetError: ecs.isTransientNetError,
-  MP_BUILD_ID: ecs.MP_BUILD_ID,
+  isRealDevice: mp.isPhone,
+  isTransientNetError: mp.isNetReset,
+  MP_BUILD_ID: mp.BUILD_ID,
 }

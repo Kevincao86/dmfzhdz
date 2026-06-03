@@ -1,6 +1,12 @@
 # 灵祺达人招募小程序 · GitHub 与 Vercel 部署指南
 
-> **说明**：微信小程序本体**不会**部署到 Vercel；Vercel 部署的是**商家 ERP 后端 API**。小程序通过微信开发者工具上传至微信公众平台。本指南说明二者如何串联。
+> **已废弃（小程序）**：达人撮合小程序**已不再**经 Vercel / `cs.mofangdianai.com` / Supabase 云。  
+> 请改用 **[ECS-小程序专用部署.md](./ECS-小程序专用部署.md)**（仅 `https://mofangdianai.com/erp-api`）。  
+> 下文仅作历史参考，勿按此配置小程序 `config.release.js`。
+
+---
+
+> **说明（历史）**：微信小程序本体**不会**部署到 Vercel；Vercel 部署的是**商家 ERP 后端 API**。小程序通过微信开发者工具上传至微信公众平台。本指南说明二者如何串联。
 
 ---
 
