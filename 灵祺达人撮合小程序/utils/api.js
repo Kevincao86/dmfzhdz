@@ -7,6 +7,10 @@ function hasApi() {
   return ecs.hasBase()
 }
 
+function bases() {
+  return ecs.bases()
+}
+
 function apiUrl(path) {
   return ecs.url(path)
 }
@@ -33,6 +37,7 @@ function request(method, path, data) {
 module.exports = {
   BUILD_ID: ecs.BUILD_ID,
   hasApi,
+  bases,
   base: ecs.base,
   apiUrl,
   request,
@@ -41,4 +46,6 @@ module.exports = {
   post: ecs.post,
   ping: ecs.ping,
   isNetReset: ecs.isNetReset,
+  transportLabel: ecs.transportLabel,
+  useCloudProxy: ecs.useCloudProxy,
 }

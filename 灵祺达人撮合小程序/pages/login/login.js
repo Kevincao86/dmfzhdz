@@ -25,13 +25,15 @@ Page({
     try {
       const h = await api.ping()
       if (h && h.ok) {
-        this.setData({ netOk: `ECS 可达 revision=${h.revision || '?'}` })
+        const via = api.transportLabel ? api.transportLabel() : 'direct'
+        this.setData({ netOk: `ECS 可达(${via}) revision=${h.revision || '?'}` })
       }
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       if (api.isNetReset(msg)) {
         this.setData({
-          netOk: 'HTTPS 握手失败。ECS: bash scripts/ecs-mp-minimal.sh；体验版 mp-20260606-ecs-clean',
+          netOk:
+            '请走云开发绕过域名：见 备案期启动-绕过域名.md，填写 MP_CLOUD_ENV 并部署 mpErpProxy',
         })
       }
     }
@@ -97,7 +99,7 @@ Page({
         const build = api.BUILD_ID
         hint =
           msg +
-          `\n\n① 合法域名 https://mofangdianai.com；② ECS: bash scripts/ecs-mp-minimal.sh；③ 体验版 ${build}，删小程序重扫。`
+          `\n\n① 合法域名 https://mofangdianai.com；② ECS: bash scripts/ecs-check-aliyun-beian-wechat.sh；③ 体验版 ${build}；④ 未完成阿里云「接入备案」时微信会一直 -101。`
       } else if (/admin_not_configured|not_configured/i.test(msg)) {
         hint = msg + '\n\nECS: bash scripts/ecs-mp-minimal.sh'
       }
