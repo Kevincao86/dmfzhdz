@@ -2,6 +2,7 @@
  * 与运营台 `meooRegistrySnapshotIo` 同源：从 Supabase `ops_registry_snapshot` 读注册表。
  * 放在 `src/lib` 供 Vite 网关与 `/api/meoo-ops-sync-registry` 共用，确保 Vercel includeFiles 能打进函数包。
  */
+import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 import type { RegistryFile } from './opsRegistryTypes.js'
 
@@ -38,7 +39,7 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
   return {
     async load(): Promise<RegistryFile> {
       const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=registry`
-      const r = await fetch(url, { headers: srHeaders(key), signal: snapSignal() })
+      const r = await erpAwareFetch(url, { headers: srHeaders(key), signal: snapSignal() })
       const t = await r.text()
       if (!r.ok) {
         throw new Error(t.slice(0, 400))
@@ -64,7 +65,7 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
         updated_at: nowIso,
       })
       const url = `${base}/rest/v1/ops_registry_snapshot`
-      const r = await fetch(url, {
+      const r = await erpAwareFetch(url, {
         method: 'POST',
         headers: {
           ...srHeaders(key),

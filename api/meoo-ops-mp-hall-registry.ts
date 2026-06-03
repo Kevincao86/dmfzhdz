@@ -1,8 +1,9 @@
 /**
- * GET /api/meoo-ops-mp-hall-registry — 达人招募大厅（Vercel → ECS erp-api）
+ * GET /api/meoo-ops-mp-hall-registry — Vercel 根 api（与 web版/merchant-erp 同源逻辑）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { proxyGetErpApi } from './mpErpApiProxy.js'
+import { isVercelServerless } from '../web版/merchant-erp/src/lib/mpErpRuntime.js'
+import { loadMpHallRegistryPayload } from '../web版/merchant-erp/src/lib/mpHallRegistryCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -25,36 +26,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-    try {
-      const payload = await proxyGetErpApi('/api/meoo-ops-mp-hall-registry')
-      if (!payload || !Array.isArray(payload.mpRecruitmentOrders)) {
-        res.status(502).send(
-          JSON.stringify({
-            ok: false,
-            error: 'meoo_ops_mp_hall_registry_failed',
-            detail: 'erp_api_invalid_shape',
-          }),
-        )
-        return
-      }
-      res.status(200).send(JSON.stringify(payload))
-    } catch (proxyErr) {
-      const proxyMsg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr)
-      res.status(503).send(
+    const payload = await loadMpHallRegistryPayload()
+
+    if (!payload || !Array.isArray(payload.mpRecruitmentOrders)) {
+      res.status(502).send(
         JSON.stringify({
           ok: false,
           error: 'meoo_ops_mp_hall_registry_failed',
-          detail: `ecs_proxy: ${proxyMsg.slice(0, 400)}`,
+          detail: 'erp_api_invalid_shape',
         }),
       )
+      return
     }
+    res.status(200).send(JSON.stringify(payload))
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).send(
+    const viaProxy = isVercelServerless() && /ecs_proxy|erp_api_proxy|ECONNRESET/i.test(msg)
+    res.status(viaProxy ? 503 : 500).send(
       JSON.stringify({
         ok: false,
         error: 'meoo_ops_mp_hall_registry_failed',
-        detail: msg.slice(0, 800),
+        detail: viaProxy ? `ecs_proxy: ${msg.slice(0, 400)}` : msg.slice(0, 800),
       }),
     )
   }
