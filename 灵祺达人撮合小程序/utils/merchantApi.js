@@ -209,10 +209,10 @@ function merchantRequest(method, path, data, attemptOrOpts = 0) {
   })
 }
 
-function merchantPostUrl(url, data) {
+function merchantPostUrl(url, data, extraHeader = {}) {
   const u = String(url || '').trim()
   if (!u) return Promise.reject(new Error('缺少请求 URL'))
-  return wxRequestPromise(u, 'POST', data || {})
+  return wxRequestPromise(u, 'POST', data || {}, extraHeader)
 }
 
 module.exports = {
@@ -223,4 +223,5 @@ module.exports = {
   merchantPostUrl,
   resolveMerchantApiUrl,
   isRealDevice,
+  isTransientNetError,
 }

@@ -2,6 +2,8 @@
  * POST/GET /api/meoo-ops-mp-auth — 达人/PR 统一登录（微信 code、账号密码、扫码票据）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { proxyGetErpApi, proxyPostErpApi } from '../src/lib/mpErpApiProxy.js'
+import { isVercelServerless } from '../src/lib/mpErpRuntime.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
@@ -55,6 +57,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (req.method === 'OPTIONS') {
     res.status(204).end()
     return
+  }
+
+  /** Vercel（cs 域名）：服务端代转 ECS，规避微信 Cronet 对根域 POST reset */
+  if (isVercelServerless()) {
+    if (req.method === 'POST') {
+      let body: Record<string, unknown> = {}
+      try {
+        body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
+      } catch {
+        sendJson(res, 400, { ok: false, error: 'invalid_json' })
+        return
+      }
+      try {
+        const { status, data } = await proxyPostErpApi('/api/meoo-ops-mp-auth', body)
+        sendJson(res, status >= 200 && status < 600 ? status : 502, data)
+        return
+      } catch (e) {
+        sendJson(res, 502, {
+          ok: false,
+          error: 'mp_auth_ecs_proxy_failed',
+          detail: e instanceof Error ? e.message : String(e),
+          hint: 'Vercel 配置 MEOO_ERP_API_HOST_IP=139.196.42.5；ECS 执行 bash scripts/ecs-fix-erp-api-502.sh',
+        })
+        return
+      }
+    }
+    if (req.method === 'GET') {
+      const qs = new URLSearchParams()
+      for (const [k, v] of Object.entries(req.query || {})) {
+        if (v == null) continue
+        qs.set(k, Array.isArray(v) ? String(v[0]) : String(v))
+      }
+      const path = `/api/meoo-ops-mp-auth${qs.toString() ? `?${qs.toString()}` : ''}`
+      try {
+        const data = await proxyGetErpApi(path)
+        sendJson(res, 200, data)
+        return
+      } catch (e) {
+        sendJson(res, 502, {
+          ok: false,
+          error: 'mp_auth_ecs_proxy_failed',
+          detail: e instanceof Error ? e.message : String(e),
+        })
+        return
+      }
+    }
   }
 
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
