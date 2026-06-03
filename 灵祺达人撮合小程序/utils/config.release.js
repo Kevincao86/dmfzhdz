@@ -5,7 +5,7 @@
  */
 module.exports = {
   MERCHANT_API_BASE_URL: 'https://mofangdianai.com/erp-api',
-  MP_BUILD_ID: 'mp-20260605-ecs-rewrite',
+  MP_BUILD_ID: 'mp-20260606-tls13-post',
   MP_ERP_API_FALLBACK_BASES: [],
   MP_GATEWAY_BASE_URL: '',
   MP_REGISTRY_GATEWAY_BASE_URL: '',

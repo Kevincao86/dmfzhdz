@@ -16,8 +16,8 @@ bash scripts/ecs-redeploy-mp-only.sh
 
 成功标准：
 
-- `curl https://mofangdianai.com/erp-api/mp-cronet-ping` → `"ok":true`
-- `revision` 含 `mp-cronet-ping` 或 `mp-chat-postgrest`
+- ECS 上 `bash scripts/ecs-fix-mp-443-handshake-definitive.sh` 通过（Node 探活 `mp-cronet-ping` → `"ok":true`）
+- `revision` 含 `20260606-tls13-post`
 
 ## 微信后台
 
@@ -28,15 +28,15 @@ bash scripts/ecs-redeploy-mp-only.sh
 
 ## 本机上传体验版
 
-1. 改 `utils/mpBuild.js` → `mp-20260605-ecs-rewrite`（与 `config.release.js` 一致）
+1. 确认 `utils/config.release.js` 中 `MP_BUILD_ID=mp-20260606-tls13-post`
 2. 微信开发者工具 → 上传体验版
 3. **删除**手机小程序 → 重新扫码
 
 ## 仍 ERR_CONNECTION_RESET 时
 
 1. 同一台 iPhone **Safari** 打开：`https://mofangdianai.com/erp-api/mp-cronet-ping`
-   - Safari 通、微信不通 → `bash scripts/ecs-diagnose-wechat-cronet-reset.sh`（TLS/Cronet）
-   - Safari 也不通 → 443/防火墙/证书
+   - Safari 通、微信不通 → 先 `bash scripts/ecs-fix-mp-443-handshake-definitive.sh`（须 TLS1.2+1.3，勿仅 1.2）
+   - Safari 也不通 → 443/防火墙/证书/阿里云备案
 2. 勿只依赖「真机调试」；以**体验版**为准
 3. 确认 `dig +short AAAA mofangdianai.com` 为空（你已确认 OK）
 
