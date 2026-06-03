@@ -1,12 +1,6 @@
-/**
- * Vercel → ECS erp-api：统一用 node:https（规避部分客户端 ALPN/h2 握手 reset）。
- * 对 mofangdianai.com / api.* 默认连公网 IP + SNI（MEOO_ERP_API_HOST_IP，默认 139.196.42.5）。
- */
+/** Vercel 根 api：转发 ECS erp-api（hostname fetch 优先，失败再 IP+SNI） */
 
-import https from 'node:https'
-
-const FETCH_TIMEOUT_MS = 25_000
-const DEFAULT_ERP_IP = '139.196.42.5'
+import { fetchErpDual } from '../web版/merchant-erp/src/lib/erpHttpsDualFetch.js'
 
 function erpApiBases(): string[] {
   const raw = [
@@ -32,69 +26,13 @@ function relPath(apiPath: string): string {
   return p.replace(/^\/api\//, '')
 }
 
-function erpHostIp(): string {
-  const ip = String(process.env.MEOO_ERP_API_HOST_IP || DEFAULT_ERP_IP).trim()
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) ? ip : DEFAULT_ERP_IP
-}
-
-function shouldConnectViaIp(hostname: string): boolean {
-  return /^(mofangdianai\.com|api\.mofangdianai\.com)$/i.test(hostname)
-}
-
-function httpsErpRequest(
-  url: string,
-  method: 'GET' | 'POST',
-  body?: string,
-): Promise<{ status: number; text: string }> {
-  const parsed = new URL(url)
-  const useIp = shouldConnectViaIp(parsed.hostname)
-  const host = useIp ? erpHostIp() : parsed.hostname
-  const path = `${parsed.pathname}${parsed.search}`
-  const sni = parsed.hostname
-
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      {
-        host,
-        port: 443,
-        path,
-        method,
-        servername: sni,
-        rejectUnauthorized: false,
-        headers: {
-          Host: sni,
-          Accept: 'application/json',
-          ...(body
-            ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-            : {}),
-        },
-        timeout: FETCH_TIMEOUT_MS,
-      },
-      (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (c) => chunks.push(c))
-        res.on('end', () => {
-          resolve({ status: res.statusCode || 0, text: Buffer.concat(chunks).toString('utf8') })
-        })
-      },
-    )
-    req.on('error', reject)
-    req.on('timeout', () => {
-      req.destroy()
-      reject(new Error('erp_https_timeout'))
-    })
-    if (body) req.write(body)
-    req.end()
-  })
-}
-
 export async function proxyGetErpApi(apiPath: string): Promise<Record<string, unknown>> {
   const rel = relPath(apiPath)
   let last = 'erp_api_proxy_failed'
   for (const base of erpApiBases()) {
     const url = `${base}/${rel}`
     try {
-      const { status, text } = await httpsErpRequest(url, 'GET')
+      const { status, text } = await fetchErpDual(url, 'GET')
       if (status < 200 || status >= 300) {
         last = `${status}:${text.slice(0, 120)}`
         continue
@@ -117,7 +55,7 @@ export async function proxyPostErpApi(
   for (const base of erpApiBases()) {
     const url = `${base}/${rel}`
     try {
-      const { status, text } = await httpsErpRequest(url, 'POST', payload)
+      const { status, text } = await fetchErpDual(url, 'POST', payload)
       let data: Record<string, unknown> = {}
       try {
         data = JSON.parse(text || '{}') as Record<string, unknown>
