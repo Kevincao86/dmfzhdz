@@ -78,7 +78,7 @@ Page({
       } else if (/reset|cronet|download:fail/i.test(msg)) {
         hint =
           msg +
-          '\n\n请确认：① DNS 已添加 api.mofangdianai.com；② 微信合法域名含 api 与根域；③ 上传体验版 mp-20260603-api-cronet 并删小程序重扫。'
+          '\n\n请确认：① 微信合法域名仅 https://mofangdianai.com（request+downloadFile）；② ECS 执行 bash scripts/ecs-fix-mp-wechat-login.sh；③ 上传体验版 mp-20260603-root-get-login 并删小程序重扫。'
       } else if (/supabase_admin_not_configured|chat_supabase/i.test(msg)) {
         hint = msg + '\n\nECS 执行: bash scripts/ecs-fix-mp-chat-ecs.sh'
       }

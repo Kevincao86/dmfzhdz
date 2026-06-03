@@ -6,7 +6,7 @@ function baseUrl() {
     .replace(/\/$/, '')
 }
 
-/** 主域 Cronet reset 时依次尝试（须 DNS：api → 与根域同 IP） */
+/** 可选 MP_ERP_API_FALLBACK_BASES 配置额外基址（勿用未备案/未解析子域） */
 function erpApiBaseList() {
   const out = []
   const push = (raw) => {
@@ -128,11 +128,7 @@ function merchantGetViaDownload(url) {
 function shouldUseCronetWorkaround(url) {
   try {
     const h = new URL(url).hostname
-    return (
-      h === 'mofangdianai.com' ||
-      h === 'www.mofangdianai.com' ||
-      h === 'api.mofangdianai.com'
-    )
+    return h === 'mofangdianai.com' || h === 'www.mofangdianai.com'
   } catch {
     return /mofangdianai\.com/i.test(String(url || ''))
   }
