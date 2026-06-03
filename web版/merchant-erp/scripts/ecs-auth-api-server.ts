@@ -55,7 +55,7 @@ import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260603-mp-chat-postgrest'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260604-mp-cronet-ping'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -134,6 +134,19 @@ const routes: Record<string, VercelLikeHandler> = {
         ok: true,
         revision: ECS_AUTH_API_ROUTE_REVISION,
         routes: Object.keys(routes).length,
+      }),
+    )
+  },
+  /** 微信 Cronet / Safari 探活：/erp-api/mp-cronet-ping → /api/mp-cronet-ping */
+  '/api/mp-cronet-ping': async (_req, res) => {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.end(
+      JSON.stringify({
+        ok: true,
+        via: 'auth-api',
+        revision: ECS_AUTH_API_ROUTE_REVISION,
       }),
     )
   },

@@ -205,7 +205,10 @@ function ecsRequest(method, apiPath, data, opts = {}) {
 }
 
 function pingEcs() {
-  return fetchJsonWithRetry(resolveUrl('/api/meoo-erp-api-health'), 'GET', undefined, {})
+  const pingPath = '/api/mp-cronet-ping'
+  return fetchJsonWithRetry(resolveUrl(pingPath), 'GET', undefined, {}).catch(() =>
+    fetchJsonWithRetry(resolveUrl('/api/meoo-erp-api-health'), 'GET', undefined, {}),
+  )
 }
 
 module.exports = {
