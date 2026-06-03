@@ -20,12 +20,14 @@ function apiPath(raw) {
   return p
 }
 
-function ipTarget(path, useHttps) {
+function ipTarget(path, { https, port }) {
+  const useHttps = https === true
+  const p = port || (useHttps ? 443 : 80)
   return {
     mode: 'ip',
     proto: useHttps ? 'https' : 'http',
     hostname: ERP_IP,
-    port: useHttps ? 443 : 80,
+    port: p,
     path,
     host: ERP_HOST,
   }
@@ -41,8 +43,10 @@ function buildAttempts(path) {
   if (ORIGIN) return [urlTarget(path)]
   if (!ERP_IP) return [urlTarget(path)]
   const list = []
-  if (target.https !== false) list.push(ipTarget(path, true))
-  list.push(ipTarget(path, false))
+  if (target.https !== false) list.push(ipTarget(path, { https: true }))
+  list.push(ipTarget(path, { https: false, port: 80 }))
+  const alt = Number(target.altPort)
+  if (alt > 0) list.push(ipTarget(path, { https: false, port: alt }))
   return list
 }
 
@@ -114,7 +118,7 @@ function upstreamRequest(t, method, body, headers) {
 }
 
 function describeTarget(t) {
-  if (t.mode === 'ip') return `${t.proto}://${t.host}${t.path} @${t.hostname}:${t.port}`
+  if (t.mode === 'ip') return `${t.proto}://${t.host}${t.path}@${t.hostname}:${t.port}`
   return t.fullUrl
 }
 
