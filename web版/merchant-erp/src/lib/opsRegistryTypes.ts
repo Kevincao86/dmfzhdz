@@ -263,6 +263,8 @@ export type RegistryMpRecruitmentOrder = {
   deadline?: string
   /** PR 反选达人 applicant.id 列表 */
   selectedApplicantIds?: string[]
+  /** PR 上传的项目群二维码（data URL 或 https） */
+  groupQrImage?: string
   mpPublishMeta?: Record<string, unknown>
   /** pr：小程序发招募；merchant：商家/运营后台同步 */
   publisherIdentity?: 'pr' | 'merchant'
@@ -280,6 +282,8 @@ export type RegistryMpTalentInboxItem = {
   contact?: string
   platformAccount?: string
   applicantId?: string
+  /** 群二维码等附图（与 body 一并展示） */
+  imageUrl?: string
   createdAt: string
   read?: boolean
 }

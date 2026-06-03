@@ -71,3 +71,12 @@
   display: block;
   line-height: 1.5;
 }
+
+.ntf-image {
+  display: block;
+  width: 100%;
+  max-width: 420rpx;
+  margin-top: 16rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid var(--lq-primary-100, #e0e7ff);
+}

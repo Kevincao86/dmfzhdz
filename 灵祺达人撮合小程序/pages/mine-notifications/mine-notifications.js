@@ -61,4 +61,9 @@ Page({
   async onShow() {
     await this.loadRows()
   },
+  onPreviewInboxImage(e) {
+    const url = e.currentTarget.dataset.url
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
 })

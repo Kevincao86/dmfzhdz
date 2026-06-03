@@ -60,9 +60,22 @@ function patchSelectedApplicantIds(mpOrderId, selectedApplicantIds) {
   )
 }
 
+function patchGroupQrImage(mpOrderId, groupQrImage) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return Promise.reject(new Error('参数无效'))
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    { id, groupQrImage: String(groupQrImage || '') },
+  )
+}
+
 module.exports = {
   updateMpRecruitmentOrder,
   deleteMpRecruitmentOrder,
   patchMpRecruitmentOrderStatus,
   patchSelectedApplicantIds,
+  patchGroupQrImage,
 }
