@@ -2,13 +2,13 @@ import type { RegistryFile, RegistryMpPrUser } from './opsRegistryTypes.js'
 import { allocateLingqiPrId } from './lingqiIdentity.js'
 
 function prDedupeKey(user: RegistryMpPrUser): string {
+  const openId = String(user.wxOpenId || '').trim()
+  if (openId) return `openid:${openId}`
   const phone = String(user.contactPhone || '')
     .replace(/\D/g, '')
     .slice(-11)
   if (phone.length >= 8) return `phone:${phone}`
-  const wx = String(user.wxOpenId || user.wechatId || user.wxNickName || '')
-    .trim()
-    .toLowerCase()
+  const wx = String(user.wechatId || user.wxNickName || '').trim().toLowerCase()
   return wx ? `wx:${wx}` : ''
 }
 

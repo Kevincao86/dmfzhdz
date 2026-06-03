@@ -1,0 +1,67 @@
+.page {
+  min-height: 100vh;
+  padding: 48rpx 32rpx;
+  background: linear-gradient(160deg, #312e81, #0f172a);
+  box-sizing: border-box;
+}
+.card {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 48rpx 36rpx;
+}
+.title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+.sub {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  margin: 12rpx 0 36rpx;
+}
+.tabs {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 32rpx;
+}
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx;
+  border-radius: 12rpx;
+  background: #f1f5f9;
+  font-size: 26rpx;
+  color: #64748b;
+}
+.tab.on {
+  background: #4f46e5;
+  color: #fff;
+}
+.input {
+  border: 1px solid #e2e8f0;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  font-size: 28rpx;
+}
+.btn.primary {
+  background: linear-gradient(90deg, #4f46e5, #f97316);
+  color: #fff;
+  border-radius: 12rpx;
+  margin-top: 8rpx;
+}
+.hint {
+  display: block;
+  font-size: 22rpx;
+  color: #94a3b8;
+  margin-top: 20rpx;
+  text-align: center;
+}
+.err {
+  display: block;
+  color: #dc2626;
+  font-size: 24rpx;
+  margin-top: 20rpx;
+}
