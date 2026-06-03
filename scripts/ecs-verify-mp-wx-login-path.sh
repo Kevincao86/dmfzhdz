@@ -55,4 +55,9 @@ wait_auth_api || true
 post_mp_auth "2) dev 全链路" \
   '{"action":"wx_login","code":"ecs_dev_full_path_probe","role":"talent","wxNickName":"probe"}'
 
-echo "期望 {\"ok\":true,\"token\":...}；若 502：bash scripts/ecs-fix-erp-api-502.sh"
+echo "=== 3) hall_registry POST（招募大厅同路径）==="
+curl -sS -m 25 -X POST -H "Content-Type: application/json" \
+  http://127.0.0.1:3001/api/meoo-ops-mp-auth \
+  -d '{"action":"hall_registry"}' | head -c 400
+echo ""
+echo "期望 {\"ok\":true,\"token\":...} 与 {\"ok\":true,\"mpRecruitmentOrders\":[...]}"

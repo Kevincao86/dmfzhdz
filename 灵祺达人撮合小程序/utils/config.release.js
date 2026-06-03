@@ -11,5 +11,5 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260606-hall-lite',
+  MP_BUILD_ID: 'mp-20260606-hall-post',
 }
