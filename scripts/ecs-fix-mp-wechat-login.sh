@@ -7,11 +7,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DOMAIN="${1:-mofangdianai.com}"
 
-echo "== 1) Nginx 根域（无 http2 / TLS1.2 / erp-api） =="
-sudo cp "$ROOT/scripts/ecs-meoo-api.nginx.conf" /etc/nginx/sites-available/meoo-api
-sudo ln -sf /etc/nginx/sites-available/meoo-api /etc/nginx/sites-enabled/meoo-api
-sudo rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
-sudo bash "$ROOT/scripts/ecs-fix-wechat-cronet-tls.sh" "$DOMAIN"
+echo "== 1) 443 握手 + Nginx + auth-api =="
+bash "$ROOT/scripts/ecs-fix-mp-443-handshake-definitive.sh" "$DOMAIN"
 
 echo "== 2) 443 仅 Nginx 监听 =="
 sudo ss -tlnp | grep ':443' || true
@@ -23,9 +20,14 @@ echo "== 4) 公网探活（根域 ${DOMAIN}） =="
 curl -sS -m 12 --http1.1 "https://${DOMAIN}/erp-api/meoo-erp-api-health" | head -c 140 || echo "FAIL health"
 echo
 CODE="probe_$(date +%s)"
-URL="https://${DOMAIN}/erp-api/meoo-ops-mp-auth?action=wx_login&code=${CODE}&role=talent"
-HTTP="$(curl -sS -o /tmp/mp-wx-login-probe.json -w "%{http_code}" -m 20 --http1.1 "$URL" || echo 000)"
-echo "GET wx_login http=${HTTP} (400/503=路由通，invalid code 正常)"
+HTTP="$(node -e "
+const https=require('https');
+const data=JSON.stringify({action:'wx_login',code:'${CODE}',role:'talent'});
+const o={host:'${DOMAIN}',port:443,path:'/erp-api/meoo-ops-mp-auth',method:'POST',servername:'${DOMAIN}',timeout:20000,headers:{Host:'${DOMAIN}','Content-Type':'application/json','Content-Length':Buffer.byteLength(data)}};
+const r=https.request(o,res=>process.exit(res.statusCode>=400&&res.statusCode<600?0:1));
+r.on('error',()=>process.exit(1));r.write(data);r.end();
+" && echo 400 || echo 000)"
+echo "POST wx_login probe http=${HTTP} (4xx/5xx=路由通，invalid code 正常)"
 head -c 200 /tmp/mp-wx-login-probe.json 2>/dev/null || true
 echo
 
@@ -38,6 +40,6 @@ echo "== 5) 微信后台（仅根域） =="
 echo "  request 合法域名: https://${DOMAIN}"
 echo "  downloadFile 合法域名: https://${DOMAIN}"
 echo "  小程序 MERCHANT_API_BASE_URL=https://${DOMAIN}/erp-api"
-echo "  体验版构建号: mp-20260604-ecs-get-login（真机 GET+downloadFile 登录）"
+echo "  体验版构建号: mp-20260606-tls13-post（登录 POST JSON，勿超长 GET）"
 echo "  若仍 reset：删除域名 AAAA 记录；iPhone Safari 打开 https://${DOMAIN}/erp-api/mp-cronet-ping"
 echo "OK"

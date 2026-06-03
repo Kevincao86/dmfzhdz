@@ -46,17 +46,6 @@ function authHeaders() {
 
 async function mpAuthRequest(action, payload = {}) {
   const body = { action, ...payload }
-  if (mp.isPhone()) {
-    const qs = Object.entries(body)
-      .filter(([, v]) => v != null && v !== '' && typeof v !== 'object')
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-      .join('&')
-    return mp.call({
-      method: 'GET',
-      path: `/api/meoo-ops-mp-auth?${qs}`,
-      headers: authHeaders(),
-    })
-  }
   return mp.call({
     method: 'POST',
     path: '/api/meoo-ops-mp-auth',

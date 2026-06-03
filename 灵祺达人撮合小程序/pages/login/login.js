@@ -32,7 +32,7 @@ Page({
       if (/reset|cronet|-101/i.test(msg)) {
         this.setData({
           netOk:
-            '微信 Cronet 无法握手（Safari 可能仍正常）。ECS: bash scripts/ecs-diagnose-wechat-cronet-reset.sh；域名删 AAAA；用体验版勿只真机调试',
+            'HTTPS 握手失败（非登录逻辑）。ECS: bash scripts/ecs-fix-mp-443-handshake-definitive.sh；删 AAAA；体验版 mp-20260606-tls13-post',
         })
       }
     }
@@ -97,10 +97,10 @@ Page({
       if (msg.indexOf('wx_not_configured') >= 0) {
         hint = '服务端未配置微信密钥，请联系管理员'
       } else if (/reset|cronet|download:fail|request:fail/i.test(msg)) {
-        const build = mp.BUILD_ID || 'mp-20260605-ecs-rewrite'
+        const build = mp.BUILD_ID || 'mp-20260606-tls13-post'
         hint =
           msg +
-          `\n\n① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-redeploy-mp-only.sh；③ 体验版 ${build}，删小程序重扫。`
+          `\n\n① 合法域名 https://mofangdianai.com；② ECS: bash scripts/ecs-fix-mp-443-handshake-definitive.sh；③ 体验版 ${build}，删小程序重扫。`
       } else if (/admin_not_configured|chat_supabase|not_configured/i.test(msg)) {
         hint = msg + '\n\nECS: bash scripts/ecs-redeploy-mp-only.sh'
       }

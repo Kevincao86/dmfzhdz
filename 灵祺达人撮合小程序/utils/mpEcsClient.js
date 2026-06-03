@@ -4,7 +4,7 @@
  */
 const config = require('./config.js')
 
-const BUILD_ID = String(config.MP_BUILD_ID || 'mp-20260605-ecs-rewrite')
+const BUILD_ID = String(config.MP_BUILD_ID || 'mp-20260606-tls13-post')
 
 const NET = {
   enableHttp2: false,
@@ -156,14 +156,6 @@ function call(opts) {
   const headers = opts.headers || {}
   let path = String(opts.path || '')
   const body = opts.body
-
-  if (method === 'POST' && isPhone() && /meoo-ops-mp-auth/i.test(path.split('?')[0]) && body && body.action) {
-    const qs = Object.entries(body)
-      .filter(([, v]) => v != null && v !== '' && typeof v !== 'object')
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-      .join('&')
-    return getJson(toUrl(`/api/meoo-ops-mp-auth?${qs}`))
-  }
 
   const url = toUrl(path)
   if (method === 'GET') return getJson(url)

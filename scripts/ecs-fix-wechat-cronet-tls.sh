@@ -22,11 +22,11 @@ fi
 echo | openssl s_client -connect 127.0.0.1:443 -servername mofangdianai.com 2>/dev/null \
   | openssl x509 -noout -subject -issuer -dates || true
 
-echo "== 2) 关 http2、仅 TLS1.2、关 session tickets（微信 Cronet 兼容） =="
+echo "== 2) 关 http2、TLS1.2+TLS1.3、关 session tickets（勿仅 TLS1.2，Cronet 先握 1.3 会 reset） =="
 sudo cp "$SITE" "${SITE}.bak.cronet.$(date +%Y%m%d%H%M%S)"
 sudo sed -i -E 's/listen ([0-9]+) ssl http2/listen \1 ssl/g' "$SITE"
 sudo sed -i -E 's/listen ([0-9]+) http2/listen \1/g' "$SITE"
-sudo sed -i 's/ssl_protocols.*/    ssl_protocols TLSv1.2;/' "$SITE"
+sudo sed -i 's/ssl_protocols.*/    ssl_protocols TLSv1.2 TLSv1.3;/' "$SITE"
 sudo grep -q ssl_session_tickets "$SITE" || sudo sed -i '/ssl_protocols/a\    ssl_session_tickets off;' "$SITE"
 # 微信 Cronet 常见兼容套件（避免仅 TLS1.3 / 现代套件导致握手 reset）
 if ! sudo grep -q 'ssl_ciphers.*ECDHE-RSA-AES128-GCM' "$SITE"; then
