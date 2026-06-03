@@ -1,7 +1,6 @@
-import type { IncomingMessage } from 'node:http'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { loadEnv, type Plugin } from 'vite'
-import mpAuthHandler from '../api/meoo-ops-mp-auth.js'
+import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.js'
 
 function applyViteEnvToProcess(env: Record<string, string>) {
   for (const [key, value] of Object.entries(env)) {
@@ -9,19 +8,10 @@ function applyViteEnvToProcess(env: Record<string, string>) {
   }
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = []
-    req.on('data', (c) => chunks.push(Buffer.from(c)))
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-    req.on('error', reject)
-  })
-}
-
-/** Vite dev：/api/meoo-ops-mp-auth */
-export function mpAuthGatewayPlugin(): Plugin {
+/** Vite dev：GET /api/meoo-ops-mp-hall-registry */
+export function mpHallRegistryGatewayPlugin(): Plugin {
   return {
-    name: 'mp-auth-gateway',
+    name: 'mp-hall-registry-gateway',
     configResolved(config) {
       applyViteEnvToProcess(loadEnv(config.mode, config.root, ''))
     },
@@ -29,31 +19,22 @@ export function mpAuthGatewayPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ?? ''
         const path = rawUrl.split('?')[0]
-        if (path !== '/api/meoo-ops-mp-auth') return next()
+        if (path !== '/api/meoo-ops-mp-hall-registry') return next()
 
         const method = req.method ?? 'GET'
         if (method === 'OPTIONS') {
           res.statusCode = 204
           res.setHeader('Access-Control-Allow-Origin', '*')
-          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
+          res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
           res.end()
           return
         }
 
-        const body = method === 'POST' ? await readBody(req) : ''
-        const url = new URL(rawUrl, 'http://127.0.0.1')
-        const query: Record<string, string | string[]> = {}
-        url.searchParams.forEach((v, k) => {
-          query[k] = v
-        })
-
         const mockReq = {
           method,
           url: rawUrl,
-          query,
+          query: Object.fromEntries(new URL(rawUrl, 'http://127.0.0.1').searchParams),
           headers: req.headers,
-          body,
         } as unknown as VercelRequest
 
         let statusCode = 200
@@ -72,14 +53,14 @@ export function mpAuthGatewayPlugin(): Plugin {
         } as unknown as VercelResponse
 
         try {
-          await mpAuthHandler(mockReq, mockRes)
+          await mpHallRegistryHandler(mockReq, mockRes)
         } catch (e) {
           res.statusCode = 500
           res.setHeader('Content-Type', 'application/json')
           res.end(
             JSON.stringify({
               ok: false,
-              error: 'mp_auth_gateway_failed',
+              error: 'mp_hall_registry_gateway_failed',
               detail: e instanceof Error ? e.message : String(e),
             }),
           )
