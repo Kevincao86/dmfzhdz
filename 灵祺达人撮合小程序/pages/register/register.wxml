@@ -33,6 +33,33 @@
   <view class="card apply-form">
     <view class="section-head">
       <view class="section-head-dot" />
+      <text class="section-title">登录账号（选填）</text>
+    </view>
+    <text class="hint block-hint">设置后可在登录页使用「账号密码」登录，与当前微信绑定为同一灵祺 ID</text>
+    <view class="form-row">
+      <text class="form-label">登录名</text>
+      <input
+        class="input"
+        placeholder="字母数字，用于账号密码登录"
+        value="{{loginName}}"
+        bindinput="onLoginNameInput"
+      />
+    </view>
+    <view class="form-row">
+      <text class="form-label">登录密码</text>
+      <input
+        class="input"
+        password
+        placeholder="{{hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}}"
+        value="{{password}}"
+        bindinput="onPasswordInput"
+      />
+    </view>
+  </view>
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
       <text class="section-title">联系信息</text>
     </view>
     <view class="form-row">

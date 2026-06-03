@@ -5,6 +5,8 @@ const userProfile = require('../../utils/userProfile.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const regionPicker = require('../../utils/regionPicker.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
+const auth = require('../../utils/auth.js')
+const accountMemberSync = require('../../utils/accountMemberSync.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const ACCOUNT_TYPES = [
@@ -38,10 +40,20 @@ Page({
     orgLabel: '公司/机构名称',
     orgPlaceholder: '请输入公司或机构全称',
     lingqiPrIdLabel: '',
+    loginName: '',
+    password: '',
+    hasPassword: false,
   },
-  onShow() {
+  async onShow() {
+    if (auth.isLoggedIn()) {
+      try {
+        await auth.refreshSession()
+      } catch (_) {}
+    }
+    const acct = auth.readAccount()
     const cur = userProfile.readPrProfile()
     const form = normalizeForm(cur)
+    if (acct) accountMemberSync.syncPrProfileFromAccount(acct)
     const wx = wxAccount.readWxAccount()
     if (wx) {
       form.wxNickName = form.wxNickName || wx.wxNickName
@@ -53,8 +65,18 @@ Page({
       ...region,
       orgLabel: form.accountType === 'personal' ? '个人名称' : '公司/机构名称',
       orgPlaceholder: form.accountType === 'personal' ? '请输入您的姓名或昵称' : '请输入公司或机构全称',
-      lingqiPrIdLabel: lingqiIdentity.formatPrIdLabel(form.lingqiPrId),
+      lingqiPrIdLabel: lingqiIdentity.formatPrIdLabel(
+        (acct && acct.lingqiPrId) || form.lingqiPrId,
+      ),
+      loginName: (acct && acct.loginName) || '',
+      hasPassword: !!(acct && acct.hasPassword),
     })
+  },
+  onLoginNameInput(e) {
+    this.setData({ loginName: e.detail.value })
+  },
+  onPasswordInput(e) {
+    this.setData({ password: e.detail.value })
   },
   onField(e) {
     const k = e.currentTarget.dataset.k
@@ -121,10 +143,12 @@ Page({
     }
     const wx = wxAccount.readWxAccount()
     const prev = userProfile.readPrProfile()
+    const acct = auth.readAccount()
     const saved = {
       ...f,
-      id: (prev && prev.id) || f.id || `MPR-${Date.now()}`,
-      lingqiPrId: (prev && prev.lingqiPrId) || f.lingqiPrId || '',
+      id: (acct && acct.registryPrId) || (prev && prev.id) || f.id || `MPR-${Date.now()}`,
+      lingqiPrId: (acct && acct.lingqiPrId) || (prev && prev.lingqiPrId) || f.lingqiPrId || '',
+      wxOpenId: String((acct && acct.openid) || f.wxOpenId || (prev && prev.wxOpenId) || '').trim(),
       registeredAt: (prev && prev.registeredAt) || f.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
       companyName: f.accountType === 'company' ? org : '',
       personalName: f.accountType === 'personal' ? org : '',
@@ -141,6 +165,7 @@ Page({
         const prUser = {
           id: saved.id || `MPR-${Date.now()}`,
           lingqiPrId: saved.lingqiPrId || '',
+          wxOpenId: saved.wxOpenId || '',
           accountType: saved.accountType,
           companyName: saved.companyName || '',
           personalName: saved.personalName || '',
@@ -163,6 +188,16 @@ Page({
         }
       } catch (_) {
         cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
+      }
+    }
+    if (auth.isLoggedIn() && String(this.data.loginName || '').trim()) {
+      try {
+        await auth.setLoginCredentials(this.data.loginName.trim(), this.data.password)
+      } catch (e) {
+        const msg = e && e.message ? e.message : String(e)
+        if (msg.indexOf('login_name_taken') >= 0) {
+          cloudWarn = cloudWarn || '登录名已被占用，请换一个'
+        }
       }
     }
     this.setData({

@@ -7,6 +7,8 @@ export type MpAccount = {
   activeRole: MpAccountRole
   lingqiTalentId: string | null
   lingqiPrId: string | null
+  registryMemberId?: string | null
+  registryPrId?: string | null
   wxNickName: string | null
   wxAvatarUrl: string | null
   hasPassword: boolean

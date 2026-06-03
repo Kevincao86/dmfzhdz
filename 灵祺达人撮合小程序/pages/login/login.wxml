@@ -19,7 +19,7 @@
     </block>
 
     <block wx:else>
-      <input class="login-input" placeholder="登录名" value="{{loginName}}" bindinput="onLoginName" />
+      <input class="login-input" placeholder="在「我的信息」中设置的登录名" value="{{loginName}}" bindinput="onLoginName" />
       <input
         class="login-input"
         password

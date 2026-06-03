@@ -1,4 +1,5 @@
 const ecs = require('./ecs.js')
+const accountMemberSync = require('./accountMemberSync.js')
 
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
@@ -24,6 +25,7 @@ function readAccount() {
 function writeSession(token, account) {
   wx.setStorageSync(SESSION_KEY, token)
   wx.setStorageSync(ACCOUNT_KEY, JSON.stringify(account || {}))
+  accountMemberSync.syncLocalProfilesFromAccount(account)
 }
 
 function clearSession() {
@@ -47,6 +49,7 @@ function authHeaders() {
 async function authPost(action, payload = {}) {
   const data = await ecs.post('/api/meoo-ops-mp-auth', { action, ...payload }, authHeaders())
   if (data.token && data.account) writeSession(data.token, data.account)
+  else if (data.account) writeSession(readSessionToken(), data.account)
   return data
 }
 
@@ -54,30 +57,40 @@ async function wxLogin(opts = {}) {
   const code = await new Promise((resolve, reject) => {
     wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
   })
-  return authPost('wx_login', {
+  const data = await authPost('wx_login', {
     code,
+    stableDevOpenId: accountMemberSync.ensureStableDevOpenId(),
     role: opts.role || 'talent',
     wxNickName: opts.wxNickName || '',
     wxAvatarUrl: opts.wxAvatarUrl || '',
     registerTalent: opts.registerTalent,
     registerPr: opts.registerPr,
   })
+  return accountMemberSync.afterAuthSuccess(data)
 }
 
 async function passwordLogin(loginName, password) {
-  return authPost('password_login', { loginName, password })
+  const data = await authPost('password_login', { loginName, password })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
+async function setLoginCredentials(loginName, password) {
+  return authPost('set_login_credentials', {
+    loginName: String(loginName || '').trim(),
+    password: password == null ? '' : String(password),
+  })
 }
 
 async function switchRole(role) {
   const data = await authPost('switch_role', { role })
   if (data.account) writeSession(readSessionToken(), data.account)
-  return data
+  return accountMemberSync.afterAuthSuccess(data)
 }
 
 async function refreshSession() {
   const data = await authPost('session', {})
   if (data.account) writeSession(readSessionToken(), data.account)
-  return data
+  return accountMemberSync.afterAuthSuccess(data)
 }
 
 module.exports = {
@@ -90,6 +103,7 @@ module.exports = {
   isLoggedIn,
   wxLogin,
   passwordLogin,
+  setLoginCredentials,
   switchRole,
   refreshSession,
 }

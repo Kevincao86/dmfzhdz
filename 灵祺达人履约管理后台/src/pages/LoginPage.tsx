@@ -123,7 +123,7 @@ export default function LoginPage() {
           <div className="space-y-4">
             <input
               className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"
-              placeholder="登录名（与小程序/Web 共用）"
+              placeholder="在「我的信息」中设置的登录名"
               value={loginName}
               onChange={(e) => setLoginName(e.target.value)}
             />
