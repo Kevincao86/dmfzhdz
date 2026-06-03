@@ -1,8 +1,9 @@
 /**
- * 达人招募小程序 PR ↔ 达人私信（Supabase service_role / RPC）
+ * 达人招募小程序 PR ↔ 达人私信（ECS PostgREST RPC + REST，无 Realtime）
  */
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import WebSocketImpl from 'ws'
+import { PostgrestClient } from '@supabase/postgrest-js'
+
+export type MpChatDb = PostgrestClient
 
 export type MpChatRole = 'pr' | 'talent'
 
@@ -41,26 +42,19 @@ export type MpChatMessageRow = {
   client_msg_id: string
 }
 
-function nodeNeedsWsShim(): boolean {
-  const v = typeof process !== 'undefined' ? process.versions?.node : undefined
-  if (!v) return false
-  const major = Number.parseInt(v.split('.')[0] ?? '', 10)
-  return Number.isFinite(major) && major < 22
-}
-
-export function createMpTalentChatAdmin(url: string, serviceRole: string): SupabaseClient {
-  // Node < 22 须 realtime.transport=ws（global.WebSocket 无效，见 @supabase/realtime-js）
-  const realtime = nodeNeedsWsShim()
-    ? { transport: WebSocketImpl as unknown as typeof WebSocket }
-    : undefined
-  return createClient(url, serviceRole, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    ...(realtime ? { realtime } : {}),
+/** 连 ECS PostgREST（/rest/v1），不初始化 Supabase Realtime，避免 Node 20 WebSocket 报错 */
+export function createMpTalentChatAdmin(url: string, serviceRole: string): MpChatDb {
+  const base = url.replace(/\/$/, '')
+  return new PostgrestClient(`${base}/rest/v1`, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+    },
   })
 }
 
 export async function upsertParticipant(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   p: MpChatParticipantInput,
 ): Promise<void> {
   const { error } = await sb.rpc('mp_talent_chat_upsert_participant', {
@@ -75,7 +69,7 @@ export async function upsertParticipant(
 }
 
 export async function listSessions(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   participantKey: string,
   deviceSecret: string,
 ): Promise<MpChatSessionRow[]> {
@@ -89,7 +83,7 @@ export async function listSessions(
 
 /** PR 侧：双方均发过消息的达人 participant_key 列表 */
 export async function listPrMutualTalentKeys(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   prKey: string,
   prSecret: string,
 ): Promise<string[]> {
@@ -102,7 +96,7 @@ export async function listPrMutualTalentKeys(
 }
 
 export async function fetchMessages(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   sessionId: string,
   participantKey: string,
   deviceSecret: string,
@@ -119,7 +113,7 @@ export async function fetchMessages(
 }
 
 export async function sendMessage(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   input: {
     sessionId: string
     participantKey: string
@@ -151,7 +145,7 @@ function isEnsureSessionRpcMissing(err: { message?: string; code?: string }): bo
 }
 
 export async function ensureSession(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   input: {
     talentKey: string
     prKey: string
@@ -199,7 +193,7 @@ export async function ensureSession(
 }
 
 export async function markSessionRead(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   sessionId: string,
   participantKey: string,
   deviceSecret: string,
@@ -213,7 +207,7 @@ export async function markSessionRead(
 }
 
 export async function readParticipantProfile(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   participantKey: string,
 ): Promise<{ displayName: string; avatarUrl: string } | null> {
   const { data, error } = await sb
@@ -230,7 +224,7 @@ export async function readParticipantProfile(
 }
 
 export async function readParticipantSecret(
-  sb: SupabaseClient,
+  sb: MpChatDb,
   participantKey: string,
 ): Promise<string | null> {
   const { data, error } = await sb

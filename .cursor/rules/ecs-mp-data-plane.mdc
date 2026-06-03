@@ -1,0 +1,12 @@
+---
+description: 小程序/达人后台数据面走 ECS 本机，非 Supabase 云服务
+alwaysApply: true
+---
+
+# ECS 数据面（非 Supabase SaaS）
+
+- **生产数据**：ECS 本机 Postgres + PostgREST `http://127.0.0.1:8888`，经 `meoo-auth-api`（:3001）与 Nginx `/erp-api/` 对外。
+- **环境变量名** `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 等为历史命名；值为本机 JWT 与 `127.0.0.1:8888`，**不要**配置 `*.supabase.co` 云端项目。
+- **小程序 API**：`https://mofangdianai.com/erp-api`（禁止改用 `api.mofangdianai.com` 子域，除非用户明确要求）。
+- **代码路径**：仓库为 `web版/merchant-erp`；ECS 若另有 `web/merchant-erp`，`systemd` 的 `WorkingDirectory` 必须与 `bash scripts/ecs-verify-auth-api-path.sh` 解析路径一致，否则 `git pull` 后仍跑旧代码。
+- **私信接口**：仅 HTTP RPC/REST 访问 PostgREST；勿依赖 `@supabase/supabase-js` 的 Realtime/WebSocket（Node 20 会报错）。
