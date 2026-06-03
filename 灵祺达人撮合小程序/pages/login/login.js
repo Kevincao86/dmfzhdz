@@ -14,6 +14,7 @@ Page({
   },
 
   onLoad() {
+    this.setData({ err: '' })
     if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
       return
@@ -99,7 +100,7 @@ Page({
         hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
       } else if (/row-level security|ops_registry_snapshot|42501/i.test(msg)) {
         hint =
-          '注册表权限未放开。ECS 执行：cd ~/app && bash scripts/ecs-fix-ops-registry-rls.sh && sudo systemctl restart meoo-auth-api'
+          '注册表 RLS 报错。若 ECS 已执行 ecs-fix-ops-registry-rls.sh 且探活 OK，请再点一次登录；仍失败则 bash scripts/ecs-verify-mp-wx-login-path.sh'
       } else if (api.isNetReset(msg)) {
         const build = api.BUILD_ID
         hint =
