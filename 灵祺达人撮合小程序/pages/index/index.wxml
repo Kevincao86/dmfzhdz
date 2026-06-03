@@ -113,7 +113,7 @@
     </view>
 
     <view wx:if="{{unconfigured}}" class="card state-warn home-filters-warn">
-      <text class="hint">尚未连接后台，演示商单可预览；请在 utils/config.release.js 填写 MERCHANT_API_BASE_URL 后重新上传体验版</text>
+      <text class="hint">演示模式，连接后台后可查看真实商单</text>
     </view>
   </view>
 
@@ -124,12 +124,11 @@
         <view class="loading-dot" />
         <view class="loading-dot" />
       </view>
-      <text class="hint list-hint">加载招募中…</text>
+      <text class="list-hint">加载中</text>
     </view>
 
     <view wx:elif="{{err}}" class="card state-error">
       <text class="err-detail">{{err}}</text>
-      <text class="err-build" wx:if="{{mpBuildId}}">构建 {{mpBuildId}}</text>
     </view>
 
     <block wx:else>

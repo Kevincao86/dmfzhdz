@@ -67,6 +67,8 @@ function buildAttempts(path) {
 function upstreamRequest(t, method, body, headers) {
   return new Promise((resolve, reject) => {
     const payload = body != null && method !== 'GET' ? JSON.stringify(body) : ''
+    const reqPath = t.mode === 'ip' ? t.path : `${new URL(t.fullUrl).pathname}${new URL(t.fullUrl).search}`
+    const timeoutMs = /registry|hall-registry/i.test(reqPath) ? 45000 : 20000
     let opts
     if (t.mode === 'ip') {
       opts = {
@@ -84,7 +86,7 @@ function upstreamRequest(t, method, body, headers) {
         },
         servername: t.sni || t.host,
         rejectUnauthorized: target.insecure !== true,
-        timeout: 20000,
+        timeout: timeoutMs,
       }
     } else {
       const u = new URL(t.fullUrl)
@@ -103,7 +105,7 @@ function upstreamRequest(t, method, body, headers) {
         },
         servername: u.hostname,
         rejectUnauthorized: true,
-        timeout: 20000,
+        timeout: timeoutMs,
       }
     }
     const lib =

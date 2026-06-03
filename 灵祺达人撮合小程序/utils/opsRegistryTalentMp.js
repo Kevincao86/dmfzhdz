@@ -1,5 +1,8 @@
 const api = require('./api.js')
 const registryCache = require('./registryCache.js')
+const { withTimeout } = require('./fetchTimeout.js')
+
+const REGISTRY_FETCH_MS = 28000
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
 function isRetryableRegistryError(msg) {
@@ -17,7 +20,7 @@ async function fetchRegistryViaErpApi() {
   let lastErr
   for (const path of paths) {
     try {
-      const data = await api.get(path)
+      const data = await withTimeout(api.get(path), REGISTRY_FETCH_MS, '招募大厅')
       registryCache.save(data, path)
       return data
     } catch (e) {

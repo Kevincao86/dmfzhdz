@@ -4,7 +4,9 @@ import {
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
-import { createRegistrySnapshotIoFetch, loadRegistrySnapshotForGet } from './registrySnapshotIoFetch.js'
+import { normalizeRegistryFile } from '../../vite-plugins/opsRegistryGatewayCore.js'
+import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 import { stripRegistryRecruitmentForAnonymous } from './registryTenantIsolation.js'
 
 export async function loadMpHallRegistryPayload(): Promise<Record<string, unknown>> {
@@ -14,7 +16,13 @@ export async function loadMpHallRegistryPayload(): Promise<Record<string, unknow
   if (missingParts.length === 0) {
     try {
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-      const data = await loadRegistrySnapshotForGet(io)
+      const loaded = await io.load()
+      const data = normalizeRegistryFile(loaded)
+      const before = data.recruitmentOrders ?? []
+      const cleaned = filterLegacyDemoRecruitmentOrders(before)
+      if (cleaned.length !== before.length) {
+        data.recruitmentOrders = cleaned
+      }
       return stripRegistryRecruitmentForAnonymous(data) as Record<string, unknown>
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

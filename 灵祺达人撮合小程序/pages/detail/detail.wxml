@@ -77,7 +77,7 @@
         </view>
         <view class="step-item">
           <text class="step-num">2</text>
-          <text class="step-body">会员可选择是否同步已保存资料</text>
+          <text class="step-body">会员可选择是否填入已保存资料</text>
         </view>
         <view class="step-item">
           <text class="step-num">3</text>

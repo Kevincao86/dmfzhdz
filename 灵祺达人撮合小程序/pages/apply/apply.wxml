@@ -8,8 +8,8 @@
     <view class="sync-row">
       <view class="sync-icon-wrap">⇄</view>
       <view class="sync-text">
-        <text class="sync-title">同步会员资料</text>
-        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料（空白必填输入框需手动填写）</text>
+        <text class="sync-title">填入会员资料</text>
+        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料</text>
       </view>
       <switch checked="{{syncMemberProfile}}" color="#6366f1" bindchange="onSyncMemberChange" />
     </view>
@@ -23,7 +23,7 @@
   <view class="card tip-card" wx:else>
     <text class="hint">未注册也可直接报名。 </text>
     <text class="link-text" bindtap="goRegister">完善我的信息</text>
-    <text class="hint"> 后可下次一键同步。</text>
+    <text class="hint"> 后可下次一键填入。</text>
   </view>
 
   <view class="card apply-form">
