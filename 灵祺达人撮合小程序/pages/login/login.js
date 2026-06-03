@@ -72,7 +72,17 @@ Page({
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
-      this.setData({ err: msg.indexOf('wx_not_configured') >= 0 ? '服务端未配置微信密钥，请联系管理员' : msg })
+      let hint = msg
+      if (msg.indexOf('wx_not_configured') >= 0) {
+        hint = '服务端未配置微信密钥，请联系管理员'
+      } else if (/reset|cronet|download:fail/i.test(msg)) {
+        hint =
+          msg +
+          '\n\n请确认：① DNS 已添加 api.mofangdianai.com；② 微信合法域名含 api 与根域；③ 上传体验版 mp-20260603-api-cronet 并删小程序重扫。'
+      } else if (/supabase_admin_not_configured|chat_supabase/i.test(msg)) {
+        hint = msg + '\n\nECS 执行: bash scripts/ecs-fix-mp-chat-ecs.sh'
+      }
+      this.setData({ err: hint })
     } finally {
       this.setData({ loading: false })
     }

@@ -6,8 +6,25 @@ function baseUrl() {
     .replace(/\/$/, '')
 }
 
+/** 主域 Cronet reset 时依次尝试（须 DNS：api → 与根域同 IP） */
+function erpApiBaseList() {
+  const out = []
+  const push = (raw) => {
+    const t = String(raw || '')
+      .trim()
+      .replace(/\/$/, '')
+    if (t && !out.includes(t)) out.push(t)
+  }
+  push(baseUrl())
+  const extras = config.MP_ERP_API_FALLBACK_BASES
+  if (Array.isArray(extras)) {
+    for (const item of extras) push(item)
+  }
+  return out
+}
+
 function hasMerchantApi() {
-  return Boolean(baseUrl())
+  return erpApiBaseList().length > 0
 }
 
 function parseResponseBody(data) {
@@ -35,19 +52,23 @@ function formatHttpError(statusCode, data) {
   return code || `请求失败 ${statusCode}`
 }
 
-/** ECS /erp-api 与 Web 商家端一致：基址含 erp-api 时去掉路径前缀 /api/ */
-function resolveMerchantApiUrl(path) {
-  const b = baseUrl()
+function resolveUrlWithBase(apiBase, path) {
+  const b = String(apiBase || '').replace(/\/$/, '')
   if (!b) return ''
   const p = path.startsWith('/') ? path : `/${path}`
   if (/\/erp-api\/?$/i.test(b) || b.includes('/erp-api/')) {
     const rel = p.replace(/^\/api\//, '')
-    return `${b.replace(/\/$/, '')}/${rel}`
+    return `${b}/${rel}`
   }
   return `${b}${p}`
 }
 
-/** 微信 Cronet：关 http2/quic/高性能模式。勿开 enableHttpDNS（须公众平台配置 serviceId，否则 invalid httpDNSServiceId） */
+/** ECS /erp-api 与 Web 商家端一致：基址含 erp-api 时去掉路径前缀 /api/ */
+function resolveMerchantApiUrl(path) {
+  return resolveUrlWithBase(baseUrl(), path)
+}
+
+/** 微信 Cronet：关 http2/quic/高性能模式。勿开 enableHttpDNS */
 const WX_NET = {
   enableHttp2: false,
   enableQuic: false,
@@ -64,7 +85,11 @@ const WX_HEADERS_JSON = {
 }
 
 function isTransientNetError(errMsg) {
-  return /reset|errcode:-101|cronet_error|timeout|超时/i.test(String(errMsg || ''))
+  return /reset|errcode:-101|cronet_error|timeout|超时|download:fail/i.test(String(errMsg || ''))
+}
+
+function isAuthApiUrl(url) {
+  return /meoo-ops-mp-auth/i.test(String(url || ''))
 }
 
 function merchantGetViaDownload(url) {
@@ -100,7 +125,6 @@ function merchantGetViaDownload(url) {
   })
 }
 
-/** 根域 / api 子域走 download 优先；cs.* 走常规 request */
 function shouldUseCronetWorkaround(url) {
   try {
     const h = new URL(url).hostname
@@ -112,12 +136,6 @@ function shouldUseCronetWorkaround(url) {
   } catch {
     return /mofangdianai\.com/i.test(String(url || ''))
   }
-}
-
-function merchantGetUrl(url) {
-  const u = String(url || '').trim()
-  if (!u) return Promise.reject(new Error('缺少请求 URL'))
-  return runGetWithFallback(u)
 }
 
 function requestTimeoutMs(url) {
@@ -161,7 +179,24 @@ function isRealDevice() {
   }
 }
 
+/** 登录 GET：仅用 wx.request（downloadFile 对根域同样会 reset） */
+function runGetRequestOnly(url, tryNo = 0) {
+  return wxRequestPromise(url, 'GET', undefined).catch((err) => {
+    const errMsg = String(err && err.message ? err.message : err)
+    if (tryNo < 2 && isTransientNetError(errMsg)) {
+      return new Promise((resolve, reject) => {
+        setTimeout(() => runGetRequestOnly(url, tryNo + 1).then(resolve, reject), 500 * (tryNo + 1))
+      })
+    }
+    throw err
+  })
+}
+
 function runGetWithFallback(url) {
+  if (isAuthApiUrl(url)) {
+    return runGetRequestOnly(url)
+  }
+
   const tryRequest = () =>
     wxRequestPromise(url, 'GET', undefined).catch((err) => {
       const errMsg = String(err && err.message ? err.message : err)
@@ -178,11 +213,13 @@ function runGetWithFallback(url) {
   return tryRequest()
 }
 
-function merchantRequest(method, path, data, attemptOrOpts = 0) {
-  const b = baseUrl()
-  if (!b) {
-    return Promise.reject(new Error('尚未配置后台地址'))
-  }
+function merchantGetUrl(url) {
+  const u = String(url || '').trim()
+  if (!u) return Promise.reject(new Error('缺少请求 URL'))
+  return runGetWithFallback(u)
+}
+
+async function merchantRequestOnBase(apiBase, method, path, data, attemptOrOpts = 0) {
   let attempt = 0
   let extraHeader = {}
   if (typeof attemptOrOpts === 'number') attempt = attemptOrOpts
@@ -190,12 +227,14 @@ function merchantRequest(method, path, data, attemptOrOpts = 0) {
     attempt = Number(attemptOrOpts.attempt) || 0
     extraHeader = attemptOrOpts.header || {}
   }
-  const url = resolveMerchantApiUrl(path)
+  const url = resolveUrlWithBase(apiBase, path)
   const m = String(method || 'GET').toUpperCase()
 
   if (m === 'GET') {
     return runGetWithFallback(url).catch((err) => {
-      if (attempt < 1) return merchantRequest(m, path, data, { attempt: 1, header: extraHeader })
+      if (attempt < 1) {
+        return merchantRequestOnBase(apiBase, m, path, data, { attempt: 1, header: extraHeader })
+      }
       throw err
     })
   }
@@ -208,15 +247,36 @@ function merchantRequest(method, path, data, attemptOrOpts = 0) {
           setTimeout(() => runPost(tryNo + 1).then(resolve, reject), 500 * (tryNo + 1))
         })
       }
-      if (isTransientNetError(errMsg) && shouldUseCronetWorkaround(url) && isRealDevice()) {
-        throw new Error(
-          `${errMsg}\n\n微信登录请使用 GET（构建号 mp-wx-login-get）。ECS: bash scripts/ecs-fix-mp-wechat-login.sh`,
-        )
-      }
       throw err
     })
 
   return runPost(attempt)
+}
+
+function merchantRequest(method, path, data, attemptOrOpts = 0) {
+  const bases = erpApiBaseList()
+  if (!bases.length) {
+    return Promise.reject(new Error('尚未配置后台地址'))
+  }
+
+  const attempts = []
+  let lastErr
+  return (async () => {
+    for (const apiBase of bases) {
+      try {
+        return await merchantRequestOnBase(apiBase, method, path, data, attemptOrOpts)
+      } catch (e) {
+        lastErr = e
+        const msg = String(e && e.message ? e.message : e)
+        attempts.push(`[${apiBase}] ${msg.slice(0, 160)}`)
+        if (!isTransientNetError(msg)) throw e
+        console.warn('[mp-api] base failed, try next', apiBase, msg.slice(0, 80))
+      }
+    }
+    const err = lastErr || new Error('所有 API 基址均失败')
+    err.attempts = attempts
+    throw err
+  })()
 }
 
 function merchantPostUrl(url, data, extraHeader = {}) {
@@ -227,6 +287,7 @@ function merchantPostUrl(url, data, extraHeader = {}) {
 
 module.exports = {
   baseUrl,
+  erpApiBaseList,
   hasMerchantApi,
   merchantRequest,
   merchantGetUrl,
