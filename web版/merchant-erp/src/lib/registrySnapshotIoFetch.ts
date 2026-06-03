@@ -59,20 +59,36 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
       const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
       const persist = registryForPersistentFile(data)
       const nowIso = new Date().toISOString()
-      const body = JSON.stringify({
+      const patchBody = JSON.stringify({
+        registry: persist as unknown as Record<string, unknown>,
+        updated_at: nowIso,
+      })
+      const signal = snapSignal()
+      const patchUrl = `${base}/rest/v1/ops_registry_snapshot?id=eq.1`
+      let r = await erpAwareFetch(patchUrl, {
+        method: 'PATCH',
+        headers: { ...srHeaders(key), Prefer: 'return=minimal' },
+        body: patchBody,
+        signal,
+      })
+      if (r.ok || r.status === 204) return
+      const patchTxt = await r.text()
+      if (r.status !== 404) {
+        throw new Error(patchTxt.slice(0, 400))
+      }
+      const insertBody = JSON.stringify({
         id: 1,
         registry: persist as unknown as Record<string, unknown>,
         updated_at: nowIso,
       })
-      const url = `${base}/rest/v1/ops_registry_snapshot`
-      const r = await erpAwareFetch(url, {
+      r = await erpAwareFetch(`${base}/rest/v1/ops_registry_snapshot`, {
         method: 'POST',
         headers: {
           ...srHeaders(key),
-          Prefer: 'resolution=merge-duplicates,return=minimal',
+          Prefer: 'return=representation',
         },
-        body,
-        signal: snapSignal(),
+        body: insertBody,
+        signal,
       })
       const txt = await r.text()
       if (!r.ok) {

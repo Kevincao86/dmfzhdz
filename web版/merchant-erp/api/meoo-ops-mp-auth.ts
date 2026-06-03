@@ -265,7 +265,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'wx_already_registered' ||
       msg === 'login_name_taken' ||
       /^invalid code/i.test(msg) ||
-      /^wx_code2session_/i.test(msg)
+      /^wx_code2session_/i.test(msg) ||
+      /duplicate key|23505/i.test(msg)
         ? 400
         : msg === 'wx_not_configured'
           ? 503
