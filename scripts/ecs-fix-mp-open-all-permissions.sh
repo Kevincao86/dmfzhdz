@@ -24,14 +24,13 @@ psql -h 127.0.0.1 -p "${ECS_PG_PORT:-5433}" -U postgres -d "${ECS_PG_DB:-postgre
   -c "NOTIFY pgrst, 'reload schema';" 2>/dev/null || true
 
 sudo systemctl restart meoo-postgrest 2>/dev/null || true
-sudo systemctl restart meoo-auth-api
-
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if curl -sS -m 3 http://127.0.0.1:3001/api/meoo-erp-api-health | grep -q '"ok":true'; then
-    break
-  fi
-  sleep 1
-done
+if [[ "$(id -un)" == "admin" ]]; then
+  bash "$ROOT/scripts/ecs-ensure-auth-api.sh" || bash "$ROOT/scripts/ecs-fix-erp-api-502.sh"
+else
+  echo "WARN: 请用 admin 执行本脚本末尾的 ecs-ensure-auth-api.sh"
+  sudo systemctl restart meoo-auth-api 2>/dev/null || true
+  sleep 5
+fi
 echo "=== 探活 ==="
 curl -sS -m 10 http://127.0.0.1:3001/api/meoo-erp-api-health | head -c 120
 echo ""
