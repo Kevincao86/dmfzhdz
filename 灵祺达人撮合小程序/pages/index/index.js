@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const { showDemoOrders } = require('../../utils/mpDemoMode.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
@@ -70,19 +71,6 @@ Page({
   onLoad() {
     applyNavLayout(this)
     console.log('[mp] build', mpBuild.ID)
-    this.primeHallPlaceholder()
-  },
-  primeHallPlaceholder() {
-    const placeholder = listFilters.mergeHallDisplayRows([])
-    this.setData({
-      loading: false,
-      err: '',
-      normalRows: placeholder,
-      urgentRows: [],
-      iceRows: [],
-      cityFilters: hallFilters.buildCityFilterOptions(placeholder),
-    })
-    this.applyFilters()
   },
   onShow() {
     setTabBarForPage(this, '/pages/index/index')
@@ -101,9 +89,10 @@ Page({
     const mapped = openList.map((mp) => orderCard.mapMpOrderRow(mp, reg))
     const iceRows = mapped.filter((r) => r.isIce)
     const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-    /** 招募大厅：全部非云剪开放单（含急单），与推荐页一致；急单/云剪 Tab 仍为子集 */
     const hallNonIce = mapped.filter((r) => !r.isIce)
-    const normalRows = listFilters.mergeHallDisplayRows(hallNonIce)
+    const normalRows = listFilters.mergeHallDisplayRows(hallNonIce, {
+      allowDemo: showDemoOrders(),
+    })
     const allForCity = [...mapped]
     this.setData({
       normalRows,
@@ -119,41 +108,39 @@ Page({
 
   async loadList() {
     const loadTok = (this._loadSeq = (this._loadSeq || 0) + 1)
-    const hasRows = (this.data.normalRows || []).length > 0
     if (!api.hasApi()) {
-      const mockOnly = listFilters.mergeHallDisplayRows([])
+      const demo = showDemoOrders() ? listFilters.mergeHallDisplayRows([], { allowDemo: true }) : []
       this.setData({
         unconfigured: true,
         loading: false,
-        normalRows: mockOnly,
+        normalRows: demo,
         urgentRows: [],
         iceRows: [],
         todayCount: 0,
-        cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
+        cityFilters: hallFilters.buildCityFilterOptions(demo),
+        err: demo.length ? '' : '未连接后台',
       })
       this.applyFilters()
       return
     }
-    this.setData({ unconfigured: false })
+    this.setData({ unconfigured: false, loading: true, err: '' })
     let showedOffline = false
     const offline = registryCache.load({ allowStale: true })
-    if (offline && offline.data) {
+    const offlineMp = offline && offline.data && offline.data.mpRecruitmentOrders
+    if (offline && offline.data && Array.isArray(offlineMp) && offlineMp.length > 0) {
       showedOffline = true
       this.applyRegistryRows(offline.data, '')
-    } else if (!hasRows) {
-      this.setData({ loading: true, err: '' })
     }
     const watchdog = setTimeout(() => {
       if (this._loadSeq !== loadTok) return
       if (!this.data.loading) return
-      const mockOnly = listFilters.mergeHallDisplayRows([])
       this.setData({
         loading: false,
         err: '加载超时，请下拉刷新',
-        normalRows: mockOnly,
+        normalRows: [],
         urgentRows: [],
         iceRows: [],
-        cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
+        displayRows: [],
       })
       this.applyFilters()
     }, 18000)
@@ -193,14 +180,13 @@ Page({
         }
         hint = '网络不稳定，请删除小程序后重新扫码'
       }
-      const mockOnly = listFilters.mergeHallDisplayRows([])
       this.setData({
         loading: false,
         err: hint,
-        normalRows: mockOnly,
+        normalRows: [],
         urgentRows: [],
         iceRows: [],
-        cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
+        displayRows: [],
       })
       this.applyFilters()
     } finally {
@@ -214,6 +200,9 @@ Page({
     const tab = this.data.hallTab
     let rows =
       tab === 'urgent' ? this.data.urgentRows : tab === 'ice' ? this.data.iceRows : this.data.normalRows
+    if (!showDemoOrders()) {
+      rows = rows.filter((r) => r && !r.isMock)
+    }
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
     const cf = this.data.filterCity

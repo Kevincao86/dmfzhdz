@@ -180,8 +180,8 @@
 
       <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
         <text class="state-empty-icon">📋</text>
-        <text class="empty-title">暂无匹配招募</text>
-        <text class="hint">试试切换大厅或调整筛选条件</text>
+        <text class="empty-title">暂无招募商单</text>
+        <text class="hint">运营台发布后将在此展示；可切换急单/云剪或下拉刷新</text>
       </view>
     </block>
   </scroll-view>

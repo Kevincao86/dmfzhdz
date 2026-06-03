@@ -156,15 +156,14 @@ function buildMockRecruitmentRow(partial) {
 }
 
 /**
- * 首页招募大厅列表：真实开放单 + 演示单（与推荐页一致，避免仅 1 条演示）
- * @param {Array<{id:string,isIce?:boolean}>} realNonIceRows 非云剪的开放商单
+ * 首页招募大厅列表：默认仅真实商单；MP_SHOW_DEMO_ORDERS=true 时才追加演示数据
  */
-function mergeHallDisplayRows(realNonIceRows) {
+function mergeHallDisplayRows(realNonIceRows, opts) {
+  const real = Array.isArray(realNonIceRows) ? realNonIceRows.filter((r) => r && !r.isMock) : []
+  const allowDemo = opts && opts.allowDemo === true
+  if (!allowDemo) return real
   const demos = buildMockRecruitmentRows().filter((d) => !d.isIce)
-  const real = Array.isArray(realNonIceRows) ? realNonIceRows : []
-  if (!real.length) {
-    return demos.length ? demos : [buildMockRecruitmentRow()]
-  }
+  if (!real.length) return demos.length ? demos : [buildMockRecruitmentRow()]
   const ids = new Set(real.map((r) => r.id))
   const extra = demos.filter((d) => !ids.has(d.id))
   return [...real, ...extra]
