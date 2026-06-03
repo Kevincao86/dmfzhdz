@@ -1,8 +1,10 @@
 const api = require('./api.js')
 const registryCache = require('./registryCache.js')
 const { withTimeout } = require('./fetchTimeout.js')
+const { normalizeHallPayload } = require('./hallRegistryParse.js')
 
-const REGISTRY_FETCH_MS = 28000
+const REGISTRY_FETCH_MS = 22000
+const HALL_PATH = '/api/meoo-ops-mp-hall-registry'
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
 function isRetryableRegistryError(msg) {
@@ -12,25 +14,10 @@ function isRetryableRegistryError(msg) {
 }
 
 async function fetchRegistryViaErpApi() {
-  const paths = [
-    '/api/meoo-ops-mp-hall-registry',
-    '/api/meoo-ops-sync-registry',
-    '/api/ops-sync/registry',
-  ]
-  let lastErr
-  for (const path of paths) {
-    try {
-      const data = await withTimeout(api.get(path), REGISTRY_FETCH_MS, '招募大厅')
-      registryCache.save(data, path)
-      return data
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!isRetryableRegistryError(msg)) throw e
-      console.warn('[mp] fetchRegistry erp-api retry next path after:', path, msg.slice(0, 120))
-    }
-  }
-  throw lastErr || new Error('erp-api 无法拉取招募大厅')
+  const raw = await withTimeout(api.get(HALL_PATH), REGISTRY_FETCH_MS, '招募大厅')
+  const data = normalizeHallPayload(raw)
+  registryCache.save(data, HALL_PATH)
+  return data
 }
 
 async function fetchRegistry() {

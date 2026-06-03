@@ -2,15 +2,21 @@
  * 备案过渡：经微信云函数访问 ECS（不经过手机 Cronet → 未备案域名）
  */
 const config = require('./config.js')
+const { withTimeout } = require('./fetchTimeout.js')
 
 const FN = 'mpErpProxy'
+const CLOUD_CALL_MS = 24000
 
 function cloudReady() {
   return !!(config.MP_USE_CLOUD_PROXY && String(config.MP_CLOUD_ENV || '').trim() && wx.cloud)
 }
 
 function callCloud(method, path, data, headers) {
-  return new Promise((resolve, reject) => {
+  const run = new Promise((resolve, reject) => {
+    if (!cloudReady()) {
+      reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
+      return
+    }
     wx.cloud.callFunction({
       name: FN,
       data: { method, path, body: data, headers: headers || {} },
@@ -36,6 +42,7 @@ function callCloud(method, path, data, headers) {
       },
     })
   })
+  return withTimeout(run, CLOUD_CALL_MS, '云函数')
 }
 
 module.exports = {

@@ -79,6 +79,9 @@ Page({
     }
     this.loadList()
   },
+  onPullDownRefresh() {
+    this.loadList().finally(() => wx.stopPullDownRefresh())
+  },
   applyRegistryRows(reg, banner) {
     const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
     const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
@@ -102,6 +105,8 @@ Page({
   },
 
   async loadList() {
+    if (this._hallLoading) return
+    this._hallLoading = true
     const loadTok = Date.now()
     this._loadTok = loadTok
     if (!api.hasApi()) {
@@ -116,6 +121,7 @@ Page({
         cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
       })
       this.applyFilters()
+      this._hallLoading = false
       return
     }
     this.setData({ unconfigured: false })
@@ -177,8 +183,13 @@ Page({
       })
       this.applyFilters()
     } finally {
-      if (this.data.loading) {
-        this.setData({ loading: false })
+      if (this._loadTok === loadTok) {
+        if (this.data.loading) {
+          this.setData({ loading: false })
+        }
+      }
+      if (this._loadTok === loadTok) {
+        this._hallLoading = false
       }
     }
   },
