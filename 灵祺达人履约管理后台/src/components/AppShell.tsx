@@ -1,38 +1,36 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { switchRole } from '../lib/mpApi'
-import {
-  clearSession,
-  getAccount,
-  getActiveRole,
-  getToken,
-  setActiveRole,
-  setSession,
-  type MpAccountRole,
-} from '../lib/mpSession'
+import { clearSession, getAccount, getActiveRole, isDevPreviewSession, type MpAccountRole } from '../lib/mpSession'
 
-const NAV = [
-  { to: '/hall', label: '招募大厅' },
-  { to: '/orders', label: '我的履约' },
-  { to: '/messages', label: '消息' },
-  { to: '/profile', label: '我的' },
-]
+type NavItem = { to: string; label: string; roles?: MpAccountRole[] }
+
+function navForRole(role: MpAccountRole): NavItem[] {
+  const common: NavItem[] = [
+    { to: '/messages', label: '消息' },
+    { to: '/addons', label: '增值服务' },
+    { to: '/profile', label: '我的' },
+  ]
+  if (role === 'pr') {
+    return [
+      { to: '/hall', label: '招募大厅' },
+      { to: '/publish', label: '发布招募' },
+      { to: '/templates', label: '我的模版' },
+      { to: '/recommend-talent', label: '推荐达人' },
+      { to: '/orders', label: '我的发单' },
+      ...common,
+    ]
+  }
+  return [
+    { to: '/hall', label: '招募大厅' },
+    { to: '/orders', label: '我的履约' },
+    ...common,
+  ]
+}
 
 export default function AppShell() {
   const nav = useNavigate()
   const account = getAccount()
   const role = getActiveRole()
-
-  async function onSwitchRole(next: MpAccountRole) {
-    if (!getToken()) return
-    try {
-      const { account: acc } = await switchRole(next)
-      setSession(getToken(), acc)
-      setActiveRole(next)
-      window.location.reload()
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '切换失败')
-    }
-  }
+  const NAV = navForRole(role)
 
   function logout() {
     clearSession()
@@ -46,28 +44,14 @@ export default function AppShell() {
 
   return (
     <div className="min-h-screen flex">
-      <aside className="w-56 border-r border-white/10 bg-[#141422] p-4 flex flex-col">
+      <aside className="w-56 border-r border-white/10 bg-[#141422] p-4 flex flex-col shrink-0">
         <div className="mb-6">
           <div className="font-bold text-lg">灵祺履约后台</div>
-          <div className="text-xs text-slate-400 mt-1">{account?.wxNickName || account?.loginName || '未登录'}</div>
+          <div className="text-xs text-slate-400 mt-1">{role === 'pr' ? 'PR 版' : '达人版'} · {account?.wxNickName || account?.loginName || '未登录'}</div>
           <div className="text-xs text-amber-400 mt-1 font-mono">{idLabel}</div>
-        </div>
-
-        <div className="mb-4 flex gap-1 rounded-lg bg-black/30 p-1">
-          <button
-            type="button"
-            className={`flex-1 text-xs py-1.5 rounded-md ${role === 'talent' ? 'bg-violet-600' : ''}`}
-            onClick={() => void onSwitchRole('talent')}
-          >
-            达人版
-          </button>
-          <button
-            type="button"
-            className={`flex-1 text-xs py-1.5 rounded-md ${role === 'pr' ? 'bg-orange-600' : ''}`}
-            onClick={() => void onSwitchRole('pr')}
-          >
-            PR 版
-          </button>
+          {isDevPreviewSession() ? (
+            <p className="text-[10px] text-amber-500/80 mt-1">开发预览模式</p>
+          ) : null}
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -88,7 +72,7 @@ export default function AppShell() {
           退出登录
         </button>
       </aside>
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6 overflow-auto min-w-0">
         <Outlet />
       </main>
     </div>

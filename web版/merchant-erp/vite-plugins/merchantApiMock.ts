@@ -451,8 +451,12 @@ export function merchantApiMockPlugin(): Plugin {
   return {
     name: 'merchant-api-gateway',
     configResolved(config) {
-      merchantEnv = loadEnv(config.mode, config.root, '')
-      viteRoot = config.root
+      const merchantOverride = process.env.MEOO_MERCHANT_VITE_ROOT?.trim()
+      viteRoot = merchantOverride || config.root
+      merchantEnv = {
+        ...loadEnv(config.mode, viteRoot, ''),
+        ...loadEnv(config.mode, config.root, ''),
+      }
     },
     configureServer(server) {
       attach(server.middlewares, merchantEnv, viteRoot)

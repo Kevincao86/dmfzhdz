@@ -1,0 +1,73 @@
+export type BudgetDisplay =
+  | { kind: 'text'; line: string; full?: string }
+  | {
+      kind: 'tiers'
+      cps: string
+      mode: string
+      summary: string
+      chips: { label: string; price: string }[]
+      moreCount: number
+    }
+
+export type RecruitmentOrderRow = {
+  id: string
+  isMock?: boolean
+  title: string
+  merchantName: string
+  storeName: string
+  statusLabel: string
+  platform: string
+  region: string
+  category: string
+  hideBudget: boolean
+  budgetText: string
+  budgetDisplay: BudgetDisplay
+  fansRequirement: string
+  summary: string
+  applicantCount: number
+  recruitCount: number | string
+  overRecruitHot?: boolean
+  urgent: boolean
+  isIce: boolean
+  recommended: boolean
+  priceAmount: number
+  publishedAtMs: number
+  deadlineMs: number
+  aiTag?: string
+  aiTagTone?: string
+  aiTagSource?: string
+  matchScore?: number
+  aiMatch?: boolean
+}
+
+export type TalentCardRow = {
+  id: string
+  isPreview?: boolean
+  isSelfTest?: boolean
+  name: string
+  avatar: string
+  platform: string
+  followers: string
+  followersRaw: number
+  salesGrade: string
+  douyinSalesLevel: string
+  quality: string
+  tags: string[]
+  accountTags: string[]
+  region: string
+  gender: string
+  online: boolean
+  matchScore: number
+  aiTag: string
+  aiTagTone: string
+  aiMatch: boolean
+  chatMutual?: boolean
+  favorited?: boolean
+}
+
+export type MpRegistry = {
+  mpRecruitmentOrders?: Record<string, unknown>[]
+  mpTalentMembers?: Record<string, unknown>[]
+  talentLibraryEntries?: Record<string, unknown>[]
+  recruitmentOrders?: Record<string, unknown>[]
+}

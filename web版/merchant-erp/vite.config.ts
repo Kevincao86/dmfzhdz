@@ -5,6 +5,7 @@ import { authRegisterGatewayPlugin } from './vite-plugins/authRegisterGateway'
 import { merchantApiMockPlugin } from './vite-plugins/merchantApiMock'
 import { mpTalentChatGatewayPlugin } from './vite-plugins/mpTalentChatGateway'
 import { mpAuthGatewayPlugin } from './vite-plugins/mpAuthGateway'
+import { mpHallRegistryGatewayPlugin } from './vite-plugins/mpHallRegistryGateway'
 import { mpRecruitApplyLandingPlugin } from './vite-plugins/mpRecruitApplyLandingPlugin'
 import { opsErpSyncGatewayPlugin } from './vite-plugins/opsErpSyncGateway'
 import { supportWsProxyToAdminPlugin } from './vite-plugins/supportWsProxyToAdmin'
@@ -32,6 +33,7 @@ export default defineConfig(({ mode }) => {
       opsErpSyncGatewayPlugin(),
       mpTalentChatGatewayPlugin(),
       mpAuthGatewayPlugin(),
+      mpHallRegistryGatewayPlugin(),
       supportWsProxyToAdminPlugin({ adminHttpOrigin: adminOrigin }),
     ],
     /**
