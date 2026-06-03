@@ -39,6 +39,20 @@ else
 fi
 
 echo ""
+echo "== 私信代码（须 PostgREST 直连，勿 createClient+Realtime） =="
+CHAT_LIB="$ERP/src/lib/mpTalentChatSupabase.ts"
+if [[ -f "$CHAT_LIB" ]]; then
+  if grep -q 'PostgrestClient' "$CHAT_LIB" && ! grep -q 'createClient' "$CHAT_LIB"; then
+    echo "OK: $CHAT_LIB 使用 PostgrestClient"
+  else
+    echo "FATAL: $CHAT_LIB 仍为旧版（会触发 Node20 WebSocket 报错）"
+    echo "  请 git pull 后: bash scripts/ecs-install-auth-api-systemd.sh"
+  fi
+else
+  echo "WARN: 缺少 $CHAT_LIB"
+fi
+
+echo ""
 echo "== 运行中 =="
 sudo lsof -iTCP:"$PORT" -sTCP:LISTEN -n -P 2>/dev/null || echo ":$PORT 无监听"
 curl -sS "http://127.0.0.1:${PORT}/api/meoo-erp-api-health" 2>/dev/null || echo "health 不可用"

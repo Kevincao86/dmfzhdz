@@ -18,11 +18,13 @@ import {
 
 function chatErrorResponse(e: unknown): { status: number; data: Record<string, unknown> } {
   const msg = e instanceof Error ? e.message : String(e)
-  const hint = /fetch failed|ECONNREFUSED|8888|54321/i.test(msg)
-    ? 'ECS 本机 API 未响应：请执行 sudo systemctl restart meoo-postgrest && sudo systemctl restart meoo-auth-api（或 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh）'
-    : /Could not find|PGRST202|schema cache|does not exist|42P01/i.test(msg)
-      ? 'ECS 数据库缺少私信表/函数：bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
-      : 'ECS auth-api 数据库连接异常，请检查 ~/stack/auth-api.env 与 PostgREST 服务'
+  const hint = /WebSocket|native WebSocket|transport: ws/i.test(msg)
+    ? 'auth-api 仍在跑旧代码或未用 PostgREST 直连：cd ~/app && git pull && bash scripts/ecs-verify-auth-api-path.sh && bash scripts/ecs-install-auth-api-systemd.sh'
+    : /fetch failed|ECONNREFUSED|8888|54321/i.test(msg)
+      ? 'ECS 本机 API 未响应：请执行 sudo systemctl restart meoo-postgrest && sudo systemctl restart meoo-auth-api（或 bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh）'
+      : /Could not find|PGRST202|schema cache|does not exist|42P01/i.test(msg)
+        ? 'ECS 数据库缺少私信表/函数：bash ~/app/scripts/ecs-fix-mp-chat-ecs.sh'
+        : 'ECS PostgREST 异常：检查 ~/stack/auth-api.env 中 SUPABASE_URL=http://127.0.0.1:8888 与 service_role JWT'
   return {
     status: 500,
     data: {
