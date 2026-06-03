@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 探活招募大厅接口（只应返回 mpRecruitmentOrders 数组）
-# ECS admin: cd ~/app && bash scripts/ecs-verify-mp-hall-registry.sh
+# ECS admin: cd ~/app && bash scripts/ecs-git-pull-main.sh && bash scripts/ecs-verify-mp-hall-registry.sh
 
 set -euo pipefail
 
