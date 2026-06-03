@@ -27,7 +27,7 @@ function timeoutSignal(ms: number): AbortSignal {
 
 function httpsViaIp(
   url: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH',
   body?: string,
 ): Promise<{ status: number; text: string }> {
   const parsed = new URL(url)
@@ -72,7 +72,7 @@ function httpsViaIp(
 
 async function fetchViaHostname(
   url: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH',
   body?: string,
 ): Promise<{ status: number; text: string }> {
   const r = await fetch(url, {
@@ -90,7 +90,7 @@ async function fetchViaHostname(
 /** 拉取 ECS URL：hostname fetch → IP+SNI */
 export async function fetchErpDual(
   url: string,
-  method: 'GET' | 'POST' = 'GET',
+  method: 'GET' | 'POST' | 'PATCH' = 'GET',
   body?: string,
 ): Promise<{ status: number; text: string }> {
   let parsed: URL
@@ -122,14 +122,18 @@ export async function fetchErpDual(
 }
 
 export function erpAwareFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const method = String(init.method || 'GET').toUpperCase() as 'GET' | 'POST'
+  const method = String(init.method || 'GET').toUpperCase() as 'GET' | 'POST' | 'PATCH'
   const body =
     init.body == null
       ? undefined
       : typeof init.body === 'string'
         ? init.body
         : undefined
-  return fetchErpDual(url, method, body).then(
-    ({ status, text }) => new Response(text, { status }),
-  )
+  return fetchErpDual(url, method, body).then(({ status, text }) => {
+    // Node fetch：204/205 不得带 body，否则 Response 构造抛错
+    if (status === 204 || status === 205) {
+      return new Response(null, { status })
+    }
+    return new Response(text, { status })
+  })
 }
