@@ -28,16 +28,13 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 - 服务端表 `mp_accounts`：`openid` 唯一，绑定唯一 `lingqiTalentId` / `lingqiPrId`
 - 详见仓库 `灵祺达人履约管理后台/README.md`
 
-## 生产部署
+## 生产部署（仅 ECS，无 Supabase 云 / 无 Vercel）
 
-**GitHub + Vercel（API）与微信上架（小程序）** 分步说明见：
+👉 **[ECS-小程序专用部署.md](./ECS-小程序专用部署.md)**
 
-👉 **[DEPLOY.md](./DEPLOY.md)**
-
-要点：
-
-- 后端：仓库根 `vercel.json` 部署商家 ERP，小程序请求其 HTTPS 根地址下的 `/api/meoo-ops-*`
-- 小程序：配置 `utils/config.release.js`（见 `config.release.example.js`）+ 微信公众平台 request 合法域名 + 开发者工具上传
+- API 唯一入口：`https://mofangdianai.com/erp-api`（ECS `meoo-auth-api`）
+- `utils/config.release.js` 已固定上述地址；勿使用 `cs.mofangdianai.com` 或 `*.supabase.co`
+- 旧文档 [DEPLOY.md](./DEPLOY.md) 含 Vercel 说明，**小程序已不再使用**
 
 ## 分享路径
 
@@ -53,18 +50,17 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 
 闭环云剪 API：`/api/meoo-ops-mp-recruitment-ice-confirm`（确认/拒绝）、`/api/meoo-ops-mp-recruitment-ice-submit`（回传抖音链接）
 
-## PR ↔ 达人私信（Supabase）
+## PR ↔ 达人私信
 
-消息/大厅/报名均经 **ECS erp-api**（体验版经 `https://cs.mofangdianai.com` 网关）。本地调试在 `config.local.js` 填 `MERCHANT_API_BASE_URL`（如 `http://本机IP:5173` 或直连 `https://mofangdianai.com/erp-api`），并确保 ECS 或本地 `npm run dev` 已挂载 `meoo-ops-mp-*` 路由。
+消息/大厅/报名/登录均经 **ECS erp-api**（`utils/mpEcsClient.js`）。
 
 - 消息 Tab：微信风格会话列表 + 聊天页（`pages/messages`、`pages/chat`）
-- 数据表：`mp_talent_chat_participants` / `mp_talent_chat_sessions` / `mp_talent_chat_messages`（迁移 `20260528100000_mp_talent_chat.sql`）
-- API：`POST /api/meoo-ops-mp-talent-chat`（`sync_profile` / `list_sessions` / `ensure_session` / `ensure_session_from_talent` / `fetch_messages` / `send_message` / `mark_read`）
-- 勿在 `config.release.js` 配置 `SUPABASE_URL`；数据已全部在 ECS PostgreSQL，由 erp-api 读写
+- 数据：ECS PostgreSQL（非 Supabase 云）
+- API：`POST /api/meoo-ops-mp-talent-chat` 等
 - **PR**：推荐达人「沟通」、报名列表「私信沟通」、消息 Tab 会话列表
 - **达人**：商单详情「联系招募方」（新发单含 `prParticipantKey`）、消息 Tab 回复 PR
 - Tab「消息」角标为私信未读合计；`MP_CHAT_DEV_TEST: true` 可显示本地测试对话入口
 
 ## 上架前
 
-在 `project.config.json` 中确认正式 `appid`，并配置 request 合法域名指向生产 API（须 HTTPS）。详见 [DEPLOY.md](./DEPLOY.md)。
+在 `project.config.json` 中确认正式 `appid`；request 合法域名仅 `https://mofangdianai.com`。详见 [ECS-小程序专用部署.md](./ECS-小程序专用部署.md)。

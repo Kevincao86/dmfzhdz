@@ -1,7 +1,7 @@
 const mpAuth = require('../../utils/mpAccountAuth.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
-const ecs = require('../../utils/ecsApi.js')
+const mp = require('../../utils/mpEcsClient.js')
 
 Page({
   data: {
@@ -23,7 +23,7 @@ Page({
 
   async probeEcs() {
     try {
-      const h = await ecs.pingEcs()
+      const h = await mp.ping()
       if (h && h.ok) {
         this.setData({ netOk: `ECS 可达 revision=${h.revision || '?'}` })
       }
@@ -31,7 +31,8 @@ Page({
       const msg = e && e.message ? e.message : String(e)
       if (/reset|cronet|-101/i.test(msg)) {
         this.setData({
-          netOk: 'ECS HTTPS 被微信重置：请在服务器执行 bash scripts/ecs-fix-mp-api-public.sh，并检查域名勿配 AAAA',
+          netOk:
+            '微信 Cronet 无法握手（Safari 可能仍正常）。ECS: bash scripts/ecs-diagnose-wechat-cronet-reset.sh；域名删 AAAA；用体验版勿只真机调试',
         })
       }
     }
@@ -96,12 +97,12 @@ Page({
       if (msg.indexOf('wx_not_configured') >= 0) {
         hint = '服务端未配置微信密钥，请联系管理员'
       } else if (/reset|cronet|download:fail|request:fail/i.test(msg)) {
-        const build = ecs.MP_BUILD_ID || 'mp-20260604-ecs-get-login'
+        const build = mp.BUILD_ID || 'mp-20260605-ecs-rewrite'
         hint =
           msg +
-          `\n\n① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-fix-mp-wechat-login.sh；③ 体验版 ${build}，删小程序重扫。`
-      } else if (/supabase_admin_not_configured|chat_supabase|not_configured/i.test(msg)) {
-        hint = msg + '\n\nECS: bash scripts/ecs-fix-mp-chat-path.sh'
+          `\n\n① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-redeploy-mp-only.sh；③ 体验版 ${build}，删小程序重扫。`
+      } else if (/admin_not_configured|chat_supabase|not_configured/i.test(msg)) {
+        hint = msg + '\n\nECS: bash scripts/ecs-redeploy-mp-only.sh'
       }
       this.setData({ err: hint })
     } finally {

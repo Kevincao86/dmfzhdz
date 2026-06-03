@@ -1,4 +1,4 @@
-const ecs = require('./ecsApi.js')
+const mp = require('./mpEcsClient.js')
 
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
@@ -37,29 +37,37 @@ function isLoggedIn() {
   return !!readSessionToken() && !!readAccount()
 }
 
-/** 登录与会话：真机走 GET+downloadFile；开发者工具走 POST */
-async function mpAuthRequest(action, payload = {}) {
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' }
   const token = readSessionToken()
-  const header = { 'Content-Type': 'application/json' }
-  if (token) header['X-Mp-Session'] = token
+  if (token) h['X-Mp-Session'] = token
+  return h
+}
+
+async function mpAuthRequest(action, payload = {}) {
   const body = { action, ...payload }
-  if (ecs.isRealDevice()) {
+  if (mp.isPhone()) {
     const qs = Object.entries(body)
       .filter(([, v]) => v != null && v !== '' && typeof v !== 'object')
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
       .join('&')
-    const path = `/api/meoo-ops-mp-auth?${qs}`
-    return ecs.ecsRequest('GET', path, undefined, { header })
+    return mp.call({
+      method: 'GET',
+      path: `/api/meoo-ops-mp-auth?${qs}`,
+      headers: authHeaders(),
+    })
   }
-  return ecs.ecsRequest('POST', '/api/meoo-ops-mp-auth', body, { header })
+  return mp.call({
+    method: 'POST',
+    path: '/api/meoo-ops-mp-auth',
+    body,
+    headers: authHeaders(),
+  })
 }
 
 async function wxLogin(opts = {}) {
   const code = await new Promise((resolve, reject) => {
-    wx.login({
-      success: (r) => resolve(r.code || ''),
-      fail: reject,
-    })
+    wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
   })
   const data = await mpAuthRequest('wx_login', {
     code,
@@ -69,9 +77,7 @@ async function wxLogin(opts = {}) {
     registerTalent: opts.registerTalent,
     registerPr: opts.registerPr,
   })
-  if (data.token && data.account) {
-    writeSession(data.token, data.account)
-  }
+  if (data.token && data.account) writeSession(data.token, data.account)
   return data
 }
 
@@ -83,9 +89,7 @@ async function passwordLogin(loginName, password) {
 
 async function switchRole(role) {
   const data = await mpAuthRequest('switch_role', { role })
-  if (data.account) {
-    writeSession(readSessionToken(), data.account)
-  }
+  if (data.account) writeSession(readSessionToken(), data.account)
   return data
 }
 
