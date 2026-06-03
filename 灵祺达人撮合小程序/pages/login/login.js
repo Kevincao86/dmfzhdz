@@ -1,6 +1,7 @@
 const mpAuth = require('../../utils/mpAccountAuth.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
+const ecs = require('../../utils/ecsApi.js')
 
 Page({
   data: {
@@ -9,11 +10,30 @@ Page({
     password: '',
     loading: false,
     err: '',
+    netOk: '',
   },
 
   onLoad() {
     if (mpAuth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
+      return
+    }
+    void this.probeEcs()
+  },
+
+  async probeEcs() {
+    try {
+      const h = await ecs.pingEcs()
+      if (h && h.ok) {
+        this.setData({ netOk: `ECS 可达 revision=${h.revision || '?'}` })
+      }
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e)
+      if (/reset|cronet|-101/i.test(msg)) {
+        this.setData({
+          netOk: 'ECS HTTPS 被微信重置：请在服务器执行 bash scripts/ecs-fix-mp-api-public.sh，并检查域名勿配 AAAA',
+        })
+      }
     }
   },
 
@@ -76,7 +96,7 @@ Page({
       if (msg.indexOf('wx_not_configured') >= 0) {
         hint = '服务端未配置微信密钥，请联系管理员'
       } else if (/reset|cronet|download:fail|request:fail/i.test(msg)) {
-        const build = require('../../utils/merchantApi.js').MP_BUILD_ID || 'mp-20260604-ecs-only'
+        const build = ecs.MP_BUILD_ID || 'mp-20260604-ecs-get-login'
         hint =
           msg +
           `\n\n① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-fix-mp-wechat-login.sh；③ 体验版 ${build}，删小程序重扫。`

@@ -59,6 +59,20 @@ function formatHttpError(statusCode, data) {
   return code || `请求失败 ${statusCode}`
 }
 
+function isAuthApiPath(apiPath) {
+  return /meoo-ops-mp-auth/i.test(String(apiPath || ''))
+}
+
+function payloadToQuery(data) {
+  const parts = []
+  for (const [k, v] of Object.entries(data || {})) {
+    if (v == null || v === '') continue
+    if (typeof v === 'object') continue
+    parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+  }
+  return parts.join('&')
+}
+
 function isTransientNetError(errMsg) {
   return /reset|errcode:-101|cronet_error|timeout|超时|download:fail|request:fail/i.test(
     String(errMsg || ''),
@@ -158,13 +172,40 @@ function fetchJsonWithRetry(url, method, data, extraHeader, tryNo = 0) {
   })
 }
 
+/** 真机 Cronet：登录类 POST 易 reset，改 GET + downloadFile（服务端已支持 query） */
+function ecsAuthRequest(method, apiPath, data, extraHeader) {
+  const m = String(method || 'GET').toUpperCase()
+  const basePath = String(apiPath || '').split('?')[0]
+  if (m === 'POST' && isRealDevice() && isAuthApiPath(basePath) && data && data.action) {
+    const qs = payloadToQuery(data)
+    const getPath = qs ? `${basePath}?${qs}` : basePath
+    const getUrl = resolveUrl(getPath)
+    return fetchJsonWithRetry(getUrl, 'GET', undefined, extraHeader).catch((err) => {
+      const postUrl = resolveUrl(basePath)
+      return fetchJsonWithRetry(postUrl, 'POST', data, extraHeader).catch(() => {
+        throw err
+      })
+    })
+  }
+  const url = resolveUrl(apiPath)
+  return fetchJsonWithRetry(url, m, data, extraHeader)
+}
+
 function ecsRequest(method, apiPath, data, opts = {}) {
   const url = resolveUrl(apiPath)
   if (!url) {
     return Promise.reject(new Error('尚未配置 ECS 地址（config.release MERCHANT_API_BASE_URL）'))
   }
   const extraHeader = opts.header || {}
-  return fetchJsonWithRetry(url, method, data, extraHeader)
+  const m = String(method || 'GET').toUpperCase()
+  if (m === 'POST' && isRealDevice() && isAuthApiPath(apiPath.split('?')[0]) && data && data.action) {
+    return ecsAuthRequest('POST', apiPath, data, extraHeader)
+  }
+  return fetchJsonWithRetry(url, m, data, extraHeader)
+}
+
+function pingEcs() {
+  return fetchJsonWithRetry(resolveUrl('/api/meoo-erp-api-health'), 'GET', undefined, {})
 }
 
 module.exports = {
@@ -173,6 +214,8 @@ module.exports = {
   hasEcsApi,
   resolveUrl,
   ecsRequest,
+  ecsAuthRequest,
+  pingEcs,
   fetchJsonWithRetry,
   isRealDevice,
   isTransientNetError,
