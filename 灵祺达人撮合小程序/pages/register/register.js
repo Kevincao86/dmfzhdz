@@ -12,6 +12,7 @@ const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionP
 
 const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
+const accountMemberSync = require('../../utils/accountMemberSync.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
 const { writeMember, readMember } = memberStore
 
@@ -66,6 +67,27 @@ Page({
     provinceIndex: 0,
     cityIndex: 0,
     lingqiTalentIdLabel: '',
+    loginName: '',
+    password: '',
+    hasPassword: false,
+  },
+  async onShow() {
+    if (auth.isLoggedIn()) {
+      try {
+        await auth.refreshSession()
+      } catch (_) {}
+    }
+    const acct = auth.readAccount()
+    if (acct) {
+      accountMemberSync.syncTalentMemberFromAccount(acct)
+      const patch = {}
+      if (acct.loginName) patch.loginName = acct.loginName
+      patch.hasPassword = !!acct.hasPassword
+      if (acct.lingqiTalentId) {
+        patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(acct.lingqiTalentId)
+      }
+      if (Object.keys(patch).length) this.setData(patch)
+    }
   },
   onLoad(options) {
     const edit = !options || options.edit !== '0'
@@ -85,8 +107,11 @@ Page({
       douyinLevelIndex,
     }
     const acct = auth.readAccount()
-    const talentId = (cur && cur.lingqiTalentId) || (acct && acct.lingqiTalentId) || ''
+    if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
+    const talentId = (acct && acct.lingqiTalentId) || (cur && cur.lingqiTalentId) || ''
     if (talentId) patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(talentId)
+    if (acct && acct.loginName) patch.loginName = acct.loginName
+    patch.hasPassword = !!(acct && acct.hasPassword)
     if (cur) {
       Object.assign(patch, {
         wxNickName: cur.wxNickName || '',
@@ -121,6 +146,12 @@ Page({
   onNicknameInput(e) {
     const nick = e.detail.value || ''
     this.setData({ wxNickName: nick })
+  },
+  onLoginNameInput(e) {
+    this.setData({ loginName: e.detail.value })
+  },
+  onPasswordInput(e) {
+    this.setData({ password: e.detail.value })
   },
   onProvinceChange(e) {
     onProvincePick(this, e)
@@ -211,12 +242,12 @@ Page({
     const prev = readMember()
     const acct = auth.readAccount()
     const member = {
-      id: (prev && prev.id) || (acct && acct.registryMemberId) || `MTM-${Date.now()}`,
-      lingqiTalentId: (prev && prev.lingqiTalentId) || (acct && acct.lingqiTalentId) || '',
+      id: (acct && acct.registryMemberId) || (prev && prev.id) || `MTM-${Date.now()}`,
+      lingqiTalentId: (acct && acct.lingqiTalentId) || (prev && prev.lingqiTalentId) || '',
       memberType: talentPlatforms.inferLegacyMemberType(profiles),
       wxNickName: String(this.data.wxNickName || '').trim(),
       wxAvatarUrl: String(this.data.wxAvatarUrl || '').trim(),
-      wxOpenId: String(this.data.wxOpenId || '').trim(),
+      wxOpenId: String((acct && acct.openid) || this.data.wxOpenId || (prev && prev.wxOpenId) || '').trim(),
       contact: String(this.data.contact || '').trim(),
       wechatId: String(this.data.wechatId || '').trim(),
       alipayAccount: String(this.data.alipayAccount || '').trim(),
@@ -261,10 +292,21 @@ Page({
           const reg = await ops.registerTalentMember(member)
           if (reg && reg.lingqiTalentId) {
             member.lingqiTalentId = reg.lingqiTalentId
-            writeMember(member)
           }
+          if (reg && reg.id) member.id = reg.id
+          writeMember(member)
         } catch (_) {
           cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
+        }
+      }
+      if (auth.isLoggedIn() && String(this.data.loginName || '').trim()) {
+        try {
+          await auth.setLoginCredentials(this.data.loginName.trim(), this.data.password)
+        } catch (e) {
+          const msg = e && e.message ? e.message : String(e)
+          if (msg.indexOf('login_name_taken') >= 0) {
+            cloudWarn = cloudWarn || '登录名已被占用，请换一个'
+          }
         }
       }
       this.setData({

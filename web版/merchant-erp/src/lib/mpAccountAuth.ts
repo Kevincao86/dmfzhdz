@@ -84,10 +84,19 @@ export function newScanTicket(): string {
   return `scan_${randomBytes(16).toString('hex')}`
 }
 
-export async function wxCodeToOpenId(code: string): Promise<{ openid: string; session_key?: string }> {
-  if (process.env.MP_AUTH_DEV_MODE === 'true' && code) {
-    const openid = `dev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
-    return { openid }
+export async function wxCodeToOpenId(
+  code: string,
+  stableDevOpenId?: string,
+): Promise<{ openid: string; session_key?: string }> {
+  if (process.env.MP_AUTH_DEV_MODE === 'true') {
+    const stable = String(stableDevOpenId || process.env.MP_DEV_FIXED_OPENID || '').trim()
+    if (stable) {
+      return { openid: stable.startsWith('dev_') ? stable : `dev_${stable}` }
+    }
+    if (code) {
+      const openid = `dev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
+      return { openid }
+    }
   }
   const appId = String(process.env.MP_WECHAT_APPID || process.env.WX_APPID || '').trim()
   const secret = String(process.env.MP_WECHAT_SECRET || process.env.WX_SECRET || '').trim()
@@ -204,6 +213,18 @@ async function provisionRegistryForAccount(
   if (role === 'talent' && !account.lingqi_talent_id) {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
+    const openId = String(account.openid || '').trim()
+    const existingByWx =
+      openId &&
+      (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
+    if (existingByWx?.lingqiTalentId) {
+      await updateAccount(rest, account.id, {
+        lingqi_talent_id: existingByWx.lingqiTalentId,
+        registry_member_id: existingByWx.id,
+        active_role: 'talent',
+      })
+      return (await findAccountById(rest, account.id))!
+    }
     const lingqiTalentId = allocateLingqiTalentId(data)
     const saved = upsertMpTalentMember(data, {
       id: account.registry_member_id || `MTM-${Date.now()}`,
@@ -229,6 +250,17 @@ async function provisionRegistryForAccount(
   if (role === 'pr' && !account.lingqi_pr_id) {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
+    const openId = String(account.openid || '').trim()
+    const existingPr =
+      openId && (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+    if (existingPr?.lingqiPrId) {
+      await updateAccount(rest, account.id, {
+        lingqi_pr_id: existingPr.lingqiPrId,
+        registry_pr_id: existingPr.id,
+        active_role: 'pr',
+      })
+      return (await findAccountById(rest, account.id))!
+    }
     const saved = upsertMpPrUser(data, {
       id: account.registry_pr_id || `MPR-${Date.now()}`,
       lingqiPrId: '',
@@ -303,6 +335,8 @@ async function syncRegistryPr(
 
 export type MpAuthWxLoginInput = {
   code: string
+  /** 开发者工具：客户端持久化的稳定 openid，避免每次 wx.login code 变化导致新账号 */
+  stableDevOpenId?: string
   role?: MpAccountRole
   wxNickName?: string
   wxAvatarUrl?: string
@@ -317,7 +351,7 @@ export async function mpAuthWxLogin(
   input: MpAuthWxLoginInput,
 ): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
   const rest = restClient(supabaseUrl, serviceRole)
-  const { openid } = await wxCodeToOpenId(input.code)
+  const { openid } = await wxCodeToOpenId(input.code, input.stableDevOpenId)
   let account = await findAccountByOpenId(rest, openid)
   let isNew = false
   const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
@@ -395,17 +429,31 @@ export async function mpAuthSetPassword(
   loginName: string,
   password: string,
 ): Promise<void> {
+  await mpAuthSetLoginCredentials(supabaseUrl, serviceRole, accountId, loginName, password)
+}
+
+/** 设置登录名；password 选填，留空则仅更新登录名、保留原密码 */
+export async function mpAuthSetLoginCredentials(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  loginName: string,
+  password?: string,
+): Promise<void> {
   const rest = restClient(supabaseUrl, serviceRole)
   const name = String(loginName || '').trim().toLowerCase()
-  if (!name || password.length < 6) throw new Error('invalid_password')
+  if (!name) throw new Error('invalid_login_name')
   const existing = await findAccountByLoginName(rest, name)
   if (existing && existing.id !== accountId) throw new Error('login_name_taken')
-  const { hash, salt } = hashPassword(password)
-  await updateAccount(rest, accountId, {
-    login_name: name,
-    password_hash: hash,
-    password_salt: salt,
-  })
+  const patch: Record<string, unknown> = { login_name: name }
+  const pwd = String(password || '')
+  if (pwd.length > 0) {
+    if (pwd.length < 6) throw new Error('invalid_password')
+    const { hash, salt } = hashPassword(pwd)
+    patch.password_hash = hash
+    patch.password_salt = salt
+  }
+  await updateAccount(rest, accountId, patch)
 }
 
 export async function mpAuthSwitchRole(

@@ -60,6 +60,15 @@ export async function fetchSession() {
   return { account: data.account as MpAccount }
 }
 
+/** 设置登录名；password 留空则仅改登录名、保留原密码 */
+export async function setLoginCredentials(loginName: string, password?: string) {
+  const data = await mpAuthRequest('set_login_credentials', {
+    loginName: loginName.trim(),
+    password: password ?? '',
+  })
+  return { account: data.account as MpAccount }
+}
+
 async function parseJsonRes(res: Response) {
   const text = await res.text()
   try {

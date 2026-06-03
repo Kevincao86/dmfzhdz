@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
-import { registerPrUser } from '../lib/mpApi'
-import { getAccount, getActiveRole } from '../lib/mpSession'
+import { fetchSession, registerPrUser, setLoginCredentials } from '../lib/mpApi'
+import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSession'
 import { emptyPrProfile, readPrProfile, writePrProfile, type PrProfile } from '../lib/mpSync/userProfile'
 import { readWxAccount } from '../lib/mpSync/wxAccount'
 import { validateRegion } from '../lib/mpSync/regionPicker'
@@ -23,9 +23,31 @@ export default function PrProfilePage() {
     ...prev,
     wxNickName: prev?.wxNickName || wx?.wxNickName || acc?.wxNickName || '',
     lingqiPrId: prev?.lingqiPrId || acc?.lingqiPrId || '',
+    id: prev?.id || acc?.registryPrId || '',
   }))
+  const [loginName, setLoginName] = useState(acc?.loginName || '')
+  const [password, setPassword] = useState('')
+  const [hasPassword, setHasPassword] = useState(!!acc?.hasPassword)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    if (!getToken()) return
+    void fetchSession()
+      .then(({ account }) => {
+        setSession(getToken(), account)
+        setLoginName(account.loginName || '')
+        setHasPassword(!!account.hasPassword)
+        if (account.lingqiPrId) {
+          setForm((f) => ({
+            ...f,
+            lingqiPrId: account.lingqiPrId || f.lingqiPrId,
+            id: account.registryPrId || f.id,
+          }))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   function setField<K extends keyof PrProfile>(k: K, v: PrProfile[K]) {
     setForm((f) => ({ ...f, [k]: v }))
@@ -47,9 +69,11 @@ export default function PrProfilePage() {
     }
     setSaving(true)
     setMsg('')
+    const accNow = getAccount()
     const saved: PrProfile = {
       ...form,
-      id: form.id || prev?.id || `MPR-${Date.now()}`,
+      id: accNow?.registryPrId || form.id || prev?.id || `MPR-${Date.now()}`,
+      lingqiPrId: accNow?.lingqiPrId || form.lingqiPrId,
       companyName: form.accountType === 'company' ? org : '',
       personalName: form.accountType === 'personal' ? org : '',
       contactName: form.contactName || (form.accountType === 'personal' ? org : form.contactName),
@@ -57,6 +81,18 @@ export default function PrProfilePage() {
       registeredAt: form.registeredAt || prev?.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
     }
     writePrProfile(saved)
+    let credWarn = ''
+    if (getToken() && loginName.trim()) {
+      try {
+        const { account } = await setLoginCredentials(loginName.trim(), password)
+        setSession(getToken(), account)
+        setHasPassword(!!account.hasPassword)
+        setPassword('')
+      } catch (e) {
+        const m = e instanceof Error ? e.message : String(e)
+        credWarn = m.includes('login_name_taken') ? '登录名已被占用' : `登录账号未保存：${m}`
+      }
+    }
     try {
       const reg = (await registerPrUser({
         id: saved.id,
@@ -79,9 +115,13 @@ export default function PrProfilePage() {
       if (reg?.id) saved.id = reg.id
       writePrProfile(saved)
       setForm(saved)
-      setMsg('已保存并同步云端')
+      setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')
     } catch (e) {
-      setMsg(`已保存本机；云端同步失败：${e instanceof Error ? e.message : String(e)}`)
+      setMsg(
+        credWarn
+          ? `${credWarn}；资料已保存本机；云端同步失败：${e instanceof Error ? e.message : String(e)}`
+          : `已保存本机；云端同步失败：${e instanceof Error ? e.message : String(e)}`,
+      )
     } finally {
       setSaving(false)
     }
@@ -95,6 +135,29 @@ export default function PrProfilePage() {
         ← 返回我的
       </Link>
       <h2 className="text-xl font-bold">PR 信息</h2>
+      {form.lingqiPrId ? <p className="text-sm text-slate-400">PR ID：{form.lingqiPrId}</p> : null}
+
+      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+        <p className="text-slate-400 text-xs">登录账号（选填）— 与小程序账号密码登录共用</p>
+        <label className="block">
+          <span className="text-slate-400">登录名</span>
+          <input
+            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            value={loginName}
+            onChange={(e) => setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))}
+          />
+        </label>
+        <label className="block">
+          <span className="text-slate-400">登录密码</span>
+          <input
+            type="password"
+            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
+          />
+        </label>
+      </section>
 
       <div className="flex gap-2">
         {ACCOUNT_TYPES.map((t) => (

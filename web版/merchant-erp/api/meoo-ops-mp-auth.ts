@@ -17,6 +17,7 @@ import {
   mpAuthScanCreate,
   mpAuthScanPoll,
   mpAuthSetPassword,
+  mpAuthSetLoginCredentials,
   mpAuthSwitchRole,
   mpAuthWxLogin,
   resolveSession,
@@ -148,6 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const roleRaw = pickAuthField(req, body, 'role')
       const { token, account, isNew } = await mpAuthWxLogin(supabaseUrl, serviceRole, {
         code: pickAuthField(req, body, 'code'),
+        stableDevOpenId: pickAuthField(req, body, 'stableDevOpenId'),
         role: roleRaw === 'pr' ? 'pr' : 'talent',
         wxNickName: pickAuthField(req, body, 'wxNickName'),
         wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
@@ -169,21 +171,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    if (action === 'set_password') {
+    if (action === 'set_password' || action === 'set_login_credentials') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
       if (!sess) {
         sendJson(res, 401, { ok: false, error: 'invalid_session' })
         return
       }
-      await mpAuthSetPassword(
+      await mpAuthSetLoginCredentials(
         supabaseUrl,
         serviceRole,
         sess.account.id,
         String(body.loginName || ''),
         String(body.password || ''),
       )
-      sendJson(res, 200, { ok: true })
+      const refreshed = await resolveSession(rest, token)
+      sendJson(res, 200, {
+        ok: true,
+        account: refreshed ? accountToClientPayload(refreshed.account) : accountToClientPayload(sess.account),
+      })
       return
     }
 
