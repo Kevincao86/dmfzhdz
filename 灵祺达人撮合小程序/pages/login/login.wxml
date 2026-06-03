@@ -1,25 +1,35 @@
-<view class="page">
-  <view class="card">
-    <text class="title">灵祺撮合平台</text>
-    <text class="sub">一微信一账号 · 与履约 Web 后台互通</text>
-    <text class="hint" wx:if="{{netOk}}">{{netOk}}</text>
+<view class="login-page">
+  <view class="login-hero">
+    <view class="login-hero__glow" aria-hidden="true" />
+    <image class="login-logo" src="/images/logo.png" mode="aspectFit" />
+    <text class="login-brand">灵祺撮合平台</text>
+    <text class="login-tagline">本地生活 · 探店种草 · 云剪直派</text>
+  </view>
 
-    <view class="tabs">
-      <view class="tab {{tab==='wx'?'on':''}}" bindtap="onTabWx">微信登录</view>
-      <view class="tab {{tab==='pwd'?'on':''}}" bindtap="onTabPwd">账号密码</view>
+  <view class="login-card">
+    <view class="login-tabs">
+      <view class="login-tab {{tab==='wx'?'login-tab--on':''}}" bindtap="onTabWx">微信登录</view>
+      <view class="login-tab {{tab==='pwd'?'login-tab--on':''}}" bindtap="onTabPwd">账号密码</view>
     </view>
 
     <block wx:if="{{tab==='wx'}}">
-      <button class="btn primary" loading="{{loading}}" bindtap="onWxLogin">微信一键登录</button>
-      <text class="hint">使用当前微信身份，不可重复注册多个账号</text>
+      <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onWxLogin">
+        微信一键登录
+      </button>
     </block>
 
     <block wx:else>
-      <input class="input" placeholder="登录名" value="{{loginName}}" bindinput="onLoginName" />
-      <input class="input" password placeholder="密码（≥6位）" value="{{password}}" bindinput="onPassword" />
-      <button class="btn primary" loading="{{loading}}" bindtap="onPwdLogin">登录</button>
+      <input class="login-input" placeholder="登录名" value="{{loginName}}" bindinput="onLoginName" />
+      <input
+        class="login-input"
+        password
+        placeholder="密码（至少 6 位）"
+        value="{{password}}"
+        bindinput="onPassword"
+      />
+      <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onPwdLogin">登录</button>
     </block>
 
-    <text class="err" wx:if="{{err}}">{{err}}</text>
+    <text class="login-err" wx:if="{{err}}">{{err}}</text>
   </view>
 </view>

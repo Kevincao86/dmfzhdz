@@ -10,33 +10,12 @@ Page({
     password: '',
     loading: false,
     err: '',
-    netOk: '',
   },
 
   onLoad() {
     this.setData({ err: '' })
     if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
-      return
-    }
-    void this.probeEcs()
-  },
-
-  async probeEcs() {
-    try {
-      const h = await api.ping()
-      if (h && h.ok) {
-        const via = api.transportLabel ? api.transportLabel() : 'direct'
-        this.setData({ netOk: `ECS 可达(${via}) revision=${h.revision || '?'}` })
-      }
-    } catch (e) {
-      const msg = e && e.message ? e.message : String(e)
-      if (api.isNetReset(msg)) {
-        this.setData({
-          netOk:
-            '请走云开发绕过域名：见 备案期启动-绕过域名.md，填写 MP_CLOUD_ENV 并部署 mpErpProxy',
-        })
-      }
     }
   },
 
@@ -98,17 +77,10 @@ Page({
         hint = '服务端未配置微信密钥，请联系管理员'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
         hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
-      } else if (/23505|duplicate key/i.test(msg)) {
-        hint = '注册表 id 冲突（将改为 PATCH 更新）。ECS：git pull && sudo systemctl restart meoo-auth-api，再点登录'
-      } else if (/row-level security|ops_registry_snapshot|42501/i.test(msg)) {
-        hint = `注册表权限：${msg.slice(0, 80)}\n\nECS：bash scripts/ecs-fix-mp-open-all-permissions.sh`
       } else if (api.isNetReset(msg)) {
-        const build = api.BUILD_ID
-        hint =
-          msg +
-          `\n\n① 合法域名 https://mofangdianai.com；② ECS: bash scripts/ecs-check-aliyun-beian-wechat.sh；③ 体验版 ${build}；④ 未完成阿里云「接入备案」时微信会一直 -101。`
+        hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
       } else if (/admin_not_configured|not_configured/i.test(msg)) {
-        hint = msg + '\n\nECS: bash scripts/ecs-mp-minimal.sh'
+        hint = '服务暂不可用，请联系管理员'
       }
       this.setData({ err: hint })
     } finally {

@@ -96,12 +96,14 @@ Page({
       cityFilters: hallFilters.buildCityFilterOptions(allForCity),
       todayCount: openList.length,
       loading: false,
-      err: String(banner || ''),
+      err: '',
     })
     this.applyFilters()
   },
 
   async loadList() {
+    const loadTok = Date.now()
+    this._loadTok = loadTok
     if (!api.hasApi()) {
       const mockOnly = [listFilters.buildMockRecruitmentRow()]
       this.setData({
@@ -123,7 +125,7 @@ Page({
     const offline = registryCache.load({ allowStale: true })
     if (offline && offline.data) {
       showedOffline = true
-      offlineBanner = `离线展示：${registryCache.formatSavedAt(offline.savedAt)}（${registryCache.formatAgeHint(offline.ageMs)}），正在尝试刷新…`
+      offlineBanner = ''
       this.applyRegistryRows(offline.data, offlineBanner)
     } else {
       this.setData({ loading: true, err: '' })
@@ -141,59 +143,39 @@ Page({
           throw e
         }
       }
+      if (this._loadTok !== loadTok) return
       this.applyRegistryRows(reg, cacheWarn)
     } catch (e) {
+      if (this._loadTok !== loadTok) return
       if (showedOffline) {
-        this.setData({
-          loading: false,
-          err: `${offlineBanner}\n刷新失败（仍显示离线数据）`,
-        })
+        this.setData({ loading: false, err: '刷新失败，请下拉重试' })
         return
       }
       const msg = String(e.message || e)
-      const registryUrl = api.apiUrl('/api/meoo-ops-sync-registry')
-      let hint = msg
-      if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
-        hint =
-          '微信合法域名请仅填 https://mofangdianai.com（request+downloadFile）。保存后删小程序重扫体验版。\n\n' +
-          msg
-      } else if (/timeout|超时/i.test(msg)) {
-        hint = '请求超时（注册表较大或网络慢）。\n\n' + msg
-      } else if (/ssl|certificate|证书/i.test(msg)) {
-        hint = 'HTTPS 证书校验失败，请确认域名证书有效。\n\n' + msg
-      } else if (/httpDNSServiceId|httpdns/i.test(msg)) {
-        hint =
-          '已关闭 HttpDNS，请重新上传体验版（构建号含 no-httpdns）。若仍见本提示说明仍是旧包。\n\n' + msg
-      } else if (/ecs_proxy|fetch failed|meoo_ops_mp_hall_registry_failed|erp_proxy/i.test(msg)) {
-        hint =
-          'ECS 不可用。请执行：bash ~/app/scripts/ecs-fix-mp-chat-path.sh\n\n' + msg
-      } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
+      let hint = '加载失败，请稍后重试'
+      if (/timeout|超时/i.test(msg)) {
+        hint = '加载超时，请检查网络后重试'
+      } else if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
+        hint = '网络配置异常，请联系管理员'
+      } else if (/reset|errcode:-101|cronet/i.test(msg)) {
         const stale = registryCache.load({ allowStale: true })
-        const attemptLines =
-          e && Array.isArray(e.attempts) && e.attempts.length ? `\n${e.attempts.join('\n')}\n` : ''
-        const build = api.BUILD_ID || 'mp-20260606-ecs-clean'
-        hint = stale
-          ? '网络仍被重置，但应已显示离线列表；删小程序重扫体验码。\n\n' + msg
-          : `请确认：① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-mp-minimal.sh；③ 体验版 ${build}。` +
-            attemptLines +
-            '\n' +
-            msg
+        if (stale && stale.data) {
+          this.applyRegistryRows(stale.data, '')
+          this.setData({ err: '网络不稳定，已显示缓存列表' })
+          return
+        }
+        hint = '网络不稳定，请删除小程序后重新扫码'
       }
-      if (apiBase && !hint.includes(apiBase)) {
-        hint += `\n\nAPI 根地址：${apiBase}`
-      }
-      if (registryUrl && !hint.includes(registryUrl)) {
-        hint += `\n注册表：${registryUrl}`
-      }
-      hint += `\n\n体验版构建：${mpBuild.ID}`
+      const mockOnly = [listFilters.buildMockRecruitmentRow()]
       this.setData({
         loading: false,
         err: hint,
-        normalRows: [],
+        normalRows: mockOnly,
         urgentRows: [],
         iceRows: [],
-        displayRows: [],
+        cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
       })
+      this.applyFilters()
     } finally {
       if (this.data.loading) {
         this.setData({ loading: false })

@@ -1,7 +1,7 @@
 <view class="page-shell page-with-bar">
   <view class="page-hero page-hero--compact">
     <text class="page-hero-title">我的信息</text>
-    <text class="page-hero-sub">按平台填写达人资料，报名时可一键同步</text>
+    <text class="page-hero-sub">按平台填写达人资料，报名时可一键填入</text>
   </view>
 
   <view class="card">
