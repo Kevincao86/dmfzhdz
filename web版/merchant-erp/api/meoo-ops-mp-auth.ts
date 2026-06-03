@@ -49,7 +49,20 @@ function rawBody(req: VercelRequest): string {
 function sessionToken(req: VercelRequest, body: Record<string, unknown>): string {
   const h = req.headers['x-mp-session'] || req.headers.authorization
   if (typeof h === 'string' && h.startsWith('Bearer ')) return h.slice(7).trim()
-  return String(body.sessionToken || body.token || '').trim()
+  const q = req.query?.sessionToken ?? req.query?.token
+  const fromQuery = Array.isArray(q) ? String(q[0] || '') : String(q || '')
+  return String(body.sessionToken || body.token || fromQuery || '').trim()
+}
+
+/** 微信真机 Cronet 对根域 POST 易 reset；GET 查询参数与 POST body 等价 */
+function pickAuthField(
+  req: VercelRequest,
+  body: Record<string, unknown>,
+  key: string,
+): string {
+  const raw = req.query?.[key]
+  const fromQuery = Array.isArray(raw) ? String(raw[0] ?? '') : String(raw ?? '')
+  return String(body[key] ?? fromQuery ?? '').trim()
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -131,11 +144,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     if (action === 'wx_login') {
+      const roleRaw = pickAuthField(req, body, 'role')
       const { token, account, isNew } = await mpAuthWxLogin(supabaseUrl, serviceRole, {
-        code: String(body.code || ''),
-        role: body.role === 'pr' ? 'pr' : 'talent',
-        wxNickName: String(body.wxNickName || ''),
-        wxAvatarUrl: String(body.wxAvatarUrl || ''),
+        code: pickAuthField(req, body, 'code'),
+        role: roleRaw === 'pr' ? 'pr' : 'talent',
+        wxNickName: pickAuthField(req, body, 'wxNickName'),
+        wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
         registerTalent: body.registerTalent as never,
         registerPr: body.registerPr as never,
       })
@@ -179,11 +193,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 401, { ok: false, error: 'invalid_session' })
         return
       }
+      const roleRaw = pickAuthField(req, body, 'role')
       const account = await mpAuthSwitchRole(
         supabaseUrl,
         serviceRole,
         sess.account.id,
-        body.role === 'pr' ? 'pr' : 'talent',
+        roleRaw === 'pr' ? 'pr' : 'talent',
       )
       sendJson(res, 200, { ok: true, account: accountToClientPayload(account) })
       return
