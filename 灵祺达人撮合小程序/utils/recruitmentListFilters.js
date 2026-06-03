@@ -155,6 +155,21 @@ function buildMockRecruitmentRow(partial) {
   }
 }
 
+/**
+ * 首页招募大厅列表：真实开放单 + 演示单（与推荐页一致，避免仅 1 条演示）
+ * @param {Array<{id:string,isIce?:boolean}>} realNonIceRows 非云剪的开放商单
+ */
+function mergeHallDisplayRows(realNonIceRows) {
+  const demos = buildMockRecruitmentRows().filter((d) => !d.isIce)
+  const real = Array.isArray(realNonIceRows) ? realNonIceRows : []
+  if (!real.length) {
+    return demos.length ? demos : [buildMockRecruitmentRow()]
+  }
+  const ids = new Set(real.map((r) => r.id))
+  const extra = demos.filter((d) => !ids.has(d.id))
+  return [...real, ...extra]
+}
+
 /** 推荐页演示商单（优质 / 热门 / 同城） */
 function buildMockRecruitmentRows() {
   const now = Date.now()
@@ -201,4 +216,5 @@ module.exports = {
   sortRecruitmentRows,
   buildMockRecruitmentRow,
   buildMockRecruitmentRows,
+  mergeHallDisplayRows,
 }
