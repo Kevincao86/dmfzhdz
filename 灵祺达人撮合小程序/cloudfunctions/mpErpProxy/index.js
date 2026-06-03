@@ -8,9 +8,16 @@ const target = require('./erp-target.js')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
+const PROXY_BUILD = 'mpErpProxy-20260603-http80ip'
 const ORIGIN = String(process.env.ECS_ERP_ORIGIN || '').replace(/\/$/, '')
 const ERP_IP = String(process.env.ECS_ERP_IP || target.ip || '').trim()
 const ERP_HOST = String(process.env.ECS_ERP_HOST || target.host || 'mofangdianai.com').trim()
+const TLS_SNI = String(target.tlsSni || ERP_HOST).trim()
+
+function requestHost(useIp) {
+  if (useIp && target.useIpHost !== false && ERP_IP) return ERP_IP
+  return ERP_HOST
+}
 
 function apiPath(raw) {
   let p = String(raw || '').trim()
@@ -20,16 +27,18 @@ function apiPath(raw) {
   return p
 }
 
-function ipTarget(path, { https, port }) {
+function ipTarget(path, { https, port, useIp }) {
   const useHttps = https === true
   const p = port || (useHttps ? 443 : 80)
+  const host = requestHost(useIp)
   return {
     mode: 'ip',
     proto: useHttps ? 'https' : 'http',
     hostname: ERP_IP,
     port: p,
     path,
-    host: ERP_HOST,
+    host,
+    sni: TLS_SNI,
   }
 }
 
@@ -43,10 +52,15 @@ function buildAttempts(path) {
   if (ORIGIN) return [urlTarget(path)]
   if (!ERP_IP) return [urlTarget(path)]
   const list = []
-  if (target.https !== false) list.push(ipTarget(path, { https: true }))
-  list.push(ipTarget(path, { https: false, port: 80 }))
+  if (target.http80IpOnly) {
+    list.push(ipTarget(path, { https: false, port: 80, useIp: true }))
+  }
+  if (target.https !== false) {
+    list.push(ipTarget(path, { https: true, useIp: true }))
+    if (!target.httpsIpOnly) list.push(ipTarget(path, { https: true, useIp: false }))
+  }
   const alt = Number(target.altPort)
-  if (alt > 0) list.push(ipTarget(path, { https: false, port: alt }))
+  if (alt > 0) list.push(ipTarget(path, { https: false, port: alt, useIp: true }))
   return list
 }
 
@@ -68,7 +82,7 @@ function upstreamRequest(t, method, body, headers) {
             : {}),
           ...headers,
         },
-        servername: t.host,
+        servername: t.sni || t.host,
         rejectUnauthorized: target.insecure !== true,
         timeout: 20000,
       }
@@ -103,7 +117,7 @@ function upstreamRequest(t, method, body, headers) {
         try {
           data = raw ? JSON.parse(raw) : {}
         } catch {
-          data = { message: raw }
+          data = { message: raw.slice(0, 500) }
         }
         resolve({ status: res.statusCode || 0, data })
       })
@@ -118,8 +132,13 @@ function upstreamRequest(t, method, body, headers) {
 }
 
 function describeTarget(t) {
-  if (t.mode === 'ip') return `${t.proto}://${t.host}${t.path}@${t.hostname}:${t.port}`
+  if (t.mode === 'ip') return `${t.proto}://Host:${t.host}${t.path}@${t.hostname}:${t.port}(sni:${t.sni})`
   return t.fullUrl
+}
+
+function isIcpBlock(data) {
+  const s = JSON.stringify(data || '')
+  return /ICP Filing|beian-block|Non-compliance/i.test(s)
 }
 
 exports.main = async (event) => {
@@ -128,28 +147,36 @@ exports.main = async (event) => {
   const body = event.body
   const headers = event.headers && typeof event.headers === 'object' ? event.headers : {}
   const attempts = buildAttempts(path)
-  const errors = []
+  const trace = []
 
   for (const t of attempts) {
+    const label = describeTarget(t)
     try {
       const { status, data } = await upstreamRequest(t, method, body, headers)
-      return {
-        ok: status >= 200 && status < 300,
-        status,
-        data,
-        via: 'cloud-mpErpProxy',
-        upstream: describeTarget(t),
+      if (status >= 200 && status < 300) {
+        return {
+          ok: true,
+          status,
+          data,
+          via: 'cloud-mpErpProxy',
+          upstream: label,
+          build: PROXY_BUILD,
+        }
       }
+      const note = isIcpBlock(data) ? 'icp-block' : `http-${status}`
+      trace.push(`${label} → ${note}`)
     } catch (e) {
-      errors.push(`${describeTarget(t)} → ${e.message || e}`)
+      trace.push(`${label} → ${e.message || e}`)
     }
   }
 
   return {
     ok: false,
     status: 0,
-    error: errors.join(' | ') || 'all attempts failed',
+    error: trace.join(' | ') || 'all attempts failed',
     via: 'cloud-mpErpProxy',
-    hint: '请在轻量检查：公网IP、443/80安全组、meoo-auth-api与Nginx是否在跑',
+    build: PROXY_BUILD,
+    hint:
+      '腾讯云 443 常 ECONNRESET：请在 ECS 配置 scripts/ecs-nginx-erp-api-80-ip.snippet，云函数 http80IpOnly 走 80+IP Host',
   }
 }
