@@ -1,4 +1,4 @@
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -136,7 +136,7 @@ Page({
     }
     userProfile.writePrProfile(saved)
     let cloudWarn = ''
-    if (merchant.hasMerchantApi()) {
+    if (api.hasApi()) {
       try {
         const prUser = {
           id: saved.id || `MPR-${Date.now()}`,

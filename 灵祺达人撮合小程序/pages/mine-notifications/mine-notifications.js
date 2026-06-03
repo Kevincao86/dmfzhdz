@@ -1,6 +1,6 @@
 const messagesStore = require('../../utils/messagesStore.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const talentMember = require('../../utils/talentMember.js')
 const userProfile = require('../../utils/userProfile.js')
 
@@ -32,7 +32,7 @@ Page({
   },
   async loadRows() {
     let rows = messagesStore.readNotifications()
-    if (userProfile.readIdentity() === 'talent' && merchant.hasMerchantApi()) {
+    if (userProfile.readIdentity() === 'talent' && api.hasApi()) {
       try {
         const member = talentMember.readMember()
         if (member && (member.id || member.contact)) {

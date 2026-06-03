@@ -1,14 +1,14 @@
-const merchant = require('./merchantApi.js')
+const api = require('./api.js')
 const participant = require('./participant.js')
 
 const POLL_MS = 2500
 const CHAT_PATH = '/api/meoo-ops-mp-talent-chat'
 
 async function chatRequest(payload) {
-  if (!merchant.hasMerchantApi()) {
-    throw new Error('未配置 ECS（config.release MERCHANT_API_BASE_URL）')
+  if (!api.hasApi()) {
+    throw new Error('未配置 MERCHANT_API_BASE_URL（config.release.js）')
   }
-  return merchant.merchantRequest('POST', CHAT_PATH, payload)
+  return api.post(CHAT_PATH, payload)
 }
 
 function throwApiError(data) {
@@ -61,7 +61,7 @@ function formatChatError(err) {
   if (/reset|errcode:-101|cronet_error/i.test(msg)) {
     return (
       '网络连接被重置。请确认体验版 mp-20260604-ecs-only、合法域名仅 mofangdianai.com，' +
-      '删小程序重扫；ECS 执行 bash scripts/ecs-fix-mp-wechat-login.sh。\n\n' +
+      '删小程序重扫；ECS 执行 bash scripts/ecs-mp-minimal.sh。\n\n' +
       msg
     )
   }
@@ -72,7 +72,7 @@ function formatChatError(err) {
 }
 
 function canChat() {
-  return merchant.hasMerchantApi()
+  return api.hasApi()
 }
 
 async function syncProfile(p) {

@@ -1,4 +1,4 @@
-const mp = require('./mpEcsClient.js')
+const ecs = require('./ecs.js')
 
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
@@ -38,27 +38,23 @@ function isLoggedIn() {
 }
 
 function authHeaders() {
-  const h = { 'Content-Type': 'application/json' }
+  const h = {}
   const token = readSessionToken()
   if (token) h['X-Mp-Session'] = token
   return h
 }
 
-async function mpAuthRequest(action, payload = {}) {
-  const body = { action, ...payload }
-  return mp.call({
-    method: 'POST',
-    path: '/api/meoo-ops-mp-auth',
-    body,
-    headers: authHeaders(),
-  })
+async function authPost(action, payload = {}) {
+  const data = await ecs.post('/api/meoo-ops-mp-auth', { action, ...payload }, authHeaders())
+  if (data.token && data.account) writeSession(data.token, data.account)
+  return data
 }
 
 async function wxLogin(opts = {}) {
   const code = await new Promise((resolve, reject) => {
     wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
   })
-  const data = await mpAuthRequest('wx_login', {
+  return authPost('wx_login', {
     code,
     role: opts.role || 'talent',
     wxNickName: opts.wxNickName || '',
@@ -66,24 +62,20 @@ async function wxLogin(opts = {}) {
     registerTalent: opts.registerTalent,
     registerPr: opts.registerPr,
   })
-  if (data.token && data.account) writeSession(data.token, data.account)
-  return data
 }
 
 async function passwordLogin(loginName, password) {
-  const data = await mpAuthRequest('password_login', { loginName, password })
-  if (data.token && data.account) writeSession(data.token, data.account)
-  return data
+  return authPost('password_login', { loginName, password })
 }
 
 async function switchRole(role) {
-  const data = await mpAuthRequest('switch_role', { role })
+  const data = await authPost('switch_role', { role })
   if (data.account) writeSession(readSessionToken(), data.account)
   return data
 }
 
 async function refreshSession() {
-  const data = await mpAuthRequest('session', {})
+  const data = await authPost('session', {})
   if (data.account) writeSession(readSessionToken(), data.account)
   return data
 }

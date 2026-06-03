@@ -1,4 +1,4 @@
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
 const platformForm = require('../../utils/platformForm.js')
@@ -7,7 +7,7 @@ const regionPicker = require('../../utils/regionPicker.js')
 const talentChat = require('../../utils/talentChat.js')
 const participant = require('../../utils/participant.js')
 const wxAccount = require('../../utils/wxAccount.js')
-const mpAuth = require('../../utils/mpAccountAuth.js')
+const auth = require('../../utils/auth.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
@@ -84,7 +84,7 @@ Page({
       platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
       douyinLevelIndex,
     }
-    const acct = mpAuth.readAccount()
+    const acct = auth.readAccount()
     const talentId = (cur && cur.lingqiTalentId) || (acct && acct.lingqiTalentId) || ''
     if (talentId) patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(talentId)
     if (cur) {
@@ -209,7 +209,7 @@ Page({
     }
     const profiles = this.data.platformProfiles
     const prev = readMember()
-    const acct = mpAuth.readAccount()
+    const acct = auth.readAccount()
     const member = {
       id: (prev && prev.id) || (acct && acct.registryMemberId) || `MTM-${Date.now()}`,
       lingqiTalentId: (prev && prev.lingqiTalentId) || (acct && acct.lingqiTalentId) || '',
@@ -256,7 +256,7 @@ Page({
           await talentChat.syncProfile(part)
         } catch (_) {}
       }
-      if (merchant.hasMerchantApi()) {
+      if (api.hasApi()) {
         try {
           const reg = await ops.registerTalentMember(member)
           if (reg && reg.lingqiTalentId) {

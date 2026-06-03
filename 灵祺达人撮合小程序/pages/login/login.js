@@ -1,7 +1,7 @@
-const mpAuth = require('../../utils/mpAccountAuth.js')
+const auth = require('../../utils/auth.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
-const mp = require('../../utils/mpEcsClient.js')
+const api = require('../../utils/api.js')
 
 Page({
   data: {
@@ -14,7 +14,7 @@ Page({
   },
 
   onLoad() {
-    if (mpAuth.isLoggedIn()) {
+    if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
       return
     }
@@ -23,16 +23,15 @@ Page({
 
   async probeEcs() {
     try {
-      const h = await mp.ping()
+      const h = await api.ping()
       if (h && h.ok) {
         this.setData({ netOk: `ECS 可达 revision=${h.revision || '?'}` })
       }
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
-      if (/reset|cronet|-101/i.test(msg)) {
+      if (api.isNetReset(msg)) {
         this.setData({
-          netOk:
-            'HTTPS 握手失败（非登录逻辑）。ECS: bash scripts/ecs-fix-mp-443-handshake-definitive.sh；删 AAAA；体验版 mp-20260606-tls13-post',
+          netOk: 'HTTPS 握手失败。ECS: bash scripts/ecs-mp-minimal.sh；体验版 mp-20260606-ecs-clean',
         })
       }
     }
@@ -69,12 +68,10 @@ Page({
           nick = prof.userInfo.nickName
           avatar = prof.userInfo.avatarUrl
           wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
-        } catch (_) {
-          /* 未授权头像昵称也可登录：服务端按 openid 自动注册并分配灵祺 ID */
-        }
+        } catch (_) {}
       }
       const role = userProfile.readIdentity().role === 'pr' ? 'pr' : 'talent'
-      const data = await mpAuth.wxLogin({
+      const data = await auth.wxLogin({
         role,
         wxNickName: nick,
         wxAvatarUrl: avatar,
@@ -96,13 +93,13 @@ Page({
       let hint = msg
       if (msg.indexOf('wx_not_configured') >= 0) {
         hint = '服务端未配置微信密钥，请联系管理员'
-      } else if (/reset|cronet|download:fail|request:fail/i.test(msg)) {
-        const build = mp.BUILD_ID || 'mp-20260606-tls13-post'
+      } else if (api.isNetReset(msg)) {
+        const build = api.BUILD_ID
         hint =
           msg +
-          `\n\n① 合法域名 https://mofangdianai.com；② ECS: bash scripts/ecs-fix-mp-443-handshake-definitive.sh；③ 体验版 ${build}，删小程序重扫。`
-      } else if (/admin_not_configured|chat_supabase|not_configured/i.test(msg)) {
-        hint = msg + '\n\nECS: bash scripts/ecs-redeploy-mp-only.sh'
+          `\n\n① 合法域名 https://mofangdianai.com；② ECS: bash scripts/ecs-mp-minimal.sh；③ 体验版 ${build}，删小程序重扫。`
+      } else if (/admin_not_configured|not_configured/i.test(msg)) {
+        hint = msg + '\n\nECS: bash scripts/ecs-mp-minimal.sh'
       }
       this.setData({ err: hint })
     } finally {
@@ -113,7 +110,7 @@ Page({
   async onPwdLogin() {
     this.setData({ loading: true, err: '' })
     try {
-      await mpAuth.passwordLogin(this.data.loginName.trim(), this.data.password)
+      await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })

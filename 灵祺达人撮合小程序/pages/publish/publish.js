@@ -1,4 +1,4 @@
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const userProfile = require('../../utils/userProfile.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
@@ -460,7 +460,7 @@ Page({
     this.resetToMode()
   },
   async loadEditOrder(mpId) {
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       wx.showToast({ title: '未配置后台地址', icon: 'none' })
       setTimeout(() => wx.navigateBack(), 800)
       return
@@ -1030,7 +1030,7 @@ Page({
       wx.showToast({ title: err, icon: 'none' })
       return
     }
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       wx.showToast({ title: '未配置后台地址', icon: 'none' })
       return
     }

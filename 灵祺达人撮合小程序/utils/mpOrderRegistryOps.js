@@ -1,10 +1,10 @@
-const { merchantRequest } = require('./merchantApi.js')
+const api = require('./api.js')
 
 async function postJson(paths, body) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, body)
+      return await api.post(path, body)
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)

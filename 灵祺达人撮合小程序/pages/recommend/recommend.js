@@ -1,5 +1,5 @@
 const config = require('../../utils/config.js')
-const merchant = require('../../utils/merchantApi.js')
+const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const userProfile = require('../../utils/userProfile.js')
 const memberStore = require('../../utils/talentMember.js')
@@ -306,7 +306,7 @@ Page({
     else this.loadOrderList()
   },
   async loadTalentList() {
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       const preview = prependSelfTalentTest([MOCK_PREVIEW])
       this.setData({
         loading: false,
@@ -382,7 +382,7 @@ Page({
   },
   async loadOrderList() {
     const mocks = listFilters.buildMockRecruitmentRows()
-    if (!merchant.hasMerchantApi()) {
+    if (!api.hasApi()) {
       this.setData({ loading: false, err: '', allOrderRows: mocks })
       this.applyOrderFilters()
       return
@@ -511,7 +511,7 @@ Page({
     const mocks = rows.filter((r) => r.isMock)
     let real = rows.filter((r) => !r.isMock)
     const member = memberStore.readMember()
-    if (member && merchant.hasMerchantApi() && real.length) {
+    if (member && api.hasApi() && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, member)
     } else {
       real = real.map((r) => ({

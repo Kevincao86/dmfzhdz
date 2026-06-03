@@ -1,4 +1,4 @@
-const { merchantRequest } = require('./merchantApi.js')
+const api = require('./api.js')
 const registryCache = require('./registryCache.js')
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
@@ -17,7 +17,7 @@ async function fetchRegistryViaErpApi() {
   let lastErr
   for (const path of paths) {
     try {
-      const data = await merchantRequest('GET', path)
+      const data = await api.get(path)
       registryCache.save(data, path)
       return data
     } catch (e) {
@@ -73,7 +73,7 @@ async function applyToMpOrder(mpOrderId, applicant) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { mpOrderId, applicant })
+      return await api.post(path, { mpOrderId, applicant })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -91,7 +91,7 @@ async function registerTalentMember(member) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { member })
+      return await api.post(path, { member })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -109,7 +109,7 @@ async function registerPrUser(prUser) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { prUser })
+      return await api.post(path, { prUser })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -127,7 +127,7 @@ async function submitIceDouyin(mpOrderId, applicantId, douyinPublishUrl) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { mpOrderId, applicantId, douyinPublishUrl })
+      return await api.post(path, { mpOrderId, applicantId, douyinPublishUrl })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -145,7 +145,7 @@ async function confirmIceTask(mpOrderId, applicantId, action) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { mpOrderId, applicantId, action })
+      return await api.post(path, { mpOrderId, applicantId, action })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -163,7 +163,7 @@ async function appendMpRecruitmentOrder(order) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { order })
+      return await api.post(path, { order })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -181,7 +181,7 @@ async function appendTalentInbox(entries) {
   let lastErr
   for (const path of paths) {
     try {
-      return await merchantRequest('POST', path, { entries })
+      return await api.post(path, { entries })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)

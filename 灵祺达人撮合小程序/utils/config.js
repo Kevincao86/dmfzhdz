@@ -1,22 +1,19 @@
 /**
- * 真机/体验版/正式版仅用 config.release.js（ECS erp-api）
- * config.local.js 仅开发者工具可选覆盖
+ * 体验版/正式版：config.release.js
+ * 开发者工具：可选 config.local.js 覆盖 MERCHANT_API_BASE_URL
  */
-const LAN_API_HOST = ''
-
-const host = LAN_API_HOST.trim()
 const core = {
-  MERCHANT_API_BASE_URL: host ? `http://${host}:5173` : '',
+  MERCHANT_API_BASE_URL: '',
+  MP_BUILD_ID: '',
   MP_TEST_TALENT_ON_RECOMMEND: false,
 }
 
 let out = { ...core }
 try {
-  const rel = require('./config.release.js')
-  if (rel && typeof rel === 'object') Object.assign(out, rel)
+  Object.assign(out, require('./config.release.js'))
 } catch (_) {}
 
-function shouldApplyLocalConfig() {
+function isDevtools() {
   try {
     return wx.getSystemInfoSync().platform === 'devtools'
   } catch {
@@ -24,20 +21,11 @@ function shouldApplyLocalConfig() {
   }
 }
 
-try {
-  const loc = require('./config.local.js')
-  if (loc && typeof loc === 'object' && shouldApplyLocalConfig()) {
-    if (/cs\.mofangdianai\.com|vercel\.app|supabase\.co/i.test(JSON.stringify(loc))) {
-      console.warn('[config] config.local.js 含已废弃的 Vercel/cs/Supabase 地址，已忽略网关字段')
-      delete loc.MP_GATEWAY_BASE_URL
-      delete loc.MP_REGISTRY_GATEWAY_BASE_URL
-      delete loc.SUPABASE_URL
-      delete loc.SUPABASE_ANON_KEY
-    }
-    Object.assign(out, loc)
-  } else if (loc && loc.MERCHANT_API_BASE_URL) {
-    console.warn('[config] 真机/体验版已忽略 config.local.js，使用 config.release.js（ECS）')
-  }
-} catch (_) {}
+if (isDevtools()) {
+  try {
+    const loc = require('./config.local.js')
+    if (loc && loc.MERCHANT_API_BASE_URL) Object.assign(out, loc)
+  } catch (_) {}
+}
 
 module.exports = out
