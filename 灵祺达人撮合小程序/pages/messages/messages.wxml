@@ -25,7 +25,7 @@
   </view>
 
   <view wx:if="{{!configured}}" class="msg-fixed-tip card">
-    <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL（体验版为 https://cs.mofangdianai.com，经网关访问 ECS erp-api）</text>
+    <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL（体验版 https://mofangdianai.com/erp-api）</text>
   </view>
 
   <block wx:elif="{{loading}}">

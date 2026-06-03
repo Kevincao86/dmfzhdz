@@ -1,6 +1,5 @@
 const merchant = require('../../utils/merchantApi.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const registryCs = require('../../utils/registryCsGateway.js')
 const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -156,7 +155,7 @@ Page({
       let hint = msg
       if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
         hint =
-          '微信未放行该域名。request 合法域名请填：https://cs.mofangdianai.com（末尾勿加分号）。保存后等 10 分钟并删除小程序再扫体验版。\n\n' +
+          '微信合法域名请仅填 https://mofangdianai.com（request+downloadFile）。保存后删小程序重扫体验版。\n\n' +
           msg
       } else if (/timeout|超时/i.test(msg)) {
         hint = '请求超时（注册表较大或网络慢）。\n\n' + msg
@@ -167,17 +166,15 @@ Page({
           '已关闭 HttpDNS，请重新上传体验版（构建号含 no-httpdns）。若仍见本提示说明仍是旧包。\n\n' + msg
       } else if (/ecs_proxy|fetch failed|meoo_ops_mp_hall_registry_failed|erp_proxy/i.test(msg)) {
         hint =
-          'ECS 或 Vercel 代拉失败。请在 ECS：sudo bash ~/app/scripts/ecs-fix-mp-api-public.sh；' +
-          'Vercel 环境变量 MEOO_ERP_API_HOST_IP=139.196.42.5 后重新部署 cs.mofangdianai.com。\n\n' +
-          msg
+          'ECS 不可用。请执行：bash ~/app/scripts/ecs-fix-mp-chat-path.sh\n\n' + msg
       } else if (/reset|errcode:-101|cronet_error/i.test(msg)) {
         const stale = registryCache.load({ allowStale: true })
         const attemptLines =
           e && Array.isArray(e.attempts) && e.attempts.length ? `\n${e.attempts.join('\n')}\n` : ''
+        const build = merchant.MP_BUILD_ID || 'mp-20260604-ecs-only'
         hint = stale
-          ? '网络仍被微信重置，但应已显示离线列表；若整页空白请删除小程序后重扫体验码。\n\n' + msg
-          : '直连 ECS 被重置时将自动改走 cs 网关。请确认：① 合法域名含 https://mofangdianai.com 与 https://cs.mofangdianai.com；' +
-            `② 网关 ${registryCs.hallRegistryUrl()} 已部署；③ 体验版构建号 mp-20260603-proxy-https。` +
+          ? '网络仍被重置，但应已显示离线列表；删小程序重扫体验码。\n\n' + msg
+          : `请确认：① 合法域名仅 https://mofangdianai.com；② ECS: bash scripts/ecs-fix-mp-wechat-login.sh；③ 体验版 ${build}。` +
             attemptLines +
             '\n' +
             msg

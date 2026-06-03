@@ -1,30 +1,26 @@
-const config = require('./config.js')
-const merchantApi = require('./merchantApi.js')
-
-function gatewayBase() {
-  const b = String(
-    config.MP_GATEWAY_BASE_URL || config.MP_REGISTRY_GATEWAY_BASE_URL || 'https://cs.mofangdianai.com',
-  )
-    .trim()
-    .replace(/\/$/, '')
-  return b
-}
+/**
+ * 已废弃 Vercel/cs 网关；统一走 ECS erp-api（与 merchantApi 相同）。
+ */
+const { merchantRequest, resolveMerchantApiUrl } = require('./merchantApi.js')
 
 function hasGateway() {
-  return /^https?:\/\//i.test(gatewayBase())
+  return false
+}
+
+function gatewayBase() {
+  return ''
 }
 
 function apiUrl(path) {
-  const p = path.startsWith('/') ? path : `/${path}`
-  return `${gatewayBase()}${p}`
+  return resolveMerchantApiUrl(path)
 }
 
 function gatewayGet(path) {
-  return merchantApi.merchantGetUrl(apiUrl(path))
+  return merchantRequest('GET', path)
 }
 
 function gatewayPost(path, body, opts = {}) {
-  return merchantApi.merchantPostUrl(apiUrl(path), body || {}, opts.header || {})
+  return merchantRequest('POST', path, body, { header: opts.header || {} })
 }
 
 module.exports = {

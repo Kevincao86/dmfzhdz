@@ -17,11 +17,16 @@ if [[ -d "$ROOT/.git" ]]; then
 else
   echo "WARN: $ROOT 不是 git 仓库"
 fi
+for alt in "$ROOT/web版/merchant-erp" "$ROOT/web/merchant-erp"; do
+  if [[ -f "$alt/scripts/ecs-auth-api-server.ts" ]]; then
+    rev="$(grep ECS_AUTH_API_ROUTE_REVISION "$alt/scripts/ecs-auth-api-server.ts" | head -1 | sed -E "s/.*'([^']+)'.*/\1/")"
+    echo "磁盘 $alt → revision=${rev:-unknown}"
+  fi
+done
 if [[ -f "$ERP/scripts/ecs-auth-api-server.ts" ]]; then
-  grep ECS_AUTH_API_ROUTE_REVISION "$ERP/scripts/ecs-auth-api-server.ts" || true
+  echo "ecs_resolve 选用: $ERP"
 else
   echo "FATAL: 缺少 $ERP/scripts/ecs-auth-api-server.ts"
-  echo "若存在 ~/app/web/merchant-erp（无「版」），说明 systemd 工作目录与 git 仓库不一致"
   ls -la "$ROOT"/web* 2>/dev/null || true
 fi
 
