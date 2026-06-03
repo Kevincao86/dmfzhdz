@@ -2,6 +2,7 @@
   <view class="card">
     <text class="title">灵祺撮合平台</text>
     <text class="sub">一微信一账号 · 与履约 Web 后台互通</text>
+    <text class="hint" wx:if="{{netOk}}">{{netOk}}</text>
 
     <view class="tabs">
       <view class="tab {{tab==='wx'?'on':''}}" bindtap="onTabWx">微信登录</view>

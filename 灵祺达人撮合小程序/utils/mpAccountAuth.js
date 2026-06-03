@@ -1,4 +1,4 @@
-const { merchantRequest } = require('./merchantApi.js')
+const ecs = require('./ecsApi.js')
 
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
@@ -37,13 +37,21 @@ function isLoggedIn() {
   return !!readSessionToken() && !!readAccount()
 }
 
-/** 登录与会话：一律 POST JSON 到 ECS（避免 GET 长 query 触发 Cronet reset） */
+/** 登录与会话：真机走 GET+downloadFile；开发者工具走 POST */
 async function mpAuthRequest(action, payload = {}) {
   const token = readSessionToken()
   const header = { 'Content-Type': 'application/json' }
   if (token) header['X-Mp-Session'] = token
   const body = { action, ...payload }
-  return merchantRequest('POST', '/api/meoo-ops-mp-auth', body, { header })
+  if (ecs.isRealDevice()) {
+    const qs = Object.entries(body)
+      .filter(([, v]) => v != null && v !== '' && typeof v !== 'object')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&')
+    const path = `/api/meoo-ops-mp-auth?${qs}`
+    return ecs.ecsRequest('GET', path, undefined, { header })
+  }
+  return ecs.ecsRequest('POST', '/api/meoo-ops-mp-auth', body, { header })
 }
 
 async function wxLogin(opts = {}) {
