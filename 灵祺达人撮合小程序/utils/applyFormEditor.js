@@ -17,7 +17,13 @@ function editorDataExtra() {
     editPlaceholder: '',
     editRequired: false,
     canEditLabel: true,
+    /** 本次编辑是否已「保存到我的模版」；确认需先保存再第二次点确认返回发单页 */
+    applyFormLibrarySaved: false,
   }
+}
+
+function resetApplyFormEditorSession(page) {
+  page.setData({ applyFormLibrarySaved: false })
 }
 
 function syncEditorRows(page) {
@@ -224,30 +230,35 @@ function confirmApplyFormEditor(page, onDone) {
     wx.showToast({ title: err, icon: 'none' })
     return
   }
-  const mode = page.data.applyFormEditorMode
-  const tplId = String(page.data.applyFormTemplateId || '').trim()
-  const defaultName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
 
-  const complete = (templateId, templateName, toastTitle) => {
-    finish(page, templateId, templateName, () => {
-      wx.showToast({ title: toastTitle, icon: 'success', duration: 1500 })
+  if (page.data.applyFormLibrarySaved) {
+    const tplId = String(page.data.applyFormTemplateId || '').trim()
+    const tplName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
+    finish(page, tplId, tplName, () => {
+      page.setData({ applyFormLibrarySaved: false })
+      wx.showToast({ title: '已更新报名信息', icon: 'success', duration: 1500 })
       setTimeout(() => {
         if (typeof onDone === 'function') onDone()
       }, 320)
     })
-  }
-
-  // 使用已有模版：写回「我的模版」并回到招募信息
-  if (mode === 'template' && tplId) {
-    const saved = saveFieldsToLibrary(page, tplId, defaultName)
-    complete(saved.id, saved.name, '模版已更新')
     return
   }
 
-  // 新建报名项：保存为新模版（避免嵌套 showModal，真机第二层弹窗易失效）
+  const tplId = String(page.data.applyFormTemplateId || '').trim()
+  const defaultName = String(page.data.applyFormTemplateName || '我的报名模版').trim() || '我的报名模版'
+
   promptTemplateName(defaultName, (name) => {
-    const saved = saveFieldsToLibrary(page, '', name)
-    complete(saved.id, saved.name, '已保存到我的模版')
+    const saved = saveFieldsToLibrary(page, tplId, name)
+    page.setData({
+      applyFormTemplateId: saved.id,
+      applyFormTemplateName: saved.name,
+      applyFormLibrarySaved: true,
+    })
+    wx.showToast({
+      title: '已保存到模版，请再次点击确认返回',
+      icon: 'none',
+      duration: 2600,
+    })
   })
 }
 
@@ -273,6 +284,7 @@ function finish(page, templateId, templateName, onDone) {
 module.exports = {
   templates,
   editorDataExtra,
+  resetApplyFormEditorSession,
   syncEditorRows,
   loadTemplateIntoPage,
   initApplyFormFromPlatform,

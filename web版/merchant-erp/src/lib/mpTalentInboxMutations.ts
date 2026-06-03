@@ -9,6 +9,7 @@ export type MpTalentInboxEntryInput = {
   contact?: string
   platformAccount?: string
   applicantId?: string
+  imageUrl?: string
 }
 
 export function appendMpTalentInboxInSnapshot(
@@ -24,6 +25,7 @@ export function appendMpTalentInboxInSnapshot(
     const talentMemberId = String(row.talentMemberId || '').trim()
     const title = String(row.title || '').trim()
     const body = String(row.body || '').trim()
+    const imageUrl = String(row.imageUrl || '').trim()
     if (!talentMemberId || !title) continue
     list.unshift({
       id: `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -36,6 +38,7 @@ export function appendMpTalentInboxInSnapshot(
       contact: row.contact ? String(row.contact).trim() : undefined,
       platformAccount: row.platformAccount ? String(row.platformAccount).trim() : undefined,
       applicantId: row.applicantId ? String(row.applicantId).trim() : undefined,
+      imageUrl: imageUrl || undefined,
       createdAt: now,
       read: false,
     })

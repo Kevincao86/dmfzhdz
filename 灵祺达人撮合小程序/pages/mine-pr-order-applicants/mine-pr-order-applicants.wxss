@@ -54,6 +54,28 @@
   border-color: transparent;
 }
 
+.pr-app-tool-btn--ok {
+  color: #047857;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.pr-app-qr-preview {
+  margin-top: 8rpx;
+  padding: 12rpx;
+  border-radius: 16rpx;
+  background: #fff;
+  border: 2rpx solid var(--lq-primary-100);
+  text-align: center;
+}
+
+.pr-app-qr-img {
+  width: 160rpx;
+  height: 160rpx;
+  display: block;
+  margin: 0 auto 8rpx;
+}
+
 .pr-app-footer-hint {
   display: block;
   text-align: center;

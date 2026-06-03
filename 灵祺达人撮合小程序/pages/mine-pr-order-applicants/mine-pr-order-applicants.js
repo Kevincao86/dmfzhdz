@@ -7,6 +7,7 @@ const heroMeta = require('../../utils/mpOrderHeroMeta.js')
 const selection = require('../../utils/mpApplicantSelection.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
+const mpGroupQr = require('../../utils/mpGroupQr.js')
 
 Page({
   data: {
@@ -26,7 +27,8 @@ Page({
     selectedApplicants: [],
     showSelectedPanel: false,
     exportingAll: false,
-    exportingSelected: false,
+    groupQrImage: '',
+    groupQrUploading: false,
     notifying: false,
     savingSelect: false,
     chatEnabled: false,
@@ -93,6 +95,7 @@ Page({
         statusLabel: appDisplay.statusLabel(mp.status),
         hallLabel: appDisplay.hallLabelFromMp(mp),
         mpOrder: mp,
+        groupQrImage: mpGroupQr.groupQrFromMp(mp),
         err: '',
       })
       this.applyApplicantsState(applicants, selectedIds)
@@ -187,8 +190,30 @@ Page({
   onExportAll() {
     this.runExport(this.data.applicants, 'exportingAll')
   },
-  onExportSelected() {
-    this.runExport(this.data.selectedApplicants, 'exportingSelected')
+  onPreviewGroupQr() {
+    const url = this.data.groupQrImage
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  async onUploadGroupQr() {
+    if (this.data.groupQrUploading) return
+    this.setData({ groupQrUploading: true })
+    try {
+      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
+      wx.showLoading({ title: '上传中…', mask: true })
+      await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, dataUrl)
+      const mp = { ...this.data.mpOrder, groupQrImage: dataUrl }
+      this.setData({ groupQrImage: dataUrl, mpOrder: mp })
+      wx.showToast({ title: '群二维码已保存', icon: 'success' })
+    } catch (e) {
+      const msg = String(e && e.message ? e.message : e)
+      if (msg !== 'cancel') {
+        wx.showToast({ title: msg.slice(0, 28), icon: 'none' })
+      }
+    } finally {
+      wx.hideLoading()
+      this.setData({ groupQrUploading: false })
+    }
   },
   async onNotifySelected() {
     if (this.data.notifying) return
@@ -197,10 +222,15 @@ Page({
       wx.showToast({ title: '请先确认选择达人', icon: 'none' })
       return
     }
+    const qr = String(this.data.groupQrImage || '').trim()
+    if (!qr) {
+      wx.showToast({ title: '请先上传群二维码', icon: 'none' })
+      return
+    }
     const confirmed = await new Promise((resolve) => {
       wx.showModal({
         title: '通知已选达人',
-        content: `将向 ${selected.length} 位达人发送站内信，提醒查看入选结果。是否继续？`,
+        content: `将向 ${selected.length} 位达人发送站内信（含群二维码图片）。是否继续？`,
         success: (r) => resolve(!!r.confirm),
       })
     })
@@ -226,7 +256,8 @@ Page({
           mpOrderId: this.data.mpOrderId,
           category: 'business',
           title: '恭喜入选招募',
-          body: `您已被 PR 选入「${title}」（单号 ${this.data.orderNo}）。请尽快查看商单详情并与招募方沟通排期。`,
+          body: `您已被 PR 选入「${title}」（单号 ${this.data.orderNo}）。请扫码加入项目群，二维码见下图。`,
+          imageUrl: qr,
         })
       }
       if (!entries.length) {

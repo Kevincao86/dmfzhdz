@@ -291,6 +291,7 @@ Page({
   openApplyFormEditorNew() {
     const platform = this.data.form.platform
     const tpl = applyTemplates.emptyCustomTemplate('我的报名模版')
+    applyFormEditor.resetApplyFormEditorSession(this)
     this.setData(
       {
         pickerView: 'applyForm',
@@ -327,6 +328,7 @@ Page({
     const tpl = applyTemplates.getTemplateById(id)
     if (!tpl) return
     this.setData({ showApplyTplPicker: false })
+    applyFormEditor.resetApplyFormEditorSession(this)
     this.setData(
       {
         pickerView: 'applyForm',

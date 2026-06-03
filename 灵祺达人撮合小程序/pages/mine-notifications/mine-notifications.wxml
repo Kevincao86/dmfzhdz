@@ -14,6 +14,14 @@
         </view>
         <text class="title-lg ntf-title">{{row.title}}</text>
         <text class="hint ntf-body">{{row.body}}</text>
+        <image
+          wx:if="{{row.imageUrl}}"
+          class="ntf-image"
+          src="{{row.imageUrl}}"
+          mode="widthFix"
+          data-url="{{row.imageUrl}}"
+          bindtap="onPreviewInboxImage"
+        />
       </view>
     </view>
   </block>

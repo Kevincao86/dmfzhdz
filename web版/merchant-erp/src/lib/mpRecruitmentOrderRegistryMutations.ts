@@ -10,6 +10,7 @@ export type MpRecruitmentPatchBody = {
   applicants?: RegistryMpRecruitmentApplicant[]
   order?: RegistryMpRecruitmentOrder
   selectedApplicantIds?: string[]
+  groupQrImage?: string
 }
 
 export function patchMpRecruitmentOrderInSnapshot(
@@ -21,8 +22,9 @@ export function patchMpRecruitmentOrderInSnapshot(
   const status = body.status
   const applicants = body.applicants
   const selectedApplicantIds = body.selectedApplicantIds
+  const hasGroupQr = body.groupQrImage !== undefined
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
-  if (!order && !status && !applicants && !selectedApplicantIds) {
+  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr) {
     return { ok: false, error: 'invalid_patch', status: 400 }
   }
   if (
@@ -61,6 +63,15 @@ export function patchMpRecruitmentOrderInSnapshot(
             selectedApplicantIds: selectedApplicantIds
               .map((x) => String(x || '').trim())
               .filter(Boolean),
+          }
+        : {}),
+      ...(hasGroupQr
+        ? {
+            groupQrImage: String(body.groupQrImage || '').trim(),
+            mpPublishMeta: {
+              ...(cur.mpPublishMeta && typeof cur.mpPublishMeta === 'object' ? cur.mpPublishMeta : {}),
+              groupQrImage: String(body.groupQrImage || '').trim(),
+            },
           }
         : {}),
       updatedAt: now,

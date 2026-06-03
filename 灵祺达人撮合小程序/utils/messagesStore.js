@@ -126,6 +126,7 @@ function inboxRowsForTalent(reg, member) {
       id: row.id,
       title: row.title || '通知',
       body: row.body || '',
+      imageUrl: row.imageUrl ? String(row.imageUrl) : '',
       category: normalizeCategory(row.category),
       categoryLabel: CATEGORY_LABELS[normalizeCategory(row.category)],
       createdAt: row.createdAt || '',

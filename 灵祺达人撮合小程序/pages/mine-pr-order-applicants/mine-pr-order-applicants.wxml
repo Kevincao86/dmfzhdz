@@ -117,10 +117,10 @@
     <view class="pr-app-toolbar">
       <button class="pr-app-tool-btn" bindtap="onViewSelected">查看已选名单</button>
       <button
-        class="pr-app-tool-btn"
-        loading="{{exportingSelected}}"
-        bindtap="onExportSelected"
-      >下载已选明细</button>
+        class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
+        loading="{{groupQrUploading}}"
+        bindtap="onUploadGroupQr"
+      >{{groupQrImage ? '已上传群码' : '上传群二维码'}}</button>
     </view>
     <view class="pr-app-toolbar">
       <button
@@ -134,7 +134,11 @@
         bindtap="onNotifySelected"
       >通知已选达人</button>
     </view>
-    <text class="hint pr-app-footer-hint">已选 {{selectedCount}} 人 · 生成 UTF-8 表格（.csv），可用 Excel / WPS 打开</text>
+    <view class="pr-app-qr-preview" wx:if="{{groupQrImage}}" bindtap="onPreviewGroupQr">
+      <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
+      <text class="hint">点击预览群二维码 · 通知已选达人时将随站内信发送</text>
+    </view>
+    <text class="hint pr-app-footer-hint">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
   </view>
 </view>
 
