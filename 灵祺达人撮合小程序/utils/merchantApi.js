@@ -200,13 +200,23 @@ function merchantRequest(method, path, data, attemptOrOpts = 0) {
     })
   }
 
-  return wxRequestPromise(url, m, data, extraHeader).catch((err) => {
-    const errMsg = String(err && err.message ? err.message : err)
-    if (attempt < 1 && isTransientNetError(errMsg)) {
-      return merchantRequest(m, path, data, { attempt: 1, header: extraHeader })
-    }
-    throw err
-  })
+  const runPost = (tryNo) =>
+    wxRequestPromise(url, m, data, extraHeader).catch((err) => {
+      const errMsg = String(err && err.message ? err.message : err)
+      if (tryNo < 2 && isTransientNetError(errMsg)) {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => runPost(tryNo + 1).then(resolve, reject), 500 * (tryNo + 1))
+        })
+      }
+      if (isTransientNetError(errMsg) && shouldUseCronetWorkaround(url) && isRealDevice()) {
+        throw new Error(
+          `${errMsg}\n\n请确认微信 request 合法域名为 https://mofangdianai.com；ECS 执行 sudo bash scripts/ecs-fix-wechat-cronet-tls.sh 后重试。`,
+        )
+      }
+      throw err
+    })
+
+  return runPost(attempt)
 }
 
 function merchantPostUrl(url, data, extraHeader = {}) {

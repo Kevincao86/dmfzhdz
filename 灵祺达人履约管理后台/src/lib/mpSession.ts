@@ -15,6 +15,39 @@ export type MpAccount = {
 const TOKEN_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account'
 const ROLE_KEY = 'lingqi_mp_active_role'
+const LOGIN_ROLE_PREF_KEY = 'lingqi_mp_login_role_pref'
+export const DEV_PREVIEW_TOKEN = 'dev-preview-local'
+
+export function getLoginRolePref(): MpAccountRole {
+  const r = localStorage.getItem(LOGIN_ROLE_PREF_KEY)
+  return r === 'pr' ? 'pr' : 'talent'
+}
+
+export function setLoginRolePref(role: MpAccountRole) {
+  localStorage.setItem(LOGIN_ROLE_PREF_KEY, role)
+}
+
+export function isDevPreviewSession(): boolean {
+  return getToken() === DEV_PREVIEW_TOKEN
+}
+
+/** 仅本地 dev：无账号时预览后台布局与大厅 */
+export function enterDevPreview(role: MpAccountRole): void {
+  if (!import.meta.env.DEV) return
+  const account: MpAccount = {
+    accountId: 'dev-preview',
+    openid: null,
+    loginName: 'dev预览',
+    activeRole: role,
+    lingqiTalentId: role === 'talent' ? 'T-DEV-001' : null,
+    lingqiPrId: role === 'pr' ? 'PR-DEV-001' : null,
+    wxNickName: '开发预览',
+    wxAvatarUrl: null,
+    hasPassword: false,
+  }
+  setSession(DEV_PREVIEW_TOKEN, account)
+  setActiveRole(role)
+}
 
 export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''

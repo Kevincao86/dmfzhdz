@@ -1,0 +1,179 @@
+import { useCallback, useEffect, useState } from 'react'
+import { fetchMpRegistry } from '../../lib/mpApi'
+import { getAccount } from '../../lib/mpSession'
+import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
+import * as listFilters from '../../lib/mpRecruitment/listFilters'
+import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
+import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
+import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
+import RecruitmentOrderCard from './RecruitmentOrderCard'
+import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
+import { readMember } from '../../lib/mpSync/talentMember'
+
+const ORDER_SEGMENTS = [
+  { id: 'match', label: '为你匹配' },
+  { id: 'quality', label: '优质' },
+  { id: 'hot', label: '热门全国' },
+  { id: 'city', label: '同城匹配' },
+] as const
+
+function matchOrderSearch(row: RecruitmentOrderRow, keyword: string) {
+  if (!keyword) return true
+  const k = keyword.toLowerCase()
+  return [row.title, row.merchantName, row.region, row.platform].join(' ').toLowerCase().includes(k)
+}
+
+function matchOrderSegment(row: RecruitmentOrderRow, segment: string, talentCity: string) {
+  if (segment === 'match') return true
+  if (segment === 'quality') return row.recommended || row.urgent || (row.priceAmount || 0) >= 1000
+  if (segment === 'city') {
+    if (!talentCity) return false
+    const region = String(row.region || '')
+    if (region.includes('全国')) return false
+    return region.includes(talentCity)
+  }
+  return true
+}
+
+export default function RecommendOrdersPanel() {
+  const goDetail = useRecruitmentNav()
+  const member = readMember()
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [orderSegment, setOrderSegment] = useState('match')
+  const [filterPlatform, setFilterPlatform] = useState('全部')
+  const [filterCity, setFilterCity] = useState('全部')
+  const [priceSelected, setPriceSelected] = useState<string[]>([])
+  const [priceFilterLabel, setPriceFilterLabel] = useState('价格')
+  const [showPriceSheet, setShowPriceSheet] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [err, setErr] = useState('')
+  const [allOrderRows, setAllOrderRows] = useState<RecruitmentOrderRow[]>([])
+  const [orderDisplayRows, setOrderDisplayRows] = useState<RecruitmentOrderRow[]>([])
+  const [orderEmptyHint, setOrderEmptyHint] = useState('')
+  const [cityFilters, setCityFilters] = useState<string[]>(['全部'])
+  const talentCity = member?.city || member?.province || ''
+
+  const applyOrderFilters = useCallback(async () => {
+    const kw = searchKeyword.trim()
+    const priceSel = priceSelected
+    let rows = allOrderRows.filter((r) => {
+      if (!matchOrderSearch(r, kw)) return false
+      if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
+      if (!hallFilters.matchCity(r.region, r.storeName, filterCity)) return false
+      if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
+      if (!matchOrderSegment(r, orderSegment, talentCity)) return false
+      return true
+    })
+    const mocks = rows.filter((r) => r.isMock)
+    let real = rows.filter((r) => !r.isMock)
+    const acc = getAccount()
+    const member = acc?.lingqiTalentId
+      ? { city: talentCity, province: '', platform: '抖音', nickname: acc.wxNickName || '', followers: '', accountTags: [] as string[] }
+      : null
+    if (member && real.length) {
+      real = await recruitmentAi.enrichOrderMatches(real, member)
+    } else {
+      real = real.map((r) => ({ ...r, ...recruitmentAi.fallbackTagForRow(r, talentCity), matchScore: 0 }))
+    }
+    const highMatch = real.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
+    const highIds = new Set(highMatch.map((r) => r.id))
+    const otherReal = real.filter((r) => !highIds.has(r.id))
+    rows = [...highMatch, ...otherReal, ...mocks]
+    let hint = ''
+    if (!rows.length) {
+      if (orderSegment === 'city' && !talentCity) hint = '请先在「我的」完善城市信息'
+      else hint = '暂无匹配商单，试试切换分类或筛选'
+    }
+    setOrderDisplayRows(rows.slice(0, 50))
+    setOrderEmptyHint(hint)
+  }, [allOrderRows, searchKeyword, orderSegment, filterPlatform, filterCity, priceSelected, talentCity])
+
+  useEffect(() => {
+    void applyOrderFilters()
+  }, [applyOrderFilters])
+
+  useEffect(() => {
+    ;(async () => {
+      setLoading(true)
+      try {
+        const reg = await fetchMpRegistry()
+        let rows = loadOpenOrderRows(reg)
+        if (!rows.length) rows = listFilters.buildMockRecruitmentRows()
+        else rows = [...listFilters.buildMockRecruitmentRows(), ...rows]
+        setAllOrderRows(rows)
+        setCityFilters(hallFilters.buildCityFilterOptions(rows))
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '加载失败')
+        setAllOrderRows(listFilters.buildMockRecruitmentRows())
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold">推荐商单</h2>
+        <p className="text-sm text-slate-400 mt-1">优质 · 热门全国 · 同城匹配（与小程序推荐 Tab 同源算法）</p>
+      </div>
+      <input
+        className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"
+        placeholder="搜索商单、门店、城市"
+        value={searchKeyword}
+        onChange={(e) => setSearchKeyword(e.target.value)}
+      />
+      <div className="flex flex-wrap gap-2">
+        {ORDER_SEGMENTS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className={`px-3 py-1.5 rounded-lg text-sm ${orderSegment === s.id ? 'bg-violet-600 text-white' : 'bg-white/5 text-slate-400'}`}
+            onClick={() => setOrderSegment(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 text-sm">
+        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
+          {hallFilters.PLATFORM_FILTERS.map((p) => (
+            <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
+          ))}
+        </select>
+        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
+          {cityFilters.map((c) => (
+            <option key={c} value={c}>{c === '全部' ? '城市' : c}</option>
+          ))}
+        </select>
+        <button type="button" className="rounded-lg border border-white/10 px-2 py-1.5" onClick={() => setShowPriceSheet(true)}>
+          {priceFilterLabel}
+        </button>
+      </div>
+      {loading ? <p className="text-slate-400">加载中…</p> : null}
+      {err ? <p className="text-amber-500 text-sm">{err}</p> : null}
+      {orderEmptyHint ? <p className="text-slate-500 text-sm">{orderEmptyHint}</p> : null}
+      <div className="grid gap-3 md:grid-cols-2">
+        {orderDisplayRows.map((o) => (
+          <RecruitmentOrderCard key={o.id} row={o} onClick={() => goDetail(o)} />
+        ))}
+      </div>
+      {showPriceSheet ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4" onClick={() => setShowPriceSheet(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-[#1a1a28] p-4 border border-white/10" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap gap-2">
+              {hallFilters.priceBucketsForView(priceSelected).map((b) => (
+                <button key={b.id} type="button" className={`px-3 py-1.5 rounded-full text-sm ${b.selected ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => setPriceSelected(hallFilters.togglePriceId(priceSelected, b.id))}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="w-full mt-4 py-2 rounded-lg bg-violet-600" onClick={() => { setPriceFilterLabel(hallFilters.priceFilterLabel(priceSelected, '价格')); setShowPriceSheet(false) }}>
+              确定
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}

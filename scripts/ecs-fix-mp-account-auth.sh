@@ -33,21 +33,30 @@ SELECT table_name FROM information_schema.tables
 }
 
 restart_services() {
-  if systemctl is-active --quiet meoo-postgrest 2>/dev/null; then
+  if systemctl list-unit-files meoo-postgrest.service &>/dev/null; then
     echo "=== 重启 PostgREST（刷新 schema）==="
-    sudo systemctl restart meoo-postgrest
-    sleep 2
-  fi
-  if systemctl is-active --quiet meoo-auth-api 2>/dev/null; then
-    echo "=== 重启 meoo-auth-api ==="
-    sudo systemctl restart meoo-auth-api
+    sudo systemctl restart meoo-postgrest || true
     sleep 2
   fi
   PORT="${AUTH_API_PORT:-3001}"
+  if systemctl list-unit-files meoo-auth-api.service &>/dev/null; then
+    echo "=== 重启 meoo-auth-api ==="
+    sudo systemctl restart meoo-auth-api || true
+    sleep 3
+  else
+    echo "WARN: 未安装 meoo-auth-api.service，将尝试一键安装…"
+  fi
+  if ! curl -sf -m 5 "http://127.0.0.1:${PORT}/api/meoo-auth-ping" >/dev/null 2>&1; then
+    echo "WARN: :${PORT} 无响应，执行 ecs-fix-erp-api-502.sh …"
+    bash "$ROOT/scripts/ecs-fix-erp-api-502.sh" || {
+      echo "仍失败时请查看: sudo journalctl -u meoo-auth-api -n 50 --no-pager"
+      return 1
+    }
+  fi
   echo "=== 探活 mp-auth（dev 模式可能返回 wx_not_configured，表存在即可）==="
   curl -sS -m 10 -X POST "http://127.0.0.1:${PORT}/api/meoo-ops-mp-auth" \
     -H 'Content-Type: application/json' \
-    -d '{"action":"scan_create"}' | head -c 280
+    -d '{"action":"scan_create"}' || echo "(mp-auth 探活失败，表已就绪)"
   echo
 }
 
@@ -69,9 +78,12 @@ sudo -u postgres psql -h 127.0.0.1 -p 5433 -d postgres -c "
 SELECT table_name FROM information_schema.tables
  WHERE table_schema='public' AND table_name LIKE 'mp_%' ORDER BY 1;
 "
-if systemctl is-active --quiet meoo-postgrest 2>/dev/null; then sudo systemctl restart meoo-postgrest; fi
-if systemctl is-active --quiet meoo-auth-api 2>/dev/null; then sudo systemctl restart meoo-auth-api; fi
-curl -sS -m 10 -X POST "http://127.0.0.1:3001/api/meoo-ops-mp-auth" -H 'Content-Type: application/json' -d '{"action":"scan_create"}' | head -c 200
+if systemctl list-unit-files meoo-postgrest.service &>/dev/null; then sudo systemctl restart meoo-postgrest; fi
+if systemctl list-unit-files meoo-auth-api.service &>/dev/null; then sudo systemctl restart meoo-auth-api; sleep 3; fi
+if ! curl -sf -m 5 http://127.0.0.1:3001/api/meoo-auth-ping >/dev/null; then
+  bash "\$HOME/app/scripts/ecs-fix-erp-api-502.sh" || true
+fi
+curl -sS -m 10 -X POST "http://127.0.0.1:3001/api/meoo-ops-mp-auth" -H 'Content-Type: application/json' -d '{"action":"scan_create"}' | head -c 200 || true
 echo
 echo "完成."
 EOF

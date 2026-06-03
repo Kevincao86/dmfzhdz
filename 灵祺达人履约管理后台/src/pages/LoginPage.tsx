@@ -1,9 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { passwordLogin, scanCreate, scanPoll } from '../lib/mpApi'
-import { setSession } from '../lib/mpSession'
+import RoleEditionToggle from '../components/RoleEditionToggle'
+import { passwordLogin, scanCreate, scanPoll, switchRole } from '../lib/mpApi'
+import {
+  enterDevPreview,
+  getLoginRolePref,
+  setActiveRole,
+  setLoginRolePref,
+  setSession,
+  type MpAccountRole,
+} from '../lib/mpSession'
 
 type Tab = 'password' | 'scan'
+
+async function applyRoleAfterLogin(token: string, account: import('../lib/mpSession').MpAccount, pref: MpAccountRole) {
+  setSession(token, account)
+  setActiveRole(pref)
+  if (account.activeRole !== pref) {
+    try {
+      const { account: next } = await switchRole(pref)
+      setSession(token, next)
+      setActiveRole(pref)
+    } catch {
+      setActiveRole(pref)
+    }
+  }
+}
 
 export default function LoginPage() {
   const nav = useNavigate()
@@ -15,6 +37,12 @@ export default function LoginPage() {
   const [ticket, setTicket] = useState('')
   const [qrPayload, setQrPayload] = useState('')
   const [scanHint, setScanHint] = useState('')
+  const [loginRole, setLoginRole] = useState<MpAccountRole>(getLoginRolePref)
+
+  function onLoginRoleChange(role: MpAccountRole) {
+    setLoginRole(role)
+    setLoginRolePref(role)
+  }
 
   useEffect(() => {
     if (tab !== 'scan') return
@@ -41,26 +69,31 @@ export default function LoginPage() {
       try {
         const r = await scanPoll(ticket)
         if (r.status === 'confirmed' && r.token && r.account) {
-          setSession(r.token, r.account)
+          await applyRoleAfterLogin(r.token, r.account, loginRole)
           nav('/hall', { replace: true })
         } else if (r.message) setScanHint(r.message)
       } catch (_) {}
     }, 2500)
     return () => clearInterval(t)
-  }, [ticket, tab, nav])
+  }, [ticket, tab, nav, loginRole])
 
   async function onPasswordLogin() {
     setErr('')
     setLoading(true)
     try {
       const { token, account } = await passwordLogin(loginName.trim(), password)
-      setSession(token, account)
+      await applyRoleAfterLogin(token, account, loginRole)
       nav('/hall', { replace: true })
     } catch (e) {
       setErr(e instanceof Error ? e.message : '登录失败')
     } finally {
       setLoading(false)
     }
+  }
+
+  function onDevPreview() {
+    enterDevPreview(loginRole)
+    nav('/hall', { replace: true })
   }
 
   return (
@@ -97,9 +130,10 @@ export default function LoginPage() {
             <input
               type="password"
               className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"
-              placeholder="密码"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="密码"
+              onKeyDown={(e) => e.key === 'Enter' && void onPasswordLogin()}
             />
             {err ? <p className="text-sm text-red-400">{err}</p> : null}
             <button
@@ -110,6 +144,21 @@ export default function LoginPage() {
             >
               {loading ? '登录中…' : '登录'}
             </button>
+
+            <div>
+              <p className="text-xs text-slate-500 text-center mb-2">登录后默认进入的版本</p>
+              <RoleEditionToggle role={loginRole} onChange={onLoginRoleChange} />
+            </div>
+
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                className="w-full py-2 rounded-lg border border-dashed border-white/20 text-sm text-slate-400 hover:text-white hover:border-violet-500/50"
+                onClick={onDevPreview}
+              >
+                开发预览：直接进入后台（{loginRole === 'pr' ? 'PR 版' : '达人版'}）
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="text-center space-y-4">
@@ -118,6 +167,19 @@ export default function LoginPage() {
             </div>
             <p className="text-xs text-slate-400">{scanHint}</p>
             <p className="text-xs text-amber-500/90">接口已打通；微信开放平台网站应用资质齐全后可展示正式二维码</p>
+            <div>
+              <p className="text-xs text-slate-500 mb-2">扫码登录后默认版本</p>
+              <RoleEditionToggle role={loginRole} onChange={onLoginRoleChange} />
+            </div>
+            {import.meta.env.DEV ? (
+              <button
+                type="button"
+                className="w-full py-2 rounded-lg border border-dashed border-white/20 text-xs text-slate-400"
+                onClick={onDevPreview}
+              >
+                开发预览进入后台
+              </button>
+            ) : null}
           </div>
         )}
       </div>

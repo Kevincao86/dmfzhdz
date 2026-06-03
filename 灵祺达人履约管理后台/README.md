@@ -5,14 +5,24 @@
 ## 本地开发
 
 ```bash
-# 终端 1：商家 ERP（提供 /api 网关）
-cd web版/merchant-erp && npm run dev
-
-# 终端 2：履约后台
+# 履约后台（已内置商家版 API 网关，无需另开 5173）
 cd 灵祺达人履约管理后台 && npm install && npm run dev
 ```
 
 浏览器打开 http://127.0.0.1:5176
+
+## 增值服务（商家版功能嵌入）
+
+侧栏 **增值服务** 直接复用 `web版/merchant-erp` 同源页面（非外链跳转）：
+
+| Tab | 商家页面 |
+|-----|----------|
+| 短视频AI处理 | `ShortVideoOptimizationPage` |
+| AI 文章与话题 | `AiOperationContentPage` |
+| 数字人口播 | `DigitalHumanBroadcastPage` |
+
+本地 dev 在 5176 端口内置商家 `/api` 网关（`merchantApiMock` 等），环境变量从 `web版/merchant-erp/.env*` 读取。  
+「AI 文章与话题」需商家抖音来客 token（`meoo_douyin_merchant_token`），与商家版相同。
 
 ## 登录方式
 

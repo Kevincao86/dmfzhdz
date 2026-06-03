@@ -7,6 +7,7 @@ const regionPicker = require('../../utils/regionPicker.js')
 const talentChat = require('../../utils/talentChat.js')
 const participant = require('../../utils/participant.js')
 const wxAccount = require('../../utils/wxAccount.js')
+const mpAuth = require('../../utils/mpAccountAuth.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
@@ -83,8 +84,10 @@ Page({
       platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
       douyinLevelIndex,
     }
+    const acct = mpAuth.readAccount()
+    const talentId = (cur && cur.lingqiTalentId) || (acct && acct.lingqiTalentId) || ''
+    if (talentId) patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(talentId)
     if (cur) {
-      patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(cur.lingqiTalentId)
       Object.assign(patch, {
         wxNickName: cur.wxNickName || '',
         wxAvatarUrl: cur.wxAvatarUrl || '',
@@ -94,6 +97,11 @@ Page({
         alipayAccount: cur.alipayAccount || '',
         platformProfiles: profiles,
         platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
+      })
+    } else if (acct) {
+      Object.assign(patch, {
+        wxNickName: acct.wxNickName || '',
+        wxAvatarUrl: acct.wxAvatarUrl || '',
       })
     }
     const wx = wxAccount.readWxAccount()
@@ -201,9 +209,10 @@ Page({
     }
     const profiles = this.data.platformProfiles
     const prev = readMember()
+    const acct = mpAuth.readAccount()
     const member = {
-      id: (prev && prev.id) || `MTM-${Date.now()}`,
-      lingqiTalentId: (prev && prev.lingqiTalentId) || '',
+      id: (prev && prev.id) || (acct && acct.registryMemberId) || `MTM-${Date.now()}`,
+      lingqiTalentId: (prev && prev.lingqiTalentId) || (acct && acct.lingqiTalentId) || '',
       memberType: talentPlatforms.inferLegacyMemberType(profiles),
       wxNickName: String(this.data.wxNickName || '').trim(),
       wxAvatarUrl: String(this.data.wxAvatarUrl || '').trim(),

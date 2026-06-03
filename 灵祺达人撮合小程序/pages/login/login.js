@@ -37,23 +37,38 @@ Page({
       let nick = local && local.wxNickName ? local.wxNickName : ''
       let avatar = local && local.wxAvatarUrl ? local.wxAvatarUrl : ''
       if (!nick) {
-        const prof = await new Promise((resolve, reject) => {
-          wx.getUserProfile({
-            desc: '用于灵祺账号绑定',
-            success: resolve,
-            fail: reject,
+        try {
+          const prof = await new Promise((resolve, reject) => {
+            wx.getUserProfile({
+              desc: '用于灵祺账号展示',
+              success: resolve,
+              fail: reject,
+            })
           })
-        })
-        nick = prof.userInfo.nickName
-        avatar = prof.userInfo.avatarUrl
-        wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
+          nick = prof.userInfo.nickName
+          avatar = prof.userInfo.avatarUrl
+          wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
+        } catch (_) {
+          /* 未授权头像昵称也可登录：服务端按 openid 自动注册并分配灵祺 ID */
+        }
       }
       const role = userProfile.readIdentity().role === 'pr' ? 'pr' : 'talent'
-      await mpAuth.wxLogin({
+      const data = await mpAuth.wxLogin({
         role,
         wxNickName: nick,
         wxAvatarUrl: avatar,
       })
+      if (data.isNew) {
+        const id =
+          role === 'pr'
+            ? data.account && data.account.lingqiPrId
+            : data.account && data.account.lingqiTalentId
+        wx.showToast({
+          title: id ? `已创建账号 ${id}` : '已创建灵祺账号',
+          icon: 'none',
+          duration: 2500,
+        })
+      }
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
