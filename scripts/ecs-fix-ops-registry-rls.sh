@@ -8,79 +8,112 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ECS_HOST="${ECS_HOST:-admin@139.196.42.5}"
-MIGRATION="20260603190000_ops_registry_snapshot_rls_service_role.sql"
+MIGRATION_RLS="20260603190000_ops_registry_snapshot_rls_service_role.sql"
+MIGRATION_TABLE="20260511140000_ops_registry_snapshot.sql"
+
+load_auth_env() {
+  for f in "$HOME/stack/auth-api.env" "$HOME/stack/.env"; do
+    if [[ -f "$f" ]]; then
+      # shellcheck disable=SC1090
+      set -a
+      source "$f"
+      set +a
+      return 0
+    fi
+  done
+  return 1
+}
+
+reload_postgrest() {
+  if systemctl list-unit-files meoo-postgrest.service &>/dev/null; then
+    echo "=== 重启 meoo-postgrest（刷新 schema，表须在 :8888 可见）==="
+    sudo systemctl restart meoo-postgrest
+    sleep 2
+  fi
+  # shellcheck disable=SC1090
+  source "$HOME/stack/db-credentials.txt"
+  export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+  psql -h 127.0.0.1 -p "${ECS_PG_PORT:-5433}" -U postgres -d "${ECS_PG_DB:-postgres}" \
+    -c "NOTIFY pgrst, 'reload schema';" 2>/dev/null || true
+}
+
+apply_sql() {
+  local file="$1"
+  # shellcheck disable=SC1090
+  source "$HOME/stack/db-credentials.txt"
+  export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+  echo "=== 应用 $(basename "$file") ==="
+  psql -h 127.0.0.1 -p "${ECS_PG_PORT:-5433}" -U postgres -d "${ECS_PG_DB:-postgres}" \
+    -v ON_ERROR_STOP=1 -f "$file"
+}
 
 run_local() {
   cd "$ROOT"
-  bash "$ROOT/scripts/ecs-apply-supabase-migration.sh" "supabase/migrations/$MIGRATION"
-  if [[ -f "$ROOT/supabase/ecs_service_role_grants.sql" ]]; then
-    # shellcheck disable=SC1090
-    source "$HOME/stack/db-credentials.txt"
-    export PGPASSWORD="${POSTGRES_PASSWORD:?}"
-    echo "=== 重放 ecs_service_role_grants.sql ==="
-    psql -h 127.0.0.1 -p "${ECS_PG_PORT:-5433}" -U postgres -d "${ECS_PG_DB:-postgres}" \
-      -v ON_ERROR_STOP=1 -f "$ROOT/supabase/ecs_service_role_grants.sql"
+  if [[ -f "$ROOT/supabase/migrations/$MIGRATION_TABLE" ]]; then
+    apply_sql "$ROOT/supabase/migrations/$MIGRATION_TABLE" || true
   fi
+  apply_sql "$ROOT/supabase/migrations/$MIGRATION_RLS"
+  if [[ -f "$ROOT/supabase/migrations/20260511160000_ops_registry_snapshot_grants.sql" ]]; then
+    apply_sql "$ROOT/supabase/migrations/20260511160000_ops_registry_snapshot_grants.sql" || true
+  fi
+  if [[ -f "$ROOT/supabase/ecs_service_role_grants.sql" ]]; then
+    apply_sql "$ROOT/supabase/ecs_service_role_grants.sql"
+  fi
+  reload_postgrest
   verify_postgrest
+  sudo systemctl restart meoo-auth-api 2>/dev/null || true
 }
 
 verify_postgrest() {
+  load_auth_env || true
   local base key
-  base="${SUPABASE_URL:-${VITE_SUPABASE_URL:-http://127.0.0.1:3000}}"
+  base="${SUPABASE_URL:-${VITE_SUPABASE_URL:-http://127.0.0.1:8888}}"
+  base="${base%/}"
   key="${SUPABASE_SERVICE_ROLE_KEY:-${SERVICE_ROLE_KEY:-}}"
-  if [[ -z "$key" ]] && [[ -f "$HOME/stack/.env" ]]; then
-    # shellcheck disable=SC1090
-    source "$HOME/stack/.env"
-    key="${SUPABASE_SERVICE_ROLE_KEY:-${SERVICE_ROLE_KEY:-}}"
-  fi
   if [[ -z "$key" ]]; then
-    echo "WARN: 未找到 SUPABASE_SERVICE_ROLE_KEY，跳过 PostgREST 探活"
+    echo "WARN: 未找到 SUPABASE_SERVICE_ROLE_KEY（检查 ~/stack/auth-api.env）"
+    echo "      可执行: bash ~/app/scripts/ecs-run-auth-api.sh"
     return 0
   fi
-  echo "=== PostgREST upsert ops_registry_snapshot（应 201/204，非 42501）==="
+  echo "=== PostgREST @ ${base}/rest/v1/ops_registry_snapshot ==="
   local code
   code=$(curl -sS -m 10 -o /tmp/ops-snap-test.json -w "%{http_code}" \
-    -X POST "${base%/}/rest/v1/ops_registry_snapshot" \
+    -X GET "${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=id" \
+    -H "apikey: ${key}" \
+    -H "Authorization: Bearer ${key}" || echo 000)
+  echo "GET http_code=$code body=$(head -c 120 /tmp/ops-snap-test.json 2>/dev/null || true)"
+  if [[ "$code" == "404" ]]; then
+    echo "FAIL: 404 多为 PostgREST 未刷新或 URL 端口错（ECS 应为 :8888，不是 :3000）"
+    return 1
+  fi
+  code=$(curl -sS -m 10 -o /tmp/ops-snap-test.json -w "%{http_code}" \
+    -X POST "${base}/rest/v1/ops_registry_snapshot" \
     -H "apikey: ${key}" \
     -H "Authorization: Bearer ${key}" \
     -H "Content-Type: application/json" \
     -H "Prefer: resolution=merge-duplicates,return=minimal" \
     -d '{"id":1,"registry":{},"updated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' || echo 000)
-  echo "http_code=$code body=$(head -c 200 /tmp/ops-snap-test.json 2>/dev/null || true)"
+  echo "POST http_code=$code body=$(head -c 200 /tmp/ops-snap-test.json 2>/dev/null || true)"
   if [[ "$code" == "401" ]] || [[ "$code" == "403" ]]; then
-    echo "FAIL: 请确认 ~/stack/.env 中 SUPABASE_SERVICE_ROLE_KEY 为 service_role JWT（非 anon）"
+    echo "FAIL: 请执行 bash ~/app/scripts/ecs-run-auth-api.sh 重生 service_role JWT"
     return 1
   fi
   if [[ "$code" != "201" && "$code" != "204" && "$code" != "200" ]]; then
-    echo "FAIL: 若仍含 row-level security，请检查迁移是否已应用"
+    echo "FAIL: 若含 row-level security，RLS 迁移未生效；若 404，请 sudo systemctl restart meoo-postgrest"
     return 1
   fi
-  echo "OK: ops_registry_snapshot 可写"
+  echo "OK: ops_registry_snapshot 可读可写"
+  echo "=== 经 meoo-auth-api 探活 scan_create ==="
+  curl -sS -m 10 -X POST "http://127.0.0.1:${AUTH_API_PORT:-3001}/api/meoo-ops-mp-auth" \
+    -H 'Content-Type: application/json' \
+    -d '{"action":"scan_create"}' | head -c 160
+  echo
 }
 
 if [[ "${1:-}" == "--remote" ]]; then
   echo "远程执行 → $ECS_HOST"
-  scp "$ROOT/supabase/migrations/$MIGRATION" "${ECS_HOST}:/tmp/$MIGRATION"
-  ssh "$ECS_HOST" bash -s <<EOF
-set -euo pipefail
-CREDS="\$HOME/stack/db-credentials.txt"
-source "\$CREDS"
-export PGPASSWORD="\$POSTGRES_PASSWORD"
-echo "=== 应用 $MIGRATION ==="
-sudo -u postgres psql -h 127.0.0.1 -p 5433 -d postgres -v ON_ERROR_STOP=1 -f "/tmp/$MIGRATION"
-rm -f "/tmp/$MIGRATION"
-if [[ -f "\$HOME/app/supabase/ecs_service_role_grants.sql" ]]; then
-  sudo -u postgres psql -h 127.0.0.1 -p 5433 -d postgres -v ON_ERROR_STOP=1 -f "\$HOME/app/supabase/ecs_service_role_grants.sql"
-fi
-if [[ -f "\$HOME/stack/.env" ]]; then set -a; source "\$HOME/stack/.env"; set +a; fi
-SUPABASE_URL="\${SUPABASE_URL:-http://127.0.0.1:3000}"
-export SUPABASE_URL
-$(declare -f verify_postgrest)
-verify_postgrest
-sudo systemctl restart meoo-postgrest 2>/dev/null || true
-sudo systemctl restart meoo-auth-api
-EOF
-  echo "远程完成。请在 ECS 再测: curl -X POST .../meoo-ops-mp-auth -d '{\"action\":\"scan_create\"}'"
+  scp "$ROOT/supabase/migrations/$MIGRATION_RLS" "${ECS_HOST}:/tmp/$MIGRATION_RLS"
+  ssh "$ECS_HOST" "cd ~/app && git pull origin main && bash scripts/ecs-fix-ops-registry-rls.sh"
   exit 0
 fi
 
