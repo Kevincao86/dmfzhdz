@@ -7,6 +7,18 @@ const REGISTRY_FETCH_MS = 20000
 const HALL_GET = '/api/meoo-ops-mp-hall-registry'
 const HALL_POST = '/api/meoo-ops-mp-auth'
 
+function useCacheIfHallEmpty(data) {
+  const mp = data && data.mpRecruitmentOrders
+  if (Array.isArray(mp) && mp.length > 0) return data
+  const cached = registryCache.load({ allowStale: true })
+  const prevMp = cached && cached.data && cached.data.mpRecruitmentOrders
+  if (Array.isArray(prevMp) && prevMp.length > 0) {
+    console.warn('[mp] hall_registry 空响应，使用本地缓存', prevMp.length)
+    return cached.data
+  }
+  return data
+}
+
 async function fetchRegistryViaErpApi() {
   let lastErr
   try {
@@ -15,7 +27,7 @@ async function fetchRegistryViaErpApi() {
       REGISTRY_FETCH_MS,
       '招募大厅',
     )
-    const data = normalizeHallPayload(raw)
+    const data = useCacheIfHallEmpty(normalizeHallPayload(raw))
     registryCache.save(data, `${HALL_POST}:hall_registry`)
     return data
   } catch (e) {
@@ -24,7 +36,7 @@ async function fetchRegistryViaErpApi() {
   }
   try {
     const raw = await withTimeout(api.get(HALL_GET), REGISTRY_FETCH_MS, '招募大厅')
-    const data = normalizeHallPayload(raw)
+    const data = useCacheIfHallEmpty(normalizeHallPayload(raw))
     registryCache.save(data, HALL_GET)
     return data
   } catch (e2) {

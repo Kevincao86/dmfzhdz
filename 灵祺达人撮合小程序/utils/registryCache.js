@@ -36,6 +36,12 @@ function load(opts) {
 
 function save(data, path) {
   try {
+    const mp = data && data.mpRecruitmentOrders
+    if (Array.isArray(mp) && mp.length === 0) {
+      const prev = load({ allowStale: true })
+      const prevMp = prev && prev.data && prev.data.mpRecruitmentOrders
+      if (Array.isArray(prevMp) && prevMp.length > 0) return
+    }
     wx.setStorageSync(KEY, {
       data,
       path: String(path || ''),

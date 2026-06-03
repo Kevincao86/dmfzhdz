@@ -1,4 +1,5 @@
 const config = require('../../utils/config.js')
+const { showDemoOrders } = require('../../utils/mpDemoMode.js')
 const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -382,8 +383,13 @@ Page({
   },
   async loadOrderList() {
     const mocks = listFilters.buildMockRecruitmentRows()
+    const allowDemo = showDemoOrders()
     if (!api.hasApi()) {
-      this.setData({ loading: false, err: '', allOrderRows: mocks })
+      this.setData({
+        loading: false,
+        err: allowDemo ? '' : '未连接后台',
+        allOrderRows: allowDemo ? mocks : [],
+      })
       this.applyOrderFilters()
       return
     }
@@ -391,8 +397,10 @@ Page({
     try {
       const reg = await ops.fetchRegistry()
       let rows = orderCard.loadOpenOrderRows(reg)
-      if (!rows.length) rows = mocks
-      else rows = [...mocks, ...rows]
+      if (allowDemo) {
+        if (!rows.length) rows = mocks
+        else rows = [...mocks, ...rows]
+      }
       this.setData({
         allOrderRows: rows,
         cityFilters: hallFilters.buildCityFilterOptions(rows),
@@ -403,7 +411,7 @@ Page({
       this.setData({
         loading: false,
         err: String(e.message || e),
-        allOrderRows: mocks,
+        allOrderRows: allowDemo ? mocks : [],
       })
       this.applyOrderFilters()
     }
@@ -508,8 +516,8 @@ Page({
       if (!matchOrderSegment(r, segment, talentCity)) return false
       return true
     })
-    const mocks = rows.filter((r) => r.isMock)
-    let real = rows.filter((r) => !r.isMock)
+    let real = rows.filter((r) => r && !r.isMock)
+    const mocks = showDemoOrders() ? rows.filter((r) => r && r.isMock) : []
     const member = memberStore.readMember()
     if (member && api.hasApi() && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, member)
