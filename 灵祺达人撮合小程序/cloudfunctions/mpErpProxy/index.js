@@ -8,7 +8,7 @@ const target = require('./erp-target.js')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
-const PROXY_BUILD = 'mpErpProxy-20260603-http80ip'
+const PROXY_BUILD = 'mpErpProxy-20260603-post-once'
 const ORIGIN = String(process.env.ECS_ERP_ORIGIN || '').replace(/\/$/, '')
 const ERP_IP = String(process.env.ECS_ERP_IP || target.ip || '').trim()
 const ERP_HOST = String(process.env.ECS_ERP_HOST || target.host || 'mofangdianai.com').trim()
@@ -148,6 +148,7 @@ exports.main = async (event) => {
   const headers = event.headers && typeof event.headers === 'object' ? event.headers : {}
   const attempts = buildAttempts(path)
   const trace = []
+  let lastFail = null
 
   for (const t of attempts) {
     const label = describeTarget(t)
@@ -163,20 +164,29 @@ exports.main = async (event) => {
           build: PROXY_BUILD,
         }
       }
-      const note = isIcpBlock(data) ? 'icp-block' : `http-${status}`
+      const apiErr = data && typeof data.error === 'string' ? data.error : ''
+      const note = isIcpBlock(data) ? 'icp-block' : apiErr || `http-${status}`
       trace.push(`${label} → ${note}`)
+      lastFail = { status, data, upstream: label }
+      /** 微信 login code 一次性，禁止换端口重试以免 code 作废 */
+      if (method === 'POST') {
+        break
+      }
     } catch (e) {
       trace.push(`${label} → ${e.message || e}`)
+      if (method === 'POST') break
     }
   }
 
   return {
     ok: false,
-    status: 0,
+    status: lastFail ? lastFail.status : 0,
+    data: lastFail ? lastFail.data : undefined,
     error: trace.join(' | ') || 'all attempts failed',
     via: 'cloud-mpErpProxy',
     build: PROXY_BUILD,
+    upstream: lastFail ? lastFail.upstream : undefined,
     hint:
-      '腾讯云 443 常 ECONNRESET：请在 ECS 配置 scripts/ecs-nginx-erp-api-80-ip.snippet，云函数 http80IpOnly 走 80+IP Host',
+      '登录 http-500：在 ECS 执行 curl POST meoo-ops-mp-auth 与 journalctl -u meoo-auth-api；常见为微信密钥或 mp_accounts 表',
   }
 }
