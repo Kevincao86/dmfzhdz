@@ -2,6 +2,7 @@
  * 达人招募小程序 PR ↔ 达人私信（Supabase service_role / RPC）
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import WebSocketImpl from 'ws'
 
 export type MpChatRole = 'pr' | 'talent'
 
@@ -40,8 +41,22 @@ export type MpChatMessageRow = {
   client_msg_id: string
 }
 
+function nodeNeedsWsShim(): boolean {
+  const v = typeof process !== 'undefined' ? process.versions?.node : undefined
+  if (!v) return false
+  const major = Number.parseInt(v.split('.')[0] ?? '', 10)
+  return Number.isFinite(major) && major < 22
+}
+
 export function createMpTalentChatAdmin(url: string, serviceRole: string): SupabaseClient {
-  return createClient(url, serviceRole, { auth: { persistSession: false, autoRefreshToken: false } })
+  // ECS auth-api 为 Node 20：@supabase/supabase-js 要求注入 ws，否则 createClient 即抛错
+  const globalOpts = nodeNeedsWsShim()
+    ? { WebSocket: WebSocketImpl as unknown as typeof WebSocket }
+    : {}
+  return createClient(url, serviceRole, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: globalOpts,
+  })
 }
 
 export async function upsertParticipant(
