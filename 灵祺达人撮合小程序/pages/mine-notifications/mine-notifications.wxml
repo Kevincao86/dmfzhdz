@@ -7,9 +7,17 @@
   <block wx:else>
     <view wx:for="{{sections}}" wx:key="id" class="ntf-section">
       <text class="ntf-section-title">{{item.title}}</text>
-      <view wx:for="{{item.rows}}" wx:for-item="row" wx:key="id" class="card ntf-card">
+      <view
+        wx:for="{{item.rows}}"
+        wx:for-item="row"
+        wx:key="id"
+        class="card ntf-card {{row.pinned ? 'ntf-card--pinned' : ''}} {{row.read ? '' : 'ntf-card--unread'}}"
+      >
         <view class="ntf-card-head">
-          <text class="ntf-cat ntf-cat--{{row.category}}">{{row.categoryLabel}}</text>
+          <view class="ntf-card-head-left">
+            <text class="ntf-cat ntf-cat--{{row.category}}">{{row.categoryLabel}}</text>
+            <text class="ntf-read {{row.read ? 'ntf-read--ok' : 'ntf-read--new'}}">{{row.readLabel}}</text>
+          </view>
           <text class="ntf-time">{{row.createdAt}}</text>
         </view>
         <text class="title-lg ntf-title">{{row.title}}</text>
@@ -22,6 +30,20 @@
           data-url="{{row.imageUrl}}"
           bindtap="onPreviewInboxImage"
         />
+        <view wx:if="{{row.showSelectionActions}}" class="ntf-actions">
+          <button
+            class="ntf-action-btn"
+            data-id="{{row.id}}"
+            data-action="confirmed"
+            bindtap="onSelectionAction"
+          >确认</button>
+          <button
+            class="ntf-action-btn ntf-action-btn--primary"
+            data-id="{{row.id}}"
+            data-action="joined"
+            bindtap="onSelectionAction"
+          >已入群</button>
+        </view>
       </view>
     </view>
   </block>

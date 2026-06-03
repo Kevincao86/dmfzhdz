@@ -2,6 +2,8 @@ const talentMember = require('./talentMember.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const applicationsStore = require('./applicationsStore.js')
 const selection = require('./mpApplicantSelection.js')
+const mpGroupQr = require('./mpGroupQr.js')
+const inboxNoticeState = require('./inboxNoticeState.js')
 
 const SELECTION_NOTICE_KEY = 'meoo_selection_notice_sent_v1'
 
@@ -96,7 +98,6 @@ function markSelectionNoticeSent(key) {
 function buildSelectionNoticeRows(reg, member) {
   if (!reg || !member) return []
   const apps = applicationsStore.readApplications()
-  const sent = readSelectionNoticeSent()
   const rows = []
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   for (let i = 0; i < apps.length; i++) {
@@ -109,17 +110,22 @@ function buildSelectionNoticeRows(reg, member) {
     const applicant = (mp.applicants || []).find((a) => a && a.id === app.applicantId)
     if (applicant && !selection.applicantMatchesLocalMember(applicant, member)) continue
     const dedupe = `sel-${app.mpOrderId}-${app.applicantId}`
-    if (sent.has(dedupe)) continue
+    if (inboxNoticeState.getHandledAction({ dedupeKey: dedupe })) continue
+    const qr = mpGroupQr.groupQrFromMp(mp)
     rows.push({
       id: `sel-local-${Date.now()}-${i}`,
       title: '恭喜入选招募',
-      body: `您已被选入「${mp.title || app.title || app.mpOrderId}」，请查看商单详情并与招募方沟通。`,
+      body: `您已被选入「${mp.title || app.title || app.mpOrderId}」。请扫码加入项目群，二维码见下图。`,
       category: 'business',
       categoryLabel: '业务',
       createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       read: false,
       fromSelection: true,
+      noticeType: 'selection',
+      mpOrderId: app.mpOrderId,
+      applicantId: app.applicantId,
       dedupeKey: dedupe,
+      imageUrl: qr || '',
     })
   }
   return rows

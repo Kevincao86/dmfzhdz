@@ -28,11 +28,43 @@
   padding: 24rpx;
 }
 
+.ntf-card--pinned {
+  border: 2rpx solid #c4b5fd;
+  box-shadow: 0 8rpx 24rpx rgba(124, 58, 237, 0.12);
+}
+
+.ntf-card--unread {
+  background: #fafaff;
+}
+
 .ntf-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12rpx;
+}
+
+.ntf-card-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.ntf-read {
+  font-size: 20rpx;
+  font-weight: 600;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+}
+
+.ntf-read--new {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.ntf-read--ok {
+  color: #6b7280;
+  background: #f3f4f6;
 }
 
 .ntf-cat {
@@ -79,4 +111,33 @@
   margin-top: 16rpx;
   border-radius: 12rpx;
   border: 2rpx solid var(--lq-primary-100, #e0e7ff);
+}
+
+.ntf-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.ntf-action-btn {
+  flex: 1;
+  margin: 0;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  color: var(--lq-primary-dark, #5b21b6);
+  background: #fff;
+  border: 2rpx solid var(--lq-primary-100, #e0e7ff);
+}
+
+.ntf-action-btn::after {
+  border: none;
+}
+
+.ntf-action-btn--primary {
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  border-color: transparent;
 }

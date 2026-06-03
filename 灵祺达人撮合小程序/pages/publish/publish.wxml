@@ -513,7 +513,7 @@
       </scroll-view>
       <view class="tpl-edit-footer pub-apply-footer">
         <button class="btn-secondary tpl-footer-btn" bindtap="onApplyFormPreview">预览</button>
-        <button class="btn-primary tpl-footer-btn" bindtap="onApplyFormConfirm">{{applyFormLibrarySaved ? '确认并返回' : '确认'}}</button>
+        <button class="btn-primary tpl-footer-btn" bindtap="onApplyFormConfirm">{{applyFormEditorMode === 'template' || applyFormLibrarySaved ? '确认并返回' : '确认'}}</button>
       </view>
     </view>
     <view class="tpl-modal-mask" wx:if="{{showFieldModal}}" bindtap="onCloseFieldModal" />

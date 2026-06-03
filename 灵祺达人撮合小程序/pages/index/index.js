@@ -1,10 +1,9 @@
 const api = require('../../utils/api.js')
 const { showDemoOrders } = require('../../utils/mpDemoMode.js')
-const ops = require('../../utils/opsRegistryTalentMp.js')
+const { loadHallList } = require('../../utils/hallLoad.js')
 const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
-const orderCard = require('../../utils/recruitmentOrderCard.js')
 const recruitmentAi = require('../../utils/recruitmentAiTags.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 
@@ -47,7 +46,7 @@ Page({
     brandRowStyle: '',
     brandLogoStyle: '',
     unconfigured: false,
-    loading: true,
+    loading: false,
     err: '',
     hallTab: 'normal',
     searchKeyword: '',
@@ -78,123 +77,20 @@ Page({
     if (api.base()) {
       console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
-    this.loadList()
+    void loadHallList(this).catch((e) => {
+      console.error('[index] loadHallList', e)
+      this.setData({
+        loading: false,
+        err: '加载异常，请下拉刷新',
+        displayRows: [],
+      })
+      this.applyFilters()
+    })
   },
   onPullDownRefresh() {
-    this.loadList().finally(() => wx.stopPullDownRefresh())
-  },
-  applyRegistryRows(reg, banner) {
-    const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-    const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
-    const mapped = openList.map((mp) => orderCard.mapMpOrderRow(mp, reg))
-    const iceRows = mapped.filter((r) => r.isIce)
-    const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-    const hallNonIce = mapped.filter((r) => !r.isIce)
-    const normalRows = listFilters.mergeHallDisplayRows(hallNonIce, {
-      allowDemo: showDemoOrders(),
-    })
-    const allForCity = [...mapped]
-    this.setData({
-      normalRows,
-      urgentRows,
-      iceRows,
-      cityFilters: hallFilters.buildCityFilterOptions(allForCity),
-      todayCount: openList.length,
-      loading: false,
-      err: '',
-    })
-    this.applyFilters()
-  },
-
-  async loadList() {
-    const loadTok = (this._loadSeq = (this._loadSeq || 0) + 1)
-    if (!api.hasApi()) {
-      const demo = showDemoOrders() ? listFilters.mergeHallDisplayRows([], { allowDemo: true }) : []
-      this.setData({
-        unconfigured: true,
-        loading: false,
-        normalRows: demo,
-        urgentRows: [],
-        iceRows: [],
-        todayCount: 0,
-        cityFilters: hallFilters.buildCityFilterOptions(demo),
-        err: demo.length ? '' : '未连接后台',
-      })
-      this.applyFilters()
-      return
-    }
-    this.setData({ unconfigured: false, loading: true, err: '' })
-    let showedOffline = false
-    const offline = registryCache.load({ allowStale: true })
-    const offlineMp = offline && offline.data && offline.data.mpRecruitmentOrders
-    if (offline && offline.data && Array.isArray(offlineMp) && offlineMp.length > 0) {
-      showedOffline = true
-      this.applyRegistryRows(offline.data, '')
-    }
-    const watchdog = setTimeout(() => {
-      if (this._loadSeq !== loadTok) return
-      if (!this.data.loading) return
-      this.setData({
-        loading: false,
-        err: '加载超时，请下拉刷新',
-        normalRows: [],
-        urgentRows: [],
-        iceRows: [],
-        displayRows: [],
-      })
-      this.applyFilters()
-    }, 18000)
-    let cacheWarn = ''
-    try {
-      let reg
-      try {
-        reg = await ops.fetchRegistry()
-      } catch (e) {
-        if (e && e.fromCache && e.cachedData) {
-          reg = e.cachedData
-          cacheWarn = String(e.message || '已使用本地缓存')
-        } else {
-          throw e
-        }
-      }
-      if (this._loadSeq !== loadTok) return
-      this.applyRegistryRows(reg, cacheWarn)
-    } catch (e) {
-      if (this._loadSeq !== loadTok) return
-      if (showedOffline) {
-        this.setData({ loading: false, err: '刷新失败，请下拉重试' })
-        return
-      }
-      const msg = String(e.message || e)
-      let hint = '加载失败，请稍后重试'
-      if (/timeout|超时/i.test(msg)) {
-        hint = '加载超时，请检查网络后重试'
-      } else if (/url not in domain list|不在.*合法域名|domain list/i.test(msg)) {
-        hint = '网络配置异常，请联系管理员'
-      } else if (/reset|errcode:-101|cronet/i.test(msg)) {
-        const stale = registryCache.load({ allowStale: true })
-        if (stale && stale.data) {
-          this.applyRegistryRows(stale.data, '')
-          this.setData({ err: '网络不稳定，已显示缓存列表' })
-          return
-        }
-        hint = '网络不稳定，请删除小程序后重新扫码'
-      }
-      this.setData({
-        loading: false,
-        err: hint,
-        normalRows: [],
-        urgentRows: [],
-        iceRows: [],
-        displayRows: [],
-      })
-      this.applyFilters()
-    } finally {
-      clearTimeout(watchdog)
-      if (this._loadSeq === loadTok && this.data.loading) {
-        this.setData({ loading: false })
-      }
-    }
+    loadHallList(this)
+      .catch(() => {})
+      .finally(() => wx.stopPullDownRefresh())
   },
   applyFilters() {
     const tab = this.data.hallTab

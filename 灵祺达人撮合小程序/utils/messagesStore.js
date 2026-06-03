@@ -95,6 +95,7 @@ function markNotificationsRead() {
 
 const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
 const talentInboxMatch = require('./talentInboxMatch.js')
+const inboxRowEnrich = require('./inboxRowEnrich.js')
 
 function readInboxSeenSet() {
   try {
@@ -122,31 +123,38 @@ function inboxRowsForTalent(reg, member) {
   const seen = readInboxSeenSet()
   return inbox
     .filter((row) => talentInboxMatch.inboxRowMatchesTalent(row, keys, member))
-    .map((row) => ({
-      id: row.id,
-      title: row.title || '通知',
-      body: row.body || '',
-      imageUrl: row.imageUrl ? String(row.imageUrl) : '',
-      category: normalizeCategory(row.category),
-      categoryLabel: CATEGORY_LABELS[normalizeCategory(row.category)],
-      createdAt: row.createdAt || '',
-      read: !!row.read || seen.has(String(row.id)),
-      fromRegistry: true,
-    }))
-    .sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+    .map((row) => {
+      const isSel =
+        row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
+      let imageUrl = row.imageUrl ? String(row.imageUrl) : ''
+      if (isSel && !imageUrl && row.mpOrderId) {
+        imageUrl = inboxRowEnrich.groupQrForMpOrder(reg, row.mpOrderId)
+      }
+      return {
+        id: row.id,
+        title: row.title || '通知',
+        body: row.body || '',
+        imageUrl,
+        category: normalizeCategory(row.category),
+        categoryLabel: CATEGORY_LABELS[normalizeCategory(row.category)],
+        createdAt: row.createdAt || '',
+        read: !!row.read || seen.has(String(row.id)),
+        fromRegistry: true,
+        noticeType: row.noticeType || (isSel ? 'selection' : ''),
+        mpOrderId: row.mpOrderId || '',
+        applicantId: row.applicantId || '',
+      }
+    })
 }
 
 function mergeRegistryInboxForTalent(reg, member) {
   const selectionRows = talentInboxMatch.buildSelectionNoticeRows(reg, member)
-  for (let i = 0; i < selectionRows.length; i++) {
-    talentInboxMatch.markSelectionNoticeSent(selectionRows[i].dedupeKey)
-  }
   const remote = inboxRowsForTalent(reg, member)
   const merged = [...selectionRows, ...remote]
   const local = readAllNotificationRows()
   const remoteIds = new Set(merged.map((r) => r.id))
   const rest = local.filter((r) => !remoteIds.has(r.id))
-  return [...merged, ...rest].sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+  return inboxRowEnrich.enrichAndSort(reg, [...merged, ...rest])
 }
 
 module.exports = {

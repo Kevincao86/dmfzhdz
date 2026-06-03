@@ -10,6 +10,8 @@ export type MpTalentInboxEntryInput = {
   platformAccount?: string
   applicantId?: string
   imageUrl?: string
+  noticeType?: 'selection' | 'general'
+  pinned?: boolean
 }
 
 export function appendMpTalentInboxInSnapshot(
@@ -39,6 +41,8 @@ export function appendMpTalentInboxInSnapshot(
       platformAccount: row.platformAccount ? String(row.platformAccount).trim() : undefined,
       applicantId: row.applicantId ? String(row.applicantId).trim() : undefined,
       imageUrl: imageUrl || undefined,
+      noticeType: row.noticeType === 'selection' ? 'selection' : undefined,
+      pinned: row.noticeType === 'selection' ? row.pinned !== false : undefined,
       createdAt: now,
       read: false,
     })
