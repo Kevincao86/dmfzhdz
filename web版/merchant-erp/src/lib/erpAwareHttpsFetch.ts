@@ -58,12 +58,7 @@ export function erpAwareFetch(url: string, init: RequestInit = {}): Promise<Resp
         res.on('data', (c) => chunks.push(c))
         res.on('end', () => {
           const text = Buffer.concat(chunks).toString('utf8')
-          resolve(
-            new Response(text, {
-              status: res.statusCode || 0,
-              headers: res.headers as HeadersInit,
-            }),
-          )
+          resolve(new Response(text, { status: res.statusCode || 0 }))
         })
       },
     )
