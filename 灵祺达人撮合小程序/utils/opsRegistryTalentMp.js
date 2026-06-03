@@ -1,6 +1,5 @@
 const { merchantRequest } = require('./merchantApi.js')
 const registryCache = require('./registryCache.js')
-const registryCs = require('./registryCsGateway.js')
 
 /** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
 function isRetryableRegistryError(msg) {
@@ -44,16 +43,6 @@ async function fetchRegistry() {
     lastErr = e
     attempts.push(`[erp-api] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
     console.warn('[mp] fetchRegistry erp-api failed', attempts[attempts.length - 1])
-  }
-
-  // 2) Vercel cs 网关（服务端 node:https 代拉 ECS，规避手机对根域 reset）
-  try {
-    const data = await registryCs.fetchHallRegistryViaCsGateway()
-    registryCache.save(data, 'cs:meoo-ops-mp-hall-registry')
-    return data
-  } catch (e) {
-    attempts.push(`[cs] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
-    console.warn('[mp] fetchRegistry cs gateway failed', attempts[attempts.length - 1])
   }
 
   const cached = registryCache.load({ allowStale: true })

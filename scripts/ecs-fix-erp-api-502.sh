@@ -8,7 +8,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=ecs-resolve-admin-home.sh
 source "$ROOT/scripts/ecs-resolve-admin-home.sh"
-ERP="$ROOT/web版/merchant-erp"
+# shellcheck source=ecs-resolve-erp-path.sh
+source "$ROOT/scripts/ecs-resolve-erp-path.sh"
+ERP="$(ecs_resolve_erp_dir "$ROOT")"
+echo "merchant-erp 路径: $ERP"
 
 if [[ ! -f "$HOME/stack/db-credentials.txt" ]]; then
   echo "缺少 $HOME/stack/db-credentials.txt（当前用户=$(id -un) HOME=$HOME）"
