@@ -3,27 +3,38 @@ const registryCache = require('./registryCache.js')
 const { withTimeout } = require('./fetchTimeout.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
 
-const REGISTRY_FETCH_MS = 22000
-const HALL_PATH = '/api/meoo-ops-mp-hall-registry'
-
-/** 某条路径失败时是否尝试下一条（404、网络 reset、超时等） */
-function isRetryableRegistryError(msg) {
-  return /404|not_found|reset|errcode:-101|cronet|timeout|超时|request:fail|download:fail|网络异常|registry_rest/i.test(
-    String(msg || ''),
-  )
-}
+const REGISTRY_FETCH_MS = 20000
+const HALL_GET = '/api/meoo-ops-mp-hall-registry'
+const HALL_POST = '/api/meoo-ops-mp-auth'
 
 async function fetchRegistryViaErpApi() {
-  const raw = await withTimeout(api.get(HALL_PATH), REGISTRY_FETCH_MS, '招募大厅')
-  const data = normalizeHallPayload(raw)
-  registryCache.save(data, HALL_PATH)
-  return data
+  let lastErr
+  try {
+    const raw = await withTimeout(
+      api.post(HALL_POST, { action: 'hall_registry' }),
+      REGISTRY_FETCH_MS,
+      '招募大厅',
+    )
+    const data = normalizeHallPayload(raw)
+    registryCache.save(data, `${HALL_POST}:hall_registry`)
+    return data
+  } catch (e) {
+    lastErr = e
+    console.warn('[mp] hall_registry POST failed', String(e.message || e).slice(0, 160))
+  }
+  try {
+    const raw = await withTimeout(api.get(HALL_GET), REGISTRY_FETCH_MS, '招募大厅')
+    const data = normalizeHallPayload(raw)
+    registryCache.save(data, HALL_GET)
+    return data
+  } catch (e2) {
+    const msg = String(e2 && e2.message ? e2.message : e2)
+    throw lastErr || e2 || new Error(msg || 'hall_fetch_failed')
+  }
 }
 
 async function fetchRegistry() {
   const attempts = []
-
-  // 1) 直连 ECS erp-api（config.release MERCHANT_API_BASE_URL）
   let lastErr
   try {
     const data = await fetchRegistryViaErpApi()
@@ -37,15 +48,8 @@ async function fetchRegistry() {
 
   const cached = registryCache.load({ allowStale: true })
   if (cached && cached.data) {
-    const when = registryCache.formatSavedAt(cached.savedAt)
-    const ageHint = registryCache.formatAgeHint(cached.ageMs)
-    const err = new Error(
-      cached.stale
-        ? `网络暂不可用，已使用 ${when}（${ageHint}）的离线缓存，数据可能不是最新`
-        : `网络暂不可用，已使用 ${when} 的缓存数据`,
-    )
+    const err = new Error('已使用本地缓存')
     err.fromCache = true
-    err.cacheStale = Boolean(cached.stale)
     err.cachedData = cached.data
     err.attempts = attempts
     throw err

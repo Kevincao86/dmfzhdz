@@ -11,7 +11,7 @@ function normalizeHallPayload(data) {
     mp = data.registry.mpRecruitmentOrders
   }
   if (!Array.isArray(mp)) {
-    throw new Error('missing_mpRecruitmentOrders')
+    mp = []
   }
   return {
     mpRecruitmentOrders: mp,

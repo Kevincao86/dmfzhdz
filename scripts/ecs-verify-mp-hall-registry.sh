@@ -18,10 +18,19 @@ if ! curl -sf -m 3 "http://127.0.0.1:${PORT}/api/meoo-auth-ping" >/dev/null 2>&1
   echo ""
 fi
 
-echo "=== :${PORT} 直连 meoo-ops-mp-hall-registry ==="
-BODY="$(curl -sS -m 25 "http://127.0.0.1:${PORT}/api/meoo-ops-mp-hall-registry" || true)"
+echo "=== :${PORT} POST hall_registry（小程序主路径）==="
+BODY="$(curl -sS -m 25 -X POST -H "Content-Type: application/json" \
+  "http://127.0.0.1:${PORT}/api/meoo-ops-mp-auth" \
+  -d '{"action":"hall_registry"}' || true)"
 echo "${BODY}" | head -c 500
 echo ""
+
+if ! echo "$BODY" | grep -q 'mpRecruitmentOrders'; then
+  echo "=== 回退 GET meoo-ops-mp-hall-registry ==="
+  BODY="$(curl -sS -m 25 "http://127.0.0.1:${PORT}/api/meoo-ops-mp-hall-registry" || true)"
+  echo "${BODY}" | head -c 500
+  echo ""
+fi
 
 if ! echo "$BODY" | grep -q 'mpRecruitmentOrders'; then
   echo "FAIL: 响应不含 mpRecruitmentOrders"

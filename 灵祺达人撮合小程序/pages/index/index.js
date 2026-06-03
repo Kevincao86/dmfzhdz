@@ -70,6 +70,19 @@ Page({
   onLoad() {
     applyNavLayout(this)
     console.log('[mp] build', mpBuild.ID)
+    this.primeHallPlaceholder()
+  },
+  primeHallPlaceholder() {
+    const mockOnly = [listFilters.buildMockRecruitmentRow()]
+    this.setData({
+      loading: false,
+      err: '',
+      normalRows: mockOnly,
+      urgentRows: [],
+      iceRows: [],
+      cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
+    })
+    this.applyFilters()
   },
   onShow() {
     setTabBarForPage(this, '/pages/index/index')
@@ -105,10 +118,8 @@ Page({
   },
 
   async loadList() {
-    if (this._hallLoading) return
-    this._hallLoading = true
-    const loadTok = Date.now()
-    this._loadTok = loadTok
+    const loadTok = (this._loadSeq = (this._loadSeq || 0) + 1)
+    const hasRows = (this.data.normalRows || []).length > 0
     if (!api.hasApi()) {
       const mockOnly = [listFilters.buildMockRecruitmentRow()]
       this.setData({
@@ -121,21 +132,31 @@ Page({
         cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
       })
       this.applyFilters()
-      this._hallLoading = false
       return
     }
     this.setData({ unconfigured: false })
-    const apiBase = api.base()
     let showedOffline = false
-    let offlineBanner = ''
     const offline = registryCache.load({ allowStale: true })
     if (offline && offline.data) {
       showedOffline = true
-      offlineBanner = ''
-      this.applyRegistryRows(offline.data, offlineBanner)
-    } else {
+      this.applyRegistryRows(offline.data, '')
+    } else if (!hasRows) {
       this.setData({ loading: true, err: '' })
     }
+    const watchdog = setTimeout(() => {
+      if (this._loadSeq !== loadTok) return
+      if (!this.data.loading) return
+      const mockOnly = [listFilters.buildMockRecruitmentRow()]
+      this.setData({
+        loading: false,
+        err: '加载超时，请下拉刷新',
+        normalRows: mockOnly,
+        urgentRows: [],
+        iceRows: [],
+        cityFilters: hallFilters.buildCityFilterOptions(mockOnly),
+      })
+      this.applyFilters()
+    }, 18000)
     let cacheWarn = ''
     try {
       let reg
@@ -149,10 +170,10 @@ Page({
           throw e
         }
       }
-      if (this._loadTok !== loadTok) return
+      if (this._loadSeq !== loadTok) return
       this.applyRegistryRows(reg, cacheWarn)
     } catch (e) {
-      if (this._loadTok !== loadTok) return
+      if (this._loadSeq !== loadTok) return
       if (showedOffline) {
         this.setData({ loading: false, err: '刷新失败，请下拉重试' })
         return
@@ -183,13 +204,9 @@ Page({
       })
       this.applyFilters()
     } finally {
-      if (this._loadTok === loadTok) {
-        if (this.data.loading) {
-          this.setData({ loading: false })
-        }
-      }
-      if (this._loadTok === loadTok) {
-        this._hallLoading = false
+      clearTimeout(watchdog)
+      if (this._loadSeq === loadTok && this.data.loading) {
+        this.setData({ loading: false })
       }
     }
   },

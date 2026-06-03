@@ -8,6 +8,7 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { loadMpHallRegistryPayload } from '../src/lib/mpHallRegistryCore.js'
 import {
   accountToClientPayload,
   createMpAuthRest,
@@ -243,6 +244,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    /** 招募大厅：与 wx_login 同走 POST，云函数代理更稳 */
+    if (action === 'hall_registry') {
+      const payload = await loadMpHallRegistryPayload()
+      const mp = Array.isArray(payload.mpRecruitmentOrders) ? payload.mpRecruitmentOrders : []
+      sendJson(res, 200, { ok: true, mpRecruitmentOrders: mp })
+      return
+    }
+
     sendJson(res, 400, {
       ok: false,
       error: 'unknown_action',
@@ -255,6 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'scan_create',
         'scan_poll',
         'scan_confirm_dev',
+        'hall_registry',
       ],
     })
   } catch (e) {
