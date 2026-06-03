@@ -210,7 +210,7 @@ function merchantRequest(method, path, data, attemptOrOpts = 0) {
       }
       if (isTransientNetError(errMsg) && shouldUseCronetWorkaround(url) && isRealDevice()) {
         throw new Error(
-          `${errMsg}\n\n请确认微信 request 合法域名为 https://mofangdianai.com；ECS 执行 sudo bash scripts/ecs-fix-wechat-cronet-tls.sh 后重试。`,
+          `${errMsg}\n\n微信登录请使用 GET（构建号 mp-wx-login-get）。ECS: bash scripts/ecs-fix-mp-wechat-login.sh`,
         )
       }
       throw err

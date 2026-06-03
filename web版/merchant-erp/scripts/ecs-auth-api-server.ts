@@ -55,7 +55,7 @@ import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260603-mp-hall-direct'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260603-mp-wx-login-get'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -184,7 +184,7 @@ function parseRequestUrl(req: IncomingMessage): { path: string; query: Record<st
 function applyErpApiCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
 }
 
 http
