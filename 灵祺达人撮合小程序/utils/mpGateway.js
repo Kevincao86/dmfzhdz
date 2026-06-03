@@ -23,8 +23,8 @@ function gatewayGet(path) {
   return merchantApi.merchantGetUrl(apiUrl(path))
 }
 
-function gatewayPost(path, body) {
-  return merchantApi.merchantPostUrl(apiUrl(path), body || {})
+function gatewayPost(path, body, opts = {}) {
+  return merchantApi.merchantPostUrl(apiUrl(path), body || {}, opts.header || {})
 }
 
 module.exports = {

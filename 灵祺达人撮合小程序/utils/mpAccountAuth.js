@@ -1,4 +1,7 @@
-const { merchantRequest } = require('./merchantApi.js')
+const { merchantRequest, isTransientNetError } = require('./merchantApi.js')
+const mpGateway = require('./mpGateway.js')
+
+const CS_AUTH_FALLBACK = 'https://cs.mofangdianai.com'
 
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
@@ -37,17 +40,34 @@ function isLoggedIn() {
   return !!readSessionToken() && !!readAccount()
 }
 
+async function mpAuthRequestViaCs(action, payload, header) {
+  const path = '/api/meoo-ops-mp-auth'
+  const url = `${CS_AUTH_FALLBACK.replace(/\/$/, '')}${path}`
+  try {
+    return await mpGateway.gatewayPost(path, { action, ...payload }, { header })
+  } catch (e) {
+    const msg = String(e && e.message ? e.message : e)
+    throw new Error(
+      msg.indexOf(CS_AUTH_FALLBACK) >= 0
+        ? msg
+        : `${msg}（已改走 ${CS_AUTH_FALLBACK} 网关，请确认微信合法域名含 cs.mofangdianai.com 且 Vercel 已配置 MEOO_ERP_API_HOST_IP）`,
+    )
+  }
+}
+
 async function mpAuthRequest(action, payload = {}) {
   const token = readSessionToken()
   const header = { 'Content-Type': 'application/json' }
   if (token) header['X-Mp-Session'] = token
-  const data = await merchantRequest(
-    'POST',
-    '/api/meoo-ops-mp-auth',
-    { action, ...payload },
-    { header },
-  )
-  return data
+  const body = { action, ...payload }
+  try {
+    return await merchantRequest('POST', '/api/meoo-ops-mp-auth', body, { header })
+  } catch (e) {
+    const msg = String(e && e.message ? e.message : e)
+    if (!isTransientNetError(msg)) throw e
+    console.warn('[mp-auth] direct erp-api failed, fallback cs gateway', msg.slice(0, 160))
+    return mpAuthRequestViaCs(action, payload, header)
+  }
 }
 
 /** 微信 code 登录（与 Web 互通） */
