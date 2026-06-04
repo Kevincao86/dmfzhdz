@@ -79,6 +79,7 @@
   height: 100%;
   display: block;
   pointer-events: none;
+  image-rendering: -webkit-optimize-contrast;
 }
 
 .orbit__shine {

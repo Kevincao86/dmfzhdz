@@ -91,9 +91,17 @@
         <view class="picker-val">{{city || '请选择城市'}}</view>
       </picker>
     </view>
-    <view class="form-row">
+    <view class="form-row form-row--intro">
       <text class="form-label">简介</text>
-      <textarea class="input textarea" data-k="intro" value="{{form.intro}}" bindinput="onField" />
+      <textarea
+        class="pr-intro-input"
+        auto-height="{{false}}"
+        maxlength="120"
+        placeholder="简要介绍机构/个人（选填，最多120字）"
+        data-k="intro"
+        value="{{form.intro}}"
+        bindinput="onField"
+      />
     </view>
     <button class="btn-primary" style="margin-top:24rpx;" bindtap="onSave">保存</button>
   </view>

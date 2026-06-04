@@ -207,14 +207,23 @@ Page({
     try {
       const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
       wx.showLoading({ title: '上传中…', mask: true })
-      await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, dataUrl)
+      this.setData({ groupQrImage: dataUrl })
+      const patchResult = await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, dataUrl)
       const mp = { ...this.data.mpOrder, groupQrImage: dataUrl }
       this.setData({ groupQrImage: dataUrl, mpOrder: mp })
-      wx.showToast({ title: '群二维码已保存', icon: 'success' })
+      if (patchResult && patchResult.localOnly) {
+        wx.showToast({ title: '已存本机，云端待同步', icon: 'none' })
+      } else {
+        wx.showToast({ title: '群二维码已保存', icon: 'success' })
+      }
     } catch (e) {
       const msg = String(e && e.message ? e.message : e)
       if (msg !== 'cancel') {
-        wx.showToast({ title: msg.slice(0, 28), icon: 'none' })
+        if (e && e.localSaved) {
+          const mp = { ...this.data.mpOrder, groupQrImage: this.data.groupQrImage }
+          this.setData({ mpOrder: mp })
+        }
+        wx.showToast({ title: msg.slice(0, 28), icon: 'none', duration: 2800 })
       }
     } finally {
       wx.hideLoading()
