@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '../cn'
-import { getLoginRolePref, getToken, setLoginRolePref, type MpAccountRole } from '../lib/mpSession'
-import RoleEditionToggle from '../components/RoleEditionToggle'
+import { getToken } from '../lib/mpSession'
+import WorkIdentityToggle from '../components/WorkIdentityToggle'
+import { getWorkIdentity, setWorkIdentity, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingRolePicker from './landing/LandingRolePicker'
 import LandingSection3 from './landing/LandingSection3'
@@ -26,7 +27,7 @@ export default function LandingPage() {
   const nav = useNavigate()
   const scrollerRef = useRef<HTMLDivElement>(null)
   const [activeSection, setActiveSection] = useState(0)
-  const [role, setRole] = useState<MpAccountRole>(() => getLoginRolePref())
+  const [role, setRole] = useState<MpWorkIdentity>(() => getWorkIdentity())
   const [loginPickerOpen, setLoginPickerOpen] = useState(false)
 
   useEffect(() => {
@@ -40,13 +41,13 @@ export default function LandingPage() {
     setActiveSection(Math.min(SECTION_COUNT - 1, Math.max(0, idx)))
   }, [])
 
-  function onRoleChange(next: MpAccountRole) {
+  function onRoleChange(next: MpWorkIdentity) {
     setRole(next)
-    setLoginRolePref(next)
+    setWorkIdentity(next)
   }
 
-  function goLogin(picked: MpAccountRole) {
-    setLoginRolePref(picked)
+  function goLogin(picked: MpWorkIdentity) {
+    setWorkIdentity(picked)
     setLoginPickerOpen(false)
     nav(`/login?role=${picked}`)
   }
@@ -96,8 +97,8 @@ export default function LandingPage() {
 
           <div className="absolute bottom-8 right-6 z-20 w-[min(100%,340px)] sm:right-10 lg:right-14">
             <p className="mb-3 text-right text-xs text-white/60">{m.cta}</p>
-            <RoleEditionToggle
-              role={role}
+            <WorkIdentityToggle
+              identity={role}
               onChange={onRoleChange}
               variant="dark"
               className="border border-white/20 bg-black/35 backdrop-blur-md"

@@ -1,14 +1,12 @@
-import type { MpAccountRole } from '../../lib/mpSession'
+import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
+import { WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 
 export const HERO_FRAMES = ['/landing/hero-1.png', '/landing/hero-2.png', '/landing/hero-3.png'] as const
 
-export const ROLE_LABEL: Record<MpAccountRole, string> = {
-  talent: '达人版',
-  pr: 'PR 版',
-}
+export const ROLE_LABEL = WORK_EDITION_LABEL
 
 export const MARKETING_BY_ROLE: Record<
-  MpAccountRole,
+  MpWorkIdentity,
   { headline: string; sub: string; cta: string }
 > = {
   talent: {
@@ -16,11 +14,28 @@ export const MARKETING_BY_ROLE: Record<
     sub: '好撮合成就好履约 · AI 置顶高契合商单',
     cta: '找商单就上灵祺履约平台',
   },
+  shoot: {
+    headline: '拍摄履约',
+    sub: '拍剪任务大厅 · 商单对接与档期协同',
+    cta: '接拍摄任务就上灵祺履约平台',
+  },
+  edit: {
+    headline: '剪辑履约',
+    sub: '云剪与剪辑任务 · 素材交付一站协同',
+    cta: '接剪辑任务就上灵祺履约平台',
+  },
   pr: {
     headline: '品牌发单',
     sub: '智能推荐达人 · 招募反选群码一站完成',
     cta: '发招募就上灵祺履约平台',
   },
+}
+
+export const ROLE_PICKER_DESC: Record<MpWorkIdentity, string> = {
+  talent: '接单大厅 · 推荐商单 · 履约与消息',
+  shoot: '拍摄任务大厅 · 档期与素材协同',
+  edit: '剪辑 / 云剪任务 · 交付与进度跟踪',
+  pr: '发招募 · 推荐达人 · 反选与群码',
 }
 
 export const SECTION2_CARDS = [

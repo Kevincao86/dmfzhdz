@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
 import { phoneRegister, sendRegisterSms } from '../lib/mpApi'
-import { setActiveRole, setLoginRolePref, setSession, type MpAccountRole } from '../lib/mpSession'
-
-function parseRole(raw: string | null): MpAccountRole {
-  return raw === 'pr' ? 'pr' : 'talent'
-}
+import { setActiveRole, setSession } from '../lib/mpSession'
+import {
+  parseWorkIdentityQuery,
+  setWorkIdentity,
+  workIdentityToAccountRole,
+  WORK_EDITION_LABEL,
+  type MpWorkIdentity,
+} from '../lib/mpWorkIdentity'
 
 function normalizePhone(raw: string) {
   const digits = raw.replace(/\D/g, '')
@@ -16,6 +19,9 @@ function normalizePhone(raw: string) {
 function formatMpApiErr(e: unknown, fallback: string) {
   const msg = e instanceof Error ? e.message : fallback
   if (/Unexpected end of JSON input/i.test(msg)) return '接口无有效响应，请检查 VITE_MP_API_BASE 或本地 dev 服务'
+  if (/^not_found$/i.test(msg) || /not_found/i.test(msg)) {
+    return '验证码接口不可用，请稍后重试或联系运维更新 ECS'
+  }
   if (/sms_not_configured/i.test(msg)) return '短信服务未配置，请联系管理员'
   if (/invalid_sms|sms_invalid/i.test(msg)) return '验证码错误或已过期'
   return msg || fallback
@@ -24,7 +30,8 @@ function formatMpApiErr(e: unknown, fallback: string) {
 export default function RegisterPage() {
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const role = parseRole(params.get('role'))
+  const workIdentity = parseWorkIdentityQuery(params.get('role'))
+  const accountRole = workIdentityToAccountRole(workIdentity)
 
   const [phone, setPhone] = useState('')
   const [smsCode, setSmsCode] = useState('')
@@ -84,11 +91,11 @@ export default function RegisterPage() {
         phone: p,
         smsCode: smsCode.trim(),
         password,
-        role,
+        role: accountRole,
       })
       setSession(token, account)
-      setLoginRolePref(role)
-      setActiveRole(role)
+      setWorkIdentity(workIdentity)
+      setActiveRole(accountRole)
       nav('/hall', { replace: true })
     } catch (e) {
       const msg = formatMpApiErr(e, '注册失败')
@@ -109,7 +116,7 @@ export default function RegisterPage() {
         onSubmit={onSubmit}
         className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-xl backdrop-blur-xl space-y-4"
       >
-        <h1 className="text-xl font-bold">注册 · {role === 'pr' ? 'PR 版' : '达人版'}</h1>
+        <h1 className="text-xl font-bold">注册 · {WORK_EDITION_LABEL[workIdentity]}</h1>
         <p className="text-sm text-slate-500">手机号作为登录账号，与小程序账号互通</p>
 
         <label className="block text-sm">
@@ -170,7 +177,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-slate-500">
           已有账号？{' '}
-          <Link to={`/login?role=${role}`} className="text-violet-600 underline">
+          <Link to={`/login?role=${workIdentity}`} className="text-violet-600 underline">
             去登录
           </Link>
         </p>

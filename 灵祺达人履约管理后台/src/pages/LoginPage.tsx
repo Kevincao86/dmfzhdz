@@ -3,39 +3,43 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '../cn'
 import { passwordLogin, scanCreate, scanPoll, switchRole } from '../lib/mpApi'
+import { enterDevPreview, setActiveRole, setSession } from '../lib/mpSession'
 import {
-  enterDevPreview,
-  setActiveRole,
-  setLoginRolePref,
-  setSession,
-  type MpAccountRole,
-} from '../lib/mpSession'
+  parseWorkIdentityQuery,
+  setWorkIdentity,
+  workIdentityToAccountRole,
+  type MpWorkIdentity,
+} from '../lib/mpWorkIdentity'
 import TalentLoginAuthPanel, { type LoginTab } from './login/TalentLoginAuthPanel'
+
 const AUTH_SHELL = cn(
   'relative w-full max-w-md rounded-[28px] border border-white/80 p-6 sm:p-8',
   'bg-white/55 shadow-[0_8px_40px_-12px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)]',
   'backdrop-blur-2xl backdrop-saturate-150',
 )
 
-function parseLoginRole(raw: string | null): MpAccountRole | null {
-  if (raw === 'talent' || raw === 'pr') return raw
-  return null
+function parseLoginWorkIdentity(raw: string | null): MpWorkIdentity | null {
+  if (!raw) return null
+  const id = parseWorkIdentityQuery(raw)
+  return raw === id ? id : null
 }
 
 async function applyRoleAfterLogin(
   token: string,
   account: import('../lib/mpSession').MpAccount,
-  pref: MpAccountRole,
+  workIdentity: MpWorkIdentity,
 ) {
+  const accountRole = workIdentityToAccountRole(workIdentity)
   setSession(token, account)
-  setActiveRole(pref)
-  if (account.activeRole !== pref) {
+  setWorkIdentity(workIdentity)
+  setActiveRole(accountRole)
+  if (account.activeRole !== accountRole) {
     try {
-      const { account: next } = await switchRole(pref)
+      const { account: next } = await switchRole(accountRole)
       setSession(token, next)
-      setActiveRole(pref)
+      setActiveRole(accountRole)
     } catch {
-      setActiveRole(pref)
+      setActiveRole(accountRole)
     }
   }
 }
@@ -43,8 +47,8 @@ async function applyRoleAfterLogin(
 export default function LoginPage() {
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const roleFromUrl = parseLoginRole(params.get('role'))
-  const loginRole = roleFromUrl ?? 'talent'
+  const roleFromUrl = parseLoginWorkIdentity(params.get('role'))
+  const workIdentity = roleFromUrl ?? 'talent'
 
   const [tab, setTab] = useState<LoginTab>('password')
   const [loginName, setLoginName] = useState('')
@@ -57,7 +61,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!roleFromUrl) nav('/', { replace: true })
-    else setLoginRolePref(roleFromUrl)
+    else setWorkIdentity(roleFromUrl)
   }, [roleFromUrl, nav])
 
   useEffect(() => {
@@ -85,20 +89,20 @@ export default function LoginPage() {
       try {
         const r = await scanPoll(ticket)
         if (r.status === 'confirmed' && r.token && r.account) {
-          await applyRoleAfterLogin(r.token, r.account, loginRole)
+          await applyRoleAfterLogin(r.token, r.account, workIdentity)
           nav('/hall', { replace: true })
         } else if (r.message) setScanHint(r.message)
       } catch (_) {}
     }, 2500)
     return () => clearInterval(t)
-  }, [ticket, tab, nav, loginRole, roleFromUrl])
+  }, [ticket, tab, nav, workIdentity, roleFromUrl])
 
   async function onPasswordLogin() {
     setErr('')
     setLoading(true)
     try {
       const { token, account } = await passwordLogin(loginName.trim(), password)
-      await applyRoleAfterLogin(token, account, loginRole)
+      await applyRoleAfterLogin(token, account, workIdentity)
       nav('/hall', { replace: true })
     } catch (e) {
       setErr(e instanceof Error ? e.message : '登录失败')
@@ -108,7 +112,7 @@ export default function LoginPage() {
   }
 
   function onDevPreview() {
-    enterDevPreview(loginRole)
+    enterDevPreview(workIdentityToAccountRole(workIdentity))
     nav('/hall', { replace: true })
   }
 
@@ -159,13 +163,13 @@ export default function LoginPage() {
           onPasswordLogin={onPasswordLogin}
           qrPayload={qrPayload}
           scanHint={scanHint}
-          loginRole={loginRole}
+          workIdentity={workIdentity}
           showDevPreview={import.meta.env.DEV}
           onDevPreview={onDevPreview}
         />
         <p className="mt-4 text-center text-sm text-slate-600">
           还没有账号？{' '}
-          <Link to={`/register?role=${loginRole}`} className="font-semibold text-violet-600 underline">
+          <Link to={`/register?role=${workIdentity}`} className="font-semibold text-violet-600 underline">
             手机号注册
           </Link>
         </p>

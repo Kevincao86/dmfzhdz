@@ -1,7 +1,7 @@
 import type { FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { cn } from '../../cn'
-import type { MpAccountRole } from '../../lib/mpSession'
+import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
 
 export type LoginTab = 'password' | 'scan'
@@ -24,7 +24,7 @@ type Props = {
   onPasswordLogin: () => void | Promise<void>
   qrPayload: string
   scanHint: string
-  loginRole: MpAccountRole
+  workIdentity: MpWorkIdentity
   showDevPreview?: boolean
   onDevPreview?: () => void
 }
@@ -41,7 +41,7 @@ export default function TalentLoginAuthPanel({
   onPasswordLogin,
   qrPayload,
   scanHint,
-  loginRole,
+  workIdentity,
   showDevPreview,
   onDevPreview,
 }: Props) {
@@ -54,7 +54,7 @@ export default function TalentLoginAuthPanel({
     <div className="relative w-full">
       <div className="mb-6">
         <div className="mb-3 inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800">
-          当前版本 · {ROLE_LABEL[loginRole]}
+          当前版本 · {ROLE_LABEL[workIdentity]}
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
@@ -150,7 +150,7 @@ export default function TalentLoginAuthPanel({
           className="mt-4 w-full rounded-xl border border-dashed border-slate-300 py-2.5 text-sm text-slate-500 hover:border-violet-400 hover:text-violet-700"
           onClick={onDevPreview}
         >
-          开发预览：直接进入（{loginRole === 'pr' ? 'PR 版' : '达人版'}）
+          开发预览：直接进入（{ROLE_LABEL[workIdentity]}）
         </button>
       ) : null}
     </div>
