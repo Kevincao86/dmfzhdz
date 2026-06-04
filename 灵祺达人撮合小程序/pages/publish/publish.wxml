@@ -39,9 +39,10 @@
     </view>
   </block>
 
-  <!-- 填写表单（主界面） -->
-  <block wx:elif="{{step === 'form' && !pickerView}}">
-    <view class="pub-screen">
+  <!-- 填写表单（主界面 + 全屏选择叠层，保留滚动位置） -->
+  <block wx:elif="{{step === 'form'}}">
+    <view class="pub-form-host">
+    <view class="pub-screen" hidden="{{pickerView}}">
       <template is="pubLifeBg" />
     <view class="pub-form-layout">
       <view class="pub-form-head" style="{{formHeadStyle}}">
@@ -56,7 +57,7 @@
         scroll-y
         enable-flex
         scroll-into-view="{{scrollIntoView}}"
-        scroll-with-animation
+        scroll-with-animation="{{scrollWithAnimation}}"
       >
         <view class="pub-form-body">
           <view class="pub-field" id="field-delivery-window">
@@ -242,10 +243,9 @@
       </scroll-view>
     </view>
     </view>
-  </block>
 
   <!-- 全屏：招募平台 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'platform'}}">
+  <block wx:if="{{pickerView === 'platform'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -267,7 +267,7 @@
   </block>
 
   <!-- 全屏：达人标签 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'tag'}}">
+  <block wx:if="{{pickerView === 'tag'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -295,7 +295,7 @@
   </block>
 
   <!-- 全屏：招募城市 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'city'}}">
+  <block wx:if="{{pickerView === 'city'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -360,7 +360,7 @@
   </block>
 
   <!-- 全屏：带货等级 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'reqLevel'}}">
+  <block wx:if="{{pickerView === 'reqLevel'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -388,7 +388,7 @@
   </block>
 
   <!-- 全屏：费用模式 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'fee'}}">
+  <block wx:if="{{pickerView === 'fee'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -416,7 +416,7 @@
   </block>
 
   <!-- 全屏：阶梯等级 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'tierLevel'}}">
+  <block wx:if="{{pickerView === 'tierLevel'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -444,7 +444,7 @@
   </block>
 
   <!-- 全屏：粉丝档位 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'fansTier'}}">
+  <block wx:if="{{pickerView === 'fansTier'}}">
     <view class="pub-full pub-full--pick">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -466,7 +466,7 @@
   </block>
 
   <!-- 全屏：达人报名必填信息 -->
-  <block wx:elif="{{step === 'form' && pickerView === 'applyForm'}}">
+  <block wx:if="{{pickerView === 'applyForm'}}">
     <view class="pub-full pub-full--pick pub-full--apply-form">
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
@@ -553,6 +553,9 @@
           <view class="picker-val picker-val--placeholder">{{item.placeholder || '请填写'}}</view>
         </view>
       </scroll-view>
+    </view>
+  </block>
+
     </view>
   </block>
 

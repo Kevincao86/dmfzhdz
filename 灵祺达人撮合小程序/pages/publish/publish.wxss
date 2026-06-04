@@ -15,6 +15,22 @@
   background: linear-gradient(180deg, #dde4ff 0%, #ede9fe 28%, #f5f3ff 60%, #faf8ff 100%);
 }
 
+.pub-form-host {
+  position: relative;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.pub-form-host > .pub-full {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+}
+
 .pub-screen {
   position: relative;
   height: 100vh;
