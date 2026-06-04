@@ -72,7 +72,7 @@ export default function LandingPage() {
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
                   LingQi Talent Fulfillment
                 </p>
-                <p className="text-base font-bold sm:text-lg">灵祺达人履约管理后台</p>
+                <p className="text-base font-bold sm:text-lg">灵祺撮合履约平台</p>
               </div>
             </div>
             <button

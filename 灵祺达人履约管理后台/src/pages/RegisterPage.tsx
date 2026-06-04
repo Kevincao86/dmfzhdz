@@ -13,6 +13,14 @@ function normalizePhone(raw: string) {
   return /^1\d{10}$/.test(digits) ? digits : ''
 }
 
+function formatMpApiErr(e: unknown, fallback: string) {
+  const msg = e instanceof Error ? e.message : fallback
+  if (/Unexpected end of JSON input/i.test(msg)) return '接口无有效响应，请检查 VITE_MP_API_BASE 或本地 dev 服务'
+  if (/sms_not_configured/i.test(msg)) return '短信服务未配置，请联系管理员'
+  if (/invalid_sms|sms_invalid/i.test(msg)) return '验证码错误或已过期'
+  return msg || fallback
+}
+
 export default function RegisterPage() {
   const nav = useNavigate()
   const [params] = useSearchParams()
@@ -46,7 +54,7 @@ export default function RegisterPage() {
         })
       }, 1000)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '验证码发送失败')
+      setErr(formatMpApiErr(e, '验证码发送失败'))
     }
   }
 
@@ -83,7 +91,7 @@ export default function RegisterPage() {
       setActiveRole(role)
       nav('/hall', { replace: true })
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '注册失败'
+      const msg = formatMpApiErr(e, '注册失败')
       setErr(msg.includes('login_name_taken') ? '该手机号已被注册' : msg)
     } finally {
       setLoading(false)

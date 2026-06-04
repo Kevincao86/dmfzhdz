@@ -3,8 +3,36 @@ import { getToken } from './mpSession'
 
 const API_BASE = (import.meta.env.VITE_MP_API_BASE as string | undefined)?.replace(/\/$/, '') || ''
 
+function apiUrl(path: string) {
+  if (!API_BASE && import.meta.env.PROD) {
+    throw new Error('未配置 VITE_MP_API_BASE，请在 Vercel 设置如 https://mofangdianai.com/erp-api 后重新部署')
+  }
+  return `${API_BASE}${path}`
+}
+
+async function parseJsonRes(res: Response) {
+  const text = await res.text()
+  if (!text.trim()) {
+    throw new Error(
+      API_BASE
+        ? `接口返回为空（HTTP ${res.status}）`
+        : '接口返回为空：生产环境请配置 VITE_MP_API_BASE；本地请用 npm run dev 启动',
+    )
+  }
+  try {
+    return JSON.parse(text) as Record<string, unknown>
+  } catch {
+    throw new Error(`接口返回非 JSON（HTTP ${res.status}）`)
+  }
+}
+
+function throwApiError(data: Record<string, unknown>, status: number) {
+  const msg = String(data.message || data.error || data.detail || `http_${status}`)
+  throw new Error(msg)
+}
+
 async function mpAuthRequest(action: string, body: Record<string, unknown> = {}) {
-  const res = await fetch(`${API_BASE}/api/meoo-ops-mp-auth`, {
+  const res = await fetch(apiUrl('/api/meoo-ops-mp-auth'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -12,10 +40,8 @@ async function mpAuthRequest(action: string, body: Record<string, unknown> = {})
     },
     body: JSON.stringify({ action, ...body }),
   })
-  const data = (await res.json()) as Record<string, unknown>
-  if (!res.ok || data.ok === false) {
-    throw new Error(String(data.error || `http_${res.status}`))
-  }
+  const data = await parseJsonRes(res)
+  if (!res.ok || data.ok === false) throwApiError(data, res.status)
   return data
 }
 
@@ -39,8 +65,8 @@ export async function scanCreate() {
 
 export async function scanPoll(ticket: string) {
   const q = new URLSearchParams({ action: 'scan_poll', ticket })
-  const res = await fetch(`${API_BASE}/api/meoo-ops-mp-auth?${q}`)
-  const data = (await res.json()) as Record<string, unknown>
+  const res = await fetch(apiUrl(`/api/meoo-ops-mp-auth?${q}`))
+  const data = await parseJsonRes(res)
   if (!res.ok || data.ok === false) throw new Error(String(data.error))
   return {
     status: String(data.status),
@@ -70,13 +96,13 @@ export async function setLoginCredentials(loginName: string, password?: string) 
 }
 
 export async function sendRegisterSms(phone: string) {
-  const res = await fetch(`${API_BASE}/api/meoo-auth-sms-send`, {
+  const res = await fetch(apiUrl('/api/meoo-auth-sms-send'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone: phone.trim() }),
   })
-  const data = (await res.json()) as Record<string, unknown>
-  if (!res.ok || data.ok === false) throw new Error(String(data.message || data.error || 'send_failed'))
+  const data = await parseJsonRes(res)
+  if (!res.ok || data.ok === false) throwApiError(data, res.status)
   return data
 }
 
@@ -98,21 +124,12 @@ export async function phoneRegister(input: {
   }
 }
 
-async function parseJsonRes(res: Response) {
-  const text = await res.text()
-  try {
-    return JSON.parse(text) as Record<string, unknown>
-  } catch {
-    throw new Error('response_not_json')
-  }
-}
-
 export async function fetchMpRegistry() {
   const paths = ['/api/meoo-ops-mp-hall-registry', '/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
   let lastErr = 'registry_failed'
   for (const path of paths) {
     try {
-      const res = await fetch(`${API_BASE}${path}`)
+      const res = await fetch(apiUrl(path))
       const data = await parseJsonRes(res)
       if (!res.ok || data.ok === false) {
         lastErr = String(data.error || data.detail || `http_${res.status}`)
@@ -132,7 +149,7 @@ export async function fetchHallRegistry() {
 }
 
 export async function postMpRecruitmentAi(body: Record<string, unknown>) {
-  const res = await fetch(`${API_BASE}/api/meoo-mp-recruitment-ai`, {
+  const res = await fetch(apiUrl('/api/meoo-mp-recruitment-ai'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(getToken() ? { 'X-Mp-Session': getToken() } : {}) },
     body: JSON.stringify(body),
@@ -153,7 +170,7 @@ async function postMpWithFallback(paths: string[], body: Record<string, unknown>
   let lastErr = 'request_failed'
   for (const path of paths) {
     try {
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await fetch(apiUrl(path), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(getToken() ? { 'X-Mp-Session': getToken() } : {}) },
         body: JSON.stringify(body),
