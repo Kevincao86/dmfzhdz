@@ -6,11 +6,11 @@ import { getLoginRolePref, getToken, setLoginRolePref, type MpAccountRole } from
 import RoleEditionToggle from '../components/RoleEditionToggle'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingRolePicker from './landing/LandingRolePicker'
+import LandingSection3 from './landing/LandingSection3'
 import {
   MARKETING_BY_ROLE,
   ROLE_LABEL,
   SECTION2_CARDS,
-  SECTION3_STEPS,
   SECTION4_STEPS,
 } from './landing/landingCopy'
 
@@ -75,12 +75,6 @@ export default function LandingPage() {
                 <p className="text-base font-bold sm:text-lg">灵祺达人履约管理后台</p>
               </div>
             </div>
-            <nav className="hidden items-center gap-6 text-sm text-white/80 md:flex">
-              <span className="cursor-default hover:text-white">AI 撮合</span>
-              <span className="cursor-default hover:text-white">履约大厅</span>
-              <span className="cursor-default hover:text-white">PR 发单</span>
-              <span className="cursor-default hover:text-white">帮助中心</span>
-            </nav>
             <button
               type="button"
               onClick={() => setLoginPickerOpen(true)}
@@ -172,55 +166,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* —— 第 3 屏：三步增长 —— */}
-        <section className="relative flex h-[100dvh] shrink-0 snap-start snap-always flex-col items-center justify-center overflow-hidden px-4 py-16">
-          <div
-            className="pointer-events-none absolute inset-0"
-            aria-hidden
-            style={{
-              background: `
-                radial-gradient(ellipse 50% 40% at 50% 0%, rgba(99, 102, 241, 0.25), transparent),
-                linear-gradient(180deg, #0c0a1a 0%, #1a1035 45%, #2d1b4e 100%)
-              `,
-            }}
-          />
-          <div
-            className="pointer-events-none absolute inset-0 opacity-40"
-            style={{
-              backgroundImage: `radial-gradient(1px 1px at 20% 30%, white, transparent),
-                radial-gradient(1px 1px at 60% 70%, white, transparent),
-                radial-gradient(1px 1px at 80% 20%, white, transparent)`,
-              backgroundSize: '200px 200px',
-            }}
-            aria-hidden
-          />
-          <h2 className="relative z-10 text-center text-2xl font-extrabold sm:text-4xl">
-            简单高效
-            <span className="bg-gradient-to-r from-violet-300 via-pink-300 to-cyan-300 bg-clip-text text-transparent">
-              {' '}
-              助推履约增长
-            </span>
-          </h2>
-          <div className="relative z-10 mt-12 grid w-full max-w-5xl grid-cols-1 gap-5 md:grid-cols-3">
-            {SECTION3_STEPS.map((step) => (
-              <div
-                key={step.n}
-                className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md"
-              >
-                <span
-                  className={cn(
-                    'inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br text-sm font-bold text-white',
-                    step.color,
-                  )}
-                >
-                  {step.n}
-                </span>
-                <p className="mt-4 text-xs text-white/55">{step.sub}</p>
-                <p className="mt-2 text-lg font-bold">{step.title}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <LandingSection3 />
 
         {/* —— 第 4 屏：达人资源 + 流程 —— */}
         <section className="relative flex h-[100dvh] shrink-0 snap-start snap-always items-center overflow-hidden px-4 py-12 sm:px-8 lg:px-12">
