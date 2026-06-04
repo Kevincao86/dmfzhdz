@@ -1,4 +1,4 @@
-import { normalizeCnMobile } from '../vite-plugins/authRegistrationOtp.js'
+import { normalizeCnMobile } from '../../vite-plugins/authRegistrationOtp.js'
 
 /** 履约/小程序账号：优先大陆手机号作为 login_name */
 export function normalizeMpLoginPhone(raw: string): string | null {

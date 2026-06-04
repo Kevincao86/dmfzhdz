@@ -152,7 +152,7 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string) {
   lines.push('招募详情：')
   const recruitDetail = String(f.recruitDetail || '').trim()
   if (recruitDetail) lines.push(recruitDetail)
-  if (mode.hall === 'ice' && String(f.iceVideoUrl || '').trim()) {
+  if (recruitModeId === 'ice' && String(f.iceVideoUrl || '').trim()) {
     lines.push(`云剪成片链接：${String(f.iceVideoUrl).trim()}`)
   }
   return lines.join('\n')
