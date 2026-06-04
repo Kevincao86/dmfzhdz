@@ -52,8 +52,9 @@
           <view class="orbit__slide">
             <image
               class="orbit__viewer-img"
-              src="{{item.src}}"
-              mode="aspectFit"
+              src="{{item.hdSrc}}"
+              mode="widthFix"
+              data-slide-index="{{slideIndex}}"
               show-menu-by-longpress="{{true}}"
               binderror="onImgError"
             />

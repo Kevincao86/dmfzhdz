@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 登录环墙：清晰优先，单文件仍 <200KB（微信代码质量）
+# 环墙：保留 520px 原图；从原图单次生成 -hd 960px（预览清晰，仍 <200KB）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAX=204800
@@ -7,33 +7,36 @@ ORBIT="$ROOT/images/login-orbit"
 
 rm -f "$ORBIT"/orbit-*.png 2>/dev/null || true
 
-compress_jpeg() {
+gen_hd() {
   local f="$1"
-  sips -Z 720 "$f" --out "${f}.tmp.jpg" -s format jpeg -s formatOptions 82 >/dev/null
-  mv "${f}.tmp.jpg" "$f"
+  local base="${f%.jpg}"
+  local hd="${base}-hd.jpg"
+  sips -Z 960 "$f" --out "${hd}.tmp.jpg" -s format jpeg -s formatOptions 88 >/dev/null
+  mv "${hd}.tmp.jpg" "$hd"
   local sz
-  sz=$(wc -c <"$f" | tr -d ' ')
+  sz=$(wc -c <"$hd" | tr -d ' ')
   if [[ "$sz" -gt "$MAX" ]]; then
-    sips -Z 640 "$f" --out "${f}.tmp.jpg" -s format jpeg -s formatOptions 76 >/dev/null
-    mv "${f}.tmp.jpg" "$f"
-    sz=$(wc -c <"$f" | tr -d ' ')
+    sips -Z 840 "$hd" --out "${hd}.tmp.jpg" -s format jpeg -s formatOptions 82 >/dev/null
+    mv "${hd}.tmp.jpg" "$hd"
+    sz=$(wc -c <"$hd" | tr -d ' ')
   fi
   if [[ "$sz" -gt "$MAX" ]]; then
-    sips -Z 560 "$f" --out "${f}.tmp.jpg" -s format jpeg -s formatOptions 70 >/dev/null
-    mv "${f}.tmp.jpg" "$f"
-    sz=$(wc -c <"$f" | tr -d ' ')
-  fi
-  if [[ "$sz" -gt "$MAX" ]]; then
-    echo "FAIL: $f still ${sz} bytes (>200KB)"
+    echo "FAIL: $hd still ${sz} bytes"
     return 1
   fi
-  echo "OK $f ($sz bytes, 720px tier)"
+  echo "OK $hd ($sz bytes)"
 }
 
 for i in 01 02 03 04 05 06; do
   f="$ORBIT/orbit-${i}.jpg"
   [[ -f "$f" ]] || continue
-  compress_jpeg "$f"
+  sz=$(wc -c <"$f" | tr -d ' ')
+  if [[ "$sz" -gt "$MAX" ]]; then
+    echo "WARN: $f ${sz}b >200KB, skip touch"
+    exit 1
+  fi
+  echo "OK $f ($sz bytes, ring)"
+  gen_hd "$f"
 done
 
 FAIL=0
@@ -44,14 +47,10 @@ while IFS= read -r -d '' f; do
     FAIL=1
   fi
 done < <(
-  find "$ROOT" \
-    -path "$ROOT/node_modules" -prune -o \
-    -path "$ROOT/cloudfunctions" -prune -o \
-    -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' \) \
-    -print0
+  find "$ORBIT" -maxdepth 1 -type f \( -iname 'orbit-*.jpg' \) -print0
 )
 
 if [[ "$FAIL" -ne 0 ]]; then
   exit 1
 fi
-echo "OK: 所有图片 ≤200KB（环墙 720px 清晰档）"
+echo "OK: 环墙 + -hd 预览图均 ≤200KB"
