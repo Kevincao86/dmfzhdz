@@ -6,6 +6,31 @@ function buildFaces(images) {
   return list.map((src, i) => ({ src, deg: Math.round(step * i * 10) / 10 }))
 }
 
+function resolvePreviewPaths(urls, cb) {
+  const list = urls.filter(Boolean)
+  if (!list.length) {
+    cb([], '')
+    return
+  }
+  const paths = new Array(list.length)
+  let pending = list.length
+  list.forEach((src, i) => {
+    wx.getImageInfo({
+      src,
+      success: (res) => {
+        paths[i] = res.path || src
+        pending -= 1
+        if (pending === 0) cb(paths, paths[0])
+      },
+      fail: () => {
+        paths[i] = src
+        pending -= 1
+        if (pending === 0) cb(paths, paths[0])
+      },
+    })
+  })
+}
+
 Component({
   properties: {
     images: {
@@ -20,7 +45,7 @@ Component({
 
   data: {
     yaw: 0,
-    radiusPx: 100,
+    radiusPx: 120,
     faces: [],
     ringSnap: false,
   },
@@ -37,7 +62,7 @@ Component({
         const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
         const rpx = win.windowWidth / 750
         this.setData({
-          radiusPx: Math.round(228 * rpx),
+          radiusPx: Math.round(300 * rpx),
           faces: buildFaces(this.properties.images),
         })
       } catch (_) {
@@ -59,18 +84,30 @@ Component({
       })
     },
 
+    _touchIndex(e) {
+      const t = e.target || {}
+      const ds = t.dataset || {}
+      if (ds.index !== undefined && ds.index !== '') return Number(ds.index)
+      const id = String(t.id || '')
+      const m = id.match(/orbit-card-(\d+)/)
+      return m ? Number(m[1]) : -1
+    },
+
     onTouchStart(e) {
       if (this._inertiaTimer) {
         clearInterval(this._inertiaTimer)
         this._inertiaTimer = null
       }
       const t = e.touches[0]
+      const faceIndex = this._touchIndex(e)
       this._drag = {
         x: t.clientX,
         y0: this.data.yaw,
         vx: 0,
         lastX: t.clientX,
         lastT: Date.now(),
+        moved: 0,
+        faceIndex: faceIndex >= 0 ? faceIndex : -1,
       }
       this.setData({ ringSnap: false })
     },
@@ -79,18 +116,24 @@ Component({
       if (!this._drag) return
       const t = e.touches[0]
       const now = Date.now()
-      const dx = t.clientX - this._drag.x
+      const dx = t.clientX - this._drag.lastX
+      this._drag.moved += Math.abs(dx)
       const dt = Math.max(now - this._drag.lastT, 1)
-      this._drag.vx = (t.clientX - this._drag.lastX) / dt
+      this._drag.vx = dx / dt
       this._drag.lastX = t.clientX
       this._drag.lastT = now
-      this._setYaw(this._drag.y0 + dx * 0.42, false)
+      this._setYaw(this._drag.y0 + (t.clientX - this._drag.x) * 0.42, false)
     },
 
     onTouchEnd() {
-      if (!this._drag) return
-      let vx = this._drag.vx || 0
+      const drag = this._drag
       this._drag = null
+      if (!drag) return
+      if (drag.moved < 14 && drag.faceIndex >= 0) {
+        this._openPreview(drag.faceIndex)
+        return
+      }
+      const vx = drag.vx || 0
       if (Math.abs(vx) < 0.08) return
       let spin = vx * 18
       this._inertiaTimer = setInterval(() => {
@@ -104,12 +147,31 @@ Component({
       }, 16)
     },
 
-    onPreview(e) {
-      const index = Number(e.currentTarget.dataset.index)
+    _openPreview(index) {
       const urls = (this.properties.images || []).filter(Boolean)
       if (!urls.length) return
-      const current = urls[index] || urls[0]
-      wx.previewImage({ urls, current })
+      const i = Math.max(0, Math.min(index, urls.length - 1))
+      resolvePreviewPaths(urls, (paths, fallback) => {
+        const list = paths.filter(Boolean)
+        if (!list.length) {
+          wx.showToast({ title: '图片加载失败', icon: 'none' })
+          return
+        }
+        wx.previewImage({
+          urls: list,
+          current: list[i] || fallback || list[0],
+          showmenu: true,
+          fail: () => {
+            wx.showToast({ title: '无法预览大图', icon: 'none' })
+          },
+        })
+      })
+    },
+
+    onPreview(e) {
+      const index = Number(e.currentTarget.dataset.index)
+      if (!Number.isFinite(index)) return
+      this._openPreview(index)
     },
   },
 })

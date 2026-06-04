@@ -117,25 +117,5 @@
   <view class="login-orbit-zone">
     <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
   </view>
-
-  <view class="login-fill">
-    <view class="login-steps">
-      <view
-        class="login-step"
-        wx:for="{{promoSteps}}"
-        wx:key="title"
-        wx:for-index="index"
-      >
-        <view class="login-step__n">{{item.n}}</view>
-        <text class="login-step__title">{{item.title}}</text>
-        <text class="login-step__sub">{{item.sub}}</text>
-        <view class="login-step__line" wx:if="{{index < 2}}" aria-hidden="true" />
-      </view>
-    </view>
-    <view class="login-trust">
-      <text class="login-trust__dot" />
-      <text class="login-trust__text">安全登录 · 一微信一灵祺 ID · 达人/PR 数据互通</text>
-    </view>
-  </view>
   </view>
 </view>
