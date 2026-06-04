@@ -16,6 +16,7 @@ const accountMemberSync = require('../../utils/accountMemberSync.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
 const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
+const accountSessionActions = require('../../utils/accountSessionActions.js')
 const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
@@ -144,6 +145,12 @@ Page({
   onNicknameInput(e) {
     const nick = e.detail.value || ''
     this.setData({ wxNickName: nick })
+  },
+  onSwitchAccount() {
+    accountSessionActions.switchAccount()
+  },
+  onLogoutAccount() {
+    accountSessionActions.logout()
   },
   onProvinceChange(e) {
     onProvincePick(this, e)

@@ -7,6 +7,7 @@ function getTabList(identity) {
       pagePath: '/pages/recommend/recommend',
       text: isPr ? '推荐达人' : '推荐商单',
       icon: 'star',
+      aiBadge: true,
     },
   ]
   if (isPr) {

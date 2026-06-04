@@ -78,8 +78,8 @@
 
     <view wx:if="{{sessions.length === 0}}" class="msg-empty">
       <text class="msg-empty-icon">💬</text>
-      <text class="empty-title">{{emptyTitle}}</text>
-      <text class="hint">{{emptyHint}}</text>
+      <text class="msg-empty-title">{{emptyTitle}}</text>
+      <text class="msg-empty-hint" wx:if="{{emptyHint}}">{{emptyHint}}</text>
     </view>
 
     <view wx:if="{{showDevTest}}" class="msg-dev-bar">

@@ -42,7 +42,7 @@
       <input
         class="input"
         type="number"
-        placeholder="便于商家联系"
+        placeholder="便于招募方联系"
         value="{{contact}}"
         data-k="contact"
         bindinput="onCommonField"
@@ -200,4 +200,6 @@
       保存资料
     </button>
   </view>
+
+  <include src="../../partials/account-session-actions.wxml" />
 </view>

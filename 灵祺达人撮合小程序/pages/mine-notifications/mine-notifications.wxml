@@ -13,14 +13,14 @@
   </view>
 
   <view wx:if="{{totalCount === 0}}" class="card state-empty ntf-empty">
-    <text class="empty-title">暂无通知</text>
-    <text class="hint">{{emptyHint || '发单、报名、PR 入选通知会显示在这里；请下拉刷新'}}</text>
+    <text class="ntf-empty-title">暂无通知</text>
+    <text class="ntf-empty-hint">{{emptyHint || '发单、报名、PR 入选通知会显示在这里；请下拉刷新'}}</text>
   </view>
 
   <block wx:elif="{{sections.length === 0}}">
     <view class="card state-empty ntf-empty">
-      <text class="empty-title">该分类暂无消息</text>
-      <text class="hint">可切换到「全部」查看其他通知</text>
+      <text class="ntf-empty-title">该分类暂无消息</text>
+      <text class="ntf-empty-hint">可切换到「全部」查看其他通知</text>
     </view>
   </block>
 

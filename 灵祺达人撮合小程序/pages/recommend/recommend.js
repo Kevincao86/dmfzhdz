@@ -295,7 +295,7 @@ Page({
       talentCity,
       orderCityHint: talentCity
         ? '已按您的资料智能匹配商单，高契合优先展示'
-        : '完善达人资料后，将为您智能匹配并置顶高契合商单',
+        : '完善达人资料后，AI将根据您的信息为您匹配并置顶符合高契合度商单',
       prMatchHint: talentTestMode ? talentTestHint : '',
     })
     if (userProfile.readIdentity() === 'pr') {

@@ -1,0 +1,4 @@
+<view class="account-session-actions">
+  <button class="account-session-btn" bindtap="onSwitchAccount">切换账号</button>
+  <button class="account-session-btn account-session-btn--ghost" bindtap="onLogoutAccount">退出登录</button>
+</view>

@@ -57,6 +57,27 @@
   margin-top: 80rpx;
   text-align: center;
   padding: 48rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.ntf-empty-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.ntf-empty-hint {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 400;
+  color: #6b7280;
+  line-height: 1.65;
+  max-width: 560rpx;
 }
 
 .ntf-section {

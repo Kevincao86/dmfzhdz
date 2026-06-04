@@ -1,35 +1,115 @@
 <view class="login-page">
-  <view class="login-hero">
-    <view class="login-hero__glow" aria-hidden="true" />
-    <image class="login-logo" src="/images/logo.png" mode="aspectFit" />
-    <text class="login-brand">灵祺撮合平台</text>
-    <text class="login-tagline">本地生活 · 探店种草 · 云剪直派</text>
-  </view>
-
-  <view class="login-card">
-    <view class="login-tabs">
-      <view class="login-tab {{tab==='wx'?'login-tab--on':''}}" bindtap="onTabWx">微信登录</view>
-      <view class="login-tab {{tab==='pwd'?'login-tab--on':''}}" bindtap="onTabPwd">账号密码</view>
+  <view class="login-top lq-hero-header" style="{{navBandStyle}}">
+    <view class="lq-hero-bg lq-hero-bg--login" aria-hidden="true">
+      <view class="lq-hero-bg__pattern" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
+      <view class="lq-hero-bg__mesh" />
+      <view class="lq-hero-bg__ring lq-hero-bg__ring--1" />
+      <view class="lq-hero-bg__ring lq-hero-bg__ring--2" />
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--ai">AI</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--shop">探店</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--clip">云剪</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--spark">✦</text>
     </view>
 
-    <block wx:if="{{tab==='wx'}}">
-      <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onWxLogin">
-        微信一键登录
-      </button>
-    </block>
+    <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
+      <view class="login-nav-row">
+        <text class="login-nav-title">登录</text>
+      </view>
+      <view class="login-brand-row">
+        <image class="login-logo" src="/images/logo.png" mode="aspectFit" />
+        <view class="login-hero-text">
+          <text class="login-brand">灵祺撮合平台</text>
+          <view class="login-chips">
+            <text class="login-chip">本地生活</text>
+            <text class="login-chip">探店种草</text>
+            <text class="login-chip">云剪直派</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="login-top-fade" aria-hidden="true" />
+  </view>
 
-    <block wx:else>
-      <input class="login-input" placeholder="在「我的信息」中设置的登录名" value="{{loginName}}" bindinput="onLoginName" />
-      <input
-        class="login-input"
-        password
-        placeholder="密码（至少 6 位）"
-        value="{{password}}"
-        bindinput="onPassword"
-      />
-      <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onPwdLogin">登录</button>
-    </block>
+  <view class="login-stack">
+    <view class="login-shell">
+      <view class="login-main">
+        <view class="login-tabs lq-gradient-tabs">
+          <view
+            class="login-tab lq-gradient-tabs__item {{tab==='wx'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            bindtap="onTabWx"
+          >
+            微信登录
+          </view>
+          <view
+            class="login-tab lq-gradient-tabs__item {{tab==='pwd'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            bindtap="onTabPwd"
+          >
+            账号密码
+          </view>
+        </view>
 
-    <text class="login-err" wx:if="{{err}}">{{err}}</text>
+        <block wx:if="{{tab==='wx'}}">
+          <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onWxLogin">
+            <text class="login-btn-icon">◎</text>
+            <text>微信一键登录</text>
+          </button>
+          <text class="login-hint">首次登录将绑定本微信，生成唯一灵祺 ID</text>
+        </block>
+
+        <block wx:else>
+          <view class="login-field">
+            <text class="login-field-label">登录名</text>
+            <input
+              class="login-input"
+              placeholder="在「我的信息」中设置"
+              value="{{loginName}}"
+              bindinput="onLoginName"
+            />
+          </view>
+          <view class="login-field">
+            <text class="login-field-label">密码</text>
+            <input
+              class="login-input"
+              password
+              placeholder="至少 6 位"
+              value="{{password}}"
+              bindinput="onPassword"
+            />
+          </view>
+          <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onPwdLogin">登录</button>
+        </block>
+
+        <text class="login-err" wx:if="{{err}}">{{err}}</text>
+      </view>
+
+      <view class="login-spark">
+        <view class="login-spark-head">
+          <view class="login-spark-orb">
+            <text class="login-spark-orb__txt">AI</text>
+            <view class="login-spark-orb__ring" aria-hidden="true" />
+          </view>
+          <view class="login-spark-copy">
+            <text class="login-spark-title">智能撮合</text>
+            <text class="login-spark-sub">{{promoLead}}</text>
+          </view>
+        </view>
+
+        <scroll-view class="login-spark-track" scroll-x enable-flex show-scrollbar="{{false}}">
+          <view
+            class="login-spark-pill login-spark-pill--{{index}}"
+            wx:for="{{promoPills}}"
+            wx:key="tag"
+            wx:for-index="index"
+          >
+            <text class="login-spark-pill__tag">{{item.tag}}</text>
+            <text class="login-spark-pill__text">{{item.text}}</text>
+          </view>
+        </scroll-view>
+
+        <text class="login-spark-flow">{{promoFlow}}</text>
+      </view>
+    </view>
   </view>
 </view>
