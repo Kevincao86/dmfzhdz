@@ -6,31 +6,6 @@ function buildFaces(images) {
   return list.map((src, i) => ({ src, deg: Math.round(step * i * 10) / 10 }))
 }
 
-function resolvePreviewPaths(urls, cb) {
-  const list = urls.filter(Boolean)
-  if (!list.length) {
-    cb([], '')
-    return
-  }
-  const paths = new Array(list.length)
-  let pending = list.length
-  list.forEach((src, i) => {
-    wx.getImageInfo({
-      src,
-      success: (res) => {
-        paths[i] = res.path || src
-        pending -= 1
-        if (pending === 0) cb(paths, paths[0])
-      },
-      fail: () => {
-        paths[i] = src
-        pending -= 1
-        if (pending === 0) cb(paths, paths[0])
-      },
-    })
-  })
-}
-
 Component({
   properties: {
     images: {
@@ -39,7 +14,7 @@ Component({
     },
     hint: {
       type: String,
-      value: '左右滑动旋转 · 点击查看大图',
+      value: '左右滑动旋转达人样片 · 点击查看大图',
     },
   },
 
@@ -48,11 +23,18 @@ Component({
     radiusPx: 120,
     faces: [],
     ringSnap: false,
+    expanded: false,
+    expandedIndex: 0,
+    faceCount: 0,
   },
 
   observers: {
     images(imgs) {
-      this.setData({ faces: buildFaces(imgs) })
+      const faces = buildFaces(imgs)
+      this.setData({
+        faces,
+        faceCount: faces.length,
+      })
     },
   },
 
@@ -61,12 +43,15 @@ Component({
       try {
         const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
         const rpx = win.windowWidth / 750
+        const faces = buildFaces(this.properties.images)
         this.setData({
           radiusPx: Math.round(300 * rpx),
-          faces: buildFaces(this.properties.images),
+          faces,
+          faceCount: faces.length,
         })
       } catch (_) {
-        this.setData({ faces: buildFaces(this.properties.images) })
+        const faces = buildFaces(this.properties.images)
+        this.setData({ faces, faceCount: faces.length })
       }
       this._drag = null
       this._inertiaTimer = null
@@ -78,22 +63,18 @@ Component({
 
   methods: {
     _setYaw(yaw, snap) {
-      this.setData({
-        yaw,
-        ringSnap: !!snap,
-      })
+      this.setData({ yaw, ringSnap: !!snap })
     },
 
     _touchIndex(e) {
       const t = e.target || {}
       const ds = t.dataset || {}
       if (ds.index !== undefined && ds.index !== '') return Number(ds.index)
-      const id = String(t.id || '')
-      const m = id.match(/orbit-card-(\d+)/)
-      return m ? Number(m[1]) : -1
+      return -1
     },
 
     onTouchStart(e) {
+      if (this.data.expanded) return
       if (this._inertiaTimer) {
         clearInterval(this._inertiaTimer)
         this._inertiaTimer = null
@@ -113,7 +94,7 @@ Component({
     },
 
     onTouchMove(e) {
-      if (!this._drag) return
+      if (!this._drag || this.data.expanded) return
       const t = e.touches[0]
       const now = Date.now()
       const dx = t.clientX - this._drag.lastX
@@ -128,9 +109,9 @@ Component({
     onTouchEnd() {
       const drag = this._drag
       this._drag = null
-      if (!drag) return
+      if (!drag || this.data.expanded) return
       if (drag.moved < 14 && drag.faceIndex >= 0) {
-        this._openPreview(drag.faceIndex)
+        this._openExpand(drag.faceIndex)
         return
       }
       const vx = drag.vx || 0
@@ -147,31 +128,37 @@ Component({
       }, 16)
     },
 
-    _openPreview(index) {
-      const urls = (this.properties.images || []).filter(Boolean)
-      if (!urls.length) return
-      const i = Math.max(0, Math.min(index, urls.length - 1))
-      resolvePreviewPaths(urls, (paths, fallback) => {
-        const list = paths.filter(Boolean)
-        if (!list.length) {
-          wx.showToast({ title: '图片加载失败', icon: 'none' })
-          return
-        }
-        wx.previewImage({
-          urls: list,
-          current: list[i] || fallback || list[0],
-          showmenu: true,
-          fail: () => {
-            wx.showToast({ title: '无法预览大图', icon: 'none' })
-          },
-        })
+    _openExpand(index) {
+      const n = this.data.faceCount || this.data.faces.length
+      if (!n) return
+      const i = Math.max(0, Math.min(index, n - 1))
+      this.setData({
+        expanded: true,
+        expandedIndex: i,
       })
+      this.triggerEvent('expand', { index: i })
     },
 
-    onPreview(e) {
+    onOpenExpand(e) {
       const index = Number(e.currentTarget.dataset.index)
       if (!Number.isFinite(index)) return
-      this._openPreview(index)
+      this._openExpand(index)
+    },
+
+    onCloseExpand() {
+      this.setData({ expanded: false })
+      this.triggerEvent('collapse')
+    },
+
+    onSwiperChange(e) {
+      const idx = e.detail && e.detail.current
+      if (typeof idx === 'number') {
+        this.setData({ expandedIndex: idx })
+      }
+    },
+
+    onImgError() {
+      wx.showToast({ title: '图片加载失败', icon: 'none' })
     },
   },
 })
