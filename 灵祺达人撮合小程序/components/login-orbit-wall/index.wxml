@@ -10,6 +10,7 @@
     <block wx:if="{{!expanded}}">
       <view
         class="orbit__ring-wrap"
+        data-yaw="{{yaw}}"
         bindtouchstart="{{ot.start}}"
         bindtouchmove="{{ot.move}}"
         bindtouchend="{{ot.end}}"

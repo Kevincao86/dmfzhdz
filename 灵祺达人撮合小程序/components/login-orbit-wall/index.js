@@ -77,23 +77,25 @@ Component({
       this.setData({ ringSnap: false })
     },
 
-    /** WXS 拖动结束：同步角度 + 可选惯性滑行（单次 CSS 过渡） */
+    /** WXS 拖动结束：吸附到正面卡位并写回 data（与 WXS state 一致） */
     orbitDragEnd(e) {
       const detail = e || {}
-      const base = Number(detail.yaw) || 0
-      const coast = Number(detail.coast) || 0
-      const yaw = base + coast
+      const n = this.data.faceCount || this.data.faces.length || 6
+      const step = 360 / n
+      let yaw = Number(detail.yaw) || 0
+      yaw = ((yaw % 360) + 360) % 360
+      yaw = Math.round(yaw / step) * step
       const ringTransform = yawTransform(yaw)
+      if (this._snapTimer) clearTimeout(this._snapTimer)
       this.setData({
         yaw,
         ringTransform,
-        ringSnap: Math.abs(coast) > 0.5,
+        ringSnap: true,
       })
-      if (this._snapTimer) clearTimeout(this._snapTimer)
       this._snapTimer = setTimeout(() => {
         this.setData({ ringSnap: false })
         this._snapTimer = null
-      }, 480)
+      }, 320)
     },
 
     orbitOpenExpand(e) {

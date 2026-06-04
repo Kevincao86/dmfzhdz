@@ -1,9 +1,26 @@
-/** 环墙旋转：拖动过程不走 setData，避免卡顿抖动 */
-var DEG_PER_PX = 0.36
-var TAP_MOVE_PX = 12
+/** 环墙旋转：拖动走 WXS，角度限制在正面可见范围 */
+var DEG_PER_PX = 0.32
+var TAP_MOVE_PX = 16
+var FACE_COUNT = 6
+var STEP = 360 / FACE_COUNT
+
+function snapYaw(yaw) {
+  var y = Number(yaw) || 0
+  y = ((y % 360) + 360) % 360
+  return Math.round(y / STEP) * STEP
+}
 
 function ringStyle(yaw) {
   return 'transform: rotateY(' + yaw + 'deg);transition:none;'
+}
+
+function readYawFromEvent(event, state) {
+  var ds = event.currentTarget && event.currentTarget.dataset
+  if (ds && ds.yaw !== undefined && ds.yaw !== '') {
+    var parsed = parseFloat(ds.yaw)
+    if (parsed === parsed) return parsed
+  }
+  return state.yaw || 0
 }
 
 function touchStart(event, ownerInstance) {
@@ -16,16 +33,18 @@ function touchStart(event, ownerInstance) {
     faceIndex = parseInt(ds.index, 10)
     if (faceIndex !== faceIndex) faceIndex = -1
   }
+  var yaw0 = readYawFromEvent(event, state)
   state.dragging = 1
   state.startX = touch.pageX
-  state.startYaw = state.yaw || 0
+  state.startYaw = yaw0
+  state.yaw = yaw0
   state.lastX = touch.pageX
   state.lastStamp = event.timeStamp
   state.moved = 0
   state.vx = 0
   state.faceIndex = faceIndex
   ownerInstance.callMethod('orbitDragStart', {})
-  ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(state.startYaw))
+  ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(yaw0))
 }
 
 function touchMove(event, ownerInstance) {
@@ -37,12 +56,10 @@ function touchMove(event, ownerInstance) {
   var step = touch.pageX - state.lastX
   state.moved = (state.moved || 0) + (step < 0 ? -step : step)
   var dt = event.timeStamp - state.lastStamp
-  if (dt > 0) {
-    state.vx = step / dt
-  }
+  if (dt > 0) state.vx = step / dt
   state.lastX = touch.pageX
   state.lastStamp = event.timeStamp
-  var yaw = state.startYaw + dx * DEG_PER_PX
+  var yaw = snapYaw(state.startYaw + dx * DEG_PER_PX)
   state.yaw = yaw
   ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(yaw))
 }
@@ -53,18 +70,15 @@ function touchEnd(event, ownerInstance) {
   state.dragging = 0
   var moved = state.moved || 0
   var faceIndex = state.faceIndex
+  var yaw = snapYaw(state.yaw || 0)
+  state.yaw = yaw
+  ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(yaw))
   if (moved < TAP_MOVE_PX && faceIndex >= 0) {
     ownerInstance.callMethod('orbitOpenExpand', { index: faceIndex })
-    ownerInstance.callMethod('orbitDragEnd', { yaw: state.yaw || 0, coast: 0 })
+    ownerInstance.callMethod('orbitDragEnd', { yaw: yaw })
     return
   }
-  var yaw = state.yaw || 0
-  var vx = state.vx || 0
-  var coast = 0
-  if (vx > 0.05 || vx < -0.05) {
-    coast = vx * 180
-  }
-  ownerInstance.callMethod('orbitDragEnd', { yaw: yaw, coast: coast })
+  ownerInstance.callMethod('orbitDragEnd', { yaw: yaw })
 }
 
 module.exports = {
