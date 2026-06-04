@@ -23,7 +23,11 @@ export function patchMpRecruitmentOrderInSnapshot(
   const applicants = body.applicants
   const selectedApplicantIds = body.selectedApplicantIds
   const hasGroupQr = body.groupQrImage !== undefined
+  const MAX_GROUP_QR_LEN = 120_000
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
+  if (hasGroupQr && String(body.groupQrImage || '').length > MAX_GROUP_QR_LEN) {
+    return { ok: false, error: 'group_qr_too_large', status: 400 }
+  }
   if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr) {
     return { ok: false, error: 'invalid_patch', status: 400 }
   }
