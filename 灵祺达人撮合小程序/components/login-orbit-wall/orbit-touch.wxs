@@ -59,7 +59,7 @@ function touchMove(event, ownerInstance) {
   if (dt > 0) state.vx = step / dt
   state.lastX = touch.pageX
   state.lastStamp = event.timeStamp
-  var yaw = snapYaw(state.startYaw + dx * DEG_PER_PX)
+  var yaw = state.startYaw + dx * DEG_PER_PX
   state.yaw = yaw
   ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(yaw))
 }
