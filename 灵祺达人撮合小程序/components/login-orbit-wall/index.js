@@ -6,6 +6,11 @@ function buildFaces(images) {
   return list.map((src, i) => ({ src, deg: Math.round(step * i * 10) / 10 }))
 }
 
+function yawTransform(yaw) {
+  const y = Math.round(Number(yaw) * 10) / 10
+  return `rotateY(${y}deg)`
+}
+
 Component({
   properties: {
     images: {
@@ -20,6 +25,7 @@ Component({
 
   data: {
     yaw: 0,
+    ringTransform: 'rotateY(0deg)',
     radiusPx: 120,
     faces: [],
     ringSnap: false,
@@ -48,84 +54,51 @@ Component({
           radiusPx: Math.round(340 * rpx),
           faces,
           faceCount: faces.length,
+          ringTransform: yawTransform(0),
         })
       } catch (_) {
         const faces = buildFaces(this.properties.images)
-        this.setData({ faces, faceCount: faces.length })
+        this.setData({ faces, faceCount: faces.length, ringTransform: yawTransform(0) })
       }
-      this._drag = null
-      this._inertiaTimer = null
+      this._snapTimer = null
     },
     detached() {
-      if (this._inertiaTimer) clearInterval(this._inertiaTimer)
+      if (this._snapTimer) clearTimeout(this._snapTimer)
     },
   },
 
   methods: {
-    _setYaw(yaw, snap) {
-      this.setData({ yaw, ringSnap: !!snap })
-    },
-
-    _touchIndex(e) {
-      const t = e.target || {}
-      const ds = t.dataset || {}
-      if (ds.index !== undefined && ds.index !== '') return Number(ds.index)
-      return -1
-    },
-
-    onTouchStart(e) {
-      if (this.data.expanded) return
-      if (this._inertiaTimer) {
-        clearInterval(this._inertiaTimer)
-        this._inertiaTimer = null
-      }
-      const t = e.touches[0]
-      const faceIndex = this._touchIndex(e)
-      this._drag = {
-        x: t.clientX,
-        y0: this.data.yaw,
-        vx: 0,
-        lastX: t.clientX,
-        lastT: Date.now(),
-        moved: 0,
-        faceIndex: faceIndex >= 0 ? faceIndex : -1,
+    /** WXS 拖动开始：关闭 CSS 过渡 */
+    orbitDragStart() {
+      if (this._snapTimer) {
+        clearTimeout(this._snapTimer)
+        this._snapTimer = null
       }
       this.setData({ ringSnap: false })
     },
 
-    onTouchMove(e) {
-      if (!this._drag || this.data.expanded) return
-      const t = e.touches[0]
-      const now = Date.now()
-      const dx = t.clientX - this._drag.lastX
-      this._drag.moved += Math.abs(dx)
-      const dt = Math.max(now - this._drag.lastT, 1)
-      this._drag.vx = dx / dt
-      this._drag.lastX = t.clientX
-      this._drag.lastT = now
-      this._setYaw(this._drag.y0 + (t.clientX - this._drag.x) * 0.42, false)
+    /** WXS 拖动结束：同步角度 + 可选惯性滑行（单次 CSS 过渡） */
+    orbitDragEnd(e) {
+      const detail = e || {}
+      const base = Number(detail.yaw) || 0
+      const coast = Number(detail.coast) || 0
+      const yaw = base + coast
+      const ringTransform = yawTransform(yaw)
+      this.setData({
+        yaw,
+        ringTransform,
+        ringSnap: Math.abs(coast) > 0.5,
+      })
+      if (this._snapTimer) clearTimeout(this._snapTimer)
+      this._snapTimer = setTimeout(() => {
+        this.setData({ ringSnap: false })
+        this._snapTimer = null
+      }, 480)
     },
 
-    onTouchEnd() {
-      const drag = this._drag
-      this._drag = null
-      if (!drag || this.data.expanded) return
-      if (drag.moved < 14 && drag.faceIndex >= 0) {
-        this._openExpand(drag.faceIndex)
-        return
-      }
-      const vx = drag.vx || 0
-      if (Math.abs(vx) < 0.08) return
-      let spin = vx * 18
-      this._inertiaTimer = setInterval(() => {
-        spin *= 0.92
-        if (Math.abs(spin) < 0.15) {
-          clearInterval(this._inertiaTimer)
-          this._inertiaTimer = null
-          return
-        }
-        this._setYaw(this.data.yaw + spin, false)
-      }, 16)
+    orbitOpenExpand(e) {
+      const index = Number(e && e.index)
+      if (Number.isFinite(index)) this._openExpand(index)
     },
 
     _openExpand(index) {
@@ -135,6 +108,7 @@ Component({
       this.setData({
         expanded: true,
         expandedIndex: i,
+        ringSnap: false,
       })
       this.triggerEvent('expand', { index: i })
     },

@@ -1,19 +1,24 @@
+<wxs module="ot" src="./orbit-touch.wxs" />
+
 <view class="orbit">
   <view class="orbit__hint">
     <text class="orbit__hint-txt" wx:if="{{!expanded}}">{{hint}}</text>
-    <text class="orbit__hint-txt" wx:else>左右滑动切换 · 点击空白处收起（{{expandedIndex + 1}}/{{faceCount}}）</text>
+    <text class="orbit__hint-txt" wx:else>左右滑动切换 · 点击收起（{{expandedIndex + 1}}/{{faceCount}}）</text>
   </view>
 
   <view class="orbit__stage {{expanded ? 'orbit__stage--expanded' : ''}}">
     <block wx:if="{{!expanded}}">
       <view
         class="orbit__ring-wrap"
-        catchtouchstart="onTouchStart"
-        catchtouchmove="onTouchMove"
-        catchtouchend="onTouchEnd"
-        catchtouchcancel="onTouchEnd"
+        bindtouchstart="{{ot.start}}"
+        bindtouchmove="{{ot.move}}"
+        bindtouchend="{{ot.end}}"
+        bindtouchcancel="{{ot.end}}"
       >
-        <view class="orbit__ring {{ringSnap ? 'orbit__ring--snap' : ''}}" style="transform: rotateY({{yaw}}deg);">
+        <view
+          class="orbit__ring {{ringSnap ? 'orbit__ring--snap' : ''}}"
+          style="transform: {{ringTransform}};"
+        >
           <view
             wx:for="{{faces}}"
             wx:key="src"
@@ -50,7 +55,6 @@
               mode="aspectFit"
               show-menu-by-longpress="{{true}}"
               binderror="onImgError"
-              data-index="{{slideIndex}}"
             />
           </view>
         </swiper-item>

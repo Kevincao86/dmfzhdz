@@ -40,12 +40,13 @@
   width: 0;
   height: 0;
   transform-style: preserve-3d;
-  transition: transform 0.05s linear;
+  transition: none;
   will-change: transform;
+  backface-visibility: hidden;
 }
 
 .orbit__ring--snap {
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .orbit__face {
