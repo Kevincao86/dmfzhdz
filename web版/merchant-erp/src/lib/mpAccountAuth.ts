@@ -8,7 +8,7 @@ import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
-import { verifyAuthSmsCode } from '../vite-plugins/authSmsAuthShared.js'
+import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
