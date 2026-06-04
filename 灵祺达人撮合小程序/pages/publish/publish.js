@@ -176,6 +176,7 @@ Page({
     formHeadStyle: '',
     heroHeadStyle: '',
     scrollIntoView: '',
+    scrollWithAnimation: false,
     lastScrollAnchor: '',
     applyFormDisplayText: '',
     applyFormPlaceholder: true,
@@ -274,19 +275,11 @@ Page({
   onPickerBack() {
     this.setData({ pickerView: '' }, () => this.syncTabBarOverlay())
   },
-  closePickerAndScroll(anchor) {
-    const target = anchor || this.data.lastScrollAnchor || ''
-    this.setData({ pickerView: '', scrollIntoView: '' }, () => {
-      this.syncTabBarOverlay()
-      if (!target) return
-      wx.nextTick(() => {
-        this.setData({ scrollIntoView: target })
-        setTimeout(() => this.setData({ scrollIntoView: '' }), 500)
-      })
-    })
+  closePickerAndScroll() {
+    this.setData({ pickerView: '', scrollIntoView: '' }, () => this.syncTabBarOverlay())
   },
   onApplyFormConfirm() {
-    applyFormEditor.confirmApplyFormEditor(this, () => this.closePickerAndScroll('field-apply-form'))
+    applyFormEditor.confirmApplyFormEditor(this, () => this.closePickerAndScroll())
   },
   openApplyFormEditorNew() {
     const platform = this.data.form.platform
@@ -592,7 +585,7 @@ Page({
       'form.douyinSalesLevels': platform === '抖音' ? levels : [],
     })
     this.syncDisplayFields()
-    this.closePickerAndScroll('field-platform')
+    this.closePickerAndScroll()
   },
   onTagTap(e) {
     const name = e.currentTarget.dataset.name
@@ -616,7 +609,7 @@ Page({
     }
     this.setData({ 'form.talentTags': talentTags })
     this.syncDisplayFields()
-    this.closePickerAndScroll('field-tag')
+    this.closePickerAndScroll()
   },
   onCityNational() {
     this.setData({
@@ -624,7 +617,7 @@ Page({
       'form.selectedCities': [],
     })
     this.syncDisplayFields()
-    this.closePickerAndScroll('field-city')
+    this.closePickerAndScroll()
   },
   onCityKeyword(e) {
     this.setData({ cityKeyword: e.detail.value }, () => this.refreshCityModalUi())
@@ -658,7 +651,7 @@ Page({
       return
     }
     this.syncDisplayFields()
-    this.closePickerAndScroll('field-city')
+    this.closePickerAndScroll()
   },
   onReqLevelTap(e) {
     const name = e.currentTarget.dataset.name
@@ -682,7 +675,7 @@ Page({
     const levels = this.data.reqLevelGrid.filter((t) => t.on).map((t) => t.name)
     this.setData({ 'form.douyinSalesLevels': levels })
     this.syncDisplayFields()
-    this.closePickerAndScroll('field-req-level')
+    this.closePickerAndScroll()
   },
   onFeeSelect(e) {
     const id = e.currentTarget.dataset.id
@@ -697,7 +690,7 @@ Page({
     }
     this.setData(patch)
     this.syncDisplayFields()
-    this.closePickerAndScroll('field-fee')
+    this.closePickerAndScroll()
   },
   onAddLevelTier() {
     const tiers = [...(this.data.form.levelTiers || []), newLevelTier()]
@@ -754,9 +747,8 @@ Page({
     if (!tiers[idx]) return
     tiers[idx].levels = levels
     tiers[idx].levelsText = levels.join('、')
-    const anchor = `field-tier-lv-${idx}`
     this.setData({ 'form.levelTiers': tiers, editingTierIndex: -1 })
-    this.closePickerAndScroll(anchor)
+    this.closePickerAndScroll()
   },
   onAddFansTier() {
     const tiers = [...(this.data.form.fansTiers || []), newFansTier()]
@@ -794,9 +786,8 @@ Page({
     if (!tiers[idx]) return
     tiers[idx].fansRange = range
     tiers[idx].fansRangeText = range
-    const anchor = `field-tier-fans-${idx}`
     this.setData({ 'form.fansTiers': tiers, editingFansTierIndex: -1 })
-    this.closePickerAndScroll(anchor)
+    this.closePickerAndScroll()
   },
   validateFee(f) {
     if (f.feeTypeId === 'fixed') {
