@@ -216,6 +216,8 @@ Page({
         title: '报名已提交',
         body: `您已报名 ${this.data.merchantOrderNo || this.data.mpOrderId}`,
         category: 'business',
+        mpOrderId: this.data.mpOrderId,
+        applicantId,
       })
       if (this.data.isIceMode) {
         try {

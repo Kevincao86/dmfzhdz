@@ -5,6 +5,54 @@
   background: var(--lq-bg, #f5f6fa);
 }
 
+.ntf-tabs {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.ntf-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  border: 2rpx solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.ntf-tab--on {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  border-color: transparent;
+}
+
+.ntf-tab--on .ntf-tab-label,
+.ntf-tab--on .ntf-tab-badge {
+  color: #fff;
+}
+
+.ntf-tab-label {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.ntf-tab-badge {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #7c3aed;
+  background: #f5f3ff;
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+}
+
+.ntf-tab--on .ntf-tab-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 .ntf-empty {
   margin-top: 80rpx;
   text-align: center;
@@ -35,6 +83,24 @@
 
 .ntf-card--unread {
   background: #fafaff;
+}
+
+.ntf-card--tappable:active {
+  opacity: 0.92;
+}
+
+.ntf-card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.ntf-arrow {
+  font-size: 36rpx;
+  line-height: 1;
+  color: #c4b5fd;
+  font-weight: 300;
 }
 
 .ntf-card-head {
@@ -89,6 +155,11 @@
   background: #ecfdf5;
 }
 
+.ntf-cat--selection {
+  color: #b45309;
+  background: #fffbeb;
+}
+
 .ntf-time {
   font-size: 22rpx;
   color: #9ca3af;
@@ -102,6 +173,21 @@
 .ntf-body {
   display: block;
   line-height: 1.5;
+}
+
+.ntf-body--clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.ntf-detail-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #7c3aed;
 }
 
 .ntf-image {

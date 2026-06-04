@@ -28,6 +28,7 @@ Page({
     showSelectedPanel: false,
     exportingAll: false,
     groupQrImage: '',
+    groupQrExpired: false,
     groupQrUploading: false,
     notifying: false,
     savingSelect: false,
@@ -96,6 +97,7 @@ Page({
         hallLabel: appDisplay.hallLabelFromMp(mp),
         mpOrder: mp,
         groupQrImage: mpGroupQr.groupQrFromMp(mp),
+        groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         err: '',
       })
       this.applyApplicantsState(applicants, selectedIds)
@@ -197,6 +199,10 @@ Page({
   },
   async onUploadGroupQr() {
     if (this.data.groupQrUploading) return
+    if (this.data.groupQrExpired) {
+      wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
+      return
+    }
     this.setData({ groupQrUploading: true })
     try {
       const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()

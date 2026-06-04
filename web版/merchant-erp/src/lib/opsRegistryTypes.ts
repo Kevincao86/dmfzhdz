@@ -265,6 +265,8 @@ export type RegistryMpRecruitmentOrder = {
   selectedApplicantIds?: string[]
   /** PR 上传的项目群二维码（data URL 或 https） */
   groupQrImage?: string
+  /** 报名截止满 7 天后自动清理群码时写入 */
+  groupQrClearedAt?: string
   mpPublishMeta?: Record<string, unknown>
   /** pr：小程序发招募；merchant：商家/运营后台同步 */
   publisherIdentity?: 'pr' | 'merchant'

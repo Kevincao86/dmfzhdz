@@ -11,6 +11,7 @@ import {
   appendMpTalentInboxInSnapshot,
   type MpTalentInboxEntryInput,
 } from '../src/lib/mpTalentInboxMutations.js'
+import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
 
 export const config = { maxDuration: 60 }
 
@@ -69,6 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
+    purgeExpiredGroupQrsInSnapshot(data)
     const result = appendMpTalentInboxInSnapshot(data, body.entries ?? [])
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
