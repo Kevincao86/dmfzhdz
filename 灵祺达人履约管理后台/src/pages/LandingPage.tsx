@@ -180,7 +180,7 @@ export default function LandingPage() {
           <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">
             <div>
               <h2 className="text-2xl font-extrabold leading-snug sm:text-3xl">
-                灵祺履约台
+                灵祺履约平台
                 <br />
                 <span className="bg-gradient-to-r from-pink-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">
                   助推营销增长
