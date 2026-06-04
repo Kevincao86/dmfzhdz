@@ -1,8 +1,28 @@
 <view class="ntf-page page-shell">
+  <view wx:if="{{totalCount > 0}}" class="ntf-tabs">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="id"
+      class="ntf-tab {{activeTab === item.id ? 'ntf-tab--on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onTabChange"
+    >
+      <text class="ntf-tab-label">{{item.label}}</text>
+      <text wx:if="{{item.badge}}" class="ntf-tab-badge">{{item.badge}}</text>
+    </view>
+  </view>
+
   <view wx:if="{{totalCount === 0}}" class="card state-empty ntf-empty">
     <text class="empty-title">暂无通知</text>
     <text class="hint">{{emptyHint || '发单、报名、PR 入选通知会显示在这里；请下拉刷新'}}</text>
   </view>
+
+  <block wx:elif="{{sections.length === 0}}">
+    <view class="card state-empty ntf-empty">
+      <text class="empty-title">该分类暂无消息</text>
+      <text class="hint">可切换到「全部」查看其他通知</text>
+    </view>
+  </block>
 
   <block wx:else>
     <view wx:for="{{sections}}" wx:key="id" class="ntf-section">
@@ -11,37 +31,43 @@
         wx:for="{{item.rows}}"
         wx:for-item="row"
         wx:key="id"
-        class="card ntf-card {{row.pinned ? 'ntf-card--pinned' : ''}} {{row.read ? '' : 'ntf-card--unread'}}"
+        class="card ntf-card {{row.pinned ? 'ntf-card--pinned' : ''}} {{row.read ? '' : 'ntf-card--unread'}} {{row.canOpenDetail ? 'ntf-card--tappable' : ''}}"
+        data-id="{{row.id}}"
+        bindtap="onOpenNotice"
       >
         <view class="ntf-card-head">
           <view class="ntf-card-head-left">
-            <text class="ntf-cat ntf-cat--{{row.category}}">{{row.categoryLabel}}</text>
+            <text class="ntf-cat ntf-cat--{{row.noticeKind}}">{{row.noticeKindLabel}}</text>
             <text class="ntf-read {{row.read ? 'ntf-read--ok' : 'ntf-read--new'}}">{{row.readLabel}}</text>
           </view>
-          <text class="ntf-time">{{row.createdAt}}</text>
+          <view class="ntf-card-head-right">
+            <text class="ntf-time">{{row.createdAt}}</text>
+            <text wx:if="{{row.canOpenDetail}}" class="ntf-arrow">›</text>
+          </view>
         </view>
         <text class="title-lg ntf-title">{{row.title}}</text>
-        <text class="hint ntf-body">{{row.body}}</text>
+        <text class="hint ntf-body ntf-body--clamp">{{row.body}}</text>
+        <text wx:if="{{row.canOpenDetail}}" class="ntf-detail-hint">{{row.detailLabel}}</text>
         <image
           wx:if="{{row.imageUrl}}"
           class="ntf-image"
           src="{{row.imageUrl}}"
           mode="widthFix"
           data-url="{{row.imageUrl}}"
-          bindtap="onPreviewInboxImage"
+          catchtap="onPreviewInboxImage"
         />
-        <view wx:if="{{row.showSelectionActions}}" class="ntf-actions">
+        <view wx:if="{{row.showSelectionActions}}" class="ntf-actions" catchtap="stopBubble">
           <button
             class="ntf-action-btn"
             data-id="{{row.id}}"
             data-action="confirmed"
-            bindtap="onSelectionAction"
+            catchtap="onSelectionAction"
           >确认</button>
           <button
             class="ntf-action-btn ntf-action-btn--primary"
             data-id="{{row.id}}"
             data-action="joined"
-            bindtap="onSelectionAction"
+            catchtap="onSelectionAction"
           >已入群</button>
         </view>
       </view>

@@ -4,31 +4,65 @@ const api = require('../../utils/api.js')
 const talentMember = require('../../utils/talentMember.js')
 const userProfile = require('../../utils/userProfile.js')
 const inboxNoticeState = require('../../utils/inboxNoticeState.js')
+const inboxCatalog = require('../../utils/inboxNoticeCatalog.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 
-const SECTION_ORDER = [
-  { id: 'pinned', title: '入选通知（待处理）' },
-  { id: 'order', title: '订单通知' },
-  { id: 'business', title: '业务通知' },
-  { id: 'system', title: '系统通知' },
+const TABS = [
+  { id: 'all', label: '全部' },
+  { id: 'selection', label: '入选' },
+  { id: 'order', label: '订单' },
+  { id: 'business', label: '业务' },
+  { id: 'system', label: '系统' },
 ]
 
-function buildSections(rows) {
-  const byCat = { pinned: [], order: [], business: [], system: [] }
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i]
-    if (r.pinned) {
-      byCat.pinned.push(r)
-      continue
-    }
-    const cat = r.category === 'order' || r.category === 'business' ? r.category : 'system'
-    byCat[cat].push(r)
+const SECTION_META = {
+  pinned: { title: '待处理' },
+  selection: { title: '入选通知' },
+  order: { title: '订单通知' },
+  business: { title: '业务通知' },
+  system: { title: '系统通知' },
+}
+
+function enrichAll(rows) {
+  return (rows || []).map((r) => inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(r)))
+}
+
+function buildSections(rows, activeTab) {
+  const filtered = inboxCatalog.filterByTab(rows, activeTab)
+  if (activeTab !== 'all') {
+    if (!filtered.length) return []
+    const title = (TABS.find((t) => t.id === activeTab) || {}).label || '通知'
+    return [{ id: activeTab, title, rows: filtered }]
   }
-  return SECTION_ORDER.map((s) => ({ ...s, rows: byCat[s.id] })).filter((s) => s.rows.length > 0)
+  const pinned = filtered.filter((r) => r.pinned)
+  const rest = filtered.filter((r) => !r.pinned)
+  const sections = []
+  if (pinned.length) {
+    sections.push({ id: 'pinned', title: SECTION_META.pinned.title, rows: pinned })
+  }
+  const kinds = ['selection', 'order', 'business', 'system']
+  for (let i = 0; i < kinds.length; i++) {
+    const kind = kinds[i]
+    const slice = rest.filter((r) => r.noticeKind === kind)
+    if (slice.length) {
+      sections.push({ id: kind, title: SECTION_META[kind].title, rows: slice })
+    }
+  }
+  return sections
+}
+
+function buildTabs(counts) {
+  return TABS.map((t) => ({
+    ...t,
+    count: counts[t.id] || 0,
+    badge: counts[t.id] > 0 ? String(counts[t.id]) : '',
+  }))
 }
 
 Page({
   data: {
+    tabs: buildTabs({ all: 0, selection: 0, order: 0, business: 0, system: 0 }),
+    activeTab: 'all',
     sections: [],
     totalCount: 0,
     emptyHint: '',
@@ -38,35 +72,72 @@ Page({
     wx.stopPullDownRefresh()
   },
   async loadRows() {
-    let rows = messagesStore.readNotifications().map((r) => inboxNoticeState.enrichRow(r))
+    let rows = enrichAll(messagesStore.readNotifications())
     if (userProfile.readIdentity() === 'talent' && api.hasApi()) {
       try {
         const member = talentMember.readMember()
         if (member && (member.id || member.contact)) {
           const reg = await ops.fetchRegistry()
-          rows = messagesStore.mergeRegistryInboxForTalent(reg, member)
+          rows = enrichAll(messagesStore.mergeRegistryInboxForTalent(reg, member))
         }
       } catch (_) {
         /* 使用本地通知 */
       }
     } else {
-      rows = inboxNoticeState.sortRows(rows)
+      rows = enrichAll(inboxNoticeState.sortRows(rows))
     }
     const pages = getCurrentPages()
     const mine = pages.length >= 2 ? pages[pages.length - 2] : null
     if (mine && typeof mine.refresh === 'function') mine.refresh()
+    const counts = inboxCatalog.tabCounts(rows)
     this.setData({
-      sections: buildSections(rows),
+      tabs: buildTabs(counts),
+      sections: buildSections(rows, this.data.activeTab),
       totalCount: rows.length,
       emptyHint:
         rows.length === 0
           ? 'PR 通知入选后，请下拉刷新；入口在「我的 → 消息通知」（不是底部「消息」）'
           : '',
     })
+    this._allRows = rows
   },
   async onShow() {
     await this.loadRows()
   },
+  onTabChange(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.activeTab) return
+    const rows = this._allRows || []
+    this.setData({
+      activeTab: id,
+      sections: buildSections(rows, id),
+    })
+  },
+  findRowById(id) {
+    const sections = this.data.sections || []
+    for (let i = 0; i < sections.length; i++) {
+      const found = (sections[i].rows || []).find((r) => r.id === id)
+      if (found) return found
+    }
+    const all = this._allRows || []
+    return all.find((r) => r.id === id) || null
+  },
+  onOpenNotice(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const row = this.findRowById(id)
+    if (!row || !row.canOpenDetail) return
+    if (!row.read) messagesStore.markInboxSeen([row.id])
+    if (row.detailUrl) {
+      wx.navigateTo({ url: row.detailUrl })
+      void this.loadRows()
+      return
+    }
+    inboxCatalog.writeDetailPayload(row)
+    wx.navigateTo({ url: '/pages/mine-notification-detail/mine-notification-detail' })
+    void this.loadRows()
+  },
+  stopBubble() {},
   onPreviewInboxImage(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
@@ -75,15 +146,7 @@ Page({
   onSelectionAction(e) {
     const { id, action } = e.currentTarget.dataset
     if (!id || !action) return
-    let row = null
-    const sections = this.data.sections || []
-    for (let i = 0; i < sections.length; i++) {
-      const found = (sections[i].rows || []).find((r) => r.id === id)
-      if (found) {
-        row = found
-        break
-      }
-    }
+    const row = this.findRowById(id)
     if (!row) return
     inboxNoticeState.markHandled(row, action)
     messagesStore.markInboxSeen([row.id])

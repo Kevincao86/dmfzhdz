@@ -1056,6 +1056,7 @@ Page({
           title: '招募已更新',
           body: `「${order.title}」已保存`,
           category: 'order',
+          mpOrderId: order.id,
         })
         wx.showToast({ title: '已保存', icon: 'success' })
         this.setData({
@@ -1076,6 +1077,7 @@ Page({
         title: '招募发布成功',
         body: `「${order.title}」已创建`,
         category: 'order',
+        mpOrderId: order.id,
       })
       const f = this.data.form
       applyTemplates.saveApplyFormForMpOrder(order.id, {

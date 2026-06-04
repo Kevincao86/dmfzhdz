@@ -4,6 +4,7 @@
  */
 import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
+import { purgeExpiredGroupQrsInSnapshot } from './mpGroupQrCleanup.js'
 import type { RegistryFile } from './opsRegistryTypes.js'
 
 const SNAPSHOT_FETCH_TIMEOUT_MS = 22_000
@@ -100,15 +101,21 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
 
 export async function loadRegistrySnapshotForGet(io: RegistrySnapshotIo): Promise<RegistryFile> {
   const data = await io.load()
+  let needSave = false
   const before = data.recruitmentOrders ?? []
   const cleaned = filterLegacyDemoRecruitmentOrders(before)
   if (cleaned.length !== before.length) {
     data.recruitmentOrders = cleaned
+    needSave = true
+  }
+  const qr = purgeExpiredGroupQrsInSnapshot(data)
+  if (qr.purgedOrderIds.length > 0 || qr.purgedInboxCount > 0) needSave = true
+  if (needSave) {
     try {
       await io.save(data)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      console.error('[loadRegistrySnapshotForGet] persist cleaned recruitmentOrders failed:', msg.slice(0, 500))
+      console.error('[loadRegistrySnapshotForGet] persist registry cleanup failed:', msg.slice(0, 500))
     }
   }
   return data

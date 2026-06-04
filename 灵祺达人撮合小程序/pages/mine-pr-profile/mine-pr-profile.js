@@ -7,6 +7,8 @@ const regionPicker = require('../../utils/regionPicker.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
 const auth = require('../../utils/auth.js')
 const accountMemberSync = require('../../utils/accountMemberSync.js')
+const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
+const credHandlers = loginCredPanel.createHandlers(auth)
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const ACCOUNT_TYPES = [
@@ -40,10 +42,9 @@ Page({
     orgLabel: '公司/机构名称',
     orgPlaceholder: '请输入公司或机构全称',
     lingqiPrIdLabel: '',
-    loginName: '',
-    password: '',
-    hasPassword: false,
+    ...loginCredPanel.patchFromAccount(null),
   },
+  ...credHandlers,
   async onShow() {
     if (auth.isLoggedIn()) {
       try {
@@ -68,15 +69,8 @@ Page({
       lingqiPrIdLabel: lingqiIdentity.formatPrIdLabel(
         (acct && acct.lingqiPrId) || form.lingqiPrId,
       ),
-      loginName: (acct && acct.loginName) || '',
-      hasPassword: !!(acct && acct.hasPassword),
+      ...loginCredPanel.patchFromAccount(acct),
     })
-  },
-  onLoginNameInput(e) {
-    this.setData({ loginName: e.detail.value })
-  },
-  onPasswordInput(e) {
-    this.setData({ password: e.detail.value })
   },
   onField(e) {
     const k = e.currentTarget.dataset.k
@@ -188,16 +182,6 @@ Page({
         }
       } catch (_) {
         cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
-      }
-    }
-    if (auth.isLoggedIn() && String(this.data.loginName || '').trim()) {
-      try {
-        await auth.setLoginCredentials(this.data.loginName.trim(), this.data.password)
-      } catch (e) {
-        const msg = e && e.message ? e.message : String(e)
-        if (msg.indexOf('login_name_taken') >= 0) {
-          cloudWarn = cloudWarn || '登录名已被占用，请换一个'
-        }
       }
     }
     this.setData({

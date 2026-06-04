@@ -1,4 +1,5 @@
 const mpOrderRegistryOps = require('./mpOrderRegistryOps.js')
+const mpGroupQrExpiry = require('./mpGroupQrExpiry.js')
 
 const LOCAL_PREFIX = 'meoo_mp_group_qr_v1_'
 
@@ -18,10 +19,16 @@ function writeLocalGroupQr(mpOrderId, dataUrl) {
 
 function groupQrFromMp(mp) {
   if (!mp) return ''
+  if (mpGroupQrExpiry.isGroupQrExpired(mp)) {
+    const id = String(mp.id || '').trim()
+    if (id) writeLocalGroupQr(id, '')
+    return ''
+  }
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
-  return (
-    String(mp.groupQrImage || meta.groupQrImage || '').trim() || readLocalGroupQr(String(mp.id || ''))
-  )
+  const remote = String(mp.groupQrImage || meta.groupQrImage || '').trim()
+  if (remote) return remote
+  const id = String(mp.id || '').trim()
+  return id ? readLocalGroupQr(id) : ''
 }
 
 function patchGroupQrImage(mpOrderId, groupQrImage) {
@@ -81,4 +88,6 @@ module.exports = {
   groupQrFromMp,
   patchGroupQrImage,
   chooseAndReadImageDataUrl,
+  isGroupQrExpired: mpGroupQrExpiry.isGroupQrExpired,
+  resolveDeadlineMs: mpGroupQrExpiry.resolveDeadlineMs,
 }

@@ -14,6 +14,8 @@ const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
 const accountMemberSync = require('../../utils/accountMemberSync.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
+const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
+const credHandlers = loginCredPanel.createHandlers(auth)
 const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
@@ -67,10 +69,9 @@ Page({
     provinceIndex: 0,
     cityIndex: 0,
     lingqiTalentIdLabel: '',
-    loginName: '',
-    password: '',
-    hasPassword: false,
+    ...loginCredPanel.patchFromAccount(null),
   },
+  ...credHandlers,
   async onShow() {
     if (auth.isLoggedIn()) {
       try {
@@ -80,13 +81,11 @@ Page({
     const acct = auth.readAccount()
     if (acct) {
       accountMemberSync.syncTalentMemberFromAccount(acct)
-      const patch = {}
-      if (acct.loginName) patch.loginName = acct.loginName
-      patch.hasPassword = !!acct.hasPassword
+      const patch = loginCredPanel.patchFromAccount(acct)
       if (acct.lingqiTalentId) {
         patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(acct.lingqiTalentId)
       }
-      if (Object.keys(patch).length) this.setData(patch)
+      this.setData(patch)
     }
   },
   onLoad(options) {
@@ -110,8 +109,7 @@ Page({
     if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
     const talentId = (acct && acct.lingqiTalentId) || (cur && cur.lingqiTalentId) || ''
     if (talentId) patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(talentId)
-    if (acct && acct.loginName) patch.loginName = acct.loginName
-    patch.hasPassword = !!(acct && acct.hasPassword)
+    Object.assign(patch, loginCredPanel.patchFromAccount(acct))
     if (cur) {
       Object.assign(patch, {
         wxNickName: cur.wxNickName || '',
@@ -146,12 +144,6 @@ Page({
   onNicknameInput(e) {
     const nick = e.detail.value || ''
     this.setData({ wxNickName: nick })
-  },
-  onLoginNameInput(e) {
-    this.setData({ loginName: e.detail.value })
-  },
-  onPasswordInput(e) {
-    this.setData({ password: e.detail.value })
   },
   onProvinceChange(e) {
     onProvincePick(this, e)
@@ -297,16 +289,6 @@ Page({
           writeMember(member)
         } catch (_) {
           cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
-        }
-      }
-      if (auth.isLoggedIn() && String(this.data.loginName || '').trim()) {
-        try {
-          await auth.setLoginCredentials(this.data.loginName.trim(), this.data.password)
-        } catch (e) {
-          const msg = e && e.message ? e.message : String(e)
-          if (msg.indexOf('login_name_taken') >= 0) {
-            cloudWarn = cloudWarn || '登录名已被占用，请换一个'
-          }
         }
       }
       this.setData({

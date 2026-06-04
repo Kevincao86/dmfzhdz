@@ -13,6 +13,7 @@
     "pages/mine-templates/mine-templates",
     "pages/mine-template-edit/mine-template-edit",
     "pages/mine-notifications/mine-notifications",
+    "pages/mine-notification-detail/mine-notification-detail",
     "pages/mine-analytics/mine-analytics",
     "pages/mine-support/mine-support",
     "pages/mine-support-chat/mine-support-chat",

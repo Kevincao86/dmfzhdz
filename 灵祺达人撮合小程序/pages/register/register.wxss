@@ -1,4 +1,5 @@
 @import "../apply/apply.wxss";
+@import "../../partials/login-cred-panel.wxss";
 
 .wx-profile {
   display: flex;

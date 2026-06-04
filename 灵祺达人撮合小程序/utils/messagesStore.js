@@ -130,19 +130,21 @@ function inboxRowsForTalent(reg, member) {
       if (isSel && !imageUrl && row.mpOrderId) {
         imageUrl = inboxRowEnrich.groupQrForMpOrder(reg, row.mpOrderId)
       }
+      const cat = isSel ? 'business' : normalizeCategory(row.category)
       return {
         id: row.id,
         title: row.title || '通知',
         body: row.body || '',
         imageUrl,
-        category: normalizeCategory(row.category),
-        categoryLabel: CATEGORY_LABELS[normalizeCategory(row.category)],
+        category: cat,
+        categoryLabel: CATEGORY_LABELS[cat],
         createdAt: row.createdAt || '',
         read: !!row.read || seen.has(String(row.id)),
         fromRegistry: true,
         noticeType: row.noticeType || (isSel ? 'selection' : ''),
         mpOrderId: row.mpOrderId || '',
         applicantId: row.applicantId || '',
+        pinned: !!row.pinned,
       }
     })
 }

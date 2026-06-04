@@ -1,0 +1,54 @@
+<view class="card apply-form cred-panel">
+  <view class="section-head">
+    <view class="section-head-dot" />
+    <text class="section-title">网页端登录</text>
+  </view>
+
+  <view wx:if="{{credentialsReady}}" class="cred-ready-row">
+    <text class="cred-ready-text">账号密码已设置</text>
+    <button class="cred-edit-btn" size="mini" bindtap="onEditCredentials">修改</button>
+  </view>
+
+  <view wx:else class="cred-check-row">
+    <checkbox-group bindchange="onToggleWebLogin">
+      <label class="cred-check-label">
+        <checkbox value="weblogin" checked="{{wantWebLogin}}" color="#7c3aed" />
+        <text>是否设置账号密码便于网页端登录</text>
+      </label>
+    </checkbox-group>
+    <text class="hint block-hint">与当前微信绑定为同一灵祺 ID，可在登录页使用账号密码登录</text>
+  </view>
+</view>
+
+<view class="cred-modal-mask" wx:if="{{showCredModal}}" bindtap="onCloseCredModal" />
+<view class="cred-modal" wx:if="{{showCredModal}}" catchtap="stopBubble">
+  <text class="cred-modal-title">{{credentialsReady ? '修改账号密码' : '设置账号密码'}}</text>
+  <view class="form-row">
+    <text class="form-label">登录名</text>
+    <input
+      class="input"
+      placeholder="字母数字，不可与已有用户重复"
+      value="{{modalLoginName}}"
+      bindinput="onModalLoginNameInput"
+    />
+  </view>
+  <view class="form-row">
+    <text class="form-label">登录密码</text>
+    <input
+      class="input"
+      password
+      placeholder="{{hasPassword ? '留空则不修改原密码' : '至少 6 位'}}"
+      value="{{modalPassword}}"
+      bindinput="onModalPasswordInput"
+    />
+  </view>
+  <text class="cred-modal-err" wx:if="{{credModalErr}}">{{credModalErr}}</text>
+  <view class="cred-modal-actions">
+    <button class="cred-modal-btn" bindtap="onCloseCredModal">取消</button>
+    <button
+      class="cred-modal-btn cred-modal-btn--primary"
+      loading="{{credModalSaving}}"
+      bindtap="onSaveCredentialsModal"
+    >保存</button>
+  </view>
+</view>

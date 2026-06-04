@@ -50,12 +50,13 @@ import mpSupportRelayHandler from '../api/meoo-ops-mp-support-relay.ts'
 import mpRecruitmentIceSubmitHandler from '../api/meoo-ops-mp-recruitment-ice-submit.ts'
 import mpRecruitmentIceConfirmHandler from '../api/meoo-ops-mp-recruitment-ice-confirm.ts'
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
+import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260606-ecs-clean'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260606-mp-group-qr-purge'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -125,6 +126,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-ice-submit': mpRecruitmentIceSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-ice-confirm': mpRecruitmentIceConfirmHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
   '/api/meoo-erp-api-health': async (_req, res) => {
     res.statusCode = 200
