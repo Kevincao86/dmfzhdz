@@ -1,7 +1,7 @@
 /**
  * 按灵祺账号隔离本机「我的报名 / 发单 / 通知」等，避免同设备换号串数据。
  */
-const auth = require('./auth.js')
+const sessionStore = require('./mpSessionStore.js')
 
 const LAST_ACCOUNT_SCOPE_KEY = 'meoo_last_account_scope_v1'
 
@@ -25,7 +25,7 @@ function scopeIdFromAccount(account) {
 
 function scopedStorageKey(baseKey, accountOrScope) {
   const acc = accountOrScope && typeof accountOrScope === 'object' ? accountOrScope : null
-  const scope = typeof accountOrScope === 'string' ? accountOrScope : scopeIdFromAccount(acc || auth.readAccount())
+  const scope = typeof accountOrScope === 'string' ? accountOrScope : scopeIdFromAccount(acc || sessionStore.readAccount())
   if (!scope) return baseKey
   return `${baseKey}:${scope}`
 }
@@ -89,7 +89,7 @@ function onAccountLogout() {
 }
 
 function currentScopeId() {
-  return scopeIdFromAccount(auth.readAccount())
+  return scopeIdFromAccount(sessionStore.readAccount())
 }
 
 module.exports = {

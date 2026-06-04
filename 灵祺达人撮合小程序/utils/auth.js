@@ -1,40 +1,18 @@
 const ecs = require('./ecs.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const mpAccountLocalScope = require('./mpAccountLocalScope.js')
+const sessionStore = require('./mpSessionStore.js')
 
-const SESSION_KEY = 'lingqi_mp_session_token'
-const ACCOUNT_KEY = 'lingqi_mp_account_v1'
-
-function readSessionToken() {
-  try {
-    return String(wx.getStorageSync(SESSION_KEY) || '').trim()
-  } catch {
-    return ''
-  }
-}
-
-function readAccount() {
-  try {
-    const raw = wx.getStorageSync(ACCOUNT_KEY)
-    if (!raw) return null
-    return typeof raw === 'string' ? JSON.parse(raw) : raw
-  } catch {
-    return null
-  }
-}
+const { SESSION_KEY, ACCOUNT_KEY, readSessionToken, readAccount } = sessionStore
 
 function writeSession(token, account) {
-  wx.setStorageSync(SESSION_KEY, token)
-  wx.setStorageSync(ACCOUNT_KEY, JSON.stringify(account || {}))
+  sessionStore.writeSessionPair(token, account)
   mpAccountLocalScope.onAccountLogin(account)
   accountMemberSync.syncLocalProfilesFromAccount(account)
 }
 
 function clearSession() {
-  try {
-    wx.removeStorageSync(SESSION_KEY)
-    wx.removeStorageSync(ACCOUNT_KEY)
-  } catch (_) {}
+  sessionStore.clearSessionPair()
   mpAccountLocalScope.onAccountLogout()
 }
 
