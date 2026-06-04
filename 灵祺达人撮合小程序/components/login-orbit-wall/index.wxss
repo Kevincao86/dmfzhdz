@@ -1,0 +1,96 @@
+.orbit {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.orbit__hint {
+  text-align: center;
+  padding: 8rpx 0 4rpx;
+}
+
+.orbit__hint-txt {
+  font-size: 22rpx;
+  color: var(--lq-text-secondary, #6b7280);
+  letter-spacing: 1rpx;
+}
+
+.orbit__stage {
+  position: relative;
+  width: 100%;
+  height: 340rpx;
+  perspective: 1100rpx;
+  perspective-origin: 50% 42%;
+}
+
+.orbit__ring {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.05s linear;
+  will-change: transform;
+}
+
+.orbit__ring--snap {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orbit__face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 168rpx;
+  height: 210rpx;
+  margin-left: -84rpx;
+  margin-top: -105rpx;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.orbit__card {
+  width: 100%;
+  height: 100%;
+  border-radius: 22rpx;
+  overflow: hidden;
+  border: 3rpx solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 16rpx 36rpx rgba(99, 102, 241, 0.22),
+    0 4rpx 12rpx rgba(15, 23, 42, 0.08);
+  background: #fff;
+  position: relative;
+}
+
+.orbit__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.orbit__shine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 45%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.orbit__pedestal {
+  position: absolute;
+  left: 50%;
+  bottom: 18rpx;
+  width: 420rpx;
+  height: 56rpx;
+  margin-left: -210rpx;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(139, 147, 255, 0.28) 0%,
+    rgba(139, 147, 255, 0.06) 55%,
+    transparent 72%
+  );
+  transform: rotateX(72deg);
+}

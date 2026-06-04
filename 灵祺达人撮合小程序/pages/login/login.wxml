@@ -114,6 +114,10 @@
     </view>
   </view>
 
+  <view class="login-orbit-zone">
+    <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
+  </view>
+
   <view class="login-fill">
     <view class="login-steps">
       <view
@@ -131,11 +135,6 @@
     <view class="login-trust">
       <text class="login-trust__dot" />
       <text class="login-trust__text">安全登录 · 一微信一灵祺 ID · 达人/PR 数据互通</text>
-    </view>
-    <view class="login-deco" aria-hidden="true">
-      <view class="login-deco__blob login-deco__blob--1" />
-      <view class="login-deco__blob login-deco__blob--2" />
-      <view class="login-deco__wave" />
     </view>
   </view>
   </view>
