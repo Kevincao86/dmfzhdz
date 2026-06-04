@@ -9,6 +9,7 @@ const auth = require('../../utils/auth.js')
 const accountMemberSync = require('../../utils/accountMemberSync.js')
 const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
+const accountSessionActions = require('../../utils/accountSessionActions.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const ACCOUNT_TYPES = [
@@ -71,6 +72,12 @@ Page({
       ),
       ...loginCredPanel.patchFromAccount(acct),
     })
+  },
+  onSwitchAccount() {
+    accountSessionActions.switchAccount()
+  },
+  onLogoutAccount() {
+    accountSessionActions.logout()
   },
   onField(e) {
     const k = e.currentTarget.dataset.k

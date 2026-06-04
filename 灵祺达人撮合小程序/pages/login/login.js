@@ -2,6 +2,7 @@ const auth = require('../../utils/auth.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
 const api = require('../../utils/api.js')
+const { applyCapsulePadding } = require('../../utils/navLayout.js')
 
 Page({
   data: {
@@ -10,13 +11,27 @@ Page({
     password: '',
     loading: false,
     err: '',
+    navBandStyle: '',
+    navInnerStyle: '',
+    promoLead: '一微信一灵祺 ID · 达人接单与 PR 发单同台',
+    promoFlow: '完善资料即刻匹配 · 商单自动置顶 · 通知群码私信一站完成',
+    promoPills: [
+      { tag: '达人', text: 'AI 置顶高契合商单' },
+      { tag: 'PR', text: '按招募智能荐达人' },
+      { tag: '一体', text: '入选·群码·私信同台' },
+    ],
   },
 
   onLoad() {
+    applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
     this.setData({ err: '' })
     if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
     }
+  },
+
+  onShow() {
+    applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
   },
 
   onTabWx() {
@@ -52,7 +67,7 @@ Page({
           wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
         } catch (_) {}
       }
-      const role = userProfile.readIdentity().role === 'pr' ? 'pr' : 'talent'
+      const role = userProfile.readIdentity() === 'pr' ? 'pr' : 'talent'
       const data = await auth.wxLogin({
         role,
         wxNickName: nick,

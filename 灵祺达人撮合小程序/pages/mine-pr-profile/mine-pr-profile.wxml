@@ -97,4 +97,6 @@
     </view>
     <button class="btn-primary" style="margin-top:24rpx;" bindtap="onSave">保存</button>
   </view>
+
+  <include src="../../partials/account-session-actions.wxml" />
 </view>

@@ -28,6 +28,7 @@
           </block>
           <block wx:elif="{{item.icon === 'star'}}">
             <view class="ico ico-star"></view>
+            <view class="tab-ai-badge" wx:if="{{item.aiBadge}}">AI</view>
           </block>
           <block wx:elif="{{item.icon === 'chat'}}">
             <view class="ico ico-chat">

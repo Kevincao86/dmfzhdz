@@ -1,7 +1,7 @@
 <view class="card apply-form cred-panel">
   <view class="section-head">
     <view class="section-head-dot" />
-    <text class="section-title">网页端登录</text>
+    <text class="section-title">新建账号密码</text>
   </view>
 
   <view wx:if="{{credentialsReady}}" class="cred-ready-row">
@@ -13,7 +13,7 @@
     <checkbox-group bindchange="onToggleWebLogin">
       <label class="cred-check-label">
         <checkbox value="weblogin" checked="{{wantWebLogin}}" color="#7c3aed" />
-        <text>是否设置账号密码便于网页端登录</text>
+        <text>用于网页端登录</text>
       </label>
     </checkbox-group>
     <text class="hint block-hint">与当前微信绑定为同一灵祺 ID，可在登录页使用账号密码登录</text>
@@ -22,7 +22,7 @@
 
 <view class="cred-modal-mask" wx:if="{{showCredModal}}" bindtap="onCloseCredModal" />
 <view class="cred-modal" wx:if="{{showCredModal}}" catchtap="stopBubble">
-  <text class="cred-modal-title">{{credentialsReady ? '修改账号密码' : '设置账号密码'}}</text>
+  <text class="cred-modal-title">{{credentialsReady ? '修改账号密码' : '新建账号密码'}}</text>
   <view class="form-row">
     <text class="form-label">登录名</text>
     <input

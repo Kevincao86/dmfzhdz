@@ -1,0 +1,29 @@
+.account-session-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin: 8rpx 28rpx 48rpx;
+}
+
+.account-session-btn {
+  margin: 0;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  color: #4f46e5;
+  background: #fff;
+  border: 2rpx solid #e0e7ff;
+}
+
+.account-session-btn::after {
+  border: none;
+}
+
+.account-session-btn--ghost {
+  color: #64748b;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  font-weight: 500;
+}
