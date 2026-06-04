@@ -16,3 +16,4 @@ for i in 01 02 03 04 05 06; do
   fi
   echo "OK $f ($sz bytes)"
 done
+bash "$(dirname "$0")/mp-check-media-size.sh"
