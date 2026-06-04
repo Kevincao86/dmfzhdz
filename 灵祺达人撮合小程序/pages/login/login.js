@@ -3,6 +3,7 @@ const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
+const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 
 Page({
   data: {
@@ -25,6 +26,7 @@ Page({
       { n: '2', title: '完善资料', sub: '平台与报价' },
       { n: '3', title: '接单履约', sub: '通知与群码' },
     ],
+    orbitImages: ORBIT_IMAGES,
   },
 
   onLoad() {

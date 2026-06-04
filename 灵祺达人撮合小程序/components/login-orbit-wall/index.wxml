@@ -1,0 +1,27 @@
+<view
+  class="orbit"
+  catchtouchstart="onTouchStart"
+  catchtouchmove="onTouchMove"
+  catchtouchend="onTouchEnd"
+  catchtouchcancel="onTouchEnd"
+>
+  <view class="orbit__hint">
+    <text class="orbit__hint-txt">{{hint}}</text>
+  </view>
+  <view class="orbit__stage">
+    <view class="orbit__ring {{ringSnap ? 'orbit__ring--snap' : ''}}" style="transform: rotateY({{yaw}}deg);">
+      <view
+        wx:for="{{faces}}"
+        wx:key="src"
+        class="orbit__face"
+        style="transform: rotateY({{item.deg}}deg) translateZ({{radiusPx}}px);"
+      >
+        <view class="orbit__card" bindtap="onPreview" data-index="{{index}}">
+          <image class="orbit__img" src="{{item.src}}" mode="aspectFill" />
+          <view class="orbit__shine" aria-hidden="true" />
+        </view>
+      </view>
+    </view>
+    <view class="orbit__pedestal" aria-hidden="true" />
+  </view>
+</view>

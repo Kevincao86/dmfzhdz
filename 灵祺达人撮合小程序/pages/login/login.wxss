@@ -365,24 +365,28 @@
   text-align: center;
 }
 
-/* 底部填充区：步骤 + 信任文案 + 渐变装饰 */
-.login-fill {
+.login-orbit-zone {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding: 20rpx 28rpx calc(env(safe-area-inset-bottom) + 12rpx);
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(180deg, var(--lq-bg) 0%, #f0ecff 55%, #ebe6ff 100%);
+  justify-content: center;
+  min-height: 360rpx;
+  padding: 8rpx 12rpx 4rpx;
+  background: linear-gradient(180deg, var(--lq-bg) 0%, #f3f0ff 48%, #ebe6ff 100%);
+}
+
+.login-fill {
+  flex-shrink: 0;
+  padding: 8rpx 28rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  background: linear-gradient(180deg, #ebe6ff 0%, var(--lq-bg) 100%);
 }
 
 .login-steps {
   display: flex;
   align-items: stretch;
   gap: 0;
-  margin-bottom: 20rpx;
-  padding: 20rpx 16rpx 18rpx;
+  margin-bottom: 12rpx;
+  padding: 16rpx 14rpx 14rpx;
   border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.72);
   border: 2rpx solid rgba(216, 200, 255, 0.45);
@@ -445,9 +449,7 @@
   align-items: center;
   justify-content: center;
   gap: 10rpx;
-  padding: 12rpx 8rpx 8rpx;
-  position: relative;
-  z-index: 2;
+  padding: 4rpx 8rpx 0;
 }
 
 .login-trust__dot {
@@ -464,50 +466,4 @@
   color: var(--lq-text-secondary);
   letter-spacing: 0.5rpx;
   line-height: 1.4;
-}
-
-.login-deco {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 200rpx;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.login-deco__blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(40rpx);
-  opacity: 0.55;
-}
-
-.login-deco__blob--1 {
-  width: 280rpx;
-  height: 280rpx;
-  left: -80rpx;
-  bottom: -100rpx;
-  background: rgba(167, 139, 250, 0.35);
-}
-
-.login-deco__blob--2 {
-  width: 240rpx;
-  height: 240rpx;
-  right: -60rpx;
-  bottom: -80rpx;
-  background: rgba(129, 140, 248, 0.32);
-}
-
-.login-deco__wave {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 120rpx;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.35) 100%
-  );
 }
