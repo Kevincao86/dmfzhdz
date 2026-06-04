@@ -175,7 +175,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         return
       }
       setSmsCooldown(60)
-      if (r.devCode) {
+      if (r.devCode && import.meta.env.DEV) {
         setSmsCode(r.devCode)
         onInfoHint(`开发环境验证码：${r.devCode}（已自动填入）`)
       } else {
@@ -201,7 +201,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         return
       }
       setLoginSmsCooldown(60)
-      if (r.devCode) {
+      if (r.devCode && import.meta.env.DEV) {
         setLoginSmsCode(r.devCode)
         onInfoHint(`开发环境验证码：${r.devCode}（已自动填入）`)
       } else {

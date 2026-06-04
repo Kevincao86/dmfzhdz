@@ -37,8 +37,16 @@ async function postAuthJson<T extends Record<string, unknown>>(
   body: unknown,
   action: string,
   retryStatuses: number[] = [],
+  opts?: { preferSameOrigin?: boolean },
 ): Promise<{ res: Response; json: T } | { ok: false; error: string; message: string }> {
-  const candidates = erpAuthApiCandidates(path)
+  let candidates = erpAuthApiCandidates(path)
+  if (opts?.preferSameOrigin && typeof window !== 'undefined') {
+    const origin = window.location.origin
+    candidates = [
+      ...candidates.filter((u) => u.startsWith(origin)),
+      ...candidates.filter((u) => !u.startsWith(origin)),
+    ]
+  }
   let lastMessage = `${action}失败，请稍后重试。`
 
   for (let i = 0; i < candidates.length; i += 1) {
@@ -67,12 +75,13 @@ async function postAuthJson<T extends Record<string, unknown>>(
 }
 
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
-  // 与注册/登录一致：优先 ECS；503 时回退同源 Vercel（Aliyun 密钥常在 Vercel）
+  // 短信发送：优先同源 Vercel（阿里云密钥），再 ECS erp-api；避免 ECS 无密钥时返回开发验证码
   const posted = await postAuthJson<SmsSendResult & { message?: string; detail?: string; devCode?: string }>(
     '/api/meoo-auth-sms-send',
     { phone },
     '发送验证码',
     [502, 503, 504],
+    { preferSameOrigin: true },
   )
   if (!('res' in posted)) {
     return posted
