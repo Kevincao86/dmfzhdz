@@ -5,11 +5,21 @@ const DELIVERY_WINDOWS = [
   { id: 'urgent', label: '急单大厅', sub: '发布后 24 小时内截止报名' },
 ]
 
+/** PR 发单：先选招募对象 */
+const RECRUIT_TARGETS = [
+  { id: 'talent', label: '达人', sub: '探店 · 品宣 · 达人报名' },
+  { id: 'shoot', label: '拍摄', sub: '拍摄任务表单筹备中', placeholder: true },
+  { id: 'edit', label: '剪辑', sub: '剪辑任务表单筹备中', placeholder: true },
+]
+
 const RECRUIT_MODES = [
   { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal', category: '探店' },
   { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal', category: '品宣' },
-  { id: 'ice', label: '云剪任务', sub: '功能搭建中', hall: 'ice', category: '云剪', disabled: true },
 ]
+
+function targetById(id) {
+  return RECRUIT_TARGETS.find((t) => t.id === id) || null
+}
 
 const PLATFORMS = ['抖音', '小红书', '大众点评', '快手', '微信视频号']
 
@@ -114,6 +124,7 @@ function newFansTier(id) {
 
 module.exports = {
   DELIVERY_WINDOWS,
+  RECRUIT_TARGETS,
   RECRUIT_MODES,
   PLATFORMS,
   TALENT_TAGS,
@@ -125,6 +136,7 @@ module.exports = {
   FEE_TYPES,
   feeTypeLabel,
   modeById,
+  targetById,
   filterCities,
   allCitiesFlat,
 }

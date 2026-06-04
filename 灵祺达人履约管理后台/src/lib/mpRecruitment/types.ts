@@ -29,6 +29,7 @@ export type RecruitmentOrderRow = {
   overRecruitHot?: boolean
   urgent: boolean
   isIce: boolean
+  recruitTarget?: 'talent' | 'shoot' | 'edit'
   recommended: boolean
   priceAmount: number
   publishedAtMs: number

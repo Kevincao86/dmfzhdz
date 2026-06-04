@@ -1,6 +1,7 @@
 const auth = require('../../utils/auth.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
+const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
@@ -10,6 +11,11 @@ Page({
     tab: 'wx',
     loginName: '',
     password: '',
+    regPhone: '',
+    regSmsCode: '',
+    regPassword: '',
+    smsSending: false,
+    smsCooldown: 0,
     loading: false,
     err: '',
     navBandStyle: '',
@@ -42,8 +48,20 @@ Page({
   onTabPwd() {
     this.setData({ tab: 'pwd', err: '' })
   },
+  onTabReg() {
+    this.setData({ tab: 'reg', err: '' })
+  },
   onLoginName(e) {
-    this.setData({ loginName: e.detail.value })
+    this.setData({ loginName: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+  onRegPhone(e) {
+    this.setData({ regPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+  onRegSmsCode(e) {
+    this.setData({ regSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
+  },
+  onRegPassword(e) {
+    this.setData({ regPassword: e.detail.value })
   },
   onPassword(e) {
     this.setData({ password: e.detail.value })
@@ -112,6 +130,69 @@ Page({
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  async onSendRegSms() {
+    const err = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
+    if (err) {
+      this.setData({ err })
+      return
+    }
+    this.setData({ smsSending: true, err: '' })
+    try {
+      await auth.sendRegisterSms(this.data.regPhone)
+      wx.showToast({ title: '验证码已发送', icon: 'none' })
+      this.setData({ smsCooldown: 60 })
+      const tick = setInterval(() => {
+        const n = this.data.smsCooldown - 1
+        if (n <= 0) {
+          clearInterval(tick)
+          this.setData({ smsCooldown: 0 })
+        } else {
+          this.setData({ smsCooldown: n })
+        }
+      }, 1000)
+    } catch (e) {
+      this.setData({ err: e && e.message ? e.message : '发送失败' })
+    } finally {
+      this.setData({ smsSending: false })
+    }
+  },
+
+  async onRegister() {
+    const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
+    if (phoneErr) {
+      this.setData({ err: phoneErr })
+      return
+    }
+    if (!/^\d{6}$/.test(this.data.regSmsCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    if (String(this.data.regPassword || '').length < 6) {
+      this.setData({ err: '密码至少 6 位' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      const role = userProfile.readIdentity() === 'pr' ? 'pr' : 'talent'
+      await auth.phoneRegister({
+        phone: this.data.regPhone,
+        smsCode: this.data.regSmsCode,
+        password: this.data.regPassword,
+        role,
+      })
+      wx.showToast({ title: '注册成功', icon: 'success' })
+      wx.switchTab({ url: '/pages/index/index' })
+    } catch (e) {
+      const msg = e && e.message ? e.message : '注册失败'
+      let hint = msg
+      if (/login_name_taken/i.test(msg)) hint = '该手机号已被注册'
+      if (/sms_code_invalid/i.test(msg)) hint = '验证码错误或已过期'
+      this.setData({ err: hint })
     } finally {
       this.setData({ loading: false })
     }

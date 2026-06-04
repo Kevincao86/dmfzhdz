@@ -32,15 +32,19 @@ function mapRegistryToRows(reg) {
       console.warn('[hallLoad] skip bad order', mp && mp.id, e)
     }
   }
+  const shootRows = mapped.filter((r) => r.recruitTarget === 'shoot')
+  const editRows = mapped.filter((r) => r.recruitTarget === 'edit')
   const iceRows = mapped.filter((r) => r.isIce)
-  const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-  const hallNonIce = mapped.filter((r) => !r.isIce)
+  const urgentRows = mapped.filter((r) => r.urgent && !r.isIce && r.recruitTarget === 'talent')
+  const hallNonIce = mapped.filter((r) => !r.isIce && r.recruitTarget === 'talent')
   const normalRows = listFilters.mergeHallDisplayRows(hallNonIce, {
     allowDemo: showDemoOrders(),
   })
   return {
     normalRows,
     urgentRows,
+    shootRows,
+    editRows,
     iceRows,
     cityFilters: hallFilters.buildCityFilterOptions(mapped),
     todayCount: openList.length,
@@ -70,6 +74,8 @@ async function loadHallList(page) {
       err: '',
       normalRows: [],
       urgentRows: [],
+      shootRows: [],
+      editRows: [],
       iceRows: [],
       displayRows: [],
     }

@@ -49,6 +49,7 @@ Page({
     loading: false,
     err: '',
     hallTab: 'normal',
+    paichianSubTab: 'shoot',
     searchKeyword: '',
     filterPlatform: '全部',
     filterCity: '全部',
@@ -63,6 +64,8 @@ Page({
     todayCount: 0,
     normalRows: [],
     urgentRows: [],
+    shootRows: [],
+    editRows: [],
     iceRows: [],
     displayRows: [],
     mpBuildId: mpBuild.ID,
@@ -94,8 +97,14 @@ Page({
   },
   applyFilters() {
     const tab = this.data.hallTab
-    let rows =
-      tab === 'urgent' ? this.data.urgentRows : tab === 'ice' ? this.data.iceRows : this.data.normalRows
+    let rows = this.data.normalRows
+    if (tab === 'urgent') rows = this.data.urgentRows
+    else if (tab === 'paichian') {
+      const sub = this.data.paichianSubTab
+      if (sub === 'edit') rows = this.data.editRows
+      else if (sub === 'ice') rows = this.data.iceRows
+      else rows = this.data.shootRows
+    }
     if (!showDemoOrders()) {
       rows = rows.filter((r) => r && !r.isMock)
     }
@@ -130,7 +139,14 @@ Page({
   },
   onHallTab(e) {
     const tab = e.currentTarget.dataset.tab
-    if (tab === 'urgent' || tab === 'normal' || tab === 'ice') this.applyHallTab(tab)
+    if (tab === 'urgent' || tab === 'normal' || tab === 'paichian') this.applyHallTab(tab)
+  },
+  onPaichianSubTab(e) {
+    const sub = e.currentTarget.dataset.sub
+    if (sub === 'shoot' || sub === 'edit' || sub === 'ice') {
+      this.setData({ paichianSubTab: sub })
+      this.applyFilters()
+    }
   },
   onSearchInput(e) {
     this.setData({ searchKeyword: e.detail.value })

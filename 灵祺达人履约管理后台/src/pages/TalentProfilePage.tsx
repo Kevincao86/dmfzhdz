@@ -123,7 +123,7 @@ export default function TalentProfilePage() {
         setPassword('')
       } catch (e) {
         const m = e instanceof Error ? e.message : String(e)
-        credWarn = m.includes('login_name_taken') ? '登录名已被占用' : `登录账号未保存：${m}`
+        credWarn = m.includes('login_name_taken') ? '该手机号已被注册' : `登录账号未保存：${m}`
       }
     }
     try {
@@ -160,7 +160,7 @@ export default function TalentProfilePage() {
       <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可用账号密码登录，与微信绑定同一灵祺 ID</p>
         <label className="block">
-          <span className="text-slate-400">登录名</span>
+          <span className="text-slate-400">手机号</span>
           <input
             className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
             value={loginName}

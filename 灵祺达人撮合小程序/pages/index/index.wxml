@@ -66,12 +66,29 @@
         <text class="tab-count lq-gradient-tabs__count" wx:if="{{urgentRows.length}}">{{urgentRows.length}}</text>
       </view>
       <view
-        class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'ice' ? 'lq-gradient-tabs__item--on active' : ''}}"
-        data-tab="ice"
+        class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'paichian' ? 'lq-gradient-tabs__item--on active' : ''}}"
+        data-tab="paichian"
         bindtap="onHallTab"
       >
-        云剪任务
+        拍剪任务
       </view>
+    </view>
+    <view class="paichian-sub-tabs" wx:if="{{hallTab === 'paichian'}}">
+      <view
+        class="paichian-sub-tab {{paichianSubTab === 'shoot' ? 'paichian-sub-tab--on' : ''}}"
+        data-sub="shoot"
+        bindtap="onPaichianSubTab"
+      >拍摄任务</view>
+      <view
+        class="paichian-sub-tab {{paichianSubTab === 'edit' ? 'paichian-sub-tab--on' : ''}}"
+        data-sub="edit"
+        bindtap="onPaichianSubTab"
+      >剪辑任务</view>
+      <view
+        class="paichian-sub-tab {{paichianSubTab === 'ice' ? 'paichian-sub-tab--on' : ''}}"
+        data-sub="ice"
+        bindtap="onPaichianSubTab"
+      >云剪任务</view>
     </view>
   </view>
 

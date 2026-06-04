@@ -375,3 +375,32 @@
   padding: 0 8rpx calc(env(safe-area-inset-bottom) + 12rpx);
   background: linear-gradient(180deg, #f8f6ff 0%, #f3f0ff 45%, #ebe6ff 100%);
 }
+
+.login-field--row {
+  display: flex;
+  gap: 12rpx;
+  align-items: stretch;
+}
+
+.login-input--code {
+  flex: 1;
+}
+
+.login-sms-btn {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 20rpx;
+  height: auto;
+  min-height: 80rpx;
+  line-height: 80rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
+  border: 2rpx solid var(--lq-primary-100);
+  border-radius: 20rpx;
+}
+
+.login-sms-btn::after {
+  border: none;
+}

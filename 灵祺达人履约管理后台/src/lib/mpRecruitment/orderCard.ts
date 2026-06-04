@@ -10,6 +10,13 @@ function isIceMpOrder(mp: Record<string, unknown>): boolean {
   return mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
 }
 
+function recruitTargetFromMp(mp: Record<string, unknown>): 'talent' | 'shoot' | 'edit' {
+  const meta = mp.mpPublishMeta as Record<string, unknown> | undefined
+  const t = String(meta?.recruitTarget || mp.recruitTarget || '').trim()
+  if (t === 'shoot' || t === 'edit') return t
+  return 'talent'
+}
+
 function isMerchantSyncedMpOrder(mp: Record<string, unknown>): boolean {
   if (mp.publisherIdentity === 'pr') return false
   if (mp.publisherIdentity === 'merchant') return true
@@ -71,6 +78,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     overRecruitHot: recruitCap > 0 && applicantCount > recruitCap,
     urgent,
     isIce: isIceMpOrder(mp),
+    recruitTarget: recruitTargetFromMp(mp),
     recommended: urgent || applicantCount >= 3 || priceAmount >= 1000,
     priceAmount,
     publishedAtMs,
@@ -88,9 +96,11 @@ export function loadOpenOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
 
 export function splitHallRows(reg: MpRegistry) {
   const mapped = loadOpenOrderRows(reg)
+  const shootRows = mapped.filter((r) => r.recruitTarget === 'shoot')
+  const editRows = mapped.filter((r) => r.recruitTarget === 'edit')
   const iceRows = mapped.filter((r) => r.isIce)
-  const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-  const realNormal = mapped.filter((r) => !r.urgent && !r.isIce)
+  const urgentRows = mapped.filter((r) => r.urgent && !r.isIce && r.recruitTarget === 'talent')
+  const realNormal = mapped.filter((r) => !r.urgent && !r.isIce && r.recruitTarget === 'talent')
   const normalRows = realNormal.length > 0 ? realNormal : [listFilters.buildMockRecruitmentRow()]
-  return { normalRows, urgentRows, iceRows, todayCount: mapped.length }
+  return { normalRows, urgentRows, shootRows, editRows, iceRows, todayCount: mapped.length }
 }

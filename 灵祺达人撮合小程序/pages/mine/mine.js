@@ -108,6 +108,10 @@ Page({
         : wxLoggedIn
           ? '完善多平台资料，报名更便捷'
           : '达人 · 发现优质商单'
+    } else if (identity === 'shoot' || identity === 'edit') {
+      if (member?.wxNickName) profileNick = member.wxNickName
+      if (member?.wxAvatarUrl) avatarUrl = member.wxAvatarUrl
+      displaySub = userProfile.supplierDisplaySub(identity)
     } else if (identity === 'pr') {
       if (prProfile?.wxNickName) profileNick = prProfile.wxNickName
       if (prProfile?.wxAvatarUrl) avatarUrl = prProfile.wxAvatarUrl
@@ -117,7 +121,10 @@ Page({
     const displayName = profileNick || '灵祺用户'
 
     let identityIdLine = ''
-    if (identity === 'talent' && member?.lingqiTalentId) {
+    if (
+      (identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
+      member?.lingqiTalentId
+    ) {
       identityIdLine = lingqiIdentity.formatTalentIdLabel(member.lingqiTalentId)
     } else if (identity === 'pr' && prProfile?.lingqiPrId) {
       identityIdLine = lingqiIdentity.formatPrIdLabel(prProfile.lingqiPrId)

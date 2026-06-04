@@ -13,6 +13,7 @@ import {
   accountToClientPayload,
   createMpAuthRest,
   mpAuthPasswordLogin,
+  mpAuthPhoneRegister,
   mpAuthScanConfirmDev,
   mpAuthScanCreate,
   mpAuthScanPoll,
@@ -170,6 +171,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'register') {
+      const roleRaw = pickAuthField(req, body, 'role')
+      const { token, account, isNew } = await mpAuthPhoneRegister(supabaseUrl, serviceRole, {
+        phone: String(body.phone || body.loginName || ''),
+        smsCode: String(body.smsCode || ''),
+        password: String(body.password || ''),
+        role: roleRaw === 'pr' ? 'pr' : 'talent',
+        wxNickName: pickAuthField(req, body, 'wxNickName'),
+        wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
+      })
+      sendJson(res, 200, { ok: true, token, isNew, account: accountToClientPayload(account) })
+      return
+    }
+
     if (action === 'set_password' || action === 'set_login_credentials') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -263,6 +278,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       actions: [
         'wx_login',
         'password_login',
+        'register',
         'set_password',
         'switch_role',
         'session',
