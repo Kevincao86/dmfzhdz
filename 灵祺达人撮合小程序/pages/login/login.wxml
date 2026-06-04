@@ -32,6 +32,7 @@
     <view class="login-top-fade" aria-hidden="true" />
   </view>
 
+  <view class="login-body">
   <view class="login-stack">
     <view class="login-shell">
       <view class="login-main">
@@ -96,7 +97,7 @@
           </view>
         </view>
 
-        <scroll-view class="login-spark-track" scroll-x enable-flex show-scrollbar="{{false}}">
+        <view class="login-spark-grid">
           <view
             class="login-spark-pill login-spark-pill--{{index}}"
             wx:for="{{promoPills}}"
@@ -106,10 +107,36 @@
             <text class="login-spark-pill__tag">{{item.tag}}</text>
             <text class="login-spark-pill__text">{{item.text}}</text>
           </view>
-        </scroll-view>
+        </view>
 
         <text class="login-spark-flow">{{promoFlow}}</text>
       </view>
     </view>
+  </view>
+
+  <view class="login-fill">
+    <view class="login-steps">
+      <view
+        class="login-step"
+        wx:for="{{promoSteps}}"
+        wx:key="title"
+        wx:for-index="index"
+      >
+        <view class="login-step__n">{{item.n}}</view>
+        <text class="login-step__title">{{item.title}}</text>
+        <text class="login-step__sub">{{item.sub}}</text>
+        <view class="login-step__line" wx:if="{{index < 2}}" aria-hidden="true" />
+      </view>
+    </view>
+    <view class="login-trust">
+      <text class="login-trust__dot" />
+      <text class="login-trust__text">安全登录 · 一微信一灵祺 ID · 达人/PR 数据互通</text>
+    </view>
+    <view class="login-deco" aria-hidden="true">
+      <view class="login-deco__blob login-deco__blob--1" />
+      <view class="login-deco__blob login-deco__blob--2" />
+      <view class="login-deco__wave" />
+    </view>
+  </view>
   </view>
 </view>
