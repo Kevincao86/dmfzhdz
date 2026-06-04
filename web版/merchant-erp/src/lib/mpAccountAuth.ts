@@ -214,9 +214,9 @@ async function provisionRegistryForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    const existingByWx =
-      openId &&
-      (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
+    const existingByWx = openId
+      ? (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
+      : undefined
     if (existingByWx?.lingqiTalentId) {
       await updateAccount(rest, account.id, {
         lingqi_talent_id: existingByWx.lingqiTalentId,
@@ -251,8 +251,9 @@ async function provisionRegistryForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    const existingPr =
-      openId && (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+    const existingPr = openId
+      ? (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+      : undefined
     if (existingPr?.lingqiPrId) {
       await updateAccount(rest, account.id, {
         lingqi_pr_id: existingPr.lingqiPrId,
