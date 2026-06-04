@@ -1,0 +1,74 @@
+/** 环墙旋转：拖动过程不走 setData，避免卡顿抖动 */
+var DEG_PER_PX = 0.36
+var TAP_MOVE_PX = 12
+
+function ringStyle(yaw) {
+  return 'transform: rotateY(' + yaw + 'deg);transition:none;'
+}
+
+function touchStart(event, ownerInstance) {
+  var touch = event.touches[0]
+  if (!touch) return
+  var state = ownerInstance.getState()
+  var ds = event.target && event.target.dataset
+  var faceIndex = -1
+  if (ds && ds.index !== undefined && ds.index !== '') {
+    faceIndex = parseInt(ds.index, 10)
+    if (faceIndex !== faceIndex) faceIndex = -1
+  }
+  state.dragging = 1
+  state.startX = touch.pageX
+  state.startYaw = state.yaw || 0
+  state.lastX = touch.pageX
+  state.lastStamp = event.timeStamp
+  state.moved = 0
+  state.vx = 0
+  state.faceIndex = faceIndex
+  ownerInstance.callMethod('orbitDragStart', {})
+  ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(state.startYaw))
+}
+
+function touchMove(event, ownerInstance) {
+  var state = ownerInstance.getState()
+  if (!state.dragging) return
+  var touch = event.touches[0]
+  if (!touch) return
+  var dx = touch.pageX - state.startX
+  var step = touch.pageX - state.lastX
+  state.moved = (state.moved || 0) + (step < 0 ? -step : step)
+  var dt = event.timeStamp - state.lastStamp
+  if (dt > 0) {
+    state.vx = step / dt
+  }
+  state.lastX = touch.pageX
+  state.lastStamp = event.timeStamp
+  var yaw = state.startYaw + dx * DEG_PER_PX
+  state.yaw = yaw
+  ownerInstance.selectComponent('.orbit__ring').setStyle(ringStyle(yaw))
+}
+
+function touchEnd(event, ownerInstance) {
+  var state = ownerInstance.getState()
+  if (!state.dragging) return
+  state.dragging = 0
+  var moved = state.moved || 0
+  var faceIndex = state.faceIndex
+  if (moved < TAP_MOVE_PX && faceIndex >= 0) {
+    ownerInstance.callMethod('orbitOpenExpand', { index: faceIndex })
+    ownerInstance.callMethod('orbitDragEnd', { yaw: state.yaw || 0, coast: 0 })
+    return
+  }
+  var yaw = state.yaw || 0
+  var vx = state.vx || 0
+  var coast = 0
+  if (vx > 0.05 || vx < -0.05) {
+    coast = vx * 180
+  }
+  ownerInstance.callMethod('orbitDragEnd', { yaw: yaw, coast: coast })
+}
+
+module.exports = {
+  start: touchStart,
+  move: touchMove,
+  end: touchEnd,
+}
