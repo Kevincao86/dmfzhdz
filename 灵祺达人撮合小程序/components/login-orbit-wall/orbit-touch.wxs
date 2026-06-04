@@ -1,12 +1,23 @@
-/** 环墙旋转：拖动走 WXS，角度限制在正面可见范围 */
+// 环墙旋转：拖动走 WXS，松手吸附到卡位
 var DEG_PER_PX = 0.32
 var TAP_MOVE_PX = 16
-var FACE_COUNT = 6
-var STEP = 360 / FACE_COUNT
+var STEP = 60
+
+function toNum(v) {
+  var n = +v
+  if (n !== n) return 0
+  return n
+}
+
+function mod360(yaw) {
+  var y = toNum(yaw)
+  while (y < 0) y = y + 360
+  while (y >= 360) y = y - 360
+  return y
+}
 
 function snapYaw(yaw) {
-  var y = Number(yaw) || 0
-  y = ((y % 360) + 360) % 360
+  var y = mod360(yaw)
   return Math.round(y / STEP) * STEP
 }
 
@@ -30,7 +41,7 @@ function touchStart(event, ownerInstance) {
   var ds = event.target && event.target.dataset
   var faceIndex = -1
   if (ds && ds.index !== undefined && ds.index !== '') {
-    faceIndex = parseInt(ds.index, 10)
+    faceIndex = parseInt(ds.index)
     if (faceIndex !== faceIndex) faceIndex = -1
   }
   var yaw0 = readYawFromEvent(event, state)
@@ -84,5 +95,5 @@ function touchEnd(event, ownerInstance) {
 module.exports = {
   start: touchStart,
   move: touchMove,
-  end: touchEnd,
+  end: touchEnd
 }
