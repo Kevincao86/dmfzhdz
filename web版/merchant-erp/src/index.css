@@ -119,3 +119,18 @@ body {
   animation: dh-preview-pan 5s ease-in-out infinite;
   transform-origin: center center;
 }
+
+@keyframes hero-crossfade {
+  0%,
+  26% {
+    opacity: 1;
+  }
+  33%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-hero-crossfade {
+  animation: hero-crossfade 10s infinite;
+}

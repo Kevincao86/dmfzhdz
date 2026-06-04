@@ -23,7 +23,7 @@ export type NavItem = {
 
 /** 与 https://ldjrg1ypt9x4.meoo.zone/ 前端 bundle 中菜单配置一致 */
 export const NAV_ITEMS: NavItem[] = [
-  { path: '/', label: '首页', icon: Home },
+  { path: '/home', label: '首页', icon: Home },
   { path: '/ai-agent', label: 'AI 智能体', icon: Bot },
   {
     path: '/store',
@@ -66,7 +66,7 @@ export const NAV_ITEMS: NavItem[] = [
 ]
 
 export function pathActive(pathname: string, itemPath: string) {
-  if (itemPath === '/') return pathname === '/'
+  if (itemPath === '/home') return pathname === '/home'
   return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
 }
 
