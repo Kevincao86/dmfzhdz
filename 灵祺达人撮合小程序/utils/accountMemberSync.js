@@ -1,4 +1,3 @@
-const auth = require('./auth.js')
 const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
 
