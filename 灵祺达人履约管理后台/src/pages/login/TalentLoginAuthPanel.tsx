@@ -67,7 +67,7 @@ export default function TalentLoginAuthPanel({
           <ShieldCheck className="h-5 w-5 text-violet-600" aria-hidden />
         </div>
         <p className="text-xs leading-relaxed text-slate-600">
-          登录名与密码在小程序「我的信息」中设置；数据经 HTTPS 加密传输。
+          手机号与密码在小程序「我的信息」中设置；数据经 HTTPS 加密传输。
         </p>
       </div>
 
@@ -99,15 +99,16 @@ export default function TalentLoginAuthPanel({
         <form className="space-y-4" onSubmit={onSubmit}>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700" htmlFor="tf-login-name">
-              登录名
+              手机号
             </label>
             <input
               id="tf-login-name"
               className={inputClass}
               autoComplete="username"
-              placeholder="在「我的信息」中设置的登录名"
+              inputMode="numeric"
+              placeholder="11 位大陆手机号"
               value={loginName}
-              onChange={(e) => onLoginNameChange(e.target.value)}
+              onChange={(e) => onLoginNameChange(e.target.value.replace(/\D/g, '').slice(0, 11))}
             />
           </div>
           <div>

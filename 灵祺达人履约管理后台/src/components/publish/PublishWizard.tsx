@@ -15,7 +15,13 @@ import {
   buildPublishOrder,
   type PublishForm,
 } from '../../lib/mpSync/publishOrder'
-import { DELIVERY_WINDOWS, newFansTier, newLevelTier, RECRUIT_MODES } from '../../lib/mpSync/publishFormOptions'
+import {
+  DELIVERY_WINDOWS,
+  newFansTier,
+  newLevelTier,
+  RECRUIT_MODES,
+  RECRUIT_TARGETS,
+} from '../../lib/mpSync/publishFormOptions'
 import {
   clearPublishDraft,
   getLatestPublishDraftForMode,
@@ -69,7 +75,9 @@ export default function PublishWizard() {
   const [search] = useSearchParams()
   const pr = readPrProfile()
 
-  const [step, setStep] = useState<'mode' | 'form' | 'done'>('mode')
+  const [step, setStep] = useState<'target' | 'mode' | 'placeholder' | 'form' | 'done'>('target')
+  const [recruitTarget, setRecruitTarget] = useState('')
+  const [recruitTargetLabel, setRecruitTargetLabel] = useState('')
   const [recruitMode, setRecruitMode] = useState('')
   const [recruitModeLabel, setRecruitModeLabel] = useState('')
   const [form, setForm] = useState<PublishForm>(emptyPublishForm)
@@ -236,7 +244,11 @@ export default function PublishWizard() {
     setErr('')
     setDraftHint('')
     try {
-      const order = buildPublishOrder(form, recruitMode, { editId: editMpId || undefined, existing: editingOrder || undefined })
+      const order = buildPublishOrder(form, recruitMode, {
+        editId: editMpId || undefined,
+        existing: editingOrder || undefined,
+        recruitTarget: recruitTarget || 'talent',
+      })
       if (isEditMode && editMpId) {
         await updateMpRecruitmentOrder(order)
       } else {
@@ -300,7 +312,7 @@ export default function PublishWizard() {
             className="px-4 py-2 rounded-lg border border-white/20"
             onClick={() => {
               setDoneId('')
-              setStep('mode')
+              setStep('target')
               setForm(emptyPublishForm())
               setIsEditMode(false)
               setEditMpId('')
@@ -315,25 +327,72 @@ export default function PublishWizard() {
     )
   }
 
+  if (step === 'target') {
+    return (
+      <div className="max-w-xl space-y-4">
+        <h2 className="text-xl font-bold">选择招募对象</h2>
+        <p className="text-sm text-slate-400">达人 · 拍摄 · 剪辑</p>
+        <div className="space-y-3">
+          {RECRUIT_TARGETS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`w-full text-left rounded-xl border p-4 transition-colors ${
+                'placeholder' in t && t.placeholder
+                  ? 'border-white/5 opacity-80'
+                  : 'border-white/10 hover:border-violet-500/40 bg-[#1a1a28]'
+              }`}
+              onClick={() => {
+                if ('placeholder' in t && t.placeholder) {
+                  setRecruitTarget(t.id)
+                  setRecruitTargetLabel(t.label)
+                  setStep('placeholder')
+                  return
+                }
+                setRecruitTarget(t.id)
+                setRecruitTargetLabel(t.label)
+                setStep('mode')
+              }}
+            >
+              <div className="font-semibold">{t.label}</div>
+              <div className="text-sm text-slate-400 mt-1">{t.sub}</div>
+              {'placeholder' in t && t.placeholder ? (
+                <span className="text-xs text-amber-500 mt-2 inline-block">筹备中</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'placeholder') {
+    return (
+      <div className="max-w-xl space-y-4">
+        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('target')}>
+          ‹ 返回
+        </button>
+        <h2 className="text-xl font-bold">{recruitTargetLabel}招募</h2>
+        <p className="text-sm text-slate-400">表单字段明日整理，当前仅支持「达人」发单。</p>
+      </div>
+    )
+  }
+
   if (step === 'mode') {
     return (
       <div className="max-w-xl space-y-4">
+        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('target')}>
+          ‹ 返回
+        </button>
         <h2 className="text-xl font-bold">选择招募模式</h2>
-        <p className="text-sm text-slate-400">探店 · 品宣 · 云剪</p>
+        <p className="text-sm text-slate-400">探店 · 品宣</p>
         <div className="space-y-3">
           {RECRUIT_MODES.map((m) => (
             <button
               key={m.id}
               type="button"
-              disabled={m.disabled}
-              className={`w-full text-left rounded-xl border p-4 transition-colors ${
-                m.disabled ? 'border-white/5 opacity-50 cursor-not-allowed' : 'border-white/10 hover:border-violet-500/40 bg-[#1a1a28]'
-              }`}
+              className="w-full text-left rounded-xl border border-white/10 hover:border-violet-500/40 bg-[#1a1a28] p-4 transition-colors"
               onClick={() => {
-                if (m.disabled) {
-                  setErr('云剪任务功能搭建中')
-                  return
-                }
                 setRecruitMode(m.id)
                 setRecruitModeLabel(m.label)
                 setSignupDeadlineDate('')
@@ -345,7 +404,6 @@ export default function PublishWizard() {
             >
               <div className="font-semibold">{m.label}</div>
               <div className="text-sm text-slate-400 mt-1">{m.sub}</div>
-              {m.disabled ? <span className="text-xs text-amber-500 mt-2 inline-block">搭建中</span> : null}
             </button>
           ))}
         </div>

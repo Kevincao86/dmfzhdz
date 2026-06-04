@@ -34,6 +34,7 @@ function applyPublishSafeHead(page) {
 
 const {
   DELIVERY_WINDOWS,
+  RECRUIT_TARGETS,
   RECRUIT_MODES,
   PLATFORMS,
   TALENT_TAGS,
@@ -43,6 +44,7 @@ const {
   FEE_TYPES,
   feeTypeLabel,
   modeById,
+  targetById,
   newLevelTier,
   newFansTier,
 } = publishOpts
@@ -133,8 +135,11 @@ function buildTierLevelGrid(selected, usedElsewhere) {
 
 Page({
   data: {
-    step: 'mode',
+    step: 'target',
+    recruitTargets: RECRUIT_TARGETS,
     recruitModes: RECRUIT_MODES,
+    recruitTarget: '',
+    recruitTargetLabel: '',
     deliveryWindows: DELIVERY_WINDOWS,
     todayDate: defaultSignupDate(),
     signupDeadlineDate: '',
@@ -452,7 +457,7 @@ Page({
     if (this.data.step === 'done' && this.data.createdOrder) return
     if (this.data.step === 'form' && this.data.recruitMode) return
     if (this.data.isEditMode) return
-    this.resetToMode()
+    this.resetToTarget()
   },
   async loadEditOrder(mpId) {
     if (!api.hasApi()) {
@@ -503,10 +508,12 @@ Page({
       wx.hideLoading()
     }
   },
-  resetToMode() {
+  resetToTarget() {
     this.setData({
-      step: 'mode',
+      step: 'target',
       pickerView: '',
+      recruitTarget: '',
+      recruitTargetLabel: '',
       recruitMode: '',
       recruitModeLabel: '',
       form: emptyForm(),
@@ -518,16 +525,35 @@ Page({
     this.syncDisplayFields()
     this.syncTabBarOverlay()
   },
-  onBackFromMode() {
+  onBackFromTarget() {
     wx.switchTab({ url: '/pages/index/index' })
+  },
+  onSelectTarget(e) {
+    const target = targetById(e.currentTarget.dataset.id)
+    if (!target) return
+    if (target.placeholder) {
+      this.setData({
+        step: 'placeholder',
+        recruitTarget: target.id,
+        recruitTargetLabel: target.label,
+      })
+      this.syncTabBarOverlay()
+      return
+    }
+    this.setData({
+      step: 'mode',
+      recruitTarget: target.id,
+      recruitTargetLabel: target.label,
+    })
+    this.syncTabBarOverlay()
+  },
+  onBackFromPlaceholder() {
+    this.setData({ step: 'target', recruitTarget: '', recruitTargetLabel: '' })
+    this.syncTabBarOverlay()
   },
   onSelectMode(e) {
     const mode = modeById(e.currentTarget.dataset.id)
     if (!mode) return
-    if (mode.disabled) {
-      wx.showToast({ title: '云剪任务功能搭建中', icon: 'none' })
-      return
-    }
     const today = defaultSignupDate()
     this.setData({
       step: 'form',
@@ -548,7 +574,7 @@ Page({
         editingOrder: null,
         isEditMode: false,
         editLoadDone: false,
-        step: 'mode',
+        step: 'target',
       })
       wx.switchTab({ url: '/pages/mine/mine' })
       return
@@ -961,6 +987,7 @@ Page({
           prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
           deliveryWindow: f.deliveryWindow,
           recruitMode: mode.id,
+          recruitTarget: this.data.recruitTarget || 'talent',
           signupDeadline: deadline,
           fansLimitMode: f.fansLimitMode,
           fansMin: f.fansMin,
@@ -1110,7 +1137,7 @@ Page({
     })
   },
   onFinish() {
-    this.resetToMode()
+    this.resetToTarget()
     wx.switchTab({ url: '/pages/index/index' })
   },
 })

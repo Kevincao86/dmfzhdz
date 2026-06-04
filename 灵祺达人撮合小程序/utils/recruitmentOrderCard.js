@@ -1,6 +1,7 @@
 const display = require('./recruitmentDisplay.js')
 const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
 const { isUrgentMpOrder, isIceMpOrder } = require('./recruitmentUrgent.js')
+const { recruitTargetFromMp } = require('./recruitTarget.js')
 const { isMerchantSyncedMpOrder } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
 
@@ -58,6 +59,7 @@ function mapMpOrderRow(mp, reg) {
     overRecruitHot,
     urgent,
     isIce: isIceMpOrder(mp),
+    recruitTarget: recruitTargetFromMp(mp),
     recommended: urgent || view.applicantCount >= 3 || priceAmount >= 1000,
     priceAmount,
     publishedAtMs,

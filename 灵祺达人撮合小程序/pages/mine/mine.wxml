@@ -102,7 +102,7 @@
         <text class="id-sheet-title">切换身份</text>
         <text class="id-sheet-close" bindtap="onCloseIdentitySheet">×</text>
       </view>
-      <text class="id-sheet-hint">同一账号可在达人接单与 PR 发单之间切换</text>
+      <text class="id-sheet-hint">同一账号可在接单团队与 PR 发单之间切换</text>
       <view
         class="id-sheet-opt {{identity === 'talent' ? 'active' : ''}}"
         data-id="talent"
@@ -116,6 +116,34 @@
           <text class="id-sheet-opt-sub">浏览商单、报名招募、管理个人资料</text>
         </view>
         <text class="id-sheet-check" wx:if="{{identity === 'talent'}}">✓</text>
+      </view>
+      <view
+        class="id-sheet-opt {{identity === 'shoot' ? 'active' : ''}}"
+        data-id="shoot"
+        bindtap="onPickIdentity"
+      >
+        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent">
+          <text class="id-sheet-opt-emoji">📷</text>
+        </view>
+        <view class="id-sheet-opt-body">
+          <text class="id-sheet-opt-title">拍摄团队</text>
+          <text class="id-sheet-opt-sub">摄影/拍摄任务接单大厅</text>
+        </view>
+        <text class="id-sheet-check" wx:if="{{identity === 'shoot'}}">✓</text>
+      </view>
+      <view
+        class="id-sheet-opt {{identity === 'edit' ? 'active' : ''}}"
+        data-id="edit"
+        bindtap="onPickIdentity"
+      >
+        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent">
+          <text class="id-sheet-opt-emoji">✂️</text>
+        </view>
+        <view class="id-sheet-opt-body">
+          <text class="id-sheet-opt-title">剪辑团队</text>
+          <text class="id-sheet-opt-sub">剪辑任务接单大厅</text>
+        </view>
+        <text class="id-sheet-check" wx:if="{{identity === 'edit'}}">✓</text>
       </view>
       <view
         class="id-sheet-opt {{identity === 'pr' ? 'active' : ''}}"

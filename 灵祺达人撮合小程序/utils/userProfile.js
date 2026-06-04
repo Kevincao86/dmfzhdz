@@ -1,26 +1,31 @@
 const IDENTITY_KEY = 'meoo_talent_identity_v1'
 const PR_PROFILE_KEY = 'meoo_pr_profile_v1'
+const identityTypes = require('./identityTypes.js')
 
-const IDENTITIES = {
-  talent: { id: 'talent', label: '达人' },
-  pr: { id: 'pr', label: 'PR' },
-}
+const IDENTITIES = identityTypes.WORK_IDENTITIES
 
 function readIdentity() {
   try {
     const v = wx.getStorageSync(IDENTITY_KEY)
-    return v === 'pr' ? 'pr' : 'talent'
+    return identityTypes.isWorkIdentity(v) ? v : 'talent'
   } catch {
     return 'talent'
   }
 }
 
 function writeIdentity(id) {
-  wx.setStorageSync(IDENTITY_KEY, id === 'pr' ? 'pr' : 'talent')
+  wx.setStorageSync(
+    IDENTITY_KEY,
+    identityTypes.isWorkIdentity(id) ? id : 'talent',
+  )
 }
 
 function identityLabel(id) {
-  return IDENTITIES[id === 'pr' ? 'pr' : 'talent'].label
+  return identityTypes.workIdentityLabel(id)
+}
+
+function isSupplierIdentity(id) {
+  return identityTypes.isSupplierWorkIdentity(id || readIdentity())
 }
 
 function readPrProfile() {
@@ -73,14 +78,23 @@ function prDisplaySub(profile) {
   return region || String(profile.companyName || '').trim() || 'PR · 发招募找达人'
 }
 
+function supplierDisplaySub(id) {
+  const identity = id || readIdentity()
+  if (identity === 'shoot') return '拍摄团队 · 接单大厅'
+  if (identity === 'edit') return '剪辑团队 · 接单大厅'
+  return '达人 · 浏览商单、报名招募'
+}
+
 module.exports = {
   IDENTITIES,
   readIdentity,
   writeIdentity,
   identityLabel,
+  isSupplierIdentity,
   readPrProfile,
   writePrProfile,
   emptyPrProfile,
   prDisplayName,
   prDisplaySub,
+  supplierDisplaySub,
 }

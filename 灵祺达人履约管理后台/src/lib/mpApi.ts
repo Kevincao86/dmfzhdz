@@ -69,6 +69,35 @@ export async function setLoginCredentials(loginName: string, password?: string) 
   return { account: data.account as MpAccount }
 }
 
+export async function sendRegisterSms(phone: string) {
+  const res = await fetch(`${API_BASE}/api/meoo-auth-sms-send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone: phone.trim() }),
+  })
+  const data = (await res.json()) as Record<string, unknown>
+  if (!res.ok || data.ok === false) throw new Error(String(data.message || data.error || 'send_failed'))
+  return data
+}
+
+export async function phoneRegister(input: {
+  phone: string
+  smsCode: string
+  password: string
+  role: 'talent' | 'pr'
+}) {
+  const data = await mpAuthRequest('register', {
+    phone: input.phone.trim(),
+    smsCode: input.smsCode.trim(),
+    password: input.password,
+    role: input.role,
+  })
+  return {
+    token: String(data.token),
+    account: data.account as MpAccount,
+  }
+}
+
 async function parseJsonRes(res: Response) {
   const text = await res.text()
   try {

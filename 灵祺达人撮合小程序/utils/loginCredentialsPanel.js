@@ -15,16 +15,16 @@ function patchFromAccount(acct) {
   }
 }
 
+const mpPhoneAuth = require('./mpPhoneAuth.js')
+
 function sanitizeLoginName(v) {
-  return String(v || '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 32)
-    .toLowerCase()
+  return mpPhoneAuth.sanitizePhoneInput(v)
 }
 
 function validateModal(loginName, password, hasPassword) {
-  const name = sanitizeLoginName(loginName)
-  if (!name || name.length < 2) return '登录名须为 2–32 位字母或数字'
+  const nameErr = mpPhoneAuth.validatePhoneAccount(loginName)
+  if (nameErr) return nameErr
+  const name = mpPhoneAuth.normalizeMpLoginPhone(loginName)
   if (!hasPassword && String(password || '').length < 6) return '请设置至少 6 位密码'
   const pwd = String(password || '')
   if (pwd.length > 0 && pwd.length < 6) return '密码至少 6 位'
@@ -33,8 +33,8 @@ function validateModal(loginName, password, hasPassword) {
 
 function mapCredError(e) {
   const msg = e && e.message ? e.message : String(e)
-  if (/login_name_taken/i.test(msg)) return '用户名已被注册'
-  if (/invalid_login_name/i.test(msg)) return '登录名格式不正确'
+  if (/login_name_taken/i.test(msg)) return '该手机号已被注册'
+  if (/invalid_login_name|invalid_phone/i.test(msg)) return '请输入有效大陆手机号'
   if (/invalid_password/i.test(msg)) return '密码至少 6 位'
   if (/invalid_session/i.test(msg)) return '请先微信登录后再设置账号密码'
   return msg || '保存失败'
@@ -118,7 +118,7 @@ function createHandlers(auth) {
         this.setData({ credModalErr: err })
         return
       }
-      const name = sanitizeLoginName(this.data.modalLoginName)
+      const name = mpPhoneAuth.normalizeMpLoginPhone(this.data.modalLoginName)
       const pwd = String(this.data.modalPassword || '')
       this.setData({ credModalSaving: true, credModalErr: '' })
       try {

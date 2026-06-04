@@ -24,10 +24,12 @@
 <view class="cred-modal" wx:if="{{showCredModal}}" catchtap="stopBubble">
   <text class="cred-modal-title">{{credentialsReady ? '修改账号密码' : '新建账号密码'}}</text>
   <view class="form-row">
-    <text class="form-label">登录名</text>
+    <text class="form-label">手机号</text>
     <input
       class="input"
-      placeholder="字母数字，不可与已有用户重复"
+      type="number"
+      maxlength="11"
+      placeholder="11 位大陆手机号，不可重复"
       value="{{modalLoginName}}"
       bindinput="onModalLoginNameInput"
     />

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/AppShell'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import HallPage from './pages/HallPage'
 import OrdersPage from './pages/OrdersPage'
 import RecommendTalentPage from './pages/RecommendTalentPage'
@@ -36,6 +37,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route
         element={
           <RequireAuth>

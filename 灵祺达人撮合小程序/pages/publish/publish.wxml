@@ -13,27 +13,66 @@
 </template>
 
 <view class="pub-page pub-page--{{step}}">
-  <!-- 选择模式 -->
-  <block wx:if="{{step === 'mode'}}">
+  <!-- 选择招募对象 -->
+  <block wx:if="{{step === 'target'}}">
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
-      <text class="pub-hero-back" bindtap="onBackFromMode">‹ 返回</text>
+      <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
+      <text class="pub-hero-title">选择招募对象</text>
+      <text class="pub-hero-sub">达人 · 拍摄 · 剪辑</text>
+    </view>
+    <view class="pub-mode-list">
+      <view
+        wx:for="{{recruitTargets}}"
+        wx:key="id"
+        class="pub-mode-card {{item.placeholder ? 'pub-mode-card--disabled' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onSelectTarget"
+      >
+        <text class="pub-mode-name">{{item.label}}</text>
+        <text class="pub-mode-sub">{{item.sub}}</text>
+        <text wx:if="{{item.placeholder}}" class="pub-mode-badge">筹备中</text>
+        <text wx:else class="pub-mode-arrow">›</text>
+      </view>
+    </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{step === 'placeholder'}}">
+    <view class="pub-screen">
+      <template is="pubLifeBg" />
+      <view class="pub-hero" style="{{heroHeadStyle}}">
+        <text class="pub-hero-back" bindtap="onBackFromPlaceholder">‹ 返回</text>
+        <text class="pub-hero-title">{{recruitTargetLabel}}招募</text>
+        <text class="pub-hero-sub">表单字段明日整理，敬请期待</text>
+      </view>
+      <view class="pub-placeholder-card card">
+        <text class="hint">当前仅支持「达人」发单；{{recruitTargetLabel}}任务发布表单将随后开放。</text>
+      </view>
+    </view>
+  </block>
+
+  <!-- 达人：选择探店/品宣 -->
+  <block wx:elif="{{step === 'mode'}}">
+    <view class="pub-screen">
+      <template is="pubLifeBg" />
+    <view class="pub-hero" style="{{heroHeadStyle}}">
+      <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
       <text class="pub-hero-title">选择招募模式</text>
-      <text class="pub-hero-sub">探店 · 品宣 · 云剪</text>
+      <text class="pub-hero-sub">探店 · 品宣</text>
     </view>
     <view class="pub-mode-list">
       <view
         wx:for="{{recruitModes}}"
         wx:key="id"
-        class="pub-mode-card {{item.disabled ? 'pub-mode-card--disabled' : ''}}"
+        class="pub-mode-card"
         data-id="{{item.id}}"
         bindtap="onSelectMode"
       >
         <text class="pub-mode-name">{{item.label}}</text>
         <text class="pub-mode-sub">{{item.sub}}</text>
-        <text wx:if="{{item.disabled}}" class="pub-mode-badge">搭建中</text>
-        <text wx:else class="pub-mode-arrow">›</text>
+        <text class="pub-mode-arrow">›</text>
       </view>
     </view>
     </view>

@@ -131,6 +131,32 @@
   width: 100%;
 }
 
+.paichian-sub-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+  padding: 0 4rpx;
+}
+
+.paichian-sub-tab {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 8rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--lq-text-secondary);
+  background: var(--lq-surface);
+  border-radius: 999rpx;
+  border: 2rpx solid var(--lq-border);
+}
+
+.paichian-sub-tab--on {
+  color: #fff;
+  background: var(--lq-gradient-tab);
+  border-color: transparent;
+  box-shadow: var(--lq-shadow-tab);
+}
+
 .hall-tab-pro.active::after {
   display: none;
 }

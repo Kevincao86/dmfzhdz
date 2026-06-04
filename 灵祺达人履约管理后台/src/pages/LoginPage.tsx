@@ -163,7 +163,13 @@ export default function LoginPage() {
           showDevPreview={import.meta.env.DEV}
           onDevPreview={onDevPreview}
         />
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-4 text-center text-sm text-slate-600">
+          还没有账号？{' '}
+          <Link to={`/register?role=${loginRole}`} className="font-semibold text-violet-600 underline">
+            手机号注册
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-500">
           登录即表示同意平台服务条款 · 与达人招募小程序账号体系互通
         </p>
       </div>

@@ -55,6 +55,20 @@ async function passwordLogin(loginName, password) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function phoneRegister({ phone, smsCode, password, role }) {
+  const data = await authPost('register', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+    password: String(password || ''),
+    role: role === 'pr' ? 'pr' : 'talent',
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
+async function sendRegisterSms(phone) {
+  return ecs.post('/api/meoo-auth-sms-send', { phone: String(phone || '').trim() })
+}
+
 async function setLoginCredentials(loginName, password) {
   return authPost('set_login_credentials', {
     loginName: String(loginName || '').trim(),
@@ -77,6 +91,8 @@ async function refreshSession() {
 module.exports = {
   SESSION_KEY,
   ACCOUNT_KEY,
+  sendRegisterSms,
+  phoneRegister,
   readSessionToken,
   readAccount,
   writeSession,

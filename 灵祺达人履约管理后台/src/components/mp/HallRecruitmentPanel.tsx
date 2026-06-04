@@ -8,7 +8,8 @@ import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
-type HallTab = 'normal' | 'urgent' | 'ice'
+type HallTab = 'normal' | 'urgent' | 'paichian'
+type PaichianSubTab = 'shoot' | 'edit' | 'ice'
 
 function matchSearch(row: RecruitmentOrderRow, keyword: string) {
   if (!keyword) return true
@@ -22,6 +23,7 @@ type Props = { prMode?: boolean }
 export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const goDetail = useRecruitmentNav()
   const [hallTab, setHallTab] = useState<HallTab>('normal')
+  const [paichianSubTab, setPaichianSubTab] = useState<PaichianSubTab>('shoot')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
@@ -34,13 +36,20 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [todayCount, setTodayCount] = useState(0)
   const [normalRows, setNormalRows] = useState<RecruitmentOrderRow[]>([])
   const [urgentRows, setUrgentRows] = useState<RecruitmentOrderRow[]>([])
+  const [shootRows, setShootRows] = useState<RecruitmentOrderRow[]>([])
+  const [editRows, setEditRows] = useState<RecruitmentOrderRow[]>([])
   const [iceRows, setIceRows] = useState<RecruitmentOrderRow[]>([])
   const [displayRows, setDisplayRows] = useState<RecruitmentOrderRow[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>(['全部'])
 
   const applyFilters = useCallback(async () => {
-    let rows =
-      hallTab === 'urgent' ? urgentRows : hallTab === 'ice' ? iceRows : normalRows
+    let rows = normalRows
+    if (hallTab === 'urgent') rows = urgentRows
+    else if (hallTab === 'paichian') {
+      if (paichianSubTab === 'edit') rows = editRows
+      else if (paichianSubTab === 'ice') rows = iceRows
+      else rows = shootRows
+    }
     const kw = searchKeyword.trim()
     rows = rows.filter((r) => {
       if (!matchSearch(r, kw)) return false
@@ -54,7 +63,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     setDisplayRows(base)
     const enriched = await recruitmentAi.enrichOrderTags(base)
     setDisplayRows(enriched)
-  }, [hallTab, urgentRows, iceRows, normalRows, searchKeyword, filterPlatform, filterCity, priceSelected, sortBy])
+  }, [hallTab, paichianSubTab, urgentRows, shootRows, editRows, iceRows, normalRows, searchKeyword, filterPlatform, filterCity, priceSelected, sortBy])
 
   useEffect(() => {
     void applyFilters()
@@ -66,12 +75,15 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       setErr('')
       try {
         const reg = await fetchMpRegistry()
-        const { normalRows: n, urgentRows: u, iceRows: i, todayCount: tc } = splitHallRows(reg)
+        const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
+          splitHallRows(reg)
         setNormalRows(n)
         setUrgentRows(u)
+        setShootRows(sh)
+        setEditRows(ed)
         setIceRows(i)
         setTodayCount(tc)
-        setCityFilters(hallFilters.buildCityFilterOptions([...n, ...u, ...i]))
+        setCityFilters(hallFilters.buildCityFilterOptions([...n, ...u, ...sh, ...ed, ...i]))
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -83,6 +95,15 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const tabs: { id: HallTab; label: string; count: number }[] = [
     { id: 'normal', label: '招募大厅', count: normalRows.length },
     { id: 'urgent', label: '急单大厅', count: urgentRows.length },
+    {
+      id: 'paichian',
+      label: '拍剪任务',
+      count: shootRows.length + editRows.length + iceRows.length,
+    },
+  ]
+  const paichianSubs: { id: PaichianSubTab; label: string; count: number }[] = [
+    { id: 'shoot', label: '拍摄任务', count: shootRows.length },
+    { id: 'edit', label: '剪辑任务', count: editRows.length },
     { id: 'ice', label: '云剪任务', count: iceRows.length },
   ]
 
@@ -117,6 +138,24 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           </button>
         ))}
       </div>
+
+      {hallTab === 'paichian' ? (
+        <div className="flex gap-2 flex-wrap">
+          {paichianSubs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`px-3 py-1.5 rounded-full text-sm ${
+                paichianSubTab === t.id ? 'bg-violet-600/80 text-white' : 'bg-white/5 text-slate-400'
+              }`}
+              onClick={() => setPaichianSubTab(t.id)}
+            >
+              {t.label}
+              {t.count > 0 ? ` ${t.count}` : ''}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2 text-sm">
         <select

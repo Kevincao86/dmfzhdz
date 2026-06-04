@@ -7,6 +7,8 @@ import { allocateLingqiTalentId } from './lingqiIdentity.js'
 import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
+import { verifyAuthSmsCode } from '../vite-plugins/authSmsAuthShared.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -412,7 +414,7 @@ export async function mpAuthPasswordLogin(
   password: string,
 ): Promise<{ token: string; account: MpAccountRow }> {
   const rest = restClient(supabaseUrl, serviceRole)
-  const name = String(loginName || '').trim().toLowerCase()
+  const name = normalizeMpLoginName(loginName)
   if (!name || !password) throw new Error('invalid_credentials')
   const account = await findAccountByLoginName(rest, name)
   if (!account?.password_hash || !account.password_salt) throw new Error('invalid_credentials')
@@ -421,6 +423,58 @@ export async function mpAuthPasswordLogin(
   }
   const token = await createSession(rest, account.id)
   return { token, account }
+}
+
+export type MpAuthPhoneRegisterInput = {
+  phone: string
+  smsCode: string
+  password: string
+  role?: MpAccountRole
+  wxNickName?: string
+  wxAvatarUrl?: string
+}
+
+/** 手机号 + 验证码注册（无微信 openid，供网页/小程序账号注册） */
+export async function mpAuthPhoneRegister(
+  supabaseUrl: string,
+  serviceRole: string,
+  input: MpAuthPhoneRegisterInput,
+): Promise<{ token: string; account: MpAccountRow; isNew: true }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const phone = normalizeMpLoginPhone(input.phone)
+  if (!phone) throw new Error('invalid_phone')
+  const smsCode = String(input.smsCode || '').trim()
+  if (!/^\d{6}$/.test(smsCode)) throw new Error('invalid_sms_code')
+  const password = String(input.password || '')
+  if (password.length < 6) throw new Error('invalid_password')
+  if (!(await verifyAuthSmsCode(phone, smsCode))) throw new Error('sms_code_invalid')
+
+  const existing = await findAccountByLoginName(rest, phone)
+  if (existing) throw new Error('login_name_taken')
+
+  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+  const { hash, salt } = hashPassword(password)
+  let account = await insertAccount(rest, {
+    openid: null,
+    login_name: phone,
+    password_hash: hash,
+    password_salt: salt,
+    active_role: role,
+    wx_nick_name: input.wxNickName || '',
+    wx_avatar_url: input.wxAvatarUrl || '',
+  })
+
+  account = await provisionRegistryForAccount(
+    supabaseUrl,
+    serviceRole,
+    account,
+    role,
+    input.wxNickName || '',
+    input.wxAvatarUrl || '',
+  )
+
+  const token = await createSession(rest, account.id)
+  return { token, account, isNew: true }
 }
 
 export async function mpAuthSetPassword(
@@ -442,8 +496,11 @@ export async function mpAuthSetLoginCredentials(
   password?: string,
 ): Promise<void> {
   const rest = restClient(supabaseUrl, serviceRole)
-  const name = String(loginName || '').trim().toLowerCase()
+  const name = normalizeMpLoginName(loginName)
   if (!name) throw new Error('invalid_login_name')
+  const cur = await findAccountById(rest, accountId)
+  const curName = String(cur?.login_name || '').trim()
+  if (name !== curName && !isValidMpLoginPhone(name)) throw new Error('invalid_login_name')
   const existing = await findAccountByLoginName(rest, name)
   if (existing && existing.id !== accountId) throw new Error('login_name_taken')
   const patch: Record<string, unknown> = { login_name: name }

@@ -1,20 +1,44 @@
 import { Link } from 'react-router-dom'
 import { getAccount, getActiveRole } from '../lib/mpSession'
+import { getWorkIdentity, setWorkIdentity, workIdentityLabel, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
+
+const WORK_IDS: MpWorkIdentity[] = ['talent', 'shoot', 'edit', 'pr']
 
 export default function ProfilePage() {
   const acc = getAccount()
   const role = getActiveRole()
+  const workId = getWorkIdentity()
   const member = readMember()
   const pr = readPrProfile()
 
   return (
     <div className="max-w-2xl space-y-6">
       <h2 className="text-xl font-bold">我的</h2>
+
+      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
+        <h3 className="text-sm font-semibold text-slate-300 mb-3">工作台身份（与小程序「我的」一致）</h3>
+        <div className="flex flex-wrap gap-2">
+          {WORK_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`px-3 py-1.5 rounded-lg text-sm ${
+                workId === id ? 'bg-violet-600 text-white' : 'bg-white/5 text-slate-400'
+              }`}
+              onClick={() => setWorkIdentity(id)}
+            >
+              {workIdentityLabel(id)}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500 mt-2">当前：{workIdentityLabel(workId)} · 账号版本仍为 {role === 'pr' ? 'PR' : '达人'}</p>
+      </section>
+
       <dl className="rounded-xl border border-white/10 bg-[#1a1a28] p-6 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
-          <dt className="text-slate-500">登录名</dt>
+          <dt className="text-slate-500">手机号</dt>
           <dd>{acc?.loginName || acc?.wxNickName || '—'}</dd>
         </div>
         <div className="flex justify-between gap-4">

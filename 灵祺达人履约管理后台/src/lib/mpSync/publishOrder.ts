@@ -270,16 +270,19 @@ export function computePublishDisplay(form: PublishForm): PublishDisplay {
 export function buildPublishOrder(
   form: PublishForm,
   recruitModeId: string,
-  options?: { editId?: string; existing?: Record<string, unknown> },
+  options?: { editId?: string; existing?: Record<string, unknown>; recruitTarget?: string },
 ) {
   const mode = modeById(recruitModeId)
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const ts = Date.now()
   const existing = options?.existing
   const editId = options?.editId
-  const mpId = editId && existing ? editId : mode.hall === 'ice' ? `MP-ICE-${ts}` : `MP-RO-${ts}`
+  const mpId = editId && existing ? editId : `MP-RO-${ts}`
   const recruitCount = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
-  const isUrgent = form.deliveryWindow === 'urgent' && mode.hall !== 'ice'
+  const isUrgent = form.deliveryWindow === 'urgent'
+  const recruitTarget = options?.recruitTarget === 'shoot' || options?.recruitTarget === 'edit'
+    ? options.recruitTarget
+    : 'talent'
   const deadline = resolveSignupDeadline(form)
   const recruitmentInfo = buildRecruitmentInfo(form, recruitModeId)
   const pr = readPrProfile()
@@ -314,6 +317,7 @@ export function buildPublishOrder(
       prWxAvatarUrl: String(pr?.wxAvatarUrl || '').trim(),
       deliveryWindow: form.deliveryWindow,
       recruitMode: mode.id,
+      recruitTarget,
       signupDeadline: deadline,
       fansLimitMode: form.fansLimitMode,
       fansMin: form.fansMin,
@@ -334,14 +338,6 @@ export function buildPublishOrder(
       applyFormFields: form.applyFormFields || [],
     },
   }
-  if (mode.hall === 'ice') {
-    order.orderKind = 'recruitment_ice'
-    order.hall = 'ice'
-    order.fulfillmentLoop = 'closed'
-    const url = String(form.iceVideoUrl || '').trim()
-    order.iceVideoSlots = [{ slotId: `SLOT-${ts}`, label: '成片1', downloadUrl: url, iceJobId: '' }]
-  } else {
-    order.hall = 'normal'
-  }
+  order.hall = 'normal'
   return order
 }
