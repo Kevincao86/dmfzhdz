@@ -1,4 +1,5 @@
 @import './styles/theme.wxss';
+@import './styles/subpage-nav.wxss';
 
 page {
   background: var(--lq-bg);
