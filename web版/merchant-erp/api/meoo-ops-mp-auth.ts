@@ -16,7 +16,6 @@ import {
   mpAuthScanConfirmDev,
   mpAuthScanCreate,
   mpAuthScanPoll,
-  mpAuthSetPassword,
   mpAuthSetLoginCredentials,
   mpAuthSwitchRole,
   mpAuthWxLogin,
