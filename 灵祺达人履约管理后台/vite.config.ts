@@ -40,24 +40,26 @@ function merchantPublicAssetsPlugin(): Plugin {
   }
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const fulfillmentRoot = path.dirname(fileURLToPath(import.meta.url))
   const env = {
     ...loadEnv(mode, MERCHANT_ERP_ROOT, ''),
     ...loadEnv(mode, fulfillmentRoot, ''),
   }
+  const devOnlyPlugins =
+    command === 'serve'
+      ? [
+          merchantPublicAssetsPlugin(),
+          merchantApiMockPlugin(),
+          opsErpSyncGatewayPlugin(),
+          mpAuthGatewayPlugin(),
+          mpHallRegistryGatewayPlugin(),
+        ]
+      : []
 
   return {
     envDir: MERCHANT_ERP_ROOT,
-    plugins: [
-      react(),
-      tailwindcss(),
-      merchantPublicAssetsPlugin(),
-      merchantApiMockPlugin(),
-      opsErpSyncGatewayPlugin(),
-      mpAuthGatewayPlugin(),
-      mpHallRegistryGatewayPlugin(),
-    ],
+    plugins: [react(), tailwindcss(), ...devOnlyPlugins],
     resolve: {
       alias: {
         '@merchant': MERCHANT_ERP_SRC,
