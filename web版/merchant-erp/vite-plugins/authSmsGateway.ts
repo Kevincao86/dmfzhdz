@@ -1,7 +1,7 @@
 import type { IncomingMessage } from 'node:http'
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import type { Plugin } from 'vite'
-import mpAuthHandler from '../api/meoo-ops-mp-auth.js'
+import type { VercelRequest } from '@vercel/node'
+import { loadEnv, type Plugin } from 'vite'
+import smsSendHandler from '../api/meoo-auth-sms-send.js'
 import { applyViteEnvDirs } from './mpDevEnv.js'
 import { createMockVercelResponse } from './vercelMockResponse.js'
 
@@ -14,10 +14,10 @@ function readBody(req: IncomingMessage): Promise<string> {
   })
 }
 
-/** Vite dev：/api/meoo-ops-mp-auth */
-export function mpAuthGatewayPlugin(opts?: { extraEnvDirs?: string[] }): Plugin {
+/** Vite dev：/api/meoo-auth-sms-send */
+export function authSmsGatewayPlugin(opts?: { extraEnvDirs?: string[] }): Plugin {
   return {
-    name: 'mp-auth-gateway',
+    name: 'auth-sms-gateway',
     configResolved(config) {
       applyViteEnvDirs(config.mode, [config.root, ...(opts?.extraEnvDirs ?? [])])
     },
@@ -25,14 +25,14 @@ export function mpAuthGatewayPlugin(opts?: { extraEnvDirs?: string[] }): Plugin 
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ?? ''
         const path = rawUrl.split('?')[0]
-        if (path !== '/api/meoo-ops-mp-auth') return next()
+        if (path !== '/api/meoo-auth-sms-send') return next()
 
         const method = req.method ?? 'GET'
         if (method === 'OPTIONS') {
           res.statusCode = 204
           res.setHeader('Access-Control-Allow-Origin', '*')
-          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
+          res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
           res.end()
           return
         }
@@ -55,14 +55,14 @@ export function mpAuthGatewayPlugin(opts?: { extraEnvDirs?: string[] }): Plugin 
         const { mockRes, setStatus } = createMockVercelResponse(res)
 
         try {
-          await mpAuthHandler(mockReq, mockRes)
+          await smsSendHandler(mockReq, mockRes)
         } catch (e) {
           setStatus(500)
           res.setHeader('Content-Type', 'application/json')
           res.end(
             JSON.stringify({
               ok: false,
-              error: 'mp_auth_gateway_failed',
+              error: 'auth_sms_gateway_failed',
               detail: e instanceof Error ? e.message : String(e),
             }),
           )

@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { MERCHANT_ERP_PUBLIC, MERCHANT_ERP_ROOT, MERCHANT_ERP_SRC } from './vite.merchantErpRoot'
 import { merchantApiMockPlugin } from '../web版/merchant-erp/vite-plugins/merchantApiMock'
+import { authSmsGatewayPlugin } from '../web版/merchant-erp/vite-plugins/authSmsGateway'
 import { mpAuthGatewayPlugin } from '../web版/merchant-erp/vite-plugins/mpAuthGateway'
 import { mpHallRegistryGatewayPlugin } from '../web版/merchant-erp/vite-plugins/mpHallRegistryGateway'
 import { opsErpSyncGatewayPlugin } from '../web版/merchant-erp/vite-plugins/opsErpSyncGateway'
@@ -52,7 +53,8 @@ export default defineConfig(({ mode, command }) => {
           merchantPublicAssetsPlugin(),
           merchantApiMockPlugin(),
           opsErpSyncGatewayPlugin(),
-          mpAuthGatewayPlugin(),
+          mpAuthGatewayPlugin({ extraEnvDirs: [MERCHANT_ERP_ROOT] }),
+          authSmsGatewayPlugin({ extraEnvDirs: [MERCHANT_ERP_ROOT] }),
           mpHallRegistryGatewayPlugin(),
         ]
       : []
