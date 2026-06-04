@@ -1,20 +1,12 @@
 import type { MpAccount } from './mpSession'
 import { getToken } from './mpSession'
-
-const API_BASE = (import.meta.env.VITE_MP_API_BASE as string | undefined)?.replace(/\/$/, '') || ''
-
-function apiUrl(path: string) {
-  if (!API_BASE && import.meta.env.PROD) {
-    throw new Error('未配置 VITE_MP_API_BASE，请在 Vercel 设置如 https://mofangdianai.com/erp-api 后重新部署')
-  }
-  return `${API_BASE}${path}`
-}
+import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 
 async function parseJsonRes(res: Response) {
   const text = await res.text()
   if (!text.trim()) {
     throw new Error(
-      API_BASE
+      mpErpApiBase()
         ? `接口返回为空（HTTP ${res.status}）`
         : '接口返回为空：生产环境请配置 VITE_MP_API_BASE；本地请用 npm run dev 启动',
     )
@@ -31,18 +23,65 @@ function throwApiError(data: Record<string, unknown>, status: number) {
   throw new Error(msg)
 }
 
+async function postJsonCandidates(
+  apiPath: string,
+  body: unknown,
+  opts?: { includeVercelSms?: boolean; extraHeaders?: Record<string, string> },
+) {
+  const candidates = mpApiFetchCandidates(apiPath, opts)
+  if (!candidates.length) {
+    throw new Error('未配置 VITE_MP_API_BASE，请在 Vercel 设置如 https://mofangdianai.com/erp-api 后重新部署')
+  }
+  let lastErr = 'request_failed'
+  for (let i = 0; i < candidates.length; i += 1) {
+    const url = candidates[i]!
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...opts?.extraHeaders,
+        },
+        body: JSON.stringify(body),
+      })
+      const data = await parseJsonRes(res)
+      if (!res.ok || data.ok === false) {
+        const err = String(data.error || data.message || `http_${res.status}`)
+        if ((res.status === 404 || err === 'not_found') && i < candidates.length - 1) {
+          lastErr = err
+          continue
+        }
+        throwApiError(data, res.status)
+      }
+      return data
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (i < candidates.length - 1 && /not_found|404|response_not_json/i.test(lastErr)) continue
+      throw e
+    }
+  }
+  throw new Error(lastErr)
+}
+
+function apiUrl(path: string) {
+  const base = mpErpApiBase()
+  if (!base) {
+    if (import.meta.env.PROD) {
+      throw new Error('未配置 VITE_MP_API_BASE，请在 Vercel 设置如 https://mofangdianai.com/erp-api 后重新部署')
+    }
+    return path
+  }
+  return buildMpErpApiUrl(base, path)
+}
+
 async function mpAuthRequest(action: string, body: Record<string, unknown> = {}) {
-  const res = await fetch(apiUrl('/api/meoo-ops-mp-auth'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(getToken() ? { 'X-Mp-Session': getToken() } : {}),
+  return postJsonCandidates(
+    '/api/meoo-ops-mp-auth',
+    { action, ...body },
+    {
+      extraHeaders: getToken() ? { 'X-Mp-Session': getToken() } : {},
     },
-    body: JSON.stringify({ action, ...body }),
-  })
-  const data = await parseJsonRes(res)
-  if (!res.ok || data.ok === false) throwApiError(data, res.status)
-  return data
+  )
 }
 
 export async function passwordLogin(loginName: string, password: string) {
@@ -65,7 +104,10 @@ export async function scanCreate() {
 
 export async function scanPoll(ticket: string) {
   const q = new URLSearchParams({ action: 'scan_poll', ticket })
-  const res = await fetch(apiUrl(`/api/meoo-ops-mp-auth?${q}`))
+  const base = mpErpApiBase()
+  const path = `/api/meoo-ops-mp-auth?${q}`
+  const url = base ? buildMpErpApiUrl(base, path) : path
+  const res = await fetch(url)
   const data = await parseJsonRes(res)
   if (!res.ok || data.ok === false) throw new Error(String(data.error))
   return {
@@ -96,14 +138,11 @@ export async function setLoginCredentials(loginName: string, password?: string) 
 }
 
 export async function sendRegisterSms(phone: string) {
-  const res = await fetch(apiUrl('/api/meoo-auth-sms-send'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: phone.trim() }),
-  })
-  const data = await parseJsonRes(res)
-  if (!res.ok || data.ok === false) throwApiError(data, res.status)
-  return data
+  return postJsonCandidates(
+    '/api/meoo-auth-sms-send',
+    { phone: phone.trim() },
+    { includeVercelSms: true },
+  )
 }
 
 export async function phoneRegister(input: {

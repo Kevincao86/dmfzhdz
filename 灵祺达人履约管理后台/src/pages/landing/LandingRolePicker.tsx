@@ -1,13 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { cn } from '../../cn'
-import type { MpAccountRole } from '../../lib/mpSession'
-import { ROLE_LABEL } from './landingCopy'
+import { WORK_ID_LIST, type MpWorkIdentity } from '../../lib/mpWorkIdentity'
+import { ROLE_LABEL, ROLE_PICKER_DESC } from './landingCopy'
 
 type Props = {
   open: boolean
   onClose: () => void
   title?: string
-  onPick: (role: MpAccountRole) => void
+  onPick: (role: MpWorkIdentity) => void
+}
+
+const CARD_STYLE: Record<MpWorkIdentity, string> = {
+  talent: 'border-violet-200 bg-violet-50/80 hover:border-violet-300 text-violet-700',
+  shoot: 'border-sky-200 bg-sky-50/80 hover:border-sky-300 text-sky-700',
+  edit: 'border-teal-200 bg-teal-50/80 hover:border-teal-300 text-teal-700',
+  pr: 'border-orange-200 bg-orange-50/80 hover:border-orange-300 text-orange-700',
 }
 
 export default function LandingRolePicker({ open, onClose, title = '选择登录版本', onPick }: Props) {
@@ -48,31 +55,18 @@ export default function LandingRolePicker({ open, onClose, title = '选择登录
         </h3>
         <p className="mt-1 text-sm text-slate-500">与达人招募小程序账号互通，登录后进入对应工作台</p>
         <div className="mt-5 grid gap-3">
-          {(['talent', 'pr'] as const).map((role) => (
+          {WORK_ID_LIST.map((role) => (
             <button
               key={role}
               type="button"
               className={cn(
                 'rounded-xl border px-4 py-4 text-left transition hover:shadow-md',
-                role === 'talent'
-                  ? 'border-violet-200 bg-violet-50/80 hover:border-violet-300'
-                  : 'border-orange-200 bg-orange-50/80 hover:border-orange-300',
+                CARD_STYLE[role],
               )}
               onClick={() => onPick(role)}
             >
-              <span
-                className={cn(
-                  'text-sm font-bold',
-                  role === 'talent' ? 'text-violet-700' : 'text-orange-700',
-                )}
-              >
-                {ROLE_LABEL[role]}
-              </span>
-              <p className="mt-1 text-xs text-slate-600">
-                {role === 'talent'
-                  ? '接单大厅 · 推荐商单 · 履约与消息'
-                  : '发招募 · 推荐达人 · 反选与群码'}
-              </p>
+              <span className="text-sm font-bold">{ROLE_LABEL[role]}</span>
+              <p className="mt-1 text-xs text-slate-600">{ROLE_PICKER_DESC[role]}</p>
             </button>
           ))}
         </div>
