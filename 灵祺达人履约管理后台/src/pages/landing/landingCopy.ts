@@ -14,12 +14,12 @@ export const MARKETING_BY_ROLE: Record<
   talent: {
     headline: '达人履约',
     sub: '好撮合成就好履约 · AI 置顶高契合商单',
-    cta: '找商单就上灵祺履约台',
+    cta: '找商单就上灵祺履约平台',
   },
   pr: {
     headline: '品牌发单',
-    sub: '智能荐达人 · 招募反选群码一站完成',
-    cta: '发招募就上灵祺履约台',
+    sub: '智能推荐达人 · 招募反选群码一站完成',
+    cta: '发招募就上灵祺履约平台',
   },
 }
 
