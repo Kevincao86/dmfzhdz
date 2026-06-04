@@ -5,7 +5,7 @@
 
 .orbit__hint {
   text-align: center;
-  padding: 8rpx 0 4rpx;
+  padding: 6rpx 0 10rpx;
 }
 
 .orbit__hint-txt {
@@ -17,15 +17,15 @@
 .orbit__stage {
   position: relative;
   width: 100%;
-  height: 340rpx;
-  perspective: 1100rpx;
-  perspective-origin: 50% 42%;
+  height: 460rpx;
+  perspective: 1280rpx;
+  perspective-origin: 50% 40%;
 }
 
 .orbit__ring {
   position: absolute;
   left: 50%;
-  top: 46%;
+  top: 44%;
   width: 0;
   height: 0;
   transform-style: preserve-3d;
@@ -41,10 +41,10 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 168rpx;
-  height: 210rpx;
-  margin-left: -84rpx;
-  margin-top: -105rpx;
+  width: 208rpx;
+  height: 262rpx;
+  margin-left: -104rpx;
+  margin-top: -131rpx;
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
@@ -52,12 +52,12 @@
 .orbit__card {
   width: 100%;
   height: 100%;
-  border-radius: 22rpx;
+  border-radius: 26rpx;
   overflow: hidden;
-  border: 3rpx solid rgba(255, 255, 255, 0.92);
+  border: 4rpx solid rgba(255, 255, 255, 0.95);
   box-shadow:
-    0 16rpx 36rpx rgba(99, 102, 241, 0.22),
-    0 4rpx 12rpx rgba(15, 23, 42, 0.08);
+    0 20rpx 44rpx rgba(99, 102, 241, 0.26),
+    0 6rpx 16rpx rgba(15, 23, 42, 0.1);
   background: #fff;
   position: relative;
 }
@@ -66,6 +66,7 @@
   width: 100%;
   height: 100%;
   display: block;
+  pointer-events: none;
 }
 
 .orbit__shine {
@@ -73,23 +74,43 @@
   left: 0;
   right: 0;
   top: 0;
-  height: 45%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 100%);
+  height: 42%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, transparent 100%);
   pointer-events: none;
+}
+
+.orbit__zoom-hint {
+  position: absolute;
+  right: 10rpx;
+  bottom: 10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.orbit__zoom-icon {
+  font-size: 26rpx;
+  color: #fff;
+  line-height: 1;
 }
 
 .orbit__pedestal {
   position: absolute;
   left: 50%;
-  bottom: 18rpx;
-  width: 420rpx;
-  height: 56rpx;
-  margin-left: -210rpx;
+  bottom: 8rpx;
+  width: 520rpx;
+  height: 72rpx;
+  margin-left: -260rpx;
   border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
-    rgba(139, 147, 255, 0.28) 0%,
-    rgba(139, 147, 255, 0.06) 55%,
+    rgba(139, 147, 255, 0.32) 0%,
+    rgba(139, 147, 255, 0.08) 55%,
     transparent 72%
   );
   transform: rotateX(72deg);

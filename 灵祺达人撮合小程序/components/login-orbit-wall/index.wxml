@@ -1,24 +1,32 @@
-<view
-  class="orbit"
-  catchtouchstart="onTouchStart"
-  catchtouchmove="onTouchMove"
-  catchtouchend="onTouchEnd"
-  catchtouchcancel="onTouchEnd"
->
+<view class="orbit">
   <view class="orbit__hint">
     <text class="orbit__hint-txt">{{hint}}</text>
   </view>
-  <view class="orbit__stage">
+  <view
+    class="orbit__stage"
+    catchtouchstart="onTouchStart"
+    catchtouchmove="onTouchMove"
+    catchtouchend="onTouchEnd"
+    catchtouchcancel="onTouchEnd"
+  >
     <view class="orbit__ring {{ringSnap ? 'orbit__ring--snap' : ''}}" style="transform: rotateY({{yaw}}deg);">
       <view
         wx:for="{{faces}}"
         wx:key="src"
+        wx:for-index="faceIndex"
         class="orbit__face"
         style="transform: rotateY({{item.deg}}deg) translateZ({{radiusPx}}px);"
       >
-        <view class="orbit__card" bindtap="onPreview" data-index="{{index}}">
-          <image class="orbit__img" src="{{item.src}}" mode="aspectFill" />
+        <view
+          class="orbit__card"
+          catchtap="onPreview"
+          data-index="{{faceIndex}}"
+        >
+          <image class="orbit__img" src="{{item.src}}" mode="aspectFill" show-menu-by-longpress="{{false}}" />
           <view class="orbit__shine" aria-hidden="true" />
+          <view class="orbit__zoom-hint" aria-hidden="true">
+            <text class="orbit__zoom-icon">⊕</text>
+          </view>
         </view>
       </view>
     </view>
