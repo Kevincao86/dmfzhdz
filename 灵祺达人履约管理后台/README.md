@@ -32,11 +32,16 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
 | 微信扫码 | `scan_create` + `scan_poll`（资质齐全后接微信开放平台） |
 | 小程序 | `wx_login` 同一接口，会话 token 可互通（`X-Mp-Session`） |
 
+## Vercel 部署
+
+见 **[docs/deploy-vercel-talent-fulfillment.md](../docs/deploy-vercel-talent-fulfillment.md)**：Root Directory 必须为 `灵祺达人履约管理后台`，并配置 `VITE_MP_API_BASE`。
+
 ## 环境变量（ECS / Vercel）
 
-- `MP_WECHAT_APPID` / `MP_WECHAT_SECRET` — 小程序 code2session
-- `MP_AUTH_DEV_MODE=true` — 无微信密钥时用 code 派生 dev openid
-- `MP_AUTH_PEPPER` — 密码哈希胡椒
+| 端 | 变量 |
+|----|------|
+| Vercel 前端 | `VITE_MP_API_BASE`、`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` |
+| ECS auth-api | `MP_WECHAT_APPID` / `MP_WECHAT_SECRET`、`MP_AUTH_PEPPER`；可选 `MP_AUTH_DEV_MODE=true` |
 
 ## 数据库
 
