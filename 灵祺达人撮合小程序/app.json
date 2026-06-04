@@ -24,7 +24,7 @@
   ],
   "window": {
     "navigationBarTitleText": "灵祺撮合平台",
-    "navigationBarBackgroundColor": "#4f46e5",
+    "navigationBarBackgroundColor": "#9b87f5",
     "navigationBarTextStyle": "white",
     "backgroundColor": "#f0eff6",
     "backgroundTextStyle": "dark"
@@ -32,7 +32,7 @@
   "tabBar": {
     "custom": true,
     "color": "#94a3b8",
-    "selectedColor": "#4f46e5",
+    "selectedColor": "#7c83ff",
     "backgroundColor": "#ffffff",
     "list": [
       { "pagePath": "pages/index/index", "text": "首页" },
