@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 上传前检查：单张图片/音频须 ≤200KB（微信代码质量）
+# 仅检查，不压缩（逻辑与 mp-compress-orbit-images.sh 末尾一致）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAX=204800
@@ -18,9 +18,7 @@ done < <(
     -print0
 )
 if [[ "$FAIL" -ne 0 ]]; then
-  echo ""
-  echo "修复：bash scripts/mp-compress-orbit-images.sh"
-  echo "并删除 images/login-orbit/*.png"
+  echo "运行: bash scripts/mp-compress-orbit-images.sh"
   exit 1
 fi
 echo "OK: 所有图片/音频 ≤200KB"

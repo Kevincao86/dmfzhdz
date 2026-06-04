@@ -17,11 +17,23 @@ PR 菜单：PR 信息、我的发单、我的模版等。
 
 ## 代码质量（图片 ≤200KB）
 
-登录环墙样片在 `images/login-orbit/orbit-*.jpg`（仅 **JPEG**，勿提交 `orbit-*.png`）。若扫描仍「未通过」：
+**必须用微信开发者工具打开本目录**（`灵祺达人撮合小程序`），不要打开上一级 `项目` 文件夹，否则会把整个仓库里其它 Web 项目的大图也算进扫描。
 
-1. 删除本地 `images/login-orbit/*.png`（若有 2MB 旧文件）
-2. 运行 `bash scripts/mp-compress-orbit-images.sh`
-3. 开发者工具 **重新编译** → 再 **上传** 体验版后重新看「代码质量」
+登录环墙样片：`images/login-orbit/orbit-*.jpg`（勿留 `orbit-*.png`）。
+
+在仓库根目录 `项目` 下可执行：
+
+```bash
+bash scripts/mp-miniprogram-media-fix.sh
+```
+
+或进入本目录后：
+
+```bash
+bash scripts/mp-compress-orbit-images.sh
+```
+
+然后：开发者工具 **清缓存 → 重新编译 → 上传** → 在「代码质量」点 **重新扫描**（时间戳应更新）。
 
 ## 快速开始（本地）
 
