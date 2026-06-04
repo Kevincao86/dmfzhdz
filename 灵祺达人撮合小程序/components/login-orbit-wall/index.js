@@ -1,9 +1,20 @@
+function hdSrcFor(src) {
+  const s = String(src || '')
+  if (!s) return s
+  if (/-hd\.(jpe?g|png|webp)$/i.test(s)) return s
+  return s.replace(/(\.(jpe?g|png|webp))$/i, '-hd$1')
+}
+
 function buildFaces(images) {
   const list = Array.isArray(images) ? images.filter(Boolean) : []
   const n = list.length
   if (!n) return []
   const step = 360 / n
-  return list.map((src, i) => ({ src, deg: Math.round(step * i * 10) / 10 }))
+  return list.map((src, i) => ({
+    src,
+    hdSrc: hdSrcFor(src),
+    deg: Math.round(step * i * 10) / 10,
+  }))
 }
 
 function yawTransform(yaw) {
@@ -133,7 +144,17 @@ Component({
       }
     },
 
-    onImgError() {
+    onImgError(e) {
+      const idx = e && e.currentTarget && e.currentTarget.dataset
+      const slideIndex = idx && idx.slideIndex != null ? Number(idx.slideIndex) : -1
+      const faces = this.data.faces || []
+      if (slideIndex >= 0 && faces[slideIndex] && faces[slideIndex].hdSrc !== faces[slideIndex].src) {
+        const next = faces.map((f, i) =>
+          i === slideIndex ? { ...f, hdSrc: f.src } : f,
+        )
+        this.setData({ faces: next })
+        return
+      }
       wx.showToast({ title: '图片加载失败', icon: 'none' })
     },
   },

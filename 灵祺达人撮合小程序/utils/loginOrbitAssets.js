@@ -1,4 +1,4 @@
-/** 登录页圈形图片墙 · AI 达人探店样片（本地静态资源） */
+/** 登录页环墙：环墙用 520px 原图；展开大图用 -hd 960px（均 <200KB） */
 const ORBIT_IMAGES = [
   '/images/login-orbit/orbit-01.jpg',
   '/images/login-orbit/orbit-02.jpg',
@@ -8,4 +8,6 @@ const ORBIT_IMAGES = [
   '/images/login-orbit/orbit-06.jpg',
 ]
 
-module.exports = { ORBIT_IMAGES }
+const ORBIT_IMAGES_HD = ORBIT_IMAGES.map((p) => p.replace(/(\.jpe?g)$/i, '-hd$1'))
+
+module.exports = { ORBIT_IMAGES, ORBIT_IMAGES_HD }
