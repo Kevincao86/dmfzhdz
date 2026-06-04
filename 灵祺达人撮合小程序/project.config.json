@@ -47,6 +47,10 @@
       {
         "value": "utils/config.local.js",
         "type": "file"
+      },
+      {
+        "type": "glob",
+        "value": "images/login-orbit/*.png"
       }
     ],
     "include": []
