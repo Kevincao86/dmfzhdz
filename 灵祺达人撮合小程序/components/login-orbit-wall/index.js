@@ -45,7 +45,7 @@ Component({
         const rpx = win.windowWidth / 750
         const faces = buildFaces(this.properties.images)
         this.setData({
-          radiusPx: Math.round(300 * rpx),
+          radiusPx: Math.round(340 * rpx),
           faces,
           faceCount: faces.length,
         })
