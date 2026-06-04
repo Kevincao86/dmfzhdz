@@ -370,7 +370,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 480rpx;
-  padding: 4rpx 8rpx calc(env(safe-area-inset-bottom) + 20rpx);
+  min-height: 560rpx;
+  padding: 4rpx 8rpx calc(env(safe-area-inset-bottom) + 16rpx);
   background: linear-gradient(180deg, var(--lq-bg) 0%, #f3f0ff 55%, #ebe6ff 100%);
 }
