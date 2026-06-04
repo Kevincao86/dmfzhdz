@@ -14,6 +14,13 @@ Page({
     err: '',
     navBandStyle: '',
     navInnerStyle: '',
+    promoLead: '一微信一灵祺 ID · 达人接单与 PR 发单同台',
+    promoFlow: '完善资料即刻匹配 · 商单自动置顶 · 通知群码私信一站完成',
+    promoPills: [
+      { tag: '达人', text: 'AI 置顶高契合商单' },
+      { tag: 'PR', text: '按招募智能荐达人' },
+      { tag: '一体', text: '入选·群码·私信同台' },
+    ],
     orbitImages: ORBIT_IMAGES,
   },
 

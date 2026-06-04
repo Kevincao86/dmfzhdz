@@ -84,6 +84,33 @@
 
         <text class="login-err" wx:if="{{err}}">{{err}}</text>
       </view>
+
+      <view class="login-spark">
+        <view class="login-spark-head">
+          <view class="login-spark-orb">
+            <text class="login-spark-orb__txt">AI</text>
+            <view class="login-spark-orb__ring" aria-hidden="true" />
+          </view>
+          <view class="login-spark-copy">
+            <text class="login-spark-title">智能撮合</text>
+            <text class="login-spark-sub">{{promoLead}}</text>
+          </view>
+        </view>
+
+        <view class="login-spark-grid">
+          <view
+            class="login-spark-pill login-spark-pill--{{index}}"
+            wx:for="{{promoPills}}"
+            wx:key="tag"
+            wx:for-index="index"
+          >
+            <text class="login-spark-pill__tag">{{item.tag}}</text>
+            <text class="login-spark-pill__text">{{item.text}}</text>
+          </view>
+        </view>
+
+        <text class="login-spark-flow">{{promoFlow}}</text>
+      </view>
     </view>
   </view>
 
