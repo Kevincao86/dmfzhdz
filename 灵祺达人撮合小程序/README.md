@@ -15,6 +15,14 @@
 达人菜单：我的信息、我的报名、我的模版、消息通知、数据分析、小灵同学。  
 PR 菜单：PR 信息、我的发单、我的模版等。
 
+## 代码质量（图片 ≤200KB）
+
+登录环墙样片在 `images/login-orbit/orbit-*.jpg`（仅 **JPEG**，勿提交 `orbit-*.png`）。若扫描仍「未通过」：
+
+1. 删除本地 `images/login-orbit/*.png`（若有 2MB 旧文件）
+2. 运行 `bash scripts/mp-compress-orbit-images.sh`
+3. 开发者工具 **重新编译** → 再 **上传** 体验版后重新看「代码质量」
+
 ## 快速开始（本地）
 
 1. 复制 `utils/config.local.example.js` 为 `utils/config.local.js`
