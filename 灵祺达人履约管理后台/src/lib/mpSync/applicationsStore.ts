@@ -1,5 +1,15 @@
-export const APPLICATIONS_KEY = 'meoo_my_applications_v1'
-export const PUBLISH_KEY = 'meoo_my_published_orders_v1'
+import { getAccount } from '../mpSession'
+import {
+  currentScopeId,
+  scopedStorageKey,
+  scopeIdFromAccount,
+} from '../mpAccountLocalScope'
+
+export const APPLICATIONS_BASE = 'meoo_my_applications_v1'
+export const PUBLISH_BASE = 'meoo_my_published_orders_v1'
+
+/** @deprecated 使用 APPLICATIONS_BASE */
+export const APPLICATIONS_KEY = APPLICATIONS_BASE
 
 export type ApplicationLocal = {
   mpOrderId: string
@@ -7,6 +17,9 @@ export type ApplicationLocal = {
   title?: string
   platform?: string
   appliedAt?: string
+  ownerAccountId?: string
+  ownerMemberId?: string
+  ownerTalentId?: string
 }
 
 export type PublishedOrderLocal = {
@@ -14,46 +27,108 @@ export type PublishedOrderLocal = {
   title?: string
   publishedAt?: string
   hall?: string
+  ownerAccountId?: string
+  ownerPrId?: string
+}
+
+function ownerIdsForFilter() {
+  const account = getAccount()
+  return {
+    ownerAccountId: scopeIdFromAccount(account),
+    memberId: String(account?.registryMemberId || '').trim(),
+    talentId: String(account?.lingqiTalentId || '').trim(),
+    prId: String(account?.lingqiPrId || '').trim(),
+  }
+}
+
+function entryBelongsToCurrentAccount(
+  entry: { ownerAccountId?: string; ownerMemberId?: string; ownerTalentId?: string; ownerPrId?: string },
+  ids: ReturnType<typeof ownerIdsForFilter>,
+) {
+  if (!ids.ownerAccountId) return true
+  if (!entry.ownerAccountId) return false
+  if (entry.ownerAccountId !== ids.ownerAccountId) return false
+  if (entry.ownerMemberId && ids.memberId && entry.ownerMemberId !== ids.memberId) return false
+  if (entry.ownerTalentId && ids.talentId && entry.ownerTalentId !== ids.talentId) return false
+  if (entry.ownerPrId && ids.prId && entry.ownerPrId !== ids.prId) return false
+  return true
+}
+
+function readListFromKey(key: string): unknown[] {
+  try {
+    const raw = localStorage.getItem(key)
+    const list = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
+function writeListToKey(key: string, list: unknown[]) {
+  localStorage.setItem(key, JSON.stringify((list || []).slice(0, 80)))
+}
+
+function readApplicationsRaw(): ApplicationLocal[] {
+  const scopedKey = scopedStorageKey(APPLICATIONS_BASE)
+  const scoped = readListFromKey(scopedKey) as ApplicationLocal[]
+  if (scoped.length) return scoped
+  const legacy = readListFromKey(APPLICATIONS_BASE) as ApplicationLocal[]
+  if (!legacy.length) return []
+  const ids = ownerIdsForFilter()
+  const filtered = legacy.filter((item) => entryBelongsToCurrentAccount(item, ids))
+  if (filtered.length) writeListToKey(scopedKey, filtered)
+  return filtered
 }
 
 export function readApplications(): ApplicationLocal[] {
-  try {
-    const raw = localStorage.getItem(APPLICATIONS_KEY)
-    const list = raw ? (JSON.parse(raw) as unknown) : []
-    return Array.isArray(list) ? (list as ApplicationLocal[]) : []
-  } catch {
-    return []
-  }
+  const ids = ownerIdsForFilter()
+  return readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
 }
 
 export function addApplication(entry: ApplicationLocal) {
-  const list = readApplications()
+  const ids = ownerIdsForFilter()
+  const list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
   list.unshift({
     appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    ownerAccountId: ids.ownerAccountId,
+    ownerMemberId: ids.memberId,
+    ownerTalentId: ids.talentId,
     ...entry,
   })
-  localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(list.slice(0, 80)))
+  writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
+}
+
+function readPublishedOrdersRaw(): PublishedOrderLocal[] {
+  const scopedKey = scopedStorageKey(PUBLISH_BASE)
+  const scoped = readListFromKey(scopedKey) as PublishedOrderLocal[]
+  if (scoped.length) return scoped
+  const legacy = readListFromKey(PUBLISH_BASE) as PublishedOrderLocal[]
+  if (!legacy.length) return []
+  const ids = ownerIdsForFilter()
+  const filtered = legacy.filter((item) => entryBelongsToCurrentAccount(item, ids))
+  if (filtered.length) writeListToKey(scopedKey, filtered)
+  return filtered
 }
 
 export function readPublishedOrders(): PublishedOrderLocal[] {
-  try {
-    const raw = localStorage.getItem(PUBLISH_KEY)
-    const list = raw ? (JSON.parse(raw) as unknown) : []
-    return Array.isArray(list) ? (list as PublishedOrderLocal[]) : []
-  } catch {
-    return []
-  }
+  const ids = ownerIdsForFilter()
+  return readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
 }
 
 export function addPublishedOrder(entry: PublishedOrderLocal) {
-  const list = readPublishedOrders()
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
   list.unshift({
     publishedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    ownerAccountId: ids.ownerAccountId,
+    ownerPrId: ids.prId,
     ...entry,
   })
-  localStorage.setItem(PUBLISH_KEY, JSON.stringify(list.slice(0, 80)))
+  writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
 }
 
 export function hasAppliedToOrder(mpOrderId: string) {
   return readApplications().some((a) => a.mpOrderId === mpOrderId)
 }
+
+export { currentScopeId }

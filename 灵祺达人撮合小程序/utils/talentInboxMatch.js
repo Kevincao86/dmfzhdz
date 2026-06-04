@@ -34,7 +34,12 @@ function resolveTalentInboxTarget(applicant, reg) {
 function talentMatchKeys(member) {
   const keys = new Set()
   if (!member) return keys
+  const auth = require('./auth.js')
+  const acc = auth.readAccount()
+  if (acc && acc.lingqiTalentId) keys.add(String(acc.lingqiTalentId).trim())
+  if (acc && acc.registryMemberId) keys.add(String(acc.registryMemberId).trim())
   if (member.id) keys.add(String(member.id).trim())
+  if (member.lingqiTalentId) keys.add(String(member.lingqiTalentId).trim())
   const contact = String(member.contact || '').trim()
   if (contact) {
     keys.add(contact)
@@ -58,6 +63,19 @@ function inboxRowMatchesTalent(row, keys, member) {
   if (!row || !keys || !keys.size) return false
   const mid = String(row.talentMemberId || '').trim()
   if (mid && keys.has(mid)) return true
+
+  const auth = require('./auth.js')
+  const acc = auth.readAccount()
+  const strictIds = new Set()
+  if (acc && acc.registryMemberId) strictIds.add(String(acc.registryMemberId).trim())
+  if (acc && acc.lingqiTalentId) strictIds.add(String(acc.lingqiTalentId).trim())
+  if (member && member.id) strictIds.add(String(member.id).trim())
+  if (member && member.lingqiTalentId) strictIds.add(String(member.lingqiTalentId).trim())
+  if (mid && strictIds.size > 0 && !strictIds.has(mid)) {
+    const looksLikeMemberId = /^MTM-/i.test(mid) || /^LQ-T-/i.test(mid)
+    if (looksLikeMemberId) return false
+  }
+
   const contact = String(row.contact || '').trim()
   if (contact) {
     if (keys.has(contact)) return true

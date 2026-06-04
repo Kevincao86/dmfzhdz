@@ -1,8 +1,8 @@
 import type { FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
-import RoleEditionToggle from '../../components/RoleEditionToggle'
 import { cn } from '../../cn'
 import type { MpAccountRole } from '../../lib/mpSession'
+import { ROLE_LABEL } from '../landing/landingCopy'
 
 export type LoginTab = 'password' | 'scan'
 
@@ -25,7 +25,6 @@ type Props = {
   qrPayload: string
   scanHint: string
   loginRole: MpAccountRole
-  onLoginRoleChange: (role: MpAccountRole) => void
   showDevPreview?: boolean
   onDevPreview?: () => void
 }
@@ -43,7 +42,6 @@ export default function TalentLoginAuthPanel({
   qrPayload,
   scanHint,
   loginRole,
-  onLoginRoleChange,
   showDevPreview,
   onDevPreview,
 }: Props) {
@@ -55,6 +53,9 @@ export default function TalentLoginAuthPanel({
   return (
     <div className="relative w-full">
       <div className="mb-6">
+        <div className="mb-3 inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800">
+          当前版本 · {ROLE_LABEL[loginRole]}
+        </div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           与达人招募小程序账号互通 · 一微信一灵祺 ID
@@ -141,11 +142,6 @@ export default function TalentLoginAuthPanel({
           </p>
         </div>
       )}
-
-      <div className="mt-6">
-        <p className="mb-2 text-center text-xs text-slate-500">登录后默认进入</p>
-        <RoleEditionToggle variant="light" role={loginRole} onChange={onLoginRoleChange} />
-      </div>
 
       {showDevPreview && onDevPreview ? (
         <button

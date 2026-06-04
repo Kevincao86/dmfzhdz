@@ -1,3 +1,5 @@
+import { onAccountLogin, onAccountLogout } from './mpAccountLocalScope'
+
 export type MpAccountRole = 'talent' | 'pr'
 
 export type MpAccount = {
@@ -59,6 +61,7 @@ export function setSession(token: string, account: MpAccount) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
   localStorage.setItem(ROLE_KEY, account.activeRole)
+  onAccountLogin(account)
 }
 
 export function getAccount(): MpAccount | null {
@@ -88,4 +91,5 @@ export function clearSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(ACCOUNT_KEY)
   localStorage.removeItem(ROLE_KEY)
+  onAccountLogout()
 }

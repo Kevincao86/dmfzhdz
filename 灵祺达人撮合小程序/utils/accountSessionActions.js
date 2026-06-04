@@ -5,11 +5,11 @@ function goLogin() {
   wx.reLaunch({ url: '/pages/login/login' })
 }
 
-/** 切换账号：清除服务端会话，保留本机资料草稿，前往登录页 */
+/** 切换账号：清除服务端会话与本机报名/通知缓存，前往登录页 */
 function switchAccount() {
   wx.showModal({
     title: '切换账号',
-    content: '将退出当前灵祺账号，可使用其他登录名或微信重新登录。本机已填资料仍会保留。',
+    content: '将退出当前灵祺账号；本机报名记录与消息通知缓存会清空，避免串到其他账号。',
     confirmText: '去登录',
     success(res) {
       if (!res.confirm) return

@@ -34,7 +34,7 @@ export default function AppShell() {
 
   function logout() {
     clearSession()
-    nav('/login', { replace: true })
+    nav('/', { replace: true })
   }
 
   const idLabel =

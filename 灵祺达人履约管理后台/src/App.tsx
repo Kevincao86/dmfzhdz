@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AppShell from './components/AppShell'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import HallPage from './pages/HallPage'
 import OrdersPage from './pages/OrdersPage'
@@ -21,13 +22,19 @@ import DigitalHumanPage from './pages/merchant/DigitalHumanPage'
 import { getToken } from './lib/mpSession'
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  if (!getToken()) return <Navigate to="/login" replace />
+  if (!getToken()) return <Navigate to="/" replace />
   return <>{children}</>
+}
+
+function RootRedirect() {
+  if (getToken()) return <Navigate to="/hall" replace />
+  return <Navigate to="/" replace />
 }
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route
         element={
@@ -55,7 +62,7 @@ export default function App() {
           <Route path="digital-human" element={<DigitalHumanPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/hall" replace />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   )
 }
