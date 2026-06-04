@@ -29,6 +29,7 @@ import SettingsPage from './pages/SettingsPage'
 import LocalPromotionAdvertisingPage from './pages/LocalPromotionAdvertisingPage'
 import LocalPromotionLeadsPage from './pages/LocalPromotionLeadsPage'
 import WalletPage from './pages/WalletPage'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 
 export default function App() {
@@ -38,9 +39,9 @@ export default function App() {
       <PartnerClientProvider>
       <AiAgentProvider>
         <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
-          path="/"
           element={
             <RequireSupabaseAuth>
               <RequireMembershipFeature>
@@ -50,7 +51,7 @@ export default function App() {
             </RequireSupabaseAuth>
           }
         >
-          <Route index element={<HomeDashboard />} />
+          <Route path="/home" element={<HomeDashboard />} />
           <Route path="ai-agent" element={<AiAgentPage />} />
           <Route path="store" element={<Navigate to="/store/info" replace />} />
           <Route path="store/info" element={<StoreInfoPage />} />

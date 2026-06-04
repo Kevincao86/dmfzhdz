@@ -54,6 +54,20 @@ export function editionLabel(): string {
   return isPartnerEdition() ? '服务商版' : '商家版'
 }
 
+/** 对端站点首页（落地页）；由登录 URL 推导 */
+export function peerEditionRootUrl(): string {
+  const login = peerEditionLoginUrl()
+  try {
+    const u = new URL(login)
+    u.pathname = '/'
+    u.search = ''
+    u.hash = ''
+    return u.toString()
+  } catch {
+    return login.replace(/\/login\/?$/, '/') || login
+  }
+}
+
 /** 登录/注册页右上角切换：对端入口 URL（未配置时按本地 dev 端口或 cs/fws 域名推断） */
 export function peerEditionLoginUrl(): string {
   const fromEnv = (import.meta.env.VITE_PEER_EDITION_LOGIN_URL as string | undefined)?.trim()

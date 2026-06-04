@@ -62,7 +62,7 @@ export default function RequireSupabaseAuth({ children }: { children: ReactNode 
   }
 
   if (supabaseConfigured && !hasSession) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>
