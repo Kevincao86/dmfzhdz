@@ -20,6 +20,11 @@ Page({
       { tag: 'PR', text: '按招募智能荐达人' },
       { tag: '一体', text: '入选·群码·私信同台' },
     ],
+    promoSteps: [
+      { n: '1', title: '微信登录', sub: '绑定灵祺 ID' },
+      { n: '2', title: '完善资料', sub: '平台与报价' },
+      { n: '3', title: '接单履约', sub: '通知与群码' },
+    ],
   },
 
   onLoad() {
