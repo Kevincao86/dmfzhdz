@@ -1,5 +1,6 @@
 const ecs = require('./ecs.js')
 const accountMemberSync = require('./accountMemberSync.js')
+const mpAccountLocalScope = require('./mpAccountLocalScope.js')
 
 const SESSION_KEY = 'lingqi_mp_session_token'
 const ACCOUNT_KEY = 'lingqi_mp_account_v1'
@@ -25,6 +26,7 @@ function readAccount() {
 function writeSession(token, account) {
   wx.setStorageSync(SESSION_KEY, token)
   wx.setStorageSync(ACCOUNT_KEY, JSON.stringify(account || {}))
+  mpAccountLocalScope.onAccountLogin(account)
   accountMemberSync.syncLocalProfilesFromAccount(account)
 }
 
@@ -33,6 +35,7 @@ function clearSession() {
     wx.removeStorageSync(SESSION_KEY)
     wx.removeStorageSync(ACCOUNT_KEY)
   } catch (_) {}
+  mpAccountLocalScope.onAccountLogout()
 }
 
 function isLoggedIn() {

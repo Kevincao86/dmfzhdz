@@ -17,7 +17,7 @@ export default function OrdersPage() {
       <h2 className="text-xl font-bold mb-4">我的履约</h2>
       <p className="text-sm text-slate-400 mb-4">
         灵祺达人 ID：<span className="text-amber-400 font-mono">{acc?.lingqiTalentId || '—'}</span>
-        · 与小程序「我的报名」共用 <code className="text-xs">meoo_my_applications_v1</code>
+        · 报名记录按当前灵祺账号隔离存储
       </p>
       {!apps.length ? (
         <p className="text-slate-500">暂无报名记录，去招募大厅挑选商单吧。</p>

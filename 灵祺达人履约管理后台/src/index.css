@@ -7,3 +7,18 @@ body {
   background: #0f0f14;
   color: #e8e6f0;
 }
+
+@keyframes hero-crossfade {
+  0%,
+  26% {
+    opacity: 1;
+  }
+  33%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-hero-crossfade {
+  animation: hero-crossfade 10s infinite;
+}
