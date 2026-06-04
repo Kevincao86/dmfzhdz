@@ -59,10 +59,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       })
       return
     }
+    const exposeDev =
+      !!sms.devCode &&
+      (process.env.MEOO_SMS_DEV_EXPOSE === '1' || process.env.VERCEL_ENV !== 'production')
     sendJson(res, 200, {
       ok: true,
       message: sms.message,
-      ...(sms.devCode ? { devCode: sms.devCode } : {}),
+      ...(exposeDev ? { devCode: sms.devCode } : {}),
     })
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e)

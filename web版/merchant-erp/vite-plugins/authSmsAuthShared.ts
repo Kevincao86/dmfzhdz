@@ -6,6 +6,59 @@ export type AuthSmsSendResult =
   | { ok: true; message: string; devCode?: string }
   | { ok: false; error: string; message?: string }
 
+function authSmsPublicBases(): string[] {
+  const raw = [
+    process.env.MEOO_AUTH_SMS_PUBLIC_BASE,
+    process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
+    process.env.MEOO_AUTH_API_PUBLIC_BASE,
+    'https://cs.mofangdianai.com',
+    'https://mofangdianai.com',
+  ]
+  const bases: string[] = []
+  for (const item of raw) {
+    const b = String(item ?? '')
+      .trim()
+      .replace(/\/$/, '')
+    if (b && !bases.includes(b)) bases.push(b)
+  }
+  return bases
+}
+
+/** ECS / 无 Aliyun 密钥时：委托已配置阿里云的环境（通常为 Vercel 商家站）发真实短信 */
+async function sendAuthSmsViaPublicApi(phone: string): Promise<AuthSmsSendResult | null> {
+  const secret = (process.env.MEOO_AUTH_INTERNAL_SECRET ?? '').trim()
+  for (const base of authSmsPublicBases()) {
+    try {
+      const res = await fetch(`${base}/api/meoo-auth-sms-send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(secret ? { 'X-Meoo-Internal-Auth': secret } : {}),
+        },
+        body: JSON.stringify({ phone }),
+      })
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+        error?: string
+      }
+      if (res.ok && j.ok !== false) {
+        return { ok: true, message: j.message ?? '验证码已发送' }
+      }
+      if (!res.ok) {
+        return {
+          ok: false,
+          error: String(j.error ?? `http_${res.status}`),
+          message: j.message ?? '验证码发送失败',
+        }
+      }
+    } catch {
+      /* try next base */
+    }
+  }
+  return null
+}
+
 export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise<AuthSmsSendResult> {
   if (aliyunSmsConfigured()) {
     const r = await sendAliyunSmsVerifyCode(phone)
@@ -15,10 +68,15 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
     return { ok: true, message: '验证码已发送' }
   }
 
+  if (!viteRoot) {
+    const remote = await sendAuthSmsViaPublicApi(phone)
+    if (remote) return remote
+  }
+
   const { code } = issueSmsCode(phone, viteRoot)
-  const sms = await dispatchSms(phone, code)
+  const sms = await dispatchSms(phone, code, !!viteRoot)
   if (!sms.sent && !sms.devExpose) {
-    return { ok: false, error: 'sms_not_configured', message: '短信服务未配置' }
+    return { ok: false, error: 'sms_not_configured', message: '短信服务未配置，请联系管理员配置阿里云短信' }
   }
   return {
     ok: true,
@@ -31,7 +89,7 @@ function authVerifyPublicBases(): string[] {
   const raw = [
     process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
     process.env.MEOO_AUTH_API_PUBLIC_BASE,
-    // ECS 无阿里云密钥时，回退至已配置 Aliyun 的 Vercel 站点核验（与 send 端一致）
+    'https://cs.mofangdianai.com',
     'https://mofangdianai.com',
   ]
   const bases: string[] = []

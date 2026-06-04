@@ -83,15 +83,19 @@ export function verifySmsCode(phone: string, code: string, viteRoot?: string): b
   return ok
 }
 
-export async function dispatchSms(phone: string, code: string): Promise<{ sent: boolean; devExpose?: string }> {
+/** 仅本地 Vite dev（传入 viteRoot）或显式 MEOO_SMS_DEV_EXPOSE=1 时回显验证码，避免 ECS 未设 NODE_ENV 误入开发模式 */
+export async function dispatchSms(
+  phone: string,
+  code: string,
+  localDevOnly = false,
+): Promise<{ sent: boolean; devExpose?: string }> {
   const provider = (process.env.MEOO_SMS_PROVIDER ?? '').trim().toLowerCase()
-  if (provider === 'none' || process.env.MEOO_SMS_DEV_EXPOSE === '1') {
+  if (provider === 'none') {
     return { sent: true, devExpose: code }
   }
-  // 预留：接入阿里云/腾讯云短信；未配置时 dev 回显验证码
-  if (process.env.NODE_ENV !== 'production' || process.env.MEOO_SMS_DEV_EXPOSE === '1') {
+  if (process.env.MEOO_SMS_DEV_EXPOSE === '1' || localDevOnly) {
     return { sent: true, devExpose: code }
   }
-  console.info(`[meoo-sms] to=${phone} code=${code} (no provider configured)`)
+  console.info(`[meoo-sms] to=${phone} (no provider configured, production)`)
   return { sent: false }
 }
