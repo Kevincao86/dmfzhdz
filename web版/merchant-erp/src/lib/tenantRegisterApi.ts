@@ -27,9 +27,30 @@ export type SmsLoginResult = {
 }
 
 
-/** 注册/登录：与智能体一致，生产优先 ECS /erp-api（Vercel 连不上自建 Supabase） */
-function erpAuthApiCandidates(path: string): string[] {
-  return merchantErpApiCandidates(path)
+const AUTH_BROWSER_PATHS = new Set([
+  '/api/meoo-auth-sms-send',
+  '/api/meoo-auth-register',
+  '/api/meoo-auth-register-partner',
+  '/api/meoo-auth-sms-login',
+])
+
+/** 注册/短信：浏览器仅走当前站点（Vercel 阿里云发码+核验）；其它 API 仍可走 erp-api */
+function erpAuthApiCandidates(
+  path: string,
+  opts?: { sameOriginOnly?: boolean },
+): string[] {
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  if (opts?.sameOriginOnly && typeof window !== 'undefined') {
+    return [`${window.location.origin}${normalized}`]
+  }
+  if (AUTH_BROWSER_PATHS.has(normalized) && typeof window !== 'undefined') {
+    return [`${window.location.origin}${normalized}`]
+  }
+  return merchantErpApiCandidates(normalized)
+}
+
+function isErpApiAuthUrl(url: string): boolean {
+  return /\/erp-api\//i.test(url)
 }
 
 async function postAuthJson<T extends Record<string, unknown>>(
@@ -37,10 +58,10 @@ async function postAuthJson<T extends Record<string, unknown>>(
   body: unknown,
   action: string,
   retryStatuses: number[] = [],
-  opts?: { preferSameOrigin?: boolean },
+  opts?: { preferSameOrigin?: boolean; sameOriginOnly?: boolean },
 ): Promise<{ res: Response; json: T } | { ok: false; error: string; message: string }> {
-  let candidates = erpAuthApiCandidates(path)
-  if (opts?.preferSameOrigin && typeof window !== 'undefined') {
+  let candidates = erpAuthApiCandidates(path, { sameOriginOnly: opts?.sameOriginOnly })
+  if (opts?.preferSameOrigin && typeof window !== 'undefined' && !opts?.sameOriginOnly) {
     const origin = window.location.origin
     candidates = [
       ...candidates.filter((u) => u.startsWith(origin)),
@@ -58,7 +79,16 @@ async function postAuthJson<T extends Record<string, unknown>>(
         body: JSON.stringify(body),
       })
       const json = (await res.json().catch(() => ({}))) as T
-      if (!res.ok && retryStatuses.includes(res.status) && i < candidates.length - 1) {
+      const errCode =
+        typeof json === 'object' && json && 'error' in json ? String((json as { error?: string }).error) : ''
+      const shouldRetry =
+        i < candidates.length - 1 &&
+        (!res.ok &&
+          (retryStatuses.includes(res.status) ||
+            (res.status === 400 &&
+              errCode === 'sms_code_invalid' &&
+              isErpApiAuthUrl(url))))
+      if (shouldRetry) {
         lastMessage =
           (typeof json === 'object' && json && 'message' in json && String(json.message)) ||
           lastMessage

@@ -8,7 +8,7 @@ import {
   normalizeCnMobile,
 } from '../vite-plugins/authRegistrationOtp.js'
 import { provisionMerchantTenant } from '../vite-plugins/authRegisterProvision.js'
-import { phoneAlreadyRegistered, verifyAuthSmsCode } from '../vite-plugins/authSmsAuthShared.js'
+import { phoneAlreadyRegistered, verifyRegisterSmsCode } from '../vite-plugins/authSmsAuthShared.js'
 
 export const config = { maxDuration: 60 }
 
@@ -95,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'password_mismatch', message: '两次输入的密码不一致' })
       return
     }
-    if (!(await verifyAuthSmsCode(phone, smsCode))) {
+    if (!(await verifyRegisterSmsCode(phone, smsCode))) {
       sendJson(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
       return
     }

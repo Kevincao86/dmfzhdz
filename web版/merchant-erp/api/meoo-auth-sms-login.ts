@@ -7,7 +7,7 @@ import {
   createAdminSessionForUserId,
   findAuthUserByPhone,
   smsLoginErrorMessage,
-  verifyAuthSmsCode,
+  verifyRegisterSmsCode,
 } from '../vite-plugins/authSmsAuthShared.js'
 
 export const config = { maxDuration: 60 }
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 400, { ok: false, error: 'invalid_sms_code', message: '请输入 6 位验证码' })
       return
     }
-    if (!(await verifyAuthSmsCode(phone, smsCode))) {
+    if (!(await verifyRegisterSmsCode(phone, smsCode))) {
       sendJson(res, 400, { ok: false, error: 'sms_code_invalid', message: '验证码错误或已过期' })
       return
     }
