@@ -321,8 +321,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
             const data = ensureRegistry(viteRoot)
-            const nextAi = normalizeRegistryVideoAi(body.videoAi ?? {})
-            data.videoAi = Object.keys(nextAi).length > 0 ? nextAi : {}
+            const { mergeRegistryVideoAiSave } = await import('../src/lib/registryVideoAiNormalize.js')
+            data.videoAi = mergeRegistryVideoAiSave(data.videoAi, body.videoAi ?? {})
             data.videoAiUpdatedAt = new Date().toISOString()
             data.videoAiWriter = lastWriter
             if (lastWriter === 'ops') {

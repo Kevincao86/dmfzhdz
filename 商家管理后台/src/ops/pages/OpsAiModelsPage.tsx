@@ -118,9 +118,17 @@ export default function OpsAiModelsPage() {
 
   const buildVendorKeysPayload = (): RegistryVendorKeys => {
     const payloadKeys: RegistryVendorKeys = {}
+    const baseline = vendorKeysBaseline.current
     for (const e of catalogFull) {
       const v = keys[e.id]
-      if (typeof v === 'string') payloadKeys[e.id] = v
+      if (typeof v !== 'string') continue
+      const trimmed = v.trim()
+      if (!trimmed) {
+        // 基线有值、现为空 → 用户显式清除；双空 → 不传该字段，避免误删注册表
+        if ((baseline[e.id] ?? '').trim()) payloadKeys[e.id] = ''
+        continue
+      }
+      payloadKeys[e.id] = v
     }
     return expandVendorKeysForRegistrySave(payloadKeys)
   }

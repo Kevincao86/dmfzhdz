@@ -1,5 +1,43 @@
 import type { RegistryVideoAi } from './opsRegistryTypes.js'
 
+const VIDEO_AI_FIELD_KEYS = [
+  'klingAccessKey',
+  'klingSecretKey',
+  'klingApiBase',
+  'arkVideoEndpoints',
+  'arkVideoApiKey',
+  'iceAppId',
+  'iceAccessKeyId',
+  'iceAccessKeySecret',
+  'iceRegion',
+  'iceVodStorageLocation',
+  'iceOutputOssUrlPrefix',
+] as const
+
+/**
+ * 保存时合并：请求体未带的字段保留库内原值；显式传空字符串则清除该字段。
+ * 避免 JSON.stringify 省略 undefined 时误清空可灵/云剪凭据。
+ */
+export function mergeRegistryVideoAiSave(prev: unknown, patch: unknown): RegistryVideoAi {
+  const base = normalizeRegistryVideoAi(prev)
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return base
+  const raw = patch as Record<string, unknown>
+  const merged: Record<string, string> = {}
+  for (const k of VIDEO_AI_FIELD_KEYS) {
+    if (k in raw) {
+      const v = raw[k]
+      if (typeof v === 'string') {
+        const t = v.trim()
+        if (t) merged[k] = t
+      }
+      continue
+    }
+    const kept = base[k]
+    if (kept) merged[k] = kept
+  }
+  return normalizeRegistryVideoAi(merged)
+}
+
 /** 运营台与 dev 注册表共用的 videoAi 规范化（去空白、截断长度）。 */
 export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
