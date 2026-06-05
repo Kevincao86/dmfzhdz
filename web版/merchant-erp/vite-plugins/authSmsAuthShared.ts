@@ -111,14 +111,25 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
   }
 }
 
+/** Vercel 商家站（配阿里云密钥）；ECS /erp-api 与根域 /api 通常无密钥，不可采信其 false */
+function isAliyunSmsVerifyHost(base: string): boolean {
+  return /cs\.mofangdianai\.com/i.test(base.replace(/\/$/, ''))
+}
+
+function isErpApiPublicBase(base: string): boolean {
+  const b = base.replace(/\/$/, '')
+  return /\/erp-api$/i.test(b) || /^https?:\/\/mofangdianai\.com$/i.test(b)
+}
+
 function authVerifyPublicBases(): string[] {
   const raw = [
     process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
     process.env.MEOO_AUTH_API_PUBLIC_BASE,
-    process.env.MEOO_ERP_PUBLIC_BASE,
-    'https://mofangdianai.com/erp-api',
+    // 与 sendAuthSms 一致：先 Vercel（阿里云发码同服核验），再 ECS
     'https://cs.mofangdianai.com',
     'https://mofangdianai.com',
+    process.env.MEOO_ERP_PUBLIC_BASE,
+    'https://mofangdianai.com/erp-api',
   ]
   const bases: string[] = []
   for (const item of raw) {
@@ -164,7 +175,11 @@ async function verifyAuthSmsCodeViaPublicApi(phone: string, code: string): Promi
     const j = await postSmsVerify(url, phone, code, !!secret)
     if (!j) continue
     if (j.ok === true) return true
-    if (j.ok === false) return false
+    if (j.ok === false) {
+      // ECS 无阿里云时会误报 false；仅采信 Vercel 节点，其余继续尝试
+      if (isAliyunSmsVerifyHost(base) || !isErpApiPublicBase(base)) return false
+      continue
+    }
   }
   return null
 }
