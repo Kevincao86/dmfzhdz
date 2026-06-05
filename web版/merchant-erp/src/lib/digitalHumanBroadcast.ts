@@ -71,6 +71,13 @@ export type DigitalHumanWork = {
   draft: DigitalHumanDraft
   previewNote?: string
   errorMessage?: string
+  /** 远端或 blob 成片地址（豆包/可灵生成） */
+  outputMp4Url?: string
+  /** 本会话 object URL，便于预览/下载 */
+  outputBlobUrl?: string
+  videoEngine?: 'seedance' | 'kling'
+  plannerModel?: 'doubao' | 'qwen'
+  segmentCount?: number
 }
 
 export const PRESET_AVATARS: PresetAvatar[] = [
@@ -426,6 +433,21 @@ export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
 
 export function deleteDigitalHumanWork(id: string): void {
   saveDigitalHumanWorks(loadDigitalHumanWorks().filter((w) => w.id !== id))
+}
+
+export function findPresetAvatarForDraft(draft: DigitalHumanDraft): PresetAvatar | null {
+  if (!draft.avatarId) return null
+  return PRESET_AVATARS.find((a) => a.id === draft.avatarId) ?? null
+}
+
+export function resolveVoiceForDraft(
+  draft: DigitalHumanDraft,
+  avatar: PresetAvatar | null,
+): VoicePreset | undefined {
+  const byId = voicePresetById(draft.voiceId)
+  if (byId) return byId
+  if (avatar) return matchVoicePresetForAvatar(avatar)
+  return undefined
 }
 
 export function workTitleFromDraft(d: DigitalHumanDraft): string {

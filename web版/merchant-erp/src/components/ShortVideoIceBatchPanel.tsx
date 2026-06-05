@@ -227,7 +227,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   }, [anyBusy, mediaBusy, cfg?.localUploadEnabled])
 
   const handleLocalFiles = useCallback(
-    async (files: FileList | null) => {
+    async (files: FileList | File[] | null) => {
       if (!files?.length || videoUploading || imageUploading || anyBusy) return
       if (!cfg?.localUploadEnabled) {
         setErr(
@@ -235,17 +235,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         )
         return
       }
-      let list: File[]
-      try {
-        list = await snapshotUploadFiles(files)
-      } catch (e) {
-        setErr(
-          e instanceof Error
-            ? e.message
-            : '无法读取视频文件，请重新选择（与 StorageLocation 无关，多为浏览器未读完文件）',
-        )
-        return
-      }
+      const list = Array.from(files)
       setVideoUploading(true)
       setErr(null)
       let added = 0
@@ -301,21 +291,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setErr('本地上传尚未开启，请先配置 OSS 前缀。')
         return
       }
-      const picked = Array.from(files).filter(isImageFile)
-      if (picked.length === 0) {
+      const snapList = Array.from(files).filter(isImageFile)
+      if (snapList.length === 0) {
         setErr('请选择 jpg/png/webp 等图片文件')
-        return
-      }
-      let snapList: File[]
-      try {
-        snapList = await snapshotUploadFiles(picked)
-      } catch (e) {
-        const msg =
-          e instanceof Error
-            ? e.message
-            : '无法读取图片文件，请重新选择（与点播 StorageLocation 无关）'
-        setImageUploadError(msg)
-        setErr(msg)
         return
       }
       setImageUploading(true)
@@ -387,6 +365,44 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       }
     },
     [videoUploading, imageUploading, anyBusy, cfg?.localUploadEnabled],
+  )
+
+  /** 选图后立刻读入内存再清空 input，避免 Chrome FileList 失效 */
+  const ingestLocalImageFiles = useCallback(
+    async (picked: FileList | File[] | null, input?: HTMLInputElement | null) => {
+      if (!picked?.length) return
+      try {
+        const snap = await snapshotUploadFiles(picked)
+        if (input) input.value = ''
+        await handleLocalImages(snap)
+      } catch (err) {
+        if (input) input.value = ''
+        const msg =
+          err instanceof Error ? err.message : '无法读取图片文件，请重新选择'
+        setImageUploadError(msg)
+        setErr(msg)
+      }
+    },
+    [handleLocalImages],
+  )
+
+  const ingestLocalVideoFiles = useCallback(
+    async (picked: FileList | null, input?: HTMLInputElement | null) => {
+      if (!picked?.length) return
+      try {
+        const snap = await snapshotUploadFiles(picked)
+        if (input) input.value = ''
+        await handleLocalFiles(snap)
+      } catch (err) {
+        if (input) input.value = ''
+        setErr(
+          err instanceof Error
+            ? err.message
+            : '无法读取视频文件，请重新选择（与 StorageLocation 无关，多为浏览器未读完文件）',
+        )
+      }
+    },
+    [handleLocalFiles],
   )
 
   const runAiEditBrief = useCallback(async () => {
@@ -886,9 +902,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
                   const input = e.target
-                  void handleLocalFiles(input.files).finally(() => {
-                    input.value = ''
-                  })
+                  void ingestLocalVideoFiles(input.files, input)
                 }}
               />
               {!cfg?.localUploadEnabled ? (
@@ -1046,9 +1060,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
                   const input = e.target
-                  void handleLocalImages(input.files).finally(() => {
-                    input.value = ''
-                  })
+                  const picked = input.files
+                  void ingestLocalImageFiles(picked, input)
                 }}
               />
               <label
@@ -1074,9 +1087,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     setErr('请拖入 jpg/png/webp 等图片文件')
                     return
                   }
-                  const dt = new DataTransfer()
-                  for (const f of imgs) dt.items.add(f)
-                  void handleLocalImages(Array.from(dt.files))
+                  void ingestLocalImageFiles(imgs)
                 }}
                 className={cn(
                   'flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition',

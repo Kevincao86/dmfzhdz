@@ -13,10 +13,21 @@ function guessUploadMime(name: string): string {
 
 export async function snapshotUploadFiles(files: FileList | File[] | null): Promise<File[]> {
   if (!files?.length) return []
+  // 立即脱离 input FileList，避免清空 value 后 Chrome 无法 arrayBuffer
   const list = Array.from(files)
   const out: File[] = []
   for (const raw of list) {
-    const buf = await raw.arrayBuffer()
+    let buf: ArrayBuffer
+    try {
+      buf = await raw.arrayBuffer()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new Error(
+        msg.includes('could not be read')
+          ? '浏览器无法读取所选文件，请重新选择（勿在选图后移动/删除原文件）'
+          : msg || '读取文件失败',
+      )
+    }
     const type = raw.type?.trim() || guessUploadMime(raw.name)
     out.push(new File([buf], raw.name, { type, lastModified: raw.lastModified }))
   }

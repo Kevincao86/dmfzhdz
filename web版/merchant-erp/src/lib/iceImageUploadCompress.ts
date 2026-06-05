@@ -13,17 +13,27 @@ function isCompressibleImage(file: File): boolean {
   return file.type.startsWith('image/') && !file.type.includes('gif')
 }
 
+async function bitmapFromUploadFile(file: File): Promise<ImageBitmap | null> {
+  try {
+    const buf = await file.arrayBuffer()
+    const blob = new Blob([buf], { type: file.type?.trim() || 'image/jpeg' })
+    return await createImageBitmap(blob)
+  } catch {
+    try {
+      return await createImageBitmap(file)
+    } catch {
+      return null
+    }
+  }
+}
+
 async function compressIceImageWithParams(
   file: File,
   maxEdge: number,
   quality: number,
 ): Promise<File> {
-  let bitmap: ImageBitmap
-  try {
-    bitmap = await createImageBitmap(file)
-  } catch {
-    return file
-  }
+  const bitmap = await bitmapFromUploadFile(file)
+  if (!bitmap) return file
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
   const w = Math.max(1, Math.round(bitmap.width * scale))
   const h = Math.max(1, Math.round(bitmap.height * scale))
