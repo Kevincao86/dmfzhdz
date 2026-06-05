@@ -174,20 +174,20 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       {listEmptyHint ? <p className="text-slate-500 text-sm">{listEmptyHint}</p> : null}
       <div className="grid gap-3 md:grid-cols-2">
         {displayRows.map((t) => (
-          <article key={t.id} className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 flex gap-3">
+          <article key={t.id} className="talent-card rounded-xl border p-4 flex gap-3">
             <div className="w-12 h-12 rounded-full bg-violet-600/30 flex items-center justify-center text-lg shrink-0">
               {t.name.slice(0, 1)}
             </div>
             <div className="min-w-0 flex-1">
               {t.aiTag ? (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300">{t.aiTag}</span>
+                <span className="order-tag order-tag--match">{t.aiTag}</span>
               ) : null}
-              <h3 className="font-semibold truncate">{t.name}</h3>
-              <p className="text-xs text-slate-500 mt-1">
+              <h3 className="font-semibold truncate text-[var(--shell-text)]">{t.name}</h3>
+              <p className="talent-card-meta text-xs mt-1">
                 {t.platform} · {t.followers}粉 · {t.salesGrade}
               </p>
-              <p className="text-xs text-slate-600 mt-0.5">{t.region}</p>
-              {t.matchScore ? <p className="text-xs text-amber-400 mt-1">匹配度 {t.matchScore}</p> : null}
+              <p className="talent-card-meta text-xs mt-0.5">{t.region}</p>
+              {t.matchScore ? <p className="order-price text-xs mt-1">匹配度 {t.matchScore}</p> : null}
             </div>
           </article>
         ))}

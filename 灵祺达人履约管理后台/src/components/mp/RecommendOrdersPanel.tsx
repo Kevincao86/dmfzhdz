@@ -160,7 +160,7 @@ export default function RecommendOrdersPanel() {
       </div>
       {showPriceSheet ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4" onClick={() => setShowPriceSheet(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-[#1a1a28] p-4 border border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl panel-card p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-wrap gap-2">
               {hallFilters.priceBucketsForView(priceSelected).map((b) => (
                 <button key={b.id} type="button" className={`px-3 py-1.5 rounded-full text-sm ${b.selected ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => setPriceSelected(hallFilters.togglePriceId(priceSelected, b.id))}>

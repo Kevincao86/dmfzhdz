@@ -14,6 +14,7 @@ function navForRole(role: MpAccountRole): NavItem[] {
   if (role === 'pr') {
     return [
       { to: '/hall', label: '招募大厅' },
+      { to: '/hall?tab=recommend', label: '推荐大厅' },
       { to: '/publish', label: '发布招募' },
       { to: '/templates', label: '我的模版' },
       { to: '/orders', label: '我的发单' },
@@ -22,6 +23,7 @@ function navForRole(role: MpAccountRole): NavItem[] {
   }
   return [
     { to: '/hall', label: '招募大厅' },
+    { to: '/hall?tab=recommend', label: '推荐大厅' },
     { to: '/orders', label: '我的履约' },
     ...common,
   ]

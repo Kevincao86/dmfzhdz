@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '../cn'
+import { formatMpApiErr } from '../lib/mpApiErrors'
 import { passwordLogin, scanCreate, scanPoll, switchRole } from '../lib/mpApi'
 import { enterDevPreview, setActiveRole, setSession } from '../lib/mpSession'
 import {
@@ -105,7 +106,7 @@ export default function LoginPage() {
       await applyRoleAfterLogin(token, account, workIdentity)
       nav('/hall', { replace: true })
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '登录失败')
+      setErr(formatMpApiErr(e, '登录失败，请稍后重试'))
     } finally {
       setLoading(false)
     }

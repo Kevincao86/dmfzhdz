@@ -47,3 +47,7 @@ export function isSupplierWorkIdentity(id?: MpWorkIdentity) {
   const x = id || getWorkIdentity()
   return x === 'talent' || x === 'shoot' || x === 'edit'
 }
+
+export function accountRoleForWorkIdentity(id: MpWorkIdentity): 'talent' | 'pr' {
+  return workIdentityToAccountRole(id)
+}

@@ -1,4 +1,5 @@
 const auth = require('../../utils/auth.js')
+const mpApiErrors = require('../../utils/mpApiErrors.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
@@ -156,7 +157,7 @@ Page({
         }
       }, 1000)
     } catch (e) {
-      this.setData({ err: e && e.message ? e.message : '发送失败' })
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
     } finally {
       this.setData({ smsSending: false })
     }
@@ -188,11 +189,7 @@ Page({
       wx.showToast({ title: '注册成功', icon: 'success' })
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {
-      const msg = e && e.message ? e.message : '注册失败'
-      let hint = msg
-      if (/login_name_taken/i.test(msg)) hint = '该手机号已被注册'
-      if (/sms_code_invalid/i.test(msg)) hint = '验证码错误或已过期'
-      this.setData({ err: hint })
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
     } finally {
       this.setData({ loading: false })
     }

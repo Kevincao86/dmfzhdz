@@ -1,25 +1,8 @@
 @import 'tailwindcss';
 
+/* 默认白光，避免 :root 与暗色变量绑在一起导致亮模式卡片仍偏黑 */
 :root,
-[data-theme='dark'] {
-  --app-bg: #0f0f14;
-  --app-text: #e8e6f0;
-  --shell-sidebar-bg: #141422;
-  --shell-main-bg: #0f0f14;
-  --shell-border: rgba(255, 255, 255, 0.1);
-  --shell-text: #f1f5f9;
-  --shell-muted: #94a3b8;
-  --shell-hover: rgba(255, 255, 255, 0.05);
-  --panel-card: rgba(0, 0, 0, 0.3);
-  --panel-sheet: #1a1a28;
-  --panel-overlay: rgba(0, 0, 0, 0.6);
-  --embed-text-primary: #f8fafc;
-  --embed-text-secondary: #e2e8f0;
-  --embed-text-muted: #cbd5e1;
-  --embed-text-accent: #c7d2fe;
-}
-
-[data-theme='light'] {
+html[data-theme='light'] {
   --app-bg: #f0f2f5;
   --app-text: #1e293b;
   --shell-sidebar-bg: #ffffff;
@@ -31,6 +14,34 @@
   --panel-card: #ffffff;
   --panel-sheet: #ffffff;
   --panel-overlay: rgba(15, 23, 42, 0.35);
+  --embed-text-primary: #1f2937;
+  --embed-text-secondary: #374151;
+  --embed-text-muted: #6b7280;
+  --embed-text-accent: #4338ca;
+  --order-price: #d97706;
+  --order-chip-bg: #f1f5f9;
+  --order-chip-text: #64748b;
+}
+
+html[data-theme='dark'] {
+  --app-bg: #0f0f14;
+  --app-text: #e8e6f0;
+  --shell-sidebar-bg: #141422;
+  --shell-main-bg: #0f0f14;
+  --shell-border: rgba(255, 255, 255, 0.1);
+  --shell-text: #f1f5f9;
+  --shell-muted: #94a3b8;
+  --shell-hover: rgba(255, 255, 255, 0.05);
+  --panel-card: #1a1a28;
+  --panel-sheet: #1a1a28;
+  --panel-overlay: rgba(0, 0, 0, 0.6);
+  --embed-text-primary: #f8fafc;
+  --embed-text-secondary: #e2e8f0;
+  --embed-text-muted: #cbd5e1;
+  --embed-text-accent: #c7d2fe;
+  --order-price: #fbbf24;
+  --order-chip-bg: rgba(255, 255, 255, 0.05);
+  --order-chip-text: #94a3b8;
 }
 
 body {
@@ -61,6 +72,127 @@ body {
 .panel-card {
   background: var(--panel-card);
   border: 1px solid var(--shell-border);
+}
+
+.surface-card {
+  background: var(--panel-card);
+  border: 1px solid var(--shell-border);
+  color: var(--shell-text);
+}
+
+.order-card {
+  background: var(--panel-card);
+  border: 1px solid var(--shell-border);
+  color: var(--shell-text);
+}
+
+.order-card--clickable {
+  cursor: pointer;
+}
+
+.order-card--clickable:hover {
+  border-color: rgb(124 58 237 / 0.45);
+}
+
+.order-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  margin-bottom: 0.5rem;
+}
+
+[data-theme='dark'] .order-tag--match { background: rgb(139 92 246 / 0.2); color: #c4b5fd; }
+[data-theme='dark'] .order-tag--urgent { background: rgb(249 115 22 / 0.2); color: #fdba74; }
+[data-theme='dark'] .order-tag--ice { background: rgb(6 182 212 / 0.2); color: #67e8f9; }
+[data-theme='dark'] .order-tag--hot { background: rgb(244 63 94 / 0.2); color: #fda4af; }
+[data-theme='dark'] .order-tag--budget { background: rgb(245 158 11 / 0.2); color: #fcd34d; }
+[data-theme='dark'] .order-tag--niche { background: rgb(100 116 139 / 0.2); color: #cbd5e1; }
+[data-theme='dark'] .order-tag--default { background: rgb(255 255 255 / 0.1); color: #94a3b8; }
+
+[data-theme='light'] .order-tag--match { background: #ede9fe; color: #6d28d9; }
+[data-theme='light'] .order-tag--urgent { background: #ffedd5; color: #c2410c; }
+[data-theme='light'] .order-tag--ice { background: #cffafe; color: #0e7490; }
+[data-theme='light'] .order-tag--hot { background: #ffe4e6; color: #be123c; }
+[data-theme='light'] .order-tag--budget { background: #fef3c7; color: #b45309; }
+[data-theme='light'] .order-tag--niche { background: #f1f5f9; color: #475569; }
+[data-theme='light'] .order-tag--default { background: #f1f5f9; color: #64748b; }
+
+.order-chip {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+[data-theme='dark'] .order-chip--status { background: rgb(139 92 246 / 0.15); color: #c4b5fd; }
+[data-theme='dark'] .order-chip--meta { background: var(--order-chip-bg); color: var(--order-chip-text); }
+[data-theme='dark'] .order-chip--urgent { background: rgb(249 115 22 / 0.2); color: #fdba74; }
+[data-theme='dark'] .order-chip--ice { background: rgb(6 182 212 / 0.2); color: #67e8f9; }
+
+[data-theme='light'] .order-chip--status { background: #ede9fe; color: #6d28d9; }
+[data-theme='light'] .order-chip--meta { background: var(--order-chip-bg); color: var(--order-chip-text); }
+[data-theme='light'] .order-chip--urgent { background: #ffedd5; color: #c2410c; }
+[data-theme='light'] .order-chip--ice { background: #cffafe; color: #0e7490; }
+
+.order-price {
+  color: var(--order-price);
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.order-meta {
+  color: var(--shell-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  margin-top: 0.5rem;
+}
+
+/* 语义卡片：亮暗模式 */
+html[data-theme='light'] :is(.order-card, .surface-card, .panel-card, .talent-card) {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] :is(.order-card, .surface-card, .panel-card, .talent-card) {
+  background-color: #1a1a28 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f1f5f9 !important;
+}
+
+html[data-theme='light'] .talent-card .talent-card-meta {
+  color: #64748b !important;
+}
+
+html[data-theme='dark'] .talent-card .talent-card-meta {
+  color: #94a3b8 !important;
+}
+
+/* 白光模式：强制覆盖全站写死的暗色 Tailwind 类（所有卡片/面板/输入框） */
+html[data-theme='light'] .bg-\[\#1a1a28\] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] :is(.bg-black\/30, .bg-black\/35) {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] .border-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme='light'] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme='light'] :is(.text-slate-400, .text-slate-500, .text-slate-600) {
+  color: #64748b !important;
 }
 
 @keyframes hero-crossfade {

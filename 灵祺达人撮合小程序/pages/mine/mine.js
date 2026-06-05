@@ -4,6 +4,9 @@ const memberStore = require('../../utils/talentMember.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const participant = require('../../utils/participant.js')
 const userProfile = require('../../utils/userProfile.js')
+const identityTypes = require('../../utils/identityTypes.js')
+const auth = require('../../utils/auth.js')
+const mpApiErrors = require('../../utils/mpApiErrors.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const { setTabBarForPage, refreshTabBar, setTabBarHidden } = require('../../utils/tabBar.js')
@@ -321,18 +324,41 @@ Page({
     setTabBarHidden(this, false)
     this.applyIdentitySwitch(id)
   },
-  applyIdentitySwitch(id) {
+  async applyIdentitySwitch(id) {
     if (!id || id === this.data.identity) return
+    const targetRole = identityTypes.accountRoleForWorkIdentity(id)
+    const account = auth.readAccount()
     userProfile.writeIdentity(id)
+    if (auth.isLoggedIn() && account) {
+      const curRole = account.activeRole === 'pr' ? 'pr' : 'talent'
+      if (curRole !== targetRole) {
+        wx.showLoading({ title: '切换身份…', mask: true })
+        try {
+          await auth.switchRole(targetRole)
+        } catch (e) {
+          wx.hideLoading()
+          userProfile.writeIdentity(this.data.identity)
+          wx.showToast({
+            title: mpApiErrors.formatMpApiErr(e, '身份切换失败'),
+            icon: 'none',
+          })
+          return
+        }
+        wx.hideLoading()
+      }
+    }
     wx.showToast({ title: `已切换为${userProfile.identityLabel(id)}`, icon: 'none' })
     this.refresh()
     refreshTabBar()
     const pages = getCurrentPages()
     const cur = pages[pages.length - 1]
-    if (id === 'talent' && cur && routeToPagePath(cur.route) === '/pages/publish/publish') {
+    if (id !== 'pr' && cur && routeToPagePath(cur.route) === '/pages/publish/publish') {
       wx.switchTab({ url: '/pages/index/index' })
     }
     if (cur && routeToPagePath(cur.route) === '/pages/recommend/recommend') {
+      cur.onShow()
+    }
+    if (cur && routeToPagePath(cur.route) === '/pages/index/index' && cur.applyFilters) {
       cur.onShow()
     }
     try {

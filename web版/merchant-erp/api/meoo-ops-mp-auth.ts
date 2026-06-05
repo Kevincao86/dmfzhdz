@@ -295,6 +295,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'account_already_exists' ||
       msg === 'wx_already_registered' ||
       msg === 'login_name_taken' ||
+      msg === 'sms_code_invalid' ||
+      msg === 'invalid_phone' ||
+      msg === 'invalid_sms_code' ||
+      msg === 'invalid_password' ||
       /^invalid code/i.test(msg) ||
       /^wx_code2session_/i.test(msg) ||
       /duplicate key|23505/i.test(msg)
@@ -302,6 +306,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         : msg === 'wx_not_configured'
           ? 503
           : 500
-    sendJson(res, status, { ok: false, error: msg })
+    const zh: Record<string, string> = {
+      sms_code_invalid: '验证码错误或已过期',
+      invalid_sms_code: '请输入 6 位验证码',
+      invalid_phone: '请输入有效大陆手机号',
+      invalid_password: '密码至少 6 位',
+      login_name_taken: '该手机号已被注册',
+      invalid_credentials: '账号或密码错误',
+      invalid_session: '登录已过期，请重新登录',
+      account_not_found: '账号不存在',
+      wx_not_configured: '微信登录未配置',
+      wx_already_registered: '该微信已注册',
+    }
+    sendJson(res, status, {
+      ok: false,
+      error: msg,
+      message: zh[msg] || (msg.includes('invalid') ? '请求参数无效' : '操作失败，请稍后重试'),
+    })
   }
 }
