@@ -161,7 +161,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         registerTalent: body.registerTalent as never,
         registerPr: body.registerPr as never,
       })
-      sendJson(res, 200, { ok: true, token, isNew, account: accountToClientPayload(account) })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, isNew, account: payload })
       return
     }
 
@@ -172,7 +173,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         String(body.loginName || ''),
         String(body.password || ''),
       )
-      sendJson(res, 200, { ok: true, token, account: accountToClientPayload(account) })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, account: payload })
       return
     }
 
@@ -186,7 +188,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         wxNickName: pickAuthField(req, body, 'wxNickName'),
         wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
       })
-      sendJson(res, 200, { ok: true, token, isNew, account: accountToClientPayload(account) })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, isNew, account: payload })
       return
     }
 
@@ -226,7 +229,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sess.account.id,
         roleRaw === 'pr' ? 'pr' : 'talent',
       )
-      sendJson(res, 200, { ok: true, account: accountToClientPayload(account) })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, account: payload })
       return
     }
 
@@ -260,7 +264,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 401, { ok: false, error: 'invalid_session' })
         return
       }
-      sendJson(res, 200, { ok: true, account: accountToClientPayload(sess.account) })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, sess.account)
+      sendJson(res, 200, { ok: true, account: payload })
       return
     }
 

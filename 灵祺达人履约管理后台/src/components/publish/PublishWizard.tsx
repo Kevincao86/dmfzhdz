@@ -33,6 +33,13 @@ import {
   TARGET_DURATIONS,
 } from '../../lib/mpSync/supplierPublishForm'
 import {
+  defaultLiveApplyFields,
+  LIVE_DURATIONS,
+  LIVE_PLATFORMS,
+  LIVE_TYPES,
+  SAMPLE_POLICIES,
+} from '../../lib/mpSync/livePublishForm'
+import {
   clearPublishDraft,
   getLatestPublishDraftForMode,
   getPublishDraftById,
@@ -122,7 +129,7 @@ export default function PublishWizard() {
   const [applyEditorTplId, setApplyEditorTplId] = useState('')
   const [showDeadlineSheet, setShowDeadlineSheet] = useState(false)
 
-  const display = useMemo(() => computePublishDisplay(form), [form])
+  const display = useMemo(() => computePublishDisplay(form, recruitMode), [form, recruitMode])
   const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
   const filteredModes = useMemo(() => modesForTarget(recruitTarget || 'talent'), [recruitTarget])
 
@@ -377,7 +384,7 @@ export default function PublishWizard() {
           ‹ 返回
         </button>
         <h2 className="text-xl font-bold">选择招募模式</h2>
-        <p className="text-sm text-slate-400">探店 · 品宣</p>
+        <p className="text-sm text-slate-400">探店 · 品宣 · 直播达人</p>
         <div className="space-y-3">
           {filteredModes.map((m) => (
             <button
@@ -391,6 +398,13 @@ export default function PublishWizard() {
                 setSignupDeadlineTime('23:59')
                 setDraftId('')
                 draftRestoredRef.current = false
+                if (m.id === 'live') {
+                  setForm((prev) => ({
+                    ...prev,
+                    applyFormFields: defaultLiveApplyFields(),
+                    applyFormTemplateName: '直播达人报名默认项',
+                  }))
+                }
                 setStep('form')
               }}
             >
@@ -458,13 +472,103 @@ export default function PublishWizard() {
           <PubLabel>招募标题 *</PubLabel>
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
-            placeholder="如：春季火锅探店招募"
+            placeholder={recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}
             value={form.title}
             onChange={(e) => patchForm({ title: e.target.value })}
           />
         </div>
 
-        {!isSupplierPublish ? (
+        {recruitMode === 'live' ? (
+          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
+            <PubLabel>直播平台 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {LIVE_PLATFORMS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`px-2 py-1 rounded text-xs ${form.livePlatform === p ? 'bg-violet-600' : 'bg-white/10'}`}
+                  onClick={() =>
+                    patchForm({
+                      livePlatform: p,
+                      platform: p.replace(/直播$/, ''),
+                    })
+                  }
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <PubLabel>直播日期 *</PubLabel>
+            <input
+              type="date"
+              className="w-full rounded-lg panel-input border px-3 py-2"
+              value={form.liveDate}
+              onChange={(e) => patchForm({ liveDate: e.target.value })}
+            />
+            <PubLabel>开播时间 *</PubLabel>
+            <input
+              type="time"
+              className="w-full rounded-lg panel-input border px-3 py-2"
+              value={form.liveTimeStart}
+              onChange={(e) => patchForm({ liveTimeStart: e.target.value })}
+            />
+            <PubLabel>预计时长 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {LIVE_DURATIONS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={`px-2 py-1 rounded text-xs ${form.liveDuration === d ? 'bg-violet-600' : 'bg-white/10'}`}
+                  onClick={() => patchForm({ liveDuration: d })}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            <PubLabel>直播类型 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {LIVE_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`px-2 py-1 rounded text-xs ${form.liveType === t ? 'bg-violet-600' : 'bg-white/10'}`}
+                  onClick={() => patchForm({ liveType: t })}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <PubLabel>带货商品/套餐说明 *</PubLabel>
+            <textarea
+              className="w-full rounded-lg panel-input border px-3 py-2 min-h-[88px]"
+              placeholder="商品名称、规格、团购价、佣金空间、是否独家等"
+              value={form.productSummary}
+              onChange={(e) => patchForm({ productSummary: e.target.value })}
+            />
+            <PubLabel>样品/寄样方式 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {SAMPLE_POLICIES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`px-2 py-1 rounded text-xs ${form.samplePolicy === s ? 'bg-violet-600' : 'bg-white/10'}`}
+                  onClick={() => patchForm({ samplePolicy: s })}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            <PubLabel>脚本/话术要求</PubLabel>
+            <textarea
+              className="w-full rounded-lg panel-input border px-3 py-2 min-h-[72px]"
+              placeholder="口播要点、禁说词、优惠机制、挂车链接说明等"
+              value={form.scriptRequirement}
+              onChange={(e) => patchForm({ scriptRequirement: e.target.value })}
+            />
+          </div>
+        ) : null}
+
+        {!isSupplierPublish && recruitMode !== 'live' ? (
           <PubSelectRow
             label="招募平台 *"
             value={display.platformDisplayText}

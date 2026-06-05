@@ -25,8 +25,8 @@
           bindinput="onNicknameInput"
         />
         <text class="hint">用于登录与身份展示</text>
-        <text class="wx-identity-id" wx:if="{{lingqiShootTeamIdLabel}}">{{lingqiShootTeamIdLabel}}</text>
-        <text class="wx-identity-id" wx:elif="{{lingqiEditTeamIdLabel}}">{{lingqiEditTeamIdLabel}}</text>
+        <text class="wx-identity-id" wx:if="{{isSupplier && workIdentity === 'shoot'}}">{{lingqiShootTeamIdLabel || '拍摄团队ID：待生成'}}</text>
+        <text class="wx-identity-id" wx:elif="{{isSupplier && workIdentity === 'edit'}}">{{lingqiEditTeamIdLabel || '剪辑团队ID：待生成'}}</text>
         <text class="wx-identity-id" wx:elif="{{lingqiTalentIdLabel}}">{{lingqiTalentIdLabel}}</text>
       </view>
     </view>

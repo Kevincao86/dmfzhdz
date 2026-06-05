@@ -96,8 +96,9 @@ export function upsertSupplierTeamLibraryFromMember(
   const role = memberSupplierRole(member)
   if (!role) return member
 
+  const explicitWork = member.workIdentity === 'shoot' || member.workIdentity === 'edit'
   const hasContact = String(member.contact || '').trim() && String(member.wechatId || '').trim()
-  if (!hasContact) return member
+  if (!explicitWork && !hasContact) return member
 
   const next = { ...member }
   if (role === 'shoot' && !next.lingqiShootTeamId) {

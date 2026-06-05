@@ -7,6 +7,7 @@ const userProfile = require('../../utils/userProfile.js')
 const identityTypes = require('../../utils/identityTypes.js')
 const auth = require('../../utils/auth.js')
 const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
+const identityIdLabels = require('../../utils/identityIdLabels.js')
 const mpApiErrors = require('../../utils/mpApiErrors.js')
 const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
 const messagesStore = require('../../utils/messagesStore.js')
@@ -97,6 +98,11 @@ Page({
       const chat = require('../../utils/talentChat.js')
       if (chat.canChat()) await chat.syncProfile()
     } catch (_) {}
+    if (auth.isLoggedIn()) {
+      try {
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+      } catch (_) {}
+    }
     try {
       this.refresh()
     } catch (e) {
@@ -149,15 +155,17 @@ Page({
 
     const displayName = profileNick || '灵祺用户'
 
+    const acct = auth.readAccount()
     let identityIdLine = ''
-    if (identity === 'shoot' && member?.lingqiShootTeamId) {
-      identityIdLine = lingqiIdentity.formatShootTeamIdLabel(member.lingqiShootTeamId)
-    } else if (identity === 'edit' && member?.lingqiEditTeamId) {
-      identityIdLine = lingqiIdentity.formatEditTeamIdLabel(member.lingqiEditTeamId)
-    } else if (identity === 'talent' && member?.lingqiTalentId) {
-      identityIdLine = lingqiIdentity.formatTalentIdLabel(member.lingqiTalentId)
-    } else if (identity === 'pr' && prProfile?.lingqiPrId) {
-      identityIdLine = lingqiIdentity.formatPrIdLabel(prProfile.lingqiPrId)
+    if (identity === 'pr') {
+      identityIdLine = lingqiIdentity.formatPrIdLabel(prProfile?.lingqiPrId)
+    } else {
+      const labels = identityIdLabels.buildIdentityIdLabels(identity, { member, account: acct })
+      identityIdLine =
+        labels.lingqiShootTeamIdLabel ||
+        labels.lingqiEditTeamIdLabel ||
+        labels.lingqiTalentIdLabel ||
+        (identity === 'shoot' ? '拍摄团队ID：待生成' : identity === 'edit' ? '剪辑团队ID：待生成' : '')
     }
 
     const wxAcc = wxAccount.readWxAccount()
@@ -360,9 +368,7 @@ Page({
       wx.hideLoading()
       if (result.needsReLogin) {
         wx.showToast({ title: result.cloudWarning || '请重新登录', icon: 'none' })
-        return
-      }
-      if (result.cloudWarning) {
+      } else if (result.cloudWarning) {
         wx.showToast({ title: result.cloudWarning, icon: 'none' })
       } else {
         wx.showToast({ title: `已切换为${userProfile.identityLabel(id)}`, icon: 'none' })

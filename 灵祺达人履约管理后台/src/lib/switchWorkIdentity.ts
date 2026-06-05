@@ -94,6 +94,8 @@ function workIdentityForApi(workId: MpWorkIdentity): 'talent' | 'shoot' | 'edit'
 function identitySatisfied(workId: MpWorkIdentity, account: MpAccount): boolean {
   const role = workIdentityToAccountRole(workId)
   if (role === 'pr') return Boolean(account.lingqiPrId)
+  if (workId === 'shoot') return Boolean(account.lingqiShootTeamId)
+  if (workId === 'edit') return Boolean(account.lingqiEditTeamId)
   return Boolean(account.lingqiTalentId)
 }
 
@@ -145,8 +147,7 @@ export async function applyWorkIdentitySwitch(next: MpWorkIdentity): Promise<Wor
     if (!identitySatisfied(next, account)) {
       return {
         workId: next,
-        needsReLogin: true,
-        cloudWarning: '身份 ID 未生成，请重新登录完成注册',
+        cloudWarning: '已切换身份，团队 ID 同步中，请稍后刷新',
       }
     }
     return { workId: next }

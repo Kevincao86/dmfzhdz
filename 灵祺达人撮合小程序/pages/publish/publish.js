@@ -50,6 +50,7 @@ const {
   newFansTier,
 } = publishOpts
 const supplierPublishForm = require('../../utils/supplierPublishForm.js')
+const livePublishForm = require('../../utils/livePublishForm.js')
 const { buildCompactBudgetText } = require('../../utils/recruitmentBudgetDisplay.js')
 
 /** 子页确认后滚动回表单对应字段 */
@@ -114,6 +115,7 @@ function emptyForm(recruitTarget) {
     applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
     applyFormFields: afFields,
     ...supplierPublishForm.emptySupplierPublishFields(),
+    ...livePublishForm.emptyLiveFields(),
   }
 }
 
@@ -165,6 +167,10 @@ Page({
     materialSources: supplierPublishForm.MATERIAL_SOURCES,
     aspectRatios: supplierPublishForm.ASPECT_RATIOS,
     targetDurations: supplierPublishForm.TARGET_DURATIONS,
+    livePlatforms: livePublishForm.LIVE_PLATFORMS,
+    liveTypes: livePublishForm.LIVE_TYPES,
+    liveDurations: livePublishForm.LIVE_DURATIONS,
+    samplePolicies: livePublishForm.SAMPLE_POLICIES,
     showDouyinLevel: false,
     pickerView: '',
     platforms: PLATFORMS,
@@ -409,7 +415,10 @@ Page({
     }
     const tags = f.talentTags || []
     const tagsDisplayText = tags.length ? tags.join('、') : '请选择达人标签（最多2个）'
-    const platformDisplayText = f.platform || '请选择招募平台'
+    const isLive = this.data.recruitMode === 'live'
+    const platformDisplayText = isLive
+      ? f.livePlatform || '请选择直播平台'
+      : f.platform || '请选择招募平台'
     const levels = f.douyinSalesLevels || []
     const levelDisplayText =
       !levels.length || levels.includes('不限') ? '不限' : levels.join('、')
@@ -434,12 +443,14 @@ Page({
       platformDisplayText,
       levelDisplayText,
       citySelectedChips: chips,
-      showDouyinLevel: f.platform === '抖音',
+      showDouyinLevel: isLive
+        ? livePublishForm.isDouyinLivePlatform(f.livePlatform)
+        : f.platform === '抖音',
       feeTypeLabel: feeTypeLabel(f.feeTypeId),
       feePlaceholder: !f.feeTypeId,
       tagsPlaceholder: !tags.length,
       cityPlaceholder: cityDisplayText === '请选择招募城市',
-      platformPlaceholder: !f.platform,
+      platformPlaceholder: isLive ? !f.livePlatform : !f.platform,
       showSignupDeadline: !urgentWin,
       signupDeadlineDisplay: urgentWin
         ? '急单默认发布后 24 小时截止'
@@ -589,7 +600,7 @@ Page({
     const mode = modeById(e.currentTarget.dataset.id)
     if (!mode) return
     const today = defaultSignupDate()
-    this.setData({
+    const patch = {
       step: 'form',
       pickerView: '',
       recruitMode: mode.id,
@@ -597,7 +608,12 @@ Page({
       todayDate: today,
       signupDeadlineDate: '',
       signupDeadlineTime: '23:59',
-    })
+    }
+    if (mode.id === 'live') {
+      patch['form.applyFormFields'] = livePublishForm.defaultLiveApplyFields()
+      patch['form.applyFormTemplateName'] = '直播达人报名默认项'
+    }
+    this.setData(patch)
     this.syncDisplayFields()
     this.syncTabBarOverlay()
   },
@@ -627,6 +643,24 @@ Page({
     const key = e.currentTarget.dataset.key
     if (!key) return
     this.setData({ [`form.${key}`]: e.detail.value || '' })
+  },
+  onLiveDatePick(e) {
+    this.setData({ 'form.liveDate': e.detail.value || '' })
+  },
+  onLiveTimePick(e) {
+    this.setData({ 'form.liveTimeStart': e.detail.value || '' })
+  },
+  onLiveOptionPick(e) {
+    const key = e.currentTarget.dataset.key
+    const val = e.currentTarget.dataset.val
+    if (!key || !val) return
+    const patch = { [`form.${key}`]: val }
+    if (key === 'livePlatform') {
+      patch['form.platform'] = val.replace(/直播$/, '')
+      patch.showDouyinLevel = livePublishForm.isDouyinLivePlatform(val)
+    }
+    this.setData(patch)
+    if (key === 'livePlatform') this.syncDisplayFields()
   },
   onTierFieldInput(e) {
     const idx = Number(e.currentTarget.dataset.index)
@@ -890,20 +924,33 @@ Page({
     const target = this.data.recruitTarget || 'talent'
     const isSupplier = target === 'shoot' || target === 'edit'
     if (!String(f.title || '').trim()) return '请填写招募标题'
-    if (!isSupplier && !f.platform) return '请选择招募平台'
+    if (this.data.recruitMode === 'live') {
+      const liveErr = livePublishForm.validateLivePublish(f)
+      if (liveErr) return liveErr
+      if (livePublishForm.isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
+        return '请选择达人带货等级'
+      }
+    } else if (!isSupplier && !f.platform) return '请选择招募平台'
     if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
     if (!isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
     if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
     if (f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
       return '请选择招募报名截止时间'
     }
-    if (!isSupplier && f.platform === '抖音' && !(f.douyinSalesLevels || []).length) return '请选择达人带货等级'
+    if (
+      !isSupplier &&
+      this.data.recruitMode !== 'live' &&
+      f.platform === '抖音' &&
+      !(f.douyinSalesLevels || []).length
+    ) {
+      return '请选择达人带货等级'
+    }
     if (!f.feeTypeId) return '请选择费用模式'
     const feeErr = this.validateFee(f)
     if (feeErr) return feeErr
     const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
     if (n < 1) return '招募人数至少为 1'
-    if (!String(f.recruitDetail || '').trim()) return '请填写招募详情'
+    if (!String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
     if (isSupplier) {
       const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
       if (sErr) return sErr
@@ -958,10 +1005,19 @@ Page({
       `费用模式：${feeTypeLabel(f.feeTypeId)}`,
     ]
     if (!isSupplier) {
-      lines.splice(4, 0, `招募平台：${f.platform || '—'}`)
+      if (this.data.recruitMode === 'live') {
+        lines.splice(4, 0, `直播平台：${f.livePlatform || '—'}`)
+        lines.push(...livePublishForm.buildLiveRecruitmentLines(f))
+      } else {
+        lines.splice(4, 0, `招募平台：${f.platform || '—'}`)
+      }
       lines.push(`需求达人标签：${(f.talentTags || []).join('、')}`)
       lines.push(`粉丝要求：${buildFansRequirementText(f)}`)
-      if (f.platform === '抖音') lines.push(`带货等级：${(f.douyinSalesLevels || []).join('、')}`)
+      const douyinLevel =
+        this.data.recruitMode === 'live'
+          ? livePublishForm.isDouyinLivePlatform(f.livePlatform)
+          : f.platform === '抖音'
+      if (douyinLevel) lines.push(`带货等级：${(f.douyinSalesLevels || []).join('、')}`)
     } else {
       lines.push(...supplierPublishForm.buildSupplierRecruitmentLines(target, f, mode, {
         buildBudgetDetailText: (form) => this.buildBudgetDetailText(form),
@@ -1053,7 +1109,7 @@ Page({
       title: String(f.title || '').trim(),
       recruitmentInfo: this.buildRecruitmentInfo(f, mode),
       taskDetail: this.buildRecruitmentInfo(f, mode),
-      platform: f.platform,
+      platform: this.data.recruitMode === 'live' ? f.livePlatform || f.platform : f.platform,
       fansRequirement: buildFansRequirementText(f),
       urgent: isUrgent,
       deadline,
@@ -1065,7 +1121,8 @@ Page({
       publisherTemplateId: 'publish-wizard-v2',
       mpPublishMeta: (() => {
         const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
-        return {
+        return livePublishForm.patchLiveMeta(
+          {
           prParticipantKey: participant.prParticipantKey(pr),
           prDisplayName: userProfile.prDisplayName(pr),
           prWxNickName: String(pr.wxNickName || '').trim(),
@@ -1105,7 +1162,9 @@ Page({
           applyFormTemplateId: f.applyFormTemplateId,
           applyFormTemplateName: f.applyFormTemplateName || '',
           applyFormFields: f.applyFormFields || [],
-        }
+        },
+          f,
+        )
       })(),
     }
     if (mode.hall === 'ice' || mode.id === 'edit_ice') {

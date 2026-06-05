@@ -11,7 +11,7 @@ const auth = require('../../utils/auth.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
-const lingqiIdentity = require('../../utils/lingqiIdentity.js')
+const identityIdLabels = require('../../utils/identityIdLabels.js')
 const accountMemberSync = require('../../utils/accountMemberSync.js')
 const userProfile = require('../../utils/userProfile.js')
 const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
@@ -98,21 +98,30 @@ Page({
     ...loginCredPanel.patchFromAccount(null),
   },
   ...credHandlers,
+  applyIdentityIdLabels(workIdentity) {
+    const wid = workIdentity || this.data.workIdentity || userProfile.readIdentity()
+    const member = readMember()
+    const account = auth.readAccount()
+    const idPatch = identityIdLabels.buildIdentityIdLabels(wid, { member, account })
+    this.setData(idPatch)
+  },
   async onShow() {
+    const workIdentity = userProfile.readIdentity()
     if (auth.isLoggedIn()) {
       try {
-        await auth.refreshSession()
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
       } catch (_) {}
     }
     const acct = auth.readAccount()
-    if (acct) {
-      accountMemberSync.syncTalentMemberFromAccount(acct)
-      const patch = loginCredPanel.patchFromAccount(acct)
-      if (acct.lingqiTalentId) {
-        patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(acct.lingqiTalentId)
-      }
-      this.setData(patch)
-    }
+    if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
+    const patch = loginCredPanel.patchFromAccount(acct)
+    Object.assign(patch, identityIdLabels.buildIdentityIdLabels(workIdentity, {
+      member: readMember(),
+      account: acct,
+    }))
+    patch.workIdentity = workIdentity
+    patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
+    this.setData(patch)
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -157,14 +166,7 @@ Page({
     }
     const acct = auth.readAccount()
     if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
-    const talentId = (acct && acct.lingqiTalentId) || (cur && cur.lingqiTalentId) || ''
-    if (talentId) patch.lingqiTalentIdLabel = lingqiIdentity.formatTalentIdLabel(talentId)
-    if (cur?.lingqiShootTeamId) {
-      patch.lingqiShootTeamIdLabel = lingqiIdentity.formatShootTeamIdLabel(cur.lingqiShootTeamId)
-    }
-    if (cur?.lingqiEditTeamId) {
-      patch.lingqiEditTeamIdLabel = lingqiIdentity.formatEditTeamIdLabel(cur.lingqiEditTeamId)
-    }
+    Object.assign(patch, identityIdLabels.buildIdentityIdLabels(workIdentity, { member: cur, account: acct }))
     Object.assign(patch, loginCredPanel.patchFromAccount(acct))
     if (cur) {
       Object.assign(patch, {
@@ -466,11 +468,7 @@ Page({
           cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
         }
       }
-      this.setData({
-        lingqiTalentIdLabel: lingqiIdentity.formatTalentIdLabel(member.lingqiTalentId),
-        lingqiShootTeamIdLabel: lingqiIdentity.formatShootTeamIdLabel(member.lingqiShootTeamId),
-        lingqiEditTeamIdLabel: lingqiIdentity.formatEditTeamIdLabel(member.lingqiEditTeamId),
-      })
+      this.applyIdentityIdLabels(workId)
       notifySavedAndBack(cloudWarn)
     } finally {
       this.setData({ submitting: false })

@@ -64,12 +64,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
-    const member = body.member
+    let member = body.member
     if (!member || !member.memberType || !String(member.wxNickName || '').trim()) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_member' })
       return
     }
-    if (!String(member.contact || '').trim() || !String(member.wechatId || '').trim()) {
+    const supplierWork = member.workIdentity === 'shoot' || member.workIdentity === 'edit'
+    const openId = String(member.wxOpenId || '').trim()
+    let contact = String(member.contact || '').trim()
+    let wechatId = String(member.wechatId || '').trim()
+    if (!contact && supplierWork) contact = openId || String(member.wxNickName || '').trim()
+    if (!wechatId && supplierWork) wechatId = contact || openId
+    member = { ...member, contact, wechatId }
+    if (!contact || !wechatId) {
       sendOpsJson(res, 400, { ok: false, error: 'contact_required' })
       return
     }
