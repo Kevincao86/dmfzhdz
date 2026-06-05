@@ -436,7 +436,7 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="digital-human-page space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="relative pl-4">
           <span

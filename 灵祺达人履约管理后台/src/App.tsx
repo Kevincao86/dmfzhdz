@@ -16,9 +16,11 @@ import PublishPage from './pages/PublishPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditPage from './pages/TemplateEditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
-import ShortVideoPage from './pages/merchant/ShortVideoPage'
-import AiContentPage from './pages/merchant/AiContentPage'
-import DigitalHumanPage from './pages/merchant/DigitalHumanPage'
+import {
+  AiContentAddonPage,
+  DigitalHumanAddonPage,
+  ShortVideoAddonPage,
+} from './merchant/embedPages'
 import { getToken } from './lib/mpSession'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -58,9 +60,9 @@ export default function App() {
         <Route path="/profile/pr" element={<PrProfilePage />} />
         <Route path="/addons" element={<MerchantEmbedShell />}>
           <Route index element={<Navigate to="/addons/shortvideo" replace />} />
-          <Route path="shortvideo" element={<ShortVideoPage />} />
-          <Route path="ai-content" element={<AiContentPage />} />
-          <Route path="digital-human" element={<DigitalHumanPage />} />
+          <Route path="shortvideo" element={<ShortVideoAddonPage />} />
+          <Route path="ai-content" element={<AiContentAddonPage />} />
+          <Route path="digital-human" element={<DigitalHumanAddonPage />} />
         </Route>
       </Route>
       <Route path="*" element={<RootRedirect />} />

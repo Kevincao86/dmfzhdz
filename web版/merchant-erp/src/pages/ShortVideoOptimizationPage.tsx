@@ -884,7 +884,7 @@ export default function ShortVideoOptimizationPage() {
   return (
     <div
       className={cn(
-        'mx-auto px-4 py-8 lg:py-12',
+        'short-video-page mx-auto px-4 py-8 lg:py-12',
         mainPane === 'cloud_batch' ? 'max-w-6xl' : 'max-w-4xl',
       )}
     >
