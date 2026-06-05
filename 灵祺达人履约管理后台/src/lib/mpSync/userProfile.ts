@@ -48,6 +48,7 @@ export function readPrProfile(): PrProfile | null {
 
 export function writePrProfile(profile: PrProfile) {
   localStorage.setItem(PR_PROFILE_KEY, JSON.stringify(profile))
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
 export function prDisplayName(profile: PrProfile | null): string {

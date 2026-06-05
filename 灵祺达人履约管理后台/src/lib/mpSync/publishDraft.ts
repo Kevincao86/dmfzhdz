@@ -58,6 +58,7 @@ function migrateLegacyDraft(): PublishWizardDraft[] {
 
 function writeList(list: PublishWizardDraft[]) {
   localStorage.setItem(DRAFTS_KEY, JSON.stringify(list.slice(0, 50)))
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
 export function listPublishDrafts(): PublishWizardDraft[] {

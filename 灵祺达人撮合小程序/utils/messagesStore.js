@@ -17,8 +17,15 @@ function readList(key) {
   }
 }
 
+function scheduleClientSync() {
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
+}
+
 function writeList(key, list) {
   wx.setStorageSync(key, JSON.stringify(list.slice(0, 100)))
+  scheduleClientSync()
 }
 
 function sortTsFromId(id) {
@@ -112,6 +119,7 @@ function markInboxSeen(ids) {
   for (const id of ids || []) set.add(String(id))
   try {
     wx.setStorageSync(INBOX_SEEN_KEY, JSON.stringify([...set].slice(-500)))
+    scheduleClientSync()
   } catch (_) {}
 }
 

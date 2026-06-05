@@ -22,6 +22,10 @@ App({
       if (route !== 'pages/login/login') {
         wx.reLaunch({ url: '/pages/login/login' })
       }
+    } else {
+      try {
+        require('./utils/mpAccountClientSync.js').pullAfterLogin()
+      } catch (_) {}
     }
   },
   onShow() {

@@ -62,6 +62,7 @@ export function setSession(token: string, account: MpAccount) {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
   localStorage.setItem(ROLE_KEY, account.activeRole)
   onAccountLogin(account)
+  import('./mpAccountClientSync').then((m) => m.pullClientStateAfterLogin()).catch(() => {})
 }
 
 export function getAccount(): MpAccount | null {

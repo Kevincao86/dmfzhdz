@@ -9,6 +9,9 @@ function writeSession(token, account) {
   sessionStore.writeSessionPair(token, account)
   mpAccountLocalScope.onAccountLogin(account)
   accountMemberSync.syncLocalProfilesFromAccount(account)
+  try {
+    require('./mpAccountClientSync.js').pullAfterLogin()
+  } catch (_) {}
 }
 
 function clearSession() {

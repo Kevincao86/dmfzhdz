@@ -254,6 +254,15 @@ export async function registerTalentMember(member: Record<string, unknown>) {
   )
 }
 
+/** 本机态与云端合并同步（报名/草稿/通知） */
+export async function syncClientState(state: Record<string, unknown>) {
+  const data = await mpAuthRequest('client_state_sync', { state })
+  return {
+    state: (data.state || {}) as Record<string, unknown>,
+    updatedAt: data.updatedAt ? String(data.updatedAt) : '',
+  }
+}
+
 export async function registerPrUser(prUser: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-pr-user-register', '/api/ops-sync/mp-pr-users/register'],

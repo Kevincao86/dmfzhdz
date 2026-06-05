@@ -16,6 +16,9 @@ function readMember() {
 function writeMember(member) {
   const migrated = talentPlatforms.migrateMember(member)
   wx.setStorageSync(STORAGE_KEY, JSON.stringify(migrated))
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
 }
 
 function clearMember() {

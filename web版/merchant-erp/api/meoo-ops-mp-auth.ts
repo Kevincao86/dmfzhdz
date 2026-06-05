@@ -23,6 +23,7 @@ import {
   mpAuthWxLogin,
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
+import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
 
 export const config = { maxDuration: 60 }
 
@@ -297,6 +298,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'client_state_get' || action === 'client_state_sync') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      if (action === 'client_state_get') {
+        const state = await mpAuthGetClientState(supabaseUrl, serviceRole, sess.account.id)
+        sendJson(res, 200, { ok: true, state })
+        return
+      }
+      const { state, updatedAt } = await mpAuthSyncClientState(
+        supabaseUrl,
+        serviceRole,
+        sess.account.id,
+        body.state,
+      )
+      sendJson(res, 200, { ok: true, state, updatedAt })
+      return
+    }
+
     sendJson(res, 400, {
       ok: false,
       error: 'unknown_action',
@@ -312,6 +335,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'scan_poll',
         'scan_confirm_dev',
         'hall_registry',
+        'client_state_get',
+        'client_state_sync',
       ],
     })
   } catch (e) {

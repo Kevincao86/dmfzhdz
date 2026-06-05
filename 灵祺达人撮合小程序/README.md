@@ -46,6 +46,7 @@ bash scripts/mp-compress-orbit-images.sh
 
 - 登录走 `POST /api/meoo-ops-mp-auth`（`wx_login` / `password_login`）
 - 服务端表 `mp_accounts`：`openid` 唯一，绑定唯一 `lingqiTalentId` / `lingqiPrId`
+- 本机态同步：`utils/mpAccountClientSync.js` → `client_state_sync`（与履约 Web 共享）
 - 详见仓库 `灵祺达人履约管理后台/README.md`
 
 ## 生产部署（仅 ECS，无 Supabase 云 / 无 Vercel）
