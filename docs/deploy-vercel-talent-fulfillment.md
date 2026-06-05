@@ -1,5 +1,7 @@
 # 灵祺达人履约管理后台 · Vercel 部署
 
+> **迁 ECS**：并行期不关 Vercel，见 **[MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md](./MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md)**；日常 ECS 发版 `bash scripts/ecs-deploy-talent-fulfillment-web.sh`。
+
 与商家版/服务商版 **独立 Vercel 项目**，勿用仓库根目录的 `vercel.json`（那是商家 ERP + `/api` 云函数）。
 
 ## 必设：Root Directory
