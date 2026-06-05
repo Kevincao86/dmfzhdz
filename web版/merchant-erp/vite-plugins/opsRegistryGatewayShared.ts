@@ -40,6 +40,7 @@ import {
   submitIceDouyinForApplicant,
 } from '../src/lib/mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
+import { syncSupplierTeamLibraries, type SupplierTeamRole } from '../src/lib/supplierTeamLibrarySync.js'
 import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
 import {
   appendRecruitmentOrderForTenant,
@@ -162,7 +163,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-mp-recruitment-orders-delete' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
-          url !== '/api/meoo-ops-mp-talent-member-register'
+          url !== '/api/meoo-ops-mp-talent-member-register' &&
+          url !== '/api/meoo-ops-supplier-team-library-sync'
         )
           return next()
 
@@ -850,6 +852,23 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             data.recruitmentVideoSubmissions = videos.slice(0, 400)
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/supplier-team-library/sync' ||
+              url === '/api/meoo-ops-supplier-team-library-sync')
+          ) {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { role?: string }
+            const roleRaw = String(body.role || 'all').trim()
+            const roles: SupplierTeamRole[] =
+              roleRaw === 'shoot' ? ['shoot'] : roleRaw === 'edit' ? ['edit'] : ['shoot', 'edit']
+            const data = ensureRegistry(viteRoot)
+            const counts = syncSupplierTeamLibraries(data, roles)
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, ...counts })
             return
           }
 

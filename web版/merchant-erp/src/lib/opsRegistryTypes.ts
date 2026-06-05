@@ -191,6 +191,7 @@ export type RegistryMpTalentPlatformProfile = {
   douyinSalesLevel?: string
   quotePrice: string
   alipayAccount: string
+  accountTags?: string[]
 }
 
 /** 达人招募小程序 · 灵祺达人会员 */
@@ -206,9 +207,30 @@ export type RegistryMpTalentMember = {
   wechatId: string
   province?: string
   city?: string
+  workIdentity?: 'talent' | 'shoot' | 'edit'
+  accountTags?: string[]
   douyin?: RegistryMpTalentPlatformProfile
   xiaohongshu?: RegistryMpTalentPlatformProfile
   registeredAt: string
+  updatedAt: string
+}
+
+export type RegistrySupplierTeamLibraryEntry = {
+  id: string
+  memberId?: string
+  lingqiTalentId?: string
+  teamType: 'shoot' | 'edit'
+  wxNickName: string
+  wxAvatarUrl?: string
+  contact: string
+  wechatId: string
+  province?: string
+  city?: string
+  platform?: '抖音' | '小红书'
+  platformAccount?: string
+  platformNickname?: string
+  accountTags?: string[]
+  sourceChannel?: 'mp' | 'web'
   updatedAt: string
 }
 
@@ -348,6 +370,8 @@ export type RegistryFile = {
   mpTalentMembers?: RegistryMpTalentMember[]
   mpPrUsers?: RegistryMpPrUser[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
+  shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
+  editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
