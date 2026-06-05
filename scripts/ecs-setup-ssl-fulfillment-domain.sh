@@ -46,9 +46,15 @@ if [[ -n "$RESOLVED" && -n "$PUBLIC_IP" && "$RESOLVED" != "$PUBLIC_IP" ]]; then
 fi
 
 echo "== 2) Nginx ACME 放行（80 端口） =="
+mkdir -p "${WEBROOT}/.well-known/acme-challenge"
+chmod -R 755 /var/www /var/www/certbot "${WEBROOT}" 2>/dev/null || true
+# 默认站点常抢走 80 并导致 acme-challenge 403
+rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+
 cat >"$ACME_SITE" <<NGX
 server {
-    listen 80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
     server_name ${DOMAIN};
 
     location ^~ /.well-known/acme-challenge/ {
@@ -71,10 +77,12 @@ echo "== 3) 本机 ACME 路径自测 =="
 TEST_FILE="ping-$(date +%s).txt"
 echo ok >"${WEBROOT}/${TEST_FILE}"
 LOCAL_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1/.well-known/acme-challenge/${TEST_FILE}" -H "Host: ${DOMAIN}" || echo 000)"
-rm -f "${WEBROOT}/${TEST_FILE}"
+PUBLIC_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "http://${DOMAIN}/.well-known/acme-challenge/${TEST_FILE}" || echo 000)"
+rm -f "${WEBROOT}/.well-known/acme-challenge/${TEST_FILE}"
 echo "  127.0.0.1 ACME HTTP ${LOCAL_CODE}（期望 200）"
-if [[ "$LOCAL_CODE" != "200" ]]; then
-  echo "FAIL: 本机 ACME 未通，请检查 nginx 配置"
+echo "  公网 ${DOMAIN} ACME HTTP ${PUBLIC_CODE}（期望 200）"
+if [[ "$LOCAL_CODE" != "200" || "$PUBLIC_CODE" != "200" ]]; then
+  echo "FAIL: ACME 路径未通（403 多为 default 站点抢占 80，已尝试移除 sites-enabled/default）"
   exit 1
 fi
 
