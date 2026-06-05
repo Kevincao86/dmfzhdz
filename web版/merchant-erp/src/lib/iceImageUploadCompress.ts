@@ -18,7 +18,12 @@ async function compressIceImageWithParams(
   maxEdge: number,
   quality: number,
 ): Promise<File> {
-  const bitmap = await createImageBitmap(file)
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(file)
+  } catch {
+    return file
+  }
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
   const w = Math.max(1, Math.round(bitmap.width * scale))
   const h = Math.max(1, Math.round(bitmap.height * scale))
