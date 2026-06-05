@@ -1,5 +1,6 @@
 const publishOpts = require('./publishFormOptions.js')
 const applyTemplates = require('./applyFormTemplates.js')
+const livePublishForm = require('./livePublishForm.js')
 
 const { modeById, newLevelTier, newFansTier } = publishOpts
 
@@ -68,6 +69,7 @@ function formPatchFromMpOrder(mp) {
     applyFormFields: Array.isArray(meta.applyFormFields)
       ? meta.applyFormFields.map((f) => ({ ...f }))
       : [],
+    ...livePublishForm.restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp?.region && mp.region !== '全国') {
     patch.selectedCities = String(mp.region)
@@ -99,6 +101,7 @@ function recruitModeIdFromMp(mp) {
   if (mp?.orderKind === 'recruitment_ice' || mp?.hall === 'ice') return 'ice'
   const cat = String(mp?.category || '')
   if (cat.includes('品宣')) return 'brand'
+  if (cat.includes('直播')) return 'live'
   return 'visit'
 }
 

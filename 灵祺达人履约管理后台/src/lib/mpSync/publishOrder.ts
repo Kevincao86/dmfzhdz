@@ -13,6 +13,13 @@ import { prDisplayName, readPrProfile } from './userProfile'
 import { prParticipantKey } from './participant'
 import { emptySupplierPublishFields, validateSupplierPublish } from './supplierPublishForm'
 import { defaultSupplierApplyFields } from './supplierPublishForm'
+import {
+  buildLiveRecruitmentLines,
+  emptyLiveFields,
+  isDouyinLivePlatform,
+  validateLivePublish,
+  type LivePublishFields,
+} from './livePublishForm'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -53,7 +60,7 @@ export type PublishForm = {
   packageTags: string[]
   deliveryDeadline: string
   referenceUrl: string
-}
+} & LivePublishFields
 
 export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
   const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
@@ -87,6 +94,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
       ? defaultSupplierApplyFields(recruitTarget)
       : (afTpl.fields || []).map((f) => ({ ...f })),
     ...supplierFields,
+    ...emptyLiveFields(),
   }
 }
 
@@ -149,10 +157,17 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
     `费用模式：${feeTypeLabel(f.feeTypeId)}`,
   ]
   if (!isSupplier) {
-    lines.splice(4, 0, `招募平台：${f.platform || '—'}`)
+    if (recruitModeId === 'live') {
+      lines.splice(4, 0, `直播平台：${f.livePlatform || '—'}`)
+      lines.push(...buildLiveRecruitmentLines(f))
+    } else {
+      lines.splice(4, 0, `招募平台：${f.platform || '—'}`)
+    }
     lines.push(`需求达人标签：${(f.talentTags || []).join('、')}`)
     lines.push(`粉丝要求：${buildFansRequirementText(f)}`)
-    if (f.platform === '抖音') lines.push(`带货等级：${(f.douyinSalesLevels || []).join('、')}`)
+    const douyinLevel =
+      recruitModeId === 'live' ? isDouyinLivePlatform(f.livePlatform) : f.platform === '抖音'
+    if (douyinLevel) lines.push(`带货等级：${(f.douyinSalesLevels || []).join('、')}`)
   } else {
     lines.push(`需求品类标签：${(f.talentTags || []).join('、')}`)
     if (recruitTarget === 'shoot') {
@@ -236,20 +251,33 @@ export function validatePublishForm(
 ): string | null {
   const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
   if (!String(f.title || '').trim()) return '请填写招募标题'
-  if (!isSupplier && !f.platform) return '请选择招募平台'
+  if (recruitMode === 'live') {
+    const liveErr = validateLivePublish(f)
+    if (liveErr) return liveErr
+    if (isDouyinLivePlatform(f.livePlatform) && !(f.douyinSalesLevels || []).length) {
+      return '请选择达人带货等级'
+    }
+  } else if (!isSupplier && !f.platform) return '请选择招募平台'
   if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
   if (!(f.talentTags || []).length) return isSupplier ? '请选择需求品类标签' : '请选择需求达人标签'
   if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
   if (f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
     return '请选择招募报名截止时间'
   }
-  if (!isSupplier && f.platform === '抖音' && !(f.douyinSalesLevels || []).length) return '请选择达人带货等级'
+  if (
+    !isSupplier &&
+    recruitMode !== 'live' &&
+    f.platform === '抖音' &&
+    !(f.douyinSalesLevels || []).length
+  ) {
+    return '请选择达人带货等级'
+  }
   if (!f.feeTypeId) return '请选择费用模式'
   const feeErr = validatePublishFee(f)
   if (feeErr) return feeErr
   const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
   if (n < 1) return '招募人数至少为 1'
-  if (!String(f.recruitDetail || '').trim()) return '请填写招募详情'
+  if (!String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
   if (isSupplier) {
     const sErr = validateSupplierPublish(recruitTarget, f, recruitMode)
     if (sErr) return sErr
@@ -282,7 +310,8 @@ export type PublishDisplay = {
   signupDeadlineDisplay: string
 }
 
-export function computePublishDisplay(form: PublishForm): PublishDisplay {
+export function computePublishDisplay(form: PublishForm, recruitMode = ''): PublishDisplay {
+  const isLive = recruitMode === 'live'
   let cityDisplayText = '请选择招募城市'
   if (form.cityNational) cityDisplayText = '全国'
   else if ((form.selectedCities || []).length) {
@@ -292,7 +321,9 @@ export function computePublishDisplay(form: PublishForm): PublishDisplay {
   }
   const tags = form.talentTags || []
   const tagsDisplayText = tags.length ? tags.join('、') : '请选择达人标签（最多2个）'
-  const platformDisplayText = form.platform || '请选择招募平台'
+  const platformDisplayText = isLive
+    ? form.livePlatform || '请选择直播平台'
+    : form.platform || '请选择招募平台'
   const levels = form.douyinSalesLevels || []
   const levelDisplayText = !levels.length || levels.includes('不限') ? '不限' : levels.join('、')
   const urgentWin = form.deliveryWindow === 'urgent'
@@ -312,7 +343,10 @@ export function computePublishDisplay(form: PublishForm): PublishDisplay {
     feeTypeLabel: feeTypeLabel(form.feeTypeId),
     applyFormDisplayText,
     applyFormPlaceholder,
-    showDouyinLevel: form.platform === '抖音',
+    showDouyinLevel:
+      recruitMode === 'live'
+        ? isDouyinLivePlatform(form.livePlatform)
+        : form.platform === '抖音',
     showSignupDeadline: !urgentWin,
     signupDeadlineDisplay: urgentWin
       ? '急单默认发布后 24 小时截止'
@@ -355,7 +389,7 @@ export function buildPublishOrder(
     title: String(form.title || '').trim(),
     recruitmentInfo,
     taskDetail: recruitmentInfo,
-    platform: form.platform,
+    platform: recruitModeId === 'live' ? form.livePlatform || form.platform : form.platform,
     fansRequirement: buildFansRequirementText(form),
     urgent: isUrgent,
     deadline,
@@ -391,7 +425,22 @@ export function buildPublishOrder(
       packageTags: form.packageTags,
       deliveryDeadline: form.deliveryDeadline,
       referenceUrl: form.referenceUrl,
-      douyinSalesLevels: form.platform === '抖音' ? form.douyinSalesLevels : [],
+      livePlatform: form.livePlatform,
+      liveDate: form.liveDate,
+      liveTimeStart: form.liveTimeStart,
+      liveDuration: form.liveDuration,
+      liveType: form.liveType,
+      productSummary: form.productSummary,
+      samplePolicy: form.samplePolicy,
+      scriptRequirement: form.scriptRequirement,
+      douyinSalesLevels:
+        recruitModeId === 'live'
+          ? isDouyinLivePlatform(form.livePlatform)
+            ? form.douyinSalesLevels
+            : []
+          : form.platform === '抖音'
+            ? form.douyinSalesLevels
+            : [],
       feeTypeId: form.feeTypeId,
       fixedPrice: form.fixedPrice,
       selfQuoteMin: form.selfQuoteMin,

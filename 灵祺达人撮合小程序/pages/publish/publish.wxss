@@ -517,6 +517,10 @@
   flex: 1;
 }
 
+.pub-radio-pair--wrap {
+  flex-wrap: wrap;
+}
+
 .pub-radio-opt {
   padding: 10rpx 24rpx;
   font-size: 24rpx;

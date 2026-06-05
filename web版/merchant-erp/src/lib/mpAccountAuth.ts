@@ -3,8 +3,13 @@
  */
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
-import { allocateLingqiTalentId } from './lingqiIdentity.js'
+import {
+  allocateLingqiEditTeamId,
+  allocateLingqiShootTeamId,
+  allocateLingqiTalentId,
+} from './lingqiIdentity.js'
 import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
+import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
@@ -219,11 +224,15 @@ export async function accountPayloadWithMemberExtras(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const memberId = String(account.registry_member_id || '').trim()
+    const phoneKey = accountPhoneKey(account)
     const member =
       (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
       (data.mpTalentMembers ?? []).find(
         (m) => account.openid && String(m.wxOpenId || '').trim() === String(account.openid).trim(),
-      )
+      ) ||
+      (phoneKey.length >= 8
+        ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
+        : undefined)
     if (member) {
       extras = {
         lingqiShootTeamId: member.lingqiShootTeamId || null,
@@ -619,32 +628,63 @@ export async function mpAuthEnsureIdentity(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const now = new Date().toLocaleString('zh-CN', { hour12: false })
-    const phone = String(account.login_name || '').trim()
+    const phoneKey = accountPhoneKey(account)
+    const loginLabel = String(account.login_name || '').trim()
+    const contactFallback = loginLabel || phoneKey || String(account.openid || '').trim()
     const memberId = account.registry_member_id || `MTM-${Date.now()}`
     const prev =
       (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
       (data.mpTalentMembers ?? []).find(
         (m) => account.openid && String(m.wxOpenId || '').trim() === String(account.openid).trim(),
-      )
+      ) ||
+      (phoneKey.length >= 8
+        ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
+        : undefined)
     const tagMerge = [
       ...(prev?.accountTags || []),
       ...supplierTags(workIdentity),
     ]
-    const saved = upsertMpTalentMember(data, {
+    let saved = upsertMpTalentMember(data, {
       ...(prev || {}),
       id: memberId,
       lingqiTalentId: prev?.lingqiTalentId || account.lingqi_talent_id || '',
+      lingqiShootTeamId: prev?.lingqiShootTeamId,
+      lingqiEditTeamId: prev?.lingqiEditTeamId,
       memberType: prev?.memberType || 'douyin',
       wxNickName: prev?.wxNickName || nick || '用户',
       wxAvatarUrl: prev?.wxAvatarUrl || account.wx_avatar_url || '',
       wxOpenId: prev?.wxOpenId || account.openid || '',
-      contact: String(prev?.contact || phone).trim(),
-      wechatId: String(prev?.wechatId || phone).trim(),
+      contact: String(prev?.contact || contactFallback).trim(),
+      wechatId: String(prev?.wechatId || contactFallback).trim(),
       workIdentity,
       accountTags: [...new Set(tagMerge)],
       registeredAt: prev?.registeredAt || now,
       updatedAt: now,
     })
+    if (workIdentity === 'shoot' && !saved.lingqiShootTeamId) {
+      saved = {
+        ...saved,
+        lingqiShootTeamId: allocateLingqiShootTeamId(data, saved.lingqiShootTeamId),
+      }
+      const members = [...(data.mpTalentMembers ?? [])]
+      const midx = members.findIndex((m) => m.id === saved.id)
+      if (midx >= 0) members[midx] = saved
+      else members.unshift(saved)
+      data.mpTalentMembers = members
+      saved = upsertSupplierTeamLibraryFromMember(data, saved)
+    }
+    if (workIdentity === 'edit' && !saved.lingqiEditTeamId) {
+      saved = {
+        ...saved,
+        lingqiEditTeamId: allocateLingqiEditTeamId(data, saved.lingqiEditTeamId),
+      }
+      const members = [...(data.mpTalentMembers ?? [])]
+      const midx = members.findIndex((m) => m.id === saved.id)
+      if (midx >= 0) members[midx] = saved
+      else members.unshift(saved)
+      data.mpTalentMembers = members
+      saved = upsertSupplierTeamLibraryFromMember(data, saved)
+    }
     await io.save(data)
     await updateAccount(rest, account.id, {
       lingqi_talent_id: saved.lingqiTalentId || account.lingqi_talent_id,

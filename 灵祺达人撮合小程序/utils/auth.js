@@ -95,7 +95,8 @@ async function ensureIdentity(role, workIdentity) {
     writeSession(readSessionToken(), data.account)
     try {
       const switchWorkIdentity = require('./switchWorkIdentity.js')
-      switchWorkIdentity.syncLocalProfilesFromAccount(data.account)
+      const wid = workIdentity || require('./userProfile.js').readIdentity()
+      switchWorkIdentity.syncLocalProfilesFromAccount(data.account, wid)
     } catch (_) {}
   }
   return accountMemberSync.afterAuthSuccess(data)

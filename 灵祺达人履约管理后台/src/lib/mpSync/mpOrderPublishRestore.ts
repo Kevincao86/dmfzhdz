@@ -1,6 +1,7 @@
 import { getApplyConfigForMpOrder, getTemplateById } from './applyFormTemplates'
 import { modeById, newFansTier, newLevelTier } from './publishFormOptions'
 import type { PublishForm } from './publishOrder'
+import { restoreLiveFields } from './livePublishForm'
 import { emptySupplierPublishFields } from './supplierPublishForm'
 
 function pickField(text: string, key: string) {
@@ -84,6 +85,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     packageTags: Array.isArray(meta.packageTags) ? [...(meta.packageTags as string[])] : [],
     deliveryDeadline: String(meta.deliveryDeadline || ''),
     referenceUrl: String(meta.referenceUrl || ''),
+    ...restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp.region && mp.region !== '全国') {
     patch.selectedCities = String(mp.region)
@@ -120,5 +122,6 @@ export function recruitModeIdFromMp(mp: Record<string, unknown>) {
   if (meta?.recruitMode) return meta.recruitMode
   if (mp.orderKind === 'recruitment_ice' || mp.hall === 'ice') return 'ice'
   if (String(mp.category || '').includes('品宣')) return 'brand'
+  if (String(mp.category || '').includes('直播')) return 'live'
   return 'visit'
 }

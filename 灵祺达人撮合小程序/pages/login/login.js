@@ -2,6 +2,7 @@ const auth = require('../../utils/auth.js')
 const mpApiErrors = require('../../utils/mpApiErrors.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
+const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
@@ -94,11 +95,20 @@ Page({
         wxNickName: nick,
         wxAvatarUrl: avatar,
       })
+      try {
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+      } catch (_) {}
       if (data.isNew) {
+        const workId = userProfile.readIdentity()
+        const acct = auth.readAccount()
         const id =
           role === 'pr'
-            ? data.account && data.account.lingqiPrId
-            : data.account && data.account.lingqiTalentId
+            ? acct && acct.lingqiPrId
+            : workId === 'shoot'
+              ? acct && acct.lingqiShootTeamId
+              : workId === 'edit'
+                ? acct && acct.lingqiEditTeamId
+                : acct && acct.lingqiTalentId
         wx.showToast({
           title: id ? `已创建账号 ${id}` : '已创建灵祺账号',
           icon: 'none',
@@ -128,6 +138,9 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
+      try {
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+      } catch (_) {}
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
@@ -186,6 +199,9 @@ Page({
         password: this.data.regPassword,
         role,
       })
+      try {
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+      } catch (_) {}
       wx.showToast({ title: '注册成功', icon: 'success' })
       wx.switchTab({ url: '/pages/index/index' })
     } catch (e) {

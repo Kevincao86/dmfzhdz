@@ -6,7 +6,7 @@ export const DELIVERY_WINDOWS = [
 ] as const
 
 export const RECRUIT_TARGETS = [
-  { id: 'talent', label: '达人', sub: '探店 · 品宣 · 达人报名' },
+  { id: 'talent', label: '达人', sub: '探店 · 品宣 · 直播 · 达人报名' },
   { id: 'shoot', label: '拍摄', sub: '跟拍探店 · 活动 · 产品拍摄' },
   { id: 'edit', label: '剪辑', sub: '探店成片 · 品宣包装 · 云剪' },
 ] as const
@@ -14,6 +14,7 @@ export const RECRUIT_TARGETS = [
 export const RECRUIT_MODES = [
   { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal' as const, category: '探店', disabled: false, target: 'talent' as const },
   { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal' as const, category: '品宣', disabled: false, target: 'talent' as const },
+  { id: 'live', label: '直播达人', sub: '直播带货 · 专场种草', hall: 'normal' as const, category: '直播', disabled: false, target: 'talent' as const },
   { id: 'shoot_visit', label: '探店跟拍', sub: '到店拍摄达人探店素材', hall: 'normal' as const, category: '拍摄', disabled: false, target: 'shoot' as const },
   { id: 'shoot_event', label: '活动拍摄', sub: '发布会 · 门店活动', hall: 'normal' as const, category: '拍摄', disabled: false, target: 'shoot' as const },
   { id: 'shoot_product', label: '产品静物', sub: '菜品 · 商品特写', hall: 'normal' as const, category: '拍摄', disabled: false, target: 'shoot' as const },

@@ -60,7 +60,7 @@
     <view class="pub-hero" style="{{heroHeadStyle}}">
       <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
       <text class="pub-hero-title">选择招募模式</text>
-      <text class="pub-hero-sub">探店 · 品宣</text>
+      <text class="pub-hero-sub">探店 · 品宣 · 直播达人</text>
     </view>
     <view class="pub-mode-list">
       <view
@@ -137,9 +137,103 @@
           </view>
           <view class="pub-field" id="field-title">
             <text class="pub-label">招募标题 *</text>
-            <input class="pub-input" placeholder="如：春季火锅探店招募" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
+            <input class="pub-input" placeholder="{{recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}}" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
           </view>
-          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish}}">
+          <block wx:if="{{recruitMode === 'live'}}">
+            <view class="pub-field">
+              <text class="pub-label">直播平台 *</text>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view
+                  wx:for="{{livePlatforms}}"
+                  wx:key="*this"
+                  class="pub-radio-opt {{form.livePlatform === item ? 'pub-radio-opt--on' : ''}}"
+                  data-key="livePlatform"
+                  data-val="{{item}}"
+                  bindtap="onLiveOptionPick"
+                >{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">直播日期 *</text>
+              <picker mode="date" value="{{form.liveDate}}" start="{{todayDate}}" bindchange="onLiveDatePick">
+                <view class="pub-select">
+                  <text class="pub-select-text {{form.liveDate ? '' : 'pub-select-text--ph'}}">{{form.liveDate || '选择日期'}}</text>
+                  <text class="pub-select-arrow">›</text>
+                </view>
+              </picker>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">开播时间 *</text>
+              <picker mode="time" value="{{form.liveTimeStart}}" bindchange="onLiveTimePick">
+                <view class="pub-select">
+                  <text class="pub-select-text {{form.liveTimeStart ? '' : 'pub-select-text--ph'}}">{{form.liveTimeStart || '选择时间'}}</text>
+                  <text class="pub-select-arrow">›</text>
+                </view>
+              </picker>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">预计时长 *</text>
+              <view class="pub-radio-pair">
+                <view
+                  wx:for="{{liveDurations}}"
+                  wx:key="*this"
+                  class="pub-radio-opt {{form.liveDuration === item ? 'pub-radio-opt--on' : ''}}"
+                  data-key="liveDuration"
+                  data-val="{{item}}"
+                  bindtap="onLiveOptionPick"
+                >{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">直播类型 *</text>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view
+                  wx:for="{{liveTypes}}"
+                  wx:key="*this"
+                  class="pub-radio-opt {{form.liveType === item ? 'pub-radio-opt--on' : ''}}"
+                  data-key="liveType"
+                  data-val="{{item}}"
+                  bindtap="onLiveOptionPick"
+                >{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">带货商品/套餐说明 *</text>
+              <textarea
+                class="pub-textarea"
+                placeholder="商品名称、规格、团购价、佣金空间、是否独家等"
+                value="{{form.productSummary}}"
+                data-key="productSummary"
+                bindinput="onFieldInput"
+                maxlength="800"
+              />
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">样品/寄样方式 *</text>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view
+                  wx:for="{{samplePolicies}}"
+                  wx:key="*this"
+                  class="pub-radio-opt {{form.samplePolicy === item ? 'pub-radio-opt--on' : ''}}"
+                  data-key="samplePolicy"
+                  data-val="{{item}}"
+                  bindtap="onLiveOptionPick"
+                >{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">脚本/话术要求</text>
+              <textarea
+                class="pub-textarea"
+                placeholder="口播要点、禁说词、优惠机制、挂车链接说明等"
+                value="{{form.scriptRequirement}}"
+                data-key="scriptRequirement"
+                bindinput="onFieldInput"
+                maxlength="600"
+              />
+            </view>
+          </block>
+          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live'}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
               <text class="pub-select-text {{platformPlaceholder ? 'pub-select-text--ph' : ''}}">{{platformDisplayText}}</text>
