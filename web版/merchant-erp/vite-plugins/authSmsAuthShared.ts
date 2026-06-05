@@ -186,6 +186,18 @@ async function verifyAuthSmsCodeViaPublicApi(phone: string, code: string): Promi
 
 export type VerifyAuthSmsOptions = { skipRemoteFallback?: boolean }
 
+/** 商家 Web 注册/登录：优先阿里云核验，ECS 无密钥时委托 Vercel */
+export async function verifyRegisterSmsCode(phone: string, code: string, viteRoot?: string): Promise<boolean> {
+  if (aliyunSmsConfigured()) {
+    const r = await checkAliyunSmsVerifyCode(phone, code)
+    return r.ok
+  }
+  const remote = await verifyAuthSmsCodeViaPublicApi(phone, code)
+  if (remote === true) return true
+  if (remote === false || wasRemoteSmsSent(phone)) return false
+  return verifySmsCode(phone, code, viteRoot)
+}
+
 export async function verifyAuthSmsCode(
   phone: string,
   code: string,
