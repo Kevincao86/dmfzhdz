@@ -235,11 +235,21 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         )
         return
       }
+      let list: File[]
+      try {
+        list = await snapshotUploadFiles(files)
+      } catch (e) {
+        setErr(
+          e instanceof Error
+            ? e.message
+            : '无法读取视频文件，请重新选择（与 StorageLocation 无关，多为浏览器未读完文件）',
+        )
+        return
+      }
       setVideoUploading(true)
       setErr(null)
       let added = 0
       try {
-        const list = await snapshotUploadFiles(files)
         for (const file of list) {
           if (!isVideoFile(file)) {
             setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
@@ -291,25 +301,35 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setErr('本地上传尚未开启，请先配置 OSS 前缀。')
         return
       }
+      const picked = Array.from(files).filter(isImageFile)
+      if (picked.length === 0) {
+        setErr('请选择 jpg/png/webp 等图片文件')
+        return
+      }
+      let snapList: File[]
+      try {
+        snapList = await snapshotUploadFiles(picked)
+      } catch (e) {
+        const msg =
+          e instanceof Error
+            ? e.message
+            : '无法读取图片文件，请重新选择（与点播 StorageLocation 无关）'
+        setImageUploadError(msg)
+        setErr(msg)
+        return
+      }
       setImageUploading(true)
       setMaterialTab('images')
       setErr(null)
       setImageUploadError(null)
-      const list = Array.from(files).filter(isImageFile)
-      if (list.length === 0) {
-        setErr('请选择 jpg/png/webp 等图片文件')
-        setImageUploading(false)
-        return
-      }
       let added = 0
       let lastFail: string | null = null
       try {
-        const snapList = await snapshotUploadFiles(list)
         for (let i = 0; i < snapList.length; i++) {
           const raw = snapList[i]!
           setImageUploadProgress({
             index: i + 1,
-            total: list.length,
+            total: snapList.length,
             percent: 8,
             fileName: raw.name,
             phase: 'encode',
@@ -317,7 +337,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           const file = await compressIceImageForUpload(raw)
           setImageUploadProgress({
             index: i + 1,
-            total: list.length,
+            total: snapList.length,
             percent: 10,
             fileName: raw.name,
             phase: 'server',
@@ -326,7 +346,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             onProgress: (p) => {
               setImageUploadProgress({
                 index: i + 1,
-                total: list.length,
+                total: snapList.length,
                 percent: p.percent,
                 fileName: raw.name,
                 phase: p.phase,
