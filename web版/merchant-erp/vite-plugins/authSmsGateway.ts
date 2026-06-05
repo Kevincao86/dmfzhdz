@@ -1,6 +1,6 @@
 import type { IncomingMessage } from 'node:http'
 import type { VercelRequest } from '@vercel/node'
-import { loadEnv, type Plugin } from 'vite'
+import type { Plugin } from 'vite'
 import smsSendHandler from '../api/meoo-auth-sms-send.js'
 import { applyViteEnvDirs } from './mpDevEnv.js'
 import { createMockVercelResponse } from './vercelMockResponse.js'
