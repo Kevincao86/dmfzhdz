@@ -1,7 +1,6 @@
-import { Copy, Loader2, Sparkles, Store } from 'lucide-react'
+import { Copy, Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiModelAutoPicker from '../components/AiModelAutoPicker'
-import DouyinStorePickerModal from '../components/store/DouyinStorePickerModal'
 import { cn } from '../cn'
 import { readMerchantSession } from '../lib/merchantSession'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
@@ -54,9 +53,7 @@ export default function AiOperationContentPage() {
   const [platformId, setPlatformId] = useState<PlatformId>('douyin')
   const [scopeMode, setScopeMode] = useState<ScopeMode>('brand')
   const [brandName, setBrandName] = useState('')
-  const [selectedPoiIds, setSelectedPoiIds] = useState<string[]>([])
-  const [selectedStoreRows, setSelectedStoreRows] = useState<{ id: string; name: string }[]>([])
-  const [storePickerOpen, setStorePickerOpen] = useState(false)
+  const [storeName, setStoreName] = useState('')
 
   const [aiModelUiTick, setAiModelUiTick] = useState(0)
 
@@ -99,12 +96,8 @@ export default function AiOperationContentPage() {
     if (scopeMode === 'brand') {
       return `${plat}；品牌：${brandName.trim() || '（未填写）'}`
     }
-    if (selectedStoreRows.length === 0) {
-      return `${plat}；门店：（未选择）`
-    }
-    const names = selectedStoreRows.map((r) => r.name).join('、')
-    return `${plat}；门店：${names}（共 ${selectedStoreRows.length} 家）`
-  }, [platformId, scopeMode, brandName, selectedStoreRows])
+    return `${plat}；门店：${storeName.trim() || '（未填写）'}`
+  }, [platformId, scopeMode, brandName, storeName])
 
   const runAssist = useCallback(
     async (action: AiAssistAction, title_draft: string) => {
@@ -183,16 +176,6 @@ export default function AiOperationContentPage() {
     setTopicCopyTip(ok ? '已复制到剪贴板' : '复制失败，请手动选择文本复制')
     window.setTimeout(() => setTopicCopyTip(null), 2500)
   }
-
-  const storeSummary =
-    selectedStoreRows.length === 0
-      ? '尚未选择门店'
-      : selectedStoreRows.length <= 2
-        ? selectedStoreRows.map((r) => r.name).join('、')
-        : `${selectedStoreRows
-            .slice(0, 2)
-            .map((r) => r.name)
-            .join('、')} 等 ${selectedStoreRows.length} 家`
 
   return (
     <div className="ai-content-page mx-auto max-w-5xl space-y-6">
@@ -278,38 +261,20 @@ export default function AiOperationContentPage() {
                 门店
               </button>
             </div>
-            {scopeMode === 'brand' ? (
-              <div className="mt-3 space-y-1.5">
-                <label className="block text-xs embed-text-muted">
-                  品牌名称
-                  {platformId === 'douyin' ? (
-                    <span className="embed-text-muted opacity-80">（手动填写，与来客「门店品牌」一致即可）</span>
-                  ) : null}
-                </label>
-                <input
-                  value={brandName}
-                  onChange={(e) => setBrandName(e.target.value)}
-                  placeholder={platformId === 'douyin' ? '如：魔楽斑马' : '填写品牌名称'}
-                  autoComplete="off"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setStorePickerOpen(true)}
-                  className="inline-flex w-full items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-800 hover:bg-indigo-100 sm:w-auto"
-                >
-                  <Store className="mr-2 h-4 w-4" />
-                  选择适用门店
-                </button>
-                <p className="text-xs embed-text-muted">
-                  已选 <span className="font-semibold embed-text-primary">{selectedPoiIds.length}</span> 家：
-                  {storeSummary}
-                </p>
-              </div>
-            )}
+            <div className="mt-3 space-y-1.5">
+              <label className="block text-xs embed-text-muted">
+                {scopeMode === 'brand' ? '品牌名称' : '门店名称'}
+              </label>
+              <input
+                value={scopeMode === 'brand' ? brandName : storeName}
+                onChange={(e) =>
+                  scopeMode === 'brand' ? setBrandName(e.target.value) : setStoreName(e.target.value)
+                }
+                placeholder={scopeMode === 'brand' ? '如：魔楽斑马' : '如：魔楽斑马生活科技馆（天一店）'}
+                autoComplete="off"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+            </div>
           </div>
         </div>
 
@@ -422,16 +387,6 @@ export default function AiOperationContentPage() {
         )}
       </section>
 
-      <DouyinStorePickerModal
-        open={storePickerOpen}
-        onClose={() => setStorePickerOpen(false)}
-        initialPoiIds={selectedPoiIds}
-        onConfirm={(poiIds, rows) => {
-          setSelectedPoiIds(poiIds)
-          setSelectedStoreRows(rows)
-          setStorePickerOpen(false)
-        }}
-      />
     </div>
   )
 }

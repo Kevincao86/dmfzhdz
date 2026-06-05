@@ -37,6 +37,7 @@ import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageForUpload } from '../lib/iceImageUploadCompress'
+import { snapshotUploadFiles } from '../lib/iceUploadFileSnapshot'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -238,7 +239,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr(null)
       let added = 0
       try {
-        for (const file of Array.from(files)) {
+        const list = await snapshotUploadFiles(files)
+        for (const file of list) {
           if (!isVideoFile(file)) {
             setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
             continue
@@ -302,8 +304,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       let added = 0
       let lastFail: string | null = null
       try {
-        for (let i = 0; i < list.length; i++) {
-          const raw = list[i]!
+        const snapList = await snapshotUploadFiles(list)
+        for (let i = 0; i < snapList.length; i++) {
+          const raw = snapList[i]!
           setImageUploadProgress({
             index: i + 1,
             total: list.length,
@@ -862,8 +865,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 className="sr-only"
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
-                  void handleLocalFiles(e.target.files)
-                  e.target.value = ''
+                  const input = e.target
+                  void handleLocalFiles(input.files).finally(() => {
+                    input.value = ''
+                  })
                 }}
               />
               {!cfg?.localUploadEnabled ? (
@@ -1020,10 +1025,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 className="sr-only"
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => {
-                  // 须先复制为数组再清空 input，否则 Chrome 会清空 FileList 导致静默失败
-                  const picked = e.target.files ? Array.from(e.target.files) : []
-                  e.target.value = ''
-                  void handleLocalImages(picked)
+                  const input = e.target
+                  void handleLocalImages(input.files).finally(() => {
+                    input.value = ''
+                  })
                 }}
               />
               <label
