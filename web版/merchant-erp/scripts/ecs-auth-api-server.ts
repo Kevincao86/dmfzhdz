@@ -22,6 +22,7 @@ import opsSyncRegistryGetHandler from '../api/meoo-ops-registry-ops-get.ts'
 import opsSyncVendorKeysHandler from '../api/meoo-ops-sync-vendor-keys.ts'
 import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
 import opsSyncVideoAiHandler from '../api/meoo-ops-sync-video-ai.ts'
+import opsRegistryTenantDeleteHandler from '../api/meoo-ops-registry-tenant-delete.ts'
 import meooAiChatHandler from '../api/meoo-ai-chat.ts'
 import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
 import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
@@ -65,7 +66,7 @@ import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260606-merchant-video-ai-routes'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260606-registry-tenant-delete'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -103,6 +104,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/ops-sync/vendor-keys': opsSyncVendorKeysHandler as VercelLikeHandler,
   '/api/ops-sync/ai': opsSyncAiHandler as VercelLikeHandler,
   '/api/ops-sync/video-ai': opsSyncVideoAiHandler as VercelLikeHandler,
+  '/api/meoo-ops-registry-tenant-delete': opsRegistryTenantDeleteHandler as VercelLikeHandler,
+  '/api/ops-sync/tenants/delete': opsRegistryTenantDeleteHandler as VercelLikeHandler,
   '/api/meoo-ai-chat': meooAiChatHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-diag': meooAiVendorKeysDiagHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
