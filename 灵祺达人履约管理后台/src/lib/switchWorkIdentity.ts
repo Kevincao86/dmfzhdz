@@ -54,15 +54,19 @@ function syncLocalProfilesFromAccount(account: MpAccount, workId?: MpWorkIdentit
     writeMember({
       id: account.registryMemberId || prev?.id || `MTM-${Date.now()}`,
       lingqiTalentId: account.lingqiTalentId || prev?.lingqiTalentId || '',
+      lingqiShootTeamId: account.lingqiShootTeamId || prev?.lingqiShootTeamId || '',
+      lingqiEditTeamId: account.lingqiEditTeamId || prev?.lingqiEditTeamId || '',
+      workIdentity: wid === 'shoot' || wid === 'edit' ? wid : prev?.workIdentity || 'talent',
       memberType: prev?.memberType || 'douyin',
       wxNickName: account.wxNickName || prev?.wxNickName || '',
       wxAvatarUrl: account.wxAvatarUrl || prev?.wxAvatarUrl || '',
       contact: prev?.contact || account.loginName || '',
       wechatId: prev?.wechatId || account.loginName || '',
       platformProfiles,
+      supplierProfile: prev?.supplierProfile,
       registeredAt: prev?.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-    })
+    } as never)
   }
   if (account.lingqiPrId) {
     const prev = readPrProfile() || emptyPrProfile()

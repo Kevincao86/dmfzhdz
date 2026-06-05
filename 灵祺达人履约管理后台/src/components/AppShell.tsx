@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
+import IdentitySwitchPanel from './IdentitySwitchPanel'
 import { clearSession, getAccount, getActiveRole, type MpAccountRole } from '../lib/mpSession'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
@@ -78,6 +79,7 @@ export default function AppShell() {
         </nav>
 
         <div className="mt-4 space-y-2">
+          <IdentitySwitchPanel />
           <ThemeToggle />
           <button
             type="button"

@@ -1,6 +1,25 @@
 /**
  * 将接口/网关返回的英文或技术错误转为商家可理解的中文提示
  */
+
+function cleanChineseMessage(s: string): string {
+  return s
+    .replace(/\bNOT_FOUND\b[\s\S]*$/i, '')
+    .replace(/\bhnd\d+:[\w-]+\b/gi, '')
+    .trim()
+}
+
+function isLocalPushContext(s: string, action: string): boolean {
+  return (
+    /本地推|线索权限|线索对接|聚光|种小草|巨量|oceanengine/i.test(s) ||
+    /授权校验|拉取线索|同步投流|回传线索|同步种小草|同步聚光/i.test(action)
+  )
+}
+
+function isAuthFlowAction(action: string): boolean {
+  return /注册|登录|验证码/.test(action)
+}
+
 export function toUserFacingError(raw: unknown, action = '操作'): string {
   const s =
     typeof raw === 'string'
@@ -24,10 +43,6 @@ export function toUserFacingError(raw: unknown, action = '操作'): string {
     return '服务暂时繁忙，请稍后再试。'
   }
 
-  if (/401|403|unauthorized|forbidden|access.?token|token.*invalid|鉴权|未授权|权限/.test(lower)) {
-    return '本地推授权已失效或权限不足，请前往系统设置重新绑定并确认开放平台已开通线索权限。'
-  }
-
   if (/network|fetch failed|failed to fetch|econnreset|econnrefused|socket|dns/.test(lower)) {
     return '网络连接失败，请检查网络后重试。'
   }
@@ -40,16 +55,34 @@ export function toUserFacingError(raw: unknown, action = '操作'): string {
     return '服务返回异常，请稍后重试或联系客服。'
   }
 
+  // 已有中文业务提示时直接展示，避免「数据库权限」等被误判为本地推授权
+  if (/[\u4e00-\u9fff]{2,}/.test(s)) {
+    const cleaned = cleanChineseMessage(s)
+    if (cleaned.length >= 4) return cleaned
+  }
+
+  if (
+    /401|403|unauthorized|forbidden|access.?token|token.*invalid|鉴权失败|未授权/.test(lower) ||
+    (/权限/.test(s) && isLocalPushContext(s, action))
+  ) {
+    if (isLocalPushContext(s, action)) {
+      return '本地推授权已失效或权限不足，请前往系统设置重新绑定并确认开放平台已开通线索权限。'
+    }
+    if (isAuthFlowAction(action)) {
+      return `${action}失败，请稍后重试；若问题持续，请联系灵祺客服。`
+    }
+    return `${action}失败，请检查账号授权或稍后重试。`
+  }
+
   if (/openapi|open_api|\/v\d+\.\d+\//i.test(s) && !/[\u4e00-\u9fff]/.test(s)) {
-    return `${action}失败，请确认本地推账号与授权有效，或稍后在系统设置中重新绑定。`
+    if (isLocalPushContext(s, action)) {
+      return `${action}失败，请确认本地推账号与授权有效，或稍后在系统设置中重新绑定。`
+    }
   }
 
   if (!/[\u4e00-\u9fff]/.test(s)) {
     return `${action}失败，请稍后重试；若问题持续，请联系灵祺客服。`
   }
 
-  return s
-    .replace(/\bNOT_FOUND\b[\s\S]*$/i, '')
-    .replace(/\bhnd\d+:[\w-]+\b/gi, '')
-    .trim()
+  return cleanChineseMessage(s)
 }

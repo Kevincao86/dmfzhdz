@@ -14,6 +14,7 @@ import supportOpsSendHandler from '../../../商家管理后台/api/support-ops-s
 import tenantsListHandler from '../../../商家管理后台/api/meoo-supabase-tenants-list.ts'
 import tenantsPatchHandler from '../../../商家管理后台/api/meoo-supabase-tenants-patch.ts'
 import tenantsResetPwdHandler from '../../../商家管理后台/api/meoo-supabase-tenants-reset-password.ts'
+import tenantsDeleteHandler from '../../../商家管理后台/api/meoo-supabase-tenants-delete.ts'
 import paymentOrdersListHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-list.ts'
 import paymentOrdersVerifyHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-verify.ts'
 import paymentOrdersConfirmHandler from '../../../商家管理后台/api/meoo-supabase-payment-orders-confirm.ts'
@@ -90,6 +91,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-patch': tenantsPatchHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-reset-password': tenantsResetPwdHandler as VercelLikeHandler,
+  '/api/meoo-supabase-tenants-delete': tenantsDeleteHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-list': paymentOrdersListHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-verify': paymentOrdersVerifyHandler as VercelLikeHandler,
   '/api/meoo-supabase-payment-orders-confirm': paymentOrdersConfirmHandler as VercelLikeHandler,

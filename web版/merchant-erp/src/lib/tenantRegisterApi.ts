@@ -112,6 +112,8 @@ export async function registerMerchantAccount(body: {
     '/api/meoo-auth-register',
     body,
     '注册',
+    [502, 503, 504],
+    { preferSameOrigin: true },
   )
   if (!('res' in posted)) {
     return posted
@@ -147,6 +149,8 @@ export async function registerPartnerAccount(body: {
       confirmPassword: body.confirmPassword,
     },
     '注册',
+    [502, 503, 504],
+    { preferSameOrigin: true },
   )
   if (!('res' in posted)) {
     return posted
@@ -171,6 +175,8 @@ export async function loginWithSmsCode(body: {
     '/api/meoo-auth-sms-login',
     body,
     '登录',
+    [502, 503, 504],
+    { preferSameOrigin: true },
   )
   if (!('res' in posted)) {
     return posted

@@ -1,7 +1,7 @@
 <view class="page-shell page-with-bar">
   <view class="page-hero page-hero--compact">
-    <text class="page-hero-title">我的信息</text>
-    <text class="page-hero-sub">按平台填写达人资料，报名时可一键填入</text>
+    <text class="page-hero-title">{{isSupplier ? (workIdentity === 'edit' ? '剪辑团队信息' : '拍摄团队信息') : '我的信息'}}</text>
+    <text class="page-hero-sub">{{isSupplier ? '填写团队服务能力与作品集，报名时可一键填入' : '按平台填写达人资料，报名时可一键填入'}}</text>
   </view>
 
   <view class="card">
@@ -25,7 +25,9 @@
           bindinput="onNicknameInput"
         />
         <text class="hint">用于登录与身份展示</text>
-        <text class="wx-identity-id" wx:if="{{lingqiTalentIdLabel}}">{{lingqiTalentIdLabel}}</text>
+        <text class="wx-identity-id" wx:if="{{lingqiShootTeamIdLabel}}">{{lingqiShootTeamIdLabel}}</text>
+        <text class="wx-identity-id" wx:elif="{{lingqiEditTeamIdLabel}}">{{lingqiEditTeamIdLabel}}</text>
+        <text class="wx-identity-id" wx:elif="{{lingqiTalentIdLabel}}">{{lingqiTalentIdLabel}}</text>
       </view>
     </view>
   </view>
@@ -84,7 +86,103 @@
     </view>
   </view>
 
-  <view class="card apply-form platform-card" wx:for="{{platformSections}}" wx:key="id">
+  <view class="card apply-form" wx:if="{{isSupplier}}">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">团队基本信息</text>
+    </view>
+    <view class="form-row">
+      <text class="form-label">团队名称</text>
+      <input class="input" placeholder="如：某某跟拍工作室" value="{{supplierProfile.teamName}}" data-k="teamName" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">主体类型</text>
+      <picker mode="selector" range="{{entityTypes}}" range-key="label" value="{{entityTypeIndex}}" bindchange="onEntityTypeChange">
+        <view class="picker-val">{{entityTypes[entityTypeIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="form-label">团队人数</text>
+      <input class="input" type="number" placeholder="可协同出片人数" value="{{supplierProfile.teamSize}}" data-k="teamSize" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">从业年限</text>
+      <picker mode="selector" range="{{experienceYears}}" value="{{experienceIndex}}" bindchange="onExperienceChange">
+        <view class="picker-val picker-val--placeholder" wx:if="{{!supplierProfile.experienceYears}}">请选择</view>
+        <view class="picker-val" wx:else>{{supplierProfile.experienceYears}}</view>
+      </picker>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">日均产能</text>
+      <picker mode="selector" range="{{dailyCapacity}}" value="{{dailyCapacityIndex}}" bindchange="onDailyCapacityChange">
+        <view class="picker-val picker-val--placeholder" wx:if="{{!supplierProfile.dailyCapacity}}">请选择</view>
+        <view class="picker-val" wx:else>{{supplierProfile.dailyCapacity}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="form-label">团队简介</text>
+      <textarea class="input" maxlength="200" placeholder="选填，最多200字" value="{{supplierProfile.intro}}" data-k="intro" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">擅长品类</text>
+      <text class="form-hint">最多 3 个</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{categoryTagGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-name="{{item.name}}" bindtap="onCategoryTagTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">拍摄类型</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{shootTypeGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="shootTypes" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">设备能力</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{equipmentGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="equipment" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">成片类型</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{editTypeGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="editTypes" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">剪辑风格</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{editStyleGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="editStyles" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">软件能力</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{softwareGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="software" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row">
+      <text class="form-label">作品集链接</text>
+      <input class="input" placeholder="样片合集或主页链接" value="{{supplierProfile.portfolioLink}}" data-k="portfolioLink" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">半日跟拍报价（元）</text>
+      <input class="input" type="digit" value="{{supplierProfile.halfDayQuote}}" data-k="halfDayQuote" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">全日跟拍报价（元）</text>
+      <input class="input" type="digit" value="{{supplierProfile.fullDayQuote}}" data-k="fullDayQuote" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">单条剪辑报价（元）</text>
+      <input class="input" type="digit" value="{{supplierProfile.perClipQuote}}" data-k="perClipQuote" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">接云剪任务</text>
+      <switch checked="{{supplierProfile.acceptsIce}}" color="#6366f1" data-k="acceptsIce" bindchange="onSupplierSwitch" />
+    </view>
+  </view>
+
+  <view class="card apply-form platform-card" wx:for="{{platformSections}}" wx:key="id" wx:if="{{!isSupplier}}">
     <view class="platform-card-head">
       <image class="platform-card-icon" src="{{item.icon}}" mode="aspectFit" />
       <text class="platform-card-title">{{item.name}}</text>

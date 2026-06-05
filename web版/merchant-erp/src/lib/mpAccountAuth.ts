@@ -182,7 +182,14 @@ export async function resolveSession(
   return { account, token: t }
 }
 
-export function accountToClientPayload(account: MpAccountRow) {
+export function accountToClientPayload(
+  account: MpAccountRow,
+  extras?: {
+    lingqiShootTeamId?: string | null
+    lingqiEditTeamId?: string | null
+    workIdentity?: string | null
+  },
+) {
   return {
     accountId: account.id,
     openid: account.openid,
@@ -190,12 +197,44 @@ export function accountToClientPayload(account: MpAccountRow) {
     activeRole: account.active_role,
     lingqiTalentId: account.lingqi_talent_id,
     lingqiPrId: account.lingqi_pr_id,
+    lingqiShootTeamId: extras?.lingqiShootTeamId ?? null,
+    lingqiEditTeamId: extras?.lingqiEditTeamId ?? null,
+    workIdentity: extras?.workIdentity ?? null,
     registryMemberId: account.registry_member_id,
     registryPrId: account.registry_pr_id,
     wxNickName: account.wx_nick_name,
     wxAvatarUrl: account.wx_avatar_url,
     hasPassword: Boolean(account.password_hash),
   }
+}
+
+export async function accountPayloadWithMemberExtras(
+  supabaseUrl: string,
+  serviceRole: string,
+  account: MpAccountRow,
+) {
+  let extras: { lingqiShootTeamId?: string | null; lingqiEditTeamId?: string | null; workIdentity?: string | null } =
+    {}
+  try {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    const memberId = String(account.registry_member_id || '').trim()
+    const member =
+      (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
+      (data.mpTalentMembers ?? []).find(
+        (m) => account.openid && String(m.wxOpenId || '').trim() === String(account.openid).trim(),
+      )
+    if (member) {
+      extras = {
+        lingqiShootTeamId: member.lingqiShootTeamId || null,
+        lingqiEditTeamId: member.lingqiEditTeamId || null,
+        workIdentity: member.workIdentity || null,
+      }
+    }
+  } catch {
+    /* registry optional */
+  }
+  return accountToClientPayload(account, extras)
 }
 
 function accountPhoneKey(account: MpAccountRow): string {
@@ -581,18 +620,29 @@ export async function mpAuthEnsureIdentity(
     const data = await io.load()
     const now = new Date().toLocaleString('zh-CN', { hour12: false })
     const phone = String(account.login_name || '').trim()
+    const memberId = account.registry_member_id || `MTM-${Date.now()}`
+    const prev =
+      (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
+      (data.mpTalentMembers ?? []).find(
+        (m) => account.openid && String(m.wxOpenId || '').trim() === String(account.openid).trim(),
+      )
+    const tagMerge = [
+      ...(prev?.accountTags || []),
+      ...supplierTags(workIdentity),
+    ]
     const saved = upsertMpTalentMember(data, {
-      id: account.registry_member_id || `MTM-${Date.now()}`,
-      lingqiTalentId: account.lingqi_talent_id || '',
-      memberType: 'douyin',
-      wxNickName: nick || '用户',
-      wxAvatarUrl: account.wx_avatar_url || '',
-      wxOpenId: account.openid || '',
-      contact: phone,
-      wechatId: phone,
+      ...(prev || {}),
+      id: memberId,
+      lingqiTalentId: prev?.lingqiTalentId || account.lingqi_talent_id || '',
+      memberType: prev?.memberType || 'douyin',
+      wxNickName: prev?.wxNickName || nick || '用户',
+      wxAvatarUrl: prev?.wxAvatarUrl || account.wx_avatar_url || '',
+      wxOpenId: prev?.wxOpenId || account.openid || '',
+      contact: String(prev?.contact || phone).trim(),
+      wechatId: String(prev?.wechatId || phone).trim(),
       workIdentity,
-      accountTags: supplierTags(workIdentity),
-      registeredAt: now,
+      accountTags: [...new Set(tagMerge)],
+      registeredAt: prev?.registeredAt || now,
       updatedAt: now,
     })
     await io.save(data)

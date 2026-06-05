@@ -1,4 +1,5 @@
 import { TALENT_TAGS } from './publishFormOptions'
+import type { SupplierProfile } from './supplierTeamProfile'
 
 export const TALENT_PLATFORMS = [
   { id: 'douyin', name: '抖音' },
@@ -84,6 +85,9 @@ export function migrateMember(raw: Record<string, unknown> | null): TalentMember
 export type TalentMember = {
   id?: string
   lingqiTalentId?: string
+  lingqiShootTeamId?: string
+  lingqiEditTeamId?: string
+  workIdentity?: string
   memberType?: string
   wxNickName?: string
   wxAvatarUrl?: string
@@ -94,6 +98,8 @@ export type TalentMember = {
   province?: string
   city?: string
   platformProfiles: Record<string, PlatformProfile>
+  supplierProfile?: SupplierProfile
+  accountTags?: string[]
   registeredAt?: string
   updatedAt?: string
 }

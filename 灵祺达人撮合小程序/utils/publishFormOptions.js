@@ -8,14 +8,25 @@ const DELIVERY_WINDOWS = [
 /** PR 发单：先选招募对象 */
 const RECRUIT_TARGETS = [
   { id: 'talent', label: '达人', sub: '探店 · 品宣 · 达人报名' },
-  { id: 'shoot', label: '拍摄', sub: '拍摄任务表单筹备中', placeholder: true },
-  { id: 'edit', label: '剪辑', sub: '剪辑任务表单筹备中', placeholder: true },
+  { id: 'shoot', label: '拍摄', sub: '跟拍探店 · 活动 · 产品拍摄' },
+  { id: 'edit', label: '剪辑', sub: '探店成片 · 品宣包装 · 云剪' },
 ]
 
 const RECRUIT_MODES = [
-  { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal', category: '探店' },
-  { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal', category: '品宣' },
+  { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal', category: '探店', target: 'talent' },
+  { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal', category: '品宣', target: 'talent' },
+  { id: 'shoot_visit', label: '探店跟拍', sub: '到店拍摄达人探店素材', hall: 'normal', category: '拍摄', target: 'shoot' },
+  { id: 'shoot_event', label: '活动拍摄', sub: '发布会 · 门店活动', hall: 'normal', category: '拍摄', target: 'shoot' },
+  { id: 'shoot_product', label: '产品静物', sub: '菜品 · 商品特写', hall: 'normal', category: '拍摄', target: 'shoot' },
+  { id: 'edit_visit', label: '探店成片', sub: '探店素材剪辑包装', hall: 'normal', category: '剪辑', target: 'edit' },
+  { id: 'edit_brand', label: '品宣包装', sub: '品牌向精剪', hall: 'normal', category: '剪辑', target: 'edit' },
+  { id: 'edit_ice', label: '云剪合成', sub: '素材链接 → 云端成片', hall: 'ice', category: '云剪', target: 'edit' },
 ]
+
+function modesForTarget(targetId) {
+  const tid = targetId || 'talent'
+  return RECRUIT_MODES.filter((m) => (m.target || 'talent') === tid)
+}
 
 function targetById(id) {
   return RECRUIT_TARGETS.find((t) => t.id === id) || null
@@ -126,6 +137,7 @@ module.exports = {
   DELIVERY_WINDOWS,
   RECRUIT_TARGETS,
   RECRUIT_MODES,
+  modesForTarget,
   PLATFORMS,
   TALENT_TAGS,
   DOUYIN_SALES_LEVELS,

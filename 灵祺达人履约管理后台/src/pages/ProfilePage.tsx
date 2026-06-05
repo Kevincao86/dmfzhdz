@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { getAccount } from '../lib/mpSession'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
+import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
 
 export default function ProfilePage() {
@@ -14,8 +15,18 @@ export default function ProfilePage() {
 
   const systemId = isPr
     ? acc?.lingqiPrId || pr?.lingqiPrId || '—'
-    : acc?.lingqiTalentId || member?.lingqiTalentId || '—'
-  const systemIdLabel = isPr ? 'PR ID' : '灵祺达人 ID'
+    : workId === 'shoot'
+      ? member?.lingqiShootTeamId || acc?.lingqiShootTeamId || '—'
+      : workId === 'edit'
+        ? member?.lingqiEditTeamId || acc?.lingqiEditTeamId || '—'
+        : acc?.lingqiTalentId || member?.lingqiTalentId || '—'
+  const systemIdLabel = isPr
+    ? 'PR ID'
+    : workId === 'shoot'
+      ? '拍摄团队 ID'
+      : workId === 'edit'
+        ? '剪辑团队 ID'
+        : '灵祺达人 ID'
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -52,13 +63,19 @@ export default function ProfilePage() {
         <section className="surface-card rounded-xl border p-6">
           <h3 className="font-semibold mb-2 text-[var(--shell-text)]">我的资料</h3>
           <p className="text-sm text-[var(--shell-muted)] mb-4">
-            {member ? `已填写平台：${memberTypeLabel(member)}` : '尚未填写多平台资料，报名时可一键同步'}
+            {workId === 'shoot' || workId === 'edit'
+              ? member?.supplierProfile
+                ? supplierSummaryLabel(workId, member.supplierProfile as never)
+                : '尚未填写团队资料'
+              : member
+                ? `已填写平台：${memberTypeLabel(member)}`
+                : '尚未填写多平台资料，报名时可一键同步'}
           </p>
           <Link
-            to="/profile/talent"
+            to={workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'}
             className="inline-block px-4 py-2 rounded-lg bg-violet-600 text-sm font-medium hover:bg-violet-500 text-white"
           >
-            编辑我的信息
+            {workId === 'shoot' || workId === 'edit' ? '编辑团队信息' : '编辑我的信息'}
           </Link>
         </section>
       )}

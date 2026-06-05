@@ -27,6 +27,14 @@ const ROLE_META = {
   visitTimeStart: { type: 'time', locked: false, bindKey: 'visitTimeStart' },
   visitTimeEnd: { type: 'time', locked: false, bindKey: 'visitTimeEnd' },
   alipayAccount: { type: 'text', locked: false, bindKey: 'alipayAccount' },
+  teamName: { type: 'text', locked: false, bindKey: 'teamName' },
+  portfolioLink: { type: 'text', locked: false, bindKey: 'portfolioLink' },
+  shootTypes: { type: 'text', locked: false, bindKey: 'shootTypes' },
+  equipment: { type: 'text', locked: false, bindKey: 'equipment' },
+  shootDate: { type: 'date', locked: false, bindKey: 'shootDate' },
+  editStyles: { type: 'text', locked: false, bindKey: 'editStyles' },
+  software: { type: 'text', locked: false, bindKey: 'software' },
+  deliveryEta: { type: 'text', locked: false, bindKey: 'deliveryEta' },
 }
 
 function newFieldId(prefix) {

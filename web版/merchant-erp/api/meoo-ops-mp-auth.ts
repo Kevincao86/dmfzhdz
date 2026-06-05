@@ -11,6 +11,7 @@ import {
 import { loadMpHallRegistryPayload } from '../src/lib/mpHallRegistryCore.js'
 import {
   accountToClientPayload,
+  accountPayloadWithMemberExtras,
   createMpAuthRest,
   mpAuthPasswordLogin,
   mpAuthPhoneRegister,
@@ -247,7 +248,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         roleRaw === 'pr' ? 'pr' : 'talent',
         workIdentity,
       )
-      sendJson(res, 200, { ok: true, account: accountToClientPayload(account) })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, account: payload })
       return
     }
 
