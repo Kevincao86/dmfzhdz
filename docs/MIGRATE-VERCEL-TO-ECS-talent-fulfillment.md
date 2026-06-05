@@ -122,29 +122,24 @@ nano ~/app/灵祺达人履约管理后台/.env.production
 
 ---
 
-## 步骤 4：DNS — 仅验收子域（不动 Vercel 正式域）
+## 步骤 4：DNS — `dr.mofangdianai.com` 指向 ECS
 
-域名控制台新增：
+Vercel 已释放 `dr` 后，在域名控制台配置：
 
 | 主机记录 | 类型 | 值 |
 |----------|------|-----|
-| `ly-ecs` | A | `8.160.173.236`（**ECS**，不是轻量） |
+| `dr` | A | `8.160.173.236`（**ECS**，不是轻量） |
 
-**不要**改 Vercel 上履约正式域的解析。
+删除仍指向 Vercel 的旧 CNAME/A（若有）。
 
-证书（在新 ECS，SAN 需含 `ly-ecs.mofangdianai.com`）：
+证书（在新 ECS，root）：
 
 ```bash
-sudo mkdir -p /var/www/certbot /etc/nginx/ssl/mofangdianai.com
-sudo certbot certonly --webroot -w /var/www/certbot \
-  -d ly-ecs.mofangdianai.com --agree-tos --register-unsafely-without-email
-sudo cp /etc/letsencrypt/live/ly-ecs.mofangdianai.com/fullchain.pem /etc/nginx/ssl/mofangdianai.com/
-sudo cp /etc/letsencrypt/live/ly-ecs.mofangdianai.com/privkey.pem /etc/nginx/ssl/mofangdianai.com/
+cd ~/app && git pull
+sudo bash scripts/ecs-setup-ssl-fulfillment-domain.sh dr.mofangdianai.com
 ```
 
-若已有通配符或根域 PEM 已覆盖子域，可跳过 certbot，沿用现有 PEM 路径。
-
-**完成标志**：`dig +short ly-ecs.mofangdianai.com` → `8.160.173.236`。
+**完成标志**：`dig +short dr.mofangdianai.com` → `8.160.173.236`。
 
 ---
 
@@ -168,7 +163,7 @@ MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-talent-fulfil
 SKIP_BUILD=1 MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-talent-fulfillment-web.sh
 ```
 
-**完成标志**：`curl -sI https://ly-ecs.mofangdianai.com/ | head -3` 返回 `200` 或 `301→200`。
+**完成标志**：`curl -sI https://dr.mofangdianai.com/ | head -3` 返回 `200`。
 
 ---
 

@@ -2,7 +2,7 @@
 # 履约后台：DNS 切流前检查清单 + 启用 ECS 正式域 Nginx
 #
 # 用法：
-#   bash scripts/ecs-cutover-talent-fulfillment-dns.sh ly.mofangdianai.com
+#   bash scripts/ecs-cutover-talent-fulfillment-dns.sh dr.mofangdianai.com
 #
 # 前置：
 #   1) https://ly-ecs.mofangdianai.com 已验收（登录、招募大厅、增值服务各点一次）
@@ -14,7 +14,7 @@ set -euo pipefail
 PROD_DOMAIN="${1:-}"
 if [[ -z "$PROD_DOMAIN" ]]; then
   echo "用法: bash scripts/ecs-cutover-talent-fulfillment-dns.sh <正式域名>"
-  echo "示例: bash scripts/ecs-cutover-talent-fulfillment-dns.sh ly.mofangdianai.com"
+  echo "示例: bash scripts/ecs-cutover-talent-fulfillment-dns.sh dr.mofangdianai.com"
   exit 1
 fi
 
@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 echo "== 切流检查：${PROD_DOMAIN} =="
 echo ""
 echo "请确认已完成："
-echo "  [ ] ly-ecs.mofangdianai.com 登录 / 招募大厅 / 增值服务 正常"
+echo "  [ ] https://${PROD_DOMAIN} 登录 / 招募大厅 / 增值服务 正常（或 ly-ecs 已验收）"
 echo "  [ ] DNS: ${PROD_DOMAIN} A 记录 → 本 ECS 公网 IP（不再指向 Vercel）"
 echo "  [ ] SSL: 证书覆盖 ${PROD_DOMAIN}"
 echo ""
@@ -33,7 +33,7 @@ if [[ "${ans,,}" != "y" && "${ans,,}" != "yes" ]]; then
   exit 0
 fi
 
-export FULFILLMENT_PROD_DOMAIN="$PROD_DOMAIN"
+export FULFILLMENT_DOMAIN="$PROD_DOMAIN"
 bash "$ROOT/scripts/ecs-deploy-talent-fulfillment-web.sh"
 
 echo ""
