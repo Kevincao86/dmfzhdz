@@ -25,7 +25,6 @@ import type {
   RegistryVideoSubmission,
   RegistryVendorKeys,
 } from '../src/lib/opsRegistryTypes.js'
-import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
 import { upsertMpPrUser } from '../src/lib/mpPrUserUpsert.js'
 import {
