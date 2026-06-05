@@ -40,6 +40,9 @@ function readPrProfile() {
 
 function writePrProfile(profile) {
   wx.setStorageSync(PR_PROFILE_KEY, JSON.stringify(profile))
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
 }
 
 function emptyPrProfile() {

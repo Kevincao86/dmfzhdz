@@ -11,6 +11,7 @@ import type { ApplyRow } from '../lib/mpSync/applyFormTemplates'
 import { labels, normalizePlatform } from '../lib/mpSync/platformLabels'
 import { DOUYIN_LEVELS } from '../lib/mpSync/platformForm'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
+import { pushNotification } from '../lib/mpSync/messagesStore'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -81,6 +82,13 @@ export default function RecruitmentApplyPage() {
         }
       }
       addApplication({ mpOrderId: orderId, applicantId, title: merchantOrderNo, platform })
+      pushNotification({
+        category: 'order',
+        title: '报名已提交',
+        body: `${merchantOrderNo} · ${platform}`,
+        mpOrderId: orderId,
+        applicantId,
+      })
       if (isIceMode) localStorage.setItem(`meoo_ice_applicant_v1_${orderId}`, applicantId)
       nav(`/recruitment/${encodeURIComponent(orderId)}?applied=1`)
     } catch (e) {

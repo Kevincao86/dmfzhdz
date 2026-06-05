@@ -66,6 +66,7 @@ function readListFromKey(key: string): unknown[] {
 
 function writeListToKey(key: string, list: unknown[]) {
   localStorage.setItem(key, JSON.stringify((list || []).slice(0, 80)))
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
 function readApplicationsRaw(): ApplicationLocal[] {

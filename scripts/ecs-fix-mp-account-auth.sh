@@ -6,10 +6,15 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ECS_HOST="${ECS_HOST:-admin@139.196.42.5}"
-MIGRATION="20260603120000_mp_account_auth.sql"
+MIGRATIONS=(
+  "20260603120000_mp_account_auth.sql"
+  "20260604120000_mp_account_client_state.sql"
+)
 
 apply_local() {
-  bash "$ROOT/scripts/ecs-apply-supabase-migration.sh" "$MIGRATION"
+  for mig in "${MIGRATIONS[@]}"; do
+    bash "$ROOT/scripts/ecs-apply-supabase-migration.sh" "$mig"
+  done
   if [[ -f "$ROOT/supabase/ecs_service_role_grants.sql" ]]; then
     # shellcheck disable=SC1090
     source "$HOME/stack/db-credentials.txt"
@@ -27,7 +32,7 @@ verify_tables() {
   echo "=== 校验 mp_accounts / mp_auth_sessions / mp_wx_scan_tickets ==="
   psql -h 127.0.0.1 -p "${ECS_PG_PORT:-5433}" -U postgres -d "${ECS_PG_DB:-postgres}" -c "
 SELECT table_name FROM information_schema.tables
- WHERE table_schema='public' AND table_name IN ('mp_accounts','mp_auth_sessions','mp_wx_scan_tickets')
+ WHERE table_schema='public' AND table_name IN ('mp_accounts','mp_auth_sessions','mp_wx_scan_tickets','mp_account_client_state')
  ORDER BY 1;
 "
 }

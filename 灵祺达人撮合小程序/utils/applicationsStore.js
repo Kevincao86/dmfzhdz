@@ -14,8 +14,15 @@ function readListFromKey(key) {
   }
 }
 
+function scheduleClientSync() {
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
+}
+
 function writeListToKey(key, list) {
   wx.setStorageSync(key, JSON.stringify((list || []).slice(0, 80)))
+  scheduleClientSync()
 }
 
 function ownerIdsForFilter() {

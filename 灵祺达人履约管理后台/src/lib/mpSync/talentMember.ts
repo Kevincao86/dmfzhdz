@@ -26,6 +26,7 @@ export function readMember(): TalentMember | null {
 export function writeMember(member: TalentMember) {
   const migrated = migrateMember(member as unknown as Record<string, unknown>)
   if (migrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
 export function memberCoversPlatform(member: TalentMember | null, platform: string) {

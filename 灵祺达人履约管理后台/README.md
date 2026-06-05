@@ -50,3 +50,4 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
 - `mp_accounts` — 唯一 `openid`，绑定 `lingqi_talent_id` / `lingqi_pr_id`
 - `mp_auth_sessions` — Web/小程序会话
 - `mp_wx_scan_tickets` — 扫码登录票据
+- `mp_account_client_state` — 本机态云端同步（草稿/报名/通知）；`client_state_sync`
