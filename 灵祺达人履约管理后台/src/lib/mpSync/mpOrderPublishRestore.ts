@@ -1,6 +1,7 @@
 import { getApplyConfigForMpOrder, getTemplateById } from './applyFormTemplates'
 import { modeById, newFansTier, newLevelTier } from './publishFormOptions'
 import type { PublishForm } from './publishOrder'
+import { emptySupplierPublishFields } from './supplierPublishForm'
 
 function pickField(text: string, key: string) {
   const re = new RegExp(`${key}[:：]([^\\n]+)`)
@@ -33,6 +34,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     if (m) fansMin = m[1]
   }
   const patch: PublishForm = {
+    ...emptySupplierPublishFields(),
     deliveryWindow: (meta.deliveryWindow as PublishForm['deliveryWindow']) || (mp.urgent ? 'urgent' : 'normal'),
     title: String(mp.title || mp.customerName || '').trim(),
     platform: String(mp.platform || '').trim(),
@@ -68,6 +70,20 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     applyFormFields: Array.isArray(meta.applyFormFields)
       ? (meta.applyFormFields as PublishForm['applyFormFields']).map((f) => ({ ...f }))
       : [],
+    shootDate: String(meta.shootDate || ''),
+    shootTimeStart: String(meta.shootTimeStart || ''),
+    shootTimeEnd: String(meta.shootTimeEnd || ''),
+    shootLocation: String(meta.shootLocation || ''),
+    deliverables: Array.isArray(meta.deliverables) ? [...(meta.deliverables as string[])] : [],
+    equipmentRequired: Array.isArray(meta.equipmentRequired) ? [...(meta.equipmentRequired as string[])] : [],
+    materialSource: String(meta.materialSource || ''),
+    materialUrl: String(meta.materialUrl || ''),
+    aspectRatio: String(meta.aspectRatio || ''),
+    targetDuration: String(meta.targetDuration || ''),
+    styleTags: Array.isArray(meta.styleTags) ? [...(meta.styleTags as string[])] : [],
+    packageTags: Array.isArray(meta.packageTags) ? [...(meta.packageTags as string[])] : [],
+    deliveryDeadline: String(meta.deliveryDeadline || ''),
+    referenceUrl: String(meta.referenceUrl || ''),
   }
   if (!patch.selectedCities.length && mp.region && mp.region !== '全国') {
     patch.selectedCities = String(mp.region)

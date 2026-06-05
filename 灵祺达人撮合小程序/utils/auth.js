@@ -85,6 +85,22 @@ async function switchRole(role) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function ensureIdentity(role, workIdentity) {
+  const payload = { role: role === 'pr' ? 'pr' : 'talent' }
+  if (workIdentity === 'shoot' || workIdentity === 'edit' || workIdentity === 'talent') {
+    payload.workIdentity = workIdentity
+  }
+  const data = await authPost('ensure_identity', payload)
+  if (data.account) {
+    writeSession(readSessionToken(), data.account)
+    try {
+      const switchWorkIdentity = require('./switchWorkIdentity.js')
+      switchWorkIdentity.syncLocalProfilesFromAccount(data.account)
+    } catch (_) {}
+  }
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 async function refreshSession() {
   const data = await authPost('session', {})
   if (data.account) writeSession(readSessionToken(), data.account)
@@ -105,5 +121,6 @@ module.exports = {
   passwordLogin,
   setLoginCredentials,
   switchRole,
+  ensureIdentity,
   refreshSession,
 }

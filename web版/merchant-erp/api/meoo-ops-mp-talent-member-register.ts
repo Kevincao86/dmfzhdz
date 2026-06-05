@@ -82,6 +82,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ok: true,
       id: saved.id,
       lingqiTalentId: saved.lingqiTalentId || null,
+      lingqiShootTeamId: saved.lingqiShootTeamId || null,
+      lingqiEditTeamId: saved.lingqiEditTeamId || null,
+      workIdentity: saved.workIdentity || null,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -194,6 +194,30 @@ export type RegistryMpTalentPlatformProfile = {
   accountTags?: string[]
 }
 
+/** 拍摄/剪辑团队扩展资料（小程序与履约 Web 共用） */
+export type RegistrySupplierTeamProfile = {
+  teamName?: string
+  entityType?: 'personal' | 'studio' | 'company'
+  teamSize?: string
+  experienceYears?: string
+  dailyCapacity?: string
+  intro?: string
+  categoryTags?: string[]
+  shootTypes?: string[]
+  equipment?: string[]
+  editTypes?: string[]
+  editStyles?: string[]
+  software?: string[]
+  portfolioLink?: string
+  halfDayQuote?: string
+  fullDayQuote?: string
+  perClipQuote?: string
+  travelRule?: string
+  packageLevel?: string
+  urgentRule?: string
+  acceptsIce?: boolean
+}
+
 /** 达人招募小程序 · 灵祺达人会员 */
 export type RegistryMpTalentMember = {
   id: string
@@ -211,6 +235,7 @@ export type RegistryMpTalentMember = {
   lingqiShootTeamId?: string
   lingqiEditTeamId?: string
   accountTags?: string[]
+  supplierProfile?: RegistrySupplierTeamProfile
   douyin?: RegistryMpTalentPlatformProfile
   xiaohongshu?: RegistryMpTalentPlatformProfile
   registeredAt: string

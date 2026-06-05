@@ -226,6 +226,10 @@ function isMeooTenantsResetPasswordPath(urlPath: string): boolean {
   return urlPath === '/api/meoo-supabase-tenants-reset-password'
 }
 
+function isMeooTenantsDeletePath(urlPath: string): boolean {
+  return urlPath === '/api/meoo-supabase-tenants-delete'
+}
+
 function isMeooTenantsTokenmixPath(urlPath: string): boolean {
   return urlPath === '/api/meoo-supabase-tenants-tokenmix'
 }
@@ -271,6 +275,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
           !urlPath.startsWith('/api/ops-supabase/') &&
           !isMeooTenantsPatchPath(urlPath) &&
           !isMeooTenantsResetPasswordPath(urlPath) &&
+          !isMeooTenantsDeletePath(urlPath) &&
           !isMeooTenantsTokenmixPath(urlPath) &&
           !isMeooFlatOpsGetPath(urlPath) &&
           !isMeooPaymentOrdersVerifyPath(urlPath) &&
@@ -291,7 +296,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
         const sendCors = () => {
           res.setHeader('Access-Control-Allow-Origin', '*')
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         }
 
         if (method === 'OPTIONS') {
@@ -310,6 +315,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
           urlPath === '/api/ops-supabase/tenants/reset-password' ||
           isMeooTenantsPatchPath(urlPath) ||
           isMeooTenantsResetPasswordPath(urlPath) ||
+          isMeooTenantsDeletePath(urlPath) ||
           isMeooTenantsTokenmixPath(urlPath) ||
           isPaymentOrdersListPath(urlPath) ||
           urlPath === '/api/ops-supabase/payment-orders/verify' ||
@@ -331,6 +337,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
             (isPaymentOrdersListPath(urlPath) && method === 'GET') ||
             (isMeooTenantsPatchPath(urlPath) && method === 'POST') ||
             (isMeooTenantsResetPasswordPath(urlPath) && method === 'POST') ||
+            (isMeooTenantsDeletePath(urlPath) && method === 'POST') ||
             (isMeooPaymentOrdersVerifyPath(urlPath) && method === 'POST') ||
             (isMeooPaymentOrdersConfirmPath(urlPath) && method === 'POST')
           ) {
@@ -585,6 +592,67 @@ export function opsSupabaseAdminPlugin(): Plugin {
               error: 'supabase_admin_not_configured',
               hint:
                 '配置 SUPABASE_SERVICE_ROLE_KEY，或 ANON+MEOO_PROVISION_SECRET 并部署 ops-reset-tenant-auth-password',
+            })
+            return
+          }
+
+          if (method === 'POST' && isMeooTenantsDeletePath(urlPath)) {
+            const raw = await readBody(req as IncomingMessage)
+            let body: Record<string, unknown>
+            try {
+              body = JSON.parse(raw || '{}') as Record<string, unknown>
+            } catch {
+              json(res, 400, { ok: false, error: 'invalid_json' })
+              return
+            }
+
+            const { purgeSupabaseTenantById, verifyOpsMasterDeleteAuth } = await import(
+              '../api/tenantDeleteCore.js'
+            )
+            const auth = verifyOpsMasterDeleteAuth(
+              {
+                authorizationHeader:
+                  typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
+                masterPhone: typeof body.masterPhone === 'string' ? body.masterPhone : undefined,
+                masterPassword: typeof body.masterPassword === 'string' ? body.masterPassword : undefined,
+              },
+              process.env,
+            )
+            if (!auth.ok) {
+              json(res, auth.status, {
+                ok: false,
+                error: auth.error,
+                message: '仅超级管理员（18768501283）可删除客户',
+              })
+              return
+            }
+
+            const id = typeof body.id === 'string' ? body.id.trim() : ''
+            if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+              json(res, 400, { ok: false, error: 'invalid_id' })
+              return
+            }
+
+            if (!effectiveKey) {
+              json(res, 503, {
+                ok: false,
+                error: 'supabase_admin_not_configured',
+                hint: '配置 SUPABASE_SERVICE_ROLE_KEY',
+              })
+              return
+            }
+
+            const ownerPhone = typeof body.ownerPhone === 'string' ? body.ownerPhone : undefined
+            const result = await purgeSupabaseTenantById(supabaseUrl, effectiveKey, id, { ownerPhone })
+            if (!result.ok) {
+              json(res, 502, { ok: false, error: result.error, detail: result.detail })
+              return
+            }
+            json(res, 200, {
+              ok: true,
+              deletedUserIds: result.deletedUserIds,
+              ownerPhone: result.ownerPhone ?? null,
+              message: '客户及注册手机号已从数据库清除',
             })
             return
           }

@@ -21,7 +21,17 @@ import {
   newLevelTier,
   RECRUIT_MODES,
   RECRUIT_TARGETS,
+  modesForTarget,
 } from '../../lib/mpSync/publishFormOptions'
+import {
+  ASPECT_RATIOS,
+  DELIVERABLES,
+  EDIT_STYLES,
+  MATERIAL_SOURCES,
+  PACKAGE_TAGS,
+  SHOOT_EQUIPMENT,
+  TARGET_DURATIONS,
+} from '../../lib/mpSync/supplierPublishForm'
 import {
   clearPublishDraft,
   getLatestPublishDraftForMode,
@@ -113,6 +123,8 @@ export default function PublishWizard() {
   const [showDeadlineSheet, setShowDeadlineSheet] = useState(false)
 
   const display = useMemo(() => computePublishDisplay(form), [form])
+  const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
+  const filteredModes = useMemo(() => modesForTarget(recruitTarget || 'talent'), [recruitTarget])
 
   const syncDeadline = useCallback((date: string, time: string) => {
     if (!date) {
@@ -235,7 +247,7 @@ export default function PublishWizard() {
     : display.signupDeadlineDisplay
 
   async function onSubmit() {
-    const vErr = validatePublishForm(form, recruitMode)
+    const vErr = validatePublishForm(form, recruitMode, recruitTarget || 'talent')
     if (vErr) {
       setErr(vErr)
       return
@@ -343,37 +355,17 @@ export default function PublishWizard() {
                   : 'surface-card border hover:border-violet-500/40'
               }`}
               onClick={() => {
-                if ('placeholder' in t && t.placeholder) {
-                  setRecruitTarget(t.id)
-                  setRecruitTargetLabel(t.label)
-                  setStep('placeholder')
-                  return
-                }
                 setRecruitTarget(t.id)
                 setRecruitTargetLabel(t.label)
+                setForm(emptyPublishForm(t.id))
                 setStep('mode')
               }}
             >
               <div className="font-semibold">{t.label}</div>
               <div className="text-sm text-slate-400 mt-1">{t.sub}</div>
-              {'placeholder' in t && t.placeholder ? (
-                <span className="text-xs text-amber-500 mt-2 inline-block">筹备中</span>
-              ) : null}
             </button>
           ))}
         </div>
-      </div>
-    )
-  }
-
-  if (step === 'placeholder') {
-    return (
-      <div className="max-w-xl space-y-4">
-        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('target')}>
-          ‹ 返回
-        </button>
-        <h2 className="text-xl font-bold">{recruitTargetLabel}招募</h2>
-        <p className="text-sm text-slate-400">拍摄/剪辑发单筹备中，当前请先选择达人招募。</p>
       </div>
     )
   }
@@ -387,7 +379,7 @@ export default function PublishWizard() {
         <h2 className="text-xl font-bold">选择招募模式</h2>
         <p className="text-sm text-slate-400">探店 · 品宣</p>
         <div className="space-y-3">
-          {RECRUIT_MODES.map((m) => (
+          {filteredModes.map((m) => (
             <button
               key={m.id}
               type="button"
@@ -472,12 +464,14 @@ export default function PublishWizard() {
           />
         </div>
 
-        <PubSelectRow
-          label="招募平台 *"
-          value={display.platformDisplayText}
-          placeholder={!form.platform}
-          onClick={() => openPicker('platform')}
-        />
+        {!isSupplierPublish ? (
+          <PubSelectRow
+            label="招募平台 *"
+            value={display.platformDisplayText}
+            placeholder={!form.platform}
+            onClick={() => openPicker('platform')}
+          />
+        ) : null}
         <PubSelectRow
           label="招募城市 *"
           value={display.cityDisplayText}
@@ -485,13 +479,67 @@ export default function PublishWizard() {
           onClick={() => openPicker('city')}
         />
         <PubSelectRow
-          label="需求达人标签 *"
+          label={isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}
           hint="最多 2 个，不可重复"
           value={display.tagsDisplayText}
           placeholder={!form.talentTags.length}
           onClick={() => openPicker('tag')}
         />
 
+        {isSupplierPublish && recruitTarget === 'shoot' ? (
+          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
+            <PubLabel>拍摄日期 *</PubLabel>
+            <input type="date" className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootDate} onChange={(e) => patchForm({ shootDate: e.target.value })} />
+            <PubLabel>拍摄时段 *</PubLabel>
+            <div className="flex gap-2">
+              <input type="time" className="flex-1 rounded-lg panel-input border px-3 py-2" value={form.shootTimeStart} onChange={(e) => patchForm({ shootTimeStart: e.target.value })} />
+              <input type="time" className="flex-1 rounded-lg panel-input border px-3 py-2" value={form.shootTimeEnd} onChange={(e) => patchForm({ shootTimeEnd: e.target.value })} />
+            </div>
+            <PubLabel>拍摄地点 *</PubLabel>
+            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.shootLocation} onChange={(e) => patchForm({ shootLocation: e.target.value })} />
+            <PubLabel>成片交付 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {DELIVERABLES.map((d) => (
+                <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.deliverables.includes(d) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ deliverables: form.deliverables.includes(d) ? form.deliverables.filter((x) => x !== d) : [...form.deliverables, d] })}>{d}</button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {isSupplierPublish && recruitTarget === 'edit' ? (
+          <div className="space-y-3 rounded-lg border border-[var(--shell-border)] p-3">
+            <PubLabel>素材来源 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {MATERIAL_SOURCES.map((s) => (
+                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.materialSource === s ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ materialSource: s })}>{s}</button>
+              ))}
+            </div>
+            <PubLabel>素材链接</PubLabel>
+            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.materialUrl} onChange={(e) => patchForm({ materialUrl: e.target.value })} />
+            <PubLabel>成片画幅 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {ASPECT_RATIOS.map((a) => (
+                <button key={a} type="button" className={`px-2 py-1 rounded text-xs ${form.aspectRatio === a ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ aspectRatio: a })}>{a}</button>
+              ))}
+            </div>
+            <PubLabel>目标时长 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {TARGET_DURATIONS.map((d) => (
+                <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.targetDuration === d ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ targetDuration: d })}>{d}</button>
+              ))}
+            </div>
+            <PubLabel>剪辑风格 *</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {EDIT_STYLES.map((s) => (
+                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.styleTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ styleTags: form.styleTags.includes(s) ? form.styleTags.filter((x) => x !== s) : [...form.styleTags, s] })}>{s}</button>
+              ))}
+            </div>
+            <PubLabel>交付截止时间 *</PubLabel>
+            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.deliveryDeadline} onChange={(e) => patchForm({ deliveryDeadline: e.target.value })} />
+          </div>
+        ) : null}
+
+        {!isSupplierPublish ? (
         <div>
           <PubLabel>达人粉丝要求 *</PubLabel>
           <div className="flex gap-2 mt-1">
@@ -529,8 +577,9 @@ export default function PublishWizard() {
             </div>
           ) : null}
         </div>
+        ) : null}
 
-        {display.showDouyinLevel ? (
+        {display.showDouyinLevel && !isSupplierPublish ? (
           <PubSelectRow label="达人带货等级 *" value={display.levelDisplayText} onClick={() => openPicker('reqLevel')} />
         ) : null}
 
@@ -719,7 +768,7 @@ export default function PublishWizard() {
           />
         </div>
 
-        {recruitMode === 'ice' ? (
+        {recruitMode === 'ice' || recruitMode === 'edit_ice' ? (
           <div>
             <PubLabel>云剪成片链接 *</PubLabel>
             <input
@@ -732,7 +781,7 @@ export default function PublishWizard() {
         ) : null}
 
         <PubSelectRow
-          label="达人报名必填信息 *"
+          label={isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}
           value={display.applyFormDisplayText}
           placeholder={display.applyFormPlaceholder}
           onClick={() => openPicker('applyMenu')}

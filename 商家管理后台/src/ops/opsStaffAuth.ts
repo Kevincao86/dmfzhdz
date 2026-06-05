@@ -319,6 +319,12 @@ export function isSuperAdmin(session: OpsSession | null): boolean {
   return session?.role === 'super_admin'
 }
 
+/** 仅主账号 18768501283 可永久删除客户 */
+export function canOpsMasterDeleteCustomer(session: OpsSession | null): boolean {
+  if (!session) return false
+  return session.phone.replace(/\D/g, '').slice(0, 11) === OPS_MASTER_PHONE
+}
+
 export function sessionHasPermission(session: OpsSession | null, key: OpsPermissionKey): boolean {
   if (!session) return false
   if (session.role === 'super_admin') return true

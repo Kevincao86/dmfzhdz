@@ -406,6 +406,31 @@ export type PatchTenantPayload = {
   password?: string
 }
 
+export async function deleteRegistryTenant(body: {
+  id: string
+  merchantName?: string
+  loginName?: string
+}): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  const res = await fetch('/api/ops-sync/tenants/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const j = (await res.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+    detail?: string
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: j.error ?? mapHttpError(res.status),
+      detail: typeof j.detail === 'string' ? j.detail : undefined,
+    }
+  }
+  return { ok: j.ok !== false }
+}
+
 export async function patchTenant(body: PatchTenantPayload): Promise<{
   ok: boolean
   error?: string

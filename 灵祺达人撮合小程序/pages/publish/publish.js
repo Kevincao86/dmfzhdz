@@ -45,9 +45,11 @@ const {
   feeTypeLabel,
   modeById,
   targetById,
+  modesForTarget,
   newLevelTier,
   newFansTier,
 } = publishOpts
+const supplierPublishForm = require('../../utils/supplierPublishForm.js')
 const { buildCompactBudgetText } = require('../../utils/recruitmentBudgetDisplay.js')
 
 /** 子页确认后滚动回表单对应字段 */
@@ -80,12 +82,16 @@ function buildFansRequirementText(f) {
   return min ? `粉丝≥${min}` : ''
 }
 
-function emptyForm() {
-  const afTpl = applyTemplates.emptyCustomTemplate('')
+function emptyForm(recruitTarget) {
+  const target = recruitTarget || 'talent'
+  const afFields =
+    target === 'shoot' || target === 'edit'
+      ? supplierPublishForm.defaultSupplierApplyFields(target)
+      : (applyTemplates.emptyCustomTemplate('').fields || []).map((f) => ({ ...f }))
   return {
     deliveryWindow: 'normal',
     title: '',
-    platform: '',
+    platform: target === 'talent' ? '' : '通用',
     cityNational: false,
     selectedCities: [],
     talentTags: [],
@@ -105,8 +111,9 @@ function emptyForm() {
     signupDeadline: '',
     iceVideoUrl: '',
     applyFormTemplateId: '',
-    applyFormTemplateName: '',
-    applyFormFields: (afTpl.fields || []).map((f) => ({ ...f })),
+    applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
+    applyFormFields: afFields,
+    ...supplierPublishForm.emptySupplierPublishFields(),
   }
 }
 
@@ -149,7 +156,15 @@ Page({
     signupDeadlinePlaceholder: true,
     recruitMode: '',
     recruitModeLabel: '',
-    form: emptyForm(),
+    form: emptyForm('talent'),
+    isSupplierPublish: false,
+    deliverableGrid: [],
+    equipmentReqGrid: [],
+    styleTagGrid: [],
+    packageTagGrid: [],
+    materialSources: supplierPublishForm.MATERIAL_SOURCES,
+    aspectRatios: supplierPublishForm.ASPECT_RATIOS,
+    targetDurations: supplierPublishForm.TARGET_DURATIONS,
     showDouyinLevel: false,
     pickerView: '',
     platforms: PLATFORMS,
@@ -516,7 +531,7 @@ Page({
       recruitTargetLabel: '',
       recruitMode: '',
       recruitModeLabel: '',
-      form: emptyForm(),
+      form: emptyForm('talent'),
       tagGrid: buildTagGrid([]),
       feeTypeLabel: '请选择',
       feePlaceholder: true,
@@ -528,23 +543,42 @@ Page({
   onBackFromTarget() {
     wx.switchTab({ url: '/pages/index/index' })
   },
+  syncSupplierPublishGrids(form) {
+    const f = form || this.data.form
+    this.setData({
+      deliverableGrid: supplierPublishForm.DELIVERABLES.map((name) => ({
+        name,
+        on: (f.deliverables || []).includes(name),
+      })),
+      equipmentReqGrid: supplierPublishForm.SHOOT_EQUIPMENT.map((name) => ({
+        name,
+        on: (f.equipmentRequired || []).includes(name),
+      })),
+      styleTagGrid: supplierPublishForm.EDIT_STYLES.map((name) => ({
+        name,
+        on: (f.styleTags || []).includes(name),
+      })),
+      packageTagGrid: supplierPublishForm.PACKAGE_TAGS.map((name) => ({
+        name,
+        on: (f.packageTags || []).includes(name),
+      })),
+    })
+  },
   onSelectTarget(e) {
     const target = targetById(e.currentTarget.dataset.id)
     if (!target) return
-    if (target.placeholder) {
-      this.setData({
-        step: 'placeholder',
-        recruitTarget: target.id,
-        recruitTargetLabel: target.label,
-      })
-      this.syncTabBarOverlay()
-      return
-    }
+    const isSupplier = target.id === 'shoot' || target.id === 'edit'
     this.setData({
       step: 'mode',
       recruitTarget: target.id,
       recruitTargetLabel: target.label,
+      recruitModes: modesForTarget(target.id),
+      isSupplierPublish: isSupplier,
+      form: emptyForm(target.id),
+      tagGrid: buildTagGrid([]),
     })
+    if (isSupplier) this.syncSupplierPublishGrids(emptyForm(target.id))
+    this.syncDisplayFields()
     this.syncTabBarOverlay()
   },
   onBackFromPlaceholder() {
@@ -585,6 +619,14 @@ Page({
     const key = e.currentTarget.dataset.key
     if (!key) return
     this.setData({ [`form.${key}`]: e.detail.value })
+  },
+  onShootDatePick(e) {
+    this.setData({ 'form.shootDate': e.detail.value || '' })
+  },
+  onShootTimePick(e) {
+    const key = e.currentTarget.dataset.key
+    if (!key) return
+    this.setData({ [`form.${key}`]: e.detail.value || '' })
   },
   onTierFieldInput(e) {
     const idx = Number(e.currentTarget.dataset.index)
@@ -845,25 +887,33 @@ Page({
   },
   validate() {
     const f = this.data.form
+    const target = this.data.recruitTarget || 'talent'
+    const isSupplier = target === 'shoot' || target === 'edit'
     if (!String(f.title || '').trim()) return '请填写招募标题'
-    if (!f.platform) return '请选择招募平台'
+    if (!isSupplier && !f.platform) return '请选择招募平台'
     if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
-    if (!(f.talentTags || []).length) return '请选择需求达人标签'
-    if (f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
+    if (!isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
+    if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
     if (f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
       return '请选择招募报名截止时间'
     }
-    if (f.platform === '抖音' && !(f.douyinSalesLevels || []).length) return '请选择达人带货等级'
+    if (!isSupplier && f.platform === '抖音' && !(f.douyinSalesLevels || []).length) return '请选择达人带货等级'
     if (!f.feeTypeId) return '请选择费用模式'
     const feeErr = this.validateFee(f)
     if (feeErr) return feeErr
     const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
     if (n < 1) return '招募人数至少为 1'
     if (!String(f.recruitDetail || '').trim()) return '请填写招募详情'
-    if (this.data.recruitMode === 'ice' && !String(f.iceVideoUrl || '').trim()) {
-      return '云剪任务请填写成片下载链接'
+    if (isSupplier) {
+      const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
+      if (sErr) return sErr
     }
-    if (!(f.applyFormFields || []).length) return '请配置达人报名必填信息'
+    if (this.data.recruitMode === 'ice' || this.data.recruitMode === 'edit_ice') {
+      if (!String(f.iceVideoUrl || '').trim()) return '云剪任务请填写参考成片链接'
+    }
+    if (!(f.applyFormFields || []).length) {
+      return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
+    }
     const afErr = applyTemplates.validateTemplateFields(f.applyFormFields)
     if (afErr) return afErr
     return null
@@ -895,19 +945,28 @@ Page({
   buildRecruitmentInfo(f, mode) {
     const deadline = this.resolveSignupDeadline(f)
     const windowLabel = f.deliveryWindow === 'urgent' ? '急单大厅' : '招募大厅'
+    const target = this.data.recruitTarget || 'talent'
+    const isSupplier = target === 'shoot' || target === 'edit'
     const lines = [
       `招募标题：${String(f.title || '').trim()}`,
       `投放窗口：${windowLabel}`,
+      `招募对象：${this.data.recruitTargetLabel || target}`,
       `招募模式：${mode.label}`,
-      `招募平台：${f.platform || '—'}`,
       `招募城市：${this.buildRegionText(f)}`,
       `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
       `招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`,
-      `需求达人标签：${(f.talentTags || []).join('、')}`,
-      `粉丝要求：${buildFansRequirementText(f)}`,
       `费用模式：${feeTypeLabel(f.feeTypeId)}`,
     ]
-    if (f.platform === '抖音') lines.push(`带货等级：${(f.douyinSalesLevels || []).join('、')}`)
+    if (!isSupplier) {
+      lines.splice(4, 0, `招募平台：${f.platform || '—'}`)
+      lines.push(`需求达人标签：${(f.talentTags || []).join('、')}`)
+      lines.push(`粉丝要求：${buildFansRequirementText(f)}`)
+      if (f.platform === '抖音') lines.push(`带货等级：${(f.douyinSalesLevels || []).join('、')}`)
+    } else {
+      lines.push(...supplierPublishForm.buildSupplierRecruitmentLines(target, f, mode, {
+        buildBudgetDetailText: (form) => this.buildBudgetDetailText(form),
+      }))
+    }
     if (f.feeTypeId === 'fixed') lines.push(`一口价：¥${f.fixedPrice}`)
     if (f.feeTypeId === 'exchange_only') lines.push('酬劳：纯置换（无现金）')
     if (f.feeTypeId === 'self_quote') {
@@ -931,10 +990,36 @@ Page({
     lines.push('招募详情：')
     const recruitDetail = String(f.recruitDetail || '').trim()
     if (recruitDetail) lines.push(recruitDetail)
-    if (mode.hall === 'ice' && String(f.iceVideoUrl || '').trim()) {
-      lines.push(`云剪成片链接：${String(f.iceVideoUrl).trim()}`)
+    if ((mode.hall === 'ice' || mode.id === 'edit_ice') && String(f.iceVideoUrl || '').trim()) {
+      lines.push(`云剪参考成片：${String(f.iceVideoUrl).trim()}`)
     }
     return lines.join('\n')
+  },
+  onSupplierListTap(e) {
+    const field = e.currentTarget.dataset.field
+    const name = e.currentTarget.dataset.name
+    if (!field || !name) return
+    const cur = Array.isArray(this.data.form[field]) ? [...this.data.form[field]] : []
+    const idx = cur.indexOf(name)
+    if (idx >= 0) cur.splice(idx, 1)
+    else cur.push(name)
+    this.setData({ [`form.${field}`]: cur })
+    this.syncSupplierPublishGrids({ ...this.data.form, [field]: cur })
+  },
+  onMaterialSourcePick(e) {
+    const val = e.currentTarget.dataset.val
+    if (!val) return
+    this.setData({ 'form.materialSource': val })
+  },
+  onAspectRatioPick(e) {
+    const val = e.currentTarget.dataset.val
+    if (!val) return
+    this.setData({ 'form.aspectRatio': val })
+  },
+  onTargetDurationPick(e) {
+    const val = e.currentTarget.dataset.val
+    if (!val) return
+    this.setData({ 'form.targetDuration': val })
   },
   buildOrder() {
     const f = this.data.form
@@ -992,6 +1077,20 @@ Page({
           fansLimitMode: f.fansLimitMode,
           fansMin: f.fansMin,
           talentTags: f.talentTags,
+          shootDate: f.shootDate,
+          shootTimeStart: f.shootTimeStart,
+          shootTimeEnd: f.shootTimeEnd,
+          shootLocation: f.shootLocation,
+          deliverables: f.deliverables,
+          equipmentRequired: f.equipmentRequired,
+          materialSource: f.materialSource,
+          materialUrl: f.materialUrl,
+          aspectRatio: f.aspectRatio,
+          targetDuration: f.targetDuration,
+          styleTags: f.styleTags,
+          packageTags: f.packageTags,
+          deliveryDeadline: f.deliveryDeadline,
+          referenceUrl: f.referenceUrl,
           douyinSalesLevels: f.platform === '抖音' ? f.douyinSalesLevels : [],
           feeTypeId: f.feeTypeId,
           fixedPrice: f.fixedPrice,
@@ -1009,7 +1108,7 @@ Page({
         }
       })(),
     }
-    if (mode.hall === 'ice') {
+    if (mode.hall === 'ice' || mode.id === 'edit_ice') {
       order.orderKind = 'recruitment_ice'
       order.hall = 'ice'
       order.fulfillmentLoop = 'closed'

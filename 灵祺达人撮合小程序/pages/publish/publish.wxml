@@ -139,7 +139,7 @@
             <text class="pub-label">招募标题 *</text>
             <input class="pub-input" placeholder="如：春季火锅探店招募" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
           </view>
-          <view class="pub-field" id="field-platform">
+          <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
               <text class="pub-select-text {{platformPlaceholder ? 'pub-select-text--ph' : ''}}">{{platformDisplayText}}</text>
@@ -154,14 +154,14 @@
             </view>
           </view>
           <view class="pub-field" id="field-tag">
-            <text class="pub-label">需求达人标签 *</text>
+            <text class="pub-label">{{isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}}</text>
             <text class="pub-label-hint">最多 2 个，不可重复</text>
             <view class="pub-select" data-view="tag" bindtap="openPicker">
               <text class="pub-select-text {{tagsPlaceholder ? 'pub-select-text--ph' : ''}}">{{tagsDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
-          <view class="pub-field" id="field-fans">
+          <view class="pub-field" id="field-fans" wx:if="{{!isSupplierPublish}}">
             <text class="pub-label">达人粉丝要求 *</text>
             <view class="pub-radio-pair pub-radio-pair--fans">
               <view
@@ -185,7 +185,86 @@
               />
             </view>
           </view>
-          <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel}}">
+          <block wx:if="{{isSupplierPublish && recruitTarget === 'shoot'}}">
+            <view class="pub-field">
+              <text class="pub-label">拍摄日期 *</text>
+              <picker mode="date" value="{{form.shootDate}}" bindchange="onShootDatePick">
+                <view class="pub-select"><text class="pub-select-text {{form.shootDate ? '' : 'pub-select-text--ph'}}">{{form.shootDate || '选择日期'}}</text><text class="pub-select-arrow">›</text></view>
+              </picker>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">拍摄时段 *</text>
+              <view class="pub-deadline-row">
+                <picker mode="time" value="{{form.shootTimeStart}}" data-key="shootTimeStart" bindchange="onShootTimePick">
+                  <view class="pub-select pub-select--half"><text class="pub-select-text">{{form.shootTimeStart || '开始'}}</text></view>
+                </picker>
+                <picker mode="time" value="{{form.shootTimeEnd}}" data-key="shootTimeEnd" bindchange="onShootTimePick">
+                  <view class="pub-select pub-select--half"><text class="pub-select-text">{{form.shootTimeEnd || '结束'}}</text></view>
+                </picker>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">拍摄地点 *</text>
+              <input class="pub-input" placeholder="门店名 + 详细地址" value="{{form.shootLocation}}" data-key="shootLocation" bindinput="onFieldInput" />
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">成片交付 *</text>
+              <view class="account-tag-grid">
+                <view wx:for="{{deliverableGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="deliverables" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">设备要求</text>
+              <view class="account-tag-grid">
+                <view wx:for="{{equipmentReqGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="equipmentRequired" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              </view>
+            </view>
+          </block>
+          <block wx:if="{{isSupplierPublish && recruitTarget === 'edit'}}">
+            <view class="pub-field">
+              <text class="pub-label">素材来源 *</text>
+              <view class="pub-radio-pair">
+                <view wx:for="{{materialSources}}" wx:key="*this" class="pub-radio-opt {{form.materialSource === item ? 'pub-radio-opt--on' : ''}}" data-val="{{item}}" bindtap="onMaterialSourcePick">{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">素材链接</text>
+              <input class="pub-input" placeholder="网盘/链接" value="{{form.materialUrl}}" data-key="materialUrl" bindinput="onFieldInput" />
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">成片画幅 *</text>
+              <view class="pub-radio-pair">
+                <view wx:for="{{aspectRatios}}" wx:key="*this" class="pub-radio-opt {{form.aspectRatio === item ? 'pub-radio-opt--on' : ''}}" data-val="{{item}}" bindtap="onAspectRatioPick">{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">目标时长 *</text>
+              <view class="pub-radio-pair">
+                <view wx:for="{{targetDurations}}" wx:key="*this" class="pub-radio-opt {{form.targetDuration === item ? 'pub-radio-opt--on' : ''}}" data-val="{{item}}" bindtap="onTargetDurationPick">{{item}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">剪辑风格 *</text>
+              <view class="account-tag-grid">
+                <view wx:for="{{styleTagGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="styleTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">包装要求</text>
+              <view class="account-tag-grid">
+                <view wx:for="{{packageTagGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="packageTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              </view>
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">交付截止时间 *</text>
+              <input class="pub-input" placeholder="如 2026-06-10 18:00" value="{{form.deliveryDeadline}}" data-key="deliveryDeadline" bindinput="onFieldInput" />
+            </view>
+            <view class="pub-field">
+              <text class="pub-label">参考片链接</text>
+              <input class="pub-input" placeholder="选填" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
+            </view>
+          </block>
+          <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel && !isSupplierPublish}}">
             <text class="pub-label">达人带货等级 *</text>
             <view class="pub-select" data-view="reqLevel" bindtap="openPicker">
               <text class="pub-select-text">{{levelDisplayText}}</text>
@@ -264,12 +343,12 @@
               show-confirm-bar="{{false}}"
             />
           </view>
-          <view class="pub-field" wx:if="{{recruitMode === 'ice'}}">
-            <text class="pub-label">云剪成片链接 *</text>
+          <view class="pub-field" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
+            <text class="pub-label">云剪参考成片链接 *</text>
             <input class="pub-input" placeholder="https://…mp4" value="{{form.iceVideoUrl}}" data-key="iceVideoUrl" bindinput="onFieldInput" />
           </view>
           <view class="pub-field" id="field-apply-form">
-            <text class="pub-label">达人报名必填信息 *</text>
+            <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}}</text>
             <view class="pub-select" data-view="applyForm" bindtap="openPicker">
               <text class="pub-select-text {{applyFormPlaceholder ? 'pub-select-text--ph' : ''}}">{{applyFormDisplayText}}</text>
               <text class="pub-select-arrow">›</text>

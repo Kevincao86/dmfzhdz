@@ -1,4 +1,4 @@
-import { BarChart3, Download, Eye, KeyRound, Link2, Pencil, Plus, Snowflake, UserX, X } from 'lucide-react'
+import { BarChart3, Download, Eye, KeyRound, Link2, Pencil, Plus, Snowflake, Trash2, UserX, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../cn'
@@ -6,7 +6,9 @@ import SecretInput from '../../components/SecretInput'
 import type { CustomerAccountStatus, OpsCustomer } from '../mockData'
 import { tenantsToCustomers } from '../mapRegistryTenant'
 import { postProvisionTenant } from '../provisionTenantApi'
+import { deleteOpsCustomer } from '../opsCustomerDeleteApi'
 import { fetchRegistry, patchTenant, postManualTenant, type RegistryTenant } from '../opsRegistryApi'
+import { canOpsMasterDeleteCustomer, readOpsSession } from '../opsStaffAuth'
 import {
   fetchSupabaseTenantsForOps,
   patchSupabaseTenant,
@@ -92,6 +94,13 @@ export default function OpsCustomersListPage() {
 
   /** 行内「停用 / 冻结」提交中，避免连点（记录具体操作以便只更新对应按钮文案） */
   const [rowStatusBusy, setRowStatusBusy] = useState<{ id: string; kind: 'disabled' | 'frozen' } | null>(null)
+
+  const [rowDeleteBusy, setRowDeleteBusy] = useState<string | null>(null)
+  const [deleteModalCustomer, setDeleteModalCustomer] = useState<OpsCustomer | null>(null)
+  const [deleteMasterPassword, setDeleteMasterPassword] = useState('')
+
+  const opsSession = useMemo(() => readOpsSession(), [])
+  const canDeleteCustomer = canOpsMasterDeleteCustomer(opsSession)
 
   const reload = useCallback(async () => {
     let regTenants: RegistryTenant[] = []
@@ -278,6 +287,42 @@ export default function OpsCustomersListPage() {
       window.alert(`「${c.companyName}」登录密码已设为「${OPS_RESET_PASSWORD}」。`)
     } finally {
       setRowResetPwdBusy(null)
+    }
+  }
+
+  const performDeleteCustomer = async () => {
+    const c = deleteModalCustomer
+    if (!c) return
+    const t = tenants.find((x) => x.id === c.id)
+    if (!t) return
+
+    const session = readOpsSession()
+    if (!session?.sessionToken && deleteMasterPassword.length < 6) {
+      window.alert('请输入超级管理员密码以确认删除')
+      return
+    }
+
+    setDeleteModalCustomer(null)
+    setRowDeleteBusy(c.id)
+    try {
+      const phoneDigits = (t.phone ?? c.phone ?? '').replace(/\D/g, '').slice(0, 11)
+      const r = await deleteOpsCustomer({
+        id: t.id,
+        loginName: t.loginName,
+        merchantName: t.merchantName,
+        ownerPhone: phoneDigits.length === 11 ? phoneDigits : undefined,
+        isSupabase: isSupabaseTenant(t),
+        masterPassword: session?.sessionToken ? undefined : deleteMasterPassword,
+      })
+      setDeleteMasterPassword('')
+      if (!r.ok) {
+        window.alert([r.message, r.detail, r.error].filter(Boolean).join('\n') || '删除失败')
+        return
+      }
+      await reload()
+      window.alert(r.message ?? '已删除')
+    } finally {
+      setRowDeleteBusy(null)
     }
   }
 
@@ -1098,6 +1143,62 @@ export default function OpsCustomersListPage() {
         </div>
       ) : null}
 
+      {deleteModalCustomer ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !rowDeleteBusy && setDeleteModalCustomer(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-red-900/50 bg-slate-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-red-300">永久删除客户</h2>
+            <p className="mt-3 text-sm text-slate-300">
+              确定删除「<span className="font-medium text-white">{deleteModalCustomer.companyName}</span>
+              」？将清除云端租户、全部关联数据及商家版注册手机号，<strong className="text-red-300">不可恢复</strong>。
+            </p>
+            {deleteModalCustomer.phone && deleteModalCustomer.phone !== '—' && deleteModalCustomer.phone !== '同步' ? (
+              <p className="mt-2 text-xs text-slate-500">注册手机：{deleteModalCustomer.phone}</p>
+            ) : null}
+            {!opsSession?.sessionToken ? (
+              <div className="mt-4">
+                <label className="mb-1 block text-xs text-slate-400">超级管理员密码</label>
+                <SecretInput
+                  autoComplete="current-password"
+                  value={deleteMasterPassword}
+                  onChange={(e) => setDeleteMasterPassword(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
+                  placeholder="确认删除权限"
+                />
+              </div>
+            ) : null}
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={!!rowDeleteBusy}
+                onClick={() => {
+                  setDeleteModalCustomer(null)
+                  setDeleteMasterPassword('')
+                }}
+                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={!!rowDeleteBusy}
+                onClick={() => void performDeleteCustomer()}
+                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {rowDeleteBusy === deleteModalCustomer.id ? '删除中…' : '确认删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">
@@ -1241,6 +1342,25 @@ export default function OpsCustomersListPage() {
                         <Snowflake className="h-3 w-3" />
                         {rowStatusBusy?.id === c.id && rowStatusBusy.kind === 'frozen' ? '处理中…' : '冻结'}
                       </button>
+                      {canDeleteCustomer ? (
+                        <button
+                          type="button"
+                          disabled={
+                            rowDeleteBusy === c.id ||
+                            rowActivateBusy === c.id ||
+                            rowResetPwdBusy === c.id ||
+                            rowStatusBusy?.id === c.id
+                          }
+                          onClick={() => {
+                            setDeleteMasterPassword('')
+                            setDeleteModalCustomer(c)
+                          }}
+                          className="inline-flex items-center gap-0.5 rounded-md border border-red-900/50 px-2 py-1 text-xs text-red-400 hover:bg-red-950/30 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          {rowDeleteBusy === c.id ? '删除中…' : '删除'}
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

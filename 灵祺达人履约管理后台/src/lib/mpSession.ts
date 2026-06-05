@@ -9,6 +9,9 @@ export type MpAccount = {
   activeRole: MpAccountRole
   lingqiTalentId: string | null
   lingqiPrId: string | null
+  lingqiShootTeamId?: string | null
+  lingqiEditTeamId?: string | null
+  workIdentity?: string | null
   registryMemberId?: string | null
   registryPrId?: string | null
   wxNickName: string | null

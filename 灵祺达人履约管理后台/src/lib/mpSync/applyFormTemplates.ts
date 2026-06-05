@@ -29,6 +29,14 @@ export const ROLE_META: Record<
   visitTimeStart: { type: 'time', bindKey: 'visitTimeStart' },
   visitTimeEnd: { type: 'time', bindKey: 'visitTimeEnd' },
   alipayAccount: { type: 'text', bindKey: 'alipayAccount' },
+  teamName: { type: 'text', bindKey: 'teamName' },
+  portfolioLink: { type: 'text', bindKey: 'portfolioLink' },
+  shootTypes: { type: 'text', bindKey: 'shootTypes' },
+  equipment: { type: 'text', bindKey: 'equipment' },
+  shootDate: { type: 'date', bindKey: 'shootDate' },
+  editStyles: { type: 'text', bindKey: 'editStyles' },
+  software: { type: 'text', bindKey: 'software' },
+  deliveryEta: { type: 'text', bindKey: 'deliveryEta' },
 }
 
 export type ApplyField = {

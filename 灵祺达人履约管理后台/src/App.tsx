@@ -9,6 +9,7 @@ import OrdersPage from './pages/OrdersPage'
 import MessagesPage from './pages/MessagesPage'
 import ProfilePage from './pages/ProfilePage'
 import TalentProfilePage from './pages/TalentProfilePage'
+import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrProfilePage from './pages/PrProfilePage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/talent" element={<TalentProfilePage />} />
+        <Route path="/profile/supplier" element={<SupplierProfilePage />} />
         <Route path="/profile/pr" element={<PrProfilePage />} />
         <Route path="/addons" element={<MerchantEmbedShell />}>
           <Route index element={<Navigate to="/addons/shortvideo" replace />} />

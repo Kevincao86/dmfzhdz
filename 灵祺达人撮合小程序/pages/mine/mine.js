@@ -6,14 +6,38 @@ const participant = require('../../utils/participant.js')
 const userProfile = require('../../utils/userProfile.js')
 const identityTypes = require('../../utils/identityTypes.js')
 const auth = require('../../utils/auth.js')
+const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const mpApiErrors = require('../../utils/mpApiErrors.js')
+const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const { setTabBarForPage, refreshTabBar, setTabBarHidden } = require('../../utils/tabBar.js')
 const { routeToPagePath } = require('../../utils/tabBarConfig.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 
-const TALENT_MENUS = [
+function talentMenusForIdentity(identity) {
+  if (identity === 'shoot') {
+    return [
+      { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info', emoji: '📷' },
+      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list', emoji: '📋' },
+      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
+      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart', emoji: '📊' },
+      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
+    ]
+  }
+  if (identity === 'edit') {
+    return [
+      { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info', emoji: '✂️' },
+      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list', emoji: '📋' },
+      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
+      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart', emoji: '📊' },
+      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
+    ]
+  }
+  return TALENT_MENUS_BASE
+}
+
+const TALENT_MENUS_BASE = [
   { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info', emoji: '🎨' },
   { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list', emoji: '📋' },
   { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
@@ -55,7 +79,7 @@ Page({
     profileSaving: false,
     displaySub: '微信登录后使用完整功能',
     identityIdLine: '',
-    menus: TALENT_MENUS,
+    menus: TALENT_MENUS_BASE,
     notifyBadge: 0,
     headerInnerStyle: '',
     showIdentitySheet: false,
@@ -80,7 +104,7 @@ Page({
       this.setData({
         identity: 'talent',
         identityLabel: '达人',
-        menus: TALENT_MENUS,
+        menus: TALENT_MENUS_BASE,
         displayName: '灵祺用户',
         displaySub: '页面加载异常，请删除小程序后重试',
       })
@@ -114,7 +138,9 @@ Page({
     } else if (identity === 'shoot' || identity === 'edit') {
       if (member?.wxNickName) profileNick = member.wxNickName
       if (member?.wxAvatarUrl) avatarUrl = member.wxAvatarUrl
-      displaySub = userProfile.supplierDisplaySub(identity)
+      displaySub = member?.supplierProfile
+        ? supplierTeamProfile.supplierSummaryLabel(identity, member.supplierProfile)
+        : userProfile.supplierDisplaySub(identity)
     } else if (identity === 'pr') {
       if (prProfile?.wxNickName) profileNick = prProfile.wxNickName
       if (prProfile?.wxAvatarUrl) avatarUrl = prProfile.wxAvatarUrl
@@ -124,10 +150,11 @@ Page({
     const displayName = profileNick || '灵祺用户'
 
     let identityIdLine = ''
-    if (
-      (identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
-      member?.lingqiTalentId
-    ) {
+    if (identity === 'shoot' && member?.lingqiShootTeamId) {
+      identityIdLine = lingqiIdentity.formatShootTeamIdLabel(member.lingqiShootTeamId)
+    } else if (identity === 'edit' && member?.lingqiEditTeamId) {
+      identityIdLine = lingqiIdentity.formatEditTeamIdLabel(member.lingqiEditTeamId)
+    } else if (identity === 'talent' && member?.lingqiTalentId) {
       identityIdLine = lingqiIdentity.formatTalentIdLabel(member.lingqiTalentId)
     } else if (identity === 'pr' && prProfile?.lingqiPrId) {
       identityIdLine = lingqiIdentity.formatPrIdLabel(prProfile.lingqiPrId)
@@ -148,7 +175,7 @@ Page({
       displayName,
       displaySub,
       identityIdLine,
-      menus: identity === 'pr' ? PR_MENUS : TALENT_MENUS,
+      menus: identity === 'pr' ? PR_MENUS : talentMenusForIdentity(identity),
       notifyBadge: messagesStore.unreadNotificationCount(),
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
@@ -326,28 +353,29 @@ Page({
   },
   async applyIdentitySwitch(id) {
     if (!id || id === this.data.identity) return
-    const targetRole = identityTypes.accountRoleForWorkIdentity(id)
-    const account = auth.readAccount()
-    userProfile.writeIdentity(id)
-    if (auth.isLoggedIn() && account) {
-      const curRole = account.activeRole === 'pr' ? 'pr' : 'talent'
-      if (curRole !== targetRole) {
-        wx.showLoading({ title: '切换身份…', mask: true })
-        try {
-          await auth.switchRole(targetRole)
-        } catch (e) {
-          wx.hideLoading()
-          userProfile.writeIdentity(this.data.identity)
-          wx.showToast({
-            title: mpApiErrors.formatMpApiErr(e, '身份切换失败'),
-            icon: 'none',
-          })
-          return
-        }
-        wx.hideLoading()
+    const prev = this.data.identity
+    wx.showLoading({ title: '切换身份…', mask: true })
+    try {
+      const result = await switchWorkIdentity.applyWorkIdentitySwitch(id)
+      wx.hideLoading()
+      if (result.needsReLogin) {
+        wx.showToast({ title: result.cloudWarning || '请重新登录', icon: 'none' })
+        return
       }
+      if (result.cloudWarning) {
+        wx.showToast({ title: result.cloudWarning, icon: 'none' })
+      } else {
+        wx.showToast({ title: `已切换为${userProfile.identityLabel(id)}`, icon: 'none' })
+      }
+    } catch (e) {
+      wx.hideLoading()
+      userProfile.writeIdentity(prev)
+      wx.showToast({
+        title: mpApiErrors.formatMpApiErr(e, '身份切换失败'),
+        icon: 'none',
+      })
+      return
     }
-    wx.showToast({ title: `已切换为${userProfile.identityLabel(id)}`, icon: 'none' })
     this.refresh()
     refreshTabBar()
     const pages = getCurrentPages()
