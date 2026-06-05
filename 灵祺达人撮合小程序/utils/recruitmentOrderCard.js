@@ -42,6 +42,7 @@ function mapMpOrderRow(mp, reg) {
     merchantName: view.merchantName,
     storeName: view.storeName,
     title: view.title,
+    status: mp.status || 'open',
     statusLabel: STATUS_LABEL[mp.status] || mp.status,
     platform,
     platformIcon: platformIcon(platform),
@@ -73,9 +74,15 @@ function loadOpenOrderRows(reg) {
   return openList.map((mp) => mapMpOrderRow(mp, reg))
 }
 
+function loadAllOrderRows(reg) {
+  const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  return mpList.filter((o) => o && o.id).map((mp) => mapMpOrderRow(mp, reg))
+}
+
 module.exports = {
   STATUS_LABEL,
   PLATFORM_ICONS,
   mapMpOrderRow,
   loadOpenOrderRows,
+  loadAllOrderRows,
 }

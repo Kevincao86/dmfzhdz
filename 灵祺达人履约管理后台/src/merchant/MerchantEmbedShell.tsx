@@ -2,6 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 import MerchantEmbedErrorBoundary from './MerchantEmbedErrorBoundary'
 import MerchantEmbedProviders from './MerchantEmbedProviders'
 import '@merchant/index.css'
+import './embed-text-utilities.css'
+import './merchant-embed-theme.css'
 
 const TABS = [
   { to: '/addons/shortvideo', label: '短视频AI处理' },
@@ -9,13 +11,13 @@ const TABS = [
   { to: '/addons/digital-human', label: '数字人口播' },
 ] as const
 
-/** 商家版同源浅色工作区 + 子 Tab（功能与 merchant-erp 页面完全一致） */
+/** 商家版同源工作区 + 子 Tab（随履约后台明暗主题切换） */
 export default function MerchantEmbedShell() {
   return (
     <MerchantEmbedErrorBoundary>
       <MerchantEmbedProviders>
-      <div className="erp-main-surface min-h-full flex flex-col bg-slate-50 text-slate-900">
-        <div className="border-b border-slate-200/90 bg-white/90 px-4 py-2 flex flex-wrap gap-2 shrink-0">
+      <div className="merchant-embed-root erp-main-surface min-h-full flex flex-col bg-[var(--shell-main-bg)] text-[var(--app-text)]">
+        <div className="border-b border-[var(--shell-border)] bg-[var(--panel-card)] px-4 py-2 flex flex-wrap gap-2 shrink-0">
           {TABS.map((t) => (
             <NavLink
               key={t.to}
@@ -24,7 +26,7 @@ export default function MerchantEmbedShell() {
                 `px-3 py-1.5 rounded-lg text-sm font-medium ${
                   isActive
                     ? 'bg-violet-600 text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
+                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
                 }`
               }
             >

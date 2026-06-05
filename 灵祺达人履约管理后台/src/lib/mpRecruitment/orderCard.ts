@@ -62,9 +62,15 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     merchantName: customerName,
     storeName,
     title,
-    statusLabel: { open: '招募中', collecting: '收集中', closed: '已关闭', done: '已完成' }[
-      String(mp.status)
-    ] || String(mp.status),
+    mpStatus: String(mp.status || 'open'),
+    statusLabel:
+      {
+        open: '招募中',
+        collecting: '收集中',
+        pending_settlement: '待结算',
+        closed: '已停止',
+        done: '已完成',
+      }[String(mp.status)] || String(mp.status),
     platform,
     region,
     category: String(mp.category || '本地生活'),
@@ -86,12 +92,14 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
   }
 }
 
-export function loadOpenOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
+export function loadAllOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const openList = mpList.filter(
-    (o) => o && (o.status === 'open' || o.status === 'collecting'),
-  ) as Record<string, unknown>[]
-  return openList.map((mp) => mapMpOrderRow(mp, reg))
+  const list = mpList.filter((o) => o && o.status !== 'deleted') as Record<string, unknown>[]
+  return list.map((mp) => mapMpOrderRow(mp, reg))
+}
+
+export function loadOpenOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
+  return loadAllOrderRows(reg).filter((r) => r.mpStatus === 'open' || r.mpStatus === 'collecting')
 }
 
 export function splitHallRows(reg: MpRegistry) {

@@ -373,7 +373,7 @@ export default function PublishWizard() {
           ‹ 返回
         </button>
         <h2 className="text-xl font-bold">{recruitTargetLabel}招募</h2>
-        <p className="text-sm text-slate-400">表单字段明日整理，当前仅支持「达人」发单。</p>
+        <p className="text-sm text-slate-400">拍摄/剪辑发单筹备中，当前请先选择达人招募。</p>
       </div>
     )
   }

@@ -2,9 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
-import { splitHallRows } from '../../lib/mpRecruitment/orderCard'
+import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
+import {
+  matchStatusLabel,
+  prioritizeActiveStatus,
+  splitRoleHallRows,
+  STATUS_FILTER_OPTIONS,
+} from '../../lib/mpRecruitment/roleHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
+import { getWorkIdentity, WORK_EDITION_LABEL, workIdentityLabel } from '../../lib/mpWorkIdentity'
+import { getActiveRole } from '../../lib/mpSession'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
@@ -22,11 +30,15 @@ type Props = { prMode?: boolean }
 
 export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const goDetail = useRecruitmentNav()
+  const role = getActiveRole()
+  const workId = getWorkIdentity()
+  const hallIdentity = prMode || role === 'pr' ? 'pr' : workId
   const [hallTab, setHallTab] = useState<HallTab>('normal')
   const [paichianSubTab, setPaichianSubTab] = useState<PaichianSubTab>('shoot')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+  const [filterStatus, setFilterStatus] = useState('全部')
   const [priceSelected, setPriceSelected] = useState<string[]>([])
   const [priceFilterLabel, setPriceFilterLabel] = useState('价格筛选')
   const [showPriceSheet, setShowPriceSheet] = useState(false)
@@ -56,14 +68,33 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
       if (!hallFilters.matchCity(r.region, r.storeName, filterCity)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
+      if (!matchStatusLabel(r, filterStatus)) return false
       return true
     })
-    rows = listFilters.sortRecruitmentRows(rows, sortBy)
+    if (hallTab === 'normal' && filterStatus === '全部' && sortBy === '发布时间') {
+      rows = prioritizeActiveStatus(rows)
+    } else {
+      rows = listFilters.sortRecruitmentRows(rows, sortBy)
+    }
     const base = rows.map((r) => ({ ...r, ...recruitmentAi.fallbackTagForRow(r), aiTagSource: 'local' }))
     setDisplayRows(base)
     const enriched = await recruitmentAi.enrichOrderTags(base)
     setDisplayRows(enriched)
-  }, [hallTab, paichianSubTab, urgentRows, shootRows, editRows, iceRows, normalRows, searchKeyword, filterPlatform, filterCity, priceSelected, sortBy])
+  }, [
+    hallTab,
+    paichianSubTab,
+    urgentRows,
+    shootRows,
+    editRows,
+    iceRows,
+    normalRows,
+    searchKeyword,
+    filterPlatform,
+    filterCity,
+    filterStatus,
+    priceSelected,
+    sortBy,
+  ])
 
   useEffect(() => {
     void applyFilters()
@@ -75,22 +106,32 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       setErr('')
       try {
         const reg = await fetchMpRegistry()
+        const mapped = loadAllOrderRows(reg)
         const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
-          splitHallRows(reg)
-        setNormalRows(n)
+          splitRoleHallRows(mapped, hallIdentity)
+        const normal = n.length > 0 ? n : hallIdentity === 'pr' ? [] : []
+        setNormalRows(normal.length ? normal : hallIdentity === 'talent' ? [listFilters.buildMockRecruitmentRow()] : [])
         setUrgentRows(u)
         setShootRows(sh)
         setEditRows(ed)
         setIceRows(i)
         setTodayCount(tc)
         setCityFilters(hallFilters.buildCityFilterOptions([...n, ...u, ...sh, ...ed, ...i]))
+        if (hallIdentity === 'edit') setPaichianSubTab('edit')
+        else if (hallIdentity === 'shoot') setPaichianSubTab('shoot')
+        else if (hallIdentity === 'talent' && !sh.length && !ed.length && i.length) setPaichianSubTab('ice')
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [hallIdentity])
+
+  const roleHint =
+    hallIdentity === 'pr'
+      ? 'PR 视角 · 全部开放商单'
+      : `${WORK_EDITION_LABEL[hallIdentity]} · ${workIdentityLabel(hallIdentity)}招募 + 云剪任务`
 
   const tabs: { id: HallTab; label: string; count: number }[] = [
     { id: 'normal', label: '招募大厅', count: normalRows.length },
@@ -110,14 +151,14 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold">招募大厅</h2>
-        <p className="text-sm text-slate-400 mt-1">
-          {prMode ? 'PR 视角 · 全部开放商单' : '与小程序首页大厅同源'} · 今日 {todayCount} 条
+        <h2 className="text-xl font-bold text-[var(--shell-text)]">招募大厅</h2>
+        <p className="text-sm text-[var(--shell-muted)] mt-1">
+          {roleHint} · 今日 {todayCount} 条
         </p>
       </div>
 
       <input
-        className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"
+        className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
         placeholder="搜索招募、门店、城市"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
@@ -128,9 +169,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           <button
             key={t.id}
             type="button"
-            className={`px-3 py-1.5 rounded-lg text-sm ${
-              hallTab === t.id ? 'bg-violet-600 text-white' : 'bg-white/5 text-slate-400'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-sm ${hallTab === t.id ? 'panel-tab-active' : 'panel-tab'}`}
             onClick={() => setHallTab(t.id)}
           >
             {t.label}
@@ -145,9 +184,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             <button
               key={t.id}
               type="button"
-              className={`px-3 py-1.5 rounded-full text-sm ${
-                paichianSubTab === t.id ? 'bg-violet-600/80 text-white' : 'bg-white/5 text-slate-400'
-              }`}
+              className={`px-3 py-1.5 rounded-full text-sm ${paichianSubTab === t.id ? 'panel-tab-active' : 'panel-tab'}`}
               onClick={() => setPaichianSubTab(t.id)}
             >
               {t.label}
@@ -159,7 +196,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
 
       <div className="flex flex-wrap gap-2 text-sm">
         <select
-          className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5"
+          className="rounded-lg panel-select px-2 py-1.5"
           value={filterPlatform}
           onChange={(e) => setFilterPlatform(e.target.value)}
         >
@@ -170,7 +207,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           ))}
         </select>
         <select
-          className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5"
+          className="rounded-lg panel-select px-2 py-1.5"
           value={filterCity}
           onChange={(e) => setFilterCity(e.target.value)}
         >
@@ -180,15 +217,28 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             </option>
           ))}
         </select>
+        <select
+          className="rounded-lg panel-select px-2 py-1.5"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          {STATUS_FILTER_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s === '全部' ? '招募单状态' : s}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
-          className={`rounded-lg border px-2 py-1.5 ${priceSelected.length ? 'border-violet-500 text-violet-300' : 'border-white/10'}`}
+          className={`rounded-lg border px-2 py-1.5 ${
+            priceSelected.length ? 'border-violet-500 text-violet-500' : 'border-[var(--shell-border)]'
+          }`}
           onClick={() => setShowPriceSheet(true)}
         >
           {priceFilterLabel}
         </button>
         <select
-          className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5"
+          className="rounded-lg panel-select px-2 py-1.5"
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
         >
@@ -200,8 +250,8 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
         </select>
       </div>
 
-      {loading ? <p className="text-slate-400">加载招募中…</p> : null}
-      {err ? <p className="text-red-400 text-sm whitespace-pre-wrap">{err}</p> : null}
+      {loading ? <p className="text-[var(--shell-muted)]">加载招募中…</p> : null}
+      {err ? <p className="text-red-500 text-sm whitespace-pre-wrap">{err}</p> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         {displayRows.map((o) => (
@@ -212,18 +262,21 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           />
         ))}
       </div>
-      {!loading && !displayRows.length ? <p className="text-slate-500">暂无匹配招募</p> : null}
+      {!loading && !displayRows.length ? <p className="text-[var(--shell-muted)]">暂无匹配招募</p> : null}
 
       {showPriceSheet ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4" onClick={() => setShowPriceSheet(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-[#1a1a28] p-4 border border-white/10" onClick={(e) => e.stopPropagation()}>
-            <p className="font-medium mb-3">价格筛选（可多选）</p>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--panel-overlay)] p-4"
+          onClick={() => setShowPriceSheet(false)}
+        >
+          <div className="w-full max-w-md rounded-2xl panel-card p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="font-medium mb-3 text-[var(--shell-text)]">价格筛选（可多选）</p>
             <div className="flex flex-wrap gap-2">
               {hallFilters.priceBucketsForView(priceSelected).map((b) => (
                 <button
                   key={b.id}
                   type="button"
-                  className={`px-3 py-1.5 rounded-full text-sm ${b.selected ? 'bg-violet-600' : 'bg-white/10'}`}
+                  className={`px-3 py-1.5 rounded-full text-sm ${b.selected ? 'panel-tab-active' : 'panel-tab'}`}
                   onClick={() => setPriceSelected(hallFilters.togglePriceId(priceSelected, b.id))}
                 >
                   {b.label}
@@ -231,12 +284,12 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
               ))}
             </div>
             <div className="flex gap-2 mt-4">
-              <button type="button" className="flex-1 py-2 rounded-lg border border-white/10" onClick={() => setPriceSelected([])}>
+              <button type="button" className="flex-1 py-2 rounded-lg border border-[var(--shell-border)]" onClick={() => setPriceSelected([])}>
                 清空
               </button>
               <button
                 type="button"
-                className="flex-1 py-2 rounded-lg bg-violet-600"
+                className="flex-1 py-2 rounded-lg panel-tab-active"
                 onClick={() => {
                   setPriceFilterLabel(hallFilters.priceFilterLabel(priceSelected))
                   setShowPriceSheet(false)

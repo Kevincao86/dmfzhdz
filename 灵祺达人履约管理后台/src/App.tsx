@@ -6,7 +6,6 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import HallPage from './pages/HallPage'
 import OrdersPage from './pages/OrdersPage'
-import RecommendTalentPage from './pages/RecommendTalentPage'
 import MessagesPage from './pages/MessagesPage'
 import ProfilePage from './pages/ProfilePage'
 import TalentProfilePage from './pages/TalentProfilePage'
@@ -48,7 +47,7 @@ export default function App() {
         <Route path="/hall" element={<HallPage />} />
         <Route path="/recruitment/:id" element={<RecruitmentDetailPage />} />
         <Route path="/recruitment/:id/apply" element={<RecruitmentApplyPage />} />
-        <Route path="/recommend-talent" element={<RecommendTalentPage />} />
+        <Route path="/recommend-talent" element={<Navigate to="/hall?tab=recommend" replace />} />
         <Route path="/publish" element={<PublishPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/edit" element={<TemplateEditPage />} />

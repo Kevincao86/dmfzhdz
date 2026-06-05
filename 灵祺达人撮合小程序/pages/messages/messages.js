@@ -39,7 +39,7 @@ Page({
       this.setData({
         identityHint: 'PR · 与达人私信',
         emptyTitle: '暂无达人会话',
-        emptyHint: '在「推荐达人」页点击「沟通」向达人发起私信',
+        emptyHint: '在「推荐大厅」页点击「沟通」向达人发起私信',
       })
     } else {
       this.setData({

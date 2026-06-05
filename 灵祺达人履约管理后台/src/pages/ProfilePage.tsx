@@ -18,7 +18,7 @@ export default function ProfilePage() {
       <h2 className="text-xl font-bold">我的</h2>
 
       <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
-        <h3 className="text-sm font-semibold text-slate-300 mb-3">工作台身份（与小程序「我的」一致）</h3>
+        <h3 className="text-sm font-semibold text-slate-300 mb-3">工作台身份</h3>
         <div className="flex flex-wrap gap-2">
           {WORK_IDS.map((id) => (
             <button
@@ -49,9 +49,6 @@ export default function ProfilePage() {
           <dt className="text-slate-500">PR ID</dt>
           <dd className="text-amber-400 font-mono">{acc?.lingqiPrId || pr?.lingqiPrId || '—'}</dd>
         </div>
-        <p className="text-xs text-slate-500 pt-2 border-t border-white/10">
-          与小程序共用 localStorage（meoo_talent_member_v1、meoo_pr_profile_v1 等），同一浏览器下数据互通。
-        </p>
       </dl>
 
       {role === 'talent' ? (

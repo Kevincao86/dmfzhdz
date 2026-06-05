@@ -1,11 +1,66 @@
 @import 'tailwindcss';
 
+:root,
+[data-theme='dark'] {
+  --app-bg: #0f0f14;
+  --app-text: #e8e6f0;
+  --shell-sidebar-bg: #141422;
+  --shell-main-bg: #0f0f14;
+  --shell-border: rgba(255, 255, 255, 0.1);
+  --shell-text: #f1f5f9;
+  --shell-muted: #94a3b8;
+  --shell-hover: rgba(255, 255, 255, 0.05);
+  --panel-card: rgba(0, 0, 0, 0.3);
+  --panel-sheet: #1a1a28;
+  --panel-overlay: rgba(0, 0, 0, 0.6);
+  --embed-text-primary: #f8fafc;
+  --embed-text-secondary: #e2e8f0;
+  --embed-text-muted: #cbd5e1;
+  --embed-text-accent: #c7d2fe;
+}
+
+[data-theme='light'] {
+  --app-bg: #f0f2f5;
+  --app-text: #1e293b;
+  --shell-sidebar-bg: #ffffff;
+  --shell-main-bg: #f0f2f5;
+  --shell-border: #e2e8f0;
+  --shell-text: #0f172a;
+  --shell-muted: #64748b;
+  --shell-hover: #f1f5f9;
+  --panel-card: #ffffff;
+  --panel-sheet: #ffffff;
+  --panel-overlay: rgba(15, 23, 42, 0.35);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   font-family: 'Noto Sans SC', system-ui, sans-serif;
-  background: #0f0f14;
-  color: #e8e6f0;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.panel-input,
+.panel-select {
+  background: var(--panel-card);
+  border: 1px solid var(--shell-border);
+  color: var(--app-text);
+}
+
+.panel-tab {
+  background: var(--shell-hover);
+  color: var(--shell-muted);
+}
+
+.panel-tab-active {
+  background: rgb(124 58 237);
+  color: #fff;
+}
+
+.panel-card {
+  background: var(--panel-card);
+  border: 1px solid var(--shell-border);
 }
 
 @keyframes hero-crossfade {

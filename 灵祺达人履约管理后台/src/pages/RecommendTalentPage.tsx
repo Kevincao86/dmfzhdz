@@ -1,8 +1,6 @@
 import { Navigate } from 'react-router-dom'
-import RecommendTalentPanel from '../components/mp/RecommendTalentPanel'
-import { getActiveRole } from '../lib/mpSession'
 
+/** @deprecated 已合并至招募大厅 · 推荐大厅 Tab */
 export default function RecommendTalentPage() {
-  if (getActiveRole() !== 'pr') return <Navigate to="/hall" replace />
-  return <RecommendTalentPanel />
+  return <Navigate to="/hall?tab=recommend" replace />
 }

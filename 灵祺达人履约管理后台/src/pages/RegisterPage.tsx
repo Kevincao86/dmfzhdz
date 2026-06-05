@@ -117,7 +117,7 @@ export default function RegisterPage() {
         className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-xl backdrop-blur-xl space-y-4"
       >
         <h1 className="text-xl font-bold">注册 · {WORK_EDITION_LABEL[workIdentity]}</h1>
-        <p className="text-sm text-slate-500">手机号作为登录账号，与小程序账号互通</p>
+        <p className="text-sm text-slate-500">手机号将作为您的登录账号</p>
 
         <label className="block text-sm">
           <span className="text-slate-600">手机号</span>

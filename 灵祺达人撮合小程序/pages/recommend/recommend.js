@@ -8,6 +8,9 @@ const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const orderCard = require('../../utils/recruitmentOrderCard.js')
 const recruitmentAi = require('../../utils/recruitmentAiTags.js')
+const hallIdentity = require('../../utils/hallIdentityBuckets.js')
+const identityTypes = require('../../utils/identityTypes.js')
+const prBoard = require('../../utils/prRecommendBoard.js')
 const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
 const participant = require('../../utils/participant.js')
@@ -35,16 +38,27 @@ const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食',
 const GENDER_FILTERS = ['全部', '男', '女']
 const STATUS_FILTERS = ['全部', '已沟通', '已收藏']
 const ORDER_SEGMENTS = [
-  { id: 'match', label: '为你匹配' },
+  { id: 'match', label: '智能匹配' },
   { id: 'quality', label: '优质' },
   { id: 'hot', label: '热门全国' },
-  { id: 'city', label: '同城匹配' },
+  { id: 'city', label: '同城' },
 ]
 
-const TALENT_SEGMENTS = [
-  { id: 'ai', label: '智能匹配' },
-  { id: 'all', label: '全部达人' },
-]
+function orderMatchHint(identity, talentCity) {
+  const label = identityTypes.workIdentityLabel(identity)
+  if (identity === 'shoot') {
+    return '已识别为拍摄团队 · 按标签与接单习惯匹配拍摄招募与云剪'
+  }
+  if (identity === 'edit') {
+    return '已识别为剪辑团队 · 按标签与接单习惯匹配剪辑招募与云剪'
+  }
+  if (identity === 'talent') {
+    return talentCity
+      ? `已识别为${label} · 按您的标签与报名习惯智能匹配，匹配分从高到低`
+      : '完善资料后，AI 将按标签与报名习惯为您匹配商单'
+  }
+  return ''
+}
 
 function readTalentCity() {
   const m = memberStore.readMember()
@@ -248,8 +262,10 @@ Page({
     allOrderRows: [],
     orderDisplayRows: [],
     orderEmptyHint: '',
-    talentSegment: 'ai',
-    talentSegments: TALENT_SEGMENTS,
+    prBoard: 'talent',
+    prBoardSegments: prBoard.PR_BOARD_SEGMENTS,
+    prBoardOrderCount: 0,
+    prSearchPlaceholder: '搜索达人昵称、ID',
     prOrderCount: 0,
     prMatchHint: '',
     registryCache: null,
@@ -289,14 +305,16 @@ Page({
     }
     this.setData({
       identity,
+      identityLabel: identityTypes.workIdentityLabel(identity),
       isPrMode,
       talentTestMode,
       talentTestHint,
       talentCity,
-      orderCityHint: talentCity
-        ? '已按您的资料智能匹配商单，高契合优先展示'
-        : '完善达人资料后，AI将根据您的信息为您匹配并置顶符合高契合度商单',
-      prMatchHint: talentTestMode ? talentTestHint : '',
+      orderCityHint: orderMatchHint(identity, talentCity),
+      prMatchHint: talentTestMode
+        ? talentTestHint
+        : prBoard.boardMatchHint('talent', 0),
+      prSearchPlaceholder: prBoard.boardSearchPlaceholder('talent'),
     })
     if (userProfile.readIdentity() === 'pr') {
       this._favoriteTalentIds = loadFavoriteIdSet()
@@ -321,53 +339,28 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const reg = await ops.fetchRegistry()
-      const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
-      const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
-      const fromLib = library.map((e) => {
-        const raw = Number(e.followers) || 0
-        return formatTalent({
-          ...e,
-          id: e.id,
-          qualityTag: raw >= 50000 ? '优质' : '推荐',
-          gender: e.gender,
-        })
-      })
-      const fromMembersEnriched = members.map((m) => {
-        const primary = memberStore.primaryPlatformProfile(m)
-        const p = (primary && primary.profile) || {}
-        const raw = Number(p.followers) || 0
-        const tags = Array.isArray(p.accountTags) ? [...p.accountTags] : []
-        return formatTalent({
-          id: m.id,
-          platformNickname: p.platformNickname || m.wxNickName,
-          wxAvatarUrl: m.wxAvatarUrl,
-          platform: (primary && primary.platform) || '抖音',
-          followers: raw,
-          province: m.province,
-          city: m.city,
-          qualityTag: '会员',
-          gender: m.gender,
-          accountTags: tags,
-          douyinSalesLevel: p.douyinSalesLevel || '',
-        })
-      })
-      let merged = [...fromLib, ...fromMembersEnriched].sort(
-        (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0),
-      )
-      merged = prependSelfTalentTest(merged)
-      const prPacks = recruitmentAi.resolvePrRecentOrders(reg)
-      const prOrderCount = prPacks.length
-      let prMatchHint = '发招募后，将按您的招募要求智能推荐达人'
-      if (prOrderCount > 0) {
-        prMatchHint = `已根据您最近 ${prOrderCount} 条发单要求智能匹配达人`
+      const board = this.data.prBoard || 'talent'
+      this._boardPools = {
+        talent: prBoard.buildBoardPool(reg, 'talent'),
+        shoot: prBoard.buildBoardPool(reg, 'shoot'),
+        edit: prBoard.buildBoardPool(reg, 'edit'),
       }
+      const pool = this._boardPools[board] || []
+      const prBoardOrderCount = prBoard.countPrOrdersForBoard(reg, board)
+      const prOrderCount = recruitmentAi.resolvePrRecentOrders(reg).length
+      const rowsForCity = [
+        ...this._boardPools.talent,
+        ...this._boardPools.shoot,
+        ...this._boardPools.edit,
+      ]
       this.setData({
-        allRows: merged.slice(0, 50),
-        cityFilters: hallFilters.buildCityFilterOptions(merged),
+        allRows: pool,
+        cityFilters: hallFilters.buildCityFilterOptions(rowsForCity),
         prOrderCount,
-        prMatchHint,
+        prBoardOrderCount,
+        prMatchHint: prBoard.boardMatchHint(board, prBoardOrderCount),
+        prSearchPlaceholder: prBoard.boardSearchPlaceholder(board),
         registryCache: reg,
-        talentSegment: prOrderCount > 0 ? 'ai' : 'all',
         loading: false,
       })
       if (userProfile.readIdentity() === 'pr') await this.refreshMutualChatKeys()
@@ -396,10 +389,14 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const reg = await ops.fetchRegistry()
-      let rows = orderCard.loadOpenOrderRows(reg)
+      const identity = userProfile.readIdentity()
+      let rows = orderCard.loadOpenOrderRows(reg).filter((r) =>
+        hallIdentity.orderMatchesIdentity(r, identity),
+      )
       if (allowDemo) {
-        if (!rows.length) rows = mocks
-        else rows = [...mocks, ...rows]
+        const demoFiltered = mocks.filter((r) => hallIdentity.orderMatchesIdentity(r, identity))
+        if (!rows.length) rows = demoFiltered
+        else rows = [...demoFiltered, ...rows]
       }
       this.setData({
         allOrderRows: rows,
@@ -417,6 +414,9 @@ Page({
     }
   },
   async applyTalentFilters() {
+    const board = this.data.prBoard || 'talent'
+    const pool =
+      (this._boardPools && this._boardPools[board]) || this.data.allRows || []
     const f = {
       platform: this.data.filterPlatform,
       city: this.data.filterCity,
@@ -424,18 +424,19 @@ Page({
       gender: this.data.filterGender,
     }
     const kw = String(this.data.searchKeyword || '').trim()
-    const segment = this.data.talentSegment
-    let filtered = this.data.allRows.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+    let filtered = pool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
 
     const token = Date.now()
     this._talentFilterToken = token
 
-    if (segment === 'ai' && this.data.prOrderCount > 0 && this.data.registryCache && filtered.length) {
+    if (this.data.prBoardOrderCount > 0 && this.data.registryCache && filtered.length) {
       wx.showLoading({ title: '智能匹配中…', mask: false })
       try {
-        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache)
+        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
+          board,
+        })
       } catch (_) {
-        const packs = recruitmentAi.resolvePrRecentOrders(this.data.registryCache)
+        const packs = recruitmentAi.resolvePrRecentOrders(this.data.registryCache, { board })
         const payloads = packs.map((p) => p.payload)
         filtered = filtered.map((t) => {
           const fb = recruitmentAi.fallbackTalentScore(t, payloads)
@@ -452,34 +453,29 @@ Page({
         wx.hideLoading()
       }
       if (this._talentFilterToken !== token) return
-      filtered = filtered.filter((t) => (t.matchScore || 0) >= 45)
-    } else if (segment === 'ai' && !this.data.prOrderCount) {
-      filtered = filtered
-        .slice()
-        .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      const matched = filtered.filter((t) => (t.matchScore || 0) >= 45)
+      filtered = matched.length ? matched : filtered
     } else {
       filtered = filtered
         .slice()
         .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     }
 
+    if (board === 'talent' && this.data.talentTestMode) {
+      filtered = prependSelfTalentTest(filtered)
+    }
+
     const showPreview =
-      !kw && segment === 'ai' && !this.data.prOrderCount && filtered.length === 0
+      !kw && !this.data.prBoardOrderCount && filtered.length === 0 && board === 'talent'
     let displayRows = filtered.slice(0, 50)
     if (showPreview) {
       displayRows = [MOCK_PREVIEW]
     }
     let listEmptyHint = ''
     if (displayRows.length === 0) {
-      if (segment === 'ai' && this.data.prOrderCount > 0) {
-        listEmptyHint = kw ? `未找到「${kw}」相关达人` : '暂无高匹配达人，可切换「全部达人」或调整筛选'
-      } else {
-        listEmptyHint = kw ? `未找到「${kw}」相关达人` : '筛选后暂无更多达人'
-      }
+      listEmptyHint = prBoard.boardEmptyHint(board, kw, this.data.prBoardOrderCount > 0)
     } else if (showPreview && displayRows.length === 1 && displayRows[0].isPreview) {
       listEmptyHint = '发招募后可在此查看 AI 匹配的达人'
-    } else if (segment === 'ai' && this.data.prOrderCount > 0 && displayRows.length > 0) {
-      listEmptyHint = ''
     }
     if (userProfile.readIdentity() === 'pr') {
       if (!this._favoriteTalentIds) this._favoriteTalentIds = loadFavoriteIdSet()
@@ -495,20 +491,31 @@ Page({
     }
     this.setData({ displayRows, listEmptyHint })
   },
-  onTalentSegment(e) {
+  onPrBoard(e) {
     const id = e.currentTarget.dataset.id
-    if (!id || id === this.data.talentSegment) return
-    this.setData({ talentSegment: id })
+    if (!id || id === this.data.prBoard) return
+    const pool = (this._boardPools && this._boardPools[id]) || []
+    const reg = this.data.registryCache
+    const prBoardOrderCount = reg ? prBoard.countPrOrdersForBoard(reg, id) : 0
+    this.setData({
+      prBoard: id,
+      allRows: pool,
+      prBoardOrderCount,
+      prMatchHint: prBoard.boardMatchHint(id, prBoardOrderCount),
+      prSearchPlaceholder: prBoard.boardSearchPlaceholder(id),
+    })
     this.applyTalentFilters()
   },
   async applyOrderFilters() {
     const segment = this.data.orderSegment
     const talentCity = this.data.talentCity
+    const identity = this.data.identity || userProfile.readIdentity()
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
     const cf = this.data.filterCity
     const priceSel = this.data.priceSelected
     let rows = (this.data.allOrderRows || []).filter((r) => {
+      if (!hallIdentity.orderMatchesIdentity(r, identity)) return false
       if (!matchOrderSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
       if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
@@ -519,34 +526,37 @@ Page({
     let real = rows.filter((r) => r && !r.isMock)
     const mocks = showDemoOrders() ? rows.filter((r) => r && r.isMock) : []
     const member = memberStore.readMember()
-    if (member && api.hasApi() && real.length) {
-      real = await recruitmentAi.enrichOrderMatches(real, member)
+    if (api.hasApi() && real.length) {
+      real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
     } else {
-      real = real.map((r) => ({
-        ...r,
-        ...recruitmentAi.fallbackTagForRow(r, talentCity),
-        matchScore: 0,
-        aiTagSource: 'local',
-      }))
+      real = real
+        .map((r) => ({
+          ...r,
+          ...recruitmentAi.fallbackTagForRow(r, talentCity),
+          matchScore: 0,
+          aiTagSource: 'local',
+        }))
+        .sort((a, b) => (b.publishedAtMs || 0) - (a.publishedAtMs || 0))
     }
-    const highMatch = real.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
-    const highIds = new Set(highMatch.map((r) => r.id))
-    const otherReal = real.filter((r) => !highIds.has(r.id))
-    rows = [...highMatch, ...otherReal, ...mocks]
-    if (segment === 'hot' && !member) {
-      real.sort((a, b) => {
-        const d = (b.applicantCount || 0) - (a.applicantCount || 0)
-        if (d !== 0) return d
-        return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
-      })
-      rows = [...real, ...mocks]
-    } else if (segment === 'quality' && !member) {
-      real = listFilters.sortRecruitmentRows(real, '价格从高到低')
-      rows = [...real, ...mocks]
-    } else if (!member && segment !== 'match') {
-      real = listFilters.sortRecruitmentRows(real, '发布时间')
-      rows = [...real, ...mocks]
+    const enrichedAll = real
+    if (segment === 'match' && enrichedAll.length) {
+      const matched = enrichedAll.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
+      real = matched.length ? matched : enrichedAll
     }
+    real.sort((a, b) => {
+      const d = (b.matchScore || 0) - (a.matchScore || 0)
+      if (d !== 0) return d
+      if (segment === 'hot') {
+        const h = (b.applicantCount || 0) - (a.applicantCount || 0)
+        if (h !== 0) return h
+      }
+      if (segment === 'quality') {
+        const p = (b.priceAmount || 0) - (a.priceAmount || 0)
+        if (p !== 0) return p
+      }
+      return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+    })
+    rows = [...real, ...mocks]
     let orderEmptyHint = ''
     if (!rows.length) {
       if (segment === 'city' && !talentCity) orderEmptyHint = '请先在「我的」完善城市信息'

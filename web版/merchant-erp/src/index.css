@@ -6,6 +6,12 @@ body,
   height: 100%;
 }
 
+:root {
+  --embed-text-primary: #1f2937;
+  --embed-text-secondary: #374151;
+  --embed-text-muted: #6b7280;
+}
+
 body {
   margin: 0;
   font-family:
@@ -26,8 +32,10 @@ body {
   }
 
   .erp-page-title {
-    @apply text-2xl font-bold tracking-tight text-slate-900;
+    @apply text-2xl font-bold tracking-tight;
+    color: var(--embed-text-primary);
   }
+
 
   .erp-main-surface {
     background:

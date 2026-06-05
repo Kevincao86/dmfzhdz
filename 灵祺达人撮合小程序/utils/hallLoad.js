@@ -8,6 +8,8 @@ const registryCache = require('./registryCache.js')
 const listFilters = require('./recruitmentListFilters.js')
 const hallFilters = require('./recruitmentHallFilters.js')
 const orderCard = require('./recruitmentOrderCard.js')
+const hallIdentity = require('./hallIdentityBuckets.js')
+const userProfile = require('./userProfile.js')
 
 const LOAD_MS = 22000
 const WATCHDOG_MS = 14000
@@ -21,33 +23,28 @@ function errHint(msg) {
   return m.slice(0, 120) || '加载失败，请下拉刷新'
 }
 
-function mapRegistryToRows(reg) {
+function mapRegistryToRows(reg, identity) {
   const mpList = Array.isArray(reg && reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
+  const workIdentity = identity || userProfile.readIdentity()
   const mapped = []
-  for (const mp of openList) {
+  for (const mp of mpList) {
+    if (!mp || !mp.id) continue
     try {
       mapped.push(orderCard.mapMpOrderRow(mp, reg))
     } catch (e) {
       console.warn('[hallLoad] skip bad order', mp && mp.id, e)
     }
   }
-  const shootRows = mapped.filter((r) => r.recruitTarget === 'shoot')
-  const editRows = mapped.filter((r) => r.recruitTarget === 'edit')
-  const iceRows = mapped.filter((r) => r.isIce)
-  const urgentRows = mapped.filter((r) => r.urgent && !r.isIce && r.recruitTarget === 'talent')
-  const hallNonIce = mapped.filter((r) => !r.isIce && r.recruitTarget === 'talent')
-  const normalRows = listFilters.mergeHallDisplayRows(hallNonIce, {
+  const buckets = hallIdentity.bucketOrdersForIdentity(mapped, workIdentity, {
     allowDemo: showDemoOrders(),
   })
+  const identityPool = mapped.filter((r) => hallIdentity.orderMatchesIdentity(r, workIdentity))
+  const todayCount = identityPool.filter((r) => listFilters.isMpOrderRecruiting(r.status)).length
   return {
-    normalRows,
-    urgentRows,
-    shootRows,
-    editRows,
-    iceRows,
-    cityFilters: hallFilters.buildCityFilterOptions(mapped),
-    todayCount: openList.length,
+    ...buckets,
+    workIdentity,
+    cityFilters: hallFilters.buildCityFilterOptions(identityPool),
+    todayCount,
   }
 }
 

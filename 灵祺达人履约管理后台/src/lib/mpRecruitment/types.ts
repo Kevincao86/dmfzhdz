@@ -15,6 +15,7 @@ export type RecruitmentOrderRow = {
   title: string
   merchantName: string
   storeName: string
+  mpStatus?: string
   statusLabel: string
   platform: string
   region: string

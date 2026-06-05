@@ -2,6 +2,9 @@ const api = require('./api.js')
 const memberStore = require('./talentMember.js')
 const applicationsStore = require('./applicationsStore.js')
 const orderCard = require('./recruitmentOrderCard.js')
+const { isIceMpOrder } = require('./recruitmentUrgent.js')
+const userProfile = require('./userProfile.js')
+const identityTypes = require('./identityTypes.js')
 
 const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v1'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v1'
@@ -51,10 +54,42 @@ function orderAiPayload(row) {
     category: row.category,
     budgetText: row.budgetText,
     fansRequirement: row.fansRequirement,
+    recruitTarget: row.recruitTarget || 'talent',
     hall: hallKey(row),
     urgent: !!row.urgent,
     isIce: !!row.isIce,
     summary: row.summary || '',
+  }
+}
+
+function applicationHabitsFromStore() {
+  const apps = applicationsStore.readApplications().slice(0, 40)
+  const platforms = {}
+  const regions = {}
+  const categories = {}
+  let iceCount = 0
+  let urgentCount = 0
+  for (const a of apps) {
+    const p = String(a.platform || '').trim()
+    if (p) platforms[p] = (platforms[p] || 0) + 1
+    const r = String(a.region || a.city || '').trim()
+    if (r) regions[r] = (regions[r] || 0) + 1
+    const c = String(a.category || '').trim()
+    if (c) categories[c] = (categories[c] || 0) + 1
+    if (a.isIce) iceCount += 1
+    if (a.urgent) urgentCount += 1
+  }
+  const top = (obj) =>
+    Object.keys(obj)
+      .sort((x, y) => (obj[y] || 0) - (obj[x] || 0))
+      .slice(0, 5)
+  return {
+    recentApplyCount: apps.length,
+    preferredPlatforms: top(platforms),
+    preferredRegions: top(regions),
+    preferredCategories: top(categories),
+    iceApplyRatio: apps.length ? Math.round((iceCount / apps.length) * 100) : 0,
+    urgentApplyRatio: apps.length ? Math.round((urgentCount / apps.length) * 100) : 0,
   }
 }
 
@@ -114,15 +149,21 @@ async function fetchTagItems(orders) {
   return map
 }
 
-function talentProfileFromMember(member) {
-  if (!member) return null
-  const primary = memberStore.primaryPlatformProfile(member)
+function talentProfileFromMember(member, opts) {
+  const identity =
+    (opts && opts.workIdentity) || userProfile.readIdentity() || 'talent'
+  const habits = (opts && opts.applicationHabits) || applicationHabitsFromStore()
+  const primary = member ? memberStore.primaryPlatformProfile(member) : null
   const prof = (primary && primary.profile) || {}
-  const city = String(member.city || '').trim()
-  const province = String(member.province || '').trim()
+  const city = String((member && member.city) || '').trim()
+  const province = String((member && member.province) || '').trim()
   return {
+    workIdentity: identity,
+    role: identity,
+    roleLabel: identityTypes.workIdentityLabel(identity),
+    recruitTarget: identityTypes.primaryRecruitTargetForIdentity(identity),
     platform: (primary && primary.platform) || '',
-    nickname: prof.platformNickname || member.wxNickName || '',
+    nickname: prof.platformNickname || (member && member.wxNickName) || '',
     followers: prof.followers || '',
     city,
     province,
@@ -130,14 +171,24 @@ function talentProfileFromMember(member) {
     accountTags: Array.isArray(prof.accountTags) ? prof.accountTags : [],
     douyinSalesLevel: prof.douyinSalesLevel || '',
     quotePrice: prof.quotePrice || '',
+    applicationHabits: habits,
   }
 }
 
 function talentCacheSuffix(talent) {
   if (!talent) return 'guest'
-  return [talent.platform, talent.nickname, talent.city, (talent.accountTags || []).join(',')]
+  const habits = talent.applicationHabits || {}
+  return [
+    talent.workIdentity || talent.role || 'talent',
+    talent.platform,
+    talent.nickname,
+    talent.city,
+    (talent.accountTags || []).join(','),
+    habits.recentApplyCount || 0,
+    (habits.preferredPlatforms || []).join(','),
+  ]
     .join('|')
-    .slice(0, 120)
+    .slice(0, 160)
 }
 
 async function fetchMatchItems(orders, talent) {
@@ -217,12 +268,21 @@ async function enrichOrderTags(rows, opts) {
   return applyTagMap(list, map, talentCity)
 }
 
-async function enrichOrderMatches(rows, member) {
+async function enrichOrderMatches(rows, member, opts) {
   const list = (rows || []).filter((r) => r && r.id && !r.isMock)
-  const talent = talentProfileFromMember(member)
+  const habits = applicationHabitsFromStore()
+  const talent = talentProfileFromMember(member, {
+    workIdentity: opts && opts.workIdentity,
+    applicationHabits: habits,
+  })
   const talentCity = talent && talent.city ? talent.city : ''
   if (!api.hasApi() || !list.length) {
-    return applyMatchMap(list, {}, talentCity)
+    const local = applyMatchMap(list, {}, talentCity)
+    return local.sort((a, b) => {
+      const d = (b.matchScore || 0) - (a.matchScore || 0)
+      if (d !== 0) return d
+      return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+    })
   }
 
   const suffix = talentCacheSuffix(talent)
@@ -235,7 +295,7 @@ async function enrichOrderMatches(rows, member) {
     if (bucket[ck]) map[row.id] = bucket[ck]
     else missing.push(row)
   }
-  if (missing.length && talent) {
+  if (missing.length) {
     const fresh = await fetchMatchItems(missing, talent)
     for (const row of missing) {
       const ck = `${row.id}:${hallKey(row)}`
@@ -268,8 +328,18 @@ function prOrderAiPayload(mp, row) {
   }
 }
 
-/** PR 本地发单 + 注册表，取最近开放中的招募单（最多 6 条） */
-function resolvePrRecentOrders(reg) {
+function orderMatchesPrBoard(row, mp, board) {
+  if (!row) return false
+  const target = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+  if (row.recruitTarget === target) return true
+  if (board === 'edit' && row.isIce) return true
+  if (board === 'talent' && mp && isIceMpOrder(mp)) return false
+  return false
+}
+
+/** PR 本地发单 + 注册表，取最近开放中的招募单（最多 6 条），可按板块筛选 */
+function resolvePrRecentOrders(reg, opts) {
+  const board = (opts && opts.board) || (opts && opts.recruitTarget) || 'talent'
   const local = applicationsStore.readPublishedOrders()
   const mpList = Array.isArray(reg?.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const out = []
@@ -279,6 +349,7 @@ function resolvePrRecentOrders(reg) {
     if (!mp) continue
     if (mp.status !== 'open' && mp.status !== 'collecting') continue
     const row = orderCard.mapMpOrderRow(mp, reg)
+    if (board && !orderMatchesPrBoard(row, mp, board)) continue
     out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
     if (out.length >= 6) break
   }
@@ -391,9 +462,9 @@ function applyTalentMatchMap(talents, map, orderPayloads) {
   })
 }
 
-async function enrichTalentMatchesForPr(talents, reg) {
+async function enrichTalentMatchesForPr(talents, reg, opts) {
   const list = (talents || []).filter((t) => t && t.id && !t.isPreview)
-  const packs = resolvePrRecentOrders(reg)
+  const packs = resolvePrRecentOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
   if (!orderPayloads.length) {
     return list.map((t) => ({
@@ -443,7 +514,9 @@ module.exports = {
   enrichOrderMatches,
   enrichTalentMatchesForPr,
   resolvePrRecentOrders,
+  orderMatchesPrBoard,
   fallbackTagForRow,
   fallbackTalentScore,
   talentProfileFromMember,
+  applicationHabitsFromStore,
 }
