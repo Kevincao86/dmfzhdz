@@ -24,6 +24,8 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
 本地 dev 在 5176 端口内置商家 `/api` 网关（`merchantApiMock` 等），环境变量从 `web版/merchant-erp/.env*` 读取。  
 「AI 文章与话题」需商家抖音来客 token（`meoo_douyin_merchant_token`），与商家版相同。
 
+构建时会将 `web版/merchant-erp/public`（`digital-human`、`ai-vendors` 等）合并进 `dist`，与商家 Web 静态资源路径一致。
+
 ## 登录方式
 
 | 方式 | 说明 |

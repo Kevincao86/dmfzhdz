@@ -1,45 +1,15 @@
 import path from 'node:path'
-import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
-import { MERCHANT_ERP_PUBLIC, MERCHANT_ERP_ROOT, MERCHANT_ERP_SRC } from './vite.merchantErpRoot'
+import { MERCHANT_ERP_ROOT, MERCHANT_ERP_SRC } from './vite.merchantErpRoot'
+import { merchantPublicAssetsPlugin } from './vite.merchantPublicAssets'
 import { merchantApiMockPlugin } from '../web版/merchant-erp/vite-plugins/merchantApiMock'
 import { authSmsGatewayPlugin } from '../web版/merchant-erp/vite-plugins/authSmsGateway'
 import { mpAuthGatewayPlugin } from '../web版/merchant-erp/vite-plugins/mpAuthGateway'
 import { mpHallRegistryGatewayPlugin } from '../web版/merchant-erp/vite-plugins/mpHallRegistryGateway'
 import { opsErpSyncGatewayPlugin } from '../web版/merchant-erp/vite-plugins/opsErpSyncGateway'
-
-function merchantPublicAssetsPlugin(): Plugin {
-  return {
-    name: 'merchant-public-assets',
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const raw = req.url?.split('?')[0] ?? ''
-        if (
-          !raw.startsWith('/digital-human') &&
-          !raw.startsWith('/ai-vendors') &&
-          !raw.startsWith('/platforms/') &&
-          !raw.startsWith('/douyin-bind-guide/')
-        ) {
-          return next()
-        }
-        const filePath = path.join(MERCHANT_ERP_PUBLIC, raw)
-        if (!filePath.startsWith(MERCHANT_ERP_PUBLIC) || !existsSync(filePath)) return next()
-        try {
-          const buf = readFileSync(filePath)
-          if (raw.endsWith('.jpg') || raw.endsWith('.jpeg')) res.setHeader('Content-Type', 'image/jpeg')
-          else if (raw.endsWith('.png')) res.setHeader('Content-Type', 'image/png')
-          else if (raw.endsWith('.svg')) res.setHeader('Content-Type', 'image/svg+xml')
-          res.end(buf)
-        } catch {
-          next()
-        }
-      })
-    },
-  }
-}
 
 /** 嵌入 @merchant 页面时强制共用本项目的 React，避免 useState 读 null 导致整页黑屏 */
 function singleReactResolve(fulfillmentRoot: string) {
@@ -63,10 +33,9 @@ export default defineConfig(({ mode, command }) => {
     ...loadEnv(mode, MERCHANT_ERP_ROOT, ''),
     ...loadEnv(mode, fulfillmentRoot, ''),
   }
-  const devOnlyPlugins =
+  const devOnlyPlugins: Plugin[] =
     command === 'serve'
       ? [
-          merchantPublicAssetsPlugin(),
           merchantApiMockPlugin(),
           opsErpSyncGatewayPlugin(),
           mpAuthGatewayPlugin({ extraEnvDirs: [MERCHANT_ERP_ROOT] }),
@@ -77,7 +46,7 @@ export default defineConfig(({ mode, command }) => {
 
   return {
     envDir: MERCHANT_ERP_ROOT,
-    plugins: [react(), tailwindcss(), ...devOnlyPlugins],
+    plugins: [react(), tailwindcss(), merchantPublicAssetsPlugin(), ...devOnlyPlugins],
     resolve: reactResolve,
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-router-dom'],
