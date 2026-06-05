@@ -24,6 +24,7 @@ import {
   BACKGROUND_OPTIONS,
   defaultDraft,
   deleteDigitalHumanWork,
+  findPresetAvatarForDraft,
   GESTURE_PRESETS,
   loadDigitalHumanWorks,
   PRESET_AVATARS,
@@ -35,6 +36,7 @@ import {
   VOICE_PRESETS,
   workTitleFromDraft,
   resolveDigitalHumanPreviewScript,
+  resolveVoiceForDraft,
   voiceSettingsForAvatar,
   voiceOptionsForAvatar,
   voicePresetById,
@@ -42,6 +44,12 @@ import {
 } from '../lib/digitalHumanBroadcast'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
 import { playDigitalHumanSpeech, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
+import {
+  downloadDigitalHumanMp4,
+  estimateDhSegmentCount,
+  renderDigitalHumanMp4,
+  resolveWorkPreviewVideoUrl,
+} from '../lib/digitalHumanVideoRender'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 
@@ -80,6 +88,9 @@ export default function DigitalHumanBroadcastPage() {
   const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
   const [renderJobId, setRenderJobId] = useState<string | null>(null)
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null)
+  const [previewVideoTitle, setPreviewVideoTitle] = useState('')
+  const renderInflightRef = useRef<Set<string>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
@@ -147,37 +158,61 @@ export default function DigitalHumanBroadcastPage() {
     setDraft((d) => ({ ...d, ...voiceSettingsForAvatar(selectedAvatar) }))
   }, [selectedAvatar, draft.voiceId])
 
-  useEffect(() => {
-    const job = works.find((w) => w.status === 'rendering' || w.status === 'queued')
-    if (!job) return
-    const tick = window.setInterval(() => {
-      setWorks((prev) => {
-        const ix = prev.findIndex((w) => w.id === job.id)
-        if (ix < 0) return prev
-        const row = prev[ix]
-        if (row.status === 'completed' || row.status === 'failed') return prev
-        const nextProgress = Math.min(100, row.progress + (row.status === 'queued' ? 8 : 5))
-        let nextStatus: DigitalHumanWork['status'] = row.status
-        if (row.status === 'queued' && nextProgress >= 12) nextStatus = 'rendering'
-        if (nextProgress >= 100) nextStatus = 'completed'
-        const updated: DigitalHumanWork = {
-          ...row,
-          progress: nextProgress,
-          status: nextStatus,
-          updatedAt: new Date().toISOString(),
-          previewNote:
-            nextStatus === 'completed'
-              ? '低清预览可用；高清 MP4 合成需接入数字人渲染服务后下载。'
-              : row.previewNote,
-        }
-        const next = [...prev]
-        next[ix] = updated
-        upsertDigitalHumanWork(updated)
-        return next
+  const runRenderJob = useCallback(async (job: DigitalHumanWork) => {
+    if (renderInflightRef.current.has(job.id)) return
+    renderInflightRef.current.add(job.id)
+
+    const mark = (patch: Partial<DigitalHumanWork>) => {
+      const current = loadDigitalHumanWorks().find((w) => w.id === job.id) ?? job
+      const row: DigitalHumanWork = {
+        ...current,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      }
+      upsertDigitalHumanWork(row)
+      setWorks(loadDigitalHumanWorks())
+      return row
+    }
+
+    const running = mark({ status: 'rendering', progress: 5, errorMessage: undefined })
+
+    const result = await renderDigitalHumanMp4(running, (p) => {
+      mark({ status: 'rendering', progress: Math.min(99, p.progress) })
+    })
+
+    if (result.ok) {
+      const blobUrl = URL.createObjectURL(result.outputBlob)
+      mark({
+        status: 'completed',
+        progress: 100,
+        outputMp4Url: result.outputMp4Url,
+        outputBlobUrl: blobUrl,
+        videoEngine: result.engine,
+        plannerModel: result.plannerModel,
+        segmentCount: result.segmentCount,
+        previewNote: `高清 MP4 已生成（${result.engine === 'seedance' ? '豆包' : '可灵'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''}）`,
       })
-    }, 800)
-    return () => window.clearInterval(tick)
-  }, [works])
+      if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
+    } else {
+      mark({
+        status: 'failed',
+        progress: 0,
+        errorMessage: result.message,
+        previewNote: result.message,
+      })
+      if (renderJobId === job.id) setToast(result.message)
+    }
+
+    renderInflightRef.current.delete(job.id)
+  }, [renderJobId])
+
+  useEffect(() => {
+    for (const job of works) {
+      if (job.status !== 'queued' && job.status !== 'rendering') continue
+      if (renderInflightRef.current.has(job.id)) continue
+      void runRenderJob(job)
+    }
+  }, [works, runRenderJob])
 
   const patchDraft = useCallback((p: Partial<DigitalHumanDraft>) => {
     setDraft((d) => ({ ...d, ...p }))
@@ -378,7 +413,12 @@ export default function DigitalHumanBroadcastPage() {
     upsertDigitalHumanWork(row)
     setWorks(loadDigitalHumanWorks())
     setRenderJobId(id)
-    setToast('已提交合成队列')
+    const segs = estimateDhSegmentCount(draft.script)
+    setToast(
+      segs > 1
+        ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
+        : '已提交高清 MP4 渲染（豆包/可灵视频模型）',
+    )
   }
 
   const loadWorkForEdit = (w: DigitalHumanWork) => {
@@ -387,6 +427,67 @@ export default function DigitalHumanBroadcastPage() {
     setStep(2)
     setToast(`已载入作品「${w.title}」继续编辑`)
   }
+
+  const previewWork = useCallback(
+    async (w: DigitalHumanWork) => {
+      if (w.status !== 'completed') {
+        setToast('渲染完成后可预览')
+        return
+      }
+      const videoUrl = resolveWorkPreviewVideoUrl(w)
+      if (videoUrl) {
+        stopAllSpeech()
+        setPreviewVideoTitle(w.title)
+        setPreviewVideoUrl(videoUrl)
+        return
+      }
+      stopAllSpeech()
+      const avatar = findPresetAvatarForDraft(w.draft)
+      const voice = resolveVoiceForDraft(w.draft, avatar)
+      const text = resolveDigitalHumanPreviewScript(w.draft, avatar)
+      setTtsBusy(true)
+      const out = await playDigitalHumanSpeech(
+        text,
+        {
+          preset: voice,
+          speechRate: w.draft.speechRate,
+          speechPitch: w.draft.speechPitch,
+          mode: 'tts',
+        },
+        {
+          onStart: () => {
+            setTtsBusy(false)
+            setTtsPlaying(true)
+          },
+          onEnd: () => {
+            setTtsPlaying(false)
+            setTtsBusy(false)
+          },
+          onError: () => {
+            setTtsPlaying(false)
+            setTtsBusy(false)
+          },
+        },
+      )
+      setTtsBusy(false)
+      if (!out.ok) {
+        setToast(out.message ?? '预览播放失败')
+        return
+      }
+      setToast('成片未缓存，已播放口播试听')
+    },
+    [],
+  )
+
+  const downloadWork = useCallback(async (w: DigitalHumanWork) => {
+    if (w.status !== 'completed') {
+      setToast('渲染完成后可下载')
+      return
+    }
+    const r = await downloadDigitalHumanMp4(w)
+    if (!r.ok) setToast(r.message ?? '下载失败')
+    else setToast('高清 MP4 下载已开始')
+  }, [])
 
   const renderAvatarPreview = (large = false, animated = false) => {
     const box = cn(
@@ -445,7 +546,7 @@ export default function DigitalHumanBroadcastPage() {
           />
           <h1 className="erp-page-title">数字人口播</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案/TTS · 视频合成 · 作品库。完整高清口型渲染需运营台配置数字人服务。
+            形象管理 · 口播文案 · 高清 MP4（豆包 Seedance / 可灵，千问或豆包分镜；超长自动分段合并）· 作品库。
           </p>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
@@ -482,7 +583,14 @@ export default function DigitalHumanBroadcastPage() {
       ) : null}
 
       {mainTab === 'works' ? (
-        <WorksPanel works={works} onRefresh={refreshWorks} onEdit={loadWorkForEdit} onDelete={deleteDigitalHumanWork} />
+        <WorksPanel
+          works={works}
+          onRefresh={refreshWorks}
+          onEdit={loadWorkForEdit}
+          onDelete={deleteDigitalHumanWork}
+          onPreview={(w) => void previewWork(w)}
+          onDownload={(w) => void downloadWork(w)}
+        />
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 p-4 shadow-sm">
@@ -1196,6 +1304,38 @@ export default function DigitalHumanBroadcastPage() {
           </div>
         </>
       )}
+      {previewVideoUrl ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="presentation"
+          onClick={() => setPreviewVideoUrl(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl"
+            role="dialog"
+            aria-label="成片预览"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="truncate text-sm font-semibold text-slate-900">{previewVideoTitle}</h3>
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
+                onClick={() => setPreviewVideoUrl(null)}
+              >
+                关闭
+              </button>
+            </div>
+            <video
+              src={previewVideoUrl}
+              controls
+              autoPlay
+              playsInline
+              className="mt-3 aspect-[9/16] w-full rounded-xl bg-black object-contain"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -1205,11 +1345,15 @@ function WorksPanel({
   onRefresh,
   onEdit,
   onDelete,
+  onPreview,
+  onDownload,
 }: {
   works: DigitalHumanWork[]
   onRefresh: () => void
   onEdit: (w: DigitalHumanWork) => void
   onDelete: (id: string) => void
+  onPreview: (w: DigitalHumanWork) => void
+  onDownload: (w: DigitalHumanWork) => void
 }) {
   const [filter, setFilter] = useState<'all' | DigitalHumanWork['status']>('all')
   const [q, setQ] = useState('')
@@ -1298,8 +1442,9 @@ function WorksPanel({
                       <button
                         type="button"
                         disabled={w.status !== 'completed'}
-                        className="inline-flex items-center gap-1 text-violet-600 disabled:text-slate-300"
-                        title={w.status === 'completed' ? '预览' : '渲染完成后可预览'}
+                        onClick={() => onPreview(w)}
+                        className="relative z-10 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-violet-600 hover:bg-violet-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                        title={w.status === 'completed' ? '播放口播预览' : '渲染完成后可预览'}
                       >
                         <Video className="h-4 w-4" />
                         预览
@@ -1307,7 +1452,9 @@ function WorksPanel({
                       <button
                         type="button"
                         disabled={w.status !== 'completed'}
-                        className="inline-flex items-center gap-1 text-slate-600 disabled:text-slate-300"
+                        onClick={() => onDownload(w)}
+                        className="relative z-10 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+                        title={w.status === 'completed' ? '下载高清 MP4' : '渲染完成后可下载'}
                       >
                         <Download className="h-4 w-4" />
                         MP4
@@ -1315,7 +1462,7 @@ function WorksPanel({
                       <button
                         type="button"
                         onClick={() => onEdit(w)}
-                        className="inline-flex items-center gap-1 text-cyan-700"
+                        className="relative z-10 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-cyan-700 hover:bg-cyan-50"
                       >
                         <Wand2 className="h-4 w-4" />
                         再编辑
