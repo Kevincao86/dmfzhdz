@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http'
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest } from '@vercel/node'
 import type { Plugin } from 'vite'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.js'
 import { applyViteEnvDirs } from './mpDevEnv.js'
