@@ -1,5 +1,6 @@
 import { syncErpTenantToOpsRegistry } from './authRegistrySync.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
+import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 function loginNameToEmail(loginName: string, domain: string): string {
   const slug = loginName
@@ -53,7 +54,7 @@ export async function provisionMerchantTenant(body: {
 
   let createRes: Response
   try {
-    createRes = await fetch(`${base}/auth/v1/admin/users`, {
+    createRes = await supabaseAdminFetch(`${base}/auth/v1/admin/users`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -89,7 +90,7 @@ export async function provisionMerchantTenant(body: {
     return { ok: false, error: 'auth_create_failed', detail: createText.slice(0, 400) }
   }
 
-  const tenantRes = await fetch(`${base}/rest/v1/tenants`, {
+  const tenantRes = await supabaseAdminFetch(`${base}/rest/v1/tenants`, {
     method: 'POST',
     headers: { ...headers, Prefer: 'return=representation' },
     body: JSON.stringify({
@@ -113,19 +114,19 @@ export async function provisionMerchantTenant(body: {
   }
   const tenantId = tenantRows[0]?.id
   if (!tenantRes.ok || !tenantId) {
-    await fetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
+    await supabaseAdminFetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
     return { ok: false, error: 'tenant_insert_failed', detail: tenantText.slice(0, 400) }
   }
 
-  const memRes = await fetch(`${base}/rest/v1/tenant_members`, {
+  const memRes = await supabaseAdminFetch(`${base}/rest/v1/tenant_members`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ tenant_id: tenantId, user_id: userId, role: 'owner' }),
   })
   if (!memRes.ok) {
     const memText = await memRes.text()
-    await fetch(`${base}/rest/v1/tenants?id=eq.${tenantId}`, { method: 'DELETE', headers })
-    await fetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
+    await supabaseAdminFetch(`${base}/rest/v1/tenants?id=eq.${tenantId}`, { method: 'DELETE', headers })
+    await supabaseAdminFetch(`${base}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers })
     return { ok: false, error: 'member_insert_failed', detail: memText.slice(0, 400) }
   }
 

@@ -62,12 +62,41 @@ sudo apt install -y nodejs
 sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
 
-# 克隆仓库（与轻量相同 remote）
-git clone <你的仓库地址> ~/app
-cd ~/app && git checkout main
+# 克隆仓库（Gitee 私有库须令牌或 SSH，勿用 su -c 'git clone https://...' 会无法输密码）
+# 方式 A（推荐）：Gitee → 设置 → 私人令牌 → 勾选 projects
+GITEE_TOKEN=你的令牌 bash /home/admin/app/scripts/ecs-clone-app-once.sh
+# 若脚本尚未克隆下来，先交互克隆一次：
+#   su - admin
+#   git clone https://gitee.com/linqierp/linqierp.git ~/app && cd ~/app && git checkout main
+
+# 方式 B：与轻量相同，复制 admin 的 ~/.ssh 到本机后：
+#   git clone git@gitee.com:linqierp/linqierp.git ~/app
 ```
 
-**完成标志**：`node -v`、`nginx -v`、`ls ~/app/scripts/ecs-deploy-talent-fulfillment-web.sh` 均 OK。
+**完成标志**：`ls /home/admin/app/scripts/ecs-deploy-talent-fulfillment-web.sh` 存在。
+
+> `fatal: could not read Username for 'https://gitee.com'` = 非交互环境无法输入 Gitee 账号，改用上面令牌或 `su - admin` 交互克隆。
+
+**Gitee 密码/令牌都不对时（推荐从轻量拷贝，轻量已有完整 `~/app`）：**
+
+```bash
+# 在新 ECS 上（root），把轻量代码同步过来（保留 .git，以后可 pull）
+rsync -avz --progress -e ssh admin@139.196.42.5:/home/admin/app/ /home/admin/app/
+chown -R admin:admin /home/admin/app
+su - admin -c 'cd ~/app && git log -1 --oneline'
+```
+
+或只拷贝 SSH 密钥后走 Gitee SSH：
+
+```bash
+# 在轻量执行，把私钥显示出来复制到新 ECS /home/admin/.ssh/id_ed25519
+# 新 ECS：
+mkdir -p /home/admin/.ssh && chmod 700 /home/admin/.ssh
+# 粘贴私钥后：
+chmod 600 /home/admin/.ssh/id_ed25519
+chown -R admin:admin /home/admin/.ssh
+su - admin -c 'git clone git@gitee.com:linqierp/linqierp.git ~/app'
+```
 
 ---
 
