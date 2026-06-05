@@ -52,7 +52,9 @@ function mapMembersAndLibrary(reg: MpRegistry): TalentCardRow[] {
   return [...fromLib, ...fromMembers].sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
 }
 
-export default function RecommendTalentPanel() {
+type Props = { embedded?: boolean }
+
+export default function RecommendTalentPanel({ embedded = false }: Props) {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [talentSegment, setTalentSegment] = useState('ai')
   const [filterPlatform, setFilterPlatform] = useState('全部')
@@ -117,12 +119,16 @@ export default function RecommendTalentPanel() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold">推荐达人</h2>
-        <p className="text-sm text-slate-400 mt-1">{prMatchHint}</p>
-      </div>
+      {embedded ? (
+        <p className="text-sm text-[var(--shell-muted)]">{prMatchHint}</p>
+      ) : (
+        <div>
+          <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
+          <p className="text-sm text-[var(--shell-muted)] mt-1">{prMatchHint}</p>
+        </div>
+      )}
       <input
-        className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"
+        className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
         placeholder="搜索达人昵称、ID"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}

@@ -195,10 +195,10 @@ export default function AiOperationContentPage() {
             .join('、')} 等 ${selectedStoreRows.length} 家`
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="ai-content-page mx-auto max-w-5xl space-y-6">
       <div>
         <h1 className="erp-page-title">AI 文章与话题</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="mt-1 text-sm embed-text-muted">
           选择平台与品牌或适用门店后，使用下方文案模型生成内容（需已完成抖音来客绑定）。
         </p>
         <div className="mt-4 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
@@ -209,7 +209,7 @@ export default function AiOperationContentPage() {
               'rounded-md px-4 py-2 text-sm font-medium transition-colors',
               mainTab === 'article'
                 ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900',
+                : 'embed-text-muted hover:embed-text-primary',
             )}
           >
             AI 文章生成
@@ -221,7 +221,7 @@ export default function AiOperationContentPage() {
               'rounded-md px-4 py-2 text-sm font-medium transition-colors',
               mainTab === 'topic'
                 ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900',
+                : 'embed-text-muted hover:embed-text-primary',
             )}
           >
             AI 话题推荐
@@ -232,7 +232,7 @@ export default function AiOperationContentPage() {
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-800">平台</label>
+            <label className="block text-sm font-medium embed-text-primary">平台</label>
             <select
               value={platformId}
               onChange={(e) => setPlatformId(e.target.value as PlatformId)}
@@ -251,7 +251,7 @@ export default function AiOperationContentPage() {
           </div>
 
           <div>
-            <span className="block text-sm font-medium text-gray-800">品牌 / 门店</span>
+            <span className="block text-sm font-medium embed-text-primary">品牌 / 门店</span>
             <div className="mt-2 inline-flex rounded-lg border border-gray-200 p-1">
               <button
                 type="button"
@@ -260,7 +260,7 @@ export default function AiOperationContentPage() {
                   'rounded-md px-3 py-1.5 text-xs font-medium',
                   scopeMode === 'brand'
                     ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-50',
+                    : 'embed-text-muted hover:bg-gray-50',
                 )}
               >
                 品牌
@@ -272,7 +272,7 @@ export default function AiOperationContentPage() {
                   'rounded-md px-3 py-1.5 text-xs font-medium',
                   scopeMode === 'store'
                     ? 'bg-indigo-600 text-white'
-                    : 'text-gray-600 hover:bg-gray-50',
+                    : 'embed-text-muted hover:bg-gray-50',
                 )}
               >
                 门店
@@ -280,10 +280,10 @@ export default function AiOperationContentPage() {
             </div>
             {scopeMode === 'brand' ? (
               <div className="mt-3 space-y-1.5">
-                <label className="block text-xs text-gray-600">
+                <label className="block text-xs embed-text-muted">
                   品牌名称
                   {platformId === 'douyin' ? (
-                    <span className="text-gray-400">（手动填写，与来客「门店品牌」一致即可）</span>
+                    <span className="embed-text-muted opacity-80">（手动填写，与来客「门店品牌」一致即可）</span>
                   ) : null}
                 </label>
                 <input
@@ -304,8 +304,8 @@ export default function AiOperationContentPage() {
                   <Store className="mr-2 h-4 w-4" />
                   选择适用门店
                 </button>
-                <p className="text-xs text-gray-600">
-                  已选 <span className="font-semibold text-gray-900">{selectedPoiIds.length}</span> 家：
+                <p className="text-xs embed-text-muted">
+                  已选 <span className="font-semibold embed-text-primary">{selectedPoiIds.length}</span> 家：
                   {storeSummary}
                 </p>
               </div>
@@ -316,16 +316,16 @@ export default function AiOperationContentPage() {
         <div className="mt-6 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            <span className="text-sm font-semibold text-gray-900">文案用 AI 模型</span>
+            <span className="text-sm font-semibold embed-text-primary">文案用 AI 模型</span>
             <AiModelAutoPicker
               kind="text"
               options={aiModelPickOptions}
               onResolutionChange={() => setAiModelUiTick((n) => n + 1)}
             />
           </div>
-          <p className="mt-2 text-xs text-gray-600">
+          <p className="mt-2 text-xs embed-text-muted">
             开启「自动」时与系统设置默认一致；关闭后可指定模型。当前请求使用：
-            <span className="font-medium text-gray-800">
+            <span className="font-medium embed-text-primary">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>
           </p>
@@ -333,9 +333,9 @@ export default function AiOperationContentPage() {
 
         {mainTab === 'article' ? (
           <div className="mt-8 border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-semibold text-gray-900">AI 文章生成</h2>
-            <p className="mt-1 text-sm text-gray-500">基于上方平台与品牌/门店信息，以及下列要点生成图文稿件。</p>
-            <label className="mt-4 block text-sm font-medium text-gray-800">
+            <h2 className="text-lg font-semibold embed-text-primary">AI 文章生成</h2>
+            <p className="mt-1 text-sm embed-text-muted">基于上方平台与品牌/门店信息，以及下列要点生成图文稿件。</p>
+            <label className="mt-4 block text-sm font-medium embed-text-primary">
               写作要点与活动信息 <span className="text-red-500">*</span>
               <textarea
                 value={articleBrief}
@@ -358,18 +358,18 @@ export default function AiOperationContentPage() {
             {articleOut ? (
               <div className="mt-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-gray-800">生成结果</p>
+                  <p className="text-sm font-medium embed-text-primary">生成结果</p>
                   <button
                     type="button"
                     onClick={() => void onCopyArticle()}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium embed-text-primary hover:bg-gray-50"
                   >
                     <Copy className="h-3.5 w-3.5" />
                     复制全文
                   </button>
                 </div>
                 {articleCopyTip && <p className="mt-1 text-xs text-emerald-700">{articleCopyTip}</p>}
-                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
+                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed embed-text-primary whitespace-pre-wrap">
                   {articleOut}
                 </div>
               </div>
@@ -377,9 +377,9 @@ export default function AiOperationContentPage() {
           </div>
         ) : (
           <div className="mt-8 border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-semibold text-gray-900">AI 话题推荐</h2>
-            <p className="mt-1 text-sm text-gray-500">结合上方平台与品牌/门店信息，生成本周选题建议。</p>
-            <label className="mt-4 block text-sm font-medium text-gray-800">
+            <h2 className="text-lg font-semibold embed-text-primary">AI 话题推荐</h2>
+            <p className="mt-1 text-sm embed-text-muted">结合上方平台与品牌/门店信息，生成本周选题建议。</p>
+            <label className="mt-4 block text-sm font-medium embed-text-primary">
               品类与客群 / 经营重点 <span className="text-red-500">*</span>
               <textarea
                 value={topicFocus}
@@ -402,18 +402,18 @@ export default function AiOperationContentPage() {
             {topicOut ? (
               <div className="mt-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-gray-800">推荐选题</p>
+                  <p className="text-sm font-medium embed-text-primary">推荐选题</p>
                   <button
                     type="button"
                     onClick={() => void onCopyTopic()}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-gray-50"
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium embed-text-primary hover:bg-gray-50"
                   >
                     <Copy className="h-3.5 w-3.5" />
                     复制全文
                   </button>
                 </div>
                 {topicCopyTip && <p className="mt-1 text-xs text-emerald-700">{topicCopyTip}</p>}
-                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed text-gray-800 whitespace-pre-wrap">
+                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed embed-text-primary whitespace-pre-wrap">
                   {topicOut}
                 </div>
               </div>

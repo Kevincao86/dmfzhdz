@@ -115,7 +115,7 @@ export default function RecommendOrdersPanel() {
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold">推荐商单</h2>
-        <p className="text-sm text-slate-400 mt-1">优质 · 热门全国 · 同城匹配（与小程序推荐 Tab 同源算法）</p>
+        <p className="text-sm text-slate-400 mt-1">优质 · 热门全国 · 同城匹配</p>
       </div>
       <input
         className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"

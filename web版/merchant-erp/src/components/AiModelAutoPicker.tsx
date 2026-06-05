@@ -174,7 +174,7 @@ export default function AiModelAutoPicker({
     <div ref={rootRef} className={cn('relative flex flex-wrap items-center gap-2 text-left', className)}>
       {inlineAuto ? (
         <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2.5 py-1 shadow-sm">
-          <span className="text-[11px] font-semibold text-gray-700">自动</span>
+          <span className="text-[11px] font-semibold embed-text-secondary">自动</span>
           <button
             type="button"
             role="switch"

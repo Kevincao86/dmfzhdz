@@ -176,6 +176,11 @@
   margin: 0 24rpx 12rpx;
 }
 
+.rec-seg-bar--pr .rec-seg-item {
+  flex: 1;
+  text-align: center;
+}
+
 .rec-seg-item--on::after {
   display: none;
 }

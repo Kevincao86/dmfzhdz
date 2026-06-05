@@ -31,7 +31,7 @@ export default function TemplatesPage() {
           新增模版
         </Link>
       </div>
-      <p className="text-sm text-slate-400">与小程序 meoo_apply_form_templates_v1 共用，发招募与报名均读取此处配置。</p>
+      <p className="text-sm text-[var(--shell-muted)]">管理报名单模版，发招募与达人报名时将自动应用。</p>
       {!rows.length ? (
         <p className="text-slate-500">暂无自定义模版，点击「新增模版」创建。</p>
       ) : (

@@ -1,5 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { clearSession, getAccount, getActiveRole, isDevPreviewSession, type MpAccountRole } from '../lib/mpSession'
+import ThemeToggle from './ThemeToggle'
+import { clearSession, getAccount, getActiveRole, type MpAccountRole } from '../lib/mpSession'
+import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 
 type NavItem = { to: string; label: string; roles?: MpAccountRole[] }
 
@@ -14,7 +16,6 @@ function navForRole(role: MpAccountRole): NavItem[] {
       { to: '/hall', label: '招募大厅' },
       { to: '/publish', label: '发布招募' },
       { to: '/templates', label: '我的模版' },
-      { to: '/recommend-talent', label: '推荐达人' },
       { to: '/orders', label: '我的发单' },
       ...common,
     ]
@@ -30,6 +31,7 @@ export default function AppShell() {
   const nav = useNavigate()
   const account = getAccount()
   const role = getActiveRole()
+  const workId = getWorkIdentity()
   const NAV = navForRole(role)
 
   function logout() {
@@ -42,16 +44,17 @@ export default function AppShell() {
       ? account?.lingqiPrId || '未绑定 PRID'
       : account?.lingqiTalentId || '未绑定达人ID'
 
+  const editionLabel = role === 'pr' ? 'PR 版' : WORK_EDITION_LABEL[workId]
+
   return (
-    <div className="min-h-screen flex">
-      <aside className="w-56 border-r border-white/10 bg-[#141422] p-4 flex flex-col shrink-0">
+    <div className="min-h-screen flex bg-[var(--shell-main-bg)] text-[var(--app-text)]">
+      <aside className="w-56 border-r border-[var(--shell-border)] bg-[var(--shell-sidebar-bg)] p-4 flex flex-col shrink-0">
         <div className="mb-6">
-          <div className="font-bold text-lg">灵祺履约后台</div>
-          <div className="text-xs text-slate-400 mt-1">{role === 'pr' ? 'PR 版' : '达人版'} · {account?.wxNickName || account?.loginName || '未登录'}</div>
-          <div className="text-xs text-amber-400 mt-1 font-mono">{idLabel}</div>
-          {isDevPreviewSession() ? (
-            <p className="text-[10px] text-amber-500/80 mt-1">开发预览模式</p>
-          ) : null}
+          <div className="font-bold text-lg text-[var(--shell-text)]">灵祺履约后台</div>
+          <div className="text-xs text-[var(--shell-muted)] mt-1">
+            {editionLabel} · {account?.wxNickName || account?.loginName || '未登录'}
+          </div>
+          <div className="text-xs text-amber-500 mt-1 font-mono">{idLabel}</div>
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -60,7 +63,11 @@ export default function AppShell() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm ${isActive ? 'bg-violet-600/30 text-white' : 'text-slate-400 hover:bg-white/5'}`
+                `block px-3 py-2 rounded-lg text-sm ${
+                  isActive
+                    ? 'bg-violet-600/30 text-[var(--shell-text)]'
+                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
+                }`
               }
             >
               {item.label}
@@ -68,9 +75,16 @@ export default function AppShell() {
           ))}
         </nav>
 
-        <button type="button" className="text-sm text-slate-500 hover:text-white mt-4" onClick={logout}>
-          退出登录
-        </button>
+        <div className="mt-4 space-y-2">
+          <ThemeToggle />
+          <button
+            type="button"
+            className="w-full text-sm text-[var(--shell-muted)] hover:text-[var(--shell-text)] text-left px-3 py-2"
+            onClick={logout}
+          >
+            退出登录
+          </button>
+        </div>
       </aside>
       <main className="flex-1 p-6 overflow-auto min-w-0">
         <Outlet />

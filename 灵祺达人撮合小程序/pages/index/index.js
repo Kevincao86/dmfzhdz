@@ -5,6 +5,8 @@ const mpBuild = require('../../utils/mpBuild.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const recruitmentAi = require('../../utils/recruitmentAiTags.js')
+const hallIdentity = require('../../utils/hallIdentityBuckets.js')
+const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 
 function matchSearch(row, keyword) {
@@ -49,7 +51,7 @@ Page({
     loading: false,
     err: '',
     hallTab: 'normal',
-    paichianSubTab: 'shoot',
+    paichianSubTab: 'ice',
     searchKeyword: '',
     filterPlatform: '全部',
     filterCity: '全部',
@@ -57,6 +59,9 @@ Page({
     priceFilterLabel: '价格筛选',
     showPriceSheet: false,
     sortBy: '发布时间',
+    filterStatus: '全部',
+    statusFilters: listFilters.HALL_STATUS_FILTERS,
+    workIdentity: 'talent',
     platformFilters: hallFilters.PLATFORM_FILTERS,
     cityFilters: ['全部'],
     priceBuckets: hallFilters.priceBucketsForView([]),
@@ -77,6 +82,13 @@ Page({
   onShow() {
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
+    const identity = userProfile.readIdentity()
+    const patch = { workIdentity: identity }
+    if (this._lastHallIdentity !== identity) {
+      patch.paichianSubTab = hallIdentity.defaultPaichianSubTab(identity)
+      this._lastHallIdentity = identity
+    }
+    this.setData(patch)
     if (api.base()) {
       console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
@@ -112,14 +124,16 @@ Page({
     const pf = this.data.filterPlatform
     const cf = this.data.filterCity
     const priceSel = this.data.priceSelected
+    const statusF = this.data.filterStatus
     rows = rows.filter((r) => {
       if (!matchSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
       if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
+      if (!listFilters.matchHallStatus(r, statusF)) return false
       return true
     })
-    rows = listFilters.sortRecruitmentRows(rows, this.data.sortBy)
+    rows = listFilters.sortHallRecruitmentRows(rows, this.data.sortBy)
     const baseRows = rows.map((r) => ({
       ...r,
       ...recruitmentAi.fallbackTagForRow(r),
@@ -195,6 +209,12 @@ Page({
   },
   onSortFilter(e) {
     this.setData({ sortBy: this.data.sortOptions[Number(e.detail.value)] || '发布时间' })
+    this.applyFilters()
+  },
+  onStatusFilter(e) {
+    this.setData({
+      filterStatus: this.data.statusFilters[Number(e.detail.value)] || '全部',
+    })
     this.applyFilters()
   },
   goDetail(e) {

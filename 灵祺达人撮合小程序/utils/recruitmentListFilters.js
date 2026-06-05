@@ -1,16 +1,33 @@
 /** 首页招募大厅：排序（价格区间见 recruitmentHallFilters） */
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
+const HALL_STATUS_FILTERS = ['全部', '招募中', '收集中', '待结算', '已关闭', '已完成']
+
 const MP_STATUS_LABEL = {
   open: '招募中',
   collecting: '收集中',
   pending_settlement: '待结算',
-  closed: '已停止',
+  closed: '已关闭',
   done: '已完成',
 }
 
 function isMpOrderRecruiting(status) {
   return status === 'open' || status === 'collecting'
+}
+
+function statusPriority(status) {
+  if (status === 'open') return 0
+  if (status === 'collecting') return 1
+  if (status === 'pending_settlement') return 2
+  if (status === 'closed') return 3
+  if (status === 'done') return 4
+  return 5
+}
+
+function matchHallStatus(row, filterLabel) {
+  if (!filterLabel || filterLabel === '全部') return true
+  const label = MP_STATUS_LABEL[row && row.status] || row.statusLabel || ''
+  return label === filterLabel
 }
 
 function parseTs(text) {
@@ -120,6 +137,25 @@ function sortRecruitmentRows(rows, sortBy) {
   return list
 }
 
+/** 招募大厅：招募中/收集中优先，再按用户所选排序 */
+function sortHallRecruitmentRows(rows, sortBy) {
+  const list = rows.slice()
+  list.sort((a, b) => {
+    const sp = statusPriority(a.status) - statusPriority(b.status)
+    if (sp !== 0) return sp
+    if (sortBy === '截止时间') {
+      const da = a.deadlineMs || 9e15
+      const db = b.deadlineMs || 9e15
+      return da - db
+    }
+    if (sortBy === '价格从高到低') {
+      return (b.priceAmount || 0) - (a.priceAmount || 0)
+    }
+    return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+  })
+  return list
+}
+
 const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
 
 function buildMockRecruitmentRow(partial) {
@@ -132,6 +168,7 @@ function buildMockRecruitmentRow(partial) {
     merchantName: '静安网红火锅',
     storeName: '静安寺店',
     title: '静安网红火锅·双人探店套餐招募',
+    status: 'open',
     statusLabel: '招募中',
     platform: '抖音',
     platformIcon: '/images/platforms/douyin.png',
@@ -145,6 +182,7 @@ function buildMockRecruitmentRow(partial) {
     recruitCount: 5,
     urgent: false,
     isIce: false,
+    recruitTarget: 'talent',
     recommended: true,
     priceAmount: 1280,
     publishedAtMs: now - 3 * 3600000,
@@ -206,6 +244,11 @@ function buildMockRecruitmentRows() {
 
 module.exports = {
   SORT_OPTIONS,
+  HALL_STATUS_FILTERS,
+  MP_STATUS_LABEL,
+  isMpOrderRecruiting,
+  matchHallStatus,
+  sortHallRecruitmentRows,
   resolvePriceAmount,
   resolvePublishedMs,
   resolveDeadlineMs,

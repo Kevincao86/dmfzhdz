@@ -21,10 +21,17 @@ function workIdentityLabel(id) {
   return WORK_IDENTITIES[key].label
 }
 
+function primaryRecruitTargetForIdentity(id) {
+  if (id === 'shoot') return 'shoot'
+  if (id === 'edit') return 'edit'
+  return 'talent'
+}
+
 module.exports = {
   WORK_IDENTITIES,
   WORK_ID_LIST,
   isWorkIdentity,
   isSupplierWorkIdentity,
   workIdentityLabel,
+  primaryRecruitTargetForIdentity,
 }

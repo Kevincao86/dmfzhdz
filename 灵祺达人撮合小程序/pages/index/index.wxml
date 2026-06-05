@@ -121,6 +121,14 @@
         </view>
       </view>
       <view class="filter-cell">
+        <picker mode="selector" range="{{statusFilters}}" bindchange="onStatusFilter">
+          <view class="filter-item {{filterStatus !== '全部' ? 'filter-item--active' : ''}}">
+            <text class="filter-label">{{filterStatus === '全部' ? '状态' : filterStatus}}</text>
+            <text class="filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="filter-cell">
         <picker mode="selector" range="{{sortOptions}}" bindchange="onSortFilter">
           <view class="filter-item {{sortBy !== '发布时间' ? 'filter-item--active' : ''}}">
             <text class="filter-label">{{sortBy === '发布时间' ? '排序' : sortBy}}</text>
