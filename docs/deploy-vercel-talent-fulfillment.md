@@ -27,6 +27,8 @@ Vercel → Project → Settings → General → **Root Directory**：
 | `VITE_SUPABASE_URL` | 与商家版相同 | 增值服务页（抖音来客等） |
 | `VITE_SUPABASE_ANON_KEY` | 与商家版相同 | 同上 |
 
+增值服务（短视频 AI、AI 文章、数字人口播）的 `/api/meoo-*` 请求会优先走 `VITE_MP_API_BASE`（或生产默认 `mofangdianai.com/erp-api`）。ECS 须已部署含 `meoo-merchant-ai-video-*` 路由的 `meoo-auth-api`（`cd ~/app && bash scripts/ecs-deploy-auth-api.sh`）。
+
 登录、招募大厅走 `VITE_MP_API_BASE` 下的 `/api/meoo-ops-mp-auth`、`/api/meoo-ops-mp-hall-registry`（由 ECS `meoo-auth-api` 提供，非 Vercel Serverless）。
 
 ## 改完变量后

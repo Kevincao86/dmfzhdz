@@ -80,11 +80,12 @@ function apiUrl(path: string) {
 }
 
 async function mpAuthRequest(action: string, body: Record<string, unknown> = {}) {
+  const token = getToken()
   return postJsonCandidates(
     '/api/meoo-ops-mp-auth',
-    { action, ...body },
+    { action, ...(token ? { sessionToken: token } : {}), ...body },
     {
-      extraHeaders: getToken() ? { 'X-Mp-Session': getToken() } : {},
+      extraHeaders: token ? { 'X-Mp-Session': token } : {},
     },
   )
 }
@@ -125,6 +126,15 @@ export async function scanPoll(ticket: string) {
 
 export async function switchRole(role: 'talent' | 'pr') {
   const data = await mpAuthRequest('switch_role', { role })
+  return { account: data.account as MpAccount }
+}
+
+/** 登录/切换身份后确保 PRID、达人ID 及拍摄/剪辑团队 ID 已写入注册表并绑定账号 */
+export async function ensureIdentity(
+  role: 'talent' | 'pr',
+  workIdentity?: 'talent' | 'shoot' | 'edit',
+) {
+  const data = await mpAuthRequest('ensure_identity', { role, workIdentity })
   return { account: data.account as MpAccount }
 }
 

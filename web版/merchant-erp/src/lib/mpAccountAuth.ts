@@ -198,7 +198,19 @@ export function accountToClientPayload(account: MpAccountRow) {
   }
 }
 
-/** 微信首次登录：分配灵祺 ID 并在注册表占位，后续「我的信息」提交时按 openid 合并补全 */
+function accountPhoneKey(account: MpAccountRow): string {
+  return String(account.login_name || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
+function memberPhoneKey(m: RegistryMpTalentMember): string {
+  return String(m.contact || m.wechatId || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
+/** 微信/手机号登录：分配灵祺 ID 并在注册表占位 */
 async function provisionRegistryForAccount(
   supabaseUrl: string,
   serviceRole: string,
@@ -209,20 +221,24 @@ async function provisionRegistryForAccount(
 ): Promise<MpAccountRow> {
   const rest = restClient(supabaseUrl, serviceRole)
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
-  const nick = String(wxNickName || account.wx_nick_name || '').trim() || '微信用户'
+  const phone = accountPhoneKey(account)
+  const loginLabel = String(account.login_name || '').trim()
+  const nick = String(wxNickName || account.wx_nick_name || loginLabel || '').trim() || '微信用户'
   const avatar = String(wxAvatarUrl || account.wx_avatar_url || '').trim()
 
   if (role === 'talent' && !account.lingqi_talent_id) {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    const existingByWx = openId
-      ? (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
-      : undefined
-    if (existingByWx?.lingqiTalentId) {
+    let existing =
+      openId && (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
+    if (!existing && phone.length >= 8) {
+      existing = (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phone)
+    }
+    if (existing?.lingqiTalentId) {
       await updateAccount(rest, account.id, {
-        lingqi_talent_id: existingByWx.lingqiTalentId,
-        registry_member_id: existingByWx.id,
+        lingqi_talent_id: existing.lingqiTalentId,
+        registry_member_id: existing.id,
         active_role: 'talent',
       })
       return (await findAccountById(rest, account.id))!
@@ -235,8 +251,8 @@ async function provisionRegistryForAccount(
       wxNickName: nick,
       wxAvatarUrl: avatar,
       wxOpenId: account.openid || '',
-      contact: '',
-      wechatId: '',
+      contact: loginLabel || phone,
+      wechatId: loginLabel || phone,
       registeredAt: now,
       updatedAt: now,
     })
@@ -253,9 +269,16 @@ async function provisionRegistryForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    const existingPr = openId
-      ? (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
-      : undefined
+    let existingPr =
+      openId && (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+    if (!existingPr && phone.length >= 8) {
+      existingPr = (data.mpPrUsers ?? []).find((u) => {
+        const p = String(u.contactPhone || '')
+          .replace(/\D/g, '')
+          .slice(-11)
+        return p === phone
+      })
+    }
     if (existingPr?.lingqiPrId) {
       await updateAccount(rest, account.id, {
         lingqi_pr_id: existingPr.lingqiPrId,
@@ -270,6 +293,7 @@ async function provisionRegistryForAccount(
       accountType: 'personal',
       personalName: nick,
       contactName: nick,
+      contactPhone: loginLabel || phone || undefined,
       wxOpenId: account.openid || '',
       wxNickName: nick,
       wxAvatarUrl: avatar,
@@ -286,6 +310,12 @@ async function provisionRegistryForAccount(
   }
 
   return account
+}
+
+function supplierTags(workIdentity: 'shoot' | 'edit'): string[] {
+  return workIdentity === 'shoot'
+    ? ['拍摄团队', '拍摄', '跟拍']
+    : ['剪辑团队', '剪辑', '后期']
 }
 
 async function syncRegistryMember(
@@ -520,17 +550,58 @@ export async function mpAuthSwitchRole(
   accountId: string,
   role: MpAccountRole,
 ): Promise<MpAccountRow> {
+  return mpAuthEnsureIdentity(supabaseUrl, serviceRole, accountId, role)
+}
+
+/** 切换/登录后确保当前身份已在注册表生成 ID 并写回账号 */
+export async function mpAuthEnsureIdentity(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  role: MpAccountRole,
+  workIdentity?: 'talent' | 'shoot' | 'edit',
+): Promise<MpAccountRow> {
   const rest = restClient(supabaseUrl, serviceRole)
   let account = await findAccountById(rest, accountId)
   if (!account) throw new Error('account_not_found')
+  const nick = account.wx_nick_name || account.login_name || ''
   account = await provisionRegistryForAccount(
     supabaseUrl,
     serviceRole,
     account,
     role,
-    account.wx_nick_name || '',
+    nick,
     account.wx_avatar_url || '',
   )
+
+  if (role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    const now = new Date().toLocaleString('zh-CN', { hour12: false })
+    const phone = String(account.login_name || '').trim()
+    const saved = upsertMpTalentMember(data, {
+      id: account.registry_member_id || `MTM-${Date.now()}`,
+      lingqiTalentId: account.lingqi_talent_id || '',
+      memberType: 'douyin',
+      wxNickName: nick || '用户',
+      wxAvatarUrl: account.wx_avatar_url || '',
+      wxOpenId: account.openid || '',
+      contact: phone,
+      wechatId: phone,
+      workIdentity,
+      accountTags: supplierTags(workIdentity),
+      registeredAt: now,
+      updatedAt: now,
+    })
+    await io.save(data)
+    await updateAccount(rest, account.id, {
+      lingqi_talent_id: saved.lingqiTalentId || account.lingqi_talent_id,
+      registry_member_id: saved.id,
+      active_role: 'talent',
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+
   await updateAccount(rest, accountId, { active_role: role })
   return (await findAccountById(rest, accountId))!
 }

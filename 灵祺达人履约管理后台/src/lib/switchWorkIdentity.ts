@@ -1,4 +1,4 @@
-import { fetchSession, registerPrUser, registerTalentMember, switchRole } from './mpApi'
+import { ensureIdentity, fetchSession } from './mpApi'
 import {
   DEV_PREVIEW_TOKEN,
   getAccount,
@@ -15,7 +15,6 @@ import { emptyPrProfile, readPrProfile, writePrProfile } from './mpSync/userProf
 import {
   getWorkIdentity,
   setWorkIdentity,
-  workIdentityLabel,
   workIdentityToAccountRole,
   type MpWorkIdentity,
 } from './mpWorkIdentity'
@@ -23,6 +22,8 @@ import {
 export type WorkIdentitySwitchResult = {
   workId: MpWorkIdentity
   cloudWarning?: string
+  /** 会话失效时需以目标身份重新登录以完成 ID 注册 */
+  needsReLogin?: boolean
 }
 
 function isSessionCloudError(msg: string): boolean {
@@ -37,7 +38,7 @@ function supplierTagsForWorkId(workId: MpWorkIdentity): string[] {
 
 function syncLocalProfilesFromAccount(account: MpAccount, workId?: MpWorkIdentity) {
   const wid = workId || getWorkIdentity()
-  if (account.lingqiTalentId) {
+  if (account.lingqiTalentId || workIdentityToAccountRole(wid) === 'talent') {
     const prev = readMember()
     const tags = supplierTagsForWorkId(wid)
     const platformProfiles = prev?.platformProfiles || emptyAllProfiles()
@@ -52,12 +53,12 @@ function syncLocalProfilesFromAccount(account: MpAccount, workId?: MpWorkIdentit
     }
     writeMember({
       id: account.registryMemberId || prev?.id || `MTM-${Date.now()}`,
-      lingqiTalentId: account.lingqiTalentId,
+      lingqiTalentId: account.lingqiTalentId || prev?.lingqiTalentId || '',
       memberType: prev?.memberType || 'douyin',
       wxNickName: account.wxNickName || prev?.wxNickName || '',
       wxAvatarUrl: account.wxAvatarUrl || prev?.wxAvatarUrl || '',
-      contact: prev?.contact || '',
-      wechatId: prev?.wechatId || '',
+      contact: prev?.contact || account.loginName || '',
+      wechatId: prev?.wechatId || account.loginName || '',
       platformProfiles,
       registeredAt: prev?.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
@@ -71,95 +72,25 @@ function syncLocalProfilesFromAccount(account: MpAccount, workId?: MpWorkIdentit
       lingqiPrId: account.lingqiPrId,
       wxNickName: account.wxNickName || prev.wxNickName || '',
       wxAvatarUrl: account.wxAvatarUrl || prev.wxAvatarUrl || '',
-      personalName: prev.personalName || account.wxNickName || '',
-      contactName: prev.contactName || account.wxNickName || '',
+      personalName: prev.personalName || account.wxNickName || account.loginName || '',
+      contactName: prev.contactName || account.wxNickName || account.loginName || '',
+      contactPhone: prev.contactPhone || account.loginName || '',
       registeredAt: prev.registeredAt || new Date().toLocaleString('zh-CN', { hour12: false }),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     })
   }
 }
 
-async function ensureTargetIdentityId(
-  workId: MpWorkIdentity,
-  account: MpAccount,
-): Promise<{ account: MpAccount; cloudWarning?: string }> {
-  const accountRole = workIdentityToAccountRole(workId)
-  let acc = account
-  let cloudWarning: string | undefined
+function workIdentityForApi(workId: MpWorkIdentity): 'talent' | 'shoot' | 'edit' | undefined {
+  if (workId === 'shoot' || workId === 'edit') return workId
+  if (workId === 'talent') return 'talent'
+  return undefined
+}
 
-  if (accountRole === 'pr' && !acc.lingqiPrId) {
-    const prev = readPrProfile() || emptyPrProfile()
-    const now = new Date().toLocaleString('zh-CN', { hour12: false })
-    try {
-      const reg = (await registerPrUser({
-        id: acc.registryPrId || prev.id || `MPR-${Date.now()}`,
-        lingqiPrId: '',
-        accountType: prev.accountType || 'personal',
-        companyName: prev.companyName || '',
-        personalName: prev.personalName || acc.wxNickName || acc.loginName || '',
-        contactName: prev.contactName || acc.wxNickName || acc.loginName || '',
-        contactPhone: prev.contactPhone || acc.loginName || '',
-        wechatId: prev.wechatId || '',
-        province: prev.province || '',
-        city: prev.city || '',
-        intro: prev.intro || '',
-        wxNickName: acc.wxNickName || prev.wxNickName || '',
-        wxAvatarUrl: acc.wxAvatarUrl || prev.wxAvatarUrl || '',
-        registeredAt: prev.registeredAt || now,
-        updatedAt: now,
-      })) as { lingqiPrId?: string; id?: string }
-      acc = {
-        ...acc,
-        lingqiPrId: reg.lingqiPrId || acc.lingqiPrId,
-        registryPrId: reg.id || acc.registryPrId,
-        activeRole: 'pr',
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (isSessionCloudError(msg)) {
-        cloudWarning = '云端 PR ID 同步未完成，请重新登录后在「我的」完善资料'
-      } else {
-        throw e
-      }
-    }
-  }
-
-  if (accountRole === 'talent' && !acc.lingqiTalentId) {
-    const prev = readMember()
-    const now = new Date().toLocaleString('zh-CN', { hour12: false })
-    const tags = supplierTagsForWorkId(workId)
-    try {
-      const reg = (await registerTalentMember({
-        id: acc.registryMemberId || prev?.id || `MTM-${Date.now()}`,
-        lingqiTalentId: '',
-        memberType: prev?.memberType || 'douyin',
-        wxNickName: acc.wxNickName || prev?.wxNickName || '',
-        wxAvatarUrl: acc.wxAvatarUrl || prev?.wxAvatarUrl || '',
-        platformProfiles: prev?.platformProfiles || emptyAllProfiles(),
-        contact: prev?.contact || acc.loginName || '',
-        wechatId: prev?.wechatId || '',
-        registeredAt: prev?.registeredAt || now,
-        updatedAt: now,
-        workIdentity: workId === 'shoot' || workId === 'edit' ? workId : 'talent',
-        accountTags: tags,
-      })) as { lingqiTalentId?: string; id?: string }
-      acc = {
-        ...acc,
-        lingqiTalentId: reg.lingqiTalentId || acc.lingqiTalentId,
-        registryMemberId: reg.id || acc.registryMemberId,
-        activeRole: 'talent',
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (isSessionCloudError(msg)) {
-        cloudWarning = `云端${workIdentityLabel(workId)} ID 同步未完成，请重新登录后在「我的」完善资料`
-      } else {
-        throw e
-      }
-    }
-  }
-
-  return { account: acc, cloudWarning }
+function identitySatisfied(workId: MpWorkIdentity, account: MpAccount): boolean {
+  const role = workIdentityToAccountRole(workId)
+  if (role === 'pr') return Boolean(account.lingqiPrId)
+  return Boolean(account.lingqiTalentId)
 }
 
 /** 同一账号切换工作台身份（达人/拍摄/剪辑/PR），并自动注册对应系统 ID */
@@ -189,53 +120,67 @@ export async function applyWorkIdentitySwitch(next: MpWorkIdentity): Promise<Wor
   const token = getToken()
   if (!token) {
     setActiveRole(accountRole)
-    syncLocalProfilesFromAccount(getAccount() || ({} as MpAccount), next)
-    return { workId: next }
+    return {
+      workId: next,
+      needsReLogin: true,
+      cloudWarning: '请重新登录以完成身份注册',
+    }
   }
 
-  const acc = getAccount()
-  const missingTargetId =
-    accountRole === 'pr' ? !acc?.lingqiPrId : !acc?.lingqiTalentId
-  const roleChanged = getActiveRole() !== accountRole
-  let cloudWarning: string | undefined
-  let account = acc
+  try {
+    await fetchSession()
+  } catch {
+    /* 继续尝试 ensure_identity */
+  }
 
-  if (roleChanged || missingTargetId) {
-    try {
-      await fetchSession()
-    } catch {
-      /* 会话刷新失败时仍尝试 switch_role */
-    }
-    try {
-      const res = await switchRole(accountRole)
-      account = res.account
-      setSession(token, account)
-      setActiveRole(accountRole)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (isSessionCloudError(msg)) {
-        cloudWarning = '云端身份同步未完成，已切换本地工作台身份'
-        setActiveRole(accountRole)
-      } else {
-        throw e
+  try {
+    const { account } = await ensureIdentity(accountRole, workIdentityForApi(next))
+    setSession(token, account)
+    setActiveRole(accountRole)
+    syncLocalProfilesFromAccount(account, next)
+    if (!identitySatisfied(next, account)) {
+      return {
+        workId: next,
+        needsReLogin: true,
+        cloudWarning: '身份 ID 未生成，请重新登录完成注册',
       }
     }
-  }
-
-  if (account) {
-    const stillMissing =
-      accountRole === 'pr' ? !account.lingqiPrId : !account.lingqiTalentId
-    if (stillMissing) {
-      const ensured = await ensureTargetIdentityId(next, account)
-      account = ensured.account
-      if (ensured.cloudWarning) cloudWarning = ensured.cloudWarning
-      if (token) setSession(token, account)
-      setActiveRole(account.activeRole)
+    return { workId: next }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (isSessionCloudError(msg)) {
+      setActiveRole(accountRole)
+      const acc = getAccount()
+      if (acc) syncLocalProfilesFromAccount(acc, next)
+      return {
+        workId: next,
+        needsReLogin: true,
+        cloudWarning: '登录已过期，请重新登录以完成身份注册',
+      }
     }
-    syncLocalProfilesFromAccount(account, next)
-  } else {
-    setActiveRole(accountRole)
+    throw e
   }
+}
 
-  return { workId: next, cloudWarning }
+/** 登录成功后绑定工作台身份并生成对应 ID */
+export async function applyWorkIdentityAfterLogin(
+  token: string,
+  account: MpAccount,
+  workId: MpWorkIdentity,
+): Promise<MpAccount> {
+  const accountRole = workIdentityToAccountRole(workId)
+  setWorkIdentity(workId)
+  setSession(token, account)
+  setActiveRole(accountRole)
+  try {
+    const { account: next } = await ensureIdentity(accountRole, workIdentityForApi(workId))
+    setSession(token, next)
+    setActiveRole(accountRole)
+    syncLocalProfilesFromAccount(next, workId)
+    return next
+  } catch {
+    setActiveRole(accountRole)
+    syncLocalProfilesFromAccount(account, workId)
+    return account
+  }
 }

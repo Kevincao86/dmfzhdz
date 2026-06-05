@@ -126,6 +126,7 @@ export type RegistryMpRecruitmentApplicant = {
 export type RegistrySupplierTeamLibraryEntry = {
   id: string
   memberId?: string
+  lingqiTeamId?: string
   lingqiTalentId?: string
   teamType: 'shoot' | 'edit'
   wxNickName: string
@@ -176,6 +177,8 @@ export type RegistryMpTalentMember = {
   province?: string
   city?: string
   workIdentity?: 'talent' | 'shoot' | 'edit'
+  lingqiShootTeamId?: string
+  lingqiEditTeamId?: string
   accountTags?: string[]
   registeredAt: string
   updatedAt: string

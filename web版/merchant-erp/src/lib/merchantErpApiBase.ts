@@ -26,6 +26,7 @@ function normalizeErpApiBase(raw: string): string {
 export function merchantErpApiBase(): string {
   const fromEnv = normalizeErpApiBase(
     (import.meta.env.VITE_ERP_AUTH_API_BASE as string | undefined) ??
+      (import.meta.env.VITE_MP_API_BASE as string | undefined) ??
       (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ??
       '',
   )

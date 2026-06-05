@@ -26,6 +26,14 @@ import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
 import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
+import videoConfigHandler from '../api/meoo-merchant-ai-video-config.ts'
+import klingStartHandler from '../api/meoo-merchant-ai-video-kling-start.ts'
+import klingStatusHandler from '../api/meoo-merchant-ai-video-kling-status.ts'
+import seedanceStartHandler from '../api/meoo-merchant-ai-video-seedance-start.ts'
+import seedanceStatusHandler from '../api/meoo-merchant-ai-video-seedance-status.ts'
+import videoLongformPlanHandler from '../api/meoo-merchant-ai-video-longform-plan.ts'
+import videoDownloadUrlHandler from '../api/meoo-merchant-ai-video-download-url.ts'
+import douyinGoodsAiAssistHandler from '../api/meoo-douyin-goods-ai-assist.ts'
 import iceConfigHandler from '../api/meoo-merchant-ai-video-ice-config.ts'
 import iceOpenshotConfigHandler from '../api/meoo-merchant-ai-video-openshot-config.ts'
 import iceUploadInitHandler from '../api/meoo-merchant-ai-video-ice-upload-init.ts'
@@ -56,7 +64,7 @@ import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260606-mp-group-qr-purge'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260606-merchant-video-ai-routes'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -101,6 +109,16 @@ const routes: Record<string, VercelLikeHandler> = {
   /** 数字人口播：MiniMax 神经 TTS 试听、抖音链接文案（须合并运营台 vendorKeys） */
   '/api/meoo-digital-human-tts': digitalHumanTtsHandler as VercelLikeHandler,
   '/api/meoo-digital-human-douyin-link': digitalHumanDouyinLinkHandler as VercelLikeHandler,
+  /** 短视频 AI（可灵 / 方舟 Seedance / 长片策划）：履约增值服务嵌入须走 ECS */
+  '/api/meoo-merchant-ai-video-config': videoConfigHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-kling-start': klingStartHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-kling-status': klingStatusHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-seedance-start': seedanceStartHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-seedance-status': seedanceStatusHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-longform-plan': videoLongformPlanHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-download-url': videoDownloadUrlHandler as VercelLikeHandler,
+  /** AI 文章与话题（抖音来客文案） */
+  '/api/meoo-douyin-goods-ai-assist': douyinGoodsAiAssistHandler as VercelLikeHandler,
   /** 灵祺AI云剪：读运营台 videoAi 注册表，须走 ECS 勿仅靠 Vercel */
   '/api/meoo-merchant-ai-video-ice-config': iceConfigHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-openshot-config': iceOpenshotConfigHandler as VercelLikeHandler,

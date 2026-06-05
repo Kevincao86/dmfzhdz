@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
 import { phoneRegister, sendRegisterSms } from '../lib/mpApi'
-import { setActiveRole, setSession } from '../lib/mpSession'
+import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import { formatMpApiErr } from '../lib/mpApiErrors'
 import {
   parseWorkIdentityQuery,
@@ -82,9 +82,7 @@ export default function RegisterPage() {
         password,
         role: accountRole,
       })
-      setSession(token, account)
-      setWorkIdentity(workIdentity)
-      setActiveRole(accountRole)
+      await applyWorkIdentityAfterLogin(token, account, workIdentity)
       nav('/hall', { replace: true })
     } catch (e) {
       setErr(formatMpApiErr(e, '注册失败，请稍后重试'))
@@ -106,7 +104,7 @@ export default function RegisterPage() {
       >
         <h1 className="text-xl font-bold">注册 · {WORK_EDITION_LABEL[workIdentity]}</h1>
         <p className="text-sm text-slate-500">
-          手机号将作为登录账号；注册后可在「我的」自由切换达人 / 拍摄 / 剪辑 / PR
+          手机号将作为登录账号；切换身份请退出登录，在首页重新选择身份后登录
         </p>
 
         <label className="block text-sm">
