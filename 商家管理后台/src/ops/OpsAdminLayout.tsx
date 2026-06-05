@@ -1,6 +1,8 @@
 import {
   Bot,
   Building2,
+  Camera,
+  Clapperboard,
   CreditCard,
   Headphones,
   LayoutDashboard,
@@ -31,6 +33,7 @@ const OPS_NAV: {
   label: string
   icon: typeof Building2
   permission: OpsPermissionKey | 'staff_admin' | 'home'
+  indent?: boolean
 }[] = [
   { to: '/', label: '首页', icon: LayoutDashboard, permission: 'home' },
   { to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
@@ -40,6 +43,8 @@ const OPS_NAV: {
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch, permission: 'recruitment_orders' },
   { to: '/mp-recruitment-orders', label: '小程序达人招募订单', icon: Smartphone, permission: 'mp_recruitment_orders' },
   { to: '/talent-library', label: '灵祺达人库', icon: Library, permission: 'talent_library' },
+  { to: '/shoot-team-library', label: '同步拍摄团队库', icon: Camera, permission: 'shoot_team_library', indent: true },
+  { to: '/edit-team-library', label: '同步剪辑团队库', icon: Clapperboard, permission: 'edit_team_library', indent: true },
   { to: '/pr-library', label: 'PR 用户库', icon: Users, permission: 'pr_library' },
   { to: '/ai-models', label: 'AI 模型', icon: Bot, permission: 'ai_models' },
   { to: '/support', label: '在线客服（ERP处理中心）', icon: Headphones, permission: 'support' },
@@ -90,7 +95,7 @@ export default function OpsAdminLayout() {
           </div>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-          {visibleNav.map(({ to, label, icon: Icon }) => {
+          {visibleNav.map(({ to, label, icon: Icon, indent }) => {
             const active =
               to === '/'
                 ? pathname === '/' || pathname === ''
@@ -100,7 +105,8 @@ export default function OpsAdminLayout() {
                 key={to}
                 to={to}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  'flex items-center gap-2.5 rounded-lg py-2.5 text-sm font-medium transition-colors',
+                  indent ? 'pl-7 pr-3 text-[13px]' : 'px-3',
                   active ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:bg-slate-800 hover:text-white',
                 )}
               >

@@ -11,6 +11,7 @@ export default function IdentitySwitchPanel() {
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [err, setErr] = useState('')
+  const [warn, setWarn] = useState('')
 
   async function onPick(next: Parameters<typeof applyWorkIdentitySwitch>[0]) {
     if (next === workId || switching) {
@@ -18,10 +19,12 @@ export default function IdentitySwitchPanel() {
       return
     }
     setErr('')
+    setWarn('')
     setSwitching(true)
     try {
-      await applyWorkIdentitySwitch(next)
+      const result = await applyWorkIdentitySwitch(next)
       setOpen(false)
+      if (result.cloudWarning) setWarn(result.cloudWarning)
       nav('/hall', { replace: true })
       window.location.reload()
     } catch (e) {
@@ -41,6 +44,7 @@ export default function IdentitySwitchPanel() {
       >
         {switching ? '切换中…' : `切换身份 · ${workIdentityLabel(workId)}`}
       </button>
+      {warn ? <p className="px-3 text-xs text-amber-600">{warn}</p> : null}
       {err ? <p className="px-3 text-xs text-red-500">{err}</p> : null}
       <LandingRolePicker
         open={open}

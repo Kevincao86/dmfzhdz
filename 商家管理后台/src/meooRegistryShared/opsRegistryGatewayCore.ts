@@ -77,6 +77,12 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const talentLibraryEntries: RegistryTalentLibraryEntry[] = Array.isArray(parsed?.talentLibraryEntries)
     ? (parsed!.talentLibraryEntries as RegistryTalentLibraryEntry[])
     : []
+  const shootTeamLibraryEntries = Array.isArray(parsed?.shootTeamLibraryEntries)
+    ? parsed!.shootTeamLibraryEntries
+    : []
+  const editTeamLibraryEntries = Array.isArray(parsed?.editTeamLibraryEntries)
+    ? parsed!.editTeamLibraryEntries
+    : []
   const talentPoolCandidates: RegistryTalentPoolRow[] = Array.isArray(parsed?.talentPoolCandidates)
     ? (parsed!.talentPoolCandidates as RegistryTalentPoolRow[])
     : []
@@ -107,6 +113,8 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     mpTalentMembers,
     mpPrUsers,
     talentLibraryEntries,
+    shootTeamLibraryEntries,
+    editTeamLibraryEntries,
     talentPoolCandidates,
     recruitmentScheduleRows,
     recruitmentVideoSubmissions,

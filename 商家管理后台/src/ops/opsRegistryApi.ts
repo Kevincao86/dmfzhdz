@@ -123,6 +123,25 @@ export type RegistryMpRecruitmentApplicant = {
   taskStatus?: 'applied' | 'pending_confirm' | 'confirmed' | 'rejected' | 'shortlisted' | 'approved'
 }
 
+export type RegistrySupplierTeamLibraryEntry = {
+  id: string
+  memberId?: string
+  lingqiTalentId?: string
+  teamType: 'shoot' | 'edit'
+  wxNickName: string
+  wxAvatarUrl?: string
+  contact: string
+  wechatId: string
+  province?: string
+  city?: string
+  platform?: '抖音' | '小红书'
+  platformAccount?: string
+  platformNickname?: string
+  accountTags?: string[]
+  sourceChannel?: 'mp' | 'web'
+  updatedAt: string
+}
+
 export type RegistryTalentLibraryEntry = {
   id: string
   lingqiTalentId?: string
@@ -143,6 +162,23 @@ export type RegistryTalentLibraryEntry = {
   lastMerchantOrderNo?: string
   province?: string
   city?: string
+}
+
+export type RegistryMpTalentMember = {
+  id: string
+  lingqiTalentId?: string
+  memberType: 'douyin' | 'xiaohongshu' | 'both'
+  wxNickName: string
+  wxAvatarUrl: string
+  wxOpenId?: string
+  contact: string
+  wechatId: string
+  province?: string
+  city?: string
+  workIdentity?: 'talent' | 'shoot' | 'edit'
+  accountTags?: string[]
+  registeredAt: string
+  updatedAt: string
 }
 
 export type RegistryMpPrUser = {
@@ -254,8 +290,11 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  mpTalentMembers?: RegistryMpTalentMember[]
   mpPrUsers?: RegistryMpPrUser[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
+  shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
+  editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
@@ -487,4 +526,29 @@ export async function setRecruitmentOrders(orders: RegistryRecruitmentOrder[]): 
   const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
   if (!res.ok) return { ok: false, error: j.error ?? mapHttpError(res.status) }
   return { ok: j.ok !== false }
+}
+
+export async function syncSupplierTeamLibrary(
+  role: 'shoot' | 'edit' | 'all' = 'all',
+): Promise<{ ok: boolean; shootCount: number; editCount: number; error?: string }> {
+  const { res, j } = await postRegistrySync(
+    [
+      '/api/meoo-ops-supplier-team-library-sync',
+      '/api/ops-sync/supplier-team-library/sync',
+    ],
+    { role },
+  )
+  if (!res.ok) {
+    return {
+      ok: false,
+      shootCount: 0,
+      editCount: 0,
+      error: String(j.error || j.detail || mapHttpError(res.status)),
+    }
+  }
+  return {
+    ok: true,
+    shootCount: Number(j.shootCount) || 0,
+    editCount: Number(j.editCount) || 0,
+  }
 }
