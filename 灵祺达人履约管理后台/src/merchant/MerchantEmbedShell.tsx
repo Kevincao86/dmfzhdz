@@ -2,7 +2,6 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { ADDON_NAV } from './embedPages'
 import MerchantEmbedErrorBoundary from './MerchantEmbedErrorBoundary'
 import MerchantEmbedProviders from './MerchantEmbedProviders'
-import '@merchant/index.css'
 import './embed-text-utilities.css'
 import './merchant-embed-theme.css'
 
@@ -34,7 +33,7 @@ export default function MerchantEmbedShell() {
               ))}
             </div>
           </nav>
-          <div className="erp-main merchant-embed-main flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+          <div className="erp-main merchant-embed-main flex-1 overflow-auto p-6 lg:p-8">
             <Outlet />
           </div>
         </div>

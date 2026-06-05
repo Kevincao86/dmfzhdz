@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+/* 嵌入的商家三页组件：与 merchant-erp 构建同一套 Tailwind 工具类 */
+@source "../../web版/merchant-erp/src";
+@import '../../web版/merchant-erp/src/merchantEmbedChrome.css';
 
 /* 默认白光，避免 :root 与暗色变量绑在一起导致亮模式卡片仍偏黑 */
 :root,
