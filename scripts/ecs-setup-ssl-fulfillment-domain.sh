@@ -75,7 +75,9 @@ systemctl reload nginx
 
 echo "== 3) 本机 ACME 路径自测 =="
 TEST_FILE="ping-$(date +%s).txt"
-echo ok >"${WEBROOT}/${TEST_FILE}"
+ACME_DIR="${WEBROOT}/.well-known/acme-challenge"
+mkdir -p "$ACME_DIR"
+echo ok >"${ACME_DIR}/${TEST_FILE}"
 LOCAL_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1/.well-known/acme-challenge/${TEST_FILE}" -H "Host: ${DOMAIN}" || echo 000)"
 PUBLIC_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "http://${DOMAIN}/.well-known/acme-challenge/${TEST_FILE}" || echo 000)"
 rm -f "${WEBROOT}/.well-known/acme-challenge/${TEST_FILE}"
