@@ -265,7 +265,11 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             confirmPassword,
           })
       if (!r.ok) {
-        onErr(toUserFacingError(r.message ?? r.detail ?? r.error, '注册'))
+        const msg =
+          r.error === 'auth_unreachable' && r.detail
+            ? `${toUserFacingError(r.message ?? r.detail ?? r.error, '注册')}（${r.detail}）`
+            : toUserFacingError(r.message ?? r.detail ?? r.error, '注册')
+        onErr(msg)
         return
       }
       setLoginName(ln)
@@ -590,6 +594,9 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             >
               {busy ? '注册中…' : '确认注册'}
             </button>
+            <p className="text-center text-[10px] text-slate-400/80">
+              auth {String(import.meta.env.VITE_AUTH_API_REVISION ?? 'legacy')}
+            </p>
           </form>
         )}
       </div>

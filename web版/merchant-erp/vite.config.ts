@@ -23,6 +23,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_APP_EDITION': JSON.stringify(
         env.VITE_APP_EDITION ?? (mode === 'partner' ? 'partner' : 'merchant'),
       ),
+      /** 注册页排障：确认 Vercel 已部署含「仅同源 auth」的前端 */
+      'import.meta.env.VITE_AUTH_API_REVISION': JSON.stringify('auth-vercel-only-v2'),
     },
     plugins: [
       react(),
