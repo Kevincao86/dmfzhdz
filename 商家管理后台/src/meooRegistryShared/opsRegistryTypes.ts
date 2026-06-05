@@ -221,6 +221,10 @@ export type RegistryMpTalentMember = {
   city?: string
   /** 履约 Web 工作台身份：拍摄/剪辑团队注册时写入 */
   workIdentity?: 'talent' | 'shoot' | 'edit'
+  /** 拍摄团队固定 ID（LQ-PS-xxxxxx） */
+  lingqiShootTeamId?: string
+  /** 剪辑团队固定 ID（LQ-J-xxxxxx） */
+  lingqiEditTeamId?: string
   accountTags?: string[]
   douyin?: RegistryMpTalentPlatformProfile
   xiaohongshu?: RegistryMpTalentPlatformProfile
@@ -232,6 +236,9 @@ export type RegistryMpTalentMember = {
 export type RegistrySupplierTeamLibraryEntry = {
   id: string
   memberId?: string
+  /** 团队库主 ID：拍摄 LQ-PS-、剪辑 LQ-J- */
+  lingqiTeamId?: string
+  /** @deprecated 兼容旧数据 */
   lingqiTalentId?: string
   teamType: 'shoot' | 'edit'
   wxNickName: string

@@ -6,36 +6,18 @@
  */
 
 import { isValidAiVendorSlug } from '../lib/aiVendorCatalogShared'
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 export { listAiUiModelOptions } from './merchantAiVendorCatalogClient'
 
-const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
-
 function assistFetchUrlCandidates(path: string): string[] {
-  const out: string[] = []
-  const add = (u: string) => {
-    const t = u.trim()
-    if (!t || out.includes(t)) return
-    out.push(t)
-  }
-  const p = path.startsWith('/') ? path : `/${path}`
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    try {
-      add(new URL(p, window.location.origin).href)
-    } catch {
-      /* ignore */
-    }
-  }
-  const b = apiBase().replace(/\/$/, '')
-  if (b) add(`${b}${p}`)
-  if (out.length === 0) add(p)
-  return out
+  return merchantApiFetchUrls(path)
 }
 
 function url(path: string) {
-  const b = apiBase().replace(/\/$/, '')
-  return `${b}${path}`
+  const candidates = merchantApiFetchUrls(path)
+  return candidates[0] ?? path
 }
 
 function authHeaders(): HeadersInit {

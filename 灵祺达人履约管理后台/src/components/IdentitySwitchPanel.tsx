@@ -24,6 +24,10 @@ export default function IdentitySwitchPanel() {
     try {
       const result = await applyWorkIdentitySwitch(next)
       setOpen(false)
+      if (result.needsReLogin) {
+        nav(`/login?role=${next}`, { replace: true })
+        return
+      }
       if (result.cloudWarning) setWarn(result.cloudWarning)
       nav('/hall', { replace: true })
       window.location.reload()

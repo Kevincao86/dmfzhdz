@@ -1,5 +1,32 @@
 @import 'tailwindcss';
 
+:root,
+html[data-theme='light'] {
+  --ops-bg: #f0f2f5;
+  --ops-sidebar: #ffffff;
+  --ops-header: rgba(255, 255, 255, 0.95);
+  --ops-panel: #ffffff;
+  --ops-border: #e2e8f0;
+  --ops-text: #0f172a;
+  --ops-muted: #64748b;
+  --ops-hover: #f1f5f9;
+  --ops-input-bg: #ffffff;
+  --ops-input-text: #0f172a;
+}
+
+html[data-theme='dark'] {
+  --ops-bg: #020617;
+  --ops-sidebar: #0f172a;
+  --ops-header: rgba(15, 23, 42, 0.95);
+  --ops-panel: #0f172a;
+  --ops-border: #1e293b;
+  --ops-text: #f1f5f9;
+  --ops-muted: #94a3b8;
+  --ops-hover: #1e293b;
+  --ops-input-bg: #020617;
+  --ops-input-text: #e2e8f0;
+}
+
 html,
 body,
 #root {
@@ -8,4 +35,88 @@ body,
 
 body {
   margin: 0;
+  font-family: 'Noto Sans SC', system-ui, sans-serif;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+}
+
+.ops-shell {
+  background: var(--ops-bg);
+  color: var(--ops-text);
+}
+
+.ops-sidebar {
+  background: var(--ops-sidebar);
+  border-color: var(--ops-border);
+}
+
+.ops-header {
+  background: var(--ops-header);
+  border-color: var(--ops-border);
+}
+
+.ops-panel {
+  background: var(--ops-panel);
+  border-color: var(--ops-border);
+}
+
+.ops-muted {
+  color: var(--ops-muted);
+}
+
+/* 白光模式：覆盖运营台写死的暗色 Tailwind 类 */
+html[data-theme='light'] .bg-slate-950 {
+  background-color: #f0f2f5 !important;
+}
+
+html[data-theme='light'] .bg-slate-900 {
+  background-color: #ffffff !important;
+}
+
+html[data-theme='light'] .bg-slate-900\/95 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html[data-theme='light'] .bg-slate-950\/80 {
+  background-color: #f8fafc !important;
+}
+
+html[data-theme='light'] :is(.border-slate-800, .border-slate-700) {
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme='light'] .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+html[data-theme='light'] :is(.text-white, .text-slate-100) {
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] .text-slate-200 {
+  color: #334155 !important;
+}
+
+html[data-theme='light'] .text-slate-300 {
+  color: #475569 !important;
+}
+
+html[data-theme='light'] :is(.text-slate-400, .text-slate-500) {
+  color: #64748b !important;
+}
+
+html[data-theme='light'] .hover\:bg-slate-800:hover,
+html[data-theme='light'] .hover\:bg-slate-800\/40:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html[data-theme='light'] .bg-slate-950.px-3 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html[data-theme='light'] input.bg-slate-950 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
 }

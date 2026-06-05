@@ -50,27 +50,72 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
   return { ...body }
 }
 
-export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
-  const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
-  let lastNetworkErr = ''
-  for (const p of paths) {
-    for (const url of merchantApiFetchUrls(p)) {
+async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
+  for (const url of merchantApiFetchUrls(pathWithQuery)) {
     try {
       const res = await fetch(url)
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
       if (res.status === 404) continue
       if (res.ok && responseLooksLikeHtml(text, ct)) continue
-      let j: VideoAiBackendConfig | null = null
-      try {
-        j = JSON.parse(text) as VideoAiBackendConfig
-      } catch {
-        j = null
-      }
-      if (res.ok && j && typeof j.klingConfigured === 'boolean') return j
-    } catch (e) {
-      lastNetworkErr = e instanceof Error ? e.message : String(e)
+      return new Response(text, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
+      })
+    } catch {
+      /* try next candidate */
     }
+  }
+  return null
+}
+
+async function fetchVideoPost(path: string, body: Record<string, unknown>): Promise<Response | null> {
+  const bodyStr = JSON.stringify(body)
+  for (const url of merchantApiFetchUrls(path)) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: bodyStr,
+      })
+      const text = await res.text()
+      const ct = res.headers.get('content-type') ?? ''
+      if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
+      if (res.ok && responseLooksLikeHtml(text, ct)) continue
+      return new Response(text, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
+      })
+    } catch {
+      /* try next candidate */
+    }
+  }
+  return null
+}
+
+export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
+  const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
+  let lastNetworkErr = ''
+  for (const p of paths) {
+    for (const url of merchantApiFetchUrls(p)) {
+      try {
+        const res = await fetch(url)
+        const text = await res.text()
+        const ct = res.headers.get('content-type') ?? ''
+        if (res.status === 404) continue
+        if (res.ok && responseLooksLikeHtml(text, ct)) continue
+        let j: VideoAiBackendConfig | null = null
+        try {
+          j = JSON.parse(text) as VideoAiBackendConfig
+        } catch {
+          j = null
+        }
+        if (res.ok && j && typeof j.klingConfigured === 'boolean') return j
+      } catch (e) {
+        lastNetworkErr = e instanceof Error ? e.message : String(e)
+      }
     }
   }
   if (lastNetworkErr) {
@@ -93,36 +138,44 @@ export async function postLongformVideoPlan(body: {
   mode: LongformPlanMode
   negativeHint?: string
 }): Promise<{ ok: true; prompts: string[] } | { ok: false; message: string }> {
-  const res = await fetch('/api/merchant/ai/video/longform/plan', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(buildVideoPostBody({ ...body })),
-  })
-  const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
-  if (!res.ok || !j.ok) {
-    const msg =
-      typeof j.message === 'string' ? j.message : `长片策划失败 HTTP ${res.status}`
-    return { ok: false, message: msg }
+  const paths = [
+    '/api/meoo-merchant-ai-video-longform-plan',
+    '/api/merchant/ai/video/longform/plan',
+  ] as const
+  for (const p of paths) {
+    const res = await fetchVideoPost(p, buildVideoPostBody({ ...body }))
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
+    if (!res.ok || !j.ok) {
+      const msg =
+        typeof j.message === 'string' ? j.message : `长片策划失败 HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const raw = j.prompts
+    if (!Array.isArray(raw)) return { ok: false, message: '服务端未返回 prompts' }
+    const prompts = raw.map((x) => String(x).trim()).filter(Boolean)
+    if (prompts.length === 0) return { ok: false, message: '分段提示词为空' }
+    return { ok: true, prompts }
   }
-  const raw = j.prompts
-  if (!Array.isArray(raw)) return { ok: false, message: '服务端未返回 prompts' }
-  const prompts = raw.map((x) => String(x).trim()).filter(Boolean)
-  if (prompts.length === 0) return { ok: false, message: '分段提示词为空' }
-  return { ok: true, prompts }
+  return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }
 }
 
 /** 经 dev 网关拉取成片，避免跨域导致无法截尾帧或拼接 */
 export async function downloadVideoUrlAsBlob(url: string): Promise<Blob> {
-  const res = await fetch('/api/merchant/ai/video/download-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ url }),
-  })
-  if (!res.ok) {
-    const j = await parseJsonSafe<{ message?: string }>(res)
-    throw new Error(j?.message || `下载视频失败 HTTP ${res.status}`)
+  const paths = [
+    '/api/meoo-merchant-ai-video-download-url',
+    '/api/merchant/ai/video/download-url',
+  ] as const
+  for (const p of paths) {
+    const res = await fetchVideoPost(p, { url })
+    if (!res) continue
+    if (!res.ok) {
+      const j = await parseJsonSafe<{ message?: string }>(res)
+      throw new Error(j?.message || `下载视频失败 HTTP ${res.status}`)
+    }
+    return res.blob()
   }
-  return res.blob()
+  throw new Error('下载视频失败：视频 AI 接口未部署或不可达')
 }
 
 export type KlingStartKind = 'text2video' | 'image2video'
@@ -143,21 +196,9 @@ export async function postKlingVideoStart(body: {
 > {
   const paths = ['/api/meoo-merchant-ai-video-kling-start', '/api/merchant/ai/video/kling/start'] as const
   for (const p of paths) {
-    const res = await fetch(p, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify(body),
-    })
-    const text = await res.text()
-    const ct = res.headers.get('content-type') ?? ''
-    if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
-    if (res.ok && responseLooksLikeHtml(text, ct)) continue
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(text) as Record<string, unknown>
-    } catch {
-      j = {}
-    }
+    const res = await fetchVideoPost(p, body)
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     const okFlag = Boolean(j.ok)
     if (!res.ok || !okFlag) {
       const msg =
@@ -192,27 +233,16 @@ export async function fetchKlingVideoStatus(
     }
   | { ok: false; message: string }
 > {
-  const sp = new URLSearchParams({
-    taskId,
-    kind,
-  })
+  const sp = new URLSearchParams({ taskId, kind })
   const qs = `?${sp}`
   const paths = [
     `/api/meoo-merchant-ai-video-kling-status${qs}`,
     `/api/merchant/ai/video/kling/status${qs}`,
   ] as const
   for (const p of paths) {
-    const res = await fetch(p)
-    const text = await res.text()
-    const ct = res.headers.get('content-type') ?? ''
-    if (res.status === 404) continue
-    if (res.ok && responseLooksLikeHtml(text, ct)) continue
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(text) as Record<string, unknown>
-    } catch {
-      j = {}
-    }
+    const res = await fetchVideoGet(p)
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {
       const msg =
         typeof j.message === 'string' ? j.message : `可灵查询失败 HTTP ${res.status}`
@@ -225,12 +255,7 @@ export async function fetchKlingVideoStatus(
         : 'running'
     const videoUrl = typeof j.videoUrl === 'string' ? j.videoUrl : null
     const taskStatus = typeof j.taskStatus === 'string' ? j.taskStatus : null
-    return {
-      ok: true,
-      phase: safePhase,
-      videoUrl,
-      taskStatus,
-    }
+    return { ok: true, phase: safePhase, videoUrl, taskStatus }
   }
   return { ok: false, message: '可灵查询失败 HTTP 404' }
 }
@@ -246,21 +271,9 @@ export async function postSeedanceVideoStart(body: {
     '/api/merchant/ai/video/seedance/start',
   ] as const
   for (const p of paths) {
-    const res = await fetch(p, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify(body),
-    })
-    const text = await res.text()
-    const ct = res.headers.get('content-type') ?? ''
-    if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
-    if (res.ok && responseLooksLikeHtml(text, ct)) continue
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(text) as Record<string, unknown>
-    } catch {
-      j = {}
-    }
+    const res = await fetchVideoPost(p, body)
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {
       const msg =
         typeof j.message === 'string'
@@ -300,17 +313,9 @@ export async function fetchSeedanceVideoStatus(
     `/api/merchant/ai/video/seedance/status${qs}`,
   ] as const
   for (const p of paths) {
-    const res = await fetch(p)
-    const text = await res.text()
-    const ct = res.headers.get('content-type') ?? ''
-    if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
-    if (res.ok && responseLooksLikeHtml(text, ct)) continue
-    let j: Record<string, unknown> = {}
-    try {
-      j = JSON.parse(text) as Record<string, unknown>
-    } catch {
-      j = {}
-    }
+    const res = await fetchVideoGet(p)
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
     if (!res.ok || !j.ok) {
       const msg =
         typeof j.message === 'string'

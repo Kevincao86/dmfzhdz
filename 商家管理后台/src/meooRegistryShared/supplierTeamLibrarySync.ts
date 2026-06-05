@@ -3,6 +3,7 @@ import type {
   RegistryMpTalentMember,
   RegistrySupplierTeamLibraryEntry,
 } from './opsRegistryTypes.js'
+import { allocateLingqiEditTeamId, allocateLingqiShootTeamId } from './lingqiIdentity.js'
 
 export const SHOOT_TAG_RE = /拍摄|跟拍|摄像|摄影|片场|拍摄团队/
 export const EDIT_TAG_RE = /剪辑|后期|调色|包装|字幕|剪辑团队/
@@ -39,20 +40,29 @@ function primaryPlatform(m: RegistryMpTalentMember) {
   return null
 }
 
+function teamIdForMember(m: RegistryMpTalentMember, teamType: SupplierTeamRole): string | undefined {
+  if (teamType === 'shoot') return m.lingqiShootTeamId
+  return m.lingqiEditTeamId
+}
+
 function entryKey(e: RegistrySupplierTeamLibraryEntry): string {
-  return String(e.lingqiTalentId || e.memberId || e.wxNickName || e.id)
+  return String(e.lingqiTeamId || e.memberId || e.wxNickName || e.id)
     .trim()
     .toLowerCase()
 }
 
-function memberToEntry(m: RegistryMpTalentMember, teamType: SupplierTeamRole): RegistrySupplierTeamLibraryEntry {
+export function memberToTeamLibraryEntry(
+  m: RegistryMpTalentMember,
+  teamType: SupplierTeamRole,
+): RegistrySupplierTeamLibraryEntry {
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const primary = primaryPlatform(m)
   const openId = String(m.wxOpenId || '').trim()
+  const lingqiTeamId = teamIdForMember(m, teamType)
   return {
     id: `STL-${teamType}-${m.id}`,
     memberId: m.id,
-    lingqiTalentId: m.lingqiTalentId,
+    lingqiTeamId,
     teamType,
     wxNickName: m.wxNickName,
     wxAvatarUrl: m.wxAvatarUrl,
@@ -79,25 +89,71 @@ function dedupeEntries(list: RegistrySupplierTeamLibraryEntry[]) {
   })
 }
 
-/** 从 mpTalentMembers 扫描拍摄/剪辑团队并写入注册表团队库 */
+/** 注册/更新会员时自动写入拍摄或剪辑团队库 */
+export function upsertSupplierTeamLibraryFromMember(
+  data: RegistryFile,
+  member: RegistryMpTalentMember,
+): RegistryMpTalentMember {
+  const role = memberSupplierRole(member)
+  if (!role) return member
+
+  const hasContact = String(member.contact || '').trim() && String(member.wechatId || '').trim()
+  if (!hasContact) return member
+
+  const next = { ...member }
+  if (role === 'shoot' && !next.lingqiShootTeamId) {
+    next.lingqiShootTeamId = allocateLingqiShootTeamId(data)
+  }
+  if (role === 'edit' && !next.lingqiEditTeamId) {
+    next.lingqiEditTeamId = allocateLingqiEditTeamId(data)
+  }
+
+  const entry = memberToTeamLibraryEntry(next, role)
+  const listKey = role === 'shoot' ? 'shootTeamLibraryEntries' : 'editTeamLibraryEntries'
+  const list = [...(data[listKey] ?? [])]
+  const idx = list.findIndex((e) => e.memberId === next.id || entryKey(e) === entryKey(entry))
+  if (idx >= 0) list[idx] = { ...list[idx], ...entry }
+  else list.unshift(entry)
+  data[listKey] = dedupeEntries(list).slice(0, 5000)
+
+  const members = [...(data.mpTalentMembers ?? [])]
+  const midx = members.findIndex((m) => m.id === next.id)
+  if (midx >= 0) {
+    members[midx] = { ...members[midx], ...next }
+    data.mpTalentMembers = members
+  }
+  return next
+}
+
+/** 运营台手动全量扫描会员池 */
 export function syncSupplierTeamLibraries(
   data: RegistryFile,
   roles: SupplierTeamRole[] = ['shoot', 'edit'],
 ): { shootCount: number; editCount: number } {
   const members = data.mpTalentMembers ?? []
-  const shootEntries: RegistrySupplierTeamLibraryEntry[] = []
-  const editEntries: RegistrySupplierTeamLibraryEntry[] = []
-
   for (const m of members) {
-    const role = memberSupplierRole(m)
-    if (role === 'shoot' && roles.includes('shoot')) shootEntries.push(memberToEntry(m, 'shoot'))
-    if (role === 'edit' && roles.includes('edit')) editEntries.push(memberToEntry(m, 'edit'))
+    upsertSupplierTeamLibraryFromMember(data, m)
+  }
+
+  if (roles.includes('shoot') && roles.includes('edit')) {
+    return {
+      shootCount: data.shootTeamLibraryEntries?.length ?? 0,
+      editCount: data.editTeamLibraryEntries?.length ?? 0,
+    }
   }
 
   if (roles.includes('shoot')) {
+    const shootEntries: RegistrySupplierTeamLibraryEntry[] = []
+    for (const m of members) {
+      if (memberSupplierRole(m) === 'shoot') shootEntries.push(memberToTeamLibraryEntry(m, 'shoot'))
+    }
     data.shootTeamLibraryEntries = dedupeEntries(shootEntries).slice(0, 5000)
   }
   if (roles.includes('edit')) {
+    const editEntries: RegistrySupplierTeamLibraryEntry[] = []
+    for (const m of members) {
+      if (memberSupplierRole(m) === 'edit') editEntries.push(memberToTeamLibraryEntry(m, 'edit'))
+    }
     data.editTeamLibraryEntries = dedupeEntries(editEntries).slice(0, 5000)
   }
 

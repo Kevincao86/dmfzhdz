@@ -3,8 +3,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '../cn'
 import { formatMpApiErr } from '../lib/mpApiErrors'
-import { passwordLogin, scanCreate, scanPoll, switchRole } from '../lib/mpApi'
-import { enterDevPreview, setActiveRole, setSession } from '../lib/mpSession'
+import { passwordLogin, scanCreate, scanPoll } from '../lib/mpApi'
+import { enterDevPreview } from '../lib/mpSession'
+import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import {
   parseWorkIdentityQuery,
   setWorkIdentity,
@@ -23,26 +24,6 @@ function parseLoginWorkIdentity(raw: string | null): MpWorkIdentity | null {
   if (!raw) return null
   const id = parseWorkIdentityQuery(raw)
   return raw === id ? id : null
-}
-
-async function applyRoleAfterLogin(
-  token: string,
-  account: import('../lib/mpSession').MpAccount,
-  workIdentity: MpWorkIdentity,
-) {
-  const accountRole = workIdentityToAccountRole(workIdentity)
-  setSession(token, account)
-  setWorkIdentity(workIdentity)
-  setActiveRole(accountRole)
-  if (account.activeRole !== accountRole) {
-    try {
-      const { account: next } = await switchRole(accountRole)
-      setSession(token, next)
-      setActiveRole(accountRole)
-    } catch {
-      setActiveRole(accountRole)
-    }
-  }
 }
 
 export default function LoginPage() {
@@ -90,7 +71,7 @@ export default function LoginPage() {
       try {
         const r = await scanPoll(ticket)
         if (r.status === 'confirmed' && r.token && r.account) {
-          await applyRoleAfterLogin(r.token, r.account, workIdentity)
+          await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
           nav('/hall', { replace: true })
         } else if (r.message) setScanHint(r.message)
       } catch (_) {}
@@ -103,7 +84,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { token, account } = await passwordLogin(loginName.trim(), password)
-      await applyRoleAfterLogin(token, account, workIdentity)
+      await applyWorkIdentityAfterLogin(token, account, workIdentity)
       nav('/hall', { replace: true })
     } catch (e) {
       setErr(formatMpApiErr(e, '登录失败，请稍后重试'))

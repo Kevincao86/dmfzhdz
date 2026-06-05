@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import SecretInput from '../components/SecretInput'
+import ThemeToggle from '../components/ThemeToggle'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import {
   ensureOpsMasterAccount,
@@ -102,6 +103,9 @@ export default function OpsLoginPage() {
             {busy ? '登录中…' : '登录'}
           </button>
         </form>
+        <div className="mt-6">
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   )

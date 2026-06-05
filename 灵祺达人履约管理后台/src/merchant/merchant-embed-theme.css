@@ -258,11 +258,188 @@
   color: var(--embed-text-accent) !important;
 }
 
+[data-theme='light'] .merchant-embed-root {
+  --embed-text-primary: #0f172a;
+  --embed-text-secondary: #334155;
+  --embed-text-muted: #64748b;
+  --embed-text-accent: #6d28d9;
+  --embed-border: #e2e8f0;
+  --embed-border-soft: #f1f5f9;
+  --embed-panel-bg: #ffffff;
+  --embed-panel-muted: #f8fafc;
+}
+
 [data-theme='light'] .merchant-embed-root.erp-main-surface {
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(34, 211, 238, 0.08), transparent 55%),
     radial-gradient(900px 500px at 100% 0%, rgba(251, 146, 60, 0.06), transparent 50%),
     linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+/* ── 白光模式：嵌入区卡片 / 边框 / 表单（对齐商家 Web 玻璃浅底风格）── */
+html[data-theme='light'] .merchant-embed-root .erp-panel,
+html:not([data-theme='dark']) .merchant-embed-root .erp-panel {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: var(--embed-border) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.02) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root :is(
+  .border-zinc-100,
+  .border-zinc-200,
+  .border-zinc-300,
+  .border-slate-200,
+  .border-slate-200\/90,
+  .border-slate-300,
+  .border-gray-100,
+  .border-gray-200,
+  .border-gray-300
+),
+html:not([data-theme='dark']) .merchant-embed-root :is(
+  .border-zinc-100,
+  .border-zinc-200,
+  .border-zinc-300,
+  .border-slate-200,
+  .border-slate-200\/90,
+  .border-slate-300,
+  .border-gray-100,
+  .border-gray-200,
+  .border-gray-300
+) {
+  border-color: var(--embed-border) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root :is(
+  .bg-white,
+  .bg-white\/95,
+  .bg-white\/90,
+  .bg-white\/80
+),
+html:not([data-theme='dark']) .merchant-embed-root :is(
+  .bg-white,
+  .bg-white\/95,
+  .bg-white\/90,
+  .bg-white\/80
+) {
+  background-color: var(--embed-panel-bg) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root :is(
+  .bg-zinc-50,
+  .bg-zinc-50\/60,
+  .bg-slate-50,
+  .bg-slate-50\/80,
+  .bg-gray-50,
+  .bg-gray-50\/90
+),
+html:not([data-theme='dark']) .merchant-embed-root :is(
+  .bg-zinc-50,
+  .bg-zinc-50\/60,
+  .bg-slate-50,
+  .bg-slate-50\/80,
+  .bg-gray-50,
+  .bg-gray-50\/90
+) {
+  background-color: var(--embed-panel-muted) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .erp-main :is(
+  [class*='text-zinc-8'],
+  [class*='text-zinc-9'],
+  [class*='text-slate-8'],
+  [class*='text-slate-9'],
+  [class*='text-gray-8'],
+  [class*='text-gray-9'],
+  h1, h2, h3, h4, label, .erp-page-title
+),
+html:not([data-theme='dark']) .merchant-embed-root .erp-main :is(
+  [class*='text-zinc-8'],
+  [class*='text-zinc-9'],
+  [class*='text-slate-8'],
+  [class*='text-slate-9'],
+  [class*='text-gray-8'],
+  [class*='text-gray-9'],
+  h1, h2, h3, h4, label, .erp-page-title
+) {
+  color: var(--embed-text-primary) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .erp-main :is(
+  [class*='text-zinc-5'],
+  [class*='text-zinc-6'],
+  [class*='text-slate-5'],
+  [class*='text-slate-6'],
+  [class*='text-gray-5'],
+  [class*='text-gray-6']
+),
+html:not([data-theme='dark']) .merchant-embed-root .erp-main :is(
+  [class*='text-zinc-5'],
+  [class*='text-zinc-6'],
+  [class*='text-slate-5'],
+  [class*='text-slate-6'],
+  [class*='text-gray-5'],
+  [class*='text-gray-6']
+) {
+  color: var(--embed-text-muted) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root input:not([type='checkbox']):not([type='radio']),
+html[data-theme='light'] .merchant-embed-root select,
+html[data-theme='light'] .merchant-embed-root textarea,
+html:not([data-theme='dark']) .merchant-embed-root input:not([type='checkbox']):not([type='radio']),
+html:not([data-theme='dark']) .merchant-embed-root select,
+html:not([data-theme='dark']) .merchant-embed-root textarea {
+  background-color: #ffffff !important;
+  border-color: var(--embed-border) !important;
+  color: var(--embed-text-primary) !important;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+html[data-theme='light'] .merchant-embed-root .border-dashed,
+html:not([data-theme='dark']) .merchant-embed-root .border-dashed {
+  border-color: #cbd5e1 !important;
+  background-color: #fafbfc !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .inline-flex.rounded-lg.border button:not([class*='bg-orange']):not([class*='bg-violet']):not([class*='bg-white']),
+html:not([data-theme='dark']) .merchant-embed-root .inline-flex.rounded-lg.border button:not([class*='bg-orange']):not([class*='bg-violet']):not([class*='bg-white']) {
+  color: var(--embed-text-muted) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .inline-flex.rounded-lg.border button[class*='bg-white'],
+html:not([data-theme='dark']) .merchant-embed-root .inline-flex.rounded-lg.border button[class*='bg-white'] {
+  background-color: #ffffff !important;
+  color: var(--embed-text-accent) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .shadow-sm,
+html[data-theme='light'] .merchant-embed-root .shadow,
+html:not([data-theme='dark']) .merchant-embed-root .shadow-sm,
+html:not([data-theme='dark']) .merchant-embed-root .shadow {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .rounded-full.border.border-gray-200,
+html[data-theme='light'] .merchant-embed-root .rounded-xl.border.border-gray-200.bg-white,
+html:not([data-theme='dark']) .merchant-embed-root .rounded-full.border.border-gray-200,
+html:not([data-theme='dark']) .merchant-embed-root .rounded-xl.border.border-gray-200.bg-white {
+  background-color: #ffffff !important;
+  border-color: var(--embed-border) !important;
+}
+
+html[data-theme='light'] .merchant-embed-root button.rounded-full.border[class*='bg-white'],
+html:not([data-theme='dark']) .merchant-embed-root button.rounded-full.border[class*='bg-white'] {
+  background-color: #f5f3ff !important;
+  color: var(--embed-text-accent) !important;
+  border-color: #ddd6fe !important;
+}
+
+html[data-theme='light'] .merchant-embed-root .hover\:bg-zinc-50:hover,
+html[data-theme='light'] .merchant-embed-root .hover\:bg-slate-50:hover,
+html:not([data-theme='dark']) .merchant-embed-root .hover\:bg-zinc-50:hover,
+html:not([data-theme='dark']) .merchant-embed-root .hover\:bg-slate-50:hover {
+  background-color: #f1f5f9 !important;
 }
 
 /* ── 暗黑模式：硬编码字色（避免 merchant :root 变量与 @layer 覆盖失效）── */

@@ -96,7 +96,7 @@ export default function RecruitmentDetailPage() {
             <p className="text-sm text-emerald-400">您已报名该招募，可在「我的履约」查看记录。</p>
           ) : null}
           {role === 'pr' ? (
-            <p className="text-sm text-slate-500">PR 账号仅可浏览大厅，报名请切换达人版。</p>
+            <p className="text-sm text-slate-500">PR 账号仅可浏览大厅，报名请退出后以达人 / 拍摄 / 剪辑身份登录。</p>
           ) : null}
         </>
       ) : null}

@@ -2,6 +2,7 @@ import type { RegistryFile, RegistryMpTalentMember, RegistryMpTalentPlatformProf
 import { allocateLingqiTalentId, memberHasPlatformInfo } from './lingqiIdentity.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
+import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 
 function profileToApplicant(
   platform: string,
@@ -83,5 +84,5 @@ export function upsertMpTalentMember(data: RegistryFile, member: RegistryMpTalen
       ...libOpts,
     })
   }
-  return next
+  return upsertSupplierTeamLibraryFromMember(data, next)
 }

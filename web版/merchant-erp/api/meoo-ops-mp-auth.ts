@@ -18,6 +18,7 @@ import {
   mpAuthScanCreate,
   mpAuthScanPoll,
   mpAuthSetLoginCredentials,
+  mpAuthEnsureIdentity,
   mpAuthSwitchRole,
   mpAuthWxLogin,
   resolveSession,
@@ -49,8 +50,10 @@ function rawBody(req: VercelRequest): string {
 }
 
 function sessionToken(req: VercelRequest, body: Record<string, unknown>): string {
-  const h = req.headers['x-mp-session'] || req.headers.authorization
-  if (typeof h === 'string' && h.startsWith('Bearer ')) return h.slice(7).trim()
+  const mpHdr = req.headers['x-mp-session']
+  if (typeof mpHdr === 'string' && mpHdr.trim()) return mpHdr.trim()
+  const auth = req.headers.authorization
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim()
   const q = req.query?.sessionToken ?? req.query?.token
   const fromQuery = Array.isArray(q) ? String(q[0] || '') : String(q || '')
   return String(body.sessionToken || body.token || fromQuery || '').trim()
@@ -225,6 +228,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'ensure_identity') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const roleRaw = pickAuthField(req, body, 'role')
+      const workRaw = pickAuthField(req, body, 'workIdentity')
+      const workIdentity =
+        workRaw === 'shoot' || workRaw === 'edit' ? workRaw : workRaw === 'talent' ? 'talent' : undefined
+      const account = await mpAuthEnsureIdentity(
+        supabaseUrl,
+        serviceRole,
+        sess.account.id,
+        roleRaw === 'pr' ? 'pr' : 'talent',
+        workIdentity,
+      )
+      sendJson(res, 200, { ok: true, account: accountToClientPayload(account) })
+      return
+    }
+
     if (action === 'session') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -281,6 +306,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'register',
         'set_password',
         'switch_role',
+        'ensure_identity',
         'session',
         'scan_create',
         'scan_poll',
