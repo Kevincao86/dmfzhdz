@@ -9,7 +9,7 @@ import type {
   RegistryVendorKeys,
   RegistryVideoAi,
 } from '../src/lib/opsRegistryTypes.js'
-import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
+import { mergeRegistryVideoAiSave } from '../src/lib/registryVideoAiNormalize.js'
 import type { RegistrySnapshotIo } from '../src/lib/registrySnapshotIoFetch.js'
 import { sanitizeVendorApiKey } from './merchantRegistryVendorEnv.js'
 
@@ -123,8 +123,7 @@ export async function opsRegistrySupabaseSaveVideoAi(
   }
   const lastWriter = body.lastWriter === 'erp' ? 'erp' : 'ops'
   const data = await io.load()
-  const nextAi = normalizeRegistryVideoAi(body.videoAi ?? {})
-  data.videoAi = Object.keys(nextAi).length > 0 ? nextAi : {}
+  data.videoAi = mergeRegistryVideoAiSave(data.videoAi, body.videoAi ?? {})
   data.videoAiUpdatedAt = new Date().toISOString()
   data.videoAiWriter = lastWriter
   if (lastWriter === 'ops') {

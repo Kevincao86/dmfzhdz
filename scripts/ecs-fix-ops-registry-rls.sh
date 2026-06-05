@@ -90,14 +90,15 @@ verify_postgrest() {
     echo "FAIL: 404 多为 PostgREST 未刷新或 URL 端口错（ECS 应为 :8888，不是 :3000）"
     return 1
   fi
+  # 仅 PATCH updated_at 验证可写；切勿 POST registry:{} — 会清空全部 vendorKeys/videoAi 绑定
   code=$(curl -sS -m 10 -o /tmp/ops-snap-test.json -w "%{http_code}" \
-    -X POST "${base}/rest/v1/ops_registry_snapshot" \
+    -X PATCH "${base}/rest/v1/ops_registry_snapshot?id=eq.1" \
     -H "apikey: ${key}" \
     -H "Authorization: Bearer ${key}" \
     -H "Content-Type: application/json" \
-    -H "Prefer: resolution=merge-duplicates,return=minimal" \
-    -d '{"id":1,"registry":{},"updated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' || echo 000)
-  echo "POST http_code=$code body=$(head -c 200 /tmp/ops-snap-test.json 2>/dev/null || true)"
+    -H "Prefer: return=minimal" \
+    -d '{"updated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' || echo 000)
+  echo "PATCH(updated_at) http_code=$code body=$(head -c 200 /tmp/ops-snap-test.json 2>/dev/null || true)"
   if [[ "$code" == "401" ]] || [[ "$code" == "403" ]]; then
     echo "FAIL: 请执行 bash ~/app/scripts/ecs-run-auth-api.sh 重生 service_role JWT"
     return 1
