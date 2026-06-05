@@ -3,11 +3,10 @@
 #
 # 机器：履约 Web 在 ECS（8.160.173.236）；API 在轻量（139.196.42.5 / mofangdianai.com）
 #
-# 并行迁移（Vercel 仍在线），见 docs/MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md：
-#   步骤 4) DNS ly-ecs → ECS IP
-#   步骤 5) 在新 ECS 执行（须指定轻量 API）：
-#     MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-talent-fulfillment-web.sh
-#   步骤 8) bash scripts/ecs-cutover-talent-fulfillment-dns.sh <正式域>
+# 正式域默认 dr.mofangdianai.com，见 docs/MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md
+#   DNS: dr → ECS 8.160.173.236
+#   sudo bash scripts/ecs-setup-ssl-fulfillment-domain.sh dr.mofangdianai.com
+#   MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-talent-fulfillment-web.sh
 #
 # 2G 内存构建失败时本机构建后上传：
 #   SKIP_BUILD=1 bash scripts/ecs-deploy-talent-fulfillment-web.sh
@@ -27,8 +26,12 @@ NGINX_SITE="/etc/nginx/sites-available/meoo-talent-fulfillment"
 
 # 新 ECS 默认反代到轻量；仅在轻量本机构建+同机 auth-api 时用 http://127.0.0.1:3001
 MEOO_API_UPSTREAM="${MEOO_API_UPSTREAM:-https://mofangdianai.com}"
-FULFILLMENT_STAGING_DOMAIN="${FULFILLMENT_STAGING_DOMAIN:-ly-ecs.mofangdianai.com}"
-FULFILLMENT_PROD_DOMAIN="${FULFILLMENT_PROD_DOMAIN:-}"
+FULFILLMENT_DOMAIN="${FULFILLMENT_DOMAIN:-dr.mofangdianai.com}"
+# 兼容旧变量名
+if [[ -n "${FULFILLMENT_PROD_DOMAIN:-}" ]]; then
+  FULFILLMENT_DOMAIN="$FULFILLMENT_PROD_DOMAIN"
+fi
+FULFILLMENT_STAGING_DOMAIN="${FULFILLMENT_STAGING_DOMAIN:-}"
 
 if [[ "$(id -un)" == "root" && "${HOME:-}" == "/root" ]]; then
   echo "请用 admin 执行，或: su - admin -c 'cd ~/app && bash scripts/ecs-deploy-talent-fulfillment-web.sh'"
@@ -102,9 +105,25 @@ case "$MEOO_API_UPSTREAM" in
     ;;
 esac
 
-SERVER_NAMES="$FULFILLMENT_STAGING_DOMAIN"
-if [[ -n "$FULFILLMENT_PROD_DOMAIN" && "$FULFILLMENT_PROD_DOMAIN" != "$FULFILLMENT_STAGING_DOMAIN" ]]; then
-  SERVER_NAMES="${FULFILLMENT_STAGING_DOMAIN} ${FULFILLMENT_PROD_DOMAIN}"
+SERVER_NAMES="$FULFILLMENT_DOMAIN"
+if [[ -n "$FULFILLMENT_STAGING_DOMAIN" && "$FULFILLMENT_STAGING_DOMAIN" != "$FULFILLMENT_DOMAIN" ]]; then
+  SERVER_NAMES="${FULFILLMENT_STAGING_DOMAIN} ${FULFILLMENT_DOMAIN}"
+fi
+
+SSL_DIR="${FULFILLMENT_SSL_DIR:-/etc/nginx/ssl/${FULFILLMENT_DOMAIN}}"
+if [[ ! -f "${SSL_DIR}/fullchain.pem" ]]; then
+  SSL_DIR="/etc/nginx/ssl/mofangdianai.com"
+fi
+SSL_CERT="${SSL_DIR}/fullchain.pem"
+SSL_KEY="${SSL_DIR}/privkey.pem"
+SSL_DHPARAM="/etc/letsencrypt/ssl-dhparams.pem"
+if [[ ! -f "$SSL_DHPARAM" ]]; then
+  SSL_DHPARAM="/dev/null"
+fi
+if [[ ! -f "$SSL_CERT" ]]; then
+  echo "缺少 TLS 证书: ${SSL_CERT}"
+  echo "请先: sudo bash scripts/ecs-setup-ssl-fulfillment-domain.sh ${FULFILLMENT_DOMAIN}"
+  exit 1
 fi
 
 TMP_NGINX="$(mktemp)"
@@ -115,6 +134,9 @@ sed \
   -e "s|__MEOO_API_PROXY__|${API_PROXY}|g" \
   -e "s|__MEOO_ERP_API_PROXY__|${ERP_PROXY}|g" \
   -e "s|__MEOO_API_PROXY_HOST__|${PROXY_HOST}|g" \
+  -e "s|__SSL_CERT__|${SSL_CERT}|g" \
+  -e "s|__SSL_KEY__|${SSL_KEY}|g" \
+  -e "s|__SSL_DHPARAM__|${SSL_DHPARAM}|g" \
   "$NGINX_TEMPLATE" >"$TMP_NGINX"
 
 sudo cp "$NGINX_SITE" "${NGINX_SITE}.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
@@ -132,11 +154,8 @@ done
 
 echo ""
 echo "完成。"
-echo "  验收子域: https://${FULFILLMENT_STAGING_DOMAIN}"
-if [[ -n "$FULFILLMENT_PROD_DOMAIN" ]]; then
-  echo "  正式域:   https://${FULFILLMENT_PROD_DOMAIN}"
+echo "  履约 Web: https://${FULFILLMENT_DOMAIN}"
+if [[ -n "$FULFILLMENT_STAGING_DOMAIN" ]]; then
+  echo "  验收子域: https://${FULFILLMENT_STAGING_DOMAIN}"
 fi
 echo "  API: curl -sS https://mofangdianai.com/erp-api/meoo-erp-api-health"
-echo ""
-echo "并行期勿关 Vercel；ECS 验收通过后："
-echo "  bash scripts/ecs-cutover-talent-fulfillment-dns.sh <Vercel正式域名>"
