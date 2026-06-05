@@ -27,6 +27,11 @@ function primaryRecruitTargetForIdentity(id) {
   return 'talent'
 }
 
+/** 服务端 mp_accounts.active_role：达人/拍摄/剪辑 → talent，PR → pr */
+function accountRoleForWorkIdentity(id) {
+  return id === 'pr' ? 'pr' : 'talent'
+}
+
 module.exports = {
   WORK_IDENTITIES,
   WORK_ID_LIST,
@@ -34,4 +39,5 @@ module.exports = {
   isSupplierWorkIdentity,
   workIdentityLabel,
   primaryRecruitTargetForIdentity,
+  accountRoleForWorkIdentity,
 }

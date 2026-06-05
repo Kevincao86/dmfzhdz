@@ -1,5 +1,6 @@
 import type { MpAccount } from './mpSession'
 import { getToken } from './mpSession'
+import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 
 async function parseJsonRes(res: Response) {
@@ -19,8 +20,12 @@ async function parseJsonRes(res: Response) {
 }
 
 function throwApiError(data: Record<string, unknown>, status: number) {
-  const msg = String(data.message || data.error || data.detail || `http_${status}`)
-  throw new Error(msg)
+  const serverMsg = String(data.message || '').trim()
+  const code = String(data.error || data.detail || `http_${status}`).trim()
+  if (serverMsg && /[\u4e00-\u9fa5]/.test(serverMsg)) {
+    throw new Error(serverMsg)
+  }
+  throw new Error(formatMpApiErr(new Error(code), '请求失败，请稍后重试'))
 }
 
 async function postJsonCandidates(
@@ -138,11 +143,7 @@ export async function setLoginCredentials(loginName: string, password?: string) 
 }
 
 export async function sendRegisterSms(phone: string) {
-  return postJsonCandidates(
-    '/api/meoo-auth-sms-send',
-    { phone: phone.trim() },
-    { includeVercelSms: true },
-  )
+  return postJsonCandidates('/api/meoo-auth-sms-send', { phone: phone.trim() })
 }
 
 export async function phoneRegister(input: {

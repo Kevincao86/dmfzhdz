@@ -102,7 +102,7 @@
         <text class="id-sheet-title">切换身份</text>
         <text class="id-sheet-close" bindtap="onCloseIdentitySheet">×</text>
       </view>
-      <text class="id-sheet-hint">同一账号可在接单团队与 PR 发单之间切换</text>
+      <text class="id-sheet-hint">同一账号可在达人、拍摄、剪辑、PR 四种身份间自由切换</text>
       <view
         class="id-sheet-opt {{identity === 'talent' ? 'active' : ''}}"
         data-id="talent"

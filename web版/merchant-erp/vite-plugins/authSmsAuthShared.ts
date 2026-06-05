@@ -1,5 +1,29 @@
 import { aliyunSmsConfigured, checkAliyunSmsVerifyCode, sendAliyunSmsVerifyCode } from './aliyunDypnsSms.js'
 import { dispatchSms, issueSmsCode, normalizeCnMobile, verifySmsCode } from './authRegistrationOtp.js'
+
+const OTP_TTL_MS = 5 * 60 * 1000
+/** 验证码经公网/阿里云发出时，禁止回落到本机 OTP 文件（避免 sms_code_invalid） */
+const remoteSmsSentUntil = new Map<string, number>()
+
+function markRemoteSmsSent(phone: string) {
+  remoteSmsSentUntil.set(phone, Date.now() + OTP_TTL_MS)
+}
+
+function wasRemoteSmsSent(phone: string): boolean {
+  const exp = remoteSmsSentUntil.get(phone)
+  if (!exp) return false
+  if (Date.now() > exp) {
+    remoteSmsSentUntil.delete(phone)
+    return false
+  }
+  return true
+}
+
+function verifyUrlForBase(base: string): string {
+  return base.includes('/erp-api')
+    ? `${base.replace(/\/$/, '')}/meoo-auth-sms-verify`
+    : `${base.replace(/\/$/, '')}/api/meoo-auth-sms-verify`
+}
 import { readMerchantSupabaseAdminEnv, readMerchantSupabaseAnonKey } from './merchantSupabaseAdminEnv.js'
 
 export type AuthSmsSendResult =
@@ -43,6 +67,7 @@ async function sendAuthSmsViaPublicApi(phone: string): Promise<AuthSmsSendResult
         error?: string
       }
       if (res.ok && j.ok !== false) {
+        markRemoteSmsSent(phone)
         return { ok: true, message: j.message ?? '验证码已发送' }
       }
       if (!res.ok) {
@@ -65,6 +90,7 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
     if (!r.ok) {
       return { ok: false, error: 'aliyun_sms_send_failed', message: r.message }
     }
+    markRemoteSmsSent(phone)
     return { ok: true, message: '验证码已发送' }
   }
 
@@ -89,6 +115,8 @@ function authVerifyPublicBases(): string[] {
   const raw = [
     process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
     process.env.MEOO_AUTH_API_PUBLIC_BASE,
+    process.env.MEOO_ERP_PUBLIC_BASE,
+    'https://mofangdianai.com/erp-api',
     'https://cs.mofangdianai.com',
     'https://mofangdianai.com',
   ]
@@ -102,26 +130,41 @@ function authVerifyPublicBases(): string[] {
   return bases
 }
 
+async function postSmsVerify(
+  url: string,
+  phone: string,
+  code: string,
+  withSecret: boolean,
+): Promise<{ ok?: boolean } | null> {
+  const secret = (process.env.MEOO_AUTH_INTERNAL_SECRET ?? '').trim()
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(withSecret && secret ? { 'X-Meoo-Internal-Auth': secret } : {}),
+      },
+      body: JSON.stringify({ phone, smsCode: code }),
+    })
+    if (res.status === 403 && withSecret && secret) {
+      return postSmsVerify(url, phone, code, false)
+    }
+    if (!res.ok) return null
+    return (await res.json().catch(() => ({}))) as { ok?: boolean }
+  } catch {
+    return null
+  }
+}
+
 /** ECS 注册/登录核验：本机未配 Aliyun 时，委托公网 verify 端点（验证码由 Aliyun 托管，与发送端同服即可） */
 async function verifyAuthSmsCodeViaPublicApi(phone: string, code: string): Promise<boolean | null> {
   const secret = (process.env.MEOO_AUTH_INTERNAL_SECRET ?? '').trim()
   for (const base of authVerifyPublicBases()) {
-    try {
-      const res = await fetch(`${base}/api/meoo-auth-sms-verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(secret ? { 'X-Meoo-Internal-Auth': secret } : {}),
-        },
-        body: JSON.stringify({ phone, smsCode: code }),
-      })
-      if (!res.ok) continue
-      const j = (await res.json().catch(() => ({}))) as { ok?: boolean }
-      if (j.ok === true) return true
-      if (j.ok === false) return false
-    } catch {
-      /* try next base */
-    }
+    const url = verifyUrlForBase(base)
+    const j = await postSmsVerify(url, phone, code, !!secret)
+    if (!j) continue
+    if (j.ok === true) return true
+    if (j.ok === false) return false
   }
   return null
 }
@@ -142,6 +185,7 @@ export async function verifyAuthSmsCode(
     const remote = await verifyAuthSmsCodeViaPublicApi(phone, code)
     if (remote === true) return true
     if (remote === false) return false
+    if (wasRemoteSmsSent(phone)) return false
   }
   return verifySmsCode(phone, code, viteRoot)
 }

@@ -56,9 +56,7 @@ export function mpApiFetchCandidates(apiPath: string, opts?: { includeVercelSms?
   const base = mpErpApiBase()
   if (base) add(buildMpErpApiUrl(base, path))
 
-  if (opts?.includeVercelSms && path === '/api/meoo-auth-sms-send') {
-    add(`https://mofangdianai.com${path}`)
-  }
+  // 验证码发送与注册核验走同一 erp-api 网关，避免 Vercel/ECS 双通道导致 sms_code_invalid
 
   if (typeof window !== 'undefined') {
     add(`${window.location.origin}${path}`)

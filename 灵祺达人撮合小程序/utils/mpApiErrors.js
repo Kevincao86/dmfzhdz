@@ -1,0 +1,31 @@
+/** 将接口 error 码转为用户可读中文 */
+const ZH = {
+  sms_code_invalid: '验证码错误或已过期',
+  invalid_sms_code: '请输入 6 位验证码',
+  sms_not_configured: '短信服务未配置，请联系管理员',
+  aliyun_sms_send_failed: '验证码发送失败，请稍后重试',
+  login_name_taken: '该手机号已被注册',
+  phone_exists: '该手机号已注册，请直接登录',
+  invalid_phone: '请输入有效大陆手机号',
+  invalid_password: '密码至少 6 位',
+  invalid_credentials: '账号或密码错误',
+  invalid_session: '登录已过期，请重新登录',
+  not_found: '接口不可用，请稍后重试',
+  auth_unreachable: '注册服务暂时不可用，请稍后重试',
+}
+
+function formatMpApiErr(e, fallback) {
+  const fb = fallback || '操作失败，请稍后重试'
+  const msg = e && e.message ? String(e.message).trim() : String(e || '').trim()
+  if (!msg) return fb
+  const code = msg.split(/[（(]/)[0]?.trim() || msg
+  if (ZH[code]) return ZH[code]
+  if (ZH[msg]) return ZH[msg]
+  if (/sms_code_invalid/i.test(msg)) return ZH.sms_code_invalid
+  if (/login_name_taken/i.test(msg)) return ZH.login_name_taken
+  if (/not_found/i.test(msg)) return ZH.not_found
+  if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  return fb
+}
+
+module.exports = { formatMpApiErr, ZH }

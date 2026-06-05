@@ -3,28 +3,17 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
 import { phoneRegister, sendRegisterSms } from '../lib/mpApi'
 import { setActiveRole, setSession } from '../lib/mpSession'
+import { formatMpApiErr } from '../lib/mpApiErrors'
 import {
   parseWorkIdentityQuery,
   setWorkIdentity,
   workIdentityToAccountRole,
   WORK_EDITION_LABEL,
-  type MpWorkIdentity,
 } from '../lib/mpWorkIdentity'
 
 function normalizePhone(raw: string) {
   const digits = raw.replace(/\D/g, '')
   return /^1\d{10}$/.test(digits) ? digits : ''
-}
-
-function formatMpApiErr(e: unknown, fallback: string) {
-  const msg = e instanceof Error ? e.message : fallback
-  if (/Unexpected end of JSON input/i.test(msg)) return '接口无有效响应，请检查 VITE_MP_API_BASE 或本地 dev 服务'
-  if (/^not_found$/i.test(msg) || /not_found/i.test(msg)) {
-    return '验证码接口不可用，请稍后重试或联系运维更新 ECS'
-  }
-  if (/sms_not_configured/i.test(msg)) return '短信服务未配置，请联系管理员'
-  if (/invalid_sms|sms_invalid/i.test(msg)) return '验证码错误或已过期'
-  return msg || fallback
 }
 
 export default function RegisterPage() {
@@ -98,8 +87,7 @@ export default function RegisterPage() {
       setActiveRole(accountRole)
       nav('/hall', { replace: true })
     } catch (e) {
-      const msg = formatMpApiErr(e, '注册失败')
-      setErr(msg.includes('login_name_taken') ? '该手机号已被注册' : msg)
+      setErr(formatMpApiErr(e, '注册失败，请稍后重试'))
     } finally {
       setLoading(false)
     }
@@ -117,7 +105,9 @@ export default function RegisterPage() {
         className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/70 p-6 shadow-xl backdrop-blur-xl space-y-4"
       >
         <h1 className="text-xl font-bold">注册 · {WORK_EDITION_LABEL[workIdentity]}</h1>
-        <p className="text-sm text-slate-500">手机号将作为您的登录账号</p>
+        <p className="text-sm text-slate-500">
+          手机号将作为登录账号；注册后可在「我的」自由切换达人 / 拍摄 / 剪辑 / PR
+        </p>
 
         <label className="block text-sm">
           <span className="text-slate-600">手机号</span>
