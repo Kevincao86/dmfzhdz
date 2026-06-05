@@ -25,6 +25,7 @@ function verifyUrlForBase(base: string): string {
     : `${base.replace(/\/$/, '')}/api/meoo-auth-sms-verify`
 }
 import { readMerchantSupabaseAdminEnv, readMerchantSupabaseAnonKey } from './merchantSupabaseAdminEnv.js'
+import { supabaseAdminFetch } from '../src/lib/supabaseAdminFetch.js'
 
 export type AuthSmsSendResult =
   | { ok: true; message: string; devCode?: string }
@@ -247,7 +248,7 @@ export async function findAuthUserByPhone(
   while (page <= 20) {
     let res: Response
     try {
-      res = await fetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, { headers })
+      res = await supabaseAdminFetch(`${base}/auth/v1/admin/users?page=${page}&per_page=${perPage}`, { headers })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       throw new Error(`无法连接认证服务 ${base}：${msg}`)
@@ -383,7 +384,7 @@ export async function createAdminSessionForUserId(
   const anonKey = readMerchantSupabaseAnonKey()
   const verifyApiKey = anonKey || serviceRole
 
-  const linkRes = await fetch(`${base}/auth/v1/admin/generate_link`, {
+  const linkRes = await supabaseAdminFetch(`${base}/auth/v1/admin/generate_link`, {
     method: 'POST',
     headers: adminHeaders,
     body: JSON.stringify({ type: 'magiclink', email }),
@@ -420,7 +421,7 @@ export async function createAdminSessionForUserId(
     | { ok: true; access_token: string; refresh_token: string; expires_in: number }
     | { ok: false; detail: string }
   > => {
-    const verifyRes = await fetch(`${base}/auth/v1/verify`, {
+    const verifyRes = await supabaseAdminFetch(`${base}/auth/v1/verify`, {
       method: 'POST',
       headers: verifyHeaders,
       body: JSON.stringify(body),
@@ -542,7 +543,7 @@ export async function signInWithPasswordLoginName(
   }
 
   const email = loginNameToTenantEmail(name)
-  const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+  const res = await supabaseAdminFetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

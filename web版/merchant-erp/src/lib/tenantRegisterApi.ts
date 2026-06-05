@@ -143,7 +143,7 @@ export async function registerMerchantAccount(body: {
     body,
     '注册',
     [502, 503, 504],
-    { preferSameOrigin: true },
+    { sameOriginOnly: true },
   )
   if (!('res' in posted)) {
     return posted
@@ -180,7 +180,7 @@ export async function registerPartnerAccount(body: {
     },
     '注册',
     [502, 503, 504],
-    { preferSameOrigin: true },
+    { sameOriginOnly: true },
   )
   if (!('res' in posted)) {
     return posted

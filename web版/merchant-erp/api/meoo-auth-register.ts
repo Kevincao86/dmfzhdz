@@ -113,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'auth_unreachable',
         message:
-          '注册服务无法连接数据库。请确认 ECS auth-api 已运行（systemctl status meoo-auth-api），或 Vercel 已配置 SUPABASE_URL=https://mofangdianai.com 与 SUPABASE_SERVICE_ROLE_KEY。',
+          '注册服务无法连接数据库。备案期请在 Vercel 设 MEOO_ERP_BEIAN_BYPASS=1、MEOO_ERP_API_HOST_IP=139.196.42.5，并确认 SUPABASE_URL=https://mofangdianai.com 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy。',
         detail,
       })
       return
