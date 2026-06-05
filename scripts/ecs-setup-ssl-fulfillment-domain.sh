@@ -88,10 +88,31 @@ if [[ "$LOCAL_CODE" != "200" || "$PUBLIC_CODE" != "200" ]]; then
   exit 1
 fi
 
-echo "== 4) certbot webroot 签发 =="
-certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
-  --non-interactive --agree-tos --register-unsafely-without-email \
-  --preferred-challenges http
+echo "== 4) certbot 签发 =="
+chown -R www-data:www-data "$WEBROOT" 2>/dev/null || chown -R nginx:nginx "$WEBROOT" 2>/dev/null || true
+chmod -R a+rX "$WEBROOT"
+
+CERTBOT_OPTS=(--non-interactive --agree-tos --register-unsafely-without-email --preferred-challenges http)
+
+echo "  尝试 webroot..."
+set +e
+certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" "${CERTBOT_OPTS[@]}"
+WEBROOT_OK=$?
+set -e
+
+if [[ "$WEBROOT_OK" -ne 0 ]]; then
+  echo "  webroot 失败（LE 403 时常见），改用 standalone：临时停止 nginx..."
+  systemctl stop nginx
+  set +e
+  certbot certonly --standalone -d "$DOMAIN" "${CERTBOT_OPTS[@]}"
+  STANDALONE_OK=$?
+  set -e
+  systemctl start nginx
+  if [[ "$STANDALONE_OK" -ne 0 ]]; then
+    echo "FAIL: webroot 与 standalone 均未签发成功"
+    exit 1
+  fi
+fi
 
 cp "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" "${SSL_DIR}/fullchain.pem"
 cp "/etc/letsencrypt/live/${DOMAIN}/privkey.pem" "${SSL_DIR}/privkey.pem"
