@@ -6,7 +6,7 @@
 |------|-----|------|
 | **轻量** | `139.196.42.5` | Supabase、PostgREST、GoTrue、`meoo-auth-api`、`mofangdianai.com/erp-api` |
 | **ECS**（新 ECS） | `8.160.173.236` | 履约 Web 静态站 + Nginx（本迁移只动这台的 Web） |
-| **Vercel** | — | 并行期继续服务履约 **正式域**；切流稳定后再 Pause |
+| **Vercel** | — | 已释放 `dr` 后可 Pause；正式域 **`dr.mofangdianai.com`** → ECS |
 
 履约站 **无 Serverless**；浏览器 API 一律打到 **轻量**（经 `mofangdianai.com/erp-api` 或新 ECS Nginx 反代过去）。
 
@@ -19,12 +19,10 @@
 | **1** | 本机 + Git | 迁移脚本入库，新 ECS 能 `git pull` | 不动 |
 | **2** | 新 ECS | 装 Node/Nginx、克隆仓库、`admin` 用户 | 不动 |
 | **3** | 本机 / Vercel 控制台 | 导出 `VITE_*` → 新 ECS `.env.production` | 不动 |
-| **4** | 域名控制台 | 仅新增 `ly-ecs` → **新 ECS IP** | 不动 |
-| **5** | 新 ECS | `ecs-deploy-talent-fulfillment-web.sh` 构建 + Nginx | 不动 |
-| **6** | 浏览器 | `ly-ecs.mofangdianai.com` 与 Vercel 正式域对照验收 | 仍在线 |
-| **7** | 域名控制台 | 正式域 DNS 改指向 **新 ECS** | 仍在线 |
-| **8** | 新 ECS | `ecs-cutover-talent-fulfillment-dns.sh` | 仍在线 |
-| **9** | Vercel 控制台 | Pause 履约项目 | 关停 |
+| **4** | 域名控制台 | `dr` A 记录 → **ECS** `8.160.173.236` | 已释放 dr |
+| **5** | 新 ECS | TLS + `ecs-deploy-talent-fulfillment-web.sh` | — |
+| **6** | 浏览器 | 验收 `https://dr.mofangdianai.com` | — |
+| **7** | Vercel | Pause 履约项目（可选，稳定后） | 关停 |
 
 下面按步骤展开；**做完一步再进下一步**。
 
