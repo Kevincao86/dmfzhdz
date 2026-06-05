@@ -34,40 +34,21 @@ const AUTH_BROWSER_PATHS = new Set([
   '/api/meoo-auth-sms-login',
 ])
 
-/** 注册/短信：浏览器仅走当前站点（Vercel 阿里云发码+核验）；其它 API 仍可走 erp-api */
-function erpAuthApiCandidates(
-  path: string,
-  opts?: { sameOriginOnly?: boolean },
-): string[] {
+/** 注册/短信/登录：浏览器强制仅走当前站点（Vercel），禁止 fallback erp-api（备案期验证码通道不一致） */
+function erpAuthApiCandidates(path: string): string[] {
   const normalized = path.startsWith('/') ? path : `/${path}`
-  if (opts?.sameOriginOnly && typeof window !== 'undefined') {
-    return [`${window.location.origin}${normalized}`]
-  }
-  if (AUTH_BROWSER_PATHS.has(normalized) && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && AUTH_BROWSER_PATHS.has(normalized)) {
     return [`${window.location.origin}${normalized}`]
   }
   return merchantErpApiCandidates(normalized)
-}
-
-function isErpApiAuthUrl(url: string): boolean {
-  return /\/erp-api\//i.test(url)
 }
 
 async function postAuthJson<T extends Record<string, unknown>>(
   path: string,
   body: unknown,
   action: string,
-  retryStatuses: number[] = [],
-  opts?: { preferSameOrigin?: boolean; sameOriginOnly?: boolean },
 ): Promise<{ res: Response; json: T } | { ok: false; error: string; message: string }> {
-  let candidates = erpAuthApiCandidates(path, { sameOriginOnly: opts?.sameOriginOnly })
-  if (opts?.preferSameOrigin && typeof window !== 'undefined' && !opts?.sameOriginOnly) {
-    const origin = window.location.origin
-    candidates = [
-      ...candidates.filter((u) => u.startsWith(origin)),
-      ...candidates.filter((u) => !u.startsWith(origin)),
-    ]
-  }
+  const candidates = erpAuthApiCandidates(path)
   let lastMessage = `${action}失败，请稍后重试。`
 
   for (let i = 0; i < candidates.length; i += 1) {
@@ -79,21 +60,6 @@ async function postAuthJson<T extends Record<string, unknown>>(
         body: JSON.stringify(body),
       })
       const json = (await res.json().catch(() => ({}))) as T
-      const errCode =
-        typeof json === 'object' && json && 'error' in json ? String((json as { error?: string }).error) : ''
-      const shouldRetry =
-        i < candidates.length - 1 &&
-        (!res.ok &&
-          (retryStatuses.includes(res.status) ||
-            (res.status === 400 &&
-              errCode === 'sms_code_invalid' &&
-              isErpApiAuthUrl(url))))
-      if (shouldRetry) {
-        lastMessage =
-          (typeof json === 'object' && json && 'message' in json && String(json.message)) ||
-          lastMessage
-        continue
-      }
       return { res, json }
     } catch (e) {
       lastMessage = toUserFacingError(e, action)
@@ -105,13 +71,10 @@ async function postAuthJson<T extends Record<string, unknown>>(
 }
 
 export async function sendAuthSms(phone: string): Promise<SmsSendResult> {
-  // 短信发送：优先同源 Vercel（阿里云密钥），再 ECS erp-api；避免 ECS 无密钥时返回开发验证码
   const posted = await postAuthJson<SmsSendResult & { message?: string; detail?: string; devCode?: string }>(
     '/api/meoo-auth-sms-send',
     { phone },
     '发送验证码',
-    [502, 503, 504],
-    { preferSameOrigin: true },
   )
   if (!('res' in posted)) {
     return posted
@@ -142,8 +105,6 @@ export async function registerMerchantAccount(body: {
     '/api/meoo-auth-register',
     body,
     '注册',
-    [502, 503, 504],
-    { sameOriginOnly: true },
   )
   if (!('res' in posted)) {
     return posted
@@ -179,8 +140,6 @@ export async function registerPartnerAccount(body: {
       confirmPassword: body.confirmPassword,
     },
     '注册',
-    [502, 503, 504],
-    { sameOriginOnly: true },
   )
   if (!('res' in posted)) {
     return posted
@@ -205,8 +164,6 @@ export async function loginWithSmsCode(body: {
     '/api/meoo-auth-sms-login',
     body,
     '登录',
-    [502, 503, 504],
-    { preferSameOrigin: true },
   )
   if (!('res' in posted)) {
     return posted
