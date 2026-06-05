@@ -41,8 +41,24 @@ function merchantPublicAssetsPlugin(): Plugin {
   }
 }
 
+/** 嵌入 @merchant 页面时强制共用本项目的 React，避免 useState 读 null 导致整页黑屏 */
+function singleReactResolve(fulfillmentRoot: string) {
+  const nm = (pkg: string) => path.resolve(fulfillmentRoot, 'node_modules', pkg)
+  return {
+    alias: {
+      '@merchant': MERCHANT_ERP_SRC,
+      react: nm('react'),
+      'react-dom': nm('react-dom'),
+      'react/jsx-runtime': nm('react/jsx-runtime'),
+      'react/jsx-dev-runtime': nm('react/jsx-dev-runtime'),
+    },
+    dedupe: ['react', 'react-dom', 'react-router', 'react-router-dom'] as string[],
+  }
+}
+
 export default defineConfig(({ mode, command }) => {
   const fulfillmentRoot = path.dirname(fileURLToPath(import.meta.url))
+  const reactResolve = singleReactResolve(fulfillmentRoot)
   const env = {
     ...loadEnv(mode, MERCHANT_ERP_ROOT, ''),
     ...loadEnv(mode, fulfillmentRoot, ''),
@@ -62,10 +78,9 @@ export default defineConfig(({ mode, command }) => {
   return {
     envDir: MERCHANT_ERP_ROOT,
     plugins: [react(), tailwindcss(), ...devOnlyPlugins],
-    resolve: {
-      alias: {
-        '@merchant': MERCHANT_ERP_SRC,
-      },
+    resolve: reactResolve,
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react-router-dom'],
     },
     server: {
       port: 5176,

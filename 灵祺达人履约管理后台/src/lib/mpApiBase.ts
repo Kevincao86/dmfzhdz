@@ -14,7 +14,10 @@ function normalizeErpApiBase(raw: string): string {
       const tail = u.pathname === '/' ? '' : u.pathname
       u.pathname = `/erp-api${tail}`
     }
-    return u.toString().replace(/\/$/, '')
+    let out = u.toString().replace(/\/$/, '')
+    // 误配 VITE_MP_API_BASE=.../erp-api/api 会导致请求 /erp-api/api/meoo-*
+    out = out.replace(/\/erp-api\/api$/i, '/erp-api')
+    return out
   } catch {
     return ''
   }

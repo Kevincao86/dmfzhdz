@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import MerchantEmbedErrorBoundary from './MerchantEmbedErrorBoundary'
 import MerchantEmbedProviders from './MerchantEmbedProviders'
 import '@merchant/index.css'
 
@@ -11,8 +12,9 @@ const TABS = [
 /** 商家版同源浅色工作区 + 子 Tab（功能与 merchant-erp 页面完全一致） */
 export default function MerchantEmbedShell() {
   return (
-    <MerchantEmbedProviders>
-      <div className="erp-main-surface min-h-full flex flex-col">
+    <MerchantEmbedErrorBoundary>
+      <MerchantEmbedProviders>
+      <div className="erp-main-surface min-h-full flex flex-col bg-slate-50 text-slate-900">
         <div className="border-b border-slate-200/90 bg-white/90 px-4 py-2 flex flex-wrap gap-2 shrink-0">
           {TABS.map((t) => (
             <NavLink
@@ -34,6 +36,7 @@ export default function MerchantEmbedShell() {
           <Outlet />
         </div>
       </div>
-    </MerchantEmbedProviders>
+      </MerchantEmbedProviders>
+    </MerchantEmbedErrorBoundary>
   )
 }
