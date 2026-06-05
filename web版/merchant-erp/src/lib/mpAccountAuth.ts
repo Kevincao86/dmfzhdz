@@ -623,19 +623,22 @@ export async function mpAuthEnsureIdentity(
     nick,
     account.wx_avatar_url || '',
   )
+  const ensuredAccount = account
 
   if (role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const now = new Date().toLocaleString('zh-CN', { hour12: false })
-    const phoneKey = accountPhoneKey(account)
-    const loginLabel = String(account.login_name || '').trim()
-    const contactFallback = loginLabel || phoneKey || String(account.openid || '').trim()
-    const memberId = account.registry_member_id || `MTM-${Date.now()}`
+    const phoneKey = accountPhoneKey(ensuredAccount)
+    const loginLabel = String(ensuredAccount.login_name || '').trim()
+    const contactFallback = loginLabel || phoneKey || String(ensuredAccount.openid || '').trim()
+    const memberId = ensuredAccount.registry_member_id || `MTM-${Date.now()}`
     const prev =
       (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
       (data.mpTalentMembers ?? []).find(
-        (m) => account.openid && String(m.wxOpenId || '').trim() === String(account.openid).trim(),
+        (m) =>
+          ensuredAccount.openid &&
+          String(m.wxOpenId || '').trim() === String(ensuredAccount.openid).trim(),
       ) ||
       (phoneKey.length >= 8
         ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
@@ -647,13 +650,13 @@ export async function mpAuthEnsureIdentity(
     let saved = upsertMpTalentMember(data, {
       ...(prev || {}),
       id: memberId,
-      lingqiTalentId: prev?.lingqiTalentId || account.lingqi_talent_id || '',
+      lingqiTalentId: prev?.lingqiTalentId || ensuredAccount.lingqi_talent_id || '',
       lingqiShootTeamId: prev?.lingqiShootTeamId,
       lingqiEditTeamId: prev?.lingqiEditTeamId,
       memberType: prev?.memberType || 'douyin',
       wxNickName: prev?.wxNickName || nick || '用户',
-      wxAvatarUrl: prev?.wxAvatarUrl || account.wx_avatar_url || '',
-      wxOpenId: prev?.wxOpenId || account.openid || '',
+      wxAvatarUrl: prev?.wxAvatarUrl || ensuredAccount.wx_avatar_url || '',
+      wxOpenId: prev?.wxOpenId || ensuredAccount.openid || '',
       contact: String(prev?.contact || contactFallback).trim(),
       wechatId: String(prev?.wechatId || contactFallback).trim(),
       workIdentity,
@@ -686,12 +689,12 @@ export async function mpAuthEnsureIdentity(
       saved = upsertSupplierTeamLibraryFromMember(data, saved)
     }
     await io.save(data)
-    await updateAccount(rest, account.id, {
-      lingqi_talent_id: saved.lingqiTalentId || account.lingqi_talent_id,
+    await updateAccount(rest, ensuredAccount.id, {
+      lingqi_talent_id: saved.lingqiTalentId || ensuredAccount.lingqi_talent_id,
       registry_member_id: saved.id,
       active_role: 'talent',
     })
-    account = (await findAccountById(rest, account.id))!
+    account = (await findAccountById(rest, ensuredAccount.id))!
   }
 
   await updateAccount(rest, accountId, { active_role: role })
