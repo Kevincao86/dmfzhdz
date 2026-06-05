@@ -23,7 +23,7 @@ Vercel → Project → Settings → General → **Root Directory**：
 
 | 变量 | 示例 | 说明 |
 |------|------|------|
-| `VITE_MP_API_BASE` | `https://mofangdianai.com/erp-api` | 小程序/Web 共用 ECS `/erp-api`（勿带末尾 `/`） |
+| `VITE_MP_API_BASE` | `https://mofangdianai.com/erp-api` | 小程序/Web 共用 ECS `/erp-api`（**勿**写成 `.../erp-api/api`，勿带末尾 `/`） |
 | `VITE_SUPABASE_URL` | 与商家版相同 | 增值服务页（抖音来客等） |
 | `VITE_SUPABASE_ANON_KEY` | 与商家版相同 | 同上 |
 
@@ -32,6 +32,16 @@ Vercel → Project → Settings → General → **Root Directory**：
 ## 改完变量后
 
 Deployments → 最新失败记录 → **Redeploy**（必须重新构建）。
+
+## 验证码 404 / 页面显示 `not_found`
+
+若浏览器 Network 里请求为 `https://mofangdianai.com/erp-api/api/meoo-auth-sms-send`（多了一层 `api`），说明 **前端仍是旧构建** 或环境变量写错：
+
+1. 确认 `VITE_MP_API_BASE` 仅为 `https://mofangdianai.com/erp-api`
+2. 对 `main` 最新提交执行 **Redeploy**（非仅 Promote 旧产物）
+3. 硬刷新注册页（Cmd+Shift+R），JS 文件名应变新（非旧的 `index-B8IgZrSA.js` 等）
+
+正确请求示例：`https://mofangdianai.com/erp-api/meoo-auth-sms-send`
 
 ## 本地对照
 
