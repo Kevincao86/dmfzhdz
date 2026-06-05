@@ -111,7 +111,7 @@ export default function PrOrdersPage() {
         PR ID：<span className="text-amber-400 font-mono">{acc?.lingqiPrId || '—'}</span> · 已发布与草稿分开展示
       </p>
 
-      <div className="flex gap-2 mb-4 p-1 rounded-xl bg-black/30 border border-white/10 max-w-md">
+      <div className="flex gap-2 mb-4 p-1 rounded-xl panel-input border max-w-md">
         <button
           type="button"
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -144,7 +144,7 @@ export default function PrOrdersPage() {
       {tab === 'published' ? (
         <>
           {!loading && !rows.length ? (
-            <div className="rounded-xl border border-white/10 bg-[#1a1a28] p-6 text-center text-slate-500 text-sm">
+            <div className="surface-card rounded-xl border p-6 text-center text-slate-500 text-sm">
               <p>暂无已发布招募单</p>
               <p className="mt-2 text-xs">发布招募成功后会出现在此处；也可在小程序发单后同步到本机</p>
               <Link to="/publish" className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm">
@@ -154,7 +154,7 @@ export default function PrOrdersPage() {
           ) : null}
           <div className="space-y-3">
             {rows.map((row) => (
-              <article key={row.mpOrderId} className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
+              <article key={row.mpOrderId} className="surface-card rounded-xl border p-4">
                 <div className="flex justify-between gap-2 items-start">
                   <div>
                     <span className="text-xs text-violet-400">{row.hallLabel}</span>
@@ -190,7 +190,7 @@ export default function PrOrdersPage() {
       ) : (
         <>
           {!loading && !drafts.length ? (
-            <div className="rounded-xl border border-white/10 bg-[#1a1a28] p-6 text-center text-slate-500 text-sm">
+            <div className="surface-card rounded-xl border p-6 text-center text-slate-500 text-sm">
               <p>草稿箱为空</p>
               <p className="mt-2 text-xs">在「发布招募」填写表单后点击「保存草稿」，会出现在此处</p>
               <Link to="/publish" className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm">
@@ -200,7 +200,7 @@ export default function PrOrdersPage() {
           ) : null}
           <div className="space-y-3">
             {drafts.map((draft) => (
-              <article key={draft.id} className="rounded-xl border border-amber-500/25 bg-[#1a1a28] p-4">
+              <article key={draft.id} className="surface-card rounded-xl border border-amber-500/25 p-4">
                 <div className="flex justify-between gap-2 items-start">
                   <div>
                     <span className="text-xs text-amber-400/90">草稿</span>

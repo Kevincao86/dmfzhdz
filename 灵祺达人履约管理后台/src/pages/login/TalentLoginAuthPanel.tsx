@@ -129,7 +129,7 @@ export default function TalentLoginAuthPanel({
             <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
           ) : null}
           <button type="submit" disabled={loading} className={primaryBtn}>
-            {loading ? '登录中…' : '进入履约工作台'}
+            {loading ? '登录中…' : '进入星选平台'}
           </button>
         </form>
       ) : (

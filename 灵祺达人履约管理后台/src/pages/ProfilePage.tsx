@@ -37,7 +37,7 @@ export default function ProfilePage() {
     <div className="max-w-2xl space-y-6">
       <h2 className="text-xl font-bold">我的</h2>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
+      <section className="surface-card rounded-xl border p-4">
         <h3 className="text-sm font-semibold text-slate-300 mb-3">工作台身份</h3>
         <p className="text-xs text-slate-500 mb-3">同一账号可在达人、拍摄团队、剪辑团队、PR 之间自由切换</p>
         <div className="flex flex-wrap gap-2">
@@ -62,7 +62,7 @@ export default function ProfilePage() {
         {err ? <p className="text-xs text-red-400 mt-2">{err}</p> : null}
       </section>
 
-      <dl className="rounded-xl border border-white/10 bg-[#1a1a28] p-6 space-y-3 text-sm">
+      <dl className="surface-card rounded-xl border p-6 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-slate-500">手机号</dt>
           <dd>{acc?.loginName || acc?.wxNickName || '—'}</dd>
@@ -77,7 +77,7 @@ export default function ProfilePage() {
         </div>
       </dl>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-6">
+      <section className="surface-card rounded-xl border p-6">
         <h3 className="font-semibold mb-2">达人资料</h3>
         <p className="text-sm text-slate-400 mb-4">
           {member ? `已填写平台：${memberTypeLabel(member)}` : '尚未填写多平台资料，报名时可一键同步'}
@@ -90,7 +90,7 @@ export default function ProfilePage() {
         </Link>
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-6">
+      <section className="surface-card rounded-xl border p-6">
         <h3 className="font-semibold mb-2">PR 资料</h3>
         <p className="text-sm text-slate-400 mb-4">
           {pr ? prDisplayName(pr) || '已保存 PR 资料' : '填写机构/个人信息后可用于发招募与推荐达人'}

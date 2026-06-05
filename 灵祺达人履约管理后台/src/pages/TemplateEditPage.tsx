@@ -60,7 +60,7 @@ export default function TemplateEditPage() {
       <label className="block text-sm">
         <span className="text-slate-400">模版名称</span>
         <input
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -68,7 +68,7 @@ export default function TemplateEditPage() {
       <label className="block text-sm">
         <span className="text-slate-400">预览平台</span>
         <select
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
           value={previewPlatform}
           onChange={(e) => setPreviewPlatform(e.target.value)}
         >
@@ -79,7 +79,7 @@ export default function TemplateEditPage() {
           ))}
         </select>
       </label>
-      <ul className="rounded-xl border border-white/10 bg-[#1a1a28] divide-y divide-white/5 text-sm">
+      <ul className="surface-card rounded-xl border divide-y divide-white/5 text-sm">
         {editorRows.map((row) => (
           <li key={row.id} className="px-4 py-3 flex justify-between items-center gap-2">
             <span>

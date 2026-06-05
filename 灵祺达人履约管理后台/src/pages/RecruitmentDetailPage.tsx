@@ -77,12 +77,12 @@ export default function RecruitmentDetailPage() {
             <p>粉丝要求：{view.fansRequirement}</p>
             <p className="font-mono text-xs text-slate-500">单号 {view.mpOrderId}</p>
           </div>
-          <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
+          <section className="surface-card rounded-xl border p-4">
             <h3 className="font-medium mb-2">招募说明</h3>
             <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans">{view.recruitmentInfo}</pre>
           </section>
           {view.taskDetail !== view.recruitmentInfo ? (
-            <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
+            <section className="surface-card rounded-xl border p-4">
               <h3 className="font-medium mb-2">任务说明</h3>
               <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans">{view.taskDetail}</pre>
             </section>

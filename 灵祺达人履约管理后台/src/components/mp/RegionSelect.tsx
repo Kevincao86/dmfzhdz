@@ -13,7 +13,7 @@ export default function RegionSelect({ province, city, onChange }: Props) {
       <label className="block text-sm">
         <span className="text-slate-400">省份</span>
         <select
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-2 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-2 py-2"
           value={state.province}
           onChange={(e) => {
             const next = setupRegionState(e.target.value, '')
@@ -30,7 +30,7 @@ export default function RegionSelect({ province, city, onChange }: Props) {
       <label className="block text-sm">
         <span className="text-slate-400">城市</span>
         <select
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-2 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-2 py-2"
           value={state.city}
           onChange={(e) => onChange(state.province, e.target.value)}
         >

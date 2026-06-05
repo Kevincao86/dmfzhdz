@@ -118,7 +118,7 @@ export default function RecommendOrdersPanel() {
         <p className="text-sm text-slate-400 mt-1">优质 · 热门全国 · 同城匹配</p>
       </div>
       <input
-        className="w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-sm"
+        className="w-full rounded-lg panel-input border px-3 py-2.5 text-sm"
         placeholder="搜索商单、门店、城市"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
@@ -136,17 +136,17 @@ export default function RecommendOrdersPanel() {
         ))}
       </div>
       <div className="flex flex-wrap gap-2 text-sm">
-        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
+        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
           {hallFilters.PLATFORM_FILTERS.map((p) => (
             <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
           ))}
         </select>
-        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
+        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
           {cityFilters.map((c) => (
             <option key={c} value={c}>{c === '全部' ? '城市' : c}</option>
           ))}
         </select>
-        <button type="button" className="rounded-lg border border-white/10 px-2 py-1.5" onClick={() => setShowPriceSheet(true)}>
+        <button type="button" className="rounded-lg panel-input border px-2 py-1.5" onClick={() => setShowPriceSheet(true)}>
           {priceFilterLabel}
         </button>
       </div>

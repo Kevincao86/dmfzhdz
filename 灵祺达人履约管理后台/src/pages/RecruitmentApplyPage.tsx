@@ -123,7 +123,7 @@ export default function RecruitmentApplyPage() {
         </p>
       )}
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         {rows.map((row) => (
           <ApplyFieldInput key={row.id} row={row} value={fieldValue(row)} lb={lb} form={form} onChange={setField} />
         ))}
@@ -178,7 +178,7 @@ function ApplyFieldInput({
       <label key={row.id} className="block">
         <span className="text-slate-400">{row.displayLabel}</span>
         <select
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
           value={value}
           onChange={(e) => onChange('douyinSalesLevel', e.target.value)}
         >
@@ -198,7 +198,7 @@ function ApplyFieldInput({
         <span className="text-slate-400">{row.displayLabel}</span>
         <input
           type="date"
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
           value={value}
           onChange={(e) => onChange(row.bindKey, e.target.value)}
         />
@@ -211,7 +211,7 @@ function ApplyFieldInput({
         <span className="text-slate-400">{row.displayLabel}</span>
         <input
           type="time"
-          className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+          className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
           value={value}
           onChange={(e) => onChange(row.bindKey, e.target.value)}
         />
@@ -225,7 +225,7 @@ function ApplyFieldInput({
         {row.required ? ' *' : ''}
       </span>
       <input
-        className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+        className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
         type={row.type === 'number' || row.type === 'digit' ? 'number' : 'text'}
         placeholder={row.placeholder || (row.role === 'platformAccount' ? `请输入${lb.accountId}` : '')}
         value={value}

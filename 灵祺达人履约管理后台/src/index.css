@@ -195,6 +195,22 @@ html[data-theme='light'] :is(.text-slate-400, .text-slate-500, .text-slate-600) 
   color: #64748b !important;
 }
 
+/* 非暗色（含默认未设 theme）时一律白卡片 */
+html:not([data-theme='dark']) :is(.order-card, .surface-card, .panel-card, .talent-card, .bg-\[\#1a1a28\]) {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html:not([data-theme='dark']) :is(.bg-black\/30, .bg-black\/35) {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html:not([data-theme='dark']) .border-white\/10 {
+  border-color: #e2e8f0 !important;
+}
+
 @keyframes hero-crossfade {
   0%,
   26% {

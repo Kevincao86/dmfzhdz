@@ -18,7 +18,7 @@ export default function RoleEditionToggle({
   const track =
     variant === 'light'
       ? 'rounded-xl border border-slate-200/90 bg-slate-100/80 p-1'
-      : 'rounded-lg bg-black/30 p-1'
+      : 'rounded-lg panel-input p-1'
   const off =
     variant === 'light'
       ? 'text-slate-500 hover:text-slate-800'

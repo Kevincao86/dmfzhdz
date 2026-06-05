@@ -137,12 +137,12 @@ export default function PrProfilePage() {
       <h2 className="text-xl font-bold">PR 信息</h2>
       {form.lingqiPrId ? <p className="text-sm text-slate-400">PR ID：{form.lingqiPrId}</p> : null}
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可使用手机号与密码登录</p>
         <label className="block">
           <span className="text-slate-400">手机号</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={loginName}
             onChange={(e) => setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))}
           />
@@ -151,7 +151,7 @@ export default function PrProfilePage() {
           <span className="text-slate-400">登录密码</span>
           <input
             type="password"
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
@@ -172,11 +172,11 @@ export default function PrProfilePage() {
         ))}
       </div>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <label className="block">
           <span className="text-slate-400">{orgLabel}</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.accountType === 'personal' ? form.personalName : form.companyName}
             onChange={(e) =>
               form.accountType === 'personal'
@@ -188,7 +188,7 @@ export default function PrProfilePage() {
         <label className="block">
           <span className="text-slate-400">联系人</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.contactName}
             onChange={(e) => setField('contactName', e.target.value)}
           />
@@ -196,7 +196,7 @@ export default function PrProfilePage() {
         <label className="block">
           <span className="text-slate-400">联系电话</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.contactPhone}
             onChange={(e) => setField('contactPhone', e.target.value)}
           />
@@ -204,7 +204,7 @@ export default function PrProfilePage() {
         <label className="block">
           <span className="text-slate-400">微信号</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.wechatId}
             onChange={(e) => setField('wechatId', e.target.value)}
           />
@@ -217,7 +217,7 @@ export default function PrProfilePage() {
         <label className="block">
           <span className="text-slate-400">简介</span>
           <textarea
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2 min-h-[80px]"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2 min-h-[80px]"
             value={form.intro}
             onChange={(e) => setField('intro', e.target.value)}
           />
@@ -225,7 +225,7 @@ export default function PrProfilePage() {
         <label className="block">
           <span className="text-slate-400">微信昵称（展示）</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.wxNickName}
             onChange={(e) => setField('wxNickName', e.target.value)}
           />

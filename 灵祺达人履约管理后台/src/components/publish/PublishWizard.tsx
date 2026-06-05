@@ -61,7 +61,7 @@ function PubSelectRow({
       <button
         type="button"
         onClick={onClick}
-        className="w-full flex justify-between items-center rounded-lg bg-black/30 border border-white/10 px-3 py-2.5 text-left text-sm"
+        className="w-full flex justify-between items-center rounded-lg panel-input border px-3 py-2.5 text-left text-sm"
       >
         <span className={placeholder ? 'text-slate-500' : ''}>{value}</span>
         <span className="text-slate-500">›</span>
@@ -340,7 +340,7 @@ export default function PublishWizard() {
               className={`w-full text-left rounded-xl border p-4 transition-colors ${
                 'placeholder' in t && t.placeholder
                   ? 'border-white/5 opacity-80'
-                  : 'border-white/10 hover:border-violet-500/40 bg-[#1a1a28]'
+                  : 'surface-card border hover:border-violet-500/40'
               }`}
               onClick={() => {
                 if ('placeholder' in t && t.placeholder) {
@@ -391,7 +391,7 @@ export default function PublishWizard() {
             <button
               key={m.id}
               type="button"
-              className="w-full text-left rounded-xl border border-white/10 hover:border-violet-500/40 bg-[#1a1a28] p-4 transition-colors"
+              className="w-full text-left surface-card rounded-xl border hover:border-violet-500/40 p-4 transition-colors"
               onClick={() => {
                 setRecruitMode(m.id)
                 setRecruitModeLabel(m.label)
@@ -425,7 +425,7 @@ export default function PublishWizard() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-4 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-4 text-sm">
         <div>
           <PubLabel>投放窗口 *</PubLabel>
           <div className="grid grid-cols-2 gap-2 mt-1">
@@ -433,7 +433,7 @@ export default function PublishWizard() {
               <button
                 key={w.id}
                 type="button"
-                className={`p-3 rounded-lg text-left border ${form.deliveryWindow === w.id ? 'border-violet-500 bg-violet-600/15' : 'border-white/10'}`}
+                className={`p-3 rounded-lg text-left border ${form.deliveryWindow === w.id ? 'border-violet-500 bg-violet-600/15' : 'border-[var(--shell-border)]'}`}
                 onClick={() => {
                   patchForm({
                     deliveryWindow: w.id,
@@ -465,7 +465,7 @@ export default function PublishWizard() {
         <div>
           <PubLabel>招募标题 *</PubLabel>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             placeholder="如：春季火锅探店招募"
             value={form.title}
             onChange={(e) => patchForm({ title: e.target.value })}
@@ -516,7 +516,7 @@ export default function PublishWizard() {
             <div className="flex items-center gap-2 mt-2">
               <span className="text-slate-400 shrink-0">粉丝 ≥</span>
               <input
-                className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                className="flex-1 rounded-lg panel-input border px-3 py-2"
                 placeholder="如：10000 或 1万"
                 value={form.fansMin}
                 onChange={(e) =>
@@ -546,7 +546,7 @@ export default function PublishWizard() {
             <PubLabel>一口价金额 *</PubLabel>
             <input
               type="number"
-              className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+              className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
               placeholder="请填写，0 代表置换"
               value={form.fixedPrice}
               onChange={(e) => patchForm({ fixedPrice: e.target.value })}
@@ -560,7 +560,7 @@ export default function PublishWizard() {
             <div className="flex items-center gap-2 mt-1">
               <input
                 type="number"
-                className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                className="flex-1 rounded-lg panel-input border px-3 py-2"
                 placeholder="最低"
                 value={form.selfQuoteMin}
                 onChange={(e) => patchForm({ selfQuoteMin: e.target.value })}
@@ -568,7 +568,7 @@ export default function PublishWizard() {
               <span className="text-slate-500">-</span>
               <input
                 type="number"
-                className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                className="flex-1 rounded-lg panel-input border px-3 py-2"
                 placeholder="最高"
                 value={form.selfQuoteMax}
                 onChange={(e) => patchForm({ selfQuoteMax: e.target.value })}
@@ -582,7 +582,7 @@ export default function PublishWizard() {
           <div className="space-y-3">
             <p className="text-slate-400 text-sm">请继续设置费用阶梯</p>
             {form.levelTiers.map((tier, idx) => (
-              <div key={tier.id} className="rounded-lg border border-white/10 p-3 space-y-2 relative">
+              <div key={tier.id} className="rounded-lg border border-[var(--shell-border)] p-3 space-y-2 relative">
                 {form.levelTiers.length > 1 ? (
                   <button
                     type="button"
@@ -611,7 +611,7 @@ export default function PublishWizard() {
                   <span className="text-slate-400 shrink-0">达人价格</span>
                   <input
                     type="number"
-                    className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                    className="flex-1 rounded-lg panel-input border px-3 py-2"
                     placeholder="0代表置换"
                     value={tier.price}
                     onChange={(e) => {
@@ -637,7 +637,7 @@ export default function PublishWizard() {
           <div className="space-y-3">
             <p className="text-slate-400 text-sm">粉丝阶梯费用</p>
             {form.fansTiers.map((tier, idx) => (
-              <div key={tier.id} className="rounded-lg border border-white/10 p-3 space-y-2 relative">
+              <div key={tier.id} className="rounded-lg border border-[var(--shell-border)] p-3 space-y-2 relative">
                 {form.fansTiers.length > 1 ? (
                   <button
                     type="button"
@@ -665,7 +665,7 @@ export default function PublishWizard() {
                   <span className="text-slate-400 shrink-0">达人价格</span>
                   <input
                     type="number"
-                    className="flex-1 rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+                    className="flex-1 rounded-lg panel-input border px-3 py-2"
                     value={tier.price}
                     onChange={(e) => {
                       const tiers = form.fansTiers.map((t) => ({ ...t }))
@@ -690,7 +690,7 @@ export default function PublishWizard() {
           <PubLabel>佣金 CPS（%）</PubLabel>
           <input
             type="number"
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             placeholder="选填"
             value={form.cpsPercent}
             onChange={(e) => patchForm({ cpsPercent: e.target.value })}
@@ -702,7 +702,7 @@ export default function PublishWizard() {
           <input
             type="number"
             min={1}
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.recruitCount}
             onChange={(e) => patchForm({ recruitCount: e.target.value })}
           />
@@ -711,7 +711,7 @@ export default function PublishWizard() {
         <div>
           <PubLabel>招募详情 *</PubLabel>
           <textarea
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2 min-h-[120px]"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2 min-h-[120px]"
             placeholder="合作要求、交付内容、档期说明、注意事项等"
             maxLength={2000}
             value={form.recruitDetail}
@@ -723,7 +723,7 @@ export default function PublishWizard() {
           <div>
             <PubLabel>云剪成片链接 *</PubLabel>
             <input
-              className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+              className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
               placeholder="https://…mp4"
               value={form.iceVideoUrl}
               onChange={(e) => patchForm({ iceVideoUrl: e.target.value })}

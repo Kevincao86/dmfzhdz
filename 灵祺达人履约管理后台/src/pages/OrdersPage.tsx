@@ -23,7 +23,7 @@ export default function OrdersPage() {
       ) : (
         <div className="space-y-3">
           {apps.map((a) => (
-            <article key={`${a.mpOrderId}-${a.applicantId}`} className="rounded-xl border border-white/10 bg-[#1a1a28] p-4">
+            <article key={`${a.mpOrderId}-${a.applicantId}`} className="surface-card rounded-xl border p-4">
               <h3 className="font-medium">{a.title || a.mpOrderId}</h3>
               <p className="text-xs text-slate-500 mt-1">
                 {a.platform || '—'} · {a.appliedAt || ''}
