@@ -143,6 +143,11 @@ sudo cp "$NGINX_SITE" "${NGINX_SITE}.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || t
 sudo cp "$TMP_NGINX" "$NGINX_SITE"
 rm -f "$TMP_NGINX"
 sudo ln -sf "$NGINX_SITE" /etc/nginx/sites-enabled/meoo-talent-fulfillment
+# 证书已就绪后移除临时 ACME 站，避免 dr 在 80 端口 server_name 冲突
+sudo rm -f /etc/nginx/sites-enabled/meoo-acme-"${FULFILLMENT_DOMAIN}" 2>/dev/null || true
+# nginx (www-data) 须能穿越 /home/admin 并读 dist
+sudo chmod o+x /home/admin /home/admin/app "$FUL" 2>/dev/null || true
+sudo chmod -R a+rX "$FUL/dist"
 sudo nginx -t
 sudo systemctl reload nginx
 
