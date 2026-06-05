@@ -230,8 +230,9 @@ async function provisionRegistryForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    let existing =
-      openId && (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
+    let existing: RegistryMpTalentMember | undefined = openId
+      ? (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
+      : undefined
     if (!existing && phone.length >= 8) {
       existing = (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phone)
     }
@@ -269,8 +270,9 @@ async function provisionRegistryForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    let existingPr =
-      openId && (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+    let existingPr: RegistryMpPrUser | undefined = openId
+      ? (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+      : undefined
     if (!existingPr && phone.length >= 8) {
       existingPr = (data.mpPrUsers ?? []).find((u) => {
         const p = String(u.contactPhone || '')
