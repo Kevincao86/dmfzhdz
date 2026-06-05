@@ -148,22 +148,22 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         </div>
       ) : null}
       <div className="flex flex-wrap gap-2 text-sm">
-        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
+        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
           {hallFilters.PLATFORM_FILTERS.map((p) => (
             <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
           ))}
         </select>
-        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
+        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
           {cityFilters.map((c) => (
             <option key={c} value={c}>{c === '全部' ? '城市' : c}</option>
           ))}
         </select>
-        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
+        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
           {TAG_FILTERS.map((t) => (
             <option key={t} value={t}>{t === '全部' ? '标签' : t}</option>
           ))}
         </select>
-        <select className="rounded-lg bg-black/30 border border-white/10 px-2 py-1.5" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
           {GENDER_FILTERS.map((g) => (
             <option key={g} value={g}>{g === '全部' ? '性别' : g}</option>
           ))}

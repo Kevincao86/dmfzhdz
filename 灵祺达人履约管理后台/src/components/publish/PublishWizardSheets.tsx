@@ -213,13 +213,13 @@ export default function PublishWizardSheets(props: Props) {
           全国
         </button>
         <input
-          className="w-full mb-3 rounded-lg bg-black/30 border border-white/10 px-3 py-2 text-sm"
+          className="w-full mb-3 rounded-lg panel-input border px-3 py-2 text-sm"
           placeholder="搜索省、市"
           value={cityKeyword}
           onChange={(e) => setCityKeyword(e.target.value)}
         />
         <div className="grid grid-cols-2 gap-2 h-52">
-          <div className="overflow-auto border border-white/10 rounded-lg">
+          <div className="overflow-auto border border-[var(--shell-border)] rounded-lg">
             {cityProvinceRows.map((p) => (
               <button
                 key={p.name}
@@ -231,7 +231,7 @@ export default function PublishWizardSheets(props: Props) {
               </button>
             ))}
           </div>
-          <div className="overflow-auto border border-white/10 rounded-lg">
+          <div className="overflow-auto border border-[var(--shell-border)] rounded-lg">
             {cityCheckGrid.map((c) => (
               <button
                 key={c.name}
@@ -494,7 +494,7 @@ export default function PublishWizardSheets(props: Props) {
         <label className="block text-sm mb-3">
           <span className="text-slate-400">模版名称</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={applyEditorName}
             onChange={(e) => setApplyEditorName(e.target.value)}
           />

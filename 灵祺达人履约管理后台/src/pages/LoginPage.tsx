@@ -147,7 +147,7 @@ export default function LoginPage() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
             LingQi · Talent Fulfillment
           </p>
-          <h1 className="text-lg font-bold text-slate-900">灵祺撮合履约平台</h1>
+          <h1 className="text-lg font-bold text-slate-900">灵祺星选平台</h1>
         </div>
       </div>
 

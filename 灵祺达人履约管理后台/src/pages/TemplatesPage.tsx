@@ -37,7 +37,7 @@ export default function TemplatesPage() {
       ) : (
         <div className="space-y-3">
           {rows.map((t) => (
-            <article key={t.id} className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 flex justify-between gap-3 items-start">
+            <article key={t.id} className="surface-card rounded-xl border p-4 flex justify-between gap-3 items-start">
               <div>
                 <h3 className="font-medium">{t.name}</h3>
                 <p className="text-xs text-slate-500 mt-1">{t.fields.length} 个报名项</p>

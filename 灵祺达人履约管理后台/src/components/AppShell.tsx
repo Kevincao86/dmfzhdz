@@ -14,7 +14,6 @@ function navForRole(role: MpAccountRole): NavItem[] {
   if (role === 'pr') {
     return [
       { to: '/hall', label: '招募大厅' },
-      { to: '/hall?tab=recommend', label: '推荐大厅' },
       { to: '/publish', label: '发布招募' },
       { to: '/templates', label: '我的模版' },
       { to: '/orders', label: '我的发单' },
@@ -23,7 +22,6 @@ function navForRole(role: MpAccountRole): NavItem[] {
   }
   return [
     { to: '/hall', label: '招募大厅' },
-    { to: '/hall?tab=recommend', label: '推荐大厅' },
     { to: '/orders', label: '我的履约' },
     ...common,
   ]
@@ -52,7 +50,7 @@ export default function AppShell() {
     <div className="min-h-screen flex bg-[var(--shell-main-bg)] text-[var(--app-text)]">
       <aside className="w-56 border-r border-[var(--shell-border)] bg-[var(--shell-sidebar-bg)] p-4 flex flex-col shrink-0">
         <div className="mb-6">
-          <div className="font-bold text-lg text-[var(--shell-text)]">灵祺履约后台</div>
+          <div className="font-bold text-lg text-[var(--shell-text)]">灵祺星选平台</div>
           <div className="text-xs text-[var(--shell-muted)] mt-1">
             {editionLabel} · {account?.wxNickName || account?.loginName || '未登录'}
           </div>

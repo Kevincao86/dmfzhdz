@@ -79,7 +79,7 @@ function DeadlineTimeWheel({ value, onChange }: TimeWheelProps) {
           <span className="text-center text-[11px] text-slate-400 mb-1 shrink-0">时</span>
           <div
             ref={hourRef}
-            className="flex-1 overflow-y-auto rounded-xl bg-black/35 border border-white/10 overscroll-contain"
+            className="flex-1 overflow-y-auto rounded-xl panel-input border overscroll-contain"
           >
             {HOURS.map((h) => {
               const on = hh === h
@@ -104,7 +104,7 @@ function DeadlineTimeWheel({ value, onChange }: TimeWheelProps) {
           <span className="text-center text-[11px] text-slate-400 mb-1 shrink-0">分</span>
           <div
             ref={minuteRef}
-            className="flex-1 overflow-y-auto rounded-xl bg-black/35 border border-white/10 overscroll-contain"
+            className="flex-1 overflow-y-auto rounded-xl panel-input border overscroll-contain"
           >
             {MINUTES.map((m) => {
               const on = mm === m

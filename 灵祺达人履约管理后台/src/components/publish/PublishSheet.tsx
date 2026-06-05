@@ -33,7 +33,7 @@ export default function PublishSheet({
       role="presentation"
     >
       <div
-        className={`w-full max-w-lg flex flex-col rounded-2xl border border-white/10 bg-[#1a1a28] shadow-2xl ${
+        className={`w-full max-w-lg flex flex-col rounded-2xl surface-card border shadow-2xl ${
           tall ? 'max-h-[min(88vh,720px)]' : 'max-h-[min(75vh,560px)]'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -41,7 +41,7 @@ export default function PublishSheet({
         aria-modal="true"
         aria-labelledby="publish-sheet-title"
       >
-        <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 shrink-0">
+        <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--shell-border)] shrink-0">
           <h3 id="publish-sheet-title" className="font-semibold text-[15px]">
             {title}
           </h3>
@@ -50,9 +50,9 @@ export default function PublishSheet({
           </button>
         </header>
         <div className="flex-1 overflow-auto px-4 py-3 min-h-0">{children}</div>
-        {pinnedBottom ? <div className="shrink-0 border-t border-white/10">{pinnedBottom}</div> : null}
+        {pinnedBottom ? <div className="shrink-0 border-t border-[var(--shell-border)]">{pinnedBottom}</div> : null}
         {onConfirm ? (
-          <footer className="px-4 py-3 border-t border-white/10 shrink-0">
+          <footer className="px-4 py-3 border-t border-[var(--shell-border)] shrink-0">
             <button type="button" className="w-full py-2.5 rounded-xl bg-violet-600 text-sm font-medium" onClick={onConfirm}>
               {confirmLabel}
             </button>

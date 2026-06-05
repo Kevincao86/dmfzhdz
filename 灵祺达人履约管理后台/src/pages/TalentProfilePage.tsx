@@ -157,12 +157,12 @@ export default function TalentProfilePage() {
         <p className="text-sm text-slate-400">达人 ID：{member.lingqiTalentId}</p>
       ) : null}
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可用账号密码登录，与微信绑定同一灵祺 ID</p>
         <label className="block">
           <span className="text-slate-400">手机号</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={loginName}
             onChange={(e) => setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))}
             placeholder="字母数字"
@@ -172,7 +172,7 @@ export default function TalentProfilePage() {
           <span className="text-slate-400">登录密码</span>
           <input
             type="password"
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
@@ -180,11 +180,11 @@ export default function TalentProfilePage() {
         </label>
       </section>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <label className="block">
           <span className="text-slate-400">昵称</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wxNickName || ''}
             onChange={(e) => patchMember({ wxNickName: e.target.value })}
           />
@@ -192,7 +192,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">联系电话</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.contact || ''}
             onChange={(e) => patchMember({ contact: e.target.value })}
           />
@@ -200,7 +200,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">微信号</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wechatId || ''}
             onChange={(e) => patchMember({ wechatId: e.target.value })}
           />
@@ -208,7 +208,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">支付宝账号</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.alipayAccount || ''}
             onChange={(e) => patchMember({ alipayAccount: e.target.value })}
           />
@@ -233,7 +233,7 @@ export default function TalentProfilePage() {
         ))}
       </div>
 
-      <section className="rounded-xl border border-white/10 bg-[#1a1a28] p-4 space-y-3 text-sm">
+      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -245,7 +245,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">{lb.nickname}</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.platformNickname || ''}
             onChange={(e) => patchProfile({ platformNickname: e.target.value })}
           />
@@ -253,7 +253,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">{lb.accountId}</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.platformAccount || ''}
             onChange={(e) => patchProfile({ platformAccount: e.target.value })}
           />
@@ -261,7 +261,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">{lb.profileLink}</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.profileLink || ''}
             onChange={(e) => patchProfile({ profileLink: e.target.value })}
           />
@@ -269,7 +269,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">{lb.followersLabel}</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.followers || ''}
             onChange={(e) => patchProfile({ followers: e.target.value })}
           />
@@ -278,7 +278,7 @@ export default function TalentProfilePage() {
           <label className="block">
             <span className="text-slate-400">抖音带货等级</span>
             <select
-              className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+              className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
               value={prof.douyinSalesLevel || ''}
               onChange={(e) => patchProfile({ douyinSalesLevel: e.target.value })}
             >
@@ -294,7 +294,7 @@ export default function TalentProfilePage() {
         <label className="block">
           <span className="text-slate-400">报价（元）</span>
           <input
-            className="mt-1 w-full rounded-lg bg-black/30 border border-white/10 px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.quotePrice || ''}
             onChange={(e) => patchProfile({ quotePrice: e.target.value })}
           />

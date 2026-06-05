@@ -4,7 +4,8 @@ const KEY = 'lingqi_mp_app_theme_v1'
 
 export function getTheme(): AppTheme {
   const v = localStorage.getItem(KEY)
-  return v === 'light' ? 'light' : 'dark'
+  if (v === 'dark') return 'dark'
+  return 'light'
 }
 
 export function setTheme(theme: AppTheme) {
