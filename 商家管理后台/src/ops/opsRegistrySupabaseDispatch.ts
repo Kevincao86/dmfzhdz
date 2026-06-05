@@ -147,29 +147,16 @@ export async function dispatchOpsRegistrySupabase(opts: {
         merchantName?: string
         loginName?: string
       }
-      const id = (body.id ?? '').trim()
-      if (!id) {
-        return { status: 400, body: { ok: false, error: 'missing_id' } }
+      const { deleteRegistryTenantFromSnapshot } = await import('./registryTenantDeleteCore.js')
+      const result = await deleteRegistryTenantFromSnapshot(io, {
+        id: String(body.id || ''),
+        merchantName: body.merchantName,
+        loginName: body.loginName,
+      })
+      if (!result.ok) {
+        return { status: 400, body: { ok: false, error: result.error } }
       }
-      const merchantName = typeof body.merchantName === 'string' ? body.merchantName.trim() : ''
-      const loginName = typeof body.loginName === 'string' ? body.loginName.trim().toLowerCase() : ''
-      const data = await io.load()
-      const before = data.tenants.length
-      data.tenants = data.tenants.filter(
-        (t) =>
-          t.id !== id &&
-          !(loginName && (t.loginName ?? '').trim().toLowerCase() === loginName),
-      )
-      if (merchantName) {
-        data.recruitmentOrders = (data.recruitmentOrders ?? []).filter(
-          (o) => (o.customerName ?? '').trim() !== merchantName,
-        )
-      }
-      await io.save(data)
-      return {
-        status: 200,
-        body: { ok: true, removed: before - data.tenants.length },
-      }
+      return { status: 200, body: { ok: true, removed: result.removed } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/tenants/patch') {

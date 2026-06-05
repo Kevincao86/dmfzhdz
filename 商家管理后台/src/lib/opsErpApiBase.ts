@@ -79,6 +79,8 @@ export async function fetchOpsErpApi(apiPath: string, init?: RequestInit): Promi
   const registryLike =
     apiPath.includes('ops-sync') ||
     apiPath.includes('meoo-ops-sync-registry') ||
+    apiPath.includes('meoo-ops-registry-tenant-delete') ||
+    apiPath.includes('tenants/delete') ||
     apiPath.includes('vendor-keys') ||
     apiPath.includes('video-ai')
   const candidates = registryLike ? opsRegistryApiUrls(apiPath) : opsErpApiCandidates(apiPath)

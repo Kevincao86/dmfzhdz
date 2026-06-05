@@ -75,6 +75,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       redirectRegistryToErpApi(res, '/api/ops-sync/video-ai')
       return
     }
+    if (method === 'POST' && urlPath === '/api/ops-sync/tenants/delete') {
+      redirectRegistryToErpApi(res, '/api/meoo-ops-registry-tenant-delete')
+      return
+    }
 
     const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
     const serviceRole = (

@@ -411,20 +411,15 @@ export async function deleteRegistryTenant(body: {
   merchantName?: string
   loginName?: string
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
-  const res = await fetch('/api/ops-sync/tenants/delete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  const j = (await res.json().catch(() => ({}))) as {
-    ok?: boolean
-    error?: string
-    detail?: string
-  }
+  const paths = [
+    '/api/meoo-ops-registry-tenant-delete',
+    '/api/ops-sync/tenants/delete',
+  ]
+  const { res, j } = await postRegistrySync(paths, body)
   if (!res.ok) {
     return {
       ok: false,
-      error: j.error ?? mapHttpError(res.status),
+      error: String(j.error || mapHttpError(res.status)),
       detail: typeof j.detail === 'string' ? j.detail : undefined,
     }
   }
