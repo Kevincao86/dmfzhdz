@@ -1,0 +1,224 @@
+# 履约管理后台 · Vercel → 新 ECS 迁移（并行期不关 Vercel）
+
+## 机器分工（术语）
+
+| 称呼 | IP | 职责 |
+|------|-----|------|
+| **轻量** | `139.196.42.5` | Supabase、PostgREST、GoTrue、`meoo-auth-api`、`mofangdianai.com/erp-api` |
+| **ECS**（新 ECS） | `8.160.173.236` | 履约 Web 静态站 + Nginx（本迁移只动这台的 Web） |
+| **Vercel** | — | 并行期继续服务履约 **正式域**；切流稳定后再 Pause |
+
+履约站 **无 Serverless**；浏览器 API 一律打到 **轻量**（经 `mofangdianai.com/erp-api` 或新 ECS Nginx 反代过去）。
+
+---
+
+## 步骤总览
+
+| 步骤 | 在哪里做 | 目标 | Vercel |
+|------|----------|------|--------|
+| **1** | 本机 + Git | 迁移脚本入库，新 ECS 能 `git pull` | 不动 |
+| **2** | 新 ECS | 装 Node/Nginx、克隆仓库、`admin` 用户 | 不动 |
+| **3** | 本机 / Vercel 控制台 | 导出 `VITE_*` → 新 ECS `.env.production` | 不动 |
+| **4** | 域名控制台 | 仅新增 `ly-ecs` → **新 ECS IP** | 不动 |
+| **5** | 新 ECS | `ecs-deploy-talent-fulfillment-web.sh` 构建 + Nginx | 不动 |
+| **6** | 浏览器 | `ly-ecs.mofangdianai.com` 与 Vercel 正式域对照验收 | 仍在线 |
+| **7** | 域名控制台 | 正式域 DNS 改指向 **新 ECS** | 仍在线 |
+| **8** | 新 ECS | `ecs-cutover-talent-fulfillment-dns.sh` | 仍在线 |
+| **9** | Vercel 控制台 | Pause 履约项目 | 关停 |
+
+下面按步骤展开；**做完一步再进下一步**。
+
+---
+
+## 步骤 1：本机 — 迁移脚本入库
+
+确保新 ECS 能拉到含以下文件的 `main`：
+
+- `scripts/ecs-deploy-talent-fulfillment-web.sh`
+- `scripts/ecs-nginx-talent-fulfillment.conf`
+- `scripts/ecs-cutover-talent-fulfillment-dns.sh`
+- `灵祺达人履约管理后台/.env.production.example`
+- 本文档
+
+本机确认后 `git push`（Gitee / GitHub）。  
+**完成标志**：新 ECS 上 `git pull` 能看到上述文件。
+
+---
+
+## 步骤 2：新 ECS 基础环境
+
+SSH：`admin@8.160.173.236`
+
+```bash
+# 示例：Ubuntu/Debian
+sudo apt update
+sudo apt install -y git nginx curl
+
+# Node 20 LTS（按你系统选 nvm 或 NodeSource）
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# 2G 内存建议开 swap（构建用）
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+
+# 克隆仓库（与轻量相同 remote）
+git clone <你的仓库地址> ~/app
+cd ~/app && git checkout main
+```
+
+**完成标志**：`node -v`、`nginx -v`、`ls ~/app/scripts/ecs-deploy-talent-fulfillment-web.sh` 均 OK。
+
+---
+
+## 步骤 3：环境变量（从 Vercel 抄到 ECS）
+
+Vercel → 履约项目（Root = `灵祺达人履约管理后台`）→ Environment Variables → Production：
+
+| 变量 | 示例 |
+|------|------|
+| `VITE_MP_API_BASE` | `https://mofangdianai.com/erp-api` |
+| `VITE_SUPABASE_URL` | `https://mofangdianai.com` |
+| `VITE_SUPABASE_ANON_KEY` | 与商家版相同 |
+
+在新 ECS：
+
+```bash
+cp ~/app/灵祺达人履约管理后台/.env.production.example \
+   ~/app/灵祺达人履约管理后台/.env.production
+nano ~/app/灵祺达人履约管理后台/.env.production
+```
+
+**完成标志**：`grep VITE_SUPABASE_ANON_KEY .env.production` 有非空值。
+
+---
+
+## 步骤 4：DNS — 仅验收子域（不动 Vercel 正式域）
+
+域名控制台新增：
+
+| 主机记录 | 类型 | 值 |
+|----------|------|-----|
+| `ly-ecs` | A | `8.160.173.236`（**ECS**，不是轻量） |
+
+**不要**改 Vercel 上履约正式域的解析。
+
+证书（在新 ECS，SAN 需含 `ly-ecs.mofangdianai.com`）：
+
+```bash
+sudo mkdir -p /var/www/certbot /etc/nginx/ssl/mofangdianai.com
+sudo certbot certonly --webroot -w /var/www/certbot \
+  -d ly-ecs.mofangdianai.com --agree-tos --register-unsafely-without-email
+sudo cp /etc/letsencrypt/live/ly-ecs.mofangdianai.com/fullchain.pem /etc/nginx/ssl/mofangdianai.com/
+sudo cp /etc/letsencrypt/live/ly-ecs.mofangdianai.com/privkey.pem /etc/nginx/ssl/mofangdianai.com/
+```
+
+若已有通配符或根域 PEM 已覆盖子域，可跳过 certbot，沿用现有 PEM 路径。
+
+**完成标志**：`dig +short ly-ecs.mofangdianai.com` → `8.160.173.236`。
+
+---
+
+## 步骤 5：新 ECS 部署（API 反代到轻量）
+
+在新 ECS（**默认 API 走轻量公网域名**）：
+
+```bash
+cd ~/app && git pull
+MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-talent-fulfillment-web.sh
+```
+
+说明：
+
+- 静态文件在新 ECS 本机 `灵祺达人履约管理后台/dist`
+- `/erp-api/`、`/api/` → 反代 `https://mofangdianai.com`（轻量 Nginx → `meoo-auth-api`）
+
+构建 OOM 时：本机 `npm run build` 后 `scp dist` 到新 ECS，再：
+
+```bash
+SKIP_BUILD=1 MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-talent-fulfillment-web.sh
+```
+
+**完成标志**：`curl -sI https://ly-ecs.mofangdianai.com/ | head -3` 返回 `200` 或 `301→200`。
+
+---
+
+## 步骤 6：并行验收（Vercel 仍对用户开放）
+
+| 检查项 | `ly-ecs.mofangdianai.com` | Vercel 正式域 |
+|--------|---------------------------|---------------|
+| 首页 / 登录 | ✓ | ✓ |
+| 账号密码登录 | ✓ | ✓ |
+| 招募大厅 | ✓ | ✓ |
+| 增值服务一页 | ✓ | ✓ |
+| Network API 路径 | `.../erp-api/meoo-*`，无 `/erp-api/api/` | 同左 |
+
+```bash
+curl -sS https://mofangdianai.com/erp-api/meoo-erp-api-health | head -c 120
+```
+
+**完成标志**：两边行为一致；正式用户仍只走 Vercel。
+
+---
+
+## 步骤 7：正式域 DNS 切到 ECS
+
+1. Vercel → 履约项目 → Domains → 记下 Production **正式域** `<正式域>`
+2. 域名控制台：`<正式域>` A 记录 → `8.160.173.236`（停用指向 Vercel 的记录）
+3. 证书 SAN 含 `<正式域>`（必要时 certbot `--expand`）
+
+**完成标志**：`dig +short <正式域>` → `8.160.173.236`。
+
+---
+
+## 步骤 8：新 ECS 启用正式域 Nginx
+
+```bash
+cd ~/app
+bash scripts/ecs-cutover-talent-fulfillment-dns.sh <正式域>
+```
+
+再测 `https://<正式域>/` 登录与招募大厅。
+
+---
+
+## 步骤 9：关停 Vercel（稳定 24–48h 后）
+
+Vercel → 履约项目 → Settings → **Pause Project**。
+
+日常发版（仅新 ECS）：
+
+```bash
+cd ~/app && git pull
+FULFILLMENT_PROD_DOMAIN=<正式域> \
+MEOO_API_UPSTREAM=https://mofangdianai.com \
+bash scripts/ecs-deploy-talent-fulfillment-web.sh
+```
+
+---
+
+## 架构示意
+
+```text
+用户浏览器
+    │
+    ├─ 并行期正式域 ──► Vercel（旧，步骤 9 前）
+    │
+    └─ ly-ecs / 切流后正式域 ──► ECS 8.160.173.236（Nginx → dist）
+              │
+              ├─ /erp-api/* ──反代──► 轻量 139.196.42.5（mofangdianai.com）
+              └─ /api/*     ──反代──► 同上
+```
+
+---
+
+## 常见问题
+
+**Q：履约要迁到轻量吗？**  
+不迁。轻量只继续跑 API/DB；履约 **Web 只在新 ECS**。
+
+**Q：并行期用户访问哪？**  
+仍访问 Vercel 正式域；`ly-ecs` 仅供验收。
+
+**Q：轻量上的 `mofangdianai.com` 商家站要动吗？**  
+本迁移不动；只在新 ECS 增加履约子域。

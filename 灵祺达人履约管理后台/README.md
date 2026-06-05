@@ -34,9 +34,14 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
 | 微信扫码 | `scan_create` + `scan_poll`（资质齐全后接微信开放平台） |
 | 小程序 | `wx_login` 同一接口，会话 token 可互通（`X-Mp-Session`） |
 
-## Vercel 部署
+## 生产部署
 
-见 **[docs/deploy-vercel-talent-fulfillment.md](../docs/deploy-vercel-talent-fulfillment.md)**：Root Directory 必须为 `灵祺达人履约管理后台`，并配置 `VITE_MP_API_BASE`。
+| 方式 | 文档 / 命令 |
+|------|-------------|
+| Vercel（迁出前） | [docs/deploy-vercel-talent-fulfillment.md](../docs/deploy-vercel-talent-fulfillment.md) |
+| ECS（推荐） | [docs/MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md](../docs/MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md) · `bash scripts/ecs-deploy-talent-fulfillment-web.sh` |
+
+Root Directory（Vercel）必须为 `灵祺达人履约管理后台`，并配置 `VITE_MP_API_BASE`。ECS 构建用本目录 `.env.production`（见 `.env.production.example`）。
 
 ## 环境变量（ECS / Vercel）
 
