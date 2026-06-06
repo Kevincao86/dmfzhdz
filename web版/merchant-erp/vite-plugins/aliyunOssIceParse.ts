@@ -40,7 +40,12 @@ export function parseVodStorageAsOssPrefix(cfg: AliyunIceConfig): ParsedOssPrefi
   return { bucket: m[1], region: m[2], keyPrefix: 'meoo' }
 }
 
-/** 本地上传候选 Bucket（按优先级）；outin 点播库通常不可 AK 直写 PutObject */
+/** ICE 点播库 outin-* 不可经 AK 直写 PutObject（会 bucket acl） */
+export function isIceVodOutinBucket(bucket: string): boolean {
+  return /^outin-/i.test(bucket.trim())
+}
+
+/** 本地上传候选 Bucket（按优先级）；跳过 outin 点播库 */
 export function resolveIceOssUploadCandidates(
   cfg: AliyunIceConfig,
   env: Record<string, string | undefined>,
@@ -48,6 +53,7 @@ export function resolveIceOssUploadCandidates(
   const out: ParsedOssPrefix[] = []
   const add = (p: ParsedOssPrefix | null) => {
     if (!p) return
+    if (isIceVodOutinBucket(p.bucket)) return
     if (!out.some((x) => x.bucket === p.bucket && x.region === p.region && x.keyPrefix === p.keyPrefix)) {
       out.push(p)
     }
@@ -59,9 +65,37 @@ export function resolveIceOssUploadCandidates(
   // 自建 Bucket（运营台 OSS 成片前缀）须已加入 IMS 媒资库，且 RAM 含 oss:PutObject
   add(parseOssUrlPrefix(cfg.outputOssUrlPrefix?.trim() ?? ''))
 
-  // outin 仅作兜底：多数账号对点播库无 bucket 写 ACL
-  add(parseVodStorageAsOssPrefix(cfg))
+  // 不再把 outin 作上传兜底（仅用于成片输出 / RegisterMediaInfo StorageLocation）
   return out
+}
+
+export function describeIceUploadBucketSelection(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+): {
+  uploadBucket: string | null
+  uploadBuckets: string[]
+  outputPrefixParseOk: boolean
+  skippedOutinSources: string[]
+} {
+  const candidates = resolveIceOssUploadCandidates(cfg, env)
+  const outputPrefixParseOk = Boolean(parseOssUrlPrefix(cfg.outputOssUrlPrefix?.trim() ?? ''))
+  const skipped: string[] = []
+  if (isIceVodOutinBucket(parseOssUrlPrefix(cfg.outputOssUrlPrefix?.trim() ?? '')?.bucket ?? '')) {
+    skipped.push('iceOutputOssUrlPrefix 指向 outin，已跳过直传')
+  }
+  const explicit = env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX?.trim()
+  if (explicit && isIceVodOutinBucket(parseOssUrlPrefix(explicit)?.bucket ?? '')) {
+    skipped.push('ALIYUN_ICE_SOURCE_OSS_URL_PREFIX 指向 outin，已跳过')
+  }
+  const uploadBuckets = candidates.map((p) => `${p.bucket}.oss-${p.region}.aliyuncs.com`)
+  const first = candidates[0]
+  return {
+    uploadBucket: first ? `${first.bucket}.oss-${first.region}.aliyuncs.com` : null,
+    uploadBuckets,
+    outputPrefixParseOk,
+    skippedOutinSources: skipped,
+  }
 }
 
 export function resolveIceOssUploadPrefix(

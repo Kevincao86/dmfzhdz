@@ -17,7 +17,7 @@ import {
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
-import { iceOssUploadAvailable, resolveIceOssUploadPrefix } from './aliyunOssIceParse.js'
+import { describeIceUploadBucketSelection, iceOssUploadAvailable } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
@@ -126,7 +126,14 @@ export async function handleAliyunIceRoutes(input: {
     const envMap = rawEnv as Record<string, string | undefined>
     const ossUpload =
       cfg != null ? iceOssUploadAvailable(cfg, envMap) : false
-    const uploadPrefix = cfg ? resolveIceOssUploadPrefix(cfg, envMap) : null
+    const bucketSel = cfg
+      ? describeIceUploadBucketSelection(cfg, envMap)
+      : {
+          uploadBucket: null,
+          uploadBuckets: [] as string[],
+          outputPrefixParseOk: false,
+          skippedOutinSources: [] as string[],
+        }
     const ramProbe = cfg ? await probeIceRamAccess(cfg) : { ok: false as const, message: '未配置 ICE' }
     json(res, 200, {
       configured: !!cfg,
@@ -134,7 +141,15 @@ export async function handleAliyunIceRoutes(input: {
       hasOssOutput: Boolean(cfg?.outputOssUrlPrefix?.trim()),
       hasVodOutput: Boolean(cfg?.vodStorageLocation?.trim()),
       localUploadEnabled: ossUpload,
-      uploadBucket: uploadPrefix ? `${uploadPrefix.bucket}.oss-${uploadPrefix.region}.aliyuncs.com` : null,
+      uploadBucket: bucketSel.uploadBucket,
+      uploadBuckets: bucketSel.uploadBuckets,
+      outputPrefixParseOk: bucketSel.outputPrefixParseOk,
+      uploadBucketHint:
+        bucketSel.uploadBucket == null
+          ? '请在运营台「OSS 成片 URL 前缀」填写自建 Bucket（如 https://mxslearningbiz.oss-cn-shanghai.aliyuncs.com/meoo/），勿填 outin 点播库。'
+          : bucketSel.skippedOutinSources.length
+            ? bucketSel.skippedOutinSources.join('；')
+            : null,
       iceRamAuthorized: ramProbe.ok,
       iceRamIssue: ramProbe.ok ? null : ramProbe.message,
       presets: ICE_EFFECT_PRESETS.map((p) => p.label),
