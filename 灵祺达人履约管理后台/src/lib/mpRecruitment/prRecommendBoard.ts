@@ -137,7 +137,12 @@ function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
   const fromLib = library.map((e) => {
     const row = e as Record<string, unknown>
     const raw = Number(row.followers) || 0
-    return formatTalent({ ...row, qualityTag: raw >= 50000 ? '优质' : '推荐' })
+    return formatTalent({
+      ...row,
+      id: row.id || row.lingqiTalentId,
+      platformNickname: row.platformNickname || row.name,
+      qualityTag: raw >= 50000 ? '优质' : '推荐',
+    })
   })
   const fromMembers = members
     .filter((m) => memberMatchesBoard(m as Record<string, unknown>, 'talent'))
@@ -146,9 +151,11 @@ function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
       const primary = primaryPlatformProfile(mem)
       const p = primary?.profile
       const raw = Number(p?.followers) || 0
+      const nick = String(p?.platformNickname || mem.wxNickName || mem.contact || '').trim()
+      if (!nick) return null
       return formatTalent({
-        id: mem.id,
-        platformNickname: p?.platformNickname || mem.wxNickName,
+        id: mem.id || mem.lingqiTalentId,
+        platformNickname: nick,
         wxAvatarUrl: mem.wxAvatarUrl,
         platform: primary?.platform || '抖音',
         followers: raw,
@@ -160,6 +167,7 @@ function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
         douyinSalesLevel: p?.douyinSalesLevel || '',
       })
     })
+    .filter((r): r is TalentCardRow => !!r && !!r.id)
   const merged = [...fromLib, ...fromMembers]
   const seen = new Set<string>()
   return merged.filter((r) => {

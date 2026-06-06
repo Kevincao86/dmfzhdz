@@ -139,32 +139,40 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     void applyTalentFilters()
   }, [applyTalentFilters])
 
-  useEffect(() => {
-    ;(async () => {
-      setLoading(true)
-      try {
-        const reg = await fetchMpRegistry()
-        setRegistryCache(reg)
-        const pools = {
-          talent: buildBoardPool(reg, 'talent'),
-          shoot: buildBoardPool(reg, 'shoot'),
-          edit: buildBoardPool(reg, 'edit'),
-        }
-        setBoardPools(pools)
-        const board = prBoard
-        const pool = pools[board]
-        const orderCount = countPrOrdersForBoard(reg, board)
-        setPrBoardOrderCount(orderCount)
-        setPrMatchHint(boardMatchHint(board, orderCount))
-        setAllRows(pool)
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : '加载失败')
-        setDisplayRows([])
-      } finally {
-        setLoading(false)
+  const loadRegistry = useCallback(async () => {
+    setLoading(true)
+    setErr('')
+    try {
+      const reg = await fetchMpRegistry()
+      setRegistryCache(reg)
+      const pools = {
+        talent: buildBoardPool(reg, 'talent'),
+        shoot: buildBoardPool(reg, 'shoot'),
+        edit: buildBoardPool(reg, 'edit'),
       }
-    })()
-  }, [])
+      setBoardPools(pools)
+      const pool = pools[prBoard]
+      const orderCount = countPrOrdersForBoard(reg, prBoard)
+      setPrBoardOrderCount(orderCount)
+      setPrMatchHint(boardMatchHint(prBoard, orderCount))
+      setAllRows(pool)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '加载失败')
+      setDisplayRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [prBoard])
+
+  useEffect(() => {
+    void loadRegistry()
+  }, [loadRegistry])
+
+  useEffect(() => {
+    const onFocus = () => void loadRegistry()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [loadRegistry])
 
   function onBoardChange(id: PrBoardId) {
     if (id === prBoard) return

@@ -15,9 +15,12 @@ function normalizeHallPayload(data) {
   }
   return {
     mpRecruitmentOrders: mp,
-    recruitmentOrders: [],
-    mpTalentMembers: [],
-    mpPrUsers: [],
+    recruitmentOrders: Array.isArray(data.recruitmentOrders) ? data.recruitmentOrders : [],
+    mpTalentMembers: Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers : [],
+    talentLibraryEntries: Array.isArray(data.talentLibraryEntries) ? data.talentLibraryEntries : [],
+    shootTeamLibraryEntries: Array.isArray(data.shootTeamLibraryEntries) ? data.shootTeamLibraryEntries : [],
+    editTeamLibraryEntries: Array.isArray(data.editTeamLibraryEntries) ? data.editTeamLibraryEntries : [],
+    mpPrUsers: Array.isArray(data.mpPrUsers) ? data.mpPrUsers : [],
   }
 }
 
