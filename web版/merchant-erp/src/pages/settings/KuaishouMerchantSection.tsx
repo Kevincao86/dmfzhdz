@@ -432,7 +432,7 @@ export default function KuaishouMerchantSection() {
       setPage(1)
       await loadStores({ silent: false, refresh: true })
     },
-    [loadStores],
+    [loadStores, clearLocalKuaishouBindingState],
   )
 
   useEffect(() => {
@@ -441,7 +441,7 @@ export default function KuaishouMerchantSection() {
 
   const openBindForm = () => {
     setBindError(null)
-    if (!canAddPlatformBinding(plan, cloudBindings.length)) {
+    if (!canAddPlatformBinding(plan, effectiveBindingCount)) {
       setBindError(platformBindingLimitExceededMessage(plan))
       return
     }
@@ -454,8 +454,10 @@ export default function KuaishouMerchantSection() {
       setBindError('请填写 AppID、App Secret 与商户 ID')
       return
     }
-    const exists = cloudBindings.some((b) => b.merchant_account_id === merchantId.trim())
-    if (!exists && !canAddPlatformBinding(plan, cloudBindings.length)) {
+    const exists =
+      cloudBindings.some((b) => b.merchant_account_id === merchantId.trim()) ||
+      (accessToken && boundMerchantId.trim() === merchantId.trim())
+    if (!exists && !canAddPlatformBinding(plan, effectiveBindingCount)) {
       setBindError(platformBindingLimitExceededMessage(plan))
       return
     }
@@ -522,15 +524,11 @@ export default function KuaishouMerchantSection() {
       void removeKuaishouBinding(cloudBindings[0].id)
       return
     }
-    clearKuaishouMerchantBindingLocal()
-    setAccessToken(null)
-    setBoundMerchantId('')
-    setBoundAccountName('')
-    setRows([])
-    setTotal(0)
-    setLastSyncAt(null)
-    setListError(null)
-    setStoresHint(null)
+    if (accessToken) {
+      void removeKuaishouBinding(LOCAL_SESSION_BINDING_ID)
+      return
+    }
+    clearLocalKuaishouBindingState()
   }
 
   return (
