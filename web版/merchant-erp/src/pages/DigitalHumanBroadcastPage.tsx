@@ -1204,9 +1204,11 @@ export default function DigitalHumanBroadcastPage() {
                                 ? '失败'
                                 : activeJob.status}
                       </p>
-                      {activeJob.status === 'failed' && activeJob.errorMessage ? (
+                      {activeJob.status === 'failed' ? (
                         <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-800">
-                          {activeJob.errorMessage}
+                          {activeJob.errorMessage ||
+                            activeJob.previewNote ||
+                            '渲染失败：请确认运营台已配置豆包 Seedance 或可灵视频 API，并在 Network 中查看 meoo-merchant-ai-video-seedance-start 响应。'}
                         </p>
                       ) : null}
                       {activeJob.previewNote && activeJob.status === 'completed' ? (
@@ -1455,9 +1457,9 @@ function WorksPanel({
                         {statusLabel[w.status]}
                         {w.status === 'rendering' || w.status === 'queued' ? ` ${w.progress}%` : ''}
                       </span>
-                      {w.status === 'failed' && w.errorMessage ? (
+                      {w.status === 'failed' && (w.errorMessage || w.previewNote) ? (
                         <p className="mt-1 max-w-md text-xs leading-relaxed text-red-700">
-                          {w.errorMessage}
+                          {w.errorMessage || w.previewNote}
                         </p>
                       ) : null}
                     </div>

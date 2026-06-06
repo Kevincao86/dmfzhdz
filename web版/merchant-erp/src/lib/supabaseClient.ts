@@ -1,6 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
+/** cs 子域勿走 ECS 双跳；Realtime wss 直连根域更稳（与 dr 履约站一致） */
+function effectiveSupabaseUrl(raw: string | undefined): string {
+  const trimmed = (raw ?? '').trim().replace(/\/$/, '')
+  if (!trimmed) return ''
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (host === 'cs.mofangdianai.com' && /cs\.mofangdianai\.com/i.test(trimmed)) {
+      return 'https://mofangdianai.com'
+    }
+  }
+  return trimmed
+}
+
+const url = effectiveSupabaseUrl(import.meta.env.VITE_SUPABASE_URL)
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabaseConfigured = Boolean(url?.trim() && anon?.trim())

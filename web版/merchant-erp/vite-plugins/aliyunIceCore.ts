@@ -517,6 +517,15 @@ export async function iceRunImagesPipeline(
   | { ok: true; jobId: string; mediaId?: string }
   | { ok: false; message: string; step?: string }
 > {
+  if (!cfg.vodStorageLocation?.trim()) {
+    return {
+      ok: false,
+      message:
+        '缺少 ICE 点播存储地址：请在运营台填写 StorageLocation（outin-***.oss-cn-shanghai.aliyuncs.com），多图成片须将素材写入该媒资库 Bucket。',
+      step: 'validate',
+    }
+  }
+
   const urls = input.imageUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
   if (urls.length === 0) {
     return { ok: false, message: '请提供至少一张公网可访问的图片 URL', step: 'validate' }
