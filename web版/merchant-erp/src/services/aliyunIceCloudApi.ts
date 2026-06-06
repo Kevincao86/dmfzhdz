@@ -1,6 +1,7 @@
 /** 阿里云 ICE 云剪辑 — 经商户 BFF 代理（生产优先 ECS /erp-api 读运营台 videoAi） */
 
 import { merchantApiFetchUrls, merchantErpApiCandidates, merchantErpApiBase, buildMerchantErpApiUrl } from '../lib/merchantErpApiBase'
+import { guessUploadImageMime, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
 
 export type AliyunIceCloudConfig = {
   configured: boolean
@@ -487,9 +488,9 @@ async function uploadIceViaServer(
 }
 
 function defaultContentType(file: File): string {
-  if (file.type?.trim()) return file.type
-  if (/\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name)) return 'image/jpeg'
-  return 'video/mp4'
+  const mime = guessUploadImageMime(file.name, file.type)
+  if (mime.startsWith('image/')) return mime
+  return file.type?.trim() || 'video/mp4'
 }
 
 export type IceUploadProgress = {
@@ -559,7 +560,7 @@ async function uploadIceDirectOss(
 }
 
 function isIceImageUploadFile(file: File): boolean {
-  return file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name)
+  return isUploadImageFile(file)
 }
 
 /**

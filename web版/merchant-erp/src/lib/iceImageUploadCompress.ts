@@ -1,3 +1,5 @@
+import { guessUploadImageMime, isUploadImageFile } from './iceUploadFileSnapshot'
+
 /** 云剪上传前压缩：超过 4MB 时尝试压至上限内 */
 const COMPRESS_IF_LARGER_BYTES = 900 * 1024
 const MAX_EDGE = 1920
@@ -12,14 +14,26 @@ const ICE_UPLOAD_TARGET_MAX_BYTES = ICE_LOCAL_IMAGE_MAX_BYTES
 const ICE_UPLOAD_MAX_EDGE = 1280
 
 function isCompressibleImage(file: File): boolean {
-  if (/\.gif$/i.test(file.name)) return false
-  return file.type.startsWith('image/') && !file.type.includes('gif')
+  if (/\.gif$/i.test(file.name) || file.type === 'image/gif') return false
+  if (/\.svg$/i.test(file.name) || file.type === 'image/svg+xml') return false
+  return isUploadImageFile(file)
+}
+
+type OutputFormat = { mime: string; ext: string; quality?: number }
+
+function outputFormatFor(file: File): OutputFormat {
+  const mime = guessUploadImageMime(file.name, file.type)
+  if (mime === 'image/png') return { mime: 'image/png', ext: '.png' }
+  if (mime === 'image/webp') return { mime: 'image/webp', ext: '.webp', quality: 0.86 }
+  if (mime === 'image/bmp') return { mime: 'image/png', ext: '.png' }
+  return { mime: 'image/jpeg', ext: '.jpg', quality: JPEG_QUALITY }
 }
 
 async function bitmapFromUploadFile(file: File): Promise<ImageBitmap | null> {
+  const mime = guessUploadImageMime(file.name, file.type)
   try {
     const buf = await file.arrayBuffer()
-    const blob = new Blob([buf], { type: file.type?.trim() || 'image/jpeg' })
+    const blob = new Blob([buf], { type: mime.startsWith('image/') ? mime : 'image/png' })
     return await createImageBitmap(blob)
   } catch {
     try {
@@ -37,6 +51,7 @@ async function compressIceImageWithParams(
 ): Promise<File> {
   const bitmap = await bitmapFromUploadFile(file)
   if (!bitmap) return file
+  const outFmt = outputFormatFor(file)
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
   const w = Math.max(1, Math.round(bitmap.width * scale))
   const h = Math.max(1, Math.round(bitmap.height * scale))
@@ -48,14 +63,18 @@ async function compressIceImageWithParams(
     bitmap.close()
     return file
   }
+  if (outFmt.mime === 'image/jpeg') {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, w, h)
+  }
   ctx.drawImage(bitmap, 0, 0, w, h)
   bitmap.close()
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', quality),
+    canvas.toBlob(resolve, outFmt.mime, outFmt.quality ?? quality),
   )
   if (!blob) return file
   const base = file.name.replace(/\.[^.]+$/i, '') || 'image'
-  return new File([blob], `${base}.jpg`, { type: 'image/jpeg' })
+  return new File([blob], `${base}${outFmt.ext}`, { type: outFmt.mime })
 }
 
 async function withCompressTimeout(file: File, maxEdge: number, quality: number): Promise<File> {
@@ -76,7 +95,7 @@ export async function compressIceImageIfNeeded(file: File): Promise<File> {
   }
 }
 
-/** 云剪本地上传：≤4MB 原图直传；更大则压缩至 4MB 内 */
+/** 云剪本地上传：≤4MB 原图直传（保留 PNG/WebP/JPEG 等格式）；更大则按原格式压缩 */
 export async function compressIceImageForUpload(file: File): Promise<File> {
   if (!isCompressibleImage(file)) return file
   if (file.size <= ICE_UPLOAD_TARGET_MAX_BYTES) return file
