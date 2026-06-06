@@ -28,16 +28,34 @@ async function tenantIdForApi(): Promise<string | undefined> {
   return tid ?? undefined
 }
 
-/** 流式对话优先同源 /api（cs 经 Nginx 反代），避免先打跨域 erp-api 卡住 SSE */
+/** 流式对话优先直连 erp-api（单跳、已关 SSE 缓冲）；cs 同源 /api 为双跳反代，易长时间无首包 */
 function aiChatFetchUrlCandidates(path: string): string[] {
-  const normalized = path.startsWith('/') ? path : `/${path}`
-  const all = merchantErpApiCandidates(normalized)
-  if (typeof window !== 'undefined') {
-    const sameOrigin = `${window.location.origin}${normalized}`
-    const rest = all.filter((u) => u !== sameOrigin)
-    return [sameOrigin, ...rest]
-  }
-  return all
+  return merchantErpApiCandidates(path.startsWith('/') ? path : `/${path}`)
+}
+
+const SSE_FIRST_EVENT_TIMEOUT_MS = 12_000
+
+function sseFirstEventTimeout(ms: number, signal?: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    const t = setTimeout(() => reject(new Error('sse_first_event_timeout')), ms)
+    const onAbort = () => {
+      clearTimeout(t)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    if (signal?.aborted) {
+      clearTimeout(t)
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+async function readSseChunk(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal?: AbortSignal,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  return Promise.race([reader.read(), sseFirstEventTimeout(SSE_FIRST_EVENT_TIMEOUT_MS, signal)])
 }
 
 /** 优先扁平路由 + erp-api，避免生产环境 Vercel 查不到租户 */
@@ -218,8 +236,7 @@ export async function streamAiChat(
     signal?: AbortSignal
   },
 ): Promise<AIChatResponse> {
-  const token = await bearer()
-  const tenantId = await tenantIdForApi()
+  const [token, tenantId] = await Promise.all([bearer(), tenantIdForApi()])
   const headers: Record<string, string> = {
     Accept: 'text/event-stream',
     'Content-Type': 'application/json',
@@ -307,10 +324,14 @@ export async function streamAiChat(
       const dec = new TextDecoder()
       let buf = ''
       let final: AIChatResponse | null = null
+      let gotSseEvent = false
       try {
         while (true) {
-          const { done, value } = await reader.read()
+          const { done, value } = await (gotSseEvent
+            ? reader.read()
+            : readSseChunk(reader, handlers.signal))
           if (done) break
+          gotSseEvent = true
           buf += dec.decode(value, { stream: true })
           const lines = buf.split('\n')
           buf = lines.pop() ?? ''
@@ -348,6 +369,13 @@ export async function streamAiChat(
             }
           }
         }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg === 'sse_first_event_timeout' || /sse_first_event_timeout/i.test(msg)) {
+          lastErr = msg
+          continue
+        }
+        throw e
       } finally {
         reader.releaseLock()
       }
@@ -355,7 +383,7 @@ export async function streamAiChat(
       return final
     }
   }
-  if (shouldFallbackNonStreamAi(lastErr)) {
+  if (shouldFallbackNonStreamAi(lastErr) || lastErr === 'sse_first_event_timeout') {
     return completeAiChatViaNonStream(req, handlers)
   }
   throw new Error(lastErr || 'ai_chat_unavailable')

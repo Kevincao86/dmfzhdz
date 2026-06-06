@@ -23,8 +23,9 @@ export async function chatDeepseek(req: AIChatRequest, env: Record<string, strin
     model,
     messages: toMessages(req.messages),
     temperature: req.temperature ?? 0.6,
-    thinking: { type: 'enabled' },
-    reasoning_effort: 'high',
+    ...(req.taskType
+      ? { thinking: { type: 'enabled' }, reasoning_effort: 'medium' }
+      : { thinking: { type: 'disabled' } }),
   }
 
   const r = await fetch(`${base}/chat/completions`, {
