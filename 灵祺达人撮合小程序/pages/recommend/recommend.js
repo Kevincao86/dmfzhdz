@@ -483,8 +483,7 @@ Page({
         wx.hideLoading()
       }
       if (this._talentFilterToken !== token) return
-      const matched = filtered.filter((t) => (t.matchScore || 0) >= 45)
-      filtered = matched.length ? matched : filtered
+      filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
     } else {
       filtered = filtered
         .slice()

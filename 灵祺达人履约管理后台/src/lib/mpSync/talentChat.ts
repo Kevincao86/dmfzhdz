@@ -15,6 +15,7 @@ import {
   collectTalentChatKeyCandidates,
   participantForSession,
   sessionAuthKeyForMe,
+  talentChatIdentityPayload,
   talentChatParticipantForKey,
 } from './talentChatKeys'
 
@@ -110,13 +111,17 @@ export async function syncProfile(p?: ChatParticipant) {
   })
 }
 
-export async function listSessions(part?: ChatParticipant) {
+export async function listSessions(part?: ChatParticipant, reg?: Parameters<typeof collectTalentChatKeyCandidates>[0]) {
   const p = part || getCurrentParticipant()
-  const data = await viaApi({
+  const payload: Record<string, unknown> = {
     action: 'list_sessions',
     participantKey: p.participantKey,
     deviceSecret: p.deviceSecret,
-  })
+  }
+  if (p.role === 'talent') {
+    Object.assign(payload, talentChatIdentityPayload(reg))
+  }
+  const data = await viaApi(payload)
   return (data.sessions || []) as ChatSession[]
 }
 
@@ -132,30 +137,27 @@ export async function listSessionsForMe(part?: ChatParticipant) {
     /* 无 registry 时仍用本地 id 候选 */
   }
 
-  const tried = new Set<string>()
-  let best: ChatSession[] = []
+  try {
+    await syncProfile(base)
+    return await listSessions(base, reg)
+  } catch {
+    /* fallback: 逐个 alias key */
+  }
 
+  const merged = new Map<string, ChatSession>()
   for (const key of collectTalentChatKeyCandidates(reg)) {
-    if (tried.has(key)) continue
-    tried.add(key)
     const p = key === base.participantKey ? base : talentChatParticipantForKey(base, key)
     try {
       await syncProfile(p)
-      const rows = await listSessions(p)
-      if (rows.length > best.length) best = rows
+      const rows = await listSessions(p, reg)
+      for (const row of rows) {
+        if (row?.id) merged.set(String(row.id), row)
+      }
     } catch {
       /* 尝试下一个 key */
     }
   }
-
-  if (!best.length) {
-    try {
-      return await listSessions(base)
-    } catch {
-      return []
-    }
-  }
-  return best
+  return [...merged.values()].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
 }
 
 export async function fetchMessages(sessionId: string, sinceTs: number, part?: ChatParticipant) {

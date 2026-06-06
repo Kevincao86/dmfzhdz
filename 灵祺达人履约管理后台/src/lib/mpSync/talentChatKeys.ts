@@ -41,11 +41,20 @@ export function canonicalTalentMemberIdFromRegistry(reg: RegistryLike, rawId: st
   return id
 }
 
+function phoneTail(v: string): string {
+  return String(v || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
 /** 达人侧可能历史会话绑定的 participant_key 候选 */
 export function collectTalentChatKeyCandidates(reg?: RegistryLike): string[] {
   const acc = getAccount()
   const member = readMember()
   const memberId = resolveTalentMemberId()
+  const lq = String(acc?.lingqiTalentId || '').trim()
+  const hintPhone = phoneTail(acc?.loginName || String(member?.contact || ''))
+  const hintOpenId = String(acc?.openid || '').trim()
   const rawIds = [
     acc?.registryMemberId,
     member?.id,
@@ -62,22 +71,53 @@ export function collectTalentChatKeyCandidates(reg?: RegistryLike): string[] {
   if (reg) {
     const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
     const lib = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
-    const mem = members.find((m) => String((m as Record<string, unknown>).id || '').trim() === memberId) as
-      | Record<string, unknown>
-      | undefined
-    const lq = String(mem?.lingqiTalentId || acc?.lingqiTalentId || '').trim()
-    if (lq) keys.add(`talent_${lq}`)
+    let mem: Record<string, unknown> | undefined
+    for (const m of members) {
+      const row = m as Record<string, unknown>
+      const mid = String(row.id || '').trim()
+      const mlq = String(row.lingqiTalentId || '').trim()
+      const mPhone = phoneTail(String(row.contact || row.wechatId || ''))
+      const mOpen = String(row.wxOpenId || '').trim()
+      const hit =
+        (memberId && mid === memberId) ||
+        (lq && mlq === lq) ||
+        (hintPhone.length >= 8 && mPhone === hintPhone) ||
+        (hintOpenId && mOpen === hintOpenId)
+      if (!hit) continue
+      mem = row
+      if (mid) keys.add(`talent_${mid}`)
+      if (mlq) keys.add(`talent_${mlq}`)
+    }
+    const linkLq = String(mem?.lingqiTalentId || lq || '').trim()
     for (const e of lib) {
       const row = e as Record<string, unknown>
       const libLq = String(row.lingqiTalentId || '').trim()
       const libId = String(row.id || '').trim()
       if (!libId) continue
-      if (libLq && lq && libLq === lq) keys.add(`talent_${libId}`)
+      if (libLq && linkLq && libLq === linkLq) keys.add(`talent_${libId}`)
       if (libId && rawIds.includes(libId)) keys.add(`talent_${libId}`)
     }
   }
 
   return [...keys]
+}
+
+/** 达人 list_sessions 请求附带的身份字段（服务端按 registry 解析历史 alias） */
+export function talentChatIdentityPayload(reg?: RegistryLike): Record<string, unknown> {
+  const acc = getAccount()
+  const member = readMember()
+  const payload: Record<string, unknown> = {
+    aliasParticipantKeys: collectTalentChatKeyCandidates(reg),
+  }
+  const lq = String(acc?.lingqiTalentId || '').trim()
+  const mid = String(acc?.registryMemberId || member?.id || '').trim()
+  const phone = String(acc?.loginName || member?.contact || '').trim()
+  const openId = String(acc?.openid || '').trim()
+  if (lq) payload.lingqiTalentId = lq
+  if (mid) payload.registryMemberId = mid
+  if (phone) payload.contactPhone = phone
+  if (openId) payload.wxOpenId = openId
+  return payload
 }
 
 /** 当前身份在该会话行上应用来鉴权的 participant_key */

@@ -91,13 +91,17 @@ async function syncProfile(p) {
   })
 }
 
-async function listSessions(part) {
+async function listSessions(part, reg) {
   const p = part || participant.getCurrentParticipant()
-  const data = await viaApi({
+  const payload = {
     action: 'list_sessions',
     participantKey: p.participantKey,
     deviceSecret: p.deviceSecret,
-  })
+  }
+  if (p.role === 'talent') {
+    Object.assign(payload, chatKeys.talentChatIdentityPayload(reg))
+  }
+  const data = await viaApi(payload)
   return data.sessions || []
 }
 
@@ -112,32 +116,30 @@ async function listSessionsForMe(part) {
     /* 无 registry 时仍用本地 id 候选 */
   }
 
-  const tried = new Set()
-  let best = []
+  try {
+    await syncProfile(base)
+    return await listSessions(base, reg)
+  } catch (_) {
+    /* fallback */
+  }
+
+  const merged = new Map()
   const candidates = chatKeys.collectTalentChatKeyCandidates(reg)
   for (let i = 0; i < candidates.length; i++) {
     const key = candidates[i]
-    if (tried.has(key)) continue
-    tried.add(key)
-    const p =
-      key === base.participantKey ? base : chatKeys.talentChatParticipantForKey(base, key)
+    const p = key === base.participantKey ? base : chatKeys.talentChatParticipantForKey(base, key)
     try {
       await syncProfile(p)
-      const rows = await listSessions(p)
-      if (rows.length > best.length) best = rows
+      const rows = await listSessions(p, reg)
+      for (let j = 0; j < rows.length; j++) {
+        const row = rows[j]
+        if (row && row.id) merged.set(String(row.id), row)
+      }
     } catch (_) {
       /* 尝试下一个 key */
     }
   }
-
-  if (!best.length) {
-    try {
-      return await listSessions(base)
-    } catch (_) {
-      return []
-    }
-  }
-  return best
+  return [...merged.values()].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
 }
 
 async function fetchMessages(sessionId, sinceTs, part) {
