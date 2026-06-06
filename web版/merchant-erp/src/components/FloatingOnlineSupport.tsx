@@ -6,6 +6,7 @@ import {
   getOrCreateSupportRelayGuestFingerprint,
   getOrCreateSupportRelaySessionId,
   getSupportRelayWsUrl,
+  isSupportRelayPollOnly,
   type SupportRelayChatLine,
 } from '../lib/supportRelay'
 import {
@@ -313,7 +314,10 @@ export default function FloatingOnlineSupport({
 
     let authSub: { unsubscribe: () => void } | null = null
 
+    const pollOnly = isSupportRelayPollOnly()
+
     const bindRealtimeJwt = async () => {
+      if (pollOnly) return
       const race = await Promise.race([
         client.auth.getSession(),
         new Promise<Awaited<ReturnType<typeof client.auth.getSession>>>((resolve) => {
@@ -326,10 +330,12 @@ export default function FloatingOnlineSupport({
     const attachAuthListener = () => {
       if (authSub) return
       const { data } = client.auth.onAuthStateChange(async (_event, session) => {
-        try {
-          await client.realtime.setAuth(session?.access_token ?? '')
-        } catch {
-          /* ignore */
+        if (!pollOnly) {
+          try {
+            await client.realtime.setAuth(session?.access_token ?? '')
+          } catch {
+            /* ignore */
+          }
         }
         runPollMerge()
       })
@@ -361,7 +367,7 @@ export default function FloatingOnlineSupport({
         )
         attachAuthListener()
         startPollingAndReady()
-        void client.realtime.setAuth('').catch(() => {})
+        if (!pollOnly) void client.realtime.setAuth('').catch(() => {})
       }, 10_000)
 
       try {
@@ -387,27 +393,29 @@ export default function FloatingOnlineSupport({
 
         attachAuthListener()
 
-        ch = client
-          .channel(`meoo-support:${sid}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'support_relay_messages',
-            },
-            (payload) => {
-              const row = payload.new as RelayRow & { session_id?: string }
-              if (row.session_id !== sid || !row.client_msg_id) return
-              setMessages((prev) => {
-                if (prev.some((m) => m.id === row.client_msg_id)) return prev
-                return [...prev, rowToChatMessage(row)].sort((a, b) =>
-                  a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id),
-                )
-              })
-            },
-          )
-          .subscribe()
+        if (!pollOnly) {
+          ch = client
+            .channel(`meoo-support:${sid}`)
+            .on(
+              'postgres_changes',
+              {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'support_relay_messages',
+              },
+              (payload) => {
+                const row = payload.new as RelayRow & { session_id?: string }
+                if (row.session_id !== sid || !row.client_msg_id) return
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === row.client_msg_id)) return prev
+                  return [...prev, rowToChatMessage(row)].sort((a, b) =>
+                    a.ts !== b.ts ? a.ts - b.ts : a.id.localeCompare(b.id),
+                  )
+                })
+              },
+            )
+            .subscribe()
+        }
       } catch {
         if (!cancelled) {
           attachAuthListener()
