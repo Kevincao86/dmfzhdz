@@ -517,13 +517,16 @@ function doubaoArkApiV3Root(env: MerchantAiEnv): string {
   return `${raw}/api/v3`
 }
 
+/** 方舟「Doubao-Seed-Character」文本生成；控制台显示名与 API model 参数见火山模型列表 */
+export const DOUBAO_DEFAULT_CHAT_MODEL_ID = 'doubao-seed-character-251128'
+
 function doubaoChatModelId(env: MerchantAiEnv): string {
-  return (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? 'doubao-seed-1-6-251015').trim() || 'doubao-seed-1-6-251015'
+  return (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? DOUBAO_DEFAULT_CHAT_MODEL_ID).trim() || DOUBAO_DEFAULT_CHAT_MODEL_ID
 }
 
-/** 主模型（如旧版 doubao-pro-32k）不可用时再试，见方舟控制台可用模型名 */
+/** 主模型不可用时再试；默认与 Character 一致，避免回退到已限流的 doubao-seed-1-6 */
 function doubaoChatFallbackModelId(env: MerchantAiEnv): string {
-  return (env.MERCHANT_AI_DOUBAO_CHAT_FALLBACK_MODEL ?? 'doubao-seed-1-6-251015').trim()
+  return (env.MERCHANT_AI_DOUBAO_CHAT_FALLBACK_MODEL ?? DOUBAO_DEFAULT_CHAT_MODEL_ID).trim()
 }
 
 /** 通义千问 OpenAI 兼容模式 model 参数，见 DashScope compatible-mode 文档 */
@@ -815,10 +818,10 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   }
   const primary = doubaoChatModelId(env)
   const fallback = doubaoChatFallbackModelId(env)
-  for (const m of [primary, fallback, 'doubao-pro-32k']) {
+  for (const m of [primary, fallback]) {
     add(m)
   }
-  return out.length ? out : ['doubao-seed-1-6-251015']
+  return out.length ? out : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
 }
 
 async function callDoubaoChat(

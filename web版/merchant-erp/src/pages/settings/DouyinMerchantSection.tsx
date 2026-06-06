@@ -17,6 +17,11 @@ import {
   upsertDouyinBindingCloud,
 } from '../../lib/merchantDouyinCloudBinding'
 import {
+  buildPlatformAccountItems,
+  countEffectivePlatformBindings,
+  LOCAL_SESSION_BINDING_ID,
+} from '../../lib/merchantPlatformAccountItems'
+import {
   fetchMerchantBindingById,
   readActiveBindingId,
 } from '../../lib/merchantPlatformBindings'
@@ -338,16 +343,27 @@ export default function DouyinMerchantSection() {
 
   const activeBindingId = readActiveBindingId('douyin')
 
+  const effectiveBindingCount = useMemo(
+    () =>
+      countEffectivePlatformBindings(cloudBindings, {
+        accessToken,
+        merchantId: boundMerchantId,
+      }),
+    [cloudBindings, accessToken, boundMerchantId],
+  )
+
   const douyinAccountItems = useMemo(
     () =>
-      cloudBindings.map((b) => ({
-        id: b.id,
-        accountId: b.merchant_account_id ?? '—',
-        displayName: b.binding_label || b.account_display_name || b.merchant_account_id || '来客账号',
-        subLabel: b.client_key ? `AppID ${b.client_key}` : undefined,
-        isActive: b.id === activeBindingId,
-      })),
-    [cloudBindings, activeBindingId],
+      buildPlatformAccountItems(cloudBindings, {
+        activeBindingId,
+        accessToken,
+        merchantId: boundMerchantId,
+        accountName: boundAccountName,
+        clientKey: appId,
+        defaultDisplayName: '来客账号',
+        localOnlySubLabel: '仅本机会话（云端同步待完成）',
+      }),
+    [cloudBindings, activeBindingId, accessToken, boundMerchantId, boundAccountName, appId],
   )
 
   const selectDouyinBinding = useCallback(
@@ -373,8 +389,25 @@ export default function DouyinMerchantSection() {
     [loadStores],
   )
 
+  const clearLocalDouyinBindingState = useCallback(() => {
+    clearDouyinMerchantBindingLocal()
+    setAccessToken(null)
+    setBoundMerchantId('')
+    setBoundAccountName('')
+    setRows([])
+    setTotal(0)
+    setLastSyncAt(null)
+    setListError(null)
+    setStoresHint(null)
+  }, [])
+
   const removeDouyinBinding = useCallback(
     async (bindingId: string) => {
+      if (bindingId === LOCAL_SESSION_BINDING_ID) {
+        if (!window.confirm('确定移除此抖音来客账号？将清除本机绑定凭据。')) return
+        clearLocalDouyinBindingState()
+        return
+      }
       if (!window.confirm('确定移除此抖音来客账号？门店列表将切换到其它已绑定账号。')) return
       if (!supabaseConfigured || !supabase) return
       const d = await deleteDouyinBindingCloud(supabase, bindingId)
@@ -399,7 +432,7 @@ export default function DouyinMerchantSection() {
       setPage(1)
       await loadStores({ silent: false, refresh: true })
     },
-    [loadStores],
+    [loadStores, clearLocalDouyinBindingState],
   )
 
   useEffect(() => {
@@ -408,7 +441,7 @@ export default function DouyinMerchantSection() {
 
   const openBindForm = () => {
     setBindError(null)
-    if (!canAddPlatformBinding(plan, cloudBindings.length)) {
+    if (!canAddPlatformBinding(plan, effectiveBindingCount)) {
       setBindError(platformBindingLimitExceededMessage(plan))
       return
     }
@@ -421,8 +454,10 @@ export default function DouyinMerchantSection() {
       setBindError('请填写 AppID、App Secret 与商户 ID')
       return
     }
-    const exists = cloudBindings.some((b) => b.merchant_account_id === merchantId.trim())
-    if (!exists && !canAddPlatformBinding(plan, cloudBindings.length)) {
+    const exists =
+      cloudBindings.some((b) => b.merchant_account_id === merchantId.trim()) ||
+      (accessToken && boundMerchantId.trim() === merchantId.trim())
+    if (!exists && !canAddPlatformBinding(plan, effectiveBindingCount)) {
       setBindError(platformBindingLimitExceededMessage(plan))
       return
     }
@@ -489,15 +524,11 @@ export default function DouyinMerchantSection() {
       void removeDouyinBinding(cloudBindings[0].id)
       return
     }
-    clearDouyinMerchantBindingLocal()
-    setAccessToken(null)
-    setBoundMerchantId('')
-    setBoundAccountName('')
-    setRows([])
-    setTotal(0)
-    setLastSyncAt(null)
-    setListError(null)
-    setStoresHint(null)
+    if (accessToken) {
+      void removeDouyinBinding(LOCAL_SESSION_BINDING_ID)
+      return
+    }
+    clearLocalDouyinBindingState()
   }
 
   return (

@@ -656,7 +656,7 @@ export default function OpsAiModelsPage() {
               disabled={loading}
               value={videoAi.arkChatEndpoints ?? ''}
               onChange={(e) => setVideoAi((p) => ({ ...p, arkChatEndpoints: e.target.value }))}
-              placeholder="Seed 1.6|doubao-seed-1-6-251015, Pro|ep-xxxxxxxx"
+              placeholder="Character|doubao-seed-character-251128, Pro|ep-xxxxxxxx"
               className={cn(
                 'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
                 !editingVideoAi && 'cursor-default opacity-80',

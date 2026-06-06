@@ -52,7 +52,7 @@ const QWEN = [
 ]
 const DOUBAO = [
   { id: 'doubao-pro-32k', label: 'doubao-pro-32k' },
-  { id: 'doubao-seed-1-6-251015', label: 'doubao-seed-1-6' },
+  { id: 'doubao-seed-character-251128', label: 'Doubao-Seed-Character' },
 ]
 
 /** 与 web modelRegistry.ts AGENT_TOKENMIX_T2I_BY_FAMILY 一致 */

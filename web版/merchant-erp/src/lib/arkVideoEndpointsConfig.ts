@@ -35,6 +35,7 @@ export function looksLikeDoubaoChatModelId(id: string): boolean {
   if (/^doubao-seed-2-0-pro$/i.test(t)) return true
   if (/^doubao-pro/i.test(t)) return true
   if (/^doubao-seed-1-6/i.test(t)) return true
+  if (/^doubao-seed-character/i.test(t)) return true
   if (/^doubao-seed-2-0-lite/i.test(t)) return true
   return false
 }
