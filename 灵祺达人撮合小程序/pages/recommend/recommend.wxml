@@ -53,6 +53,20 @@
       </view>
     </view>
 
+    <view class="rec-view-mode-bar" wx:if="{{isPrMode}}">
+      <text class="rec-view-mode-label">浏览模式</text>
+      <view
+        class="rec-view-mode-item {{prViewMode === 'ai' ? 'rec-view-mode-item--on' : ''}}"
+        data-mode="ai"
+        bindtap="onPrViewMode"
+      >智能匹配</view>
+      <view
+        class="rec-view-mode-item {{prViewMode === 'all' ? 'rec-view-mode-item--on' : ''}}"
+        data-mode="all"
+        bindtap="onPrViewMode"
+      >{{prAllModeLabel}}</view>
+    </view>
+
     <view class="rec-seg-bar lq-gradient-tabs" wx:if="{{!isPrMode}}">
       <view
         wx:for="{{orderSegments}}"

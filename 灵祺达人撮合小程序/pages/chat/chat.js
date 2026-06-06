@@ -26,6 +26,11 @@ Page({
     scrollTo: '',
     ready: false,
     statusSub: '连接中…',
+    canSend: true,
+    sendHint: '',
+    inputPlaceholder: '输入消息…',
+    turnHint: chat.CHAT_TURN_HINT,
+    showTurnBanner: false,
   },
   onLoad(options) {
     applyCapsulePadding(this, null, { band: 'navBarStyle', right: 'navInnerStyle' })
@@ -90,9 +95,10 @@ Page({
         })
       }
       const rows = await chat.fetchMessages(this._sessionId, 0)
-      this.setMessages(chat.mergeMessages([], rows), me.role)
+      const merged = chat.mergeMessages([], rows)
       await chat.markRead(this._sessionId)
       this.setData({ ready: true, statusSub: '消息已同步' })
+      this.setMessages(merged, me.role)
     } catch (e) {
       this.setData({ ready: false, statusSub: chat.formatChatError(e).slice(0, 48) })
     }
@@ -124,9 +130,15 @@ Page({
     if (ui.length) {
       this._sinceTs = Math.max(this._sinceTs, ...ui.map((m) => m.ts || 0))
     }
+    const gate = chat.canSendNextMessage(ui, myRole)
+    const ready = this.data.ready
     this.setData({
       messages: ui,
       scrollTo: last && last.id ? `msg-${last.id}` : '',
+      canSend: ready && gate.ok,
+      sendHint: gate.hint,
+      inputPlaceholder: ready ? (gate.ok ? '输入消息…' : gate.hint) : '连接中…',
+      showTurnBanner: ready && !gate.ok,
     })
   },
   onInput(e) {
@@ -134,7 +146,12 @@ Page({
   },
   async onSend() {
     const text = String(this.data.input || '').trim()
-    if (!text || !this._sessionId) return
+    if (!text || !this._sessionId || !this.data.canSend) {
+      if (this.data.sendHint) {
+        wx.showToast({ title: this.data.sendHint, icon: 'none' })
+      }
+      return
+    }
     const me = participant.getCurrentParticipant()
     const mid = chat.newMsgId()
     const optimistic = {

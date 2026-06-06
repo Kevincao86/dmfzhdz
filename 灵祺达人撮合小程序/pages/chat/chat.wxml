@@ -39,21 +39,30 @@
         mode="aspectFill"
       />
     </view>
+    <view class="chat-turn-empty" wx:if="{{ready && messages.length === 0}}">
+      <text>{{turnHint}}</text>
+    </view>
     <view class="scroll-pad"></view>
   </scroll-view>
 
   <view class="chat-composer">
+    <view class="chat-turn-banner" wx:if="{{showTurnBanner}}">
+      <text>{{sendHint}}</text>
+    </view>
+    <view class="chat-turn-banner chat-turn-banner--tip" wx:elif="{{ready && messages.length === 0}}">
+      <text>{{turnHint}}</text>
+    </view>
     <view class="composer-row">
       <input
         class="chat-input"
-        placeholder="输入消息…"
+        placeholder="{{inputPlaceholder}}"
         value="{{input}}"
         bindinput="onInput"
         confirm-type="send"
         bindconfirm="onSend"
-        disabled="{{!ready}}"
+        disabled="{{!canSend}}"
       />
-      <button class="send-btn" bindtap="onSend" disabled="{{!ready || !input}}">发送</button>
+      <button class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
     </view>
   </view>
 </view>

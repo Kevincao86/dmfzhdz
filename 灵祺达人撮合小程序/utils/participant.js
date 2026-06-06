@@ -2,6 +2,7 @@ const SECRET_KEY = 'meoo_talent_chat_secret_v1'
 const OVERRIDE_KEY = 'meoo_chat_participant_override_v1'
 const userProfile = require('./userProfile.js')
 const talentMember = require('./talentMember.js')
+const sessionStore = require('./sessionStore.js')
 
 function randomSecret() {
   return `sec_${Date.now()}_${Math.random().toString(36).slice(2, 14)}${Math.random().toString(36).slice(2, 14)}`
@@ -27,8 +28,15 @@ function getDeviceSecret() {
   }
 }
 
+function resolveTalentMemberId() {
+  const member = talentMember.readMember()
+  const acc = sessionStore.readAccount()
+  return String((member && member.id) || (acc && acc.registryMemberId) || '').trim()
+}
+
 function talentParticipantKey(member) {
-  if (member && member.id) return `talent_${member.id}`
+  const id = String((member && member.id) || resolveTalentMemberId() || '').trim()
+  if (id) return `talent_${id}`
   return `talent_guest_${getDeviceSecret().slice(0, 12)}`
 }
 
@@ -77,7 +85,8 @@ function getCurrentParticipant() {
     }
   }
   const member = talentMember.readMember()
-  const key = talentParticipantKey(member)
+  const memberId = resolveTalentMemberId()
+  const key = memberId ? `talent_${memberId}` : talentParticipantKey(member)
   const name = member
     ? String(member.wxNickName || member.douyin?.platformNickname || '').trim() || '达人'
     : '达人'
@@ -125,6 +134,7 @@ module.exports = {
   getCurrentParticipant,
   setParticipantOverride,
   clearParticipantOverride,
+  resolveTalentMemberId,
   talentParticipantKey,
   prParticipantKey,
   bootstrapTalentSecret,
