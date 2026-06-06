@@ -3,6 +3,7 @@ import {
   platformIdFromName,
   profileFilled,
   summaryLabel,
+  TALENT_PLATFORMS,
   type PlatformProfile,
   type TalentMember,
 } from './talentPlatformProfiles'
@@ -46,4 +47,20 @@ export function platformProfileFromMember(member: TalentMember | null, platform:
 
 export function memberTypeLabel(member: TalentMember | null) {
   return summaryLabel(member)
+}
+
+export function primaryPlatformProfile(member: Record<string, unknown> | TalentMember | null) {
+  if (!member) return null
+  const m = member as TalentMember
+  if (m.platformProfiles) {
+    for (const p of TALENT_PLATFORMS) {
+      const prof = m.platformProfiles[p.id]
+      if (profileFilled(prof)) return { platform: p.name, profile: prof }
+    }
+  }
+  const legacy = member as Record<string, unknown>
+  if (legacy.douyin && String((legacy.douyin as Record<string, unknown>).platformAccount || (legacy.douyin as Record<string, unknown>).platformNickname || '').trim()) {
+    return { platform: '抖音', profile: legacy.douyin as PlatformProfile }
+  }
+  return null
 }

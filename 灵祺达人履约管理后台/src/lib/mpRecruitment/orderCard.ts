@@ -6,11 +6,11 @@ function isUrgentMpOrder(mp: Record<string, unknown>): boolean {
   return mp.urgent === true
 }
 
-function isIceMpOrder(mp: Record<string, unknown>): boolean {
+export function isIceMpOrder(mp: Record<string, unknown>): boolean {
   return mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
 }
 
-function recruitTargetFromMp(mp: Record<string, unknown>): 'talent' | 'shoot' | 'edit' {
+export function recruitTargetFromMp(mp: Record<string, unknown>): 'talent' | 'shoot' | 'edit' {
   const meta = mp.mpPublishMeta as Record<string, unknown> | undefined
   const t = String(meta?.recruitTarget || mp.recruitTarget || '').trim()
   if (t === 'shoot' || t === 'edit') return t

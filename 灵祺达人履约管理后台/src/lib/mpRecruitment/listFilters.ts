@@ -163,6 +163,14 @@ export function buildMockRecruitmentRows() {
   ]
 }
 
+function recruitTargetFromMp(mp: Record<string, unknown> | null): 'talent' | 'shoot' | 'edit' {
+  if (!mp) return 'talent'
+  const meta = mp.mpPublishMeta as Record<string, unknown> | undefined
+  const t = String(meta?.recruitTarget || mp.recruitTarget || '').trim()
+  if (t === 'shoot' || t === 'edit') return t
+  return 'talent'
+}
+
 export function enrichMpOrderListItem(
   mp: Record<string, unknown> | null,
   localItem: { title?: string; mpOrderId?: string; hall?: string },
@@ -172,6 +180,8 @@ export function enrichMpOrderListItem(
   const applicantCount = Array.isArray(mp?.applicants) ? mp.applicants.length : 0
   const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
   const deadlineMs = mp ? resolvePublishedMs(mp) + 7 * 86400000 : 0
+  const meta = mp?.mpPublishMeta as Record<string, unknown> | undefined
+  const platform = String(mp?.platform || meta?.platform || '抖音').trim() || '抖音'
   return {
     ...localItem,
     title: localItem.title || String(mp?.title || mp?.customerName || localItem.mpOrderId),
@@ -186,6 +196,8 @@ export function enrichMpOrderListItem(
     signupLabel: `报名 ${applicantCount}/${recruitCount} 人`,
     deadlineDaysText: formatDeadlineDaysText(deadlineMs),
     deadlineMs,
+    platform,
+    recruitTarget: recruitTargetFromMp(mp),
     hallLabel:
       mp?.hall === 'urgent' || mp?.urgent
         ? '急单大厅'

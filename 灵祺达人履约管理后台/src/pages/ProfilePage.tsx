@@ -30,10 +30,11 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div>
+      <header className="surface-card rounded-xl border p-5">
         <h2 className="text-xl font-bold text-[var(--shell-text)]">我的</h2>
         <p className="text-sm text-[var(--shell-muted)] mt-1">当前身份：{edition}</p>
-      </div>
+        <p className="text-xs text-[var(--shell-muted)] mt-2">完善资料后，推荐大厅将按标签与习惯智能匹配</p>
+      </header>
 
       <dl className="surface-card rounded-xl border p-6 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
