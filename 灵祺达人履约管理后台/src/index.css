@@ -85,6 +85,39 @@ body {
   box-shadow: 0 6px 16px -8px rgb(124 58 237 / 0.55);
 }
 
+/* 侧边栏导航：滑过高亮 */
+.shell-nav-link {
+  color: var(--shell-muted);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.shell-nav-link:hover {
+  background: rgb(124 58 237 / 0.12);
+  color: var(--shell-text);
+  transform: translateX(4px);
+  box-shadow: inset 3px 0 0 rgb(124 58 237 / 0.55);
+}
+
+.shell-nav-link--active {
+  background: rgb(124 58 237 / 0.22);
+  color: var(--shell-text);
+  box-shadow:
+    inset 3px 0 0 rgb(124 58 237),
+    0 4px 14px -8px rgb(124 58 237 / 0.45);
+}
+
+html[data-theme='dark'] .shell-nav-link:hover {
+  background: rgb(124 58 237 / 0.2);
+}
+
+html[data-theme='dark'] .shell-nav-link--active {
+  background: rgb(124 58 237 / 0.28);
+}
+
 .panel-card {
   background: var(--panel-card);
   border: 1px solid var(--shell-border);

@@ -6,6 +6,7 @@ import {
   emptyCustomTemplate,
   listCustomTemplates,
   saveCustomTemplate,
+  templateKindFromRecruitTarget,
   validateTemplateFields,
   type ApplyField,
 } from '../../lib/mpSync/applyFormTemplates'
@@ -65,6 +66,9 @@ type Props = {
   setApplyEditorName: (v: string) => void
   applyEditorTplId: string
   setApplyEditorTplId: (v: string) => void
+  applyEditorMode: 'new' | 'template'
+  setApplyEditorMode: (v: 'new' | 'template') => void
+  recruitTarget: string
 }
 
 export default function PublishWizardSheets(props: Props) {
@@ -99,7 +103,18 @@ export default function PublishWizardSheets(props: Props) {
     setApplyEditorName,
     applyEditorTplId,
     setApplyEditorTplId,
+    applyEditorMode,
+    setApplyEditorMode,
+    recruitTarget,
   } = props
+
+  const applyTemplateKind = templateKindFromRecruitTarget(recruitTarget || 'talent')
+  const applyMenuTitle =
+    applyTemplateKind === 'shoot'
+      ? '拍摄团队报名必填信息'
+      : applyTemplateKind === 'edit'
+        ? '剪辑团队报名必填信息'
+        : '达人报名必填信息'
 
   const tier = editingTierIndex >= 0 ? form.levelTiers[editingTierIndex] : null
   const usedLevels = new Set<string>()
@@ -113,7 +128,8 @@ export default function PublishWizardSheets(props: Props) {
     form.fansTiers.filter((_, j) => j !== editingTierIndex).map((t) => t.fansRange).filter(Boolean),
   )
   const previewPlatform = form.platform || '抖音'
-  const editorRows = buildEditorRows(applyEditorFields, previewPlatform)
+  const editorRows = buildEditorRows(applyEditorFields, previewPlatform, applyTemplateKind)
+  const customTemplates = listCustomTemplates(applyTemplateKind)
 
   return (
     <>
@@ -417,13 +433,21 @@ export default function PublishWizardSheets(props: Props) {
         </div>
       </PublishSheet>
 
-      <PublishSheet open={pickerView === 'applyMenu'} title="达人报名必填信息" onClose={() => setPickerView('')}>
+      <PublishSheet open={pickerView === 'applyMenu'} title={applyMenuTitle} onClose={() => setPickerView('')}>
         <div className="space-y-2">
           <button
             type="button"
-            className="w-full py-3 rounded-lg bg-white/10 text-sm hover:bg-violet-600/30"
+            className="w-full py-3 rounded-lg bg-white/10 text-sm hover:bg-violet-600/30 transition-colors"
             onClick={() => {
-              const tpl = emptyCustomTemplate('我的报名模版')
+              const tpl = emptyCustomTemplate(
+                applyTemplateKind === 'shoot'
+                  ? '拍摄报名模版'
+                  : applyTemplateKind === 'edit'
+                    ? '剪辑报名模版'
+                    : '我的报名模版',
+                applyTemplateKind,
+              )
+              setApplyEditorMode('new')
               setApplyEditorTplId(tpl.id)
               setApplyEditorName(tpl.name)
               setApplyEditorFields(tpl.fields.map((f) => ({ ...f })))
@@ -434,10 +458,10 @@ export default function PublishWizardSheets(props: Props) {
           </button>
           <button
             type="button"
-            className="w-full py-3 rounded-lg bg-white/10 text-sm hover:bg-violet-600/30"
+            className="w-full py-3 rounded-lg bg-white/10 text-sm hover:bg-violet-600/30 transition-colors"
             onClick={() => {
-              if (!listCustomTemplates().length) {
-                setErr('请先在「我的模版」中新建自定义模版')
+              if (!customTemplates.length) {
+                setErr('请先在「我的模版」中新建对应类型的自定义模版')
                 return
               }
               setPickerView('applyTplList')
@@ -450,12 +474,13 @@ export default function PublishWizardSheets(props: Props) {
 
       <PublishSheet open={pickerView === 'applyTplList'} title="选择报名模版" onClose={() => setPickerView('applyMenu')}>
         <div className="space-y-1 max-h-48 overflow-auto">
-          {listCustomTemplates().map((t) => (
+          {customTemplates.map((t) => (
             <button
               key={t.id}
               type="button"
-              className="w-full text-left py-2.5 px-2 rounded-lg text-sm hover:bg-white/10"
+              className="w-full text-left py-2.5 px-2 rounded-lg text-sm hover:bg-white/10 transition-colors"
               onClick={() => {
+                setApplyEditorMode('template')
                 setApplyEditorTplId(t.id)
                 setApplyEditorName(t.name)
                 setApplyEditorFields(t.fields.map((f) => ({ ...f })))
@@ -474,7 +499,7 @@ export default function PublishWizardSheets(props: Props) {
         tall
         onClose={() => setPickerView('')}
         onConfirm={() => {
-          const v = validateTemplateFields(applyEditorFields)
+          const v = validateTemplateFields(applyEditorFields, applyTemplateKind)
           if (v) {
             setErr(v)
             return
@@ -485,9 +510,22 @@ export default function PublishWizardSheets(props: Props) {
             applyFormTemplateName: name,
             applyFormFields: applyEditorFields,
           })
-          if (window.confirm('是否同时保存为「我的模版」？')) {
-            saveCustomTemplate({ id: applyEditorTplId, name, kind: 'apply', fields: applyEditorFields })
+          const usingExistingTemplate =
+            applyEditorMode === 'template' &&
+            !!applyEditorTplId &&
+            customTemplates.some((t) => t.id === applyEditorTplId)
+          if (!usingExistingTemplate) {
+            const shouldSave = window.confirm('是否同时保存为「我的模版」？')
+            if (shouldSave) {
+              saveCustomTemplate({
+                id: applyEditorTplId,
+                name,
+                kind: applyTemplateKind,
+                fields: applyEditorFields,
+              })
+            }
           }
+          setApplyEditorMode('new')
           setPickerView('')
         }}
       >

@@ -74,6 +74,7 @@
       wx:for="{{menus}}"
       wx:key="key"
       class="menu-card"
+      hover-class="menu-card--hover"
       data-key="{{item.key}}"
       bindtap="onMenuTap"
     >

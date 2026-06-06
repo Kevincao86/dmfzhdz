@@ -1,7 +1,39 @@
+.tpl-kind-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.tpl-kind-tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  color: var(--lq-text-muted, #64748b);
+  background: rgba(124, 58, 237, 0.06);
+  transition: all 0.2s ease;
+}
+
+.tpl-kind-tab--active {
+  color: #fff;
+  background: #7c3aed;
+  box-shadow: 0 8rpx 20rpx rgba(124, 58, 237, 0.28);
+}
+
+.tpl-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
 .tpl-head {
   display: flex;
   align-items: center;
   gap: 12rpx;
+}
+
+.tpl-active-badge {
+  font-size: 22rpx;
+  color: #10b981;
 }
 
 .tpl-actions {

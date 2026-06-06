@@ -17,8 +17,8 @@ function navForRole(role: MpAccountRole): NavItem[] {
     return [
       { to: '/hall', label: '招募大厅' },
       { to: '/publish', label: '发布招募' },
-      { to: '/templates', label: '我的模版' },
       { to: '/orders', label: '我的发单' },
+      { to: '/templates', label: '我的模版' },
       ...common,
     ]
   }
@@ -66,10 +66,8 @@ export default function AppShell() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
-                  isActive
-                    ? 'bg-violet-600/30 text-[var(--shell-text)] shadow-sm'
-                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] hover:translate-x-0.5'
+                `shell-nav-link block px-3 py-2 rounded-lg text-sm ${
+                  isActive ? 'shell-nav-link--active' : ''
                 }`
               }
             >
@@ -83,7 +81,7 @@ export default function AppShell() {
           <ThemeToggle />
           <button
             type="button"
-            className="w-full text-sm text-[var(--shell-muted)] hover:text-[var(--shell-text)] text-left px-3 py-2"
+            className="shell-nav-link w-full text-sm text-left px-3 py-2"
             onClick={logout}
           >
             退出登录

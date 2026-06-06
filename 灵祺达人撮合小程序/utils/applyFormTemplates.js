@@ -1,8 +1,29 @@
 const { labels, normalizePlatform } = require('./platformLabels.js')
 const { PLATFORMS } = require('./publishFormOptions.js')
 
+const { defaultSupplierApplyFields } = require('./supplierPublishForm.js')
+
 const STORAGE_KEY = 'meoo_apply_form_templates_v1'
-const ACTIVE_TEMPLATE_KEY = 'meoo_active_apply_template_v1'
+const ACTIVE_TEMPLATE_KEYS = {
+  talent: 'meoo_active_apply_template_v1',
+  shoot: 'meoo_active_shoot_apply_template_v1',
+  edit: 'meoo_active_edit_apply_template_v1',
+}
+
+const TEMPLATE_KINDS = [
+  { id: 'talent', label: '达人' },
+  { id: 'shoot', label: '拍摄' },
+  { id: 'edit', label: '剪辑' },
+]
+
+function normalizeTemplateKind(raw) {
+  if (raw === 'shoot' || raw === 'edit') return raw
+  return 'talent'
+}
+
+function templateKindFromRecruitTarget(target) {
+  return normalizeTemplateKind(target)
+}
 
 const FIELD_TYPES = [
   { id: 'text', label: '文本', iconText: 'A' },
@@ -100,19 +121,22 @@ function normalizeField(raw) {
   }
 }
 
-function normalizeFields(list) {
+function normalizeFields(list, kind) {
+  const tplKind = normalizeTemplateKind(kind)
   if (!Array.isArray(list)) return []
   const out = []
   for (const item of list) {
     const f = normalizeField(item)
     if (f) out.push(f)
   }
-  const hasNick = out.some((f) => f.role === 'platformNickname')
-  const hasAcct = out.some((f) => f.role === 'platformAccount')
-  const hasFans = out.some((f) => f.role === 'followers')
-  if (!hasNick) out.unshift({ id: newFieldId('pf'), role: 'platformNickname', required: true, type: 'text' })
-  if (!hasAcct) out.splice(1, 0, { id: newFieldId('pf'), role: 'platformAccount', required: true, type: 'text' })
-  if (!hasFans) out.splice(2, 0, { id: newFieldId('pf'), role: 'followers', required: true, type: 'number' })
+  if (tplKind === 'talent') {
+    const hasNick = out.some((f) => f.role === 'platformNickname')
+    const hasAcct = out.some((f) => f.role === 'platformAccount')
+    const hasFans = out.some((f) => f.role === 'followers')
+    if (!hasNick) out.unshift({ id: newFieldId('pf'), role: 'platformNickname', required: true, type: 'text' })
+    if (!hasAcct) out.splice(1, 0, { id: newFieldId('pf'), role: 'platformAccount', required: true, type: 'text' })
+    if (!hasFans) out.splice(2, 0, { id: newFieldId('pf'), role: 'followers', required: true, type: 'number' })
+  }
   return out.filter((f) => f.role || String(f.label || '').trim())
 }
 
@@ -135,6 +159,14 @@ function resolveFieldLabel(field, platform) {
   if (field.role === 'visitTimeStart') return '探店开始'
   if (field.role === 'visitTimeEnd') return '探店结束'
   if (field.role === 'alipayAccount') return '支付宝账号'
+  if (field.role === 'teamName') return '团队名称'
+  if (field.role === 'portfolioLink') return '作品集链接'
+  if (field.role === 'shootTypes') return '拍摄类型'
+  if (field.role === 'equipment') return '设备说明'
+  if (field.role === 'shootDate') return '可拍摄日期'
+  if (field.role === 'editStyles') return '剪辑风格'
+  if (field.role === 'software') return '常用软件'
+  if (field.role === 'deliveryEta') return '交付周期'
   return field.label || field.role
 }
 
@@ -154,10 +186,13 @@ function fieldVisibleForPlatform(field, platform) {
   return normalizePlatform(meta.platformOnly) === p
 }
 
-function buildEditorRows(fields, previewPlatform) {
+function buildEditorRows(fields, previewPlatform, kind) {
   const platform = normalizePlatform(previewPlatform)
-  return normalizeFields(fields)
-    .filter((f) => fieldVisibleForPlatform(f, platform))
+  const tplKind = normalizeTemplateKind(kind)
+  const normalized = normalizeFields(fields, tplKind)
+  const visible =
+    tplKind === 'talent' ? normalized.filter((f) => fieldVisibleForPlatform(f, platform)) : normalized
+  return visible
     .map((f) => {
       const meta = f.role ? ROLE_META[f.role] : null
       const locked = meta ? !!meta.locked : false
@@ -218,12 +253,15 @@ function readCustomTemplates() {
     const raw = wx.getStorageSync(STORAGE_KEY)
     const list = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (!Array.isArray(list)) return []
-    return list.map((t) => ({
-      ...t,
-      kind: 'apply',
-      isSystem: false,
-      fields: normalizeFields(t.fields),
-    }))
+    return list.map((t) => {
+      const tplKind = normalizeTemplateKind(t.kind)
+      return {
+        ...t,
+        kind: tplKind,
+        isSystem: false,
+        fields: normalizeFields(t.fields, tplKind),
+      }
+    })
   } catch {
     return []
   }
@@ -234,8 +272,11 @@ function writeCustomTemplates(list) {
 }
 
 /** 用户可见模版列表（仅自定义，不含系统默认） */
-function listCustomTemplates() {
-  return readCustomTemplates()
+function listCustomTemplates(kind) {
+  const all = readCustomTemplates()
+  if (!kind) return all
+  const k = normalizeTemplateKind(kind)
+  return all.filter((t) => normalizeTemplateKind(t.kind) === k)
 }
 
 function listAllTemplates() {
@@ -250,11 +291,12 @@ function getTemplateById(id) {
 function saveCustomTemplate(tpl) {
   const list = readCustomTemplates()
   const idx = list.findIndex((t) => t.id === tpl.id)
+  const tplKind = normalizeTemplateKind(tpl.kind)
   const next = {
     ...tpl,
-    kind: 'apply',
+    kind: tplKind,
     isSystem: false,
-    fields: normalizeFields(tpl.fields),
+    fields: normalizeFields(tpl.fields, tplKind),
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
   if (idx >= 0) list[idx] = next
@@ -267,41 +309,56 @@ function deleteCustomTemplate(id) {
   writeCustomTemplates(readCustomTemplates().filter((t) => t.id !== id))
 }
 
-function newCustomTemplateId() {
-  return `apply-tpl-${Date.now()}`
+function newCustomTemplateId(kind) {
+  const k = normalizeTemplateKind(kind)
+  return `${k}-tpl-${Date.now()}`
 }
 
-function emptyCustomTemplate(name) {
+function emptyCustomTemplate(name, kind) {
+  const tplKind = normalizeTemplateKind(kind)
+  if (tplKind === 'shoot' || tplKind === 'edit') {
+    return {
+      id: newCustomTemplateId(tplKind),
+      name: name || (tplKind === 'shoot' ? '拍摄报名模版' : '剪辑报名模版'),
+      isSystem: false,
+      kind: tplKind,
+      fields: defaultSupplierApplyFields(tplKind).map((f) => ({ ...f, id: newFieldId('sf') })),
+    }
+  }
   return {
-    id: newCustomTemplateId(),
+    id: newCustomTemplateId(tplKind),
     name: name || '我的报名模版',
     isSystem: false,
-    kind: 'apply',
+    kind: tplKind,
     fields: defaultApplyFieldsMinimal().map((f) => ({ ...f, id: newFieldId('pf') })),
   }
 }
 
-function getActiveTemplateId() {
+function getActiveTemplateId(kind) {
+  const tplKind = normalizeTemplateKind(kind)
+  const key = ACTIVE_TEMPLATE_KEYS[tplKind]
   try {
-    const id = String(wx.getStorageSync(ACTIVE_TEMPLATE_KEY) || '').trim()
+    const id = String(wx.getStorageSync(key) || '').trim()
     if (id && id !== DEFAULT_TEMPLATE.id && getTemplateById(id)) return id
-    const first = readCustomTemplates()[0]
+    const first = listCustomTemplates(tplKind)[0]
     return first ? first.id : ''
   } catch {
     return ''
   }
 }
 
-function setActiveTemplateId(id) {
+function setActiveTemplateId(id, kind) {
+  const tplKind = normalizeTemplateKind(kind)
+  const key = ACTIVE_TEMPLATE_KEYS[tplKind]
   if (!id || id === DEFAULT_TEMPLATE.id) {
     try {
-      wx.removeStorageSync(ACTIVE_TEMPLATE_KEY)
+      wx.removeStorageSync(key)
     } catch {
       /* ignore */
     }
     return
   }
-  wx.setStorageSync(ACTIVE_TEMPLATE_KEY, String(id))
+  wx.setStorageSync(key, String(id))
 }
 
 function getTemplateForApply(templateId) {
@@ -355,8 +412,8 @@ function getApplyConfigForMpOrder(mpOrderId, templateId) {
   return getTemplateForApply()
 }
 
-function validateTemplateFields(fields) {
-  const list = normalizeFields(fields)
+function validateTemplateFields(fields, kind) {
+  const list = normalizeFields(fields, kind)
   if (!list.length) return '请至少保留一个报名项'
   const names = list.filter((f) => !f.role).map((f) => f.label)
   if (names.some((n) => !n)) return '请为自定义项填写名称'
@@ -380,6 +437,9 @@ module.exports = {
   ROLE_META,
   DEFAULT_TEMPLATE,
   STORAGE_KEY,
+  TEMPLATE_KINDS,
+  normalizeTemplateKind,
+  templateKindFromRecruitTarget,
   listAllTemplates,
   listCustomTemplates,
   builtinMinimalTemplate,

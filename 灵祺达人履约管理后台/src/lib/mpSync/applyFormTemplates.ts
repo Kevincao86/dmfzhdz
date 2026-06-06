@@ -1,8 +1,31 @@
 import { labels, normalizePlatform } from './platformLabels'
 import { PLATFORMS } from './publishFormOptions'
+import { defaultSupplierApplyFields } from './supplierPublishForm'
 
 export const STORAGE_KEY = 'meoo_apply_form_templates_v1'
-const ACTIVE_TEMPLATE_KEY = 'meoo_active_apply_template_v1'
+
+export type TemplateKind = 'talent' | 'shoot' | 'edit'
+
+export const TEMPLATE_KINDS: { id: TemplateKind; label: string }[] = [
+  { id: 'talent', label: '达人' },
+  { id: 'shoot', label: '拍摄' },
+  { id: 'edit', label: '剪辑' },
+]
+
+const ACTIVE_TEMPLATE_KEYS: Record<TemplateKind, string> = {
+  talent: 'meoo_active_apply_template_v1',
+  shoot: 'meoo_active_shoot_apply_template_v1',
+  edit: 'meoo_active_edit_apply_template_v1',
+}
+
+export function normalizeTemplateKind(raw?: string | null): TemplateKind {
+  if (raw === 'shoot' || raw === 'edit') return raw
+  return 'talent'
+}
+
+export function templateKindFromRecruitTarget(target?: string | null): TemplateKind {
+  return normalizeTemplateKind(target)
+}
 
 export const FIELD_TYPES = [
   { id: 'text', label: '文本' },
@@ -52,7 +75,7 @@ export type ApplyTemplate = {
   id: string
   name: string
   isSystem?: boolean
-  kind: 'apply'
+  kind: TemplateKind | 'apply'
   fields: ApplyField[]
   updatedAt?: string
 }
@@ -73,7 +96,7 @@ function defaultApplyFieldsMinimal(): ApplyField[] {
   ]
 }
 
-export function normalizeFields(list: unknown): ApplyField[] {
+export function normalizeFields(list: unknown, kind: TemplateKind = 'talent'): ApplyField[] {
   if (!Array.isArray(list)) return []
   const out: ApplyField[] = []
   for (const item of list) {
@@ -90,14 +113,16 @@ export function normalizeFields(list: unknown): ApplyField[] {
       placeholder: String(raw.placeholder || '').trim(),
     })
   }
-  if (!out.some((f) => f.role === 'platformNickname')) {
-    out.unshift({ id: newFieldId('pf'), role: 'platformNickname', required: true, type: 'text' })
-  }
-  if (!out.some((f) => f.role === 'platformAccount')) {
-    out.splice(1, 0, { id: newFieldId('pf'), role: 'platformAccount', required: true, type: 'text' })
-  }
-  if (!out.some((f) => f.role === 'followers')) {
-    out.splice(2, 0, { id: newFieldId('pf'), role: 'followers', required: true, type: 'number' })
+  if (kind === 'talent') {
+    if (!out.some((f) => f.role === 'platformNickname')) {
+      out.unshift({ id: newFieldId('pf'), role: 'platformNickname', required: true, type: 'text' })
+    }
+    if (!out.some((f) => f.role === 'platformAccount')) {
+      out.splice(1, 0, { id: newFieldId('pf'), role: 'platformAccount', required: true, type: 'text' })
+    }
+    if (!out.some((f) => f.role === 'followers')) {
+      out.splice(2, 0, { id: newFieldId('pf'), role: 'followers', required: true, type: 'number' })
+    }
   }
   return out.filter((f) => f.role || String(f.label || '').trim())
 }
@@ -121,6 +146,14 @@ export function resolveFieldLabel(field: ApplyField, platform: string) {
     visitTimeStart: '探店开始',
     visitTimeEnd: '探店结束',
     alipayAccount: '支付宝账号',
+    teamName: '团队名称',
+    portfolioLink: '作品集链接',
+    shootTypes: '拍摄类型',
+    equipment: '设备说明',
+    shootDate: '可拍摄日期',
+    editStyles: '剪辑风格',
+    software: '常用软件',
+    deliveryEta: '交付周期',
   }
   return map[field.role] || field.label || field.role
 }
@@ -131,19 +164,26 @@ function fieldVisibleForPlatform(field: ApplyField, platform: string) {
   return normalizePlatform(meta.platformOnly) === normalizePlatform(platform)
 }
 
-export function buildEditorRows(fields: ApplyField[], previewPlatform: string) {
-  return normalizeFields(fields)
-    .filter((f) => fieldVisibleForPlatform(f, previewPlatform))
-    .map((f) => {
-      const meta = f.role ? ROLE_META[f.role] : null
-      return {
-        ...f,
-        displayLabel: resolveFieldLabel(f, previewPlatform),
-        locked: meta ? !!meta.locked : false,
-        deletable: !(meta && meta.locked),
-        bindKey: meta ? meta.bindKey : `custom_${f.id}`,
-      }
-    })
+export function buildEditorRows(
+  fields: ApplyField[],
+  previewPlatform: string,
+  kind: TemplateKind = 'talent',
+) {
+  const normalized = normalizeFields(fields, kind)
+  const visible =
+    kind === 'talent'
+      ? normalized.filter((f) => fieldVisibleForPlatform(f, previewPlatform))
+      : normalized
+  return visible.map((f) => {
+    const meta = f.role ? ROLE_META[f.role] : null
+    return {
+      ...f,
+      displayLabel: resolveFieldLabel(f, previewPlatform),
+      locked: meta ? !!meta.locked : false,
+      deletable: !(meta && meta.locked),
+      bindKey: meta ? meta.bindKey : `custom_${f.id}`,
+    }
+  })
 }
 
 export type ApplyRow = ApplyField & {
@@ -190,12 +230,15 @@ function readCustomTemplates(): ApplyTemplate[] {
     const raw = localStorage.getItem(STORAGE_KEY)
     const list = raw ? (JSON.parse(raw) as unknown) : []
     if (!Array.isArray(list)) return []
-    return list.map((t) => ({
-      ...(t as ApplyTemplate),
-      kind: 'apply' as const,
-      isSystem: false,
-      fields: normalizeFields((t as ApplyTemplate).fields),
-    }))
+    return list.map((t) => {
+      const kind = normalizeTemplateKind((t as ApplyTemplate).kind)
+      return {
+        ...(t as ApplyTemplate),
+        kind,
+        isSystem: false,
+        fields: normalizeFields((t as ApplyTemplate).fields, kind),
+      }
+    })
   } catch {
     return []
   }
@@ -205,8 +248,10 @@ function writeCustomTemplates(list: ApplyTemplate[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 30)))
 }
 
-export function listCustomTemplates() {
-  return readCustomTemplates()
+export function listCustomTemplates(kind?: TemplateKind) {
+  const all = readCustomTemplates()
+  if (!kind) return all
+  return all.filter((t) => normalizeTemplateKind(t.kind) === kind)
 }
 
 export function getTemplateById(id: string) {
@@ -217,11 +262,12 @@ export function getTemplateById(id: string) {
 export function saveCustomTemplate(tpl: ApplyTemplate) {
   const list = readCustomTemplates()
   const idx = list.findIndex((t) => t.id === tpl.id)
+  const kind = normalizeTemplateKind(tpl.kind)
   const next: ApplyTemplate = {
     ...tpl,
-    kind: 'apply',
+    kind,
     isSystem: false,
-    fields: normalizeFields(tpl.fields),
+    fields: normalizeFields(tpl.fields, kind),
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
   if (idx >= 0) list[idx] = next
@@ -234,16 +280,25 @@ export function deleteCustomTemplate(id: string) {
   writeCustomTemplates(readCustomTemplates().filter((t) => t.id !== id))
 }
 
-export function newCustomTemplateId() {
-  return `apply-tpl-${Date.now()}`
+export function newCustomTemplateId(kind: TemplateKind = 'talent') {
+  return `${kind}-tpl-${Date.now()}`
 }
 
-export function emptyCustomTemplate(name?: string): ApplyTemplate {
+export function emptyCustomTemplate(name?: string, kind: TemplateKind = 'talent'): ApplyTemplate {
+  if (kind === 'shoot' || kind === 'edit') {
+    return {
+      id: newCustomTemplateId(kind),
+      name: name || (kind === 'shoot' ? '拍摄报名模版' : '剪辑报名模版'),
+      isSystem: false,
+      kind,
+      fields: defaultSupplierApplyFields(kind).map((f) => ({ ...f, id: newFieldId('sf') })),
+    }
+  }
   return {
-    id: newCustomTemplateId(),
+    id: newCustomTemplateId(kind),
     name: name || '我的报名模版',
     isSystem: false,
-    kind: 'apply',
+    kind,
     fields: defaultApplyFieldsMinimal().map((f) => ({ ...f, id: newFieldId('pf') })),
   }
 }
@@ -253,37 +308,39 @@ export function builtinMinimalTemplate(): ApplyTemplate {
     id: 'builtin-minimal',
     name: '报名表单',
     isSystem: false,
-    kind: 'apply',
+    kind: 'talent',
     fields: defaultApplyFieldsMinimal().map((f) => ({ ...f, id: newFieldId('pf') })),
   }
 }
 
-export function getActiveTemplateId() {
+export function getActiveTemplateId(kind: TemplateKind = 'talent') {
   try {
-    const id = String(localStorage.getItem(ACTIVE_TEMPLATE_KEY) || '').trim()
+    const key = ACTIVE_TEMPLATE_KEYS[kind]
+    const id = String(localStorage.getItem(key) || '').trim()
     if (id && getTemplateById(id)) return id
-    const first = readCustomTemplates()[0]
+    const first = listCustomTemplates(kind)[0]
     return first ? first.id : ''
   } catch {
     return ''
   }
 }
 
-export function setActiveTemplateId(id: string) {
+export function setActiveTemplateId(id: string, kind: TemplateKind = 'talent') {
+  const key = ACTIVE_TEMPLATE_KEYS[kind]
   if (!id) {
-    localStorage.removeItem(ACTIVE_TEMPLATE_KEY)
+    localStorage.removeItem(key)
     return
   }
-  localStorage.setItem(ACTIVE_TEMPLATE_KEY, id)
+  localStorage.setItem(key, id)
 }
 
-function getTemplateForApply() {
-  const active = getActiveTemplateId()
+function getTemplateForApply(kind: TemplateKind = 'talent') {
+  const active = getActiveTemplateId(kind)
   if (active) {
     const t = getTemplateById(active)
     if (t) return t
   }
-  return builtinMinimalTemplate()
+  return kind === 'talent' ? builtinMinimalTemplate() : emptyCustomTemplate(undefined, kind)
 }
 
 export function mpApplyFormStorageKey(mpOrderId: string) {
@@ -327,8 +384,8 @@ export function getApplyConfigForMpOrder(mpOrderId: string, templateId?: string)
   return getTemplateForApply()
 }
 
-export function validateTemplateFields(fields: ApplyField[]) {
-  const list = normalizeFields(fields)
+export function validateTemplateFields(fields: ApplyField[], kind: TemplateKind = 'talent') {
+  const list = normalizeFields(fields, kind)
   if (!list.length) return '请至少保留一个报名项'
   if (list.filter((f) => !f.role).some((f) => !String(f.label || '').trim())) {
     return '请为自定义项填写名称'
