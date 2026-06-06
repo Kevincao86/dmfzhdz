@@ -226,9 +226,20 @@ async function putIceSourceObjectToPrefix(
   const contentType = input.contentType?.trim() || 'video/mp4'
   try {
     const client = await createOssClient(cfg, ossPrefix)
-    await client.put(objectKey, input.buffer, {
-      headers: { 'Content-Type': contentType },
-    })
+    try {
+      await client.put(objectKey, input.buffer, {
+        headers: {
+          'Content-Type': contentType,
+          'x-oss-object-acl': 'public-read',
+        },
+      })
+    } catch (aclErr) {
+      const aclMsg = aclErr instanceof Error ? aclErr.message : String(aclErr)
+      if (!/acl|access denied|bucket acl|not allowed/i.test(aclMsg)) throw aclErr
+      await client.put(objectKey, input.buffer, {
+        headers: { 'Content-Type': contentType },
+      })
+    }
     const mediaUrl = ensureIceHttpsUrl(
       client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
     )
