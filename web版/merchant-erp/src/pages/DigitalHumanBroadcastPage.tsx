@@ -410,6 +410,13 @@ export default function DigitalHumanBroadcastPage() {
       setToast('未配置视频生成：请在运营台绑定豆包（方舟 Seedance）或可灵 API 后重试')
       return
     }
+    if (cfg.arkKeyConfigured && cfg.arkVideoModels.length === 0) {
+      const hint =
+        cfg.arkVideoSetupIssue?.trim() ||
+        '豆包 Seedance 未配置可用 ep- 接入点：请在运营台「AI模型 → 短视频 API」填写方舟视频 ep- 模型。'
+      setToast(hint)
+      return
+    }
 
     const id = `dh-${Date.now()}`
     const row: DigitalHumanWork = {

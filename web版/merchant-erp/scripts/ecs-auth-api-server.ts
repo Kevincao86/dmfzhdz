@@ -1,6 +1,9 @@
 /**
  * ECS 本机 API（Auth + 运营客服轮询），供 Nginx 反代 /erp-api/
  */
+/** 避免 loadRegistrySnapshotForServer 经 erp-api 回环自调导致 pending/502 */
+process.env.MEOO_AUTH_API_SERVER = '1'
+
 import http from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { URL } from 'node:url'
@@ -70,7 +73,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260606-merchant-api-fallback'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260601-registry-no-loop-ice-ram'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 

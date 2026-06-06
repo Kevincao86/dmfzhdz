@@ -50,6 +50,18 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
   return { ...body }
 }
 
+const VIDEO_FETCH_TIMEOUT_MS = 120_000
+const VIDEO_CONFIG_TIMEOUT_MS = 25_000
+
+function videoFetchSignal(ms: number): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), ms)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 /** 视频生成耗时长，仅走 erp-api 单跳，避免 cs 同源 /api 双跳 pending */
 function videoApiFetchUrls(pathWithQuery: string): string[] {
   const all = merchantApiFetchUrls(pathWithQuery)
@@ -60,7 +72,7 @@ function videoApiFetchUrls(pathWithQuery: string): string[] {
 async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
   for (const url of videoApiFetchUrls(pathWithQuery)) {
     try {
-      const res = await fetch(url)
+      const res = await fetch(url, { signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS) })
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
       if (res.status === 404) continue
@@ -85,6 +97,7 @@ async function fetchVideoPost(path: string, body: Record<string, unknown>): Prom
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: bodyStr,
+        signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS),
       })
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
@@ -108,7 +121,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
   for (const p of paths) {
     for (const url of videoApiFetchUrls(p)) {
       try {
-        const res = await fetch(url)
+        const res = await fetch(url, { signal: videoFetchSignal(VIDEO_CONFIG_TIMEOUT_MS) })
         const text = await res.text()
         const ct = res.headers.get('content-type') ?? ''
         if (res.status === 404) continue
