@@ -193,21 +193,24 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     tier: VendorModelTier,
     capability: AiModelCapability,
   ) => {
-    const groupLabel = VENDOR_TIER_LABELS[vendor][tier]
+    const tierLabel = VENDOR_TIER_LABELS[vendor][tier]
+    const vendorBrand = tierLabel.split(' · ')[0] ?? tierLabel
     out.push({
       key: vendorTierAutoPickerKey(vendor, tier),
       provider: vendor,
       model: '',
-      label: `${groupLabel} · 自动（随机 · 额度切换）`,
+      label: `${tierLabel} · 自动（随机 · 额度切换）`,
       capability,
-      groupLabel,
+      groupLabel: vendorBrand,
       tierAuto: true,
     })
   }
 
-  for (const tier of ['language', 'image_text', 'vision'] as const) {
-    pushVendorTierAutoOnly('qwen', tier, tier === 'language' ? 'chat' : 'image')
-    pushVendorTierAutoOnly('doubao', tier, tier === 'language' ? 'chat' : 'image')
+  /** 按厂商成块排列：豆包三档 → 千问三档，避免交替 */
+  for (const vendor of ['doubao', 'qwen'] as const) {
+    for (const tier of ['language', 'image_text', 'vision'] as const) {
+      pushVendorTierAutoOnly(vendor, tier, tier === 'language' ? 'chat' : 'image')
+    }
   }
 
   out.push({
