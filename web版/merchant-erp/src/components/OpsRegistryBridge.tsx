@@ -137,7 +137,7 @@ export default function OpsRegistryBridge() {
 
     void tick()
 
-    const interval = window.setInterval(() => void tick(), 2500)
+    const interval = window.setInterval(() => void tick(), 15_000)
 
     const onVis = () => {
       if (document.visibilityState === 'visible') void tick()

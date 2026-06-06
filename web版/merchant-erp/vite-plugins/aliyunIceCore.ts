@@ -450,16 +450,28 @@ function iceUrlBucketName(url: string): string | undefined {
   }
 }
 
-/** 自建 OSS 素材勿写入 outin StorageLocation，否则 RegisterMediaInfo 与真实文件位置不一致 */
+/** 自建 OSS 素材：StorageLocation 须与 IMS 已绑定 Bucket 域名一致（勿填 outin 当素材在商户 Bucket） */
 function buildIceRegisterConfig(cfg: AliyunIceConfig, inputURL?: string): string {
   const registerConfig: Record<string, string> = {
     NeedSprite: 'false',
     NeedSnapshot: 'false',
   }
-  const storage = normalizeIceStorageLocationHost(cfg.vodStorageLocation)
   const bucket = inputURL ? iceUrlBucketName(inputURL) : undefined
-  if (storage && (!bucket || isIceVodOutinBucket(bucket))) {
-    registerConfig.StorageLocation = storage
+  const iceRegion = cfg.regionId.replace(/^oss-/, '')
+
+  if (bucket && !isIceVodOutinBucket(bucket)) {
+    let host = `${bucket}.oss-${iceRegion}.aliyuncs.com`
+    if (inputURL && /^https?:\/\//i.test(inputURL)) {
+      try {
+        host = new URL(inputURL).hostname
+      } catch {
+        /* use default host */
+      }
+    }
+    registerConfig.StorageLocation = host
+  } else {
+    const storage = normalizeIceStorageLocationHost(cfg.vodStorageLocation)
+    if (storage) registerConfig.StorageLocation = storage
   }
   return JSON.stringify(registerConfig)
 }
@@ -554,6 +566,62 @@ async function uploadUrlToMediaId(
     return { ok: true, mediaId }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+function iceMediaInfoLooksReady(info: Record<string, unknown>): boolean {
+  const basic = (info.mediaBasicInfo ?? info.MediaBasicInfo) as Record<string, unknown> | undefined
+  const status = String(info.status ?? basic?.status ?? '').toLowerCase()
+  if (status.includes('fail') || status.includes('error')) return false
+  if (status.includes('normal') || status.includes('success') || status.includes('ready')) return true
+
+  const inputURL = readIceJobString(basic ?? {}, 'inputURL', 'InputURL')
+  if (inputURL?.startsWith('oss://') || /\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(inputURL ?? '')) {
+    return true
+  }
+
+  const list = (info.fileInfoList ?? info.FileInfoList) as unknown
+  if (!Array.isArray(list) || list.length === 0) return false
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const fb = (row.fileBasicInfo ?? row.FileBasicInfo) as Record<string, unknown> | undefined
+    const fileUrl = readIceJobString(fb ?? row, 'fileUrl', 'FileUrl')
+    const fileSize = Number(fb?.fileSize ?? fb?.FileSize ?? 0)
+    if (fileUrl && (!Number.isFinite(fileSize) || fileSize > 0)) return true
+  }
+  return false
+}
+
+/** 图片 RegisterMediaInfo 后须等 IMS 入库完成，空 status 不可视为就绪 */
+async function waitIceImageMediaReady(
+  client: InstanceType<typeof IceClient>,
+  mediaId: string,
+  maxTries = 24,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  for (let i = 0; i < maxTries; i++) {
+    try {
+      const res = await client.getMediaInfo(new GetMediaInfoRequest({ mediaId, outputType: 'oss' }))
+      const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
+      if (!info) {
+        await sleep(2500)
+        continue
+      }
+      const basic = (info.mediaBasicInfo ?? info.MediaBasicInfo) as Record<string, unknown> | undefined
+      const status = String(info.status ?? basic?.status ?? '').toLowerCase()
+      if (status.includes('fail') || status.includes('error')) {
+        return { ok: false, message: `媒资注册失败：${status}` }
+      }
+      if (iceMediaInfoLooksReady(info)) return { ok: true }
+    } catch {
+      /* 注册初期可能尚未可查 */
+    }
+    await sleep(2500)
+  }
+  return {
+    ok: false,
+    message:
+      '图片已上传 OSS 但 IMS 媒资库尚未入库完成。请确认该 Bucket 已在智能媒体服务控制台绑定，且与 ICE 同区域（cn-shanghai）。',
   }
 }
 
@@ -681,7 +749,7 @@ export async function iceRunImagesPipeline(
     if (!up.ok) {
       return { ok: false, message: `第 ${i + 1} 张图片上传失败：${up.message}`, step: 'upload_media' }
     }
-    const ready = await waitMediaReady(client, up.mediaId, 16, { strict: true })
+    const ready = await waitIceImageMediaReady(client, up.mediaId)
     if (!ready.ok) {
       return { ok: false, message: `第 ${i + 1} 张图片媒资未就绪：${ready.message}`, step: 'wait_media' }
     }
