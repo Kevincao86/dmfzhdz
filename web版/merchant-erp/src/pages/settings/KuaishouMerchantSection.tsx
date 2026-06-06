@@ -17,6 +17,11 @@ import {
   upsertKuaishouBindingCloud,
 } from '../../lib/merchantKuaishouCloudBinding'
 import {
+  buildPlatformAccountItems,
+  countEffectivePlatformBindings,
+  LOCAL_SESSION_BINDING_ID,
+} from '../../lib/merchantPlatformAccountItems'
+import {
   fetchMerchantBindingById,
   readActiveBindingId,
 } from '../../lib/merchantPlatformBindings'
@@ -338,16 +343,27 @@ export default function KuaishouMerchantSection() {
 
   const activeBindingId = readActiveBindingId('kuaishou')
 
+  const effectiveBindingCount = useMemo(
+    () =>
+      countEffectivePlatformBindings(cloudBindings, {
+        accessToken,
+        merchantId: boundMerchantId,
+      }),
+    [cloudBindings, accessToken, boundMerchantId],
+  )
+
   const kuaishouAccountItems = useMemo(
     () =>
-      cloudBindings.map((b) => ({
-        id: b.id,
-        accountId: b.merchant_account_id ?? '—',
-        displayName: b.binding_label || b.account_display_name || b.merchant_account_id || '来客账号',
-        subLabel: b.client_key ? `AppID ${b.client_key}` : undefined,
-        isActive: b.id === activeBindingId,
-      })),
-    [cloudBindings, activeBindingId],
+      buildPlatformAccountItems(cloudBindings, {
+        activeBindingId,
+        accessToken,
+        merchantId: boundMerchantId,
+        accountName: boundAccountName,
+        clientKey: appId,
+        defaultDisplayName: '来客账号',
+        localOnlySubLabel: '仅本机会话（云端同步待完成）',
+      }),
+    [cloudBindings, activeBindingId, accessToken, boundMerchantId, boundAccountName, appId],
   )
 
   const selectKuaishouBinding = useCallback(
@@ -373,8 +389,25 @@ export default function KuaishouMerchantSection() {
     [loadStores],
   )
 
+  const clearLocalKuaishouBindingState = useCallback(() => {
+    clearKuaishouMerchantBindingLocal()
+    setAccessToken(null)
+    setBoundMerchantId('')
+    setBoundAccountName('')
+    setRows([])
+    setTotal(0)
+    setLastSyncAt(null)
+    setListError(null)
+    setStoresHint(null)
+  }, [])
+
   const removeKuaishouBinding = useCallback(
     async (bindingId: string) => {
+      if (bindingId === LOCAL_SESSION_BINDING_ID) {
+        if (!window.confirm('确定移除此快手团购账号？将清除本机绑定凭据。')) return
+        clearLocalKuaishouBindingState()
+        return
+      }
       if (!window.confirm('确定移除此快手团购账号？门店列表将切换到其它已绑定账号。')) return
       if (!supabaseConfigured || !supabase) return
       const d = await deleteKuaishouBindingCloud(supabase, bindingId)
