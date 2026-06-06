@@ -270,10 +270,14 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
             confirmPassword,
           })
       if (!r.ok) {
-        const msg =
-          r.error === 'auth_unreachable' && r.detail
-            ? `${toUserFacingError(r.message ?? r.detail ?? r.error, '注册')}（${r.detail}）`
-            : toUserFacingError(r.message ?? r.detail ?? r.error, '注册')
+        const base = toUserFacingError(r.message ?? r.detail ?? r.error, '注册')
+        const showDetail =
+          r.detail &&
+          (r.error === 'auth_unreachable' ||
+            r.error === 'tenant_insert_failed' ||
+            r.error === 'member_insert_failed' ||
+            r.error === 'auth_create_failed')
+        const msg = showDetail ? `${base}（${r.detail}）` : base
         onErr(msg)
         return
       }
