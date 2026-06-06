@@ -40,19 +40,35 @@ export function parseVodStorageAsOssPrefix(cfg: AliyunIceConfig): ParsedOssPrefi
   return { bucket: m[1], region: m[2], keyPrefix: 'meoo' }
 }
 
+/** 本地上传候选 Bucket（按优先级）；outin 点播库通常不可 AK 直写 PutObject */
+export function resolveIceOssUploadCandidates(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+): ParsedOssPrefix[] {
+  const out: ParsedOssPrefix[] = []
+  const add = (p: ParsedOssPrefix | null) => {
+    if (!p) return
+    if (!out.some((x) => x.bucket === p.bucket && x.region === p.region && x.keyPrefix === p.keyPrefix)) {
+      out.push(p)
+    }
+  }
+
+  const explicit = env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX?.trim()
+  if (explicit) add(parseOssUrlPrefix(explicit))
+
+  // 自建 Bucket（运营台 OSS 成片前缀）须已加入 IMS 媒资库，且 RAM 含 oss:PutObject
+  add(parseOssUrlPrefix(cfg.outputOssUrlPrefix?.trim() ?? ''))
+
+  // outin 仅作兜底：多数账号对点播库无 bucket 写 ACL
+  add(parseVodStorageAsOssPrefix(cfg))
+  return out
+}
+
 export function resolveIceOssUploadPrefix(
   cfg: AliyunIceConfig,
   env: Record<string, string | undefined>,
 ): ParsedOssPrefix | null {
-  const explicit = env.ALIYUN_ICE_SOURCE_OSS_URL_PREFIX?.trim()
-  if (explicit) {
-    const parsed = parseOssUrlPrefix(explicit)
-    if (parsed) return parsed
-  }
-  // 优先写入 ICE 点播库 Bucket，避免素材落在未加入媒资库的自建 Bucket 导致 RegisterMediaInfo 403
-  const vod = parseVodStorageAsOssPrefix(cfg)
-  if (vod) return vod
-  return parseOssUrlPrefix(cfg.outputOssUrlPrefix?.trim() ?? '')
+  return resolveIceOssUploadCandidates(cfg, env)[0] ?? null
 }
 
 export function iceOssUploadAvailable(

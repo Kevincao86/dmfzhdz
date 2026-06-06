@@ -4,7 +4,11 @@
 /// <reference path="./ali-oss.d.ts" />
 import path from 'node:path'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
-import { resolveIceOssUploadPrefix, type ParsedOssPrefix } from './aliyunOssIceParse.js'
+import {
+  resolveIceOssUploadCandidates,
+  resolveIceOssUploadPrefix,
+  type ParsedOssPrefix,
+} from './aliyunOssIceParse.js'
 
 const MAX_BYTES = 500 * 1024 * 1024
 /** 经服务端转存 OSS（避免浏览器直传 CORS）；本地开发单请求上限 */
@@ -188,32 +192,32 @@ export async function ensureIcePublicImageUrls(
   return { ok: true, urls: out }
 }
 
-export async function putIceSourceObject(
+function isOssBucketAclError(msg: string): boolean {
+  return /bucket acl|accessdenied|access denied|no right to access/i.test(msg)
+}
+
+function formatIceOssPutError(msg: string, tried: ParsedOssPrefix[]): string {
+  const buckets = tried.map((p) => `${p.bucket}.oss-${p.region}.aliyuncs.com`).join('、')
+  if (isOssBucketAclError(msg)) {
+    return (
+      `写入 OSS 失败：${msg}。本地上传须写入运营台「OSS 成片 URL 前缀」对应 Bucket（${buckets || '未配置'}），` +
+      `并在 RAM 为该 AccessKey 授权 oss:PutObject；outin 点播库不可直传。` +
+      `同时确认该 Bucket 已在 IMS 智能媒体服务媒资库中绑定。`
+    )
+  }
+  return `写入 OSS 失败：${msg}`
+}
+
+async function putIceSourceObjectToPrefix(
   cfg: AliyunIceConfig,
-  env: Record<string, string | undefined>,
+  ossPrefix: ParsedOssPrefix,
   input: { fileName: string; contentType: string; buffer: Buffer },
 ): Promise<
   | { ok: true; mediaUrl: string; objectKey: string }
-  | { ok: false; message: string }
+  | { ok: false; message: string; aclDenied?: boolean }
 > {
-  const ossPrefix = resolveIceOssUploadPrefix(cfg, env)
-  if (!ossPrefix) {
-    return {
-      ok: false,
-      message:
-        '未配置 OSS：请在运营台「短视频 API」填写 OSS 成片 URL 前缀，本地上传将写入该 Bucket 的 source/ 目录。',
-    }
-  }
-  if (!input.buffer.length) {
-    return { ok: false, message: '文件内容为空' }
-  }
-  if (input.buffer.length > MAX_BYTES) {
-    return { ok: false, message: '单文件不能超过 500MB' }
-  }
-
   const objectKey = buildObjectKey(ossPrefix, input.fileName || 'video.mp4')
   const contentType = input.contentType?.trim() || 'video/mp4'
-
   try {
     const client = await createOssClient(cfg, ossPrefix)
     await client.put(objectKey, input.buffer, {
@@ -223,8 +227,43 @@ export async function putIceSourceObject(
     return { ok: true, mediaUrl, objectKey }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, message: `写入 OSS 失败：${msg}` }
+    return { ok: false, message: msg, aclDenied: isOssBucketAclError(msg) }
   }
+}
+
+export async function putIceSourceObject(
+  cfg: AliyunIceConfig,
+  env: Record<string, string | undefined>,
+  input: { fileName: string; contentType: string; buffer: Buffer },
+): Promise<
+  | { ok: true; mediaUrl: string; objectKey: string }
+  | { ok: false; message: string }
+> {
+  const candidates = resolveIceOssUploadCandidates(cfg, env)
+  if (!candidates.length) {
+    return {
+      ok: false,
+      message:
+        '未配置 OSS：请在运营台「短视频 API」填写 OSS 成片 URL 前缀（如 https://mxslearningbiz.oss-cn-shanghai.aliyuncs.com/meoo/），本地上传将写入该 Bucket 的 source/ 目录。',
+    }
+  }
+  if (!input.buffer.length) {
+    return { ok: false, message: '文件内容为空' }
+  }
+  if (input.buffer.length > MAX_BYTES) {
+    return { ok: false, message: '单文件不能超过 500MB' }
+  }
+
+  const tried: ParsedOssPrefix[] = []
+  let lastMsg = 'unknown'
+  for (const prefix of candidates) {
+    tried.push(prefix)
+    const out = await putIceSourceObjectToPrefix(cfg, prefix, input)
+    if (out.ok) return out
+    lastMsg = out.message
+    if (!out.aclDenied) break
+  }
+  return { ok: false, message: formatIceOssPutError(lastMsg, tried) }
 }
 
 function normalizePartEtag(etag: string | undefined): string {
