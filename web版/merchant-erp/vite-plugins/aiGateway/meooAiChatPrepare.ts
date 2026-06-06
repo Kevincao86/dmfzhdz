@@ -24,6 +24,7 @@ export type MeooAiChatPrepared =
       req: AIChatRequest
       chatEnv: Record<string, string>
       env: Record<string, string>
+      usageCtx?: import('../tenantMembershipCore.js').TenantAiContext
     }
   | { ok: false; status: number; body: Record<string, unknown> }
 
@@ -89,6 +90,7 @@ export async function prepareMeooAiChat(
     }
   }
   chatEnv = access.envForChat
+  const usageCtx = access.usageCtx
 
   const rawModel = typeof parsed.model === 'string' ? parsed.model.trim() : ''
   const modelFamily = provider === 'tokenmix' ? normalizeAiModelFamily(parsed.modelFamily) : undefined
@@ -125,6 +127,7 @@ export async function prepareMeooAiChat(
     ...(provider === 'tokenmix' ? { modelFamily } : {}),
     messages: mergeSystemPrompt(messagesWithIntel, {
       agentPickerKey: typeof parsed.agentPickerKey === 'string' ? parsed.agentPickerKey : undefined,
+      taskType,
     }),
     ...(imageDataUrls?.length ? { imageDataUrls } : {}),
     temperature: parsed.temperature,
@@ -132,5 +135,5 @@ export async function prepareMeooAiChat(
     taskType,
   }
 
-  return { ok: true, user, req, chatEnv, env }
+  return { ok: true, user, req, chatEnv, env, usageCtx }
 }

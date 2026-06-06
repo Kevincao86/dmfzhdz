@@ -211,34 +211,63 @@ export async function loadTenantAiContextForUser(
 ): Promise<TenantAiContext | null> {
   lastTenantLookupHttpError = ''
   const hint = tenantIdHint?.trim() || undefined
+  const cacheKey = `${userId}:${hint ?? ''}`
+  const hit = tenantCtxCache.get(cacheKey)
+  if (hit && Date.now() - hit.at < TENANT_CTX_CACHE_MS) return hit.ctx
 
   /** 1) Service Role（ECS / 公网 PostgREST；服务端查租户最稳） */
   const viaService = await loadTenantAiContextViaServiceRole(userId, env, hint)
-  if (viaService) return viaService
+  if (viaService) {
+    tenantCtxCache.set(cacheKey, { at: Date.now(), ctx: viaService })
+    return viaService
+  }
 
   /** 2) 用户 JWT + RLS（与浏览器一致） */
   if (userJwt) {
     const viaJwt = await loadTenantAiContextViaUserJwt(userId, userJwt, env, hint)
     if (viaJwt) {
-      if (viaJwt.plan !== 'member_plus') return viaJwt
-      const viaService2 = await loadTenantAiContextViaServiceRole(userId, env, viaJwt.tenantId)
-      if (viaService2?.tokenmixApiKey) {
-        return { ...viaJwt, tokenmixApiKey: viaService2.tokenmixApiKey }
+      if (viaJwt.plan !== 'member_plus') {
+        tenantCtxCache.set(cacheKey, { at: Date.now(), ctx: viaJwt })
+        return viaJwt
       }
-      return viaJwt
+      const viaService2 = await loadTenantAiContextViaServiceRole(userId, env, viaJwt.tenantId)
+      const merged =
+        viaService2?.tokenmixApiKey
+          ? { ...viaJwt, tokenmixApiKey: viaService2.tokenmixApiKey }
+          : viaJwt
+      tenantCtxCache.set(cacheKey, { at: Date.now(), ctx: merged })
+      return merged
     }
   }
 
   if (userJwt && hint) {
-    return loadTenantAiContextViaUserJwt(userId, userJwt, env)
+    const viaJwt2 = await loadTenantAiContextViaUserJwt(userId, userJwt, env)
+    tenantCtxCache.set(cacheKey, { at: Date.now(), ctx: viaJwt2 })
+    return viaJwt2
   }
 
+  tenantCtxCache.set(cacheKey, { at: Date.now(), ctx: null })
   return null
 }
 
+/** 对话成功后再记次，避免每次请求先 PATCH tenants 拖慢首 token */
+export function recordDirectAiUsageAfterSuccess(
+  ctx: TenantAiContext | undefined,
+  env: Record<string, string>,
+): void {
+  if (!ctx || ctx.plan !== 'free') return
+  const month = currentUsageMonth()
+  let used = ctx.directAiCallsUsed
+  if (ctx.directAiUsageMonth !== month) used = 0
+  void incrementDirectAiUsage(ctx.tenantId, month, used, env)
+}
+
 export type AiAccessCheck =
-  | { ok: true; envForChat: Record<string, string> }
+  | { ok: true; envForChat: Record<string, string>; usageCtx?: TenantAiContext }
   | { ok: false; status: number; error: string; detail?: string }
+
+const TENANT_CTX_CACHE_MS = 45_000
+const tenantCtxCache = new Map<string, { at: number; ctx: TenantAiContext | null }>()
 
 function tenantNotFoundDetail(env: Record<string, string>): string {
   const base = supabaseBase(env)
@@ -333,13 +362,9 @@ export async function assertAiChatAccess(
         detail: `免费版直连 AI 每月上限 ${FREE_DIRECT_AI_CALL_LIMIT} 次，请升级会员版`,
       }
     }
-    const inc = await incrementDirectAiUsage(ctx.tenantId, month, used, env)
-    if (!inc.ok) {
-      return { ok: false, status: 502, error: 'usage_increment_failed', detail: inc.detail }
-    }
   }
 
-  return { ok: true, envForChat: env }
+  return { ok: true, envForChat: env, usageCtx: ctx }
 }
 
 async function incrementDirectAiUsage(

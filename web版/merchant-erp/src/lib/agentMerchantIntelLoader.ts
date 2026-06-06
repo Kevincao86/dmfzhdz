@@ -307,9 +307,13 @@ export async function loadFullMerchantIntelSnapshot(
   return { ...base, ...enriched }
 }
 
+const CASUAL_INTEL_LINE =
+  '【门店经营情报】当前为日常对话；仅当用户明确讨论经营、商品、推广、招募时再结合 ERP 数据作答，勿主动展开。'
+
 export async function buildAgentMerchantIntelContextAsync(
   taskType?: AiTaskType,
 ): Promise<string> {
+  if (!taskType) return CASUAL_INTEL_LINE
   const full = await loadFullMerchantIntelSnapshot(taskType)
   return buildAgentMerchantIntelContextFromSnapshot(full)
 }

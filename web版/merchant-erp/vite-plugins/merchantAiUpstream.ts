@@ -2280,25 +2280,19 @@ export async function streamBuiltinAgentChatFromMessages(
     return { modelUsed: model }
   }
   const url = `${doubaoArkApiV3Root(eff)}/chat/completions`
-  let lastErr: Error | null = null
-  for (const mid of doubaoChatModelCandidates(eff)) {
-    try {
-      for await (const d of openAiCompatChatStream({
-        url,
-        apiKey: key,
-        model: mid,
-        messages: oaiMessages,
-        temperature: 0.65,
-        signal,
-      })) {
-        if (d.reasoning || d.content) onDelta(d)
-      }
-      return { modelUsed: mid }
-    } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e))
-    }
+  const mid = doubaoChatModelCandidates(eff)[0]
+  if (!mid) throw new Error('豆包流式对话失败：未配置模型')
+  for await (const d of openAiCompatChatStream({
+    url,
+    apiKey: key,
+    model: mid,
+    messages: oaiMessages,
+    temperature: 0.65,
+    signal,
+  })) {
+    if (d.reasoning || d.content) onDelta(d)
   }
-  throw lastErr ?? new Error('豆包流式对话失败')
+  return { modelUsed: mid }
 }
 
 export async function merchantAgentChatFromMessages(

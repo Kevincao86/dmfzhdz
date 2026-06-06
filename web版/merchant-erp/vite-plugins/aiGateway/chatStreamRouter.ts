@@ -117,28 +117,25 @@ async function streamKimi(
   const models = moonshotChatModelCandidates(env, req.model)
   const bases = moonshotChatBaseCandidates(env)
   const messages = toOpenAiMessages(req.messages)
-  let lastErr = 'Kimi: 请求失败'
-  for (const baseURL of bases) {
-    for (const model of models) {
-      try {
-        await consumeGenerator(
-          openAiCompatChatStream({
-            url: `${baseURL.replace(/\/$/, '')}/chat/completions`,
-            apiKey,
-            model,
-            messages,
-            temperature: req.temperature ?? 0.6,
-            signal,
-          }),
-          onDelta,
-        )
-        return { model }
-      } catch (e) {
-        lastErr = e instanceof Error ? e.message : String(e)
-      }
-    }
+  const baseURL = bases[0]
+  const model = models[0]
+  if (!baseURL || !model) throw new Error('Kimi: 未配置模型或 Base URL')
+  try {
+    await consumeGenerator(
+      openAiCompatChatStream({
+        url: `${baseURL.replace(/\/$/, '')}/chat/completions`,
+        apiKey,
+        model,
+        messages,
+        temperature: req.temperature ?? 0.6,
+        signal,
+      }),
+      onDelta,
+    )
+    return { model }
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : String(e))
   }
-  throw new Error(lastErr)
 }
 
 async function streamMinimax(
@@ -157,30 +154,27 @@ async function streamMinimax(
   const models = minimaxChatModelCandidates(env, req.model, reg?.defaultModel)
   const bases = minimaxChatBaseCandidates(env, apiKey)
   const messages = toOpenAiMessages(req.messages)
-  let lastErr = 'MiniMax: 请求失败'
-  for (const baseURL of bases) {
-    for (const model of models) {
-      try {
-        const root = baseURL.replace(/\/$/, '')
-        const url = root.includes('/chat/completions') ? root : `${root}/chat/completions`
-        await consumeGenerator(
-          openAiCompatChatStream({
-            url,
-            apiKey,
-            model,
-            messages,
-            temperature: req.temperature ?? 1,
-            signal,
-          }),
-          onDelta,
-        )
-        return { model }
-      } catch (e) {
-        lastErr = e instanceof Error ? e.message : String(e)
-      }
-    }
+  const baseURL = bases[0]
+  const model = models[0]
+  if (!baseURL || !model) throw new Error('MiniMax: 未配置模型或 Base URL')
+  const root = baseURL.replace(/\/$/, '')
+  const url = root.includes('/chat/completions') ? root : `${root}/chat/completions`
+  try {
+    await consumeGenerator(
+      openAiCompatChatStream({
+        url,
+        apiKey,
+        model,
+        messages,
+        temperature: req.temperature ?? 1,
+        signal,
+      }),
+      onDelta,
+    )
+    return { model }
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : String(e))
   }
-  throw new Error(lastErr)
 }
 
 /**
