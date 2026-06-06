@@ -212,9 +212,9 @@ function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
   }
 }
 
-/** 多图轮播时间线：HTTPS MediaURL（与 MediaId 二选一），阿里云图片轨建议带 Duration */
+/** 多图轮播时间线：优先 MediaId（与 RegisterMediaInfo 一致），避免签名 URL 导致 InputFile is bad */
 function buildTimelineFromImages(
-  imageUrls: string[],
+  mediaIds: string[],
   plan: IceBriefTimelinePlan,
   width: number,
   height: number,
@@ -222,17 +222,17 @@ function buildTimelineFromImages(
   let cursor = 0
   const clips: Record<string, unknown>[] = []
   const durations =
-    plan.imageDurations.length === imageUrls.length
+    plan.imageDurations.length === mediaIds.length
       ? plan.imageDurations
-      : Array.from({ length: imageUrls.length }, () =>
-          Math.max(0.5, plan.totalDurationSec / imageUrls.length),
+      : Array.from({ length: mediaIds.length }, () =>
+          Math.max(0.5, plan.totalDurationSec / mediaIds.length),
         )
 
-  for (let i = 0; i < imageUrls.length; i++) {
+  for (let i = 0; i < mediaIds.length; i++) {
     const dur = Math.max(0.5, durations[i] ?? 1)
     const clip: Record<string, unknown> = {
       Type: 'Image',
-      MediaURL: ensureIceHttpsUrl(imageUrls[i]!),
+      MediaId: mediaIds[i]!,
       TimelineIn: cursor,
       TimelineOut: cursor + dur,
       Duration: dur,
@@ -240,7 +240,7 @@ function buildTimelineFromImages(
       Height: height,
     }
     const effects: Record<string, unknown>[] = []
-    appendClipEffects(effects, plan, dur, i, imageUrls.length)
+    appendClipEffects(effects, plan, dur, i, mediaIds.length)
     if (effects.length) clip.Effects = effects
     clips.push(clip)
     cursor += dur
@@ -645,7 +645,7 @@ export async function iceRunImagesPipeline(
     imageCount: urls.length,
     effectId: input.effectId,
   })
-  const timeline = buildTimelineFromImages(urls, plan, input.width, input.height)
+  const timeline = buildTimelineFromImages(mediaIds, plan, input.width, input.height)
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -656,7 +656,7 @@ export async function iceRunImagesPipeline(
           Title: input.projectName.slice(0, 120),
           Description:
             (input.editBrief.slice(0, 400) || '灵祺AI云剪') +
-            `；多图 ${urls.length} 张；已应用时间线：${plan.summary}`,
+            `；多图 ${mediaIds.length} 张；已应用时间线：${plan.summary}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'false' }),
         source: 'OPENAPI',

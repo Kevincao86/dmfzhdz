@@ -411,6 +411,7 @@ export async function postAiAgentNativeImage(
   prompt: string,
   opts?: {
     preferredVendor?: 'qwen' | 'doubao' | 'minimax'
+    preferredModelId?: string
     referenceImageDataUrl?: string
     imageRoute?: 'builtin' | 'tokenmix'
     tokenmixImageModel?: string
@@ -429,6 +430,8 @@ export async function postAiAgentNativeImage(
   let lastErr = 'no_response'
   const body: Record<string, unknown> = { prompt }
   if (opts?.preferredVendor) body.preferred_vendor = opts.preferredVendor
+  const pm = opts?.preferredModelId?.trim()
+  if (pm) body.preferred_model_id = pm
   const ref = opts?.referenceImageDataUrl?.trim()
   if (ref) body.reference_image = ref
   if (opts?.imageRoute === 'tokenmix') body.image_route = 'tokenmix'

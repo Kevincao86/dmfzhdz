@@ -39,6 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   let body: {
     prompt?: unknown
     preferred_vendor?: unknown
+    preferred_model_id?: unknown
     reference_image?: unknown
     image_route?: unknown
     tokenmix_image_model?: unknown
@@ -69,6 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const imageRoute = routeRaw === 'tokenmix' ? 'tokenmix' : 'builtin'
   const tokenmixImageModel =
     typeof body.tokenmix_image_model === 'string' ? body.tokenmix_image_model.trim() : undefined
+  const preferredModelId =
+    typeof body.preferred_model_id === 'string' ? body.preferred_model_id.trim() : undefined
 
   const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
     '../vite-plugins/merchantRegistryVendorEnv.js'
@@ -104,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       prompt,
       referenceImage,
       preferredVendor,
+      preferredModelId,
       imageRoute,
       tokenmixImageModel,
     })

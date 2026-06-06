@@ -6,13 +6,9 @@
  */
 import type { ServerResponse } from 'node:http'
 
-import {
-  DOUBAO_CHAT_CATALOG,
-  DOUBAO_IMAGE_CATALOG,
-  isArkQuotaHopableError,
-  mergeCatalogModelIds,
-} from '../src/lib/arkModelCatalog.js'
+import { isArkQuotaHopableError } from '../src/lib/arkModelCatalog.js'
 import { qwenImageModelCandidates } from '../src/lib/qwenVisionCatalog.js'
+import { buildVendorModelCandidates, invokeWithQuotaFailover } from '../src/lib/vendorModelPool.js'
 import {
   buildQwenVisionImageRequest,
   extractQwenVisionImageUrls,
@@ -399,7 +395,7 @@ export async function runAgentFreeformTextToImage(
   env: MerchantAiEnv,
   userLine: string,
   preferredVendor?: 'qwen' | 'doubao' | 'minimax',
-  opts?: { referenceImage?: string; exactPrompt?: boolean },
+  opts?: { referenceImage?: string; exactPrompt?: boolean; preferredModelId?: string },
 ): Promise<
   | { ok: true; imageUrl: string; vendorUsed: 'qwen' | 'doubao' | 'minimax' }
   | { ok: false; message: string }
@@ -411,9 +407,16 @@ export async function runAgentFreeformTextToImage(
     : ref
       ? buildAgentFreeformImageI2iPrompt(userLine)
       : buildAgentFreeformImagePrompt(userLine)
-  const order = imageVendorOrderPreferring(env, preferredVendor)
-  const primary = pickPrimaryVendorWithKey(env, order)
-  const { key, label } = pickKey(env, primary)
+  const modelId = opts?.preferredModelId?.trim()
+  let effEnv = env
+  if (modelId && preferredVendor === 'qwen') {
+    effEnv = { ...env, MERCHANT_AI_QWEN_IMAGE_MODEL: modelId }
+  } else if (modelId && preferredVendor === 'doubao') {
+    effEnv = { ...env, MERCHANT_AI_DOUBAO_IMAGE_MODEL: modelId }
+  }
+  const order = imageVendorOrderPreferring(effEnv, preferredVendor)
+  const primary = pickPrimaryVendorWithKey(effEnv, order)
+  const { key, label } = pickKey(effEnv, primary)
   if (!key) {
     return {
       ok: false,
@@ -423,7 +426,7 @@ export async function runAgentFreeformTextToImage(
   try {
     const { urls, modelUsed } = await runAgentImageGenerateWithBuiltinFailover(
       primary,
-      env,
+      effEnv,
       key,
       prompt,
       ref,
@@ -552,12 +555,12 @@ function doubaoImageModelId(env: MerchantAiEnv): string {
 
 function doubaoImageModelCandidates(env: MerchantAiEnv, mode: 't2i' | 'i2i'): string[] {
   const e = env as Record<string, string | undefined>
-  return mergeCatalogModelIds(
-    DOUBAO_IMAGE_CATALOG,
-    e.MERCHANT_AI_DOUBAO_IMAGE_MODELS ?? e.MERCHANT_AI_DOUBAO_IMAGE_ENDPOINTS,
-    doubaoImageModelId(env),
+  const tier = mode === 't2i' ? 'image_text' : 'vision'
+  return buildVendorModelCandidates('doubao', tier, {
+    envRaw: e.MERCHANT_AI_DOUBAO_IMAGE_MODELS ?? e.MERCHANT_AI_DOUBAO_IMAGE_ENDPOINTS,
+    preferredId: doubaoImageModelId(env),
     mode,
-  )
+  })
 }
 
 function qwenWanxModelId(env: MerchantAiEnv): string {
@@ -861,15 +864,24 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   const registryIds = fromRegistry
     ? parseArkVideoEndpointsRaw(fromRegistry).map((item) => item.endpointId)
     : []
-  const merged = mergeCatalogModelIds(
-    DOUBAO_CHAT_CATALOG,
-    registryIds.join(', '),
-    doubaoChatModelId(env),
-    'chat',
-  )
+  const merged = buildVendorModelCandidates('doubao', 'language', {
+    envRaw: registryIds.join(', '),
+    preferredId: doubaoChatModelId(env),
+    mode: 'chat',
+  })
   const fallback = doubaoChatFallbackModelId(env)
   if (fallback && !merged.includes(fallback)) merged.push(fallback)
   return merged.length ? merged : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
+}
+
+function qwenChatModelCandidates(env: MerchantAiEnv): string[] {
+  const e = env as Record<string, string | undefined>
+  const merged = buildVendorModelCandidates('qwen', 'language', {
+    envRaw: e.MERCHANT_AI_QWEN_CHAT_MODELS ?? e.MERCHANT_AI_QWEN_CHAT_ENDPOINTS,
+    preferredId: qwenChatModelId(env),
+    mode: 'chat',
+  })
+  return merged.length ? merged : [qwenChatModelId(env)]
 }
 
 async function callDoubaoChat(
@@ -879,18 +891,27 @@ async function callDoubaoChat(
   user: string,
   chatOverrides?: Record<string, unknown>,
   fetchSignal?: AbortSignal,
-): Promise<string> {
+): Promise<{ text: string; modelUsed: string }> {
   const url = `${doubaoArkApiV3Root(env)}/chat/completions`
-  let lastErr: Error | null = null
-  for (const mid of doubaoChatModelCandidates(env)) {
-    try {
-      return await openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal)
-    } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e))
-      if (!isArkQuotaHopableError(lastErr.message)) throw lastErr
-    }
-  }
-  throw lastErr ?? new Error('豆包对话请求失败')
+  const { result, modelUsed } = await invokeWithQuotaFailover(doubaoChatModelCandidates(env), (mid) =>
+    openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
+  )
+  return { text: result, modelUsed }
+}
+
+async function callQwenChat(
+  apiKey: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+  chatOverrides?: Record<string, unknown>,
+  fetchSignal?: AbortSignal,
+): Promise<{ text: string; modelUsed: string }> {
+  const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  const { result, modelUsed } = await invokeWithQuotaFailover(qwenChatModelCandidates(env), (mid) =>
+    openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
+  )
+  return { text: result, modelUsed }
 }
 
 async function callModelText(
@@ -901,16 +922,14 @@ async function callModelText(
   user: string,
 ): Promise<string> {
   switch (model) {
-    case 'qwen':
-      return openAiStyleChat(
-        'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-        apiKey,
-        qwenChatModelId(env),
-        system,
-        user,
-      )
-    case 'doubao':
-      return callDoubaoChat(apiKey, env, system, user)
+    case 'qwen': {
+      const { text } = await callQwenChat(apiKey, env, system, user)
+      return text
+    }
+    case 'doubao': {
+      const { text } = await callDoubaoChat(apiKey, env, system, user)
+      return text
+    }
     case 'minimax':
       return callMinimaxChat(apiKey, env, system, user)
     case 'gemini':
@@ -2346,33 +2365,49 @@ export async function streamBuiltinAgentChatFromMessages(
     { role: 'user' as const, content: user },
   ]
   if (vendor === 'qwen') {
-    const model = qwenChatModelId(eff)
-    for await (const d of openAiCompatChatStream({
-      url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-      apiKey: key,
-      model,
-      messages: oaiMessages,
-      temperature: 0.65,
-      signal,
-    })) {
-      if (d.reasoning || d.content) onDelta(d)
+    const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+    let lastErr: Error | null = null
+    for (const model of qwenChatModelCandidates(eff)) {
+      try {
+        for await (const d of openAiCompatChatStream({
+          url,
+          apiKey: key,
+          model,
+          messages: oaiMessages,
+          temperature: 0.65,
+          signal,
+        })) {
+          if (d.reasoning || d.content) onDelta(d)
+        }
+        return { modelUsed: model }
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e))
+        if (!isArkQuotaHopableError(lastErr.message)) throw lastErr
+      }
     }
-    return { modelUsed: model }
+    throw lastErr ?? new Error('通义千问流式对话失败（同类模型额度已用尽）')
   }
   const url = `${doubaoArkApiV3Root(eff)}/chat/completions`
-  const mid = doubaoChatModelCandidates(eff)[0]
-  if (!mid) throw new Error('豆包流式对话失败：未配置模型')
-  for await (const d of openAiCompatChatStream({
-    url,
-    apiKey: key,
-    model: mid,
-    messages: oaiMessages,
-    temperature: 0.65,
-    signal,
-  })) {
-    if (d.reasoning || d.content) onDelta(d)
+  let lastDoubaoErr: Error | null = null
+  for (const mid of doubaoChatModelCandidates(eff)) {
+    try {
+      for await (const d of openAiCompatChatStream({
+        url,
+        apiKey: key,
+        model: mid,
+        messages: oaiMessages,
+        temperature: 0.65,
+        signal,
+      })) {
+        if (d.reasoning || d.content) onDelta(d)
+      }
+      return { modelUsed: mid }
+    } catch (e) {
+      lastDoubaoErr = e instanceof Error ? e : new Error(String(e))
+      if (!isArkQuotaHopableError(lastDoubaoErr.message)) throw lastDoubaoErr
+    }
   }
-  return { modelUsed: mid }
+  throw lastDoubaoErr ?? new Error('豆包流式对话失败：未配置可用模型')
 }
 
 export async function merchantAgentChatFromMessages(
@@ -2397,7 +2432,10 @@ export async function merchantAgentChatFromMessages(
         ? { ...envM, MERCHANT_AI_DOUBAO_CHAT_MODEL: mo }
         : { ...envM, MERCHANT_AI_QWEN_CHAT_MODEL: mo }
   }
-  const raw = await callModelText(vendor, key, eff, system, user)
-  const modelUsed = vendor === 'doubao' ? doubaoChatModelId(eff) : qwenChatModelId(eff)
-  return { text: polishVisibleAssistantText(raw), modelUsed }
+  if (vendor === 'doubao') {
+    const { text, modelUsed } = await callDoubaoChat(key, eff, system, user)
+    return { text: polishVisibleAssistantText(text), modelUsed }
+  }
+  const { text, modelUsed } = await callQwenChat(key, eff, system, user)
+  return { text: polishVisibleAssistantText(text), modelUsed }
 }

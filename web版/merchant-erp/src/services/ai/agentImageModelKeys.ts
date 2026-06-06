@@ -1,7 +1,8 @@
 import type { AIModelFamily } from './types'
 import { detectImageGenerationIntent } from './aiImageIntentRouting.js'
-import { parseAiModelPickerKey } from './modelRegistry.js'
+import { parseAiModelPickerKey, parseVendorTierAutoFromKey } from './modelRegistry.js'
 import { normalizeAiModelFamily } from './tokenmixClient.js'
+import { vendorTierAutoPickerKey } from '../../lib/vendorModelPool.js'
 
 /**
  * 智能体模型下拉：文生图专用 key（`img::…`）。
@@ -10,12 +11,22 @@ import { normalizeAiModelFamily } from './tokenmixClient.js'
  */
 export type ParsedAgentImagePicker =
   | { kind: 'vendor'; vendor: 'qwen' | 'doubao' | 'minimax' | 'auto' }
+  | { kind: 'vendor-model'; vendor: 'qwen' | 'doubao'; modelId: string }
   | { kind: 'style'; family: AIModelFamily; modelId: string }
   | { kind: 'brand-direct'; slug: 'kimi' | 'deepseek' }
 
 export function parseAgentImagePickerKey(key: string): ParsedAgentImagePicker | null {
+  const tierAuto = parseVendorTierAutoFromKey(key)
+  if (tierAuto && (tierAuto.tier === 'image_text' || tierAuto.tier === 'vision')) {
+    return { kind: 'vendor', vendor: tierAuto.vendor }
+  }
   const parts = key.split('::')
   if (parts[0] !== 'img' || parts.length < 3) return null
+  if (parts[1] === 'qwen' || parts[1] === 'doubao') {
+    const modelId = parts.slice(2).join('::')
+    if (!modelId) return null
+    return { kind: 'vendor-model', vendor: parts[1], modelId }
+  }
   if (parts[1] === 'v') {
     const v = parts[2]
     if (v === 'qwen' || v === 'doubao' || v === 'minimax' || v === 'auto') return { kind: 'vendor', vendor: v }
@@ -39,12 +50,15 @@ export function isAgentImagePickerKey(key: string): boolean {
 
 /** 内置生图路由（万相/豆包/MiniMax）或 TokenMix 图像模型 */
 export type AgentNativeImageRoute =
-  | { route: 'builtin'; preferredVendor?: 'qwen' | 'doubao' | 'minimax' }
+  | { route: 'builtin'; preferredVendor?: 'qwen' | 'doubao' | 'minimax'; preferredModelId?: string }
   | { route: 'tokenmix'; tokenmixImageModel: string }
 
 export function agentNativeImageRouteFromPickerKey(key: string): AgentNativeImageRoute {
   const p = parseAgentImagePickerKey(key)
   if (p?.kind === 'style') return { route: 'tokenmix', tokenmixImageModel: p.modelId }
+  if (p?.kind === 'vendor-model') {
+    return { route: 'builtin', preferredVendor: p.vendor, preferredModelId: p.modelId }
+  }
   if (p?.kind === 'vendor') {
     if (p.vendor === 'auto') return { route: 'builtin' }
     return { route: 'builtin', preferredVendor: p.vendor }
@@ -90,12 +104,16 @@ export function imagePickerKeyForChatSelection(
     return auto?.key ?? 'img::v::auto'
   }
   if (parsed.provider === 'doubao') {
-    const k = 'img::v::doubao'
-    return options.some((o) => o.key === k) ? k : 'img::v::auto'
+    const k = vendorTierAutoPickerKey('doubao', 'image_text')
+    if (options.some((o) => o.key === k)) return k
+    const legacy = 'img::v::doubao'
+    return options.some((o) => o.key === legacy) ? legacy : 'img::v::auto'
   }
   if (parsed.provider === 'qwen') {
-    const k = 'img::v::qwen'
-    return options.some((o) => o.key === k) ? k : 'img::v::auto'
+    const k = vendorTierAutoPickerKey('qwen', 'image_text')
+    if (options.some((o) => o.key === k)) return k
+    const legacy = 'img::v::qwen'
+    return options.some((o) => o.key === legacy) ? legacy : 'img::v::auto'
   }
   if (parsed.provider === 'minimax') {
     const k = 'img::v::minimax'

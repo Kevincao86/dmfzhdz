@@ -5,6 +5,7 @@ export type MeooAgentImageRequestInput = {
   prompt: string
   referenceImage?: string
   preferredVendor?: 'qwen' | 'doubao' | 'minimax'
+  preferredModelId?: string
   imageRoute: 'builtin' | 'tokenmix'
   tokenmixImageModel?: string
 }
@@ -31,7 +32,7 @@ export async function runMeooAgentImageRequest(
   env: Record<string, string>,
   input: MeooAgentImageRequestInput,
 ): Promise<MeooAgentImageResult> {
-  const { prompt, referenceImage, preferredVendor, imageRoute, tokenmixImageModel } = input
+  const { prompt, referenceImage, preferredVendor, preferredModelId, imageRoute, tokenmixImageModel } = input
   const tm = (tokenmixImageModel ?? '').trim()
 
   if (imageRoute === 'tokenmix' && tm && !referenceImage) {
@@ -40,7 +41,10 @@ export async function runMeooAgentImageRequest(
       return { ok: true, imageUrl, channel: 'tokenmix', displayModel: modelUsed }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, { referenceImage })
+      const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, {
+        referenceImage,
+        preferredModelId,
+      })
       if (out.ok) {
         return {
           ok: true,
@@ -54,7 +58,10 @@ export async function runMeooAgentImageRequest(
     }
   }
 
-  const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, { referenceImage })
+  const out = await runAgentFreeformTextToImage(env, prompt, preferredVendor, {
+    referenceImage,
+    preferredModelId,
+  })
   if (!out.ok) return { ok: false, message: out.message }
   const extra: { fallbackNote?: string } = {}
   if (imageRoute === 'tokenmix' && tm && referenceImage) {
