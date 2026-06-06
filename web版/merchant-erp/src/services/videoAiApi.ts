@@ -50,8 +50,15 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
   return { ...body }
 }
 
+/** 视频生成耗时长，仅走 erp-api 单跳，避免 cs 同源 /api 双跳 pending */
+function videoApiFetchUrls(pathWithQuery: string): string[] {
+  const all = merchantApiFetchUrls(pathWithQuery)
+  const erpOnly = all.filter((u) => /\/erp-api\//i.test(u))
+  return erpOnly.length ? erpOnly : all
+}
+
 async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
-  for (const url of merchantApiFetchUrls(pathWithQuery)) {
+  for (const url of videoApiFetchUrls(pathWithQuery)) {
     try {
       const res = await fetch(url)
       const text = await res.text()
@@ -72,7 +79,7 @@ async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
 
 async function fetchVideoPost(path: string, body: Record<string, unknown>): Promise<Response | null> {
   const bodyStr = JSON.stringify(body)
-  for (const url of merchantApiFetchUrls(path)) {
+  for (const url of videoApiFetchUrls(path)) {
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -99,7 +106,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
   const paths = ['/api/meoo-merchant-ai-video-config', '/api/merchant/ai/video/config'] as const
   let lastNetworkErr = ''
   for (const p of paths) {
-    for (const url of merchantApiFetchUrls(p)) {
+    for (const url of videoApiFetchUrls(p)) {
       try {
         const res = await fetch(url)
         const text = await res.text()

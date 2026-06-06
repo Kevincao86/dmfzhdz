@@ -192,6 +192,12 @@ export async function renderDigitalHumanMp4(
   }
 
   const cfg = await fetchVideoAiConfig()
+  if (cfg?.configLoadError) {
+    return {
+      ok: false,
+      message: `视频 AI 配置拉取失败：${cfg.configLoadError}。请确认 /erp-api/meoo-merchant-ai-video-config 可达后重试。`,
+    }
+  }
   const engine = pickEngine(cfg)
   if (!engine) {
     return {

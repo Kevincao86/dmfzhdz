@@ -52,6 +52,7 @@ import {
 } from '../lib/digitalHumanVideoRender'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
+import { fetchVideoAiConfig } from '../services/videoAiApi'
 
 type MainTab = 'create' | 'works'
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -399,7 +400,17 @@ export default function DigitalHumanBroadcastPage() {
     return true
   }
 
-  const submitRender = () => {
+  const submitRender = async () => {
+    const cfg = await fetchVideoAiConfig()
+    if (cfg?.configLoadError) {
+      setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
+      return
+    }
+    if (!cfg?.arkKeyConfigured && !cfg?.klingConfigured) {
+      setToast('未配置视频生成：请在运营台绑定豆包（方舟 Seedance）或可灵 API 后重试')
+      return
+    }
+
     const id = `dh-${Date.now()}`
     const row: DigitalHumanWork = {
       id,
@@ -1189,8 +1200,18 @@ export default function DigitalHumanBroadcastPage() {
                             ? '渲染中'
                             : activeJob.status === 'completed'
                               ? '已完成'
-                              : activeJob.status}
+                              : activeJob.status === 'failed'
+                                ? '失败'
+                                : activeJob.status}
                       </p>
+                      {activeJob.status === 'failed' && activeJob.errorMessage ? (
+                        <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-800">
+                          {activeJob.errorMessage}
+                        </p>
+                      ) : null}
+                      {activeJob.previewNote && activeJob.status === 'completed' ? (
+                        <p className="mt-2 text-xs text-emerald-700">{activeJob.previewNote}</p>
+                      ) : null}
                       <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-200">
                         <div
                           className="h-full bg-violet-600 transition-all"
@@ -1420,19 +1441,26 @@ function WorksPanel({
                 <tr key={w.id} className="border-b border-slate-50">
                   <td className="py-3 pr-4 font-medium text-slate-900">{w.title}</td>
                   <td className="py-3 pr-4">
-                    <span
-                      className={cn(
-                        'rounded-full px-2 py-0.5 text-xs',
-                        w.status === 'completed'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : w.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-slate-100 text-slate-700',
-                      )}
-                    >
-                      {statusLabel[w.status]}
-                      {w.status === 'rendering' || w.status === 'queued' ? ` ${w.progress}%` : ''}
-                    </span>
+                    <div>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs',
+                          w.status === 'completed'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : w.status === 'failed'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-slate-100 text-slate-700',
+                        )}
+                      >
+                        {statusLabel[w.status]}
+                        {w.status === 'rendering' || w.status === 'queued' ? ` ${w.progress}%` : ''}
+                      </span>
+                      {w.status === 'failed' && w.errorMessage ? (
+                        <p className="mt-1 max-w-md text-xs leading-relaxed text-red-700">
+                          {w.errorMessage}
+                        </p>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="py-3 pr-4 text-slate-500">
                     {new Date(w.createdAt).toLocaleString('zh-CN')}
