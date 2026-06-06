@@ -5,6 +5,7 @@
       <image class="chat-nav-avatar" src="{{peerAvatar || '/images/logo.png'}}" mode="aspectFill" />
       <view class="chat-nav-meta">
         <text class="chat-nav-name">{{peerName}}</text>
+        <text class="chat-nav-id" wx:if="{{peerId}}">{{peerId}}</text>
         <text class="chat-nav-sub">{{statusSub}}</text>
       </view>
     </view>

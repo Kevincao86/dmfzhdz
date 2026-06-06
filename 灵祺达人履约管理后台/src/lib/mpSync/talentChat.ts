@@ -13,7 +13,10 @@ import { fetchMpRegistry } from '../mpApi'
 import {
   canonicalTalentMemberIdFromRegistry,
   collectTalentChatKeyCandidates,
+  dedupePrTalentSessions,
   participantForSession,
+  resolvePrDisplayId,
+  resolveTalentDisplayId,
   sessionAuthKeyForMe,
   talentChatIdentityPayload,
   talentChatParticipantForKey,
@@ -128,7 +131,16 @@ export async function listSessions(part?: ChatParticipant, reg?: Parameters<type
 /** 达人端：按多个历史 participant_key 尝试拉取会话（修复 PR 用 TL/LQ id 建会话） */
 export async function listSessionsForMe(part?: ChatParticipant) {
   const base = part || getCurrentParticipant()
-  if (base.role === 'pr') return listSessions(base)
+  if (base.role === 'pr') {
+    let reg: Parameters<typeof dedupePrTalentSessions>[1] = null
+    try {
+      reg = (await fetchMpRegistry()) as Parameters<typeof dedupePrTalentSessions>[1]
+    } catch {
+      /* 无 registry 时按 talent_key 去重 */
+    }
+    const rows = await listSessions(base, reg)
+    return dedupePrTalentSessions(rows, reg)
+  }
 
   let reg: Parameters<typeof collectTalentChatKeyCandidates>[0] = null
   try {
@@ -370,8 +382,18 @@ export function sessionPreviewTime(ts: number) {
   return formatTime(ts)
 }
 
-export function sessionPeerFromRow(session: ChatSession, myKey: string) {
-  return peerDisplay(session, myKey)
+export function sessionPeerFromRow(
+  session: ChatSession,
+  myKey: string,
+  reg?: Parameters<typeof resolveTalentDisplayId>[0],
+) {
+  const iAmTalent = session.talent_key === myKey
+  const talentKey = String(session.talent_key || '')
+  const prKey = String(session.pr_key || '')
+  return peerDisplay(session, myKey, {
+    talentPeerId: iAmTalent ? '' : resolveTalentDisplayId(reg || null, talentKey),
+    prPeerId: iAmTalent ? resolvePrDisplayId(prKey) : '',
+  })
 }
 
 /** 轮流回复：上一条是自己发的则暂不可再发 */

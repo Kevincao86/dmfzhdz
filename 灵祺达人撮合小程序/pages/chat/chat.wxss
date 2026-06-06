@@ -47,6 +47,13 @@
   color: #111;
 }
 
+.chat-nav-id {
+  display: block;
+  font-size: 20rpx;
+  color: #9ca3af;
+  margin-top: 2rpx;
+}
+
 .chat-nav-sub {
   display: block;
   margin-top: 4rpx;

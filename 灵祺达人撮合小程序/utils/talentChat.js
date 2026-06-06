@@ -105,9 +105,28 @@ async function listSessions(part, reg) {
   return data.sessions || []
 }
 
+function sessionPeerFromRow(session, myKey, reg) {
+  const iAmTalent = session.talent_key === myKey
+  const talentKey = String((session && session.talent_key) || '')
+  const prKey = String((session && session.pr_key) || '')
+  return participant.peerDisplay(session, myKey, {
+    talentPeerId: iAmTalent ? '' : chatKeys.resolveTalentDisplayId(reg || null, talentKey),
+    prPeerId: iAmTalent ? chatKeys.resolvePrDisplayId(prKey) : '',
+  })
+}
+
 async function listSessionsForMe(part) {
   const base = part || participant.getCurrentParticipant()
-  if (base.role === 'pr') return listSessions(base)
+  if (base.role === 'pr') {
+    let reg = null
+    try {
+      reg = await opsRegistry.fetchRegistry()
+    } catch (_) {
+      /* */
+    }
+    const rows = await listSessions(base, reg)
+    return chatKeys.dedupePrTalentSessions(rows, reg)
+  }
 
   let reg = null
   try {
@@ -442,6 +461,7 @@ module.exports = {
   syncProfile,
   listSessions,
   listSessionsForMe,
+  sessionPeerFromRow,
   participantForSession: chatKeys.participantForSession,
   sessionAuthKeyForMe: chatKeys.sessionAuthKeyForMe,
   listMutualTalentKeysForPr,

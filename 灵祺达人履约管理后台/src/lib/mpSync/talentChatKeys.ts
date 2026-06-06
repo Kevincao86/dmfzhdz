@@ -151,3 +151,70 @@ export function talentChatParticipantForKey(
     deviceSecret: bootstrapTalentSecret(participantKey),
   }
 }
+
+export function participantIdFromKey(participantKey: string): string {
+  return String(participantKey || '')
+    .replace(/^talent_/, '')
+    .replace(/^pr_/, '')
+    .trim()
+}
+
+/** 同一达人在 registry 中的归并键（用于 PR 会话去重） */
+export function talentSessionGroupKey(reg: RegistryLike, talentKey: string): string {
+  const raw = participantIdFromKey(talentKey)
+  if (!raw) return talentKey
+  const canonMtm = canonicalTalentMemberIdFromRegistry(reg, raw)
+  const members = Array.isArray(reg?.mpTalentMembers) ? reg!.mpTalentMembers! : []
+  for (const m of members) {
+    const mem = m as Record<string, unknown>
+    const mid = String(mem.id || '').trim()
+    const mlq = String(mem.lingqiTalentId || '').trim()
+    if (mid && (mid === canonMtm || mid === raw || mlq === raw)) {
+      return mlq || mid
+    }
+  }
+  return canonMtm || raw
+}
+
+/** PR 侧：同一达人因历史 talent_key 不同产生的重复会话，保留最近一条 */
+export function dedupePrTalentSessions<T extends { talent_key?: unknown; last_ts?: unknown }>(
+  sessions: T[],
+  reg?: RegistryLike,
+): T[] {
+  const byGroup = new Map<string, T>()
+  for (const s of sessions) {
+    const tk = String(s.talent_key || '')
+    const group = talentSessionGroupKey(reg || null, tk)
+    const prev = byGroup.get(group)
+    if (!prev || Number(s.last_ts || 0) > Number(prev.last_ts || 0)) {
+      byGroup.set(group, s)
+    }
+  }
+  return [...byGroup.values()].sort(
+    (a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0),
+  )
+}
+
+/** 从 talent_key 解析展示用 ID（优先灵祺达人 ID） */
+export function resolveTalentDisplayId(reg: RegistryLike, talentKey: string): string {
+  const raw = participantIdFromKey(talentKey)
+  if (!raw) return ''
+  const canonMtm = canonicalTalentMemberIdFromRegistry(reg, raw)
+  const members = Array.isArray(reg?.mpTalentMembers) ? reg!.mpTalentMembers! : []
+  for (const m of members) {
+    const mem = m as Record<string, unknown>
+    const mid = String(mem.id || '').trim()
+    const mlq = String(mem.lingqiTalentId || '').trim()
+    if (mid && (mid === canonMtm || mid === raw || mlq === raw) && mlq) return mlq
+  }
+  if (/^LQ-D-/i.test(raw)) return raw.toUpperCase()
+  return canonMtm || raw
+}
+
+export function resolvePrDisplayId(prKey: string): string {
+  const raw = participantIdFromKey(prKey)
+  if (/^LQ-P-/i.test(raw)) return raw.toUpperCase()
+  const phone = raw.replace(/\D/g, '')
+  if (phone.length >= 11) return phone.slice(-11)
+  return raw
+}

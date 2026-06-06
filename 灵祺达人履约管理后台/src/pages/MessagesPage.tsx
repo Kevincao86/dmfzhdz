@@ -45,16 +45,17 @@ export default function MessagesPage() {
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionsErr, setSessionsErr] = useState('')
   const [activeSessionId, setActiveSessionId] = useState('')
+  const [registryForChat, setRegistryForChat] = useState<Record<string, unknown> | null>(null)
 
   const activeSession = useMemo(
     () => sessions.find((s) => String(s.id) === activeSessionId) || null,
     [sessions, activeSessionId],
   )
   const activePeer = useMemo(() => {
-    if (!activeSession) return { name: '会话', avatar: '' }
+    if (!activeSession) return { name: '会话', avatar: '', peerId: '' }
     const authKey = sessionAuthKeyForMe(activeSession, me)
-    return sessionPeerFromRow(activeSession, authKey)
-  }, [activeSession, me])
+    return sessionPeerFromRow(activeSession, authKey, registryForChat)
+  }, [activeSession, me, registryForChat])
 
   const refreshSessions = useCallback(async () => {
     if (!canChat()) {
@@ -66,6 +67,13 @@ export default function MessagesPage() {
     setSessionsErr('')
     try {
       await syncProfile()
+      let reg: Record<string, unknown> | null = null
+      try {
+        reg = (await fetchMpRegistry()) as Record<string, unknown>
+        setRegistryForChat(reg)
+      } catch {
+        reg = registryForChat
+      }
       const list = await listSessionsForMe()
       const sorted = [...list].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
       setSessions(sorted)
@@ -177,7 +185,7 @@ export default function MessagesPage() {
               ) : null}
               {sessions.map((s) => {
                 const authKey = sessionAuthKeyForMe(s, me)
-                const peer = sessionPeerFromRow(s, authKey)
+                const peer = sessionPeerFromRow(s, authKey, registryForChat)
                 const unreadN = unreadForMe(s, authKey)
                 const sid = String(s.id)
                 const active = sid === activeSessionId
@@ -204,6 +212,9 @@ export default function MessagesPage() {
                           {sessionPreviewTime(Number(s.last_ts || 0))}
                         </span>
                       </div>
+                      {peer.peerId ? (
+                        <p className="text-[10px] text-[#9ca3af] truncate">{peer.peerId}</p>
+                      ) : null}
                       <p className="text-xs text-[#888] truncate mt-0.5">{String(s.last_text || '')}</p>
                     </div>
                     {unreadN > 0 ? (
@@ -223,6 +234,7 @@ export default function MessagesPage() {
                 sessionId={activeSessionId}
                 peerName={activePeer.name}
                 peerAvatar={activePeer.avatar}
+                peerId={activePeer.peerId}
                 sessionRow={
                   activeSession
                     ? {

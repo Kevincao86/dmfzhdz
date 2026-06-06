@@ -19,10 +19,11 @@ type Props = {
   sessionId: string
   peerName: string
   peerAvatar: string
+  peerId?: string
   sessionRow?: { talent_key?: string; pr_key?: string }
 }
 
-export default function ChatPanel({ sessionId, peerName, peerAvatar, sessionRow }: Props) {
+export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, sessionRow }: Props) {
   const [messages, setMessages] = useState<UiChatMessage[]>([])
   const [input, setInput] = useState('')
   const [ready, setReady] = useState(false)
@@ -145,6 +146,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, sessionRow 
         )}
         <div className="min-w-0">
           <p className="font-medium text-[#191919] truncate">{peerName}</p>
+          {peerId ? <p className="text-[10px] text-[#9ca3af] truncate">{peerId}</p> : null}
           <p className="text-xs text-[#888] truncate">{statusSub}</p>
         </div>
       </header>
