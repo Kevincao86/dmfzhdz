@@ -265,7 +265,7 @@ export async function fetchAliyunIceCloudConfig(): Promise<AliyunIceCloudConfig 
 }
 
 export type IceUploadInitResult =
-  | { ok: true; uploadUrl: string; contentType: string; mediaUrl: string; objectKey?: string }
+  | { ok: true; uploadUrl: string; contentType: string; mediaUrl: string; timelineUrl?: string; objectKey?: string }
   | { ok: false; message: string }
 
 export async function postIceUploadInit(body: {
@@ -398,7 +398,7 @@ async function postJsonPathsServer<T extends { ok: boolean; message?: string }>(
 async function uploadIceViaServer(
   file: File,
   onProgress?: (p: IceUploadProgress) => void,
-): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+): Promise<{ ok: true; mediaUrl: string; timelineUrl?: string; label: string } | { ok: false; message: string }> {
   const contentType = defaultContentType(file)
   const label = file.name.replace(/\.[^.]+$/, '') || file.name
   const report = (percent: number, phase: IceUploadProgress['phase'] = 'server') => {
@@ -419,6 +419,7 @@ async function uploadIceViaServer(
     const r = await postJsonPathsServer<{
       ok: true
       mediaUrl: string
+      timelineUrl?: string
       label?: string
     }>(
       UPLOAD_SERVER_PATHS,
@@ -432,7 +433,7 @@ async function uploadIceViaServer(
     )
     if (!r.ok) return r
     report(100)
-    return { ok: true, mediaUrl: r.mediaUrl, label: r.label ?? label }
+    return { ok: true, mediaUrl: r.mediaUrl, timelineUrl: r.timelineUrl, label: r.label ?? label }
   }
 
   const init = await postJsonPathsServer<{
@@ -480,6 +481,7 @@ async function uploadIceViaServer(
   const done = await postJsonPathsServer<{
     ok: true
     mediaUrl: string
+    timelineUrl?: string
     label?: string
   }>(UPLOAD_MULTIPART_PATHS, {
     step: 'complete',
@@ -490,7 +492,7 @@ async function uploadIceViaServer(
   })
   if (!done.ok) return done
   report(100)
-  return { ok: true, mediaUrl: done.mediaUrl, label: done.label ?? label }
+  return { ok: true, mediaUrl: done.mediaUrl, timelineUrl: done.timelineUrl, label: done.label ?? label }
 }
 
 function defaultContentType(file: File): string {
@@ -577,7 +579,9 @@ function isIceImageUploadFile(file: File): boolean {
 export async function uploadIceLocalMediaFile(
   file: File,
   opts?: { onProgress?: (p: IceUploadProgress) => void },
-): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+): Promise<
+  { ok: true; mediaUrl: string; timelineUrl?: string; label: string } | { ok: false; message: string }
+> {
   if (isIceImageUploadFile(file)) {
     opts?.onProgress?.({ loaded: 0, total: file.size, percent: 10, phase: 'server' })
     return uploadIceViaServer(file, opts?.onProgress)

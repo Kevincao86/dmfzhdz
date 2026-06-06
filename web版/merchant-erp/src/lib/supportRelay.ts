@@ -46,6 +46,21 @@ export function getSupportRelayWsUrl(): string | null {
   return `ws://127.0.0.1:5173${DEV_ONLINE_PATH}`
 }
 
+/** 生产 ECS 未部署 Supabase Realtime 反代时，仅用 REST 轮询，避免 wss 反复失败 */
+export function isSupportRelayPollOnly(): boolean {
+  const flag = import.meta.env.VITE_SUPPORT_RELAY_POLL_ONLY
+  if (flag === '1' || flag === 'true') return true
+  if (flag === '0' || flag === 'false') return false
+  if (getSupportRelayWsUrl()) return false
+  if (typeof window === 'undefined') return false
+  const host = window.location.hostname.toLowerCase()
+  return (
+    host === 'mofangdianai.com' ||
+    host === 'cs.mofangdianai.com' ||
+    host === 'dr.mofangdianai.com'
+  )
+}
+
 function randomSid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
   return `sid_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`

@@ -83,8 +83,15 @@ function isVideoFile(file: File): boolean {
 type IceImageItem = {
   id: string
   label: string
+  /** 带签名，用于预览 */
   mediaUrl: string
+  /** 无签名 OSS 直链，提交 ICE 合成用 */
+  pipelineUrl?: string
   previewUrl?: string
+}
+
+function icePipelineImageUrl(item: IceImageItem): string {
+  return item.pipelineUrl?.trim() || item.mediaUrl
 }
 
 function formatProgress(p?: number): string {
@@ -353,6 +360,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               id: newJobId(),
               label: r.label.slice(0, 32),
               mediaUrl: r.mediaUrl,
+              pipelineUrl: r.timelineUrl,
               previewUrl: r.mediaUrl,
             },
           ])
@@ -417,7 +425,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const runAiEditBrief = useCallback(async () => {
     if (!canAiBrief) return
-    const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
     const videoUrls = jobs
       .filter((j) => !j.imageUrls?.length)
       .map((j) => j.mediaUrl)
@@ -574,7 +582,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请先上传或粘贴至少一张图片')
       return
     }
-    const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
     const badUrl = imageUrls.find((u) => /localhost|127\.0\.0\.1|blob:/i.test(u))
     if (badUrl) {
       setErr('图片须为公网可访问地址，请使用「本地上传」写入 OSS 后再成片')
@@ -687,7 +695,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     const pending = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
-    const imageUrls = imageItems.map((x) => x.mediaUrl)
+    const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
     const badUrl = imageUrls.find((u) => /localhost|127\.0\.0\.1|blob:/i.test(u))
     if (badUrl) {
       setErr('图片须为公网可访问地址，请使用「本地上传」写入 OSS 后再批量剪辑')

@@ -384,7 +384,7 @@ export async function completeIceMultipartUpload(
     uploadId: string
     parts: { partNumber: number; etag: string }[]
   },
-): Promise<{ ok: true; mediaUrl: string; objectKey: string } | { ok: false; message: string }> {
+): Promise<{ ok: true; mediaUrl: string; objectKey: string; timelineUrl: string } | { ok: false; message: string }> {
   const ossPrefix = resolveIceOssUploadPrefix(cfg, env)
   if (!ossPrefix) {
     return { ok: false, message: '未配置 OSS 前缀' }
@@ -407,7 +407,8 @@ export async function completeIceMultipartUpload(
     const mediaUrl = ensureIceHttpsUrl(
       client.signatureUrl(input.objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
     )
-    return { ok: true, mediaUrl, objectKey: input.objectKey }
+    const timelineUrl = buildIceCanonicalOssUrl(ossPrefix, input.objectKey)
+    return { ok: true, mediaUrl, objectKey: input.objectKey, timelineUrl }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `OSS 合并分片失败：${msg}` }

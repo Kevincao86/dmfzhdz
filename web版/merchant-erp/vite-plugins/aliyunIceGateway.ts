@@ -216,6 +216,7 @@ export async function handleAliyunIceRoutes(input: {
     json(res, 200, {
       ok: true,
       mediaUrl: put.mediaUrl,
+      timelineUrl: put.timelineUrl,
       objectKey: put.objectKey,
       label: fileName.replace(/\.[^.]+$/, '') || fileName,
     })
@@ -319,6 +320,7 @@ export async function handleAliyunIceRoutes(input: {
       json(res, 200, {
         ok: true,
         mediaUrl: done.mediaUrl,
+        timelineUrl: done.timelineUrl,
         objectKey: done.objectKey,
         label: fileName.replace(/\.[^.]+$/, '') || fileName,
       })
