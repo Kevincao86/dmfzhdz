@@ -1,6 +1,12 @@
 /** 阿里云 ICE 云剪辑 — 经商户 BFF 代理（生产优先 ECS /erp-api 读运营台 videoAi） */
 
-import { merchantApiFetchUrls, merchantErpApiCandidates, merchantErpApiBase, buildMerchantErpApiUrl } from '../lib/merchantErpApiBase'
+import {
+  merchantApiFetchUrls,
+  merchantBinaryApiFetchUrls,
+  merchantErpApiCandidates,
+  merchantErpApiBase,
+  buildMerchantErpApiUrl,
+} from '../lib/merchantErpApiBase'
 import { guessUploadImageMime, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
 
 export type AliyunIceCloudConfig = {
@@ -49,7 +55,7 @@ export function iceJobDownloadProxyPaths(jobId: string, inline = false): string[
   ]
   const urls: string[] = []
   for (const p of paths) {
-    for (const u of merchantApiFetchUrls(p)) {
+    for (const u of merchantBinaryApiFetchUrls(p)) {
       if (!urls.includes(u)) urls.push(u)
     }
   }
@@ -79,7 +85,7 @@ export async function downloadIceExportFile(jobId: string, label: string): Promi
       if (!res.ok) {
         const j = ct.includes('json') ? await parseJson<{ message?: string }>(res) : null
         lastErr = j?.message ?? `下载失败 HTTP ${res.status}`
-        if (res.status === 404) continue
+        if (res.status === 404 || res.status === 500 || res.status === 502) continue
         throw new Error(lastErr)
       }
       if (ct.includes('json') || ct.includes('text/html')) {
@@ -683,7 +689,7 @@ export async function fetchIceExportPreviewUrl(jobId: string): Promise<string> {
   ]
   const urls: string[] = []
   for (const p of paths) {
-    for (const u of merchantApiFetchUrls(p)) {
+    for (const u of merchantBinaryApiFetchUrls(p)) {
       if (!urls.includes(u)) urls.push(u)
     }
   }
@@ -699,9 +705,11 @@ export async function fetchIceExportPreviewUrl(jobId: string): Promise<string> {
         if (res.status === 409) {
           throw new Error(`${detail}（成片尚未写入完成，请稍后重试）`)
         }
+        if (i < urls.length - 1 && (res.status === 500 || res.status === 502)) continue
         throw new Error(detail)
       }
       if (ct.includes('json') || ct.includes('text/html')) {
+        if (i < urls.length - 1) continue
         throw new Error('预览接口返回了非视频内容，请确认已部署最新版云剪下载 API')
       }
       const blob = await res.blob()

@@ -1,3 +1,9 @@
+import {
+  catalogToPickerOptions,
+  DOUBAO_CHAT_CATALOG,
+  DOUBAO_IMAGE_CATALOG,
+} from '../../lib/arkModelCatalog.js'
+import { QWEN_IMAGE_CATALOG, QWEN_VIDEO_CATALOG } from '../../lib/qwenVisionCatalog.js'
 import type { MembershipPlan } from '../../lib/membershipPlan.js'
 import { membershipAllowsTokenMix } from '../../lib/membershipPlan.js'
 import type { AIProvider, AIModelFamily } from './types'
@@ -203,22 +209,38 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     key: 'img::v::qwen',
     provider: 'qwen',
     model: 'wanx',
-    label: '通义千问 · 文生图（万相 · 首选通义）',
+    label: '通义千问 · 文生图（视觉 · 自动切换同型）',
     capability: 'image',
   })
+  for (const m of catalogToPickerOptions(QWEN_IMAGE_CATALOG, 'image')) {
+    out.push({
+      key: `img::qwen::${m.id}`,
+      provider: 'qwen',
+      model: m.id,
+      label: `通义千问 · ${m.label}`,
+      capability: 'image',
+    })
+  }
+  for (const m of catalogToPickerOptions(QWEN_VIDEO_CATALOG, 'video')) {
+    out.push({
+      key: `vid::qwen::${m.id}`,
+      provider: 'qwen',
+      model: m.id,
+      label: `通义千问 · ${m.label}（视频）`,
+      capability: 'image',
+    })
+  }
 
-  const doubaoModels = [
-    { id: 'doubao-seed-character-251128', label: 'Doubao-Seed-Character' },
-    { id: 'doubao-pro-32k', label: 'doubao-pro-32k（旧版，建议 ep）' },
-  ] as const
+  const doubaoChatFromCatalog = catalogToPickerOptions(DOUBAO_CHAT_CATALOG, 'chat')
+  const doubaoImageFromCatalog = catalogToPickerOptions(DOUBAO_IMAGE_CATALOG, 'image')
   out.push({
     key: 'doubao::__default__',
     provider: 'doubao',
     model: '',
-    label: '豆包 · 默认',
+    label: '豆包 · 默认（额度超限自动切换同型模型）',
     capability: 'chat',
   })
-  for (const m of doubaoModels) {
+  for (const m of doubaoChatFromCatalog) {
     out.push({
       key: `doubao::${m.id}`,
       provider: 'doubao',
@@ -231,9 +253,18 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     key: 'img::v::doubao',
     provider: 'doubao',
     model: 'seedream',
-    label: '豆包 · 文生图（Seedream · 首选豆包）',
+    label: '豆包 · 文生图（Seedream · 自动切换同型）',
     capability: 'image',
   })
+  for (const m of doubaoImageFromCatalog) {
+    out.push({
+      key: `img::doubao::${m.id}`,
+      provider: 'doubao',
+      model: m.id,
+      label: `豆包 · ${m.label}`,
+      capability: 'image',
+    })
+  }
 
   out.push({
     key: 'img::v::auto',

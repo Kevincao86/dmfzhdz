@@ -10,9 +10,18 @@ import crypto from 'node:crypto'
 import { applyRegistryVendorKeysToMerchantEnv } from './merchantRegistryVendorEnv.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
+  DOUBAO_VIDEO_CATALOG,
+  isArkQuotaHopableError,
+  isQwenVideoTaskId,
+  mergeCatalogModelIds,
+  stripQwenVideoTaskPrefix,
+  wrapQwenVideoTaskId,
+} from '../src/lib/arkModelCatalog.js'
+import { qwenVideoModelCandidates } from '../src/lib/qwenVisionCatalog.js'
+import { buildQwenVisionVideoRequest } from '../src/lib/qwenVisionApi.js'
+import {
   DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   describeArkVideoSetupIssue,
-  isArkVideoEndpointId,
   isDoubaoSeedanceModelId,
   listValidArkVideoModels,
   looksLikeArkPlaceholderEndpointId,
@@ -187,6 +196,171 @@ function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
   ).trim()
   const fb = String((env as Record<string, string>).MERCHANT_AI_ARK_VIDEO_FALLBACK_ENDPOINT ?? '').trim()
   return listValidArkVideoModels(raw, fb, seedanceVideoModelFromEnv(env))
+}
+
+function qwenBearerKey(env: MerchantAiEnv): string | null {
+  const t = (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
+  return t || null
+}
+
+function detectVideoInputMode(body: Record<string, unknown>): 't2v' | 'i2v' {
+  const images = body.images_base64
+  if (Array.isArray(images)) {
+    for (const row of images) {
+      if (typeof row === 'string' && row.trim()) return 'i2v'
+    }
+  }
+  if (Array.isArray(body.content)) {
+    for (const row of body.content) {
+      if (row && typeof row === 'object' && String((row as { type?: unknown }).type) === 'image_url') {
+        return 'i2v'
+      }
+    }
+  }
+  return 't2v'
+}
+
+function arkVideoModelCandidates(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  preferred?: string,
+): string[] {
+  const mode = detectVideoInputMode(body)
+  const envRaw = (
+    env.MERCHANT_AI_ARK_VIDEO_ENDPOINTS ??
+    env.MERCHANT_AI_SEEDANCE_VIDEO_MODELS ??
+    ''
+  ).trim()
+  const fromList = parseArkVideoModelList(env).map((m) => m.endpointId)
+  const merged = mergeCatalogModelIds(DOUBAO_VIDEO_CATALOG, envRaw, preferred, mode)
+  const out: string[] = []
+  const add = (id: string) => {
+    const t = id.trim()
+    if (t && !out.includes(t)) out.push(t)
+  }
+  if (preferred?.trim()) add(normalizeArkVideoModelParam(preferred))
+  for (const id of fromList) add(id)
+  for (const id of merged) add(id)
+  return out
+}
+
+function qwenVideoCandidatesFromEnv(env: MerchantAiEnv, mode: 't2v' | 'i2v'): string[] {
+  const e = env as Record<string, string | undefined>
+  return qwenVideoModelCandidates(
+    e.MERCHANT_AI_QWEN_VIDEO_MODELS ?? e.MERCHANT_AI_QWEN_VISION_MODELS,
+    e.MERCHANT_AI_QWEN_VIDEO_MODEL,
+    mode,
+  )
+}
+
+function firstImageUrlFromBody(body: Record<string, unknown>): string | undefined {
+  const images = body.images_base64
+  if (Array.isArray(images)) {
+    for (const row of images) {
+      if (typeof row !== 'string') continue
+      const t = row.trim()
+      if (!t) continue
+      if (t.startsWith('data:image') || /^https?:\/\//i.test(t)) return t
+      return `data:image/jpeg;base64,${t.replace(/\s/g, '')}`
+    }
+  }
+  return undefined
+}
+
+async function qwenPollVideoTask(apiKey: string, taskId: string): Promise<ArkPollState> {
+  const url = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
+  for (let i = 0; i < 120; i++) {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } })
+    const j = await readJsonResponse(res)
+    if (!res.ok) {
+      const msg = (typeof j.message === 'string' && j.message) || `千问视频查询 HTTP ${res.status}`
+      throw new Error(msg)
+    }
+    const output = j.output as Record<string, unknown> | undefined
+    const status = String(output?.task_status ?? j.task_status ?? '').toUpperCase()
+    const videoUrl =
+      normalizeHttpUrl(output?.video_url) ||
+      normalizeHttpUrl(output?.videoUrl) ||
+      extractHttpVideoUrl(j)
+    if (status === 'SUCCEEDED' && videoUrl) {
+      return { phase: 'succeeded', statusLabel: status, videoUrl }
+    }
+    if (status === 'FAILED' || status === 'UNKNOWN') {
+      const failReason =
+        (typeof output?.message === 'string' && output.message) ||
+        (typeof j.message === 'string' && j.message) ||
+        '千问视频任务失败'
+      return { phase: 'failed', statusLabel: status, failReason }
+    }
+    await new Promise((r) => setTimeout(r, i < 20 ? 2000 : 4000))
+  }
+  return { phase: 'failed', statusLabel: 'TIMEOUT', failReason: '千问视频生成超时' }
+}
+
+async function qwenPostVideoTask(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+): Promise<{ ok: false; msg: string } | { ok: true; taskId: string; modelUsed: string }> {
+  const key = qwenBearerKey(env)
+  if (!key) {
+    return {
+      ok: false,
+      msg: '未配置通义千问 Key，无法切换千问视频。请在运营台配置 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY。',
+    }
+  }
+  const mode = detectVideoInputMode(body)
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+  const flags = parseSeedanceCliFlags(typeof body.flags === 'string' ? body.flags : '')
+  const imgUrl = mode === 'i2v' ? firstImageUrlFromBody(body) : undefined
+  if (mode === 'i2v' && !imgUrl) {
+    return { ok: false, msg: '图生视频缺少参考图，无法切换千问 i2v 模型。' }
+  }
+  if (!prompt && mode === 't2v') {
+    return { ok: false, msg: '文生视频缺少提示词。' }
+  }
+
+  let lastMsg = '千问视频生成失败'
+  for (const modelId of qwenVideoCandidatesFromEnv(env, mode)) {
+    const built = buildQwenVisionVideoRequest(modelId, prompt, {
+      imgUrl,
+      duration: flags.duration,
+      ratio: flags.ratio,
+    })
+    try {
+      const res = await fetch(built.url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'X-DashScope-Async': 'enable',
+        },
+        body: JSON.stringify(built.body),
+      })
+      const j = await readJsonResponse(res)
+      if (!res.ok) {
+        lastMsg =
+          (typeof j.message === 'string' && j.message) ||
+          (typeof j.code === 'string' && j.code) ||
+          `千问视频创建失败 HTTP ${res.status}`
+        if (!isArkQuotaHopableError(lastMsg)) continue
+        continue
+      }
+      const output = j.output as Record<string, unknown> | undefined
+      const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
+      if (!taskId) {
+        lastMsg = '千问视频未返回 task_id'
+        continue
+      }
+      return { ok: true, taskId, modelUsed: modelId }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
+      if (!isArkQuotaHopableError(lastMsg)) continue
+    }
+  }
+  return {
+    ok: false,
+    msg: `${lastMsg}。豆包视频模型额度已用尽或不可用，已尝试切换千问视频模型仍失败；请充值火山方舟或百炼账户后重试。`,
+  }
 }
 
 function signKlingJwt(accessKey: string, secretKey: string): string {
@@ -453,60 +627,56 @@ async function arkPostVideoGenerationTask(
 async function arkCreateVideoTask(
   env: MerchantAiEnv,
   body: Record<string, unknown>,
-): Promise<{ ok: false; msg: string; status?: number } | { ok: true; taskId: string; raw?: unknown }> {
+): Promise<
+  | { ok: false; msg: string; status?: number }
+  | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
+> {
   const key = doubaoBearerKey(env)
-  if (!key)
-    return {
-      ok: false,
-      msg:
-        '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key，或设置服务端 MERCHANT_AI_DOUBAO_KEY。',
-    }
-  let modelId =
+  const preferred =
     typeof body.model === 'string' ? normalizeArkVideoModelParam(body.model) : ''
-  if (!modelId) {
-    const list = parseArkVideoModelList(env)
-    if (list[0]?.endpointId) modelId = list[0].endpointId
-  }
-  if (!modelId)
-    return {
-      ok: false,
-      msg:
-        '请选择视频模型，或由运营在管控台「短视频 API」录入 Seedance 模型 ID 或 ep- 接入点；也可设置 MERCHANT_AI_SEEDANCE_VIDEO_MODEL。',
-    }
-  if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) {
-    return {
-      ok: false,
-      msg: arkCreateTaskUserMessage('', modelId),
-      status: 400,
-    }
-  }
+  const candidates = key ? arkVideoModelCandidates(env, body, preferred) : []
 
-  const built = buildArkVideoTaskPayload(modelId, body)
-  if (built.ok === false) return { ok: false, msg: built.msg }
+  let lastMsg = '豆包视频生成失败'
+  let lastStatus: number | undefined
 
-  let posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
-
-  if (
-    posted.ok === false &&
-    isArkVideoEndpointId(modelId) &&
-    posted.rawMsg &&
-    /does not support content generation/i.test(posted.rawMsg)
-  ) {
-    const fallback = seedanceVideoModelFromEnv(env)
-    if (fallback && isDoubaoSeedanceModelId(fallback) && fallback !== modelId) {
-      const retryBuilt = buildArkVideoTaskPayload(fallback, body)
-      if (retryBuilt.ok === true) {
-        const retry = await arkPostVideoGenerationTask(env, key, retryBuilt.payload, fallback)
-        if (retry.ok === true) return retry
-        posted = retry
+  if (key && candidates.length > 0) {
+    for (const modelId of candidates) {
+      if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) continue
+      const built = buildArkVideoTaskPayload(modelId, body)
+      if (built.ok === false) continue
+      const posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
+      if (posted.ok === true) {
+        return { ok: true, taskId: posted.taskId, provider: 'ark', modelUsed: modelId, raw: posted.raw }
       }
+      lastMsg = posted.msg
+      lastStatus = posted.status
+      const hopable = isArkQuotaHopableError(posted.rawMsg ?? posted.msg)
+      if (!hopable) {
+        const soft = /请填写|无效|placeholder|对话模型|not activated/i.test(posted.msg)
+        if (soft) continue
+      }
+      if (!hopable) break
+    }
+  } else if (!key) {
+    lastMsg =
+      '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
+  }
+
+  const qwen = await qwenPostVideoTask(env, body)
+  if (qwen.ok === true) {
+    return {
+      ok: true,
+      taskId: wrapQwenVideoTaskId(qwen.taskId),
+      provider: 'qwen',
+      modelUsed: qwen.modelUsed,
     }
   }
 
-  if (posted.ok === false) {
-    return { ok: false, msg: posted.msg, status: posted.status }
+  return {
+    ok: false,
+    msg: key ? `${lastMsg}；${qwen.msg}` : qwen.msg,
+    status: lastStatus,
   }
-  return { ok: true, taskId: posted.taskId, raw: posted.raw }
 }
 
 async function arkGetVideoTask(
@@ -626,6 +796,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         doubao: arkKeyOk,
         qwen: qwenOk,
       },
+      qwenVideoConfigured: qwenOk,
       credentialNote,
     })
     return true
@@ -909,7 +1080,12 @@ export async function handleMerchantAiVideoRoutes(input: {
     }
     const r = await arkCreateVideoTask(env, parsed)
     if (r.ok === true) {
-      json(res, 200, { ok: true, taskId: r.taskId })
+      json(res, 200, {
+        ok: true,
+        taskId: r.taskId,
+        provider: r.provider ?? 'ark',
+        modelUsed: r.modelUsed ?? null,
+      })
       return true
     }
     json(res, arkCreateTaskHttpStatus(r.status), { ok: false, message: r.msg })
@@ -922,9 +1098,25 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '缺少 query taskId。' })
       return true
     }
+    if (isQwenVideoTaskId(taskIdSd)) {
+      const qk = qwenBearerKey(env)
+      if (!qk) {
+        json(res, 502, { ok: false, message: '未配置通义千问 Key，无法查询千问视频任务。' })
+        return true
+      }
+      try {
+        const state = await qwenPollVideoTask(qk, stripQwenVideoTaskPrefix(taskIdSd))
+        json(res, 200, { ok: true, provider: 'qwen', ...state })
+        return true
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        json(res, 502, { ok: false, message: msg })
+        return true
+      }
+    }
     const r = await arkGetVideoTask(env, taskIdSd)
     if (r.ok === true) {
-      json(res, 200, { ok: true, ...r.state })
+      json(res, 200, { ok: true, provider: 'ark', ...r.state })
       return true
     }
     json(res, r.status && r.status >= 400 ? r.status : 502, {

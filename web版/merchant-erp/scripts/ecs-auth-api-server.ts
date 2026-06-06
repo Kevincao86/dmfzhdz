@@ -229,20 +229,44 @@ function readBody(req: IncomingMessage): Promise<Buffer> {
   })
 }
 
+type VercelLikeBody = string | Buffer | Uint8Array
+
 function adaptVercelResponse(res: ServerResponse): ServerResponse & {
-  status: (code: number) => { send: (body: string) => void; end: () => void }
+  status: (code: number) => { send: (body?: VercelLikeBody) => void; end: () => void }
+  send: (body?: VercelLikeBody) => void
 } {
-  const r = res as ServerResponse & {
-    status: (code: number) => { send: (body: string) => void; end: () => void }
+  const sendBody = (body?: VercelLikeBody) => {
+    if (res.writableEnded) return
+    if (body === undefined || body === null) {
+      res.end()
+      return
+    }
+    if (Buffer.isBuffer(body) || body instanceof Uint8Array) {
+      const buf = Buffer.isBuffer(body) ? body : Buffer.from(body)
+      if (!res.getHeader('Content-Length')) {
+        res.setHeader('Content-Length', String(buf.length))
+      }
+      res.end(buf)
+      return
+    }
+    const text = typeof body === 'string' ? body : String(body)
+    if (!res.getHeader('Content-Length')) {
+      res.setHeader('Content-Length', String(Buffer.byteLength(text, 'utf8')))
+    }
+    res.end(text)
   }
+
+  const r = res as ServerResponse & {
+    status: (code: number) => { send: (body?: VercelLikeBody) => void; end: () => void }
+    send: (body?: VercelLikeBody) => void
+  }
+  r.send = sendBody
   r.status = (code: number) => {
     r.statusCode = code
     return {
-      send: (body: string) => {
-        r.end(body)
-      },
+      send: sendBody,
       end: () => {
-        r.end()
+        if (!r.writableEnded) r.end()
       },
     }
   }

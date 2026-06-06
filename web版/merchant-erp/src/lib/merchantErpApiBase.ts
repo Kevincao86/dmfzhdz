@@ -60,6 +60,32 @@ export function merchantApiFetchUrls(apiPathWithOptionalQuery: string): string[]
   return merchantErpApiCandidates(apiPathWithOptionalQuery)
 }
 
+const ECS_WEB_HOSTS = new Set(['cs.mofangdianai.com', 'dr.mofangdianai.com'])
+
+/**
+ * 二进制下载（云剪 MP4 等）：ECS 静态站优先走同源 /api/（Nginx → 轻量 IP，避免跨域 erp-api 二进制 500）。
+ * JSON API 仍用 merchantApiFetchUrls / merchantErpApiCandidates。
+ */
+export function merchantBinaryApiFetchUrls(apiPathWithOptionalQuery: string): string[] {
+  const path = apiPathWithOptionalQuery.startsWith('/')
+    ? apiPathWithOptionalQuery
+    : `/${apiPathWithOptionalQuery}`
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (ECS_WEB_HOSTS.has(host)) {
+      add(`${window.location.origin}${path}`)
+    }
+  }
+  for (const u of merchantErpApiCandidates(path)) {
+    add(u)
+  }
+  return urls
+}
+
 /** 生产默认 erp-api 优先，再同源 Vercel（避免 tenant_not_found / 密钥未合并） */
 export function merchantErpApiCandidates(apiPath: string): string[] {
   const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
