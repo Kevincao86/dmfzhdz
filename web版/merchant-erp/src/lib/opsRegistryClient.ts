@@ -7,6 +7,7 @@ import type {
   RegistryTenant,
   RegistryVideoSubmission,
 } from './opsRegistryTypes'
+import { buildMerchantErpApiUrl, merchantErpApiBase } from './merchantErpApiBase'
 import { supabase, supabaseConfigured } from './supabaseClient'
 import {
   filterRegistrySnapshotForMerchant,
@@ -15,16 +16,34 @@ import {
 import { filterRegistryForTenant } from './tenantRegistryScope'
 import { fetchPrimaryTenantId } from './tenantBilling'
 
-/** 注册表与商户网关分离：优先运营台域名（线上 ERP 静态站无 /api/ops-sync 时需配置）。 */
-function registryApiBase(): string {
-  const admin = (import.meta.env.VITE_MERCHANT_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, '')?.trim()
-  if (admin) return admin
-  return (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? ''
+const REGISTRY_FETCH_TIMEOUT_MS = 18_000
+
+function registryFetchSignal(): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(REGISTRY_FETCH_TIMEOUT_MS)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), REGISTRY_FETCH_TIMEOUT_MS)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
 }
 
-function url(path: string) {
-  const b = registryApiBase()
-  return `${b}${path}`
+/** 注册表：cs 等静态站固定走轻量 /erp-api，避免同源 /api 双跳 pending。 */
+function registryFetchUrls(path: string): string[] {
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  const erp = merchantErpApiBase()
+  if (erp) add(buildMerchantErpApiUrl(erp, path))
+  const admin = (import.meta.env.VITE_MERCHANT_ADMIN_ORIGIN as string | undefined)?.replace(/\/$/, '')?.trim()
+  if (admin) add(`${admin}${path}`)
+  const apiBase = (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined)?.replace(/\/$/, '')?.trim()
+  if (apiBase) add(`${apiBase}${path}`)
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (host !== 'cs.mofangdianai.com') add(`${window.location.origin}${path}`)
+  }
+  return urls
 }
 
 async function registryAuthHeaders(): Promise<Record<string, string>> {
@@ -42,23 +61,47 @@ async function registryAuthHeaders(): Promise<Record<string, string>> {
 
 async function fetchRegistryAt(path: string): Promise<RegistryFile> {
   const headers = await registryAuthHeaders()
-  const res = await fetch(url(path), { headers })
-  const text = await res.text()
-  if (!res.ok) throw new Error(`registry ${res.status}`)
-  try {
-    return JSON.parse(text) as RegistryFile
-  } catch {
-    throw new Error('registry_non_json')
+  let lastErr = 'registry_unreachable'
+  for (const url of registryFetchUrls(path)) {
+    try {
+      const res = await fetch(url, { headers, signal: registryFetchSignal() })
+      const text = await res.text()
+      if (!res.ok) {
+        lastErr = `registry ${res.status}`
+        continue
+      }
+      try {
+        return JSON.parse(text) as RegistryFile
+      } catch {
+        lastErr = 'registry_non_json'
+      }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
   }
+  throw new Error(lastErr)
 }
 
 /** 线上 ERP 与 Vercel 扁平 `/api/meoo-*` 对齐；未部署时回退旧路径（运营台域名）。 */
 async function postRegistrySync(pathMeoo: string, pathLegacy: string, jsonBody: unknown): Promise<Response> {
   const payload = JSON.stringify(jsonBody)
   const headers = await registryAuthHeaders()
-  const r1 = await fetch(url(pathMeoo), { method: 'POST', headers, body: payload })
-  if (r1.ok) return r1
-  return fetch(url(pathLegacy), { method: 'POST', headers, body: payload })
+  for (const url of registryFetchUrls(pathMeoo)) {
+    try {
+      const r1 = await fetch(url, { method: 'POST', headers, body: payload, signal: registryFetchSignal() })
+      if (r1.ok) return r1
+    } catch {
+      /* try next */
+    }
+  }
+  for (const url of registryFetchUrls(pathLegacy)) {
+    try {
+      return await fetch(url, { method: 'POST', headers, body: payload, signal: registryFetchSignal() })
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error('registry_post_unreachable')
 }
 
 async function resolveClientTenantId(): Promise<string | null> {
@@ -120,30 +163,57 @@ export async function appendRecruitmentOrderToOps(order: RegistryRecruitmentOrde
   }
 }
 
-export async function setTalentPoolCandidatesOnOps(candidates: RegistryTalentPoolRow[]): Promise<void> {
+async function postRegistryPath(pathMeoo: string, pathLegacy: string, body: string): Promise<Response> {
   const headers = await registryAuthHeaders()
+  for (const url of registryFetchUrls(pathMeoo)) {
+    try {
+      const r1 = await fetch(url, { method: 'POST', headers, body, signal: registryFetchSignal() })
+      if (r1.ok) return r1
+    } catch {
+      /* try next */
+    }
+  }
+  for (const url of registryFetchUrls(pathLegacy)) {
+    try {
+      return await fetch(url, { method: 'POST', headers, body, signal: registryFetchSignal() })
+    } catch {
+      /* try next */
+    }
+  }
+  throw new Error('registry_post_unreachable')
+}
+
+export async function setTalentPoolCandidatesOnOps(candidates: RegistryTalentPoolRow[]): Promise<void> {
   const body = JSON.stringify({ candidates })
-  const r1 = await fetch(url('/api/meoo-ops-talent-pool-set'), { method: 'POST', headers, body })
-  if (r1.ok) return
-  const res = await fetch(url('/api/ops-sync/talent-pool/set'), { method: 'POST', headers, body })
+  const res = await postRegistryPath('/api/meoo-ops-talent-pool-set', '/api/ops-sync/talent-pool/set', body)
   if (!res.ok) throw new Error(`talent pool set ${res.status}`)
 }
 
 export async function setRecruitmentScheduleRowsOnOps(rows: RegistryScheduleRow[]): Promise<void> {
-  const headers = await registryAuthHeaders()
   const body = JSON.stringify({ rows })
-  const r1 = await fetch(url('/api/meoo-ops-recruitment-schedule-set'), { method: 'POST', headers, body })
-  if (r1.ok) return
-  const res = await fetch(url('/api/ops-sync/recruitment-schedule/set'), { method: 'POST', headers, body })
+  const res = await postRegistryPath(
+    '/api/meoo-ops-recruitment-schedule-set',
+    '/api/ops-sync/recruitment-schedule/set',
+    body,
+  )
   if (!res.ok) throw new Error(`schedule set ${res.status}`)
 }
 
 export async function setRecruitmentVideoSubmissionsOnOps(videos: RegistryVideoSubmission[]): Promise<void> {
   const headers = await registryAuthHeaders()
-  const res = await fetch(url('/api/ops-sync/recruitment-videos/set'), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ videos }),
-  })
-  if (!res.ok) throw new Error(`videos set ${res.status}`)
+  for (const url of registryFetchUrls('/api/ops-sync/recruitment-videos/set')) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ videos }),
+        signal: registryFetchSignal(),
+      })
+      if (!res.ok) throw new Error(`videos set ${res.status}`)
+      return
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('videos set ')) throw e
+    }
+  }
+  throw new Error('videos set unreachable')
 }

@@ -617,10 +617,20 @@ export async function postIcePipeline(body: {
   for (const p of PIPELINE_PATHS) {
     for (const url of merchantApiFetchUrls(p)) {
       try {
+        const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+        const signal =
+          typeof AS.timeout === 'function'
+            ? AS.timeout(280_000)
+            : (() => {
+                const c = new AbortController()
+                setTimeout(() => c.abort(), 280_000)
+                return c.signal
+              })()
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json; charset=utf-8' },
           body: JSON.stringify(body),
+          signal,
         })
         const j = await parseJson<IcePipelineResult & { message?: string }>(res)
         if (res.status === 404) continue

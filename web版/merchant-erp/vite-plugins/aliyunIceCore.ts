@@ -5,6 +5,7 @@
 import IceModule, {
   GetMediaInfoRequest,
   GetMediaProducingJobRequest,
+  ListMediaBasicInfosRequest,
   RegisterMediaInfoRequest,
   SubmitMediaProducingJobRequest,
   UploadMediaByURLRequest,
@@ -23,6 +24,7 @@ type IceClientClass = {
     getMediaInfo(req: GetMediaInfoRequest): Promise<{ body?: Record<string, unknown> }>
     submitMediaProducingJob(req: SubmitMediaProducingJobRequest): Promise<{ body?: Record<string, unknown> }>
     getMediaProducingJob(req: GetMediaProducingJobRequest): Promise<{ body?: Record<string, unknown> }>
+    listMediaBasicInfos(req: ListMediaBasicInfosRequest): Promise<{ body?: Record<string, unknown> }>
   }
 }
 
@@ -401,7 +403,7 @@ function normalizeIceRegisterInputUrl(imageUrl: string): string {
 function formatIceRegisterMediaError(raw: string): string {
   if (/403|forbidden|not authorized|无权|拒绝访问/i.test(raw)) {
     return (
-      `${raw}。请在阿里云为 ICE AccessKey 授权 AliyunICEFullAccess（或 ice:RegisterMediaInfo），` +
+      `${raw}。请在阿里云 RAM 为 ICE 所用 AccessKey 用户（如 modian）附加 AliyunICEFullAccess（至少含 ice:RegisterMediaInfo），` +
       `并在智能媒体服务控制台将运营台配置的 OSS Bucket 加入媒资库；` +
       `同时确认运营台已填写 StorageLocation（outin-***.oss-cn-shanghai.aliyuncs.com）。`
     )
@@ -409,9 +411,51 @@ function formatIceRegisterMediaError(raw: string): string {
   return raw
 }
 
+/** IMS 点播 StorageLocation 主机名，写入 RegisterMediaInfo.registerConfig */
+function normalizeIceStorageLocationHost(raw: string | undefined): string {
+  const trimmed = String(raw ?? '').trim()
+  if (!trimmed) return ''
+  if (trimmed.includes('://')) {
+    try {
+      return new URL(trimmed).hostname.trim()
+    } catch {
+      return ''
+    }
+  }
+  return (trimmed.split('/')[0] ?? trimmed).trim()
+}
+
+function buildIceRegisterConfig(cfg: AliyunIceConfig): string {
+  const registerConfig: Record<string, string> = {
+    NeedSprite: 'false',
+    NeedSnapshot: 'false',
+  }
+  const storage = normalizeIceStorageLocationHost(cfg.vodStorageLocation)
+  if (storage) registerConfig.StorageLocation = storage
+  return JSON.stringify(registerConfig)
+}
+
+/** 轻量探活：区分 RAM 未授权与其它配置问题 */
+export async function probeIceRamAccess(
+  cfg: AliyunIceConfig,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const client = createClient(cfg)
+    await client.listMediaBasicInfos(new ListMediaBasicInfosRequest({ maxResults: 1 }))
+    return { ok: true }
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e)
+    if (/403|forbidden|not authorized|无权|拒绝访问/i.test(raw)) {
+      return { ok: false, message: formatIceRegisterMediaError(raw) }
+    }
+    return { ok: true }
+  }
+}
+
 /** 图片须走 RegisterMediaInfo；UploadMediaByURL 仅支持音视频 */
 async function registerImageUrlToMediaId(
   client: InstanceType<typeof IceClient>,
+  cfg: AliyunIceConfig,
   imageUrl: string,
   title: string,
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
@@ -424,7 +468,7 @@ async function registerImageUrlToMediaId(
         businessType: 'general',
         title: title.slice(0, 120),
         overwrite: true,
-        registerConfig: JSON.stringify({ NeedSprite: 'false', NeedSnapshot: 'false' }),
+        registerConfig: buildIceRegisterConfig(cfg),
       }),
     )
     const body = bodyOf(res)
@@ -544,7 +588,7 @@ export async function iceRunImagesPipeline(
 
   for (let i = 0; i < urls.length; i++) {
     const title = `${input.projectName}-图${i + 1}`.slice(0, 120)
-    const up = await registerImageUrlToMediaId(client, urls[i]!, title)
+    const up = await registerImageUrlToMediaId(client, cfg, urls[i]!, title)
     if (!up.ok) {
       return { ok: false, message: `第 ${i + 1} 张图片上传失败：${up.message}`, step: 'upload_media' }
     }

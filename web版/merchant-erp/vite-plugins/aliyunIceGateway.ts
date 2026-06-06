@@ -13,10 +13,11 @@ import {
   iceRunImagesPipeline,
   iceRunSinglePipeline,
   mergeAliyunIceConfig,
+  probeIceRamAccess,
   readAliyunIceConfigFromEnv,
   type AliyunIceConfig,
 } from './aliyunIceCore.js'
-import { iceOssUploadAvailable } from './aliyunOssIceParse.js'
+import { iceOssUploadAvailable, resolveIceOssUploadPrefix } from './aliyunOssIceParse.js'
 import { evaluateIceOutputReady, fetchIceOutputObject } from './aliyunOssIceUpload.js'
 
 function iceJobDownloadProxyPath(jobId: string, inline?: boolean): string {
@@ -125,17 +126,22 @@ export async function handleAliyunIceRoutes(input: {
     const envMap = rawEnv as Record<string, string | undefined>
     const ossUpload =
       cfg != null ? iceOssUploadAvailable(cfg, envMap) : false
+    const uploadPrefix = cfg ? resolveIceOssUploadPrefix(cfg, envMap) : null
+    const ramProbe = cfg ? await probeIceRamAccess(cfg) : { ok: false as const, message: '未配置 ICE' }
     json(res, 200, {
       configured: !!cfg,
       regionId: cfg?.regionId ?? 'cn-shanghai',
       hasOssOutput: Boolean(cfg?.outputOssUrlPrefix?.trim()),
       hasVodOutput: Boolean(cfg?.vodStorageLocation?.trim()),
       localUploadEnabled: ossUpload,
+      uploadBucket: uploadPrefix ? `${uploadPrefix.bucket}.oss-${uploadPrefix.region}.aliyuncs.com` : null,
+      iceRamAuthorized: ramProbe.ok,
+      iceRamIssue: ramProbe.ok ? null : ramProbe.message,
       presets: ICE_EFFECT_PRESETS.map((p) => p.label),
       effectOptions: ICE_EFFECT_PRESETS,
       urlUploadRequiresVod: Boolean(cfg?.vodStorageLocation?.trim()),
       credentialNote:
-        '灵祺AI云剪凭据由运营在「AI模型 → 短视频 API」维护。须填写 ICE 点播 StorageLocation（outin-*，本地上传与多图成片素材写入该 Bucket）；OSS 成片前缀仅用于成片 MP4 落盘。',
+        '灵祺AI云剪凭据由运营在「AI模型 → 短视频 API」维护。须填写 ICE 点播 StorageLocation（outin-*，本地上传与多图成片素材写入该 Bucket）；OSS 成片前缀仅用于成片 MP4 落盘。RAM 用户须含 AliyunICEFullAccess。',
       docsUrl:
         'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview',
     })

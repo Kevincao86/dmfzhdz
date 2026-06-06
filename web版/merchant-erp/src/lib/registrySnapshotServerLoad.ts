@@ -137,6 +137,12 @@ function mergeRegistrySnapshotsPreferComplete(a: RegistryFile, b: RegistryFile):
   }
 }
 
+function shouldSkipRegistryErpApiLoop(): boolean {
+  if (process.env.MEOO_AUTH_API_SERVER === '1') return true
+  if (process.env.AUTH_API_PORT?.trim()) return true
+  return false
+}
+
 /** Vercel / ECS 商品图、云剪等合并注册表时的统一加载顺序。 */
 export async function loadRegistrySnapshotForServer(
   viteRoot?: string,
@@ -147,9 +153,10 @@ export async function loadRegistrySnapshotForServer(
   }
 
   const local = loadLocalRegistryFile(viteRoot)
+  const skipErpLoop = shouldSkipRegistryErpApiLoop()
   const [fromDb, fromErp] = await Promise.all([
     loadRegistryViaSupabase(),
-    loadRegistryViaErpApi(),
+    skipErpLoop ? Promise.resolve(null) : loadRegistryViaErpApi(),
   ])
   let merged: RegistryFile | null = null
   if (fromDb && fromErp) merged = mergeRegistrySnapshotsPreferComplete(fromDb, fromErp)
