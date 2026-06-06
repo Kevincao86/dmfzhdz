@@ -36,7 +36,7 @@ import {
 import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
-import { compressIceImageForUpload } from '../lib/iceImageUploadCompress'
+import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
 import { snapshotUploadFiles } from '../lib/iceUploadFileSnapshot'
 
 const POLL_MS = 5000
@@ -305,6 +305,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       try {
         for (let i = 0; i < snapList.length; i++) {
           const raw = snapList[i]!
+          if (raw.size > ICE_LOCAL_IMAGE_MAX_BYTES) {
+            lastFail = `「${raw.name}」超过 4MB，请压缩后重试`
+            setImageUploadError(lastFail)
+            setErr(lastFail)
+            break
+          }
           setImageUploadProgress({
             index: i + 1,
             total: snapList.length,
@@ -313,6 +319,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             phase: 'encode',
           })
           const file = await compressIceImageForUpload(raw)
+          if (file.size > ICE_LOCAL_IMAGE_MAX_BYTES) {
+            lastFail = `「${raw.name}」压缩后仍超过 4MB，请换更小图片`
+            setImageUploadError(lastFail)
+            setErr(lastFail)
+            break
+          }
           setImageUploadProgress({
             index: i + 1,
             total: snapList.length,
@@ -1130,7 +1142,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     <ImagePlus className="h-7 w-7 text-violet-600" />
                     <span className="text-sm font-semibold text-zinc-900">本地上传图片（可多选）</span>
                     <span className="text-center text-xs text-zinc-500">
-                      JPG / PNG / WebP · 多张合成一条竖屏短视频
+                      JPG / PNG / WebP · 单张 ≤ 4MB · 多张合成一条竖屏短视频
                     </span>
                   </>
                 )}
