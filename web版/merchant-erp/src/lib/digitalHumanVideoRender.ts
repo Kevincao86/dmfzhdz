@@ -6,6 +6,7 @@ import { findPresetAvatarForDraft } from './digitalHumanBroadcast'
 import { concatVideoSegmentsToMp4 } from './concatVideoSegments'
 import { extractVideoLastFramePureBase64, imageUrlToPureBase64 } from './videoFrameUtils'
 import {
+  concatVideoUrlsOnServer,
   downloadVideoUrlAsBlob,
   fetchKlingVideoStatus,
   fetchSeedanceVideoStatus,
@@ -163,10 +164,12 @@ async function waitKlingVideo(taskId: string, kind: 'text2video' | 'image2video'
   throw new Error('可灵视频生成超时，请稍后重试')
 }
 
+type SegmentVideo = { blob: Blob; sourceUrl: string }
+
 async function generateKlingSegment(
   prompt: string,
   frameB64: string | null,
-): Promise<Blob> {
+): Promise<SegmentVideo> {
   if (frameB64) {
     const r = await postKlingVideoStart({
       kind: 'image2video',
@@ -179,7 +182,7 @@ async function generateKlingSegment(
     })
     if (!r.ok) throw new Error(r.message)
     const url = await waitKlingVideo(r.taskId, r.pollKind)
-    return downloadVideoUrlAsBlob(url)
+    return { sourceUrl: url, blob: await downloadVideoUrlAsBlob(url) }
   }
 
   const r = await postKlingVideoStart({
@@ -192,7 +195,7 @@ async function generateKlingSegment(
   })
   if (!r.ok) throw new Error(r.message)
   const url = await waitKlingVideo(r.taskId, r.pollKind)
-  return downloadVideoUrlAsBlob(url)
+  return { sourceUrl: url, blob: await downloadVideoUrlAsBlob(url) }
 }
 
 async function generateSeedanceSegmentWithFailover(opts: {
@@ -200,7 +203,7 @@ async function generateSeedanceSegmentWithFailover(opts: {
   frameB64: string | null
   seedanceModels: string[]
   seedanceFlags: string
-}): Promise<Blob> {
+}): Promise<SegmentVideo> {
   const { prompt, frameB64, seedanceModels, seedanceFlags } = opts
   let lastErr = '豆包视频生成失败'
   for (const model of seedanceModels) {
@@ -215,7 +218,7 @@ async function generateSeedanceSegmentWithFailover(opts: {
         throw new Error(r.message)
       }
       const url = await waitSeedanceVideo(r.taskId)
-      return downloadVideoUrlAsBlob(url)
+      return { sourceUrl: url, blob: await downloadVideoUrlAsBlob(url) }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       lastErr = msg
@@ -235,7 +238,7 @@ async function generateOneSegment(opts: {
   frameB64: string | null
   seedanceModels: string[]
   seedanceFlags: string
-}): Promise<Blob> {
+}): Promise<SegmentVideo> {
   const { engine, cfg, prompt, frameB64, seedanceModels, seedanceFlags } = opts
 
   if (engine === 'seedance') {
@@ -258,6 +261,25 @@ async function generateOneSegment(opts: {
   }
 
   return generateKlingSegment(prompt, frameB64)
+}
+
+async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<Blob> {
+  if (blobs.length === 1) return blobs[0]!
+  try {
+    return await concatVideoSegmentsToMp4(blobs)
+  } catch (browserErr) {
+    const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
+    if (urls.length >= blobs.length) {
+      try {
+        return await concatVideoUrlsOnServer(urls)
+      } catch (serverErr) {
+        const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
+        const sMsg = serverErr instanceof Error ? serverErr.message : String(serverErr)
+        throw new Error(`${bMsg}；云端拼接：${sMsg}`)
+      }
+    }
+    throw browserErr
+  }
 }
 
 export async function renderDigitalHumanMp4(
@@ -326,6 +348,7 @@ export async function renderDigitalHumanMp4(
 
   const avatarB64 = await resolveAvatarBase64(draft)
   const blobs: Blob[] = []
+  const sourceUrls: string[] = []
   let prevBlob: Blob | null = null
 
   for (let i = 0; i < prompts.length; i++) {
@@ -347,7 +370,7 @@ export async function renderDigitalHumanMp4(
     }
 
     try {
-      const blob = await generateOneSegment({
+      const segment = await generateOneSegment({
         engine,
         cfg,
         prompt: prompts[i]!,
@@ -355,8 +378,9 @@ export async function renderDigitalHumanMp4(
         seedanceModels,
         seedanceFlags,
       })
-      blobs.push(blob)
-      prevBlob = blob
+      blobs.push(segment.blob)
+      sourceUrls.push(segment.sourceUrl)
+      prevBlob = segment.blob
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       return { ok: false, message: `第 ${i + 1}/${prompts.length} 段生成失败：${msg}` }
@@ -367,7 +391,7 @@ export async function renderDigitalHumanMp4(
 
   let finalBlob: Blob
   try {
-    finalBlob = blobs.length === 1 ? blobs[0]! : await concatVideoSegmentsToMp4(blobs)
+    finalBlob = await mergeSegmentVideos(blobs, sourceUrls)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `多段合并失败：${msg}` }

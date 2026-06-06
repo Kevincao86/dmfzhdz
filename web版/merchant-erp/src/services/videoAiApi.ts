@@ -53,6 +53,7 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
 }
 
 const VIDEO_FETCH_TIMEOUT_MS = 120_000
+const VIDEO_CONCAT_TIMEOUT_MS = 300_000
 const VIDEO_CONFIG_TIMEOUT_MS = 25_000
 
 function videoFetchSignal(ms: number): AbortSignal {
@@ -83,6 +84,45 @@ async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
         status: res.status,
         statusText: res.statusText,
         headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
+      })
+    } catch {
+      /* try next candidate */
+    }
+  }
+  return null
+}
+
+async function fetchVideoPostBinary(
+  path: string,
+  body: Record<string, unknown>,
+  timeoutMs = VIDEO_CONCAT_TIMEOUT_MS,
+): Promise<Response | null> {
+  const bodyStr = JSON.stringify(body)
+  for (const url of videoApiFetchUrls(path)) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: bodyStr,
+        signal: videoFetchSignal(timeoutMs),
+      })
+      const ct = res.headers.get('content-type') ?? ''
+      if (res.status === 404) continue
+      if (!res.ok) {
+        const text = await res.text()
+        if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
+        return new Response(text, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
+        })
+      }
+      const buf = await res.arrayBuffer()
+      if (responseLooksLikeHtml(new TextDecoder().decode(buf.slice(0, 256)), ct)) continue
+      return new Response(buf, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: { 'Content-Type': ct || 'video/mp4' },
       })
     } catch {
       /* try next candidate */
@@ -180,6 +220,26 @@ export async function postLongformVideoPlan(body: {
     return { ok: true, prompts }
   }
   return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }
+}
+
+/** 服务端 ffmpeg 拼接多段远程 MP4（浏览器 wasm 失败时兜底） */
+export async function concatVideoUrlsOnServer(urls: string[]): Promise<Blob> {
+  const paths = [
+    '/api/meoo-merchant-ai-video-concat-urls',
+    '/api/merchant/ai/video/concat-urls',
+  ] as const
+  for (const p of paths) {
+    const res = await fetchVideoPostBinary(p, { urls })
+    if (!res) continue
+    if (!res.ok) {
+      const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
+      throw new Error(j?.message || `云端拼接失败 HTTP ${res.status}`)
+    }
+    const blob = await res.blob()
+    if (blob.size < 1024) throw new Error('云端拼接返回空文件')
+    return blob
+  }
+  throw new Error('云端拼接失败：视频 AI 接口未部署或不可达')
 }
 
 /** 经 dev 网关拉取成片，避免跨域导致无法截尾帧或拼接 */
