@@ -5,6 +5,7 @@
 import path from 'node:path'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 import {
+  ensureIceHttpsUrl,
   resolveIceOssUploadCandidates,
   resolveIceOssUploadPrefix,
   type ParsedOssPrefix,
@@ -87,8 +88,11 @@ export async function createIceSourceUploadPlan(
       method: 'PUT',
       expires: UPLOAD_EXPIRES_SEC,
       'Content-Type': contentType,
+      secure: true,
     })
-    const mediaUrl = client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC })
+    const mediaUrl = ensureIceHttpsUrl(
+      client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
+    )
     return { ok: true, uploadUrl, contentType, mediaUrl, objectKey }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -158,7 +162,7 @@ export async function ensureIcePublicImageUrls(
       }
     }
     if (urlOnIceOssBucket(raw, ossPrefix)) {
-      out.push(raw)
+      out.push(ensureIceHttpsUrl(raw))
       continue
     }
     try {
@@ -223,7 +227,9 @@ async function putIceSourceObjectToPrefix(
     await client.put(objectKey, input.buffer, {
       headers: { 'Content-Type': contentType },
     })
-    const mediaUrl = client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC })
+    const mediaUrl = ensureIceHttpsUrl(
+      client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
+    )
     return { ok: true, mediaUrl, objectKey }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -395,7 +401,9 @@ export async function completeIceMultipartUpload(
         etag: normalizePartEtag(p.etag),
       })),
     )
-    const mediaUrl = client.signatureUrl(input.objectKey, { expires: MEDIA_URL_EXPIRES_SEC })
+    const mediaUrl = ensureIceHttpsUrl(
+      client.signatureUrl(input.objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
+    )
     return { ok: true, mediaUrl, objectKey: input.objectKey }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -464,7 +472,7 @@ export async function signIceOssObjectUrl(
       accessKeySecret: cfg.accessKeySecret,
       bucket: parsed.bucket,
     })
-    return client.signatureUrl(parsed.objectKey, { expires: expiresSec })
+    return ensureIceHttpsUrl(client.signatureUrl(parsed.objectKey, { expires: expiresSec, secure: true }))
   } catch {
     return null
   }

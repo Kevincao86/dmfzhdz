@@ -14,10 +14,10 @@ const METRIC_CARDS: { key: keyof HallDashboardStats; label: string; color: strin
 function BarRow({ label, count, max }: { label: string; count: number; max: number }) {
   const pct = max > 0 ? Math.round((count / max) * 100) : 0
   return (
-    <div className="flex items-center gap-3 text-sm">
+    <div className="stat-bar-row flex items-center gap-3 text-sm">
       <span className="w-24 shrink-0 text-[var(--shell-muted)] truncate">{label}</span>
       <div className="flex-1 h-2 rounded-full bg-[var(--shell-hover)] overflow-hidden">
-        <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${Math.max(pct, count ? 8 : 0)}%` }} />
+        <div className="h-full rounded-full bg-violet-500 transition-all duration-300" style={{ width: `${Math.max(pct, count ? 8 : 0)}%` }} />
       </div>
       <span className="w-8 text-right font-mono text-[var(--shell-text)]">{count}</span>
     </div>
@@ -111,7 +111,7 @@ export default function HallHomeDashboard() {
             {METRIC_CARDS.map((c) => (
               <div
                 key={c.key}
-                className={`rounded-xl bg-gradient-to-br ${c.color} p-4 text-white shadow-sm`}
+                className={`metric-card rounded-xl bg-gradient-to-br ${c.color} p-4 text-white shadow-sm`}
               >
                 <p className="text-sm opacity-90">{c.label}</p>
                 <p className="text-3xl font-bold mt-2">{stats[c.key] as number}</p>
@@ -120,7 +120,7 @@ export default function HallHomeDashboard() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="panel-card rounded-xl p-4 lg:col-span-1">
+            <div className="panel-card hover-panel rounded-xl p-4 lg:col-span-1">
               <h3 className="font-semibold text-[var(--shell-text)] mb-4">平台发布分布</h3>
               <ul className="space-y-3">
                 {stats.platformCounts.map((p) => (
@@ -129,12 +129,12 @@ export default function HallHomeDashboard() {
               </ul>
             </div>
 
-            <div className="panel-card rounded-xl p-4 lg:col-span-1">
+            <div className="panel-card hover-panel rounded-xl p-4 lg:col-span-1">
               <h3 className="font-semibold text-[var(--shell-text)] mb-4">撮合单平台占比</h3>
               <DonutChart items={stats.platformCounts} />
             </div>
 
-            <div className="panel-card rounded-xl p-4 lg:col-span-1">
+            <div className="panel-card hover-panel rounded-xl p-4 lg:col-span-1">
               <h3 className="font-semibold text-[var(--shell-text)] mb-4">品类分布</h3>
               <ul className="space-y-3">
                 {stats.categoryCounts.length ? (
@@ -148,7 +148,7 @@ export default function HallHomeDashboard() {
             </div>
           </div>
 
-          <div className="panel-card rounded-xl p-4">
+          <div className="panel-card hover-panel rounded-xl p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h3 className="font-semibold text-[var(--shell-text)]">撮合进展</h3>
               <div className="flex flex-wrap gap-3 text-sm text-[var(--shell-muted)]">
@@ -158,7 +158,7 @@ export default function HallHomeDashboard() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
               {stats.statusCounts.map((s) => (
-                <div key={s.label} className="rounded-lg bg-[var(--shell-hover)] px-4 py-3">
+                <div key={s.label} className="status-tile rounded-lg bg-[var(--shell-hover)] px-4 py-3">
                   <p className="text-xs text-[var(--shell-muted)]">{s.label}</p>
                   <p className="text-2xl font-bold text-[var(--shell-text)] mt-1">{s.count}</p>
                 </div>

@@ -23,9 +23,7 @@ export default function RecruitmentOrderCard({ row, onClick }: Props) {
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
-      className={`order-card rounded-xl p-4 text-left w-full transition-colors ${
-        onClick ? 'order-card--clickable' : ''
-      }`}
+      className={`order-card rounded-xl p-4 text-left w-full ${onClick ? 'order-card--clickable' : ''}`}
     >
       {row.aiTag ? (
         <span className={`order-tag ${tagTone}`}>{row.aiTag}</span>

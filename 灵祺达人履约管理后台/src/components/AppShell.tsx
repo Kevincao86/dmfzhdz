@@ -66,10 +66,10 @@ export default function AppShell() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `block px-3 py-2 rounded-lg text-sm ${
+                `block px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
                   isActive
-                    ? 'bg-violet-600/30 text-[var(--shell-text)]'
-                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
+                    ? 'bg-violet-600/30 text-[var(--shell-text)] shadow-sm'
+                    : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)] hover:translate-x-0.5'
                 }`
               }
             >
