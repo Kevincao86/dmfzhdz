@@ -7,6 +7,7 @@ import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
+import HallCityFilter from './HallCityFilter'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { readMember } from '../../lib/mpSync/talentMember'
 
@@ -41,6 +42,7 @@ export default function RecommendOrdersPanel() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [orderSegment, setOrderSegment] = useState('match')
   const [filterPlatform, setFilterPlatform] = useState('全部')
+  const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
   const [priceSelected, setPriceSelected] = useState<string[]>([])
   const [priceFilterLabel, setPriceFilterLabel] = useState('价格')
@@ -50,7 +52,6 @@ export default function RecommendOrdersPanel() {
   const [allOrderRows, setAllOrderRows] = useState<RecruitmentOrderRow[]>([])
   const [orderDisplayRows, setOrderDisplayRows] = useState<RecruitmentOrderRow[]>([])
   const [orderEmptyHint, setOrderEmptyHint] = useState('')
-  const [cityFilters, setCityFilters] = useState<string[]>(['全部'])
   const talentCity = member?.city || member?.province || ''
 
   const applyOrderFilters = useCallback(async () => {
@@ -59,7 +60,7 @@ export default function RecommendOrdersPanel() {
     let rows = allOrderRows.filter((r) => {
       if (!matchOrderSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
-      if (!hallFilters.matchCity(r.region, r.storeName, filterCity)) return false
+      if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
       if (!matchOrderSegment(r, orderSegment, talentCity)) return false
       return true
@@ -86,7 +87,7 @@ export default function RecommendOrdersPanel() {
     }
     setOrderDisplayRows(rows.slice(0, 50))
     setOrderEmptyHint(hint)
-  }, [allOrderRows, searchKeyword, orderSegment, filterPlatform, filterCity, priceSelected, talentCity])
+  }, [allOrderRows, searchKeyword, orderSegment, filterPlatform, filterProvince, filterCity, priceSelected, talentCity])
 
   useEffect(() => {
     void applyOrderFilters()
@@ -101,7 +102,6 @@ export default function RecommendOrdersPanel() {
         if (!rows.length) rows = listFilters.buildMockRecruitmentRows()
         else rows = [...listFilters.buildMockRecruitmentRows(), ...rows]
         setAllOrderRows(rows)
-        setCityFilters(hallFilters.buildCityFilterOptions(rows))
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
         setAllOrderRows(listFilters.buildMockRecruitmentRows())
@@ -141,11 +141,15 @@ export default function RecommendOrdersPanel() {
             <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
           ))}
         </select>
-        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
-          {cityFilters.map((c) => (
-            <option key={c} value={c}>{c === '全部' ? '城市' : c}</option>
-          ))}
-        </select>
+        <HallCityFilter
+          compact
+          province={filterProvince}
+          city={filterCity}
+          onChange={(prov, c) => {
+            setFilterProvince(prov)
+            setFilterCity(c)
+          }}
+        />
         <button type="button" className="rounded-lg panel-input border px-2 py-1.5" onClick={() => setShowPriceSheet(true)}>
           {priceFilterLabel}
         </button>

@@ -31,6 +31,12 @@ export function boardLabel(board: PrBoardId): string {
   return '达人'
 }
 
+export function boardAllModeLabel(board: PrBoardId): string {
+  if (board === 'shoot') return '全部拍摄团队'
+  if (board === 'edit') return '全部剪辑团队'
+  return '全部达人'
+}
+
 export function boardEmptyHint(board: PrBoardId, kw: string, hasOrders: boolean): string {
   if (kw) return `未找到「${kw}」相关的${boardLabel(board)}`
   if (!hasOrders) {
