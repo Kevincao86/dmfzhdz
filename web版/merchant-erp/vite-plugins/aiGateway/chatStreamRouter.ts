@@ -70,6 +70,12 @@ async function streamTokenMix(
   return { model: model }
 }
 
+function deepseekExtraBody(req: AIChatRequest): Record<string, unknown> {
+  // 闲聊禁用 thinking，避免长时间只有「思考中」；经营类任务再开中等推理
+  if (!req.taskType) return { thinking: { type: 'disabled' } }
+  return { thinking: { type: 'enabled' }, reasoning_effort: 'medium' }
+}
+
 async function streamDeepseek(
   req: AIChatRequest,
   env: Record<string, string>,
@@ -88,7 +94,7 @@ async function streamDeepseek(
       model,
       messages: toOpenAiMessages(req.messages),
       temperature: req.temperature ?? 0.6,
-      extraBody: { thinking: { type: 'enabled' }, reasoning_effort: 'high' },
+      extraBody: deepseekExtraBody(req),
       signal,
     }),
     onDelta,

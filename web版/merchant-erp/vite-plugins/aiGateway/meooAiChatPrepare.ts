@@ -100,18 +100,23 @@ export async function prepareMeooAiChat(
           .slice(0, MAX_AI_CHAT_IMAGE_ATTACHMENTS)
       : undefined
 
+  const taskType =
+    typeof parsed.taskType === 'string' ? (parsed.taskType as AIChatRequest['taskType']) : undefined
+  const clientHasIntel = parsed.messages.some(
+    (m) => m.role === 'system' && /门店经营情报/.test(m.content),
+  )
+
   let messagesWithIntel = parsed.messages
-  try {
-    const intel = await buildServerMerchantIntelContext(
-      user.id,
-      env,
-      typeof parsed.taskType === 'string' ? (parsed.taskType as AIChatRequest['taskType']) : undefined,
-    )
-    if (intel?.trim()) {
-      messagesWithIntel = [{ role: 'system', content: intel.trim() }, ...parsed.messages]
+  // 闲聊：浏览器已注入本地情报，跳过服务端再查 Supabase（省 2～4 次 DB 往返）
+  if (taskType && !clientHasIntel) {
+    try {
+      const intel = await buildServerMerchantIntelContext(user.id, env, taskType)
+      if (intel?.trim()) {
+        messagesWithIntel = [{ role: 'system', content: intel.trim() }, ...parsed.messages]
+      }
+    } catch {
+      /* 情报注入失败不阻断对话 */
     }
-  } catch {
-    /* 情报注入失败不阻断对话 */
   }
 
   const req: AIChatRequest = {
@@ -124,7 +129,7 @@ export async function prepareMeooAiChat(
     ...(imageDataUrls?.length ? { imageDataUrls } : {}),
     temperature: parsed.temperature,
     stream: parsed.stream === true,
-    taskType: parsed.taskType,
+    taskType,
   }
 
   return { ok: true, user, req, chatEnv, env }
