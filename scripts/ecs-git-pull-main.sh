@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 # ECS 拉取最新代码（main 分支）
 #
-# 说明：ECS 克隆仓库通常只有 remote「origin」，没有「gitee」。
-# Gitee 默认分支可能是 master，开发主分支是 main，须显式 checkout + pull origin main。
+# 轻量 139.196.42.5 请用「只拉 Gitee」脚本（勿 git pull gitee / 勿拉 GitHub）:
+#   bash ~/app/scripts/ecs-git-pull-gitee.sh
+# 首次配置远程: bash ~/app/scripts/ecs-setup-git-gitee-only.sh
 #
-# 用法：bash ~/app/scripts/ecs-git-pull-main.sh
+# 其它 ECS（仅 origin、origin 已是 Gitee 或 GitHub 镜像）:
+#   bash ~/app/scripts/ecs-git-pull-main.sh
+#
+# 强制只拉 Gitee: ECS_GIT_PULL_GITEE_ONLY=1 bash ~/app/scripts/ecs-git-pull-main.sh
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+if [[ "${ECS_GIT_PULL_GITEE_ONLY:-}" == "1" ]]; then
+  exec bash "$ROOT/scripts/ecs-git-pull-gitee.sh"
+fi
 
 if [[ ! -d .git ]]; then
   echo "FATAL: $ROOT 不是 git 仓库"

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # 确保 meoo-auth-api 在 :3001 监听（失败则自动跑 ecs-fix-erp-api-502.sh）
-# ECS admin（勿用 git pull gitee，ECS 只有 origin）:
+# 轻量 admin（只拉 Gitee）:
+#   cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-ensure-auth-api.sh
+# 其它 ECS:
 #   cd ~/app && bash scripts/ecs-git-pull-main.sh && bash scripts/ecs-ensure-auth-api.sh
 
 set -euo pipefail

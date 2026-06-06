@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 云剪 / 数字人口播 / 注册表 一键探活（在轻量或本机执行）
+# 轻量先拉代码: bash ~/app/scripts/ecs-git-pull-gitee.sh
 set -euo pipefail
 
 BASE="${MEOO_DIAG_BASE:-https://mofangdianai.com}"
