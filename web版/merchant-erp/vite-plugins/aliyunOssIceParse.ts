@@ -111,3 +111,10 @@ export function iceOssUploadAvailable(
 ): boolean {
   return resolveIceOssUploadPrefix(cfg, env) !== null
 }
+
+/** ICE 时间线与浏览器预览须 HTTPS，避免 Mixed Content 与 InputFile is bad */
+export function ensureIceHttpsUrl(url: string): string {
+  const trimmed = url.trim()
+  if (!trimmed) return trimmed
+  return trimmed.replace(/^http:\/\//i, 'https://')
+}

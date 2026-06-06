@@ -11,7 +11,7 @@ declare module 'ali-oss' {
     })
     signatureUrl(
       name: string,
-      options?: Record<string, string | number | undefined>,
+      options?: Record<string, string | number | boolean | undefined>,
     ): string
     put(
       name: string,

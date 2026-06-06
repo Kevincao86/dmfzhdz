@@ -16,6 +16,7 @@ import {
   parseIceEditBriefPlan,
   type IceBriefTimelinePlan,
 } from './iceBriefTimelinePlan.js'
+import { ensureIceHttpsUrl, isIceVodOutinBucket } from './aliyunOssIceParse.js'
 
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
@@ -211,9 +212,9 @@ function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
   }
 }
 
-/** 多图轮播时间线：按文案解析的每张停留时长拼接，并叠加字幕轨 */
+/** 多图轮播时间线：HTTPS MediaURL（与 MediaId 二选一），阿里云图片轨建议带 Duration */
 function buildTimelineFromImages(
-  mediaIds: string[],
+  imageUrls: string[],
   plan: IceBriefTimelinePlan,
   width: number,
   height: number,
@@ -221,24 +222,25 @@ function buildTimelineFromImages(
   let cursor = 0
   const clips: Record<string, unknown>[] = []
   const durations =
-    plan.imageDurations.length === mediaIds.length
+    plan.imageDurations.length === imageUrls.length
       ? plan.imageDurations
-      : Array.from({ length: mediaIds.length }, () =>
-          Math.max(0.5, plan.totalDurationSec / mediaIds.length),
+      : Array.from({ length: imageUrls.length }, () =>
+          Math.max(0.5, plan.totalDurationSec / imageUrls.length),
         )
 
-  for (let i = 0; i < mediaIds.length; i++) {
+  for (let i = 0; i < imageUrls.length; i++) {
     const dur = Math.max(0.5, durations[i] ?? 1)
     const clip: Record<string, unknown> = {
       Type: 'Image',
-      MediaId: mediaIds[i],
+      MediaURL: ensureIceHttpsUrl(imageUrls[i]!),
       TimelineIn: cursor,
       TimelineOut: cursor + dur,
+      Duration: dur,
       Width: width,
       Height: height,
     }
     const effects: Record<string, unknown>[] = []
-    appendClipEffects(effects, plan, dur, i, mediaIds.length)
+    appendClipEffects(effects, plan, dur, i, imageUrls.length)
     if (effects.length) clip.Effects = effects
     clips.push(clip)
     cursor += dur
@@ -349,7 +351,7 @@ function buildOutputConfig(
   | { ok: false; message: string } {
   const prefix = cfg.outputOssUrlPrefix?.replace(/\/+$/, '')
   if (prefix) {
-    const mediaURL = `${prefix}/${jobKey}.mp4`
+    const mediaURL = ensureIceHttpsUrl(`${prefix}/${jobKey}.mp4`)
     return {
       ok: true,
       target: 'oss-object',
@@ -425,14 +427,46 @@ function normalizeIceStorageLocationHost(raw: string | undefined): string {
   return (trimmed.split('/')[0] ?? trimmed).trim()
 }
 
-function buildIceRegisterConfig(cfg: AliyunIceConfig): string {
+/** 从 oss:// 或 HTTPS 地址解析 Bucket 名 */
+function iceUrlBucketName(url: string): string | undefined {
+  const trimmed = url.trim()
+  if (trimmed.startsWith('oss://')) {
+    const rest = trimmed.slice(6)
+    const slash = rest.indexOf('/')
+    if (slash > 0) return rest.slice(0, slash).trim() || undefined
+    return rest.trim() || undefined
+  }
+  try {
+    const host = new URL(trimmed).hostname
+    const m = host.match(/^([^.]+)\.oss-[a-z0-9-]+\.aliyuncs\.com$/i)
+    return m?.[1]
+  } catch {
+    return undefined
+  }
+}
+
+/** 自建 OSS 素材勿写入 outin StorageLocation，否则 RegisterMediaInfo 与真实文件位置不一致 */
+function buildIceRegisterConfig(cfg: AliyunIceConfig, inputURL?: string): string {
   const registerConfig: Record<string, string> = {
     NeedSprite: 'false',
     NeedSnapshot: 'false',
   }
   const storage = normalizeIceStorageLocationHost(cfg.vodStorageLocation)
-  if (storage) registerConfig.StorageLocation = storage
+  const bucket = inputURL ? iceUrlBucketName(inputURL) : undefined
+  if (storage && (!bucket || isIceVodOutinBucket(bucket))) {
+    registerConfig.StorageLocation = storage
+  }
   return JSON.stringify(registerConfig)
+}
+
+function formatIceProduceError(raw: string): string {
+  if (/InputFile is bad|inputfile is bad/i.test(raw)) {
+    return (
+      `${raw}。常见原因：素材 OSS 不可读、媒资注册 Bucket 与文件不一致、或时间线须使用 HTTPS 的 MediaURL。` +
+      `请重新本地上传图片后重试。`
+    )
+  }
+  return raw
 }
 
 /** 轻量探活：区分 RAM 未授权与其它配置问题 */
@@ -468,7 +502,7 @@ async function registerImageUrlToMediaId(
         businessType: 'general',
         title: title.slice(0, 120),
         overwrite: true,
-        registerConfig: buildIceRegisterConfig(cfg),
+        registerConfig: buildIceRegisterConfig(cfg, inputURL),
       }),
     )
     const body = bodyOf(res)
@@ -561,16 +595,18 @@ export async function iceRunImagesPipeline(
   | { ok: true; jobId: string; mediaId?: string }
   | { ok: false; message: string; step?: string }
 > {
-  if (!cfg.vodStorageLocation?.trim()) {
+  if (!cfg.vodStorageLocation?.trim() && !cfg.outputOssUrlPrefix?.trim()) {
     return {
       ok: false,
       message:
-        '缺少 ICE 点播存储地址：请在运营台填写 StorageLocation（outin-***.oss-cn-shanghai.aliyuncs.com），多图成片须将素材写入该媒资库 Bucket。',
+        '缺少成片输出配置：请在运营台填写 StorageLocation 或 OSS 成片 URL 前缀，多图成片须将素材写入 IMS 已绑定的 Bucket。',
       step: 'validate',
     }
   }
 
-  const urls = input.imageUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
+  const urls = input.imageUrls
+    .map((u) => ensureIceHttpsUrl(u.trim()))
+    .filter((u) => /^https:\/\//i.test(u))
   if (urls.length === 0) {
     return { ok: false, message: '请提供至少一张公网可访问的图片 URL', step: 'validate' }
   }
@@ -609,7 +645,7 @@ export async function iceRunImagesPipeline(
     imageCount: urls.length,
     effectId: input.effectId,
   })
-  const timeline = buildTimelineFromImages(mediaIds, plan, input.width, input.height)
+  const timeline = buildTimelineFromImages(urls, plan, input.width, input.height)
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -622,7 +658,7 @@ export async function iceRunImagesPipeline(
             (input.editBrief.slice(0, 400) || '灵祺AI云剪') +
             `；多图 ${urls.length} 张；已应用时间线：${plan.summary}`,
         }),
-        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
+        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'false' }),
         source: 'OPENAPI',
         clientToken: jobKey,
       }),
@@ -633,9 +669,10 @@ export async function iceRunImagesPipeline(
     const mediaId = typeof submitBody?.mediaId === 'string' ? submitBody.mediaId : undefined
     return { ok: true, jobId, mediaId }
   } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e)
     return {
       ok: false,
-      message: e instanceof Error ? e.message : String(e),
+      message: formatIceProduceError(raw),
       step: 'submit_job',
     }
   }
@@ -817,7 +854,7 @@ export async function iceGetProducingJob(
             : typeof job.Progress === 'number'
               ? job.Progress
               : undefined,
-        message: readIceJobString(job, 'message', 'Message'),
+        message: formatIceProduceError(readIceJobString(job, 'message', 'Message') ?? ''),
       }
     } catch (e) {
       lastMsg = formatIceClientError(e, cfg)
