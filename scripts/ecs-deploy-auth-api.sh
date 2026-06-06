@@ -7,7 +7,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-bash "$ROOT/scripts/ecs-git-pull-main.sh"
+if [[ -f "$ROOT/scripts/ecs-git-pull-gitee.sh" ]]; then
+  bash "$ROOT/scripts/ecs-git-pull-gitee.sh"
+else
+  bash "$ROOT/scripts/ecs-git-pull-main.sh"
+fi
 bash "$ROOT/scripts/ecs-fix-erp-api-502.sh"
 
 echo ""
