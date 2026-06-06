@@ -751,12 +751,15 @@ Page({
     wx.showLoading({ title: '连接中' })
     try {
       await chat.syncProfile()
-      const sessionId = await chat.ensureSessionWithTalent({
-        id,
-        talentMemberId: id === 'mock-preview' ? 'mock-preview' : id,
-        name,
-        avatar,
-      })
+      const sessionId = await chat.ensureSessionWithTalent(
+        {
+          id,
+          talentMemberId: id === 'mock-preview' ? 'mock-preview' : id,
+          name,
+          avatar,
+        },
+        this.data.registryCache,
+      )
       wx.hideLoading()
       wx.navigateTo({
         url:

@@ -1,5 +1,7 @@
 const api = require('./api.js')
 const participant = require('./participant.js')
+const chatKeys = require('./talentChatKeys.js')
+const opsRegistry = require('./opsRegistryTalentMp.js')
 
 const POLL_MS = 2500
 const CHAT_PATH = '/api/meoo-ops-mp-talent-chat'
@@ -99,6 +101,45 @@ async function listSessions(part) {
   return data.sessions || []
 }
 
+async function listSessionsForMe(part) {
+  const base = part || participant.getCurrentParticipant()
+  if (base.role === 'pr') return listSessions(base)
+
+  let reg = null
+  try {
+    reg = await opsRegistry.fetchRegistry()
+  } catch (_) {
+    /* 无 registry 时仍用本地 id 候选 */
+  }
+
+  const tried = new Set()
+  let best = []
+  const candidates = chatKeys.collectTalentChatKeyCandidates(reg)
+  for (let i = 0; i < candidates.length; i++) {
+    const key = candidates[i]
+    if (tried.has(key)) continue
+    tried.add(key)
+    const p =
+      key === base.participantKey ? base : chatKeys.talentChatParticipantForKey(base, key)
+    try {
+      await syncProfile(p)
+      const rows = await listSessions(p)
+      if (rows.length > best.length) best = rows
+    } catch (_) {
+      /* 尝试下一个 key */
+    }
+  }
+
+  if (!best.length) {
+    try {
+      return await listSessions(base)
+    } catch (_) {
+      return []
+    }
+  }
+  return best
+}
+
 async function fetchMessages(sessionId, sinceTs, part) {
   const p = part || participant.getCurrentParticipant()
   const data = await viaApi({
@@ -154,14 +195,14 @@ async function ensureSessionRpc(input) {
   return String(data.sessionId)
 }
 
-async function ensureSessionWithTalent(talent) {
+async function ensureSessionWithTalent(talent, reg) {
   const me = participant.getCurrentParticipant()
   if (me.role !== 'pr') {
     throw new Error('请切换为 PR 身份后发起沟通')
   }
-  const talentKey = participant.talentParticipantKey({
-    id: talent.talentMemberId || talent.id,
-  })
+  const rawId = talent.talentMemberId || talent.id
+  const memberId = chatKeys.canonicalTalentMemberIdFromRegistry(reg || null, rawId) || rawId
+  const talentKey = participant.talentParticipantKey({ id: memberId })
   const talentSecret = participant.bootstrapTalentSecret(talentKey)
   return ensureSessionRpc({
     talentKey,
@@ -398,6 +439,9 @@ module.exports = {
   formatChatError,
   syncProfile,
   listSessions,
+  listSessionsForMe,
+  participantForSession: chatKeys.participantForSession,
+  sessionAuthKeyForMe: chatKeys.sessionAuthKeyForMe,
   listMutualTalentKeysForPr,
   fetchMessages,
   sendMessage,

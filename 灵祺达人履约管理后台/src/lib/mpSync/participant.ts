@@ -31,7 +31,8 @@ export function bootstrapTalentSecret(talentKey: string) {
 export function resolveTalentMemberId(): string {
   const member = readMember()
   const acc = getAccount()
-  return String(member?.id || acc?.registryMemberId || '').trim()
+  // 云端 registryMemberId（MTM-*）优先，避免本地 member.id 与 PR 发起会话时不一致
+  return String(acc?.registryMemberId || member?.id || '').trim()
 }
 
 export function talentParticipantKey(member: { id?: string } | null) {

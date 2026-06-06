@@ -9,6 +9,16 @@ import {
   peerDisplay,
   unreadForMe,
 } from './participant'
+import { fetchMpRegistry } from '../mpApi'
+import {
+  canonicalTalentMemberIdFromRegistry,
+  collectTalentChatKeyCandidates,
+  participantForSession,
+  sessionAuthKeyForMe,
+  talentChatParticipantForKey,
+} from './talentChatKeys'
+
+export { participantForSession, sessionAuthKeyForMe }
 
 const CHAT_PATH = '/api/meoo-ops-mp-talent-chat'
 export const POLL_MS = 2500
@@ -110,6 +120,44 @@ export async function listSessions(part?: ChatParticipant) {
   return (data.sessions || []) as ChatSession[]
 }
 
+/** 达人端：按多个历史 participant_key 尝试拉取会话（修复 PR 用 TL/LQ id 建会话） */
+export async function listSessionsForMe(part?: ChatParticipant) {
+  const base = part || getCurrentParticipant()
+  if (base.role === 'pr') return listSessions(base)
+
+  let reg: Parameters<typeof collectTalentChatKeyCandidates>[0] = null
+  try {
+    reg = (await fetchMpRegistry()) as Parameters<typeof collectTalentChatKeyCandidates>[0]
+  } catch {
+    /* 无 registry 时仍用本地 id 候选 */
+  }
+
+  const tried = new Set<string>()
+  let best: ChatSession[] = []
+
+  for (const key of collectTalentChatKeyCandidates(reg)) {
+    if (tried.has(key)) continue
+    tried.add(key)
+    const p = key === base.participantKey ? base : talentChatParticipantForKey(base, key)
+    try {
+      await syncProfile(p)
+      const rows = await listSessions(p)
+      if (rows.length > best.length) best = rows
+    } catch {
+      /* 尝试下一个 key */
+    }
+  }
+
+  if (!best.length) {
+    try {
+      return await listSessions(base)
+    } catch {
+      return []
+    }
+  }
+  return best
+}
+
 export async function fetchMessages(sessionId: string, sinceTs: number, part?: ChatParticipant) {
   const p = part || getCurrentParticipant()
   const data = await viaApi({
@@ -165,15 +213,20 @@ async function ensureSessionRpc(input: Record<string, string>) {
   return String(data.sessionId)
 }
 
-export async function ensureSessionWithTalent(talent: {
-  id: string
-  talentMemberId?: string
-  name?: string
-  avatar?: string
-}) {
+export async function ensureSessionWithTalent(
+  talent: {
+    id: string
+    talentMemberId?: string
+    name?: string
+    avatar?: string
+  },
+  reg?: { mpTalentMembers?: Record<string, unknown>[]; talentLibraryEntries?: Record<string, unknown>[] } | null,
+) {
   const me = getCurrentParticipant()
   if (me.role !== 'pr') throw new Error('请切换为 PR 身份后发起沟通')
-  const talentKey = talentParticipantKey({ id: talent.talentMemberId || talent.id })
+  const rawId = talent.talentMemberId || talent.id
+  const memberId = canonicalTalentMemberIdFromRegistry(reg || null, rawId) || rawId
+  const talentKey = talentParticipantKey({ id: memberId })
   const talentSecret = bootstrapTalentSecret(talentKey)
   return ensureSessionRpc({
     talentKey,

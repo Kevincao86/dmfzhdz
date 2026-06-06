@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getCurrentParticipant } from '../../lib/mpSync/participant'
 import {
   canSendNextMessage,
   CHAT_TURN_HINT,
@@ -8,19 +7,22 @@ import {
   markRead,
   mergeMessages,
   newMsgId,
+  participantForSession,
   POLL_MS,
   sendMessage,
   syncProfile,
   type UiChatMessage,
 } from '../../lib/mpSync/talentChat'
+import { getCurrentParticipant } from '../../lib/mpSync/participant'
 
 type Props = {
   sessionId: string
   peerName: string
   peerAvatar: string
+  sessionRow?: { talent_key?: string; pr_key?: string }
 }
 
-export default function ChatPanel({ sessionId, peerName, peerAvatar }: Props) {
+export default function ChatPanel({ sessionId, peerName, peerAvatar, sessionRow }: Props) {
   const [messages, setMessages] = useState<UiChatMessage[]>([])
   const [input, setInput] = useState('')
   const [ready, setReady] = useState(false)
@@ -29,7 +31,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar }: Props) {
   const sinceTsRef = useRef(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const me = getCurrentParticipant()
+  const me = sessionRow ? participantForSession(sessionRow) : getCurrentParticipant()
 
   const scrollBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -49,19 +51,19 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar }: Props) {
   const syncCloud = useCallback(async () => {
     if (!sessionId || !ready) return
     try {
-      const rows = await fetchMessages(sessionId, sinceTsRef.current)
+      const rows = await fetchMessages(sessionId, sinceTsRef.current, me)
       if (!rows.length) return
       setMessages((prev) => {
         const merged = mergeMessages(prev, rows, me.role)
         sinceTsRef.current = Math.max(sinceTsRef.current, ...merged.map((m) => m.ts || 0))
         return merged
       })
-      await markRead(sessionId)
+      await markRead(sessionId, me)
       requestAnimationFrame(scrollBottom)
     } catch {
       /* 轮询静默 */
     }
-  }, [sessionId, ready, me.role, scrollBottom])
+  }, [sessionId, ready, me, scrollBottom])
 
   useEffect(() => {
     let cancelled = false
@@ -72,12 +74,12 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar }: Props) {
         return
       }
       try {
-        await syncProfile()
-        const rows = await fetchMessages(sessionId, 0)
+        await syncProfile(me)
+        const rows = await fetchMessages(sessionId, 0, me)
         if (cancelled) return
         const merged = mergeMessages([], rows, me.role)
         applyMessages(merged)
-        await markRead(sessionId)
+        await markRead(sessionId, me)
         setReady(true)
         setStatusSub('消息已同步')
       } catch (e) {
@@ -90,7 +92,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar }: Props) {
     return () => {
       cancelled = true
     }
-  }, [sessionId, me.role, applyMessages])
+  }, [sessionId, me, applyMessages])
 
   useEffect(() => {
     pollRef.current = setInterval(() => void syncCloud(), POLL_MS)
@@ -124,7 +126,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar }: Props) {
     sinceTsRef.current = Math.max(sinceTsRef.current, optimistic.ts)
     requestAnimationFrame(scrollBottom)
     try {
-      await sendMessage(sessionId, text, mid)
+      await sendMessage(sessionId, text, mid, me)
       void syncCloud()
     } catch (e) {
       setSendErr(formatChatError(e))
