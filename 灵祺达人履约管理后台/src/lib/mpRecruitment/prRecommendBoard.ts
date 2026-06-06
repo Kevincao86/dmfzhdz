@@ -131,50 +131,84 @@ function formatSupplierFromApplicant(a: Record<string, unknown>, board: 'shoot' 
   }
 }
 
+function platAccountDedupeKey(platform: string, account: string): string | null {
+  const a = String(account || '').trim().toLowerCase()
+  if (!a) return null
+  return `${String(platform || '抖音').trim()}::${a}`
+}
+
+/** 会员与达人库常为同一人但 id 不同（TL-* vs MTM-*），按灵祺 ID / 平台账号 / 手机号去重 */
+function collectTalentDedupeKeys(source: Record<string, unknown>, primary?: ReturnType<typeof primaryPlatformProfile>) {
+  const keys: string[] = []
+  const id = String(source.id || '').trim()
+  const lq = String(source.lingqiTalentId || '').trim()
+  if (id) keys.push(`id:${id}`)
+  if (lq) keys.push(`lq:${lq}`)
+  const p = primary?.profile
+  const plat = String(primary?.platform || source.platform || '抖音')
+  const pk = platAccountDedupeKey(plat, String(p?.platformAccount || source.platformAccount || ''))
+  if (pk) keys.push(`pk:${pk}`)
+  const phone = String(source.contact || '').replace(/\D/g, '').slice(-11)
+  if (phone.length >= 11) keys.push(`ph:${phone}`)
+  return keys
+}
+
+function appendTalentIfNew(
+  row: TalentCardRow | null,
+  keys: string[],
+  seen: Set<string>,
+  out: TalentCardRow[],
+) {
+  if (!row?.id) return
+  if (keys.some((k) => seen.has(k))) return
+  keys.forEach((k) => seen.add(k))
+  seen.add(`id:${row.id}`)
+  out.push(row)
+}
+
 function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
   const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
   const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
-  const fromLib = library.map((e) => {
+  const seen = new Set<string>()
+  const out: TalentCardRow[] = []
+
+  for (const m of members) {
+    const mem = m as Record<string, unknown>
+    if (!memberMatchesBoard(mem, 'talent')) continue
+    const primary = primaryPlatformProfile(mem)
+    const p = primary?.profile
+    const raw = Number(p?.followers) || 0
+    const nick = String(p?.platformNickname || mem.wxNickName || mem.contact || '').trim()
+    if (!nick) continue
+    const row = formatTalent({
+      id: mem.id || mem.lingqiTalentId,
+      platformNickname: nick,
+      wxAvatarUrl: mem.wxAvatarUrl,
+      platform: primary?.platform || '抖音',
+      followers: raw,
+      province: mem.province,
+      city: mem.city,
+      qualityTag: '会员',
+      gender: mem.gender,
+      accountTags: accountTagsFromMember(mem),
+      douyinSalesLevel: p?.douyinSalesLevel || '',
+    })
+    appendTalentIfNew(row, collectTalentDedupeKeys(mem, primary), seen, out)
+  }
+
+  for (const e of library) {
     const row = e as Record<string, unknown>
     const raw = Number(row.followers) || 0
-    return formatTalent({
+    const card = formatTalent({
       ...row,
       id: row.id || row.lingqiTalentId,
       platformNickname: row.platformNickname || row.name,
       qualityTag: raw >= 50000 ? '优质' : '推荐',
     })
-  })
-  const fromMembers = members
-    .filter((m) => memberMatchesBoard(m as Record<string, unknown>, 'talent'))
-    .map((m) => {
-      const mem = m as Record<string, unknown>
-      const primary = primaryPlatformProfile(mem)
-      const p = primary?.profile
-      const raw = Number(p?.followers) || 0
-      const nick = String(p?.platformNickname || mem.wxNickName || mem.contact || '').trim()
-      if (!nick) return null
-      return formatTalent({
-        id: mem.id || mem.lingqiTalentId,
-        platformNickname: nick,
-        wxAvatarUrl: mem.wxAvatarUrl,
-        platform: primary?.platform || '抖音',
-        followers: raw,
-        province: mem.province,
-        city: mem.city,
-        qualityTag: '会员',
-        gender: mem.gender,
-        accountTags: accountTagsFromMember(mem),
-        douyinSalesLevel: p?.douyinSalesLevel || '',
-      })
-    })
-    .filter((r): r is TalentCardRow => !!r && !!r.id)
-  const merged = [...fromLib, ...fromMembers]
-  const seen = new Set<string>()
-  return merged.filter((r) => {
-    if (!r.id || seen.has(r.id)) return false
-    seen.add(r.id)
-    return true
-  })
+    appendTalentIfNew(card, collectTalentDedupeKeys(row), seen, out)
+  }
+
+  return out
 }
 
 function suppliersFromRegistry(reg: MpRegistry, board: 'shoot' | 'edit'): TalentCardRow[] {

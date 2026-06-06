@@ -95,6 +95,25 @@ export function buildShareTitle(order: { title?: string; region?: string }): str
   return `${order.title || '招募'} · ${order.region || '全国'}招募`
 }
 
+/** 达人分享招募单（无 PR 机构抬头） */
+export async function copyRecruitmentShareForTalent(order: Record<string, unknown>) {
+  const id = String(order.id || '').trim()
+  if (!id) throw new Error('订单数据缺失')
+  const text = buildGroupCopyText(
+    {
+      id,
+      title: String(order.title || ''),
+      region: String(order.region || '全国'),
+      recruitmentInfo: String(order.recruitmentInfo || ''),
+      taskDetail: String(order.taskDetail || ''),
+      merchantRequirements: String(order.merchantRequirements || ''),
+    },
+    null,
+  )
+  await navigator.clipboard.writeText(text)
+  return text
+}
+
 export async function copyRecruitmentShare(order: Record<string, unknown>, prProfile?: ReturnType<typeof readPrProfile> | null) {
   const id = String(order.id || '').trim()
   if (!id) throw new Error('订单数据缺失')
