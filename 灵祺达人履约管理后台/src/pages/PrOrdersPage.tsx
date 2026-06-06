@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry, patchMpRecruitmentOrder } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
+import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { readPublishedOrders } from '../lib/mpRecruitment/publishedOrders'
 import {
@@ -15,13 +16,28 @@ import { DELIVERY_WINDOWS } from '../lib/mpSync/publishFormOptions'
 
 type Tab = 'published' | 'drafts'
 
+const TARGET_FILTERS = [
+  { id: 'all', label: '全部身份' },
+  { id: 'talent', label: '达人' },
+  { id: 'shoot', label: '拍摄' },
+  { id: 'edit', label: '剪辑' },
+] as const
+
 type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   mpOrderId: string
   hallLabel: string
+  platform: string
+  recruitTarget: 'talent' | 'shoot' | 'edit'
 }
 
 function deliveryWindowLabel(id: string) {
   return DELIVERY_WINDOWS.find((w) => w.id === id)?.label || '招募大厅'
+}
+
+function recruitTargetLabel(t: string) {
+  if (t === 'shoot') return '拍摄'
+  if (t === 'edit') return '剪辑'
+  return '达人'
 }
 
 export default function PrOrdersPage() {
@@ -34,6 +50,8 @@ export default function PrOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
+  const [filterTarget, setFilterTarget] = useState('all')
+  const [filterPlatform, setFilterPlatform] = useState('全部')
 
   const refreshDrafts = useCallback(() => {
     setDrafts(listPublishDrafts())
@@ -53,7 +71,13 @@ export default function PrOrdersPage() {
         local.map((item) => {
           const mp = mpList.find((o) => o && o.id === item.mpOrderId)
           const enriched = listFilters.enrichMpOrderListItem(mp || null, item)
-          return { ...enriched, mpOrderId: item.mpOrderId, hallLabel: enriched.hallLabel as string }
+          return {
+            ...enriched,
+            mpOrderId: item.mpOrderId,
+            hallLabel: enriched.hallLabel as string,
+            platform: enriched.platform as string,
+            recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
+          }
         }),
       )
     } catch (e) {
@@ -61,7 +85,13 @@ export default function PrOrdersPage() {
       setRows(
         local.map((item) => {
           const enriched = listFilters.enrichMpOrderListItem(null, item)
-          return { ...enriched, mpOrderId: item.mpOrderId, hallLabel: '招募大厅' }
+          return {
+            ...enriched,
+            mpOrderId: item.mpOrderId,
+            hallLabel: '招募大厅',
+            platform: '抖音',
+            recruitTarget: 'talent' as const,
+          }
         }),
       )
     }
@@ -77,6 +107,14 @@ export default function PrOrdersPage() {
   useEffect(() => {
     void load()
   }, [refreshDrafts])
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (filterTarget !== 'all' && row.recruitTarget !== filterTarget) return false
+      if (!hallFilters.matchPlatform(row.platform, filterPlatform)) return false
+      return true
+    })
+  }, [rows, filterTarget, filterPlatform])
 
   function setTab(next: Tab) {
     if (next === 'drafts') setSearch({ tab: 'drafts' })
@@ -105,46 +143,74 @@ export default function PrOrdersPage() {
   }
 
   return (
-    <div>
-      <h2 className="text-xl font-bold mb-1">我的发单</h2>
-      <p className="text-sm text-slate-400 mb-4">
-        PR ID：<span className="text-amber-400 font-mono">{acc?.lingqiPrId || '—'}</span> · 已发布与草稿分开展示
-      </p>
+    <div className="max-w-3xl space-y-4">
+      <div>
+        <h2 className="text-xl font-bold text-[var(--shell-text)]">我的发单</h2>
+        <p className="text-sm text-[var(--shell-muted)] mt-1">
+          PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span> · 已发布与草稿分开展示
+        </p>
+      </div>
 
-      <div className="flex gap-2 mb-4 p-1 rounded-xl panel-input border max-w-md">
+      <div className="flex gap-2 p-1 rounded-xl panel-input border max-w-md">
         <button
           type="button"
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'published' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'
+            tab === 'published' ? 'bg-violet-600 text-white' : 'panel-tab'
           }`}
           onClick={() => setTab('published')}
         >
           已发布招募单
-          {!loading && rows.length ? (
-            <span className="ml-1 text-xs opacity-80">({rows.length})</span>
-          ) : null}
+          {!loading && rows.length ? <span className="ml-1 text-xs opacity-80">({rows.length})</span> : null}
         </button>
         <button
           type="button"
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'drafts' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white'
+            tab === 'drafts' ? 'bg-violet-600 text-white' : 'panel-tab'
           }`}
           onClick={() => setTab('drafts')}
         >
           草稿箱
-          {!loading && drafts.length ? (
-            <span className="ml-1 text-xs opacity-80">({drafts.length})</span>
-          ) : null}
+          {!loading && drafts.length ? <span className="ml-1 text-xs opacity-80">({drafts.length})</span> : null}
         </button>
       </div>
 
-      {loading ? <p className="text-slate-400">加载中…</p> : null}
-      {err && tab === 'published' ? <p className="text-amber-500 text-sm mb-2">{err}</p> : null}
+      {tab === 'published' && rows.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-xs text-[var(--shell-muted)]">筛选</span>
+            {TARGET_FILTERS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`px-3 py-1.5 rounded-lg text-sm ${filterTarget === f.id ? 'bg-violet-600 text-white' : 'panel-tab'}`}
+                onClick={() => setFilterTarget(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+            <select
+              className="rounded-lg panel-input border px-2 py-1.5 text-sm ml-auto"
+              value={filterPlatform}
+              onChange={(e) => setFilterPlatform(e.target.value)}
+            >
+              {hallFilters.PLATFORM_FILTERS.map((p) => (
+                <option key={p} value={p}>{p === '全部' ? '全部平台' : p}</option>
+              ))}
+            </select>
+          </div>
+          {filteredRows.length !== rows.length ? (
+            <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {rows.length} 条</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {loading ? <p className="text-[var(--shell-muted)]">加载中…</p> : null}
+      {err && tab === 'published' ? <p className="text-amber-600 text-sm">{err}</p> : null}
 
       {tab === 'published' ? (
         <>
           {!loading && !rows.length ? (
-            <div className="surface-card rounded-xl border p-6 text-center text-slate-500 text-sm">
+            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
               <p>暂无已发布招募单</p>
               <p className="mt-2 text-xs">发布招募成功后会出现在此处；也可在小程序发单后同步到本机</p>
               <Link to="/publish" className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm">
@@ -152,23 +218,37 @@ export default function PrOrdersPage() {
               </Link>
             </div>
           ) : null}
+          {!loading && rows.length && !filteredRows.length ? (
+            <p className="text-sm text-[var(--shell-muted)] text-center py-6">当前筛选条件下暂无招募单</p>
+          ) : null}
           <div className="space-y-3">
-            {rows.map((row) => (
+            {filteredRows.map((row) => (
               <article key={row.mpOrderId} className="surface-card rounded-xl border p-4">
                 <div className="flex justify-between gap-2 items-start">
-                  <div>
-                    <span className="text-xs text-violet-400">{row.hallLabel}</span>
-                    <h3 className="font-semibold mt-1">{row.title}</h3>
-                    <p className="text-xs text-slate-500 mt-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-xs text-violet-500">{row.hallLabel}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{recruitTargetLabel(row.recruitTarget)}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{row.platform}</span>
+                    </div>
+                    <h3 className="font-semibold mt-1 text-[var(--shell-text)]">{row.title}</h3>
+                    <p className="text-xs text-[var(--shell-muted)] mt-2">
                       {row.signupLabel} · {row.deadlineDaysText}
                     </p>
                   </div>
-                  <span className="text-xs px-2 py-0.5 rounded bg-white/10">{row.statusLabel}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-white/10 shrink-0">{row.statusLabel}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link
+                    to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                    className="text-sm px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500"
+                  >
+                    报名管理
+                    {row.applicantCount ? <span className="ml-1 opacity-80">({row.applicantCount})</span> : null}
+                  </Link>
+                  <Link
                     to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
-                    className="text-sm px-3 py-1.5 rounded-lg border border-violet-500/40 text-violet-300 hover:bg-violet-600/10"
+                    className="text-sm px-3 py-1.5 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50"
                   >
                     编辑招募
                   </Link>
@@ -176,7 +256,7 @@ export default function PrOrdersPage() {
                     <button
                       type="button"
                       disabled={togglingId === row.mpOrderId}
-                      className="text-sm px-3 py-1.5 rounded-lg border border-white/20 hover:bg-white/5"
+                      className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] hover:bg-white/5"
                       onClick={() => void onToggle(row)}
                     >
                       {row.toggleActionLabel}招募
@@ -190,7 +270,7 @@ export default function PrOrdersPage() {
       ) : (
         <>
           {!loading && !drafts.length ? (
-            <div className="surface-card rounded-xl border p-6 text-center text-slate-500 text-sm">
+            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
               <p>草稿箱为空</p>
               <p className="mt-2 text-xs">在「发布招募」填写表单后点击「保存草稿」，会出现在此处</p>
               <Link to="/publish" className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm">
@@ -203,9 +283,9 @@ export default function PrOrdersPage() {
               <article key={draft.id} className="surface-card rounded-xl border border-amber-500/25 p-4">
                 <div className="flex justify-between gap-2 items-start">
                   <div>
-                    <span className="text-xs text-amber-400/90">草稿</span>
+                    <span className="text-xs text-amber-500/90">草稿</span>
                     <h3 className="font-semibold mt-1">{draftDisplayTitle(draft)}</h3>
-                    <p className="text-xs text-slate-500 mt-2">
+                    <p className="text-xs text-[var(--shell-muted)] mt-2">
                       {draft.recruitModeLabel || '招募'} · {deliveryWindowLabel(draft.form.deliveryWindow)} · 保存于{' '}
                       {formatDraftSavedAt(draft.savedAt)}
                     </p>
@@ -220,7 +300,7 @@ export default function PrOrdersPage() {
                   </Link>
                   <button
                     type="button"
-                    className="text-sm px-3 py-1.5 rounded-lg border border-white/20 hover:bg-white/5"
+                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
                     onClick={() => onDeleteDraft(draft.id)}
                   >
                     删除

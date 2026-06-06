@@ -1,7 +1,8 @@
 import type { MpRegistry, RecruitmentOrderRow, TalentCardRow } from './types'
 import { postMpRecruitmentAi } from '../mpApi'
-import { mapMpOrderRow } from './orderCard'
+import { isIceMpOrder, mapMpOrderRow } from './orderCard'
 import { readPublishedOrders } from './publishedOrders'
+import type { PrBoardId } from './prRecommendBoard'
 
 function hallKey(row: RecruitmentOrderRow) {
   if (row.isIce) return 'ice'
@@ -126,7 +127,28 @@ export async function enrichOrderMatches(
   return enriched
 }
 
-export function resolvePrRecentOrders(reg: MpRegistry) {
+function prOrderAiPayload(mp: Record<string, unknown>, row: RecruitmentOrderRow) {
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? (mp.mpPublishMeta as Record<string, unknown>) : {}
+  const info = String(mp.recruitmentInfo || mp.merchantRequirements || '').slice(0, 500)
+  return {
+    ...orderAiPayload(row),
+    talentTags: Array.isArray(meta.talentTags) ? meta.talentTags : [],
+    infoSummary: info,
+    recruitDetail: String(meta.recruitDetail || '').slice(0, 200),
+  }
+}
+
+export function orderMatchesPrBoard(row: RecruitmentOrderRow, mp: Record<string, unknown> | null, board: PrBoardId): boolean {
+  if (!row) return false
+  const target = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+  if (row.recruitTarget === target) return true
+  if (board === 'edit' && row.isIce) return true
+  if (board === 'talent' && mp && isIceMpOrder(mp)) return false
+  return false
+}
+
+export function resolvePrRecentOrders(reg: MpRegistry, opts?: { board?: PrBoardId; recruitTarget?: PrBoardId }) {
+  const board = opts?.board || opts?.recruitTarget || 'talent'
   const local = readPublishedOrders()
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const out: { mp: Record<string, unknown>; row: RecruitmentOrderRow; payload: Record<string, unknown> }[] = []
@@ -135,20 +157,46 @@ export function resolvePrRecentOrders(reg: MpRegistry) {
     const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
     if (!mp || (mp.status !== 'open' && mp.status !== 'collecting')) continue
     const row = mapMpOrderRow(mp, reg)
-    out.push({
-      mp,
-      row,
-      payload: {
-        ...orderAiPayload(row),
-        talentTags: Array.isArray((mp.mpPublishMeta as Record<string, unknown>)?.talentTags)
-          ? (mp.mpPublishMeta as Record<string, unknown>).talentTags
-          : [],
-        infoSummary: String(mp.recruitmentInfo || mp.merchantRequirements || '').slice(0, 500),
-      },
-    })
+    if (board && !orderMatchesPrBoard(row, mp, board)) continue
+    out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
     if (out.length >= 6) break
   }
   return out
+}
+
+export function fallbackTalentScore(
+  talent: TalentCardRow,
+  orderPayloads: Record<string, unknown>[],
+): { score: number; tag: string; tone: string } {
+  if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
+  let best = 0
+  let tag = '可沟通'
+  for (const o of orderPayloads) {
+    let s = 40
+    const plat = String(o.platform || '')
+    const tPlat = String(talent.platform || '')
+    if (plat && tPlat && plat === tPlat) s += 20
+    const region = String(o.region || '')
+    const tRegion = String(talent.region || '')
+    if (region && tRegion && region.includes('全国')) s += 5
+    else if (region && tRegion && region.includes(tRegion.split('·')[0]?.trim() || '')) s += 15
+    const needTags = (o.talentTags as string[]) || []
+    const tTags = talent.tags || talent.accountTags || []
+    if (needTags.length && tTags.some((t) => needTags.includes(t))) s += 15
+    const fansReq = String(o.fansRequirement || o.fans || '')
+    const f = Number(talent.followersRaw) || 0
+    if (fansReq.includes('不限')) s += 10
+    else {
+      const fm = fansReq.match(/(\d+)/)
+      if (fm && f >= Number(fm[1])) s += 12
+    }
+    if (s > best) {
+      best = s
+      if (s >= 70) tag = '较契合'
+      else if (plat === tPlat) tag = '平台匹配'
+    }
+  }
+  return { score: Math.min(88, best), tag, tone: best >= 65 ? 'match' : 'default' }
 }
 
 function talentAiPayload(row: TalentCardRow) {
@@ -166,34 +214,17 @@ function talentAiPayload(row: TalentCardRow) {
   }
 }
 
-function fallbackTalentScore(
-  talent: TalentCardRow,
-  orderPayloads: Record<string, unknown>[],
-): { score: number; tag: string; tone: string } {
-  if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
-  let best = 0
-  let tag = '可沟通'
-  for (const o of orderPayloads) {
-    let s = 40
-    if (o.platform && talent.platform && o.platform === talent.platform) s += 20
-    const region = String(o.region || '')
-    const tRegion = talent.region || ''
-    if (region.includes('全国')) s += 5
-    else if (region && tRegion && region.includes(tRegion.split('·')[0]?.trim() || '')) s += 15
-    if (s > best) {
-      best = s
-      if (s >= 70) tag = '较契合'
-    }
-  }
-  return { score: Math.min(88, best), tag, tone: best >= 65 ? 'match' : 'default' }
-}
-
-export async function enrichTalentMatchesForPr(rows: TalentCardRow[], reg: MpRegistry) {
-  const packs = resolvePrRecentOrders(reg)
+export async function enrichTalentMatchesForPr(
+  rows: TalentCardRow[],
+  reg: MpRegistry,
+  opts?: { board?: PrBoardId },
+) {
+  const list = rows.filter((t) => t?.id && !t.isPreview)
+  const packs = resolvePrRecentOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
-  if (!orderPayloads.length) return rows
+  if (!orderPayloads.length) return list
   const map: Record<string, { score: number; tag: string; tone: string }> = {}
-  for (const part of chunk(rows, 12)) {
+  for (const part of chunk(list, 12)) {
     try {
       const res = await postMpRecruitmentAi({
         mode: 'match_talent',
@@ -213,21 +244,15 @@ export async function enrichTalentMatchesForPr(rows: TalentCardRow[], reg: MpReg
       break
     }
   }
-  return rows
+  return list
     .map((t) => {
       const hit = map[t.id]
       if (hit) {
         const score = Math.min(100, Math.round(hit.score))
-        return {
-          ...t,
-          matchScore: score,
-          aiTag: hit.tag || t.aiTag,
-          aiTagTone: hit.tone,
-          aiMatch: score >= 55,
-        }
+        return { ...t, matchScore: score, aiTag: hit.tag || t.aiTag, aiTagTone: hit.tone, aiMatch: score >= 55 }
       }
       const fb = fallbackTalentScore(t, orderPayloads)
       return { ...t, matchScore: fb.score, aiTag: fb.tag, aiTagTone: fb.tone, aiMatch: fb.score >= 55 }
     })
-    .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+    .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))
 }

@@ -11,6 +11,7 @@ import ProfilePage from './pages/ProfilePage'
 import TalentProfilePage from './pages/TalentProfilePage'
 import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrProfilePage from './pages/PrProfilePage'
+import PrOrderApplicantsPage from './pages/PrOrderApplicantsPage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
 import PublishPage from './pages/PublishPage'
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/edit" element={<TemplateEditPage />} />
         <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/talent" element={<TalentProfilePage />} />
