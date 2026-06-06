@@ -83,20 +83,23 @@ Page({
       return
     }
     try {
-      await chat.syncProfile()
-      const me = participant.getCurrentParticipant()
-      const sessions = await chat.listSessions(me)
+      const base = participant.getCurrentParticipant()
+      const sessions = await chat.listSessionsForMe(base)
       const cur = (sessions || []).find((s) => String(s.id) === String(this._sessionId))
+      const me = cur ? chat.participantForSession(cur, base) : base
+      this._chatPart = me
+      await chat.syncProfile(me)
       if (cur) {
-        const peer = participant.peerDisplay(cur, me.participantKey)
+        const authKey = chat.sessionAuthKeyForMe(cur, base)
+        const peer = participant.peerDisplay(cur, authKey)
         this.setData({
           peerName: peer.name,
           peerAvatar: peer.avatar || this.data.peerAvatar,
         })
       }
-      const rows = await chat.fetchMessages(this._sessionId, 0)
+      const rows = await chat.fetchMessages(this._sessionId, 0, me)
       const merged = chat.mergeMessages([], rows)
-      await chat.markRead(this._sessionId)
+      await chat.markRead(this._sessionId, me)
       this.setData({ ready: true, statusSub: '消息已同步' })
       this.setMessages(merged, me.role)
     } catch (e) {
@@ -106,12 +109,12 @@ Page({
   async syncCloud() {
     if (!this._sessionId || !this.data.ready) return
     try {
-      const rows = await chat.fetchMessages(this._sessionId, this._sinceTs)
+      const rows = await chat.fetchMessages(this._sessionId, this._sinceTs, this._chatPart)
       if (!rows.length) return
-      const me = participant.getCurrentParticipant()
+      const me = this._chatPart || participant.getCurrentParticipant()
       const merged = chat.mergeMessages(toRawMessages(this.data.messages), rows)
       this.setMessages(merged, me.role)
-      await chat.markRead(this._sessionId)
+      await chat.markRead(this._sessionId, me)
       void chatBadgeWatcher.refreshNow()
     } catch (_) {
       /* 轮询静默 */
@@ -152,7 +155,7 @@ Page({
       }
       return
     }
-    const me = participant.getCurrentParticipant()
+    const me = this._chatPart || participant.getCurrentParticipant()
     const mid = chat.newMsgId()
     const optimistic = {
       id: mid,
@@ -166,7 +169,7 @@ Page({
     this.setData({ messages: next, input: '', scrollTo: `msg-${mid}` })
     this._sinceTs = Math.max(this._sinceTs, optimistic.ts)
     try {
-      await chat.sendMessage(this._sessionId, text, mid)
+      await chat.sendMessage(this._sessionId, text, mid, me)
       void this.syncCloud()
     } catch (e) {
       wx.showToast({ title: String(e.message || '发送失败'), icon: 'none' })

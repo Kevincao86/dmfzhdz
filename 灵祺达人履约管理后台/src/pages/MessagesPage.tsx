@@ -15,7 +15,8 @@ import { getCurrentParticipant, unreadForMe } from '../lib/mpSync/participant'
 import {
   canChat,
   formatChatError,
-  listSessions,
+  listSessionsForMe,
+  sessionAuthKeyForMe,
   sessionPeerFromRow,
   sessionPreviewTime,
   syncProfile,
@@ -51,8 +52,9 @@ export default function MessagesPage() {
   )
   const activePeer = useMemo(() => {
     if (!activeSession) return { name: '会话', avatar: '' }
-    return sessionPeerFromRow(activeSession, me.participantKey)
-  }, [activeSession, me.participantKey])
+    const authKey = sessionAuthKeyForMe(activeSession, me)
+    return sessionPeerFromRow(activeSession, authKey)
+  }, [activeSession, me])
 
   const refreshSessions = useCallback(async () => {
     if (!canChat()) {
@@ -64,7 +66,7 @@ export default function MessagesPage() {
     setSessionsErr('')
     try {
       await syncProfile()
-      const list = await listSessions()
+      const list = await listSessionsForMe()
       const sorted = [...list].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
       setSessions(sorted)
       if (!activeSessionId && sorted.length) {
@@ -174,8 +176,9 @@ export default function MessagesPage() {
                 </p>
               ) : null}
               {sessions.map((s) => {
-                const peer = sessionPeerFromRow(s, me.participantKey)
-                const unreadN = unreadForMe(s, me.participantKey)
+                const authKey = sessionAuthKeyForMe(s, me)
+                const peer = sessionPeerFromRow(s, authKey)
+                const unreadN = unreadForMe(s, authKey)
                 const sid = String(s.id)
                 const active = sid === activeSessionId
                 return (
@@ -220,6 +223,14 @@ export default function MessagesPage() {
                 sessionId={activeSessionId}
                 peerName={activePeer.name}
                 peerAvatar={activePeer.avatar}
+                sessionRow={
+                  activeSession
+                    ? {
+                        talent_key: String(activeSession.talent_key || ''),
+                        pr_key: String(activeSession.pr_key || ''),
+                      }
+                    : undefined
+                }
               />
             ) : (
               <div className="h-full flex items-center justify-center text-sm text-[#888] bg-[#ededed]">

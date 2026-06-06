@@ -2,6 +2,7 @@
  * PR 推荐大厅三板块：达人 / 拍摄 / 剪辑
  */
 const memberStore = require('./talentMember.js')
+const chatKeys = require('./talentChatKeys.js')
 const hallFilters = require('./recruitmentHallFilters.js')
 const { recruitTargetFromMp } = require('./recruitTarget.js')
 const { isIceMpOrder } = require('./recruitmentUrgent.js')
@@ -220,8 +221,10 @@ function buildTalentPool(reg) {
     const p = (primary && primary.profile) || {}
     const raw = Number(p.followers) || 0
     const tags = accountTagsFromMember(m)
+    const mid = String((m && m.id) || '').trim()
+    if (!mid) continue
     const row = formatTalentRow({
-      id: m.id,
+      id: mid,
       platformNickname: p.platformNickname || m.wxNickName,
       wxAvatarUrl: m.wxAvatarUrl,
       platform: (primary && primary.platform) || '抖音',
@@ -239,9 +242,12 @@ function buildTalentPool(reg) {
   for (let j = 0; j < library.length; j++) {
     const e = library[j]
     const raw = Number(e.followers) || 0
+    const chatId =
+      chatKeys.canonicalTalentMemberIdFromRegistry(reg, String(e.id || e.lingqiTalentId || '')) ||
+      String(e.id || e.lingqiTalentId || '')
     const row = formatTalentRow({
       ...e,
-      id: e.id,
+      id: chatId,
       qualityTag: raw >= 50000 ? '优质' : '推荐',
       gender: e.gender,
     })

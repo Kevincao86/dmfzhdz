@@ -31,7 +31,7 @@ function getDeviceSecret() {
 function resolveTalentMemberId() {
   const member = talentMember.readMember()
   const acc = sessionStore.readAccount()
-  return String((member && member.id) || (acc && acc.registryMemberId) || '').trim()
+  return String((acc && acc.registryMemberId) || (member && member.id) || '').trim()
 }
 
 function talentParticipantKey(member) {

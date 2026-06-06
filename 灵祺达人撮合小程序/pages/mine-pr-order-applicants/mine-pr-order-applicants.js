@@ -323,12 +323,16 @@ Page({
     wx.showLoading({ title: '连接中' })
     try {
       await chat.syncProfile()
-      const sessionId = await chat.ensureSessionWithTalent({
-        id: a.id,
-        talentMemberId: a.talentMemberId || a.id,
-        name: a.displayName || a.platformNickname || '达人',
-        avatar: a.avatar || '',
-      })
+      const reg = await ops.fetchRegistry()
+      const sessionId = await chat.ensureSessionWithTalent(
+        {
+          id: a.id,
+          talentMemberId: a.talentMemberId || a.id,
+          name: a.displayName || a.platformNickname || '达人',
+          avatar: a.avatar || '',
+        },
+        reg,
+      )
       wx.hideLoading()
       wx.navigateTo({
         url:

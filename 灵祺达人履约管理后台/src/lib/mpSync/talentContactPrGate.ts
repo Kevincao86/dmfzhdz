@@ -24,7 +24,7 @@ function localApplicantIdForOrder(mpOrderId: string): string {
 function applicantMatchesCurrentTalent(applicant: Record<string, unknown>): boolean {
   const member = readMember()
   const acc = getAccount()
-  const memberId = String(member?.id || acc?.registryMemberId || '').trim()
+  const memberId = String(acc?.registryMemberId || member?.id || '').trim()
   if (memberId && applicant.talentMemberId) {
     return String(applicant.talentMemberId).trim() === memberId
   }

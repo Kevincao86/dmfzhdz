@@ -3,6 +3,7 @@ import { isIceMpOrder, recruitTargetFromMp } from './orderCard'
 import { readPublishedOrders } from './publishedOrders'
 import { formatTalent } from './talentFormat'
 import { primaryPlatformProfile } from '../mpSync/talentMember'
+import { canonicalTalentMemberIdFromRegistry } from '../mpSync/talentChatKeys'
 
 export type PrBoardId = 'talent' | 'shoot' | 'edit'
 
@@ -180,8 +181,10 @@ function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
     const raw = Number(p?.followers) || 0
     const nick = String(p?.platformNickname || mem.wxNickName || mem.contact || '').trim()
     if (!nick) continue
+    const mid = String(mem.id || '').trim()
+    if (!mid) continue
     const row = formatTalent({
-      id: mem.id || mem.lingqiTalentId,
+      id: mid,
       platformNickname: nick,
       wxAvatarUrl: mem.wxAvatarUrl,
       platform: primary?.platform || '抖音',
@@ -199,9 +202,12 @@ function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
   for (const e of library) {
     const row = e as Record<string, unknown>
     const raw = Number(row.followers) || 0
+    const chatId =
+      canonicalTalentMemberIdFromRegistry(reg, String(row.id || row.lingqiTalentId || '')) ||
+      String(row.id || row.lingqiTalentId || '')
     const card = formatTalent({
       ...row,
-      id: row.id || row.lingqiTalentId,
+      id: chatId,
       platformNickname: row.platformNickname || row.name,
       qualityTag: raw >= 50000 ? '优质' : '推荐',
     })

@@ -62,10 +62,16 @@ Page({
       } catch (syncErr) {
         console.warn('[messages] syncProfile', syncErr)
       }
-      const rows = await chat.listSessions()
+      const rows = await chat.listSessionsForMe()
       const me = participant.getCurrentParticipant()
-      const sessions = rows.map((s) => this.mapSession(s, me.participantKey))
-      const unread = chat.totalUnreadCount(rows, me.participantKey)
+      const sessions = rows.map((s) => {
+        const authKey = chat.sessionAuthKeyForMe(s, me)
+        return this.mapSession(s, authKey)
+      })
+      let unread = 0
+      for (let i = 0; i < rows.length; i++) {
+        unread += participant.unreadForMe(rows[i], chat.sessionAuthKeyForMe(rows[i], me))
+      }
       this.setData({ allSessions: sessions, loading: false, refreshing: false })
       this.applySearch()
       refreshChatTabBadge(this, unread)

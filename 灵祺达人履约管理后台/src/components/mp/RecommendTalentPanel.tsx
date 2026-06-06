@@ -198,12 +198,15 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     setChatLoadingId(row.id)
     try {
       await syncProfile()
-      const sessionId = await ensureSessionWithTalent({
-        id: row.id,
-        talentMemberId: row.id,
-        name: row.name,
-        avatar: row.avatar || '',
-      })
+      const sessionId = await ensureSessionWithTalent(
+        {
+          id: row.id,
+          talentMemberId: row.id,
+          name: row.name,
+          avatar: row.avatar || '',
+        },
+        registryCache,
+      )
       navigate(
         `/chat?sessionId=${encodeURIComponent(sessionId)}` +
           `&peerName=${encodeURIComponent(row.name)}` +

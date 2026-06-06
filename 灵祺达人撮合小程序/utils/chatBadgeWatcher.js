@@ -69,8 +69,12 @@ async function refreshNow(options) {
       console.warn('[chatBadgeWatcher] syncProfile', syncErr)
     }
     const me = participant.getCurrentParticipant()
-    const rows = await chat.listSessions(me)
-    const count = chat.totalUnreadCount(rows, me.participantKey)
+    const rows = await chat.listSessionsForMe(me)
+    let count = 0
+    for (let i = 0; i < rows.length; i++) {
+      const s = rows[i]
+      count += participant.unreadForMe(s, chat.sessionAuthKeyForMe(s, me))
+    }
     applyBadgeToBar(bar, count)
     return count
   } catch (e) {
