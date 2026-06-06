@@ -24,6 +24,13 @@ function normalizeErpApiBase(raw: string): string {
 }
 
 export function merchantErpApiBase(): string {
+  // cs 静态站：视频/云剪/注册等 API 固定走轻量 erp-api，避免同源 /api 双跳 pending
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (host === 'cs.mofangdianai.com') {
+      return 'https://mofangdianai.com/erp-api'
+    }
+  }
   const fromEnv = normalizeErpApiBase(
     (import.meta.env.VITE_ERP_AUTH_API_BASE as string | undefined) ??
       (import.meta.env.VITE_MP_API_BASE as string | undefined) ??
@@ -65,7 +72,11 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
   if (base) add(buildMerchantErpApiUrl(base, path))
 
   if (typeof window !== 'undefined') {
-    add(`${window.location.origin}${path}`)
+    const host = window.location.hostname.toLowerCase()
+    // cs 仅 erp-api 单跳；其它环境保留同源 fallback
+    if (host !== 'cs.mofangdianai.com') {
+      add(`${window.location.origin}${path}`)
+    }
   } else if (!base) {
     add(path)
   }

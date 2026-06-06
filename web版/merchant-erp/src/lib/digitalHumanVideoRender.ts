@@ -212,6 +212,15 @@ export async function renderDigitalHumanMp4(
   const segmentTotal = estimateDhSegmentCount(script)
   const seedanceModel = pickSeedanceModel(cfg)
   const seedanceFlags = `--dur ${SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
+  if (engine === 'seedance' && !seedanceModel) {
+    const hint = cfg?.arkVideoSetupIssue?.trim()
+    return {
+      ok: false,
+      message:
+        hint ||
+        '豆包 Seedance 未配置可用 ep 接入点：请在运营台「AI模型 → 短视频 API」填写方舟视频 ep- 模型。',
+    }
+  }
 
   onProgress?.({ phase: 'planning', segmentIndex: 0, segmentTotal, progress: 8 })
 

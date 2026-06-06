@@ -190,9 +190,9 @@ function iceUploadServerFetchUrls(apiPath: string): string[] {
     if (u && !urls.includes(u)) urls.push(u)
   }
 
-  if (iceConfigBackend === 'ecs') {
-    const base = merchantErpApiBase()
-    if (base) add(buildMerchantErpApiUrl(base, path))
+  const base = merchantErpApiBase()
+  if (base) add(buildMerchantErpApiUrl(base, path))
+  if (iceConfigBackend === 'ecs' || (typeof window !== 'undefined' && window.location.hostname.toLowerCase() === 'cs.mofangdianai.com')) {
     return urls
   }
 
