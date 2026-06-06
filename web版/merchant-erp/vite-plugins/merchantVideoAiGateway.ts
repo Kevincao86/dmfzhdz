@@ -20,7 +20,6 @@ import {
   normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
 } from '../src/lib/arkVideoEndpointsConfig.js'
-import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
