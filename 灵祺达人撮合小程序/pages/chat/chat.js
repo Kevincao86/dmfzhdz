@@ -19,6 +19,7 @@ Page({
     navInnerStyle: '',
     sessionId: '',
     peerName: '会话',
+    peerId: '',
     peerAvatar: '',
     myAvatar: '',
     messages: [],
@@ -36,6 +37,7 @@ Page({
     applyCapsulePadding(this, null, { band: 'navBarStyle', right: 'navInnerStyle' })
     const sessionId = options && options.sessionId ? decodeURIComponent(options.sessionId) : ''
     const peerName = options && options.peerName ? decodeURIComponent(options.peerName) : '会话'
+    const peerId = options && options.peerId ? decodeURIComponent(options.peerId) : ''
     const peerAvatar = options && options.peerAvatar ? decodeURIComponent(options.peerAvatar) : ''
     const me = participant.getCurrentParticipant()
     this._sessionId = sessionId
@@ -45,6 +47,7 @@ Page({
     this.setData({
       sessionId,
       peerName,
+      peerId,
       peerAvatar,
       myAvatar: me.avatarUrl || '/images/logo.png',
     })
@@ -94,6 +97,7 @@ Page({
         const peer = participant.peerDisplay(cur, authKey)
         this.setData({
           peerName: peer.name,
+          peerId: peer.peerId || this.data.peerId,
           peerAvatar: peer.avatar || this.data.peerAvatar,
         })
       }

@@ -1,5 +1,6 @@
 const chat = require('../../utils/talentChat.js')
 const participant = require('../../utils/participant.js')
+const ops = require('../../utils/opsRegistryTalentMp.js')
 const userProfile = require('../../utils/userProfile.js')
 const config = require('../../utils/config.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
@@ -62,11 +63,18 @@ Page({
       } catch (syncErr) {
         console.warn('[messages] syncProfile', syncErr)
       }
+      let reg = null
+      try {
+        reg = await ops.fetchRegistry()
+      } catch (_) {
+        /* */
+      }
+      this._registryForChat = reg
       const rows = await chat.listSessionsForMe()
       const me = participant.getCurrentParticipant()
       const sessions = rows.map((s) => {
         const authKey = chat.sessionAuthKeyForMe(s, me)
-        return this.mapSession(s, authKey)
+        return this.mapSession(s, authKey, reg)
       })
       let unread = 0
       for (let i = 0; i < rows.length; i++) {
@@ -90,11 +98,13 @@ Page({
     this.setData({ refreshing: true })
     void this.bootstrap()
   },
-  mapSession(s, myKey) {
+  mapSession(s, myKey, reg) {
+    const peer = chat.sessionPeerFromRow(s, myKey, reg || this._registryForChat)
     return {
       id: s.id,
-      peerName: participant.peerLabel(s, myKey),
-      peerAvatar: participant.peerAvatar(s, myKey),
+      peerName: peer.name,
+      peerId: peer.peerId || '',
+      peerAvatar: peer.avatar,
       lastText: s.last_text || '',
       timeText: chat.sessionPreviewTime(s.last_ts),
       unread: participant.unreadForMe(s, myKey),
@@ -106,7 +116,7 @@ Page({
     const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
     const sessions = kw
       ? this.data.allSessions.filter((s) => {
-          const blob = [s.peerName, s.lastText].join(' ').toLowerCase()
+          const blob = [s.peerName, s.peerId, s.lastText].join(' ').toLowerCase()
           return blob.includes(kw)
         })
       : this.data.allSessions
@@ -119,10 +129,15 @@ Page({
   openChat(e) {
     const id = e.currentTarget.dataset.id
     const name = e.currentTarget.dataset.name || '会话'
+    const peerId = e.currentTarget.dataset.peerId || ''
     const avatar = e.currentTarget.dataset.avatar || ''
     if (!id) return
     wx.navigateTo({
-      url: `/pages/chat/chat?sessionId=${encodeURIComponent(id)}&peerName=${encodeURIComponent(name)}&peerAvatar=${encodeURIComponent(avatar)}`,
+      url:
+        `/pages/chat/chat?sessionId=${encodeURIComponent(id)}` +
+        `&peerName=${encodeURIComponent(name)}` +
+        `&peerId=${encodeURIComponent(peerId)}` +
+        `&peerAvatar=${encodeURIComponent(avatar)}`,
     })
   },
   async openTestDialog() {

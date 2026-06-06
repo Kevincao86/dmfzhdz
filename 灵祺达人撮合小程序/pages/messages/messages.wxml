@@ -61,12 +61,16 @@
       bindtap="openChat"
       data-id="{{item.id}}"
       data-name="{{item.peerName}}"
+      data-peer-id="{{item.peerId}}"
       data-avatar="{{item.peerAvatar}}"
     >
       <image class="msg-entry-avatar" src="{{item.peerAvatar || '/images/logo.png'}}" mode="aspectFill" />
       <view class="msg-entry-body">
         <view class="msg-entry-top">
-          <text class="msg-entry-name">{{item.peerName}}</text>
+          <view class="msg-entry-name-wrap">
+            <text class="msg-entry-name">{{item.peerName}}</text>
+            <text class="msg-entry-id" wx:if="{{item.peerId}}">{{item.peerId}}</text>
+          </view>
           <text class="msg-entry-time">{{item.timeText}}</text>
         </view>
         <view class="msg-entry-bottom">

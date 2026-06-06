@@ -165,10 +165,26 @@
   gap: 12rpx;
 }
 
+.msg-entry-name-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+}
+
 .msg-entry-name {
   font-size: 30rpx;
   font-weight: 600;
   color: #111;
+}
+
+.msg-entry-id {
+  font-size: 20rpx;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .msg-entry-time {

@@ -100,18 +100,21 @@ function getCurrentParticipant() {
   }
 }
 
-function peerDisplay(session, myKey) {
-  if (!session) return { name: '会话', avatar: '' }
+function peerDisplay(session, myKey, opts) {
+  const o = opts || {}
+  if (!session) return { name: '会话', avatar: '', peerId: '' }
   const iAmTalent = session.talent_key === myKey
   if (iAmTalent) {
     return {
       name: String(session.pr_name || '').trim() || 'PR',
       avatar: String(session.pr_avatar || '').trim(),
+      peerId: String(o.prPeerId || '').trim(),
     }
   }
   return {
     name: String(session.talent_name || '').trim() || '达人',
     avatar: String(session.talent_avatar || '').trim(),
+    peerId: String(o.talentPeerId || '').trim(),
   }
 }
 

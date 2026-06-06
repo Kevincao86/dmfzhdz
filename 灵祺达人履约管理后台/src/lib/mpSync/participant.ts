@@ -96,18 +96,30 @@ export function getCurrentParticipant(): ChatParticipant {
   }
 }
 
-export function peerDisplay(session: Record<string, unknown>, myKey: string) {
-  if (!session) return { name: '会话', avatar: '' }
+export type ChatPeerDisplay = {
+  name: string
+  avatar: string
+  peerId: string
+}
+
+export function peerDisplay(
+  session: Record<string, unknown>,
+  myKey: string,
+  opts?: { talentPeerId?: string; prPeerId?: string },
+): ChatPeerDisplay {
+  if (!session) return { name: '会话', avatar: '', peerId: '' }
   const iAmTalent = session.talent_key === myKey
   if (iAmTalent) {
     return {
       name: String(session.pr_name || '').trim() || 'PR',
       avatar: String(session.pr_avatar || '').trim(),
+      peerId: String(opts?.prPeerId || '').trim(),
     }
   }
   return {
     name: String(session.talent_name || '').trim() || '达人',
     avatar: String(session.talent_avatar || '').trim(),
+    peerId: String(opts?.talentPeerId || '').trim(),
   }
 }
 

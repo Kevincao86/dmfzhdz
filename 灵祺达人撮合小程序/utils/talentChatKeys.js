@@ -126,6 +126,62 @@ function participantForSession(session, base) {
   return { ...me, participantKey: authKey }
 }
 
+function participantIdFromKey(participantKey) {
+  return String(participantKey || '')
+    .replace(/^talent_/, '')
+    .replace(/^pr_/, '')
+    .trim()
+}
+
+function talentSessionGroupKey(reg, talentKey) {
+  const raw = participantIdFromKey(talentKey)
+  if (!raw) return talentKey
+  const canonMtm = canonicalTalentMemberIdFromRegistry(reg, raw)
+  const members = Array.isArray(reg && reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (let i = 0; i < members.length; i++) {
+    const mem = members[i]
+    const mid = String((mem && mem.id) || '').trim()
+    const mlq = String((mem && mem.lingqiTalentId) || '').trim()
+    if (mid && (mid === canonMtm || mid === raw || mlq === raw)) return mlq || mid
+  }
+  return canonMtm || raw
+}
+
+function dedupePrTalentSessions(sessions, reg) {
+  const byGroup = new Map()
+  for (let i = 0; i < (sessions || []).length; i++) {
+    const s = sessions[i]
+    const tk = String((s && s.talent_key) || '')
+    const group = talentSessionGroupKey(reg || null, tk)
+    const prev = byGroup.get(group)
+    if (!prev || Number(s.last_ts || 0) > Number(prev.last_ts || 0)) byGroup.set(group, s)
+  }
+  return [...byGroup.values()].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
+}
+
+function resolveTalentDisplayId(reg, talentKey) {
+  const raw = participantIdFromKey(talentKey)
+  if (!raw) return ''
+  const canonMtm = canonicalTalentMemberIdFromRegistry(reg, raw)
+  const members = Array.isArray(reg && reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (let i = 0; i < members.length; i++) {
+    const mem = members[i]
+    const mid = String((mem && mem.id) || '').trim()
+    const mlq = String((mem && mem.lingqiTalentId) || '').trim()
+    if (mid && (mid === canonMtm || mid === raw || mlq === raw) && mlq) return mlq
+  }
+  if (/^LQ-D-/i.test(raw)) return raw.toUpperCase()
+  return canonMtm || raw
+}
+
+function resolvePrDisplayId(prKey) {
+  const raw = participantIdFromKey(prKey)
+  if (/^LQ-P-/i.test(raw)) return raw.toUpperCase()
+  const phone = raw.replace(/\D/g, '')
+  if (phone.length >= 11) return phone.slice(-11)
+  return raw
+}
+
 module.exports = {
   canonicalTalentMemberIdFromRegistry,
   collectTalentChatKeyCandidates,
@@ -133,4 +189,8 @@ module.exports = {
   talentChatParticipantForKey,
   sessionAuthKeyForMe,
   participantForSession,
+  participantIdFromKey,
+  dedupePrTalentSessions,
+  resolveTalentDisplayId,
+  resolvePrDisplayId,
 }
