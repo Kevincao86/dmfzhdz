@@ -360,14 +360,19 @@ Page({
     syncUiFromProfiles(this, profiles, i)
   },
   validateAll() {
-    if (!String(this.data.wxNickName || '').trim()) return '请填写微信昵称'
-    if (!String(this.data.contact || '').trim()) return '请填写联系方式'
-    if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
+    const basicContact = require('../../utils/basicContactFields.js')
+    const contactErr = basicContact.validateBasicContactFields({
+      wxNickName: this.data.wxNickName,
+      contact: this.data.contact,
+      wechatId: this.data.wechatId,
+    })
+    if (contactErr) return contactErr
     if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
     const regionErr = validateRegion(this.data.province, this.data.city)
     if (regionErr) return regionErr
     if (this.data.isSupplier) {
       return supplierTeamProfile.validateSupplierProfile(this.data.workIdentity, this.data.supplierProfile, {
+        wxNickName: this.data.wxNickName,
         contact: this.data.contact,
         wechatId: this.data.wechatId,
         alipayAccount: this.data.alipayAccount,

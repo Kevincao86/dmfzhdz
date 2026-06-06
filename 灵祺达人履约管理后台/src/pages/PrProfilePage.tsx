@@ -5,6 +5,7 @@ import { fetchSession, registerPrUser, setLoginCredentials } from '../lib/mpApi'
 import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSession'
 import { emptyPrProfile, readPrProfile, writePrProfile, type PrProfile } from '../lib/mpSync/userProfile'
 import { readWxAccount } from '../lib/mpSync/wxAccount'
+import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
 import { validateRegion } from '../lib/mpSync/regionPicker'
 
 const ACCOUNT_TYPES = [
@@ -60,6 +61,15 @@ export default function PrProfilePage() {
         : String(form.companyName || '').trim()
     if (!org) {
       setMsg(form.accountType === 'personal' ? '请填写个人名称' : '请填写公司/机构名称')
+      return
+    }
+    const contactErr = validateBasicContactFields({
+      wxNickName: form.wxNickName,
+      contactPhone: form.contactPhone,
+      wechatId: form.wechatId,
+    })
+    if (contactErr) {
+      setMsg(contactErr)
       return
     }
     const regionErr = validateRegion(form.province, form.city)
@@ -194,19 +204,23 @@ export default function PrProfilePage() {
           />
         </label>
         <label className="block">
-          <span className="text-slate-400">联系电话</span>
+          <span className="text-slate-400">联系电话 *</span>
           <input
+            required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.contactPhone}
             onChange={(e) => setField('contactPhone', e.target.value)}
+            placeholder="便于合作方联系"
           />
         </label>
         <label className="block">
-          <span className="text-slate-400">微信号</span>
+          <span className="text-slate-400">微信号 *</span>
           <input
+            required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.wechatId}
             onChange={(e) => setField('wechatId', e.target.value)}
+            placeholder="请填写微信号（非微信昵称）"
           />
         </label>
         <RegionSelect
@@ -223,11 +237,13 @@ export default function PrProfilePage() {
           />
         </label>
         <label className="block">
-          <span className="text-slate-400">微信昵称（展示）</span>
+          <span className="text-slate-400">昵称 *</span>
           <input
+            required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.wxNickName}
             onChange={(e) => setField('wxNickName', e.target.value)}
+            placeholder="用于登录与身份展示"
           />
         </label>
       </section>

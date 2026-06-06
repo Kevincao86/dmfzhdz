@@ -135,6 +135,16 @@ export default function SupplierProfilePage() {
 
       <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <label className="block">
+          <span className="text-slate-400">昵称 *</span>
+          <input
+            required
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+            value={member.wxNickName || ''}
+            onChange={(e) => setMember((m) => ({ ...m, wxNickName: e.target.value }))}
+            placeholder="用于登录与身份展示"
+          />
+        </label>
+        <label className="block">
           <span className="text-slate-400">团队名称 *</span>
           <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.teamName} onChange={(e) => patchSp({ teamName: e.target.value })} />
         </label>

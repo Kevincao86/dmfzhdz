@@ -11,6 +11,7 @@ const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
 const accountSessionActions = require('../../utils/accountSessionActions.js')
 const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
+const { validateBasicContactFields } = require('../../utils/basicContactFields.js')
 
 const ACCOUNT_TYPES = [
   { id: 'company', label: '公司（机构）' },
@@ -130,6 +131,17 @@ Page({
       })
       return
     }
+    const wx = wxAccount.readWxAccount()
+    const nick = String(f.wxNickName || (wx && wx.wxNickName) || '').trim()
+    const contactErr = validateBasicContactFields({
+      wxNickName: nick,
+      contactPhone: f.contactPhone,
+      wechatId: f.wechatId,
+    })
+    if (contactErr) {
+      wx.showToast({ title: contactErr, icon: 'none' })
+      return
+    }
     if (!String(f.contactName || '').trim() && f.accountType === 'company') {
       wx.showToast({ title: '请填写联系人', icon: 'none' })
       return
@@ -142,7 +154,6 @@ Page({
       wx.showToast({ title: regionErr, icon: 'none' })
       return
     }
-    const wx = wxAccount.readWxAccount()
     const prev = userProfile.readPrProfile()
     const acct = auth.readAccount()
     const saved = {

@@ -13,6 +13,7 @@ import {
 } from '../lib/mpSync/talentPlatformProfiles'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
+import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
 import { readWxAccount, writeWxAccount } from '../lib/mpSync/wxAccount'
 
 export default function TalentProfilePage() {
@@ -98,8 +99,13 @@ export default function TalentProfilePage() {
         return
       }
     }
-    if (!String(member.contact || '').trim()) {
-      setMsg('请填写联系电话')
+    const contactErr = validateBasicContactFields({
+      wxNickName: member.wxNickName,
+      contact: member.contact,
+      wechatId: member.wechatId,
+    })
+    if (contactErr) {
+      setMsg(contactErr)
       return
     }
     setSaving(true)
@@ -182,27 +188,33 @@ export default function TalentProfilePage() {
 
       <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <label className="block">
-          <span className="text-slate-400">昵称</span>
+          <span className="text-slate-400">昵称 *</span>
           <input
+            required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wxNickName || ''}
             onChange={(e) => patchMember({ wxNickName: e.target.value })}
+            placeholder="用于登录与身份展示"
           />
         </label>
         <label className="block">
-          <span className="text-slate-400">联系电话</span>
+          <span className="text-slate-400">联系电话 *</span>
           <input
+            required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.contact || ''}
             onChange={(e) => patchMember({ contact: e.target.value })}
+            placeholder="便于招募方联系"
           />
         </label>
         <label className="block">
-          <span className="text-slate-400">微信号</span>
+          <span className="text-slate-400">微信号 *</span>
           <input
+            required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wechatId || ''}
             onChange={(e) => patchMember({ wechatId: e.target.value })}
+            placeholder="请填写微信号（非微信昵称）"
           />
         </label>
         <label className="block">
