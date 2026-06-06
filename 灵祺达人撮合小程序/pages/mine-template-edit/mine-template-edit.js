@@ -1,8 +1,9 @@
 const templates = require('../../utils/applyFormTemplates.js')
 
 function syncRows(page) {
+  const kind = templates.normalizeTemplateKind(page.data.templateKind)
   page.setData({
-    editorRows: templates.buildEditorRows(page.data.fields, page.data.previewPlatform),
+    editorRows: templates.buildEditorRows(page.data.fields, page.data.previewPlatform, kind),
   })
 }
 
@@ -12,6 +13,8 @@ Page({
     name: '',
     fields: [],
     isNew: true,
+    templateKind: 'talent',
+    kindLabel: '达人',
     previewPlatform: '小红书',
     previewPlatformIndex: 1,
     platformOptions: templates.PLATFORMS,
@@ -28,6 +31,8 @@ Page({
   },
   onLoad(options) {
     const id = options?.id ? decodeURIComponent(options.id) : ''
+    const kind = templates.normalizeTemplateKind(options?.kind)
+    const kindLabel = (templates.TEMPLATE_KINDS.find((k) => k.id === kind) || {}).label || '达人'
     const platform = options?.platform ? decodeURIComponent(options.platform) : '小红书'
     if (id) {
       const tpl = templates.getTemplateById(id)
@@ -35,21 +40,29 @@ Page({
         wx.navigateBack()
         return
       }
+      const tplKind = templates.normalizeTemplateKind(tpl.kind)
       this.setData({
         id,
         name: tpl.name,
         fields: tpl.fields.map((f) => ({ ...f })),
         isNew: false,
+        templateKind: tplKind,
+        kindLabel: (templates.TEMPLATE_KINDS.find((k) => k.id === tplKind) || {}).label || kindLabel,
         previewPlatform: templates.PLATFORMS.includes(platform) ? platform : '小红书',
         previewPlatformIndex: Math.max(0, templates.PLATFORMS.indexOf(platform)),
       })
     } else {
-      const tpl = templates.emptyCustomTemplate('')
+      const tpl = templates.emptyCustomTemplate(
+        kind === 'shoot' ? '拍摄报名模版' : kind === 'edit' ? '剪辑报名模版' : '我的报名模版',
+        kind,
+      )
       this.setData({
         id: tpl.id,
-        name: '我的报名模版',
+        name: tpl.name,
         fields: tpl.fields,
         isNew: true,
+        templateKind: kind,
+        kindLabel,
         previewPlatform: '小红书',
         previewPlatformIndex: 1,
       })
@@ -150,7 +163,7 @@ Page({
     })
   },
   onPreview() {
-    const err = templates.validateTemplateFields(this.data.fields)
+    const err = templates.validateTemplateFields(this.data.fields, this.data.templateKind)
     if (err) {
       wx.showToast({ title: err, icon: 'none' })
       return
@@ -171,7 +184,7 @@ Page({
       wx.showToast({ title: '请填写模版名称', icon: 'none' })
       return
     }
-    const err = templates.validateTemplateFields(this.data.fields)
+    const err = templates.validateTemplateFields(this.data.fields, this.data.templateKind)
     if (err) {
       wx.showToast({ title: err, icon: 'none' })
       return
@@ -179,9 +192,10 @@ Page({
     templates.saveCustomTemplate({
       id: this.data.id,
       name,
+      kind: this.data.templateKind,
       fields: this.data.fields,
     })
-    templates.setActiveTemplateId(this.data.id)
+    templates.setActiveTemplateId(this.data.id, this.data.templateKind)
     wx.showToast({ title: '已保存', icon: 'success' })
     setTimeout(() => wx.navigateBack(), 400)
   },

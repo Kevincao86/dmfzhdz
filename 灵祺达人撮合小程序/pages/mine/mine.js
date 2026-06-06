@@ -49,9 +49,9 @@ const TALENT_MENUS_BASE = [
 const PR_MENUS = [
   { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info', emoji: '🪪' },
   { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list', emoji: '📦' },
-  { key: 'templates', label: '我的模版', sub: '达人报名表单模版', icon: 'tpl', emoji: '📑' },
   { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
   { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart', emoji: '📈' },
+  { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl', emoji: '📑' },
   { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
 ]
 

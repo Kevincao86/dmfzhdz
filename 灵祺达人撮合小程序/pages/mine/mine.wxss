@@ -308,9 +308,12 @@
   box-shadow: var(--lq-shadow-card);
 }
 
+.menu-card--hover,
 .menu-card:active {
-  transform: translateY(4rpx);
-  box-shadow: 0 6rpx 0 rgba(216, 200, 255, 0.32);
+  transform: translateY(2rpx);
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 0 8rpx 20rpx rgba(124, 58, 237, 0.16);
 }
 
 .menu-icon-wrap {

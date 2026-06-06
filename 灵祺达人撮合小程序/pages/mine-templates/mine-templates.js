@@ -2,27 +2,56 @@ const templates = require('../../utils/applyFormTemplates.js')
 
 Page({
   data: {
+    kind: 'talent',
+    kindTabs: templates.TEMPLATE_KINDS,
     rows: [],
+    activeId: '',
   },
   refresh() {
-    this.setData({ rows: templates.listCustomTemplates() })
+    const kind = templates.normalizeTemplateKind(this.data.kind)
+    const key =
+      kind === 'shoot'
+        ? 'meoo_active_shoot_apply_template_v1'
+        : kind === 'edit'
+          ? 'meoo_active_edit_apply_template_v1'
+          : 'meoo_active_apply_template_v1'
+    let activeId = ''
+    try {
+      activeId = String(wx.getStorageSync(key) || '').trim()
+    } catch {
+      activeId = ''
+    }
+    this.setData({
+      rows: templates.listCustomTemplates(kind),
+      activeId,
+    })
   },
   onShow() {
     this.refresh()
   },
+  onKindTab(e) {
+    const kind = e.currentTarget.dataset.kind
+    if (!kind) return
+    this.setData({ kind }, () => this.refresh())
+  },
   onAdd() {
-    wx.navigateTo({ url: '/pages/mine-template-edit/mine-template-edit' })
+    const kind = templates.normalizeTemplateKind(this.data.kind)
+    wx.navigateTo({ url: `/pages/mine-template-edit/mine-template-edit?kind=${kind}` })
   },
   onEdit(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
-    wx.navigateTo({ url: `/pages/mine-template-edit/mine-template-edit?id=${encodeURIComponent(id)}` })
+    const kind = templates.normalizeTemplateKind(this.data.kind)
+    wx.navigateTo({
+      url: `/pages/mine-template-edit/mine-template-edit?id=${encodeURIComponent(id)}&kind=${kind}`,
+    })
   },
   onUseTemplate(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
-    templates.setActiveTemplateId(id)
-    wx.showToast({ title: '已设为当前报名模版', icon: 'success' })
+    templates.setActiveTemplateId(id, this.data.kind)
+    wx.showToast({ title: '已设为当前模版', icon: 'success' })
+    this.refresh()
   },
   onDelete(e) {
     const id = e.currentTarget.dataset.id

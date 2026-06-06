@@ -19,6 +19,7 @@ function editorDataExtra() {
     canEditLabel: true,
     /** 本次编辑是否已「保存到我的模版」；确认需先保存再第二次点确认返回发单页 */
     applyFormLibrarySaved: false,
+    applyFormTemplateKind: 'talent',
   }
 }
 
@@ -28,8 +29,11 @@ function resetApplyFormEditorSession(page) {
 
 function syncEditorRows(page) {
   const platform = page.data.applyFormPreviewPlatform || page.data.form?.platform || '抖音'
+  const kind = templates.normalizeTemplateKind(
+    page.data.applyFormTemplateKind || page.data.recruitTarget || 'talent',
+  )
   page.setData({
-    applyFormEditorRows: templates.buildEditorRows(page.data.applyFormFields || [], platform),
+    applyFormEditorRows: templates.buildEditorRows(page.data.applyFormFields || [], platform, kind),
     applyFormPreviewPlatform: platform,
     applyFormPreviewPlatformIndex: Math.max(0, templates.PLATFORMS.indexOf(platform)),
   })
@@ -215,17 +219,24 @@ function promptTemplateName(defaultName, onConfirm) {
 }
 
 function saveFieldsToLibrary(page, id, name) {
+  const kind = templates.normalizeTemplateKind(
+    page.data.applyFormTemplateKind || page.data.recruitTarget || 'talent',
+  )
   const saved = templates.saveCustomTemplate({
-    id: id || templates.newCustomTemplateId(),
+    id: id || templates.newCustomTemplateId(kind),
     name,
+    kind,
     fields: page.data.applyFormFields,
   })
-  templates.setActiveTemplateId(saved.id)
+  templates.setActiveTemplateId(saved.id, kind)
   return saved
 }
 
 function confirmApplyFormEditor(page, onDone) {
-  const err = templates.validateTemplateFields(page.data.applyFormFields)
+  const kind = templates.normalizeTemplateKind(
+    page.data.applyFormTemplateKind || page.data.recruitTarget || 'talent',
+  )
+  const err = templates.validateTemplateFields(page.data.applyFormFields, kind)
   if (err) {
     wx.showToast({ title: err, icon: 'none' })
     return

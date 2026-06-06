@@ -307,18 +307,25 @@ Page({
   onApplyFormConfirm() {
     applyFormEditor.confirmApplyFormEditor(this, () => this.closePickerAndScroll())
   },
+  applyTemplateKind() {
+    return applyTemplates.templateKindFromRecruitTarget(this.data.recruitTarget || 'talent')
+  },
   openApplyFormEditorNew() {
-    const platform = this.data.form.platform
-    const tpl = applyTemplates.emptyCustomTemplate('我的报名模版')
+    const kind = this.applyTemplateKind()
+    const tpl = applyTemplates.emptyCustomTemplate(
+      kind === 'shoot' ? '拍摄报名模版' : kind === 'edit' ? '剪辑报名模版' : '我的报名模版',
+      kind,
+    )
     applyFormEditor.resetApplyFormEditorSession(this)
     this.setData(
       {
         pickerView: 'applyForm',
         applyFormEditorMode: 'new',
+        applyFormTemplateKind: kind,
         applyFormTemplateId: tpl.id,
         applyFormTemplateName: tpl.name,
         applyFormFields: tpl.fields.map((f) => ({ ...f })),
-        applyTemplateList: applyTemplates.listCustomTemplates(),
+        applyTemplateList: applyTemplates.listCustomTemplates(kind),
       },
       () => {
         applyFormEditor.syncEditorRows(this)
@@ -327,16 +334,17 @@ Page({
     )
   },
   openApplyFormUseTemplate() {
-    const list = applyTemplates.listCustomTemplates()
+    const kind = this.applyTemplateKind()
+    const list = applyTemplates.listCustomTemplates(kind)
     if (!list.length) {
       wx.showModal({
         title: '暂无模版',
-        content: '请先在「我的」→「我的模版」中新建自定义模版',
+        content: '请先在「我的」→「我的模版」中新建对应类型的自定义模版',
         showCancel: false,
       })
       return
     }
-    this.setData({ showApplyTplPicker: true, customTemplateList: list })
+    this.setData({ showApplyTplPicker: true, customTemplateList: list, applyFormTemplateKind: kind })
   },
   onCloseApplyTplPicker() {
     this.setData({ showApplyTplPicker: false })
@@ -352,6 +360,7 @@ Page({
       {
         pickerView: 'applyForm',
         applyFormEditorMode: 'template',
+        applyFormTemplateKind: this.applyTemplateKind(),
         applyFormTemplateId: tpl.id,
         applyFormTemplateName: tpl.name,
         applyFormFields: tpl.fields.map((f) => ({ ...f })),
@@ -366,7 +375,9 @@ Page({
     const view = e.currentTarget.dataset.view
     if (!view) return
     if (view === 'applyForm') {
-      if (!this.data.form.platform) {
+      const target = this.data.recruitTarget || 'talent'
+      const isSupplier = target === 'shoot' || target === 'edit'
+      if (!isSupplier && !this.data.form.platform) {
         wx.showToast({ title: '请先选择招募平台', icon: 'none' })
         return
       }

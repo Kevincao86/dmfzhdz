@@ -1,10 +1,22 @@
 <view class="page-shell">
   <view class="card">
+    <view class="tpl-kind-tabs">
+      <view
+        wx:for="{{kindTabs}}"
+        wx:key="id"
+        class="tpl-kind-tab {{kind === item.id ? 'tpl-kind-tab--active' : ''}}"
+        data-kind="{{item.id}}"
+        bindtap="onKindTab"
+      >
+        {{item.label}}
+      </view>
+    </view>
     <button class="btn-primary" bindtap="onAdd">新建自定义模版</button>
   </view>
-  <view wx:for="{{rows}}" wx:key="id" class="card">
+  <view wx:for="{{rows}}" wx:key="id" class="card tpl-card">
     <view class="tpl-head">
       <text class="title-lg">{{item.name}}</text>
+      <text class="tpl-active-badge" wx:if="{{activeId === item.id}}">当前默认</text>
     </view>
     <text class="hint">{{item.fields.length}} 个字段</text>
     <view class="tpl-actions">

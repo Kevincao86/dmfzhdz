@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { appendMpRecruitmentOrder, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
 import { addPublishedOrder } from '../../lib/mpSync/applicationsStore'
-import { saveApplyFormForMpOrder, setActiveTemplateId, type ApplyField } from '../../lib/mpSync/applyFormTemplates'
+import {
+  saveApplyFormForMpOrder,
+  setActiveTemplateId,
+  templateKindFromRecruitTarget,
+  type ApplyField,
+} from '../../lib/mpSync/applyFormTemplates'
 import PublishWizardSheets, { type PickerView } from './PublishWizardSheets'
 import { formatSignupDeadlineDisplay } from './SignupDeadlineSheet'
 import { formPatchFromMpOrder } from '../../lib/mpSync/mpOrderPublishRestore'
@@ -127,6 +132,7 @@ export default function PublishWizard() {
   const [applyEditorFields, setApplyEditorFields] = useState<ApplyField[]>([])
   const [applyEditorName, setApplyEditorName] = useState('')
   const [applyEditorTplId, setApplyEditorTplId] = useState('')
+  const [applyEditorMode, setApplyEditorMode] = useState<'new' | 'template'>('new')
   const [showDeadlineSheet, setShowDeadlineSheet] = useState(false)
 
   const display = useMemo(() => computePublishDisplay(form, recruitMode), [form, recruitMode])
@@ -281,7 +287,9 @@ export default function PublishWizard() {
         templateName: form.applyFormTemplateName,
         fields: form.applyFormFields,
       })
-      if (form.applyFormTemplateId) setActiveTemplateId(form.applyFormTemplateId)
+      if (form.applyFormTemplateId) {
+        setActiveTemplateId(form.applyFormTemplateId, templateKindFromRecruitTarget(recruitTarget))
+      }
       setDoneId(String(order.id))
       setStep('done')
     } catch (e) {
@@ -952,6 +960,9 @@ export default function PublishWizard() {
       setApplyEditorName={setApplyEditorName}
       applyEditorTplId={applyEditorTplId}
       setApplyEditorTplId={setApplyEditorTplId}
+      applyEditorMode={applyEditorMode}
+      setApplyEditorMode={setApplyEditorMode}
+      recruitTarget={recruitTarget}
     />
     </>
   )
