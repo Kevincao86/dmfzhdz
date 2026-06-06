@@ -124,6 +124,29 @@
   text-align: right;
 }
 
+.chat-turn-empty {
+  text-align: center;
+  padding: 48rpx 32rpx 16rpx;
+  font-size: 24rpx;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+.chat-turn-banner {
+  padding: 16rpx 20rpx;
+  font-size: 24rpx;
+  color: #b45309;
+  background: #fffbeb;
+  border-bottom: 1rpx solid #fde68a;
+  line-height: 1.45;
+}
+
+.chat-turn-banner--tip {
+  color: #6b7280;
+  background: #f9fafb;
+  border-bottom-color: #e5e7eb;
+}
+
 .chat-composer {
   flex-shrink: 0;
   padding: 12rpx 16rpx calc(12rpx + env(safe-area-inset-bottom));

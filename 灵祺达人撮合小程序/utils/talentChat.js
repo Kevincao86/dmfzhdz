@@ -296,6 +296,19 @@ function newMsgId() {
   return `m_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+/** 轮流回复：上一条是自己发的则暂不可再发（与履约 Web 一致） */
+function canSendNextMessage(messages, myRole) {
+  if (!messages || !messages.length) return { ok: true, hint: '' }
+  const last = messages[messages.length - 1]
+  if (last.fromRole === myRole) {
+    return { ok: false, hint: '等待对方回复后可继续发送' }
+  }
+  return { ok: true, hint: '' }
+}
+
+const CHAT_TURN_HINT =
+  '温馨提示：双方需轮流回复，发送一条消息后需等待对方回复才能继续发送。'
+
 function sessionPreviewTime(ts) {
   return formatTime(ts)
 }
@@ -397,4 +410,6 @@ module.exports = {
   mergeMessages,
   newMsgId,
   sessionPreviewTime,
+  canSendNextMessage,
+  CHAT_TURN_HINT,
 }

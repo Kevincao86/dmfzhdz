@@ -43,6 +43,12 @@ function boardLabel(board) {
   return '达人'
 }
 
+function boardAllModeLabel(board) {
+  if (board === 'shoot') return '全部拍摄团队'
+  if (board === 'edit') return '全部剪辑团队'
+  return '全部达人'
+}
+
 function boardMatchHint(board, orderCount) {
   const label = boardLabel(board)
   if (orderCount > 0) {
@@ -306,6 +312,7 @@ module.exports = {
   boardSearchPlaceholder,
   boardEmptyHint,
   boardLabel,
+  boardAllModeLabel,
   boardMatchHint,
   buildBoardPool,
   countPrOrdersForBoard,

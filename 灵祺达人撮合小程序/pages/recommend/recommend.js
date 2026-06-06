@@ -269,6 +269,8 @@ Page({
     prOrderCount: 0,
     prMatchHint: '',
     registryCache: null,
+    prViewMode: 'ai',
+    prAllModeLabel: '全部达人',
   },
   async refreshMutualChatKeys() {
     this._mutualTalentKeys = new Set()
@@ -315,6 +317,7 @@ Page({
         ? talentTestHint
         : prBoard.boardMatchHint('talent', 0),
       prSearchPlaceholder: prBoard.boardSearchPlaceholder('talent'),
+      prAllModeLabel: prBoard.boardAllModeLabel('talent'),
     })
     if (userProfile.readIdentity() === 'pr') {
       this._favoriteTalentIds = loadFavoriteIdSet()
@@ -429,6 +432,33 @@ Page({
     const token = Date.now()
     this._talentFilterToken = token
 
+    if (this.data.prViewMode === 'all') {
+      filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      if (this._talentFilterToken !== token) return
+      let displayRows = filtered.slice(0, 100)
+      if (userProfile.readIdentity() === 'pr') {
+        if (!this._favoriteTalentIds) this._favoriteTalentIds = loadFavoriteIdSet()
+        displayRows = stampTalentStatus(
+          displayRows,
+          this._mutualTalentKeys,
+          this._favoriteTalentIds,
+        )
+        displayRows = applyStatusFilters(displayRows, this.data.filterStatus)
+      }
+      let listEmptyHint = ''
+      if (!displayRows.length) {
+        const label = this.data.prAllModeLabel || prBoard.boardAllModeLabel(board)
+        listEmptyHint = kw
+          ? `未找到「${kw}」相关结果`
+          : `暂无已注册的${String(label).replace('全部', '')}`
+      }
+      if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
+        listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
+      }
+      this.setData({ displayRows, listEmptyHint })
+      return
+    }
+
     if (this.data.prBoardOrderCount > 0 && this.data.registryCache && filtered.length) {
       wx.showLoading({ title: '智能匹配中…', mask: false })
       try {
@@ -499,11 +529,19 @@ Page({
     const prBoardOrderCount = reg ? prBoard.countPrOrdersForBoard(reg, id) : 0
     this.setData({
       prBoard: id,
+      prViewMode: 'ai',
       allRows: pool,
       prBoardOrderCount,
       prMatchHint: prBoard.boardMatchHint(id, prBoardOrderCount),
       prSearchPlaceholder: prBoard.boardSearchPlaceholder(id),
+      prAllModeLabel: prBoard.boardAllModeLabel(id),
     })
+    this.applyTalentFilters()
+  },
+  onPrViewMode(e) {
+    const mode = e.currentTarget.dataset.mode
+    if (!mode || mode === this.data.prViewMode) return
+    this.setData({ prViewMode: mode })
     this.applyTalentFilters()
   },
   async applyOrderFilters() {
