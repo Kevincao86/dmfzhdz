@@ -130,6 +130,14 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
       `控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/model`
     )
   }
+  if (/inference limit|Safe Experience Mode|model service has been paused/i.test(msg)) {
+    const modelId = msg.match(/\[([^\]]+)\]/)?.[1] ?? endpointId
+    return (
+      `火山方舟账号对 Seedance 模型「${modelId}」已达推理限额（安全体验模式），视频生成已暂停。` +
+      `请登录火山方舟控制台 → 模型激活 / 开通管理 → 关闭或调高「安全体验模式」限额，或开通正式计费后再试。` +
+      `控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/model`
+    )
+  }
   if (upstreamStatus === 404 || /does not exist|not have access/i.test(msg)) {
     const kind = /^ep-/i.test(endpointId) ? '推理接入点 ep' : '模型'
     return `方舟视频${kind}无效或无权访问（${endpointId}）：${msg}。请在火山方舟控制台确认已开通 Seedance 视频服务，且与运营台配置的 API Key 为同一账号。`
