@@ -180,7 +180,8 @@ curl -s https://mofangdianai.com/api/meoo-auth-ping
 
 | 目录 | 说明 |
 |------|------|
-| `灵祺达人履约管理后台/` | **已文档化**：`docs/MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md` · `ecs-deploy-talent-fulfillment-web.sh` |
+| `灵祺达人履约管理后台/` | `docs/MIGRATE-VERCEL-TO-ECS-talent-fulfillment.md` · `ecs-deploy-talent-fulfillment-web.sh` |
+| `web版/merchant-erp`（cs） | `docs/MIGRATE-VERCEL-TO-ECS-merchant-cs.md` · `ecs-deploy-merchant-cs-web.sh` |
 | `商家管理后台/` | 运营台，单独 `vercel.json`，可迁 `admin.*` 子域或同 ECS |
 | `web版/partner-erp/` | 服务商版 |
 | `商业BP/` | 静态 BP，已可复制到 `dist/bp`，根域 `/bp/` 访问 |

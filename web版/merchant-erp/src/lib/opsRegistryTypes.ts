@@ -9,6 +9,8 @@ export type RegistryVideoAi = {
   klingApiBase?: string
   /** 与 MERCHANT_AI_ARK_VIDEO_ENDPOINTS：逗号分隔「别名|ep-xxxx」 */
   arkVideoEndpoints?: string
+  /** 豆包对话：逗号分隔「显示名|模型ID或ep-xxxx」→ MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS */
+  arkChatEndpoints?: string
   /**
    * 可选：方舟视频专用 Key。留空时 ERP dev 服务端会回退注册表 vendorKeys.doubao
    * 或服务端 MERCHANT_AI_DOUBAO_KEY（按合并策略）。

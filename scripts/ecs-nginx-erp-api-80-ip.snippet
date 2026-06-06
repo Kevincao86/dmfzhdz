@@ -1,8 +1,6 @@
-# 备案期：腾讯云 443 易 ECONNRESET，80+域名 Host 易备案页；用「80 + IP Host」明文反代
-# sudo tee /etc/nginx/snippets/erp-api-80-ip.conf < ~/app/scripts/ecs-nginx-erp-api-80-ip.snippet
-# printf '%s\n' 'include snippets/erp-api-80-ip.conf;' | sudo tee /etc/nginx/sites-enabled/erp-api-80-ip.conf
-# sudo nginx -t && sudo systemctl reload nginx
-# curl -sS -H "Host: 139.196.42.5" http://127.0.0.1/erp-api/mp-cronet-ping
+# 方案 B：Vercel supabaseAdminFetch 经 HTTP:80 + IP Host 访问 GoTrue/PostgREST（非 erp-api 注册 relay）
+# 安装: sudo bash scripts/ecs-install-beian-http-80.sh
+# 自测: curl -sS -H "Host: 139.196.42.5" http://127.0.0.1/erp-api/meoo-erp-api-health
 
 server {
     listen 80;
@@ -18,6 +16,24 @@ server {
         client_max_body_size 4m;
         gzip off;
         proxy_pass http://127.0.0.1:3001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host mofangdianai.com;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+    }
+
+    location /auth/v1/ {
+        proxy_pass http://127.0.0.1:9999/;
+        proxy_http_version 1.1;
+        proxy_set_header Host mofangdianai.com;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+    }
+
+    location /rest/v1/ {
+        proxy_pass http://127.0.0.1:3000/;
         proxy_http_version 1.1;
         proxy_set_header Host mofangdianai.com;
         proxy_set_header X-Real-IP $remote_addr;

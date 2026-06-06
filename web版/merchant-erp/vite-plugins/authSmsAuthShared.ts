@@ -37,7 +37,7 @@ function authSmsPublicBases(): string[] {
     process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
     process.env.MEOO_AUTH_API_PUBLIC_BASE,
     'https://cs.mofangdianai.com',
-    'https://mofangdianai.com',
+    // 勿含 mofangdianai.com：ECS 无密钥时会再委托 cs，形成 cs + 本机各发一条
   ]
   const bases: string[] = []
   for (const item of raw) {
@@ -58,6 +58,7 @@ async function sendAuthSmsViaPublicApi(phone: string): Promise<AuthSmsSendResult
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Meoo-Sms-Relay': '1',
           ...(secret ? { 'X-Meoo-Internal-Auth': secret } : {}),
         },
         body: JSON.stringify({ phone }),

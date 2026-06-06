@@ -1,6 +1,6 @@
 /**
- * Vercel Serverless 访问 ECS 自建 Supabase（GoTrue / PostgREST）。
- * 备案期外网 SNI 域名会被 reset，经 erpHttpsDualFetch 改连 IP + Host 头。
+ * 方案 B：Vercel Serverless 直连轻量 Supabase（GoTrue / PostgREST）。
+ * SUPABASE_URL=https://mofangdianai.com；备案期经 erpHttpsDualFetch → HTTP:80 IP bypass。
  */
 import { erpAwareFetch } from './erpHttpsDualFetch.js'
 

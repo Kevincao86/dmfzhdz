@@ -1,7 +1,10 @@
 /**
- * 访问 ECS：先 fetch 域名，失败再 node:https 连公网 IP。
- * 备案期外网带 SNI 域名会被阿里云 reset；IP 连接勿发域名 SNI，仅用 Host 头路由。
+ * 方案 B：Vercel Serverless 访问轻量 Supabase（GoTrue / PostgREST）。
+ * 备案期外网 HTTPS + 域名 SNI 会被 reset；MEOO_ERP_BEIAN_BYPASS=1 时：
+ *   1) 优先 HTTP:80 + Host:公网IP（轻量 Nginx 反代 /auth/v1、/rest/v1）
+ *   2) 再试 HTTPS:443 + Host:mofangdianai.com（无域名 SNI）
  */
+import http from 'node:http'
 import https from 'node:https'
 
 const DEFAULT_ERP_IP = '139.196.42.5'
@@ -33,6 +36,53 @@ function timeoutSignal(ms: number): AbortSignal {
   return c.signal
 }
 
+/** 备案 bypass 第一步：HTTP:80，Nginx server_name 为公网 IP */
+function httpViaIp(
+  url: string,
+  method: ErpHttpMethod,
+  body?: string,
+  extraHeaders?: Record<string, string>,
+): Promise<{ status: number; text: string }> {
+  const parsed = new URL(url)
+  const path = `${parsed.pathname}${parsed.search}`
+  const ip = erpHostIp()
+
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: ip,
+        port: 80,
+        path,
+        method,
+        headers: {
+          Host: ip,
+          Accept: 'application/json',
+          ...(extraHeaders ?? {}),
+          ...(body
+            ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+            : {}),
+        },
+        timeout: TIMEOUT_MS,
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c) => chunks.push(c))
+        res.on('end', () => {
+          resolve({ status: res.statusCode || 0, text: Buffer.concat(chunks).toString('utf8') })
+        })
+      },
+    )
+    req.on('error', reject)
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('beian_http_timeout'))
+    })
+    if (body) req.write(body)
+    req.end()
+  })
+}
+
+/** 备案 bypass 第二步：HTTPS:443 连 IP，Host 头用域名路由 Nginx default_server */
 function httpsViaIp(
   url: string,
   method: ErpHttpMethod,
@@ -50,7 +100,6 @@ function httpsViaIp(
         port: 443,
         path,
         method,
-        // 备案期：禁止 SNI 域名（外网 reset）；Nginx default_server + Host 头即可
         rejectUnauthorized: false,
         headers: {
           Host: hostHeader,
@@ -73,7 +122,7 @@ function httpsViaIp(
     req.on('error', reject)
     req.on('timeout', () => {
       req.destroy()
-      reject(new Error('erp_ip_timeout'))
+      reject(new Error('beian_https_timeout'))
     })
     if (body) req.write(body)
     req.end()
@@ -129,7 +178,7 @@ function pickExtraHeaders(init?: RequestInit): Record<string, string> {
   return out
 }
 
-/** 拉取 ECS URL：域名 fetch → IP（无域名 SNI） */
+/** 拉取 ECS Supabase URL：备案期 HTTP:80 IP → HTTPS IP → 域名 */
 export async function fetchErpDual(
   url: string,
   method: ErpHttpMethod = 'GET',
@@ -148,11 +197,19 @@ export async function fetchErpDual(
   }
 
   if (beianBypassPreferred()) {
+    let httpErr = ''
+    try {
+      const out = await httpViaIp(url, method, body, extraHeaders)
+      if (out.status > 0 && !out.text.trimStart().startsWith('<')) return out
+      httpErr = out.status === 0 ? 'empty' : `http_${out.status}_html`
+    } catch (e) {
+      httpErr = e instanceof Error ? e.message : String(e)
+    }
     try {
       return await httpsViaIp(url, method, body, extraHeaders)
     } catch (ipErr) {
       const b = ipErr instanceof Error ? ipErr.message : String(ipErr)
-      throw new Error(`beian_ip:${b}`)
+      throw new Error(`beian_http:${httpErr || 'fail'} | beian_ip:${b}`)
     }
   }
 
@@ -186,7 +243,6 @@ export function erpAwareFetch(url: string, init: RequestInit = {}): Promise<Resp
         : undefined
   const extraHeaders = pickExtraHeaders(init)
   return fetchErpDual(url, method as ErpHttpMethod, body, extraHeaders).then(({ status, text }) => {
-    // Node fetch：204/205 不得带 body，否则 Response 构造抛错
     if (status === 204 || status === 205) {
       return new Response(null, { status })
     }

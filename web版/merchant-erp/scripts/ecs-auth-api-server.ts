@@ -64,9 +64,13 @@ import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
+import douyinBindHandler from '../api/douyin-bind.ts'
+import kuaishouBindHandler from '../api/kuaishou-bind.ts'
+import apiPingHandler from '../api/ping.ts'
+import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260606-registry-tenant-delete'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260606-merchant-api-fallback'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -151,6 +155,12 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
+  '/api/douyin-bind': douyinBindHandler as VercelLikeHandler,
+  '/api/meoo-douyin-bind': douyinBindHandler as VercelLikeHandler,
+  '/api/merchant/douyin/bind': douyinBindHandler as VercelLikeHandler,
+  '/api/kuaishou-bind': kuaishouBindHandler as VercelLikeHandler,
+  '/api/meoo-kuaishou-bind': kuaishouBindHandler as VercelLikeHandler,
+  '/api/ping': apiPingHandler as VercelLikeHandler,
   '/api/meoo-erp-api-health': async (_req, res) => {
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -176,6 +186,35 @@ const routes: Record<string, VercelLikeHandler> = {
     )
   },
   // tokenmix 依赖 @supabase/supabase-js（须在 商家管理后台/node_modules）；ECS 仅走 Vercel /api/meoo-supabase-tenants-tokenmix
+}
+
+const dynamicHandlerCache = new Map<string, VercelLikeHandler>()
+
+/** ECS 迁移：Vercel 上 api/*.ts 自动成路由；轻量 auth-api 需动态加载或 merchant 网关 */
+async function resolveHandler(path: string): Promise<VercelLikeHandler | null> {
+  const exact = routes[path]
+  if (exact) return exact
+
+  if (path.startsWith('/api/merchant/')) {
+    return merchantSlugHandler as VercelLikeHandler
+  }
+
+  const rel = path.slice('/api/'.length)
+  if (!rel || rel.includes('/') || !/^[\w-]+$/.test(rel)) return null
+
+  const cached = dynamicHandlerCache.get(path)
+  if (cached) return cached
+
+  try {
+    const mod = (await import(`../api/${rel}.ts`)) as { default?: VercelLikeHandler }
+    if (typeof mod.default === 'function') {
+      dynamicHandlerCache.set(path, mod.default)
+      return mod.default
+    }
+  } catch {
+    /* 无对应 api 文件 */
+  }
+  return null
 }
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
@@ -235,7 +274,7 @@ http
       res.end()
       return
     }
-    const handler = routes[path]
+    const handler = await resolveHandler(path)
     if (!handler) {
       res.statusCode = 404
       res.setHeader('Access-Control-Allow-Origin', '*')
@@ -246,13 +285,13 @@ http
           error: 'not_found',
           path,
           revision: ECS_AUTH_API_ROUTE_REVISION,
-          hint: '请在 ECS 执行: cd ~/app && git pull && bash scripts/ecs-run-auth-api.sh（或 systemctl restart meoo-auth-api）',
+          hint: '请在轻量执行: cd ~/app && git pull && bash scripts/ecs-deploy-auth-api.sh',
         }),
       )
       return
     }
     try {
-      const bodyBuf = req.method === 'POST' ? await readBody(req) : Buffer.alloc(0)
+      const bodyBuf = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' ? await readBody(req) : Buffer.alloc(0)
       let body: unknown = undefined
       if (bodyBuf.length) {
         const text = bodyBuf.toString('utf8')
@@ -262,7 +301,14 @@ http
           body = text
         }
       }
-      const vercelReq = Object.assign(req, { body, query, headers: req.headers })
+      const slugParts =
+        path.startsWith('/api/merchant/') ? path.slice('/api/merchant/'.length).split('/').filter(Boolean) : []
+      const vercelReq = Object.assign(req, {
+        body,
+        query: slugParts.length ? { ...query, slug: slugParts } : query,
+        headers: req.headers,
+        url: req.url,
+      })
       await handler(vercelReq, vercelRes)
     } catch (e) {
       res.statusCode = 500

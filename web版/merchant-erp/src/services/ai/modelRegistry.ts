@@ -208,8 +208,8 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
   })
 
   const doubaoModels = [
-    { id: 'doubao-pro-32k', label: 'doubao-pro-32k' },
     { id: 'doubao-seed-1-6-251015', label: 'doubao-seed-1-6' },
+    { id: 'doubao-pro-32k', label: 'doubao-pro-32k（旧版，建议运营台配 ep）' },
   ] as const
   out.push({
     key: 'doubao::__default__',

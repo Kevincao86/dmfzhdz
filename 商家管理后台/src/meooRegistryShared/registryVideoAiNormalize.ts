@@ -16,6 +16,7 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     klingSecretKey: slice('klingSecretKey', 520),
     klingApiBase: slice('klingApiBase', 260),
     arkVideoEndpoints: slice('arkVideoEndpoints', 8192),
+    arkChatEndpoints: slice('arkChatEndpoints', 8192),
     arkVideoApiKey: slice('arkVideoApiKey', 520),
     iceAppId: slice('iceAppId', 120),
     iceAccessKeyId: slice('iceAccessKeyId', 260),
