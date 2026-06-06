@@ -1,5 +1,11 @@
 /** 火山方舟 Seedance 视频：接入点 ep- 或模型 ID doubao-seedance-* */
 
+import {
+  catalogEndpointsCsv,
+  DOUBAO_VIDEO_CATALOG,
+  isArkGenerativeVideoModelId,
+} from './arkModelCatalog.js'
+
 export type ArkVideoModelOption = { label: string; endpointId: string }
 
 /** Seedance 1.5 Pro 默认模型（方舟 API 模型名，须账号已开通） */
@@ -9,6 +15,9 @@ export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-1-5-pro-251215'
 const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
   'doubao-seedance-1.5-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   'doubao-seedance-1-5-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
+  'doubao-seaweed': 'doubao-seaweed-241128',
+  'doubao-视频生成-seaweed': 'doubao-seaweed-241128',
+  'wan2.1-14b': 'wan2-1-14b-250224',
 }
 
 export function normalizeArkVideoModelParam(modelId: string): string {
@@ -20,6 +29,7 @@ export function normalizeArkVideoModelParam(modelId: string): string {
 
 export function isDoubaoSeedanceModelId(id: string): boolean {
   const t = id.trim()
+  if (isArkGenerativeVideoModelId(t)) return true
   if (/^doubao-seedance/i.test(t)) return true
   return Object.keys(SEEDANCE_MODEL_ALIASES).includes(t.toLowerCase())
 }
@@ -37,6 +47,9 @@ export function looksLikeDoubaoChatModelId(id: string): boolean {
   if (/^doubao-seed-1-6/i.test(t)) return true
   if (/^doubao-seed-character/i.test(t)) return true
   if (/^doubao-seed-2-0-lite/i.test(t)) return true
+  if (/^doubao-seed-2-0-mini/i.test(t)) return true
+  if (/^doubao-seed-2-0-code/i.test(t)) return true
+  if (/^doubao-seed-1-8/i.test(t)) return true
   return false
 }
 
@@ -113,7 +126,7 @@ export function pickMergedArkEndpointsField(envRaw: string, registryRaw: string)
     seen.add(m.endpointId)
     uniq.push(m)
   }
-  if (uniq.length === 0) return ''
+  if (uniq.length === 0) return catalogEndpointsCsv(DOUBAO_VIDEO_CATALOG)
   return uniq
     .map((m) => (m.label && m.label !== m.endpointId ? `${m.label}|${m.endpointId}` : m.endpointId))
     .join(', ')

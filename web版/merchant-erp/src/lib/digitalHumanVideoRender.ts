@@ -54,6 +54,7 @@ export function estimateDhSegmentCount(script: string): number {
 
 function pickEngine(cfg: VideoAiBackendConfig | null): DhVideoEngine | null {
   if (cfg?.arkKeyConfigured && cfg.arkVideoModels.length > 0) return 'seedance'
+  if (cfg?.qwenVideoConfigured) return 'seedance'
   if (cfg?.klingConfigured) return 'kling'
   return null
 }
@@ -143,7 +144,7 @@ async function generateOneSegment(opts: {
     const images =
       frameB64 != null ? [`data:image/jpeg;base64,${frameB64.replace(/\s/g, '')}`] : undefined
     const r = await postSeedanceVideoStart({
-      model: seedanceModel,
+      ...(seedanceModel ? { model: seedanceModel } : {}),
       prompt,
       flags: seedanceFlags,
       images_base64: images,
@@ -212,13 +213,13 @@ export async function renderDigitalHumanMp4(
   const segmentTotal = estimateDhSegmentCount(script)
   const seedanceModel = pickSeedanceModel(cfg)
   const seedanceFlags = `--dur ${SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
-  if (engine === 'seedance' && !seedanceModel) {
+  if (engine === 'seedance' && !seedanceModel && !cfg?.qwenVideoConfigured) {
     const hint = cfg?.arkVideoSetupIssue?.trim()
     return {
       ok: false,
       message:
         hint ||
-        '豆包 Seedance 未配置可用 ep 接入点：请在运营台「AI模型 → 短视频 API」填写方舟视频 ep- 模型。',
+        '豆包 Seedance 未配置可用 ep 接入点：请在运营台「AI模型 → 短视频 API」填写方舟视频 ep- 模型，或配置通义千问 Key 作视频兜底。',
     }
   }
 

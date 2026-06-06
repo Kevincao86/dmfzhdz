@@ -6,6 +6,17 @@
  */
 import type { ServerResponse } from 'node:http'
 
+import {
+  DOUBAO_CHAT_CATALOG,
+  DOUBAO_IMAGE_CATALOG,
+  isArkQuotaHopableError,
+  mergeCatalogModelIds,
+} from '../src/lib/arkModelCatalog.js'
+import { qwenImageModelCandidates } from '../src/lib/qwenVisionCatalog.js'
+import {
+  buildQwenVisionImageRequest,
+  extractQwenVisionImageUrls,
+} from '../src/lib/qwenVisionApi.js'
 import { parseArkVideoEndpointsRaw } from '../src/lib/arkVideoEndpointsConfig.js'
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import { isTokenmixLinkedVendor } from '../src/lib/aiVendorKeysShared.js'
@@ -337,9 +348,8 @@ async function runAgentT2iSingleVendor(
     })
   }
   if (primaryNorm === 'doubao') {
-    const imgModel = doubaoImageModelId(env)
     const payload: Record<string, unknown> = {
-      model: imgModel,
+      model: doubaoImageModelId(env),
       prompt,
       size: '2K',
       response_format: 'url',
@@ -540,8 +550,27 @@ function doubaoImageModelId(env: MerchantAiEnv): string {
   ).trim() || 'doubao-seedream-4-0-250828'
 }
 
+function doubaoImageModelCandidates(env: MerchantAiEnv, mode: 't2i' | 'i2i'): string[] {
+  const e = env as Record<string, string | undefined>
+  return mergeCatalogModelIds(
+    DOUBAO_IMAGE_CATALOG,
+    e.MERCHANT_AI_DOUBAO_IMAGE_MODELS ?? e.MERCHANT_AI_DOUBAO_IMAGE_ENDPOINTS,
+    doubaoImageModelId(env),
+    mode,
+  )
+}
+
 function qwenWanxModelId(env: MerchantAiEnv): string {
   return (env.MERCHANT_AI_QWEN_IMAGE_MODEL ?? 'wanx-v1').trim() || 'wanx-v1'
+}
+
+function qwenWanxModelCandidates(env: MerchantAiEnv, mode: 't2i' | 'i2i'): string[] {
+  const e = env as Record<string, string | undefined>
+  return qwenImageModelCandidates(
+    e.MERCHANT_AI_QWEN_IMAGE_MODELS ?? e.MERCHANT_AI_QWEN_VISION_MODELS,
+    qwenWanxModelId(env),
+    mode,
+  )
 }
 
 function minimaxImageModelId(env: MerchantAiEnv): string {
@@ -828,23 +857,19 @@ async function callMinimaxChat(
 }
 
 function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
-  const out: string[] = []
-  const add = (m: string) => {
-    const t = m.trim()
-    if (t && !out.includes(t)) out.push(t)
-  }
   const fromRegistry = String(env.MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS ?? '').trim()
-  if (fromRegistry) {
-    for (const item of parseArkVideoEndpointsRaw(fromRegistry)) {
-      add(item.endpointId)
-    }
-  }
-  const primary = doubaoChatModelId(env)
+  const registryIds = fromRegistry
+    ? parseArkVideoEndpointsRaw(fromRegistry).map((item) => item.endpointId)
+    : []
+  const merged = mergeCatalogModelIds(
+    DOUBAO_CHAT_CATALOG,
+    registryIds.join(', '),
+    doubaoChatModelId(env),
+    'chat',
+  )
   const fallback = doubaoChatFallbackModelId(env)
-  for (const m of [primary, fallback]) {
-    add(m)
-  }
-  return out.length ? out : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
+  if (fallback && !merged.includes(fallback)) merged.push(fallback)
+  return merged.length ? merged : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
 }
 
 async function callDoubaoChat(
@@ -862,6 +887,7 @@ async function callDoubaoChat(
       return await openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal)
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
+      if (!isArkQuotaHopableError(lastErr.message)) throw lastErr
     }
   }
   throw lastErr ?? new Error('豆包对话请求失败')
@@ -1054,42 +1080,41 @@ function goodsAiLockSuffixFromBody(body: Record<string, unknown>): string {
 
 async function qwenWanxCreateTask(
   apiKey: string,
-  env: MerchantAiEnv,
-  input: Record<string, unknown>,
-  parameterExtras?: Record<string, unknown>,
+  _env: MerchantAiEnv,
+  prompt: string,
+  opts?: {
+    refImageUrl?: string
+    parameterExtras?: Record<string, unknown>
+    negativePrompt?: string
+    modelOverride?: string
+  },
 ): Promise<string> {
-  const wanxModel = qwenWanxModelId(env)
-  const res = await fetch(
-    'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-DashScope-Async': 'enable',
-      },
-      body: JSON.stringify({
-        model: wanxModel,
-        input,
-        parameters: {
-          style: '<auto>',
-          size: '1024*1024',
-          n: 1,
-          ...parameterExtras,
-        },
-      }),
+  const wanxModel = opts?.modelOverride?.trim() || qwenWanxModelId(_env)
+  const built = buildQwenVisionImageRequest(wanxModel, prompt, {
+    refImageUrl: opts?.refImageUrl,
+    parameterExtras: opts?.parameterExtras,
+    negativePrompt: opts?.negativePrompt,
+  })
+  const res = await fetch(built.url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'X-DashScope-Async': 'enable',
     },
-  )
+    body: JSON.stringify(built.body),
+  })
   const data = await readJson(res)
   if (!res.ok) {
     const msg =
       (typeof data.message === 'string' && data.message) ||
+      (typeof data.code === 'string' && data.code) ||
       JSON.stringify(data).slice(0, 400)
-    throw new Error(msg || `万相创建任务 HTTP ${res.status}`)
+    throw new Error(msg || `千问视觉创建任务 HTTP ${res.status}`)
   }
   const output = data.output as Record<string, unknown> | undefined
   const taskId = typeof output?.task_id === 'string' ? output.task_id : ''
-  if (!taskId) throw new Error(`万相未返回 task_id：${JSON.stringify(data).slice(0, 280)}`)
+  if (!taskId) throw new Error(`千问视觉未返回 task_id：${JSON.stringify(data).slice(0, 280)}`)
   return taskId
 }
 
@@ -1111,25 +1136,20 @@ async function qwenWanxPollUrls(apiKey: string, taskId: string): Promise<string[
     const output = data.output as Record<string, unknown> | undefined
     const status = String(output?.task_status ?? '')
     if (status === 'SUCCEEDED') {
-      const results = (output?.results as unknown[]) ?? []
-      const urls: string[] = []
-      for (const row of results) {
-        const r = row as Record<string, unknown>
-        if (typeof r.url === 'string' && r.url.trim()) urls.push(r.url.trim())
-      }
-      if (urls.length === 0) throw new Error('万相任务成功但未返回图片 URL')
+      const urls = extractQwenVisionImageUrls(output)
+      if (urls.length === 0) throw new Error('千问视觉任务成功但未返回图片 URL')
       return urls
     }
     if (status === 'FAILED' || status === 'UNKNOWN') {
       const msg =
         (typeof output?.message === 'string' && output.message) ||
         (typeof data.message === 'string' && data.message) ||
-        '万相任务失败'
+        '千问视觉任务失败'
       throw new Error(msg)
     }
     await sleep(i < 18 ? 800 : 1500)
   }
-  throw new Error('万相任务排队超时，请稍后重试')
+  throw new Error('千问视觉任务排队超时，请稍后重试')
 }
 
 function qwenI2iRefStrength(env: MerchantAiEnv): number {
@@ -1166,9 +1186,29 @@ async function qwenWanxOneImage(
         : '手机,智能手机,平板电脑,笔记本电脑,显示器,键盘,鼠标,办公桌面,数码产品特写,与商品标题无关的食物,杂乱拼贴,低分辨率,畸形手指,水印,无关展厅,样板间,办公室,工位',
     }
   }
-  const taskId = await qwenWanxCreateTask(apiKey, env, input, parameterExtras)
-  const urls = await qwenWanxPollUrls(apiKey, taskId)
-  return urls[0]!
+  const mode = useRef ? 'i2i' : 't2i'
+  let lastErr: Error | null = null
+  for (const wanxModel of qwenWanxModelCandidates(env, mode)) {
+    try {
+      const taskId = await qwenWanxCreateTask(apiKey, env, prompt, {
+        refImageUrl: useRef ? refImageUrl : undefined,
+        parameterExtras,
+        negativePrompt:
+          typeof input.negative_prompt === 'string'
+            ? input.negative_prompt
+            : typeof parameterExtras?.negative_prompt === 'string'
+              ? parameterExtras.negative_prompt
+              : undefined,
+        modelOverride: wanxModel,
+      })
+      const urls = await qwenWanxPollUrls(apiKey, taskId)
+      return urls[0]!
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+      if (!isArkQuotaHopableError(lastErr.message) && !isVendorHopableError(e)) throw lastErr
+    }
+  }
+  throw lastErr ?? new Error('千问视觉生图失败（已轮询同型全部模型）')
 }
 
 async function minimaxImageUrls(apiKey: string, body: Record<string, unknown>): Promise<string[]> {
@@ -1203,7 +1243,7 @@ async function minimaxImageUrls(apiKey: string, body: Record<string, unknown>): 
   throw new Error(`MiniMax 未返回图片：${JSON.stringify(data).slice(0, 240)}`)
 }
 
-async function doubaoSeedreamUrls(
+async function doubaoSeedreamUrlsOnce(
   env: MerchantAiEnv,
   apiKey: string,
   payload: Record<string, unknown>,
@@ -1238,6 +1278,25 @@ async function doubaoSeedreamUrls(
   }
   if (out.length === 0) throw new Error('豆包生图未返回 url')
   return out
+}
+
+async function doubaoSeedreamUrls(
+  env: MerchantAiEnv,
+  apiKey: string,
+  payload: Record<string, unknown>,
+): Promise<string[]> {
+  const mode = payload.image ? 'i2i' : 't2i'
+  const candidates = doubaoImageModelCandidates(env, mode)
+  let lastErr: Error | null = null
+  for (const modelId of candidates) {
+    try {
+      return await doubaoSeedreamUrlsOnce(env, apiKey, { ...payload, model: modelId })
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+      if (!isArkQuotaHopableError(lastErr.message)) throw lastErr
+    }
+  }
+  throw lastErr ?? new Error('豆包生图失败')
 }
 
 async function runImageGenerate(
@@ -1287,9 +1346,8 @@ async function runImageGenerate(
     })
   }
   if (model === 'doubao') {
-    const imgModel = doubaoImageModelId(env)
     return doubaoSeedreamUrls(env, key, {
-      model: imgModel,
+      model: doubaoImageModelId(env),
       prompt,
       size: '2K',
       response_format: 'url',
@@ -1351,9 +1409,8 @@ async function runImageEnhanceOne(
     return urls[0]!
   }
   if (model === 'doubao') {
-    const imgModel = doubaoImageModelId(env)
     const payload: Record<string, unknown> = {
-      model: imgModel,
+      model: doubaoImageModelId(env),
       prompt,
       size: '2K',
       response_format: 'url',

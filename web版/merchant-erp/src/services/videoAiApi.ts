@@ -10,6 +10,8 @@ export type VideoAiBackendConfig = {
   /** @deprecated 使用 iceConfigured */
   openshotConfigured?: boolean
   longformPlanner?: { doubao: boolean; qwen: boolean }
+  /** 百炼千问视频（豆包额度用尽时服务端自动切换） */
+  qwenVideoConfigured?: boolean
   /** 后端返回的商户端说明（不在此页绑 Key） */
   credentialNote?: string
   /** 方舟 Key 已有但无可用 ep 时的具体原因 */
