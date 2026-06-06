@@ -43,6 +43,7 @@ import {
   parseCreateProductIntentsFromPlan,
   planIncludesRecruitInfluencer,
   shouldDeferTaskPreview,
+  shouldUseFullAgentSystemPrompt,
   summarizeAssistantContent,
 } from '../lib/aiAgentActionParse'
 import { splitAssistantStreamView } from '../lib/assistantThinkingText'
@@ -1253,8 +1254,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           agentPickerKey: userPickerKey,
         }
 
-        /** 日常闲聊走非流式 JSON（与 Vercel 迁 ECS 前一致），避免 SSE 双跳缓冲导致长时间「思考中」 */
-        const res = taskType
+        /** 纯闲聊非流式；方案/融资/政策等深度问题走流式 + 完整系统提示 */
+        const useDeepReply = shouldUseFullAgentSystemPrompt(trimmed, taskType)
+        const res = taskType || useDeepReply
           ? await streamAiChat(
               { ...chatReq, stream: true as const },
               {

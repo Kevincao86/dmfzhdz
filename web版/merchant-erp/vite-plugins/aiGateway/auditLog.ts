@@ -1,5 +1,6 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
 import { AI_AGENT_CASUAL_SYSTEM_PROMPT, AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
+import { shouldUseFullAgentSystemPrompt } from '../../src/lib/aiAgentActionParse.js'
 import { dialogueStyleAddonForPickerKey } from './agentDialogueStyle.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 
@@ -45,9 +46,10 @@ export function mergeSystemPrompt(
   messages: AIChatRequest['messages'],
   req?: Pick<AIChatRequest, 'agentPickerKey' | 'taskType'>,
 ): AIChatRequest['messages'] {
-  const base = req?.taskType
-    ? buildAgentSystemContent(req)
-    : AI_AGENT_CASUAL_SYSTEM_PROMPT
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+  const userLine = typeof lastUser?.content === 'string' ? lastUser.content : ''
+  const useFull = shouldUseFullAgentSystemPrompt(userLine, req?.taskType)
+  const base = useFull ? buildAgentSystemContent(req ?? {}) : AI_AGENT_CASUAL_SYSTEM_PROMPT
   const first = messages[0]
   if (first?.role === 'system') {
     return [{ role: 'system', content: `${base}\n\n${first.content}` }, ...messages.slice(1)]

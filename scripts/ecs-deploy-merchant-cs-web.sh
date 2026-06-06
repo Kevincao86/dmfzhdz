@@ -56,6 +56,13 @@ if ! grep -qE '^VITE_SUPABASE_ANON_KEY=.+$' "$ENV_PROD"; then
   echo "请在 $ENV_PROD 填入 VITE_SUPABASE_ANON_KEY 后重跑"
   exit 1
 fi
+if grep -qE '^VITE_SUPABASE_URL=https://cs\.mofangdianai\.com' "$ENV_PROD"; then
+  echo "WARN: VITE_SUPABASE_URL 指向 cs 子域会导致登录卡在「正在加载…」（ECS→轻量双跳）。"
+  echo "      请改为 VITE_SUPABASE_URL=https://mofangdianai.com（与 dr 履约站一致）后重新 build。"
+  if [[ "${ALLOW_CS_SUPABASE_URL:-0}" != "1" ]]; then
+    exit 1
+  fi
+fi
 
 echo "== 2) npm build =="
 if [[ "${SKIP_BUILD:-0}" != "1" ]]; then
