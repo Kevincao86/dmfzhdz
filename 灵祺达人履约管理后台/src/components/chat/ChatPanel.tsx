@@ -13,6 +13,7 @@ import {
   syncProfile,
   type UiChatMessage,
 } from '../../lib/mpSync/talentChat'
+import { getAccount } from '../../lib/mpSession'
 import { getCurrentParticipant } from '../../lib/mpSync/participant'
 
 type Props = {
@@ -33,6 +34,8 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const me = sessionRow ? participantForSession(sessionRow) : getCurrentParticipant()
+  const myAvatar =
+    String(me.avatarUrl || getAccount()?.wxAvatarUrl || '').trim() || ''
 
   const scrollBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -156,7 +159,10 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
           <p className="text-center text-xs text-[#888] mt-8">{CHAT_TURN_HINT}</p>
         ) : null}
         {messages.map((m) => (
-          <div key={m.id} className={`chat-bubble-row flex gap-2 mb-3 ${m.mine ? 'flex-row-reverse' : ''}`}>
+          <div
+            key={m.id}
+            className={`chat-bubble-row flex gap-2 mb-3 ${m.mine ? 'justify-end' : 'justify-start'}`}
+          >
             {!m.mine ? (
               peerAvatar ? (
                 <img src={peerAvatar} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
@@ -164,7 +170,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
                 <div className="w-8 h-8 rounded-md bg-slate-300 shrink-0" />
               )
             ) : null}
-            <div className={`max-w-[70%] ${m.mine ? 'items-end' : 'items-start'} flex flex-col`}>
+            <div className={`max-w-[70%] flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
               <div
                 className={`chat-bubble px-3 py-2 rounded-md text-sm leading-relaxed ${
                   m.mine ? 'bg-[#95ec69] text-[#191919]' : 'bg-white text-[#191919]'
@@ -175,8 +181,8 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
               <span className="text-[10px] text-[#b2b2b2] mt-0.5 px-1">{m.at}</span>
             </div>
             {m.mine ? (
-              me.avatarUrl ? (
-                <img src={me.avatarUrl} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
+              myAvatar ? (
+                <img src={myAvatar} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
               ) : (
                 <div className="w-8 h-8 rounded-md bg-violet-400/30 shrink-0" />
               )

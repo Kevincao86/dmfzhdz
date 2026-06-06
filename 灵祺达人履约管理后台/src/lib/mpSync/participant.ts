@@ -72,7 +72,7 @@ export function getCurrentParticipant(): ChatParticipant {
       participantKey: prParticipantKey(pr),
       deviceSecret: secret,
       displayName: name,
-      avatarUrl: String(pr?.wxAvatarUrl || '').trim(),
+      avatarUrl: String(pr?.wxAvatarUrl || acc?.wxAvatarUrl || '').trim(),
       memberSnapshot: (pr as Record<string, unknown>) || null,
     }
   }
@@ -91,7 +91,7 @@ export function getCurrentParticipant(): ChatParticipant {
     participantKey: key,
     deviceSecret: bootstrapTalentSecret(key),
     displayName: name,
-    avatarUrl: String(member?.wxAvatarUrl || '').trim(),
+    avatarUrl: String(member?.wxAvatarUrl || acc?.wxAvatarUrl || '').trim(),
     memberSnapshot: (member as Record<string, unknown>) || null,
   }
 }
