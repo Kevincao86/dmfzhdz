@@ -1028,7 +1028,7 @@ async function resolveMainProductAnchorForImage(
 只输出一行 JSON：{"main_product":"..."}，不超过 32 字。`
   const user = `商品类型：${typeLabel || (Number.isFinite(productType) ? `product_type=${productType}` : '未知')}\n商品标题：${listingTitle}`
   try {
-    const raw = await callDoubaoChat(key, env, system, user)
+    const { text: raw } = await callDoubaoChat(key, env, system, user)
     const parsed = JSON.parse(stripAssistantJsonFence(raw)) as { main_product?: string }
     const mp = String(parsed.main_product ?? '').trim()
     if (mp.length >= 2) return mp.slice(0, 120)
@@ -1847,7 +1847,8 @@ ${task}
 格式要求：不要 Markdown、不要编号列表；全文不超过 220 字；只输出回复正文一段。`
   const user = `顾客昵称：${ctx.userName}\n评价原文（你必须逐句阅读并据此写回复）：\n${ctx.reviewText}`
   try {
-    const text = (await callDoubaoChat(key, envM, system, user)).trim()
+    const { text: rawReply } = await callDoubaoChat(key, envM, system, user)
+    const text = rawReply.trim()
     if (!text) return { ok: false, message: '豆包未返回有效回复' }
     return { ok: true, text }
   } catch (e) {
@@ -1945,7 +1946,7 @@ export async function handleDouyinGoodsAiAssist(
     const qualityCtrl = new AbortController()
     const qualityTimer = setTimeout(() => qualityCtrl.abort(), 130_000)
     try {
-      let text = await callDoubaoChat(
+      let { text } = await callDoubaoChat(
         key,
         env,
         systemPrompt,
@@ -1956,12 +1957,12 @@ export async function handleDouyinGoodsAiAssist(
       let parsed = parseQualityAnalysisJson(text, nameById)
       if (parsed.error) {
         try {
-          const text2 = await callDoubaoChat(key, env, systemPrompt, user, {
+          const retry = await callDoubaoChat(key, env, systemPrompt, user, {
             ...chatOpts,
             response_format: { type: 'json_object' },
           }, qualityCtrl.signal)
-          text = text2
-          parsed = parseQualityAnalysisJson(text2, nameById)
+          text = retry.text
+          parsed = parseQualityAnalysisJson(text, nameById)
         } catch {
           /* 保留首次模型输出用于排错 */
         }

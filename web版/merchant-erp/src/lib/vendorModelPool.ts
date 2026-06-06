@@ -47,15 +47,6 @@ export const QWEN_CHAT_CATALOG: ArkCatalogEntry[] = [
 ]
 
 const VISION_IMAGE_KINDS: ArkModelKind[] = ['image_i2i']
-const VISION_VIDEO_KINDS: ArkModelKind[] = [
-  'video_t2v',
-  'video_i2v',
-  'video_both',
-  'video_3d',
-  'video_r2v',
-  'video_portrait',
-  'video_edit',
-]
 
 function filterCatalogByKinds(catalog: readonly ArkCatalogEntry[], kinds: readonly ArkModelKind[]): ArkCatalogEntry[] {
   const set = new Set(kinds)

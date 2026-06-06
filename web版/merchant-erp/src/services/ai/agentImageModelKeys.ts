@@ -84,8 +84,14 @@ export function fallbackChatPickerKeyFromImagePicker(key: string): string {
     if (p.vendor === 'minimax') return 'minimax::__default__'
     return 'tokenmix::openai::__default__'
   }
+  if (p.kind === 'vendor-model') {
+    return p.vendor === 'qwen' ? 'qwen::__default__' : 'doubao::__default__'
+  }
   if (p.kind === 'style') return `tokenmix::${p.family}::__default__`
-  return p.slug === 'kimi' ? 'kimi::__default__' : 'deepseek::__default__'
+  if (p.kind === 'brand-direct') {
+    return p.slug === 'kimi' ? 'kimi::__default__' : 'deepseek::__default__'
+  }
+  return 'tokenmix::openai::__default__'
 }
 
 export function effectiveChatPickerKey(modelPickerKey: string): string {
