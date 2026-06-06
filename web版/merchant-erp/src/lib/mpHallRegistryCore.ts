@@ -48,13 +48,24 @@ async function fetchRegistryPartialFromDb(
   return reg as Partial<RegistryFile>
 }
 
+function sliceRegistryList<T>(raw: unknown, max = 5000): T[] {
+  return Array.isArray(raw) ? (raw as T[]).slice(0, max) : []
+}
+
 function buildHallPayload(partial: Partial<RegistryFile>): Record<string, unknown> {
   const mpRaw = Array.isArray(partial.mpRecruitmentOrders)
     ? (partial.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
     : []
   const stub = { mpRecruitmentOrders: mpRaw } as RegistryFile
   const mpRecruitmentOrders = mpRecruitmentOrdersForTalentHall(stub)
-  return { mpRecruitmentOrders }
+  return {
+    ok: true,
+    mpRecruitmentOrders,
+    mpTalentMembers: sliceRegistryList(partial.mpTalentMembers),
+    talentLibraryEntries: sliceRegistryList(partial.talentLibraryEntries),
+    shootTeamLibraryEntries: sliceRegistryList(partial.shootTeamLibraryEntries),
+    editTeamLibraryEntries: sliceRegistryList(partial.editTeamLibraryEntries),
+  }
 }
 
 export async function loadMpHallRegistryPayload(): Promise<Record<string, unknown>> {
@@ -82,7 +93,7 @@ export async function loadMpHallRegistryPayload(): Promise<Record<string, unknow
     try {
       const remote = await proxyGetErpApi('/api/meoo-ops-mp-hall-registry')
       if (remote && Array.isArray(remote.mpRecruitmentOrders)) {
-        return { mpRecruitmentOrders: remote.mpRecruitmentOrders }
+        return buildHallPayload(remote as Partial<RegistryFile>)
       }
       return buildHallPayload(remote as Partial<RegistryFile>)
     } catch (e) {

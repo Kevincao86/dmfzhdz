@@ -300,8 +300,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     /** 招募大厅：与 wx_login 同走 POST，云函数代理更稳 */
     if (action === 'hall_registry') {
       const payload = await loadMpHallRegistryPayload()
-      const mp = Array.isArray(payload.mpRecruitmentOrders) ? payload.mpRecruitmentOrders : []
-      sendJson(res, 200, { ok: true, mpRecruitmentOrders: mp })
+      sendJson(res, 200, { ok: true, ...payload })
       return
     }
 
