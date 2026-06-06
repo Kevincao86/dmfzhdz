@@ -694,6 +694,29 @@ function extractChatCompletionText(data: Record<string, unknown>): string {
   throw new Error(`无法解析模型输出：${JSON.stringify(data).slice(0, 320)}`)
 }
 
+const UPSTREAM_CHAT_TIMEOUT_MS = 45_000
+
+function combineUpstreamAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
+  if (!a) return b
+  if (!b) return a
+  if (a.aborted) return a
+  if (b.aborted) return b
+  const c = new AbortController()
+  const onAbort = () => c.abort()
+  a.addEventListener('abort', onAbort, { once: true })
+  b.addEventListener('abort', onAbort, { once: true })
+  return c.signal
+}
+
+function upstreamChatTimeoutSignal(): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(UPSTREAM_CHAT_TIMEOUT_MS)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), UPSTREAM_CHAT_TIMEOUT_MS)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 async function openAiStyleChat(
   url: string,
   apiKey: string,
@@ -719,7 +742,7 @@ async function openAiStyleChat(
       stream: false,
       ...bodyOverrides,
     }),
-    signal: fetchSignal,
+    signal: combineUpstreamAbortSignals(fetchSignal, upstreamChatTimeoutSignal()),
   })
   const data = await readJson(res)
   if (!res.ok) {

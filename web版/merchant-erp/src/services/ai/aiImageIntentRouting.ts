@@ -16,6 +16,7 @@ export function detectImageGenerationIntent(text: string): boolean {
   }
   if (/生成.{0,24}(图|照片|图片|照|海报|门头|封面|插画|效果图|宣传图|店招|logo)/i.test(t)) return true
   if (/(?:设计|做|来).{0,10}(?:图|海报|门头|封面|店招|logo)/i.test(t)) return true
+  if (/主图|商品图|详情图|banner|Banner/i.test(t)) return true
   if (/门头照|店招|宣传海报|封面图|配图|效果图|插画|海报设计|logo设计|文生|图生/i.test(t)) return true
   return false
 }

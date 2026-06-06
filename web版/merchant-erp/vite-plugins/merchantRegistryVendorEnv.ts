@@ -237,11 +237,24 @@ function mergeVendorKeysFromLocalRegistry(viteRoot: string | undefined, out: Mer
   }
 }
 
+const MERGED_AI_ENV_CACHE_MS = 60_000
+let mergedAiEnvCache: { at: number; root: string; env: MerchantAiEnv } | null = null
+
 /** 商品文案 / 智能体 / 数字人 TTS：合并运营台 vendorKeys（本地 registry.json + ECS PostgREST 注册表）。 */
 export async function mergeMerchantAiEnvWithRegistrySnapshot(
   viteRoot: string | undefined,
   base: MerchantAiEnv,
 ): Promise<MerchantAiEnv> {
+  const rootKey = viteRoot ?? ''
+  const now = Date.now()
+  if (
+    mergedAiEnvCache &&
+    mergedAiEnvCache.root === rootKey &&
+    now - mergedAiEnvCache.at < MERGED_AI_ENV_CACHE_MS
+  ) {
+    return { ...mergedAiEnvCache.env, ...base }
+  }
+
   const out: MerchantAiEnv = { ...base }
   sanitizeMerchantAiEnvInPlace(out)
   purgeJwtDirectLlmKeys(out)
@@ -253,12 +266,13 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     const data = await loadRegistrySnapshotForServer(viteRoot)
     if (!data) {
       purgeJwtDirectLlmKeys(out)
+      mergedAiEnvCache = { at: now, root: rootKey, env: { ...out } }
       return out
     }
+    const { applyRegistryVideoAiToMerchantEnv } = await import('./registryVideoAiEnvMerge.js')
     const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(data.vendorKeys))
     stripDirectLlmEnvKeysForVendors(out, expanded)
     applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
-    const { applyRegistryVideoAiToMerchantEnv } = await import('./registryVideoAiEnvMerge.js')
     applyRegistryVideoAiToMerchantEnv(out, {
       videoAi: data.videoAi,
       vendorKeys: data.vendorKeys,
@@ -276,5 +290,6 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     console.error('[mergeMerchantAiEnv] registry snapshot load failed:', msg.slice(0, 300))
   }
   purgeJwtDirectLlmKeys(out)
+  mergedAiEnvCache = { at: now, root: rootKey, env: { ...out } }
   return out
 }

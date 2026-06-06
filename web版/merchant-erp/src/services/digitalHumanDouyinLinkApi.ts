@@ -16,19 +16,14 @@ export type DouyinLinkParseResponse =
   | { ok: false; message: string }
 
 const API_PATH = '/api/meoo-digital-human-douyin-link'
-const LINK_PARSE_FETCH_TIMEOUT_MS = 180_000
+/** 与 Nginx erp-api 180s 对齐，避免 120s 504 后重复打同源接口 */
+const LINK_PARSE_FETCH_TIMEOUT_MS = 150_000
 
-/** 链接解析含 ASR，优先 ECS（无 60s Serverless 上限），同源 Vercel 作备用 */
+/** 长耗时 ASR 仅走 erp-api 单跳，避免 504 后 cs 同源再耗一整轮 */
 function douyinLinkApiCandidates(): string[] {
-  const urls: string[] = []
-  const add = (u: string) => {
-    if (u && !urls.includes(u)) urls.push(u)
-  }
-  for (const u of merchantErpApiCandidates(API_PATH)) add(u)
-  if (typeof window !== 'undefined') {
-    add(`${window.location.origin}${API_PATH}`)
-  }
-  return urls
+  const all = merchantErpApiCandidates(API_PATH)
+  const erpOnly = all.filter((u) => /\/erp-api\//i.test(u))
+  return erpOnly.length ? erpOnly : all
 }
 
 function isLinkParseTimeoutResponse(status: number, text: string): boolean {

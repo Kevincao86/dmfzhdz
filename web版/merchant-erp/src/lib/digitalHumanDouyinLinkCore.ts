@@ -345,25 +345,32 @@ function extractAsrTextFromPayload(payload: unknown): string {
   return ''
 }
 
-function readAsrPollBudgetMs(env: Record<string, string>, videoDurationMs?: number | null): number {
-  const onVercel = Boolean(env.VERCEL || process.env.VERCEL)
-  if (onVercel) return 38_000
-  return Math.min(
-    120_000,
-    Math.max(55_000, Math.round((videoDurationMs ?? 60_000) * 0.25) + 35_000),
-  )
+/** 整段 ASR 阶段总预算（须 < Nginx erp-api 180s，并留时间给抖音抓取与动作推断） */
+const ASR_PHASE_DEADLINE_MS = 78_000
+const ASR_PRIMARY_MODEL = 'qwen3-asr-flash-filetrans'
+const ASR_FALLBACK_MODELS = ['paraformer-v2'] as const
+
+function asrRemainingMs(deadline: number): number {
+  return Math.max(0, deadline - Date.now())
+}
+
+function asrPhaseDeadline(videoDurationMs?: number | null): number {
+  const onVercel = Boolean(process.env.VERCEL)
+  const cap = onVercel ? 42_000 : ASR_PHASE_DEADLINE_MS
+  const scaled = Math.round((videoDurationMs ?? 45_000) * 0.18) + 28_000
+  return Date.now() + Math.min(cap, Math.max(onVercel ? 32_000 : 50_000, scaled))
 }
 
 async function pollDashScopeAsrTask(
   taskId: string,
   apiKey: string,
   baseUrl: string,
-  pollMs = 120_000,
+  deadline: number,
 ): Promise<string | null> {
-  const deadline = Date.now() + pollMs
   let waited = 0
-  while (Date.now() < deadline) {
-    const delay = waited < 10_000 ? 800 : 1500
+  while (asrRemainingMs(deadline) > 1_500) {
+    const delay = Math.min(waited < 8_000 ? 700 : 1_200, asrRemainingMs(deadline) - 500)
+    if (delay <= 0) break
     await new Promise((r) => setTimeout(r, delay))
     waited += delay
     try {
@@ -372,7 +379,7 @@ async function pollDashScopeAsrTask(
           Authorization: `Bearer ${apiKey}`,
           'X-DashScope-Async': 'enable',
         },
-        signal: AbortSignal.timeout(12_000),
+        signal: AbortSignal.timeout(Math.min(12_000, asrRemainingMs(deadline))),
       })
       if (!res.ok) continue
       const j = (await res.json()) as Record<string, unknown>
@@ -387,7 +394,9 @@ async function pollDashScopeAsrTask(
         (typeof output?.transcription_url === 'string' && output.transcription_url) ||
         null
       if (transcriptionUrl) {
-        const tr = await fetch(transcriptionUrl, { signal: AbortSignal.timeout(15_000) })
+        const tr = await fetch(transcriptionUrl, {
+          signal: AbortSignal.timeout(Math.min(12_000, asrRemainingMs(deadline))),
+        })
         if (tr.ok) {
           const payload = (await tr.json()) as unknown
           const text = extractAsrTextFromPayload(payload)
@@ -398,54 +407,61 @@ async function pollDashScopeAsrTask(
       const inline = extractAsrTextFromPayload(j)
       if (inline.length >= 8) return inline
     } catch {
-      /* retry */
+      /* retry until deadline */
     }
   }
   return null
 }
 
+async function submitDashScopeAsrTask(
+  fileUrl: string,
+  apiKey: string,
+  model: string,
+  deadline: number,
+): Promise<string | null> {
+  if (asrRemainingMs(deadline) < 6_000) return null
+  const baseUrl = 'https://dashscope.aliyuncs.com'
+  const input =
+    model === ASR_PRIMARY_MODEL ? { file_url: fileUrl } : { file_urls: [fileUrl] }
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/services/audio/asr/transcription`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'X-DashScope-Async': 'enable',
+      },
+      body: JSON.stringify({
+        model,
+        input,
+        parameters: { channel_id: [0], enable_itn: true },
+      }),
+      signal: AbortSignal.timeout(Math.min(18_000, asrRemainingMs(deadline))),
+    })
+    if (!res.ok) return null
+    const j = (await res.json()) as Record<string, unknown>
+    const output = j.output as Record<string, unknown> | undefined
+    const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
+    if (!taskId) return null
+    return pollDashScopeAsrTask(taskId, apiKey, baseUrl, deadline)
+  } catch {
+    return null
+  }
+}
+
 async function transcribeDouyinVideoViaDashScope(
   fileUrl: string,
   env: Record<string, string>,
-  pollMs = 120_000,
+  deadline: number,
+  models: readonly string[],
 ): Promise<string | null> {
   const apiKey = readDashScopeAsrKey(env)
-  if (!apiKey) return null
-
-  const baseUrl = 'https://dashscope.aliyuncs.com'
-  const models = ['qwen3-asr-flash-filetrans', 'paraformer-v2', 'fun-asr']
+  if (!apiKey || asrRemainingMs(deadline) < 5_000) return null
 
   for (const model of models) {
-    try {
-      const input =
-        model === 'qwen3-asr-flash-filetrans'
-          ? { file_url: fileUrl }
-          : { file_urls: [fileUrl] }
-
-      const res = await fetch(`${baseUrl}/api/v1/services/audio/asr/transcription`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'X-DashScope-Async': 'enable',
-        },
-        body: JSON.stringify({
-          model,
-          input,
-          parameters: { channel_id: [0], enable_itn: true },
-        }),
-        signal: AbortSignal.timeout(20_000),
-      })
-      if (!res.ok) continue
-      const j = (await res.json()) as Record<string, unknown>
-      const output = j.output as Record<string, unknown> | undefined
-      const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
-      if (!taskId) continue
-      const text = await pollDashScopeAsrTask(taskId, apiKey, baseUrl, pollMs)
-      if (text && text.length >= 8) return text
-    } catch {
-      /* try next model */
-    }
+    const text = await submitDashScopeAsrTask(fileUrl, apiKey, model, deadline)
+    if (text && text.length >= 8) return text
+    if (asrRemainingMs(deadline) < 8_000) break
   }
   return null
 }
@@ -455,25 +471,41 @@ async function transcribeDouyinVideoAudio(
   env: Record<string, string>,
   videoDurationMs?: number | null,
 ): Promise<string | null> {
-  const pollMs = readAsrPollBudgetMs(env, videoDurationMs)
+  const deadline = asrPhaseDeadline(videoDurationMs)
   const direct = playUrl.replace(/\/playwm\//, '/play/')
 
-  let text = await transcribeDouyinVideoViaDashScope(direct, env, pollMs)
+  // 与 Vercel 一致：先直链 ASR（通义侧拉抖音 CDN）
+  let text = await transcribeDouyinVideoViaDashScope(direct, env, deadline, [ASR_PRIMARY_MODEL])
   if (text && text.length >= 12) return text
 
-  const onVercel = Boolean(env.VERCEL || process.env.VERCEL)
-  if (!onVercel) {
-    const mediaUrl = await resolveMediaUrlForAsr(playUrl, env)
-    if (mediaUrl !== direct) {
-      text = await transcribeDouyinVideoViaDashScope(mediaUrl, env, pollMs)
+  // 直链失败：ECS 下载转 OSS 再 ASR（共享剩余预算，不再串行 3 模型 × 120s）
+  let ossMediaUrl: string | null = null
+  if (asrRemainingMs(deadline) > 12_000) {
+    const mediaUrl = await resolveMediaUrlForAsr(playUrl, env, deadline)
+    if (mediaUrl !== direct) ossMediaUrl = mediaUrl
+    if (ossMediaUrl && asrRemainingMs(deadline) > 8_000) {
+      text = await transcribeDouyinVideoViaDashScope(ossMediaUrl, env, deadline, [ASR_PRIMARY_MODEL])
       if (text && text.length >= 12) return text
     }
+  }
+
+  // 仅当仍有预算且主模型未出结果时，快速试备用模型一次
+  if (asrRemainingMs(deadline) > 15_000 && (!text || text.length < 12)) {
+    text = await transcribeDouyinVideoViaDashScope(
+      ossMediaUrl ?? direct,
+      env,
+      deadline,
+      ASR_FALLBACK_MODELS,
+    )
   }
 
   return text && text.length >= 8 ? text : null
 }
 
-async function downloadDouyinMediaBuffer(playUrl: string): Promise<Buffer | null> {
+async function downloadDouyinMediaBuffer(
+  playUrl: string,
+  timeoutMs = 28_000,
+): Promise<Buffer | null> {
   const url = playUrl.replace(/\/playwm\//, '/play/')
   try {
     const res = await fetch(url, {
@@ -483,7 +515,7 @@ async function downloadDouyinMediaBuffer(playUrl: string): Promise<Buffer | null
         Referer: 'https://www.douyin.com/',
         Accept: '*/*',
       },
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) return null
     const buf = Buffer.from(await res.arrayBuffer())
@@ -514,11 +546,17 @@ async function uploadDouyinMediaForAsr(
   }
 }
 
-/** 抖音 CDN 常拦截外部 ASR 拉流：先服务端下载，再转存 OSS 供通义 ASR 读取 */
-async function resolveMediaUrlForAsr(playUrl: string, env: Record<string, string>): Promise<string> {
+/** 抖音 CDN 常拦截通义直拉：服务端下载后转 OSS（受 ASR 总预算约束） */
+async function resolveMediaUrlForAsr(
+  playUrl: string,
+  env: Record<string, string>,
+  deadline: number,
+): Promise<string> {
   const direct = playUrl.replace(/\/playwm\//, '/play/')
-  const buf = await downloadDouyinMediaBuffer(direct)
-  if (buf) {
+  const dlMs = Math.min(28_000, asrRemainingMs(deadline) - 4_000)
+  if (dlMs < 5_000) return direct
+  const buf = await downloadDouyinMediaBuffer(direct, dlMs)
+  if (buf && asrRemainingMs(deadline) > 4_000) {
     const ossUrl = await uploadDouyinMediaForAsr(buf, env)
     if (ossUrl) return ossUrl
   }
@@ -937,6 +975,8 @@ function parseMotionFromAi(content: string): string {
   return ''
 }
 
+const MOTION_INFER_TIMEOUT_MS = 22_000
+
 async function inferMotionInstructionsFromScript(
   script: string,
   env: Record<string, string>,
@@ -951,10 +991,19 @@ ${script}
 请严格输出 JSON（不要 markdown），格式：
 {"motionInstructions":"按时间轴每行一条，如 [0-3s] 半身镜头微笑点头；与文案节奏、手势、表情对应"}`
 
-  const aiOut = await generateLinkParseContent(prompt, env, authHeader, tenantIdHint)
-  if (!aiOut.ok) return defaultMotionInstructions()
-  const motion = parseMotionFromAi(aiOut.content)
-  return motion.trim() || defaultMotionInstructions()
+  try {
+    const aiOut = await Promise.race([
+      generateLinkParseContent(prompt, env, authHeader, tenantIdHint),
+      new Promise<{ ok: false; message: string }>((resolve) => {
+        setTimeout(() => resolve({ ok: false, message: 'motion_timeout' }), MOTION_INFER_TIMEOUT_MS)
+      }),
+    ])
+    if (!aiOut.ok) return defaultMotionInstructions()
+    const motion = parseMotionFromAi(aiOut.content)
+    return motion.trim() || defaultMotionInstructions()
+  } catch {
+    return defaultMotionInstructions()
+  }
 }
 
 function parseScriptFromAi(content: string): string {
