@@ -37,7 +37,7 @@ import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
-import { snapshotUploadFiles } from '../lib/iceUploadFileSnapshot'
+import { snapshotUploadFiles, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -73,9 +73,7 @@ function parseImageUrlLines(text: string): string[] {
 }
 
 function isImageFile(file: File): boolean {
-  return (
-    file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|heic)$/i.test(file.name)
-  )
+  return isUploadImageFile(file)
 }
 
 function isVideoFile(file: File): boolean {
@@ -293,7 +291,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       }
       const snapList = Array.from(files).filter(isImageFile)
       if (snapList.length === 0) {
-        setErr('请选择 jpg/png/webp 等图片文件')
+        setErr('请选择 JPG / PNG / WebP / GIF / BMP 等图片文件')
         return
       }
       setImageUploading(true)
@@ -1066,7 +1064,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 id="ice-local-image-input"
                 ref={imageFileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/*,.jpg,.jpeg,.png,.webp,.gif"
+                accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.heic,.avif"
                 multiple
                 className="sr-only"
                 disabled={anyBusy || mediaBusy}
@@ -1096,7 +1094,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   if (anyBusy || mediaBusy) return
                   const imgs = Array.from(e.dataTransfer.files).filter(isImageFile)
                   if (imgs.length === 0) {
-                    setErr('请拖入 jpg/png/webp 等图片文件')
+                    setErr('请拖入 JPG / PNG / WebP / GIF / BMP 等图片文件')
                     return
                   }
                   void ingestLocalImageFiles(imgs)
@@ -1142,7 +1140,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     <ImagePlus className="h-7 w-7 text-violet-600" />
                     <span className="text-sm font-semibold text-zinc-900">本地上传图片（可多选）</span>
                     <span className="text-center text-xs text-zinc-500">
-                      JPG / PNG / WebP · 单张 ≤ 4MB · 多张合成一条竖屏短视频
+                      JPG / PNG / WebP / GIF / BMP · 单张 ≤ 4MB · 多张合成一条竖屏短视频
                     </span>
                   </>
                 )}
