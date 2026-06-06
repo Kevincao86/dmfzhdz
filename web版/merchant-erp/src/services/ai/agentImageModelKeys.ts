@@ -79,13 +79,15 @@ export function fallbackChatPickerKeyFromImagePicker(key: string): string {
   const p = parseAgentImagePickerKey(key)
   if (!p) return 'tokenmix::openai::__default__'
   if (p.kind === 'vendor') {
-    if (p.vendor === 'qwen') return 'qwen::__default__'
-    if (p.vendor === 'doubao') return 'doubao::__default__'
+    if (p.vendor === 'qwen') return vendorTierAutoPickerKey('qwen', 'language')
+    if (p.vendor === 'doubao') return vendorTierAutoPickerKey('doubao', 'language')
     if (p.vendor === 'minimax') return 'minimax::__default__'
     return 'tokenmix::openai::__default__'
   }
   if (p.kind === 'vendor-model') {
-    return p.vendor === 'qwen' ? 'qwen::__default__' : 'doubao::__default__'
+    return p.vendor === 'qwen'
+      ? vendorTierAutoPickerKey('qwen', 'language')
+      : vendorTierAutoPickerKey('doubao', 'language')
   }
   if (p.kind === 'style') return `tokenmix::${p.family}::__default__`
   if (p.kind === 'brand-direct') {
@@ -111,15 +113,11 @@ export function imagePickerKeyForChatSelection(
   }
   if (parsed.provider === 'doubao') {
     const k = vendorTierAutoPickerKey('doubao', 'image_text')
-    if (options.some((o) => o.key === k)) return k
-    const legacy = 'img::v::doubao'
-    return options.some((o) => o.key === legacy) ? legacy : 'img::v::auto'
+    return options.some((o) => o.key === k) ? k : 'img::v::auto'
   }
   if (parsed.provider === 'qwen') {
     const k = vendorTierAutoPickerKey('qwen', 'image_text')
-    if (options.some((o) => o.key === k)) return k
-    const legacy = 'img::v::qwen'
-    return options.some((o) => o.key === legacy) ? legacy : 'img::v::auto'
+    return options.some((o) => o.key === k) ? k : 'img::v::auto'
   }
   if (parsed.provider === 'minimax') {
     const k = 'img::v::minimax'
