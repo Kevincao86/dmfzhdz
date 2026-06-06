@@ -62,7 +62,8 @@ function scopesForTask(task?: AiTaskType): {
     case 'follow_local_lead':
       return { geo: true, activities: true, kol: false, recruitmentDraft: false, competitorRefresh: false }
     default:
-      return { geo: true, activities: true, kol: true, recruitmentDraft: true, competitorRefresh: true }
+      // 日常闲聊不拉 GEO/活动/竞品接口，避免发送后长时间「思考中」才发起流式对话
+      return { geo: false, activities: false, kol: true, recruitmentDraft: true, competitorRefresh: false }
   }
 }
 

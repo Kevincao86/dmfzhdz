@@ -28,8 +28,16 @@ async function tenantIdForApi(): Promise<string | undefined> {
   return tid ?? undefined
 }
 
+/** 流式对话优先同源 /api（cs 经 Nginx 反代），避免先打跨域 erp-api 卡住 SSE */
 function aiChatFetchUrlCandidates(path: string): string[] {
-  return merchantErpApiCandidates(path)
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  const all = merchantErpApiCandidates(normalized)
+  if (typeof window !== 'undefined') {
+    const sameOrigin = `${window.location.origin}${normalized}`
+    const rest = all.filter((u) => u !== sameOrigin)
+    return [sameOrigin, ...rest]
+  }
+  return all
 }
 
 /** 优先扁平路由 + erp-api，避免生产环境 Vercel 查不到租户 */

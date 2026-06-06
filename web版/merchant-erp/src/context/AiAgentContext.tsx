@@ -1222,6 +1222,15 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (ownsRun) setAiSending(true)
 
       try {
+        const placeholder = createAgentMessage('assistant', '')
+        placeholder.isStreaming = true
+        setStreamingReply({ thinking: '', content: '' })
+        setMessages((prev) => {
+          const next = [...prev, placeholder]
+          messagesRef.current = next
+          return next
+        })
+
         const merchantCtx = await resolveMerchantIntelBlock(taskType)
         const history: AIMessage[] = [
           { role: 'system', content: merchantCtx },
@@ -1231,14 +1240,6 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         if (parsed.provider === 'tokenmix' && !chatModel) {
           chatModel = defaultModelIdForFamily(parsed.modelFamily)
         }
-        const placeholder = createAgentMessage('assistant', '')
-        placeholder.isStreaming = true
-        setStreamingReply({ thinking: '', content: '' })
-        setMessages((prev) => {
-          const next = [...prev, placeholder]
-          messagesRef.current = next
-          return next
-        })
 
         const streamReq = {
           provider: parsed.provider,

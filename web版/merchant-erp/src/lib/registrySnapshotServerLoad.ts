@@ -12,6 +12,9 @@ import {
 } from './registrySnapshotIoFetch.js'
 
 const FETCH_TIMEOUT_MS = 18_000
+const REGISTRY_SNAPSHOT_CACHE_MS = 60_000
+
+let registrySnapshotCache: { at: number; data: RegistryFile } | null = null
 
 function fetchTimeoutSignal(ms: number): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
@@ -138,11 +141,24 @@ function mergeRegistrySnapshotsPreferComplete(a: RegistryFile, b: RegistryFile):
 export async function loadRegistrySnapshotForServer(
   viteRoot?: string,
 ): Promise<RegistryFile | null> {
+  const now = Date.now()
+  if (registrySnapshotCache && now - registrySnapshotCache.at < REGISTRY_SNAPSHOT_CACHE_MS) {
+    return registrySnapshotCache.data
+  }
+
   const local = loadLocalRegistryFile(viteRoot)
-  const fromDb = await loadRegistryViaSupabase()
-  const fromErp = await loadRegistryViaErpApi()
-  if (fromDb && fromErp) return mergeRegistrySnapshotsPreferComplete(fromDb, fromErp)
-  if (fromDb) return fromDb
-  if (fromErp) return fromErp
-  return local
+  const [fromDb, fromErp] = await Promise.all([
+    loadRegistryViaSupabase(),
+    loadRegistryViaErpApi(),
+  ])
+  let merged: RegistryFile | null = null
+  if (fromDb && fromErp) merged = mergeRegistrySnapshotsPreferComplete(fromDb, fromErp)
+  else if (fromDb) merged = fromDb
+  else if (fromErp) merged = fromErp
+  else merged = local
+
+  if (merged) {
+    registrySnapshotCache = { at: now, data: merged }
+  }
+  return merged
 }

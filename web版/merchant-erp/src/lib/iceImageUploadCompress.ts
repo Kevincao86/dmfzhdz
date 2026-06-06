@@ -1,11 +1,14 @@
-/** 云剪上传前压缩，避免 >2MB 触发分片 + 减轻 ECS Base64 中转耗时 */
+/** 云剪上传前压缩：超过 4MB 时尝试压至上限内 */
 const COMPRESS_IF_LARGER_BYTES = 900 * 1024
 const MAX_EDGE = 1920
 const JPEG_QUALITY = 0.82
 const COMPRESS_TIMEOUT_MS = 8_000
 
-/** 单请求上传目标上限（Base64 后须 <2MB 分片阈值） */
-const ICE_UPLOAD_TARGET_MAX_BYTES = 1.4 * 1024 * 1024
+/** 云剪本地上传单张图片上限 */
+export const ICE_LOCAL_IMAGE_MAX_BYTES = 4 * 1024 * 1024
+
+/** 单请求上传目标上限（≤4MB 时走单次 Base64；更大走分片） */
+const ICE_UPLOAD_TARGET_MAX_BYTES = ICE_LOCAL_IMAGE_MAX_BYTES
 const ICE_UPLOAD_MAX_EDGE = 1280
 
 function isCompressibleImage(file: File): boolean {
@@ -73,21 +76,21 @@ export async function compressIceImageIfNeeded(file: File): Promise<File> {
   }
 }
 
-/** 云剪本地上传：尽量压到 1.4MB 内，避免走分片卡在 ECS */
+/** 云剪本地上传：≤4MB 原图直传；更大则压缩至 4MB 内 */
 export async function compressIceImageForUpload(file: File): Promise<File> {
   if (!isCompressibleImage(file)) return file
-  if (file.size <= ICE_UPLOAD_TARGET_MAX_BYTES && file.type === 'image/jpeg') return file
+  if (file.size <= ICE_UPLOAD_TARGET_MAX_BYTES) return file
 
   try {
     let edge = ICE_UPLOAD_MAX_EDGE
     let quality = 0.82
     let best = file
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const out = await withCompressTimeout(file, edge, quality)
       if (out.size <= ICE_UPLOAD_TARGET_MAX_BYTES) return out
       if (out.size < best.size) best = out
-      quality = Math.max(0.55, quality - 0.1)
-      edge = Math.max(720, Math.round(edge * 0.88))
+      quality = Math.max(0.5, quality - 0.1)
+      edge = Math.max(640, Math.round(edge * 0.85))
     }
     return best
   } catch {
