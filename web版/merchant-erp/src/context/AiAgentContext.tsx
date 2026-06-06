@@ -155,6 +155,7 @@ function buildAgentImagePostOpts(
     o.tokenmixImageModel = r.tokenmixImageModel
   } else if (r.preferredVendor) {
     o.preferredVendor = r.preferredVendor
+    if (r.preferredModelId) o.preferredModelId = r.preferredModelId
   }
   if (Object.keys(o).length === 0) return undefined
   return o

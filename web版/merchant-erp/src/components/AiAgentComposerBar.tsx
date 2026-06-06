@@ -372,24 +372,35 @@ export function AiAgentComposerBar({ layout }: { layout: Layout }) {
                 className="absolute bottom-full right-0 z-50 mb-1.5 max-h-52 w-[min(16rem,calc(100vw-3rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg shadow-slate-900/10"
               >
                 <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">模型</p>
-                {filteredModelOptions.map((o) => (
-                  <button
-                    key={o.key}
-                    type="button"
-                    role="option"
-                    aria-selected={modelPickerKey === o.key}
-                    onClick={() => {
-                      setModelPickerKey(o.key)
-                      setModelOpen(false)
-                    }}
-                    className={cn(
-                      'flex w-full px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:bg-slate-50',
-                      modelPickerKey === o.key && 'bg-indigo-50 font-medium text-indigo-900',
-                    )}
-                  >
-                    {o.label}
-                  </button>
-                ))}
+                {filteredModelOptions.map((o, idx) => {
+                  const prevGroup = filteredModelOptions[idx - 1]?.groupLabel
+                  const showGroup = o.groupLabel && o.groupLabel !== prevGroup
+                  return (
+                    <div key={o.key}>
+                      {showGroup ? (
+                        <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold text-slate-500 first:pt-1">
+                          {o.groupLabel}
+                        </p>
+                      ) : null}
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={modelPickerKey === o.key}
+                        onClick={() => {
+                          setModelPickerKey(o.key)
+                          setModelOpen(false)
+                        }}
+                        className={cn(
+                          'flex w-full px-3 py-2 text-left text-xs leading-snug text-slate-700 hover:bg-slate-50',
+                          modelPickerKey === o.key && 'bg-indigo-50 font-medium text-indigo-900',
+                          o.tierAuto && 'text-indigo-800/90',
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             ) : null}
           </div>

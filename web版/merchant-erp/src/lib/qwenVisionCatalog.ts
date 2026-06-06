@@ -2,7 +2,8 @@
  * 百炼 / 通义千问视觉模型全量目录（控制台「视觉模型」已开通项）。
  * 额度超限或报错时按 kind 同型自动切换，逻辑与豆包 arkModelCatalog 一致。
  */
-import type { ArkCatalogEntry, ArkModelKind } from './arkModelCatalog.js'
+import type { ArkCatalogEntry } from './arkModelCatalog.js'
+import { buildVendorModelCandidates } from './vendorModelPool.js'
 
 export type QwenVisionEntry = ArkCatalogEntry
 
@@ -123,47 +124,20 @@ export const QWEN_VIDEO_CATALOG: QwenVisionEntry[] = [
 
 export type QwenVisionMode = 't2i' | 'i2i' | 't2v' | 'i2v'
 
-const VIDEO_MODE_KINDS: Record<'t2v' | 'i2v', ArkModelKind[]> = {
-  t2v: ['video_t2v', 'video_both'],
-  i2v: ['video_i2v', 'video_both', 'video_r2v', 'video_portrait'],
-}
-
-function parseEnvModelList(raw: string | undefined): string[] {
-  const out: string[] = []
-  for (const part of String(raw ?? '').split(',')) {
-    const seg = part.trim()
-    if (!seg) continue
-    const pipes = seg.split('|').map((s) => s.trim())
-    const id = (pipes.length >= 2 ? pipes[1] : pipes[0])?.trim()
-    if (id && !out.includes(id)) out.push(id)
-  }
-  return out
-}
-
-/** 千问视觉：按能力合并候选（含运营台覆盖） */
+/** 千问视觉：按能力合并候选（含运营台覆盖 + 随机起点） */
 export function qwenVisionModelCandidates(
   catalog: readonly QwenVisionEntry[],
   envRaw: string | undefined,
   preferredId: string | undefined,
   mode: QwenVisionMode,
 ): string[] {
-  const kinds: ArkModelKind[] =
-    mode === 't2i'
-      ? ['image_t2i']
-      : mode === 'i2i'
-        ? ['image_i2i']
-        : VIDEO_MODE_KINDS[mode]
-  const filtered = catalog.filter((e) => kinds.includes(e.kind))
-  const sorted = [...filtered].sort((a, b) => a.priority - b.priority)
-  const out: string[] = []
-  const add = (id: string) => {
-    const t = id.trim()
-    if (t && !out.includes(t)) out.push(t)
-  }
-  if (preferredId?.trim()) add(preferredId.trim())
-  for (const id of parseEnvModelList(envRaw)) add(id)
-  for (const e of sorted) add(e.modelId)
-  return out
+  void catalog
+  const tier = mode === 't2i' ? 'image_text' : 'vision'
+  return buildVendorModelCandidates('qwen', tier, {
+    envRaw,
+    preferredId,
+    mode,
+  })
 }
 
 export function qwenImageModelCandidates(
@@ -179,5 +153,9 @@ export function qwenVideoModelCandidates(
   preferredId: string | undefined,
   mode: 't2v' | 'i2v',
 ): string[] {
-  return qwenVisionModelCandidates(QWEN_VIDEO_CATALOG, envRaw, preferredId, mode)
+  return buildVendorModelCandidates('qwen', 'vision', {
+    envRaw,
+    preferredId,
+    mode,
+  })
 }

@@ -1,9 +1,10 @@
 import {
-  catalogToPickerOptions,
-  DOUBAO_CHAT_CATALOG,
-  DOUBAO_IMAGE_CATALOG,
-} from '../../lib/arkModelCatalog.js'
-import { QWEN_IMAGE_CATALOG, QWEN_VIDEO_CATALOG } from '../../lib/qwenVisionCatalog.js'
+  vendorTierAutoPickerKey,
+  vendorTierPickerOptions,
+  VENDOR_TIER_LABELS,
+  type BuiltinVendor,
+  type VendorModelTier,
+} from '../../lib/vendorModelPool.js'
 import type { MembershipPlan } from '../../lib/membershipPlan.js'
 import { membershipAllowsTokenMix } from '../../lib/membershipPlan.js'
 import type { AIProvider, AIModelFamily } from './types'
@@ -77,6 +78,10 @@ export type AiModelPickerOption = {
   label: string
   /** 默认 chat；image 为文生图（走服务端万相/豆包/MiniMax） */
   capability?: AiModelCapability
+  /** 豆包/千问六类分组标题（下拉展示） */
+  groupLabel?: string
+  /** 是否为分组内「自动随机 + 额度切换」项 */
+  tierAuto?: boolean
 }
 
 /** TokenMix 各家族下展示的「文生图」模型名（与 chat id 独立；出图仍由灵祺服务端引擎执行） */
@@ -183,88 +188,102 @@ export function listAiModelPickerOptions(): AiModelPickerOption[] {
     }
   }
 
-  /** 通义 / 豆包：走 Vercel /api/meoo-ai-chat → 服务端 DashScope / 火山方舟（密钥仅环境变量或运营注册表） */
-  const qwenModels = [
-    { id: 'qwen-turbo', label: 'qwen-turbo' },
-    { id: 'qwen-plus', label: 'qwen-plus' },
-    { id: 'qwen-max', label: 'qwen-max' },
-  ] as const
+  const pushBuiltinVendorTier = (
+    vendor: BuiltinVendor,
+    tier: VendorModelTier,
+    capability: AiModelCapability,
+    keyPrefix: string,
+  ) => {
+    const groupLabel = VENDOR_TIER_LABELS[vendor][tier]
+    const brand = groupLabel.split(' · ')[0] ?? groupLabel
+    out.push({
+      key: vendorTierAutoPickerKey(vendor, tier),
+      provider: vendor,
+      model: '',
+      label: `${groupLabel} · 自动（随机 · 额度切换）`,
+      capability,
+      groupLabel,
+      tierAuto: true,
+    })
+    if (tier === 'vision') {
+      for (const m of vendorTierPickerOptions(vendor, tier, 'image')) {
+        out.push({
+          key: `${keyPrefix}::${m.id}`,
+          provider: vendor,
+          model: m.id,
+          label: `${brand} · ${m.label}`,
+          capability: 'image',
+          groupLabel,
+        })
+      }
+      for (const m of vendorTierPickerOptions(vendor, tier, 'video')) {
+        out.push({
+          key: `vid::${vendor}::${m.id}`,
+          provider: vendor,
+          model: m.id,
+          label: `${brand} · ${m.label}（视频）`,
+          capability: 'image',
+          groupLabel,
+        })
+      }
+      return
+    }
+    for (const m of vendorTierPickerOptions(vendor, tier)) {
+      out.push({
+        key: `${keyPrefix}::${m.id}`,
+        provider: vendor,
+        model: m.id,
+        label: `${brand} · ${m.label}`,
+        capability,
+        groupLabel,
+      })
+    }
+  }
+
+  /** 兼容旧 key：默认 = 语言档自动 */
   out.push({
     key: 'qwen::__default__',
     provider: 'qwen',
     model: '',
-    label: '通义千问 · 默认',
+    label: '通义千问 · 默认（语言 · 随机 · 额度切换）',
     capability: 'chat',
+    groupLabel: VENDOR_TIER_LABELS.qwen.language,
+    tierAuto: true,
   })
-  for (const m of qwenModels) {
-    out.push({
-      key: `qwen::${m.id}`,
-      provider: 'qwen',
-      model: m.id,
-      label: `通义千问 · ${m.label}`,
-      capability: 'chat',
-    })
-  }
+  pushBuiltinVendorTier('qwen', 'language', 'chat', 'qwen')
+  pushBuiltinVendorTier('qwen', 'image_text', 'image', 'img::qwen')
   out.push({
     key: 'img::v::qwen',
     provider: 'qwen',
     model: 'wanx',
-    label: '通义千问 · 文生图（视觉 · 自动切换同型）',
+    label: '通义千问 · 图文模型 · 自动（随机 · 额度切换）',
     capability: 'image',
+    groupLabel: VENDOR_TIER_LABELS.qwen.image_text,
+    tierAuto: true,
   })
-  for (const m of catalogToPickerOptions(QWEN_IMAGE_CATALOG, 'image')) {
-    out.push({
-      key: `img::qwen::${m.id}`,
-      provider: 'qwen',
-      model: m.id,
-      label: `通义千问 · ${m.label}`,
-      capability: 'image',
-    })
-  }
-  for (const m of catalogToPickerOptions(QWEN_VIDEO_CATALOG, 'video')) {
-    out.push({
-      key: `vid::qwen::${m.id}`,
-      provider: 'qwen',
-      model: m.id,
-      label: `通义千问 · ${m.label}（视频）`,
-      capability: 'image',
-    })
-  }
+  pushBuiltinVendorTier('qwen', 'vision', 'image', 'img::qwen')
 
-  const doubaoChatFromCatalog = catalogToPickerOptions(DOUBAO_CHAT_CATALOG, 'chat')
-  const doubaoImageFromCatalog = catalogToPickerOptions(DOUBAO_IMAGE_CATALOG, 'image')
   out.push({
     key: 'doubao::__default__',
     provider: 'doubao',
     model: '',
-    label: '豆包 · 默认（额度超限自动切换同型模型）',
+    label: '豆包 · 默认（语言 · 随机 · 额度切换）',
     capability: 'chat',
+    groupLabel: VENDOR_TIER_LABELS.doubao.language,
+    tierAuto: true,
   })
-  for (const m of doubaoChatFromCatalog) {
-    out.push({
-      key: `doubao::${m.id}`,
-      provider: 'doubao',
-      model: m.id,
-      label: `豆包 · ${m.label}`,
-      capability: 'chat',
-    })
-  }
+  pushBuiltinVendorTier('doubao', 'language', 'chat', 'doubao')
+  pushBuiltinVendorTier('doubao', 'image_text', 'image', 'img::doubao')
   out.push({
     key: 'img::v::doubao',
     provider: 'doubao',
     model: 'seedream',
-    label: '豆包 · 文生图（Seedream · 自动切换同型）',
+    label: '豆包 · 图文模型 · 自动（随机 · 额度切换）',
     capability: 'image',
+    groupLabel: VENDOR_TIER_LABELS.doubao.image_text,
+    tierAuto: true,
   })
-  for (const m of doubaoImageFromCatalog) {
-    out.push({
-      key: `img::doubao::${m.id}`,
-      provider: 'doubao',
-      model: m.id,
-      label: `豆包 · ${m.label}`,
-      capability: 'image',
-    })
-  }
+  pushBuiltinVendorTier('doubao', 'vision', 'image', 'img::doubao')
 
   out.push({
     key: 'img::v::auto',
@@ -306,6 +325,10 @@ export type ParsedModelPicker =
   | { provider: 'deepseek' | 'kimi' | 'minimax' | 'qwen' | 'doubao'; model: string }
 
 export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
+  const tierAuto = parseVendorTierAutoFromKey(key)
+  if (tierAuto) {
+    return { provider: tierAuto.vendor, model: '' }
+  }
   const parts = key.split('::')
   if (parts[0] === 'tokenmix' && parts.length >= 3) {
     const family = normalizeAiModelFamily(parts[1])
@@ -322,3 +345,14 @@ export function parseAiModelPickerKey(key: string): ParsedModelPicker | null {
   }
   return null
 }
+
+function parseVendorTierAutoFromKey(key: string): { vendor: BuiltinVendor; tier: VendorModelTier } | null {
+  const parts = key.split('::')
+  if (parts.length !== 4 || parts[1] !== 'tier' || parts[3] !== '__auto__') return null
+  if (parts[0] !== 'doubao' && parts[0] !== 'qwen') return null
+  const tier = parts[2] as VendorModelTier
+  if (tier !== 'language' && tier !== 'image_text' && tier !== 'vision') return null
+  return { vendor: parts[0], tier }
+}
+
+export { parseVendorTierAutoFromKey, vendorTierAutoPickerKey }

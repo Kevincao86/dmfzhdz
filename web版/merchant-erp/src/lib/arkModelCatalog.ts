@@ -58,8 +58,9 @@ export const DOUBAO_3D_CATALOG: ArkCatalogEntry[] = [
   { label: 'Doubao-Seed3D-2.0', modelId: 'doubao-seed3d-2-0-251015', kind: 'video_3d', priority: 1 },
 ]
 
-/** 千问视觉全量目录见 qwenVisionCatalog.ts */
+/** 千问视觉全量目录见 qwenVisionCatalog.ts；语言模型见 vendorModelPool.ts */
 export { QWEN_IMAGE_CATALOG, QWEN_VIDEO_CATALOG } from './qwenVisionCatalog.js'
+export { QWEN_CHAT_CATALOG } from './vendorModelPool.js'
 
 export const QWEN_VIDEO_TASK_PREFIX = 'qwv1:'
 
