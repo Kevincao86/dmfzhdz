@@ -32,6 +32,7 @@ import {
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
+import { concatRemoteMp4Urls } from './videoConcatServer.js'
 
 function applyRegistrySliceToVideoAiEnv(
   out: MerchantAiEnv,
@@ -858,6 +859,34 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     json(res, 200, { ok: true, prompts })
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/concat-urls') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const rawUrls = parsed.urls
+    const urls = Array.isArray(rawUrls)
+      ? rawUrls.map((x) => String(x).trim()).filter((u) => /^https?:\/\//i.test(u))
+      : []
+    if (urls.length < 2) {
+      json(res, 400, { ok: false, message: '缺少至少 2 个有效视频 URL。' })
+      return true
+    }
+    const merged = await concatRemoteMp4Urls(urls)
+    if (!merged.ok) {
+      json(res, 502, { ok: false, message: merged.message })
+      return true
+    }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Content-Length', String(merged.buffer.length))
+    res.end(merged.buffer)
     return true
   }
 
