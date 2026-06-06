@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchMpRegistry } from '../lib/mpApi'
+import { appendTalentInbox, fetchMpRegistry } from '../lib/mpApi'
 import {
   enrichApplicantRow,
   hallLabelFromMp,
@@ -19,7 +19,8 @@ import { copyApplicantProfile, downloadApplicantsCsv } from '../lib/mpSync/mpApp
 import { groupQrFromMp, isGroupQrExpired, patchGroupQrImage, readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
-import { pushNotification } from '../lib/mpSync/messagesStore'
+import { copyRecruitmentShare } from '../lib/mpSync/recruitmentShareCopy'
+import { readPrProfile } from '../lib/mpSync/userProfile'
 
 export default function PrOrderApplicantsPage() {
   const { id: mpOrderId = '' } = useParams()
@@ -190,6 +191,7 @@ export default function PrOrderApplicantsPage() {
     try {
       const reg = await fetchMpRegistry()
       const orderTitle = title || mpOrderId
+      const entries = []
       const skipped: string[] = []
       for (const a of selectedApplicants) {
         const target = resolveTalentInboxTarget(a, reg)
@@ -197,26 +199,46 @@ export default function PrOrderApplicantsPage() {
           skipped.push(String(a.displayName || a.id))
           continue
         }
-        pushNotification({
-          category: 'business',
+        entries.push({
+          talentMemberId: target.talentMemberId,
+          contact: target.contact,
+          platformAccount: target.platformAccount,
+          applicantId: target.applicantId,
+          mpOrderId,
+          category: 'business' as const,
           title: '恭喜入选招募',
           body: `您已被 PR 选入「${orderTitle}」（单号 ${orderNo}）。请扫码加入项目群，二维码见下图。`,
-          imageUrl: qr,
-          noticeType: 'selection',
+          noticeType: 'selection' as const,
           pinned: true,
-          mpOrderId,
-          applicantId: target.applicantId,
         })
       }
-      if (skipped.length) {
-        alert(`已写入站内信。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`)
-      } else {
-        alert('通知已写入系统消息，达人可在「消息 → 系统消息」查看。')
+      if (!entries.length) {
+        alert('所选达人缺少手机号或平台账号，无法通知')
+        return
       }
+      await appendTalentInbox(entries)
+      alert(
+        skipped.length
+          ? `已通知 ${entries.length} 人。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
+          : '通知已发送，达人可在小程序与履约后台「消息 → 系统消息」查看。',
+      )
     } catch (e) {
       alert(e instanceof Error ? e.message : '发送失败')
     } finally {
       setNotifying(false)
+    }
+  }
+
+  async function onShareOrder() {
+    if (!mpOrder) {
+      alert('订单数据缺失')
+      return
+    }
+    try {
+      await copyRecruitmentShare(mpOrder, readPrProfile())
+      alert('已复制招募信息，请打开微信群粘贴发送给达人。')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '分享失败')
     }
   }
 
@@ -251,11 +273,16 @@ export default function PrOrderApplicantsPage() {
               ) : null}
             </div>
           </div>
-          <dl className="text-xs text-[var(--shell-muted)] space-y-1 shrink-0">
-            <div>单号 {orderNo}</div>
-            <div>发布 {publishedAt}</div>
-            <div>截止 {deadlineText}</div>
-          </dl>
+          <div className="shrink-0 flex flex-col items-end gap-2">
+            <button type="button" className="text-sm px-3 py-1.5 rounded-lg border" onClick={() => void onShareOrder()}>
+              分享招募
+            </button>
+            <dl className="text-xs text-[var(--shell-muted)] space-y-1 text-right">
+              <div>单号 {orderNo}</div>
+              <div>发布 {publishedAt}</div>
+              <div>截止 {deadlineText}</div>
+            </dl>
+          </div>
         </header>
       ) : null}
 

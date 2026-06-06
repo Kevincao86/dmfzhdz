@@ -50,8 +50,8 @@ export default function AppShell() {
   const editionLabel = role === 'pr' ? 'PR 版' : WORK_EDITION_LABEL[workId]
 
   return (
-    <div className="min-h-screen flex bg-[var(--shell-main-bg)] text-[var(--app-text)]">
-      <aside className="w-56 border-r border-[var(--shell-border)] bg-[var(--shell-sidebar-bg)] p-4 flex flex-col shrink-0">
+    <div className="min-h-screen bg-[var(--shell-main-bg)] text-[var(--app-text)]">
+      <aside className="app-sidebar fixed left-0 top-0 z-30 h-screen w-56 border-r border-[var(--shell-border)] bg-[var(--shell-sidebar-bg)] p-4 flex flex-col overflow-y-auto">
         <div className="mb-6">
           <div className="font-bold text-lg text-[var(--shell-text)]">灵祺星选平台</div>
           <div className="text-xs text-[var(--shell-muted)] mt-1">
@@ -88,7 +88,7 @@ export default function AppShell() {
           </button>
         </div>
       </aside>
-      <main className="flex-1 p-6 overflow-auto min-w-0">
+      <main className="app-main ml-56 min-h-screen p-6 min-w-0">
         <Outlet />
       </main>
     </div>

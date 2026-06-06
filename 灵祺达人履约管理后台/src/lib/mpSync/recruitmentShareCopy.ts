@@ -1,0 +1,114 @@
+import { readPrProfile, prDisplayName } from './userProfile'
+
+const GUIDE_DIVIDER = '—— 报名指引 ——'
+
+export function shareCopyHeader(prProfile?: ReturnType<typeof readPrProfile> | null): string {
+  const pr = prProfile ?? readPrProfile()
+  if (pr && pr.accountType === 'company') {
+    const name = prDisplayName(pr)
+    if (name) return `【${name}】`
+  }
+  return '【灵祺撮合平台】'
+}
+
+function apiBase(): string {
+  const base = String(import.meta.env.VITE_MP_API_BASE || '').trim().replace(/\/$/, '')
+  return base || 'https://mofangdianai.com/erp-api'
+}
+
+export function buildRecruitmentApplyLink(orderId: string): string {
+  const id = String(orderId || '').trim()
+  if (!id) return ''
+  const custom = String(import.meta.env.VITE_MP_SHARE_APPLY_BASE_URL || '').trim().replace(/\/$/, '')
+  if (custom) {
+    if (custom.includes('{mpId}')) return custom.replace(/\{mpId\}/g, encodeURIComponent(id))
+    const sep = custom.includes('?') ? '&' : '?'
+    return `${custom}${sep}mpId=${encodeURIComponent(id)}`
+  }
+  return `${apiBase()}/mp-recruit/apply?mpId=${encodeURIComponent(id)}`
+}
+
+export function formatShareRecruitmentInfo(info: string): string {
+  const lines = String(info || '')
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (!lines.length) return ''
+
+  let feeMode = ''
+  for (const line of lines) {
+    const m = line.match(/^费用模式[:：]\s*(.+)$/)
+    if (m) feeMode = m[1].trim()
+  }
+
+  const out: string[] = []
+  for (const line of lines) {
+    if (/^酬劳摘要[:：]/.test(line)) continue
+    if (/^佣金CPS[:：]\s*未设置/.test(line)) continue
+    if (/^酬劳[:：]/.test(line)) {
+      if (feeMode === '纯置换' && /纯置换/.test(line)) continue
+      if (feeMode === '一口价' && /一口价|¥/.test(line)) continue
+    }
+    const detailMatch = line.match(/^招募详情[:：]\s*(.*)$/)
+    if (detailMatch) {
+      out.push('招募详情：')
+      const body = String(detailMatch[1] || '').trim()
+      if (body) out.push(body)
+      continue
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
+function buildShareGuideBlock(orderId: string): string {
+  const applyLink = buildRecruitmentApplyLink(orderId)
+  const openHint = '请打开「灵祺撮合平台」小程序，在招募大厅找到本单或联系发布者获取详情页报名。'
+  const parts = [GUIDE_DIVIDER, '']
+  if (applyLink) parts.push(`报名地址：${applyLink}`, openHint)
+  else parts.push(openHint)
+  parts.push(`招募单号：${orderId}`)
+  return parts.join('\n')
+}
+
+export function buildGroupCopyText(
+  order: {
+    id: string
+    title?: string
+    region?: string
+    recruitmentInfo?: string
+    taskDetail?: string
+    merchantRequirements?: string
+  },
+  prProfile?: ReturnType<typeof readPrProfile> | null,
+): string {
+  const raw = order.recruitmentInfo || order.taskDetail || order.merchantRequirements || ''
+  const info = formatShareRecruitmentInfo(raw)
+  const guide = buildShareGuideBlock(order.id)
+  const parts = [shareCopyHeader(prProfile), '']
+  if (info) parts.push(info, '')
+  parts.push(guide)
+  return parts.join('\n')
+}
+
+export function buildShareTitle(order: { title?: string; region?: string }): string {
+  return `${order.title || '招募'} · ${order.region || '全国'}招募`
+}
+
+export async function copyRecruitmentShare(order: Record<string, unknown>, prProfile?: ReturnType<typeof readPrProfile> | null) {
+  const id = String(order.id || '').trim()
+  if (!id) throw new Error('订单数据缺失')
+  const text = buildGroupCopyText(
+    {
+      id,
+      title: String(order.title || ''),
+      region: String(order.region || '全国'),
+      recruitmentInfo: String(order.recruitmentInfo || ''),
+      taskDetail: String(order.taskDetail || ''),
+      merchantRequirements: String(order.merchantRequirements || ''),
+    },
+    prProfile,
+  )
+  await navigator.clipboard.writeText(text)
+  return text
+}
