@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
+import { fetchMpRegistry } from '../lib/mpApi'
+import { getActiveRole } from '../lib/mpSession'
 import {
   markNotificationsRead,
+  mergeNotificationsWithRegistry,
   readAllNotificationRows,
   unreadNotificationCount,
   type NotificationRow,
 } from '../lib/mpSync/messagesStore'
+import { inboxRowsForTalent, buildSelectionNoticeRows } from '../lib/mpSync/talentInboxMatch'
+import { readMember } from '../lib/mpSync/talentMember'
 
 type MsgTab = 'realtime' | 'system'
 
@@ -17,26 +22,44 @@ const SYSTEM_TABS = [
 ] as const
 
 export default function MessagesPage() {
+  const role = getActiveRole()
   const [msgTab, setMsgTab] = useState<MsgTab>('realtime')
   const [systemFilter, setSystemFilter] = useState('all')
   const [rows, setRows] = useState<NotificationRow[]>(() => readAllNotificationRows())
   const [unread, setUnread] = useState(() => unreadNotificationCount())
+  const [loadingInbox, setLoadingInbox] = useState(false)
 
-  useEffect(() => {
-    void pullClientStateAfterLogin().finally(() => {
+  async function refreshFromRegistry() {
+    setLoadingInbox(true)
+    try {
+      await pullClientStateAfterLogin()
+      let merged = readAllNotificationRows()
+      if (role !== 'pr') {
+        const reg = await fetchMpRegistry()
+        const member = readMember() as Record<string, unknown> | null
+        const registryRows = [
+          ...buildSelectionNoticeRows(reg, member),
+          ...inboxRowsForTalent(reg, member),
+        ] as NotificationRow[]
+        merged = mergeNotificationsWithRegistry(registryRows, merged)
+      }
+      setRows(merged)
+      setUnread(merged.filter((m) => !m.read).length)
+    } catch {
       setRows(readAllNotificationRows())
       setUnread(unreadNotificationCount())
-    })
-  }, [])
-
-  function refresh() {
-    setRows(readAllNotificationRows())
-    setUnread(unreadNotificationCount())
+    } finally {
+      setLoadingInbox(false)
+    }
   }
+
+  useEffect(() => {
+    void refreshFromRegistry()
+  }, [role])
 
   function onMarkAllRead() {
     markNotificationsRead()
-    refresh()
+    void refreshFromRegistry()
   }
 
   const systemRows = useMemo(() => {
@@ -97,16 +120,28 @@ export default function MessagesPage() {
                 {t.label}
               </button>
             ))}
+            <button
+              type="button"
+              className="ml-auto text-xs text-violet-600"
+              disabled={loadingInbox}
+              onClick={() => void refreshFromRegistry()}
+            >
+              {loadingInbox ? '同步中…' : '刷新同步'}
+            </button>
           </div>
           {systemRows.length === 0 ? (
-            <p className="text-sm text-[var(--shell-muted)]">暂无系统消息，报名入选或业务通知将显示在这里。</p>
+            <p className="text-sm text-[var(--shell-muted)]">
+              暂无系统消息。入选通知、业务提醒将从小程序与履约后台 registry 同步显示。
+            </p>
           ) : (
             <ul className="space-y-3">
               {systemRows.map((row) => (
                 <li
                   key={row.id}
                   className={`rounded-xl border p-4 ${
-                    row.read ? 'border-slate-200 bg-white/60' : 'border-teal-200 bg-teal-50/40'
+                    row.read
+                      ? 'border-slate-200 bg-white/60'
+                      : 'border-teal-200 bg-teal-50/40'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -115,6 +150,9 @@ export default function MessagesPage() {
                       {row.body ? <p className="mt-1 text-sm text-slate-600">{row.body}</p> : null}
                       {row.imageUrl ? (
                         <img src={row.imageUrl} alt="" className="mt-2 max-h-32 rounded border" />
+                      ) : null}
+                      {row.fromRegistry ? (
+                        <p className="mt-1 text-xs text-violet-500">已从小程序/履约后台同步</p>
                       ) : null}
                     </div>
                     <span className="shrink-0 text-xs text-slate-400">{row.categoryLabel || row.category}</span>

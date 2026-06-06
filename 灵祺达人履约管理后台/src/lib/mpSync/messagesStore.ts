@@ -51,15 +51,30 @@ function normalizeCategory(cat: unknown): keyof typeof CATEGORY_LABELS {
   return 'system'
 }
 
+function mapNotificationRow(row: NotificationRow): NotificationRow {
+  return {
+    ...row,
+    category: normalizeCategory(row.category),
+    categoryLabel: row.categoryLabel || CATEGORY_LABELS[normalizeCategory(row.category)],
+  }
+}
+
 export function readAllNotificationRows(): NotificationRow[] {
   const merged = [...readList(NOTIFY_KEY), ...readList(MSG_KEY)]
-  return merged
-    .map((row) => ({
-      ...row,
-      category: normalizeCategory(row.category),
-      categoryLabel: CATEGORY_LABELS[normalizeCategory(row.category)],
-    }))
-    .sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+  return merged.map(mapNotificationRow).sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+}
+
+/** 合并 registry 站内信 + 本机通知（达人身份） */
+export function mergeNotificationsWithRegistry(
+  registryRows: NotificationRow[],
+  localRows?: NotificationRow[],
+): NotificationRow[] {
+  const local = localRows ?? readAllNotificationRows()
+  const remoteIds = new Set(registryRows.map((r) => r.id))
+  const rest = local.filter((r) => !remoteIds.has(r.id))
+  return [...registryRows.map(mapNotificationRow), ...rest].sort(
+    (a, b) => sortTsFromId(b.id) - sortTsFromId(a.id),
+  )
 }
 
 export function pushNotification(item: Partial<NotificationRow> & { title?: string; body?: string }) {

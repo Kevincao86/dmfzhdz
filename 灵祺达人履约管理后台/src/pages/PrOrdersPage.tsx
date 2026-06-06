@@ -13,6 +13,8 @@ import {
   type PublishWizardDraft,
 } from '../lib/mpSync/publishDraft'
 import { DELIVERY_WINDOWS } from '../lib/mpSync/publishFormOptions'
+import { copyRecruitmentShare } from '../lib/mpSync/recruitmentShareCopy'
+import { readPrProfile } from '../lib/mpSync/userProfile'
 
 type Tab = 'published' | 'drafts'
 
@@ -28,6 +30,7 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   hallLabel: string
   platform: string
   recruitTarget: 'talent' | 'shoot' | 'edit'
+  mp: Record<string, unknown> | null
 }
 
 function deliveryWindowLabel(id: string) {
@@ -77,6 +80,7 @@ export default function PrOrdersPage() {
             hallLabel: enriched.hallLabel as string,
             platform: enriched.platform as string,
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
+            mp: mp || null,
           }
         }),
       )
@@ -91,6 +95,7 @@ export default function PrOrdersPage() {
             hallLabel: '招募大厅',
             platform: '抖音',
             recruitTarget: 'talent' as const,
+            mp: null,
           }
         }),
       )
@@ -127,13 +132,28 @@ export default function PrOrdersPage() {
     refreshDrafts()
   }
 
+  async function onShare(row: PrOrderRow) {
+    const order = row.mp || {
+      id: row.mpOrderId,
+      title: row.title,
+      region: '全国',
+      recruitmentInfo: '',
+    }
+    try {
+      await copyRecruitmentShare(order as Record<string, unknown>, readPrProfile())
+      alert('已复制招募信息，请打开微信群粘贴发送给达人。')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '分享失败')
+    }
+  }
+
   async function onToggle(row: PrOrderRow) {
     if (!row.canToggleRecruit || togglingId) return
     const next = row.toggleNextStatus as string
     if (!confirm(next === 'closed' ? '停止后达人将无法继续报名，已报名数据保留。' : '开始后将在招募大厅重新展示。')) return
     setTogglingId(row.mpOrderId)
     try {
-      await patchMpRecruitmentOrder({ mpOrderId: row.mpOrderId, status: next })
+      await patchMpRecruitmentOrder({ id: row.mpOrderId, status: next })
       await loadPublished()
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
@@ -252,11 +272,18 @@ export default function PrOrdersPage() {
                   >
                     编辑招募
                   </Link>
+                  <button
+                    type="button"
+                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
+                    onClick={() => void onShare(row)}
+                  >
+                    分享
+                  </button>
                   {row.canToggleRecruit ? (
                     <button
                       type="button"
                       disabled={togglingId === row.mpOrderId}
-                      className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] hover:bg-white/5"
+                      className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
                       onClick={() => void onToggle(row)}
                     >
                       {row.toggleActionLabel}招募

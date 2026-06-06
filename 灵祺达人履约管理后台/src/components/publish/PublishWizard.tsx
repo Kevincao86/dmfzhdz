@@ -364,10 +364,10 @@ export default function PublishWizard() {
             <button
               key={t.id}
               type="button"
-              className={`w-full text-left rounded-xl border p-4 transition-colors ${
+              className={`choice-card w-full text-left rounded-xl border p-4 ${
                 'placeholder' in t && t.placeholder
                   ? 'border-white/5 opacity-80'
-                  : 'surface-card border hover:border-violet-500/40'
+                  : 'surface-card border'
               }`}
               onClick={() => {
                 setRecruitTarget(t.id)
@@ -398,7 +398,7 @@ export default function PublishWizard() {
             <button
               key={m.id}
               type="button"
-              className="w-full text-left surface-card rounded-xl border hover:border-violet-500/40 p-4 transition-colors"
+              className="choice-card w-full text-left surface-card rounded-xl border p-4"
               onClick={() => {
                 setRecruitMode(m.id)
                 setRecruitModeLabel(m.label)

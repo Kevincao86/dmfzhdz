@@ -70,6 +70,7 @@ export type TalentCardRow = {
 export type MpRegistry = {
   mpRecruitmentOrders?: Record<string, unknown>[]
   mpTalentMembers?: Record<string, unknown>[]
+  mpTalentInbox?: Record<string, unknown>[]
   talentLibraryEntries?: Record<string, unknown>[]
   recruitmentOrders?: Record<string, unknown>[]
 }

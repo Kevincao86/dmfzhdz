@@ -227,7 +227,8 @@ async function postMpWithFallback(paths: string[], body: Record<string, unknown>
       })
       const data = await parseJsonRes(res)
       if (!res.ok || data.ok === false) {
-        lastErr = String(data.error || `http_${res.status}`)
+        const detail = String(data.detail || data.message || '').trim()
+        lastErr = detail ? `${String(data.error || `http_${res.status}`)}: ${detail}` : String(data.error || `http_${res.status}`)
         if (/404|not_found/i.test(lastErr)) continue
         throw new Error(lastErr)
       }
@@ -282,5 +283,26 @@ export async function updateMpRecruitmentOrder(order: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-recruitment-orders-patch', '/api/ops-sync/mp-recruitment-orders/patch'],
     { id, order },
+  )
+}
+
+export type TalentInboxEntry = {
+  talentMemberId: string
+  title: string
+  body: string
+  category?: 'order' | 'business' | 'system'
+  mpOrderId?: string
+  contact?: string
+  platformAccount?: string
+  applicantId?: string
+  imageUrl?: string
+  noticeType?: 'selection' | 'general'
+  pinned?: boolean
+}
+
+export async function appendTalentInbox(entries: TalentInboxEntry[]) {
+  return postMpWithFallback(
+    ['/api/meoo-ops-mp-talent-inbox-append', '/api/ops-sync/mp-talent-inbox/append'],
+    { entries },
   )
 }
