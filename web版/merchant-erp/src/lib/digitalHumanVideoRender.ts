@@ -15,6 +15,7 @@ import {
   postSeedanceVideoStart,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
+import { isArkQuotaHopableError } from './arkModelCatalog'
 import { KLING_DEFAULT_MODEL_ID } from './shortVideoUiLabels'
 
 const SEGMENT_DURATION_SEC = 10
@@ -66,10 +67,33 @@ function pickPlanner(cfg: VideoAiBackendConfig | null): 'doubao' | 'qwen' {
   return 'doubao'
 }
 
-function pickSeedanceModel(cfg: VideoAiBackendConfig | null): string {
-  const models = cfg?.arkVideoModels ?? []
-  const preferred = models.find((m) => /^doubao-seedance/i.test(m.endpointId)) ?? models[0]
-  return preferred?.endpointId?.trim() ?? ''
+const SEEDANCE_SERVER_AUTO = '__server_auto__'
+
+/** 方舟 Seedance ep 列表；末项由服务端按目录随机 + 千问视频兜底 */
+function listSeedanceModelCandidates(cfg: VideoAiBackendConfig | null): string[] {
+  const out: string[] = []
+  for (const m of cfg?.arkVideoModels ?? []) {
+    const id = m.endpointId?.trim()
+    if (id && !out.includes(id)) out.push(id)
+  }
+  out.push(SEEDANCE_SERVER_AUTO)
+  return out
+}
+
+function seedanceStartPayload(
+  prompt: string,
+  frameB64: string | null,
+  seedanceFlags: string,
+  model?: string,
+) {
+  const images =
+    frameB64 != null ? [`data:image/jpeg;base64,${frameB64.replace(/\s/g, '')}`] : undefined
+  return {
+    ...(model ? { model } : {}),
+    prompt,
+    flags: seedanceFlags,
+    images_base64: images,
+  }
 }
 
 function buildOverallPrompt(draft: DigitalHumanDraft, avatar: PresetAvatar | null): string {
@@ -110,10 +134,18 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
 }
 
 async function waitSeedanceVideo(taskId: string): Promise<string> {
+  let transientErrors = 0
   for (let i = 0; i < POLL_MAX; i++) {
     await sleep(POLL_MS)
     const st = await fetchSeedanceVideoStatus(taskId)
-    if (!st.ok) throw new Error(st.message)
+    if (!st.ok) {
+      if (isArkQuotaHopableError(st.message) && transientErrors < 15) {
+        transientErrors++
+        continue
+      }
+      throw new Error(st.message)
+    }
+    transientErrors = 0
     if (st.phase === 'succeeded' && st.videoUrl) return st.videoUrl
     if (st.phase === 'failed') throw new Error(st.failReason ?? '豆包视频生成失败')
   }
@@ -131,29 +163,10 @@ async function waitKlingVideo(taskId: string, kind: 'text2video' | 'image2video'
   throw new Error('可灵视频生成超时，请稍后重试')
 }
 
-async function generateOneSegment(opts: {
-  engine: DhVideoEngine
-  prompt: string
-  frameB64: string | null
-  seedanceModel: string
-  seedanceFlags: string
-}): Promise<Blob> {
-  const { engine, prompt, frameB64, seedanceModel, seedanceFlags } = opts
-
-  if (engine === 'seedance') {
-    const images =
-      frameB64 != null ? [`data:image/jpeg;base64,${frameB64.replace(/\s/g, '')}`] : undefined
-    const r = await postSeedanceVideoStart({
-      ...(seedanceModel ? { model: seedanceModel } : {}),
-      prompt,
-      flags: seedanceFlags,
-      images_base64: images,
-    })
-    if (!r.ok) throw new Error(r.message)
-    const url = await waitSeedanceVideo(r.taskId)
-    return downloadVideoUrlAsBlob(url)
-  }
-
+async function generateKlingSegment(
+  prompt: string,
+  frameB64: string | null,
+): Promise<Blob> {
   if (frameB64) {
     const r = await postKlingVideoStart({
       kind: 'image2video',
@@ -180,6 +193,71 @@ async function generateOneSegment(opts: {
   if (!r.ok) throw new Error(r.message)
   const url = await waitKlingVideo(r.taskId, r.pollKind)
   return downloadVideoUrlAsBlob(url)
+}
+
+async function generateSeedanceSegmentWithFailover(opts: {
+  prompt: string
+  frameB64: string | null
+  seedanceModels: string[]
+  seedanceFlags: string
+}): Promise<Blob> {
+  const { prompt, frameB64, seedanceModels, seedanceFlags } = opts
+  let lastErr = '豆包视频生成失败'
+  for (const model of seedanceModels) {
+    const modelId = model === SEEDANCE_SERVER_AUTO ? undefined : model
+    try {
+      const r = await postSeedanceVideoStart(
+        seedanceStartPayload(prompt, frameB64, seedanceFlags, modelId),
+      )
+      if (!r.ok) {
+        lastErr = r.message
+        if (isArkQuotaHopableError(r.message)) continue
+        throw new Error(r.message)
+      }
+      const url = await waitSeedanceVideo(r.taskId)
+      return downloadVideoUrlAsBlob(url)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr = msg
+      if (isArkQuotaHopableError(msg)) continue
+      throw e instanceof Error ? e : new Error(msg)
+    }
+  }
+  throw new Error(
+    `${lastErr}。已轮询豆包/千问同类视频模型仍失败，请稍后重试或检查方舟/百炼额度。`,
+  )
+}
+
+async function generateOneSegment(opts: {
+  engine: DhVideoEngine
+  cfg: VideoAiBackendConfig | null
+  prompt: string
+  frameB64: string | null
+  seedanceModels: string[]
+  seedanceFlags: string
+}): Promise<Blob> {
+  const { engine, cfg, prompt, frameB64, seedanceModels, seedanceFlags } = opts
+
+  if (engine === 'seedance') {
+    try {
+      return await generateSeedanceSegmentWithFailover({
+        prompt,
+        frameB64,
+        seedanceModels,
+        seedanceFlags,
+      })
+    } catch (e) {
+      if (cfg?.klingConfigured) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (isArkQuotaHopableError(msg) || /仍失败|额度|502|503|429/i.test(msg)) {
+          return generateKlingSegment(prompt, frameB64)
+        }
+      }
+      throw e
+    }
+  }
+
+  return generateKlingSegment(prompt, frameB64)
 }
 
 export async function renderDigitalHumanMp4(
@@ -211,9 +289,11 @@ export async function renderDigitalHumanMp4(
   const plannerModel = pickPlanner(cfg)
   const avatar = findPresetAvatarForDraft(draft)
   const segmentTotal = estimateDhSegmentCount(script)
-  const seedanceModel = pickSeedanceModel(cfg)
+  const seedanceModels = listSeedanceModelCandidates(cfg)
   const seedanceFlags = `--dur ${SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
-  if (engine === 'seedance' && !seedanceModel && !cfg?.qwenVideoConfigured) {
+  const hasSeedancePath =
+    (cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0) || cfg?.qwenVideoConfigured
+  if (engine === 'seedance' && !hasSeedancePath) {
     const hint = cfg?.arkVideoSetupIssue?.trim()
     return {
       ok: false,
@@ -269,9 +349,10 @@ export async function renderDigitalHumanMp4(
     try {
       const blob = await generateOneSegment({
         engine,
+        cfg,
         prompt: prompts[i]!,
         frameB64,
-        seedanceModel,
+        seedanceModels,
         seedanceFlags,
       })
       blobs.push(blob)

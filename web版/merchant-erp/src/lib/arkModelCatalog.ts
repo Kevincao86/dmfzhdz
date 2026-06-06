@@ -95,7 +95,8 @@ export function isArkQuotaHopableError(msg: string): boolean {
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) return true
   if (/\b402\b/.test(raw) || lower.includes('insufficient balance') || lower.includes('insufficient_quota'))
     return true
-  if (lower.includes('503') || lower.includes('502 bad gateway')) return true
+  if (/\b502\b/.test(raw) || /\b503\b/.test(raw) || /\b504\b/.test(raw)) return true
+  if (lower.includes('502 bad gateway') || lower.includes('bad gateway')) return true
   if (/does not support content generation/i.test(raw)) return true
   if (/not support.*video|不支持.*视频/i.test(raw)) return true
   return false
