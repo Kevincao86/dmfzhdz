@@ -80,7 +80,7 @@ function getCurrentParticipant() {
       participantKey: prParticipantKey(pr),
       deviceSecret: secret,
       displayName: name,
-      avatarUrl: String(pr.wxAvatarUrl || '').trim(),
+      avatarUrl: String(pr.wxAvatarUrl || (acc && acc.wxAvatarUrl) || '').trim(),
       memberSnapshot: pr,
     }
   }
@@ -95,7 +95,7 @@ function getCurrentParticipant() {
     participantKey: key,
     deviceSecret: bootstrapTalentSecret(key),
     displayName: name,
-    avatarUrl: member && member.wxAvatarUrl ? member.wxAvatarUrl : '',
+    avatarUrl: String((member && member.wxAvatarUrl) || (acc && acc.wxAvatarUrl) || '').trim(),
     memberSnapshot: member || null,
   }
 }

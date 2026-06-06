@@ -396,15 +396,16 @@ export function sessionPeerFromRow(
   })
 }
 
-/** 轮流回复：上一条是自己发的则暂不可再发 */
+/** 首条往来：己方发过一条后须等对方首次回复，之后可自由互发 */
 export function canSendNextMessage(messages: UiChatMessage[], myRole: string): { ok: boolean; hint: string } {
   if (!messages.length) return { ok: true, hint: '' }
-  const last = messages[messages.length - 1]
-  if (last.fromRole === myRole) {
+  const peerRole = myRole === 'pr' ? 'talent' : 'pr'
+  if (messages.some((m) => m.fromRole === peerRole)) return { ok: true, hint: '' }
+  if (messages.some((m) => m.fromRole === myRole)) {
     return { ok: false, hint: '等待对方回复后可继续发送' }
   }
   return { ok: true, hint: '' }
 }
 
 export const CHAT_TURN_HINT =
-  '温馨提示：双方需轮流回复，发送一条消息后需等待对方回复才能继续发送。'
+  '温馨提示：发起方发送首条消息后，需等待对方首次回复，之后即可自由互发。'
