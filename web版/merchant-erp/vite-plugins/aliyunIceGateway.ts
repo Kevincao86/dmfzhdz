@@ -141,7 +141,7 @@ export async function handleAliyunIceRoutes(input: {
       effectOptions: ICE_EFFECT_PRESETS,
       urlUploadRequiresVod: Boolean(cfg?.vodStorageLocation?.trim()),
       credentialNote:
-        '灵祺AI云剪凭据由运营在「AI模型 → 短视频 API」维护。须填写 ICE 点播 StorageLocation（outin-*，本地上传与多图成片素材写入该 Bucket）；OSS 成片前缀仅用于成片 MP4 落盘。RAM 用户须含 AliyunICEFullAccess。',
+        '灵祺AI云剪：本地上传写入运营台「OSS 成片 URL 前缀」对应 Bucket（须 IMS 媒资库已绑定 + RAM 含 oss:PutObject）；StorageLocation（outin-*）用于成片输出与 RegisterMediaInfo；RAM 还须 AliyunICEFullAccess。',
       docsUrl:
         'https://help.aliyun.com/zh/ims/developer-reference/api-ice-2020-11-09-overview',
     })
