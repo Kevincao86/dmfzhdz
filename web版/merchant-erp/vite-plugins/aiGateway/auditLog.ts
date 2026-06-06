@@ -1,6 +1,6 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
 import { AI_AGENT_CASUAL_SYSTEM_PROMPT, AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
-import { shouldUseFullAgentSystemPrompt } from '../../src/lib/aiAgentActionParse.js'
+import { shouldUseFullAgentSystemPrompt } from '../../src/lib/aiAgentSystemPromptRoute.js'
 import { dialogueStyleAddonForPickerKey } from './agentDialogueStyle.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 
