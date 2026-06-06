@@ -31,10 +31,19 @@ function canonicalTalentMemberIdFromRegistry(reg, rawId) {
   return id
 }
 
+function phoneTail(v) {
+  return String(v || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
 function collectTalentChatKeyCandidates(reg) {
   const acc = sessionStore.readAccount()
   const member = talentMember.readMember()
   const memberId = participant.resolveTalentMemberId()
+  const lq = String((acc && acc.lingqiTalentId) || '').trim()
+  const hintPhone = phoneTail((acc && acc.loginName) || (member && member.contact) || '')
+  const hintOpenId = String((acc && acc.openid) || '').trim()
   const rawIds = [
     acc && acc.registryMemberId,
     member && member.id,
@@ -51,23 +60,49 @@ function collectTalentChatKeyCandidates(reg) {
     const lib = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
     let mem = null
     for (let i = 0; i < members.length; i++) {
-      if (String((members[i] && members[i].id) || '').trim() === memberId) {
-        mem = members[i]
-        break
-      }
+      const row = members[i]
+      const mid = String((row && row.id) || '').trim()
+      const mlq = String((row && row.lingqiTalentId) || '').trim()
+      const mPhone = phoneTail((row && row.contact) || (row && row.wechatId) || '')
+      const mOpen = String((row && row.wxOpenId) || '').trim()
+      const hit =
+        (memberId && mid === memberId) ||
+        (lq && mlq === lq) ||
+        (hintPhone.length >= 8 && mPhone === hintPhone) ||
+        (hintOpenId && mOpen === hintOpenId)
+      if (!hit) continue
+      mem = row
+      if (mid) keys.add(`talent_${mid}`)
+      if (mlq) keys.add(`talent_${mlq}`)
     }
-    const lq = String((mem && mem.lingqiTalentId) || (acc && acc.lingqiTalentId) || '').trim()
-    if (lq) keys.add(`talent_${lq}`)
+    const linkLq = String((mem && mem.lingqiTalentId) || lq || '').trim()
     for (let j = 0; j < lib.length; j++) {
       const row = lib[j]
       const libLq = String((row && row.lingqiTalentId) || '').trim()
       const libId = String((row && row.id) || '').trim()
       if (!libId) continue
-      if (libLq && lq && libLq === lq) keys.add(`talent_${libId}`)
+      if (libLq && linkLq && libLq === linkLq) keys.add(`talent_${libId}`)
       if (libId && rawIds.indexOf(libId) >= 0) keys.add(`talent_${libId}`)
     }
   }
   return [...keys]
+}
+
+function talentChatIdentityPayload(reg) {
+  const acc = sessionStore.readAccount()
+  const member = talentMember.readMember()
+  const payload = {
+    aliasParticipantKeys: collectTalentChatKeyCandidates(reg),
+  }
+  const lq = String((acc && acc.lingqiTalentId) || '').trim()
+  const mid = String((acc && acc.registryMemberId) || (member && member.id) || '').trim()
+  const phone = String((acc && acc.loginName) || (member && member.contact) || '').trim()
+  const openId = String((acc && acc.openid) || '').trim()
+  if (lq) payload.lingqiTalentId = lq
+  if (mid) payload.registryMemberId = mid
+  if (phone) payload.contactPhone = phone
+  if (openId) payload.wxOpenId = openId
+  return payload
 }
 
 function talentChatParticipantForKey(base, participantKey) {
@@ -94,6 +129,7 @@ function participantForSession(session, base) {
 module.exports = {
   canonicalTalentMemberIdFromRegistry,
   collectTalentChatKeyCandidates,
+  talentChatIdentityPayload,
   talentChatParticipantForKey,
   sessionAuthKeyForMe,
   participantForSession,

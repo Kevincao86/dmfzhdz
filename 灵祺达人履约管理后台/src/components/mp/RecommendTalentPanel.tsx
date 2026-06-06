@@ -96,8 +96,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       setMatching(true)
       try {
         filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, registryCache, { board: prBoard })
-        const matched = filtered.filter((t) => (t.matchScore || 0) >= 45)
-        filtered = matched.length ? matched : filtered
+        filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
       } catch {
         const packs = recruitmentAi.resolvePrRecentOrders(registryCache, { board: prBoard })
         const payloads = packs.map((p) => p.payload)

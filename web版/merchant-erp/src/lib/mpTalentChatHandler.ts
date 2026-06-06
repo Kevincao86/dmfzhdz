@@ -1,4 +1,13 @@
 import {
+  bootstrapTalentChatSecret,
+  canonicalTalentMemberIdFromRegistry,
+  collectTalentParticipantKeys,
+  listSessionsByTalentKeysAdmin,
+  mergeSessionsById,
+  verifyTalentOwnsAnyKey,
+  type TalentChatIdentityHints,
+} from './mpTalentChatAliases.js'
+import {
   createMpTalentChatAdmin,
   ensureSession,
   fetchMessages,
@@ -11,6 +20,7 @@ import {
   upsertParticipant,
   type MpChatRole,
 } from './mpTalentChatSupabase.js'
+import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
@@ -58,6 +68,29 @@ export type MpTalentChatBody = {
   prName?: string
   talentAvatar?: string
   prAvatar?: string
+  aliasParticipantKeys?: string[]
+  lingqiTalentId?: string
+  registryMemberId?: string
+  contactPhone?: string
+  wxOpenId?: string
+}
+
+async function loadRegistryForChat(supabaseUrl: string, serviceRole: string) {
+  try {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    return await io.load()
+  } catch {
+    return null
+  }
+}
+
+function identityHintsFromBody(body: MpTalentChatBody): TalentChatIdentityHints {
+  return {
+    lingqiTalentId: String(body.lingqiTalentId || '').trim() || undefined,
+    registryMemberId: String(body.registryMemberId || '').trim() || undefined,
+    contactPhone: String(body.contactPhone || '').trim() || undefined,
+    wxOpenId: String(body.wxOpenId || '').trim() || undefined,
+  }
 }
 
 export async function handleMpTalentChatBody(
@@ -113,7 +146,37 @@ export async function handleMpTalentChatBody(
   }
 
   if (action === 'list_sessions') {
-    const sessions = await listSessions(sb, participantKey, deviceSecret)
+    let primary: Awaited<ReturnType<typeof listSessions>> = []
+    let primaryOk = false
+    try {
+      primary = await listSessions(sb, participantKey, deviceSecret)
+      primaryOk = true
+    } catch {
+      primary = []
+    }
+
+    if (!participantKey.startsWith('talent_')) {
+      if (!primaryOk) {
+        return { status: 403, data: { ok: false, error: 'forbidden' } }
+      }
+      return { status: 200, data: { ok: true, sessions: primary } }
+    }
+
+    const extra = Array.isArray(body.aliasParticipantKeys)
+      ? body.aliasParticipantKeys.map((k) => String(k || '').trim()).filter(Boolean)
+      : []
+    const hints = identityHintsFromBody(body)
+    const reg = await loadRegistryForChat(supabaseUrl, serviceRole)
+    const aliasKeys = collectTalentParticipantKeys(reg, hints, [participantKey, ...extra])
+
+    const owns = await verifyTalentOwnsAnyKey(sb, participantKey, deviceSecret, aliasKeys)
+    if (!owns) {
+      if (primaryOk) return { status: 200, data: { ok: true, sessions: primary } }
+      return { status: 403, data: { ok: false, error: 'forbidden' } }
+    }
+
+    const merged = await listSessionsByTalentKeysAdmin(sb, aliasKeys)
+    const sessions = mergeSessionsById(primary, merged)
     return { status: 200, data: { ok: true, sessions } }
   }
 
@@ -168,12 +231,19 @@ export async function handleMpTalentChatBody(
   }
 
   if (action === 'ensure_session') {
-    const talentKey = String(body.talentKey || '').trim()
+    let talentKey = String(body.talentKey || '').trim()
     const prKey = String(body.prKey || '').trim()
-    const talentSecret = String(body.talentSecret || deviceSecret).trim()
+    let talentSecret = String(body.talentSecret || deviceSecret).trim()
     const prSecret = String(body.prSecret || deviceSecret).trim()
     if (!talentKey || !prKey) {
       return { status: 400, data: { ok: false, error: 'invalid_session_parties' } }
+    }
+    const reg = await loadRegistryForChat(supabaseUrl, serviceRole)
+    const rawId = talentKey.replace(/^talent_/, '')
+    const canonical = canonicalTalentMemberIdFromRegistry(reg, rawId)
+    if (canonical && canonical !== rawId) {
+      talentKey = `talent_${canonical}`
+      talentSecret = bootstrapTalentChatSecret(talentKey)
     }
     await upsertParticipant(sb, {
       participantKey: talentKey,
