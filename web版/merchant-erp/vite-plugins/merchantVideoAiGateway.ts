@@ -686,59 +686,69 @@ async function arkGetVideoTask(
   const key = doubaoBearerKey(env)
   if (!key) return { ok: false, msg: '未配置方舟 API Key。' }
   const root = arkApiV3Root(env)
-  const res = await fetch(`${root}/contents/generations/tasks/${encodeURIComponent(taskId)}`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${key}` },
-  })
-  const j = await readJsonResponse(res)
-  if (!res.ok) {
-    const msg =
-      (typeof j.message === 'string' && j.message) || `方舟查询任务失败（HTTP ${res.status}）。`
-    return { ok: false, msg, status: res.status }
+  let lastMsg = '方舟查询任务失败'
+  let lastStatus: number | undefined
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(`${root}/contents/generations/tasks/${encodeURIComponent(taskId)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${key}` },
+    })
+    const j = await readJsonResponse(res)
+    if (!res.ok) {
+      lastMsg =
+        (typeof j.message === 'string' && j.message) || `方舟查询任务失败（HTTP ${res.status}）。`
+      lastStatus = res.status
+      if (isArkQuotaHopableError(lastMsg) && attempt < 3) {
+        await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)))
+        continue
+      }
+      return { ok: false, msg: lastMsg, status: lastStatus }
+    }
+    const rawStatus = typeof j.status === 'string' ? j.status : typeof j.phase === 'string' ? j.phase : ''
+    const st = rawStatus.trim().toLowerCase()
+    const videoUrl = extractHttpVideoUrl(j)
+
+    /** 语义归一（不同版本字段不一致） */
+    let phase: ArkPollPhase = 'running'
+    if (!st || st === 'submitted' || st === 'queued' || st === 'pending') phase = 'queued'
+    else if (
+      st === 'running' ||
+      st === 'processing' ||
+      st === 'in_progress' ||
+      st === 'generating' ||
+      st === 'working'
+    )
+      phase = 'running'
+    else if (
+      st === 'succeeded' ||
+      st === 'success' ||
+      st === 'completed' ||
+      st === 'finished' ||
+      st === 'complete'
+    )
+      phase = 'succeeded'
+    else if (st === 'failed' || st === 'error') phase = 'failed'
+    else if (videoUrl && st !== '') phase = 'succeeded'
+
+    const failReason =
+      (typeof j.error === 'object' &&
+        j.error &&
+        typeof (j.error as { message?: unknown }).message === 'string' &&
+        (j.error as { message: string }).message) ||
+      (typeof j.message === 'string' ? j.message : undefined)
+
+    return {
+      ok: true,
+      state: {
+        phase,
+        statusLabel: rawStatus || phase,
+        videoUrl,
+        raw: j as unknown as Record<string, unknown>,
+        failReason: phase === 'failed' ? failReason || '方舟任务失败，请稍后重试。' : undefined,
+      },
+    }
   }
-  const rawStatus = typeof j.status === 'string' ? j.status : typeof j.phase === 'string' ? j.phase : ''
-  const st = rawStatus.trim().toLowerCase()
-  const videoUrl = extractHttpVideoUrl(j)
-
-  /** 语义归一（不同版本字段不一致） */
-  let phase: ArkPollPhase = 'running'
-  if (!st || st === 'submitted' || st === 'queued' || st === 'pending') phase = 'queued'
-  else if (
-    st === 'running' ||
-    st === 'processing' ||
-    st === 'in_progress' ||
-    st === 'generating' ||
-    st === 'working'
-  )
-    phase = 'running'
-  else if (
-    st === 'succeeded' ||
-    st === 'success' ||
-    st === 'completed' ||
-    st === 'finished' ||
-    st === 'complete'
-  )
-    phase = 'succeeded'
-  else if (st === 'failed' || st === 'error') phase = 'failed'
-  else if (videoUrl && st !== '') phase = 'succeeded'
-
-  const failReason =
-    (typeof j.error === 'object' &&
-      j.error &&
-      typeof (j.error as { message?: unknown }).message === 'string' &&
-      (j.error as { message: string }).message) ||
-    (typeof j.message === 'string' ? j.message : undefined)
-
-  return {
-    ok: true,
-    state: {
-      phase,
-      statusLabel: rawStatus || phase,
-      videoUrl,
-      raw: j as unknown as Record<string, unknown>,
-      failReason: phase === 'failed' ? failReason || '方舟任务失败，请稍后重试。' : undefined,
-    },
-  }
+  return { ok: false, msg: lastMsg, status: lastStatus }
 }
 
 export type ArkPollPhase = 'queued' | 'running' | 'succeeded' | 'failed'
