@@ -46,6 +46,21 @@ export function matchCity(region: string, storeName: string, cityFilter: string)
   return false
 }
 
+/** 省 + 市筛选（与发布招募 RegionSelect 一致） */
+export function matchRegionFilter(region: string, storeName: string, province: string, city: string): boolean {
+  const prov = String(province || '').trim()
+  const c = String(city || '').trim()
+  if ((!prov || prov === '全部') && (!c || c === '全部')) return true
+  const blob = [region, storeName].filter(Boolean).join(' ')
+  if (!blob || blob === '—') return false
+  if (prov && prov !== '全部') {
+    const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
+    if (pShort.length >= 2 && !blob.includes(pShort) && !blob.includes(prov)) return false
+  }
+  if (c && c !== '全部') return matchCity(region, storeName, c)
+  return true
+}
+
 export function matchPriceBuckets(amount: number, selectedIds: string[]): boolean {
   if (!selectedIds.length) return true
   const n = Number(amount) || 0

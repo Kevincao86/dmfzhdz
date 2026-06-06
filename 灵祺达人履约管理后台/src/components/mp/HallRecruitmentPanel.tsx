@@ -14,6 +14,7 @@ import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { getWorkIdentity, WORK_EDITION_LABEL, workIdentityLabel } from '../../lib/mpWorkIdentity'
 import { getActiveRole } from '../../lib/mpSession'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
+import HallCityFilter from './HallCityFilter'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
 type HallTab = 'normal' | 'urgent' | 'paichian'
@@ -37,6 +38,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [paichianSubTab, setPaichianSubTab] = useState<PaichianSubTab>('shoot')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('全部')
+  const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
   const [filterStatus, setFilterStatus] = useState('全部')
   const [priceSelected, setPriceSelected] = useState<string[]>([])
@@ -52,7 +54,6 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [editRows, setEditRows] = useState<RecruitmentOrderRow[]>([])
   const [iceRows, setIceRows] = useState<RecruitmentOrderRow[]>([])
   const [displayRows, setDisplayRows] = useState<RecruitmentOrderRow[]>([])
-  const [cityFilters, setCityFilters] = useState<string[]>(['全部'])
 
   const applyFilters = useCallback(async () => {
     let rows = normalRows
@@ -66,7 +67,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     rows = rows.filter((r) => {
       if (!matchSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
-      if (!hallFilters.matchCity(r.region, r.storeName, filterCity)) return false
+      if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
       if (!matchStatusLabel(r, filterStatus)) return false
       return true
@@ -90,6 +91,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     normalRows,
     searchKeyword,
     filterPlatform,
+    filterProvince,
     filterCity,
     filterStatus,
     priceSelected,
@@ -116,7 +118,6 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
         setEditRows(ed)
         setIceRows(i)
         setTodayCount(tc)
-        setCityFilters(hallFilters.buildCityFilterOptions([...n, ...u, ...sh, ...ed, ...i]))
         if (hallIdentity === 'edit') setPaichianSubTab('edit')
         else if (hallIdentity === 'shoot') setPaichianSubTab('shoot')
         else if (hallIdentity === 'talent' && !sh.length && !ed.length && i.length) setPaichianSubTab('ice')
@@ -206,17 +207,15 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             </option>
           ))}
         </select>
-        <select
-          className="rounded-lg panel-select px-2 py-1.5"
-          value={filterCity}
-          onChange={(e) => setFilterCity(e.target.value)}
-        >
-          {cityFilters.map((c) => (
-            <option key={c} value={c}>
-              {c === '全部' ? '城市' : c}
-            </option>
-          ))}
-        </select>
+        <HallCityFilter
+          compact
+          province={filterProvince}
+          city={filterCity}
+          onChange={(prov, c) => {
+            setFilterProvince(prov)
+            setFilterCity(c)
+          }}
+        />
         <select
           className="rounded-lg panel-select px-2 py-1.5"
           value={filterStatus}

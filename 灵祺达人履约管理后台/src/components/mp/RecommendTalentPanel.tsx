@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchMpRegistry } from '../../lib/mpApi'
+import { getActiveRole } from '../../lib/mpSession'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import {
+  boardAllModeLabel,
   boardEmptyHint,
   boardMatchHint,
   boardSearchPlaceholder,
@@ -13,9 +16,18 @@ import {
 } from '../../lib/mpRecruitment/prRecommendBoard'
 import type { MpRegistry, TalentCardRow } from '../../lib/mpRecruitment/types'
 import { matchTalentFilters } from '../../lib/mpRecruitment/talentFormat'
+import {
+  canChat,
+  ensureSessionWithTalent,
+  formatChatError,
+  syncProfile,
+} from '../../lib/mpSync/talentChat'
+import HallCityFilter from './HallCityFilter'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
 const GENDER_FILTERS = ['全部', '男', '女']
+
+type ViewMode = 'ai' | 'all'
 
 function matchTalentSearch(row: TalentCardRow, keyword: string) {
   if (!keyword) return true
@@ -29,21 +41,25 @@ function matchTalentSearch(row: TalentCardRow, keyword: string) {
 type Props = { embedded?: boolean }
 
 export default function RecommendTalentPanel({ embedded = false }: Props) {
+  const navigate = useNavigate()
+  const role = getActiveRole()
   const [prBoard, setPrBoard] = useState<PrBoardId>('talent')
+  const [viewMode, setViewMode] = useState<ViewMode>('ai')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('全部')
+  const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
   const [filterTag, setFilterTag] = useState('全部')
   const [filterGender, setFilterGender] = useState('全部')
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
+  const [chatLoadingId, setChatLoadingId] = useState('')
   const [err, setErr] = useState('')
   const [allRows, setAllRows] = useState<TalentCardRow[]>([])
   const [displayRows, setDisplayRows] = useState<TalentCardRow[]>([])
   const [listEmptyHint, setListEmptyHint] = useState('')
   const [prBoardOrderCount, setPrBoardOrderCount] = useState(0)
   const [prMatchHint, setPrMatchHint] = useState('发达人招募后，将按发单要求智能推荐达人')
-  const [cityFilters, setCityFilters] = useState<string[]>(['全部'])
   const [registryCache, setRegistryCache] = useState<MpRegistry | null>(null)
   const [boardPools, setBoardPools] = useState<Record<PrBoardId, TalentCardRow[]>>({
     talent: [],
@@ -52,11 +68,29 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   })
 
   const searchPlaceholder = useMemo(() => boardSearchPlaceholder(prBoard), [prBoard])
+  const allModeLabel = useMemo(() => boardAllModeLabel(prBoard), [prBoard])
 
   const applyTalentFilters = useCallback(async () => {
-    const f = { platform: filterPlatform, city: filterCity, tag: filterTag, gender: filterGender }
+    const f = {
+      platform: filterPlatform,
+      province: filterProvince,
+      city: filterCity,
+      tag: filterTag,
+      gender: filterGender,
+    }
     const kw = searchKeyword.trim()
     let filtered = allRows.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+
+    if (viewMode === 'all') {
+      filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      let hint = ''
+      if (!filtered.length) {
+        hint = kw ? `未找到「${kw}」相关结果` : `暂无已注册的${allModeLabel.replace('全部', '')}`
+      }
+      setDisplayRows(filtered.slice(0, 100))
+      setListEmptyHint(hint)
+      return
+    }
 
     if (prBoardOrderCount > 0 && registryCache && filtered.length) {
       setMatching(true)
@@ -90,12 +124,15 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     allRows,
     searchKeyword,
     filterPlatform,
+    filterProvince,
     filterCity,
     filterTag,
     filterGender,
     prBoardOrderCount,
     registryCache,
     prBoard,
+    viewMode,
+    allModeLabel,
   ])
 
   useEffect(() => {
@@ -120,8 +157,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         setPrBoardOrderCount(orderCount)
         setPrMatchHint(boardMatchHint(board, orderCount))
         setAllRows(pool)
-        const rowsForCity = [...pools.talent, ...pools.shoot, ...pools.edit]
-        setCityFilters(hallFilters.buildCityFilterOptions(rowsForCity.map((r) => ({ region: r.region }))))
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
         setDisplayRows([])
@@ -136,10 +171,41 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     const pool = boardPools[id] || []
     const orderCount = registryCache ? countPrOrdersForBoard(registryCache, id) : 0
     setPrBoard(id)
+    setViewMode('ai')
     setAllRows(pool)
     setPrBoardOrderCount(orderCount)
     setPrMatchHint(boardMatchHint(id, orderCount))
     setSearchKeyword('')
+  }
+
+  async function onChatTap(row: TalentCardRow) {
+    if (role !== 'pr') {
+      window.alert('请先在「我的」切换为 PR 身份，再向达人发起沟通。')
+      return
+    }
+    if (!canChat()) {
+      window.alert('未配置后台 API，无法发起私信。')
+      return
+    }
+    setChatLoadingId(row.id)
+    try {
+      await syncProfile()
+      const sessionId = await ensureSessionWithTalent({
+        id: row.id,
+        talentMemberId: row.id,
+        name: row.name,
+        avatar: row.avatar || '',
+      })
+      navigate(
+        `/chat?sessionId=${encodeURIComponent(sessionId)}` +
+          `&peerName=${encodeURIComponent(row.name)}` +
+          `&peerAvatar=${encodeURIComponent(row.avatar || '')}`,
+      )
+    } catch (e) {
+      window.alert(formatChatError(e))
+    } finally {
+      setChatLoadingId('')
+    }
   }
 
   return (
@@ -169,6 +235,24 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <span className="text-xs text-[var(--shell-muted)] self-center mr-1">浏览模式</span>
+        <button
+          type="button"
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'ai' ? 'bg-violet-600 text-white' : 'panel-tab'}`}
+          onClick={() => setViewMode('ai')}
+        >
+          智能匹配
+        </button>
+        <button
+          type="button"
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'all' ? 'bg-violet-600 text-white' : 'panel-tab'}`}
+          onClick={() => setViewMode('all')}
+        >
+          {allModeLabel}
+        </button>
+      </div>
+
       <input
         className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
         placeholder={searchPlaceholder}
@@ -176,17 +260,21 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         onChange={(e) => setSearchKeyword(e.target.value)}
       />
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <div className="flex flex-wrap gap-2 text-sm items-center">
         <select className="rounded-lg panel-input border px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
           {hallFilters.PLATFORM_FILTERS.map((p) => (
             <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
           ))}
         </select>
-        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
-          {cityFilters.map((c) => (
-            <option key={c} value={c}>{c === '全部' ? '城市' : c}</option>
-          ))}
-        </select>
+        <HallCityFilter
+          compact
+          province={filterProvince}
+          city={filterCity}
+          onChange={(prov, c) => {
+            setFilterProvince(prov)
+            setFilterCity(c)
+          }}
+        />
         <select className="rounded-lg panel-input border px-2 py-1.5" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
           {TAG_FILTERS.map((t) => (
             <option key={t} value={t}>{t === '全部' ? '标签' : t}</option>
@@ -218,15 +306,25 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              {t.aiTag ? <span className="order-tag order-tag--match">{t.aiTag}</span> : null}
+              {viewMode === 'ai' && t.aiTag ? (
+                <span className="order-tag order-tag--match">{t.aiTag}</span>
+              ) : null}
               <h3 className="font-semibold truncate text-[var(--shell-text)]">{t.name}</h3>
               <p className="talent-card-meta text-xs mt-1">
                 {t.platform} · {t.followers === '团队' ? t.salesGrade : `${t.followers}粉`} · {t.salesGrade}
               </p>
               <p className="talent-card-meta text-xs mt-0.5">{t.region}</p>
-              {t.matchScore ? (
+              {viewMode === 'ai' && t.matchScore ? (
                 <p className="order-price text-xs mt-1 font-medium text-orange-600">匹配度 {t.matchScore}</p>
               ) : null}
+              <button
+                type="button"
+                className="mt-2 px-3 py-1 rounded-lg text-xs font-medium bg-[#07c160] text-white hover:bg-[#06ad56] disabled:opacity-50 transition-colors"
+                disabled={chatLoadingId === t.id}
+                onClick={() => void onChatTap(t)}
+              >
+                {chatLoadingId === t.id ? '连接中…' : '沟通'}
+              </button>
             </div>
           </article>
         ))}

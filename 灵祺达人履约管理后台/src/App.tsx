@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage'
 import HallPage from './pages/HallPage'
 import OrdersPage from './pages/OrdersPage'
 import MessagesPage from './pages/MessagesPage'
+import ChatPage from './pages/ChatPage'
 import ProfilePage from './pages/ProfilePage'
 import TalentProfilePage from './pages/TalentProfilePage'
 import SupplierProfilePage from './pages/SupplierProfilePage'
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
         <Route path="/messages" element={<MessagesPage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/talent" element={<TalentProfilePage />} />
         <Route path="/profile/supplier" element={<SupplierProfilePage />} />

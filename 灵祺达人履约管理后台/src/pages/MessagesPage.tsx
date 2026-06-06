@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
@@ -11,6 +11,17 @@ import {
 } from '../lib/mpSync/messagesStore'
 import { inboxRowsForTalent, buildSelectionNoticeRows } from '../lib/mpSync/talentInboxMatch'
 import { readMember } from '../lib/mpSync/talentMember'
+import { getCurrentParticipant, unreadForMe } from '../lib/mpSync/participant'
+import {
+  canChat,
+  formatChatError,
+  listSessions,
+  sessionPeerFromRow,
+  sessionPreviewTime,
+  syncProfile,
+  type ChatSession,
+} from '../lib/mpSync/talentChat'
+import ChatPanel from '../components/chat/ChatPanel'
 
 type MsgTab = 'realtime' | 'system'
 
@@ -23,11 +34,49 @@ const SYSTEM_TABS = [
 
 export default function MessagesPage() {
   const role = getActiveRole()
+  const me = getCurrentParticipant()
   const [msgTab, setMsgTab] = useState<MsgTab>('realtime')
   const [systemFilter, setSystemFilter] = useState('all')
   const [rows, setRows] = useState<NotificationRow[]>(() => readAllNotificationRows())
   const [unread, setUnread] = useState(() => unreadNotificationCount())
   const [loadingInbox, setLoadingInbox] = useState(false)
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionsErr, setSessionsErr] = useState('')
+  const [activeSessionId, setActiveSessionId] = useState('')
+
+  const activeSession = useMemo(
+    () => sessions.find((s) => String(s.id) === activeSessionId) || null,
+    [sessions, activeSessionId],
+  )
+  const activePeer = useMemo(() => {
+    if (!activeSession) return { name: '会话', avatar: '' }
+    return sessionPeerFromRow(activeSession, me.participantKey)
+  }, [activeSession, me.participantKey])
+
+  const refreshSessions = useCallback(async () => {
+    if (!canChat()) {
+      setSessions([])
+      setSessionsErr('未配置后台 API')
+      return
+    }
+    setSessionsLoading(true)
+    setSessionsErr('')
+    try {
+      await syncProfile()
+      const list = await listSessions()
+      const sorted = [...list].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
+      setSessions(sorted)
+      if (!activeSessionId && sorted.length) {
+        setActiveSessionId(String(sorted[0]!.id))
+      }
+    } catch (e) {
+      setSessionsErr(formatChatError(e))
+      setSessions([])
+    } finally {
+      setSessionsLoading(false)
+    }
+  }, [activeSessionId])
 
   async function refreshFromRegistry() {
     setLoadingInbox(true)
@@ -57,6 +106,10 @@ export default function MessagesPage() {
     void refreshFromRegistry()
   }, [role])
 
+  useEffect(() => {
+    if (msgTab === 'realtime') void refreshSessions()
+  }, [msgTab, refreshSessions])
+
   function onMarkAllRead() {
     markNotificationsRead()
     void refreshFromRegistry()
@@ -69,7 +122,7 @@ export default function MessagesPage() {
   }, [rows, systemFilter])
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-[var(--shell-text)]">消息</h2>
         {unread > 0 && msgTab === 'system' ? (
@@ -98,14 +151,80 @@ export default function MessagesPage() {
       </div>
 
       {msgTab === 'realtime' ? (
-        <div className="surface-card rounded-xl border p-6 text-center">
-          <p className="font-medium text-[var(--shell-text)]">私信会话</p>
-          <p className="text-sm text-[var(--shell-muted)] mt-2">
-            Web 端实时私信功能与小程序同步建设中。请在小程序「消息」页与达人/招募方私信沟通。
-          </p>
-          <p className="text-xs text-[var(--shell-muted)] mt-4">
-            PR：在推荐大厅向达人发起沟通 · 达人：报名通过后可在商单详情联系招募方
-          </p>
+        <div className="chat-shell flex rounded-xl border border-[#d6d6d6] overflow-hidden h-[calc(100vh-12rem)] min-h-[420px] bg-white shadow-sm">
+          <aside className="chat-session-list w-72 shrink-0 border-r border-[#e8e8e8] bg-[#f7f7f7] flex flex-col min-h-0">
+            <div className="px-3 py-2 border-b border-[#e8e8e8] flex items-center justify-between">
+              <span className="text-sm font-medium text-[#191919]">私信会话</span>
+              <button
+                type="button"
+                className="text-xs text-violet-600"
+                disabled={sessionsLoading}
+                onClick={() => void refreshSessions()}
+              >
+                {sessionsLoading ? '刷新中…' : '刷新'}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {sessionsErr ? <p className="p-3 text-xs text-red-500">{sessionsErr}</p> : null}
+              {!sessionsLoading && !sessions.length && !sessionsErr ? (
+                <p className="p-4 text-xs text-[#888] text-center">
+                  暂无会话。PR 可在推荐大厅向达人发起「沟通」。
+                </p>
+              ) : null}
+              {sessions.map((s) => {
+                const peer = sessionPeerFromRow(s, me.participantKey)
+                const unreadN = unreadForMe(s, me.participantKey)
+                const sid = String(s.id)
+                const active = sid === activeSessionId
+                return (
+                  <button
+                    key={sid}
+                    type="button"
+                    className={`w-full text-left px-3 py-3 flex gap-2 border-b border-[#efefef] hover:bg-[#ededed] transition-colors ${
+                      active ? 'bg-[#c9c9c9]/40' : ''
+                    }`}
+                    onClick={() => setActiveSessionId(sid)}
+                  >
+                    {peer.avatar ? (
+                      <img src={peer.avatar} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-md bg-violet-400/20 flex items-center justify-center text-sm shrink-0">
+                        {peer.name.slice(0, 1)}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-sm font-medium text-[#191919] truncate">{peer.name}</span>
+                        <span className="text-[10px] text-[#b2b2b2] shrink-0">
+                          {sessionPreviewTime(Number(s.last_ts || 0))}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#888] truncate mt-0.5">{String(s.last_text || '')}</p>
+                    </div>
+                    {unreadN > 0 ? (
+                      <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center px-1">
+                        {unreadN > 99 ? '99+' : unreadN}
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
+          <main className="chat-main flex-1 min-w-0 min-h-0">
+            {activeSessionId ? (
+              <ChatPanel
+                key={activeSessionId}
+                sessionId={activeSessionId}
+                peerName={activePeer.name}
+                peerAvatar={activePeer.avatar}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-sm text-[#888] bg-[#ededed]">
+                选择左侧会话开始聊天
+              </div>
+            )}
+          </main>
         </div>
       ) : (
         <>

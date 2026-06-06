@@ -1,5 +1,5 @@
 import type { TalentCardRow } from './types'
-import { matchCity, matchPlatform, normalizeHallPlatform } from './hallFilters'
+import { matchPlatform, matchRegionFilter, normalizeHallPlatform } from './hallFilters'
 
 export function formatFans(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(1)}万`
@@ -45,10 +45,10 @@ export function formatTalent(row: Record<string, unknown>): TalentCardRow {
 
 export function matchTalentFilters(
   row: TalentCardRow,
-  f: { platform: string; city: string; tag: string; gender: string },
+  f: { platform: string; province?: string; city: string; tag: string; gender: string },
 ): boolean {
   if (!matchPlatform(row.platform, f.platform)) return false
-  if (!matchCity(row.region, '', f.city)) return false
+  if (!matchRegionFilter(row.region, '', f.province || '全部', f.city)) return false
   if (f.tag !== '全部') {
     const blob = [row.quality, ...row.tags].join(' ')
     if (!blob.includes(f.tag)) return false
