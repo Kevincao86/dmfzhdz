@@ -59,9 +59,20 @@ function dayOffset(text: string): 0 | 1 | 2 {
   return 0
 }
 
+/** 纯问候：本地秒回，不走大模型 */
+export function instantCasualGreetingReply(text: string): string | null {
+  const t = text.trim().replace(/[!！。~～\s]+$/u, '')
+  if (!t || t.length > 24) return null
+  if (/^(你好|您好|hi|hello|嗨|在吗|在么|早上好|下午好|晚上好)$/i.test(t)) {
+    return '你好！我是灵祺 AI 助手，有什么可以帮你的？'
+  }
+  return null
+}
+
 export function isDailyAssistQuery(text: string): boolean {
   const t = text.trim()
   if (!t || t.length > 120) return false
+  if (instantCasualGreetingReply(t)) return true
   if (
     /天气|气温|温度|下雨|降雨|下雪|预报|几度|冷不冷|热不热|穿什么|带伞/.test(t)
   ) {
@@ -95,6 +106,8 @@ export async function fetchDailyAssistReply(
   text: string,
   signal?: AbortSignal,
 ): Promise<string | null> {
+  const greeting = instantCasualGreetingReply(text)
+  if (greeting) return greeting
   if (!isDailyAssistQuery(text)) return null
 
   const dateOnly = formatLocalDateReply(text)

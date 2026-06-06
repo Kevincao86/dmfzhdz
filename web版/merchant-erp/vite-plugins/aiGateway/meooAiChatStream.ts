@@ -8,6 +8,7 @@ import {
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChatStream } from './chatStreamRouter.js'
 import { prepareMeooAiChat } from './meooAiChatPrepare.js'
+import { recordDirectAiUsageAfterSuccess } from '../tenantMembershipCore.js'
 import {
   describeDirectLlmKeyDebug,
   formatDirectLlmKeyDebugHint,
@@ -37,7 +38,7 @@ export async function runMeooAiChatStream(
     return
   }
 
-  const { user, req, chatEnv, env: fullEnv } = prep
+  const { user, req, chatEnv, env: fullEnv, usageCtx } = prep
   const lastUser = [...req.messages].reverse().find((m) => m.role === 'user')
   logAiChatServerLine({
     phase: 'request',
@@ -52,10 +53,12 @@ export async function runMeooAiChatStream(
   let rawContent = ''
   let reasoningAcc = ''
 
+  const casualChat = !req.taskType
+
   const publishView = () => {
     const view = splitAssistantStreamView(rawContent)
     const thinking = [reasoningAcc, view.thinking].filter(Boolean).join('\n\n').trim()
-    if (thinking) write({ event: 'thinking', text: thinking })
+    if (!casualChat && thinking) write({ event: 'thinking', text: thinking })
     const answer = resolveAssistantVisibleText(rawContent) || view.answer.trim()
     if (answer) write({ event: 'content', text: answer })
   }
@@ -87,6 +90,7 @@ export async function runMeooAiChatStream(
       tokenUsage: usageSafe ?? null,
       status: 'ok',
     })
+    recordDirectAiUsageAfterSuccess(usageCtx, fullEnv)
     write({
       event: 'done',
       content: resolveAssistantVisibleText(res.content) || res.content,

@@ -33,7 +33,7 @@ function aiChatFetchUrlCandidates(path: string): string[] {
   return merchantErpApiCandidates(path.startsWith('/') ? path : `/${path}`)
 }
 
-const SSE_FIRST_EVENT_TIMEOUT_MS = 12_000
+const SSE_FIRST_EVENT_TIMEOUT_MS = 8_000
 
 function sseFirstEventTimeout(ms: number, signal?: AbortSignal): Promise<never> {
   return new Promise((_, reject) => {

@@ -2,6 +2,29 @@
 
 import type { OpenAiCompatMessage } from './providers/openAiCompatibleFetch.js'
 
+const UPSTREAM_STREAM_TIMEOUT_MS = 45_000
+
+function combineAbortSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
+  if (!a) return b
+  if (!b) return a
+  if (a.aborted) return a
+  if (b.aborted) return b
+  const c = new AbortController()
+  const onAbort = () => c.abort()
+  a.addEventListener('abort', onAbort, { once: true })
+  b.addEventListener('abort', onAbort, { once: true })
+  return c.signal
+}
+
+function upstreamStreamTimeoutSignal(): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(UPSTREAM_STREAM_TIMEOUT_MS)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), UPSTREAM_STREAM_TIMEOUT_MS)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 export type OpenAiStreamDelta = {
   reasoning?: string
   content?: string
@@ -57,7 +80,7 @@ export async function* openAiCompatChatStream(opts: {
       stream: true,
       ...opts.extraBody,
     }),
-    signal: opts.signal,
+    signal: combineAbortSignals(opts.signal, upstreamStreamTimeoutSignal()),
   })
   if (!res.ok) {
     const text = await res.text()

@@ -195,14 +195,15 @@ function savePickerKey(key: string): void {
   }
 }
 
-function agentMessagesToChatMessages(msgs: AiAgentMessage[]): AIMessage[] {
+function agentMessagesToChatMessages(msgs: AiAgentMessage[], taskType?: AiTaskType): AIMessage[] {
   const out: AIMessage[] = []
   for (const m of msgs) {
     if (m.role === 'user' || m.role === 'assistant') {
       out.push({ role: m.role, content: m.content })
     }
   }
-  return out.slice(-24)
+  const limit = taskType ? 24 : 8
+  return out.slice(-limit)
 }
 
 const MAX_ARCHIVED_SESSIONS = 10
@@ -1234,7 +1235,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         const merchantCtx = await resolveMerchantIntelBlock(taskType)
         const history: AIMessage[] = [
           { role: 'system', content: merchantCtx },
-          ...agentMessagesToChatMessages(snapshot),
+          ...agentMessagesToChatMessages(snapshot, taskType),
         ]
         let chatModel = parsed.model
         if (parsed.provider === 'tokenmix' && !chatModel) {
