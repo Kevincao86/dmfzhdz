@@ -1,4 +1,4 @@
-const sessionStore = require('./sessionStore.js')
+const sessionStore = require('./mpSessionStore.js')
 const talentMember = require('./talentMember.js')
 const participant = require('./participant.js')
 

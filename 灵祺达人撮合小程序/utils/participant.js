@@ -2,7 +2,7 @@ const SECRET_KEY = 'meoo_talent_chat_secret_v1'
 const OVERRIDE_KEY = 'meoo_chat_participant_override_v1'
 const userProfile = require('./userProfile.js')
 const talentMember = require('./talentMember.js')
-const sessionStore = require('./sessionStore.js')
+const sessionStore = require('./mpSessionStore.js')
 
 function randomSecret() {
   return `sec_${Date.now()}_${Math.random().toString(36).slice(2, 14)}${Math.random().toString(36).slice(2, 14)}`
