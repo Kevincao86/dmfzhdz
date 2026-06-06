@@ -5,7 +5,6 @@ import SecretInput from '../../components/SecretInput'
 import { cn } from '../../cn'
 import { supabase } from '../../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
-import { clearTenantScopedBrowserState } from '../../lib/tenantLocalState'
 import { editionLabel, isPartnerEdition } from '../../lib/appEdition'
 import {
   isCnMobileValid,
@@ -119,7 +118,6 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         onErr('登录已成功，但未读到会话。请刷新本页或稍后再试。')
         return
       }
-      clearTenantScopedBrowserState()
       onLoginSuccess()
     } finally {
       setBusy(false)
@@ -154,7 +152,6 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       }
       const ok = await applySessionTokens(r.access_token, r.refresh_token)
       if (ok) {
-        clearTenantScopedBrowserState()
         onLoginSuccess()
       }
     } finally {

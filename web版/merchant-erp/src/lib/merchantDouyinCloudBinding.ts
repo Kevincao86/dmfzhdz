@@ -11,12 +11,13 @@ import {
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { applyActiveDouyinBinding, pickActiveDouyinBinding } from './douyinActiveBinding'
 import { readMerchantSession } from './merchantSession'
+import { tenantLocalKey } from './tenantLocalState'
 
 const TOKEN_KEY = 'meoo_douyin_merchant_token'
 const META_APP_ID = 'meoo_douyin_app_id'
 const META_MERCHANT_ID = 'meoo_douyin_merchant_id'
 const META_ACCOUNT_NAME = 'meoo_douyin_account_name'
-const CLOUD_BACKUP_ATTEMPTED_KEY = 'meoo_douyin_cloud_backup_attempted'
+const CLOUD_BACKUP_ATTEMPTED_BASE = 'meoo_douyin_cloud_backup_attempted'
 
 const PROVIDER = 'douyin' as const
 
@@ -120,13 +121,13 @@ export async function hydrateDouyinBindingsFromCloud(
   if (tok?.trim() && merchantId?.trim()) {
     let attempted = false
     try {
-      attempted = sessionStorage.getItem(CLOUD_BACKUP_ATTEMPTED_KEY) === '1'
+      attempted = localStorage.getItem(tenantLocalKey(CLOUD_BACKUP_ATTEMPTED_BASE)) === '1'
     } catch {
       /* ignore */
     }
     if (!attempted) {
       try {
-        sessionStorage.setItem(CLOUD_BACKUP_ATTEMPTED_KEY, '1')
+        localStorage.setItem(tenantLocalKey(CLOUD_BACKUP_ATTEMPTED_BASE), '1')
       } catch {
         /* ignore */
       }

@@ -11,12 +11,13 @@ import {
 import { fetchPrimaryTenantId } from './tenantBilling'
 import { applyActiveKuaishouBinding, pickActiveKuaishouBinding } from './kuaishouActiveBinding'
 import { readMerchantSession } from './merchantSession'
+import { tenantLocalKey } from './tenantLocalState'
 
 const TOKEN_KEY = 'meoo_kuaishou_merchant_token'
 const META_APP_ID = 'meoo_kuaishou_app_id'
 const META_MERCHANT_ID = 'meoo_kuaishou_merchant_id'
 const META_ACCOUNT_NAME = 'meoo_kuaishou_account_name'
-const CLOUD_BACKUP_ATTEMPTED_KEY = 'meoo_kuaishou_cloud_backup_attempted'
+const CLOUD_BACKUP_ATTEMPTED_BASE = 'meoo_kuaishou_cloud_backup_attempted'
 
 const PROVIDER = 'kuaishou' as const
 
@@ -119,13 +120,13 @@ export async function hydrateKuaishouBindingsFromCloud(
   if (tok?.trim() && merchantId?.trim()) {
     let attempted = false
     try {
-      attempted = sessionStorage.getItem(CLOUD_BACKUP_ATTEMPTED_KEY) === '1'
+      attempted = localStorage.getItem(tenantLocalKey(CLOUD_BACKUP_ATTEMPTED_BASE)) === '1'
     } catch {
       /* ignore */
     }
     if (!attempted) {
       try {
-        sessionStorage.setItem(CLOUD_BACKUP_ATTEMPTED_KEY, '1')
+        localStorage.setItem(tenantLocalKey(CLOUD_BACKUP_ATTEMPTED_BASE), '1')
       } catch {
         /* ignore */
       }

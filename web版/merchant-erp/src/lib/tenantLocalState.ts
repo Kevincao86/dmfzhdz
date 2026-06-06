@@ -1,7 +1,11 @@
 /**
  * 切换 Supabase 商户账号时清理浏览器内未按租户隔离的本地态，避免串租户数据。
+ * 平台绑定（抖音/快手）仅在用户主动解绑或切换账号/退出时清除；登录与 Token 刷新不得清空。
  */
-import { clearDouyinMerchantBindingLocal } from './merchantSession'
+import {
+  clearDouyinMerchantBindingLocal,
+  clearKuaishouMerchantBindingLocal,
+} from './merchantSession'
 import {
   MEOO_MERCHANT_DISPLAY_NAME_KEY,
   MEOO_OFFICIAL_REMAINING_DAYS_KEY,
@@ -81,34 +85,61 @@ function removeStorageKey(storage: Storage, key: string): void {
   }
 }
 
-export function clearTenantScopedBrowserState(): void {
+const PLATFORM_BINDING_KEY_MARKERS = [
+  'meoo_douyin_',
+  'meoo_kuaishou_',
+  'meoo_active_douyin_binding_id',
+  'meoo_active_kuaishou_binding_id',
+  'meoo_douyin_cloud_backup_attempted',
+  'meoo_kuaishou_cloud_backup_attempted',
+] as const
+
+/** 平台商家后台绑定凭据：登录/刷新会话时不得删除 */
+export function isPlatformBindingStorageKey(key: string): boolean {
+  return PLATFORM_BINDING_KEY_MARKERS.some((m) => key === m || key.startsWith(m) || key.includes(`@${m}`))
+}
+
+export function clearPlatformBindingLocalState(): void {
   clearDouyinMerchantBindingLocal()
+  clearKuaishouMerchantBindingLocal()
+}
+
+function purgeMeooStorageExceptBindings(storage: Storage): void {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i)
+      if (!k) continue
+      if (!k.includes('@') && !k.startsWith('meoo_')) continue
+      if (isPlatformBindingStorageKey(k)) continue
+      keys.push(k)
+    }
+    for (const k of keys) removeStorageKey(storage, k)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 仅清草稿/缓存，保留抖音快手等平台绑定 */
+export function clearTenantDraftBrowserState(): void {
   try {
     sessionStorage.removeItem(MEOO_ACTIVE_TENANT_ID_KEY)
   } catch {
     /* ignore */
   }
   for (const k of [...EXTRA_LOCAL_KEYS, ...PLATFORM_SESSION_KEYS]) {
+    if (isPlatformBindingStorageKey(k)) continue
     removeStorageKey(window.localStorage, k)
     removeStorageKey(window.sessionStorage, k)
   }
-  try {
-    const localKeys: string[] = []
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i)
-      if (k && (k.includes('@') || k.startsWith('meoo_'))) localKeys.push(k)
-    }
-    for (const k of localKeys) removeStorageKey(window.localStorage, k)
+  purgeMeooStorageExceptBindings(window.localStorage)
+  purgeMeooStorageExceptBindings(window.sessionStorage)
+}
 
-    const sessionKeys: string[] = []
-    for (let i = 0; i < window.sessionStorage.length; i++) {
-      const k = window.sessionStorage.key(i)
-      if (k && (k.includes('@') || k.startsWith('meoo_'))) sessionKeys.push(k)
-    }
-    for (const k of sessionKeys) removeStorageKey(window.sessionStorage, k)
-  } catch {
-    /* ignore */
-  }
+/** 切换账号 / 退出登录：清草稿并清平台绑定本机副本（云端 tenant_merchant_bindings 仍保留） */
+export function clearTenantScopedBrowserState(): void {
+  clearPlatformBindingLocalState()
+  clearTenantDraftBrowserState()
 }
 
 /** 大陆 11 位手机号脱敏展示 */
