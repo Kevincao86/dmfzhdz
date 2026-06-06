@@ -647,6 +647,24 @@ export default function OpsAiModelsPage() {
           </div>
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs text-slate-400">
+              豆包 · 对话模型（逗号分隔「显示名|方舟模型ID或 ep-xxxx」；智能体 / 商品 AI 优先用此列表）
+            </label>
+            <textarea
+              spellCheck={false}
+              rows={2}
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              value={videoAi.arkChatEndpoints ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, arkChatEndpoints: e.target.value }))}
+              placeholder="Seed 1.6|doubao-seed-1-6-251015, Pro|ep-xxxxxxxx"
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
               Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）
             </label>
             <textarea

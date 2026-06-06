@@ -131,9 +131,12 @@ export async function runMeooAiChatStream(
       status: 'error',
       detail: msg.slice(0, 500),
     })
-    const authHint = /401|invalid api key|invalid authentication|2049|JWT|TokenMix Key 与/i.test(msg)
-      ? '上游 401：请核对运营台 Key 与 ECS auth-api。'
-      : undefined
+    const authHint =
+      /\b401\b|invalid api key|invalid authentication|authentication.?failed|2049|JWT|TokenMix Key 与/i.test(
+        msg,
+      )
+        ? '上游鉴权失败：请核对商家管理后台「豆包」Key 与轻量 auth-api.env，并 systemctl restart meoo-auth-api。'
+        : undefined
     write({
       event: 'error',
       error: 'upstream_error',

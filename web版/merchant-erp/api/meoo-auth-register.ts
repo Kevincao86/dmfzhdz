@@ -1,5 +1,6 @@
 /**
  * POST /api/meoo-auth-register — 商家自助注册（验证码 + 开通租户）
+ * 方案 B：浏览器 → Vercel 同源；发码阿里云；写库经 supabaseAdminFetch IP bypass 连轻量 Supabase。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -113,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: false,
         error: 'auth_unreachable',
         message:
-          '注册服务无法连接数据库。备案期请在 Vercel 设 MEOO_ERP_BEIAN_BYPASS=1、MEOO_ERP_API_HOST_IP=139.196.42.5，并确认 SUPABASE_URL=https://mofangdianai.com 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy。',
+          '注册服务无法连接数据库（方案B）。Vercel 设 MEOO_ERP_BEIAN_BYPASS=1、MEOO_ERP_API_HOST_IP=139.196.42.5、SUPABASE_URL=https://mofangdianai.com、SUPABASE_SERVICE_ROLE_KEY；轻量执行 sudo bash scripts/ecs-install-beian-http-80.sh 后 Redeploy。',
         detail,
       })
       return
@@ -141,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           : result.error === 'supabase_admin_not_configured'
             ? '注册服务未配置 SUPABASE_SERVICE_ROLE_KEY，请联系管理员'
             : result.error === 'auth_unreachable'
-              ? '注册服务无法连接 mofangdianai.com，请检查 Vercel 环境变量 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy'
+              ? '注册服务无法连接 mofangdianai.com（方案B IP bypass）。请检查 Vercel 环境变量与轻量 HTTP:80 反代后 Redeploy'
               : result.error === 'auth_create_failed'
                 ? '创建账号失败，请稍后重试'
                 : result.error === 'tenant_insert_failed'
@@ -157,14 +158,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     })
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e)
-    const fetchUnreachable = /fetch failed|failed to fetch|econnrefused|enotfound|etimedout|socket/i.test(
+    const fetchUnreachable = /fetch failed|failed to fetch|econnrefused|enotfound|etimedout|socket|beian_/i.test(
       detail,
     )
     sendJson(res, 500, {
       ok: false,
       error: 'register_failed',
       message: fetchUnreachable
-        ? '注册服务无法连接认证 API（mofangdianai.com）。请检查 Vercel 的 SUPABASE_URL、SUPABASE_SERVICE_ROLE_KEY 是否与 ECS 一致并已 Redeploy；ECS GoTrue 需配置 GOTRUE_JWT_ADMIN_ROLES=service_role。'
+        ? '注册服务无法连接 Supabase（方案B）。请确认 Vercel MEOO_ERP_BEIAN_BYPASS=1 与轻量 ecs-install-beian-http-80.sh 已执行。'
         : '注册失败，请稍后重试',
       detail,
     })

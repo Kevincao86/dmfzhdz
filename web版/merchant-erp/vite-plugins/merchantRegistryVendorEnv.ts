@@ -108,6 +108,8 @@ export function describeMergedAiVendorKeys(
     return { vendor, configured: false, fingerprint: '(empty)', source: 'none' }
   }
   return [
+    pick('doubao', expanded.doubao, ['MERCHANT_AI_DOUBAO_KEY', 'ARK_API_KEY']),
+    pick('qwen', expanded.qwen, ['MERCHANT_AI_QWEN_KEY', 'DASHSCOPE_API_KEY']),
     pick('kimi', expanded.kimi, ['MOONSHOT_API_KEY', 'MERCHANT_AI_KIMI_KEY', 'KIMI_API_KEY']),
     pick('minimax', expanded.minimax, ['MINIMAX_API_KEY', 'MERCHANT_AI_MINIMAX_KEY']),
     pick('tokenmix', expanded.tokenmix, ['TOKENMIX_API_KEY']),
@@ -256,6 +258,11 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     const expanded = expandVendorKeysForRegistrySave(normalizeVendorKeysFromDisk(data.vendorKeys))
     stripDirectLlmEnvKeysForVendors(out, expanded)
     applyRegistryVendorKeysToMerchantEnv(out, data.vendorKeys)
+    const { applyRegistryVideoAiToMerchantEnv } = await import('./registryVideoAiEnvMerge.js')
+    applyRegistryVideoAiToMerchantEnv(out, {
+      videoAi: data.videoAi,
+      vendorKeys: data.vendorKeys,
+    })
     const va = data.videoAi
     if (va && typeof va === 'object') {
       const region = va as { minimaxRegion?: string; kimiRegion?: string }

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# 商家 ERP：构建 dist 并部署到 mofangdianai.com（替代 Vercel cs）
+# 商家 ERP：构建 dist 并部署到轻量根域 mofangdianai.com（单机全栈）
+# 新 ECS 仅 Web + cs 子域请用: scripts/ecs-deploy-merchant-cs-web.sh
+# 见 docs/MIGRATE-VERCEL-TO-ECS-merchant-cs.md
 # ECS（admin）:
 #   cd ~/app && git pull
 #   sudo bash scripts/ecs-deploy-merchant-web-mofangdianai.sh

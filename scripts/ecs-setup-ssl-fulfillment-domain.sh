@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 新 ECS：为履约域名签发 TLS（默认 dr.mofangdianai.com）
+# 新 ECS：为子域签发 TLS（dr / cs / fws 等，用法: bash $0 <域名>）
 # Nginx 已占 80 时：先装 ACME 专用 server，再 webroot 签发（勿 standalone 抢 80）
 #
 # 用法（root）:

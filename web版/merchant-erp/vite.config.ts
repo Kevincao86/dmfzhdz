@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
         env.VITE_APP_EDITION ?? (mode === 'partner' ? 'partner' : 'merchant'),
       ),
       /** 注册页排障：确认 Vercel 已部署含「仅同源 auth」的前端 */
-      'import.meta.env.VITE_AUTH_API_REVISION': JSON.stringify('auth-vercel-only-v2'),
+      'import.meta.env.VITE_AUTH_API_REVISION': JSON.stringify('auth-beian-bypass-v3'),
     },
     plugins: [
       react(),

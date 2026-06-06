@@ -6,6 +6,7 @@
  */
 import type { ServerResponse } from 'node:http'
 
+import { parseArkVideoEndpointsRaw } from '../src/lib/arkVideoEndpointsConfig.js'
 import { isDouyinAssistAiVendorId, isValidAiVendorSlug } from '../src/lib/aiVendorCatalogShared.js'
 import { isTokenmixLinkedVendor } from '../src/lib/aiVendorKeysShared.js'
 import {
@@ -517,7 +518,7 @@ function doubaoArkApiV3Root(env: MerchantAiEnv): string {
 }
 
 function doubaoChatModelId(env: MerchantAiEnv): string {
-  return (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? 'doubao-pro-32k').trim() || 'doubao-pro-32k'
+  return (env.MERCHANT_AI_DOUBAO_CHAT_MODEL ?? 'doubao-seed-1-6-251015').trim() || 'doubao-seed-1-6-251015'
 }
 
 /** 主模型（如旧版 doubao-pro-32k）不可用时再试，见方舟控制台可用模型名 */
@@ -801,14 +802,23 @@ async function callMinimaxChat(
 }
 
 function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
-  const primary = doubaoChatModelId(env)
-  const fallback = doubaoChatFallbackModelId(env)
   const out: string[] = []
-  for (const m of [primary, fallback]) {
+  const add = (m: string) => {
     const t = m.trim()
     if (t && !out.includes(t)) out.push(t)
   }
-  return out.length ? out : ['doubao-pro-32k']
+  const fromRegistry = String(env.MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS ?? '').trim()
+  if (fromRegistry) {
+    for (const item of parseArkVideoEndpointsRaw(fromRegistry)) {
+      add(item.endpointId)
+    }
+  }
+  const primary = doubaoChatModelId(env)
+  const fallback = doubaoChatFallbackModelId(env)
+  for (const m of [primary, fallback, 'doubao-pro-32k']) {
+    add(m)
+  }
+  return out.length ? out : ['doubao-seed-1-6-251015']
 }
 
 async function callDoubaoChat(

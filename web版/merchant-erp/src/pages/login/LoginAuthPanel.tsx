@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import EditionSwitchLink from '../../components/EditionSwitchLink'
 import SecretInput from '../../components/SecretInput'
@@ -56,6 +56,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
   const [confirmPassword, setConfirmPassword] = useState('')
   const [smsCooldown, setSmsCooldown] = useState(0)
   const [smsSending, setSmsSending] = useState(false)
+  const smsInflightRef = useRef(false)
+  const loginSmsInflightRef = useRef(false)
 
   useEffect(() => {
     if (smsCooldown <= 0) return
@@ -161,12 +163,14 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
   }
 
   const sendSmsForRegister = useCallback(async () => {
+    if (smsInflightRef.current || smsSending || smsCooldown > 0) return
     onErr(null)
     const mobile = phone.replace(/\D/g, '')
     if (!isCnMobileValid(mobile)) {
       onErr('请输入有效的大陆手机号（11 位）')
       return
     }
+    smsInflightRef.current = true
     setSmsSending(true)
     try {
       const r = await sendAuthSms(mobile)
@@ -182,17 +186,20 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         onInfoHint(r.message ?? '验证码已发送')
       }
     } finally {
+      smsInflightRef.current = false
       setSmsSending(false)
     }
-  }, [phone, onErr, onInfoHint])
+  }, [phone, onErr, onInfoHint, smsSending, smsCooldown])
 
   const sendSmsForLogin = useCallback(async () => {
+    if (loginSmsInflightRef.current || loginSmsSending || loginSmsCooldown > 0) return
     onErr(null)
     const mobile = loginPhone.replace(/\D/g, '')
     if (!isCnMobileValid(mobile)) {
       onErr('请输入有效的大陆手机号（11 位）')
       return
     }
+    loginSmsInflightRef.current = true
     setLoginSmsSending(true)
     try {
       const r = await sendAuthSms(mobile)
@@ -208,9 +215,10 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
         onInfoHint(r.message ?? '验证码已发送')
       }
     } finally {
+      loginSmsInflightRef.current = false
       setLoginSmsSending(false)
     }
-  }, [loginPhone, onErr, onInfoHint])
+  }, [loginPhone, onErr, onInfoHint, loginSmsSending, loginSmsCooldown])
 
   const submitRegister = async (e: FormEvent) => {
     e.preventDefault()
