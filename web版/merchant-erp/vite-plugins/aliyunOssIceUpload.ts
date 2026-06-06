@@ -5,9 +5,11 @@
 import path from 'node:path'
 import type { AliyunIceConfig } from './aliyunIceCore.js'
 import {
+  buildIceCanonicalOssUrl,
   ensureIceHttpsUrl,
   resolveIceOssUploadCandidates,
   resolveIceOssUploadPrefix,
+  toIceTimelineOssUrl,
   type ParsedOssPrefix,
 } from './aliyunOssIceParse.js'
 
@@ -162,7 +164,7 @@ export async function ensureIcePublicImageUrls(
       }
     }
     if (urlOnIceOssBucket(raw, ossPrefix)) {
-      out.push(ensureIceHttpsUrl(raw))
+      out.push(toIceTimelineOssUrl(raw))
       continue
     }
     try {
@@ -187,7 +189,7 @@ export async function ensureIcePublicImageUrls(
         buffer: buf,
       })
       if (!put.ok) return put
-      out.push(put.mediaUrl)
+      out.push(put.timelineUrl ?? toIceTimelineOssUrl(put.mediaUrl))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       return { ok: false, message: `第 ${i + 1} 张图片转存失败：${msg}` }
@@ -217,7 +219,7 @@ async function putIceSourceObjectToPrefix(
   ossPrefix: ParsedOssPrefix,
   input: { fileName: string; contentType: string; buffer: Buffer },
 ): Promise<
-  | { ok: true; mediaUrl: string; objectKey: string }
+  | { ok: true; mediaUrl: string; timelineUrl: string; objectKey: string }
   | { ok: false; message: string; aclDenied?: boolean }
 > {
   const objectKey = buildObjectKey(ossPrefix, input.fileName || 'video.mp4')
@@ -230,7 +232,8 @@ async function putIceSourceObjectToPrefix(
     const mediaUrl = ensureIceHttpsUrl(
       client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
     )
-    return { ok: true, mediaUrl, objectKey }
+    const timelineUrl = buildIceCanonicalOssUrl(ossPrefix, objectKey)
+    return { ok: true, mediaUrl, timelineUrl, objectKey }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: msg, aclDenied: isOssBucketAclError(msg) }
@@ -242,7 +245,7 @@ export async function putIceSourceObject(
   env: Record<string, string | undefined>,
   input: { fileName: string; contentType: string; buffer: Buffer },
 ): Promise<
-  | { ok: true; mediaUrl: string; objectKey: string }
+  | { ok: true; mediaUrl: string; timelineUrl: string; objectKey: string }
   | { ok: false; message: string }
 > {
   const candidates = resolveIceOssUploadCandidates(cfg, env)
