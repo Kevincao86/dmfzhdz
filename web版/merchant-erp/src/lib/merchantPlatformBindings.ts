@@ -84,6 +84,7 @@ export function writeActiveBindingId(
       window.localStorage.removeItem(key)
     } else {
       window.sessionStorage.setItem(key, bindingId)
+      window.localStorage.setItem(key, bindingId)
     }
   } catch {
     /* ignore */

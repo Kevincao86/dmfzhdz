@@ -12,6 +12,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
+import type { AuthChangeEvent } from '@supabase/supabase-js'
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { childActive, filterNavItemsForPlan, NAV_ITEMS, pathActive } from '../config/nav'
@@ -27,6 +28,7 @@ import OpsRegistryBridge from './OpsRegistryBridge'
 import SupabaseChangePasswordForm from './SupabaseChangePasswordForm'
 import { useAiAgent } from '../context/AiAgentContext'
 import { fetchPrimaryTenantId, fetchTenantEnterpriseName } from '../lib/tenantBilling'
+import { hydratePlatformBindingsFromCloud } from '../lib/merchantPlatformBindingHydrate'
 import {
   clearTenantScopedBrowserState,
   maskCnPhone,
@@ -58,16 +60,23 @@ export default function MeooLayout() {
     const client = supabase
     if (!supabaseConfigured || !client) return
     let lastUserId: string | null = null
-    const apply = () => {
+    const apply = (event?: AuthChangeEvent) => {
       void (async () => {
-        const { data } = await client.auth.getUser()
-        const u = data.user
+        const {
+          data: { session },
+        } = await client.auth.getSession()
+        const u = session?.user ?? null
         if (!u) {
-          if (lastUserId) clearTenantScopedBrowserState()
-          lastUserId = null
-          setAdminName('管理员')
-          setEnterpriseName('')
-          setPhone('—')
+          /** 仅明确登出时清本地态；Token 刷新间隙 session 为空不得误删绑定 */
+          if (event === 'SIGNED_OUT' && lastUserId) {
+            clearTenantScopedBrowserState()
+          }
+          if (event === 'SIGNED_OUT') {
+            lastUserId = null
+            setAdminName('管理员')
+            setEnterpriseName('')
+            setPhone('—')
+          }
           return
         }
         if (lastUserId && lastUserId !== u.id) {
@@ -86,10 +95,14 @@ export default function MeooLayout() {
         } else {
           setEnterpriseName('')
         }
+        await hydratePlatformBindingsFromCloud(client)
       })()
     }
     apply()
-    const { data: sub } = client.auth.onAuthStateChange(() => apply())
+    const { data: sub } = client.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') return
+      apply(event)
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
