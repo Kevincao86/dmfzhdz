@@ -16,7 +16,7 @@ import {
   parseIceEditBriefPlan,
   type IceBriefTimelinePlan,
 } from './iceBriefTimelinePlan.js'
-import { ensureIceHttpsUrl, isIceVodOutinBucket } from './aliyunOssIceParse.js'
+import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl } from './aliyunOssIceParse.js'
 
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
@@ -212,9 +212,9 @@ function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
   }
 }
 
-/** 多图轮播时间线：优先 MediaId（与 RegisterMediaInfo 一致），避免签名 URL 导致 InputFile is bad */
+/** 多图轮播时间线：须用 OSS 外网直链（无 ?Signature=），见 IMS Timeline 文档 */
 function buildTimelineFromImages(
-  mediaIds: string[],
+  imageUrls: string[],
   plan: IceBriefTimelinePlan,
   width: number,
   height: number,
@@ -222,17 +222,19 @@ function buildTimelineFromImages(
   let cursor = 0
   const clips: Record<string, unknown>[] = []
   const durations =
-    plan.imageDurations.length === mediaIds.length
+    plan.imageDurations.length === imageUrls.length
       ? plan.imageDurations
-      : Array.from({ length: mediaIds.length }, () =>
-          Math.max(0.5, plan.totalDurationSec / mediaIds.length),
+      : Array.from({ length: imageUrls.length }, () =>
+          Math.max(0.5, plan.totalDurationSec / imageUrls.length),
         )
 
-  for (let i = 0; i < mediaIds.length; i++) {
+  for (let i = 0; i < imageUrls.length; i++) {
     const dur = Math.max(0.5, durations[i] ?? 1)
     const clip: Record<string, unknown> = {
       Type: 'Image',
-      MediaId: mediaIds[i]!,
+      MediaURL: toIceTimelineOssUrl(imageUrls[i]!),
+      In: 0,
+      Out: dur,
       TimelineIn: cursor,
       TimelineOut: cursor + dur,
       Duration: dur,
@@ -240,7 +242,7 @@ function buildTimelineFromImages(
       Height: height,
     }
     const effects: Record<string, unknown>[] = []
-    appendClipEffects(effects, plan, dur, i, mediaIds.length)
+    appendClipEffects(effects, plan, dur, i, imageUrls.length)
     if (effects.length) clip.Effects = effects
     clips.push(clip)
     cursor += dur
@@ -462,8 +464,8 @@ function buildIceRegisterConfig(cfg: AliyunIceConfig, inputURL?: string): string
 function formatIceProduceError(raw: string): string {
   if (/InputFile is bad|inputfile is bad/i.test(raw)) {
     return (
-      `${raw}。常见原因：素材 OSS 不可读、媒资注册 Bucket 与文件不一致、或时间线须使用 HTTPS 的 MediaURL。` +
-      `请重新本地上传图片后重试。`
+      `${raw}。常见原因：时间线 MediaURL 须为 OSS 外网直链（https://bucket.oss-cn-*.aliyuncs.com/key，勿带签名参数），` +
+      `且 Bucket 已在 IMS 媒资库绑定；请重新本地上传图片后重试。`
     )
   }
   return raw
@@ -635,6 +637,27 @@ export async function iceRunImagesPipeline(
     mediaIds.push(up.mediaId)
   }
 
+  const timelineUrls: string[] = []
+  for (let i = 0; i < urls.length; i++) {
+    const fromInfo = await iceFileUrlFromMediaInfo(client, mediaIds[i]!)
+    const candidate = toIceTimelineOssUrl(fromInfo ?? urls[i]!)
+    if (!/^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\/.+/i.test(candidate)) {
+      return {
+        ok: false,
+        message: `第 ${i + 1} 张图片无法解析为 OSS 直链，请重新本地上传`,
+        step: 'validate',
+      }
+    }
+    if (candidate.includes('?')) {
+      return {
+        ok: false,
+        message: `第 ${i + 1} 张图片地址含签名参数，ICE 无法读取，请重新本地上传`,
+        step: 'validate',
+      }
+    }
+    timelineUrls.push(candidate)
+  }
+
   const out = buildOutputConfig(cfg, input.width, input.height, jobKey)
   if (!out.ok) {
     return { ok: false, message: out.message, step: 'output_config' }
@@ -642,10 +665,10 @@ export async function iceRunImagesPipeline(
 
   const plan = parseIceEditBriefPlan(input.editBrief, {
     clipEndSec: input.totalDurationSec,
-    imageCount: urls.length,
+    imageCount: timelineUrls.length,
     effectId: input.effectId,
   })
-  const timeline = buildTimelineFromImages(mediaIds, plan, input.width, input.height)
+  const timeline = buildTimelineFromImages(timelineUrls, plan, input.width, input.height)
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -656,9 +679,9 @@ export async function iceRunImagesPipeline(
           Title: input.projectName.slice(0, 120),
           Description:
             (input.editBrief.slice(0, 400) || '灵祺AI云剪') +
-            `；多图 ${mediaIds.length} 张；已应用时间线：${plan.summary}`,
+            `；多图 ${timelineUrls.length} 张；已应用时间线：${plan.summary}`,
         }),
-        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'false' }),
+        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
         source: 'OPENAPI',
         clientToken: jobKey,
       }),

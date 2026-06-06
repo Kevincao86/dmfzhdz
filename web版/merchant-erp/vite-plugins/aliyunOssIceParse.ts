@@ -118,3 +118,40 @@ export function ensureIceHttpsUrl(url: string): string {
   if (!trimmed) return trimmed
   return trimmed.replace(/^http:\/\//i, 'https://')
 }
+
+/** ICE Timeline 仅接受 OSS 外网 Endpoint 直链，勿带 ?Signature= 等查询参数 */
+export function toIceTimelineOssUrl(url: string): string {
+  const trimmed = url.trim()
+  if (!trimmed) return trimmed
+  if (trimmed.startsWith('oss://')) {
+    const rest = trimmed.slice(6)
+    const slash = rest.indexOf('/')
+    if (slash > 0) {
+      const bucket = rest.slice(0, slash)
+      const key = rest.slice(slash + 1)
+      const m = bucket.match(/^([^.]+)\.oss-([a-z0-9-]+)\.aliyuncs\.com$/i)
+      if (m?.[1] && m[2]) {
+        return ensureIceHttpsUrl(
+          `https://${m[1]}.oss-${m[2]}.aliyuncs.com/${key.replace(/^\/+/, '')}`,
+        )
+      }
+    }
+  }
+  try {
+    const u = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`)
+    if (/^([^.]+)\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(u.hostname)) {
+      u.protocol = 'https:'
+      u.search = ''
+      u.hash = ''
+      return u.toString()
+    }
+  } catch {
+    /* fall through */
+  }
+  return ensureIceHttpsUrl(trimmed)
+}
+
+export function buildIceCanonicalOssUrl(prefix: ParsedOssPrefix, objectKey: string): string {
+  const key = objectKey.replace(/^\/+/, '')
+  return ensureIceHttpsUrl(`https://${prefix.bucket}.oss-${prefix.region}.aliyuncs.com/${key}`)
+}
