@@ -170,46 +170,79 @@ function formatSupplierFromApplicant(a, board, idx) {
   }
 }
 
+function platAccountDedupeKey(platform, account) {
+  const a = String(account || '').trim().toLowerCase()
+  if (!a) return null
+  return `${String(platform || '抖音').trim()}::${a}`
+}
+
+function collectTalentDedupeKeys(source, primary) {
+  const keys = []
+  const id = String(source.id || '').trim()
+  const lq = String(source.lingqiTalentId || '').trim()
+  if (id) keys.push(`id:${id}`)
+  if (lq) keys.push(`lq:${lq}`)
+  const p = primary && primary.profile
+  const plat = String((primary && primary.platform) || source.platform || '抖音')
+  const pk = platAccountDedupeKey(plat, String((p && p.platformAccount) || source.platformAccount || ''))
+  if (pk) keys.push(`pk:${pk}`)
+  const phone = String(source.contact || '').replace(/\D/g, '').slice(-11)
+  if (phone.length >= 11) keys.push(`ph:${phone}`)
+  return keys
+}
+
+function appendTalentIfNew(row, keys, seen, out) {
+  if (!row || !row.id) return
+  for (let i = 0; i < keys.length; i++) {
+    if (seen.has(keys[i])) return
+  }
+  for (let i = 0; i < keys.length; i++) seen.add(keys[i])
+  seen.add(`id:${row.id}`)
+  out.push(row)
+}
+
 function buildTalentPool(reg) {
   const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
   const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
-  const fromLib = library.map((e) => {
+  const seen = new Set()
+  const out = []
+
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i]
+    if (!memberMatchesBoard(m, 'talent')) continue
+    const primary = memberStore.primaryPlatformProfile(m)
+    const p = (primary && primary.profile) || {}
+    const raw = Number(p.followers) || 0
+    const tags = accountTagsFromMember(m)
+    const row = formatTalentRow({
+      id: m.id,
+      platformNickname: p.platformNickname || m.wxNickName,
+      wxAvatarUrl: m.wxAvatarUrl,
+      platform: (primary && primary.platform) || '抖音',
+      followers: raw,
+      province: m.province,
+      city: m.city,
+      qualityTag: '会员',
+      gender: m.gender,
+      accountTags: tags,
+      douyinSalesLevel: p.douyinSalesLevel || '',
+    })
+    appendTalentIfNew(row, collectTalentDedupeKeys(m, primary), seen, out)
+  }
+
+  for (let j = 0; j < library.length; j++) {
+    const e = library[j]
     const raw = Number(e.followers) || 0
-    return formatTalentRow({
+    const row = formatTalentRow({
       ...e,
       id: e.id,
       qualityTag: raw >= 50000 ? '优质' : '推荐',
       gender: e.gender,
     })
-  })
-  const fromMembers = members
-    .filter((m) => memberMatchesBoard(m, 'talent'))
-    .map((m) => {
-      const primary = memberStore.primaryPlatformProfile(m)
-      const p = (primary && primary.profile) || {}
-      const raw = Number(p.followers) || 0
-      const tags = accountTagsFromMember(m)
-      return formatTalentRow({
-        id: m.id,
-        platformNickname: p.platformNickname || m.wxNickName,
-        wxAvatarUrl: m.wxAvatarUrl,
-        platform: (primary && primary.platform) || '抖音',
-        followers: raw,
-        province: m.province,
-        city: m.city,
-        qualityTag: '会员',
-        gender: m.gender,
-        accountTags: tags,
-        douyinSalesLevel: p.douyinSalesLevel || '',
-      })
-    })
-  const merged = [...fromLib, ...fromMembers]
-  const seen = new Set()
-  return merged.filter((r) => {
-    if (!r.id || seen.has(r.id)) return false
-    seen.add(r.id)
-    return true
-  })
+    appendTalentIfNew(row, collectTalentDedupeKeys(e), seen, out)
+  }
+
+  return out
 }
 
 function suppliersFromRegistry(reg, board) {

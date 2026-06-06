@@ -27,8 +27,16 @@ export function bootstrapTalentSecret(talentKey: string) {
   return `boot_${core || 'talent'}_meoo_chat_seed`
 }
 
+/** 与 registry / PR 发起私信时使用的 member id 对齐 */
+export function resolveTalentMemberId(): string {
+  const member = readMember()
+  const acc = getAccount()
+  return String(member?.id || acc?.registryMemberId || '').trim()
+}
+
 export function talentParticipantKey(member: { id?: string } | null) {
-  if (member?.id) return `talent_${member.id}`
+  const id = String(member?.id || resolveTalentMemberId() || '').trim()
+  if (id) return `talent_${id}`
   return `talent_guest_${getDeviceSecret().slice(0, 12)}`
 }
 
@@ -68,7 +76,8 @@ export function getCurrentParticipant(): ChatParticipant {
     }
   }
   const member = readMember()
-  const key = talentParticipantKey(member)
+  const memberId = resolveTalentMemberId()
+  const key = memberId ? `talent_${memberId}` : talentParticipantKey(member)
   const primary = member?.platformProfiles
     ? Object.values(member.platformProfiles).find((p) => p?.platformNickname)
     : null

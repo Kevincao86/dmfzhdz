@@ -168,7 +168,9 @@ export default function MessagesPage() {
               {sessionsErr ? <p className="p-3 text-xs text-red-500">{sessionsErr}</p> : null}
               {!sessionsLoading && !sessions.length && !sessionsErr ? (
                 <p className="p-4 text-xs text-[#888] text-center">
-                  暂无会话。PR 可在推荐大厅向达人发起「沟通」。
+                  {role === 'pr'
+                    ? '暂无会话。可在推荐大厅向达人发起「沟通」。'
+                    : '暂无会话。PR 联系您后，或您在已通过审核的招募详情页点击「沟通」后，会话将显示在此。'}
                 </p>
               ) : null}
               {sessions.map((s) => {
