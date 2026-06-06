@@ -90,9 +90,17 @@ export function normalizeSupplierProfile(raw: unknown): SupplierProfile {
 export function validateSupplierProfile(
   workId: string,
   profile: SupplierProfile,
-  contact: { contact?: string; wechatId?: string; alipayAccount?: string; province?: string; city?: string },
+  contact: {
+    wxNickName?: string
+    contact?: string
+    wechatId?: string
+    alipayAccount?: string
+    province?: string
+    city?: string
+  },
 ): string | null {
   const p = normalizeSupplierProfile(profile)
+  if (!String(contact.wxNickName || '').trim()) return '请填写昵称'
   if (!String(p.teamName || '').trim()) return '请填写团队名称'
   if (!String(contact.contact || '').trim()) return '请填写联系电话'
   if (!String(contact.wechatId || '').trim()) return '请填写微信号'

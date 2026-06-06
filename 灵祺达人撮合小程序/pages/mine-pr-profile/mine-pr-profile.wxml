@@ -10,10 +10,11 @@
         <view class="wx-avatar wx-avatar--ph" wx:else><text class="wx-avatar-txt">头像</text></view>
       </button>
       <view class="wx-meta">
+        <text class="form-label">昵称 *</text>
         <input
           class="wx-nick-input"
           type="nickname"
-          placeholder="点击输入微信昵称"
+          placeholder="点击输入昵称（必填）"
           value="{{form.wxNickName}}"
           bindinput="onNicknameInput"
         />
@@ -66,11 +67,11 @@
       <input class="input" data-k="contactName" value="{{form.contactName}}" bindinput="onField" />
     </view>
     <view class="form-row">
-      <text class="form-label">手机号</text>
+      <text class="form-label">联系电话 *</text>
       <input class="input" type="number" data-k="contactPhone" value="{{form.contactPhone}}" bindinput="onField" />
     </view>
     <view class="form-row">
-      <text class="form-label">微信号</text>
+      <text class="form-label">微信号 *</text>
       <input
         class="input"
         data-k="wechatId"
