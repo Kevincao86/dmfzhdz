@@ -1,4 +1,5 @@
 import { resolveImagePickerKeyForUserLine } from './agentImageModelKeys.js'
+import { vendorTierAutoPickerKey } from '../../lib/vendorModelPool.js'
 import type { AiModelPickerOption } from './modelRegistry'
 
 /** 文案/话术类「生成」不应走像素出图 */
@@ -38,9 +39,9 @@ export function modelPickerKeyForNativeImageVendor(
 ): string | null {
   const k =
     vendorUsed === 'qwen'
-      ? 'qwen::__default__'
+      ? vendorTierAutoPickerKey('qwen', 'image_text')
       : vendorUsed === 'doubao'
-        ? 'doubao::__default__'
+        ? vendorTierAutoPickerKey('doubao', 'image_text')
         : 'minimax::__default__'
   return options.some((o) => o.key === k) ? k : null
 }
