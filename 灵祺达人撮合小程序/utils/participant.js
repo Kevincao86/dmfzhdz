@@ -68,6 +68,7 @@ function getCurrentParticipant() {
   } catch (_) {}
   const identity = userProfile.readIdentity()
   const secret = getDeviceSecret()
+  const acc = sessionStore.readAccount()
   if (identity === 'pr') {
     const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
     const wxNick = String(pr.wxNickName || '').trim()
