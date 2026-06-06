@@ -135,6 +135,7 @@ import { defaultModelIdForFamily } from '../services/ai/tokenmixClient'
 import {
   isAiRequestAborted,
   postAiAgentNativeImage,
+  postAiChat,
   streamAiChat,
   type AiAgentNativeImageOk,
 } from '../services/ai/aiClient'
@@ -1242,7 +1243,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           chatModel = defaultModelIdForFamily(parsed.modelFamily)
         }
 
-        const streamReq = {
+        const chatReq = {
           provider: parsed.provider,
           model: chatModel || undefined,
           ...(parsed.provider === 'tokenmix' ? { modelFamily: parsed.modelFamily } : {}),
@@ -1250,39 +1251,44 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           ...(imageDataUrls.length ? { imageDataUrls } : {}),
           taskType,
           agentPickerKey: userPickerKey,
-          stream: true as const,
         }
 
-        const res = await streamAiChat(streamReq, {
-          signal,
-          onEvent: (ev) => {
-            if (ev.event === 'thinking') {
-              setStreamingReply((r) => ({
-                thinking: ev.text,
-                content: r?.content ?? '',
-              }))
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholder.id ? { ...m, thinkingText: ev.text } : m,
-                ),
-              )
-            }
-            if (ev.event === 'content') {
-              const displayPartial = formatAssistantDisplayText(ev.text)
-              setStreamingReply((r) => ({
-                thinking: r?.thinking ?? '',
-                content: ev.text,
-              }))
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === placeholder.id
-                    ? { ...m, content: displayPartial || ev.text.trim() }
-                    : m,
-                ),
-              )
-            }
-          },
-        })
+        /** 日常闲聊走非流式 JSON（与 Vercel 迁 ECS 前一致），避免 SSE 双跳缓冲导致长时间「思考中」 */
+        const res = taskType
+          ? await streamAiChat(
+              { ...chatReq, stream: true as const },
+              {
+                signal,
+                onEvent: (ev) => {
+                  if (ev.event === 'thinking') {
+                    setStreamingReply((r) => ({
+                      thinking: ev.text,
+                      content: r?.content ?? '',
+                    }))
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === placeholder.id ? { ...m, thinkingText: ev.text } : m,
+                      ),
+                    )
+                  }
+                  if (ev.event === 'content') {
+                    const displayPartial = formatAssistantDisplayText(ev.text)
+                    setStreamingReply((r) => ({
+                      thinking: r?.thinking ?? '',
+                      content: ev.text,
+                    }))
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === placeholder.id
+                          ? { ...m, content: displayPartial || ev.text.trim() }
+                          : m,
+                      ),
+                    )
+                  }
+                },
+              },
+            )
+          : await postAiChat(chatReq, { signal })
 
         setStreamingReply(null)
         const { thinking, answer } = splitAssistantStreamView(res.content)
@@ -1454,6 +1460,13 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               visionUrls.length > 0,
             )
             if (shouldRouteToAgentNativeImage(imagePickerKey, line, visionUrls)) {
+              const imgPlaceholder = createAgentMessage('assistant', '正在生成图片，请稍候…')
+              imgPlaceholder.isStreaming = true
+              setMessages((prev) => {
+                const next = [...prev, imgPlaceholder]
+                messagesRef.current = next
+                return next
+              })
               const imgOpts = buildAgentImagePostOpts(imagePickerKey, refImg)
               const imgRes = await postAiAgentNativeImage(line, {
                 ...imgOpts,
@@ -1474,13 +1487,25 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
                   { imageUrls: [imgRes.imageUrl] },
                 )
                 setMessages((prev) => {
-                  const next = [...prev, assistantMsg]
+                  const without = prev.filter((m) => m.id !== imgPlaceholder.id)
+                  const next = [...without, assistantMsg]
                   messagesRef.current = next
                   return next
                 })
                 scheduleTaskPreview(trimmed, undefined, inferTaskTypeFromText(trimmed), pageContext?.pageLabel)
                 return
               }
+              const errMsg = imgRes.ok === false ? imgRes.message : '生图失败'
+              setMessages((prev) => {
+                const without = prev.filter((m) => m.id !== imgPlaceholder.id)
+                const next = [
+                  ...without,
+                  createAgentMessage('assistant', `图片生成失败：${errMsg}`),
+                ]
+                messagesRef.current = next
+                return next
+              })
+              return
             }
             await runGatewayForSnapshot(
               messagesRef.current,

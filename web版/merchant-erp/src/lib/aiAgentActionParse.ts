@@ -4,6 +4,7 @@ import { AI_TASK_TYPE_LABELS } from './aiAgentTypes'
 import { filterScenarioTaskTypes } from './aiAgentPreviewState'
 import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
 import { buildMenuComboIntentLabels } from './merchantBriefCatalog'
+import { detectImageGenerationIntent } from '../services/ai/aiImageIntentRouting'
 
 const ACTION_TO_TASK: Record<string, AiTaskType> = {
   create_product: 'create_product',
@@ -53,6 +54,8 @@ export function isRecruitInfluencerUserIntent(t: string): boolean {
 /** 从用户话术推断任务类型（与 scheduleTaskPreview 共用） */
 export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
+  // 文生图/主图/海报等像素出图，勿误判为创建团购商品（否则会拉 GEO/竞品，分钟级卡住）
+  if (detectImageGenerationIntent(x)) return undefined
   if (
     /创建|商品|套餐|上架|双人|单人|三人|四人|火锅|团购|代金券|代\s*\d+|抵\s*\d+|券面|上传.*(商品|套餐|券)/.test(
       x,

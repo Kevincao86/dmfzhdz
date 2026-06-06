@@ -17,7 +17,12 @@ export function shouldRouteToAgentNativeImage(
   visionUrls: string[],
 ): boolean {
   if (!isAgentImagePickerKey(pickerKey)) return false
-  if (inferTaskTypeFromText(userLine) === 'create_product') return false
+  if (
+    inferTaskTypeFromText(userLine) === 'create_product' &&
+    !detectImageGenerationIntent(userLine)
+  ) {
+    return false
+  }
   if (visionUrls.length > 0 && STRUCTURED_PRODUCT_PREVIEW_HINT.test(userLine)) return false
   const refImg = visionUrls[0]?.trim()
   if (refImg) return true

@@ -381,17 +381,47 @@ function buildOutputConfig(
   }
 }
 
+/** 本地上传返回带签名的 HTTPS；RegisterMediaInfo 对同账号 OSS 用 oss:// 更稳定 */
+function normalizeIceRegisterInputUrl(imageUrl: string): string {
+  const trimmed = imageUrl.trim()
+  if (trimmed.startsWith('oss://')) return trimmed
+  try {
+    const url = new URL(trimmed)
+    const m = url.hostname.match(/^([^.]+)\.oss-([a-z0-9-]+)\.aliyuncs\.com$/i)
+    if (m?.[1]) {
+      const key = decodeURIComponent(url.pathname.replace(/^\/+/, ''))
+      if (key) return `oss://${m[1]}/${key}`
+    }
+  } catch {
+    /* 保留原 URL */
+  }
+  return trimmed
+}
+
+function formatIceRegisterMediaError(raw: string): string {
+  if (/403|forbidden|not authorized|无权|拒绝访问/i.test(raw)) {
+    return (
+      `${raw}。请在阿里云为 ICE AccessKey 授权 AliyunICEFullAccess（或 ice:RegisterMediaInfo），` +
+      `并在智能媒体服务控制台将运营台配置的 OSS Bucket 加入媒资库；` +
+      `同时确认运营台已填写 StorageLocation（outin-***.oss-cn-shanghai.aliyuncs.com）。`
+    )
+  }
+  return raw
+}
+
 /** 图片须走 RegisterMediaInfo；UploadMediaByURL 仅支持音视频 */
 async function registerImageUrlToMediaId(
   client: InstanceType<typeof IceClient>,
   imageUrl: string,
   title: string,
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
+  const inputURL = normalizeIceRegisterInputUrl(imageUrl)
   try {
     const res = await client.registerMediaInfo(
       new RegisterMediaInfoRequest({
-        inputURL: imageUrl,
+        inputURL,
         mediaType: 'image',
+        businessType: 'general',
         title: title.slice(0, 120),
         overwrite: true,
         registerConfig: JSON.stringify({ NeedSprite: 'false', NeedSnapshot: 'false' }),
@@ -407,7 +437,8 @@ async function registerImageUrlToMediaId(
     }
     return { ok: true, mediaId }
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    const raw = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: formatIceRegisterMediaError(raw) }
   }
 }
 
