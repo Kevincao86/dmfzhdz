@@ -8,13 +8,6 @@ const ICON_GLYPH = {
   tpl: '▦',
 }
 
-const IDENTITY_GLYPH = {
-  talent: '达',
-  shoot: '拍',
-  edit: '剪',
-  pr: 'PR',
-}
-
 function menuGlyph(icon) {
   return ICON_GLYPH[icon] || '◫'
 }
@@ -28,7 +21,6 @@ function attachMenuGlyphs(menus) {
 
 module.exports = {
   ICON_GLYPH,
-  IDENTITY_GLYPH,
   menuGlyph,
   attachMenuGlyphs,
 }

@@ -27,8 +27,8 @@
   z-index: 3;
   padding-left: 28rpx;
   padding-right: 28rpx;
-  padding-bottom: 64rpx;
-  min-height: 200rpx;
+  padding-bottom: 28rpx;
+  min-height: 180rpx;
   box-sizing: border-box;
 }
 
@@ -109,63 +109,6 @@
   font-weight: 700;
   color: #fff;
   background: transparent;
-}
-
-.identity-switch-btn {
-  position: absolute;
-  right: 28rpx;
-  bottom: 20rpx;
-  z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 12rpx 22rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.42);
-  border: 3rpx solid rgba(255, 255, 255, 0.65);
-  box-shadow: 0 8rpx 0 rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(8px);
-}
-
-/* 我的页：右侧留给身份切换，不铺背景图与浮动标签 */
-.mine-header .lq-hero-bg--mine .lq-hero-bg__glow--2 {
-  left: -80rpx;
-  bottom: -60rpx;
-  right: auto;
-  opacity: 0.5;
-}
-
-.mine-header .lq-hero-bg--mine::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 42%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent 0%, rgba(79, 70, 229, 0.35) 100%);
-  z-index: 2;
-  pointer-events: none;
-}
-
-.identity-switch-hint {
-  font-size: 22rpx;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.88);
-  line-height: 1;
-}
-
-.identity-switch-label {
-  font-size: 26rpx;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1;
-}
-
-.identity-switch-arrow {
-  font-size: 20rpx;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1;
-  margin-top: 2rpx;
 }
 
 .profile-sub {

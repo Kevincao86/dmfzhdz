@@ -55,11 +55,6 @@
         </view>
         <text class="profile-edit" bindtap="goEditProfile">›</text>
       </view>
-      <view class="identity-switch-btn" catchtap="onOpenIdentitySheet">
-        <text class="identity-switch-hint">身份切换</text>
-        <text class="identity-switch-label">{{identityLabel}}</text>
-        <text class="identity-switch-arrow">▾</text>
-      </view>
     </view>
   </view>
 
@@ -92,36 +87,6 @@
     </view>
   </view>
   </scroll-view>
-
-  <view
-    class="id-sheet-mask"
-    wx:if="{{showIdentitySheet}}"
-    bindtap="onCloseIdentitySheet"
-  >
-    <view class="id-sheet" catchtap="noopSheetTap">
-      <view class="id-sheet-head">
-        <text class="id-sheet-title">切换身份</text>
-        <text class="id-sheet-close" bindtap="onCloseIdentitySheet">×</text>
-      </view>
-      <text class="id-sheet-hint">同一账号可在达人、拍摄、剪辑、PR 四种身份间自由切换</text>
-      <view
-        wx:for="{{identitySheetOpts}}"
-        wx:key="id"
-        class="id-sheet-opt {{identity === item.id ? 'active' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onPickIdentity"
-      >
-        <view class="id-sheet-opt-icon">
-          <text class="id-sheet-opt-glyph">{{item.glyph}}</text>
-        </view>
-        <view class="id-sheet-opt-body">
-          <text class="id-sheet-opt-title">{{item.label}}</text>
-          <text class="id-sheet-opt-sub">{{item.sub}}</text>
-        </view>
-        <text class="id-sheet-check" wx:if="{{identity === item.id}}">✓</text>
-      </view>
-    </view>
-  </view>
 
   <view
     class="id-sheet-mask"

@@ -8,28 +8,12 @@ const identityTypes = require('../../utils/identityTypes.js')
 const auth = require('../../utils/auth.js')
 const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const identityIdLabels = require('../../utils/identityIdLabels.js')
-const mpApiErrors = require('../../utils/mpApiErrors.js')
 const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const wxAccount = require('../../utils/wxAccount.js')
-const { setTabBarForPage, refreshTabBar, setTabBarHidden } = require('../../utils/tabBar.js')
-const { routeToPagePath } = require('../../utils/tabBarConfig.js')
+const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
-const { attachMenuGlyphs, IDENTITY_GLYPH } = require('../../utils/mineMenuIcons.js')
-
-const IDENTITY_SUBS = {
-  talent: '浏览商单、报名招募、管理个人资料',
-  shoot: '摄影/拍摄任务接单大厅',
-  edit: '剪辑任务接单大厅',
-  pr: '发布招募、管理发单与达人沟通',
-}
-
-const IDENTITY_SHEET_OPTS = identityTypes.WORK_ID_LIST.map((id) => ({
-  id,
-  label: identityTypes.WORK_IDENTITIES[id].label,
-  glyph: IDENTITY_GLYPH[id] || '身',
-  sub: IDENTITY_SUBS[id],
-}))
+const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
@@ -98,9 +82,7 @@ Page({
     menus: TALENT_MENUS_BASE,
     notifyBadge: 0,
     headerInnerStyle: '',
-    showIdentitySheet: false,
     showWxLoginSheet: false,
-    identitySheetOpts: IDENTITY_SHEET_OPTS,
     wxLoginNick: '',
     wxLoginAvatar: '',
     wxLoginSubmitting: false,
@@ -272,14 +254,6 @@ Page({
       this.setData({ wxLoginSubmitting: false })
     }
   },
-  onOpenIdentitySheet() {
-    setTabBarHidden(this, true)
-    this.setData({ showIdentitySheet: true })
-  },
-  onCloseIdentitySheet() {
-    this.setData({ showIdentitySheet: false })
-    setTabBarHidden(this, false)
-  },
   noopSheetTap() {},
   noopProfileTap() {},
   onProfileNickInput(e) {
@@ -384,53 +358,6 @@ Page({
     } finally {
       this.setData({ profileSaving: false })
     }
-  },
-  onPickIdentity(e) {
-    const id = e.currentTarget.dataset.id
-    this.setData({ showIdentitySheet: false })
-    setTabBarHidden(this, false)
-    this.applyIdentitySwitch(id)
-  },
-  async applyIdentitySwitch(id) {
-    if (!id || id === this.data.identity) return
-    const prev = this.data.identity
-    wx.showLoading({ title: '切换身份…', mask: true })
-    try {
-      const result = await switchWorkIdentity.applyWorkIdentitySwitch(id)
-      wx.hideLoading()
-      if (result.needsReLogin) {
-        wx.showToast({ title: result.cloudWarning || '请重新登录', icon: 'none' })
-      } else if (result.cloudWarning) {
-        wx.showToast({ title: result.cloudWarning, icon: 'none' })
-      } else {
-        wx.showToast({ title: `已切换为${userProfile.identityLabel(id)}`, icon: 'none' })
-      }
-    } catch (e) {
-      wx.hideLoading()
-      userProfile.writeIdentity(prev)
-      wx.showToast({
-        title: mpApiErrors.formatMpApiErr(e, '身份切换失败'),
-        icon: 'none',
-      })
-      return
-    }
-    this.refresh()
-    refreshTabBar()
-    const pages = getCurrentPages()
-    const cur = pages[pages.length - 1]
-    if (id !== 'pr' && cur && routeToPagePath(cur.route) === '/pages/publish/publish') {
-      wx.switchTab({ url: '/pages/index/index' })
-    }
-    if (cur && routeToPagePath(cur.route) === '/pages/recommend/recommend') {
-      cur.onShow()
-    }
-    if (cur && routeToPagePath(cur.route) === '/pages/index/index' && cur.applyFilters) {
-      cur.onShow()
-    }
-    try {
-      const chat = require('../../utils/talentChat.js')
-      if (chat.canChat()) void chat.syncProfile()
-    } catch (_) {}
   },
   onMenuTap(e) {
     if (!this.ensureWxLoggedIn()) return
