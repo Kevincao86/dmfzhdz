@@ -25,6 +25,7 @@ import {
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
+import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
 
 export const config = { maxDuration: 60 }
 
@@ -304,6 +305,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'registry_profile_get') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, sess.account)
+      sendJson(res, 200, { ok: true, ...profile })
+      return
+    }
+
     if (action === 'client_state_get' || action === 'client_state_sync') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -343,6 +356,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'hall_registry',
         'client_state_get',
         'client_state_sync',
+        'registry_profile_get',
       ],
     })
   } catch (e) {
