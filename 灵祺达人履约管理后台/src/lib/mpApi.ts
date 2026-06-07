@@ -223,13 +223,12 @@ export type ParsedProfileLink = {
 }
 
 export async function parseProfileLink(link: string, platform = '抖音'): Promise<ParsedProfileLink> {
-  const data = (await postJsonCandidates(
+  const data = await postJsonCandidates(
     '/api/meoo-ops-mp-profile-link-parse',
     { link: String(link || '').trim(), platform },
     { extraHeaders: getToken() ? { 'X-Mp-Session': getToken()! } : {} },
-  )) as ParsedProfileLink & { ok?: boolean; message?: string }
-  if (data.ok === false) throw new Error(String(data.message || '解析失败'))
-  return data
+  )
+  return { ok: true, ...data } as ParsedProfileLink
 }
 
 export async function patchMpRecruitmentOrder(body: Record<string, unknown>) {

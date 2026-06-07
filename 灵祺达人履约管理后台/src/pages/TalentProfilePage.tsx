@@ -114,9 +114,10 @@ export default function TalentProfilePage() {
     setMsg('')
     try {
       const parsed = await parseProfileLink(link, platName)
+      const talentTagSet = new Set<string>(TALENT_TAGS)
       const mergedTags = [
         ...new Set([...(prof.accountTags || []), ...(parsed.accountTags || [])]),
-      ].filter((t) => TALENT_TAGS.includes(t))
+      ].filter((t): t is (typeof TALENT_TAGS)[number] => talentTagSet.has(t))
       const profilePatch: Partial<PlatformProfile> = {
         platformAccount: parsed.platformAccount || prof.platformAccount,
         platformNickname: parsed.platformNickname || prof.platformNickname,
