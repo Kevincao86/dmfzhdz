@@ -302,8 +302,10 @@ function objectToBlob(o: Record<string, unknown>, key: ProfilePlatformKey): RawP
   return blob
 }
 
+type ProfileTreeBest = { score: number; blob: RawProfileBlob }
+
 function findBestProfileInTree(node: unknown, key: ProfilePlatformKey): RawProfileBlob | null {
-  let best: { score: number; blob: RawProfileBlob } | null = null
+  const state: { best: ProfileTreeBest | null } = { best: null }
 
   function walk(n: unknown, depth: number) {
     if (!n || depth > 24) return
@@ -316,14 +318,14 @@ function findBestProfileInTree(node: unknown, key: ProfilePlatformKey): RawProfi
     const score = scoreProfileObject(o, key)
     if (score >= 6) {
       const blob = objectToBlob(o, key)
-      if (!best || score > best.score) best = { score, blob }
+      if (!state.best || score > state.best.score) state.best = { score, blob }
     }
     if (o.user && typeof o.user === 'object') {
       const u = o.user as Record<string, unknown>
       const us = scoreProfileObject(u, key)
       if (us >= 6) {
         const blob = objectToBlob(u, key)
-        if (!best || us > best.score) best = { score: us, blob }
+        if (!state.best || us > state.best.score) state.best = { score: us, blob }
       }
     }
     if (o.userInfo && typeof o.userInfo === 'object') walk(o.userInfo, depth + 1)
@@ -332,7 +334,7 @@ function findBestProfileInTree(node: unknown, key: ProfilePlatformKey): RawProfi
   }
 
   walk(node, 0)
-  return best?.blob ?? null
+  return state.best?.blob ?? null
 }
 
 function parseProfileFromHtml(html: string, key: ProfilePlatformKey): RawProfileBlob | null {

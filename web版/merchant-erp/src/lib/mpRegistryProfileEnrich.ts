@@ -75,6 +75,15 @@ function pickRicherProfile(
   return profileRichness(next) > profileRichness(current) ? next : current
 }
 
+function assignRicherProfile(
+  map: Record<string, LooseProfile>,
+  id: string,
+  candidate: LooseProfile | undefined,
+): void {
+  const merged = pickRicherProfile(map[id], candidate)
+  if (merged) map[id] = merged
+}
+
 function memberProfilesToLooseMap(member: MemberWithPlatformProfiles): Record<string, LooseProfile> {
   const out: Record<string, LooseProfile> = {}
   const pp = member.platformProfiles
@@ -84,10 +93,10 @@ function memberProfilesToLooseMap(member: MemberWithPlatformProfiles): Record<st
     }
   }
   if (member.douyin) {
-    out.douyin = pickRicherProfile(out.douyin, { ...member.douyin, enabled: true })
+    assignRicherProfile(out, 'douyin', { ...member.douyin, enabled: true })
   }
   if (member.xiaohongshu) {
-    out.xiaohongshu = pickRicherProfile(out.xiaohongshu, { ...member.xiaohongshu, enabled: true })
+    assignRicherProfile(out, 'xiaohongshu', { ...member.xiaohongshu, enabled: true })
   }
   return out
 }
@@ -207,7 +216,7 @@ export function enrichMemberFromRegistrySources(
     base = mergeScalarFields(base, sib)
     const sibProfiles = memberProfilesToLooseMap(sib as MemberWithPlatformProfiles)
     for (const [id, prof] of Object.entries(sibProfiles)) {
-      platformProfiles[id] = pickRicherProfile(platformProfiles[id], prof)
+      assignRicherProfile(platformProfiles, id, prof)
     }
   }
 
@@ -215,7 +224,7 @@ export function enrichMemberFromRegistrySources(
     base = mergeScalarFields(base, entry)
     const platId = PLATFORM_NAME_TO_ID[normalizeRecruitmentPlatform(entry.platform)]
     const loose = libraryEntryToLooseProfile(entry)
-    platformProfiles[platId] = pickRicherProfile(platformProfiles[platId], loose)
+    assignRicherProfile(platformProfiles, platId, loose)
   }
 
   const hasPlatforms =
