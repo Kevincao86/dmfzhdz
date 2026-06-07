@@ -330,6 +330,22 @@ async function enrichOrderTags(rows, opts) {
   return applyTagMap(list, map, talentCity)
 }
 
+function mergeCardAiTags(scored, tagged) {
+  const byId = {}
+  for (const r of tagged) byId[r.id] = r
+  return scored.map((row) => {
+    const t = byId[row.id]
+    if (!t) return row
+    const tagFromAi = t.aiTagSource === 'ai' && t.aiTag
+    return {
+      ...row,
+      aiTag: tagFromAi ? t.aiTag : t.aiTag || row.aiTag,
+      aiTagTone: tagFromAi ? t.aiTagTone : t.aiTagTone || row.aiTagTone,
+      aiTagSource: tagFromAi ? 'ai' : t.aiTagSource || row.aiTagSource,
+    }
+  })
+}
+
 async function enrichOrderMatches(rows, member, opts) {
   const list = (rows || []).filter((r) => r && r.id && !r.isMock)
   const habits = applicationHabitsFromStore()
@@ -338,9 +354,16 @@ async function enrichOrderMatches(rows, member, opts) {
     applicationHabits: habits,
   })
   const talentCity = talent && talent.city ? talent.city : ''
-  if (!api.hasApi() || !list.length || !talent) {
-    const local = applyMatchMap(list, {}, talent || {}, talentCity)
-    return local.sort((a, b) => {
+  const tagPromise = enrichOrderTags(list, { talentCity })
+
+  if (!list.length) {
+    return tagPromise
+  }
+  if (!api.hasApi() || !talent) {
+    const tagged = await tagPromise
+    if (!talent) return tagged.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
+    const local = applyMatchMap(list, {}, talent, talentCity)
+    return mergeCardAiTags(local, tagged).sort((a, b) => {
       const d = (b.matchScore || 0) - (a.matchScore || 0)
       if (d !== 0) return d
       return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
@@ -370,7 +393,9 @@ async function enrichOrderMatches(rows, member, opts) {
     writeCache(MATCH_CACHE_KEY, cache)
   }
 
-  const enriched = applyMatchMap(list, map, talent, talentCity)
+  const scored = applyMatchMap(list, map, talent, talentCity)
+  const tagged = await tagPromise
+  const enriched = mergeCardAiTags(scored, tagged)
   enriched.sort((a, b) => {
     const d = (b.matchScore || 0) - (a.matchScore || 0)
     if (d !== 0) return d
