@@ -19,7 +19,7 @@
 .login-top {
   position: relative;
   overflow: hidden;
-  padding-bottom: 56rpx;
+  padding-bottom: 32rpx;
   flex-shrink: 0;
 }
 
@@ -45,22 +45,8 @@
   box-sizing: border-box;
 }
 
-.login-nav-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 56rpx;
-  margin-bottom: 4rpx;
-}
-
-.login-nav-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 2rpx;
-}
-
 .login-brand-row {
+  margin-top: 4rpx;
   display: flex;
   align-items: center;
   gap: 20rpx;
@@ -106,7 +92,7 @@
 }
 
 .login-stack {
-  margin-top: -48rpx;
+  margin-top: -56rpx;
   padding: 0 28rpx;
   position: relative;
   z-index: 4;
