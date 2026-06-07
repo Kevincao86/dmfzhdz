@@ -19,8 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
   try {
     const body = JSON.parse(rawBody(req) || '{}') as { link?: string; platform?: string }
-    const { runDouyinProfileParseCore } = await import('../src/lib/douyinProfileParseCore.js')
-    const out = await runDouyinProfileParseCore({
+    const { runProfileLinkParseCore } = await import('../src/lib/profileLinkParseCore.js')
+    const out = await runProfileLinkParseCore({
       link: String(body.link || ''),
       platform: body.platform,
     })

@@ -332,10 +332,7 @@ Page({
   },
   async onProfileLinkAutofill(e) {
     const id = e.currentTarget.dataset.id
-    if (!id || id !== 'douyin') {
-      wx.showToast({ title: '暂仅支持抖音主页', icon: 'none' })
-      return
-    }
+    if (!id) return
     const plat = talentPlatforms.TALENT_PLATFORMS.find((p) => p.id === id)
     const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
     const link = String(prof.profileLink || '').trim()
@@ -356,6 +353,7 @@ Page({
       if (parsed.platformNickname) cur.platformNickname = parsed.platformNickname
       if (parsed.profileLink) cur.profileLink = parsed.profileLink
       if (parsed.followers > 0) cur.followers = String(parsed.followers)
+      if (parsed.talentGrade && id === 'kuaishou') cur.talentGrade = parsed.talentGrade
       if (Array.isArray(parsed.accountTags) && parsed.accountTags.length) {
         const merged = [...new Set([...(cur.accountTags || []), ...parsed.accountTags])]
         cur.accountTags = merged

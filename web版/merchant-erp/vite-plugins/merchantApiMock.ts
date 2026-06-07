@@ -212,8 +212,8 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       try {
         const bodyRaw = await readBody(req as IncomingMessage)
         const body = JSON.parse(bodyRaw || '{}') as { link?: string; platform?: string }
-        const { runDouyinProfileParseCore } = await import('../src/lib/douyinProfileParseCore.js')
-        const out = await runDouyinProfileParseCore({
+        const { runProfileLinkParseCore } = await import('../src/lib/profileLinkParseCore.js')
+        const out = await runProfileLinkParseCore({
           link: String(body.link || ''),
           platform: body.platform,
         })
