@@ -5,7 +5,7 @@
   padding: 18rpx 18rpx 16rpx;
   background: var(--lq-card);
   border-radius: var(--lq-radius-sm);
-  border: 3rpx solid var(--lq-border);
+  border: 1rpx solid var(--lq-border);
   box-shadow: var(--lq-shadow-card);
   overflow: hidden;
 }

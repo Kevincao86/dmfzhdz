@@ -1,40 +1,34 @@
-/* 灵祺 · 卡通舒适主题（柔和粉紫 + 圆润卡片） */
+/* 灵祺星选 · 商务简洁主题（浅蓝 + 白卡片 + 扁平阴影） */
 page {
-  --lq-primary: #7c83ff;
-  --lq-primary-dark: #6d72f0;
-  --lq-primary-deep: #5b61e8;
-  --lq-primary-soft: #a5abff;
-  --lq-primary-50: #f3f1ff;
-  --lq-primary-100: #e8e4ff;
-  --lq-accent: #ffd166;
-  --lq-accent-deep: #ffb347;
-  --lq-violet: #b794f6;
-  --lq-magenta: #e879f9;
-  --lq-gradient: linear-gradient(135deg, #8b93ff 0%, #b794f6 52%, #f0abfc 100%);
-  --lq-gradient-header: linear-gradient(
-    145deg,
-    #7c83ff 0%,
-    #9b87f5 38%,
-    #c084fc 72%,
-    #f0abfc 100%
-  );
-  --lq-gradient-deep: linear-gradient(165deg, #7c83ff 0%, #a78bfa 55%, #f0abfc 100%);
-  --lq-gradient-tab: linear-gradient(135deg, #8b93ff 0%, #b794f6 55%, #f0abfc 100%);
-  --lq-gradient-tab-track: linear-gradient(90deg, #f3f1ff 0%, #fdf4ff 50%, #fff7ed 100%);
-  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #faf8ff 100%);
-  --lq-bg: #faf7ff;
+  --lq-primary: #1677ff;
+  --lq-primary-dark: #0958d9;
+  --lq-primary-deep: #003eb3;
+  --lq-primary-soft: #69b1ff;
+  --lq-primary-50: #e8f4ff;
+  --lq-primary-100: #d6e8ff;
+  --lq-accent: #fa8c16;
+  --lq-accent-deep: #d46b08;
+  --lq-violet: #597ef7;
+  --lq-magenta: #1677ff;
+  --lq-gradient: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  --lq-gradient-header: linear-gradient(180deg, #e8f4ff 0%, #f5f8fc 68%, #f5f7fa 100%);
+  --lq-gradient-deep: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  --lq-gradient-tab: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  --lq-gradient-tab-track: #f0f2f5;
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #fafbfc 100%);
+  --lq-bg: #f5f7fa;
   --lq-surface: #ffffff;
   --lq-card: #ffffff;
-  --lq-text: #3d3654;
-  --lq-text-secondary: #8b85a8;
-  --lq-border: rgba(216, 208, 240, 0.95);
-  --lq-shadow: 0 12rpx 0 rgba(199, 186, 255, 0.35);
-  --lq-shadow-card: 0 10rpx 0 rgba(216, 200, 255, 0.42);
-  --lq-shadow-soft: 0 8rpx 28rpx rgba(139, 147, 255, 0.12);
-  --lq-shadow-header: 0 14rpx 0 rgba(183, 148, 246, 0.28);
-  --lq-shadow-tab: 0 6rpx 0 rgba(183, 148, 246, 0.38);
-  --lq-radius-lg: 40rpx;
-  --lq-radius-md: 32rpx;
-  --lq-radius-sm: 24rpx;
-  --lq-header-pad-bottom: 32rpx;
+  --lq-text: #1f2937;
+  --lq-text-secondary: #8c8c8c;
+  --lq-border: #eef0f3;
+  --lq-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+  --lq-shadow-card: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+  --lq-shadow-soft: 0 2rpx 12rpx rgba(15, 23, 42, 0.05);
+  --lq-shadow-header: none;
+  --lq-shadow-tab: 0 2rpx 8rpx rgba(22, 119, 255, 0.18);
+  --lq-radius-lg: 24rpx;
+  --lq-radius-md: 20rpx;
+  --lq-radius-sm: 16rpx;
+  --lq-header-pad-bottom: 24rpx;
 }

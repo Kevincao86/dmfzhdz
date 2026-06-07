@@ -39,7 +39,10 @@
         <view class="login-identity-row">
           <view class="login-identity-main">
             <text class="login-identity-label">选择登录身份</text>
-            <text class="login-identity-value" wx:if="{{loginIdentity}}">{{loginIdentityEmoji}} {{loginIdentityLabel}}</text>
+            <view class="login-identity-value" wx:if="{{loginIdentity}}">
+              <view class="lq-biz-icon lq-biz-icon--sm lq-biz-icon--identity"><text>{{loginIdentityGlyph}}</text></view>
+              <text class="login-identity-value-text">{{loginIdentityLabel}}</text>
+            </view>
             <text class="login-identity-placeholder" wx:else>请先切换身份后再登录</text>
           </view>
           <view class="login-identity-switch" bindtap="onOpenIdentitySheet">切换身份</view>
@@ -190,7 +193,7 @@
         data-id="{{item.id}}"
         bindtap="onPickLoginIdentity"
       >
-        <text class="login-id-sheet-emoji">{{item.emoji}}</text>
+        <view class="lq-biz-icon lq-biz-icon--sm lq-biz-icon--identity"><text>{{item.glyph}}</text></view>
         <view class="login-id-sheet-body">
           <text class="login-id-sheet-name">{{item.label}}</text>
         </view>
