@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { getActiveRole } from '../lib/mpSession'
 import {
   deleteCustomTemplate,
+  getActiveTemplateId,
   listCustomTemplates,
   setActiveTemplateId,
   TEMPLATE_KINDS,
@@ -14,19 +15,7 @@ export default function TemplatesPage() {
 
   const [kind, setKind] = useState<TemplateKind>('talent')
   const [rows, setRows] = useState(() => listCustomTemplates())
-  const activeId = (() => {
-    try {
-      const key =
-        kind === 'shoot'
-          ? 'meoo_active_shoot_apply_template_v1'
-          : kind === 'edit'
-            ? 'meoo_active_edit_apply_template_v1'
-            : 'meoo_active_apply_template_v1'
-      return localStorage.getItem(key) || ''
-    } catch {
-      return ''
-    }
-  })()
+  const activeId = getActiveTemplateId(kind)
 
   const filtered = useMemo(() => listCustomTemplates(kind), [rows, kind])
 

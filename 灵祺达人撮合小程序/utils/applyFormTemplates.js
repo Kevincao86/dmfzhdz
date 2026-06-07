@@ -2,6 +2,7 @@ const { labels, normalizePlatform } = require('./platformLabels.js')
 const { PLATFORMS } = require('./publishFormOptions.js')
 
 const { defaultSupplierApplyFields } = require('./supplierPublishForm.js')
+const scope = require('./mpAccountLocalScope.js')
 
 const STORAGE_KEY = 'meoo_apply_form_templates_v1'
 const ACTIVE_TEMPLATE_KEYS = {
@@ -248,9 +249,19 @@ function defaultPlaceholder(field, platform) {
   return '请填写'
 }
 
+function templatesStorageKey() {
+  return scope.scopedStorageKey(STORAGE_KEY)
+}
+
+function activeTemplateStorageKey(kind) {
+  const tplKind = normalizeTemplateKind(kind)
+  return scope.scopedStorageKey(ACTIVE_TEMPLATE_KEYS[tplKind])
+}
+
 function readCustomTemplates() {
   try {
-    const raw = wx.getStorageSync(STORAGE_KEY)
+    scope.migrateLegacyKeyToScoped(STORAGE_KEY)
+    const raw = wx.getStorageSync(templatesStorageKey())
     const list = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (!Array.isArray(list)) return []
     return list.map((t) => {
@@ -268,7 +279,10 @@ function readCustomTemplates() {
 }
 
 function writeCustomTemplates(list) {
-  wx.setStorageSync(STORAGE_KEY, JSON.stringify(list.slice(0, 30)))
+  wx.setStorageSync(templatesStorageKey(), JSON.stringify(list.slice(0, 30)))
+  try {
+    wx.removeStorageSync(STORAGE_KEY)
+  } catch (_) {}
 }
 
 /** 用户可见模版列表（仅自定义，不含系统默认） */
@@ -336,7 +350,8 @@ function emptyCustomTemplate(name, kind) {
 
 function getActiveTemplateId(kind) {
   const tplKind = normalizeTemplateKind(kind)
-  const key = ACTIVE_TEMPLATE_KEYS[tplKind]
+  scope.migrateLegacyKeyToScoped(ACTIVE_TEMPLATE_KEYS[tplKind])
+  const key = activeTemplateStorageKey(tplKind)
   try {
     const id = String(wx.getStorageSync(key) || '').trim()
     if (id && id !== DEFAULT_TEMPLATE.id && getTemplateById(id)) return id
@@ -349,16 +364,20 @@ function getActiveTemplateId(kind) {
 
 function setActiveTemplateId(id, kind) {
   const tplKind = normalizeTemplateKind(kind)
-  const key = ACTIVE_TEMPLATE_KEYS[tplKind]
+  const key = activeTemplateStorageKey(tplKind)
   if (!id || id === DEFAULT_TEMPLATE.id) {
     try {
       wx.removeStorageSync(key)
+      wx.removeStorageSync(ACTIVE_TEMPLATE_KEYS[tplKind])
     } catch {
       /* ignore */
     }
     return
   }
   wx.setStorageSync(key, String(id))
+  try {
+    wx.removeStorageSync(ACTIVE_TEMPLATE_KEYS[tplKind])
+  } catch (_) {}
 }
 
 function getTemplateForApply(templateId) {
@@ -375,7 +394,7 @@ function getTemplateForApply(templateId) {
 }
 
 function mpApplyFormStorageKey(mpOrderId) {
-  return `meoo_mp_apply_form_${mpOrderId}`
+  return scope.scopedStorageKey(`meoo_mp_apply_form_${mpOrderId}`)
 }
 
 function saveApplyFormForMpOrder(mpOrderId, payload) {

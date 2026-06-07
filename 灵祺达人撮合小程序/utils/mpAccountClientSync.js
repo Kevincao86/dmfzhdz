@@ -51,6 +51,9 @@ function collectLocalState() {
   const account = sessionStore.readAccount()
   const appKey = scope.scopedStorageKey(APPLICATIONS_BASE, account)
   const pubKey = scope.scopedStorageKey(PUBLISH_BASE, account)
+  const notifyKey = scope.scopedStorageKey(NOTIFY_KEY, account)
+  const msgKey = scope.scopedStorageKey(MSG_KEY, account)
+  const inboxKey = scope.scopedStorageKey(INBOX_SEEN_KEY, account)
   const member = memberStore.readMember()
   const pr = userProfile.readPrProfile()
   return {
@@ -59,9 +62,9 @@ function collectLocalState() {
     prProfileDraft: pr || null,
     applications: readList(appKey),
     publishedOrders: readList(pubKey),
-    notifications: readList(NOTIFY_KEY),
-    messages: readList(MSG_KEY),
-    inboxSeen: readJson(INBOX_SEEN_KEY, []),
+    notifications: readList(notifyKey),
+    messages: readList(msgKey),
+    inboxSeen: readJson(inboxKey, []),
   }
 }
 
@@ -83,14 +86,17 @@ function applyRemoteState(state) {
   if (Array.isArray(state.publishedOrders)) {
     writeJson(pubKey, state.publishedOrders.slice(0, 80))
   }
+  const notifyKey = scope.scopedStorageKey(NOTIFY_KEY, account)
+  const msgKey = scope.scopedStorageKey(MSG_KEY, account)
+  const inboxKey = scope.scopedStorageKey(INBOX_SEEN_KEY, account)
   if (Array.isArray(state.notifications)) {
-    writeJson(NOTIFY_KEY, state.notifications.slice(0, 100))
+    writeJson(notifyKey, state.notifications.slice(0, 100))
   }
   if (Array.isArray(state.messages)) {
-    writeJson(MSG_KEY, state.messages.slice(0, 100))
+    writeJson(msgKey, state.messages.slice(0, 100))
   }
   if (Array.isArray(state.inboxSeen)) {
-    writeJson(INBOX_SEEN_KEY, state.inboxSeen.slice(-500))
+    writeJson(inboxKey, state.inboxSeen.slice(-500))
   }
 }
 

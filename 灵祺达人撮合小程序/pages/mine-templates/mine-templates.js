@@ -9,21 +9,9 @@ Page({
   },
   refresh() {
     const kind = templates.normalizeTemplateKind(this.data.kind)
-    const key =
-      kind === 'shoot'
-        ? 'meoo_active_shoot_apply_template_v1'
-        : kind === 'edit'
-          ? 'meoo_active_edit_apply_template_v1'
-          : 'meoo_active_apply_template_v1'
-    let activeId = ''
-    try {
-      activeId = String(wx.getStorageSync(key) || '').trim()
-    } catch {
-      activeId = ''
-    }
     this.setData({
       rows: templates.listCustomTemplates(kind),
-      activeId,
+      activeId: templates.getActiveTemplateId(kind),
     })
   },
   onShow() {

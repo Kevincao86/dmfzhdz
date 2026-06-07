@@ -1,3 +1,4 @@
+import { migrateLegacyKeyToScoped, scopedStorageKey } from '../mpAccountLocalScope'
 import { labels, normalizePlatform } from './platformLabels'
 import { PLATFORMS } from './publishFormOptions'
 import { defaultSupplierApplyFields } from './supplierPublishForm'
@@ -225,9 +226,18 @@ export function resolveApplyRows(template: ApplyTemplate, platform: string, opti
     })
 }
 
+function templatesStorageKey() {
+  return scopedStorageKey(STORAGE_KEY)
+}
+
+function activeTemplateStorageKey(kind: TemplateKind) {
+  return scopedStorageKey(ACTIVE_TEMPLATE_KEYS[kind])
+}
+
 function readCustomTemplates(): ApplyTemplate[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    migrateLegacyKeyToScoped(STORAGE_KEY)
+    const raw = localStorage.getItem(templatesStorageKey())
     const list = raw ? (JSON.parse(raw) as unknown) : []
     if (!Array.isArray(list)) return []
     return list.map((t) => {
@@ -245,7 +255,12 @@ function readCustomTemplates(): ApplyTemplate[] {
 }
 
 function writeCustomTemplates(list: ApplyTemplate[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 30)))
+  localStorage.setItem(templatesStorageKey(), JSON.stringify(list.slice(0, 30)))
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
 }
 
 export function listCustomTemplates(kind?: TemplateKind) {
@@ -315,7 +330,8 @@ export function builtinMinimalTemplate(): ApplyTemplate {
 
 export function getActiveTemplateId(kind: TemplateKind = 'talent') {
   try {
-    const key = ACTIVE_TEMPLATE_KEYS[kind]
+    migrateLegacyKeyToScoped(ACTIVE_TEMPLATE_KEYS[kind])
+    const key = activeTemplateStorageKey(kind)
     const id = String(localStorage.getItem(key) || '').trim()
     if (id && getTemplateById(id)) return id
     const first = listCustomTemplates(kind)[0]
@@ -326,12 +342,22 @@ export function getActiveTemplateId(kind: TemplateKind = 'talent') {
 }
 
 export function setActiveTemplateId(id: string, kind: TemplateKind = 'talent') {
-  const key = ACTIVE_TEMPLATE_KEYS[kind]
+  const key = activeTemplateStorageKey(kind)
   if (!id) {
     localStorage.removeItem(key)
+    try {
+      localStorage.removeItem(ACTIVE_TEMPLATE_KEYS[kind])
+    } catch {
+      /* ignore */
+    }
     return
   }
   localStorage.setItem(key, id)
+  try {
+    localStorage.removeItem(ACTIVE_TEMPLATE_KEYS[kind])
+  } catch {
+    /* ignore */
+  }
 }
 
 function getTemplateForApply(kind: TemplateKind = 'talent') {
@@ -344,7 +370,7 @@ function getTemplateForApply(kind: TemplateKind = 'talent') {
 }
 
 export function mpApplyFormStorageKey(mpOrderId: string) {
-  return `meoo_mp_apply_form_${mpOrderId}`
+  return scopedStorageKey(`meoo_mp_apply_form_${mpOrderId}`)
 }
 
 export function saveApplyFormForMpOrder(

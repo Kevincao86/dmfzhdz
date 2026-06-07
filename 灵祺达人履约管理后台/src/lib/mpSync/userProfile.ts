@@ -1,4 +1,10 @@
+import { migrateLegacyKeyToScoped, scopedStorageKey } from '../mpAccountLocalScope'
+
 export const PR_PROFILE_KEY = 'meoo_pr_profile_v1'
+
+function prProfileStorageKey() {
+  return scopedStorageKey(PR_PROFILE_KEY)
+}
 
 export type PrProfile = {
   accountType: 'company' | 'personal'
@@ -38,7 +44,8 @@ export function emptyPrProfile(): PrProfile {
 
 export function readPrProfile(): PrProfile | null {
   try {
-    const raw = localStorage.getItem(PR_PROFILE_KEY)
+    migrateLegacyKeyToScoped(PR_PROFILE_KEY)
+    const raw = localStorage.getItem(prProfileStorageKey())
     if (!raw) return null
     return JSON.parse(raw) as PrProfile
   } catch {
@@ -47,7 +54,12 @@ export function readPrProfile(): PrProfile | null {
 }
 
 export function writePrProfile(profile: PrProfile) {
-  localStorage.setItem(PR_PROFILE_KEY, JSON.stringify(profile))
+  localStorage.setItem(prProfileStorageKey(), JSON.stringify(profile))
+  try {
+    localStorage.removeItem(PR_PROFILE_KEY)
+  } catch {
+    /* ignore */
+  }
   import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
