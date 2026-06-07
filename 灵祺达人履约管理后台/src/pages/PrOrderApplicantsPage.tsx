@@ -4,7 +4,6 @@ import { appendTalentInbox, fetchMpRegistry } from '../lib/mpApi'
 import {
   enrichApplicantRow,
   hallLabelFromMp,
-  normalizeProfileUrl,
   statusLabel,
   type EnrichedApplicantRow,
 } from '../lib/mpSync/applicationDisplay'
@@ -43,7 +42,7 @@ export default function PrOrderApplicantsPage() {
   const [groupQrUploading, setGroupQrUploading] = useState(false)
   const [notifying, setNotifying] = useState(false)
   const [savingSelect, setSavingSelect] = useState(false)
-  const [profileModalUrl, setProfileModalUrl] = useState('')
+  const [profileModalApplicant, setProfileModalApplicant] = useState<EnrichedApplicantRow | null>(null)
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
 
   const selectedCount = selectedIds.length
@@ -244,12 +243,21 @@ export default function PrOrderApplicantsPage() {
   }
 
   function onOpenProfile(a: EnrichedApplicantRow) {
-    const url = normalizeProfileUrl(a.profileLink)
+    const url = String(a.resolvedProfileHref || '').trim()
+    if (!url) {
+      alert('未填写主页链接，且达人库中未找到对应平台资料')
+      return
+    }
+    setProfileModalApplicant(a)
+  }
+
+  function onOpenProfileInNewWindow(a: EnrichedApplicantRow) {
+    const url = String(a.resolvedProfileHref || '').trim()
     if (!url) {
       alert('未填写主页链接')
       return
     }
-    setProfileModalUrl(url)
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -443,24 +451,85 @@ export default function PrOrderApplicantsPage() {
         </div>
       ) : null}
 
-      {profileModalUrl ? (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/50" onClick={() => setProfileModalUrl('')}>
-          <div className="flex justify-between items-center p-3 bg-white border-b" onClick={(e) => e.stopPropagation()}>
-            <span className="font-medium text-sm">达人主页预览</span>
-            <div className="flex gap-2">
-              <a href={profileModalUrl} target="_blank" rel="noreferrer" className="text-sm text-violet-600">
-                新窗口打开
-              </a>
-              <button type="button" className="text-sm" onClick={() => setProfileModalUrl('')}>关闭</button>
+      {profileModalApplicant ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setProfileModalApplicant(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-4 py-3 border-b">
+              <span className="font-medium text-sm">
+                达人主页 · {String(profileModalApplicant.displayPlatform)}
+              </span>
+              <button type="button" className="text-sm text-slate-500" onClick={() => setProfileModalApplicant(null)}>
+                关闭
+              </button>
+            </div>
+            <div className="p-4 space-y-3 text-sm">
+              <div>
+                <div className="text-lg font-semibold">{String(profileModalApplicant.displayName)}</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {String(profileModalApplicant.displayPlatform)} · 粉丝 {String(profileModalApplicant.displayFollowers)}
+                </div>
+              </div>
+              <dl className="grid grid-cols-2 gap-2 text-xs">
+                {profileModalApplicant.platformAccount ? (
+                  <div>
+                    <dt className="text-slate-500">平台账号</dt>
+                    <dd className="font-medium">{String(profileModalApplicant.platformAccount)}</dd>
+                  </div>
+                ) : null}
+                <div>
+                  <dt className="text-slate-500">带货等级</dt>
+                  <dd className="font-medium">{String(profileModalApplicant.displaySalesLevel)}</dd>
+                </div>
+                {profileModalApplicant.quotePrice ? (
+                  <div>
+                    <dt className="text-slate-500">报价</dt>
+                    <dd className="font-medium">{String(profileModalApplicant.quotePrice)}</dd>
+                  </div>
+                ) : null}
+                {profileModalApplicant.contact ? (
+                  <div>
+                    <dt className="text-slate-500">手机</dt>
+                    <dd className="font-medium">{String(profileModalApplicant.contact)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="rounded-lg bg-slate-50 border px-3 py-2 text-xs break-all">
+                <span className="text-slate-500">主页链接 </span>
+                {String(profileModalApplicant.resolvedProfileHref)}
+              </div>
+              {profileModalApplicant.profileOpensExternally ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  抖音、小红书等平台禁止在网页内嵌预览，请点击下方按钮在新窗口打开，或复制链接到对应 App 查看。
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium"
+                  onClick={() => onOpenProfileInNewWindow(profileModalApplicant)}
+                >
+                  {profileModalApplicant.profileLinkDisplay || '新窗口打开主页'}
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-lg border text-sm"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(String(profileModalApplicant.resolvedProfileHref))
+                      .then(() => alert('主页链接已复制'))
+                  }
+                >
+                  复制链接
+                </button>
+              </div>
             </div>
           </div>
-          <iframe
-            src={profileModalUrl}
-            title="达人主页"
-            className="flex-1 w-full bg-white"
-            sandbox="allow-scripts allow-same-origin allow-popups"
-            onClick={(e) => e.stopPropagation()}
-          />
         </div>
       ) : null}
     </div>

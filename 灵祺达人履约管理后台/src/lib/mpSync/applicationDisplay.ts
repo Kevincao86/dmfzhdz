@@ -3,6 +3,12 @@ import { platformIdFromName } from './talentPlatformProfiles'
 import { labels } from './platformLabels'
 import { TALENT_TAGS } from './publishFormOptions'
 import { readMember, primaryPlatformProfile } from './talentMember'
+import {
+  extractProfileLinkUrl,
+  profileLinkLabel,
+  profileLinkOpensExternally,
+  resolveTalentProfileHref,
+} from './talentProfileLink'
 
 export const MP_STATUS_LABEL: Record<string, string> = {
   open: '招募中',
@@ -25,10 +31,52 @@ export function hallLabelFromMp(mp: Record<string, unknown> | null): string {
 }
 
 export function normalizeProfileUrl(raw: unknown): string {
-  const u = String(raw || '').trim()
-  if (!u) return ''
-  if (/^https?:\/\//i.test(u)) return u
-  return `https://${u}`
+  return resolveTalentProfileHref('', raw) || extractProfileLinkUrl(raw)
+}
+
+function resolveApplicantProfileLink(applicant: Record<string, unknown>, reg: MpRegistry): string {
+  const platform = String(applicant.platform || '抖音')
+  const pid = platformIdFromName(platform)
+  const account = String(applicant.platformAccount || '').trim().toLowerCase()
+  const contact = String(applicant.contact || '').trim()
+
+  const fromRow = resolveTalentProfileHref(platform, applicant.profileLink)
+  if (fromRow) return fromRow
+
+  const members = Array.isArray(reg?.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (const m of members) {
+    const mem = m as Record<string, unknown>
+    const profs = mem.platformProfiles as Record<string, { platformAccount?: string; profileLink?: string }> | undefined
+    const prof = profs?.[pid]
+    if (prof) {
+      const profAccount = String(prof.platformAccount || '').trim().toLowerCase()
+      if (account && profAccount === account) {
+        const href = resolveTalentProfileHref(platform, prof.profileLink)
+        if (href) return href
+      }
+    }
+    if (contact && String(mem.contact || '').trim() === contact && prof) {
+      const href = resolveTalentProfileHref(platform, prof.profileLink)
+      if (href) return href
+    }
+  }
+
+  const lib = Array.isArray(reg?.talentLibraryEntries) ? reg.talentLibraryEntries : []
+  for (const e of lib) {
+    const entry = e as Record<string, unknown>
+    if (platformIdFromName(entry.platform) !== pid) continue
+    const entryAccount = String(entry.platformAccount || '').trim().toLowerCase()
+    if (account && entryAccount === account) {
+      const href = resolveTalentProfileHref(platform, entry.profileLink)
+      if (href) return href
+    }
+    if (contact && String(entry.contact || '').trim() === contact) {
+      const href = resolveTalentProfileHref(platform, entry.profileLink)
+      if (href) return href
+    }
+  }
+
+  return ''
 }
 
 function normalizeAccountTags(raw: unknown): string[] {
@@ -154,6 +202,9 @@ export type EnrichedApplicantRow = Record<string, unknown> & {
   hasAccountTags: boolean
   avatar: string
   profileLink: string
+  resolvedProfileHref: string
+  profileLinkDisplay: string
+  profileOpensExternally: boolean
   hasProfileLink: boolean
   profileLinkShort: string
   selected?: boolean
@@ -161,8 +212,14 @@ export type EnrichedApplicantRow = Record<string, unknown> & {
 
 export function enrichApplicantRow(applicant: Record<string, unknown>, index: number, reg: MpRegistry): EnrichedApplicantRow {
   const a = applicant || {}
-  const profileLink = String(a.profileLink || '').trim()
   const platform = String(a.platform || '抖音')
+  const profileLink = String(a.profileLink || '').trim()
+  const resolvedProfileHref = resolveApplicantProfileLink(a, reg)
+  const profileLinkDisplay = resolvedProfileHref
+    ? profileLinkLabel(platform, resolvedProfileHref)
+    : profileLink
+      ? profileLinkLabel(platform, profileLink)
+      : ''
   const followers = a.followers != null ? a.followers : '—'
   let fansText = String(followers)
   const n = Number(followers)
@@ -187,7 +244,16 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
     douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
     avatar: resolveApplicantAvatar(a, reg),
     profileLink,
-    hasProfileLink: !!profileLink,
-    profileLinkShort: profileLink.length > 36 ? `${profileLink.slice(0, 34)}…` : profileLink,
+    resolvedProfileHref,
+    profileLinkDisplay,
+    profileOpensExternally: profileLinkOpensExternally(platform),
+    hasProfileLink: !!resolvedProfileHref,
+    profileLinkShort: resolvedProfileHref
+      ? resolvedProfileHref.length > 36
+        ? `${resolvedProfileHref.slice(0, 34)}…`
+        : resolvedProfileHref
+      : profileLink.length > 36
+        ? `${profileLink.slice(0, 34)}…`
+        : profileLink,
   }
 }
