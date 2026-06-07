@@ -48,6 +48,33 @@
   box-shadow: var(--lq-shadow-tab);
 }
 
+.pr-app-tool-btn--batch {
+  color: #c2410c;
+  border-color: #fdba74;
+  background: #fff7ed;
+}
+
+.applicant-card-v2__check {
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 12rpx;
+  margin-top: 8rpx;
+  border-radius: 10rpx;
+  border: 2rpx solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #fff;
+  background: #fff;
+}
+
+.applicant-card-v2__check--on {
+  background: #ea580c;
+  border-color: #ea580c;
+}
+
 .pr-app-tool-btn--notify {
   color: #fff;
   background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
