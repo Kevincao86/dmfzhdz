@@ -54,7 +54,7 @@ Page({
   onShareAppMessage() {
     const v = this.data.view
     return {
-      title: v ? v.title : '灵祺撮合平台',
+      title: v ? v.title : '灵祺星选平台',
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
   },

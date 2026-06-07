@@ -17,7 +17,7 @@
           <text class="rec-hero-sub" wx:else>智能识别{{identityLabel}}身份 · 按标签与习惯匹配商单</text>
           <text class="rec-head-meta" wx:if="{{!isPrMode && orderCityHint}}">{{orderCityHint}}</text>
           <text class="rec-head-meta" wx:elif="{{isPrMode && prMatchHint}}">{{prMatchHint}}</text>
-          <text class="rec-head-meta" wx:elif="{{isPrMode}}">灵祺 LINGQI · 撮合平台</text>
+          <text class="rec-head-meta" wx:elif="{{isPrMode}}">灵祺 LINGQI · 星选平台</text>
         </view>
       </view>
     </view>

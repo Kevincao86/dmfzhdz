@@ -1285,7 +1285,7 @@ Page({
   },
   onShareAppMessage() {
     const order = this.data.createdOrder
-    if (!order) return { title: '灵祺撮合平台', path: '/pages/index/index' }
+    if (!order) return { title: '灵祺星选平台', path: '/pages/index/index' }
     return {
       title: this.data.shareTitle || order.title,
       path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,

@@ -2,15 +2,54 @@ const auth = require('../../utils/auth.js')
 const mpApiErrors = require('../../utils/mpApiErrors.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const userProfile = require('../../utils/userProfile.js')
+const identityTypes = require('../../utils/identityTypes.js')
 const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 
+const IDENTITY_OPTIONS = identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id])
+
+function requireLoginIdentity(page) {
+  const id = page.data.loginIdentity
+  if (!identityTypes.isWorkIdentity(id)) {
+    page.setData({ err: '请先选择登录身份（达人 / 拍摄 / 剪辑 / PR）' })
+    return null
+  }
+  userProfile.writeIdentity(id)
+  return id
+}
+
+async function finishLoginWithIdentity(page, data, workId) {
+  const role = identityTypes.accountRoleForWorkIdentity(workId)
+  if (data && data.token && data.account) {
+    if (data.account.activeRole !== role) {
+      try {
+        await auth.switchRole(role)
+      } catch (_) {}
+    }
+    await switchWorkIdentity.applyWorkIdentityAfterLogin(
+      data.token || auth.readSessionToken(),
+      auth.readAccount() || data.account,
+      workId,
+    )
+  } else {
+    try {
+      await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+    } catch (_) {}
+  }
+  const tabBar = require('../../utils/tabBar.js')
+  tabBar.refreshTabBar()
+  wx.switchTab({ url: '/pages/index/index' })
+}
+
 Page({
   data: {
     tab: 'wx',
+    loginIdentity: '',
+    loginIdentityLabel: '',
+    identityOptions: IDENTITY_OPTIONS,
     loginName: '',
     password: '',
     regPhone: '',
@@ -34,7 +73,7 @@ Page({
 
   onLoad() {
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
-    this.setData({ err: '' })
+    this.setData({ err: '', loginIdentity: '', loginIdentityLabel: '' })
     if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
     }
@@ -42,6 +81,17 @@ Page({
 
   onShow() {
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
+  },
+
+  onPickLoginIdentity(e) {
+    const id = e.currentTarget.dataset.id
+    if (!identityTypes.isWorkIdentity(id)) return
+    userProfile.writeIdentity(id)
+    this.setData({
+      loginIdentity: id,
+      loginIdentityLabel: userProfile.identityLabel(id),
+      err: '',
+    })
   },
 
   onTabWx() {
@@ -70,6 +120,8 @@ Page({
   },
 
   async onWxLogin() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
     this.setData({ loading: true, err: '' })
     try {
       const local = wxAccount.readWxAccount()
@@ -89,17 +141,13 @@ Page({
           wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
         } catch (_) {}
       }
-      const role = userProfile.readIdentity() === 'pr' ? 'pr' : 'talent'
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
         role,
         wxNickName: nick,
         wxAvatarUrl: avatar,
       })
-      try {
-        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-      } catch (_) {}
       if (data.isNew) {
-        const workId = userProfile.readIdentity()
         const acct = auth.readAccount()
         const id =
           role === 'pr'
@@ -115,7 +163,7 @@ Page({
           duration: 2500,
         })
       }
-      wx.switchTab({ url: '/pages/index/index' })
+      await finishLoginWithIdentity(this, data, workId)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
@@ -135,13 +183,12 @@ Page({
   },
 
   async onPwdLogin() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
     this.setData({ loading: true, err: '' })
     try {
-      await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
-      try {
-        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-      } catch (_) {}
-      wx.switchTab({ url: '/pages/index/index' })
+      const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
+      await finishLoginWithIdentity(this, data, workId)
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
     } finally {
@@ -177,6 +224,8 @@ Page({
   },
 
   async onRegister() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
     const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
     if (phoneErr) {
       this.setData({ err: phoneErr })
@@ -192,18 +241,15 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const role = userProfile.readIdentity() === 'pr' ? 'pr' : 'talent'
-      await auth.phoneRegister({
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
+      const data = await auth.phoneRegister({
         phone: this.data.regPhone,
         smsCode: this.data.regSmsCode,
         password: this.data.regPassword,
         role,
       })
-      try {
-        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-      } catch (_) {}
       wx.showToast({ title: '注册成功', icon: 'success' })
-      wx.switchTab({ url: '/pages/index/index' })
+      await finishLoginWithIdentity(this, data, workId)
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
     } finally {
