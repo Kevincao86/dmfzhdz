@@ -4,6 +4,7 @@ import {
   filterTaskDetailText,
   normalizeRecruitmentPlatform,
   shouldExcludeRecruitmentSegment,
+  type RecruitmentPlatform,
 } from '../meooRegistryShared/recruitmentInfoFilter.js'
 import type { RegistryMpRecruitmentOrder, RegistryRecruitmentOrder } from './opsRegistryApi'
 
@@ -31,7 +32,7 @@ function parseRecruitCount(summary: string, fallbackFans: number): number {
 /** 从商家达人招募订单生成小程序单展示字段 */
 export function buildMpRecruitmentFieldsFromMerchant(
   order: RegistryRecruitmentOrder,
-  opts?: { platform?: '抖音' | '小红书'; urgent?: boolean },
+  opts?: { platform?: RecruitmentPlatform; urgent?: boolean },
 ): Pick<
   RegistryMpRecruitmentOrder,
   | 'title'

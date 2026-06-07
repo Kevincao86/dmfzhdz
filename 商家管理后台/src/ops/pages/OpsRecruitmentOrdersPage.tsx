@@ -12,7 +12,11 @@ import {
   type RegistryRecruitmentOrder,
   type RegistryTalentPoolRow,
 } from '../opsRegistryApi'
-import { normalizeRecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
+import {
+  normalizeRecruitmentPlatform,
+  RECRUITMENT_PLATFORMS,
+  type RecruitmentPlatform,
+} from '../../meooRegistryShared/recruitmentInfoFilter'
 import { buildMpRecruitmentFieldsForIce, buildMpRecruitmentFieldsFromMerchant } from '../mpRecruitmentFields'
 import {
   MP_RECRUIT_ALREADY_SUBMITTED_MSG,
@@ -159,7 +163,7 @@ export default function OpsRecruitmentOrdersPage() {
   const [acceptSheetOrder, setAcceptSheetOrder] = useState<RegistryRecruitmentOrder | null>(null)
   const [mpShareInfo, setMpShareInfo] = useState<{ merchantOrderId: string; mpOrderId: string } | null>(null)
   const [mpAcceptBusy, setMpAcceptBusy] = useState(false)
-  const [mpRecruitPlatform, setMpRecruitPlatform] = useState<'抖音' | '小红书'>('抖音')
+  const [mpRecruitPlatform, setMpRecruitPlatform] = useState<RecruitmentPlatform>('抖音')
   /** 小程序招募下发至达人端：正常单 → 招募大厅；加急单 → 急单大厅 */
   const [mpHallKind, setMpHallKind] = useState<'normal' | 'urgent'>('normal')
   const [acceptSheetFile, setAcceptSheetFile] = useState<File | null>(null)
@@ -1044,11 +1048,14 @@ export default function OpsRecruitmentOrdersPage() {
               <select
                 value={mpRecruitPlatform}
                 disabled={mpAcceptBusy || acceptModeChoiceOrder.orderKind === 'recruitment_ice'}
-                onChange={(e) => setMpRecruitPlatform(e.target.value as '抖音' | '小红书')}
+                onChange={(e) => setMpRecruitPlatform(e.target.value as RecruitmentPlatform)}
                 className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
               >
-                <option value="抖音">抖音</option>
-                <option value="小红书">小红书</option>
+                {RECRUITMENT_PLATFORMS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
               </select>
               <p className="mt-1 text-[10px] text-slate-600">小红书招募单不展示带货等级；报名表单字段随平台切换。</p>
             </div>

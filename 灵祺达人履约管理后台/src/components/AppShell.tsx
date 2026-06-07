@@ -38,6 +38,13 @@ export default function AppShell() {
   const NAV = navForRole(role)
 
   function logout() {
+    if (
+      !window.confirm(
+        '退出后将清除本机全部报名、资料与消息缓存，避免串到其他账号。确定退出？',
+      )
+    ) {
+      return
+    }
     clearSession()
     nav('/', { replace: true })
   }
