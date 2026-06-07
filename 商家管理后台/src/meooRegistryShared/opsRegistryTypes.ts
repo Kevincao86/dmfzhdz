@@ -230,6 +230,12 @@ export type RegistryMpTalentMember = {
   accountTags?: string[]
   douyin?: RegistryMpTalentPlatformProfile
   xiaohongshu?: RegistryMpTalentPlatformProfile
+  /** 履约 Web / 小程序多平台资料（优先于 douyin / xiaohongshu） */
+  platformProfiles?: Record<
+    string,
+    RegistryMpTalentPlatformProfile & { enabled?: boolean; talentGrade?: string }
+  >
+  alipayAccount?: string
   registeredAt: string
   updatedAt: string
 }
