@@ -22,7 +22,7 @@ function hasFtypBox(data: Uint8Array, maxScan = 8192): boolean {
 }
 
 /** 豆包/可灵成片可能是 ftyp 非固定偏移或 WebM，交给 wasm ffmpeg 再规范化 */
-function looksLikeVideoBytes(data: Uint8Array): boolean {
+export function looksLikeVideoBytes(data: Uint8Array): boolean {
   if (data.length < 1024) return false
   if (hasFtypBox(data)) return true
   if (data[0] === 0x1a && data[1] === 0x45 && data[2] === 0xdf && data[3] === 0xa3) return true
@@ -30,8 +30,12 @@ function looksLikeVideoBytes(data: Uint8Array): boolean {
   return false
 }
 
-function isValidMp4(data: Uint8Array): boolean {
-  return hasFtypBox(data)
+export async function assertBlobLooksLikeVideo(blob: Blob, label: string): Promise<Blob> {
+  const head = new Uint8Array(await blob.slice(0, Math.min(blob.size, 8192)).arrayBuffer())
+  if (looksLikeVideoBytes(head)) return blob
+  throw new Error(
+    `${label}不是有效视频文件（${blob.size} 字节），可能模型未返回 MP4，请重试或检查视频 API 配置`,
+  )
 }
 
 async function blobToBytes(blob: Blob): Promise<Uint8Array> {

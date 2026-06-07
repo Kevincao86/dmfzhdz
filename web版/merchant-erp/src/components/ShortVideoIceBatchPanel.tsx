@@ -1242,14 +1242,14 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                AI 生成文案
+                AI 生成文案与指令
               </button>
             </div>
             <div className="space-y-4 px-5 pb-5 pt-4">
               <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/40 px-4 py-3">
                 <p className="mb-3 text-xs font-medium text-violet-900">输出参数</p>
                 <p className="mb-3 text-[11px] leading-relaxed text-violet-800/90">
-                  请先确认画幅、时长与特效，再使用「AI 生成文案」；生成结果将按此处参数编写指令。
+                  请先确认画幅、时长与特效，再点「AI 生成文案与指令」；结果将分别填入下方两框。
                 </p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Field label="画幅">
@@ -1294,35 +1294,43 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </div>
               </div>
 
-              <label className="block text-xs font-medium text-zinc-700">
-                文案框（上屏字幕 / 口播展示）
-                <textarea
-                  value={editCopy}
-                  disabled={anyBusy || briefAiLoading}
-                  onChange={(e) => setEditCopy(e.target.value)}
-                  placeholder={
-                    '示例：\n「江南味道」\n「传承三十年的手工面」\n「一碗面，一座城的记忆」'
-                  }
-                  className="mt-1.5 min-h-[100px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                />
-              </label>
-              <label className="block text-xs font-medium text-zinc-700">
-                指令框（剪辑节奏 / 转场 / BGM / 背景音效）
-                <textarea
-                  value={editInstruction}
-                  disabled={anyBusy || briefAiLoading}
-                  onChange={(e) => setEditInstruction(e.target.value)}
-                  placeholder={
-                    '示例：整体基调温暖祥和，节奏舒适；前 3 秒快切吸睛；BGM 轻快铺底；加入碗碟碰撞与市井吆喝环境音效；图片间淡入淡出转场。'
-                  }
-                  className={cn(
-                    'mt-1.5 min-h-[100px] w-full rounded-lg border px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
-                    briefOk || !editInstruction
-                      ? 'border-zinc-300 focus:border-violet-500 focus:ring-violet-500/20'
-                      : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
-                  )}
-                />
-              </label>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <label className="block rounded-xl border-2 border-orange-200 bg-orange-50/30 p-3 text-xs font-medium text-orange-950">
+                  <span className="text-sm font-semibold">文案框</span>
+                  <span className="mt-0.5 block font-normal text-orange-800/90">
+                    上屏字幕 / 口播展示（观众看得见）
+                  </span>
+                  <textarea
+                    value={editCopy}
+                    disabled={anyBusy || briefAiLoading}
+                    onChange={(e) => setEditCopy(e.target.value)}
+                    placeholder={
+                      '示例：\n「江南味道」\n「传承三十年的手工面」\n「一碗面，一座城的记忆」'
+                    }
+                    className="mt-2 min-h-[120px] w-full rounded-lg border border-orange-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </label>
+                <label className="block rounded-xl border-2 border-violet-200 bg-violet-50/30 p-3 text-xs font-medium text-violet-950">
+                  <span className="text-sm font-semibold">指令框</span>
+                  <span className="mt-0.5 block font-normal text-violet-800/90">
+                    剪辑节奏 / 转场 / BGM / 背景音效（不上屏）
+                  </span>
+                  <textarea
+                    value={editInstruction}
+                    disabled={anyBusy || briefAiLoading}
+                    onChange={(e) => setEditInstruction(e.target.value)}
+                    placeholder={
+                      '示例：整体基调温暖祥和，节奏舒适；前 3 秒快切吸睛；BGM 轻快铺底；加入碗碟碰撞与市井吆喝环境音效；图片间淡入淡出转场。'
+                    }
+                    className={cn(
+                      'mt-2 min-h-[120px] w-full rounded-lg border bg-white px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
+                      briefOk || !editInstruction
+                        ? 'border-violet-200 focus:border-violet-500 focus:ring-violet-500/20'
+                        : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
+                    )}
+                  />
+                </label>
+              </div>
               {!briefOk && (editCopy.length > 0 || editInstruction.length > 0) ? (
                 <p className="flex items-center gap-1 text-xs text-amber-700">
                   <AlertCircle className="h-3.5 w-3.5" />

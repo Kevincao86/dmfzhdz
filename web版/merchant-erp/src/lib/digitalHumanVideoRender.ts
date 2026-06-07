@@ -3,7 +3,7 @@
  */
 import type { DigitalHumanDraft, DigitalHumanWork, PresetAvatar } from './digitalHumanBroadcast'
 import { findPresetAvatarForDraft } from './digitalHumanBroadcast'
-import { concatVideoSegmentsToMp4 } from './concatVideoSegments'
+import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4 } from './concatVideoSegments'
 import { extractVideoLastFramePureBase64, imageUrlToPureBase64 } from './videoFrameUtils'
 import {
   concatVideoBlobsOnServer,
@@ -183,7 +183,10 @@ async function generateKlingSegment(
     })
     if (!r.ok) throw new Error(r.message)
     const url = await waitKlingVideo(r.taskId, r.pollKind)
-    const blob = await downloadVideoUrlAsBlob(url)
+    const blob = await assertBlobLooksLikeVideo(
+      await downloadVideoUrlAsBlob(url),
+      '可灵第 1 段',
+    )
     if (blob.size < 1024) throw new Error('可灵返回的视频为空，请重试')
     return { sourceUrl: url, blob }
   }
@@ -198,7 +201,7 @@ async function generateKlingSegment(
   })
   if (!r.ok) throw new Error(r.message)
   const url = await waitKlingVideo(r.taskId, r.pollKind)
-  const blob = await downloadVideoUrlAsBlob(url)
+  const blob = await assertBlobLooksLikeVideo(await downloadVideoUrlAsBlob(url), '可灵成片')
   if (blob.size < 1024) throw new Error('可灵返回的视频为空，请重试')
   return { sourceUrl: url, blob }
 }
@@ -223,7 +226,7 @@ async function generateSeedanceSegmentWithFailover(opts: {
         throw new Error(r.message)
       }
       const url = await waitSeedanceVideo(r.taskId)
-      const blob = await downloadVideoUrlAsBlob(url)
+      const blob = await assertBlobLooksLikeVideo(await downloadVideoUrlAsBlob(url), '豆包成片')
       if (blob.size < 1024) throw new Error('豆包返回的视频为空，请重试')
       return { sourceUrl: url, blob }
     } catch (e) {
@@ -277,39 +280,36 @@ function assertSegmentBlob(blob: Blob, index: number): void {
 }
 
 async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<Blob> {
-  if (blobs.length === 1) {
-    assertSegmentBlob(blobs[0]!, 0)
-    return blobs[0]!
+  for (let i = 0; i < blobs.length; i++) {
+    await assertBlobLooksLikeVideo(blobs[i]!, `第 ${i + 1} 段`)
+    assertSegmentBlob(blobs[i]!, i)
   }
-  for (let i = 0; i < blobs.length; i++) assertSegmentBlob(blobs[i]!, i)
+  if (blobs.length === 1) return blobs[0]!
 
   const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
+  const errors: string[] = []
+
+  if (urls.length >= blobs.length) {
+    try {
+      return await concatVideoUrlsOnServer(urls)
+    } catch (e) {
+      errors.push(`URL 云端：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   try {
     return await concatVideoSegmentsToMp4(blobs)
-  } catch (browserErr) {
-    if (urls.length >= blobs.length) {
-      try {
-        return await concatVideoUrlsOnServer(urls)
-      } catch (serverErr) {
-        try {
-          return await concatVideoBlobsOnServer(blobs)
-        } catch (blobServerErr) {
-          const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
-          const sMsg = serverErr instanceof Error ? serverErr.message : String(serverErr)
-          const bsMsg = blobServerErr instanceof Error ? blobServerErr.message : String(blobServerErr)
-          throw new Error(`浏览器拼接：${bMsg}；URL 云端：${sMsg}；Blob 云端：${bsMsg}`)
-        }
-      }
-    }
-    try {
-      return await concatVideoBlobsOnServer(blobs)
-    } catch (blobServerErr) {
-      const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
-      const bsMsg = blobServerErr instanceof Error ? blobServerErr.message : String(blobServerErr)
-      throw new Error(`浏览器拼接：${bMsg}；Blob 云端：${bsMsg}`)
-    }
+  } catch (e) {
+    errors.push(`浏览器：${e instanceof Error ? e.message : String(e)}`)
   }
+
+  try {
+    return await concatVideoBlobsOnServer(blobs)
+  } catch (e) {
+    errors.push(`Blob 云端：${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  throw new Error(errors.join('；') || '多段合并失败')
 }
 
 export async function renderDigitalHumanMp4(
