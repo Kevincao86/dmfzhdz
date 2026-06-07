@@ -28,11 +28,13 @@ function callCloud(method, path, data, headers) {
         }
         if (r.ok === false || (r.status && r.status >= 400)) {
           const d = r.data || {}
+          const userMsg = String(d.message || d.detail || d.hint || '').trim()
+          if (userMsg && /[\u4e00-\u9fa5]/.test(userMsg)) {
+            reject(new Error(userMsg))
+            return
+          }
           const apiErr = typeof d.error === 'string' ? d.error : ''
-          const msg = [apiErr, d.detail, d.message, d.hint, r.error, `http_${r.status}`]
-            .filter(Boolean)
-            .join(' — ')
-          reject(new Error(msg || 'cloud_proxy_fail'))
+          reject(new Error(apiErr || userMsg || r.error || `http_${r.status}` || 'cloud_proxy_fail'))
           return
         }
         resolve(r.data != null ? r.data : {})
