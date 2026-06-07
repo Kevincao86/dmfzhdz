@@ -7,7 +7,7 @@ const userProfile = require('./userProfile.js')
 const identityTypes = require('./identityTypes.js')
 
 const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v1'
-const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v1'
+const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v2'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
 const CACHE_TTL_MS = 6 * 3600 * 1000
 const BATCH_SIZE = 8
@@ -63,69 +63,125 @@ function orderAiPayload(row) {
   }
 }
 
-function fallbackOrderMatchScore(order, talent) {
-  let s = 38
-  const plat = String(order.platform || '')
-  const tPlat = String(talent.platform || '')
-  if (plat && tPlat && plat === tPlat) s += 18
+function talentMatchCacheKey(talent) {
+  if (!talent) return 'guest'
+  return [
+    String(talent.id || '').trim(),
+    talent.workIdentity || talent.role || 'talent',
+    talent.platform || '',
+    talent.city || '',
+    talent.province || '',
+    String(talent.followers ?? ''),
+    talent.douyinSalesLevel || '',
+    talent.quotePrice || '',
+    (talent.accountTags || []).slice(0, 8).join(','),
+  ]
+    .join('|')
+    .slice(0, 200)
+}
 
-  const region = String(order.region || '')
-  const city = String(talent.city || (talent.region && talent.region.split('·')[0].trim()) || '')
-  if (region.includes('全国')) s += 6
-  else if (city) {
-    const short = city.replace(/市$/, '')
-    if (region.includes(city) || (short.length >= 2 && region.includes(short))) s += 16
-  }
+function regionMatchesTalent(region, city, province) {
+  const r = String(region || '').trim()
+  if (!r) return 'unknown'
+  if (r.includes('全国')) return 'national'
+  const c = String(city || '').trim()
+  const p = String(province || '').trim()
+  const cShort = c.replace(/市$/, '')
+  const pShort = p.replace(/省$/, '')
+  if (c && (r.includes(c) || (cShort.length >= 2 && r.includes(cShort)))) return 'same_city'
+  if (pShort.length >= 2 && r.includes(pShort)) return 'same_province'
+  if (c || p) return 'mismatch'
+  return 'unknown'
+}
 
-  const cat = String(order.category || '')
-  const tags = [...(talent.accountTags || []), ...(talent.tags || []), ...(talent.supplierSkills || [])]
-  if (cat && tags.some((t) => t && (cat.includes(t) || t.includes(cat)))) s += 14
-
+function recruitTargetMatchesOrder(order, talent) {
   const target = String(order.recruitTarget || 'talent')
   const wid = String(talent.workIdentity || talent.role || 'talent')
-  if (target === wid) s += 14
-  else if (target !== wid) s -= 18
+  if (target === wid) return true
+  if (target === 'edit' && order.isIce && wid === 'edit') return true
+  return false
+}
 
+function clampMatchScoreByFacts(score, order, talent) {
+  let s = Number(score)
+  if (!Number.isFinite(s)) s = 0
+  if (!recruitTargetMatchesOrder(order, talent)) {
+    return Math.max(0, Math.min(100, Math.round(Math.min(s, 28))))
+  }
+  const plat = String(order.platform || '')
+  const tPlat = String(talent.platform || '')
+  if (plat && tPlat && plat !== tPlat) s = Math.min(s, 42)
+  const loc = regionMatchesTalent(order.region || '', talent.city || '', talent.province || '')
+  if (loc === 'mismatch') s = Math.min(s, 48)
+  else if (loc === 'unknown' && !String(order.region || '').includes('全国')) s = Math.min(s, 52)
+  else if (loc === 'same_province' && s > 68) s = Math.min(s, 68)
+  else if (loc === 'national' && s > 72) s = Math.min(s, 72)
   const fansReq = String(order.fansRequirement || '')
   const f = Number(talent.followers) || 0
-  if (fansReq.includes('不限')) s += 10
+  if (fansReq && !fansReq.includes('不限')) {
+    const fm = fansReq.match(/([\d.]+)\s*万/)
+    const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
+    if (need > 0 && f > 0 && f < need * 0.85) s = Math.min(s, 44)
+  }
+  return Math.max(0, Math.min(100, Math.round(s)))
+}
+
+function fallbackOrderMatchScore(order, talent) {
+  if (!recruitTargetMatchesOrder(order, talent)) {
+    return { score: 18, tag: '身份不符', tone: 'default' }
+  }
+  let s = 10
+  const plat = String(order.platform || '')
+  const tPlat = String(talent.platform || '')
+  if (plat && tPlat && plat === tPlat) s += 14
+  else if (plat && tPlat) s -= 6
+  const loc = regionMatchesTalent(order.region || '', talent.city || '', talent.province || '')
+  if (loc === 'same_city') s += 24
+  else if (loc === 'same_province') s += 12
+  else if (loc === 'national') s += 6
+  else if (loc === 'mismatch') s -= 8
+  const cat = String(order.category || '')
+  const tags = [...(talent.accountTags || []), ...(talent.tags || []), ...(talent.supplierSkills || [])]
+  if (cat && tags.some((t) => t && (cat.includes(t) || t.includes(cat)))) s += 12
+  const fansReq = String(order.fansRequirement || '')
+  const f = Number(talent.followers) || 0
+  if (fansReq.includes('不限')) s += 2
   else {
     const fm = fansReq.match(/([\d.]+)\s*万/)
     const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
-    if (need > 0 && f >= need) s += 12
+    if (need > 0 && f >= need) s += 10
+    else if (need > 0 && f > 0) s -= 8
   }
-
-  if ((order.priceAmount || 0) >= 500) s += 4
-  if (order.urgent && (talent.applicationHabits && talent.applicationHabits.urgentApplyRatio || 0) > 20) s += 6
-  if (order.isIce && wid === 'edit') s += 10
-
   const habits = talent.applicationHabits || {}
-  if (habits.preferredPlatforms && habits.preferredPlatforms.includes(plat)) s += 8
-  if (cat && habits.preferredCategories && habits.preferredCategories.some((c) => cat.includes(c) || c.includes(cat))) s += 6
-
-  const score = Math.max(0, Math.min(90, Math.round(s)))
+  if (habits.preferredPlatforms && habits.preferredPlatforms.includes(plat)) s += 3
+  if (cat && habits.preferredCategories && habits.preferredCategories.some((c) => cat.includes(c) || c.includes(cat))) s += 2
+  if (order.urgent && (habits.urgentApplyRatio || 0) > 25) s += 2
+  const score = clampMatchScoreByFacts(s, order, talent)
   let tag = '可看看'
-  if (score >= 78) tag = '高匹配'
-  else if (score >= 65) tag = '较契合'
+  if (score >= 72) tag = '高匹配'
+  else if (score >= 58) tag = '较契合'
+  else if (loc === 'same_city') tag = '同城'
   else if (plat && tPlat && plat === tPlat) tag = '平台匹配'
-  return { score, tag, tone: score >= 65 ? 'match' : 'default' }
+  else if (loc === 'mismatch') tag = '异地'
+  return { score, tag, tone: score >= 58 ? 'match' : 'default' }
 }
 
 function applyOrderMatchResults(rows, map, talent, talentCity) {
+  const profile = { ...talent, city: talent.city || talentCity }
   return rows.map((row) => {
     const hit = map[row.id]
     if (hit && hit.score > 0) {
-      const score = Math.max(0, Math.min(100, Math.round(hit.score)))
+      const score = clampMatchScoreByFacts(hit.score, row, profile)
       return {
         ...row,
         matchScore: score,
-        aiTag: hit.tag || (score >= 75 ? '高匹配' : ''),
-        aiTagTone: hit.tone || (score >= 75 ? 'match' : 'default'),
-        aiMatch: score >= 60,
+        aiTag: hit.tag || (score >= 72 ? '高匹配' : ''),
+        aiTagTone: hit.tone || (score >= 72 ? 'match' : 'default'),
+        aiMatch: score >= 58,
         aiTagSource: 'ai',
       }
     }
-    const fb = fallbackOrderMatchScore(row, { ...talent, city: talent.city || talentCity })
+    const fb = fallbackOrderMatchScore(row, profile)
     return {
       ...row,
       matchScore: fb.score,
@@ -239,6 +295,7 @@ function talentProfileFromMember(member, opts) {
         ? ['剪辑', '后期', '云剪']
         : []
   return {
+    id: String((member && member.id) || '').trim(),
     workIdentity: identity,
     role: identity,
     roleLabel: identityTypes.workIdentityLabel(identity),
@@ -255,22 +312,6 @@ function talentProfileFromMember(member, opts) {
     supplierSkills,
     applicationHabits: habits,
   }
-}
-
-function talentCacheSuffix(talent) {
-  if (!talent) return 'guest'
-  const habits = talent.applicationHabits || {}
-  return [
-    talent.workIdentity || talent.role || 'talent',
-    talent.platform,
-    talent.nickname,
-    talent.city,
-    (talent.accountTags || []).join(','),
-    habits.recentApplyCount || 0,
-    (habits.preferredPlatforms || []).join(','),
-  ]
-    .join('|')
-    .slice(0, 160)
 }
 
 async function fetchMatchItems(orders, talent) {
@@ -370,7 +411,7 @@ async function enrichOrderMatches(rows, member, opts) {
     })
   }
 
-  const suffix = talentCacheSuffix(talent)
+  const suffix = talentMatchCacheKey(talent)
   const cache = readCache(MATCH_CACHE_KEY)
   const bucket = cache[suffix] && typeof cache[suffix] === 'object' ? cache[suffix] : {}
   const missing = []
@@ -480,41 +521,28 @@ function prOrdersCacheKey(orderPayloads) {
 
 function fallbackTalentScore(talent, orderPayloads, board) {
   if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
+  const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+  const parts = String(talent.region || '')
+    .split('·')
+    .map((s) => s.trim())
+  const profile = {
+    workIdentity: wid,
+    platform: talent.platform || '',
+    followers: talent.followersRaw != null ? talent.followersRaw : talent.followers,
+    city: parts[1] || parts[0] || '',
+    province: parts[0] || '',
+    accountTags: [...(talent.accountTags || []), ...(talent.tags || [])],
+  }
   let best = 0
   let tag = '可沟通'
-  const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
   for (const o of orderPayloads) {
-    let s = 38
-    const plat = String(o.platform || '')
-    const tPlat = String(talent.platform || '')
-    if (plat && tPlat && plat === tPlat) s += 18
-    const region = String(o.region || '')
-    const tRegion = String(talent.region || '')
-    if (region.includes('全国')) s += 6
-    else if (tRegion && region.includes(tRegion.split('·')[0].trim())) s += 16
-    const target = String(o.recruitTarget || 'talent')
-    if (target === wid) s += 14
-    else if (target !== wid) s -= 18
-    const needTags = o.talentTags || []
-    const tTags = [...(talent.tags || []), ...(talent.accountTags || [])]
-    if (needTags.length && tTags.some((t) => needTags.includes(t))) s += 14
-    const fansReq = String(o.fansRequirement || o.fans || '')
-    const f = Number(talent.followersRaw) || 0
-    if (fansReq.includes('不限')) s += 10
-    else {
-      const fm = fansReq.match(/([\d.]+)\s*万/)
-      const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
-      if (need > 0 && f >= need) s += 12
-    }
-    if ((o.priceAmount || 0) >= 500) s += 4
-    if (s > best) {
-      best = s
-      if (s >= 78) tag = '高匹配'
-      else if (s >= 65) tag = '较契合'
-      else if (plat === tPlat) tag = '平台匹配'
+    const fb = fallbackOrderMatchScore(o, profile)
+    if (fb.score > best) {
+      best = fb.score
+      tag = fb.tag
     }
   }
-  return { score: Math.min(90, best), tag, tone: best >= 65 ? 'match' : 'default' }
+  return { score: best, tag, tone: best >= 58 ? 'match' : 'default' }
 }
 
 async function fetchPrTalentMatchItems(orderPayloads, talents, board) {
