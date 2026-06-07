@@ -52,6 +52,7 @@ import {
   type PublishWizardDraft,
 } from '../../lib/mpSync/publishDraft'
 import { readPrProfile } from '../../lib/mpSync/userProfile'
+import PageHero from '../ui/PageHero'
 
 const PUBLISH_EDIT_KEY = 'meoo_publish_edit_mp_id'
 
@@ -356,18 +357,22 @@ export default function PublishWizard() {
 
   if (step === 'target') {
     return (
-      <div className="max-w-xl space-y-4">
-        <h2 className="text-xl font-bold">选择招募对象</h2>
-        <p className="text-sm text-slate-400">达人 · 拍摄 · 剪辑</p>
-        <div className="space-y-3">
+      <div className="max-w-2xl space-y-5">
+        <PageHero
+          title="发布招募"
+          subtitle="先选择招募对象，再进入探店 / 品宣 / 直播等模式填写表单。"
+          badge="步骤 1/4"
+        />
+        <p className="text-sm text-[var(--shell-muted)] px-1">选择招募对象 · 达人 · 拍摄 · 剪辑</p>
+        <div className="grid gap-3 sm:grid-cols-1">
           {RECRUIT_TARGETS.map((t) => (
             <button
               key={t.id}
               type="button"
-              className={`choice-card w-full text-left rounded-xl border p-4 ${
+              className={`choice-card w-full text-left rounded-xl border p-5 ${
                 'placeholder' in t && t.placeholder
                   ? 'border-white/5 opacity-80'
-                  : 'surface-card border'
+                  : 'surface-card border hover-panel'
               }`}
               onClick={() => {
                 setRecruitTarget(t.id)
@@ -376,8 +381,8 @@ export default function PublishWizard() {
                 setStep('mode')
               }}
             >
-              <div className="font-semibold">{t.label}</div>
-              <div className="text-sm text-slate-400 mt-1">{t.sub}</div>
+              <div className="font-semibold text-lg text-[var(--shell-text)]">{t.label}</div>
+              <div className="text-sm text-[var(--shell-muted)] mt-1.5 leading-relaxed">{t.sub}</div>
             </button>
           ))}
         </div>

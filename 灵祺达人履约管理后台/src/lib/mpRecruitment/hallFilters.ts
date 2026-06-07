@@ -1,5 +1,21 @@
 export const PLATFORM_FILTERS = ['全部', '抖音', '小红书', '大众点评', '快手', '微信视频号'] as const
 
+export const CATEGORY_FILTERS = [
+  '全部',
+  '餐饮美食',
+  '本地生活',
+  '酒旅',
+  '母婴',
+  '美妆时尚',
+  '家居家装',
+  '数码科技',
+  '汽车',
+  '教育',
+  '其他',
+] as const
+
+export const HALL_TYPE_FILTERS = ['全部', '招募大厅', '急单大厅', '云剪任务'] as const
+
 export const PRICE_BUCKETS = [
   { id: 'p0_49', label: '0-49', min: 0, max: 49 },
   { id: 'p50_99', label: '50-99', min: 50, max: 99 },
@@ -32,6 +48,18 @@ export function normalizeHallPlatform(raw: unknown): string {
 export function matchPlatform(rowPlatform: string, filterPlatform: string): boolean {
   if (!filterPlatform || filterPlatform === '全部') return true
   return normalizeHallPlatform(rowPlatform) === normalizeHallPlatform(filterPlatform)
+}
+
+export function matchCategory(rowCategory: string, filterCategory: string): boolean {
+  if (!filterCategory || filterCategory === '全部') return true
+  const c = String(rowCategory || '').trim() || '其他'
+  if (filterCategory === '其他') return !CATEGORY_FILTERS.slice(1, -1).some((cat) => c.includes(cat))
+  return c.includes(filterCategory) || filterCategory.includes(c)
+}
+
+export function matchHallType(hallLabel: string, filterHall: string): boolean {
+  if (!filterHall || filterHall === '全部') return true
+  return String(hallLabel || '').trim() === filterHall
 }
 
 export function matchCity(region: string, storeName: string, cityFilter: string): boolean {

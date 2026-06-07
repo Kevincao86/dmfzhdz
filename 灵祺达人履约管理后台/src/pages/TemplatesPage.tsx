@@ -9,6 +9,7 @@ import {
   TEMPLATE_KINDS,
   type TemplateKind,
 } from '../lib/mpSync/applyFormTemplates'
+import PageHero from '../components/ui/PageHero'
 
 export default function TemplatesPage() {
   if (getActiveRole() !== 'pr') return <Navigate to="/hall" replace />
@@ -32,35 +33,37 @@ export default function TemplatesPage() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <div className="flex justify-between items-center gap-3">
-        <h2 className="text-xl font-bold">我的模版</h2>
+      <PageHero
+        title="我的模版"
+        subtitle="管理达人 / 拍摄 / 剪辑报名单模版，发招募时将按招募对象自动匹配。"
+        badge={kindHint}
+      >
         <Link
           to={`/templates/edit?kind=${kind}`}
-          className="text-sm px-3 py-1.5 rounded-lg bg-violet-600 text-white hover-panel hover:bg-violet-500 transition-colors"
+          className="inline-flex px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500"
         >
           新增模版
         </Link>
-      </div>
-      <p className="text-sm text-[var(--shell-muted)]">
-        管理达人 / 拍摄 / 剪辑报名单模版，发招募时将按招募对象自动匹配。
-      </p>
+      </PageHero>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 p-1 rounded-xl panel-input border">
         {TEMPLATE_KINDS.map((k) => (
           <button
             key={k.id}
             type="button"
-            className={`panel-tab px-4 py-2 rounded-lg text-sm ${kind === k.id ? 'panel-tab-active' : ''}`}
+            className={`flex-1 min-w-[5rem] panel-tab px-4 py-2 rounded-lg text-sm ${kind === k.id ? 'panel-tab-active' : ''}`}
             onClick={() => setKind(k.id)}
           >
             {k.label}
           </button>
         ))}
       </div>
-      <p className="text-xs text-[var(--shell-muted)]">{kindHint}</p>
 
       {!filtered.length ? (
-        <p className="text-slate-500">暂无{kind === 'talent' ? '达人' : kind === 'shoot' ? '拍摄' : '剪辑'}模版，点击「新增模版」创建。</p>
+        <div className="surface-card rounded-xl border p-8 text-center text-[var(--shell-muted)] text-sm">
+          <p>暂无{kind === 'talent' ? '达人' : kind === 'shoot' ? '拍摄' : '剪辑'}模版</p>
+          <p className="text-xs mt-2">点击「新增模版」创建报名项模版，发招募时自动套用</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {filtered.map((t) => (

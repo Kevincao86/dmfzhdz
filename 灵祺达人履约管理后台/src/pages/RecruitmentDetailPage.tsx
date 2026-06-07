@@ -192,7 +192,7 @@ export default function RecruitmentDetailPage() {
           </div>
 
           {applied && role === 'talent' && !contactGate.canContact ? (
-            <p className="text-sm text-emerald-400">您已报名该招募，可在「我的履约」查看记录。</p>
+            <p className="text-sm text-emerald-400">您已报名该招募，可在「我的报名」查看记录。</p>
           ) : null}
 
           {chatEnabled && contactGate.canContact ? (

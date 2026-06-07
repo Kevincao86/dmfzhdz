@@ -14,6 +14,7 @@ import { profileFilled, TALENT_PLATFORMS } from '../../lib/mpSync/talentPlatform
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
 import RecommendTalentPanel from './RecommendTalentPanel'
+import PageHero from '../ui/PageHero'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
 function habitPlatforms(): string[] {
@@ -125,12 +126,11 @@ function SupplierRecommendOrders() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
-        <p className="text-sm text-[var(--shell-muted)] mt-1">
-          AI 识别 {WORK_EDITION_LABEL[workId]} 身份 · 结合标签与报名习惯匹配 · 按匹配分从高到低排序
-        </p>
-      </div>
+      <PageHero
+        title="推荐大厅"
+        subtitle={`AI 识别 ${WORK_EDITION_LABEL[workId]} 身份 · 结合标签与报名习惯匹配 · 按匹配分从高到低排序`}
+        badge="智能推荐"
+      />
       <input
         className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
         placeholder="搜索商单、门店、城市"
@@ -165,7 +165,7 @@ function SupplierRecommendOrders() {
       ) : null}
       <div className="grid gap-3 md:grid-cols-2">
         {orderDisplayRows.map((o) => (
-          <RecruitmentOrderCard key={o.id} row={o} onClick={() => goDetail(o)} />
+          <RecruitmentOrderCard key={o.id} row={o} showMatchScore onClick={() => goDetail(o)} />
         ))}
       </div>
       {showPriceSheet ? (
@@ -192,13 +192,12 @@ export default function RecommendHallPanel() {
   const role = getActiveRole()
   if (role === 'pr') {
     return (
-      <div className="space-y-2">
-        <div className="mb-2">
-          <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
-          <p className="text-sm text-[var(--shell-muted)] mt-1">
-            AI 识别 PR 身份 · 结合招募要求与发单习惯推荐达人 · 按匹配分从高到低排序
-          </p>
-        </div>
+      <div className="space-y-4">
+        <PageHero
+          title="推荐大厅"
+          subtitle="AI 识别 PR 身份 · 结合招募要求与发单习惯推荐达人/拍摄/剪辑 · 按匹配分从高到低排序"
+          badge="达人匹配"
+        />
         <RecommendTalentPanel embedded />
       </div>
     )

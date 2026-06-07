@@ -15,6 +15,8 @@ import {
 import { DELIVERY_WINDOWS } from '../lib/mpSync/publishFormOptions'
 import { copyRecruitmentShare } from '../lib/mpSync/recruitmentShareCopy'
 import { readPrProfile } from '../lib/mpSync/userProfile'
+import PageHero from '../components/ui/PageHero'
+import HallCityFilter from '../components/mp/HallCityFilter'
 
 type Tab = 'published' | 'drafts'
 
@@ -29,6 +31,8 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   mpOrderId: string
   hallLabel: string
   platform: string
+  region: string
+  category: string
   recruitTarget: 'talent' | 'shoot' | 'edit'
   mp: Record<string, unknown> | null
 }
@@ -55,6 +59,10 @@ export default function PrOrdersPage() {
   const [togglingId, setTogglingId] = useState('')
   const [filterTarget, setFilterTarget] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
+  const [filterCategory, setFilterCategory] = useState('全部')
+  const [filterHall, setFilterHall] = useState('全部')
+  const [filterProvince, setFilterProvince] = useState('全部')
+  const [filterCity, setFilterCity] = useState('全部')
 
   const refreshDrafts = useCallback(() => {
     setDrafts(listPublishDrafts())
@@ -79,6 +87,8 @@ export default function PrOrdersPage() {
             mpOrderId: item.mpOrderId,
             hallLabel: enriched.hallLabel as string,
             platform: enriched.platform as string,
+            region: String(mp?.region || mp?.storeName || ''),
+            category: String(mp?.category || '本地生活'),
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
             mp: mp || null,
           }
@@ -94,6 +104,8 @@ export default function PrOrdersPage() {
             mpOrderId: item.mpOrderId,
             hallLabel: '招募大厅',
             platform: '抖音',
+            region: '',
+            category: '本地生活',
             recruitTarget: 'talent' as const,
             mp: null,
           }
@@ -117,9 +129,12 @@ export default function PrOrdersPage() {
     return rows.filter((row) => {
       if (filterTarget !== 'all' && row.recruitTarget !== filterTarget) return false
       if (!hallFilters.matchPlatform(row.platform, filterPlatform)) return false
+      if (!hallFilters.matchCategory(row.category, filterCategory)) return false
+      if (!hallFilters.matchHallType(row.hallLabel, filterHall)) return false
+      if (!hallFilters.matchRegionFilter(row.region, '', filterProvince, filterCity)) return false
       return true
     })
-  }, [rows, filterTarget, filterPlatform])
+  }, [rows, filterTarget, filterPlatform, filterCategory, filterHall, filterProvince, filterCity])
 
   function setTab(next: Tab) {
     if (next === 'drafts') setSearch({ tab: 'drafts' })
@@ -164,12 +179,21 @@ export default function PrOrdersPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-[var(--shell-text)]">我的发单</h2>
-        <p className="text-sm text-[var(--shell-muted)] mt-1">
-          PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span> · 已发布与草稿分开展示
-        </p>
-      </div>
+      <PageHero
+        title="我的发单"
+        subtitle="管理已发布招募单与草稿，支持按身份、平台、城市、类目与大厅类型筛选。"
+        badge={tab === 'published' ? `${filteredRows.length} 条发单` : `${drafts.length} 草稿`}
+      >
+        <Link
+          to="/publish"
+          className="inline-flex px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500"
+        >
+          发布招募
+        </Link>
+      </PageHero>
+      <p className="text-sm text-[var(--shell-muted)] px-1">
+        PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span>
+      </p>
 
       <div className="flex gap-2 p-1 rounded-xl panel-input border max-w-md">
         <button
@@ -195,9 +219,9 @@ export default function PrOrdersPage() {
       </div>
 
       {tab === 'published' && rows.length > 0 ? (
-        <div className="space-y-3">
+        <div className="filter-strip rounded-xl border p-3 space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs text-[var(--shell-muted)]">筛选</span>
+            <span className="text-xs text-[var(--shell-muted)]">身份</span>
             {TARGET_FILTERS.map((f) => (
               <button
                 key={f.id}
@@ -208,8 +232,10 @@ export default function PrOrdersPage() {
                 {f.label}
               </button>
             ))}
+          </div>
+          <div className="flex flex-wrap gap-2 items-center text-sm">
             <select
-              className="rounded-lg panel-input border px-2 py-1.5 text-sm ml-auto"
+              className="rounded-lg panel-input border px-2 py-1.5"
               value={filterPlatform}
               onChange={(e) => setFilterPlatform(e.target.value)}
             >
@@ -217,6 +243,33 @@ export default function PrOrdersPage() {
                 <option key={p} value={p}>{p === '全部' ? '全部平台' : p}</option>
               ))}
             </select>
+            <select
+              className="rounded-lg panel-input border px-2 py-1.5"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              {hallFilters.CATEGORY_FILTERS.map((c) => (
+                <option key={c} value={c}>{c === '全部' ? '全部类目' : c}</option>
+              ))}
+            </select>
+            <select
+              className="rounded-lg panel-input border px-2 py-1.5"
+              value={filterHall}
+              onChange={(e) => setFilterHall(e.target.value)}
+            >
+              {hallFilters.HALL_TYPE_FILTERS.map((h) => (
+                <option key={h} value={h}>{h === '全部' ? '全部大厅' : h}</option>
+              ))}
+            </select>
+            <HallCityFilter
+              compact
+              province={filterProvince}
+              city={filterCity}
+              onChange={(prov, c) => {
+                setFilterProvince(prov)
+                setFilterCity(c)
+              }}
+            />
           </div>
           {filteredRows.length !== rows.length ? (
             <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {rows.length} 条</p>
@@ -253,7 +306,7 @@ export default function PrOrdersPage() {
                     </div>
                     <h3 className="font-semibold mt-1 text-[var(--shell-text)]">{row.title}</h3>
                     <p className="text-xs text-[var(--shell-muted)] mt-2">
-                      {row.signupLabel} · {row.deadlineDaysText}
+                      {row.region || '—'} · {row.category} · {row.signupLabel} · {row.deadlineDaysText}
                     </p>
                   </div>
                   <span className="text-xs px-2 py-0.5 rounded bg-white/10 shrink-0">{row.statusLabel}</span>

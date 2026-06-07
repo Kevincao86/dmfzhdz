@@ -1,4 +1,5 @@
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
+import MatchScoreBadge from '../ui/MatchScoreBadge'
 
 const TONE_CLASS: Record<string, string> = {
   match: 'order-tag--match',
@@ -13,9 +14,10 @@ const TONE_CLASS: Record<string, string> = {
 type Props = {
   row: RecruitmentOrderRow
   onClick?: () => void
+  showMatchScore?: boolean
 }
 
-export default function RecruitmentOrderCard({ row, onClick }: Props) {
+export default function RecruitmentOrderCard({ row, onClick, showMatchScore = false }: Props) {
   const tagTone = TONE_CLASS[row.aiTagTone || 'default'] || TONE_CLASS.default
   return (
     <article
@@ -23,8 +25,11 @@ export default function RecruitmentOrderCard({ row, onClick }: Props) {
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
       onKeyDown={(e) => e.key === 'Enter' && onClick?.()}
-      className={`order-card rounded-xl p-4 text-left w-full ${onClick ? 'order-card--clickable' : ''}`}
+      className={`order-card rounded-xl p-4 text-left w-full relative ${onClick ? 'order-card--clickable' : ''}`}
     >
+      {showMatchScore && row.matchScore ? (
+        <MatchScoreBadge score={row.matchScore} className="absolute top-3 right-3" />
+      ) : null}
       {row.aiTag ? (
         <span className={`order-tag ${tagTone}`}>{row.aiTag}</span>
       ) : row.isMock ? (
