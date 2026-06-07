@@ -1,8 +1,6 @@
+/** 展开大图与环墙同图，避免主包打入 -hd 冗余资源（微信主包 2MB 限制） */
 function hdSrcFor(src) {
-  const s = String(src || '')
-  if (!s) return s
-  if (/-hd\.(jpe?g|png|webp)$/i.test(s)) return s
-  return s.replace(/(\.(jpe?g|png|webp))$/i, '-hd$1')
+  return String(src || '')
 }
 
 function buildFaces(images) {

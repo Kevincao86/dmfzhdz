@@ -52,6 +52,10 @@
       },
       {
         "type": "glob",
+        "value": "images/login-orbit/*-hd.jpg"
+      },
+      {
+        "type": "glob",
         "value": "images/login-orbit/*.png"
       }
     ],
