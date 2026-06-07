@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
+  deleteMpLibraryEntries,
   fetchRegistry,
   syncSupplierTeamLibrary,
   type RegistrySupplierTeamLibraryEntry,
 } from '../opsRegistryApi'
+import { useOpsBatchSelection } from '../useOpsBatchSelection'
 
 type TeamRole = 'shoot' | 'edit'
 
@@ -76,6 +78,33 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
     return list.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
   }, [entries, q])
 
+  const rowIds = useMemo(() => rows.map((e) => e.id), [rows])
+  const batch = useOpsBatchSelection(rowIds)
+
+  async function onBatchDelete() {
+    if (!batch.checkedIds.length || batch.deleting) return
+    const label = role === 'shoot' ? '拍摄' : '剪辑'
+    if (
+      !window.confirm(
+        `确定删除选中的 ${batch.checkedIds.length} 条${label}团队记录？\n将同步清除注册表会员，履约 Web / 小程序刷新后可重新注册。`,
+      )
+    ) {
+      return
+    }
+    batch.setDeleting(true)
+    try {
+      const r = await deleteMpLibraryEntries({ kind: role, ids: batch.checkedIds })
+      if (!r.ok) {
+        window.alert(r.error ?? '删除失败')
+        return
+      }
+      batch.clearChecked(batch.checkedIds)
+      await load()
+    } finally {
+      batch.setDeleting(false)
+    }
+  }
+
   async function onSync() {
     setSyncing(true)
     setSyncMsg('')
@@ -119,6 +148,16 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
         >
           {syncing ? '扫描中…' : '扫描会员池'}
         </button>
+        {batch.checkedIds.length > 0 ? (
+          <button
+            type="button"
+            disabled={batch.deleting}
+            onClick={() => void onBatchDelete()}
+            className="rounded-lg border border-rose-700 bg-rose-950/40 px-3 py-2 text-sm text-rose-300 hover:bg-rose-950 disabled:opacity-50"
+          >
+            {batch.deleting ? '删除中…' : `批量删除（${batch.checkedIds.length}）`}
+          </button>
+        ) : null}
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-500 hover:underline">
           刷新
         </button>
@@ -134,6 +173,14 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
         <table className="w-full text-left text-sm">
           <thead className="border-b border-[var(--ops-border)] bg-[var(--ops-hover)] text-xs">
             <tr>
+              <th className="ops-muted w-10 px-4 py-3 font-medium">
+                <input
+                  type="checkbox"
+                  checked={batch.allVisibleChecked}
+                  onChange={batch.toggleAllVisible}
+                  aria-label="全选"
+                />
+              </th>
               <th className="ops-muted px-4 py-3 font-medium">昵称 / {meta.idLabel} ID</th>
               <th className="ops-muted px-4 py-3 font-medium">平台账号</th>
               <th className="ops-muted px-4 py-3 font-medium">联系</th>
@@ -145,13 +192,21 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
           <tbody className="divide-y divide-[var(--ops-border)]">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="ops-muted px-4 py-10 text-center">
+                <td colSpan={7} className="ops-muted px-4 py-10 text-center">
                   暂无数据；前端注册拍摄/剪辑团队后将自动入库，或点击「扫描会员池」补全历史数据
                 </td>
               </tr>
             ) : (
               rows.map((e) => (
                 <tr key={e.id} className="hover:bg-[var(--ops-hover)]">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={batch.checkedIds.includes(e.id)}
+                      onChange={() => batch.toggleRow(e.id)}
+                      aria-label={`选择 ${e.lingqiTeamId || e.id}`}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{e.wxNickName || '—'}</div>
                     <div className="font-mono text-[11px] text-indigo-500">

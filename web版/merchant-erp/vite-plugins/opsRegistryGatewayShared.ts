@@ -33,6 +33,10 @@ import {
   type MpRecruitmentPatchBody,
 } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
 import {
+  deleteMpLibraryEntriesFromSnapshot,
+  type MpLibraryDeleteKind,
+} from '../src/lib/mpLibraryRegistryMutations.js'
+import {
   handleIceMpApply,
   handleIceMpConfirm,
   isIceMpOrder,
@@ -160,6 +164,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-mp-recruitment-orders-apply' &&
           url !== '/api/meoo-ops-mp-recruitment-orders-patch' &&
           url !== '/api/meoo-ops-mp-recruitment-orders-delete' &&
+          url !== '/api/meoo-ops-mp-library-delete' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-talent-member-register' &&
@@ -590,6 +595,28 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             }
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true, deletedIds: result.deletedIds })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-library/delete' || url === '/api/meoo-ops-mp-library-delete')
+          ) {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { kind?: MpLibraryDeleteKind; ids?: string[] }
+            const kind = body.kind
+            if (!kind || !['talent', 'shoot', 'edit', 'pr'].includes(kind)) {
+              json(res, 400, { ok: false, error: 'invalid_kind' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            const result = deleteMpLibraryEntriesFromSnapshot(data, kind, body.ids ?? [])
+            if (!result.ok) {
+              json(res, result.status, { ok: false, error: result.error })
+              return
+            }
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, deletedCount: result.deletedCount })
             return
           }
 

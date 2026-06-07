@@ -58,6 +58,7 @@ import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-app
 import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
 import mpRecruitmentPatchHandler from '../api/meoo-ops-mp-recruitment-orders-patch.ts'
 import mpRecruitmentDeleteHandler from '../api/meoo-ops-mp-recruitment-orders-delete.ts'
+import mpLibraryDeleteHandler from '../api/meoo-ops-mp-library-delete.ts'
 import mpTalentMemberRegisterHandler from '../api/meoo-ops-mp-talent-member-register.ts'
 import mpPrUserRegisterHandler from '../api/meoo-ops-mp-pr-user-register.ts'
 import mpTalentChatHandler from '../api/meoo-ops-mp-talent-chat.ts'
@@ -154,6 +155,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-orders-append': mpRecruitmentAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-patch': mpRecruitmentPatchHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-delete': mpRecruitmentDeleteHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-library-delete': mpLibraryDeleteHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-member-register': mpTalentMemberRegisterHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-pr-user-register': mpPrUserRegisterHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-chat': mpTalentChatHandler as VercelLikeHandler,

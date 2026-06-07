@@ -19,6 +19,10 @@ import { upsertTalentLibraryFromApplicant } from '../meooRegistryShared/talentLi
 import {
   deleteMpRecruitmentOrdersFromSnapshot,
 } from '../meooRegistryShared/mpRecruitmentOrderDelete.js'
+import {
+  deleteMpLibraryEntriesFromSnapshot,
+  type MpLibraryDeleteKind,
+} from '../meooRegistryShared/mpLibraryRegistryMutations.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
@@ -562,6 +566,21 @@ export async function dispatchOpsRegistrySupabase(opts: {
       const saved = upsertMpPrUser(data, prUser)
       await io.save(data)
       return { status: 200, body: { ok: true, id: saved.id, lingqiPrId: saved.lingqiPrId } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/mp-library/delete') {
+      const body = JSON.parse(bodyRaw || '{}') as { kind?: MpLibraryDeleteKind; ids?: string[] }
+      const kind = body.kind
+      if (!kind || !['talent', 'shoot', 'edit', 'pr'].includes(kind)) {
+        return { status: 400, body: { ok: false, error: 'invalid_kind' } }
+      }
+      const data = await io.load()
+      const result = deleteMpLibraryEntriesFromSnapshot(data, kind, body.ids ?? [])
+      if (!result.ok) {
+        return { status: result.status, body: { ok: false, error: result.error } }
+      }
+      await io.save(data)
+      return { status: 200, body: { ok: true, deletedCount: result.deletedCount } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {
