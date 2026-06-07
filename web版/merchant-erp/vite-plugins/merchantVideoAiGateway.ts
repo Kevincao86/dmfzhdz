@@ -32,7 +32,7 @@ import {
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
-import { concatRemoteMp4Urls } from './videoConcatServer.js'
+import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
 
 function applyRegistrySliceToVideoAiEnv(
   out: MerchantAiEnv,
@@ -879,6 +879,50 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const merged = await concatRemoteMp4Urls(urls)
+    if (!merged.ok) {
+      json(res, 502, { ok: false, message: merged.message })
+      return true
+    }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Content-Length', String(merged.buffer.length))
+    res.end(merged.buffer)
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/concat-blobs') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const rawSegs = parsed.segments
+    if (!Array.isArray(rawSegs) || rawSegs.length < 2) {
+      json(res, 400, { ok: false, message: '缺少至少 2 段 base64 视频片段。' })
+      return true
+    }
+    const buffers: Buffer[] = []
+    for (let i = 0; i < rawSegs.length; i++) {
+      const b64 = String(rawSegs[i] ?? '').trim()
+      if (!b64) {
+        json(res, 400, { ok: false, message: `第 ${i + 1} 段为空` })
+        return true
+      }
+      try {
+        const buf = Buffer.from(b64, 'base64')
+        if (buf.length > 80 * 1024 * 1024) {
+          json(res, 400, { ok: false, message: `第 ${i + 1} 段过大` })
+          return true
+        }
+        buffers.push(buf)
+      } catch {
+        json(res, 400, { ok: false, message: `第 ${i + 1} 段 base64 无效` })
+        return true
+      }
+    }
+    const merged = await concatLocalMp4Buffers(buffers)
     if (!merged.ok) {
       json(res, 502, { ok: false, message: merged.message })
       return true

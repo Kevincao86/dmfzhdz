@@ -41,6 +41,122 @@ function runFfmpeg(bin: string, args: string[]): { ok: boolean; stderr: string }
   return { ok: r.status === 0, stderr }
 }
 
+/** 将已下载到本地的多段视频 buffer 拼接（供 concat-blobs API 使用） */
+export async function concatLocalMp4Buffers(buffers: Buffer[]): Promise<
+  | { ok: true; buffer: Buffer }
+  | { ok: false; message: string }
+> {
+  if (buffers.length < 2) {
+    return { ok: false, message: '至少需要 2 段视频。' }
+  }
+  if (buffers.length > MAX_SEGMENTS) {
+    return { ok: false, message: `单次最多拼接 ${MAX_SEGMENTS} 段。` }
+  }
+  const ffmpeg = resolveFfmpegBin()
+  if (!ffmpeg) {
+    return {
+      ok: false,
+      message: '服务端未安装 ffmpeg，无法云端拼接。请在 ECS 执行：sudo apt-get install -y ffmpeg',
+    }
+  }
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-vconcat-blob-'))
+  try {
+    const localFiles: string[] = []
+    for (let i = 0; i < buffers.length; i++) {
+      const buf = buffers[i]!
+      if (buf.length === 0) return { ok: false, message: `第 ${i + 1} 段视频为空` }
+      if (buf.length > MAX_SEGMENT_BYTES) {
+        return { ok: false, message: `第 ${i + 1} 段视频过大（>${MAX_SEGMENT_BYTES / 1024 / 1024}MB）` }
+      }
+      if (!bufferLooksLikeVideo(buf)) {
+        return { ok: false, message: `第 ${i + 1} 段不是可识别的视频（${buf.length} 字节）` }
+      }
+      const fp = path.join(tmpDir, `s${i}.bin`)
+      fs.writeFileSync(fp, buf)
+      localFiles.push(fp)
+    }
+
+    const normalized: string[] = []
+    for (let i = 0; i < localFiles.length; i++) {
+      const src = localFiles[i]!
+      const norm = path.join(tmpDir, `n${i}.mp4`)
+      const normRes = runFfmpeg(ffmpeg, [
+        '-y',
+        '-i',
+        src,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'fast',
+        '-crf',
+        '23',
+        '-pix_fmt',
+        'yuv420p',
+        '-an',
+        '-movflags',
+        '+faststart',
+        norm,
+      ])
+      if (normRes.ok && fs.existsSync(norm) && fs.statSync(norm).size > 1024) {
+        normalized.push(norm)
+        continue
+      }
+      const copyNorm = path.join(tmpDir, `c${i}.mp4`)
+      const copyRes = runFfmpeg(ffmpeg, ['-y', '-i', src, '-c', 'copy', '-movflags', '+faststart', copyNorm])
+      if (copyRes.ok && fs.existsSync(copyNorm) && fs.statSync(copyNorm).size > 1024) {
+        normalized.push(copyNorm)
+        continue
+      }
+      return {
+        ok: false,
+        message: `第 ${i + 1} 段无法转为 MP4：${(normRes.stderr || copyRes.stderr).slice(-400)}`,
+      }
+    }
+
+    const listPath = path.join(tmpDir, 'list.txt')
+    const listTxt = normalized.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n')
+    fs.writeFileSync(listPath, listTxt, 'utf8')
+    const outPath = path.join(tmpDir, 'out.mp4')
+    const attempts: string[][] = [
+      ['-y', '-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', '-movflags', '+faststart', outPath],
+      [
+        '-y',
+        '-f',
+        'concat',
+        '-safe',
+        '0',
+        '-i',
+        listPath,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'fast',
+        '-crf',
+        '23',
+        '-pix_fmt',
+        'yuv420p',
+        '-an',
+        '-movflags',
+        '+faststart',
+        outPath,
+      ],
+    ]
+    let lastErr = 'ffmpeg 拼接失败'
+    for (const args of attempts) {
+      const r = runFfmpeg(ffmpeg, args)
+      if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
+        return { ok: true, buffer: fs.readFileSync(outPath) }
+      }
+      if (r.stderr) lastErr = r.stderr.slice(-600)
+    }
+    return { ok: false, message: lastErr }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '云端拼接异常' }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
+
 export async function concatRemoteMp4Urls(urls: string[]): Promise<
   | { ok: true; buffer: Buffer }
   | { ok: false; message: string }

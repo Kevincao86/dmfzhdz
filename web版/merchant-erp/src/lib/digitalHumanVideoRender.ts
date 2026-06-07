@@ -6,6 +6,7 @@ import { findPresetAvatarForDraft } from './digitalHumanBroadcast'
 import { concatVideoSegmentsToMp4 } from './concatVideoSegments'
 import { extractVideoLastFramePureBase64, imageUrlToPureBase64 } from './videoFrameUtils'
 import {
+  concatVideoBlobsOnServer,
   concatVideoUrlsOnServer,
   downloadVideoUrlAsBlob,
   fetchKlingVideoStatus,
@@ -182,7 +183,9 @@ async function generateKlingSegment(
     })
     if (!r.ok) throw new Error(r.message)
     const url = await waitKlingVideo(r.taskId, r.pollKind)
-    return { sourceUrl: url, blob: await downloadVideoUrlAsBlob(url) }
+    const blob = await downloadVideoUrlAsBlob(url)
+    if (blob.size < 1024) throw new Error('可灵返回的视频为空，请重试')
+    return { sourceUrl: url, blob }
   }
 
   const r = await postKlingVideoStart({
@@ -195,7 +198,9 @@ async function generateKlingSegment(
   })
   if (!r.ok) throw new Error(r.message)
   const url = await waitKlingVideo(r.taskId, r.pollKind)
-  return { sourceUrl: url, blob: await downloadVideoUrlAsBlob(url) }
+  const blob = await downloadVideoUrlAsBlob(url)
+  if (blob.size < 1024) throw new Error('可灵返回的视频为空，请重试')
+  return { sourceUrl: url, blob }
 }
 
 async function generateSeedanceSegmentWithFailover(opts: {
@@ -218,7 +223,9 @@ async function generateSeedanceSegmentWithFailover(opts: {
         throw new Error(r.message)
       }
       const url = await waitSeedanceVideo(r.taskId)
-      return { sourceUrl: url, blob: await downloadVideoUrlAsBlob(url) }
+      const blob = await downloadVideoUrlAsBlob(url)
+      if (blob.size < 1024) throw new Error('豆包返回的视频为空，请重试')
+      return { sourceUrl: url, blob }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       lastErr = msg
@@ -263,23 +270,46 @@ async function generateOneSegment(opts: {
   return generateKlingSegment(prompt, frameB64)
 }
 
+function assertSegmentBlob(blob: Blob, index: number): void {
+  if (blob.size < 1024) {
+    throw new Error(`第 ${index + 1} 段视频过小（${blob.size} 字节），请重新生成`)
+  }
+}
+
 async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<Blob> {
-  if (blobs.length === 1) return blobs[0]!
+  if (blobs.length === 1) {
+    assertSegmentBlob(blobs[0]!, 0)
+    return blobs[0]!
+  }
+  for (let i = 0; i < blobs.length; i++) assertSegmentBlob(blobs[i]!, i)
+
   const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
-  if (urls.length >= blobs.length) {
-    try {
-      return await concatVideoUrlsOnServer(urls)
-    } catch (serverErr) {
+
+  try {
+    return await concatVideoSegmentsToMp4(blobs)
+  } catch (browserErr) {
+    if (urls.length >= blobs.length) {
       try {
-        return await concatVideoSegmentsToMp4(blobs)
-      } catch (browserErr) {
-        const sMsg = serverErr instanceof Error ? serverErr.message : String(serverErr)
-        const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
-        throw new Error(`云端拼接：${sMsg}；浏览器拼接：${bMsg}`)
+        return await concatVideoUrlsOnServer(urls)
+      } catch (serverErr) {
+        try {
+          return await concatVideoBlobsOnServer(blobs)
+        } catch (blobServerErr) {
+          const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
+          const sMsg = serverErr instanceof Error ? serverErr.message : String(serverErr)
+          const bsMsg = blobServerErr instanceof Error ? blobServerErr.message : String(blobServerErr)
+          throw new Error(`浏览器拼接：${bMsg}；URL 云端：${sMsg}；Blob 云端：${bsMsg}`)
+        }
       }
     }
+    try {
+      return await concatVideoBlobsOnServer(blobs)
+    } catch (blobServerErr) {
+      const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
+      const bsMsg = blobServerErr instanceof Error ? blobServerErr.message : String(blobServerErr)
+      throw new Error(`浏览器拼接：${bMsg}；Blob 云端：${bsMsg}`)
+    }
   }
-  return concatVideoSegmentsToMp4(blobs)
 }
 
 export async function renderDigitalHumanMp4(
