@@ -3,6 +3,7 @@ import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
 import { clearSession, getAccount, getActiveRole, type MpAccountRole } from '../lib/mpSession'
 import { readPrProfile } from '../lib/mpSync/userProfile'
+import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 
 type NavItem = { to: string; label: string; roles?: MpAccountRole[] }
@@ -42,10 +43,15 @@ export default function AppShell() {
   }
 
   const prProfile = role === 'pr' ? readPrProfile() : null
+  const member = role !== 'pr' ? readMember() : null
   const idLabel =
     role === 'pr'
       ? account?.lingqiPrId || prProfile?.lingqiPrId || '未绑定 PRID'
-      : account?.lingqiTalentId || '未绑定达人ID'
+      : workId === 'shoot'
+        ? member?.lingqiShootTeamId || account?.lingqiShootTeamId || '未绑定拍摄团队ID'
+        : workId === 'edit'
+          ? member?.lingqiEditTeamId || account?.lingqiEditTeamId || '未绑定剪辑团队ID'
+          : account?.lingqiTalentId || member?.lingqiTalentId || '未绑定达人ID'
 
   const editionLabel = role === 'pr' ? 'PR 版' : WORK_EDITION_LABEL[workId]
 

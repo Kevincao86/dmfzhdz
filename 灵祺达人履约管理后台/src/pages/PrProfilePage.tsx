@@ -6,7 +6,7 @@ import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSessio
 import { emptyPrProfile, readPrProfile, writePrProfile, type PrProfile } from '../lib/mpSync/userProfile'
 import { readWxAccount } from '../lib/mpSync/wxAccount'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
-import { validateRegion } from '../lib/mpSync/regionPicker'
+import { setupRegionState, validateRegion } from '../lib/mpSync/regionPicker'
 
 const ACCOUNT_TYPES = [
   { id: 'company' as const, label: '公司（机构）' },
@@ -72,7 +72,8 @@ export default function PrProfilePage() {
       setMsg(contactErr)
       return
     }
-    const regionErr = validateRegion(form.province, form.city)
+    const region = setupRegionState(form.province, form.city)
+    const regionErr = validateRegion(region.province, region.city)
     if (regionErr) {
       setMsg(regionErr)
       return
@@ -82,6 +83,8 @@ export default function PrProfilePage() {
     const accNow = getAccount()
     const saved: PrProfile = {
       ...form,
+      province: region.province,
+      city: region.city,
       id: accNow?.registryPrId || form.id || prev?.id || `MPR-${Date.now()}`,
       lingqiPrId: accNow?.lingqiPrId || form.lingqiPrId,
       companyName: form.accountType === 'company' ? org : '',
