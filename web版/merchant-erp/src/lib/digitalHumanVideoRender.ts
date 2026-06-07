@@ -226,8 +226,25 @@ async function generateSeedanceSegmentWithFailover(opts: {
         throw new Error(r.message)
       }
       const url = await waitSeedanceVideo(r.taskId)
-      const blob = await assertBlobLooksLikeVideo(await downloadVideoUrlAsBlob(url), '豆包成片')
-      if (blob.size < 1024) throw new Error('豆包返回的视频为空，请重试')
+      let blob: Blob | null = null
+      let lastDlErr = '豆包返回的视频为空，请重试'
+      for (let d = 0; d < 4; d++) {
+        if (d > 0) await sleep(2000 * d)
+        try {
+          const candidate = await assertBlobLooksLikeVideo(
+            await downloadVideoUrlAsBlob(url),
+            '豆包成片',
+          )
+          if (candidate.size >= 1024) {
+            blob = candidate
+            break
+          }
+          lastDlErr = `豆包返回的视频为空（${candidate.size} 字节）`
+        } catch (e) {
+          lastDlErr = e instanceof Error ? e.message : String(e)
+        }
+      }
+      if (!blob) throw new Error(lastDlErr)
       return { sourceUrl: url, blob }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
