@@ -232,6 +232,8 @@ export type RegistryMpRecruitmentOrder = {
   fulfillmentLoop?: 'open' | 'closed'
   /** 发布方身份：商家 ERP 创建为 merchant；PR 小程序创建为 pr */
   publisherIdentity?: 'pr' | 'merchant'
+  mpPublishMeta?: Record<string, unknown>
+  recruitTarget?: 'talent' | 'shoot' | 'edit'
 }
 
 export type RegistryTalentPoolRow = {
@@ -540,6 +542,23 @@ export async function patchMpRecruitmentOrder(body: {
   const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
   if (!res.ok) return { ok: false, error: j.error ?? mapHttpError(res.status) }
   return { ok: j.ok !== false }
+}
+
+export async function deleteMpRecruitmentOrders(body: {
+  id?: string
+  ids?: string[]
+}): Promise<{ ok: boolean; deletedIds?: string[]; error?: string }> {
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-mp-recruitment-orders-delete', '/api/ops-sync/mp-recruitment-orders/delete'],
+    body,
+  )
+  if (!res.ok) {
+    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+  }
+  return {
+    ok: j.ok !== false,
+    deletedIds: Array.isArray(j.deletedIds) ? (j.deletedIds as string[]) : undefined,
+  }
 }
 
 export async function setRecruitmentOrders(orders: RegistryRecruitmentOrder[]): Promise<{ ok: boolean; error?: string }> {

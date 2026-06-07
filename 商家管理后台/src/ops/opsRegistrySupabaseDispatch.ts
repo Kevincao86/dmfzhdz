@@ -16,6 +16,9 @@ import type {
 import { filterLegacyDemoRecruitmentOrders } from '../meooRegistryShared/recruitmentLegacyDemoOrders.js'
 import { upsertMpTalentMember } from '../meooRegistryShared/mpTalentMemberUpsert.js'
 import { upsertTalentLibraryFromApplicant } from '../meooRegistryShared/talentLibraryUpsert.js'
+import {
+  deleteMpRecruitmentOrdersFromSnapshot,
+} from '../meooRegistryShared/mpRecruitmentOrderDelete.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
@@ -369,18 +372,19 @@ export async function dispatchOpsRegistrySupabase(opts: {
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/delete') {
-      const body = JSON.parse(bodyRaw || '{}') as { id?: string }
-      const id = (body.id ?? '').trim()
-      if (!id) return { status: 400, body: { ok: false, error: 'invalid_delete' } }
+      const body = JSON.parse(bodyRaw || '{}') as { id?: string; ids?: string[] }
+      const ids = Array.isArray(body.ids)
+        ? body.ids
+        : body.id
+          ? [body.id]
+          : []
       const data = await io.load()
-      const list = data.mpRecruitmentOrders ?? []
-      const next = list.filter((o) => o && o.id !== id)
-      if (next.length === list.length) {
-        return { status: 404, body: { ok: false, error: 'not_found' } }
+      const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
+      if (!result.ok) {
+        return { status: result.status, body: { ok: false, error: result.error } }
       }
-      data.mpRecruitmentOrders = next
       await io.save(data)
-      return { status: 200, body: { ok: true } }
+      return { status: 200, body: { ok: true, deletedIds: result.deletedIds } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/apply') {

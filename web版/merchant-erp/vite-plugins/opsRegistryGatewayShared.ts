@@ -28,7 +28,7 @@ import type {
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
 import { upsertMpPrUser } from '../src/lib/mpPrUserUpsert.js'
 import {
-  deleteMpRecruitmentOrderFromSnapshot,
+  deleteMpRecruitmentOrdersFromSnapshot,
   patchMpRecruitmentOrderInSnapshot,
   type MpRecruitmentPatchBody,
 } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
@@ -580,15 +580,16 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               url === '/api/meoo-ops-mp-recruitment-orders-delete')
           ) {
             const raw = await readBody(req)
-            const body = JSON.parse(raw || '{}') as { id?: string }
+            const body = JSON.parse(raw || '{}') as { id?: string; ids?: string[] }
+            const ids = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : []
             const data = ensureRegistry(viteRoot)
-            const result = deleteMpRecruitmentOrderFromSnapshot(data, body.id ?? '')
+            const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
             if (!result.ok) {
               json(res, result.status, { ok: false, error: result.error })
               return
             }
             writeRegistry(viteRoot, data)
-            json(res, 200, { ok: true })
+            json(res, 200, { ok: true, deletedIds: result.deletedIds })
             return
           }
 
