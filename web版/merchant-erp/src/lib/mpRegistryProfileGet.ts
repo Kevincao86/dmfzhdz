@@ -2,6 +2,7 @@ import type { MpAccountRow } from './mpAccountAuth.js'
 import type { RegistryFile, RegistryMpPrUser, RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
+import { enrichMemberFromRegistrySources } from './mpRegistryProfileEnrich.js'
 import { registryMemberToClientDraft, registryPrToClientDraft } from './registryMemberClientMap.js'
 
 function accountPhoneKey(account: MpAccountRow): string {
@@ -105,10 +106,21 @@ export async function mpAuthGetRegistryProfile(
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
-  const member = findRegistryMemberForAccount(data, account)
+  const rawMember = findRegistryMemberForAccount(data, account)
+  const member = enrichMemberFromRegistrySources(data, account, rawMember)
   const pr = findRegistryPrForAccount(data, account)
+  const accTalentId = String(account.lingqi_talent_id || '').trim()
+  const accMemberId = String(account.registry_member_id || '').trim()
+  let talentMember = member ? registryMemberToClientDraft(member) : null
+  if (talentMember && typeof talentMember === 'object') {
+    talentMember = {
+      ...talentMember,
+      id: accMemberId || talentMember.id,
+      lingqiTalentId: accTalentId || talentMember.lingqiTalentId,
+    }
+  }
   return {
-    talentMember: member ? registryMemberToClientDraft(member) : null,
+    talentMember,
     prProfile: pr ? registryPrToClientDraft(pr) : null,
   }
 }

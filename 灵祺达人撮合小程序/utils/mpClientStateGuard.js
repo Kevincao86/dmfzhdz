@@ -7,8 +7,14 @@ function talentDraftBelongsToAccount(draft, account) {
   if (!draft || typeof draft !== 'object' || !account) return false
   const accTalentId = String(account.lingqiTalentId || '').trim()
   const draftTalentId = String(draft.lingqiTalentId || '').trim()
-  if (accTalentId && draftTalentId && accTalentId !== draftTalentId) return false
   const loginPhone = digits11(account.loginName)
+  if (accTalentId && draftTalentId && accTalentId !== draftTalentId) {
+    const contact = digits11(draft.contact)
+    const wechat = digits11(draft.wechatId)
+    const phoneOk =
+      !!loginPhone && (contact === loginPhone || wechat === loginPhone || (!contact && !wechat))
+    if (!phoneOk) return false
+  }
   if (!loginPhone) return true
   const contact = digits11(draft.contact)
   const wechat = digits11(draft.wechatId)

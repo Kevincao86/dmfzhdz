@@ -1,8 +1,26 @@
 #!/usr/bin/env npx tsx
 import { findRegistryMemberForAccount } from '../src/lib/mpRegistryProfileGet.ts'
+import { enrichMemberFromRegistrySources } from '../src/lib/mpRegistryProfileEnrich.ts'
+import { registryMemberToClientDraft } from '../src/lib/registryMemberClientMap.ts'
 import type { MpAccountRow } from '../src/lib/mpAccountAuth.ts'
 
 const data = {
+  talentLibraryEntries: [
+    {
+      id: 'TL-1',
+      lingqiTalentId: 'LQ-D-000001',
+      platform: '抖音' as const,
+      platformAccount: 'vcdd',
+      platformNickname: '迷糊',
+      profileLink: 'https://v.douyin.com/x',
+      followers: 5000,
+      contact: '18768501283',
+      wechatId: '18768501283',
+      quotePrice: '500',
+      paymentMethod: '支付宝',
+      updatedAt: '2026/6/7',
+    },
+  ],
   mpTalentMembers: [
     {
       id: 'MTM-A',
@@ -60,4 +78,22 @@ if (!byTalentOnly || byTalentOnly.lingqiTalentId !== 'LQ-D-000009') {
   process.exit(1)
 }
 
-console.log('OK: registry member lookup by member_id and lingqi_talent_id')
+const enriched = enrichMemberFromRegistrySources(data, account, hit!)
+const draft = registryMemberToClientDraft(enriched!)
+const douyin = (draft.platformProfiles as Record<string, Record<string, unknown>>)?.douyin
+if (!douyin || douyin.platformNickname !== '迷糊' || douyin.platformAccount !== 'vcdd') {
+  console.error('FAIL: expected merged douyin profile from library/sibling', douyin)
+  process.exit(1)
+}
+if (draft.lingqiTalentId !== 'LQ-D-000009') {
+  console.error('FAIL: draft must keep account lingqi id', draft.lingqiTalentId)
+  process.exit(1)
+}
+
+const libOnly = enrichMemberFromRegistrySources(data, account, null)
+if (!libOnly || !libOnly.platformProfiles?.douyin) {
+  console.error('FAIL: library-only enrich')
+  process.exit(1)
+}
+
+console.log('OK: registry member lookup + talent library merge for LQ-D-000009')
