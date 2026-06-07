@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { setupRegionState } from '../../lib/mpSync/regionPicker'
 
 type Props = {
@@ -8,6 +9,21 @@ type Props = {
 
 export default function RegionSelect({ province, city, onChange }: Props) {
   const state = setupRegionState(province, city)
+
+  /** 下拉默认展示首项省市，但父级 state 可能仍为空，导致保存校验「请选择省份」 */
+  useEffect(() => {
+    const resolved = setupRegionState(province, city)
+    const provEmpty = !String(province || '').trim()
+    const cityEmpty = !String(city || '').trim()
+    if (
+      (provEmpty || cityEmpty) &&
+      resolved.province &&
+      resolved.city &&
+      (resolved.province !== province || resolved.city !== city)
+    ) {
+      onChange(resolved.province, resolved.city)
+    }
+  }, [province, city, onChange])
   return (
     <div className="grid grid-cols-2 gap-3">
       <label className="block text-sm">
