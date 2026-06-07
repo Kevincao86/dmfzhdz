@@ -36,22 +36,13 @@
   <view class="login-stack">
     <view class="login-shell">
       <view class="login-main">
-        <view class="login-identity">
-          <text class="login-identity-label">选择登录身份</text>
-          <view class="login-identity-grid">
-            <view
-              wx:for="{{identityOptions}}"
-              wx:key="id"
-              class="login-identity-item {{loginIdentity === item.id ? 'login-identity-item--on' : ''}}"
-              data-id="{{item.id}}"
-              bindtap="onPickLoginIdentity"
-            >
-              <text class="login-identity-emoji">{{item.emoji}}</text>
-              <text class="login-identity-name">{{item.label}}</text>
-            </view>
+        <view class="login-identity-row">
+          <view class="login-identity-main">
+            <text class="login-identity-label">选择登录身份</text>
+            <text class="login-identity-value" wx:if="{{loginIdentity}}">{{loginIdentityEmoji}} {{loginIdentityLabel}}</text>
+            <text class="login-identity-placeholder" wx:else>请先切换身份后再登录</text>
           </view>
-          <text class="login-identity-hint" wx:if="{{!loginIdentity}}">请先选择身份，再进行微信 / 账号登录或注册</text>
-          <text class="login-identity-picked" wx:else>当前：{{loginIdentityLabel}}</text>
+          <view class="login-identity-switch" bindtap="onOpenIdentitySheet">切换身份</view>
         </view>
 
         <view class="login-tabs lq-gradient-tabs">
@@ -183,5 +174,28 @@
   <view class="login-orbit-zone">
     <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
   </view>
+  </view>
+
+  <view class="login-id-sheet-mask" wx:if="{{showIdentitySheet}}" bindtap="onCloseIdentitySheet">
+    <view class="login-id-sheet" catchtap="noopSheetTap">
+      <view class="login-id-sheet-head">
+        <text class="login-id-sheet-title">切换登录身份</text>
+        <text class="login-id-sheet-close" bindtap="onCloseIdentitySheet">×</text>
+      </view>
+      <text class="login-id-sheet-hint">达人 / 拍摄 / 剪辑 / PR 四选一，选定后再登录</text>
+      <view
+        wx:for="{{identityOptions}}"
+        wx:key="id"
+        class="login-id-sheet-opt {{loginIdentity === item.id ? 'active' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickLoginIdentity"
+      >
+        <text class="login-id-sheet-emoji">{{item.emoji}}</text>
+        <view class="login-id-sheet-body">
+          <text class="login-id-sheet-name">{{item.label}}</text>
+        </view>
+        <text class="login-id-sheet-check" wx:if="{{loginIdentity === item.id}}">✓</text>
+      </view>
+    </view>
   </view>
 </view>
