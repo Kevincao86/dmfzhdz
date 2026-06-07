@@ -99,7 +99,7 @@ const PLATFORM_HOST: Record<ProfilePlatformKey, RegExp> = {
   douyin: /(?:^|\.)?(?:douyin\.com|iesdouyin\.com|v\.douyin\.com)(?:\/|$)/i,
   xiaohongshu: /(?:^|\.)?(?:xiaohongshu\.com|xhslink\.com|xhs\.cn)(?:\/|$)/i,
   kuaishou: /(?:^|\.)?(?:kuaishou\.com|chenzhongtech\.com|gifshow\.com|v\.kuaishou\.com)(?:\/|$)/i,
-  dianping: /(?:^|\.)?(?:dianping\.com|m\.dianping\.com)(?:\/|$)/i,
+  dianping: /(?:^|\.)?(?:dianping\.com|m\.dianping\.com|w\.dianping\.com)(?:\/|$)/i,
   weixin_video: /(?:^|\.)?(?:channels\.weixin\.qq\.com)(?:\/|$)/i,
 }
 
@@ -167,6 +167,53 @@ function douyinMirrorUrls(profileUrl: string): string[] {
   return [...out]
 }
 
+function canonicalDouyinProfileUrl(profileUrl: string): string {
+  const sec = extractSecUidFromDouyinUrl(profileUrl)
+  return sec ? `https://www.douyin.com/user/${sec}` : profileUrl
+}
+
+type IesDouyinUserInfo = {
+  nickname?: string
+  unique_id?: string
+  short_id?: string
+  signature?: string
+  mplatform_followers_count?: number
+  follower_count?: number
+  gender?: number
+}
+
+async function fetchDouyinUserBySecUid(secUid: string): Promise<RawProfileBlob | null> {
+  if (!secUid) return null
+  const apiUrl = `https://www.iesdouyin.com/web/api/v2/user/info/?sec_uid=${encodeURIComponent(secUid)}`
+  try {
+    const res = await fetch(apiUrl, {
+      headers: {
+        ...fetchHeaders('douyin', 'mobile'),
+        Accept: 'application/json, text/plain, */*',
+      },
+      signal: AbortSignal.timeout(12_000),
+    })
+    if (!res.ok) return null
+    const j = (await res.json()) as { status_code?: number; user_info?: IesDouyinUserInfo }
+    if (j.status_code !== 0 || !j.user_info) return null
+    const u = j.user_info
+    const uniqueId = String(u.unique_id || '').trim()
+    const shortId = String(u.short_id || '').trim()
+    return {
+      platformNickname: String(u.nickname || '').trim(),
+      platformAccount: uniqueId && uniqueId !== '0' ? uniqueId : shortId !== '0' ? shortId : '',
+      followers: Math.max(
+        0,
+        Number(u.mplatform_followers_count ?? u.follower_count ?? 0) || 0,
+      ),
+      gender: typeof u.gender === 'number' ? u.gender : undefined,
+      signature: String(u.signature || '').trim(),
+    }
+  } catch {
+    return null
+  }
+}
+
 function parseRenderDataScript(html: string): unknown | null {
   const m =
     /<script[^>]+id=["']RENDER_DATA["'][^>]*>([\s\S]*?)<\/script>/i.exec(html) ??
@@ -214,18 +261,27 @@ async function fetchProfileHtmlCandidates(profileUrl: string, key: ProfilePlatfo
   for (const u of urls) {
     attempts.push({ url: u, ua: 'mobile' }, { url: u, ua: 'desktop' })
   }
-  let longest = ''
+  let bestHtml = ''
+  let bestScore = -1
   for (const { url, ua } of attempts) {
     try {
       const html = await fetchHtml(url, key, ua)
-      if (html.length > longest.length) longest = html
+      if (!html) continue
       const probe = parseProfileFromHtml(html, key, profileUrl)
-      if (probe?.platformNickname || probe?.platformAccount) return html
+      const score =
+        (probe?.platformNickname ? 4 : 0) +
+        (probe?.platformAccount ? 3 : 0) +
+        ((probe?.followers ?? 0) > 0 ? 3 : 0) +
+        Math.min(html.length / 100_000, 2)
+      if (score > bestScore || (score === bestScore && html.length > bestHtml.length)) {
+        bestScore = score
+        bestHtml = html
+      }
     } catch {
       /* next */
     }
   }
-  return longest
+  return bestHtml
 }
 
 function parseJsonObjectFromScriptPrefix(raw: string): unknown | null {
@@ -259,12 +315,155 @@ function unescapeJsonString(raw: string): string {
 }
 
 function pickMetaContent(html: string, key: string): string | null {
-  const re = new RegExp(
-    `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']`,
-    'i',
-  )
-  const m = re.exec(html)
-  return m?.[1] ? unescapeJsonString(m[1].trim()) : null
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+(?:property|name)=["']${key}["'][^>]+content=["']([^"']+)["']`,
+      'i',
+    ),
+    new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${key}["']`,
+      'i',
+    ),
+  ]
+  for (const re of patterns) {
+    const m = re.exec(html)
+    if (m?.[1]) return unescapeJsonString(m[1].trim())
+  }
+  return null
+}
+
+function pickHtmlTitle(html: string): string {
+  const m = /<title[^>]*>([^<]+)<\/title>/i.exec(html)
+  return m?.[1] ? unescapeJsonString(m[1].trim()) : ''
+}
+
+function parseChineseCount(raw: string): number {
+  const s = String(raw || '').replace(/,/g, '').trim()
+  if (!s) return 0
+  const wm = /^([\d.]+)\s*[wW万]\+?$/i.exec(s)
+  if (wm) return Math.round(Number(wm[1]) * 10000)
+  const qm = /^([\d.]+)\s*千\+?$/i.exec(s)
+  if (qm) return Math.round(Number(qm[1]) * 1000)
+  const km = /^([\d.]+)\s*[kK]\+?$/i.exec(s)
+  if (km) return Math.round(Number(km[1]) * 1000)
+  const kmInline = /^([\d.]+)(?:[kK]|千)\+?$/.exec(s)
+  if (kmInline) return Math.round(Number(kmInline[1]) * 1000)
+  const n = Number.parseInt(s.replace(/\+/g, ''), 10)
+  return Number.isFinite(n) ? Math.max(0, n) : 0
+}
+
+function mergeProfileBlob(base: RawProfileBlob | null, extra: RawProfileBlob | null): RawProfileBlob | null {
+  if (!base && !extra) return null
+  if (!base) return extra
+  if (!extra) return base
+  return {
+    platformNickname: base.platformNickname || extra.platformNickname,
+    platformAccount: base.platformAccount || extra.platformAccount,
+    followers: Math.max(base.followers ?? 0, extra.followers ?? 0) || undefined,
+    gender: base.gender ?? extra.gender,
+    signature: base.signature || extra.signature,
+    talentGrade: base.talentGrade || extra.talentGrade,
+    reviewCount: base.reviewCount || extra.reviewCount,
+  }
+}
+
+function extractAtHandleFromShareText(raw: string): string {
+  const m = /@([A-Za-z0-9_\u4e00-\u9fff-]{2,32})/.exec(raw)
+  const handle = m?.[1]?.trim() || ''
+  return handle.replace(/的个人主页$/i, '').replace(/在小红书.*$/i, '').trim()
+}
+
+function extractDianpingUserId(raw: string): string {
+  const decoded = decodeURIComponent(raw)
+  const m =
+    /[?&]userid=(\d{5,12})/i.exec(decoded) ??
+    /userid[=:](\d{5,12})/i.exec(decoded) ??
+    /\/member\/(\d{5,12})/i.exec(decoded)
+  return m?.[1]?.trim() || ''
+}
+
+function parseDianpingShareFallback(raw: string, profileUrl: string): RawProfileBlob | null {
+  const userId = extractDianpingUserId(raw) || extractDianpingUserId(profileUrl)
+  const handle = extractAtHandleFromShareText(raw)
+  if (!userId && !handle) return null
+  return {
+    platformAccount: userId,
+    platformNickname: handle,
+  }
+}
+
+function enrichProfileFromHtml(
+  html: string,
+  key: ProfilePlatformKey,
+  profileUrl: string,
+  blob: RawProfileBlob | null,
+): RawProfileBlob | null {
+  let out = blob ? { ...blob } : null
+
+  const nickM = /"(?:nickname|nickName|userName)"\s*:\s*"((?:\\.|[^"\\])*)"/i.exec(html)
+  const uidM =
+    /"(?:unique_id|redId|red_id|userId|finderUsername|kwaiId)"\s*:\s*"((?:\\.|[^"\\])*)"/i.exec(
+      html,
+    ) ?? /"(?:unique_id|userId)"\s*:\s*(\d+)/.exec(html)
+  const fansM =
+    /"(?:follower_count|followerCount|fansCount|fanCount|fans|mplatform_followers_count)"\s*:\s*(\d+)/i.exec(
+      html,
+    )
+  const sigM = /"(?:signature|desc|description|bio)"\s*:\s*"((?:\\.|[^"\\])*)"/i.exec(html)
+
+  out = mergeProfileBlob(out, {
+    platformNickname: nickM ? unescapeJsonString(nickM[1]) : undefined,
+    platformAccount: uidM ? unescapeJsonString(uidM[1]) : undefined,
+    followers: fansM ? Number.parseInt(fansM[1], 10) : undefined,
+    signature: sigM ? unescapeJsonString(sigM[1]) : undefined,
+  })
+
+  if (key === 'douyin') {
+    const genderM = /"gender"\s*:\s*([12])\b/.exec(html)
+    if (genderM) {
+      out = mergeProfileBlob(out, { gender: Number.parseInt(genderM[1], 10) })
+    }
+  }
+
+  const ogTitle = pickMetaContent(html, 'og:title')
+  const metaDesc = pickMetaContent(html, 'description')
+  const pageTitle = pickHtmlTitle(html)
+
+  if (key === 'xiaohongshu') {
+    if (!out?.platformNickname && pageTitle) {
+      const nick = pageTitle.replace(/的个人主页$/i, '').replace(/^@/, '').trim()
+      out = mergeProfileBlob(out, { platformNickname: nick })
+    }
+    if (metaDesc) {
+      const fansM2 = /(?:有|拥有)?([\d.]+(?:[kKwW万]|千)?\+?)\s*位粉丝/i.exec(metaDesc)
+      if (fansM2) {
+        out = mergeProfileBlob(out, { followers: parseChineseCount(fansM2[1]) })
+      }
+      if (!out?.platformNickname) {
+        const nickM2 = /^([^在「]+)在「小红书」/.exec(metaDesc)
+        if (nickM2?.[1]) out = mergeProfileBlob(out, { platformNickname: nickM2[1].trim() })
+      }
+    }
+    const redIdM = /小红书号\s+([A-Za-z0-9_]+)/i.exec(html)
+    if (redIdM?.[1]) {
+      out = mergeProfileBlob(out, { platformAccount: redIdM[1] })
+    }
+  }
+
+  if (key === 'douyin' && ogTitle) {
+    const title = ogTitle.replace(/\s*[-|–—@].*$/, '').replace(/的抖音$/i, '').trim()
+    out = mergeProfileBlob(out, { platformNickname: title })
+  }
+
+  if (ogTitle && !out?.platformNickname) {
+    const title = ogTitle.replace(/\s*[-|–—@].*$/, '').trim()
+    out = mergeProfileBlob(out, { platformNickname: title })
+  }
+  if (metaDesc && !out?.signature) {
+    out = mergeProfileBlob(out, { signature: metaDesc })
+  }
+
+  return out
 }
 
 function pickStr(o: Record<string, unknown>, keys: string[]): string {
@@ -426,6 +625,8 @@ function parseProfileFromHtml(
   key: ProfilePlatformKey,
   profileUrl = '',
 ): RawProfileBlob | null {
+  let best: RawProfileBlob | null = null
+
   const extraRoots = [parseRenderDataScript(html), parseUniversalHydration(html)].filter(Boolean)
   const scripts = [
     /window\._ROUTER_DATA\s*=\s*(\{[\s\S]*)/,
@@ -438,53 +639,17 @@ function parseProfileFromHtml(
   ]
   for (const root of extraRoots) {
     const hit = findBestProfileInTree(root, key)
-    if (hit?.platformNickname || hit?.platformAccount) return hit
+    if (hit) best = mergeProfileBlob(best, hit)
   }
   for (const pat of scripts) {
     const m = pat.exec(html)
     if (!m?.[1]) continue
     const root = parseJsonObjectFromScriptPrefix(m[1])
     const hit = findBestProfileInTree(root, key)
-    if (hit?.platformNickname || hit?.platformAccount) return hit
+    if (hit) best = mergeProfileBlob(best, hit)
   }
 
-  const nickM = /"(?:nickname|nickName|userName)"\s*:\s*"((?:\\.|[^"\\])*)"/i.exec(html)
-  const uidM =
-    /"(?:unique_id|redId|red_id|userId|finderUsername|kwaiId)"\s*:\s*"((?:\\.|[^"\\])*)"/i.exec(
-      html,
-    ) ?? /"(?:unique_id|userId)"\s*:\s*(\d+)/.exec(html)
-  const fansM =
-    /"(?:follower_count|followerCount|fansCount|fanCount|fans)"\s*:\s*(\d+)/i.exec(html) ??
-    /"(?:mplatform_followers_count)"\s*:\s*(\d+)/.exec(html)
-  const genderM = /"gender"\s*:\s*([012])/.exec(html)
-  const sigM = /"(?:signature|desc|description|bio)"\s*:\s*"((?:\\.|[^"\\])*)"/i.exec(html)
-
-  if (nickM || uidM || fansM) {
-    return {
-      platformNickname: nickM ? unescapeJsonString(nickM[1]) : undefined,
-      platformAccount: uidM ? unescapeJsonString(uidM[1]) : undefined,
-      followers: fansM ? Number.parseInt(fansM[1], 10) : undefined,
-      gender: genderM ? Number.parseInt(genderM[1], 10) : undefined,
-      signature: sigM ? unescapeJsonString(sigM[1]) : undefined,
-    }
-  }
-
-  const ogTitle = pickMetaContent(html, 'og:title')
-  const ogDesc = pickMetaContent(html, 'og:description')
-  if (ogTitle) {
-    const title = ogTitle.replace(/\s*[-|–—@].*$/, '').replace(/的抖音$/i, '').trim()
-    const blob: RawProfileBlob = {
-      platformNickname: title,
-      signature: ogDesc || '',
-    }
-    if (key === 'douyin') {
-      const sec = extractSecUidFromDouyinUrl(profileUrl)
-      if (sec && !sec.startsWith('MS4w')) blob.platformAccount = sec
-    }
-    return blob
-  }
-
-  return null
+  return enrichProfileFromHtml(html, key, profileUrl, best)
 }
 
 function cleanUrlFromText(text: string): string {
@@ -520,7 +685,7 @@ function extractPlatformUrlFromText(text: string, key: ProfilePlatformKey): stri
       : key === 'kuaishou'
         ? '(?:www\\.)?(?:kuaishou\\.com|v\\.kuaishou\\.com|chenzhongtech\\.com)[^\\s\\u4e00-\\u9fff「」【】《》]+'
         : key === 'dianping'
-          ? '(?:www\\.|m\\.)?dianping\\.com[^\\s\\u4e00-\\u9fff「」【】《》]+'
+          ? '(?:www\\.|m\\.|w\\.)?dianping\\.com[^\\s\\u4e00-\\u9fff「」【】《》]+'
           : 'channels\\.weixin\\.qq\\.com[^\\s\\u4e00-\\u9fff「」【】《】]+'
 
   const re = new RegExp(`https?:\\/\\/${hostPart}`, 'gi')
@@ -596,8 +761,19 @@ async function resolveProfileUrl(raw: string, key: ProfilePlatformKey): Promise<
     if (!PLATFORM_HOST[key].test(url)) return null
   }
 
+  if (key === 'dianping') {
+    const userId = extractDianpingUserId(raw) || extractDianpingUserId(url)
+    if (userId) return `https://www.dianping.com/member/${userId}`
+  }
+
   url = await followRedirects(url, key)
+  if (key === 'douyin') url = canonicalDouyinProfileUrl(url)
   if (isPlatformProfileUrl(url, key)) return url
+
+  if (key === 'dianping') {
+    const userId = extractDianpingUserId(raw) || extractDianpingUserId(url)
+    if (userId) return `https://www.dianping.com/member/${userId}`
+  }
 
   if (PLATFORM_HOST[key].test(url)) return url
   return null
@@ -653,16 +829,27 @@ export async function runProfileLinkParseCore(
   let html = ''
   try {
     html = await fetchProfileHtmlCandidates(profileUrl, key)
-    if (!html) {
-      return { ok: false, message: `抓取${platName}主页失败，请稍后重试或手动填写。` }
-    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `网络请求失败：${msg.slice(0, 120)}` }
   }
 
-  const user = parseProfileFromHtml(html, key, profileUrl)
-  if (!user) {
+  let user = html ? parseProfileFromHtml(html, key, profileUrl) : null
+
+  if (key === 'douyin') {
+    const sec = extractSecUidFromDouyinUrl(profileUrl)
+    const apiUser = sec ? await fetchDouyinUserBySecUid(sec) : null
+    user = mergeProfileBlob(user, apiUser)
+  }
+
+  if (key === 'dianping') {
+    user = mergeProfileBlob(user, parseDianpingShareFallback(raw, profileUrl))
+  }
+
+  if (!user?.platformNickname && !user?.platformAccount) {
+    if (key === 'douyin' && !html) {
+      return { ok: false, message: `抓取${platName}主页失败，请稍后重试或手动填写。` }
+    }
     return {
       ok: false,
       message: `未能从${platName}主页读取资料。请复制 App「分享主页」里的完整口令（含 https 链接），或改用手动填写。`,
