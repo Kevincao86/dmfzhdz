@@ -49,6 +49,8 @@ Page({
     tab: 'wx',
     loginIdentity: '',
     loginIdentityLabel: '',
+    loginIdentityEmoji: '',
+    showIdentitySheet: false,
     identityOptions: IDENTITY_OPTIONS,
     loginName: '',
     password: '',
@@ -83,13 +85,26 @@ Page({
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
   },
 
+  onOpenIdentitySheet() {
+    this.setData({ showIdentitySheet: true, err: '' })
+  },
+
+  onCloseIdentitySheet() {
+    this.setData({ showIdentitySheet: false })
+  },
+
+  noopSheetTap() {},
+
   onPickLoginIdentity(e) {
     const id = e.currentTarget.dataset.id
     if (!identityTypes.isWorkIdentity(id)) return
+    const meta = identityTypes.WORK_IDENTITIES[id]
     userProfile.writeIdentity(id)
     this.setData({
       loginIdentity: id,
-      loginIdentityLabel: userProfile.identityLabel(id),
+      loginIdentityLabel: meta.label,
+      loginIdentityEmoji: meta.emoji,
+      showIdentitySheet: false,
       err: '',
     })
   },
