@@ -34,8 +34,24 @@ export function filterTaskDetailText(text: string): string {
   return explodeAndFilterDisplayLines(text).join('\n')
 }
 
-export function normalizeRecruitmentPlatform(raw: string | undefined): '抖音' | '小红书' {
-  const s = String(raw || '').trim()
-  if (s.includes('红')) return '小红书'
+export type RecruitmentPlatform = '抖音' | '小红书' | '大众点评' | '快手' | '微信视频号'
+
+export const RECRUITMENT_PLATFORMS: RecruitmentPlatform[] = [
+  '抖音',
+  '小红书',
+  '大众点评',
+  '快手',
+  '微信视频号',
+]
+
+export function normalizeRecruitmentPlatform(raw: string | undefined): RecruitmentPlatform {
+  const s = String(raw || '').trim().toLowerCase()
+  if (!s) return '抖音'
+  if (s.includes('红') || s === 'xiaohongshu' || s === 'xhs') return '小红书'
+  if (s.includes('点评') || s.includes('大众') || s === 'dianping') return '大众点评'
+  if (s.includes('快手') || s === 'kuaishou' || s === 'ks') return '快手'
+  if (s.includes('视频号') || s === 'weixin_video' || s.includes('channels.weixin')) {
+    return '微信视频号'
+  }
   return '抖音'
 }

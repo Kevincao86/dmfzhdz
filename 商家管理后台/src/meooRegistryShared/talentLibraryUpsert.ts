@@ -4,6 +4,7 @@ import type {
   RegistryTalentLibraryEntry,
 } from './opsRegistryTypes.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
+import { extractProfileLinkUrl } from './talentProfileLink.js'
 
 export function talentLibraryDedupeKey(platform: string, platformAccount: string): string {
   const plat = normalizeRecruitmentPlatform(platform)
@@ -39,7 +40,10 @@ export function upsertTalentLibraryFromApplicant(
     platform: plat,
     platformAccount: account,
     platformNickname: opts.applicant.platformNickname || opts.applicant.name,
-    profileLink: String(opts.applicant.profileLink || (idx >= 0 ? list[idx]!.profileLink : '') || '').trim(),
+    profileLink:
+      extractProfileLinkUrl(opts.applicant.profileLink) ||
+      extractProfileLinkUrl(idx >= 0 ? list[idx]!.profileLink : '') ||
+      String(opts.applicant.profileLink || (idx >= 0 ? list[idx]!.profileLink : '') || '').trim(),
     followers: Math.max(0, opts.applicant.followers || 0),
     douyinSalesLevel:
       plat === '抖音' ? String(opts.applicant.douyinSalesLevel || '').trim() || undefined : undefined,
