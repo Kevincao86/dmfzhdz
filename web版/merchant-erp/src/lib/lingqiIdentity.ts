@@ -1,4 +1,5 @@
 import type { RegistryFile, RegistryMpTalentMember } from './opsRegistryTypes.js'
+import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 
 const TALENT_ID_RE = /^LQ-D-(\d+)$/i
 const PR_ID_RE = /^LQ-P-(\d+)$/i
@@ -71,7 +72,5 @@ export function allocateLingqiPrId(data: RegistryFile, preferred?: string): stri
 }
 
 export function memberHasPlatformInfo(member: RegistryMpTalentMember): boolean {
-  const dy = member.douyin?.platformAccount
-  const xhs = member.xiaohongshu?.platformAccount
-  return !!(String(dy || '').trim() || String(xhs || '').trim())
+  return memberHasResolvablePlatformInfo(member)
 }
