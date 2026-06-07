@@ -1,6 +1,6 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
-import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export type VideoAiBackendConfig = {
   klingConfigured: boolean
@@ -98,7 +98,7 @@ async function fetchVideoPostBinary(
   timeoutMs = VIDEO_CONCAT_TIMEOUT_MS,
 ): Promise<Response | null> {
   const bodyStr = JSON.stringify(body)
-  for (const url of videoApiFetchUrls(path)) {
+  for (const url of merchantBinaryApiFetchUrls(path)) {
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -274,22 +274,29 @@ export async function concatVideoBlobsOnServer(blobs: Blob[]): Promise<Blob> {
   throw new Error('Blob 云端拼接失败：视频 AI 接口未部署或不可达')
 }
 
-/** 经 dev 网关拉取成片，避免跨域导致无法截尾帧或拼接 */
+/** 经网关二进制代理拉取成片（cs 同源 /api 优先，避免 erp-api 大文件 500/空体） */
 export async function downloadVideoUrlAsBlob(url: string): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-download-url',
     '/api/merchant/ai/video/download-url',
   ] as const
+  let lastErr = '视频 AI 接口未部署或不可达'
   for (const p of paths) {
-    const res = await fetchVideoPost(p, { url })
+    const res = await fetchVideoPostBinary(p, { url }, VIDEO_FETCH_TIMEOUT_MS)
     if (!res) continue
     if (!res.ok) {
-      const j = await parseJsonSafe<{ message?: string }>(res)
-      throw new Error(j?.message || `下载视频失败 HTTP ${res.status}`)
+      const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
+      lastErr = j?.message || `下载视频失败 HTTP ${res.status}`
+      continue
     }
-    return res.blob()
+    const blob = await res.blob()
+    if (blob.size < 1024) {
+      lastErr = `下载视频为空（${blob.size} 字节），成片可能尚未落盘，请稍后重试`
+      continue
+    }
+    return blob
   }
-  throw new Error('下载视频失败：视频 AI 接口未部署或不可达')
+  throw new Error(`下载视频失败：${lastErr}`)
 }
 
 export type KlingStartKind = 'text2video' | 'image2video'

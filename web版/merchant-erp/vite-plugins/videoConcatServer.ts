@@ -9,7 +9,7 @@ import path from 'node:path'
 const MAX_SEGMENT_BYTES = 80 * 1024 * 1024
 const MAX_SEGMENTS = 12
 
-function bufferLooksLikeVideo(buf: Buffer): boolean {
+export function bufferLooksLikeVideo(buf: Buffer): boolean {
   if (buf.length < 1024) return false
   if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return true
   const limit = Math.min(buf.length - 4, 8192)

@@ -32,7 +32,7 @@ import {
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
-import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
+import { bufferLooksLikeVideo, concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
 
 function applyRegistrySliceToVideoAiEnv(
   out: MerchantAiEnv,
@@ -469,15 +469,19 @@ async function readJsonResponse(res: globalThis.Response): Promise<Record<string
   }
 }
 
+function looksLikePlayableVideoUrl(raw: string): boolean {
+  const t = raw.trim()
+  if (!/^https?:\/\/\S+/i.test(t)) return false
+  if (/\.(mp4|webm|mov)(\?\S*)?$/i.test(t)) return true
+  if (/blob|vod|tos|tos-cn|cdn|video|seedance/i.test(t)) return true
+  return false
+}
+
 /** 从方舟「查询视频任务」等大 JSON 中提取 mp4/https 播放地址（字段名多端差异较大） */
 function extractHttpVideoUrl(depth: unknown, dep = 0): string | undefined {
   if (dep > 12) return undefined
   if (typeof depth === 'string') {
-    if (/^https?:\/\/\S+/i.test(depth)) {
-      if (/\.(mp4|webm)(\?\S*)?$/i.test(depth)) return depth
-      if (/blob|vod|tos|tos-cn|cdn|video/i.test(depth)) return depth
-    }
-    return undefined
+    return looksLikePlayableVideoUrl(depth) ? depth.trim() : undefined
   }
   if (!depth || typeof depth !== 'object') return undefined
   if (Array.isArray(depth)) {
@@ -488,7 +492,15 @@ function extractHttpVideoUrl(depth: unknown, dep = 0): string | undefined {
     return undefined
   }
   const o = depth as Record<string, unknown>
-  for (const k of ['video_url', 'preview_video_url', 'url', 'cover_url']) {
+  for (const k of [
+    'video_url',
+    'videoUrl',
+    'preview_video_url',
+    'previewVideoUrl',
+    'output_url',
+    'outputUrl',
+    'url',
+  ]) {
     const u = extractHttpVideoUrl(o[k], dep + 1)
     if (u) return u
   }
@@ -726,9 +738,9 @@ async function arkGetVideoTask(
       st === 'completed' ||
       st === 'finished' ||
       st === 'complete'
-    )
-      phase = 'succeeded'
-    else if (st === 'failed' || st === 'error') phase = 'failed'
+    ) {
+      phase = videoUrl ? 'succeeded' : 'running'
+    } else if (st === 'failed' || st === 'error') phase = 'failed'
     else if (videoUrl && st !== '') phase = 'succeeded'
 
     const failReason =
@@ -954,25 +966,47 @@ export async function handleMerchantAiVideoRoutes(input: {
         json(res, 400, { ok: false, message: '仅支持 http(s) URL。' })
         return true
       }
-      const upstream = await fetch(urlStr, {
-        redirect: 'follow',
-        headers: { 'User-Agent': 'meoo-merchant-erp-video-proxy/1.0' },
-      })
-      if (!upstream.ok) {
-        json(res, 502, { ok: false, message: `下载失败 HTTP ${upstream.status}` })
+      let buf: Buffer | null = null
+      let lastFetchMsg = '下载失败'
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt))
+        const upstream = await fetch(urlStr, {
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'meoo-merchant-erp-video-proxy/1.0',
+            Accept: 'video/mp4,video/*,*/*',
+          },
+        })
+        if (!upstream.ok) {
+          lastFetchMsg = `下载失败 HTTP ${upstream.status}`
+          continue
+        }
+        const len = upstream.headers.get('content-length')
+        if (len && Number(len) > maxBytes) {
+          json(res, 400, { ok: false, message: '视频文件过大。' })
+          return true
+        }
+        const chunk = Buffer.from(await upstream.arrayBuffer())
+        if (chunk.length > maxBytes) {
+          json(res, 400, { ok: false, message: '视频文件过大。' })
+          return true
+        }
+        if (chunk.length < 1024) {
+          lastFetchMsg = `成片尚未就绪（${chunk.length} 字节）`
+          continue
+        }
+        if (!bufferLooksLikeVideo(chunk)) {
+          lastFetchMsg = '拉取到的不是有效视频文件（可能为封面图或错误页）'
+          continue
+        }
+        buf = chunk
+        break
+      }
+      if (!buf) {
+        json(res, 502, { ok: false, message: lastFetchMsg })
         return true
       }
-      const len = upstream.headers.get('content-length')
-      if (len && Number(len) > maxBytes) {
-        json(res, 400, { ok: false, message: '视频文件过大。' })
-        return true
-      }
-      const buf = Buffer.from(await upstream.arrayBuffer())
-      if (buf.length > maxBytes) {
-        json(res, 400, { ok: false, message: '视频文件过大。' })
-        return true
-      }
-      const ct = upstream.headers.get('content-type')?.split(';')[0]?.trim() || 'video/mp4'
+      const ct = 'video/mp4'
       res.statusCode = 200
       res.setHeader('Content-Type', ct)
       res.setHeader('Content-Length', String(buf.length))
