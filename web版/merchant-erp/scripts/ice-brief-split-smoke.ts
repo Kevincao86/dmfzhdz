@@ -1,5 +1,9 @@
 #!/usr/bin/env npx tsx
-import { composeIceEditBrief, splitIceEditBrief } from '../src/lib/iceEditBriefCompose.ts'
+import {
+  composeIceEditBrief,
+  sanitizeIceEditBriefBrandNoise,
+  splitIceEditBrief,
+} from '../src/lib/iceEditBriefCompose.ts'
 import { parseIceEditBriefPlan } from '../vite-plugins/iceBriefTimelinePlan.ts'
 
 const copy = '「招牌牛肉面」\n「传承三十年」'
@@ -21,5 +25,15 @@ if (!plan.segmentCaptions?.length) {
   console.error('FAIL: plan should include segment captions from copy box')
   process.exit(1)
 }
+if (!plan.bgmClip?.mediaUrl?.includes('ice-document-materials.oss-cn-shanghai.aliyuncs.com')) {
+  console.error('FAIL: BGM should use IMS public audio', plan.bgmClip?.mediaUrl)
+  process.exit(1)
+}
 
-console.log('OK: ice brief copy/instruction split + timeline subtitles')
+const noisy = sanitizeIceEditBriefBrandNoise('灵祺AI云剪推荐「招牌面」')
+if (noisy.includes('灵祺') || noisy.includes('云剪')) {
+  console.error('FAIL: brand noise sanitize', noisy)
+  process.exit(1)
+}
+
+console.log('OK: ice brief copy/instruction split + public BGM + brand sanitize')
