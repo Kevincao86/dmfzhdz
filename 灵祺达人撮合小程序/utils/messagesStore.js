@@ -7,11 +7,48 @@ const CATEGORY_LABELS = {
   system: '系统',
 }
 
+const scope = require('./mpAccountLocalScope.js')
+const auth = require('./auth.js')
+
+const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
+const talentInboxMatch = require('./talentInboxMatch.js')
+const inboxRowEnrich = require('./inboxRowEnrich.js')
+
+function ownerIdsForFilter() {
+  const account = auth.readAccount()
+  return {
+    ownerAccountId: scope.scopeIdFromAccount(account),
+    memberId: String(account?.registryMemberId || '').trim(),
+    talentId: String(account?.lingqiTalentId || '').trim(),
+  }
+}
+
+function entryBelongsToCurrentAccount(entry, ids) {
+  if (!entry) return false
+  if (!entry.ownerAccountId && !entry.ownerMemberId && !entry.ownerTalentId) return false
+  if (!ids.ownerAccountId) {
+    if (ids.memberId && entry.ownerMemberId) return entry.ownerMemberId === ids.memberId
+    if (ids.talentId && entry.ownerTalentId) return entry.ownerTalentId === ids.talentId
+    return false
+  }
+  if (!entry.ownerAccountId) return false
+  if (entry.ownerAccountId !== ids.ownerAccountId) return false
+  if (entry.ownerMemberId && ids.memberId && entry.ownerMemberId !== ids.memberId) return false
+  if (entry.ownerTalentId && ids.talentId && entry.ownerTalentId !== ids.talentId) return false
+  return true
+}
+
+function storageKey(base) {
+  return scope.scopedStorageKey(base)
+}
+
 function readList(key) {
   try {
-    const raw = wx.getStorageSync(key)
+    const raw = wx.getStorageSync(storageKey(key))
     const list = typeof raw === 'string' ? JSON.parse(raw) : raw
-    return Array.isArray(list) ? list : []
+    const rows = Array.isArray(list) ? list : []
+    const ids = ownerIdsForFilter()
+    return rows.filter((item) => entryBelongsToCurrentAccount(item, ids))
   } catch {
     return []
   }
@@ -24,7 +61,9 @@ function scheduleClientSync() {
 }
 
 function writeList(key, list) {
-  wx.setStorageSync(key, JSON.stringify(list.slice(0, 100)))
+  const ids = ownerIdsForFilter()
+  const scoped = (list || []).filter((item) => entryBelongsToCurrentAccount(item, ids))
+  wx.setStorageSync(storageKey(key), JSON.stringify(scoped.slice(0, 100)))
   scheduleClientSync()
 }
 
@@ -58,6 +97,7 @@ function readNotifications() {
 }
 
 function pushNotification(item) {
+  const ids = ownerIdsForFilter()
   const list = readList(NOTIFY_KEY)
   const cat = normalizeCategory(item && item.category)
   list.unshift({
@@ -68,6 +108,9 @@ function pushNotification(item) {
     read: false,
     category: cat,
     createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    ownerAccountId: ids.ownerAccountId,
+    ownerMemberId: ids.memberId,
+    ownerTalentId: ids.talentId,
   })
   writeList(NOTIFY_KEY, list)
 }
@@ -77,8 +120,9 @@ function pushMessage(item) {
   pushNotification({ ...item, category: 'business' })
 }
 
-function unreadNotificationCount() {
-  return readAllNotificationRows().filter((m) => !m.read).length
+function unreadNotificationCount(rows) {
+  const list = rows || readAllNotificationRows()
+  return list.filter((m) => !m.read).length
 }
 
 function unreadMessageCount() {
@@ -92,21 +136,20 @@ function markMessagesRead() {
   )
 }
 
-function markNotificationsRead() {
-  writeList(
-    NOTIFY_KEY,
-    readList(NOTIFY_KEY).map((m) => ({ ...m, read: true })),
-  )
-  markMessagesRead()
+function markNotificationsRead(ids) {
+  const idSet = ids && ids.length ? new Set(ids.map(String)) : null
+  const patch = (m) => {
+    if (idSet) return idSet.has(m.id) ? { ...m, read: true } : m
+    return { ...m, read: true }
+  }
+  writeList(NOTIFY_KEY, readList(NOTIFY_KEY).map(patch))
+  writeList(MSG_KEY, readList(MSG_KEY).map(patch))
+  if (idSet) markInboxSeen([...idSet])
 }
-
-const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
-const talentInboxMatch = require('./talentInboxMatch.js')
-const inboxRowEnrich = require('./inboxRowEnrich.js')
 
 function readInboxSeenSet() {
   try {
-    const raw = wx.getStorageSync(INBOX_SEEN_KEY)
+    const raw = wx.getStorageSync(storageKey(INBOX_SEEN_KEY))
     const list = typeof raw === 'string' ? JSON.parse(raw) : raw
     return new Set(Array.isArray(list) ? list.map(String) : [])
   } catch {
@@ -118,12 +161,12 @@ function markInboxSeen(ids) {
   const set = readInboxSeenSet()
   for (const id of ids || []) set.add(String(id))
   try {
-    wx.setStorageSync(INBOX_SEEN_KEY, JSON.stringify([...set].slice(-500)))
+    wx.setStorageSync(storageKey(INBOX_SEEN_KEY), JSON.stringify([...set].slice(-500)))
     scheduleClientSync()
   } catch (_) {}
 }
 
-/** 合并 registry 站内信（达人：会员 id / 手机号 / 账号 / 报名 id 匹配） */
+/** 合并 registry 站内信（达人：会员 id / 报名 id 严格匹配） */
 function inboxRowsForTalent(reg, member) {
   if (!reg || !member) return []
   const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
@@ -158,7 +201,11 @@ function inboxRowsForTalent(reg, member) {
 }
 
 function mergeRegistryInboxForTalent(reg, member) {
-  const selectionRows = talentInboxMatch.buildSelectionNoticeRows(reg, member)
+  const seen = readInboxSeenSet()
+  const selectionRows = talentInboxMatch.buildSelectionNoticeRows(reg, member).map((r) => ({
+    ...r,
+    read: !!r.read || seen.has(String(r.id)),
+  }))
   const remote = inboxRowsForTalent(reg, member)
   const merged = [...selectionRows, ...remote]
   const local = readAllNotificationRows()
@@ -178,7 +225,6 @@ module.exports = {
   markMessagesRead,
   markNotificationsRead,
   inboxRowsForTalent,
-  /** @deprecated 使用 inboxRowsForTalent */
   inboxRowsForTalentMember: inboxRowsForTalent,
   mergeRegistryInboxForTalent,
   markInboxSeen,

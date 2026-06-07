@@ -112,11 +112,22 @@ export function filterRegistrySnapshotForMerchant(authTenantId: string, file: Re
   }
 }
 
-/** 达人招募小程序大厅可读：开放中的小程序招募单 */
+/** 达人招募小程序大厅可读：开放中的小程序招募单（不含群码，仅入选达人经站内信获取） */
 export function mpRecruitmentOrdersForTalentHall(file: RegistryFile) {
-  return (file.mpRecruitmentOrders ?? []).filter(
-    (o) => o && (o.status === 'open' || o.status === 'collecting'),
-  )
+  return (file.mpRecruitmentOrders ?? [])
+    .filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
+    .map((o) => {
+      const meta =
+        o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
+          ? { ...o.mpPublishMeta, groupQrImage: undefined }
+          : o.mpPublishMeta
+      return {
+        ...o,
+        groupQrImage: undefined,
+        selectedApplicantIds: undefined,
+        mpPublishMeta: meta,
+      }
+    })
 }
 
 /** 未登录或无法识别租户时：隐藏商户侧招募；保留小程序招募大厅公开单 */

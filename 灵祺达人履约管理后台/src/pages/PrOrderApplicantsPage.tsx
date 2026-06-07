@@ -210,6 +210,7 @@ export default function PrOrderApplicantsPage() {
           body: `您已被 PR 选入「${orderTitle}」（单号 ${orderNo}）。请扫码加入项目群，二维码见下图。`,
           noticeType: 'selection' as const,
           pinned: true,
+          imageUrl: qr,
         })
       }
       if (!entries.length) {

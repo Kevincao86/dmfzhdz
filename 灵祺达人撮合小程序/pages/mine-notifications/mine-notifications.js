@@ -126,8 +126,15 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     const row = this.findRowById(id)
-    if (!row || !row.canOpenDetail) return
-    if (!row.read) messagesStore.markInboxSeen([row.id])
+    if (!row) return
+    if (!row.read) {
+      messagesStore.markNotificationsRead([row.id])
+      messagesStore.markInboxSeen([row.id])
+    }
+    if (!row.canOpenDetail) {
+      void this.loadRows()
+      return
+    }
     if (row.detailUrl) {
       wx.navigateTo({ url: row.detailUrl })
       void this.loadRows()

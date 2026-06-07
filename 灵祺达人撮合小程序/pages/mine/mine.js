@@ -105,6 +105,7 @@ Page({
     }
     try {
       this.refresh()
+      void this.refreshNotifyBadge()
     } catch (e) {
       console.error('[mine] refresh', e)
       this.setData({
@@ -184,10 +185,25 @@ Page({
       displaySub,
       identityIdLine,
       menus: identity === 'pr' ? PR_MENUS : talentMenusForIdentity(identity),
-      notifyBadge: messagesStore.unreadNotificationCount(),
+      notifyBadge: 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
     })
+  },
+  async refreshNotifyBadge() {
+    const identity = userProfile.readIdentity()
+    const member = memberStore.readMember()
+    let count = messagesStore.unreadNotificationCount()
+    if (identity === 'talent' && member && api.hasApi()) {
+      try {
+        const reg = await ops.fetchRegistry()
+        const rows = messagesStore.mergeRegistryInboxForTalent(reg, member)
+        count = messagesStore.unreadNotificationCount(rows)
+      } catch (_) {
+        /* 使用本地未读数 */
+      }
+    }
+    this.setData({ notifyBadge: count })
   },
   onHide() {
     setTabBarHidden(this, false)

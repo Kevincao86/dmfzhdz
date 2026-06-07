@@ -2,9 +2,9 @@ import type { MpRegistry } from '../mpRecruitment/types'
 import { getAccount } from '../mpSession'
 import { readApplications } from './applicationsStore'
 import { groupQrFromMp } from './mpGroupQr'
+import { applicantMatchesLocalMember, resolveTalentMemberId, selectedIdsFromMp } from './mpApplicantSelection'
 import { platformIdFromName, TALENT_PLATFORMS } from './talentPlatformProfiles'
 import { readMember } from './talentMember'
-import { resolveTalentMemberId, selectedIdsFromMp } from './mpApplicantSelection'
 
 function contactKey(contact: string): string {
   const digits = String(contact || '').replace(/\D/g, '')
@@ -16,6 +16,31 @@ function accountKey(platform: string, account: string): string {
   if (!a) return ''
   const pid = platformIdFromName(platform || '抖音')
   return `acct:${pid}:${a}`
+}
+
+function looksLikeRegistryMemberId(id: string): boolean {
+  return /^(MTM-|LQ-[TD]-|talent_)/i.test(id)
+}
+
+function strictTalentIds(member: Record<string, unknown> | null): Set<string> {
+  const ids = new Set<string>()
+  const acc = getAccount()
+  for (const v of [
+    acc?.lingqiTalentId,
+    acc?.registryMemberId,
+    member?.id,
+    member?.lingqiTalentId,
+  ]) {
+    const s = String(v ?? '').trim()
+    if (s) ids.add(s)
+  }
+  return ids
+}
+
+function userOwnsApplicantId(applicantId: string): boolean {
+  const aid = String(applicantId || '').trim()
+  if (!aid) return false
+  return readApplications().some((a) => String(a.applicantId || '') === aid)
 }
 
 export function resolveTalentInboxTarget(applicant: Record<string, unknown>, reg: MpRegistry) {
@@ -34,6 +59,7 @@ export function talentMatchKeys(member: Record<string, unknown> | null): Set<str
   if (!member) return keys
   const acc = getAccount()
   if (acc?.lingqiTalentId) keys.add(String(acc.lingqiTalentId).trim())
+  if (acc?.registryMemberId) keys.add(String(acc.registryMemberId).trim())
   if (member.id) keys.add(String(member.id).trim())
   if (member.lingqiTalentId) keys.add(String(member.lingqiTalentId).trim())
   const contact = String(member.contact || '').trim()
@@ -49,9 +75,6 @@ export function talentMatchKeys(member: Record<string, unknown> | null): Set<str
     keys.add(accountKey(p.name, String(prof.platformAccount || '')))
     keys.add(String(prof.platformAccount).trim().toLowerCase())
   }
-  for (const app of readApplications()) {
-    if (app?.applicantId) keys.add(`app:${app.applicantId}`)
-  }
   return keys
 }
 
@@ -60,22 +83,57 @@ export function inboxRowMatchesTalent(
   keys: Set<string>,
   member: Record<string, unknown> | null,
 ): boolean {
-  if (!row || !keys.size) return false
+  if (!row || !member) return false
+  const strictIds = strictTalentIds(member)
   const mid = String(row.talentMemberId || '').trim()
-  if (mid && keys.has(mid)) return true
-  const contact = String(row.contact || '').trim()
-  if (contact) {
-    if (keys.has(contact)) return true
-    const ck = contactKey(contact)
-    if (ck && keys.has(ck)) return true
-  }
   const applicantId = String(row.applicantId || '').trim()
-  if (applicantId && keys.has(`app:${applicantId}`)) return true
-  if (member && contact && String(member.contact || '').trim() === contact) return true
+  const isSelection =
+    row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
+
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid)) return false
+
+  if (applicantId) {
+    if (!userOwnsApplicantId(applicantId)) return false
+    if (isSelection) return true
+  }
+
+  if (mid && keys.has(mid)) {
+    if (!applicantId || userOwnsApplicantId(applicantId)) return true
+  }
+
+  const contact = String(row.contact || '').trim()
+  if (contact && applicantId && userOwnsApplicantId(applicantId)) {
+    if (keys.has(contact) || keys.has(contactKey(contact))) return true
+    if (String(member.contact || '').trim() === contact) return true
+  }
+
   const plat = String(row.platform || '抖音')
   const acct = String(row.platformAccount || '').trim().toLowerCase()
-  if (acct && keys.has(accountKey(plat, acct))) return true
+  if (acct && applicantId && userOwnsApplicantId(applicantId)) {
+    if (keys.has(accountKey(plat, acct))) return true
+    if (applicantMatchesLocalMember({ platform: plat, platformAccount: acct }, member)) return true
+  }
+
+  if (isSelection) return false
   return false
+}
+
+function registryHasSelectionForApplicant(
+  reg: MpRegistry,
+  member: Record<string, unknown> | null,
+  mpOrderId: string,
+  applicantId: string,
+): boolean {
+  const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+  const keys = talentMatchKeys(member)
+  return inbox.some((row) => {
+    const r = row as Record<string, unknown>
+    if (String(r.mpOrderId || '') !== mpOrderId) return false
+    if (String(r.applicantId || '') !== applicantId) return false
+    if (r.noticeType !== 'selection' && !/恭喜入选/.test(String(r.title || ''))) return false
+    return inboxRowMatchesTalent(r, keys, member)
+  })
 }
 
 export function buildSelectionNoticeRows(reg: MpRegistry, member: Record<string, unknown> | null) {
@@ -92,6 +150,11 @@ export function buildSelectionNoticeRows(reg: MpRegistry, member: Record<string,
     if (!mp) continue
     const selected = selectedIdsFromMp(mp)
     if (!selected.includes(String(app.applicantId))) continue
+    const applicant = ((mp.applicants as unknown[]) || []).find(
+      (a) => a && typeof a === 'object' && (a as Record<string, unknown>).id === app.applicantId,
+    ) as Record<string, unknown> | undefined
+    if (applicant && !applicantMatchesLocalMember(applicant, member)) continue
+    if (registryHasSelectionForApplicant(reg, member, app.mpOrderId, String(app.applicantId))) continue
     const qr = groupQrFromMp(mp)
     rows.push({
       id: `sel-reg-${app.mpOrderId}-${app.applicantId}`,

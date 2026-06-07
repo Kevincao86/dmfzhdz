@@ -3,6 +3,7 @@ import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import {
+  markInboxSeen,
   markNotificationsRead,
   mergeNotificationsWithRegistry,
   readAllNotificationRows,
@@ -121,8 +122,19 @@ export default function MessagesPage() {
   }, [msgTab, refreshSessions])
 
   function onMarkAllRead() {
-    markNotificationsRead()
+    const ids = rows.map((r) => r.id)
+    markNotificationsRead(ids)
+    markInboxSeen(ids)
     void refreshFromRegistry()
+  }
+
+  function onOpenSystemMessage(row: NotificationRow) {
+    if (!row.read) {
+      markNotificationsRead([row.id])
+      markInboxSeen([row.id])
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, read: true } : r)))
+      setUnread((n) => Math.max(0, n - 1))
+    }
   }
 
   const systemRows = useMemo(() => {
@@ -282,7 +294,13 @@ export default function MessagesPage() {
               {systemRows.map((row) => (
                 <li
                   key={row.id}
-                  className={`rounded-xl border p-4 ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenSystemMessage(row)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') onOpenSystemMessage(row)
+                  }}
+                  className={`rounded-xl border p-4 cursor-pointer transition-colors hover:border-violet-200 ${
                     row.read
                       ? 'border-slate-200 bg-white/60'
                       : 'border-teal-200 bg-teal-50/40'
@@ -299,7 +317,12 @@ export default function MessagesPage() {
                         <p className="mt-1 text-xs text-violet-500">已从小程序/履约后台同步</p>
                       ) : null}
                     </div>
-                    <span className="shrink-0 text-xs text-slate-400">{row.categoryLabel || row.category}</span>
+                    <div className="shrink-0 text-right">
+                      <span className="text-xs text-slate-400">{row.categoryLabel || row.category}</span>
+                      <p className={`mt-1 text-xs ${row.read ? 'text-slate-400' : 'text-teal-600 font-medium'}`}>
+                        {row.read ? '已读' : '未读'}
+                      </p>
+                    </div>
                   </div>
                   {row.createdAt ? <p className="mt-2 text-xs text-slate-400">{row.createdAt}</p> : null}
                 </li>
