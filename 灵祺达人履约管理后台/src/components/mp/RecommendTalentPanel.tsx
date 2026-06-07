@@ -103,7 +103,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         const payloads = packs.map((p) => p.payload)
         filtered = filtered
           .map((t) => {
-            const fb = recruitmentAi.fallbackTalentScore(t, payloads)
+            const fb = recruitmentAi.fallbackTalentScore(t, payloads, prBoard)
             return { ...t, matchScore: fb.score, aiTag: fb.tag, aiTagTone: fb.tone, aiMatch: fb.score >= 55 }
           })
           .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
