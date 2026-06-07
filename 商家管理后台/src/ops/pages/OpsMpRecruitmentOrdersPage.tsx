@@ -21,10 +21,36 @@ import type { RecruitmentFulfillmentLoop } from '../../meooRegistryShared/opsReg
 import {
   fetchRegistry,
   patchMpRecruitmentOrder,
+  deleteMpRecruitmentOrders,
   type RegistryMpRecruitmentOrder,
 } from '../opsRegistryApi'
 
 type MpStatus = RegistryMpRecruitmentOrder['status']
+type RecruitTarget = 'talent' | 'shoot' | 'edit'
+
+function inferRecruitTarget(o: RegistryMpRecruitmentOrder): RecruitTarget {
+  const raw = o as RegistryMpRecruitmentOrder & { recruitTarget?: string }
+  const meta =
+    o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
+      ? (o.mpPublishMeta as Record<string, unknown>)
+      : null
+  const t = String(raw.recruitTarget || meta?.recruitTarget || '')
+  if (t === 'shoot' || t === 'edit') return t
+  const info = String(o.recruitmentInfo || o.taskDetail || '')
+  if (info.includes('招募对象：拍摄')) return 'shoot'
+  if (info.includes('招募对象：剪辑')) return 'edit'
+  return 'talent'
+}
+
+function recruitTargetLabel(t: RecruitTarget): string {
+  if (t === 'shoot') return '拍摄'
+  if (t === 'edit') return '剪辑'
+  return '达人'
+}
+
+function publisherLabel(o: RegistryMpRecruitmentOrder): string {
+  return o.publisherIdentity === 'pr' ? 'PR' : '商家'
+}
 
 function mpStatusLabel(s: MpStatus): string {
   const m: Record<MpStatus, string> = {
@@ -52,9 +78,13 @@ function loopBadgeStyle(loop: RecruitmentFulfillmentLoop): string {
 export default function OpsMpRecruitmentOrdersPage() {
   const [status, setStatus] = useState<'all' | MpStatus>('all')
   const [loopFilter, setLoopFilter] = useState<'all' | RecruitmentFulfillmentLoop>('all')
+  const [targetFilter, setTargetFilter] = useState<'all' | RecruitTarget>('all')
+  const [publisherFilter, setPublisherFilter] = useState<'all' | 'pr' | 'merchant'>('all')
   const [orders, setOrders] = useState<RegistryMpRecruitmentOrder[]>([])
   const [detail, setDetail] = useState<RegistryMpRecruitmentOrder | null>(null)
   const [patchBusyId, setPatchBusyId] = useState<string | null>(null)
+  const [checkedIds, setCheckedIds] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -80,9 +110,50 @@ export default function OpsMpRecruitmentOrdersPage() {
     return sorted.filter((o) => {
       if (status !== 'all' && o.status !== status) return false
       if (loopFilter !== 'all' && inferFulfillmentLoop(o) !== loopFilter) return false
+      if (targetFilter !== 'all' && inferRecruitTarget(o) !== targetFilter) return false
+      if (publisherFilter === 'pr' && o.publisherIdentity !== 'pr') return false
+      if (publisherFilter === 'merchant' && o.publisherIdentity === 'pr') return false
       return true
     })
-  }, [sorted, status, loopFilter])
+  }, [sorted, status, loopFilter, targetFilter, publisherFilter])
+
+  const visibleIds = useMemo(() => rows.map((o) => o.id), [rows])
+  const allVisibleChecked = visibleIds.length > 0 && visibleIds.every((id) => checkedIds.includes(id))
+
+  const toggleRowCheck = (id: string) => {
+    setCheckedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+  }
+
+  const toggleAllVisible = () => {
+    if (allVisibleChecked) {
+      setCheckedIds((cur) => cur.filter((id) => !visibleIds.includes(id)))
+    } else {
+      setCheckedIds((cur) => [...new Set([...cur, ...visibleIds])])
+    }
+  }
+
+  const deleteOrders = async (ids: string[]) => {
+    const uniq = [...new Set(ids.map(String).filter(Boolean))]
+    if (!uniq.length || deleting) return
+    const msg =
+      uniq.length === 1
+        ? '删除后该招募单将从大厅移除，报名与站内信一并清除，商家/PR/达人/拍摄/剪辑端刷新后可重新发单或报名。确定删除？'
+        : `确定删除选中的 ${uniq.length} 条招募单？删除后相关端需刷新，可重新开始发单与报名。`
+    if (!window.confirm(msg)) return
+    setDeleting(true)
+    try {
+      const r = await deleteMpRecruitmentOrders({ ids: uniq })
+      if (!r.ok) {
+        window.alert(r.error ?? '删除失败')
+        return
+      }
+      setCheckedIds((cur) => cur.filter((id) => !uniq.includes(id)))
+      setDetail((cur) => (cur && uniq.includes(cur.id) ? null : cur))
+      await load()
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const changeStatus = async (id: string, next: MpStatus) => {
     setPatchBusyId(id)
@@ -162,6 +233,37 @@ export default function OpsMpRecruitmentOrdersPage() {
           <option value="open">开环招募</option>
           <option value="closed">闭环云剪</option>
         </select>
+        <span className="text-sm text-slate-400">对象</span>
+        <select
+          value={targetFilter}
+          onChange={(e) => setTargetFilter(e.target.value as typeof targetFilter)}
+          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+        >
+          <option value="all">全部</option>
+          <option value="talent">达人</option>
+          <option value="shoot">拍摄</option>
+          <option value="edit">剪辑</option>
+        </select>
+        <span className="text-sm text-slate-400">发布方</span>
+        <select
+          value={publisherFilter}
+          onChange={(e) => setPublisherFilter(e.target.value as typeof publisherFilter)}
+          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+        >
+          <option value="all">全部</option>
+          <option value="pr">PR</option>
+          <option value="merchant">商家/运营</option>
+        </select>
+        {checkedIds.length > 0 ? (
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={() => void deleteOrders(checkedIds)}
+            className="rounded-lg border border-rose-700 bg-rose-950/40 px-3 py-2 text-sm text-rose-300 hover:bg-rose-950 disabled:opacity-50"
+          >
+            {deleting ? '删除中…' : `批量删除（${checkedIds.length}）`}
+          </button>
+        ) : null}
         <span className="ml-auto text-xs text-slate-500">共 {rows.length} 条</span>
       </div>
 
@@ -170,9 +272,20 @@ export default function OpsMpRecruitmentOrdersPage() {
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="border-b border-slate-800 text-[11px] font-semibold uppercase text-slate-500">
               <tr>
+                <th className="px-3 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleChecked}
+                    onChange={toggleAllVisible}
+                    aria-label="全选当前页"
+                    className="rounded border-slate-600"
+                  />
+                </th>
                 <th className="px-3 py-3">小程序单号</th>
                 <th className="px-3 py-3">关联商家订单</th>
                 <th className="px-3 py-3">客户 / 门店</th>
+                <th className="px-3 py-3">对象</th>
+                <th className="px-3 py-3">发布方</th>
                 <th className="px-3 py-3">链路</th>
                 <th className="px-3 py-3">大厅</th>
                 <th className="px-3 py-3">状态</th>
@@ -184,20 +297,45 @@ export default function OpsMpRecruitmentOrdersPage() {
             <tbody className="divide-y divide-slate-800">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={12} className="px-3 py-10 text-center text-sm text-slate-500">
                     暂无小程序招募单。请在「商家达人招募订单」处理弹窗中选择「小程序招募」或「云剪单」创建。
                   </td>
                 </tr>
               ) : (
                 rows.map((o) => {
                   const loop = inferFulfillmentLoop(o)
+                  const target = inferRecruitTarget(o)
                   return (
                     <tr key={o.id} className="hover:bg-slate-800/30">
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={checkedIds.includes(o.id)}
+                          onChange={() => toggleRowCheck(o.id)}
+                          aria-label={`选择 ${o.id}`}
+                          className="rounded border-slate-600"
+                        />
+                      </td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-300">{o.id}</td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-400">{o.sourceMerchantOrderId}</td>
                       <td className="px-3 py-2 text-slate-300">
                         <div>{o.customerName}</div>
                         <div className="text-xs text-slate-500">{o.storeName}</div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
+                          {recruitTargetLabel(target)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-xs font-medium',
+                            o.publisherIdentity === 'pr' ? 'bg-violet-500/15 text-violet-300' : 'bg-slate-700 text-slate-300',
+                          )}
+                        >
+                          {publisherLabel(o)}
+                        </span>
                       </td>
                       <td className="px-3 py-2">
                         <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', loopBadgeStyle(loop))}>
@@ -221,9 +359,17 @@ export default function OpsMpRecruitmentOrdersPage() {
                       </td>
                       <td className="px-3 py-2 tabular-nums text-slate-300">{(o.applicants ?? []).length}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-slate-500">{o.createdAt}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 text-right space-x-2">
                         <button type="button" onClick={() => setDetail(o)} className="text-xs text-indigo-400 hover:underline">
                           详情
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deleting}
+                          onClick={() => void deleteOrders([o.id])}
+                          className="text-xs text-rose-400 hover:underline disabled:opacity-40"
+                        >
+                          删除
                         </button>
                       </td>
                     </tr>
@@ -374,7 +520,15 @@ export default function OpsMpRecruitmentOrdersPage() {
                 </ul>
               )}
             </div>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void deleteOrders([detail.id])}
+                className="rounded-lg border border-rose-700 bg-rose-950/40 px-4 py-2 text-sm text-rose-300 hover:bg-rose-950 disabled:opacity-50"
+              >
+                删除招募单
+              </button>
               <button
                 type="button"
                 onClick={async () => {

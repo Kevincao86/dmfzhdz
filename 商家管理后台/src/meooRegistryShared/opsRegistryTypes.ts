@@ -353,6 +353,21 @@ export type RegistryVideoSubmission = {
   duration?: string
 }
 
+/** 达人招募小程序 · 站内信 */
+export type RegistryMpTalentInboxItem = {
+  id: string
+  talentMemberId: string
+  title: string
+  body: string
+  category: 'order' | 'business' | 'system'
+  mpOrderId?: string
+  contact?: string
+  platformAccount?: string
+  applicantId?: string
+  imageUrl?: string
+  createdAt: string
+}
+
 export type RegistryFile = {
   tenants: RegistryTenant[]
   aiModels: RegistryAiModels
@@ -376,4 +391,5 @@ export type RegistryFile = {
   talentPoolCandidates?: RegistryTalentPoolRow[]
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
+  mpTalentInbox?: RegistryMpTalentInboxItem[]
 }

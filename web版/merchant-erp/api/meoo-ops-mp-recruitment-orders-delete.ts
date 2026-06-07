@@ -7,7 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
-import { deleteMpRecruitmentOrderFromSnapshot } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
+import { deleteMpRecruitmentOrdersFromSnapshot } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
 
 export const config = { maxDuration: 60 }
 
@@ -56,23 +56,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { id?: string }
+    let body: { id?: string; ids?: string[] }
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { id?: string }
+      body = JSON.parse(rawBody(req) || '{}') as { id?: string; ids?: string[] }
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
 
+    const ids = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : []
+
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = deleteMpRecruitmentOrderFromSnapshot(data, body.id ?? '')
+    const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true })
+    sendOpsJson(res, 200, { ok: true, deletedIds: result.deletedIds })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
