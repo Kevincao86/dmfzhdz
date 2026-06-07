@@ -299,12 +299,12 @@ ${MATCH_SCORE_GUIDE}
       return { status: 200, body: { ok: true, provider, mode: 'match', items } }
     }
 
-    const system = `你是本地生活招募商单标注助手。为每条商单生成一个醒目、简短的自定义标签（2-4个汉字，勿与状态重复）。
+    const system = `你是本地生活招募商单解读助手。逐条阅读商单的平台、城市/区域、类目、预算与报价（含 CPS/一口价/自报价/置换）、粉丝与带货等级要求、招募对象（达人/拍摄/剪辑）及描述摘要，提炼最能吸引对应供给方的一个短标签（2-4 个汉字，勿与「收集中/急单/演示」等状态重复）。
 只输出 JSON 数组。每项：id、tag（2-4字）、tone（hot|match|urgent|ice|budget|niche|default）。
-标签示例：高佣优选、同城急单、云剪直派、粉丝友好、美食探店、置换友好。`
-    const user = `商单列表：${orderJson}
+示例：高佣优选、同城急单、云剪直派、粉丝友好、美食探店、置换友好、Lv3友好、亲子向、佣金友好。`
+    const user = `商单列表（含 platform/region/category/budget/priceAmount/fans/recruitTarget/summary）：${orderJson}
 
-请为每条商单生成一个最合适的展示标签。`
+请为每条商单生成一个最贴切、可点击的展示标签。`
     const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
     const items = extractJsonArray(text)
       .map(normalizeTagItem)

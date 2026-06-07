@@ -9,6 +9,7 @@ import { getWorkIdentity, workIdentityLabel, type MpWorkIdentity } from '../mpWo
 import {
   applicationHabitsFromApps,
   applyOrderMatchResults,
+  mergeCardAiTags,
   type ApplicationHabits,
   type OrderMatchPayload,
   type TalentMatchProfile,
@@ -134,9 +135,16 @@ export async function enrichOrderMatches(
   const list = rows.filter((r) => r.id && !r.isMock)
   const talent = talentProfileFromMember(member ?? readMember(), opts)
   const talentCity = talent?.city || ''
-  if (!talent || !list.length) {
-    return list.map((r) => ({ ...r, ...fallbackTagForRow(r, talentCity), matchScore: 0, aiTagSource: 'local' as const }))
+  const tagPromise = enrichOrderTags(list, talentCity)
+
+  if (!list.length) {
+    return tagPromise
   }
+  if (!talent) {
+    const tagged = await tagPromise
+    return tagged.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
+  }
+
   const map: Record<string, { score: number; tag: string; tone: string }> = {}
   for (const part of chunk(list, 8)) {
     try {
@@ -154,7 +162,9 @@ export async function enrichOrderMatches(
       break
     }
   }
-  const enriched = applyOrderMatchResults(list, map, talent, talentCity)
+  const scored = applyOrderMatchResults(list, map, talent, talentCity)
+  const tagged = await tagPromise
+  const enriched = mergeCardAiTags(scored, tagged)
   enriched.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.publishedAtMs || 0) - (a.publishedAtMs || 0))
   return enriched
 }

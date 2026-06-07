@@ -70,8 +70,9 @@ export default function RecommendOrdersPanel() {
     const memberRow = readMember()
     if (memberRow && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: getWorkIdentity() })
-    } else {
-      real = real.map((r) => ({ ...r, ...recruitmentAi.fallbackTagForRow(r, talentCity), matchScore: 0 }))
+    } else if (real.length) {
+      real = await recruitmentAi.enrichOrderTags(real, talentCity)
+      real = real.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
     }
     const highMatch = real.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
     const highIds = new Set(highMatch.map((r) => r.id))

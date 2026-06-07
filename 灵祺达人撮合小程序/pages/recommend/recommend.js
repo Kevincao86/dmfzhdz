@@ -574,14 +574,9 @@ Page({
     const member = memberStore.readMember()
     if (api.hasApi() && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
-    } else {
-      real = real
-        .map((r) => ({
-          ...r,
-          ...recruitmentAi.fallbackTagForRow(r, talentCity),
-          matchScore: 0,
-          aiTagSource: 'local',
-        }))
+    } else if (real.length) {
+      real = await recruitmentAi.enrichOrderTags(real, { talentCity })
+      real = real.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
     }
     const enrichedAll = real
     if (segment === 'match' && enrichedAll.length) {

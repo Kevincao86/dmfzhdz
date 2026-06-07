@@ -131,6 +131,24 @@ export function fallbackOrderMatchScore(
   return { score, tag, tone: score >= 65 ? 'match' : 'default' }
 }
 
+export function mergeCardAiTags<T extends { id: string; aiTag?: string; aiTagTone?: string; aiTagSource?: string }>(
+  scored: T[],
+  tagged: T[],
+): T[] {
+  const byId = new Map(tagged.map((r) => [r.id, r]))
+  return scored.map((row) => {
+    const t = byId.get(row.id)
+    if (!t) return row
+    const tagFromAi = t.aiTagSource === 'ai' && t.aiTag
+    return {
+      ...row,
+      aiTag: tagFromAi ? t.aiTag : t.aiTag || row.aiTag,
+      aiTagTone: tagFromAi ? t.aiTagTone : t.aiTagTone || row.aiTagTone,
+      aiTagSource: tagFromAi ? 'ai' : t.aiTagSource || row.aiTagSource,
+    }
+  })
+}
+
 export function applyOrderMatchResults<T extends OrderMatchPayload & { id: string }>(
   rows: T[],
   map: Record<string, { score: number; tag: string; tone: string }>,
