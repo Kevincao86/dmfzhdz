@@ -1,66 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
-import { getAccount, getActiveRole } from '../../lib/mpSession'
-import { readApplications } from '../../lib/mpSync/applicationsStore'
+import { getActiveRole } from '../../lib/mpSession'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
 import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
 import { orderVisibleToWorkIdentity } from '../../lib/mpRecruitment/roleHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
-import { getWorkIdentity, workIdentityLabel, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
+import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 import { readMember } from '../../lib/mpSync/talentMember'
-import { profileFilled, TALENT_PLATFORMS } from '../../lib/mpSync/talentPlatformProfiles'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
 import RecommendTalentPanel from './RecommendTalentPanel'
 import PageHero from '../ui/PageHero'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
-
-function habitPlatforms(): string[] {
-  const apps = readApplications()
-  const set = new Set<string>()
-  for (const a of apps.slice(0, 20)) {
-    if (a.platform) set.add(a.platform)
-  }
-  return [...set]
-}
-
-function localHabitBoost(row: RecruitmentOrderRow, platforms: string[]): number {
-  let boost = 0
-  if (platforms.length && platforms.includes(row.platform)) boost += 12
-  if (row.recommended) boost += 6
-  if (row.urgent) boost += 4
-  return boost
-}
-
-function buildSupplierMember() {
-  const member = readMember()
-  const acc = getAccount()
-  const workId = getWorkIdentity()
-  const primaryEntry = member?.platformProfiles
-    ? TALENT_PLATFORMS.map((p) => ({ plat: p, prof: member.platformProfiles[p.id] })).find(
-        (x) => profileFilled(x.prof),
-      )
-    : null
-  const primary = primaryEntry?.prof
-  const platformName = primaryEntry?.plat.name || '抖音'
-  const accountTags = [
-    ...(primary?.accountTags || []),
-    workIdentityLabel(workId),
-    ...(workId === 'shoot' ? ['拍摄', '跟拍'] : []),
-    ...(workId === 'edit' ? ['剪辑', '后期'] : []),
-  ]
-  return {
-    city: member?.city || '',
-    province: member?.province || '',
-    platform: platformName,
-    nickname: primary?.platformNickname || acc?.wxNickName || '',
-    followers: primary?.followers ? String(primary.followers) : '',
-    accountTags,
-    workIdentity: workId,
-  }
-}
 
 function SupplierRecommendOrders() {
   const goDetail = useRecruitmentNav()
@@ -77,10 +30,9 @@ function SupplierRecommendOrders() {
   const [allOrderRows, setAllOrderRows] = useState<RecruitmentOrderRow[]>([])
   const [orderDisplayRows, setOrderDisplayRows] = useState<RecruitmentOrderRow[]>([])
   const talentCity = readMember()?.city || readMember()?.province || ''
-  const habitPlats = habitPlatforms()
 
   const applyOrderFilters = useCallback(async () => {
-    const member = buildSupplierMember()
+    const member = readMember()
     const kw = searchKeyword.trim()
     let rows = allOrderRows.filter((r) => {
       if (!orderVisibleToWorkIdentity(r, workId)) return false
@@ -94,15 +46,10 @@ function SupplierRecommendOrders() {
     const mocks = rows.filter((r) => r.isMock)
     let real = rows.filter((r) => !r.isMock)
     if (real.length) {
-      real = await recruitmentAi.enrichOrderMatches(real, member)
-      real = real.map((r) => ({
-        ...r,
-        matchScore: Math.min(100, (r.matchScore || 0) + localHabitBoost(r, habitPlats)),
-      }))
-      real.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.publishedAtMs || 0) - (a.publishedAtMs || 0))
+      real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: workId })
     }
     setOrderDisplayRows([...real, ...mocks].slice(0, 50))
-  }, [allOrderRows, searchKeyword, filterPlatform, filterProvince, filterCity, priceSelected, workId, habitPlats])
+  }, [allOrderRows, searchKeyword, filterPlatform, filterProvince, filterCity, priceSelected, workId])
 
   useEffect(() => {
     void applyOrderFilters()

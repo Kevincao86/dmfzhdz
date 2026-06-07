@@ -13,10 +13,19 @@ export type MpRecruitmentAiOrderInput = {
   urgent?: boolean
   isIce?: boolean
   summary?: string
+  recruitTarget?: string
+  priceAmount?: number
+  talentTags?: string[]
+  infoSummary?: string
+  recruitDetail?: string
 }
 
 export type MpRecruitmentAiTalentInput = {
   id?: string
+  workIdentity?: string
+  role?: string
+  roleLabel?: string
+  recruitTarget?: string
   platform?: string
   nickname?: string
   followers?: number | string
@@ -29,28 +38,42 @@ export type MpRecruitmentAiTalentInput = {
   gender?: string
   quality?: string
   tags?: string[]
+  supplierSkills?: string[]
+  applicationHabits?: Record<string, unknown>
 }
+
+const MATCH_SCORE_GUIDE = `评分维度（合计 100）：
+1) 平台一致 0-20；2) 城市/区域 0-20；3) 类目与达人标签契合 0-20；
+4) 报价/预算与身份（达人/拍摄/剪辑）匹配 0-15；5) 粉丝/带货等级是否达标 0-15；
+6) 招募描述与达人/团队能力、历史报名习惯 0-10。明显不符应低于 40。`
 
 function compactTalent(t: MpRecruitmentAiTalentInput): Record<string, unknown> {
   return {
     id: String(t.id ?? '').trim(),
+    workIdentity: t.workIdentity || t.role || 'talent',
+    roleLabel: t.roleLabel || '',
+    recruitTarget: t.recruitTarget || t.workIdentity || 'talent',
     platform: t.platform || '',
     nickname: (t.nickname || '').slice(0, 32),
     followers: t.followers ?? '',
     region: t.region || [t.province, t.city].filter(Boolean).join(' '),
-    accountTags: Array.isArray(t.accountTags) ? t.accountTags.slice(0, 4) : [],
+    accountTags: Array.isArray(t.accountTags) ? t.accountTags.slice(0, 8) : [],
     douyinSalesLevel: t.douyinSalesLevel || '',
+    quotePrice: t.quotePrice || '',
     gender: t.gender || '',
     quality: t.quality || '',
-    tags: Array.isArray(t.tags) ? t.tags.slice(0, 4) : [],
+    tags: Array.isArray(t.tags) ? t.tags.slice(0, 8) : [],
+    supplierSkills: Array.isArray(t.supplierSkills) ? t.supplierSkills.slice(0, 8) : [],
+    applicationHabits: t.applicationHabits || null,
   }
 }
 
-function compactPrOrder(o: MpRecruitmentAiOrderInput & { talentTags?: string[]; infoSummary?: string }) {
+function compactPrOrder(o: MpRecruitmentAiOrderInput) {
   return {
     ...compactOrder(o),
     talentTags: Array.isArray(o.talentTags) ? o.talentTags : [],
     info: String(o.infoSummary || o.summary || '').slice(0, 400),
+    recruitDetail: String(o.recruitDetail || '').slice(0, 200),
   }
 }
 
@@ -61,19 +84,28 @@ function hasKey(env: Record<string, string>, provider: AIProvider): boolean {
   if (provider === 'qwen') {
     return Boolean((env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim())
   }
+  if (provider === 'minimax') {
+    return Boolean((env.MERCHANT_AI_MINIMAX_KEY ?? env.MINIMAX_API_KEY ?? '').trim())
+  }
   return false
 }
 
-function pickProvider(env: Record<string, string>, preferred?: string): AIProvider | null {
-  const want = String(preferred || env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim() as AIProvider
-  if (want === 'doubao' || want === 'qwen') {
-    if (hasKey(env, want)) return want
-    const alt = want === 'doubao' ? 'qwen' : 'doubao'
-    if (hasKey(env, alt)) return alt
+function providerChain(env: Record<string, string>, preferred?: string): AIProvider[] {
+  const chain: AIProvider[] = []
+  const add = (p: AIProvider) => {
+    if (hasKey(env, p) && !chain.includes(p)) chain.push(p)
   }
-  if (hasKey(env, 'doubao')) return 'doubao'
-  if (hasKey(env, 'qwen')) return 'qwen'
-  return null
+  const want = String(preferred || env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim() as AIProvider
+  add(want)
+  for (const p of ['doubao', 'qwen', 'minimax'] as AIProvider[]) add(p)
+  return chain
+}
+
+function isRetryableAiError(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
+  return /429|quota|rate.?limit|余额|不足|insufficient|exhausted|limit exceeded|too many|resource|额度|欠费|over.?limit|capacity/.test(
+    msg,
+  )
 }
 
 function compactOrder(o: MpRecruitmentAiOrderInput): Record<string, unknown> {
@@ -84,8 +116,11 @@ function compactOrder(o: MpRecruitmentAiOrderInput): Record<string, unknown> {
     region: o.region || '',
     category: o.category || '',
     budget: o.budgetText || '',
+    priceAmount: o.priceAmount ?? 0,
     fans: o.fansRequirement || '',
+    recruitTarget: o.recruitTarget || 'talent',
     hall: o.hall || (o.isIce ? 'ice' : o.urgent ? 'urgent' : 'normal'),
+    summary: String(o.summary || '').slice(0, 220),
   }
 }
 
@@ -97,7 +132,7 @@ function extractJsonArray(text: string): unknown[] {
   try {
     const j = JSON.parse(candidate) as unknown
     if (Array.isArray(j)) return j
-    if (j && typeof j === 'object') {
+    if ( j && typeof j === 'object') {
       const o = j as Record<string, unknown>
       if (Array.isArray(o.items)) return o.items
       if (Array.isArray(o.tags)) return o.tags
@@ -154,12 +189,33 @@ async function callLlm(
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      temperature: 0.25,
+      temperature: 0.2,
       stream: false,
     },
     env,
   )
   return String(res.content || '').trim()
+}
+
+async function callLlmWithFallback(
+  env: Record<string, string>,
+  preferred: string | undefined,
+  system: string,
+  user: string,
+): Promise<{ text: string; provider: AIProvider }> {
+  const chain = providerChain(env, preferred)
+  if (!chain.length) throw new Error('ai_not_configured')
+  let lastErr = ''
+  for (const provider of chain) {
+    try {
+      const text = await callLlm(env, provider, system, user)
+      if (text) return { text, provider }
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (!isRetryableAiError(e)) throw e
+    }
+  }
+  throw new Error(lastErr || 'all_providers_quota_exhausted')
 }
 
 export async function runMpRecruitmentAiCore(
@@ -193,34 +249,33 @@ export async function runMpRecruitmentAiCore(
     return { status: 400, body: { ok: false, error: 'orders_required' } }
   }
 
-  const provider = pickProvider(env, body.provider)
-  if (!provider) {
+  if (!providerChain(env, body.provider).length) {
     return {
       status: 503,
       body: {
         ok: false,
         error: 'ai_not_configured',
-        hint: '请在服务端配置 MERCHANT_AI_DOUBAO_KEY 或 MERCHANT_AI_QWEN_KEY',
+        hint: '请在服务端配置 MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_QWEN_KEY 或 MERCHANT_AI_MINIMAX_KEY',
       },
     }
   }
 
   const orderJson = JSON.stringify(
-    mode === 'match_talent' ? orders.map((o) => compactPrOrder(o as MpRecruitmentAiOrderInput & { talentTags?: string[]; infoSummary?: string })) : orders.map(compactOrder),
+    mode === 'match_talent' ? orders.map(compactPrOrder) : orders.map(compactOrder),
   )
   const talentJson = JSON.stringify(talents.map(compactTalent))
 
   try {
     if (mode === 'match_talent') {
-      const system = `你是 PR 达人招募匹配助手。根据 PR 近期发布的招募单要求，为每位达人评估与发单需求的契合度。
-只输出 JSON 数组。每项：id（达人id）、score（0-100）、tag（2-4字标签，如高度契合/平台匹配/粉丝达标/同城达人）、tone（match|hot|niche|default）。
-score 综合平台、城市、粉丝、标签、带货等级与发单要求；无契合则 score 低于 40。`
-      const user = `PR 近期招募单（合并评估）：${orderJson}
+      const system = `你是 PR 招募智能匹配助手。根据 PR 近期发布的招募单（含标签、预算、粉丝/等级要求、描述），为每位达人/拍摄/剪辑候选评估契合度。
+${MATCH_SCORE_GUIDE}
+只输出 JSON 数组。每项：id（候选 id）、score（0-100 整数）、tag（2-4 字，如高度契合/平台匹配/粉丝达标/同城达人/拍剪匹配）、tone（match|hot|niche|default）。`
+      const user = `PR 近期招募单（合并评估，注意 recruitTarget 区分达人/拍摄/剪辑）：${orderJson}
 
-达人列表：${talentJson}
+候选列表（含 workIdentity、标签、报价、等级、技能）：${talentJson}
 
-请为每位达人打分（相对该 PR 发单需求的最佳匹配度）。`
-      const text = await callLlm(env, provider, system, user)
+请为每位候选打分，按与发单需求的最佳匹配度排序思路给出 score。`
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
       const items = extractJsonArray(text)
         .map(normalizeMatchItem)
         .filter((x): x is NonNullable<typeof x> => !!x)
@@ -228,15 +283,16 @@ score 综合平台、城市、粉丝、标签、带货等级与发单要求；�
     }
 
     if (mode === 'match') {
-      const talent = body.talent || {}
-      const system = `你是本地生活达人招募匹配助手。根据达人资料为每条商单评估匹配度。
-只输出 JSON 数组，无其它文字。每项字段：id（商单id）、score（0-100整数）、tag（2-4字中文亮点标签，如高匹配/同城优选/粉丝友好）、tone（match|hot|urgent|ice|budget|niche|default）。`
-      const user = `达人资料：${JSON.stringify(talent)}
+      const talent = compactTalent(body.talent || {})
+      const system = `你是本地生活招募智能匹配助手。根据达人/拍摄/剪辑团队资料，为每条商单评估匹配度。
+${MATCH_SCORE_GUIDE}
+只输出 JSON 数组，无其它文字。每项：id（商单 id）、score（0-100 整数）、tag（2-4 字中文亮点）、tone（match|hot|urgent|ice|budget|niche|default）。`
+      const user = `候选资料（含身份 workIdentity、标签 accountTags、报价 quotePrice、等级 douyinSalesLevel、报名习惯 applicationHabits）：${JSON.stringify(talent)}
 
-商单列表：${orderJson}
+商单列表（含平台、城市、类目、预算、粉丝要求、招募对象 recruitTarget、描述 summary）：${orderJson}
 
-请为每条商单打分并给标签，score 越高越适合该达人。`
-      const text = await callLlm(env, provider, system, user)
+请为每条商单打分；score 越高表示越适合该候选接单/报名。`
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
       const items = extractJsonArray(text)
         .map(normalizeMatchItem)
         .filter((x): x is NonNullable<typeof x> => !!x)
@@ -249,7 +305,7 @@ score 综合平台、城市、粉丝、标签、带货等级与发单要求；�
     const user = `商单列表：${orderJson}
 
 请为每条商单生成一个最合适的展示标签。`
-    const text = await callLlm(env, provider, system, user)
+    const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
     const items = extractJsonArray(text)
       .map(normalizeTagItem)
       .filter((x): x is NonNullable<typeof x> => !!x)

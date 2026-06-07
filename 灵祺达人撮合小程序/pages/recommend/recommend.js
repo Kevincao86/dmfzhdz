@@ -14,26 +14,8 @@ const prBoard = require('../../utils/prRecommendBoard.js')
 const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
 const participant = require('../../utils/participant.js')
-const applicationsStore = require('../../utils/applicationsStore.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
-
-function habitPlatforms() {
-  const apps = applicationsStore.readApplications() || []
-  const set = new Set()
-  for (const a of apps.slice(0, 20)) {
-    if (a.platform) set.add(a.platform)
-  }
-  return [...set]
-}
-
-function localHabitBoost(row, platforms) {
-  let boost = 0
-  if (platforms.length && platforms.includes(row.platform)) boost += 12
-  if (row.recommended) boost += 6
-  if (row.urgent) boost += 4
-  return boost
-}
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -495,7 +477,7 @@ Page({
         const packs = recruitmentAi.resolvePrRecentOrders(this.data.registryCache, { board })
         const payloads = packs.map((p) => p.payload)
         filtered = filtered.map((t) => {
-          const fb = recruitmentAi.fallbackTalentScore(t, payloads)
+          const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
           return {
             ...t,
             matchScore: fb.score,
@@ -590,13 +572,8 @@ Page({
     let real = rows.filter((r) => r && !r.isMock)
     const mocks = showDemoOrders() ? rows.filter((r) => r && r.isMock) : []
     const member = memberStore.readMember()
-    const habitPlats = habitPlatforms()
     if (api.hasApi() && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
-      real = real.map((r) => ({
-        ...r,
-        matchScore: Math.min(100, (r.matchScore || 0) + localHabitBoost(r, habitPlats)),
-      }))
     } else {
       real = real
         .map((r) => ({

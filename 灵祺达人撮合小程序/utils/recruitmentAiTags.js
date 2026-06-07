@@ -59,7 +59,82 @@ function orderAiPayload(row) {
     urgent: !!row.urgent,
     isIce: !!row.isIce,
     summary: row.summary || '',
+    priceAmount: row.priceAmount || 0,
   }
+}
+
+function fallbackOrderMatchScore(order, talent) {
+  let s = 38
+  const plat = String(order.platform || '')
+  const tPlat = String(talent.platform || '')
+  if (plat && tPlat && plat === tPlat) s += 18
+
+  const region = String(order.region || '')
+  const city = String(talent.city || (talent.region && talent.region.split('·')[0].trim()) || '')
+  if (region.includes('全国')) s += 6
+  else if (city) {
+    const short = city.replace(/市$/, '')
+    if (region.includes(city) || (short.length >= 2 && region.includes(short))) s += 16
+  }
+
+  const cat = String(order.category || '')
+  const tags = [...(talent.accountTags || []), ...(talent.tags || []), ...(talent.supplierSkills || [])]
+  if (cat && tags.some((t) => t && (cat.includes(t) || t.includes(cat)))) s += 14
+
+  const target = String(order.recruitTarget || 'talent')
+  const wid = String(talent.workIdentity || talent.role || 'talent')
+  if (target === wid) s += 14
+  else if (target !== wid) s -= 18
+
+  const fansReq = String(order.fansRequirement || '')
+  const f = Number(talent.followers) || 0
+  if (fansReq.includes('不限')) s += 10
+  else {
+    const fm = fansReq.match(/([\d.]+)\s*万/)
+    const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
+    if (need > 0 && f >= need) s += 12
+  }
+
+  if ((order.priceAmount || 0) >= 500) s += 4
+  if (order.urgent && (talent.applicationHabits && talent.applicationHabits.urgentApplyRatio || 0) > 20) s += 6
+  if (order.isIce && wid === 'edit') s += 10
+
+  const habits = talent.applicationHabits || {}
+  if (habits.preferredPlatforms && habits.preferredPlatforms.includes(plat)) s += 8
+  if (cat && habits.preferredCategories && habits.preferredCategories.some((c) => cat.includes(c) || c.includes(cat))) s += 6
+
+  const score = Math.max(0, Math.min(90, Math.round(s)))
+  let tag = '可看看'
+  if (score >= 78) tag = '高匹配'
+  else if (score >= 65) tag = '较契合'
+  else if (plat && tPlat && plat === tPlat) tag = '平台匹配'
+  return { score, tag, tone: score >= 65 ? 'match' : 'default' }
+}
+
+function applyOrderMatchResults(rows, map, talent, talentCity) {
+  return rows.map((row) => {
+    const hit = map[row.id]
+    if (hit && hit.score > 0) {
+      const score = Math.max(0, Math.min(100, Math.round(hit.score)))
+      return {
+        ...row,
+        matchScore: score,
+        aiTag: hit.tag || (score >= 75 ? '高匹配' : ''),
+        aiTagTone: hit.tone || (score >= 75 ? 'match' : 'default'),
+        aiMatch: score >= 60,
+        aiTagSource: 'ai',
+      }
+    }
+    const fb = fallbackOrderMatchScore(row, { ...talent, city: talent.city || talentCity })
+    return {
+      ...row,
+      matchScore: fb.score,
+      aiTag: fb.tag,
+      aiTagTone: fb.tone,
+      aiMatch: fb.score >= 55,
+      aiTagSource: 'local',
+    }
+  })
 }
 
 function applicationHabitsFromStore() {
@@ -157,6 +232,12 @@ function talentProfileFromMember(member, opts) {
   const prof = (primary && primary.profile) || {}
   const city = String((member && member.city) || '').trim()
   const province = String((member && member.province) || '').trim()
+  const supplierSkills =
+    identity === 'shoot'
+      ? ['拍摄', '跟拍', '现场']
+      : identity === 'edit'
+        ? ['剪辑', '后期', '云剪']
+        : []
   return {
     workIdentity: identity,
     role: identity,
@@ -171,6 +252,7 @@ function talentProfileFromMember(member, opts) {
     accountTags: Array.isArray(prof.accountTags) ? prof.accountTags : [],
     douyinSalesLevel: prof.douyinSalesLevel || '',
     quotePrice: prof.quotePrice || '',
+    supplierSkills,
     applicationHabits: habits,
   }
 }
@@ -216,28 +298,8 @@ async function fetchMatchItems(orders, talent) {
   return map
 }
 
-function applyMatchMap(rows, map, talentCity) {
-  return rows.map((row) => {
-    const hit = map[row.id]
-    const fb = fallbackTagForRow(row, talentCity)
-    if (!hit) {
-      return {
-        ...row,
-        ...fb,
-        matchScore: row.matchScore || 0,
-        aiTagSource: 'local',
-      }
-    }
-    const score = Math.max(0, Math.min(100, Math.round(Number(hit.score) || 0)))
-    return {
-      ...row,
-      matchScore: score,
-      aiTag: hit.tag || (score >= 75 ? '高匹配' : fb.aiTag),
-      aiTagTone: hit.tone || (score >= 75 ? 'match' : fb.aiTagTone),
-      aiMatch: score >= 60,
-      aiTagSource: 'ai',
-    }
-  })
+function applyMatchMap(rows, map, talent, talentCity) {
+  return applyOrderMatchResults(rows, map, talent, talentCity)
 }
 
 async function enrichOrderTags(rows, opts) {
@@ -276,8 +338,8 @@ async function enrichOrderMatches(rows, member, opts) {
     applicationHabits: habits,
   })
   const talentCity = talent && talent.city ? talent.city : ''
-  if (!api.hasApi() || !list.length) {
-    const local = applyMatchMap(list, {}, talentCity)
+  if (!api.hasApi() || !list.length || !talent) {
+    const local = applyMatchMap(list, {}, talent || {}, talentCity)
     return local.sort((a, b) => {
       const d = (b.matchScore || 0) - (a.matchScore || 0)
       if (d !== 0) return d
@@ -308,7 +370,7 @@ async function enrichOrderMatches(rows, member, opts) {
     writeCache(MATCH_CACHE_KEY, cache)
   }
 
-  const enriched = applyMatchMap(list, map, talentCity)
+  const enriched = applyMatchMap(list, map, talent, talentCity)
   enriched.sort((a, b) => {
     const d = (b.matchScore || 0) - (a.matchScore || 0)
     if (d !== 0) return d
@@ -356,9 +418,20 @@ function resolvePrRecentOrders(reg, opts) {
   return out
 }
 
-function talentAiPayload(row) {
+function talentAiPayload(row, board) {
+  const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+  const skills =
+    wid === 'shoot'
+      ? ['拍摄', '跟拍', ...(row.tags || [])]
+      : wid === 'edit'
+        ? ['剪辑', '后期', ...(row.tags || [])]
+        : row.tags || []
   return {
     id: row.id,
+    workIdentity: wid,
+    role: wid,
+    roleLabel: wid === 'shoot' ? '拍摄团队' : wid === 'edit' ? '剪辑团队' : '达人',
+    recruitTarget: wid,
     platform: row.platform || '',
     nickname: row.name || '',
     followers: row.followersRaw != null ? row.followersRaw : row.followers,
@@ -368,6 +441,8 @@ function talentAiPayload(row) {
     gender: row.gender || '',
     quality: row.quality || '',
     tags: row.tags || [],
+    supplierSkills: skills.slice(0, 8),
+    quotePrice: row.quotePrice || '',
   }
 }
 
@@ -378,46 +453,53 @@ function prOrdersCacheKey(orderPayloads) {
     .slice(0, 80)
 }
 
-function fallbackTalentScore(talent, orderPayloads) {
+function fallbackTalentScore(talent, orderPayloads, board) {
   if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
   let best = 0
   let tag = '可沟通'
+  const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
   for (const o of orderPayloads) {
-    let s = 40
+    let s = 38
     const plat = String(o.platform || '')
     const tPlat = String(talent.platform || '')
-    if (plat && tPlat && plat === tPlat) s += 20
+    if (plat && tPlat && plat === tPlat) s += 18
     const region = String(o.region || '')
     const tRegion = String(talent.region || '')
-    if (region && tRegion && region.includes('全国')) s += 5
-    else if (region && tRegion && tRegion && region.includes(tRegion.split('·')[0].trim())) s += 15
+    if (region.includes('全国')) s += 6
+    else if (tRegion && region.includes(tRegion.split('·')[0].trim())) s += 16
+    const target = String(o.recruitTarget || 'talent')
+    if (target === wid) s += 14
+    else if (target !== wid) s -= 18
     const needTags = o.talentTags || []
-    const tTags = talent.tags || talent.accountTags || []
-    if (needTags.length && tTags.some((t) => needTags.includes(t))) s += 15
-    const fansReq = String(o.fans || '')
+    const tTags = [...(talent.tags || []), ...(talent.accountTags || [])]
+    if (needTags.length && tTags.some((t) => needTags.includes(t))) s += 14
+    const fansReq = String(o.fansRequirement || o.fans || '')
     const f = Number(talent.followersRaw) || 0
     if (fansReq.includes('不限')) s += 10
     else {
-      const fm = fansReq.match(/(\d+)/)
-      if (fm && f >= Number(fm[1])) s += 12
+      const fm = fansReq.match(/([\d.]+)\s*万/)
+      const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
+      if (need > 0 && f >= need) s += 12
     }
+    if ((o.priceAmount || 0) >= 500) s += 4
     if (s > best) {
       best = s
-      if (s >= 70) tag = '较契合'
+      if (s >= 78) tag = '高匹配'
+      else if (s >= 65) tag = '较契合'
       else if (plat === tPlat) tag = '平台匹配'
     }
   }
-  return { score: Math.min(88, best), tag, tone: best >= 65 ? 'match' : 'default' }
+  return { score: Math.min(90, best), tag, tone: best >= 65 ? 'match' : 'default' }
 }
 
-async function fetchPrTalentMatchItems(orderPayloads, talents) {
+async function fetchPrTalentMatchItems(orderPayloads, talents, board) {
   const map = {}
   for (const part of chunk(talents, TALENT_BATCH_SIZE)) {
     try {
       const res = await postAi({
         mode: 'match_talent',
         orders: orderPayloads,
-        talents: part.map(talentAiPayload),
+        talents: part.map((t) => talentAiPayload(t, board)),
       })
       const items = res && Array.isArray(res.items) ? res.items : []
       for (const it of items) {
@@ -435,34 +517,35 @@ async function fetchPrTalentMatchItems(orderPayloads, talents) {
   return map
 }
 
-function applyTalentMatchMap(talents, map, orderPayloads) {
+function applyTalentMatchMap(talents, map, orderPayloads, board) {
   return talents.map((t) => {
     if (t.isPreview) return { ...t, matchScore: 0, aiTag: '预览', aiTagTone: 'default' }
     const hit = map[t.id]
-    const fb = fallbackTalentScore(t, orderPayloads)
-    if (!hit) {
+    const fb = fallbackTalentScore(t, orderPayloads, board)
+    if (hit && hit.score > 0) {
+      const score = Math.max(0, Math.min(100, Math.round(Number(hit.score) || 0)))
       return {
         ...t,
-        matchScore: fb.score,
-        aiTag: fb.tag,
-        aiTagTone: fb.tone,
-        aiMatch: fb.score >= 60,
-        aiTagSource: 'local',
+        matchScore: score,
+        aiTag: hit.tag || (score >= 75 ? '高匹配' : fb.tag),
+        aiTagTone: hit.tone || (score >= 75 ? 'match' : fb.tone),
+        aiMatch: score >= 55,
+        aiTagSource: 'ai',
       }
     }
-    const score = Math.max(0, Math.min(100, Math.round(Number(hit.score) || 0)))
     return {
       ...t,
-      matchScore: score,
-      aiTag: hit.tag || (score >= 75 ? '高匹配' : fb.tag),
-      aiTagTone: hit.tone || (score >= 75 ? 'match' : fb.tone),
-      aiMatch: score >= 55,
-      aiTagSource: 'ai',
+      matchScore: fb.score,
+      aiTag: fb.tag,
+      aiTagTone: fb.tone,
+      aiMatch: fb.score >= 55,
+      aiTagSource: 'local',
     }
   })
 }
 
 async function enrichTalentMatchesForPr(talents, reg, opts) {
+  const board = (opts && opts.board) || 'talent'
   const list = (talents || []).filter((t) => t && t.id && !t.isPreview)
   const packs = resolvePrRecentOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
@@ -476,7 +559,7 @@ async function enrichTalentMatchesForPr(talents, reg, opts) {
     }))
   }
   if (!api.hasApi() || !list.length) {
-    return applyTalentMatchMap(list, {}, orderPayloads)
+    return applyTalentMatchMap(list, {}, orderPayloads, board)
   }
 
   const cache = readCache(PR_TALENT_MATCH_CACHE_KEY)
@@ -489,7 +572,7 @@ async function enrichTalentMatchesForPr(talents, reg, opts) {
     else missing.push(t)
   }
   if (missing.length) {
-    const fresh = await fetchPrTalentMatchItems(orderPayloads, missing)
+    const fresh = await fetchPrTalentMatchItems(orderPayloads, missing, board)
     for (const t of missing) {
       if (fresh[t.id]) {
         map[t.id] = fresh[t.id]
@@ -500,7 +583,7 @@ async function enrichTalentMatchesForPr(talents, reg, opts) {
     writeCache(PR_TALENT_MATCH_CACHE_KEY, cache)
   }
 
-  const enriched = applyTalentMatchMap(list, map, orderPayloads)
+  const enriched = applyTalentMatchMap(list, map, orderPayloads, board)
   enriched.sort((a, b) => {
     const d = (b.matchScore || 0) - (a.matchScore || 0)
     if (d !== 0) return d

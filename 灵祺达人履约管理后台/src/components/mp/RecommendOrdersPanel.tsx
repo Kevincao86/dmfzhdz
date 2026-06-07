@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
-import { getAccount } from '../../lib/mpSession'
+import { getWorkIdentity } from '../../lib/mpWorkIdentity'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
 import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
@@ -67,12 +67,9 @@ export default function RecommendOrdersPanel() {
     })
     const mocks = rows.filter((r) => r.isMock)
     let real = rows.filter((r) => !r.isMock)
-    const acc = getAccount()
-    const member = acc?.lingqiTalentId
-      ? { city: talentCity, province: '', platform: '抖音', nickname: acc.wxNickName || '', followers: '', accountTags: [] as string[] }
-      : null
-    if (member && real.length) {
-      real = await recruitmentAi.enrichOrderMatches(real, member)
+    const memberRow = readMember()
+    if (memberRow && real.length) {
+      real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: getWorkIdentity() })
     } else {
       real = real.map((r) => ({ ...r, ...recruitmentAi.fallbackTagForRow(r, talentCity), matchScore: 0 }))
     }
