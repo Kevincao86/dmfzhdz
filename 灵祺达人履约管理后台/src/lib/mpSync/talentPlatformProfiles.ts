@@ -95,6 +95,7 @@ export type TalentMember = {
   contact?: string
   wechatId?: string
   alipayAccount?: string
+  gender?: string
   province?: string
   city?: string
   platformProfiles: Record<string, PlatformProfile>

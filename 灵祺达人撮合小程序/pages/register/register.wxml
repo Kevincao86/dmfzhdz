@@ -65,11 +65,26 @@
       <text class="form-label">支付宝账号</text>
       <input
         class="input"
-        placeholder="用于结算打款，全平台共用"
+        placeholder="选填，用于结算打款"
         value="{{alipayAccount}}"
         data-k="alipayAccount"
         bindinput="onCommonField"
       />
+    </view>
+    <view class="form-row">
+      <text class="form-label">性别</text>
+      <view class="gender-row">
+        <view
+          class="gender-chip {{gender === '男' ? 'gender-chip--on' : ''}}"
+          data-gender="男"
+          bindtap="onGenderTap"
+        >男</view>
+        <view
+          class="gender-chip {{gender === '女' ? 'gender-chip--on' : ''}}"
+          data-gender="女"
+          bindtap="onGenderTap"
+        >女</view>
+      </view>
     </view>
     <view class="form-row form-row-inline">
       <view class="form-col">
@@ -199,6 +214,26 @@
     <block wx:if="{{item.enabled}}">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">
+        <text class="form-label">{{item.labels.profileLink}}</text>
+        <input
+          class="input"
+          placeholder="粘贴抖音分享口令或主页链接"
+          value="{{item.profile.profileLink}}"
+          data-id="{{item.id}}"
+          data-k="profileLink"
+          bindinput="onPlatformField"
+        />
+        <button
+          wx:if="{{item.id === 'douyin'}}"
+          class="profile-autofill-btn"
+          size="mini"
+          loading="{{profileAutofillLoading && profileAutofillPlatform === item.id}}"
+          disabled="{{profileAutofillLoading}}"
+          data-id="{{item.id}}"
+          bindtap="onProfileLinkAutofill"
+        >根据链接自动填写</button>
+      </view>
+      <view class="form-row">
         <text class="form-label">{{item.labels.accountId}}</text>
         <input
           class="input"
@@ -217,17 +252,6 @@
           value="{{item.profile.platformNickname}}"
           data-id="{{item.id}}"
           data-k="platformNickname"
-          bindinput="onPlatformField"
-        />
-      </view>
-      <view class="form-row">
-        <text class="form-label">{{item.labels.profileLink}}</text>
-        <input
-          class="input"
-          placeholder="请填写主页链接"
-          value="{{item.profile.profileLink}}"
-          data-id="{{item.id}}"
-          data-k="profileLink"
           bindinput="onPlatformField"
         />
       </view>

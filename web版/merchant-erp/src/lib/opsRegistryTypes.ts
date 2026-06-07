@@ -246,6 +246,7 @@ export type RegistryMpTalentMember = {
     RegistryMpTalentPlatformProfile & { enabled?: boolean; talentGrade?: string }
   >
   alipayAccount?: string
+  gender?: string
   registeredAt: string
   updatedAt: string
 }
