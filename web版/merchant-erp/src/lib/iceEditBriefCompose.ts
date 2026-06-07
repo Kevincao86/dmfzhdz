@@ -1,5 +1,16 @@
 /** 云剪：字幕文案框 + 剪辑指令框 合并为 ICE 解析用完整 brief */
 
+const ICE_BRIEF_BRAND_NOISE_RE = /灵祺\s*AI?|智能\s*ERP|云剪|Lingqi/gi
+
+/** 去掉 AI 偶发带入的产品/平台名称，避免上屏字幕出现品牌词 */
+export function sanitizeIceEditBriefBrandNoise(text: string): string {
+  return String(text || '')
+    .split('\n')
+    .map((line) => line.replace(ICE_BRIEF_BRAND_NOISE_RE, '').replace(/\s{2,}/g, ' ').trim())
+    .filter((line) => line.length > 0)
+    .join('\n')
+}
+
 export function composeIceEditBrief(copy: string, instruction: string): string {
   const c = String(copy || '').trim()
   const i = String(instruction || '').trim()

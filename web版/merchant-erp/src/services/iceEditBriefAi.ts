@@ -18,7 +18,7 @@ function buildMaterialSummary(ctx: IceMaterialContext): string {
       ? `生成视频总时长约：${ctx.clipEndSec} 秒`
       : `单段取用时长约：${ctx.clipEndSec} 秒`
   const lines: string[] = [
-    '【云剪素材概况】',
+    '【短视频素材概况】',
     `画幅：${ctx.aspectLabel}`,
     durationLine,
     `画面特效：${ctx.preset}`,
@@ -31,7 +31,7 @@ function buildMaterialSummary(ctx: IceMaterialContext): string {
   return lines.join('\n')
 }
 
-import { splitIceEditBrief } from '../lib/iceEditBriefCompose'
+import { sanitizeIceEditBriefBrandNoise, splitIceEditBrief } from '../lib/iceEditBriefCompose'
 
 /** 根据已上传图片/视频，推断发布意图并生成云剪剪辑文案指令 */
 export async function generateIceEditBriefAi(
@@ -77,6 +77,7 @@ export async function generateIceEditBriefAi(
     '【字幕文案】',
     '（本段写上屏短句，每条 4-20 字，可用「」括起，与图片/镜头顺序对应；可含 Slogan）',
     `全片总时长约 ${ctx.clipEndSec} 秒；画幅 ${ctx.aspectLabel}；特效 ${ctx.preset}。`,
+    '字幕文案与剪辑指令中禁止出现灵祺、灵祺AI、云剪、智能ERP 等产品或平台名称。',
     '只输出上述两段正文，不要 Markdown、不要 JSON、不要解释。',
     '',
     buildMaterialSummary(ctx),
@@ -86,13 +87,20 @@ export async function generateIceEditBriefAi(
   const r = await postDouyinGoodsAiAssist({
     model,
     action: 'operation_article',
-    product_name: '灵祺AI云剪',
+    product_name: '门店短视频',
     title_draft: titleDraft,
   })
   if (!r.ok || !r.description?.trim()) {
     return { ok: false, message: r.ok ? 'AI 未返回有效文案' : r.message }
   }
-  const brief = r.description.trim()
+  const brief = sanitizeIceEditBriefBrandNoise(r.description.trim())
   const { copy, instruction } = splitIceEditBrief(brief)
-  return { ok: true, brief, copy, instruction }
+  const cleanCopy = sanitizeIceEditBriefBrandNoise(copy)
+  const cleanInstruction = sanitizeIceEditBriefBrandNoise(instruction)
+  const merged = sanitizeIceEditBriefBrandNoise(
+    cleanInstruction && cleanCopy
+      ? `【剪辑指令】\n${cleanInstruction}\n\n【字幕文案】\n${cleanCopy}`
+      : brief,
+  )
+  return { ok: true, brief: merged, copy: cleanCopy, instruction: cleanInstruction }
 }

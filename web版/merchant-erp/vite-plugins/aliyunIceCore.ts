@@ -17,6 +17,7 @@ import {
   parseIceEditBriefPlan,
   type IceBriefTimelinePlan,
 } from './iceBriefTimelinePlan.js'
+import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
 import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl } from './aliyunOssIceParse.js'
 
 type IceClientClass = {
@@ -484,6 +485,12 @@ function formatIceProduceError(raw: string): string {
       `③ 请删除旧图后重新本地上传再试。`
     )
   }
+  if (/clips url not found|specified clips url not found/i.test(raw)) {
+    return (
+      `${raw}。常见原因：时间线引用的 BGM/音效 OSS 地址不存在或不可读；` +
+      `请重新提交云剪（系统已改用 IMS 公网示例音轨），或删除指令框中的 BGM/音效描述后仅保留字幕再试。`
+    )
+  }
   return raw
 }
 
@@ -782,11 +789,12 @@ export async function iceRunImagesPipeline(
     return { ok: false, message: out.message, step: 'output_config' }
   }
 
-  const plan = parseIceEditBriefPlan(input.editBrief, {
+  const rawPlan = parseIceEditBriefPlan(input.editBrief, {
     clipEndSec: input.totalDurationSec,
     imageCount: timelineUrls.length,
     effectId: input.effectId,
   })
+  const plan = await sanitizeIceBriefAudioPlan(rawPlan, cfg)
   const timeline = buildTimelineFromImages(timelineUrls, plan, input.width, input.height)
   try {
     const res = await client.submitMediaProducingJob(
@@ -850,11 +858,12 @@ export async function iceRunSinglePipeline(
     return { ok: false, message: out.message, step: 'output_config' }
   }
 
-  const plan = parseIceEditBriefPlan(input.editBrief, {
+  const rawPlan = parseIceEditBriefPlan(input.editBrief, {
     clipEndSec: input.clipEndSec,
     imageCount: 1,
     effectId: input.effectId,
   })
+  const plan = await sanitizeIceBriefAudioPlan(rawPlan, cfg)
   const timeline = buildTimeline(up.mediaId, plan)
   try {
     const res = await client.submitMediaProducingJob(

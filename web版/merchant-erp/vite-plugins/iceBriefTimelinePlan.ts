@@ -3,6 +3,16 @@
  * 此前 editBrief 仅写入 projectMetadata，成片不会按文案包装。
  */
 
+/** IMS 官方文档示例音轨（公网可读，勿用未上传的 meoo-out/stock/*.mp3） */
+export const ICE_PUBLIC_BGM_URLS = {
+  warm: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/m1.wav',
+  upbeat: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/m1.wav',
+  calm: 'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/speech.mp3',
+} as const
+
+export const ICE_PUBLIC_SFX_URL =
+  'https://ice-document-materials.oss-cn-shanghai.aliyuncs.com/test_media/music/speech.mp3'
+
 export type IceAudioClipPlan = {
   mediaUrl: string
   timelineIn: number
@@ -30,19 +40,17 @@ export type IceBriefTimelinePlan = {
   summary: string
 }
 
-const ICE_STOCK_AUDIO_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/meoo-out/stock'
-
 const ICE_BGM_PRESETS: Record<string, { url: string; label: string }> = {
-  warm: { url: `${ICE_STOCK_AUDIO_BASE}/bgm-warm-food.mp3`, label: '温暖氛围 BGM' },
-  upbeat: { url: `${ICE_STOCK_AUDIO_BASE}/bgm-upbeat.mp3`, label: '轻快 BGM' },
-  calm: { url: `${ICE_STOCK_AUDIO_BASE}/bgm-calm.mp3`, label: '舒缓 BGM' },
+  warm: { url: ICE_PUBLIC_BGM_URLS.warm, label: '温暖氛围 BGM' },
+  upbeat: { url: ICE_PUBLIC_BGM_URLS.upbeat, label: '轻快 BGM' },
+  calm: { url: ICE_PUBLIC_BGM_URLS.calm, label: '舒缓 BGM' },
 }
 
 const ICE_SFX_PRESETS: Array<{ re: RegExp; url: string; label: string; dur: number }> = [
-  { re: /碗|瓷|餐具|碰撞/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-bowl.mp3`, label: '碗碟音效', dur: 1.2 },
-  { re: /锅|炒|烹|厨房/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-kitchen.mp3`, label: '厨房音效', dur: 2 },
-  { re: /吆喝|人声|喧闹|市井/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-crowd.mp3`, label: '市井人声', dur: 2.5 },
-  { re: /环境|氛围|街道/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-ambient.mp3`, label: '环境氛围', dur: 3 },
+  { re: /碗|瓷|餐具|碰撞/, url: ICE_PUBLIC_SFX_URL, label: '碗碟音效', dur: 1.2 },
+  { re: /锅|炒|烹|厨房/, url: ICE_PUBLIC_SFX_URL, label: '厨房音效', dur: 2 },
+  { re: /吆喝|人声|喧闹|市井/, url: ICE_PUBLIC_SFX_URL, label: '市井人声', dur: 2.5 },
+  { re: /环境|氛围|街道/, url: ICE_PUBLIC_SFX_URL, label: '环境氛围', dur: 3 },
 ]
 
 function splitBriefBlocks(brief: string): { instruction: string; copy: string } {
@@ -190,7 +198,7 @@ function parseOpeningSec(brief: string, total: number): number {
 }
 
 const META_CAPTION_RE =
-  /剪辑文案|文案指令|云剪|整体定位|镜头与节奏|字幕与包装|关键帧|输出参数|BGM|背景音乐|画面特效|画幅|每张分配/i
+  /剪辑文案|文案指令|云剪|灵祺|整体定位|镜头与节奏|字幕与包装|关键帧|输出参数|BGM|背景音乐|画面特效|画幅|每张分配/i
 
 function isMetaCaptionText(text: string): boolean {
   const t = text.replace(/\s+/g, ' ').trim()
