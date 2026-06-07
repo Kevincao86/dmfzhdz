@@ -89,6 +89,8 @@ export default function DigitalHumanBroadcastPage() {
   const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
   const [renderJobId, setRenderJobId] = useState<string | null>(null)
+  /** 从作品管理「再编辑」载入时复用该作品 id 重新提交 */
+  const [editingWorkId, setEditingWorkId] = useState<string | null>(null)
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null)
   const [previewVideoTitle, setPreviewVideoTitle] = useState('')
   const renderInflightRef = useRef<Set<string>>(new Set())
@@ -418,32 +420,55 @@ export default function DigitalHumanBroadcastPage() {
       return
     }
 
-    const id = `dh-${Date.now()}`
+    const reuseId = editingWorkId?.trim() || null
+    const prev = reuseId ? loadDigitalHumanWorks().find((w) => w.id === reuseId) : null
+    const id = reuseId ?? `dh-${Date.now()}`
+    if (prev?.outputBlobUrl?.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(prev.outputBlobUrl)
+      } catch {
+        /* ignore */
+      }
+    }
     const row: DigitalHumanWork = {
       id,
       title: workTitleFromDraft(draft),
       status: 'queued',
       progress: 0,
-      createdAt: new Date().toISOString(),
+      createdAt: prev?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       draft: { ...draft },
+      errorMessage: undefined,
+      previewNote: undefined,
+      outputMp4Url: undefined,
+      outputBlobUrl: undefined,
+      videoEngine: undefined,
+      plannerModel: undefined,
+      segmentCount: undefined,
     }
     upsertDigitalHumanWork(row)
+    setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
     setRenderJobId(id)
     const segs = estimateDhSegmentCount(draft.script)
     setToast(
-      segs > 1
-        ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
-        : '已提交高清 MP4 渲染（豆包/可灵视频模型）',
+      reuseId
+        ? segs > 1
+          ? `已重新提交渲染（分 ${segs} 段生成后合并）`
+          : '已重新提交高清 MP4 渲染'
+        : segs > 1
+          ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
+          : '已提交高清 MP4 渲染（豆包/可灵视频模型）',
     )
   }
 
   const loadWorkForEdit = (w: DigitalHumanWork) => {
     setDraft({ ...w.draft })
+    setEditingWorkId(w.id)
+    setRenderJobId(null)
     setMainTab('create')
     setStep(2)
-    setToast(`已载入作品「${w.title}」继续编辑`)
+    setToast(`已载入作品「${w.title}」继续编辑，完成后可重新提交渲染`)
   }
 
   const previewWork = useCallback(
@@ -1196,31 +1221,13 @@ export default function DigitalHumanBroadcastPage() {
                     <li>· 输出：{draft.resolution.toUpperCase()} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>
                   </ul>
-                  {activeJob ? (
+                  {activeJob &&
+                  (activeJob.status === 'queued' || activeJob.status === 'rendering') ? (
                     <div className="rounded-xl border border-violet-200 bg-violet-50/80 p-4">
                       <p className="text-sm font-medium text-violet-900">{activeJob.title}</p>
                       <p className="mt-1 text-xs text-violet-700">
-                        状态：
-                        {activeJob.status === 'queued'
-                          ? '排队中'
-                          : activeJob.status === 'rendering'
-                            ? '渲染中'
-                            : activeJob.status === 'completed'
-                              ? '已完成'
-                              : activeJob.status === 'failed'
-                                ? '失败'
-                                : activeJob.status}
+                        状态：{activeJob.status === 'queued' ? '排队中' : '渲染中'}
                       </p>
-                      {activeJob.status === 'failed' ? (
-                        <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-800">
-                          {activeJob.errorMessage ||
-                            activeJob.previewNote ||
-                            '渲染失败：请确认运营台已配置豆包 Seedance 或可灵视频 API，并在 Network 中查看 meoo-merchant-ai-video-seedance-start 响应。'}
-                        </p>
-                      ) : null}
-                      {activeJob.previewNote && activeJob.status === 'completed' ? (
-                        <p className="mt-2 text-xs text-emerald-700">{activeJob.previewNote}</p>
-                      ) : null}
                       <div className="mt-2 h-2 overflow-hidden rounded-full bg-violet-200">
                         <div
                           className="h-full bg-violet-600 transition-all"
@@ -1228,16 +1235,31 @@ export default function DigitalHumanBroadcastPage() {
                         />
                       </div>
                     </div>
-                  ) : (
+                  ) : null}
+                  {activeJob?.status === 'completed' ? (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4">
+                      <p className="text-sm font-medium text-emerald-900">{activeJob.title}</p>
+                      <p className="mt-1 text-xs text-emerald-700">状态：已完成</p>
+                      {activeJob.previewNote ? (
+                        <p className="mt-2 text-xs text-emerald-700">{activeJob.previewNote}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {!(
+                    activeJob &&
+                    (activeJob.status === 'queued' || activeJob.status === 'rendering')
+                  ) ? (
                     <button
                       type="button"
                       onClick={submitRender}
                       className="flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-700"
                     >
                       <Clapperboard className="h-5 w-5" />
-                      提交后台渲染
+                      {editingWorkId || activeJob?.status === 'failed'
+                        ? '重新提交渲染'
+                        : '提交后台渲染'}
                     </button>
-                  )}
+                  ) : null}
                 </section>
               ) : null}
 
