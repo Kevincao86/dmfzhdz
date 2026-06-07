@@ -12,6 +12,7 @@ if [[ -f "$ROOT/scripts/ecs-git-pull-gitee.sh" ]]; then
 else
   bash "$ROOT/scripts/ecs-git-pull-main.sh"
 fi
+bash "$ROOT/scripts/ecs-install-ffmpeg.sh" 2>/dev/null || true
 bash "$ROOT/scripts/ecs-fix-erp-api-502.sh"
 
 echo ""

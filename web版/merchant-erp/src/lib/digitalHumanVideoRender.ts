@@ -265,21 +265,21 @@ async function generateOneSegment(opts: {
 
 async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<Blob> {
   if (blobs.length === 1) return blobs[0]!
-  try {
-    return await concatVideoSegmentsToMp4(blobs)
-  } catch (browserErr) {
-    const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
-    if (urls.length >= blobs.length) {
+  const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
+  if (urls.length >= blobs.length) {
+    try {
+      return await concatVideoUrlsOnServer(urls)
+    } catch (serverErr) {
       try {
-        return await concatVideoUrlsOnServer(urls)
-      } catch (serverErr) {
-        const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
+        return await concatVideoSegmentsToMp4(blobs)
+      } catch (browserErr) {
         const sMsg = serverErr instanceof Error ? serverErr.message : String(serverErr)
-        throw new Error(`${bMsg}；云端拼接：${sMsg}`)
+        const bMsg = browserErr instanceof Error ? browserErr.message : String(browserErr)
+        throw new Error(`云端拼接：${sMsg}；浏览器拼接：${bMsg}`)
       }
     }
-    throw browserErr
   }
+  return concatVideoSegmentsToMp4(blobs)
 }
 
 export async function renderDigitalHumanMp4(
