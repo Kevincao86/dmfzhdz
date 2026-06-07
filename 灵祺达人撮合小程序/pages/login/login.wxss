@@ -19,7 +19,7 @@
 .login-top {
   position: relative;
   overflow: hidden;
-  padding-bottom: 32rpx;
+  padding-bottom: 48rpx;
   flex-shrink: 0;
 }
 
@@ -92,10 +92,10 @@
 }
 
 .login-stack {
-  margin-top: -56rpx;
+  margin-top: 12rpx;
   padding: 0 28rpx;
   position: relative;
-  z-index: 4;
+  z-index: 2;
   flex-shrink: 0;
 }
 
