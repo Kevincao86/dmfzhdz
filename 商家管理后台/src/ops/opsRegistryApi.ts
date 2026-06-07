@@ -561,6 +561,25 @@ export async function deleteMpRecruitmentOrders(body: {
   }
 }
 
+export type MpLibraryDeleteKind = 'talent' | 'shoot' | 'edit' | 'pr'
+
+export async function deleteMpLibraryEntries(body: {
+  kind: MpLibraryDeleteKind
+  ids: string[]
+}): Promise<{ ok: boolean; deletedCount?: number; error?: string }> {
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-mp-library-delete', '/api/ops-sync/mp-library/delete'],
+    body,
+  )
+  if (!res.ok) {
+    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+  }
+  return {
+    ok: j.ok !== false,
+    deletedCount: typeof j.deletedCount === 'number' ? j.deletedCount : undefined,
+  }
+}
+
 export async function setRecruitmentOrders(orders: RegistryRecruitmentOrder[]): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch('/api/ops-sync/recruitment-orders/set', {
     method: 'POST',

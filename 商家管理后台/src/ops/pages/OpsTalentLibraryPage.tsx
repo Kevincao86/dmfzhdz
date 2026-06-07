@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
-import { fetchRegistry, type RegistryTalentLibraryEntry } from '../opsRegistryApi'
+import { deleteMpLibraryEntries, fetchRegistry, type RegistryTalentLibraryEntry } from '../opsRegistryApi'
+import { useOpsBatchSelection } from '../useOpsBatchSelection'
 import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
   extractProfileLinkUrl,
@@ -48,7 +49,33 @@ export default function OpsTalentLibraryPage() {
     return [...list].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
   }, [entries, tab, q])
 
-  const colCount = tab === '抖音' ? 12 : 11
+  const rowIds = useMemo(() => rows.map((e) => e.id), [rows])
+  const batch = useOpsBatchSelection(rowIds)
+
+  async function onBatchDelete() {
+    if (!batch.checkedIds.length || batch.deleting) return
+    if (
+      !window.confirm(
+        `确定删除选中的 ${batch.checkedIds.length} 条达人库记录？\n将同步清除注册表会员与站内信，履约 Web / 达人小程序刷新后可重新填写资料。`,
+      )
+    ) {
+      return
+    }
+    batch.setDeleting(true)
+    try {
+      const r = await deleteMpLibraryEntries({ kind: 'talent', ids: batch.checkedIds })
+      if (!r.ok) {
+        window.alert(r.error ?? '删除失败')
+        return
+      }
+      batch.clearChecked(batch.checkedIds)
+      await load()
+    } finally {
+      batch.setDeleting(false)
+    }
+  }
+
+  const colCount = tab === '抖音' ? 13 : 12
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
@@ -84,6 +111,16 @@ export default function OpsTalentLibraryPage() {
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
           刷新
         </button>
+        {batch.checkedIds.length > 0 ? (
+          <button
+            type="button"
+            disabled={batch.deleting}
+            onClick={() => void onBatchDelete()}
+            className="rounded-lg border border-rose-700 bg-rose-950/40 px-3 py-2 text-sm text-rose-300 hover:bg-rose-950 disabled:opacity-50"
+          >
+            {batch.deleting ? '删除中…' : `批量删除（${batch.checkedIds.length}）`}
+          </button>
+        ) : null}
         <span className="text-xs text-slate-500">
           {tab} · {rows.length} 人
         </span>
@@ -94,6 +131,15 @@ export default function OpsTalentLibraryPage() {
           <table className="w-full min-w-[1200px] text-left text-sm">
             <thead className="border-b border-slate-800 text-[11px] font-semibold uppercase text-slate-500">
               <tr>
+                <th className="px-3 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={batch.allVisibleChecked}
+                    onChange={batch.toggleAllVisible}
+                    aria-label="全选"
+                    className="rounded border-slate-600"
+                  />
+                </th>
                 <th className="px-3 py-3">灵祺达人 ID</th>
                 <th className="px-3 py-3">平台账号</th>
                 <th className="px-3 py-3">昵称</th>
@@ -121,6 +167,15 @@ export default function OpsTalentLibraryPage() {
                   const label = profileLinkLabel(e.platform, e.profileLink)
                   return (
                     <tr key={e.id} className="hover:bg-slate-800/30">
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={batch.checkedIds.includes(e.id)}
+                          onChange={() => batch.toggleRow(e.id)}
+                          aria-label={`选择 ${e.lingqiTalentId || e.id}`}
+                          className="rounded border-slate-600"
+                        />
+                      </td>
                       <td className="px-3 py-2 font-mono text-xs text-indigo-300">
                         {e.lingqiTalentId || '—'}
                       </td>
