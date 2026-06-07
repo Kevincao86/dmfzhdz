@@ -15,6 +15,8 @@ export const ICE_PUBLIC_SFX_URL =
 
 export type IceAudioClipPlan = {
   mediaUrl: string
+  /** IMS 入库后的媒资 ID，优先于 MediaURL（更稳定） */
+  mediaId?: string
   timelineIn: number
   timelineOut: number
   volume: number
@@ -440,26 +442,31 @@ export function buildSubtitleTracksFromPlan(
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
 }
 
+function buildIceAudioTrackClip(clip: IceAudioClipPlan): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    TimelineIn: clip.timelineIn,
+    TimelineOut: clip.timelineOut,
+    Volume: clip.volume,
+    In: 0,
+  }
+  if (clip.loop) row.Loop = true
+  if (clip.mediaId?.trim()) {
+    row.MediaId = clip.mediaId.trim()
+  } else if (clip.mediaUrl.trim()) {
+    row.MediaURL = clip.mediaUrl.trim()
+  }
+  return row
+}
+
 export function buildAudioTracksFromPlan(
   plan: IceBriefTimelinePlan,
 ): { AudioTracks: Array<{ AudioTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
   const clips: Record<string, unknown>[] = []
   if (plan.bgmClip) {
-    clips.push({
-      MediaURL: plan.bgmClip.mediaUrl,
-      TimelineIn: plan.bgmClip.timelineIn,
-      TimelineOut: plan.bgmClip.timelineOut,
-      Loop: plan.bgmClip.loop ?? true,
-      Volume: plan.bgmClip.volume,
-    })
+    clips.push(buildIceAudioTrackClip(plan.bgmClip))
   }
   for (const sfx of plan.sfxClips) {
-    clips.push({
-      MediaURL: sfx.mediaUrl,
-      TimelineIn: sfx.timelineIn,
-      TimelineOut: sfx.timelineOut,
-      Volume: sfx.volume,
-    })
+    clips.push(buildIceAudioTrackClip(sfx))
   }
   if (!clips.length) return {}
   return { AudioTracks: [{ AudioTrackClips: clips }] }

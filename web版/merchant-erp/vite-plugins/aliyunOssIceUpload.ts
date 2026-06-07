@@ -516,6 +516,20 @@ async function ossClientForObject(
   }) as unknown as OssObjectClient
 }
 
+/** 匿名 HEAD：判断 ICE 时间线能否用无签名 OSS 直链（私有 Bucket 须改走 MediaId） */
+export async function probeAnonymousOssReadable(url: string): Promise<boolean> {
+  const u = toIceTimelineOssUrl(url.trim())
+  if (!/^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\/.+/i.test(u)) return false
+  try {
+    const res = await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(10_000) })
+    if (!res.ok) return false
+    const len = Number(res.headers.get('content-length') ?? 0)
+    return len > 0
+  } catch {
+    return false
+  }
+}
+
 /** HEAD 成片 OSS 对象大小（用于轮询「Success 但尚未落盘」） */
 export async function probeIceOutputObjectSize(
   cfg: AliyunIceConfig,
