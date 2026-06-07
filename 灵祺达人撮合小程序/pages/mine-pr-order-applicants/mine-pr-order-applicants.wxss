@@ -50,7 +50,7 @@
 
 .pr-app-tool-btn--notify {
   color: #fff;
-  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
   border-color: transparent;
 }
 

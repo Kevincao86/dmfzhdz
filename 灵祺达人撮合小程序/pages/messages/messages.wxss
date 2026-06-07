@@ -25,15 +25,15 @@
 
 .msg-nav-title {
   font-size: 34rpx;
-  font-weight: 700;
-  color: var(--lq-text);
+  font-weight: 800;
+  color: #fff;
 }
 
 .msg-nav-sub {
   display: block;
   margin-top: 6rpx;
   font-size: 22rpx;
-  color: var(--lq-text-secondary);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .msg-fixed-tip {

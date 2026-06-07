@@ -69,25 +69,25 @@
   </view>
 
   <scroll-view class="mine-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-  <view class="biz-menu-card menu-section">
+  <view class="menu-section">
     <view
       wx:for="{{menus}}"
       wx:key="key"
-      class="biz-menu-row"
-      hover-class="biz-menu-row--hover"
+      class="menu-card"
+      hover-class="menu-card--hover"
       data-key="{{item.key}}"
       bindtap="onMenuTap"
     >
-      <view class="lq-biz-icon lq-biz-icon--{{item.icon}}">
-        <text>{{item.glyph}}</text>
+      <view class="menu-icon-wrap menu-icon-wrap--{{item.icon}}">
+        <text class="menu-glyph">{{item.glyph}}</text>
       </view>
-      <view class="biz-menu-body">
-        <text class="biz-menu-label">{{item.label}}</text>
-        <text class="biz-menu-sub">{{item.sub}}</text>
+      <view class="menu-body">
+        <text class="menu-label">{{item.label}}</text>
+        <text class="menu-sub">{{item.sub}}</text>
       </view>
       <view class="menu-right">
-        <text class="biz-menu-badge" wx:if="{{item.key === 'notifications' && notifyBadge > 0}}">{{notifyBadge}}</text>
-        <text class="biz-menu-arrow">›</text>
+        <text class="menu-badge" wx:if="{{item.key === 'notifications' && notifyBadge > 0}}">{{notifyBadge}}</text>
+        <text class="menu-arrow">›</text>
       </view>
     </view>
   </view>
@@ -111,8 +111,8 @@
         data-id="{{item.id}}"
         bindtap="onPickIdentity"
       >
-        <view class="lq-biz-icon lq-biz-icon--identity">
-          <text>{{item.glyph}}</text>
+        <view class="id-sheet-opt-icon">
+          <text class="id-sheet-opt-glyph">{{item.glyph}}</text>
         </view>
         <view class="id-sheet-opt-body">
           <text class="id-sheet-opt-title">{{item.label}}</text>

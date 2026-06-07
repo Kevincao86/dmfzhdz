@@ -15,7 +15,7 @@ const wxAccount = require('../../utils/wxAccount.js')
 const { setTabBarForPage, refreshTabBar, setTabBarHidden } = require('../../utils/tabBar.js')
 const { routeToPagePath } = require('../../utils/tabBarConfig.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
-const { attachMenuGlyphs } = require('../../utils/bizGlyphs.js')
+const { attachMenuGlyphs, IDENTITY_GLYPH } = require('../../utils/mineMenuIcons.js')
 
 const IDENTITY_SUBS = {
   talent: '浏览商单、报名招募、管理个人资料',
@@ -24,10 +24,12 @@ const IDENTITY_SUBS = {
   pr: '发布招募、管理发单与达人沟通',
 }
 
-const IDENTITY_SHEET_OPTS = identityTypes.WORK_ID_LIST.map((id) => {
-  const meta = identityTypes.WORK_IDENTITIES[id]
-  return { id, ...meta, sub: IDENTITY_SUBS[id] }
-})
+const IDENTITY_SHEET_OPTS = identityTypes.WORK_ID_LIST.map((id) => ({
+  id,
+  label: identityTypes.WORK_IDENTITIES[id].label,
+  glyph: IDENTITY_GLYPH[id] || '身',
+  sub: IDENTITY_SUBS[id],
+}))
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {

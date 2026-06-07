@@ -53,9 +53,9 @@ function boardAllModeLabel(board) {
 function boardMatchHint(board, orderCount) {
   const label = boardLabel(board)
   if (orderCount > 0) {
-    return `已根据您最近 ${orderCount} 条${label}招募要求智能匹配`
+    return `已根据您最近 ${orderCount} 条${label}招募要求智能匹配 · 按匹配分从高到低`
   }
-  return `发${label}招募后，将按发单要求智能推荐${label}`
+  return `发${label}招募后，将按发单要求智能推荐 · 按匹配分从高到低`
 }
 
 function accountTagsFromMember(m) {
