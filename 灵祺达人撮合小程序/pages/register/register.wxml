@@ -217,21 +217,20 @@
         <text class="form-label">{{item.labels.profileLink}}</text>
         <input
           class="input"
-          placeholder="粘贴抖音分享口令或主页链接"
+          placeholder="粘贴分享口令或主页链接"
           value="{{item.profile.profileLink}}"
           data-id="{{item.id}}"
           data-k="profileLink"
           bindinput="onPlatformField"
         />
         <button
-          wx:if="{{item.id === 'douyin'}}"
           class="profile-autofill-btn"
           size="mini"
           loading="{{profileAutofillLoading && profileAutofillPlatform === item.id}}"
           disabled="{{profileAutofillLoading}}"
           data-id="{{item.id}}"
           bindtap="onProfileLinkAutofill"
-        >根据链接自动填写</button>
+        >AI自动解析链接并填写下方信息</button>
       </view>
       <view class="form-row">
         <text class="form-label">{{item.labels.accountId}}</text>

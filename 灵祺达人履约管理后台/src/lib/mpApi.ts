@@ -211,13 +211,15 @@ export async function postMpRecruitmentAi(body: Record<string, unknown>) {
 
 export type ParsedProfileLink = {
   ok: true
-  platform: '抖音'
+  platform: string
   platformAccount: string
   platformNickname: string
   profileLink: string
   followers: number
   gender: '' | '男' | '女'
   accountTags: string[]
+  talentGrade?: string
+  reviewCount?: string
 }
 
 export async function parseProfileLink(link: string, platform = '抖音'): Promise<ParsedProfileLink> {

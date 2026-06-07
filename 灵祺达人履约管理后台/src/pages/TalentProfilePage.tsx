@@ -104,29 +104,30 @@ export default function TalentProfilePage() {
   }, [member.wxNickName, member.wxAvatarUrl])
 
   async function onAutofillFromLink() {
-    if (activePlatform !== 'douyin') {
-      setMsg('暂仅支持抖音主页链接自动填写')
-      return
-    }
+    const platName = TALENT_PLATFORMS.find((p) => p.id === activePlatform)?.name || '抖音'
     const link = String(prof.profileLink || '').trim()
     if (!link) {
-      setMsg('请先粘贴抖音主页分享链接')
+      setMsg('请先粘贴主页分享链接')
       return
     }
     setAutofillLoading(true)
     setMsg('')
     try {
-      const parsed = await parseProfileLink(link, '抖音')
+      const parsed = await parseProfileLink(link, platName)
       const mergedTags = [
         ...new Set([...(prof.accountTags || []), ...(parsed.accountTags || [])]),
       ].filter((t) => TALENT_TAGS.includes(t))
-      patchProfile({
+      const profilePatch: Partial<PlatformProfile> = {
         platformAccount: parsed.platformAccount || prof.platformAccount,
         platformNickname: parsed.platformNickname || prof.platformNickname,
         profileLink: parsed.profileLink || prof.profileLink,
         followers: parsed.followers > 0 ? String(parsed.followers) : prof.followers,
         accountTags: mergedTags,
-      })
+      }
+      if (parsed.talentGrade && activePlatform === 'kuaishou') {
+        profilePatch.talentGrade = parsed.talentGrade
+      }
+      patchProfile(profilePatch)
       if (parsed.gender && !member.gender) patchMember({ gender: parsed.gender })
       setMsg('已根据链接自动填写')
     } catch (e) {
@@ -332,18 +333,16 @@ export default function TalentProfilePage() {
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.profileLink || ''}
             onChange={(e) => patchProfile({ profileLink: e.target.value })}
-            placeholder="粘贴抖音分享口令或主页链接"
+            placeholder="粘贴分享口令或主页链接"
           />
-          {activePlatform === 'douyin' ? (
-            <button
-              type="button"
-              disabled={autofillLoading}
-              className="mt-2 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-500 py-2 text-sm font-medium disabled:opacity-50"
-              onClick={() => void onAutofillFromLink()}
-            >
-              {autofillLoading ? '解析中…' : '根据链接自动填写'}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            disabled={autofillLoading}
+            className="mt-2 w-full rounded-lg bg-gradient-to-r from-violet-600 to-indigo-500 py-2 text-sm font-medium disabled:opacity-50"
+            onClick={() => void onAutofillFromLink()}
+          >
+            {autofillLoading ? 'AI 解析中…' : 'AI自动解析链接并填写下方信息'}
+          </button>
         </label>
         <label className="block">
           <span className="text-slate-400">{lb.accountId}</span>
