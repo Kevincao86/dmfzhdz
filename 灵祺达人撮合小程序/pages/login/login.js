@@ -77,7 +77,7 @@ Page({
   },
 
   onLoad() {
-    applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
+    this.applyLoginNavPadding()
     this.setData({ err: '', loginIdentity: '', loginIdentityLabel: '' })
     if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
@@ -85,7 +85,22 @@ Page({
   },
 
   onShow() {
+    this.applyLoginNavPadding()
+  },
+
+  applyLoginNavPadding() {
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
+    try {
+      const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+      const menu = wx.getMenuButtonBoundingClientRect()
+      const pxToRpx = 750 / win.windowWidth
+      const topRpx = Math.max(0, Math.round(menu.top * pxToRpx) - 16)
+      const rightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
+      this.setData({
+        navBandStyle: `padding-top:${topRpx}rpx;`,
+        navInnerStyle: `padding-right:${rightRpx}rpx;`,
+      })
+    } catch (_) {}
   },
 
   onOpenIdentitySheet() {
