@@ -112,19 +112,26 @@ export function filterRegistrySnapshotForMerchant(authTenantId: string, file: Re
   }
 }
 
-/** 达人招募小程序大厅可读：开放中的小程序招募单（不含群码，仅入选达人经站内信获取） */
+/** 达人招募小程序大厅可读：开放中的小程序招募单（不含群码，保留 PR 确认状态供达人侧展示） */
 export function mpRecruitmentOrdersForTalentHall(file: RegistryFile) {
   return (file.mpRecruitmentOrders ?? [])
     .filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
     .map((o) => {
+      const selectedSet = new Set(
+        (Array.isArray(o.selectedApplicantIds) ? o.selectedApplicantIds : []).map((id) => String(id)),
+      )
       const meta =
         o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
           ? { ...o.mpPublishMeta, groupQrImage: undefined }
           : o.mpPublishMeta
+      const applicants = (o.applicants ?? []).map((a) => ({
+        ...a,
+        prSelected: a.prSelected === true || selectedSet.has(String(a.id)),
+      }))
       return {
         ...o,
         groupQrImage: undefined,
-        selectedApplicantIds: undefined,
+        applicants,
         mpPublishMeta: meta,
       }
     })

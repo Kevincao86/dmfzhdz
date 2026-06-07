@@ -13,6 +13,17 @@ export type MpRecruitmentPatchBody = {
   groupQrImage?: string
 }
 
+function stampApplicantsPrSelected(
+  applicants: RegistryMpRecruitmentApplicant[] | undefined,
+  selectedIds: string[],
+): RegistryMpRecruitmentApplicant[] {
+  const set = new Set(selectedIds.map((id) => String(id)))
+  return (applicants ?? []).map((a) => ({
+    ...a,
+    prSelected: set.has(String(a.id)),
+  }))
+}
+
 export function patchMpRecruitmentOrderInSnapshot(
   data: RegistrySnapshot,
   body: MpRecruitmentPatchBody,
@@ -58,15 +69,17 @@ export function patchMpRecruitmentOrderInSnapshot(
       updatedAt: now,
     }
   } else {
+    const nextSelectedIds = selectedApplicantIds
+      ? selectedApplicantIds.map((x) => String(x || '').trim()).filter(Boolean)
+      : null
     data.mpRecruitmentOrders[idx] = {
       ...cur,
       ...(status ? { status } : {}),
       ...(applicants ? { applicants } : {}),
-      ...(selectedApplicantIds
+      ...(nextSelectedIds
         ? {
-            selectedApplicantIds: selectedApplicantIds
-              .map((x) => String(x || '').trim())
-              .filter(Boolean),
+            selectedApplicantIds: nextSelectedIds,
+            applicants: stampApplicantsPrSelected(cur.applicants, nextSelectedIds),
           }
         : {}),
       ...(hasGroupQr

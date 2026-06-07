@@ -30,7 +30,12 @@ export function normalizeSelectedIds(raw: unknown): string[] {
 
 export function selectedIdsFromMp(mp: Record<string, unknown> | null): string[] {
   if (!mp) return []
-  return normalizeSelectedIds(mp.selectedApplicantIds)
+  const fromField = normalizeSelectedIds(mp.selectedApplicantIds)
+  if (fromField.length) return fromField
+  const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
+  return normalizeSelectedIds(
+    applicants.filter((a) => a && a.prSelected === true).map((a) => a.id),
+  )
 }
 
 export type ApplicantRow = Record<string, unknown> & {
