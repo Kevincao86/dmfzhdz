@@ -1,3 +1,4 @@
+import { migrateLegacyKeyToScoped, scopedStorageKey } from '../mpAccountLocalScope'
 import {
   migrateMember,
   platformIdFromName,
@@ -12,9 +13,14 @@ export type { TalentMember, PlatformProfile }
 
 const STORAGE_KEY = 'meoo_talent_member_v1'
 
+function memberStorageKey() {
+  return scopedStorageKey(STORAGE_KEY)
+}
+
 export function readMember(): TalentMember | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    migrateLegacyKeyToScoped(STORAGE_KEY)
+    const raw = localStorage.getItem(memberStorageKey())
     if (!raw) return null
     const j = JSON.parse(raw) as Record<string, unknown>
     if (!j || (!j.platformProfiles && !j.memberType && !j.douyin)) return null
@@ -26,7 +32,14 @@ export function readMember(): TalentMember | null {
 
 export function writeMember(member: TalentMember) {
   const migrated = migrateMember(member as unknown as Record<string, unknown>)
-  if (migrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+  if (migrated) {
+    localStorage.setItem(memberStorageKey(), JSON.stringify(migrated))
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* ignore */
+    }
+  }
   import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 

@@ -1,9 +1,15 @@
 const STORAGE_KEY = 'meoo_talent_member_v1'
 const talentPlatforms = require('./talentPlatformProfiles.js')
+const scope = require('./mpAccountLocalScope.js')
+
+function memberStorageKey() {
+  return scope.scopedStorageKey(STORAGE_KEY)
+}
 
 function readMember() {
   try {
-    const raw = wx.getStorageSync(STORAGE_KEY)
+    scope.migrateLegacyKeyToScoped(STORAGE_KEY)
+    const raw = wx.getStorageSync(memberStorageKey())
     if (!raw) return null
     const j = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (!j || (!j.platformProfiles && !j.memberType && !j.douyin)) return null
@@ -15,7 +21,10 @@ function readMember() {
 
 function writeMember(member) {
   const migrated = talentPlatforms.migrateMember(member)
-  wx.setStorageSync(STORAGE_KEY, JSON.stringify(migrated))
+  wx.setStorageSync(memberStorageKey(), JSON.stringify(migrated))
+  try {
+    wx.removeStorageSync(STORAGE_KEY)
+  } catch (_) {}
   try {
     require('./mpAccountClientSync.js').schedulePush()
   } catch (_) {}
@@ -23,6 +32,7 @@ function writeMember(member) {
 
 function clearMember() {
   try {
+    wx.removeStorageSync(memberStorageKey())
     wx.removeStorageSync(STORAGE_KEY)
   } catch {
     /* ignore */

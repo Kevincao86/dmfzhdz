@@ -52,16 +52,20 @@ export function collectLocalClientState(): MpClientStatePayload {
   const account = getAccount()
   const appKey = scopedStorageKey(APPLICATIONS_BASE, account)
   const pubKey = scopedStorageKey(PUBLISH_BASE, account)
+  const notifyKey = scopedStorageKey(NOTIFY_KEY, account)
+  const msgKey = scopedStorageKey(MSG_KEY, account)
+  const inboxKey = scopedStorageKey(INBOX_SEEN_KEY, account)
+  const draftsKey = scopedStorageKey(PUBLISH_DRAFTS_KEY, account)
   return {
     v: 1,
     talentMemberDraft: (readMember() as Record<string, unknown> | null) || null,
     prProfileDraft: (readPrProfile() as Record<string, unknown> | null) || null,
     applications: readList(appKey),
     publishedOrders: readList(pubKey),
-    notifications: readList(NOTIFY_KEY),
-    messages: readList(MSG_KEY),
-    inboxSeen: readJson<string[]>(INBOX_SEEN_KEY, []),
-    publishWizardDrafts: readList(PUBLISH_DRAFTS_KEY),
+    notifications: readList(notifyKey),
+    messages: readList(msgKey),
+    inboxSeen: readJson<string[]>(inboxKey, []),
+    publishWizardDrafts: readList(draftsKey),
   }
 }
 
@@ -83,17 +87,21 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   if (Array.isArray(state.publishedOrders)) {
     writeJson(pubKey, state.publishedOrders.slice(0, 80))
   }
+  const notifyKey = scopedStorageKey(NOTIFY_KEY, account)
+  const msgKey = scopedStorageKey(MSG_KEY, account)
+  const inboxKey = scopedStorageKey(INBOX_SEEN_KEY, account)
+  const draftsKey = scopedStorageKey(PUBLISH_DRAFTS_KEY, account)
   if (Array.isArray(state.notifications)) {
-    writeJson(NOTIFY_KEY, state.notifications.slice(0, 100))
+    writeJson(notifyKey, state.notifications.slice(0, 100))
   }
   if (Array.isArray(state.messages)) {
-    writeJson(MSG_KEY, state.messages.slice(0, 100))
+    writeJson(msgKey, state.messages.slice(0, 100))
   }
   if (Array.isArray(state.inboxSeen)) {
-    writeJson(INBOX_SEEN_KEY, state.inboxSeen.slice(-500))
+    writeJson(inboxKey, state.inboxSeen.slice(-500))
   }
   if (Array.isArray(state.publishWizardDrafts)) {
-    writeJson(PUBLISH_DRAFTS_KEY, state.publishWizardDrafts.slice(0, 20))
+    writeJson(draftsKey, state.publishWizardDrafts.slice(0, 20))
   }
 }
 

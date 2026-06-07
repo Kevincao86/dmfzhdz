@@ -1,6 +1,11 @@
 const IDENTITY_KEY = 'meoo_talent_identity_v1'
 const PR_PROFILE_KEY = 'meoo_pr_profile_v1'
 const identityTypes = require('./identityTypes.js')
+const scope = require('./mpAccountLocalScope.js')
+
+function prProfileStorageKey() {
+  return scope.scopedStorageKey(PR_PROFILE_KEY)
+}
 
 const IDENTITIES = identityTypes.WORK_IDENTITIES
 
@@ -30,7 +35,8 @@ function isSupplierIdentity(id) {
 
 function readPrProfile() {
   try {
-    const raw = wx.getStorageSync(PR_PROFILE_KEY)
+    scope.migrateLegacyKeyToScoped(PR_PROFILE_KEY)
+    const raw = wx.getStorageSync(prProfileStorageKey())
     if (!raw) return null
     return typeof raw === 'string' ? JSON.parse(raw) : raw
   } catch {
@@ -39,7 +45,10 @@ function readPrProfile() {
 }
 
 function writePrProfile(profile) {
-  wx.setStorageSync(PR_PROFILE_KEY, JSON.stringify(profile))
+  wx.setStorageSync(prProfileStorageKey(), JSON.stringify(profile))
+  try {
+    wx.removeStorageSync(PR_PROFILE_KEY)
+  } catch (_) {}
   try {
     require('./mpAccountClientSync.js').schedulePush()
   } catch (_) {}

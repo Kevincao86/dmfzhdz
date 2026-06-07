@@ -1,7 +1,12 @@
+import { migrateLegacyKeyToScoped, scopedStorageKey } from '../mpAccountLocalScope'
 import type { PublishForm } from './publishOrder'
 
 const DRAFTS_KEY = 'meoo_publish_wizard_drafts_v1'
 const LEGACY_KEY = 'meoo_publish_wizard_draft_v1'
+
+function draftsStorageKey() {
+  return scopedStorageKey(DRAFTS_KEY)
+}
 
 export type PublishWizardDraft = {
   id: string
@@ -21,7 +26,8 @@ function newDraftId() {
 
 function readRawList(): PublishWizardDraft[] {
   try {
-    const raw = localStorage.getItem(DRAFTS_KEY)
+    migrateLegacyKeyToScoped(DRAFTS_KEY)
+    const raw = localStorage.getItem(draftsStorageKey())
     if (!raw) return migrateLegacyDraft()
     const list = JSON.parse(raw) as unknown
     if (!Array.isArray(list)) return []
@@ -33,7 +39,9 @@ function readRawList(): PublishWizardDraft[] {
 
 function migrateLegacyDraft(): PublishWizardDraft[] {
   try {
-    const raw = localStorage.getItem(LEGACY_KEY)
+    migrateLegacyKeyToScoped(LEGACY_KEY)
+    const scopedLegacy = scopedStorageKey(LEGACY_KEY)
+    const raw = localStorage.getItem(scopedLegacy) || localStorage.getItem(LEGACY_KEY)
     if (!raw) return []
     const d = JSON.parse(raw) as PublishWizardDraft & { id?: string }
     if (!d?.form) return []
@@ -50,6 +58,7 @@ function migrateLegacyDraft(): PublishWizardDraft[] {
     }
     writeList([migrated])
     localStorage.removeItem(LEGACY_KEY)
+    localStorage.removeItem(scopedLegacy)
     return [migrated]
   } catch {
     return []
@@ -57,7 +66,12 @@ function migrateLegacyDraft(): PublishWizardDraft[] {
 }
 
 function writeList(list: PublishWizardDraft[]) {
-  localStorage.setItem(DRAFTS_KEY, JSON.stringify(list.slice(0, 50)))
+  localStorage.setItem(draftsStorageKey(), JSON.stringify(list.slice(0, 50)))
+  try {
+    localStorage.removeItem(DRAFTS_KEY)
+  } catch {
+    /* ignore */
+  }
   import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
@@ -103,8 +117,10 @@ export function clearPublishDraft(id?: string) {
     deletePublishDraft(id)
     return
   }
+  localStorage.removeItem(draftsStorageKey())
   localStorage.removeItem(DRAFTS_KEY)
   localStorage.removeItem(LEGACY_KEY)
+  localStorage.removeItem(scopedStorageKey(LEGACY_KEY))
 }
 
 /** @deprecated 使用 getPublishDraftById / getLatestPublishDraftForMode */
