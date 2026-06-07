@@ -63,7 +63,8 @@ function evaluate(mp, mpOrderId) {
     }
   }
   const selectedIds = selection.selectedIdsFromMp(mp)
-  const approved = selectedIds.includes(String(applicant.id))
+  const approved =
+    selectedIds.includes(String(applicant.id)) || applicant.prSelected === true
   if (!approved) {
     return {
       canContact: false,

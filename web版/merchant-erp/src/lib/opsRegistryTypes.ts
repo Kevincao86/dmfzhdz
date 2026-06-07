@@ -159,6 +159,8 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyNote?: string
   completedAt?: string
   taskStatus?: MpApplicantTaskStatus
+  /** PR 已确认选择该报名 */
+  prSelected?: boolean
 }
 
 export type RegistryTalentLibraryEntry = {

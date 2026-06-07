@@ -69,7 +69,8 @@ export function evaluateContactPrGate(mp: Record<string, unknown> | null, mpOrde
     }
   }
   const selectedIds = selectedIdsFromMp(mp)
-  const approved = selectedIds.includes(String(applicant.id))
+  const approved =
+    selectedIds.includes(String(applicant.id)) || applicant.prSelected === true
   if (!approved) {
     return {
       canContact: false,

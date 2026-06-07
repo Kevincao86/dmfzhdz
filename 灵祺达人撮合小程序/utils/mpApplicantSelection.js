@@ -27,7 +27,12 @@ function normalizeSelectedIds(raw) {
 
 function selectedIdsFromMp(mp) {
   if (!mp) return []
-  return normalizeSelectedIds(mp.selectedApplicantIds)
+  const fromField = normalizeSelectedIds(mp.selectedApplicantIds)
+  if (fromField.length) return fromField
+  const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+  return normalizeSelectedIds(
+    applicants.filter((a) => a && a.prSelected === true).map((a) => a.id),
+  )
 }
 
 function stampApplicantsSelected(applicants, selectedIds) {
