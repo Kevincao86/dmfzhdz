@@ -20,6 +20,14 @@ echo
 curl -fsS -m 25 "${ERP}/meoo-merchant-ai-video-ice-config" | head -c 600 || echo "FAIL ice-config"
 echo
 
+echo "== ffmpeg（数字人多段合并） =="
+if command -v ffmpeg >/dev/null 2>&1; then
+  ffmpeg -version 2>/dev/null | head -1
+else
+  echo "MISSING: 请执行 bash scripts/ecs-install-ffmpeg.sh"
+fi
+echo
+
 echo "== auth-api revision（404 响应内 revision 字段） =="
 curl -fsS -m 10 "${ERP}/meoo-nonexistent-route" 2>/dev/null || true
 echo

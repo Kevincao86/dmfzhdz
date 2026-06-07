@@ -9,6 +9,20 @@ import path from 'node:path'
 const MAX_SEGMENT_BYTES = 80 * 1024 * 1024
 const MAX_SEGMENTS = 12
 
+function bufferLooksLikeVideo(buf: Buffer): boolean {
+  if (buf.length < 1024) return false
+  if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return true
+  const limit = Math.min(buf.length - 4, 8192)
+  for (let i = 0; i < limit; i++) {
+    if (buf[i] === 0x66 && buf[i + 1] === 0x74 && buf[i + 2] === 0x79 && buf[i + 3] === 0x70) {
+      return true
+    }
+  }
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return true
+  if (buf[0] === 0x47) return true
+  return false
+}
+
 function resolveFfmpegBin(): string | null {
   const fromEnv = (process.env.MEOO_FFMPEG_PATH ?? '').trim()
   if (fromEnv && fs.existsSync(fromEnv)) return fromEnv
@@ -65,13 +79,65 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
       if (buf.length > MAX_SEGMENT_BYTES) {
         return { ok: false, message: `第 ${i + 1} 段视频过大（>${MAX_SEGMENT_BYTES / 1024 / 1024}MB）` }
       }
-      const fp = path.join(tmpDir, `s${i}.mp4`)
+      if (!bufferLooksLikeVideo(buf)) {
+        return {
+          ok: false,
+          message: `第 ${i + 1} 段不是可识别的视频（${buf.length} 字节），请重新生成`,
+        }
+      }
+      const fp = path.join(tmpDir, `s${i}.bin`)
       fs.writeFileSync(fp, buf)
       localFiles.push(fp)
     }
 
+    const normalized: string[] = []
+    for (let i = 0; i < localFiles.length; i++) {
+      const src = localFiles[i]!
+      const norm = path.join(tmpDir, `n${i}.mp4`)
+      const normRes = runFfmpeg(ffmpeg, [
+        '-y',
+        '-i',
+        src,
+        '-c:v',
+        'libx264',
+        '-preset',
+        'fast',
+        '-crf',
+        '23',
+        '-pix_fmt',
+        'yuv420p',
+        '-an',
+        '-movflags',
+        '+faststart',
+        norm,
+      ])
+      if (normRes.ok && fs.existsSync(norm) && fs.statSync(norm).size > 1024) {
+        normalized.push(norm)
+        continue
+      }
+      const copyNorm = path.join(tmpDir, `c${i}.mp4`)
+      const copyRes = runFfmpeg(ffmpeg, [
+        '-y',
+        '-i',
+        src,
+        '-c',
+        'copy',
+        '-movflags',
+        '+faststart',
+        copyNorm,
+      ])
+      if (copyRes.ok && fs.existsSync(copyNorm) && fs.statSync(copyNorm).size > 1024) {
+        normalized.push(copyNorm)
+        continue
+      }
+      return {
+        ok: false,
+        message: `第 ${i + 1} 段无法转为 MP4：${(normRes.stderr || copyRes.stderr).slice(-400)}`,
+      }
+    }
+
     const listPath = path.join(tmpDir, 'list.txt')
-    const listTxt = localFiles.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n')
+    const listTxt = normalized.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join('\n')
     fs.writeFileSync(listPath, listTxt, 'utf8')
 
     const outPath = path.join(tmpDir, 'out.mp4')

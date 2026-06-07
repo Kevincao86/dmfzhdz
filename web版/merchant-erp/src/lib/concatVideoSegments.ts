@@ -9,9 +9,29 @@ const FFMPEG_CORE_VER = '0.12.10'
 let ffmpegRef: FFmpeg | null = null
 let loadPromise: Promise<FFmpeg> | null = null
 
-function isValidMp4(data: Uint8Array): boolean {
+function hasFtypBox(data: Uint8Array, maxScan = 8192): boolean {
   if (data.length < 12) return false
-  return data[4] === 0x66 && data[5] === 0x74 && data[6] === 0x79 && data[7] === 0x70
+  if (data[4] === 0x66 && data[5] === 0x74 && data[6] === 0x79 && data[7] === 0x70) return true
+  const limit = Math.min(data.length - 4, maxScan)
+  for (let i = 0; i < limit; i++) {
+    if (data[i] === 0x66 && data[i + 1] === 0x74 && data[i + 2] === 0x79 && data[i + 3] === 0x70) {
+      return true
+    }
+  }
+  return false
+}
+
+/** 豆包/可灵成片可能是 ftyp 非固定偏移或 WebM，交给 wasm ffmpeg 再规范化 */
+function looksLikeVideoBytes(data: Uint8Array): boolean {
+  if (data.length < 1024) return false
+  if (hasFtypBox(data)) return true
+  if (data[0] === 0x1a && data[1] === 0x45 && data[2] === 0xdf && data[3] === 0xa3) return true
+  if (data[0] === 0x47) return true
+  return false
+}
+
+function isValidMp4(data: Uint8Array): boolean {
+  return hasFtypBox(data)
 }
 
 async function blobToBytes(blob: Blob): Promise<Uint8Array> {
@@ -82,8 +102,8 @@ async function writeSegments(ffmpeg: FFmpeg, blobs: Blob[]): Promise<string[]> {
   const names: string[] = []
   for (let i = 0; i < blobs.length; i++) {
     const data = await blobToBytes(blobs[i]!)
-    if (!isValidMp4(data)) {
-      throw new Error(`第 ${i + 1} 段不是有效 MP4，无法拼接`)
+    if (!looksLikeVideoBytes(data)) {
+      throw new Error(`第 ${i + 1} 段不是可识别的视频文件，无法拼接`)
     }
     const name = `c${i}.mp4`
     await ffmpeg.writeFile(name, data)
