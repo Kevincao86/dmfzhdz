@@ -8,8 +8,11 @@ const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
+const { attachLoginIdentityIcons, loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 
-const IDENTITY_OPTIONS = identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id])
+const IDENTITY_OPTIONS = attachLoginIdentityIcons(
+  identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
+)
 
 function requireLoginIdentity(page) {
   const id = page.data.loginIdentity
@@ -49,7 +52,7 @@ Page({
     tab: 'wx',
     loginIdentity: '',
     loginIdentityLabel: '',
-    loginIdentityEmoji: '',
+    loginIdentityIcon: '',
     showIdentitySheet: false,
     identityOptions: IDENTITY_OPTIONS,
     loginName: '',
@@ -103,7 +106,7 @@ Page({
     this.setData({
       loginIdentity: id,
       loginIdentityLabel: meta.label,
-      loginIdentityEmoji: meta.emoji,
+      loginIdentityIcon: loginIdentityIcon(id),
       showIdentitySheet: false,
       err: '',
     })

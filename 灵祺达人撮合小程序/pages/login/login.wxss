@@ -152,9 +152,20 @@
 }
 
 .login-identity-value {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.login-identity-icon {
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
+}
+
+.login-identity-value-text {
   font-size: 28rpx;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--lq-primary-deep);
 }
 
@@ -239,9 +250,21 @@
   background: var(--lq-primary-50);
 }
 
-.login-id-sheet-emoji {
-  font-size: 40rpx;
-  line-height: 1;
+.login-id-sheet-icon-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  background: #f5f3ff;
+  border: 1rpx solid #ede9fe;
+}
+
+.login-id-sheet-icon {
+  width: 44rpx;
+  height: 44rpx;
 }
 
 .login-id-sheet-body {
