@@ -224,6 +224,7 @@
           bindinput="onPlatformField"
         />
         <button
+          wx:if="{{item.id !== 'weixin_video'}}"
           class="profile-autofill-btn"
           size="mini"
           loading="{{profileAutofillLoading && profileAutofillPlatform === item.id}}"
