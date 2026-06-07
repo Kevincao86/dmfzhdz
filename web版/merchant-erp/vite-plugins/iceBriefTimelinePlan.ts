@@ -3,6 +3,15 @@
  * 此前 editBrief 仅写入 projectMetadata，成片不会按文案包装。
  */
 
+export type IceAudioClipPlan = {
+  mediaUrl: string
+  timelineIn: number
+  timelineOut: number
+  volume: number
+  loop?: boolean
+  label: string
+}
+
 export type IceBriefTimelinePlan = {
   totalDurationSec: number
   clipEndSec: number
@@ -14,7 +23,75 @@ export type IceBriefTimelinePlan = {
   segmentCaptions: Array<{ text: string; timelineIn: number; timelineOut: number }>
   /** 多图时各张停留秒数，长度与图片数一致 */
   imageDurations: number[]
+  /** 指令框解析：背景音乐 */
+  bgmClip?: IceAudioClipPlan
+  /** 指令框解析：背景音效片段 */
+  sfxClips: IceAudioClipPlan[]
   summary: string
+}
+
+const ICE_STOCK_AUDIO_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/meoo-out/stock'
+
+const ICE_BGM_PRESETS: Record<string, { url: string; label: string }> = {
+  warm: { url: `${ICE_STOCK_AUDIO_BASE}/bgm-warm-food.mp3`, label: '温暖氛围 BGM' },
+  upbeat: { url: `${ICE_STOCK_AUDIO_BASE}/bgm-upbeat.mp3`, label: '轻快 BGM' },
+  calm: { url: `${ICE_STOCK_AUDIO_BASE}/bgm-calm.mp3`, label: '舒缓 BGM' },
+}
+
+const ICE_SFX_PRESETS: Array<{ re: RegExp; url: string; label: string; dur: number }> = [
+  { re: /碗|瓷|餐具|碰撞/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-bowl.mp3`, label: '碗碟音效', dur: 1.2 },
+  { re: /锅|炒|烹|厨房/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-kitchen.mp3`, label: '厨房音效', dur: 2 },
+  { re: /吆喝|人声|喧闹|市井/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-crowd.mp3`, label: '市井人声', dur: 2.5 },
+  { re: /环境|氛围|街道/, url: `${ICE_STOCK_AUDIO_BASE}/sfx-ambient.mp3`, label: '环境氛围', dur: 3 },
+]
+
+function splitBriefBlocks(brief: string): { instruction: string; copy: string } {
+  const raw = brief.trim()
+  const inst = raw.match(/【剪辑指令】\s*([\s\S]*?)(?=\n*【字幕文案】|$)/)?.[1]?.trim() ?? ''
+  const copy = raw.match(/【字幕文案】\s*([\s\S]*?)(?=\n*【|$)/)?.[1]?.trim() ?? ''
+  if (inst || copy) return { instruction: inst, copy }
+  return { instruction: raw, copy: raw }
+}
+
+function parseBgmFromInstruction(instruction: string, total: number): IceAudioClipPlan | undefined {
+  const t = instruction.trim()
+  if (!t) return undefined
+  if (!/BGM|背景音乐|配乐|背景音/.test(t) && !/温暖|轻快|舒缓|祥和|节奏/.test(t)) {
+    return undefined
+  }
+  let key: keyof typeof ICE_BGM_PRESETS = 'warm'
+  if (/轻快|活泼|愉快|节奏舒适|明快/.test(t)) key = 'upbeat'
+  else if (/舒缓|平静|柔和/.test(t)) key = 'calm'
+  const preset = ICE_BGM_PRESETS[key]
+  return {
+    mediaUrl: preset.url,
+    timelineIn: 0,
+    timelineOut: total,
+    volume: /音量低|弱|铺底/.test(t) ? 0.22 : 0.32,
+    loop: true,
+    label: preset.label,
+  }
+}
+
+function parseSfxFromInstruction(instruction: string, total: number): IceAudioClipPlan[] {
+  const out: IceAudioClipPlan[] = []
+  if (!/音效|环境音|碗|锅|吆喝|人声|氛围音/.test(instruction)) return out
+  let cursor = Math.min(1.5, total * 0.15)
+  for (const row of ICE_SFX_PRESETS) {
+    if (!row.re.test(instruction)) continue
+    const dur = Math.min(row.dur, Math.max(0.5, total - cursor))
+    if (dur < 0.4 || cursor >= total) continue
+    out.push({
+      mediaUrl: row.url,
+      timelineIn: cursor,
+      timelineOut: Math.min(total, cursor + dur),
+      volume: 0.55,
+      label: row.label,
+    })
+    cursor += dur + 0.35
+    if (out.length >= 4) break
+  }
+  return out
 }
 
 export function parseIceEditBriefPlan(
@@ -26,19 +103,22 @@ export function parseIceEditBriefPlan(
   },
 ): IceBriefTimelinePlan {
   const brief = editBrief.trim()
+  const { instruction, copy } = splitBriefBlocks(brief)
   const imageCount = Math.max(0, opts.imageCount ?? 0)
   /** clipEndSec：单视频为片段时长；多图时为「生成视频总时长」 */
   const fallbackTotal = Math.min(120, Math.max(imageCount > 1 ? 3 : 1, opts.clipEndSec))
 
-  const totalDurationSec = parseTotalDurationSec(brief, fallbackTotal)
-  const openingSec = parseOpeningSec(brief, totalDurationSec)
-  const fastPace = /快节奏|紧凑|快剪|切片|吸睛/.test(brief)
-  const useFade = opts.effectId === 'fade' || /淡入|淡出|fade/i.test(brief)
+  const totalDurationSec = parseTotalDurationSec(instruction || brief, fallbackTotal)
+  const openingSec = parseOpeningSec(instruction || brief, totalDurationSec)
+  const fastPace = /快节奏|紧凑|快剪|切片|吸睛/.test(instruction || brief)
+  const useFade = opts.effectId === 'fade' || /淡入|淡出|fade/i.test(instruction || brief)
   const useTransition =
-    useFade || fastPace || /转场|切换|叠化/.test(brief)
-  const titleText = extractTitleText(brief)
+    useFade || fastPace || /转场|切换|叠化/.test(instruction || brief)
+  const titleText = extractTitleText(copy || brief)
   const imageDurations = computeImageDurations(imageCount, totalDurationSec, openingSec, fastPace)
-  const segmentCaptions = buildSegmentCaptions(brief, totalDurationSec, imageDurations, titleText)
+  const segmentCaptions = buildSegmentCaptions(copy || brief, totalDurationSec, imageDurations, titleText)
+  const bgmClip = parseBgmFromInstruction(instruction, totalDurationSec)
+  const sfxClips = parseSfxFromInstruction(instruction, totalDurationSec)
   const clipEndSec =
     imageCount > 0
       ? imageCount === 1
@@ -52,6 +132,8 @@ export function parseIceEditBriefPlan(
     openingSec > 0 ? `片头 ${openingSec}s` : '',
     segmentCaptions.length ? `字幕 ${segmentCaptions.length} 条` : '',
     useTransition ? '含转场' : '',
+    bgmClip ? '含 BGM' : '',
+    sfxClips.length ? `音效 ${sfxClips.length} 处` : '',
   ]
     .filter(Boolean)
     .join(' · ')
@@ -66,6 +148,8 @@ export function parseIceEditBriefPlan(
     titleText,
     segmentCaptions,
     imageDurations,
+    bgmClip,
+    sfxClips,
     summary,
   }
 }
@@ -193,8 +277,9 @@ function extractSectionLines(brief: string): string[] {
     out.push(line)
   }
 
-  for (const line of extractSubtitleBlockLines(brief)) push(line)
-  if (out.length >= 2) return out.slice(0, 8)
+  const subtitleBlock = extractSubtitleBlockLines(brief)
+  for (const line of subtitleBlock) push(line)
+  if (subtitleBlock.length >= 1) return out.slice(0, 8)
 
   for (const q of extractQuotedCaptions(brief)) push(q)
 
@@ -345,4 +430,29 @@ export function buildSubtitleTracksFromPlan(
 
   if (!clips.length) return {}
   return { SubtitleTracks: [{ SubtitleTrackClips: clips }] }
+}
+
+export function buildAudioTracksFromPlan(
+  plan: IceBriefTimelinePlan,
+): { AudioTracks: Array<{ AudioTrackClips: Record<string, unknown>[] }> } | Record<string, never> {
+  const clips: Record<string, unknown>[] = []
+  if (plan.bgmClip) {
+    clips.push({
+      MediaURL: plan.bgmClip.mediaUrl,
+      TimelineIn: plan.bgmClip.timelineIn,
+      TimelineOut: plan.bgmClip.timelineOut,
+      Loop: plan.bgmClip.loop ?? true,
+      Volume: plan.bgmClip.volume,
+    })
+  }
+  for (const sfx of plan.sfxClips) {
+    clips.push({
+      MediaURL: sfx.mediaUrl,
+      TimelineIn: sfx.timelineIn,
+      TimelineOut: sfx.timelineOut,
+      Volume: sfx.volume,
+    })
+  }
+  if (!clips.length) return {}
+  return { AudioTracks: [{ AudioTrackClips: clips }] }
 }

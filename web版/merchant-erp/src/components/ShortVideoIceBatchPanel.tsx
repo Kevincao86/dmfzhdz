@@ -35,6 +35,7 @@ import {
 } from '../lib/iceDispatchSlotProgress'
 import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import { composeIceEditBrief, splitIceEditBrief } from '../lib/iceEditBriefCompose'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
 import { snapshotUploadFiles, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
@@ -109,7 +110,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [urlText, setUrlText] = useState('')
   const [imageUrlText, setImageUrlText] = useState('')
   const [imageItems, setImageItems] = useState<IceImageItem[]>([])
-  const [editBrief, setEditBrief] = useState('')
+  const [editCopy, setEditCopy] = useState('')
+  const [editInstruction, setEditInstruction] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [oneClickBusy, setOneClickBusy] = useState(false)
   const [batchBusy, setBatchBusy] = useState(false)
@@ -158,7 +160,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const totalBatchRuns = pendingCount * effectiveBatchCount + imageBatchRuns
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
-  const briefOk = editBrief.trim().length >= 4
+  const composedBrief = composeIceEditBrief(editCopy, editInstruction)
+  const briefOk = editCopy.trim().length >= 2 || editInstruction.trim().length >= 4
   const mediaBusy = videoUploading || imageUploading
   const anyBusy = oneClickBusy || batchBusy
   const canSubmit =
@@ -440,16 +443,17 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       aspectLabel: aspect.label,
       clipEndSec,
       preset,
-      userHint: editBrief.trim() || undefined,
+      userHint: composedBrief.trim() || undefined,
     })
     setBriefAiLoading(false)
     if (!r.ok) {
       setErr(r.message)
       return
     }
-    setEditBrief(r.brief)
-    setHint('已根据素材生成剪辑文案，请核对后提交云剪。')
-  }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, preset, editBrief])
+    setEditCopy(r.copy || splitIceEditBrief(r.brief).copy)
+    setEditInstruction(r.instruction || splitIceEditBrief(r.brief).instruction)
+    setHint('已生成文案框与指令框，请核对后提交云剪。')
+  }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, preset, composedBrief])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -575,7 +579,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     if (!briefOk) {
-      setErr('请填写剪辑文案指令（至少 4 个字）')
+      setErr('请填写文案框或指令框（文案≥2字 或 指令≥4字）')
       return
     }
     if (imageItems.length === 0) {
@@ -607,7 +611,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     const pipe = await postIcePipeline({
       imageUrls,
       projectName: `灵祺AI云剪-${label}`.slice(0, 120),
-      editBrief: editBrief.trim(),
+      editBrief: composedBrief.trim(),
       width: aspect.width,
       height: aspect.height,
       clipEndSec,
@@ -691,7 +695,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     if (!briefOk) {
-      setErr('请填写剪辑文案指令（至少 4 个字），描述成片风格与要求。')
+      setErr('请填写文案框（上屏字幕）或指令框（节奏/BGM/音效）。')
       return
     }
     const pending = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
@@ -716,7 +720,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           : `正在提交 ${pending.length} 条单条剪辑任务…`,
     )
 
-    const brief = editBrief.trim()
+    const brief = composedBrief.trim()
     let runIndex = 0
 
     if (runImageBatch) {
@@ -1220,11 +1224,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
                     2
                   </span>
-                  剪辑文案指令
+                  剪辑文案与指令
                   <RequiredMark />
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  先设置下方输出参数，再填写或由 AI 生成剪辑文案。提交时按参数解析时间线（时长、字幕、转场）。
+                  文案框内容上屏展示；指令框控制节奏、转场、BGM 与背景音效。AI 生成会分别填入两框。
                 </p>
               </div>
               <button
@@ -1290,24 +1294,39 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </div>
               </div>
 
-              <textarea
-                value={editBrief}
-                disabled={anyBusy || briefAiLoading}
-                onChange={(e) => setEditBrief(e.target.value)}
-                placeholder={
-                  '示例：竖屏探店短视频，前 3 秒抓眼球，整体轻快；突出「招牌牛肉面」与店内环境；结尾加品牌 Slogan 位；适合抖音发布。'
-                }
-                className={cn(
-                  'min-h-[120px] w-full rounded-lg border px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
-                  briefOk || !editBrief
-                    ? 'border-zinc-300 focus:border-orange-500 focus:ring-orange-500/20'
-                    : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
-                )}
-              />
-              {!briefOk && editBrief.length > 0 ? (
+              <label className="block text-xs font-medium text-zinc-700">
+                文案框（上屏字幕 / 口播展示）
+                <textarea
+                  value={editCopy}
+                  disabled={anyBusy || briefAiLoading}
+                  onChange={(e) => setEditCopy(e.target.value)}
+                  placeholder={
+                    '示例：\n「江南味道」\n「传承三十年的手工面」\n「一碗面，一座城的记忆」'
+                  }
+                  className="mt-1.5 min-h-[100px] w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                />
+              </label>
+              <label className="block text-xs font-medium text-zinc-700">
+                指令框（剪辑节奏 / 转场 / BGM / 背景音效）
+                <textarea
+                  value={editInstruction}
+                  disabled={anyBusy || briefAiLoading}
+                  onChange={(e) => setEditInstruction(e.target.value)}
+                  placeholder={
+                    '示例：整体基调温暖祥和，节奏舒适；前 3 秒快切吸睛；BGM 轻快铺底；加入碗碟碰撞与市井吆喝环境音效；图片间淡入淡出转场。'
+                  }
+                  className={cn(
+                    'mt-1.5 min-h-[100px] w-full rounded-lg border px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
+                    briefOk || !editInstruction
+                      ? 'border-zinc-300 focus:border-violet-500 focus:ring-violet-500/20'
+                      : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
+                  )}
+                />
+              </label>
+              {!briefOk && (editCopy.length > 0 || editInstruction.length > 0) ? (
                 <p className="flex items-center gap-1 text-xs text-amber-700">
                   <AlertCircle className="h-3.5 w-3.5" />
-                  指令过短，请至少输入 4 个字
+                  请至少在文案框写 2 字，或在指令框写 4 字
                 </p>
               ) : null}
 
@@ -1642,7 +1661,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       try {
                         const { orderId } = await dispatchIceBatchToRecruitmentOps({
                           doneJobs,
-                          editBrief,
+                          editBrief: composedBrief,
                           supabase: supabaseConfigured ? supabase : null,
                         })
                         writeIceDispatchTrack(orderId)

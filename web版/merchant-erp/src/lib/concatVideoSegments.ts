@@ -89,7 +89,7 @@ async function execOk(ffmpeg: FFmpeg, args: string[]): Promise<boolean> {
 async function readOutputMp4(ffmpeg: FFmpeg, outName: string): Promise<Uint8Array | null> {
   try {
     const raw = await ffmpeg.readFile(outName)
-    if (!(raw instanceof Uint8Array) || raw.length < 1024 || !isValidMp4(raw)) return null
+    if (!(raw instanceof Uint8Array) || raw.length < 1024 || !looksLikeVideoBytes(raw)) return null
     const copy = new Uint8Array(raw.length)
     copy.set(raw)
     return copy

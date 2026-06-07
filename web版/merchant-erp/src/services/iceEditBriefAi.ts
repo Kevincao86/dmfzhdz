@@ -31,10 +31,15 @@ function buildMaterialSummary(ctx: IceMaterialContext): string {
   return lines.join('\n')
 }
 
+import { splitIceEditBrief } from '../lib/iceEditBriefCompose'
+
 /** 根据已上传图片/视频，推断发布意图并生成云剪剪辑文案指令 */
 export async function generateIceEditBriefAi(
   ctx: IceMaterialContext,
-): Promise<{ ok: true; brief: string } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; brief: string; copy: string; instruction: string }
+  | { ok: false; message: string }
+> {
   const model = resolveTextAiModelForRequest() as AiModelId
   const hasMedia = ctx.imageUrls.length > 0 || ctx.videoUrls.length > 0
   if (!hasMedia) {
@@ -86,5 +91,7 @@ export async function generateIceEditBriefAi(
   if (!r.ok || !r.description?.trim()) {
     return { ok: false, message: r.ok ? 'AI 未返回有效文案' : r.message }
   }
-  return { ok: true, brief: r.description.trim() }
+  const brief = r.description.trim()
+  const { copy, instruction } = splitIceEditBrief(brief)
+  return { ok: true, brief, copy, instruction }
 }

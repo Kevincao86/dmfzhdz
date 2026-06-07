@@ -12,6 +12,7 @@ import IceModule, {
 } from '@alicloud/ice20201109'
 import { $OpenApiUtil } from '@alicloud/openapi-core'
 import {
+  buildAudioTracksFromPlan,
   buildSubtitleTracksFromPlan,
   parseIceEditBriefPlan,
   type IceBriefTimelinePlan,
@@ -209,6 +210,7 @@ function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
   return {
     VideoTracks: [{ VideoTrackClips: [clip] }],
     ...buildSubtitleTracksFromPlan(plan),
+    ...buildAudioTracksFromPlan(plan),
   }
 }
 
@@ -251,6 +253,7 @@ export function buildTimelineFromImages(
   return {
     VideoTracks: [{ VideoTrackClips: clips }],
     ...buildSubtitleTracksFromPlan(plan),
+    ...buildAudioTracksFromPlan(plan),
   }
 }
 

@@ -242,6 +242,38 @@ export async function concatVideoUrlsOnServer(urls: string[]): Promise<Blob> {
   throw new Error('云端拼接失败：视频 AI 接口未部署或不可达')
 }
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+/** 将浏览器已下载的分段 MP4 发到服务端 ffmpeg 拼接（URL 拉取失败时兜底） */
+export async function concatVideoBlobsOnServer(blobs: Blob[]): Promise<Blob> {
+  const segments = await Promise.all(blobs.map((b) => blobToBase64(b)))
+  const paths = [
+    '/api/meoo-merchant-ai-video-concat-blobs',
+    '/api/merchant/ai/video/concat-blobs',
+  ] as const
+  for (const p of paths) {
+    const res = await fetchVideoPostBinary(p, { segments }, 300_000)
+    if (!res) continue
+    if (!res.ok) {
+      const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
+      throw new Error(j?.message || `Blob 云端拼接失败 HTTP ${res.status}`)
+    }
+    const out = await res.blob()
+    if (out.size < 1024) throw new Error('Blob 云端拼接返回空文件')
+    return out
+  }
+  throw new Error('Blob 云端拼接失败：视频 AI 接口未部署或不可达')
+}
+
 /** 经 dev 网关拉取成片，避免跨域导致无法截尾帧或拼接 */
 export async function downloadVideoUrlAsBlob(url: string): Promise<Blob> {
   const paths = [
