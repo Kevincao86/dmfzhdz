@@ -35,7 +35,7 @@
   </view>
 
   <view wx:if="{{!loading && rows.length === 0}}" class="card state-empty">
-    <text class="state-empty-icon">单</text>
+    <text class="state-empty-icon">📋</text>
     <text class="empty-title">暂无报名记录</text>
     <text class="hint">在招募大厅报名后，将在此展示商单与报名状态</text>
   </view>

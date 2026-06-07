@@ -25,7 +25,7 @@
 }
 
 .ntf-tab--on {
-  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
   border-color: transparent;
 }
 
@@ -43,7 +43,7 @@
 .ntf-tab-badge {
   font-size: 20rpx;
   font-weight: 700;
-  color: #1677ff;
+  color: #7c3aed;
   background: #f5f3ff;
   padding: 2rpx 10rpx;
   border-radius: 999rpx;
@@ -98,7 +98,7 @@
 }
 
 .ntf-card--pinned {
-  border: 2rpx solid #d6e8ff;
+  border: 2rpx solid #c4b5fd;
   box-shadow: 0 8rpx 24rpx rgba(124, 58, 237, 0.12);
 }
 
@@ -120,7 +120,7 @@
 .ntf-arrow {
   font-size: 36rpx;
   line-height: 1;
-  color: #d6e8ff;
+  color: #c4b5fd;
   font-weight: 300;
 }
 
@@ -167,7 +167,7 @@
 }
 
 .ntf-cat--business {
-  color: #1677ff;
+  color: #7c3aed;
   background: #f5f3ff;
 }
 
@@ -208,7 +208,7 @@
   margin-top: 12rpx;
   font-size: 24rpx;
   font-weight: 600;
-  color: #1677ff;
+  color: #7c3aed;
 }
 
 .ntf-image {
@@ -245,6 +245,6 @@
 
 .ntf-action-btn--primary {
   color: #fff;
-  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
   border-color: transparent;
 }

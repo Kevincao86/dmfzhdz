@@ -13,7 +13,7 @@
             <view class="rec-hero-badge">AI</view>
           </view>
           <text class="rec-hero-sub" wx:if="{{talentTestMode}}">预览 PR 端推荐大厅 · 置顶您的达人资料</text>
-          <text class="rec-hero-sub" wx:elif="{{isPrMode}}">智能识别 PR 身份 · 达人 / 拍摄 / 剪辑分板块推荐</text>
+          <text class="rec-hero-sub" wx:elif="{{isPrMode}}">智能识别 PR 身份 · 达人 / 拍摄 / 剪辑分板块 · 按匹配分排序</text>
           <text class="rec-hero-sub" wx:else>智能识别{{identityLabel}}身份 · 按标签与习惯匹配商单</text>
           <text class="rec-head-meta" wx:if="{{!isPrMode && orderCityHint}}">{{orderCityHint}}</text>
           <text class="rec-head-meta" wx:elif="{{isPrMode && prMatchHint}}">{{prMatchHint}}</text>
@@ -160,7 +160,7 @@
         wx:if="{{item.aiTag && !item.isPreview}}"
         class="talent-ai-tag talent-ai-tag--{{item.aiTagTone}}"
       >{{item.aiTag}}</text>
-      <text class="talent-match-ribbon" wx:if="{{item.matchScore >= 55 && !item.isPreview}}">匹配{{item.matchScore}}%</text>
+      <text class="talent-match-ribbon" wx:if="{{prViewMode === 'ai' && item.matchScore > 0 && !item.isPreview}}">匹配度 {{item.matchScore}}</text>
       <view class="talent-card-compact__row">
         <view class="talent-avatar-wrap">
           <image class="talent-avatar" src="{{item.avatar || '/images/logo.png'}}" mode="aspectFill" />
@@ -175,8 +175,8 @@
             </view>
           </view>
           <view class="talent-line2">
-            <text class="talent-meta talent-meta--match" wx:if="{{item.matchScore >= 55}}">匹配 {{item.matchScore}}%</text>
-            <text class="talent-meta-sep" wx:if="{{item.matchScore >= 55}}">·</text>
+            <text class="talent-meta talent-meta--match" wx:if="{{prViewMode === 'ai' && item.matchScore > 0}}">匹配度 {{item.matchScore}}</text>
+            <text class="talent-meta-sep" wx:if="{{prViewMode === 'ai' && item.matchScore > 0}}">·</text>
             <text class="talent-meta" wx:if="{{!item.isSupplier}}">粉 {{item.followers}}</text>
             <text class="talent-meta-sep" wx:if="{{!item.isSupplier}}">·</text>
             <text class="talent-meta talent-meta--grade">{{item.salesGrade}}</text>
@@ -231,7 +231,7 @@
         <view class="job-card-compact__main">
           <text class="job-card-compact__title">{{item.title}}</text>
             <view class="job-card-compact__line2">
-              <text class="job-card-compact__tag" wx:if="{{item.matchScore >= 60}}">匹配{{item.matchScore}}%</text>
+              <text class="job-card-compact__tag job-card-compact__tag--match" wx:if="{{item.matchScore > 0 && !item.isMock}}">匹配度 {{item.matchScore}}</text>
               <text class="job-card-compact__tag">{{item.statusLabel}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--hot" wx:if="{{item.overRecruitHot}}">🔥 爆满</text>
               <text class="job-card-compact__tag job-card-compact__tag--gray">报名{{item.applicantCount}}/{{item.recruitCount}}</text>

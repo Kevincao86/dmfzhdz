@@ -14,8 +14,34 @@ const prBoard = require('../../utils/prRecommendBoard.js')
 const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
 const participant = require('../../utils/participant.js')
+const applicationsStore = require('../../utils/applicationsStore.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
+
+function habitPlatforms() {
+  const apps = applicationsStore.readApplications() || []
+  const set = new Set()
+  for (const a of apps.slice(0, 20)) {
+    if (a.platform) set.add(a.platform)
+  }
+  return [...set]
+}
+
+function localHabitBoost(row, platforms) {
+  let boost = 0
+  if (platforms.length && platforms.includes(row.platform)) boost += 12
+  if (row.recommended) boost += 6
+  if (row.urgent) boost += 4
+  return boost
+}
+
+function sortByMatchScoreDesc(rows, tieBreak) {
+  return (rows || []).slice().sort((a, b) => {
+    const d = (b.matchScore || 0) - (a.matchScore || 0)
+    if (d !== 0) return d
+    return tieBreak ? tieBreak(a, b) : 0
+  })
+}
 
 const MOCK_PREVIEW = {
   id: 'mock-preview',
@@ -47,10 +73,10 @@ const ORDER_SEGMENTS = [
 function orderMatchHint(identity, talentCity) {
   const label = identityTypes.workIdentityLabel(identity)
   if (identity === 'shoot') {
-    return '已识别为拍摄团队 · 按标签与接单习惯匹配拍摄招募与云剪'
+    return '已识别为拍摄团队 · 按标签与接单习惯匹配，匹配分从高到低'
   }
   if (identity === 'edit') {
-    return '已识别为剪辑团队 · 按标签与接单习惯匹配剪辑招募与云剪'
+    return '已识别为剪辑团队 · 按标签与接单习惯匹配，匹配分从高到低'
   }
   if (identity === 'talent') {
     return talentCity
@@ -478,12 +504,13 @@ Page({
             aiMatch: fb.score >= 55,
           }
         })
-        filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
       } finally {
         wx.hideLoading()
       }
       if (this._talentFilterToken !== token) return
+      filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
+      filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     } else {
       filtered = filtered
         .slice()
@@ -563,8 +590,13 @@ Page({
     let real = rows.filter((r) => r && !r.isMock)
     const mocks = showDemoOrders() ? rows.filter((r) => r && r.isMock) : []
     const member = memberStore.readMember()
+    const habitPlats = habitPlatforms()
     if (api.hasApi() && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
+      real = real.map((r) => ({
+        ...r,
+        matchScore: Math.min(100, (r.matchScore || 0) + localHabitBoost(r, habitPlats)),
+      }))
     } else {
       real = real
         .map((r) => ({
@@ -573,16 +605,13 @@ Page({
           matchScore: 0,
           aiTagSource: 'local',
         }))
-        .sort((a, b) => (b.publishedAtMs || 0) - (a.publishedAtMs || 0))
     }
     const enrichedAll = real
     if (segment === 'match' && enrichedAll.length) {
       const matched = enrichedAll.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
       real = matched.length ? matched : enrichedAll
     }
-    real.sort((a, b) => {
-      const d = (b.matchScore || 0) - (a.matchScore || 0)
-      if (d !== 0) return d
+    real = sortByMatchScoreDesc(real, (a, b) => {
       if (segment === 'hot') {
         const h = (b.applicantCount || 0) - (a.applicantCount || 0)
         if (h !== 0) return h

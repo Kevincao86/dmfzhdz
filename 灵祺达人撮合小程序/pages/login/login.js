@@ -49,7 +49,7 @@ Page({
     tab: 'wx',
     loginIdentity: '',
     loginIdentityLabel: '',
-    loginIdentityGlyph: '',
+    loginIdentityEmoji: '',
     showIdentitySheet: false,
     identityOptions: IDENTITY_OPTIONS,
     loginName: '',
@@ -103,7 +103,7 @@ Page({
     this.setData({
       loginIdentity: id,
       loginIdentityLabel: meta.label,
-      loginIdentityGlyph: meta.glyph,
+      loginIdentityEmoji: meta.emoji,
       showIdentitySheet: false,
       err: '',
     })
