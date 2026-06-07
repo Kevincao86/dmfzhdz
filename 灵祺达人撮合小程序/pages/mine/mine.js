@@ -15,45 +15,58 @@ const wxAccount = require('../../utils/wxAccount.js')
 const { setTabBarForPage, refreshTabBar, setTabBarHidden } = require('../../utils/tabBar.js')
 const { routeToPagePath } = require('../../utils/tabBarConfig.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
+const { attachMenuGlyphs } = require('../../utils/bizGlyphs.js')
+
+const IDENTITY_SUBS = {
+  talent: '浏览商单、报名招募、管理个人资料',
+  shoot: '摄影/拍摄任务接单大厅',
+  edit: '剪辑任务接单大厅',
+  pr: '发布招募、管理发单与达人沟通',
+}
+
+const IDENTITY_SHEET_OPTS = identityTypes.WORK_ID_LIST.map((id) => {
+  const meta = identityTypes.WORK_IDENTITIES[id]
+  return { id, ...meta, sub: IDENTITY_SUBS[id] }
+})
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
-    return [
-      { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info', emoji: '📷' },
-      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list', emoji: '📋' },
-      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
-      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart', emoji: '📊' },
-      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
-    ]
+    return attachMenuGlyphs([
+      { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
+      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
+      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+    ])
   }
   if (identity === 'edit') {
-    return [
-      { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info', emoji: '✂️' },
-      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list', emoji: '📋' },
-      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
-      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart', emoji: '📊' },
-      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
-    ]
+    return attachMenuGlyphs([
+      { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
+      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
+      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+    ])
   }
   return TALENT_MENUS_BASE
 }
 
-const TALENT_MENUS_BASE = [
-  { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info', emoji: '🎨' },
-  { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list', emoji: '📋' },
-  { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
-  { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart', emoji: '📊' },
-  { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
-]
+const TALENT_MENUS_BASE = attachMenuGlyphs([
+  { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
+  { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+  { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
+  { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+  { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+])
 
-const PR_MENUS = [
-  { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info', emoji: '🪪' },
-  { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list', emoji: '📦' },
-  { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell', emoji: '🔔' },
-  { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart', emoji: '📈' },
-  { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl', emoji: '📑' },
-  { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support', emoji: '🧚' },
-]
+const PR_MENUS = attachMenuGlyphs([
+  { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
+  { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
+  { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
+  { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
+  { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
+  { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+])
 
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
@@ -85,6 +98,7 @@ Page({
     headerInnerStyle: '',
     showIdentitySheet: false,
     showWxLoginSheet: false,
+    identitySheetOpts: IDENTITY_SHEET_OPTS,
     wxLoginNick: '',
     wxLoginAvatar: '',
     wxLoginSubmitting: false,

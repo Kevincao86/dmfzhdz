@@ -1,9 +1,9 @@
 /** 工作台身份（本地切换，与 mp_accounts.active_role 的 talent/pr 独立） */
 const WORK_IDENTITIES = {
-  talent: { id: 'talent', label: '达人', emoji: '🎭' },
-  shoot: { id: 'shoot', label: '拍摄团队', emoji: '📷' },
-  edit: { id: 'edit', label: '剪辑团队', emoji: '✂️' },
-  pr: { id: 'pr', label: 'PR', emoji: '💼' },
+  talent: { id: 'talent', label: '达人', glyph: '达' },
+  shoot: { id: 'shoot', label: '拍摄团队', glyph: '拍' },
+  edit: { id: 'edit', label: '剪辑团队', glyph: '剪' },
+  pr: { id: 'pr', label: 'PR', glyph: 'PR' },
 }
 
 const WORK_ID_LIST = ['talent', 'shoot', 'edit', 'pr']

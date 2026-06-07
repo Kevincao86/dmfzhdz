@@ -32,7 +32,7 @@
   line-height: 56rpx;
   font-size: 24rpx;
   font-weight: 600;
-  color: #7c3aed;
+  color: #1677ff;
   background: #f5f3ff;
   border: 2rpx solid #e0e7ff;
   border-radius: 999rpx;
@@ -101,5 +101,5 @@
 
 .cred-modal-btn--primary {
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
 }

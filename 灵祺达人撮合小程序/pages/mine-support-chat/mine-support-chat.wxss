@@ -8,7 +8,7 @@
 .status-bar {
   flex-shrink: 0;
   padding: 20rpx 24rpx;
-  background: linear-gradient(95deg, #4f46e5, #7c3aed);
+  background: linear-gradient(95deg, #4f46e5, #1677ff);
   color: #fff;
 }
 

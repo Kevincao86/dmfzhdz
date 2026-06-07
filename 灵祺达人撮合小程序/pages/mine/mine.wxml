@@ -69,25 +69,25 @@
   </view>
 
   <scroll-view class="mine-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-  <view class="menu-section">
+  <view class="biz-menu-card menu-section">
     <view
       wx:for="{{menus}}"
       wx:key="key"
-      class="menu-card"
-      hover-class="menu-card--hover"
+      class="biz-menu-row"
+      hover-class="biz-menu-row--hover"
       data-key="{{item.key}}"
       bindtap="onMenuTap"
     >
-      <view class="menu-icon-wrap menu-icon-wrap--{{item.icon}}">
-        <text class="menu-emoji">{{item.emoji}}</text>
+      <view class="lq-biz-icon lq-biz-icon--{{item.icon}}">
+        <text>{{item.glyph}}</text>
       </view>
-      <view class="menu-body">
-        <text class="menu-label">{{item.label}}</text>
-        <text class="menu-sub">{{item.sub}}</text>
+      <view class="biz-menu-body">
+        <text class="biz-menu-label">{{item.label}}</text>
+        <text class="biz-menu-sub">{{item.sub}}</text>
       </view>
       <view class="menu-right">
-        <text class="menu-badge" wx:if="{{item.key === 'notifications' && notifyBadge > 0}}">{{notifyBadge}}</text>
-        <text class="menu-arrow">›</text>
+        <text class="biz-menu-badge" wx:if="{{item.key === 'notifications' && notifyBadge > 0}}">{{notifyBadge}}</text>
+        <text class="biz-menu-arrow">›</text>
       </view>
     </view>
   </view>
@@ -105,60 +105,20 @@
       </view>
       <text class="id-sheet-hint">同一账号可在达人、拍摄、剪辑、PR 四种身份间自由切换</text>
       <view
-        class="id-sheet-opt {{identity === 'talent' ? 'active' : ''}}"
-        data-id="talent"
+        wx:for="{{identitySheetOpts}}"
+        wx:key="id"
+        class="id-sheet-opt {{identity === item.id ? 'active' : ''}}"
+        data-id="{{item.id}}"
         bindtap="onPickIdentity"
       >
-        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent">
-          <text class="id-sheet-opt-emoji">🎭</text>
+        <view class="lq-biz-icon lq-biz-icon--identity">
+          <text>{{item.glyph}}</text>
         </view>
         <view class="id-sheet-opt-body">
-          <text class="id-sheet-opt-title">达人</text>
-          <text class="id-sheet-opt-sub">浏览商单、报名招募、管理个人资料</text>
+          <text class="id-sheet-opt-title">{{item.label}}</text>
+          <text class="id-sheet-opt-sub">{{item.sub}}</text>
         </view>
-        <text class="id-sheet-check" wx:if="{{identity === 'talent'}}">✓</text>
-      </view>
-      <view
-        class="id-sheet-opt {{identity === 'shoot' ? 'active' : ''}}"
-        data-id="shoot"
-        bindtap="onPickIdentity"
-      >
-        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent">
-          <text class="id-sheet-opt-emoji">📷</text>
-        </view>
-        <view class="id-sheet-opt-body">
-          <text class="id-sheet-opt-title">拍摄团队</text>
-          <text class="id-sheet-opt-sub">摄影/拍摄任务接单大厅</text>
-        </view>
-        <text class="id-sheet-check" wx:if="{{identity === 'shoot'}}">✓</text>
-      </view>
-      <view
-        class="id-sheet-opt {{identity === 'edit' ? 'active' : ''}}"
-        data-id="edit"
-        bindtap="onPickIdentity"
-      >
-        <view class="id-sheet-opt-icon id-sheet-opt-icon--talent">
-          <text class="id-sheet-opt-emoji">✂️</text>
-        </view>
-        <view class="id-sheet-opt-body">
-          <text class="id-sheet-opt-title">剪辑团队</text>
-          <text class="id-sheet-opt-sub">剪辑任务接单大厅</text>
-        </view>
-        <text class="id-sheet-check" wx:if="{{identity === 'edit'}}">✓</text>
-      </view>
-      <view
-        class="id-sheet-opt {{identity === 'pr' ? 'active' : ''}}"
-        data-id="pr"
-        bindtap="onPickIdentity"
-      >
-        <view class="id-sheet-opt-icon id-sheet-opt-icon--pr">
-          <text class="id-sheet-opt-emoji">💼</text>
-        </view>
-        <view class="id-sheet-opt-body">
-          <text class="id-sheet-opt-title">PR</text>
-          <text class="id-sheet-opt-sub">发布招募、管理发单与达人沟通</text>
-        </view>
-        <text class="id-sheet-check" wx:if="{{identity === 'pr'}}">✓</text>
+        <text class="id-sheet-check" wx:if="{{identity === item.id}}">✓</text>
       </view>
     </view>
   </view>
