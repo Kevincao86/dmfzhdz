@@ -1,4 +1,3 @@
-const talentMember = require('./talentMember.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const applicationsStore = require('./applicationsStore.js')
 const selection = require('./mpApplicantSelection.js')
@@ -17,6 +16,27 @@ function accountKey(platform, account) {
   if (!a) return ''
   const pid = talentPlatforms.platformIdFromName(platform || '抖音')
   return `acct:${pid}:${a}`
+}
+
+function looksLikeRegistryMemberId(id) {
+  return /^(MTM-|LQ-[TD]-|talent_)/i.test(id)
+}
+
+function strictTalentIds(member) {
+  const ids = new Set()
+  const auth = require('./auth.js')
+  const acc = auth.readAccount()
+  for (const v of [acc && acc.lingqiTalentId, acc && acc.registryMemberId, member && member.id, member && member.lingqiTalentId]) {
+    const s = String(v || '').trim()
+    if (s) ids.add(s)
+  }
+  return ids
+}
+
+function userOwnsApplicantId(applicantId) {
+  const aid = String(applicantId || '').trim()
+  if (!aid) return false
+  return applicationsStore.readApplications().some((a) => a && String(a.applicantId || '') === aid)
 }
 
 /** PR 写入站内信时用的 talentMemberId（无会员 id 时用手机号/账号兜底） */
@@ -53,45 +73,57 @@ function talentMatchKeys(member) {
     keys.add(accountKey(p.name, prof.platformAccount))
     keys.add(String(prof.platformAccount).trim().toLowerCase())
   }
-  for (const app of applicationsStore.readApplications()) {
-    if (app && app.applicantId) keys.add(`app:${app.applicantId}`)
-  }
   return keys
 }
 
 function inboxRowMatchesTalent(row, keys, member) {
-  if (!row || !keys || !keys.size) return false
+  if (!row || !member) return false
+  const strictIds = strictTalentIds(member)
   const mid = String(row.talentMemberId || '').trim()
-  if (mid && keys.has(mid)) return true
+  const applicantId = String(row.applicantId || '').trim()
+  const isSelection = row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
 
-  const auth = require('./auth.js')
-  const acc = auth.readAccount()
-  const strictIds = new Set()
-  if (acc && acc.registryMemberId) strictIds.add(String(acc.registryMemberId).trim())
-  if (acc && acc.lingqiTalentId) strictIds.add(String(acc.lingqiTalentId).trim())
-  if (member && member.id) strictIds.add(String(member.id).trim())
-  if (member && member.lingqiTalentId) strictIds.add(String(member.lingqiTalentId).trim())
-  if (mid && strictIds.size > 0 && !strictIds.has(mid)) {
-    const looksLikeMemberId = /^MTM-/i.test(mid) || /^LQ-T-/i.test(mid)
-    if (looksLikeMemberId) return false
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid)) return false
+
+  if (applicantId) {
+    if (!userOwnsApplicantId(applicantId)) return false
+    if (isSelection) return true
+  }
+
+  if (mid && keys.has(mid)) {
+    if (!applicantId || userOwnsApplicantId(applicantId)) return true
   }
 
   const contact = String(row.contact || '').trim()
-  if (contact) {
+  if (contact && applicantId && userOwnsApplicantId(applicantId)) {
     if (keys.has(contact)) return true
     const ck = contactKey(contact)
     if (ck && keys.has(ck)) return true
+    if (String(member.contact || '').trim() === contact) return true
   }
-  const applicantId = String(row.applicantId || '').trim()
-  if (applicantId && keys.has(`app:${applicantId}`)) return true
-  if (member && contact && String(member.contact || '').trim() === contact) return true
+
   const plat = row.platform || '抖音'
   const acct = String(row.platformAccount || '').trim().toLowerCase()
-  if (acct && keys.has(accountKey(plat, acct))) return true
-  if (member && acct && selection.applicantMatchesLocalMember({ platform: plat, platformAccount: acct }, member)) {
-    return true
+  if (acct && applicantId && userOwnsApplicantId(applicantId)) {
+    if (keys.has(accountKey(plat, acct))) return true
+    if (selection.applicantMatchesLocalMember({ platform: plat, platformAccount: acct }, member)) return true
   }
+
+  if (isSelection) return false
   return false
+}
+
+function registryHasSelectionForApplicant(reg, member, mpOrderId, applicantId) {
+  const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+  const keys = talentMatchKeys(member)
+  return inbox.some((row) => {
+    if (!row) return false
+    if (String(row.mpOrderId || '') !== mpOrderId) return false
+    if (String(row.applicantId || '') !== applicantId) return false
+    if (row.noticeType !== 'selection' && !/恭喜入选/.test(String(row.title || ''))) return false
+    return inboxRowMatchesTalent(row, keys, member)
+  })
 }
 
 function readSelectionNoticeSent() {
@@ -127,11 +159,12 @@ function buildSelectionNoticeRows(reg, member) {
     if (!selected.includes(String(app.applicantId))) continue
     const applicant = (mp.applicants || []).find((a) => a && a.id === app.applicantId)
     if (applicant && !selection.applicantMatchesLocalMember(applicant, member)) continue
+    if (registryHasSelectionForApplicant(reg, member, app.mpOrderId, String(app.applicantId))) continue
     const dedupe = `sel-${app.mpOrderId}-${app.applicantId}`
     if (inboxNoticeState.getHandledAction({ dedupeKey: dedupe })) continue
     const qr = mpGroupQr.groupQrFromMp(mp)
     rows.push({
-      id: `sel-local-${Date.now()}-${i}`,
+      id: `sel-local-${app.mpOrderId}-${app.applicantId}`,
       title: '恭喜入选招募',
       body: `您已被选入「${mp.title || app.title || app.mpOrderId}」。请扫码加入项目群，二维码见下图。`,
       category: 'business',

@@ -62,6 +62,7 @@ function buildHallPayload(partial: Partial<RegistryFile>): Record<string, unknow
     ok: true,
     mpRecruitmentOrders,
     mpTalentMembers: sliceRegistryList(partial.mpTalentMembers),
+    mpTalentInbox: sliceRegistryList(partial.mpTalentInbox),
     talentLibraryEntries: sliceRegistryList(partial.talentLibraryEntries),
     shootTeamLibraryEntries: sliceRegistryList(partial.shootTeamLibraryEntries),
     editTeamLibraryEntries: sliceRegistryList(partial.editTeamLibraryEntries),

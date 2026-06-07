@@ -52,6 +52,23 @@ export function filterSelectedApplicants(applicants: ApplicantRow[], selectedIds
   return (applicants || []).filter((a) => a?.id && set.has(String(a.id)))
 }
 
+export function applicantMatchesLocalMember(
+  applicant: Record<string, unknown>,
+  member: Record<string, unknown> | null,
+): boolean {
+  if (!applicant || !member) return false
+  if (member.id && applicant.talentMemberId) {
+    return String(member.id).trim() === String(applicant.talentMemberId).trim()
+  }
+  const contact = String(member.contact || '').trim()
+  if (contact && String(applicant.contact || '').trim() === contact) return true
+  const plat = platformIdFromName(String(applicant.platform || '抖音'))
+  const profs = member.platformProfiles as Record<string, { platformAccount?: string }> | undefined
+  const prof = profs?.[plat]
+  const account = prof && String(prof.platformAccount || '').trim().toLowerCase()
+  return !!(account && String(applicant.platformAccount || '').trim().toLowerCase() === account)
+}
+
 export function resolveTalentMemberId(applicant: Record<string, unknown>, reg: MpRegistry): string {
   const a = applicant || {}
   if (a.talentMemberId) return String(a.talentMemberId).trim()

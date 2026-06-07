@@ -8,6 +8,9 @@ const LAST_ACCOUNT_SCOPE_KEY = 'meoo_last_account_scope_v1'
 const TRANSACTIONAL_PREFIXES = [
   'meoo_my_applications_v',
   'meoo_my_published_orders_v',
+  'meoo_talent_messages_v1',
+  'meoo_talent_notifications_v1',
+  'meoo_talent_inbox_seen_v1',
 ]
 
 export function scopeIdFromAccount(account: MpAccount | null | undefined): string {

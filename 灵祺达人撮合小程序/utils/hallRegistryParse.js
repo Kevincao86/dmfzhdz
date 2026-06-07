@@ -13,10 +13,15 @@ function normalizeHallPayload(data) {
   if (!Array.isArray(mp)) {
     mp = []
   }
+  let inbox = data.mpTalentInbox
+  if (!Array.isArray(inbox) && data.registry && typeof data.registry === 'object') {
+    inbox = data.registry.mpTalentInbox
+  }
   return {
     mpRecruitmentOrders: mp,
     recruitmentOrders: Array.isArray(data.recruitmentOrders) ? data.recruitmentOrders : [],
     mpTalentMembers: Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers : [],
+    mpTalentInbox: Array.isArray(inbox) ? inbox : [],
     talentLibraryEntries: Array.isArray(data.talentLibraryEntries) ? data.talentLibraryEntries : [],
     shootTeamLibraryEntries: Array.isArray(data.shootTeamLibraryEntries) ? data.shootTeamLibraryEntries : [],
     editTeamLibraryEntries: Array.isArray(data.editTeamLibraryEntries) ? data.editTeamLibraryEntries : [],

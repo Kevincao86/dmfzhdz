@@ -36,7 +36,15 @@ function ownerIdsForFilter() {
 
 function entryBelongsToCurrentAccount(entry, ids) {
   if (!entry) return false
-  if (!ids.ownerAccountId) return true
+  if (!entry.ownerAccountId && !entry.ownerMemberId && !entry.ownerTalentId && !entry.ownerPrId) {
+    return false
+  }
+  if (!ids.ownerAccountId) {
+    if (ids.memberId && entry.ownerMemberId) return entry.ownerMemberId === ids.memberId
+    if (ids.talentId && entry.ownerTalentId) return entry.ownerTalentId === ids.talentId
+    if (ids.prId && entry.ownerPrId) return entry.ownerPrId === ids.prId
+    return false
+  }
   if (!entry.ownerAccountId) return false
   if (entry.ownerAccountId !== ids.ownerAccountId) return false
   if (entry.ownerMemberId && ids.memberId && entry.ownerMemberId !== ids.memberId) return false
