@@ -45,6 +45,7 @@ export default function PrOrderApplicantsPage() {
   const [checkedIds, setCheckedIds] = useState<string[]>([])
   const [batchConfirming, setBatchConfirming] = useState(false)
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
+  const [profileModalApplicant, setProfileModalApplicant] = useState<EnrichedApplicantRow | null>(null)
 
   const selectedCount = selectedIds.length
   const checkedCount = checkedIds.length
