@@ -17,6 +17,7 @@ const userProfile = require('../../utils/userProfile.js')
 const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
 const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
+const profileLinkParse = require('../../utils/profileLinkParse.js')
 const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
 const accountSessionActions = require('../../utils/accountSessionActions.js')
@@ -60,6 +61,9 @@ Page({
     contact: '',
     wechatId: '',
     alipayAccount: '',
+    gender: '',
+    profileAutofillLoading: false,
+    profileAutofillPlatform: '',
     platformProfiles: talentPlatforms.emptyAllProfiles(),
     platformSections: [],
     douyinLevels: DOUYIN_LEVELS,
@@ -176,6 +180,7 @@ Page({
         contact: cur.contact || '',
         wechatId: cur.wechatId || '',
         alipayAccount: cur.alipayAccount || '',
+        gender: cur.gender || '',
         platformProfiles: profiles,
         platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
       })
@@ -320,6 +325,57 @@ Page({
     const k = e.currentTarget.dataset.k
     if (k) this.setData({ [k]: e.detail.value })
   },
+  onGenderTap(e) {
+    const g = e.currentTarget.dataset.gender
+    if (!g) return
+    this.setData({ gender: this.data.gender === g ? '' : g })
+  },
+  async onProfileLinkAutofill(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id !== 'douyin') {
+      wx.showToast({ title: '暂仅支持抖音主页', icon: 'none' })
+      return
+    }
+    const plat = talentPlatforms.TALENT_PLATFORMS.find((p) => p.id === id)
+    const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
+    const link = String(prof.profileLink || '').trim()
+    if (!link) {
+      wx.showToast({ title: '请先粘贴主页链接', icon: 'none' })
+      return
+    }
+    if (!api.hasApi()) {
+      wx.showToast({ title: '请先配置 API 后再自动填写', icon: 'none' })
+      return
+    }
+    this.setData({ profileAutofillLoading: true, profileAutofillPlatform: id })
+    try {
+      const parsed = await profileLinkParse.parseProfileLink(link, plat?.name || '抖音')
+      const profiles = { ...this.data.platformProfiles }
+      const cur = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}), enabled: true }
+      if (parsed.platformAccount) cur.platformAccount = parsed.platformAccount
+      if (parsed.platformNickname) cur.platformNickname = parsed.platformNickname
+      if (parsed.profileLink) cur.profileLink = parsed.profileLink
+      if (parsed.followers > 0) cur.followers = String(parsed.followers)
+      if (Array.isArray(parsed.accountTags) && parsed.accountTags.length) {
+        const merged = [...new Set([...(cur.accountTags || []), ...parsed.accountTags])]
+        cur.accountTags = merged
+      }
+      profiles[id] = cur
+      syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+      const patch = {}
+      if (parsed.gender && !this.data.gender) patch.gender = parsed.gender
+      if (Object.keys(patch).length) this.setData(patch)
+      wx.showToast({ title: '已自动填写', icon: 'success' })
+    } catch (err) {
+      wx.showToast({
+        title: (err && err.message) || '解析失败',
+        icon: 'none',
+        duration: 2800,
+      })
+    } finally {
+      this.setData({ profileAutofillLoading: false, profileAutofillPlatform: '' })
+    }
+  },
   onTogglePlatformEnable(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
@@ -367,7 +423,6 @@ Page({
       wechatId: this.data.wechatId,
     })
     if (contactErr) return contactErr
-    if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
     const regionErr = validateRegion(this.data.province, this.data.city)
     if (regionErr) return regionErr
     if (this.data.isSupplier) {
@@ -413,6 +468,7 @@ Page({
       contact: String(this.data.contact || '').trim(),
       wechatId: String(this.data.wechatId || '').trim(),
       alipayAccount: String(this.data.alipayAccount || '').trim(),
+      gender: String(this.data.gender || '').trim(),
       province: String(this.data.province || '').trim(),
       city: String(this.data.city || '').trim(),
       platformProfiles: profiles,

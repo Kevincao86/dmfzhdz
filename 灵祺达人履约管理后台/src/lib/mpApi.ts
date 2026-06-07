@@ -209,6 +209,27 @@ export async function postMpRecruitmentAi(body: Record<string, unknown>) {
   return data
 }
 
+export type ParsedProfileLink = {
+  ok: true
+  platform: '抖音'
+  platformAccount: string
+  platformNickname: string
+  profileLink: string
+  followers: number
+  gender: '' | '男' | '女'
+  accountTags: string[]
+}
+
+export async function parseProfileLink(link: string, platform = '抖音'): Promise<ParsedProfileLink> {
+  const data = (await postJsonCandidates(
+    '/api/meoo-ops-mp-profile-link-parse',
+    { link: String(link || '').trim(), platform },
+    { extraHeaders: getToken() ? { 'X-Mp-Session': getToken()! } : {} },
+  )) as ParsedProfileLink & { ok?: boolean; message?: string }
+  if (data.ok === false) throw new Error(String(data.message || '解析失败'))
+  return data
+}
+
 export async function patchMpRecruitmentOrder(body: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-recruitment-orders-patch', '/api/ops-sync/mp-recruitment-orders/patch'],

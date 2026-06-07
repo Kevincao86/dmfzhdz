@@ -193,6 +193,44 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       return
     }
 
+    if (loc.pathname === '/api/meoo-ops-mp-profile-link-parse') {
+      const method = req.method ?? 'GET'
+      if (method === 'OPTIONS') {
+        res.statusCode = 204
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        res.end()
+        return
+      }
+      if (method !== 'POST') {
+        res.statusCode = 405
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ ok: false, error: 'method_not_allowed' }))
+        return
+      }
+      try {
+        const bodyRaw = await readBody(req as IncomingMessage)
+        const body = JSON.parse(bodyRaw || '{}') as { link?: string; platform?: string }
+        const { runDouyinProfileParseCore } = await import('../src/lib/douyinProfileParseCore.js')
+        const out = await runDouyinProfileParseCore({
+          link: String(body.link || ''),
+          platform: body.platform,
+        })
+        res.statusCode = out.ok ? 200 : 422
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify(out.ok ? out : { ok: false, error: 'profile_parse_failed', message: out.message }))
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end(JSON.stringify({ ok: false, error: 'profile_parse_error', detail: msg.slice(0, 800) }))
+      }
+      return
+    }
+
     if (loc.pathname === '/api/meoo-mp-recruitment-ai') {
       const method = req.method ?? 'GET'
       if (method === 'OPTIONS') {

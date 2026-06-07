@@ -171,6 +171,46 @@
   transform: scale(0.82);
 }
 
+.gender-row {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}
+
+.gender-chip {
+  min-width: 120rpx;
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #64748b;
+  background: #f1f5f9;
+  border: 2rpx solid transparent;
+}
+
+.gender-chip--on {
+  color: #4338ca;
+  background: #eef2ff;
+  border-color: #818cf8;
+  font-weight: 600;
+}
+
+.profile-autofill-btn {
+  margin-top: 16rpx;
+  width: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  line-height: 2.2;
+  border: none;
+}
+
+.profile-autofill-btn::after {
+  border: none;
+}
+
 .submit-wrap {
   margin-bottom: 48rpx;
 }

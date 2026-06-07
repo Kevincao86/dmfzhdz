@@ -67,6 +67,7 @@ import mpRecruitmentIceConfirmHandler from '../api/meoo-ops-mp-recruitment-ice-c
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
 import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
+import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 import douyinBindHandler from '../api/douyin-bind.ts'
@@ -162,6 +163,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-profile-link-parse': mpProfileLinkParseHandler as VercelLikeHandler,
   '/api/douyin-bind': douyinBindHandler as VercelLikeHandler,
   '/api/meoo-douyin-bind': douyinBindHandler as VercelLikeHandler,
   '/api/merchant/douyin/bind': douyinBindHandler as VercelLikeHandler,
