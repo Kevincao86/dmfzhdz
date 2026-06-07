@@ -38,6 +38,9 @@ export type ProfileLinkParseResult = ProfileLinkParseOk | { ok: false; message: 
 const MOBILE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 
+const DESKTOP_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+
 const REFERER_BY_PLATFORM: Record<ProfilePlatformKey, string> = {
   douyin: 'https://www.douyin.com/',
   xiaohongshu: 'https://www.xiaohongshu.com/',
@@ -136,13 +139,93 @@ function platformDisplayName(key: ProfilePlatformKey): ProfilePlatformName {
   return map[key]
 }
 
-function fetchHeaders(key: ProfilePlatformKey) {
+function fetchHeaders(key: ProfilePlatformKey, ua: 'mobile' | 'desktop' = 'mobile') {
   return {
-    'User-Agent': MOBILE_UA,
+    'User-Agent': ua === 'desktop' ? DESKTOP_UA : MOBILE_UA,
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9',
     Referer: REFERER_BY_PLATFORM[key],
+    'Cache-Control': 'no-cache',
   } as const
+}
+
+function extractSecUidFromDouyinUrl(url: string): string {
+  const m =
+    /\/user\/([A-Za-z0-9_-]{10,120})/i.exec(url) ??
+    /\/share\/user\/([A-Za-z0-9_-]{10,120})/i.exec(url) ??
+    /sec_uid=([A-Za-z0-9_-]{10,120})/i.exec(url)
+  return m?.[1]?.trim() || ''
+}
+
+function douyinMirrorUrls(profileUrl: string): string[] {
+  const sec = extractSecUidFromDouyinUrl(profileUrl)
+  if (!sec) return [profileUrl]
+  const out = new Set<string>([profileUrl])
+  out.add(`https://www.douyin.com/user/${sec}`)
+  out.add(`https://www.iesdouyin.com/share/user/${sec}`)
+  out.add(`https://m.douyin.com/share/user/${sec}`)
+  return [...out]
+}
+
+function parseRenderDataScript(html: string): unknown | null {
+  const m =
+    /<script[^>]+id=["']RENDER_DATA["'][^>]*>([\s\S]*?)<\/script>/i.exec(html) ??
+    /<script[^>]+id=["']__RENDER_DATA__["'][^>]*>([\s\S]*?)<\/script>/i.exec(html)
+  if (!m?.[1]) return null
+  const raw = m[1].trim()
+  for (const text of [raw, decodeURIComponent(raw.replace(/\+/g, '%20'))]) {
+    try {
+      return JSON.parse(text) as unknown
+    } catch {
+      /* try next */
+    }
+  }
+  return null
+}
+
+function parseUniversalHydration(html: string): unknown | null {
+  const patterns = [
+    /window\.__UNIVERSAL_DATA_FOR_REHYDRATION__\s*=\s*(\{[\s\S]*)/,
+    /window\.ssrData\s*=\s*(\{[\s\S]*)/,
+    /window\.pageData\s*=\s*(\{[\s\S]*)/,
+  ]
+  for (const pat of patterns) {
+    const m = pat.exec(html)
+    if (!m?.[1]) continue
+    const root = parseJsonObjectFromScriptPrefix(m[1])
+    if (root) return root
+  }
+  return null
+}
+
+async function fetchHtml(url: string, key: ProfilePlatformKey, ua: 'mobile' | 'desktop'): Promise<string> {
+  const res = await fetch(url, {
+    redirect: 'follow',
+    headers: fetchHeaders(key, ua),
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) return ''
+  return res.text()
+}
+
+async function fetchProfileHtmlCandidates(profileUrl: string, key: ProfilePlatformKey): Promise<string> {
+  const urls = key === 'douyin' ? douyinMirrorUrls(profileUrl) : [profileUrl]
+  const attempts: Array<{ url: string; ua: 'mobile' | 'desktop' }> = []
+  for (const u of urls) {
+    attempts.push({ url: u, ua: 'mobile' }, { url: u, ua: 'desktop' })
+  }
+  let longest = ''
+  for (const { url, ua } of attempts) {
+    try {
+      const html = await fetchHtml(url, key, ua)
+      if (html.length > longest.length) longest = html
+      const probe = parseProfileFromHtml(html, key, profileUrl)
+      if (probe?.platformNickname || probe?.platformAccount) return html
+    } catch {
+      /* next */
+    }
+  }
+  return longest
 }
 
 function parseJsonObjectFromScriptPrefix(raw: string): unknown | null {
@@ -305,6 +388,7 @@ function objectToBlob(o: Record<string, unknown>, key: ProfilePlatformKey): RawP
 type ProfileTreeBest = { score: number; blob: RawProfileBlob }
 
 function findBestProfileInTree(node: unknown, key: ProfilePlatformKey): RawProfileBlob | null {
+  const minScore = key === 'douyin' ? 4 : 6
   const state: { best: ProfileTreeBest | null } = { best: null }
 
   function walk(n: unknown, depth: number) {
@@ -316,14 +400,14 @@ function findBestProfileInTree(node: unknown, key: ProfilePlatformKey): RawProfi
     if (typeof n !== 'object') return
     const o = n as Record<string, unknown>
     const score = scoreProfileObject(o, key)
-    if (score >= 6) {
+    if (score >= minScore) {
       const blob = objectToBlob(o, key)
       if (!state.best || score > state.best.score) state.best = { score, blob }
     }
     if (o.user && typeof o.user === 'object') {
       const u = o.user as Record<string, unknown>
       const us = scoreProfileObject(u, key)
-      if (us >= 6) {
+      if (us >= minScore) {
         const blob = objectToBlob(u, key)
         if (!state.best || us > state.best.score) state.best = { score: us, blob }
       }
@@ -337,7 +421,12 @@ function findBestProfileInTree(node: unknown, key: ProfilePlatformKey): RawProfi
   return state.best?.blob ?? null
 }
 
-function parseProfileFromHtml(html: string, key: ProfilePlatformKey): RawProfileBlob | null {
+function parseProfileFromHtml(
+  html: string,
+  key: ProfilePlatformKey,
+  profileUrl = '',
+): RawProfileBlob | null {
+  const extraRoots = [parseRenderDataScript(html), parseUniversalHydration(html)].filter(Boolean)
   const scripts = [
     /window\._ROUTER_DATA\s*=\s*(\{[\s\S]*)/,
     /window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*)/,
@@ -347,6 +436,10 @@ function parseProfileFromHtml(html: string, key: ProfilePlatformKey): RawProfile
     /window\.__NEXT_DATA__\s*=\s*(\{[\s\S]*)/,
     /window\.__NUXT__\s*=\s*(\{[\s\S]*)/,
   ]
+  for (const root of extraRoots) {
+    const hit = findBestProfileInTree(root, key)
+    if (hit?.platformNickname || hit?.platformAccount) return hit
+  }
   for (const pat of scripts) {
     const m = pat.exec(html)
     if (!m?.[1]) continue
@@ -379,11 +472,16 @@ function parseProfileFromHtml(html: string, key: ProfilePlatformKey): RawProfile
   const ogTitle = pickMetaContent(html, 'og:title')
   const ogDesc = pickMetaContent(html, 'og:description')
   if (ogTitle) {
-    const title = ogTitle.replace(/\s*[-|–—]\s*.*$/, '').trim()
-    return {
+    const title = ogTitle.replace(/\s*[-|–—@].*$/, '').replace(/的抖音$/i, '').trim()
+    const blob: RawProfileBlob = {
       platformNickname: title,
       signature: ogDesc || '',
     }
+    if (key === 'douyin') {
+      const sec = extractSecUidFromDouyinUrl(profileUrl)
+      if (sec && !sec.startsWith('MS4w')) blob.platformAccount = sec
+    }
+    return blob
   }
 
   return null
@@ -409,6 +507,10 @@ function extractPlatformUrlFromText(text: string, key: ProfilePlatformKey): stri
   if (key === 'douyin') {
     const share = extractDouyinShareFromText(t)
     if (share.url) return normalizeDouyinShareUrl(share.url)
+    const bare = /(?:^|[\s「」【】])((?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?)|(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff]+)/i.exec(
+      t,
+    )
+    if (bare?.[1]) return cleanUrlFromText(bare[1])
     return normalizeDouyinShareUrl(t)
   }
 
@@ -454,7 +556,7 @@ async function followRedirects(url: string, key: ProfilePlatformKey): Promise<st
     try {
       const res = await fetch(current, {
         redirect: 'manual',
-        headers: fetchHeaders(key),
+        headers: fetchHeaders(key, 'mobile'),
         signal: AbortSignal.timeout(12_000),
       })
       const loc = res.headers.get('location')
@@ -473,7 +575,7 @@ async function followRedirects(url: string, key: ProfilePlatformKey): Promise<st
   try {
     const res = await fetch(url, {
       redirect: 'follow',
-      headers: fetchHeaders(key),
+      headers: fetchHeaders(key, 'mobile'),
       signal: AbortSignal.timeout(15_000),
     })
     return res.url?.trim() || url
@@ -550,25 +652,20 @@ export async function runProfileLinkParseCore(
 
   let html = ''
   try {
-    const res = await fetch(profileUrl, {
-      redirect: 'follow',
-      headers: fetchHeaders(key),
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!res.ok) {
-      return { ok: false, message: `抓取主页失败（HTTP ${res.status}），请稍后重试或手动填写。` }
+    html = await fetchProfileHtmlCandidates(profileUrl, key)
+    if (!html) {
+      return { ok: false, message: `抓取${platName}主页失败，请稍后重试或手动填写。` }
     }
-    html = await res.text()
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `网络请求失败：${msg.slice(0, 120)}` }
   }
 
-  const user = parseProfileFromHtml(html, key)
+  const user = parseProfileFromHtml(html, key, profileUrl)
   if (!user) {
     return {
       ok: false,
-      message: `已打开${platName}主页但未解析到资料（可能触发平台反爬）。请稍后重试或手动填写。`,
+      message: `未能从${platName}主页读取资料。请复制 App「分享主页」里的完整口令（含 https 链接），或改用手动填写。`,
     }
   }
 

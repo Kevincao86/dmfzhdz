@@ -46,7 +46,7 @@ function parseBody(raw) {
 function errMsg(status, data) {
   const mpApiErrors = require('./mpApiErrors.js')
   const d = parseBody(data)
-  const detail = String(d.message || d.detail || '').trim()
+  const detail = String(d.message || d.detail || d.hint || '').trim()
   const code = String(d.error || `http_${status}`).trim()
   if (detail && /[\u4e00-\u9fa5]/.test(detail)) return detail
   return mpApiErrors.formatMpApiErr(new Error(code), detail || '请求失败，请稍后重试')

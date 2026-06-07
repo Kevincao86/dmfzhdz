@@ -217,7 +217,7 @@
         <text class="form-label">{{item.labels.profileLink}}</text>
         <input
           class="input"
-          placeholder="粘贴分享口令或主页链接"
+          placeholder="粘贴抖音「分享主页」整段口令（含 https 链接）"
           value="{{item.profile.profileLink}}"
           data-id="{{item.id}}"
           data-k="profileLink"
