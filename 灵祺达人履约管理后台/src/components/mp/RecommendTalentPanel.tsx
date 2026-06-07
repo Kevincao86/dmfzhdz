@@ -23,6 +23,7 @@ import {
   syncProfile,
 } from '../../lib/mpSync/talentChat'
 import HallCityFilter from './HallCityFilter'
+import MatchScoreBadge from '../ui/MatchScoreBadge'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
 const GENDER_FILTERS = ['全部', '男', '女']
@@ -112,6 +113,8 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     } else {
       filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     }
+
+    filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))
 
     let hint = ''
     if (!filtered.length) {
@@ -307,7 +310,8 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
 
       <div className="grid gap-3 md:grid-cols-2">
         {displayRows.map((t) => (
-          <article key={t.id} className="talent-card rounded-xl border p-4 flex gap-3">
+          <article key={t.id} className="talent-card rounded-xl border p-4 flex gap-3 relative hover-panel">
+            {viewMode === 'ai' ? <MatchScoreBadge score={t.matchScore} className="absolute top-3 right-3" /> : null}
             {t.avatar ? (
               <img src={t.avatar} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
             ) : (
@@ -315,17 +319,14 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
                 {t.name.slice(0, 1)}
               </div>
             )}
-            <div className="min-w-0 flex-1">
-              {viewMode === 'ai' && t.aiTag ? (
-                <span className="order-tag order-tag--match">{t.aiTag}</span>
-              ) : null}
+            <div className="min-w-0 flex-1 pr-14">
               <h3 className="font-semibold truncate text-[var(--shell-text)]">{t.name}</h3>
               <p className="talent-card-meta text-xs mt-1">
                 {t.platform} · {t.followers === '团队' ? t.salesGrade : `${t.followers}粉`} · {t.salesGrade}
               </p>
               <p className="talent-card-meta text-xs mt-0.5">{t.region}</p>
-              {viewMode === 'ai' && t.matchScore ? (
-                <p className="order-price text-xs mt-1 font-medium text-orange-600">匹配度 {t.matchScore}</p>
+              {viewMode === 'ai' && t.aiTag ? (
+                <span className="order-tag order-tag--match mt-2 inline-block">{t.aiTag}</span>
               ) : null}
               <button
                 type="button"

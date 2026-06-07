@@ -15,6 +15,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL, workIdentityLabel } from '../../li
 import { getActiveRole } from '../../lib/mpSession'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
+import PageHero from '../ui/PageHero'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
 type HallTab = 'normal' | 'urgent' | 'paichian'
@@ -41,6 +42,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
   const [filterStatus, setFilterStatus] = useState('全部')
+  const [filterCategory, setFilterCategory] = useState('全部')
   const [priceSelected, setPriceSelected] = useState<string[]>([])
   const [priceFilterLabel, setPriceFilterLabel] = useState('价格筛选')
   const [showPriceSheet, setShowPriceSheet] = useState(false)
@@ -68,6 +70,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       if (!matchSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
       if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
+      if (!hallFilters.matchCategory(r.category, filterCategory)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
       if (!matchStatusLabel(r, filterStatus)) return false
       return true
@@ -93,6 +96,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     filterPlatform,
     filterProvince,
     filterCity,
+    filterCategory,
     filterStatus,
     priceSelected,
     sortBy,
@@ -151,12 +155,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-[var(--shell-text)]">招募大厅</h2>
-        <p className="text-sm text-[var(--shell-muted)] mt-1">
-          {roleHint} · 今日 {todayCount} 条
-        </p>
-      </div>
+      <PageHero
+        title="招募大厅"
+        subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
+        badge={`${displayRows.length} 条`}
+      />
 
       <input
         className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
@@ -216,6 +219,17 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             setFilterCity(c)
           }}
         />
+        <select
+          className="rounded-lg panel-select px-2 py-1.5"
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+        >
+          {hallFilters.CATEGORY_FILTERS.map((c) => (
+            <option key={c} value={c}>
+              {c === '全部' ? '类目' : c}
+            </option>
+          ))}
+        </select>
         <select
           className="rounded-lg panel-select px-2 py-1.5"
           value={filterStatus}

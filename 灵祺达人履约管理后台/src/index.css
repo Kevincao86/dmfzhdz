@@ -426,6 +426,72 @@ html[data-theme='dark'] .choice-card:hover {
     0 6px 16px -8px rgb(0 0 0 / 0.4);
 }
 
+.page-hero {
+  background: linear-gradient(135deg, rgb(124 58 237 / 0.08) 0%, var(--panel-card) 55%);
+  border-color: rgb(124 58 237 / 0.18);
+}
+
+html[data-theme='dark'] .page-hero {
+  background: linear-gradient(135deg, rgb(124 58 237 / 0.16) 0%, var(--panel-card) 60%);
+  border-color: rgb(167 139 250 / 0.22);
+}
+
+.page-hero-badge {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  margin-bottom: 0.5rem;
+  background: rgb(124 58 237 / 0.12);
+  color: rgb(109 40 217);
+}
+
+html[data-theme='dark'] .page-hero-badge {
+  background: rgb(124 58 237 / 0.25);
+  color: #ddd6fe;
+}
+
+.filter-strip {
+  background: var(--panel-card);
+  border-color: var(--shell-border);
+}
+
+.match-score-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.match-score-badge--high {
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  color: #fff;
+  box-shadow: 0 4px 12px -4px rgb(124 58 237 / 0.55);
+}
+
+.match-score-badge--mid {
+  background: rgb(124 58 237 / 0.14);
+  color: rgb(109 40 217);
+  border: 1px solid rgb(124 58 237 / 0.28);
+}
+
+.match-score-badge--low {
+  background: var(--order-chip-bg);
+  color: var(--shell-muted);
+  border: 1px solid var(--shell-border);
+}
+
+html[data-theme='dark'] .match-score-badge--mid {
+  color: #c4b5fd;
+}
+
 /* 边框按钮悬停 */
 button.border:not(:disabled):hover,
 a.border:hover {

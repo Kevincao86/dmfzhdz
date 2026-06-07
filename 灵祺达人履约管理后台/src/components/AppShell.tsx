@@ -25,7 +25,7 @@ function navForRole(role: MpAccountRole): NavItem[] {
   }
   return [
     { to: '/hall', label: '招募大厅' },
-    { to: '/orders', label: '我的履约' },
+    { to: '/orders', label: '我的报名' },
     ...common,
   ]
 }

@@ -4,6 +4,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
+import PageHero from '../components/ui/PageHero'
 
 export default function ProfilePage() {
   const acc = getAccount()
@@ -29,14 +30,14 @@ export default function ProfilePage() {
         : '灵祺达人 ID'
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <header className="surface-card rounded-xl border p-5">
-        <h2 className="text-xl font-bold text-[var(--shell-text)]">我的</h2>
-        <p className="text-sm text-[var(--shell-muted)] mt-1">当前身份：{edition}</p>
-        <p className="text-xs text-[var(--shell-muted)] mt-2">完善资料后，推荐大厅将按标签与习惯智能匹配</p>
-      </header>
+    <div className="max-w-2xl space-y-5">
+      <PageHero
+        title="我的"
+        subtitle={`当前身份：${edition} · 完善资料后，推荐大厅将按标签与习惯智能匹配`}
+        badge={acc?.loginName || acc?.wxNickName || '账户'}
+      />
 
-      <dl className="surface-card rounded-xl border p-6 space-y-3 text-sm">
+      <dl className="surface-card rounded-xl border p-6 space-y-4 text-sm hover-panel">
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--shell-muted)]">手机号</dt>
           <dd className="text-[var(--shell-text)]">{acc?.loginName || acc?.wxNickName || '—'}</dd>
@@ -48,7 +49,7 @@ export default function ProfilePage() {
       </dl>
 
       {isPr ? (
-        <section className="surface-card rounded-xl border p-6">
+        <section className="surface-card rounded-xl border p-6 hover-panel">
           <h3 className="font-semibold mb-2 text-[var(--shell-text)]">PR 资料</h3>
           <p className="text-sm text-[var(--shell-muted)] mb-4">
             {pr ? prDisplayName(pr) || '已保存 PR 资料' : '填写机构/个人信息后可用于发招募与推荐达人'}
@@ -61,7 +62,7 @@ export default function ProfilePage() {
           </Link>
         </section>
       ) : (
-        <section className="surface-card rounded-xl border p-6">
+        <section className="surface-card rounded-xl border p-6 hover-panel">
           <h3 className="font-semibold mb-2 text-[var(--shell-text)]">我的资料</h3>
           <p className="text-sm text-[var(--shell-muted)] mb-4">
             {workId === 'shoot' || workId === 'edit'
