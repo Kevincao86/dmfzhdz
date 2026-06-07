@@ -146,7 +146,7 @@ export type RegistrySupplierTeamLibraryEntry = {
 export type RegistryTalentLibraryEntry = {
   id: string
   lingqiTalentId?: string
-  platform: '抖音' | '小红书'
+  platform: '抖音' | '小红书' | '大众点评' | '快手' | '微信视频号'
   platformAccount: string
   platformNickname: string
   profileLink: string

@@ -165,7 +165,7 @@ export type RegistryTalentLibraryEntry = {
   id: string
   /** 灵祺固定达人身份 ID（LQ-D-xxxxxx） */
   lingqiTalentId?: string
-  platform: '抖音' | '小红书'
+  platform: '抖音' | '小红书' | '大众点评' | '快手' | '微信视频号'
   platformAccount: string
   platformNickname: string
   profileLink: string

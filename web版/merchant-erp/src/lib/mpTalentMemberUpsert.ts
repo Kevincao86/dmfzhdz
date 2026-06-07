@@ -7,6 +7,7 @@ import {
 } from './mpTalentPlatformProfileResolve.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
+import { extractProfileLinkUrl } from './talentProfileLink.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 
 function profileToApplicant(
@@ -26,7 +27,8 @@ function profileToApplicant(
     platform: plat,
     platformAccount: String(profile.platformAccount || '').trim(),
     platformNickname: nick,
-    profileLink: String(profile.profileLink || '').trim(),
+    profileLink:
+      extractProfileLinkUrl(profile.profileLink) || String(profile.profileLink || '').trim(),
     followers: Math.max(0, profile.followers || 0),
     douyinSalesLevel: plat === '抖音' ? profile.douyinSalesLevel : undefined,
     contact: String(contact || '').trim(),
