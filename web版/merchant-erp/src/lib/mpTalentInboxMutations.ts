@@ -9,9 +9,19 @@ export type MpTalentInboxEntryInput = {
   contact?: string
   platformAccount?: string
   applicantId?: string
+  /** 客户端勿传大图 base64；入选通知请留空，由服务端从招募单 groupQrImage 读取 */
   imageUrl?: string
   noticeType?: 'selection' | 'general'
   pinned?: boolean
+}
+
+function groupQrImageFromOrder(data: RegistrySnapshot, mpOrderId: string): string {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return ''
+  const o = (data.mpRecruitmentOrders || []).find((x) => x && x.id === id)
+  if (!o) return ''
+  const meta = o.mpPublishMeta && typeof o.mpPublishMeta === 'object' ? o.mpPublishMeta : {}
+  return String(o.groupQrImage || (meta as { groupQrImage?: string }).groupQrImage || '').trim()
 }
 
 export function appendMpTalentInboxInSnapshot(
@@ -27,8 +37,13 @@ export function appendMpTalentInboxInSnapshot(
     const talentMemberId = String(row.talentMemberId || '').trim()
     const title = String(row.title || '').trim()
     const body = String(row.body || '').trim()
-    const imageUrl = String(row.imageUrl || '').trim()
+    let imageUrl = String(row.imageUrl || '').trim()
+    const mpOrderId = row.mpOrderId ? String(row.mpOrderId).trim() : ''
+    if (!imageUrl && mpOrderId && row.noticeType === 'selection') {
+      imageUrl = groupQrImageFromOrder(data, mpOrderId)
+    }
     if (!talentMemberId || !title) continue
+    if (row.noticeType === 'selection' && !imageUrl) continue
     list.unshift({
       id: `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       talentMemberId,
@@ -48,7 +63,14 @@ export function appendMpTalentInboxInSnapshot(
     })
     added += 1
   }
-  if (!added) return { ok: false, error: 'invalid_entries', status: 400 }
+  if (!added) {
+    const needQr = rows.some((r) => r.noticeType === 'selection')
+    return {
+      ok: false,
+      error: needQr ? 'group_qr_missing_on_order' : 'invalid_entries',
+      status: needQr ? 400 : 400,
+    }
+  }
   data.mpTalentInbox = list.slice(0, 5000)
   return { ok: true, count: added }
 }

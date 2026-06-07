@@ -25,6 +25,9 @@ Page({
     selectedIds: [],
     selectedCount: 0,
     selectedApplicants: [],
+    checkedIds: [],
+    checkedCount: 0,
+    batchConfirming: false,
     showSelectedPanel: false,
     exportingAll: false,
     groupQrImage: '',
@@ -106,6 +109,40 @@ Page({
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 80),
       })
+    }
+  },
+  onToggleCheck(e) {
+    const id = String(e.currentTarget.dataset.id || '').trim()
+    if (!id) return
+    const set = new Set(this.data.checkedIds)
+    if (set.has(id)) set.delete(id)
+    else set.add(id)
+    const checkedIds = [...set]
+    this.setData({ checkedIds, checkedCount: checkedIds.length })
+  },
+  async onBatchConfirm() {
+    if (this.data.batchConfirming || this.data.savingSelect) return
+    const checked = this.data.checkedIds.filter((id) => !this.data.selectedIds.includes(id))
+    if (!checked.length) {
+      wx.showToast({
+        title: this.data.checkedCount ? '勾选的已在已选名单' : '请先勾选达人',
+        icon: 'none',
+      })
+      return
+    }
+    const next = [...new Set([...this.data.selectedIds, ...checked])]
+    this.applyApplicantsState(this.data.applicants, next)
+    this.setData({ checkedIds: [], checkedCount: 0, batchConfirming: true })
+    try {
+      await selection.persistSelectedIds(this.data.mpOrderId, next)
+      const mp = { ...this.data.mpOrder, selectedApplicantIds: next }
+      this.setData({ mpOrder: mp })
+      wx.showToast({ title: `已确认 ${checked.length} 人`, icon: 'success' })
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '批量确认失败').slice(0, 28), icon: 'none' })
+      await this.loadOrder()
+    } finally {
+      this.setData({ batchConfirming: false })
     }
   },
   async onToggleSelect(e) {
@@ -272,7 +309,6 @@ Page({
           category: 'business',
           title: '恭喜入选招募',
           body: `您已被 PR 选入「${title}」（单号 ${this.data.orderNo}）。请扫码加入项目群，二维码见下图。`,
-          imageUrl: qr,
           noticeType: 'selection',
           pinned: true,
         })

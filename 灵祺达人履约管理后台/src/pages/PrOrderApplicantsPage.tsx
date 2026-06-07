@@ -42,10 +42,12 @@ export default function PrOrderApplicantsPage() {
   const [groupQrUploading, setGroupQrUploading] = useState(false)
   const [notifying, setNotifying] = useState(false)
   const [savingSelect, setSavingSelect] = useState(false)
-  const [profileModalApplicant, setProfileModalApplicant] = useState<EnrichedApplicantRow | null>(null)
+  const [checkedIds, setCheckedIds] = useState<string[]>([])
+  const [batchConfirming, setBatchConfirming] = useState(false)
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
 
   const selectedCount = selectedIds.length
+  const checkedCount = checkedIds.length
   const selectedApplicants = filterSelectedApplicants(applicants, selectedIds)
 
   const applyApplicantsState = useCallback((rows: EnrichedApplicantRow[], ids: string[]) => {
@@ -174,6 +176,34 @@ export default function PrOrderApplicantsPage() {
     }
   }
 
+  async function onToggleCheck(a: EnrichedApplicantRow) {
+    if (!a?.id) return
+    const id = String(a.id)
+    setCheckedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  async function onBatchConfirm() {
+    if (batchConfirming || savingSelect) return
+    const ids = checkedIds.filter((id) => !selectedIds.includes(id))
+    if (!ids.length) {
+      alert(checkedCount ? '勾选的达人已在已选名单中' : '请先勾选要确认的达人')
+      return
+    }
+    const next = [...new Set([...selectedIds, ...ids])]
+    applyApplicantsState(applicants, next)
+    setCheckedIds([])
+    setBatchConfirming(true)
+    try {
+      await persistSelectedIds(mpOrderId, next)
+      if (mpOrder) setMpOrder({ ...mpOrder, selectedApplicantIds: next })
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '批量确认失败')
+      await loadOrder()
+    } finally {
+      setBatchConfirming(false)
+    }
+  }
+
   async function onNotifySelected() {
     if (notifying) return
     if (!selectedApplicants.length) {
@@ -186,6 +216,10 @@ export default function PrOrderApplicantsPage() {
       return
     }
     if (!confirm(`将向 ${selectedApplicants.length} 位达人发送站内信（含群二维码）。是否继续？`)) return
+    if (!groupQrImage) {
+      alert('请先上传群二维码')
+      return
+    }
     setNotifying(true)
     try {
       const reg = await fetchMpRegistry()
@@ -209,7 +243,6 @@ export default function PrOrderApplicantsPage() {
           body: `您已被 PR 选入「${orderTitle}」（单号 ${orderNo}）。请扫码加入项目群，二维码见下图。`,
           noticeType: 'selection' as const,
           pinned: true,
-          imageUrl: qr,
         })
       }
       if (!entries.length) {
@@ -223,7 +256,12 @@ export default function PrOrderApplicantsPage() {
           : '通知已发送，达人可在小程序与履约后台「消息 → 系统消息」查看。',
       )
     } catch (e) {
-      alert(e instanceof Error ? e.message : '发送失败')
+      const msg = e instanceof Error ? e.message : '发送失败'
+      if (msg.includes('group_qr_missing')) {
+        alert('群二维码未同步到服务器，请重新上传群码后再通知')
+      } else {
+        alert(msg)
+      }
     } finally {
       setNotifying(false)
     }
@@ -303,6 +341,14 @@ export default function PrOrderApplicantsPage() {
           >
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 justify-between">
               <div className="flex gap-3 min-w-0">
+                <label className="flex items-start pt-1 shrink-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1 rounded border-slate-300"
+                    checked={checkedIds.includes(String(a.id))}
+                    onChange={() => void onToggleCheck(a)}
+                  />
+                </label>
                 {a.avatar ? (
                   <img src={String(a.avatar)} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
                 ) : (
@@ -406,6 +452,16 @@ export default function PrOrderApplicantsPage() {
             <button type="button" className="px-3 py-2 rounded-lg border text-sm" disabled={exportingAll} onClick={onExportAll}>
               下载明细
             </button>
+            {checkedCount > 0 ? (
+              <button
+                type="button"
+                className="px-3 py-2 rounded-lg border border-orange-500 text-orange-700 text-sm font-medium"
+                disabled={batchConfirming || savingSelect}
+                onClick={() => void onBatchConfirm()}
+              >
+                批量确认 ({checkedCount})
+              </button>
+            ) : null}
             <button
               type="button"
               className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm ml-auto"

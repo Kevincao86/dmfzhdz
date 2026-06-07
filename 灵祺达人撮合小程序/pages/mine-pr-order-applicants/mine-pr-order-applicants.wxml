@@ -30,6 +30,13 @@
   >
     <view class="applicant-card-v2__top">
       <view class="applicant-card-v2__top-main">
+        <view
+          class="applicant-card-v2__check {{checkedIds.indexOf(item.id) >= 0 ? 'applicant-card-v2__check--on' : ''}}"
+          data-id="{{item.id}}"
+          catchtap="onToggleCheck"
+        >
+          <text wx:if="{{checkedIds.indexOf(item.id) >= 0}}">✓</text>
+        </view>
         <image
           wx:if="{{item.avatar}}"
           class="applicant-card-v2__avatar"
@@ -116,6 +123,12 @@
   <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0}}">
     <view class="pr-app-toolbar">
       <button class="pr-app-tool-btn" bindtap="onViewSelected">查看已选名单</button>
+      <button
+        wx:if="{{checkedCount > 0}}"
+        class="pr-app-tool-btn pr-app-tool-btn--batch"
+        loading="{{batchConfirming}}"
+        bindtap="onBatchConfirm"
+      >批量确认 ({{checkedCount}})</button>
       <button
         class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
         loading="{{groupQrUploading}}"
