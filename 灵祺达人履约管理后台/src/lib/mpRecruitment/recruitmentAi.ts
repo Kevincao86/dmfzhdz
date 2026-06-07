@@ -9,7 +9,10 @@ import { getWorkIdentity, workIdentityLabel, type MpWorkIdentity } from '../mpWo
 import {
   applicationHabitsFromApps,
   applyOrderMatchResults,
+  clampTalentScoreForOrders,
+  fallbackOrderMatchScore,
   mergeCardAiTags,
+  talentMatchCacheKey,
   type ApplicationHabits,
   type OrderMatchPayload,
   type TalentMatchProfile,
@@ -63,6 +66,7 @@ export function talentProfileFromMember(
         ? ['剪辑', '后期', '云剪']
         : []
   return {
+    id: String(member.id || '').trim(),
     workIdentity: identity,
     role: identity,
     roleLabel: workIdentityLabel(identity),
@@ -102,6 +106,71 @@ function chunk<T>(list: T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size))
   return out
+}
+
+const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v2'
+const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
+
+function readWebMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
+  try {
+    const raw = sessionStorage.getItem(WEB_MATCH_CACHE_KEY)
+    if (!raw) return {}
+    const j = JSON.parse(raw) as { expiresAt?: number; data?: Record<string, Record<string, { score: number; tag: string; tone: string }>> }
+    if (j.expiresAt && Date.now() > j.expiresAt) return {}
+    return j.data && typeof j.data === 'object' ? j.data : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeWebMatchCache(data: Record<string, Record<string, { score: number; tag: string; tone: string }>>) {
+  try {
+    sessionStorage.setItem(
+      WEB_MATCH_CACHE_KEY,
+      JSON.stringify({ expiresAt: Date.now() + WEB_MATCH_CACHE_TTL_MS, data }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+async function fetchOrderMatchMap(
+  list: RecruitmentOrderRow[],
+  talent: TalentMatchProfile,
+): Promise<Record<string, { score: number; tag: string; tone: string }>> {
+  const suffix = talentMatchCacheKey(talent)
+  const cache = readWebMatchCache()
+  const bucket = cache[suffix] && typeof cache[suffix] === 'object' ? { ...cache[suffix] } : {}
+  const missing: RecruitmentOrderRow[] = []
+  const map: Record<string, { score: number; tag: string; tone: string }> = {}
+  for (const row of list) {
+    const ck = `${row.id}:${hallKey(row)}`
+    if (bucket[ck]) map[row.id] = bucket[ck]
+    else missing.push(row)
+  }
+  for (const part of chunk(missing, 8)) {
+    try {
+      const res = await postMpRecruitmentAi({ mode: 'match', orders: part.map(orderAiPayload), talent })
+      const items = Array.isArray(res.items) ? res.items : []
+      for (const it of items) {
+        if (!it?.id) continue
+        map[String(it.id)] = {
+          score: Number(it.score) || 0,
+          tag: String(it.tag || ''),
+          tone: String(it.tone || 'default'),
+        }
+      }
+      for (const row of part) {
+        const ck = `${row.id}:${hallKey(row)}`
+        if (map[row.id]) bucket[ck] = map[row.id]
+      }
+    } catch {
+      break
+    }
+  }
+  cache[suffix] = bucket
+  writeWebMatchCache(cache)
+  return map
 }
 
 export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = '') {
@@ -145,23 +214,7 @@ export async function enrichOrderMatches(
     return tagged.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
   }
 
-  const map: Record<string, { score: number; tag: string; tone: string }> = {}
-  for (const part of chunk(list, 8)) {
-    try {
-      const res = await postMpRecruitmentAi({ mode: 'match', orders: part.map(orderAiPayload), talent })
-      const items = Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (!it?.id) continue
-        map[String(it.id)] = {
-          score: Number(it.score) || 0,
-          tag: String(it.tag || ''),
-          tone: String(it.tone || 'default'),
-        }
-      }
-    } catch {
-      break
-    }
-  }
+  const map = await fetchOrderMatchMap(list, talent)
   const scored = applyOrderMatchResults(list, map, talent, talentCity)
   const tagged = await tagPromise
   const enriched = mergeCardAiTags(scored, tagged)
@@ -212,41 +265,28 @@ export function fallbackTalentScore(
   board?: PrBoardId,
 ): { score: number; tag: string; tone: string } {
   if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
+  const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+  const parts = String(talent.region || '')
+    .split('·')
+    .map((s) => s.trim())
+  const profile: TalentMatchProfile = {
+    workIdentity: wid,
+    platform: talent.platform,
+    followers: talent.followersRaw,
+    city: parts[1] || parts[0] || '',
+    province: parts[0] || '',
+    accountTags: [...(talent.accountTags || []), ...(talent.tags || [])],
+  }
   let best = 0
   let tag = '可沟通'
-  const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
   for (const o of orderPayloads) {
-    let s = 38
-    const plat = String(o.platform || '')
-    const tPlat = String(talent.platform || '')
-    if (plat && tPlat && plat === tPlat) s += 18
-    const region = String(o.region || '')
-    const tRegion = String(talent.region || '')
-    if (region.includes('全国')) s += 6
-    else if (tRegion && region.includes(tRegion.split('·')[0]?.trim() || '')) s += 16
-    const target = String(o.recruitTarget || 'talent')
-    if (target === wid) s += 14
-    else if (target !== wid) s -= 18
-    const needTags = (o.talentTags as string[]) || []
-    const tTags = [...(talent.tags || []), ...(talent.accountTags || [])]
-    if (needTags.length && tTags.some((t) => needTags.includes(t))) s += 14
-    const fansReq = String(o.fansRequirement || o.fans || '')
-    const f = Number(talent.followersRaw) || 0
-    if (fansReq.includes('不限')) s += 10
-    else {
-      const fm = fansReq.match(/([\d.]+)\s*万/)
-      const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
-      if (need > 0 && f >= need) s += 12
-    }
-    if ((o.priceAmount as number) >= 500) s += 4
-    if (s > best) {
-      best = s
-      if (s >= 78) tag = '高匹配'
-      else if (s >= 65) tag = '较契合'
-      else if (plat === tPlat) tag = '平台匹配'
+    const fb = fallbackOrderMatchScore(o as OrderMatchPayload, profile)
+    if (fb.score > best) {
+      best = fb.score
+      tag = fb.tag
     }
   }
-  return { score: Math.min(90, best), tag, tone: best >= 65 ? 'match' : 'default' }
+  return { score: best, tag, tone: best >= 58 ? 'match' : 'default' }
 }
 
 function talentAiPayload(row: TalentCardRow, board?: PrBoardId) {
@@ -312,11 +352,27 @@ export async function enrichTalentMatchesForPr(
     .map((t) => {
       const hit = map[t.id]
       if (hit && hit.score > 0) {
-        const score = Math.min(100, Math.round(hit.score))
+        const parts = String(t.region || '')
+          .split('·')
+          .map((s) => s.trim())
+        const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+        const profile: TalentMatchProfile = {
+          workIdentity: wid,
+          platform: t.platform,
+          followers: t.followersRaw,
+          city: parts[1] || parts[0] || '',
+          province: parts[0] || '',
+          accountTags: [...(t.accountTags || []), ...(t.tags || [])],
+        }
+        const score = clampTalentScoreForOrders(
+          Math.min(100, Math.round(hit.score)),
+          orderPayloads as OrderMatchPayload[],
+          profile,
+        )
         return {
           ...t,
           matchScore: score,
-          aiTag: hit.tag || (score >= 75 ? '高匹配' : t.aiTag),
+          aiTag: hit.tag || (score >= 72 ? '高匹配' : t.aiTag),
           aiTagTone: hit.tone,
           aiMatch: score >= 55,
           aiTagSource: 'ai' as const,

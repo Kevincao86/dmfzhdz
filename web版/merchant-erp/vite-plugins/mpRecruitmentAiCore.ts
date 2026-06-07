@@ -1,5 +1,11 @@
 import type { AIProvider } from '../src/services/ai/types.js'
 import { routeAiChat } from './aiGateway/chatRouter.js'
+import {
+  clampMatchScoreByFacts,
+  clampTalentScoreForOrders,
+  type OrderMatchPayload,
+  type TalentMatchProfile,
+} from '../src/lib/mpRecruitmentMatchShared.js'
 
 export type MpRecruitmentAiOrderInput = {
   id: string
@@ -42,10 +48,14 @@ export type MpRecruitmentAiTalentInput = {
   applicationHabits?: Record<string, unknown>
 }
 
-const MATCH_SCORE_GUIDE = `评分维度（合计 100）：
-1) 平台一致 0-20；2) 城市/区域 0-20；3) 类目与达人标签契合 0-20；
-4) 报价/预算与身份（达人/拍摄/剪辑）匹配 0-15；5) 粉丝/带货等级是否达标 0-15；
-6) 招募描述与达人/团队能力、历史报名习惯 0-10。明显不符应低于 40。`
+const MATCH_SCORE_GUIDE = `严格评分（0-100，禁止普遍给高分）：
+- 平台一致最多 20 分；平台不同通常总分 ≤42
+- 城市/区域：同城 +20、同省 +12、全国商单 +6；跨城不匹配通常 ≤48，不得因平台相同就给 80+
+- 类目与达人标签契合 0-20；无相关标签应 ≤55
+- 报价/预算与身份匹配 0-15
+- 粉丝/带货等级达标 0-15；明显不达标 ≤44
+- 描述与能力/报名习惯 0-10
+参考：仅平台相同且跨城 30-48；同城+平台+部分标签 55-68；多项契合 72-88；招募对象不符 ≤28`
 
 function compactTalent(t: MpRecruitmentAiTalentInput): Record<string, unknown> {
   return {
@@ -181,6 +191,7 @@ async function callLlm(
   provider: AIProvider,
   system: string,
   user: string,
+  temperature = 0.2,
 ): Promise<string> {
   const res = await routeAiChat(
     {
@@ -189,7 +200,7 @@ async function callLlm(
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      temperature: 0.2,
+      temperature,
       stream: false,
     },
     env,
@@ -202,13 +213,14 @@ async function callLlmWithFallback(
   preferred: string | undefined,
   system: string,
   user: string,
+  temperature = 0.2,
 ): Promise<{ text: string; provider: AIProvider }> {
   const chain = providerChain(env, preferred)
   if (!chain.length) throw new Error('ai_not_configured')
   let lastErr = ''
   for (const provider of chain) {
     try {
-      const text = await callLlm(env, provider, system, user)
+      const text = await callLlm(env, provider, system, user, temperature)
       if (text) return { text, provider }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
@@ -216,6 +228,33 @@ async function callLlmWithFallback(
     }
   }
   throw new Error(lastErr || 'all_providers_quota_exhausted')
+}
+
+function clampMatchItemsForTalent(
+  items: Array<{ id: string; score: number; tag: string; tone: string }>,
+  orders: MpRecruitmentAiOrderInput[],
+  talent: TalentMatchProfile,
+) {
+  const orderMap = new Map(orders.map((o) => [o.id, o as OrderMatchPayload]))
+  return items.map((item) => {
+    const order = orderMap.get(item.id)
+    if (!order) return item
+    return { ...item, score: clampMatchScoreByFacts(item.score, order, talent) }
+  })
+}
+
+function clampMatchItemsForOrders(
+  items: Array<{ id: string; score: number; tag: string; tone: string }>,
+  orders: MpRecruitmentAiOrderInput[],
+  talents: MpRecruitmentAiTalentInput[],
+) {
+  const talentMap = new Map(talents.map((t) => [String(t.id || ''), t as TalentMatchProfile]))
+  const orderPayloads = orders.map((o) => o as OrderMatchPayload)
+  return items.map((item) => {
+    const talent = talentMap.get(item.id)
+    if (!talent) return item
+    return { ...item, score: clampTalentScoreForOrders(item.score, orderPayloads, talent) }
+  })
 }
 
 export async function runMpRecruitmentAiCore(
@@ -274,11 +313,12 @@ ${MATCH_SCORE_GUIDE}
 
 候选列表（含 workIdentity、标签、报价、等级、技能）：${talentJson}
 
-请为每位候选打分，按与发单需求的最佳匹配度排序思路给出 score。`
-      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
-      const items = extractJsonArray(text)
+请为每位候选打分，按与发单需求的最佳匹配度排序思路给出 score。跨城、平台不符须低分。`
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0)
+      const rawItems = extractJsonArray(text)
         .map(normalizeMatchItem)
         .filter((x): x is NonNullable<typeof x> => !!x)
+      const items = clampMatchItemsForOrders(rawItems, orders, talents)
       return { status: 200, body: { ok: true, provider, mode: 'match_talent', items } }
     }
 
@@ -291,11 +331,12 @@ ${MATCH_SCORE_GUIDE}
 
 商单列表（含平台、城市、类目、预算、粉丝要求、招募对象 recruitTarget、描述 summary）：${orderJson}
 
-请为每条商单打分；score 越高表示越适合该候选接单/报名。`
-      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
-      const items = extractJsonArray(text)
+请为每条商单打分；跨城且类目不相关通常 30-48，勿因平台相同就给 80+。`
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0)
+      const rawItems = extractJsonArray(text)
         .map(normalizeMatchItem)
         .filter((x): x is NonNullable<typeof x> => !!x)
+      const items = clampMatchItemsForTalent(rawItems, orders, body.talent || {})
       return { status: 200, body: { ok: true, provider, mode: 'match', items } }
     }
 
