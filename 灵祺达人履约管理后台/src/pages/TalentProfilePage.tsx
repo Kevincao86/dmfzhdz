@@ -11,6 +11,7 @@ import {
   type PlatformProfile,
   type TalentMember,
 } from '../lib/mpSync/talentPlatformProfiles'
+import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
@@ -52,13 +53,27 @@ export default function TalentProfilePage() {
         setSession(getToken(), account)
         setLoginName(account.loginName || '')
         setHasPassword(!!account.hasPassword)
-        if (account.lingqiTalentId) {
-          setMember((m) => ({
-            ...m,
-            lingqiTalentId: account.lingqiTalentId || m.lingqiTalentId,
-            id: account.registryMemberId || m.id,
-          }))
-        }
+        return pullRegistryProfileAfterLogin()
+      })
+      .then(() => {
+        const prev = readMember()
+        const acc = getAccount()
+        const wx = readWxAccount()
+        if (!prev && !acc) return
+        const profiles = prev?.platformProfiles || emptyAllProfiles()
+        setMember({
+          id: prev?.id || acc?.registryMemberId || `MTM-${Date.now()}`,
+          lingqiTalentId: prev?.lingqiTalentId || acc?.lingqiTalentId || '',
+          wxNickName: prev?.wxNickName || wx?.wxNickName || acc?.wxNickName || '',
+          wxAvatarUrl: prev?.wxAvatarUrl || wx?.wxAvatarUrl || '',
+          contact: prev?.contact || acc?.loginName || '',
+          wechatId: prev?.wechatId || acc?.loginName || '',
+          alipayAccount: prev?.alipayAccount || '',
+          province: prev?.province || '',
+          city: prev?.city || '',
+          platformProfiles: profiles,
+          registeredAt: prev?.registeredAt,
+        })
       })
       .catch(() => {})
   }, [])

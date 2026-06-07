@@ -4,7 +4,6 @@
 const ecs = require('./ecs.js')
 const sessionStore = require('./mpSessionStore.js')
 const scope = require('./mpAccountLocalScope.js')
-const clientStateGuard = require('./mpClientStateGuard.js')
 const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
 
@@ -75,23 +74,11 @@ function applyRemoteState(state) {
   const appKey = scope.scopedStorageKey(APPLICATIONS_BASE, account)
   const pubKey = scope.scopedStorageKey(PUBLISH_BASE, account)
 
-  if (
-    state.talentMemberDraft &&
-    typeof state.talentMemberDraft === 'object' &&
-    clientStateGuard.talentDraftBelongsToAccount(state.talentMemberDraft, account)
-  ) {
-    memberStore.writeMember(state.talentMemberDraft)
-  } else if (state.talentMemberDraft) {
-    console.warn('[mp] skip_talent_member_draft: account_mismatch')
+  if (state.talentMemberDraft) {
+    console.warn('[mp] skip_talent_member_draft: use_registry_profile')
   }
-  if (
-    state.prProfileDraft &&
-    typeof state.prProfileDraft === 'object' &&
-    clientStateGuard.prDraftBelongsToAccount(state.prProfileDraft, account)
-  ) {
-    userProfile.writePrProfile(state.prProfileDraft)
-  } else if (state.prProfileDraft) {
-    console.warn('[mp] skip_pr_profile_draft: account_mismatch')
+  if (state.prProfileDraft) {
+    console.warn('[mp] skip_pr_profile_draft: use_registry_profile')
   }
   if (Array.isArray(state.applications)) {
     writeJson(appKey, state.applications.slice(0, 80))

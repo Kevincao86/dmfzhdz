@@ -1,4 +1,3 @@
-import { syncLocalProfilesFromAccount } from './accountMemberSync'
 import { onAccountLogin, onAccountLogout } from './mpAccountLocalScope'
 
 export type MpAccountRole = 'talent' | 'pr'
@@ -66,8 +65,10 @@ export function setSession(token: string, account: MpAccount) {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
   localStorage.setItem(ROLE_KEY, account.activeRole)
   onAccountLogin(account)
-  syncLocalProfilesFromAccount(account)
-  import('./mpAccountClientSync').then((m) => m.pullClientStateAfterLogin()).catch(() => {})
+  void import('./registryProfileSync')
+    .then((m) => m.pullRegistryProfileAfterLogin())
+    .then(() => import('./mpAccountClientSync').then((c) => c.pullClientStateAfterLogin()))
+    .catch(() => {})
 }
 
 export function getAccount(): MpAccount | null {

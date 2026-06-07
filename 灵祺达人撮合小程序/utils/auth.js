@@ -8,10 +8,17 @@ const { SESSION_KEY, ACCOUNT_KEY, readSessionToken, readAccount } = sessionStore
 function writeSession(token, account) {
   sessionStore.writeSessionPair(token, account)
   mpAccountLocalScope.onAccountLogin(account)
-  accountMemberSync.syncLocalProfilesFromAccount(account)
-  try {
-    require('./mpAccountClientSync.js').pullAfterLogin()
-  } catch (_) {}
+  const registryProfileSync = require('./registryProfileSync.js')
+  void registryProfileSync
+    .pullRegistryProfileAfterLogin()
+    .then(() => {
+      try {
+        return require('./mpAccountClientSync.js').pullAfterLogin()
+      } catch (_) {
+        return null
+      }
+    })
+    .catch(() => {})
 }
 
 function clearSession() {

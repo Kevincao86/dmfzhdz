@@ -255,6 +255,24 @@ export async function registerTalentMember(member: Record<string, unknown>) {
   )
 }
 
+/** 从注册表数据库拉取当前账号达人/PR/团队资料（权威数据源） */
+export async function fetchRegistryProfile(): Promise<{
+  talentMember: Record<string, unknown> | null
+  prProfile: Record<string, unknown> | null
+}> {
+  const data = await mpAuthRequest('registry_profile_get', {})
+  return {
+    talentMember:
+      data.talentMember && typeof data.talentMember === 'object'
+        ? (data.talentMember as Record<string, unknown>)
+        : null,
+    prProfile:
+      data.prProfile && typeof data.prProfile === 'object'
+        ? (data.prProfile as Record<string, unknown>)
+        : null,
+  }
+}
+
 /** 本机态与云端合并同步（报名/草稿/通知） */
 export async function syncClientState(state: Record<string, unknown>) {
   const data = await mpAuthRequest('client_state_sync', { state })

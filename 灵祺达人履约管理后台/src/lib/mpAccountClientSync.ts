@@ -6,9 +6,8 @@ import {
   PUBLISH_BASE,
 } from './mpSync/applicationsStore'
 import { scopedStorageKey } from './mpAccountLocalScope'
-import { prDraftBelongsToAccount, talentDraftBelongsToAccount } from './mpClientStateGuard'
-import { readMember, writeMember } from './mpSync/talentMember'
-import { readPrProfile, writePrProfile } from './mpSync/userProfile'
+import { readMember } from './mpSync/talentMember'
+import { readPrProfile } from './mpSync/userProfile'
 
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
@@ -76,23 +75,12 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   const appKey = scopedStorageKey(APPLICATIONS_BASE, account)
   const pubKey = scopedStorageKey(PUBLISH_BASE, account)
 
-  if (
-    state.talentMemberDraft &&
-    typeof state.talentMemberDraft === 'object' &&
-    talentDraftBelongsToAccount(state.talentMemberDraft, account)
-  ) {
-    writeMember(state.talentMemberDraft as never)
-  } else if (state.talentMemberDraft) {
-    console.warn('[fulfillment] skip_talent_member_draft: account_mismatch')
+  // 达人/PR/团队资料以 registry_profile_get（注册表数据库）为准，client_state 仅同步报名/通知等事务数据
+  if (state.talentMemberDraft) {
+    console.warn('[fulfillment] skip_talent_member_draft: use_registry_profile')
   }
-  if (
-    state.prProfileDraft &&
-    typeof state.prProfileDraft === 'object' &&
-    prDraftBelongsToAccount(state.prProfileDraft, account)
-  ) {
-    writePrProfile(state.prProfileDraft as never)
-  } else if (state.prProfileDraft) {
-    console.warn('[fulfillment] skip_pr_profile_draft: account_mismatch')
+  if (state.prProfileDraft) {
+    console.warn('[fulfillment] skip_pr_profile_draft: use_registry_profile')
   }
   if (Array.isArray(state.applications)) {
     writeJson(appKey, state.applications.slice(0, 80))
