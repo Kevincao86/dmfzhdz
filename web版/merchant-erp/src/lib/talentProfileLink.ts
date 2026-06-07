@@ -14,7 +14,7 @@ export function extractProfileLinkUrl(raw: unknown): string {
   return ''
 }
 
-export function resolveTalentProfileHref(platform: string, rawLink: unknown): string {
+export function resolveTalentProfileHref(_platform: string, rawLink: unknown): string {
   const url = extractProfileLinkUrl(rawLink)
   if (!url) return ''
   return url

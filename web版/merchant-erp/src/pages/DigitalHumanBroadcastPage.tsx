@@ -94,6 +94,8 @@ export default function DigitalHumanBroadcastPage() {
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null)
   const [previewVideoTitle, setPreviewVideoTitle] = useState('')
   const renderInflightRef = useRef<Set<string>>(new Set())
+  const submitRenderLockRef = useRef(false)
+  const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
@@ -403,6 +405,10 @@ export default function DigitalHumanBroadcastPage() {
   }
 
   const submitRender = async () => {
+    if (submitRenderLockRef.current) return
+    submitRenderLockRef.current = true
+    setSubmitRenderBusy(true)
+    try {
     const cfg = await fetchVideoAiConfig()
     if (cfg?.configLoadError) {
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
@@ -422,7 +428,24 @@ export default function DigitalHumanBroadcastPage() {
 
     const reuseId = editingWorkId?.trim() || null
     const prev = reuseId ? loadDigitalHumanWorks().find((w) => w.id === reuseId) : null
-    const id = reuseId ?? `dh-${Date.now()}`
+    const scriptKey = draft.script.trim()
+    const titleNow = workTitleFromDraft(draft)
+    const inflight = loadDigitalHumanWorks().find(
+      (w) =>
+        (w.status === 'queued' || w.status === 'rendering') &&
+        w.title === titleNow &&
+        w.draft.script.trim() === scriptKey,
+    )
+    if (inflight && !reuseId) {
+      setRenderJobId(inflight.id)
+      setToast('相同口播已在队列中渲染，请勿重复提交')
+      return
+    }
+    const id =
+      reuseId ??
+      (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? `dh-${crypto.randomUUID()}`
+        : `dh-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`)
     if (prev?.outputBlobUrl?.startsWith('blob:')) {
       try {
         URL.revokeObjectURL(prev.outputBlobUrl)
@@ -460,6 +483,10 @@ export default function DigitalHumanBroadcastPage() {
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
           : '已提交高清 MP4 渲染（豆包/可灵视频模型）',
     )
+    } finally {
+      submitRenderLockRef.current = false
+      setSubmitRenderBusy(false)
+    }
   }
 
   const loadWorkForEdit = (w: DigitalHumanWork) => {
@@ -1251,13 +1278,20 @@ export default function DigitalHumanBroadcastPage() {
                   ) ? (
                     <button
                       type="button"
-                      onClick={submitRender}
-                      className="flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-700"
+                      disabled={submitRenderBusy}
+                      onClick={() => void submitRender()}
+                      className="flex items-center gap-2 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <Clapperboard className="h-5 w-5" />
-                      {editingWorkId || activeJob?.status === 'failed'
-                        ? '重新提交渲染'
-                        : '提交后台渲染'}
+                      {submitRenderBusy ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Clapperboard className="h-5 w-5" />
+                      )}
+                      {submitRenderBusy
+                        ? '提交中…'
+                        : editingWorkId || activeJob?.status === 'failed'
+                          ? '重新提交渲染'
+                          : '提交后台渲染'}
                     </button>
                   ) : null}
                 </section>
