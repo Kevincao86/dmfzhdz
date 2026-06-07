@@ -23,7 +23,7 @@ function switchAccount() {
 function logout() {
   wx.showModal({
     title: '退出登录',
-    content: '退出后需重新登录才能报名、私信与同步云端资料。',
+    content: '退出后将清除本机全部报名、资料与消息缓存，避免串到其他账号；需重新登录。',
     confirmText: '退出',
     confirmColor: '#dc2626',
     success(res) {

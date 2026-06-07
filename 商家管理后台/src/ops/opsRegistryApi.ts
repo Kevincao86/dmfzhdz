@@ -3,6 +3,7 @@
  * 线上：浏览器优先经 ECS /erp-api 读写 Supabase 快照（Vercel Function 无法访问 ECS）。
  */
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+import type { RecruitmentPlatform } from '../meooRegistryShared/recruitmentInfoFilter.js'
 export type RegistryTenantSource = 'erp' | 'ops_manual' | 'supabase'
 
 export type RegistryTenant = {
@@ -80,7 +81,7 @@ export type RegistryRecruitmentOrder = {
   orderKind?: 'recruitment' | 'recruitment_ice'
   acceptMode?: 'manual' | 'miniprogram' | 'ice'
   linkedMpOrderId?: string
-  recruitmentPlatform?: '抖音' | '小红书'
+  recruitmentPlatform?: RecruitmentPlatform
   iceVideoCount?: number
   iceVideoSlots?: Array<{
     slotId: string

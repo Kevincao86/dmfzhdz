@@ -6,6 +6,7 @@ import {
   PUBLISH_BASE,
 } from './mpSync/applicationsStore'
 import { scopedStorageKey } from './mpAccountLocalScope'
+import { prDraftBelongsToAccount, talentDraftBelongsToAccount } from './mpClientStateGuard'
 import { readMember, writeMember } from './mpSync/talentMember'
 import { readPrProfile, writePrProfile } from './mpSync/userProfile'
 
@@ -75,11 +76,23 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   const appKey = scopedStorageKey(APPLICATIONS_BASE, account)
   const pubKey = scopedStorageKey(PUBLISH_BASE, account)
 
-  if (state.talentMemberDraft && typeof state.talentMemberDraft === 'object') {
+  if (
+    state.talentMemberDraft &&
+    typeof state.talentMemberDraft === 'object' &&
+    talentDraftBelongsToAccount(state.talentMemberDraft, account)
+  ) {
     writeMember(state.talentMemberDraft as never)
+  } else if (state.talentMemberDraft) {
+    console.warn('[fulfillment] skip_talent_member_draft: account_mismatch')
   }
-  if (state.prProfileDraft && typeof state.prProfileDraft === 'object') {
+  if (
+    state.prProfileDraft &&
+    typeof state.prProfileDraft === 'object' &&
+    prDraftBelongsToAccount(state.prProfileDraft, account)
+  ) {
     writePrProfile(state.prProfileDraft as never)
+  } else if (state.prProfileDraft) {
+    console.warn('[fulfillment] skip_pr_profile_draft: account_mismatch')
   }
   if (Array.isArray(state.applications)) {
     writeJson(appKey, state.applications.slice(0, 80))

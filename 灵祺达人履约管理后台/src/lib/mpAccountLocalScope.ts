@@ -24,6 +24,7 @@ const LEGACY_GLOBAL_PROFILE_KEYS = [
   'meoo_active_shoot_apply_template_v1',
   'meoo_active_edit_apply_template_v1',
   'meoo_talent_identity_v1',
+  'meoo_wx_account_v1',
   'meoo_talent_messages_v1',
   'meoo_talent_notifications_v1',
   'meoo_talent_inbox_seen_v1',
@@ -41,6 +42,7 @@ const MIGRATE_ON_FIRST_SCOPE_KEYS = [
   'meoo_active_apply_template_v1',
   'meoo_active_shoot_apply_template_v1',
   'meoo_active_edit_apply_template_v1',
+  'meoo_wx_account_v1',
 ]
 
 export function scopeIdFromAccount(account: MpAccount | null | undefined): string {
@@ -191,10 +193,31 @@ export function onAccountLogin(account: MpAccount) {
   writeLastScopeId(next)
 }
 
+/** 退出登录：清除本域所有灵祺小程序/履约 Web 本地缓存（含 scoped 资料与报名草稿） */
+export function clearAllMpBrowserCache() {
+  const prefixes = ['meoo_', 'lingqi_mp_']
+  const keys: string[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k) keys.push(k)
+    }
+  } catch {
+    return
+  }
+  for (const k of keys) {
+    if (prefixes.some((p) => k.startsWith(p))) {
+      try {
+        localStorage.removeItem(k)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
 export function onAccountLogout() {
-  clearTransactionalLocalData()
-  clearLegacyGlobalProfileKeys()
-  writeLastScopeId('')
+  clearAllMpBrowserCache()
 }
 
 export function currentScopeId(): string {

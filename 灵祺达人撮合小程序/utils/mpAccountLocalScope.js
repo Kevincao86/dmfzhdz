@@ -160,11 +160,20 @@ function onAccountLogin(account) {
   writeLastScopeId(next)
 }
 
-/** 切换账号 / 退出：清空事务数据与会话 */
+function clearAllMpBrowserCache() {
+  const prefixes = ['meoo_', 'lingqi_mp_']
+  removeStorageKeysMatching((k) => {
+    if (!k || typeof k !== 'string') return false
+    for (let i = 0; i < prefixes.length; i++) {
+      if (k.indexOf(prefixes[i]) === 0) return true
+    }
+    return false
+  })
+}
+
+/** 切换账号 / 退出：清空本机全部灵祺缓存 */
 function onAccountLogout() {
-  clearTransactionalLocalData()
-  clearLegacyGlobalProfileKeys()
-  writeLastScopeId('')
+  clearAllMpBrowserCache()
 }
 
 function currentScopeId() {
@@ -178,6 +187,7 @@ module.exports = {
   onAccountLogout,
   clearTransactionalLocalData,
   clearLegacyGlobalProfileKeys,
+  clearAllMpBrowserCache,
   migrateLegacyKeyToScoped,
   currentScopeId,
 }

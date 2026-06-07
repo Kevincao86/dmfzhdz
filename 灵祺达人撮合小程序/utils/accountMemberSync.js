@@ -28,9 +28,29 @@ function writeStableDevOpenId(openid) {
   } catch (_) {}
 }
 
+function digits11(raw) {
+  const d = String(raw == null ? '' : raw).replace(/\D/g, '')
+  return d.length === 11 ? d : ''
+}
+
+function stripMismatchedContactFields(prev, account) {
+  const loginPhone = digits11(account && account.loginName)
+  if (!loginPhone) return prev
+  const contact = digits11(prev.contact)
+  const wechat = digits11(prev.wechatId)
+  const next = { ...prev }
+  if (contact && contact !== loginPhone) {
+    next.contact = ''
+    if (wechat && wechat !== loginPhone) next.wechatId = ''
+  } else if (wechat && wechat !== loginPhone) {
+    next.wechatId = ''
+  }
+  return next
+}
+
 function syncTalentMemberFromAccount(account) {
   if (!account) return null
-  const prev = memberStore.readMember() || {}
+  const prev = stripMismatchedContactFields(memberStore.readMember() || {}, account)
   const next = {
     ...prev,
     id: String(account.registryMemberId || prev.id || '').trim(),
