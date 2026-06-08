@@ -33,25 +33,67 @@ function normalizeProfileUrl(raw) {
   return `https://${u}`
 }
 
-/** 复制链接并提示（小程序内打开外链受限） */
-function openTalentProfileLink(url, platform) {
-  const link = normalizeProfileUrl(url)
-  if (!link) {
+function resolveApplicantProfileLinkRaw(applicant, reg) {
+  if (!applicant) return ''
+  const platform = applicant.platform || '抖音'
+  const pid = talentPlatforms.platformIdFromName(platform)
+  const account = String(applicant.platformAccount || '').trim().toLowerCase()
+  const contact = String(applicant.contact || '').trim()
+
+  const fromRow = String(applicant.profileLink || '').trim()
+  if (fromRow) return fromRow
+
+  const members = Array.isArray(reg?.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (const m of members) {
+    const prof = m.platformProfiles && m.platformProfiles[pid]
+    if (prof) {
+      const profAccount = String(prof.platformAccount || '').trim().toLowerCase()
+      if (account && profAccount === account) {
+        const link = String(prof.profileLink || '').trim()
+        if (link) return link
+      }
+    }
+    if (contact && String(m.contact || '').trim() === contact && prof) {
+      const link = String(prof.profileLink || '').trim()
+      if (link) return link
+    }
+  }
+
+  const lib = Array.isArray(reg?.talentLibraryEntries) ? reg.talentLibraryEntries : []
+  for (const e of lib) {
+    if (talentPlatforms.platformIdFromName(e.platform) !== pid) continue
+    const entryAccount = String(e.platformAccount || '').trim().toLowerCase()
+    if (account && entryAccount === account) {
+      const link = String(e.profileLink || '').trim()
+      if (link) return link
+    }
+    if (contact && String(e.contact || '').trim() === contact) {
+      const link = String(e.profileLink || '').trim()
+      if (link) return link
+    }
+  }
+
+  return ''
+}
+
+/** 复制报名时填写的平台主页链接（整段口令或 URL，不做外链跳转） */
+function copyTalentProfileLink(rawLink) {
+  const text = String(rawLink || '').trim()
+  if (!text) {
     wx.showToast({ title: '未填写主页链接', icon: 'none' })
     return
   }
   wx.setClipboardData({
-    data: link,
+    data: text,
     success() {
-      const plat = platform ? `「${platform}」` : ''
-      wx.showModal({
-        title: '达人主页',
-        content: `${plat}主页链接已复制。请粘贴到微信或${plat || '对应'} App 中打开查看。`,
-        showCancel: false,
-        confirmText: '知道了',
-      })
+      wx.showToast({ title: '已复制主页链接', icon: 'success' })
     },
   })
+}
+
+/** @deprecated 小程序内仅复制链接，保留别名避免旧调用报错 */
+function openTalentProfileLink(url) {
+  copyTalentProfileLink(url)
 }
 
 function resolveApplicantAvatar(applicant, reg) {
@@ -169,7 +211,7 @@ function resolveDisplaySalesLevel(applicant, reg) {
 
 function enrichApplicantRow(applicant, index, reg) {
   const a = applicant || {}
-  const profileLink = String(a.profileLink || '').trim()
+  const profileLink = resolveApplicantProfileLinkRaw(a, reg) || String(a.profileLink || '').trim()
   const platform = a.platform || '抖音'
   const followers = a.followers != null ? a.followers : '—'
   let fansText = followers
@@ -261,6 +303,8 @@ module.exports = {
   statusLabel,
   hallLabelFromMp,
   normalizeProfileUrl,
+  resolveApplicantProfileLinkRaw,
+  copyTalentProfileLink,
   openTalentProfileLink,
   resolveApplicantAvatar,
   enrichApplicantRow,
