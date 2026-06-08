@@ -208,6 +208,7 @@ Page({
     heroHeadStyle: '',
     scrollIntoView: '',
     scrollWithAnimation: false,
+    formScrollTop: 0,
     lastScrollAnchor: '',
     applyFormDisplayText: '',
     applyFormPlaceholder: true,
@@ -250,6 +251,18 @@ Page({
   /** 填写表单及子页全屏时隐藏 TabBar */
   syncTabBarOverlay() {
     setTabBarHidden(this, this.data.step === 'form')
+  },
+  /** 进入表单或重新选模式时回到顶部（避免 scroll-into-view / scroll-top 残留） */
+  resetFormScrollToTop() {
+    this.setData({
+      scrollIntoView: 'field-delivery-window',
+      scrollWithAnimation: false,
+      lastScrollAnchor: '',
+      formScrollTop: 0,
+    })
+    setTimeout(() => {
+      this.setData({ scrollIntoView: '', formScrollTop: 0 })
+    }, 80)
   },
   syncDeadlineFromParts() {
     const d = this.data.signupDeadlineDate
@@ -632,6 +645,7 @@ Page({
       })
       this.syncDisplayFields()
       this.syncTabBarOverlay()
+      this.resetFormScrollToTop()
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
       setTimeout(() => wx.navigateBack(), 800)
@@ -718,9 +732,11 @@ Page({
       patch['form.applyFormFields'] = livePublishForm.defaultLiveApplyFields()
       patch['form.applyFormTemplateName'] = '直播达人报名默认项'
     }
-    this.setData(patch)
-    this.syncDisplayFields()
-    this.syncTabBarOverlay()
+    this.setData(patch, () => {
+      this.syncDisplayFields()
+      this.syncTabBarOverlay()
+      this.resetFormScrollToTop()
+    })
   },
   onBackToMode() {
     if (this.data.isEditMode) {
@@ -734,7 +750,7 @@ Page({
       wx.switchTab({ url: '/pages/mine/mine' })
       return
     }
-    this.setData({ step: 'mode' })
+    this.setData({ step: 'mode', scrollIntoView: '', lastScrollAnchor: '', formScrollTop: 0 })
   },
   onFieldInput(e) {
     const key = e.currentTarget.dataset.key
