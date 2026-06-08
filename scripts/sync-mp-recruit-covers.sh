@@ -45,4 +45,8 @@ PY
 
 node "$ROOT/scripts/generate-mp-cover-asset-registry.js"
 
+if [[ "${UPLOAD_OSS:-}" == "1" ]]; then
+  node "$ROOT/scripts/upload-mp-recruit-covers-oss.js"
+fi
+
 node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"

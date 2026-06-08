@@ -1,77 +1,53 @@
 const manifest = require('./recruitCoverLibrary.manifest.js')
 const config = require('./config.js')
 
-/** 封面图走星选 Web CDN，不打包进小程序主包 */
-const MP_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')}/`
+/** 星选 Web / ECS 静态目录（备案后可用） */
+const WEB_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')}/`
 
-/** 小程序封面分包（高压缩 JPEG，与星选 Web CDN 分离） */
-const MP_COVER_SUBPACK = 'recruitCoversMp'
-const MP_COVER_BUNDLE_ROOT = '/packages/recruit-covers-mp'
-const MP_COVER_REGISTRY = '/packages/recruit-covers-mp/coverAssetRegistry.js'
-
-/** 分包 load 后由 require 解析出的真实本地路径（上传版与预览一致） */
-let bundleUrlByPath = null
-let bundleLoadPromise = null
-
-function useCoverBundle() {
-  if (config.MP_COVER_USE_CDN === true && !config.MP_USE_CLOUD_PROXY) return false
-  return true
+function readOssCoverBase() {
+  if (config.MP_COVER_OSS_BASE) {
+    return String(config.MP_COVER_OSS_BASE).replace(/\/$/, '')
+  }
+  try {
+    const base = require('./recruitCoverOssBase.js')
+    if (base && String(base).trim().startsWith('http')) return String(base).trim().replace(/\/$/, '')
+  } catch (_) {}
+  return ''
 }
 
-function loadBundleUrlMap() {
-  if (bundleUrlByPath) return bundleUrlByPath
-  try {
-    const mod = require(MP_COVER_REGISTRY)
-    bundleUrlByPath = mod && (mod.byPath || mod)
-  } catch (_) {
-    bundleUrlByPath = null
-  }
-  return bundleUrlByPath
+/** 小程序封面默认走 OSS 公网 URL；仅显式 MP_COVER_USE_BUNDLE 时走本地分包 */
+function useCoverBundle() {
+  if (config.MP_COVER_USE_BUNDLE === true) return true
+  if (readOssCoverBase()) return false
+  if (config.MP_COVER_USE_CDN === true) return false
+  return false
+}
+
+function mpCoverRoot() {
+  const oss = readOssCoverBase()
+  if (oss && !useCoverBundle()) return `${oss}/`
+  if (!useCoverBundle()) return WEB_COVER_ROOT
+  return '/packages/recruit-covers-mp/'
 }
 
 function mpAssetUrl(relPath) {
   const rel = String(relPath || '').replace(/^\/+/, '')
-  if (useCoverBundle()) {
-    const map = bundleUrlByPath || loadBundleUrlMap()
-    if (map && map[rel]) return map[rel]
-    return `${MP_COVER_BUNDLE_ROOT}/${rel}`
-  }
-  return `${MP_COVER_ROOT}${rel}`
+  return `${mpCoverRoot()}${rel}`
 }
 
 function loadCoverSubpackages() {
   if (!useCoverBundle()) return Promise.resolve()
-  if (bundleLoadPromise) return bundleLoadPromise
-  bundleLoadPromise = new Promise((resolve, reject) => {
-    const onReady = () => {
-      loadBundleUrlMap()
+  return new Promise((resolve, reject) => {
+    if (typeof wx.loadSubpackage !== 'function') {
       resolve()
-    }
-    if (typeof wx.loadSubpackage === 'function') {
-      wx.loadSubpackage({
-        name: MP_COVER_SUBPACK,
-        success: onReady,
-        fail: (err) => {
-          bundleLoadPromise = null
-          reject(new Error((err && err.errMsg) || '封面分包加载失败'))
-        },
-      })
       return
     }
-    if (typeof wx.preloadSubpackage === 'function') {
-      wx.preloadSubpackage({
-        name: MP_COVER_SUBPACK,
-        success: onReady,
-        fail: (err) => {
-          bundleLoadPromise = null
-          reject(new Error((err && err.errMsg) || '封面分包预加载失败'))
-        },
-      })
-      return
-    }
-    onReady()
+    wx.loadSubpackage({
+      name: 'recruitCoversMp',
+      success: () => resolve(),
+      fail: (err) => reject(new Error((err && err.errMsg) || '封面分包加载失败')),
+    })
   })
-  return bundleLoadPromise
 }
 
 function preloadCoverSubpackages() {
@@ -160,14 +136,24 @@ function resolveDefaultCover(platform, talentTags) {
     const tagCovers = getTagCovers(tag)
     if (tagCovers.length) return tagCovers[0]
   }
-  return getPlatformCovers('抖音')[0] || { id: 'platform-douyin-1', path: 'platforms/douyin-1.jpg', url: mpAssetUrl('platforms/douyin-1.jpg'), label: '默认封面' }
+  return (
+    getPlatformCovers('抖音')[0] || {
+      id: 'platform-douyin-1',
+      path: 'platforms/douyin-1.jpg',
+      url: mpAssetUrl('platforms/douyin-1.jpg'),
+      label: '默认封面',
+    }
+  )
 }
 
-function remapCdnCoverToBundle(url) {
+function remapStoredCoverUrl(url) {
   const s = String(url || '').trim()
+  if (!s) return ''
   const m = s.match(/\/recruit-covers\/((?:platforms|tags)\/[^?#]+)/i)
-  if (m && useCoverBundle()) return mpAssetUrl(m[1])
-  return ''
+  if (m) return mpAssetUrl(m[1])
+  const m2 = s.match(/\/mp-recruit-covers\/((?:platforms|tags)\/[^?#]+)/i)
+  if (m2) return mpAssetUrl(m2[1])
+  return s
 }
 
 function coverImageFromOrder(order) {
@@ -184,16 +170,13 @@ function resolveOrderCoverUrl(order) {
     if (hit) return hit.url
   }
   const custom = coverImageFromOrder(order)
-  if (custom) {
-    const bundled = remapCdnCoverToBundle(custom)
-    return bundled || custom
-  }
+  if (custom) return remapStoredCoverUrl(custom)
   const platform = String(order.platform || meta.platform || '').trim()
   const tags = Array.isArray(meta.talentTags) ? meta.talentTags : []
   return resolveDefaultCover(platform, tags).url
 }
 
-/** 微信分享 imageUrl：包内路径 / https；data URL 需先落盘 */
+/** 微信分享 imageUrl：https OSS / 包内路径 / data URL */
 function resolveShareImageUrl(coverUrl) {
   const img = String(coverUrl || '').trim()
   if (!img) return ''
@@ -232,10 +215,9 @@ function buildCoverFieldsForOrder(form) {
 
 module.exports = {
   manifest,
-  MP_COVER_ROOT,
-  MP_COVER_SUBPACK,
-  MP_COVER_BUNDLE_ROOT,
+  WEB_COVER_ROOT,
   useCoverBundle,
+  mpCoverRoot,
   mpAssetUrl,
   preloadCoverSubpackages,
   loadCoverSubpackages,
@@ -252,4 +234,5 @@ module.exports = {
   resolveOrderCoverUrl,
   resolveShareImageUrl,
   buildCoverFieldsForOrder,
+  readOssCoverBase,
 }
