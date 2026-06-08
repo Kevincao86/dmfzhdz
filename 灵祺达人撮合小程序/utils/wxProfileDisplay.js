@@ -1,4 +1,5 @@
 const PLACEHOLDER_NICKS = new Set(['', '微信用户', '用户', '灵祺用户'])
+const CACHE_KEY = 'meoo_wx_profile_cache_v1'
 
 function isPlaceholderWxNick(name) {
   return PLACEHOLDER_NICKS.has(String(name || '').trim())
@@ -77,10 +78,62 @@ async function persistWxAvatarUrl(url) {
   }
 }
 
+function readWxProfileCache() {
+  try {
+    const raw = wx.getStorageSync(CACHE_KEY)
+    if (!raw) return null
+    const o = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return o && typeof o === 'object' ? o : null
+  } catch {
+    return null
+  }
+}
+
+function writeWxProfileCache(patch) {
+  const prev = readWxProfileCache()
+  const next = {
+    wxNickName: pickWxNick(patch && patch.wxNickName, prev && prev.wxNickName),
+    wxAvatarUrl: pickWxAvatar(patch && patch.wxAvatarUrl, prev && prev.wxAvatarUrl),
+    updatedAt: Date.now(),
+  }
+  if (!next.wxNickName && !next.wxAvatarUrl) return next
+  try {
+    wx.setStorageSync(CACHE_KEY, JSON.stringify(next))
+  } catch (_) {}
+  return next
+}
+
+function clearWxProfileCache() {
+  try {
+    wx.removeStorageSync(CACHE_KEY)
+  } catch (_) {}
+}
+
+async function resolveWxProfileForLogin(wxLoginNick, wxLoginAvatar) {
+  let nick = String(wxLoginNick || '').trim()
+  let avatar = String(wxLoginAvatar || '').trim()
+  if (isPlaceholderWxNick(nick) || !avatar) {
+    try {
+      const prof = await new Promise((resolve, reject) => {
+        wx.getUserProfile({ desc: '用于灵祺账号展示', success: resolve, fail: reject })
+      })
+      const ui = prof && prof.userInfo
+      if (ui && ui.nickName && isPlaceholderWxNick(nick)) nick = String(ui.nickName).trim()
+      if (!avatar && ui && ui.avatarUrl) avatar = String(ui.avatarUrl).trim()
+    } catch (_) {}
+  }
+  avatar = await persistWxAvatarUrl(avatar)
+  return { nick, avatar }
+}
+
 module.exports = {
   isPlaceholderWxNick,
   isLocalTempAvatar,
   pickWxNick,
   pickWxAvatar,
   persistWxAvatarUrl,
+  readWxProfileCache,
+  writeWxProfileCache,
+  clearWxProfileCache,
+  resolveWxProfileForLogin,
 }

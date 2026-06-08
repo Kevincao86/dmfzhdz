@@ -157,23 +157,20 @@ Page({
     if (!workId) return
     this.setData({ loading: true, err: '' })
     try {
+      const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
       const local = wxAccount.readWxAccount()
-      let nick = local && local.wxNickName ? local.wxNickName : ''
-      let avatar = local && local.wxAvatarUrl ? local.wxAvatarUrl : ''
-      if (!nick) {
-        try {
-          const prof = await new Promise((resolve, reject) => {
-            wx.getUserProfile({
-              desc: '用于灵祺账号展示',
-              success: resolve,
-              fail: reject,
-            })
-          })
-          nick = prof.userInfo.nickName
-          avatar = prof.userInfo.avatarUrl
-          wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
-        } catch (_) {}
+      const cache = wxProfileDisplay.readWxProfileCache()
+      let nick = wxProfileDisplay.pickWxNick(cache?.wxNickName, local?.wxNickName)
+      let avatar = wxProfileDisplay.pickWxAvatar(cache?.wxAvatarUrl, local?.wxAvatarUrl)
+      const resolved = await wxProfileDisplay.resolveWxProfileForLogin(nick, avatar)
+      nick = resolved.nick
+      avatar = resolved.avatar
+      if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
+        wx.showToast({ title: '无法获取微信昵称，请在我的页登录', icon: 'none' })
+        return
       }
+      wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
+      wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
       const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
         role,
