@@ -59,9 +59,10 @@ Page({
 
   startPoll() {
     this.stopPoll()
+    const ms = this.data.humanMode ? relay.POLL_MS_HUMAN : relay.POLL_MS
     this._pollTimer = setInterval(() => {
       void this.syncFromCloud()
-    }, relay.POLL_MS)
+    }, ms)
   },
 
   stopPoll() {
@@ -144,6 +145,7 @@ Page({
       .sendChatLine('system', sysText, bid, this._sessionId)
       .then(() => {
         this.setData({ humanMode: true, connecting: false, showHumanBtn: false, input: '' })
+        this.startPoll()
       })
       .catch((e) => {
         this.setData({ connecting: false })
