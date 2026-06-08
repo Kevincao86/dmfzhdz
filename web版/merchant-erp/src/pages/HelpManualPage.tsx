@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import LoginPortalNav from '../components/login/LoginPortalNav'
 import { fetchHelpManualPublic } from '../lib/helpManualApi'
 import {
   childCategories,
   firstSelectableCategoryId,
+  hasChildCategories,
   topLevelCategories,
 } from '../lib/helpManualCategoryTree'
 import type { HelpManualEdition, RegistryHelpManualArticle, RegistryHelpManualCategory } from '../lib/helpManualTypes'
@@ -12,13 +13,27 @@ import { productNameForEdition } from '../lib/legalProductMeta'
 
 type Props = { edition: HelpManualEdition }
 
+function defaultExpandedTopIds(categories: RegistryHelpManualCategory[]): Set<string> {
+  return new Set(topLevelCategories(categories).filter((t) => hasChildCategories(categories, t.id)).map((t) => t.id))
+}
+
 export default function HelpManualPage({ edition }: Props) {
   const { articleId } = useParams()
   const [categories, setCategories] = useState<RegistryHelpManualCategory[]>([])
   const [articles, setArticles] = useState<RegistryHelpManualArticle[]>([])
   const [activeCat, setActiveCat] = useState('')
+  const [expandedTopIds, setExpandedTopIds] = useState<Set<string>>(() => new Set())
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(true)
+
+  const toggleTopExpanded = useCallback((topId: string) => {
+    setExpandedTopIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(topId)) next.delete(topId)
+      else next.add(topId)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -26,16 +41,30 @@ export default function HelpManualPage({ edition }: Props) {
       .then((r) => {
         setCategories(r.categories)
         setArticles(r.articles)
-        setActiveCat((cur) => cur || firstSelectableCategoryId(r.categories))
+        const firstId = firstSelectableCategoryId(r.categories)
+        setActiveCat((cur) => cur || firstId)
+        setExpandedTopIds(defaultExpandedTopIds(r.categories))
         setErr('')
       })
       .catch((e) => {
         setErr(e instanceof Error ? e.message : '加载失败')
         setCategories([])
         setArticles([])
+        setExpandedTopIds(new Set())
       })
       .finally(() => setLoading(false))
   }, [edition])
+
+  useEffect(() => {
+    const active = categories.find((c) => c.id === activeCat)
+    if (!active?.parentId) return
+    setExpandedTopIds((prev) => {
+      if (prev.has(active.parentId!)) return prev
+      const next = new Set(prev)
+      next.add(active.parentId!)
+      return next
+    })
+  }, [activeCat, categories])
 
   const topCats = useMemo(() => topLevelCategories(categories), [categories])
 
@@ -94,24 +123,45 @@ export default function HelpManualPage({ edition }: Props) {
               }
               return (
                 <li key={top.id}>
-                  <p className="px-3 py-1 text-xs font-semibold text-slate-500">{top.title}</p>
-                  <ul className="mt-0.5 space-y-0.5 border-l border-slate-200 pl-2 ml-2">
-                    {children.map((child) => (
-                      <li key={child.id}>
-                        <button
-                          type="button"
-                          onClick={() => setActiveCat(child.id)}
-                          className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-                            activeCat === child.id
-                              ? 'bg-cyan-50 font-medium text-cyan-800'
-                              : 'text-slate-600 hover:bg-slate-50'
-                          }`}
-                        >
-                          {child.title}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => toggleTopExpanded(top.id)}
+                    aria-expanded={expandedTopIds.has(top.id)}
+                    className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-2 text-left text-sm font-medium ${
+                      children.some((c) => c.id === activeCat)
+                        ? 'bg-cyan-50 text-cyan-800'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block shrink-0 text-[10px] text-slate-400 transition-transform ${
+                        expandedTopIds.has(top.id) ? 'rotate-90' : ''
+                      }`}
+                      aria-hidden
+                    >
+                      ▶
+                    </span>
+                    <span className="min-w-0 flex-1">{top.title}</span>
+                  </button>
+                  {expandedTopIds.has(top.id) ? (
+                    <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2">
+                      {children.map((child) => (
+                        <li key={child.id}>
+                          <button
+                            type="button"
+                            onClick={() => setActiveCat(child.id)}
+                            className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+                              activeCat === child.id
+                                ? 'bg-cyan-50 font-medium text-cyan-800'
+                                : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {child.title}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </li>
               )
             })}
