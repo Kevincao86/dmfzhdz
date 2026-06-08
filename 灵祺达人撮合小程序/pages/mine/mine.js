@@ -98,11 +98,24 @@ Page({
   async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/mine/mine')
+    if (!auth.isLoggedIn()) {
+      if (wxAccount.readWxAccount()) wxAccount.clearWxAccount()
+    }
     try {
       const chat = require('../../utils/talentChat.js')
       if (chat.canChat()) await chat.syncProfile()
     } catch (_) {}
     if (auth.isLoggedIn()) {
+      try {
+        const acct = auth.readAccount()
+        if (acct) require('../../utils/accountMemberSync.js').syncWxAccountFromAuthAccount(acct)
+      } catch (_) {}
+      try {
+        await auth.refreshSession()
+      } catch (_) {}
+      try {
+        await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+      } catch (_) {}
       try {
         await switchWorkIdentity.ensureWorkIdentityIfNeeded()
       } catch (_) {}
@@ -126,16 +139,19 @@ Page({
     const identity = userProfile.readIdentity()
     const member = memberStore.readMember()
     const prProfile = userProfile.readPrProfile()
+    const acct = auth.readAccount()
     const wx = wxAccount.readWxAccount()
-    const wxLoggedIn = !!wx
+    const wxLoggedIn = auth.isLoggedIn()
 
     let avatarUrl = ''
     let profileNick = ''
     let displaySub = '微信登录后使用完整功能'
 
+    if (acct?.wxAvatarUrl) avatarUrl = acct.wxAvatarUrl
+    if (acct?.wxNickName) profileNick = acct.wxNickName
     if (wx) {
-      avatarUrl = wx.wxAvatarUrl || ''
-      profileNick = wx.wxNickName || ''
+      if (!avatarUrl) avatarUrl = wx.wxAvatarUrl || ''
+      if (!profileNick) profileNick = wx.wxNickName || ''
     }
 
     if (identity === 'talent') {
@@ -160,7 +176,6 @@ Page({
 
     const displayName = profileNick || '灵祺用户'
 
-    const acct = auth.readAccount()
     let identityIdLine = ''
     if (identity === 'pr') {
       identityIdLine = lingqiIdentity.formatPrIdLabel(prProfile?.lingqiPrId)
@@ -213,7 +228,8 @@ Page({
     setTabBarHidden(this, false)
   },
   ensureWxLoggedIn() {
-    if (wxAccount.isWxLoggedIn()) return true
+    if (auth.isLoggedIn()) return true
+    if (wxAccount.readWxAccount()) wxAccount.clearWxAccount()
     this.onOpenWxLoginSheet()
     return false
   },
@@ -244,12 +260,28 @@ Page({
       wx.showToast({ title: '请填写微信昵称', icon: 'none' })
       return
     }
+    const identity = userProfile.readIdentity()
+    if (!identityTypes.isWorkIdentity(identity)) {
+      wx.showToast({ title: '请先选择登录身份', icon: 'none' })
+      wx.navigateTo({ url: '/pages/login/login' })
+      return
+    }
     this.setData({ wxLoginSubmitting: true })
     try {
-      await wxAccount.completeWxLogin({
+      const role = identityTypes.accountRoleForWorkIdentity(identity)
+      const data = await auth.wxLogin({
+        role,
         wxNickName: nick,
-        wxAvatarUrl: this.data.wxLoginAvatar,
+        wxAvatarUrl: String(this.data.wxLoginAvatar || '').trim(),
       })
+      await switchWorkIdentity.applyWorkIdentityAfterLogin(
+        (data && data.token) || auth.readSessionToken(),
+        auth.readAccount() || (data && data.account),
+        identity,
+      )
+      try {
+        await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+      } catch (_) {}
       wx.showToast({ title: '登录成功', icon: 'success' })
       this.setData({ showWxLoginSheet: false })
       setTabBarHidden(this, false)

@@ -1,5 +1,6 @@
 const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
+const wxAccount = require('./wxAccount.js')
 
 const STABLE_OPENID_KEY = 'meoo_stable_wx_openid_v1'
 
@@ -72,8 +73,8 @@ function syncTalentMemberFromAccount(account) {
     lingqiEditTeamId: String(account.lingqiEditTeamId || prev.lingqiEditTeamId || '').trim(),
     workIdentity: account.workIdentity || prev.workIdentity || '',
     wxOpenId: String(account.openid || prev.wxOpenId || '').trim(),
-    wxNickName: prev.wxNickName || account.wxNickName || '',
-    wxAvatarUrl: prev.wxAvatarUrl || account.wxAvatarUrl || '',
+    wxNickName: account.wxNickName || prev.wxNickName || '',
+    wxAvatarUrl: account.wxAvatarUrl || prev.wxAvatarUrl || '',
   }
   memberStore.writeMember(next)
   return next
@@ -87,16 +88,30 @@ function syncPrProfileFromAccount(account) {
     id: String(account.registryPrId || prev.id || '').trim(),
     lingqiPrId: String(account.lingqiPrId || prev.lingqiPrId || '').trim(),
     wxOpenId: String(account.openid || prev.wxOpenId || '').trim(),
-    wxNickName: prev.wxNickName || account.wxNickName || '',
-    wxAvatarUrl: prev.wxAvatarUrl || account.wxAvatarUrl || '',
+    wxNickName: account.wxNickName || prev.wxNickName || '',
+    wxAvatarUrl: account.wxAvatarUrl || prev.wxAvatarUrl || '',
   }
   userProfile.writePrProfile(next)
   return next
 }
 
+function syncWxAccountFromAuthAccount(account) {
+  if (!account) return null
+  const openid = String(account.openid || '').trim()
+  const nick = String(account.wxNickName || '').trim()
+  const avatar = String(account.wxAvatarUrl || '').trim()
+  if (!openid && !nick) return null
+  return wxAccount.writeWxAccount({
+    wxOpenId: openid,
+    wxNickName: nick || '微信用户',
+    wxAvatarUrl: avatar,
+  })
+}
+
 function syncLocalProfilesFromAccount(account) {
   if (!account) return
   writeStableDevOpenId(account.openid)
+  syncWxAccountFromAuthAccount(account)
   const role = account.activeRole === 'pr' ? 'pr' : 'talent'
   if (role === 'pr') syncPrProfileFromAccount(account)
   else syncTalentMemberFromAccount(account)
@@ -114,6 +129,7 @@ module.exports = {
   ensureStableDevOpenId,
   writeStableDevOpenId,
   mergeMemberForCloudRegister,
+  syncWxAccountFromAuthAccount,
   syncTalentMemberFromAccount,
   syncPrProfileFromAccount,
   syncLocalProfilesFromAccount,

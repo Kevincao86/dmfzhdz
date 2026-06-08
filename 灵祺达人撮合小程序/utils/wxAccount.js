@@ -13,7 +13,11 @@ function readWxAccount() {
 }
 
 function isWxLoggedIn() {
-  return !!readWxAccount()
+  try {
+    const auth = require('./auth.js')
+    if (auth.isLoggedIn()) return true
+  } catch (_) {}
+  return false
 }
 
 function writeWxAccount(patch) {

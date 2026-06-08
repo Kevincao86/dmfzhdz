@@ -32,5 +32,17 @@ App({
   },
   onShow() {
     void chatBadgeWatcher.refreshNow()
+    if (auth.isLoggedIn()) {
+      auth
+        .refreshSession()
+        .then(() => {
+          try {
+            return require('./utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+          } catch (_) {
+            return null
+          }
+        })
+        .catch(() => {})
+    }
   },
 })
