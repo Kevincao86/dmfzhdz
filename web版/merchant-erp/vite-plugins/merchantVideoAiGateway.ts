@@ -257,9 +257,10 @@ function arkVideoModelCandidates(
   for (const id of fromList) add(id)
   for (const id of merged) add(id)
   if (out.length <= 1) return out
-  if (!pref) return randomRotateModelIds(out)
-  const rest = out.filter((id) => id !== pref)
-  return [pref, ...randomRotateModelIds(rest)]
+  const prefNorm = pref ? normalizeArkVideoModelParam(pref) : ''
+  if (!prefNorm) return randomRotateModelIds(out)
+  const rest = out.filter((id) => id !== prefNorm)
+  return [prefNorm, ...randomRotateModelIds(rest)]
 }
 
 function qwenVideoCandidatesFromEnv(env: MerchantAiEnv, mode: 't2v' | 'i2v'): string[] {
@@ -662,8 +663,14 @@ async function arkCreateVideoTask(
   | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
 > {
   const key = doubaoBearerKey(env)
+  const rawModel = typeof body.model === 'string' ? body.model.trim() : ''
+  const isServerAuto = !rawModel || rawModel === SEEDANCE_SERVER_AUTO
   const preferred = resolvePreferredVideoModel(body.model)
-  const candidates = key ? arkVideoModelCandidates(env, body, preferred) : []
+  const candidates = key
+    ? isServerAuto
+      ? arkVideoModelCandidates(env, body, preferred)
+      : [normalizeArkVideoModelParam(rawModel)]
+    : []
 
   let lastMsg = '豆包视频生成失败'
   let lastStatus: number | undefined
