@@ -2,6 +2,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteMpLibraryEntries, fetchRegistry, type RegistryMpPrUser } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 
+function formatPrPlatformAccount(u: RegistryMpPrUser): string {
+  const acct = String(u.platformAccount || u.wxOpenId || u.contactPhone || '').trim()
+  if (!acct) return '—'
+  if (acct.length <= 16) return acct
+  return `${acct.slice(0, 8)}…${acct.slice(-6)}`
+}
+
+function formatPrSource(u: RegistryMpPrUser): string {
+  if (u.sourceChannel === 'mp') return '小程序'
+  if (u.sourceChannel === 'web') return '履约 Web'
+  if (u.wxOpenId || u.platformAccount) return '小程序'
+  if (u.contactPhone) return '履约 Web'
+  return '—'
+}
+
 export default function OpsPrLibraryPage() {
   const [rows, setRows] = useState<RegistryMpPrUser[]>([])
   const [q, setQ] = useState('')
@@ -28,6 +43,8 @@ export default function OpsPrLibraryPage() {
       list = list.filter((u) => {
         const blob = [
           u.lingqiPrId,
+          u.platformAccount,
+          u.wxOpenId,
           u.companyName,
           u.personalName,
           u.contactName,
@@ -76,7 +93,7 @@ export default function OpsPrLibraryPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">PR 用户库</h1>
         <p className="mt-1 text-sm text-slate-500">
-          小程序 PR 填写机构/企业/个人资料后自动入库；PRID（LQ-P-xxxxxx）与达人 ID 区分。
+          小程序 PR 填写资料后自动入库；平台账号（微信 openid / 履约 Web 手机号）锁死灵祺 PRID，同一登录不再重复建档。
         </p>
       </div>
 
@@ -84,7 +101,7 @@ export default function OpsPrLibraryPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="搜索 PRID / 机构 / 联系人 / 手机 / 微信"
+          placeholder="搜索 PRID / 平台账号 / 机构 / 联系人 / 手机 / 微信"
           className="min-w-[240px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
         />
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
@@ -117,12 +134,14 @@ export default function OpsPrLibraryPage() {
                 />
               </th>
               <th className="px-4 py-3">PRID</th>
+              <th className="px-4 py-3">平台账号</th>
               <th className="px-4 py-3">主体</th>
               <th className="px-4 py-3">名称</th>
               <th className="px-4 py-3">联系人</th>
               <th className="px-4 py-3">手机</th>
               <th className="px-4 py-3">微信</th>
               <th className="px-4 py-3">地区</th>
+              <th className="px-4 py-3">来源</th>
               <th className="px-4 py-3">更新时间</th>
             </tr>
           </thead>
@@ -139,6 +158,14 @@ export default function OpsPrLibraryPage() {
                   />
                 </td>
                 <td className="px-4 py-3 font-mono text-indigo-300">{u.lingqiPrId}</td>
+                <td className="px-4 py-3">
+                  <div className="font-mono text-xs text-slate-300" title={u.platformAccount || u.wxOpenId || ''}>
+                    {formatPrPlatformAccount(u)}
+                  </div>
+                  {u.wxNickName ? (
+                    <div className="text-xs text-slate-500">{u.wxNickName}</div>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">{u.accountType === 'personal' ? '个人' : '机构'}</td>
                 <td className="px-4 py-3">
                   {u.accountType === 'personal' ? u.personalName : u.companyName}
@@ -149,12 +176,13 @@ export default function OpsPrLibraryPage() {
                 <td className="px-4 py-3">
                   {[u.province, u.city].filter(Boolean).join(' · ') || '—'}
                 </td>
+                <td className="px-4 py-3 text-xs">{formatPrSource(u)}</td>
                 <td className="px-4 py-3 text-xs text-slate-500">{u.updatedAt}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={11} className="px-4 py-12 text-center text-slate-500">
                   暂无 PR 用户，请引导小程序 PR 身份保存资料
                 </td>
               </tr>

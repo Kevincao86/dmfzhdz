@@ -79,6 +79,9 @@ export function registryPrToClientDraft(pr: RegistryMpPrUser): Record<string, un
     intro: pr.intro || '',
     wxNickName: pr.wxNickName || '',
     wxAvatarUrl: pr.wxAvatarUrl || '',
+    wxOpenId: pr.wxOpenId || '',
+    platformAccount: pr.platformAccount || pr.wxOpenId || '',
+    sourceChannel: pr.sourceChannel,
     registeredAt: pr.registeredAt,
     updatedAt: pr.updatedAt,
   }

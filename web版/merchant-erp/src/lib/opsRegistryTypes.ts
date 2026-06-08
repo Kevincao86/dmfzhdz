@@ -356,6 +356,10 @@ export type RegistryMpPrUser = {
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string
+  /** 登录平台账号：小程序=微信 openid，履约 Web=手机号；用于锁死灵祺 PRID */
+  platformAccount?: string
+  /** mp=小程序微信登录；web=履约 Web 手机登录 */
+  sourceChannel?: 'mp' | 'web'
   registeredAt: string
   updatedAt: string
 }
