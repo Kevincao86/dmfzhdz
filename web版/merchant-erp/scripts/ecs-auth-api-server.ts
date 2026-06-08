@@ -54,6 +54,7 @@ import iceOpenshotExportDownloadHandler from '../api/meoo-merchant-ai-video-open
 import iceOpenshotExportHandler from '../api/meoo-merchant-ai-video-openshot-export.ts'
 import digitalHumanTtsHandler from '../api/meoo-digital-human-tts.ts'
 import digitalHumanDouyinLinkHandler from '../api/meoo-digital-human-douyin-link.ts'
+import recruitmentOrdersPatchHandler from '../api/meoo-ops-recruitment-orders-patch.ts'
 import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-apply.ts'
 import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
 import mpRecruitmentPatchHandler from '../api/meoo-ops-mp-recruitment-orders-patch.ts'
@@ -153,6 +154,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-openshot-export-download':
     iceOpenshotExportDownloadHandler as VercelLikeHandler,
   /** 灵祺达人招募小程序（与 Vercel 根 api/ 同名路由） */
+  '/api/meoo-ops-recruitment-orders-patch': recruitmentOrdersPatchHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-apply': mpRecruitmentApplyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-append': mpRecruitmentAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-patch': mpRecruitmentPatchHandler as VercelLikeHandler,

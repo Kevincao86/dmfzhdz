@@ -97,6 +97,48 @@ export type RegistryIceVideoSlot = {
   assignedAt?: string
 }
 
+export type KolTierKey = 'v3' | 'v4' | 'v5' | 'v5plus'
+
+export type RecruitmentTierPlan = {
+  feeType: 'tier' | 'fixed'
+  totalHeadcount: number
+  budgetYuan: number
+  city: string
+  tiers: Partial<Record<KolTierKey, { count: number; unitPriceYuan: number }>>
+  fixedPriceYuan?: number
+  strategy?: string
+  source?: 'ai' | 'fallback'
+  costHint?: string
+}
+
+export type RecruitmentWorkflowStage =
+  | 'submitted'
+  | 'recruiting'
+  | 'selecting'
+  | 'group_notify'
+  | 'scheduling'
+  | 'video_review'
+  | 'payment_pending'
+  | 'payment_ops'
+  | 'completed'
+
+export type RecruitmentScheduleMeta = {
+  visitStart?: string
+  visitEnd?: string
+  visitSlots?: string[]
+  mealCount?: number
+  tableSize?: number
+  shareTable?: boolean
+  scheduleConfirmedAt?: string
+  scheduleSentAt?: string
+}
+
+export type RecruitmentPaymentState =
+  | 'none'
+  | 'awaiting_merchant_confirm'
+  | 'awaiting_ops_paid'
+  | 'paid'
+
 /** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
 export type RegistryRecruitmentOrder = {
   id: string
@@ -128,6 +170,12 @@ export type RegistryRecruitmentOrder = {
   iceVideoSlots?: RegistryIceVideoSlot[]
   fulfillmentLoop?: RecruitmentFulfillmentLoop
   autoPublishMp?: boolean
+  /** 星选闭环阶段（商家 ERP 主流程） */
+  workflowStage?: RecruitmentWorkflowStage
+  /** AI 阶梯/一口价招募方案 */
+  tierPlan?: RecruitmentTierPlan
+  scheduleMeta?: RecruitmentScheduleMeta
+  paymentState?: RecruitmentPaymentState
 }
 
 export type RegistryMpRecruitmentApplicant = {
@@ -161,6 +209,15 @@ export type RegistryMpRecruitmentApplicant = {
   taskStatus?: MpApplicantTaskStatus
   /** PR 已确认选择该报名 */
   prSelected?: boolean
+  /** 商家 ERP 反选 */
+  merchantSelected?: boolean
+  kolTier?: KolTierKey
+  groupJoinStatus?: 'pending' | 'confirmed' | 'joined'
+  videoUrl?: string
+  videoStatus?: 'pending' | 'passed' | 'rejected'
+  videoRejectReason?: string
+  videoSubmittedAt?: string
+  talentMemberId?: string
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -376,6 +433,9 @@ export type RegistryScheduleRow = {
   talentName: string
   storeName: string
   tableNote: string
+  applicantId?: string
+  mpOrderId?: string
+  recruitmentOrderId?: string
 }
 
 /** 达人视频审核（dev 注册表，由 API/上传同步写入） */
@@ -388,6 +448,11 @@ export type RegistryVideoSubmission = {
   aiNote: string
   thumbUrl?: string
   duration?: string
+  applicantId?: string
+  mpOrderId?: string
+  recruitmentOrderId?: string
+  rejectReason?: string
+  videoUrl?: string
 }
 
 export type RegistryFile = {

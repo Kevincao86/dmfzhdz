@@ -850,6 +850,43 @@ export default function OpsRecruitmentOrdersPage() {
                 </p>
               ) : null}
             </div>
+            {(processOrder as RegistryRecruitmentOrder & { paymentState?: string }).paymentState ===
+            'awaiting_ops_paid' ? (
+              <button
+                type="button"
+                disabled={patchBusyId === processOrder.id}
+                onClick={async () => {
+                  setPatchBusyId(processOrder.id)
+                  try {
+                    const r = await patchRecruitmentOrder({
+                      id: processOrder.id,
+                      paymentState: 'paid',
+                      workflowStage: 'completed',
+                      status: 'done',
+                    })
+                    if (!r.ok) {
+                      window.alert(r.error ?? '更新失败')
+                      return
+                    }
+                    if (processOrder.linkedMpOrderId) {
+                      await fetch('/api/ops-sync/mp-recruitment-orders/patch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: processOrder.linkedMpOrderId, status: 'done' }),
+                      })
+                    }
+                    window.alert('已确认打款，星选达人将收到到账通知（站内信需另行配置或手动触达）。')
+                    setProcessOrder(null)
+                    await loadRegistry()
+                  } finally {
+                    setPatchBusyId(null)
+                  }
+                }}
+                className="mt-3 w-full rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                确认已打款（通知达人 · 订单完结）
+              </button>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               {(
                 [
