@@ -217,6 +217,8 @@ export type RegistryMpRecruitmentApplicant = {
   videoStatus?: 'pending' | 'passed' | 'rejected'
   videoRejectReason?: string
   videoSubmittedAt?: string
+  /** 累计提交次数（含首次上传与驳回后重传） */
+  videoSubmitCount?: number
   talentMemberId?: string
 }
 
@@ -404,7 +406,7 @@ export type RegistryMpTalentInboxItem = {
   applicantId?: string
   /** 群二维码等附图（与 body 一并展示） */
   imageUrl?: string
-  noticeType?: 'selection' | 'general'
+  noticeType?: 'selection' | 'general' | 'video_reject'
   pinned?: boolean
   createdAt: string
   read?: boolean

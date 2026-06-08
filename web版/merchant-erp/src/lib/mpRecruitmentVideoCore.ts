@@ -74,12 +74,14 @@ export function patchApplicantVideoSubmit(
   if (!aid || !url) return { ok: false, error: 'invalid_submit' }
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
+    const prevCount = Math.max(0, Number(a.videoSubmitCount || 0))
     return {
       ...a,
       videoUrl: url,
       videoStatus: 'pending' as const,
       videoRejectReason: undefined,
       videoSubmittedAt: nowCn(),
+      videoSubmitCount: prevCount + 1,
       aiVerifyStatus: 'pending' as const,
       aiVerifyNote: '待 PR 审核',
     }
@@ -124,13 +126,20 @@ export function buildVideoReviewInboxEntries(
   const passed = action === 'pass'
   const title = passed ? '探店视频已通过' : '探店视频需重新上传'
   const reason = String(rejectReason || '').trim()
+  const submitNo = Math.max(1, Number(reviewedApplicant.videoSubmitCount || 0) || 1)
+  const submitLabel = `（第 ${submitNo} 次提交）`
   const body = passed
-    ? `您在「${orderTitle}」提交的视频已通过 PR 审核。`
-    : `您在「${orderTitle}」提交的视频未通过审核。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新上传视频。`
+    ? `您在「${orderTitle}」提交的视频已通过 PR 审核${submitLabel}。`
+    : `您在「${orderTitle}」提交的视频未通过审核${submitLabel}。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新上传视频。`
 
   const entries: MpTalentInboxEntryInput[] = []
   const seen = new Set<string>()
-  const pushEntry = (applicant: RegistryMpRecruitmentApplicant, customTitle?: string, customBody?: string) => {
+  const pushEntry = (
+    applicant: RegistryMpRecruitmentApplicant,
+    customTitle?: string,
+    customBody?: string,
+    opts?: { noticeType?: MpTalentInboxEntryInput['noticeType']; pinned?: boolean },
+  ) => {
     const target = inboxTargetFromApplicant(applicant, reg)
     if (!target.talentMemberId || seen.has(target.talentMemberId)) return
     seen.add(target.talentMemberId)
@@ -143,11 +152,15 @@ export function buildVideoReviewInboxEntries(
       category: 'business',
       title: customTitle || title,
       body: customBody || body,
-      noticeType: 'general',
+      noticeType: opts?.noticeType ?? (passed ? 'general' : undefined),
+      pinned: opts?.pinned,
     })
   }
 
-  pushEntry(reviewedApplicant)
+  pushEntry(reviewedApplicant, undefined, undefined, {
+    noticeType: passed ? 'general' : 'video_reject',
+    pinned: passed ? undefined : true,
+  })
 
   const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
   const selected = new Set(selectedApplicantIds(mp))

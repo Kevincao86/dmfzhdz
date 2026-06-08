@@ -7,6 +7,8 @@ import {
   markNotificationsRead,
   mergeNotificationsWithRegistry,
   readAllNotificationRows,
+  isPinnedUnread,
+  sortNotificationRows,
   unreadNotificationCount,
   type NotificationRow,
 } from '../lib/mpSync/messagesStore'
@@ -138,7 +140,7 @@ export default function MessagesPage() {
   }
 
   const systemRows = useMemo(() => {
-    const list = rows
+    const list = sortNotificationRows(rows)
     if (systemFilter === 'all') return list
     return list.filter((r) => r.category === systemFilter)
   }, [rows, systemFilter])
@@ -304,11 +306,18 @@ export default function MessagesPage() {
                     row.read
                       ? 'border-slate-200 bg-white/60'
                       : 'border-teal-200 bg-teal-50/40'
-                  }`}
+                  } ${isPinnedUnread(row) ? 'ring-1 ring-amber-200' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-medium text-slate-900">{row.title || '通知'}</p>
+                      <p className="font-medium text-slate-900">
+                        {isPinnedUnread(row) ? (
+                          <span className="mr-1.5 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                            置顶
+                          </span>
+                        ) : null}
+                        {row.title || '通知'}
+                      </p>
                       {row.body ? <p className="mt-1 text-sm text-slate-600">{row.body}</p> : null}
                       {row.imageUrl ? (
                         <img src={row.imageUrl} alt="" className="mt-2 max-h-32 rounded border" />
