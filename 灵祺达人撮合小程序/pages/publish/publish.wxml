@@ -95,6 +95,7 @@
         class="pub-form-scroll"
         scroll-y
         enable-flex
+        scroll-top="{{formScrollTop}}"
         scroll-into-view="{{scrollIntoView}}"
         scroll-with-animation="{{scrollWithAnimation}}"
       >
