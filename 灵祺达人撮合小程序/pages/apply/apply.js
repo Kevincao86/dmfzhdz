@@ -1,6 +1,7 @@
 const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const memberStore = require('../../utils/talentMember.js')
+const auth = require('../../utils/auth.js')
 const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
 const regionPicker = require('../../utils/regionPicker.js')
 const { setupRegionState, onProvincePick, onCityPick } = regionPicker
@@ -65,6 +66,21 @@ Page({
     isIceMode: false,
   },
   onLoad(options) {
+    if (!auth.isLoggedIn()) {
+      const q = []
+      if (options) {
+        Object.keys(options).forEach((k) => {
+          if (options[k] != null && options[k] !== '') {
+            q.push(`${k}=${encodeURIComponent(String(options[k]))}`)
+          }
+        })
+      }
+      const applyUrl = `/pages/apply/apply${q.length ? `?${q.join('&')}` : ''}`
+      wx.redirectTo({
+        url: `/pages/login/login?redirect=${encodeURIComponent(applyUrl)}`,
+      })
+      return
+    }
     const mpOrderId = options && options.mpId ? decodeURIComponent(options.mpId) : ''
     const merchantOrderNo =
       options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''

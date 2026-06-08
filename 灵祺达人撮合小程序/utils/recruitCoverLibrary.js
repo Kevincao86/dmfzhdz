@@ -2,7 +2,7 @@ const manifest = require('./recruitCoverLibrary.manifest.js')
 const config = require('./config.js')
 
 /** 封面图走星选 Web CDN，不打包进小程序主包 */
-const MP_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://dr.mofangdianai.com/recruit-covers').replace(/\/$/, '')}/`
+const MP_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')}/`
 
 function mpAssetUrl(relPath) {
   const rel = String(relPath || '').replace(/^\/+/, '')

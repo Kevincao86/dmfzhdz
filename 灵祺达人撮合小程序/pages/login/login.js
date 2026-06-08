@@ -44,9 +44,27 @@ async function applyLoginIdentity(data, workId) {
   }
 }
 
-async function enterAppAfterLogin() {
+async function navigateAfterLogin(page) {
   const tabBar = require('../../utils/tabBar.js')
   tabBar.refreshTabBar()
+  const redirect = page && page.data && page.data.redirect ? String(page.data.redirect).trim() : ''
+  if (redirect && redirect.startsWith('/pages/')) {
+    const pathOnly = redirect.split('?')[0].replace(/^\//, '')
+    const tabPaths = new Set([
+      'pages/index/index',
+      'pages/recommend/recommend',
+      'pages/publish/publish',
+      'pages/messages/messages',
+      'pages/mine/mine',
+    ])
+    const url = redirect.startsWith('/') ? redirect : `/${redirect}`
+    if (tabPaths.has(pathOnly)) {
+      wx.switchTab({ url: pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}` })
+    } else {
+      wx.redirectTo({ url })
+    }
+    return
+  }
   wx.switchTab({ url: '/pages/index/index' })
 }
 
@@ -82,10 +100,13 @@ Page({
     showWxAuthSheet: false,
     wxAuthStep: 'avatar',
     pendingWorkId: '',
+    redirect: '',
   },
 
-  onLoad() {
+  onLoad(options) {
     this.applyLoginNavPadding()
+    const redirect =
+      options && options.redirect ? decodeURIComponent(String(options.redirect)) : ''
     const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
     const cache = wxProfileDisplay.readWxProfileCache()
     const local = wxAccount.readWxAccount()
@@ -93,11 +114,12 @@ Page({
       err: '',
       loginIdentity: '',
       loginIdentityLabel: '',
+      redirect,
       wxNickName: wxProfileDisplay.pickWxNick(cache && cache.wxNickName, local && local.wxNickName),
       wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
     })
     if (auth.isLoggedIn()) {
-      wx.switchTab({ url: '/pages/index/index' })
+      void navigateAfterLogin(this)
     }
   },
 
@@ -267,7 +289,7 @@ Page({
       await applyLoginIdentity(data, workId)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
       this.setData({ showWxAuthSheet: false, pendingWorkId: '' })
-      await enterAppAfterLogin()
+      await navigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
@@ -293,7 +315,7 @@ Page({
     try {
       const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
       await applyLoginIdentity(data, workId)
-      await enterAppAfterLogin()
+      await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
     } finally {
@@ -355,7 +377,7 @@ Page({
       })
       wx.showToast({ title: '注册成功', icon: 'success' })
       await applyLoginIdentity(data, workId)
-      await enterAppAfterLogin()
+      await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
     } finally {

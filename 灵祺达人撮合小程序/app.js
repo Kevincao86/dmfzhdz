@@ -2,6 +2,7 @@ const chatBadgeWatcher = require('./utils/chatBadgeWatcher.js')
 const auth = require('./utils/auth.js')
 const config = require('./utils/config.js')
 const mpShare = require('./utils/mpShare.js')
+const guestRoutes = require('./utils/mpGuestRoutes.js')
 
 App({
   globalData: {
@@ -19,9 +20,8 @@ App({
     }
     chatBadgeWatcher.start()
     if (!auth.isLoggedIn()) {
-      const pages = getCurrentPages()
-      const route = pages.length ? pages[pages.length - 1].route : ''
-      if (route !== 'pages/login/login') {
+      const route = guestRoutes.currentRoutePath()
+      if (!guestRoutes.isGuestAllowedPath(route)) {
         wx.reLaunch({ url: '/pages/login/login' })
       }
     } else {
