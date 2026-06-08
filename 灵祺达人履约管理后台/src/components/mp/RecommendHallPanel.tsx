@@ -11,6 +11,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 import { readMember } from '../../lib/mpSync/talentMember'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
+import HallToolbarCard from './HallToolbarCard'
 import RecommendTalentPanel from './RecommendTalentPanel'
 import PageHero from '../ui/PageHero'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
@@ -71,20 +72,24 @@ function SupplierRecommendOrders() {
     })()
   }, [workId])
 
+  const listTwoCol = orderDisplayRows.length > 1
+
   return (
     <div className="hall-page">
-      <PageHero
-        title="推荐大厅"
-        subtitle={`AI 识别 ${WORK_EDITION_LABEL[workId]} 身份 · 结合标签与报名习惯匹配 · 按匹配分从高到低排序`}
-        badge="智能推荐"
-      />
-      <input
-        className="hall-search-input panel-input"
-        placeholder="搜索商单、门店、城市"
-        value={searchKeyword}
-        onChange={(e) => setSearchKeyword(e.target.value)}
-      />
-      <div className="hall-filter-row">
+      <HallToolbarCard>
+        <PageHero
+          inset
+          title="推荐大厅"
+          subtitle={`AI 识别 ${WORK_EDITION_LABEL[workId]} 身份 · 结合标签与报名习惯匹配 · 按匹配分从高到低排序`}
+          badge="智能推荐"
+        />
+        <input
+          className="hall-search-input panel-input"
+          placeholder="搜索商单、门店、城市"
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+        />
+        <div className="hall-filter-row">
         <select className="rounded-lg panel-select px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
           {hallFilters.PLATFORM_FILTERS.map((p) => (
             <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
@@ -102,7 +107,8 @@ function SupplierRecommendOrders() {
         <button type="button" className="rounded-lg border border-[var(--shell-border)] px-2 py-1.5" onClick={() => setShowPriceSheet(true)}>
           {priceFilterLabel}
         </button>
-      </div>
+        </div>
+      </HallToolbarCard>
       {loading ? <p className="text-[var(--shell-muted)]">智能匹配中…</p> : null}
       {err ? <p className="text-amber-600 text-sm">{err}</p> : null}
       {!loading && !orderDisplayRows.length ? (
@@ -110,7 +116,7 @@ function SupplierRecommendOrders() {
           {talentCity ? '暂无高匹配商单，可调整筛选条件' : '请先在「我的」完善资料，以获得更精准推荐'}
         </p>
       ) : null}
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
         {orderDisplayRows.map((o) => (
           <RecruitmentOrderCard key={o.id} row={o} showMatchScore onClick={() => goDetail(o)} />
         ))}

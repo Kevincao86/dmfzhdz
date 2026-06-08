@@ -15,6 +15,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL, workIdentityLabel } from '../../li
 import { getActiveRole } from '../../lib/mpSession'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
+import HallToolbarCard from './HallToolbarCard'
 import PageHero from '../ui/PageHero'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
@@ -153,22 +154,26 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     { id: 'ice', label: '云剪任务', count: iceRows.length },
   ]
 
+  const listTwoCol = displayRows.length > 1
+
   return (
     <div className="hall-page">
-      <PageHero
-        title="招募大厅"
-        subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
-        badge={`${displayRows.length} 条`}
-      />
+      <HallToolbarCard>
+        <PageHero
+          inset
+          title="招募大厅"
+          subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
+          badge={`${displayRows.length} 条`}
+        />
 
-      <input
-        className="hall-search-input panel-input"
-        placeholder="搜索招募、门店、城市"
-        value={searchKeyword}
-        onChange={(e) => setSearchKeyword(e.target.value)}
-      />
+        <input
+          className="hall-search-input panel-input"
+          placeholder="搜索招募、门店、城市"
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+        />
 
-      <div className="hall-segment-row">
+        <div className="hall-segment-row">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -262,11 +267,12 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           ))}
         </select>
       </div>
+      </HallToolbarCard>
 
       {loading ? <p className="text-[var(--shell-muted)]">加载招募中…</p> : null}
       {err ? <p className="text-red-500 text-sm whitespace-pre-wrap">{err}</p> : null}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
         {displayRows.map((o) => (
           <RecruitmentOrderCard
             key={o.id}

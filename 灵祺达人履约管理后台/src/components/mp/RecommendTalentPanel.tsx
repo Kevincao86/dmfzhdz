@@ -30,6 +30,7 @@ import {
   syncProfile,
 } from '../../lib/mpSync/talentChat'
 import HallCityFilter from './HallCityFilter'
+import HallToolbarCard from './HallToolbarCard'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
 import PageHero from '../ui/PageHero'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
@@ -271,25 +272,28 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     }
   }
 
+  const listTwoCol = displayRows.length > 1
+
   return (
     <div className="hall-page">
-      {embedded ? (
-        <PageHero title="推荐大厅" subtitle={prMatchHint} badge="达人匹配" />
-      ) : (
-        <div>
-          <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
-          <p className="text-sm text-[var(--shell-muted)] mt-1">{prMatchHint}</p>
-        </div>
-      )}
+      <HallToolbarCard>
+        {embedded ? (
+          <PageHero inset title="推荐大厅" subtitle={prMatchHint} badge="达人匹配" />
+        ) : (
+          <div>
+            <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
+            <p className="text-sm text-[var(--shell-muted)] mt-1">{prMatchHint}</p>
+          </div>
+        )}
 
-      <input
-        className="hall-search-input panel-input"
-        placeholder={searchPlaceholder}
-        value={searchKeyword}
-        onChange={(e) => setSearchKeyword(e.target.value)}
-      />
+        <input
+          className="hall-search-input panel-input"
+          placeholder={searchPlaceholder}
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+        />
 
-      <div className="hall-segment-block">
+        <div className="hall-segment-block">
         <div className="hall-segment-group">
           <span className="hall-field-label">需求身份</span>
           <div className="hall-segment-row">
@@ -380,6 +384,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
           </select>
         ) : null}
       </div>
+      </HallToolbarCard>
 
       {loading || matching ? (
         <p className="text-[var(--shell-muted)] text-sm">{matching ? '智能匹配中…' : '加载中…'}</p>
@@ -387,7 +392,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       {err ? <p className="text-red-400 text-sm">{err}</p> : null}
       {listEmptyHint ? <p className="text-[var(--shell-muted)] text-sm">{listEmptyHint}</p> : null}
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
         {displayRows.map((t) => (
           <article key={t.id} className="talent-card rounded-xl border p-4 flex gap-3 relative hover-panel">
             {viewMode === 'ai' ? <MatchScoreBadge score={t.matchScore} className="absolute top-3 right-3" /> : null}
