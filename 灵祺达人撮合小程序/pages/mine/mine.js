@@ -11,6 +11,7 @@ const identityIdLabels = require('../../utils/identityIdLabels.js')
 const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const wxAccount = require('../../utils/wxAccount.js')
+const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
@@ -147,31 +148,24 @@ Page({
     let profileNick = ''
     let displaySub = '微信登录后使用完整功能'
 
-    if (acct?.wxAvatarUrl) avatarUrl = acct.wxAvatarUrl
-    if (acct?.wxNickName) profileNick = acct.wxNickName
-    if (wx) {
-      if (!avatarUrl) avatarUrl = wx.wxAvatarUrl || ''
-      if (!profileNick) profileNick = wx.wxNickName || ''
-    }
-
-    if (identity === 'talent') {
-      if (member?.wxNickName) profileNick = member.wxNickName
-      if (member?.wxAvatarUrl) avatarUrl = member.wxAvatarUrl
-      displaySub = member
-        ? memberStore.memberTypeLabel(member)
-        : wxLoggedIn
-          ? '完善多平台资料，报名更便捷'
-          : '达人 · 发现优质商单'
-    } else if (identity === 'shoot' || identity === 'edit') {
-      if (member?.wxNickName) profileNick = member.wxNickName
-      if (member?.wxAvatarUrl) avatarUrl = member.wxAvatarUrl
-      displaySub = member?.supplierProfile
-        ? supplierTeamProfile.supplierSummaryLabel(identity, member.supplierProfile)
-        : userProfile.supplierDisplaySub(identity)
-    } else if (identity === 'pr') {
-      if (prProfile?.wxNickName) profileNick = prProfile.wxNickName
-      if (prProfile?.wxAvatarUrl) avatarUrl = prProfile.wxAvatarUrl
+    if (identity === 'pr') {
+      profileNick = wxProfileDisplay.pickWxNick(acct?.wxNickName, wx?.wxNickName, prProfile?.wxNickName)
+      avatarUrl = wxProfileDisplay.pickWxAvatar(acct?.wxAvatarUrl, wx?.wxAvatarUrl, prProfile?.wxAvatarUrl)
       displaySub = userProfile.prDisplaySub(prProfile)
+    } else {
+      profileNick = wxProfileDisplay.pickWxNick(acct?.wxNickName, wx?.wxNickName, member?.wxNickName)
+      avatarUrl = wxProfileDisplay.pickWxAvatar(acct?.wxAvatarUrl, wx?.wxAvatarUrl, member?.wxAvatarUrl)
+      if (identity === 'talent') {
+        displaySub = member
+          ? memberStore.memberTypeLabel(member)
+          : wxLoggedIn
+            ? '完善多平台资料，报名更便捷'
+            : '达人 · 发现优质商单'
+      } else if (identity === 'shoot' || identity === 'edit') {
+        displaySub = member?.supplierProfile
+          ? supplierTeamProfile.supplierSummaryLabel(identity, member.supplierProfile)
+          : userProfile.supplierDisplaySub(identity)
+      }
     }
 
     const displayName = profileNick || '灵祺用户'
@@ -269,10 +263,11 @@ Page({
     this.setData({ wxLoginSubmitting: true })
     try {
       const role = identityTypes.accountRoleForWorkIdentity(identity)
+      const avatar = await wxProfileDisplay.persistWxAvatarUrl(String(this.data.wxLoginAvatar || '').trim())
       const data = await auth.wxLogin({
         role,
         wxNickName: nick,
-        wxAvatarUrl: String(this.data.wxLoginAvatar || '').trim(),
+        wxAvatarUrl: avatar,
       })
       await switchWorkIdentity.applyWorkIdentityAfterLogin(
         (data && data.token) || auth.readSessionToken(),
@@ -282,6 +277,8 @@ Page({
       try {
         await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
       } catch (_) {}
+      const acct = auth.readAccount()
+      if (acct) require('../../utils/accountMemberSync.js').syncLocalProfilesFromAccount(acct)
       wx.showToast({ title: '登录成功', icon: 'success' })
       this.setData({ showWxLoginSheet: false })
       setTabBarHidden(this, false)
@@ -325,13 +322,18 @@ Page({
     }
     this.setData({ profileSaving: true })
     try {
-      wxAccount.writeWxAccount({ wxNickName: n, wxAvatarUrl: av })
+      const avatarPersisted = await wxProfileDisplay.persistWxAvatarUrl(av)
+      wxAccount.writeWxAccount({ wxNickName: n, wxAvatarUrl: avatarPersisted })
+      const avFinal = avatarPersisted || av
+      try {
+        await auth.updateWxProfile(n, avFinal)
+      } catch (_) {}
       const identity = userProfile.readIdentity()
       const ts = new Date().toLocaleString('zh-CN', { hour12: false })
       if (identity === 'talent') {
         const prev = memberStore.readMember()
         if (prev) {
-          const member = { ...prev, wxNickName: n, wxAvatarUrl: av, updatedAt: ts }
+          const member = { ...prev, wxNickName: n, wxAvatarUrl: avFinal, updatedAt: ts }
           memberStore.writeMember(member)
           if (api.hasApi() && member.contact) {
             try {
@@ -345,7 +347,7 @@ Page({
         }
       } else {
         const prev = userProfile.readPrProfile() || userProfile.emptyPrProfile()
-        const saved = { ...prev, wxNickName: n, wxAvatarUrl: av, updatedAt: ts }
+        const saved = { ...prev, wxNickName: n, wxAvatarUrl: avFinal, updatedAt: ts }
         userProfile.writePrProfile(saved)
         if (api.hasApi() && String(saved.contactPhone || '').trim()) {
           try {
@@ -362,7 +364,7 @@ Page({
               city: saved.city || '',
               intro: saved.intro || '',
               wxNickName: n,
-              wxAvatarUrl: av,
+              wxAvatarUrl: avFinal,
               registeredAt: saved.registeredAt || ts,
               updatedAt: ts,
             })
@@ -379,9 +381,9 @@ Page({
         if (chat.canChat()) {
           const part = participant.getCurrentParticipant()
           part.displayName = n
-          part.avatarUrl = av
+          part.avatarUrl = avFinal
           if (part.memberSnapshot) {
-            part.memberSnapshot = { ...part.memberSnapshot, wxNickName: n, wxAvatarUrl: av }
+            part.memberSnapshot = { ...part.memberSnapshot, wxNickName: n, wxAvatarUrl: avFinal }
           }
           await chat.syncProfile(part)
         }

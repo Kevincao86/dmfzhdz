@@ -19,6 +19,25 @@ import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
+const WX_PLACEHOLDER_NICKS = new Set(['', '微信用户', '用户', '灵祺用户'])
+
+function mergeWxNick(incoming: string, existing?: string | null): string {
+  const inc = String(incoming || '').trim()
+  const ex = String(existing || '').trim()
+  if (inc && !WX_PLACEHOLDER_NICKS.has(inc)) return inc
+  if (ex && !WX_PLACEHOLDER_NICKS.has(ex)) return ex
+  return inc || ex || '微信用户'
+}
+
+function mergeWxAvatar(incoming: string, existing?: string | null): string {
+  const inc = String(incoming || '').trim()
+  const ex = String(existing || '').trim()
+  const usable = (u: string) => Boolean(u) && !u.startsWith('wxfile://')
+  if (usable(inc)) return inc
+  if (usable(ex)) return ex
+  return inc || ex
+}
+
 export type MpAccountRow = {
   id: string
   openid: string | null
@@ -273,8 +292,11 @@ async function provisionRegistryForAccount(
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const phone = accountPhoneKey(account)
   const loginLabel = String(account.login_name || '').trim()
-  const nick = String(wxNickName || account.wx_nick_name || loginLabel || '').trim() || '微信用户'
-  const avatar = String(wxAvatarUrl || account.wx_avatar_url || '').trim()
+  const nick = mergeWxNick(
+    String(wxNickName || account.wx_nick_name || loginLabel || '').trim(),
+    account.wx_nick_name,
+  )
+  const avatar = mergeWxAvatar(String(wxAvatarUrl || account.wx_avatar_url || '').trim(), account.wx_avatar_url)
 
   if (role === 'talent') {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
@@ -297,8 +319,8 @@ async function provisionRegistryForAccount(
       ...base,
       id: base.id,
       lingqiTalentId: lingqiTalentId || base.lingqiTalentId,
-      wxNickName: nick || base.wxNickName,
-      wxAvatarUrl: avatar || base.wxAvatarUrl,
+      wxNickName: mergeWxNick(nick, base.wxNickName),
+      wxAvatarUrl: mergeWxAvatar(avatar, base.wxAvatarUrl),
       wxOpenId: openId || base.wxOpenId || '',
       contact: base.contact || loginLabel || phone,
       wechatId: base.wechatId || loginLabel || phone,
@@ -357,6 +379,30 @@ async function provisionRegistryForAccount(
       active_role: 'pr',
     })
     return (await findAccountById(rest, account.id))!
+  }
+
+  if (role === 'pr' && account.lingqi_pr_id && account.registry_pr_id) {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    const prId = String(account.registry_pr_id || '').trim()
+    const prev = (data.mpPrUsers ?? []).find((u) => u && u.id === prId)
+    if (prev) {
+      const saved = upsertMpPrUser(data, {
+        ...prev,
+        wxNickName: mergeWxNick(nick, prev.wxNickName),
+        wxAvatarUrl: mergeWxAvatar(avatar, prev.wxAvatarUrl),
+        wxOpenId: String(account.openid || prev.wxOpenId || '').trim(),
+        updatedAt: now,
+      })
+      await io.save(data)
+      if (saved.wxNickName !== account.wx_nick_name || saved.wxAvatarUrl !== account.wx_avatar_url) {
+        await updateAccount(rest, account.id, {
+          wx_nick_name: saved.wxNickName || account.wx_nick_name,
+          wx_avatar_url: saved.wxAvatarUrl || account.wx_avatar_url,
+        })
+        return (await findAccountById(rest, account.id))!
+      }
+    }
   }
 
   return account
@@ -489,8 +535,8 @@ export async function mpAuthWxLogin(
     })
   } else if (input.wxNickName || input.wxAvatarUrl) {
     await updateAccount(rest, account.id, {
-      wx_nick_name: input.wxNickName || account.wx_nick_name,
-      wx_avatar_url: input.wxAvatarUrl || account.wx_avatar_url,
+      wx_nick_name: mergeWxNick(input.wxNickName || '', account.wx_nick_name),
+      wx_avatar_url: mergeWxAvatar(input.wxAvatarUrl || '', account.wx_avatar_url),
     })
     account = (await findAccountById(rest, account.id))!
   }
@@ -643,6 +689,28 @@ export async function mpAuthSwitchRole(
   return mpAuthEnsureIdentity(supabaseUrl, serviceRole, accountId, role)
 }
 
+/** 已登录：更新微信昵称头像并同步注册表 */
+export async function mpAuthUpdateWxProfile(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  wxNickName: string,
+  wxAvatarUrl: string,
+): Promise<MpAccountRow> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  let account = await findAccountById(rest, accountId)
+  if (!account) throw new Error('account_not_found')
+  const nick = mergeWxNick(wxNickName, account.wx_nick_name)
+  const avatar = mergeWxAvatar(wxAvatarUrl, account.wx_avatar_url)
+  await updateAccount(rest, accountId, {
+    wx_nick_name: nick,
+    wx_avatar_url: avatar,
+  })
+  account = (await findAccountById(rest, account.id))!
+  const role: MpAccountRole = account.active_role === 'pr' ? 'pr' : 'talent'
+  return provisionRegistryForAccount(supabaseUrl, serviceRole, account, role, nick, avatar)
+}
+
 /** 切换/登录后确保当前身份已在注册表生成 ID 并写回账号 */
 export async function mpAuthEnsureIdentity(
   supabaseUrl: string,
@@ -694,8 +762,8 @@ export async function mpAuthEnsureIdentity(
       lingqiShootTeamId: prev?.lingqiShootTeamId,
       lingqiEditTeamId: prev?.lingqiEditTeamId,
       memberType: prev?.memberType || 'douyin',
-      wxNickName: prev?.wxNickName || nick || '用户',
-      wxAvatarUrl: prev?.wxAvatarUrl || ensuredAccount.wx_avatar_url || '',
+      wxNickName: mergeWxNick(nick, prev?.wxNickName),
+      wxAvatarUrl: mergeWxAvatar(ensuredAccount.wx_avatar_url || '', prev?.wxAvatarUrl),
       wxOpenId: prev?.wxOpenId || ensuredAccount.openid || '',
       contact: String(prev?.contact || contactFallback).trim(),
       wechatId: String(prev?.wechatId || contactFallback).trim(),

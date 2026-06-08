@@ -21,6 +21,7 @@ import {
   mpAuthSetLoginCredentials,
   mpAuthEnsureIdentity,
   mpAuthSwitchRole,
+  mpAuthUpdateWxProfile,
   mpAuthWxLogin,
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
@@ -266,6 +267,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, sess.account)
+      sendJson(res, 200, { ok: true, account: payload })
+      return
+    }
+
+    if (action === 'update_wx_profile') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await mpAuthUpdateWxProfile(
+        supabaseUrl,
+        serviceRole,
+        sess.account.id,
+        pickAuthField(req, body, 'wxNickName'),
+        pickAuthField(req, body, 'wxAvatarUrl'),
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, account: payload })
       return
     }

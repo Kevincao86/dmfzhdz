@@ -115,6 +115,14 @@ async function refreshSession() {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function updateWxProfile(wxNickName, wxAvatarUrl) {
+  const data = await authPost('update_wx_profile', {
+    wxNickName: String(wxNickName || '').trim(),
+    wxAvatarUrl: String(wxAvatarUrl || '').trim(),
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 module.exports = {
   SESSION_KEY,
   ACCOUNT_KEY,
@@ -131,4 +139,5 @@ module.exports = {
   switchRole,
   ensureIdentity,
   refreshSession,
+  updateWxProfile,
 }
