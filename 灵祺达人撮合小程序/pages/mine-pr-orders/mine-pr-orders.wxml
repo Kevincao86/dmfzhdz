@@ -112,4 +112,18 @@
   <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">当前筛选条件下暂无发单</text>
   </view>
+
+  <view class="pr-share-sheet-mask" wx:if="{{showShareSheet}}" bindtap="onCloseShareSheet">
+    <view class="pr-share-sheet" catchtap="noopShareSheetTap">
+      <view class="pr-share-sheet-head">
+        <text class="pr-share-sheet-title">分享招募</text>
+        <text class="pr-share-sheet-close" bindtap="onCloseShareSheet">×</text>
+      </view>
+      <text wx:if="{{shareTitle}}" class="pr-share-sheet-sub">{{shareTitle}}</text>
+      <view class="pr-share-sheet-item" bindtap="onShareCopyText">分享文案</view>
+      <button class="pr-share-sheet-item pr-share-sheet-btn" open-type="share">分享小程序</button>
+      <view class="pr-share-sheet-item" bindtap="onShareTimelineTap">分享朋友圈</view>
+      <view class="pr-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
+    </view>
+  </view>
 </view>
