@@ -1,9 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { enrichMpOrder } from '../lib/mpSync/recruitmentDisplay'
+import {
+  submitRecruitmentVideo,
+  uploadRecruitmentVideoFile,
+  videoStatusLabel,
+} from '../lib/mpSync/recruitmentVideo'
 import {
   applicationStatusLabel,
   evaluateContactPrGate,
@@ -30,8 +35,14 @@ export default function RecruitmentDetailPage() {
   const [prChatMeta, setPrChatMeta] = useState<ReturnType<typeof extractPrChatMeta>>(null)
   const [contacting, setContacting] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const appliedFromUrl = search.get('applied') === '1'
   const applied = appliedFromUrl || (id ? hasAppliedToOrder(id) : false) || contactGate.hasApplication
+  const myApplicant = contactGate.applicant
+  const videoStatus = myApplicant ? String(myApplicant.videoStatus || '') : ''
+  const videoRejectReason = myApplicant && myApplicant.videoRejectReason ? String(myApplicant.videoRejectReason) : ''
+  const canUploadVideo = applied && (!videoStatus || videoStatus === 'rejected')
 
   useEffect(() => {
     if (!id) {
@@ -122,11 +133,59 @@ export default function RecruitmentDetailPage() {
     }
   }
 
+  async function reloadOrder() {
+    if (!id) return
+    const reg = await fetchMpRegistry()
+    const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
+    const mp = list.find((o) => o && o.id === id)
+    if (!mp) return
+    const enriched = enrichMpOrder(mp)
+    setMpRaw(mp)
+    setView(enriched)
+    const gate = evaluateContactPrGate(mp, id)
+    setContactGate(gate)
+    setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+  }
+
+  function onPickVideo() {
+    const applicantId = myApplicant ? String(myApplicant.id || '') : ''
+    if (!id || !applicantId) {
+      window.alert('缺少报名信息，请重新报名后再上传')
+      return
+    }
+    fileRef.current?.click()
+  }
+
+  async function onVideoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    const applicantId = myApplicant ? String(myApplicant.id || '') : ''
+    if (!file || !id || !applicantId) return
+    setUploadingVideo(true)
+    try {
+      const url = await uploadRecruitmentVideoFile(file)
+      await submitRecruitmentVideo(id, applicantId, url)
+      window.alert('视频已提交，请等待 PR 审核')
+      await reloadOrder()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '上传失败')
+    } finally {
+      setUploadingVideo(false)
+    }
+  }
+
   const statusLabel = applicationStatusLabel(contactGate)
   const chatEnabled = role === 'talent' && canChat() && !!prChatMeta
 
   return (
     <div className="max-w-2xl space-y-4">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="video/mp4,video/quicktime,video/*"
+        className="hidden"
+        onChange={(e) => void onVideoFileChange(e)}
+      />
       <Link to="/hall" className="text-sm text-slate-400 hover:text-white">
         ← 返回招募大厅
       </Link>
@@ -160,6 +219,46 @@ export default function RecruitmentDetailPage() {
                 <p className="mt-1 text-xs opacity-90">PR 已通过您的报名，可联系招募方沟通排期。</p>
               ) : null}
             </div>
+          ) : null}
+
+          {role === 'talent' && applied ? (
+            <section className="surface-card rounded-xl border p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-medium">探店成片</h3>
+                {videoStatus ? (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      videoStatus === 'passed'
+                        ? 'bg-emerald-500/10 text-emerald-700'
+                        : videoStatus === 'rejected'
+                          ? 'bg-red-500/10 text-red-700'
+                          : 'bg-amber-500/10 text-amber-700'
+                    }`}
+                  >
+                    视频{videoStatusLabel(videoStatus)}
+                  </span>
+                ) : null}
+              </div>
+              {videoStatus === 'rejected' && videoRejectReason ? (
+                <p className="text-xs text-red-600 rounded-lg bg-red-50 px-3 py-2">驳回原因：{videoRejectReason}</p>
+              ) : null}
+              {videoStatus === 'pending' ? (
+                <p className="text-xs text-[var(--shell-muted)]">视频已提交，请等待 PR 审核。审核结果将通过消息通知。</p>
+              ) : null}
+              {videoStatus === 'passed' ? (
+                <p className="text-xs text-emerald-700">视频已通过 PR 审核。</p>
+              ) : null}
+              {canUploadVideo ? (
+                <button
+                  type="button"
+                  disabled={uploadingVideo}
+                  className="w-full py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 disabled:opacity-60 transition-colors"
+                  onClick={onPickVideo}
+                >
+                  {uploadingVideo ? '上传中…' : videoStatus === 'rejected' ? '重新上传视频' : '上传视频'}
+                </button>
+              ) : null}
+            </section>
           ) : null}
 
           <section className="surface-card rounded-xl border p-4">
