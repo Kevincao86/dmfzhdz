@@ -8,6 +8,7 @@ const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const prOrderFilters = require('../../utils/prOrderListFilters.js')
+const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -161,19 +162,19 @@ Page({
     this.load().finally(() => wx.stopPullDownRefresh())
   },
   async load() {
-    const local = applicationsStore.readPublishedOrders()
-    if (!local.length) {
-      this.setData({
-        rows: [],
-        filteredRows: [],
-        loading: false,
-        err: '',
-        filterCountText: '',
-        cityOptions: ['全部'],
-      })
-      return
-    }
     if (!api.hasApi()) {
+      const local = applicationsStore.readPublishedOrders()
+      if (!local.length) {
+        this.setData({
+          rows: [],
+          filteredRows: [],
+          loading: false,
+          err: '',
+          filterCountText: '',
+          cityOptions: ['全部'],
+        })
+        return
+      }
       const rows = local.map((item) => mapRow(item, null))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
       const { filtered, filterCountText } = this.applyFilters(rows)
@@ -191,6 +192,18 @@ Page({
     try {
       const reg = await ops.fetchRegistry()
       const mpList = reg.mpRecruitmentOrders || []
+      const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)
+      if (!local.length) {
+        this.setData({
+          rows: [],
+          filteredRows: [],
+          loading: false,
+          err: '',
+          filterCountText: '',
+          cityOptions: ['全部'],
+        })
+        return
+      }
       const rows = local.map((item) => {
         const mp = mpList.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)

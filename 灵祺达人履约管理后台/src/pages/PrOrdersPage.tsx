@@ -5,7 +5,8 @@ import { getAccount } from '../lib/mpSession'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
-import { readPublishedOrders } from '../lib/mpRecruitment/publishedOrders'
+import { readPublishedOrders, listPublishedOrdersForCurrentPr } from '../lib/mpRecruitment/publishedOrders'
+import { syncClientStateWithServer } from '../lib/mpAccountClientSync'
 import {
   deletePublishDraft,
   draftDisplayTitle,
@@ -71,15 +72,19 @@ export default function PrOrdersPage() {
   }, [])
 
   async function loadPublished() {
-    const local = readPublishedOrders()
-    if (!local.length) {
-      setRows([])
-      return
-    }
     setErr('')
     try {
+      await syncClientStateWithServer().catch(() => null)
       const reg = await fetchMpRegistry()
-      const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
+      const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
+        string,
+        unknown
+      >[]
+      const local = listPublishedOrdersForCurrentPr(mpList)
+      if (!local.length) {
+        setRows([])
+        return
+      }
       setRows(
         local.map((item) => {
           const mp = mpList.find((o) => o && o.id === item.mpOrderId)
@@ -98,8 +103,9 @@ export default function PrOrdersPage() {
       )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
+      const fallback = readPublishedOrders()
       setRows(
-        local.map((item) => {
+        fallback.map((item) => {
           const enriched = listFilters.enrichMpOrderListItem(null, item)
           return {
             ...enriched,
