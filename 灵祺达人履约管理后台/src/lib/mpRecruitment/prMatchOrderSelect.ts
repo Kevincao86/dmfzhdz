@@ -53,6 +53,17 @@ export function buildPrMatchOrderOptions(
   return opts
 }
 
+export function filterPrMatchOrderOptions(options: PrMatchOrderOption[], keyword: string): PrMatchOrderOption[] {
+  const kw = String(keyword || '').trim().toLowerCase()
+  if (!kw) return options
+  return options.filter((o) => {
+    const label = String(o.label || '').toLowerCase()
+    const title = String(o.title || '').toLowerCase()
+    const id = String(o.id || '').toLowerCase()
+    return label.includes(kw) || title.includes(kw) || id.includes(kw)
+  })
+}
+
 export function matchHintForSelection(
   board: PrBoardId,
   selectedId: string,

@@ -154,7 +154,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   ]
 
   return (
-    <div className="space-y-4">
+    <div className="hall-page">
       <PageHero
         title="招募大厅"
         subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
@@ -162,13 +162,13 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       />
 
       <input
-        className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
+        className="hall-search-input panel-input"
         placeholder="搜索招募、门店、城市"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
       />
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="hall-segment-row">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -183,7 +183,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       </div>
 
       {hallTab === 'paichian' ? (
-        <div className="flex gap-2 flex-wrap">
+        <div className="hall-segment-row">
           {paichianSubs.map((t) => (
             <button
               key={t.id}
@@ -198,7 +198,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 text-sm">
+      <div className="hall-filter-row">
         <select
           className="rounded-lg panel-select px-2 py-1.5"
           value={filterPlatform}

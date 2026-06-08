@@ -283,6 +283,9 @@ Page({
     prMatchOrderLabels: [],
     prMatchOrderIndex: 0,
     prMatchOrderLabel: '',
+    showPrMatchOrderSheet: false,
+    prMatchOrderKeyword: '',
+    prMatchOrderFiltered: [],
     registryCache: null,
     prViewMode: 'ai',
     prAllModeLabel: '全部达人',
@@ -615,14 +618,34 @@ Page({
     })
     this.applyTalentFilters()
   },
-  onPrMatchOrderChange(e) {
-    const idx = Number(e.detail.value) || 0
+  refreshPrMatchOrderFiltered(keyword) {
+    const kw = keyword != null ? keyword : this.data.prMatchOrderKeyword
+    const filtered = prMatchOrderSelect.filterPrMatchOrderOptions(this.data.prMatchOrderOptions || [], kw)
+    this.setData({ prMatchOrderFiltered: filtered })
+  },
+  openPrMatchOrderSheet() {
+    this.setData({ showPrMatchOrderSheet: true, prMatchOrderKeyword: '' })
+    this.refreshPrMatchOrderFiltered('')
+  },
+  closePrMatchOrderSheet() {
+    this.setData({ showPrMatchOrderSheet: false, prMatchOrderKeyword: '' })
+  },
+  onPrMatchOrderKeyword(e) {
+    const kw = e.detail.value || ''
+    this.setData({ prMatchOrderKeyword: kw })
+    this.refreshPrMatchOrderFiltered(kw)
+  },
+  onPrMatchOrderPick(e) {
+    const id = e.currentTarget.dataset.id
     const opts = this.data.prMatchOrderOptions || []
-    const hit = opts[idx]
+    const hit = opts.find((o) => o.id === id)
     if (!hit) return
     const board = this.data.prBoard || 'talent'
+    const idx = Math.max(0, opts.findIndex((o) => o.id === hit.id))
     prMatchOrderSelect.writePrMatchOrderId(board, hit.id)
     this.setData({
+      showPrMatchOrderSheet: false,
+      prMatchOrderKeyword: '',
       prMatchOrderId: hit.id,
       prMatchOrderIndex: idx,
       prMatchOrderLabel: hit.label,
