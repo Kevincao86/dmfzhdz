@@ -4,20 +4,38 @@ import { deleteMpLibraryEntries, fetchRegistry, type RegistryTalentLibraryEntry 
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
+  enrichTalentLibraryEntry,
+  matchTalentLibraryFilters,
+  TALENT_DOUYIN_LEVEL_OPTS,
+  TALENT_FOLLOWER_TIER_OPTS,
+  TALENT_GENDER_OPTS,
+  TALENT_LIBRARY_TAG_OPTS,
+} from '../../meooRegistryShared/talentLibraryFilters'
+import {
   extractProfileLinkUrl,
   profileLinkLabel,
   resolveTalentProfileHref,
 } from '../../meooRegistryShared/talentProfileLink'
 
+function toggleChip(list: string[], item: string): string[] {
+  return list.includes(item) ? list.filter((x) => x !== item) : [...list, item]
+}
+
 export default function OpsTalentLibraryPage() {
   const [tab, setTab] = useState<RecruitmentPlatform>('抖音')
   const [entries, setEntries] = useState<RegistryTalentLibraryEntry[]>([])
   const [q, setQ] = useState('')
+  const [genderFilter, setGenderFilter] = useState('全部')
+  const [followerFilters, setFollowerFilters] = useState<string[]>([])
+  const [levelFilters, setLevelFilters] = useState<string[]>([])
+  const [tagFilter, setTagFilter] = useState('全部')
 
   const load = useCallback(async () => {
     try {
       const r = await fetchRegistry()
-      setEntries(r.talentLibraryEntries ?? [])
+      const members = r.mpTalentMembers ?? []
+      const enriched = (r.talentLibraryEntries ?? []).map((e) => enrichTalentLibraryEntry(e, members))
+      setEntries(enriched)
     } catch {
       setEntries([])
     }
@@ -29,9 +47,20 @@ export default function OpsTalentLibraryPage() {
     return () => window.clearInterval(t)
   }, [load])
 
+  const filterState = useMemo(
+    () => ({
+      gender: genderFilter,
+      followerTiers: followerFilters,
+      douyinLevels: levelFilters,
+      tag: tagFilter,
+    }),
+    [genderFilter, followerFilters, levelFilters, tagFilter],
+  )
+
   const rows = useMemo(() => {
     const plat = tab
     let list = entries.filter((e) => e.platform === plat)
+    list = list.filter((e) => matchTalentLibraryFilters(e, filterState))
     const needle = q.trim().toLowerCase()
     if (needle) {
       list = list.filter(
@@ -41,16 +70,24 @@ export default function OpsTalentLibraryPage() {
           e.contact.toLowerCase().includes(needle) ||
           e.wechatId.toLowerCase().includes(needle) ||
           (e.lingqiTalentId || '').toLowerCase().includes(needle) ||
+          (e.gender || '').toLowerCase().includes(needle) ||
+          (e.accountTags || []).join(' ').toLowerCase().includes(needle) ||
           extractProfileLinkUrl(e.profileLink).toLowerCase().includes(needle) ||
           (e.province || '').toLowerCase().includes(needle) ||
           (e.city || '').toLowerCase().includes(needle),
       )
     }
     return [...list].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
-  }, [entries, tab, q])
+  }, [entries, tab, q, filterState])
 
   const rowIds = useMemo(() => rows.map((e) => e.id), [rows])
   const batch = useOpsBatchSelection(rowIds)
+
+  const hasActiveFilters =
+    genderFilter !== '全部' ||
+    followerFilters.length > 0 ||
+    levelFilters.length > 0 ||
+    tagFilter !== '全部'
 
   async function onBatchDelete() {
     if (!batch.checkedIds.length || batch.deleting) return
@@ -75,7 +112,7 @@ export default function OpsTalentLibraryPage() {
     }
   }
 
-  const colCount = tab === '抖音' ? 13 : 12
+  const colCount = tab === '抖音' ? 15 : 14
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
@@ -105,7 +142,7 @@ export default function OpsTalentLibraryPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="搜索达人 ID / 昵称 / 省市 / 联系 / 微信"
+          placeholder="搜索达人 ID / 昵称 / 省市 / 联系 / 微信 / 标签"
           className="min-w-[200px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
         />
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
@@ -126,6 +163,112 @@ export default function OpsTalentLibraryPage() {
         </span>
       </div>
 
+      <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">性别</span>
+          {TALENT_GENDER_OPTS.map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGenderFilter(g)}
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs transition-colors',
+                genderFilter === g
+                  ? 'bg-indigo-600 text-white'
+                  : 'border border-slate-700 text-slate-400 hover:text-white',
+              )}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">粉丝量级</span>
+          {TALENT_FOLLOWER_TIER_OPTS.map((tier) => (
+            <button
+              key={tier}
+              type="button"
+              onClick={() => setFollowerFilters((prev) => toggleChip(prev, tier))}
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs transition-colors',
+                followerFilters.includes(tier)
+                  ? 'bg-sky-600 text-white'
+                  : 'border border-slate-700 text-slate-400 hover:text-white',
+              )}
+            >
+              {tier}
+            </button>
+          ))}
+        </div>
+
+        {tab === '抖音' ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">带货等级</span>
+            {TALENT_DOUYIN_LEVEL_OPTS.map((lv) => (
+              <button
+                key={lv}
+                type="button"
+                onClick={() => setLevelFilters((prev) => toggleChip(prev, lv))}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs transition-colors',
+                  levelFilters.includes(lv)
+                    ? 'bg-violet-600 text-white'
+                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                )}
+              >
+                {lv}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">达人标签</span>
+          <button
+            type="button"
+            onClick={() => setTagFilter('全部')}
+            className={cn(
+              'rounded-md px-2.5 py-1 text-xs transition-colors',
+              tagFilter === '全部'
+                ? 'bg-emerald-600 text-white'
+                : 'border border-slate-700 text-slate-400 hover:text-white',
+            )}
+          >
+            全部
+          </button>
+          {TALENT_LIBRARY_TAG_OPTS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setTagFilter(tag)}
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs transition-colors',
+                tagFilter === tag
+                  ? 'bg-emerald-600 text-white'
+                  : 'border border-slate-700 text-slate-400 hover:text-white',
+              )}
+            >
+              {tag}
+            </button>
+          ))}
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={() => {
+                setGenderFilter('全部')
+                setFollowerFilters([])
+                setLevelFilters([])
+                setTagFilter('全部')
+              }}
+              className="ml-2 text-xs text-slate-500 underline hover:text-slate-300"
+            >
+              清除筛选
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1200px] text-left text-sm">
@@ -143,6 +286,8 @@ export default function OpsTalentLibraryPage() {
                 <th className="px-3 py-3">灵祺达人 ID</th>
                 <th className="px-3 py-3">平台账号</th>
                 <th className="px-3 py-3">昵称</th>
+                <th className="px-3 py-3">性别</th>
+                <th className="px-3 py-3">标签</th>
                 <th className="px-3 py-3">省份</th>
                 <th className="px-3 py-3">城市</th>
                 <th className="px-3 py-3">粉丝</th>
@@ -165,6 +310,7 @@ export default function OpsTalentLibraryPage() {
                 rows.map((e) => {
                   const href = resolveTalentProfileHref(e.platform, e.profileLink)
                   const label = profileLinkLabel(e.platform, e.profileLink)
+                  const tags = e.accountTags || []
                   return (
                     <tr key={e.id} className="hover:bg-slate-800/30">
                       <td className="px-3 py-2">
@@ -181,6 +327,16 @@ export default function OpsTalentLibraryPage() {
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-300">{e.platformAccount}</td>
                       <td className="px-3 py-2 text-slate-200">{e.platformNickname}</td>
+                      <td className="px-3 py-2 text-slate-400">{e.gender || '—'}</td>
+                      <td className="max-w-[160px] px-3 py-2 text-xs text-slate-400">
+                        {tags.length ? (
+                          <span className="line-clamp-2" title={tags.join('、')}>
+                            {tags.join('、')}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-slate-400">{e.province || '—'}</td>
                       <td className="px-3 py-2 text-slate-400">{e.city || '—'}</td>
                       <td className="px-3 py-2 tabular-nums text-slate-400">

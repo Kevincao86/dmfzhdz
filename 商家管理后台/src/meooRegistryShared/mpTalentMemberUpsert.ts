@@ -6,6 +6,7 @@ import {
   type MemberWithPlatformProfiles,
 } from './mpTalentPlatformProfileResolve.js'
 import { normalizeRecruitmentPlatform } from './recruitmentInfoFilter.js'
+import { collectTagsForPlatform } from './talentLibraryFilters.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
 import { extractProfileLinkUrl } from './talentProfileLink.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
@@ -13,11 +14,12 @@ import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.j
 function profileToApplicant(
   platform: string,
   profile: RegistryMpTalentPlatformProfile,
-  contact: string,
-  wechatId: string,
-  province: string,
-  city: string,
+  member: RegistryMpTalentMember,
 ) {
+  const contact = String(member.contact || '').trim()
+  const wechatId = String(member.wechatId || '').trim()
+  const province = String(member.province || '').trim()
+  const city = String(member.city || '').trim()
   const plat = normalizeRecruitmentPlatform(platform)
   const nick = String(profile.platformNickname || '').trim()
   const alipay = String(profile.alipayAccount || '').trim()
@@ -36,8 +38,10 @@ function profileToApplicant(
     quotePrice: String(profile.quotePrice || '').trim(),
     alipayAccount: alipay,
     paymentMethod: alipay ? `支付宝：${alipay}` : '支付宝',
-    province: String(province || '').trim() || undefined,
-    city: String(city || '').trim() || undefined,
+    province: province || undefined,
+    city: city || undefined,
+    gender: String(member.gender || '').trim() || undefined,
+    accountTags: collectTagsForPlatform(member, plat),
     appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
 }
@@ -71,10 +75,6 @@ export function upsertMpTalentMember(
   else list.unshift(next)
   data.mpTalentMembers = list.slice(0, 5000)
 
-  const contact = next.contact
-  const wechatId = next.wechatId
-  const province = String(next.province || '').trim()
-  const city = String(next.city || '').trim()
   const libOpts = {
     mpOrderId: '',
     merchantOrderNo: '',
@@ -83,7 +83,7 @@ export function upsertMpTalentMember(
   for (const { platform, profile } of collectMemberPlatformProfiles(next)) {
     upsertTalentLibraryFromApplicant(data, {
       platform,
-      applicant: profileToApplicant(platform, profile, contact, wechatId, province, city),
+      applicant: profileToApplicant(platform, profile, next),
       ...libOpts,
     })
   }

@@ -164,6 +164,8 @@ export type RegistryTalentLibraryEntry = {
   lastMerchantOrderNo?: string
   province?: string
   city?: string
+  gender?: string
+  accountTags?: string[]
 }
 
 export type RegistryMpTalentMember = {
@@ -181,6 +183,7 @@ export type RegistryMpTalentMember = {
   lingqiShootTeamId?: string
   lingqiEditTeamId?: string
   accountTags?: string[]
+  gender?: string
   registeredAt: string
   updatedAt: string
 }

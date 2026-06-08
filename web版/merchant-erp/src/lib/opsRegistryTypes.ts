@@ -202,6 +202,8 @@ export type RegistryMpRecruitmentApplicant = {
   appliedAt: string
   province?: string
   city?: string
+  gender?: string
+  accountTags?: string[]
   assignedIceSlotId?: string
   assignedVideoLabel?: string
   assignedVideoDownloadUrl?: string
@@ -246,6 +248,8 @@ export type RegistryTalentLibraryEntry = {
   lastMerchantOrderNo?: string
   province?: string
   city?: string
+  gender?: string
+  accountTags?: string[]
 }
 
 /** 达人招募小程序 · 单平台资料（抖音/小红书） */

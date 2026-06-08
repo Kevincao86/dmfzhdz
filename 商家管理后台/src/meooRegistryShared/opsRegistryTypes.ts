@@ -169,6 +169,8 @@ export type RegistryMpRecruitmentApplicant = {
   appliedAt: string
   province?: string
   city?: string
+  gender?: string
+  accountTags?: string[]
   /** 云剪单：系统分配的成片槽位 */
   assignedIceSlotId?: string
   assignedVideoLabel?: string
@@ -201,6 +203,8 @@ export type RegistryTalentLibraryEntry = {
   lastMerchantOrderNo?: string
   province?: string
   city?: string
+  gender?: string
+  accountTags?: string[]
 }
 
 export type RegistryMpTalentPlatformProfile = {
@@ -232,6 +236,7 @@ export type RegistryMpTalentMember = {
   /** 剪辑团队固定 ID（LQ-J-xxxxxx） */
   lingqiEditTeamId?: string
   accountTags?: string[]
+  gender?: string
   douyin?: RegistryMpTalentPlatformProfile
   xiaohongshu?: RegistryMpTalentPlatformProfile
   /** 履约 Web / 小程序多平台资料（优先于 douyin / xiaohongshu） */
