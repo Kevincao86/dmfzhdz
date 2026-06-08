@@ -68,16 +68,19 @@
       <text>驳回原因：{{item.videoRejectReason}}</text>
     </view>
     <view class="app-card__actions">
-      <view
+      <button
         wx:if="{{item.canUploadVideo}}"
-        class="app-card__btn app-card__btn--primary {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? 'app-card__btn--disabled' : ''}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+        disabled="{{!!uploadingKey}}"
         catchtap="onUploadVideo"
         data-id="{{item.mpOrderId}}"
         data-applicant-id="{{item.applicantId}}"
       >
-        <text wx:if="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}">上传中…</text>
-        <text wx:else>{{item.uploadBtnLabel}}</text>
-      </view>
+        {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : item.uploadBtnLabel}}
+      </button>
       <view class="app-card__foot app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
         <text>查看商单详情</text>
         <text class="app-card__link">›</text>

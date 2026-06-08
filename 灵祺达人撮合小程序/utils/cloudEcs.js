@@ -6,6 +6,7 @@ const { withTimeout } = require('./fetchTimeout.js')
 
 const FN = 'mpErpProxy'
 const CLOUD_CALL_MS = 24000
+const CLOUD_CALL_UPLOAD_MS = 125000
 
 function cloudReady() {
   return !!(config.MP_USE_CLOUD_PROXY && String(config.MP_CLOUD_ENV || '').trim() && wx.cloud)
@@ -44,7 +45,8 @@ function callCloud(method, path, data, headers) {
       },
     })
   })
-  return withTimeout(run, CLOUD_CALL_MS, '云函数')
+  const ms = /video-upload/i.test(String(path || '')) ? CLOUD_CALL_UPLOAD_MS : CLOUD_CALL_MS
+  return withTimeout(run, ms, '云函数')
 }
 
 module.exports = {

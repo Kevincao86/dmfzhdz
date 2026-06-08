@@ -3,11 +3,7 @@ import { Link } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { readApplications, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
-import {
-  submitRecruitmentVideo,
-  uploadRecruitmentVideoFile,
-  videoStatusLabel,
-} from '../lib/mpSync/recruitmentVideo'
+import { uploadAndSubmitRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
 import {
   APPLICATION_TIME_FILTERS,
   matchApplicationTimeFilter,
@@ -115,8 +111,7 @@ function TalentApplicationsPage() {
     const key = `${app.mpOrderId}-${app.applicantId}`
     setUploadingKey(key)
     try {
-      const url = await uploadRecruitmentVideoFile(file)
-      await submitRecruitmentVideo(app.mpOrderId, app.applicantId, url)
+      await uploadAndSubmitRecruitmentVideo(file, app.mpOrderId, app.applicantId)
       alert('视频已提交，请等待 PR 审核')
       await reloadApps()
     } catch (err) {

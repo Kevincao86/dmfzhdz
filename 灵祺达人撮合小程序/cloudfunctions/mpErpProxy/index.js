@@ -68,7 +68,11 @@ function upstreamRequest(t, method, body, headers) {
   return new Promise((resolve, reject) => {
     const payload = body != null && method !== 'GET' ? JSON.stringify(body) : ''
     const reqPath = t.mode === 'ip' ? t.path : `${new URL(t.fullUrl).pathname}${new URL(t.fullUrl).search}`
-    const timeoutMs = /registry|hall-registry/i.test(reqPath) ? 45000 : 20000
+    const timeoutMs = /video-upload/i.test(reqPath)
+      ? 120000
+      : /registry|hall-registry/i.test(reqPath)
+        ? 45000
+        : 20000
     let opts
     if (t.mode === 'ip') {
       opts = {
@@ -125,7 +129,7 @@ function upstreamRequest(t, method, body, headers) {
       })
     })
     req.on('error', reject)
-    req.setTimeout(20000, () => {
+    req.setTimeout(timeoutMs, () => {
       req.destroy(new Error('timeout'))
     })
     if (payload) req.write(payload)
