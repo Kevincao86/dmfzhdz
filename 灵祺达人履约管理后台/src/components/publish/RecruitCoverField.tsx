@@ -185,18 +185,24 @@ export default function RecruitCoverField({ platform, talentTags, coverImage, co
             </div>
           ) : null}
 
-          <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4 content-start">
-            {galleryItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`overflow-hidden rounded-xl border text-left ${coverLibraryId === item.id ? 'border-violet-400 ring-2 ring-violet-400/40' : 'border-white/10'}`}
-                onClick={() => onPickLibrary(item)}
-              >
-                <img src={item.url} alt={item.label} className="aspect-[5/4] w-full object-cover" />
-                <span className="block px-2 py-1.5 text-xs text-white/80">{item.label}</span>
-              </button>
-            ))}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <div className="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 lg:grid-cols-4">
+              {galleryItems.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`flex flex-col overflow-hidden rounded-xl border text-left ${
+                    coverLibraryId === item.id ? 'border-violet-400 ring-2 ring-violet-400/40' : 'border-white/10'
+                  }`}
+                  onClick={() => onPickLibrary(item)}
+                >
+                  <div className="aspect-[5/4] w-full shrink-0 overflow-hidden bg-black/20">
+                    <img src={item.url} alt={item.label} className="h-full w-full object-cover" loading="lazy" />
+                  </div>
+                  <span className="block px-2 py-1.5 text-xs text-white/80">{item.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
