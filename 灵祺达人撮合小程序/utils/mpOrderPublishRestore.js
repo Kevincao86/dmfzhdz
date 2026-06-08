@@ -69,6 +69,8 @@ function formPatchFromMpOrder(mp) {
     applyFormFields: Array.isArray(meta.applyFormFields)
       ? meta.applyFormFields.map((f) => ({ ...f }))
       : [],
+    coverImage: String(mp?.coverImage || meta.coverImage || '').trim(),
+    coverLibraryId: String(meta.coverLibraryId || '').trim(),
     ...livePublishForm.restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp?.region && mp.region !== '全国') {

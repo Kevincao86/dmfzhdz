@@ -1264,3 +1264,74 @@
   margin-top: 24rpx;
   width: 100%;
 }
+
+.pub-cover-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: rgba(71, 85, 105, 0.85);
+}
+
+.pub-cover-preview {
+  display: block;
+  width: 100%;
+  height: 280rpx;
+  margin-top: 16rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.pub-cover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.pub-cover-btn {
+  margin: 0;
+  padding: 0 24rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  font-size: 24rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.85);
+  color: #4338ca;
+  border: 1rpx solid rgba(99, 102, 241, 0.25);
+}
+
+.pub-cover-btn--ghost {
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.25);
+}
+
+.pub-cover-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx;
+  padding: 24rpx;
+}
+
+.pub-cover-cell {
+  overflow: hidden;
+  border-radius: 16rpx;
+  border: 2rpx solid transparent;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.pub-cover-cell--on {
+  border-color: #7c3aed;
+}
+
+.pub-cover-cell-img {
+  display: block;
+  width: 100%;
+  height: 200rpx;
+}
+
+.pub-cover-cell-label {
+  display: block;
+  padding: 12rpx 16rpx;
+  font-size: 22rpx;
+  color: #475569;
+}

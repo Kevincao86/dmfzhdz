@@ -20,6 +20,7 @@ import {
   validateLivePublish,
   type LivePublishFields,
 } from './livePublishForm'
+import { buildCoverFieldsForOrder } from './recruitCoverLibrary'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -46,6 +47,10 @@ export type PublishForm = {
   applyFormTemplateId: string
   applyFormTemplateName: string
   applyFormFields: ApplyField[]
+  /** 用户上传封面 data URL（选填） */
+  coverImage?: string
+  /** 图库封面 id（选填；与 coverImage 二选一） */
+  coverLibraryId?: string
   shootDate: string
   shootTimeStart: string
   shootTimeEnd: string
@@ -375,6 +380,7 @@ export function buildPublishOrder(
   const deadline = resolveSignupDeadline(form)
   const recruitmentInfo = buildRecruitmentInfo(form, recruitModeId, recruitTarget)
   const pr = readPrProfile()
+  const coverFields = buildCoverFieldsForOrder(form)
   const order: Record<string, unknown> = {
     id: mpId,
     sourceMerchantOrderId:
@@ -399,6 +405,7 @@ export function buildPublishOrder(
     category: mode.category,
     publisherIdentity: 'pr',
     publisherTemplateId: 'publish-wizard-v2',
+    coverImage: coverFields.coverImage,
     mpPublishMeta: {
       prParticipantKey: prParticipantKey(pr),
       prDisplayName: prDisplayName(pr),
@@ -454,6 +461,9 @@ export function buildPublishOrder(
       applyFormTemplateId: form.applyFormTemplateId,
       applyFormTemplateName: form.applyFormTemplateName || '',
       applyFormFields: form.applyFormFields || [],
+      coverImage: coverFields.coverImage,
+      coverLibraryId: coverFields.coverLibraryId,
+      coverImageSource: coverFields.coverImageSource,
     },
   }
   order.hall = 'normal'

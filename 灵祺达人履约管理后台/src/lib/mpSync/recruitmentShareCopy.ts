@@ -11,11 +11,13 @@ export function shareCopyHeader(prProfile?: ReturnType<typeof readPrProfile> | n
   return '【灵祺星选平台】'
 }
 
-function apiBase(): string {
-  const base = String(import.meta.env.VITE_MP_API_BASE || '').trim().replace(/\/$/, '')
-  return base || 'https://mofangdianai.com/erp-api'
+export function buildRecruitmentMpPath(orderId: string): string {
+  const id = String(orderId || '').trim()
+  if (!id) return ''
+  return `/pages/detail/detail?id=${encodeURIComponent(id)}`
 }
 
+/** 报名地址：小程序商单详情路径；自定义 VITE_MP_SHARE_APPLY_BASE_URL 仍优先 */
 export function buildRecruitmentApplyLink(orderId: string): string {
   const id = String(orderId || '').trim()
   if (!id) return ''
@@ -25,7 +27,7 @@ export function buildRecruitmentApplyLink(orderId: string): string {
     const sep = custom.includes('?') ? '&' : '?'
     return `${custom}${sep}mpId=${encodeURIComponent(id)}`
   }
-  return `${apiBase()}/mp-recruit/apply?mpId=${encodeURIComponent(id)}`
+  return buildRecruitmentMpPath(id)
 }
 
 export function formatShareRecruitmentInfo(info: string): string {
@@ -63,7 +65,7 @@ export function formatShareRecruitmentInfo(info: string): string {
 
 function buildShareGuideBlock(orderId: string): string {
   const applyLink = buildRecruitmentApplyLink(orderId)
-  const openHint = '请打开「灵祺星选平台」小程序，在招募大厅找到本单或联系发布者获取详情页报名。'
+  const openHint = '请打开灵祺星选平台 小程序或网址（https://dr.mofangdianai.com/）'
   const parts = [GUIDE_DIVIDER, '']
   if (applyLink) parts.push(`报名地址：${applyLink}`, openHint)
   else parts.push(openHint)

@@ -53,12 +53,20 @@ Page({
   },
   onShareAppMessage() {
     const mpShare = require('../../utils/mpShare.js')
+    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
     mpShare.enableShareMenu()
     const v = this.data.view
-    return {
+    const mp = this.data.mpOrder
+    const share = {
       title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
+    if (mp) {
+      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      const imageUrl = recruitCoverLib.resolveShareImageUrl(coverUrl)
+      if (imageUrl) share.imageUrl = imageUrl
+    }
+    return share
   },
   async loadOrder(id) {
     if (!api.hasApi()) {
