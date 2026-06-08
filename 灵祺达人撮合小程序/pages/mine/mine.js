@@ -106,24 +106,8 @@ Page({
       const chat = require('../../utils/talentChat.js')
       if (chat.canChat()) await chat.syncProfile()
     } catch (_) {}
-    if (auth.isLoggedIn()) {
-      try {
-        const acct = auth.readAccount()
-        if (acct) require('../../utils/accountMemberSync.js').syncWxAccountFromAuthAccount(acct)
-      } catch (_) {}
-      try {
-        await auth.refreshSession()
-      } catch (_) {}
-      try {
-        await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
-      } catch (_) {}
-      try {
-        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
-      } catch (_) {}
-    }
     try {
       this.refresh()
-      void this.refreshNotifyBadge()
     } catch (e) {
       console.error('[mine] refresh', e)
       this.setData({
@@ -134,7 +118,31 @@ Page({
         displaySub: '页面加载异常，请删除小程序后重试',
       })
       wx.showToast({ title: '我的页加载失败', icon: 'none' })
+      return
     }
+    if (auth.isLoggedIn()) {
+      try {
+        const acct = auth.readAccount()
+        if (acct) require('../../utils/accountMemberSync.js').syncWxAccountFromAuthAccount(acct)
+      } catch (_) {}
+      try {
+        await auth.refreshSession()
+        const acct = auth.readAccount()
+        if (acct) require('../../utils/accountMemberSync.js').syncLocalProfilesFromAccount(acct)
+      } catch (_) {}
+      try {
+        await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+      } catch (_) {}
+      try {
+        await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+      } catch (_) {}
+      try {
+        this.refresh()
+      } catch (e) {
+        console.error('[mine] refresh after sync', e)
+      }
+    }
+    void this.refreshNotifyBadge()
   },
   refresh() {
     const identity = userProfile.readIdentity()
@@ -142,6 +150,7 @@ Page({
     const prProfile = userProfile.readPrProfile()
     const acct = auth.readAccount()
     const wx = wxAccount.readWxAccount()
+    const cache = wxProfileDisplay.readWxProfileCache()
     const wxLoggedIn = auth.isLoggedIn()
 
     let avatarUrl = ''
@@ -149,12 +158,32 @@ Page({
     let displaySub = '微信登录后使用完整功能'
 
     if (identity === 'pr') {
-      profileNick = wxProfileDisplay.pickWxNick(acct?.wxNickName, wx?.wxNickName, prProfile?.wxNickName)
-      avatarUrl = wxProfileDisplay.pickWxAvatar(acct?.wxAvatarUrl, wx?.wxAvatarUrl, prProfile?.wxAvatarUrl)
+      profileNick = wxProfileDisplay.pickWxNick(
+        cache?.wxNickName,
+        acct?.wxNickName,
+        wx?.wxNickName,
+        prProfile?.wxNickName,
+      )
+      avatarUrl = wxProfileDisplay.pickWxAvatar(
+        cache?.wxAvatarUrl,
+        acct?.wxAvatarUrl,
+        wx?.wxAvatarUrl,
+        prProfile?.wxAvatarUrl,
+      )
       displaySub = userProfile.prDisplaySub(prProfile)
     } else {
-      profileNick = wxProfileDisplay.pickWxNick(acct?.wxNickName, wx?.wxNickName, member?.wxNickName)
-      avatarUrl = wxProfileDisplay.pickWxAvatar(acct?.wxAvatarUrl, wx?.wxAvatarUrl, member?.wxAvatarUrl)
+      profileNick = wxProfileDisplay.pickWxNick(
+        cache?.wxNickName,
+        acct?.wxNickName,
+        wx?.wxNickName,
+        member?.wxNickName,
+      )
+      avatarUrl = wxProfileDisplay.pickWxAvatar(
+        cache?.wxAvatarUrl,
+        acct?.wxAvatarUrl,
+        wx?.wxAvatarUrl,
+        member?.wxAvatarUrl,
+      )
       if (identity === 'talent') {
         displaySub = member
           ? memberStore.memberTypeLabel(member)
@@ -242,16 +271,40 @@ Page({
   },
   onChooseAvatar(e) {
     const url = e.detail?.avatarUrl
-    if (url) this.setData({ wxLoginAvatar: url })
+    if (!url) return
+    this.setData({ wxLoginAvatar: url })
+    wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
   },
   onNicknameInput(e) {
-    this.setData({ wxLoginNick: e.detail.value || '' })
+    const nick = e.detail.value || ''
+    this.setData({ wxLoginNick: nick })
+    if (nick) wxProfileDisplay.writeWxProfileCache({ wxNickName: nick })
+  },
+  onNicknameReview(e) {
+    const nick = String(e.detail?.nickname || e.detail?.value || '').trim()
+    if (!nick) return
+    this.setData({ wxLoginNick: nick })
+    wxProfileDisplay.writeWxProfileCache({ wxNickName: nick })
   },
   async onConfirmWxLogin() {
     if (this.data.wxLoginSubmitting) return
-    const nick = String(this.data.wxLoginNick || '').trim()
+    let nick = String(this.data.wxLoginNick || '').trim()
+    let avatar = String(this.data.wxLoginAvatar || '').trim()
+    try {
+      const resolved = await wxProfileDisplay.resolveWxProfileForLogin(nick, avatar)
+      nick = resolved.nick
+      avatar = resolved.avatar
+    } catch (_) {}
     if (!nick) {
       wx.showToast({ title: '请填写微信昵称', icon: 'none' })
+      return
+    }
+    if (wxProfileDisplay.isPlaceholderWxNick(nick)) {
+      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
+      return
+    }
+    if (!avatar) {
+      wx.showToast({ title: '请先选择微信头像', icon: 'none' })
       return
     }
     const identity = userProfile.readIdentity()
@@ -260,10 +313,10 @@ Page({
       wx.navigateTo({ url: '/pages/login/login' })
       return
     }
-    this.setData({ wxLoginSubmitting: true })
+    wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
+    this.setData({ wxLoginSubmitting: true, profileNick: nick, avatarUrl: avatar, displayName: nick })
     try {
       const role = identityTypes.accountRoleForWorkIdentity(identity)
-      const avatar = await wxProfileDisplay.persistWxAvatarUrl(String(this.data.wxLoginAvatar || '').trim())
       const data = await auth.wxLogin({
         role,
         wxNickName: nick,

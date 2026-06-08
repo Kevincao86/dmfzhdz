@@ -2,12 +2,31 @@ const ecs = require('./ecs.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const mpAccountLocalScope = require('./mpAccountLocalScope.js')
 const sessionStore = require('./mpSessionStore.js')
+const wxProfileDisplay = require('./wxProfileDisplay.js')
 
 const { SESSION_KEY, ACCOUNT_KEY, readSessionToken, readAccount } = sessionStore
 
+function mergeAccountProfile(prev, next) {
+  if (!next) return prev || null
+  const cache = wxProfileDisplay.readWxProfileCache()
+  const merged = prev ? { ...prev, ...next } : { ...next }
+  merged.wxNickName = wxProfileDisplay.pickWxNick(
+    cache && cache.wxNickName,
+    prev && prev.wxNickName,
+    next.wxNickName,
+  )
+  merged.wxAvatarUrl = wxProfileDisplay.pickWxAvatar(
+    cache && cache.wxAvatarUrl,
+    prev && prev.wxAvatarUrl,
+    next.wxAvatarUrl,
+  )
+  return merged
+}
+
 function writeSession(token, account) {
-  sessionStore.writeSessionPair(token, account)
-  mpAccountLocalScope.onAccountLogin(account)
+  const merged = mergeAccountProfile(readAccount(), account)
+  sessionStore.writeSessionPair(token, merged)
+  mpAccountLocalScope.onAccountLogin(merged)
   const registryProfileSync = require('./registryProfileSync.js')
   void registryProfileSync
     .pullRegistryProfileAfterLogin()
@@ -24,6 +43,7 @@ function writeSession(token, account) {
 function clearSession() {
   sessionStore.clearSessionPair()
   mpAccountLocalScope.onAccountLogout()
+  wxProfileDisplay.clearWxProfileCache()
 }
 
 function isLoggedIn() {
@@ -45,6 +65,9 @@ async function authPost(action, payload = {}) {
 }
 
 async function wxLogin(opts = {}) {
+  const nick = String(opts.wxNickName || '').trim()
+  const avatar = String(opts.wxAvatarUrl || '').trim()
+  if (nick || avatar) wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
   const code = await new Promise((resolve, reject) => {
     wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
   })
@@ -52,11 +75,16 @@ async function wxLogin(opts = {}) {
     code,
     stableDevOpenId: accountMemberSync.ensureStableDevOpenId(),
     role: opts.role || 'talent',
-    wxNickName: opts.wxNickName || '',
-    wxAvatarUrl: opts.wxAvatarUrl || '',
+    wxNickName: nick,
+    wxAvatarUrl: avatar,
     registerTalent: opts.registerTalent,
     registerPr: opts.registerPr,
   })
+  if (nick || avatar) {
+    try {
+      await updateWxProfile(nick, avatar)
+    } catch (_) {}
+  }
   return accountMemberSync.afterAuthSuccess(data)
 }
 
@@ -116,9 +144,12 @@ async function refreshSession() {
 }
 
 async function updateWxProfile(wxNickName, wxAvatarUrl) {
+  const nick = String(wxNickName || '').trim()
+  const avatar = String(wxAvatarUrl || '').trim()
+  if (nick || avatar) wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
   const data = await authPost('update_wx_profile', {
-    wxNickName: String(wxNickName || '').trim(),
-    wxAvatarUrl: String(wxAvatarUrl || '').trim(),
+    wxNickName: nick,
+    wxAvatarUrl: avatar,
   })
   return accountMemberSync.afterAuthSuccess(data)
 }

@@ -109,9 +109,10 @@
         <input
           class="wx-login-nick-input"
           type="nickname"
-          placeholder="点击输入微信昵称"
+          placeholder="点击选用微信昵称"
           value="{{wxLoginNick}}"
           bindinput="onNicknameInput"
+          bindnicknamereview="onNicknameReview"
         />
       </view>
       <button

@@ -98,9 +98,10 @@ function syncPrProfileFromAccount(account) {
 
 function syncWxAccountFromAuthAccount(account) {
   if (!account) return null
+  const cache = wxProfileDisplay.readWxProfileCache()
   const openid = String(account.openid || '').trim()
-  const nick = wxProfileDisplay.pickWxNick(account.wxNickName)
-  const avatar = wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl)
+  const nick = wxProfileDisplay.pickWxNick(cache && cache.wxNickName, account.wxNickName)
+  const avatar = wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, account.wxAvatarUrl)
   if (!openid && !nick) return null
   return wxAccount.writeWxAccount({
     wxOpenId: openid,
