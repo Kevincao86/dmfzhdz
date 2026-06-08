@@ -104,7 +104,7 @@
         class="applicant-card-v2__btn applicant-card-v2__btn--link"
         data-index="{{index}}"
         catchtap="onOpenProfile"
-      >打开达人主页</button>
+      >复制主页链接</button>
       <button
         wx:if="{{chatEnabled}}"
         class="applicant-card-v2__btn applicant-card-v2__btn--primary"

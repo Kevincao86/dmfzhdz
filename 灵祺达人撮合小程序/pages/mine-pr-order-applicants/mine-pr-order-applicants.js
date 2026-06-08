@@ -387,7 +387,7 @@ Page({
     const idx = Number(e.currentTarget.dataset.index)
     const a = this.data.applicants[idx]
     if (!a) return
-    appDisplay.openTalentProfileLink(a.profileLink, a.displayPlatform)
+    appDisplay.copyTalentProfileLink(a.profileLink)
   },
   noop() {},
   onCopyApplicant(e) {
