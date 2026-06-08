@@ -527,15 +527,26 @@ Page({
   },
   openCoverGallery() {
     const f = this.data.form || {}
-    recruitCoverLib.preloadCoverSubpackages()
-    this.setData({
-      pickerView: 'coverGallery',
-      coverGalleryTab: 'recommended',
-      coverGallerySubKey: '',
-      coverPlatformNames: recruitCoverLib.listCoverPlatformNames(),
-      coverTagNames: recruitCoverLib.listCoverTagNames(),
-    })
-    this.refreshCoverGalleryItems('recommended', '', f.platform, f.talentTags || [])
+    const tab = 'recommended'
+    const names = recruitCoverLib.subpackNamesForGalleryTab(tab, f.platform, f.talentTags || [], '')
+    wx.showLoading({ title: '加载图库', mask: true })
+    recruitCoverLib
+      .loadCoverSubpackages(names)
+      .then(() => {
+        wx.hideLoading()
+        this.setData({
+          pickerView: 'coverGallery',
+          coverGalleryTab: tab,
+          coverGallerySubKey: '',
+          coverPlatformNames: recruitCoverLib.listCoverPlatformNames(),
+          coverTagNames: recruitCoverLib.listCoverTagNames(),
+        })
+        this.refreshCoverGalleryItems(tab, '', f.platform, f.talentTags || [])
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '图库加载失败', icon: 'none' })
+      })
   },
   refreshCoverGalleryItems(tab, subKey, platform, talentTags) {
     const items = recruitCoverLib.getGalleryItemsForTab(
@@ -553,15 +564,29 @@ Page({
     let subKey = ''
     if (tab === 'platform') subKey = f.platform || (this.data.coverPlatformNames[0] || '抖音')
     if (tab === 'tag') subKey = (f.talentTags && f.talentTags[0]) || (this.data.coverTagNames[0] || '美食')
-    this.setData({ coverGalleryTab: tab, coverGallerySubKey: subKey })
-    this.refreshCoverGalleryItems(tab, subKey, f.platform, f.talentTags || [])
+    const names = recruitCoverLib.subpackNamesForGalleryTab(tab, f.platform, f.talentTags || [], subKey)
+    wx.showLoading({ title: '加载中', mask: true })
+    recruitCoverLib.loadCoverSubpackages(names).then(() => {
+      wx.hideLoading()
+      this.setData({ coverGalleryTab: tab, coverGallerySubKey: subKey })
+      this.refreshCoverGalleryItems(tab, subKey, f.platform, f.talentTags || [])
+    })
   },
   onCoverGallerySubPick(e) {
     const key = e.currentTarget.dataset.key
     if (!key) return
     const f = this.data.form || {}
-    this.setData({ coverGallerySubKey: key })
-    this.refreshCoverGalleryItems(this.data.coverGalleryTab, key, f.platform, f.talentTags || [])
+    const tab = this.data.coverGalleryTab
+    const names = recruitCoverLib.subpackNamesForGalleryTab(tab, f.platform, f.talentTags || [], key)
+    const apply = () => {
+      this.setData({ coverGallerySubKey: key })
+      this.refreshCoverGalleryItems(tab, key, f.platform, f.talentTags || [])
+    }
+    if (tab === 'tag' && names.length) {
+      recruitCoverLib.loadCoverSubpackages(names).then(apply)
+      return
+    }
+    apply()
   },
   onCoverGalleryPick(e) {
     const id = e.currentTarget.dataset.id
