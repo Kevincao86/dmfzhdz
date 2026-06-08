@@ -143,6 +143,12 @@ async function refreshSession() {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+/** 未登录时静默 wx.login 并建立云端会话（资料保存/注册前调用） */
+async function ensureWxAuthSession(opts = {}) {
+  if (isLoggedIn()) return readAccount()
+  return wxLogin(opts)
+}
+
 async function updateWxProfile(wxNickName, wxAvatarUrl) {
   const nick = String(wxNickName || '').trim()
   const avatar = String(wxAvatarUrl || '').trim()
@@ -164,6 +170,8 @@ module.exports = {
   writeSession,
   clearSession,
   isLoggedIn,
+  authHeaders,
+  ensureWxAuthSession,
   wxLogin,
   passwordLogin,
   setLoginCredentials,

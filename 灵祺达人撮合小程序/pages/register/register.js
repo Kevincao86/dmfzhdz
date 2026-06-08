@@ -17,6 +17,9 @@ const userProfile = require('../../utils/userProfile.js')
 const supplierTeamProfile = require('../../utils/supplierTeamProfile.js')
 const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
+const identityTypes = require('../../utils/identityTypes.js')
+const mpApiErrors = require('../../utils/mpApiErrors.js')
+const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 const profileLinkParse = require('../../utils/profileLinkParse.js')
 const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
@@ -508,7 +511,18 @@ Page({
       }
       if (api.hasApi()) {
         try {
-          if (this.data.isSupplier && auth.isLoggedIn()) {
+          member.wxAvatarUrl = await wxProfileDisplay.persistWxAvatarUrl(member.wxAvatarUrl)
+          const loginOpts = {
+            role: identityTypes.accountRoleForWorkIdentity(workId),
+            wxNickName: member.wxNickName,
+            wxAvatarUrl: member.wxAvatarUrl,
+          }
+          if (!this.data.isSupplier) loginOpts.registerTalent = member
+          const acctAfterLogin = await auth.ensureWxAuthSession(loginOpts)
+          if (acctAfterLogin) {
+            Object.assign(member, accountMemberSync.mergeMemberForCloudRegister(member, acctAfterLogin))
+          }
+          if (this.data.isSupplier) {
             await auth.ensureIdentity('talent', workId)
           }
           const payload = this.data.isSupplier
@@ -520,11 +534,11 @@ Page({
           if (reg && reg.lingqiEditTeamId) member.lingqiEditTeamId = reg.lingqiEditTeamId
           if (reg && reg.id) member.id = reg.id
           writeMember(member)
-          if (auth.isLoggedIn()) {
-            switchWorkIdentity.syncLocalProfilesFromAccount(auth.readAccount(), workId)
-          }
-        } catch (_) {
-          cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
+          switchWorkIdentity.syncLocalProfilesFromAccount(auth.readAccount(), workId)
+        } catch (cloudErr) {
+          console.warn('[register] cloud sync failed', cloudErr)
+          const detail = mpApiErrors.formatMpApiErr(cloudErr, '请稍后重试')
+          cloudWarn = `资料已写入本机，云端同步失败：${detail}`
         }
       }
       this.applyIdentityIdLabels(workId)
