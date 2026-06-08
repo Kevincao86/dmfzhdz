@@ -8,7 +8,8 @@ import {
   allocateLingqiShootTeamId,
   allocateLingqiTalentId,
 } from './lingqiIdentity.js'
-import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
+import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
+import { findRegistryMemberForAccount } from './mpRegistryProfileGet.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
@@ -275,54 +276,38 @@ async function provisionRegistryForAccount(
   const nick = String(wxNickName || account.wx_nick_name || loginLabel || '').trim() || '微信用户'
   const avatar = String(wxAvatarUrl || account.wx_avatar_url || '').trim()
 
-  if (role === 'talent' && !account.lingqi_talent_id) {
+  if (role === 'talent') {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    let existing: RegistryMpTalentMember | undefined = openId
-      ? (data.mpTalentMembers ?? []).find((m) => String(m.wxOpenId || '').trim() === openId)
-      : undefined
-    if (!existing && phone.length >= 8) {
-      existing = (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phone)
-    }
-    if (existing) {
-      let lingqiTalentId = existing.lingqiTalentId
-      if (!lingqiTalentId && memberHasResolvablePlatformInfo(existing)) {
-        lingqiTalentId = allocateLingqiTalentId(data, lingqiTalentId)
-      }
-      const saved = upsertMpTalentMember(data, {
-        ...existing,
-        id: existing.id,
-        lingqiTalentId: lingqiTalentId || existing.lingqiTalentId,
-        wxNickName: nick || existing.wxNickName,
-        wxAvatarUrl: avatar || existing.wxAvatarUrl,
-        wxOpenId: openId || existing.wxOpenId || '',
-        contact: existing.contact || loginLabel || phone,
-        wechatId: existing.wechatId || loginLabel || phone,
-        updatedAt: now,
-      })
-      await io.save(data)
-      await updateAccount(rest, account.id, {
-        lingqi_talent_id: saved.lingqiTalentId || existing.lingqiTalentId,
-        registry_member_id: saved.id,
-        active_role: 'talent',
-      })
-      return (await findAccountById(rest, account.id))!
+    const existing = findRegistryMemberForAccount(data, account) ?? undefined
+    const base = existing
+      ? { ...existing }
+      : {
+          id: account.registry_member_id || `MTM-${Date.now()}`,
+          memberType: 'douyin' as const,
+          lingqiTalentId: account.lingqi_talent_id || '',
+          registeredAt: now,
+        }
+    let lingqiTalentId = base.lingqiTalentId || account.lingqi_talent_id || ''
+    if (!lingqiTalentId && memberHasResolvablePlatformInfo(base)) {
+      lingqiTalentId = allocateLingqiTalentId(data, lingqiTalentId)
     }
     const saved = upsertMpTalentMember(data, {
-      id: account.registry_member_id || `MTM-${Date.now()}`,
-      memberType: 'douyin',
-      wxNickName: nick,
-      wxAvatarUrl: avatar,
-      wxOpenId: account.openid || '',
-      contact: loginLabel || phone,
-      wechatId: loginLabel || phone,
-      registeredAt: now,
+      ...base,
+      id: base.id,
+      lingqiTalentId: lingqiTalentId || base.lingqiTalentId,
+      wxNickName: nick || base.wxNickName,
+      wxAvatarUrl: avatar || base.wxAvatarUrl,
+      wxOpenId: openId || base.wxOpenId || '',
+      contact: base.contact || loginLabel || phone,
+      wechatId: base.wechatId || loginLabel || phone,
       updatedAt: now,
     })
+    if (openId) dedupeMpTalentMembersByOpenId(data, openId, saved.id)
     await io.save(data)
     await updateAccount(rest, account.id, {
-      lingqi_talent_id: saved.lingqiTalentId,
+      lingqi_talent_id: saved.lingqiTalentId || account.lingqi_talent_id || base.lingqiTalentId,
       registry_member_id: saved.id,
       active_role: 'talent',
     })
@@ -403,7 +388,47 @@ async function syncRegistryMember(
     id: account.registry_member_id || member.id,
     lingqiTalentId: account.lingqi_talent_id || member.lingqiTalentId,
   })
+  const openId = String(account.openid || saved.wxOpenId || '').trim()
+  if (openId) dedupeMpTalentMembersByOpenId(data, openId, saved.id)
   await io.save(data)
+  return saved
+}
+
+/** 小程序保存达人资料：绑定登录账号，复用同一 openid 的灵祺达人 ID */
+export async function registerMpTalentMember(
+  supabaseUrl: string,
+  serviceRole: string,
+  member: RegistryMpTalentMember,
+  account: MpAccountRow | null,
+): Promise<RegistryMpTalentMember> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  const prev = account ? findRegistryMemberForAccount(data, account) : null
+  const openId = String(account?.openid || member.wxOpenId || '').trim()
+  const payload: RegistryMpTalentMember = {
+    ...member,
+    wxOpenId: openId || member.wxOpenId,
+    id:
+      String(account?.registry_member_id || prev?.id || member.id || '').trim() ||
+      `MTM-${Date.now()}`,
+    lingqiTalentId: String(
+      account?.lingqi_talent_id || prev?.lingqiTalentId || member.lingqiTalentId || '',
+    ).trim(),
+    lingqiShootTeamId: prev?.lingqiShootTeamId || member.lingqiShootTeamId,
+    lingqiEditTeamId: prev?.lingqiEditTeamId || member.lingqiEditTeamId,
+    registeredAt: prev?.registeredAt || member.registeredAt,
+  }
+  const saved = upsertMpTalentMember(data, payload)
+  if (openId) dedupeMpTalentMembersByOpenId(data, openId, saved.id)
+  await io.save(data)
+  if (account) {
+    await updateAccount(rest, account.id, {
+      lingqi_talent_id: saved.lingqiTalentId || account.lingqi_talent_id,
+      registry_member_id: saved.id,
+      active_role: 'talent',
+    })
+  }
   return saved
 }
 
@@ -679,6 +704,8 @@ export async function mpAuthEnsureIdentity(
       registeredAt: prev?.registeredAt || now,
       updatedAt: now,
     })
+    const teamOpenId = String(ensuredAccount.openid || saved.wxOpenId || '').trim()
+    if (teamOpenId) dedupeMpTalentMembersByOpenId(data, teamOpenId, saved.id)
     if (workIdentity === 'shoot' && !saved.lingqiShootTeamId) {
       saved = {
         ...saved,

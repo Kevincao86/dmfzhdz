@@ -48,6 +48,19 @@ function stripMismatchedContactFields(prev, account) {
   return next
 }
 
+function mergeMemberForCloudRegister(member, account) {
+  const prev = member && typeof member === 'object' ? member : {}
+  const acct = account || {}
+  return {
+    ...prev,
+    id: String(acct.registryMemberId || prev.id || '').trim(),
+    lingqiTalentId: String(acct.lingqiTalentId || prev.lingqiTalentId || '').trim(),
+    lingqiShootTeamId: String(acct.lingqiShootTeamId || prev.lingqiShootTeamId || '').trim(),
+    lingqiEditTeamId: String(acct.lingqiEditTeamId || prev.lingqiEditTeamId || '').trim(),
+    wxOpenId: String(acct.openid || prev.wxOpenId || '').trim(),
+  }
+}
+
 function syncTalentMemberFromAccount(account) {
   if (!account) return null
   const prev = stripMismatchedContactFields(memberStore.readMember() || {}, account)
@@ -100,6 +113,7 @@ module.exports = {
   readStableDevOpenId,
   ensureStableDevOpenId,
   writeStableDevOpenId,
+  mergeMemberForCloudRegister,
   syncTalentMemberFromAccount,
   syncPrProfileFromAccount,
   syncLocalProfilesFromAccount,
