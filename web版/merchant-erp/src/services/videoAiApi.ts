@@ -1,6 +1,8 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
 import { isArkQuotaHopableError } from '../lib/arkModelCatalog'
+import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
+import { normalizeArkVideoModelParam } from '../lib/arkVideoEndpointsConfig'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export type VideoAiBackendConfig = {
@@ -419,24 +421,53 @@ export async function postSeedanceVideoStart(body: {
   }
 }
 
-/** 额度/限流时让服务端按模型池自动切换（omit 手选 model） */
+/** 额度/限流时按运营台模型池逐个切换，最后走服务端 __server_auto__ 轮询（含千问） */
 export async function postSeedanceVideoStartWithFailover(body: {
   model?: string
   prompt?: string
   flags?: string
   images_base64?: string[]
+  /** 运营台配置的全部视频模型 ID */
+  poolModels?: string[]
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }
 > {
-  const preferred = body.model?.trim()
-  const first = await postSeedanceVideoStart(body)
-  if (first.ok) return first
-  if (!isArkQuotaHopableError(first.message)) return first
-  if (!preferred || preferred === '__server_auto__') return first
-  const retry = await postSeedanceVideoStart({ ...body, model: '__server_auto__' })
-  if (retry.ok) return retry
-  return { ok: false, message: `${first.message}（已尝试自动切换模型：${retry.message}）` }
+  const preferred = body.model?.trim() ?? ''
+  const tryOrder: string[] = []
+  const seen = new Set<string>()
+  const push = (raw: string) => {
+    const t = raw.trim()
+    if (!t || seen.has(t)) return
+    seen.add(t)
+    tryOrder.push(t)
+  }
+
+  if (preferred && preferred !== SEEDANCE_SERVER_AUTO) {
+    push(normalizeArkVideoModelParam(preferred))
+  }
+  for (const m of body.poolModels ?? []) {
+    if (m !== SEEDANCE_SERVER_AUTO) push(normalizeArkVideoModelParam(m))
+  }
+  push(SEEDANCE_SERVER_AUTO)
+
+  let lastMsg = '视频生成失败'
+  const tried: string[] = []
+  for (const model of tryOrder) {
+    const r = await postSeedanceVideoStart({ ...body, model })
+    if (r.ok) return r
+    lastMsg = r.message
+    tried.push(model === SEEDANCE_SERVER_AUTO ? '服务端自动轮询' : model)
+    if (!isArkQuotaHopableError(r.message)) return r
+  }
+
+  return {
+    ok: false,
+    message:
+      tried.length > 1
+        ? `${lastMsg}（已依次尝试 ${tried.length} 路：${tried.join(' → ')}）`
+        : lastMsg,
+  }
 }
 
 export type SeedancePollPhase = 'queued' | 'running' | 'succeeded' | 'failed'

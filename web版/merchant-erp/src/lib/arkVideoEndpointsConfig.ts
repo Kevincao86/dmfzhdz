@@ -21,10 +21,15 @@ const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
   'wan2.1-14b': 'wan2-1-14b-250224',
 }
 
+/** 运营台常填 1.5，方舟 API 须为 1-5 */
+function fixSeedanceDottedVersion(id: string): string {
+  return id.replace(/doubao-seedance-(\d+)\.(\d+)/gi, 'doubao-seedance-$1-$2')
+}
+
 export function normalizeArkVideoModelParam(modelId: string): string {
   const t = modelId.trim()
   if (/^ep-/i.test(t)) return t
-  const lower = t.toLowerCase()
+  const lower = fixSeedanceDottedVersion(t.toLowerCase())
   return SEEDANCE_MODEL_ALIASES[lower] ?? lower
 }
 

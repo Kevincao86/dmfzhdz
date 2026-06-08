@@ -2,6 +2,7 @@ import { Cloud, Download, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Uploa
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
+import { isArkQuotaHopableError } from '../lib/arkModelCatalog'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
   KLING_DEFAULT_MODEL_ID,
@@ -243,6 +244,21 @@ export default function ShortVideoOptimizationPage() {
     return `--dur ${dur} --fps ${sdFps} --ratio ${sdAspect} --wm ${sdWatermark === 'on' ? 'true' : 'false'}`
   }, [longformEnabled, sdDurationSec, sdFps, sdAspect, sdWatermark])
 
+  const seedancePoolModels = useMemo(
+    () => cfg?.arkVideoModels.map((m) => m.endpointId) ?? [],
+    [cfg?.arkVideoModels],
+  )
+
+  const startSeedanceVideo = useCallback(
+    (body: {
+      model?: string
+      prompt?: string
+      flags?: string
+      images_base64?: string[]
+    }) => postSeedanceVideoStartWithFailover({ ...body, poolModels: seedancePoolModels }),
+    [seedancePoolModels],
+  )
+
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [progress, setProgress] = useState<string | null>(null)
 
@@ -470,7 +486,7 @@ export default function ShortVideoOptimizationPage() {
           return
         }
       } else {
-        const r = await postSeedanceVideoStartWithFailover({
+        const r = await startSeedanceVideo({
           model: sdModelEp.trim(),
           prompt: segPrompt,
           flags: seedanceFlagsLine,
@@ -614,7 +630,7 @@ export default function ShortVideoOptimizationPage() {
         }
       } else {
         if (i === 0 && genMode === 'text') {
-          const r = await postSeedanceVideoStartWithFailover({
+          const r = await startSeedanceVideo({
             model: sdModelEp.trim(),
             prompt: segPrompt,
             flags: seedanceFlagsLine,
@@ -652,7 +668,7 @@ export default function ShortVideoOptimizationPage() {
             return
           }
         }
-        const r = await postSeedanceVideoStartWithFailover({
+        const r = await startSeedanceVideo({
           model: sdModelEp.trim(),
           prompt: segPrompt,
           flags: seedanceFlagsLine,
@@ -741,12 +757,32 @@ export default function ShortVideoOptimizationPage() {
         const urlOut = await poll('kling', r.pollKind, r.taskId)
         if (urlOut) setResultUrl(urlOut)
       } else {
-        const r = await postSeedanceVideoStartWithFailover({
+        let r = await startSeedanceVideo({
           model: sdModelEp.trim(),
           prompt: p,
           flags: seedanceFlagsLine,
           images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
         })
+        if (!r.ok && cfg?.klingConfigured && isArkQuotaHopableError(r.message)) {
+          setHint('豆包视频额度不足，正在切换可灵视频模型…')
+          const kr = await postKlingVideoStart({
+            kind: 'image2video',
+            prompt: p,
+            negative_prompt: optNegative.trim(),
+            duration: durNum,
+            mode: kMode,
+            aspect_ratio: aspect,
+            image_base64: framePureB64.replace(/\s/g, ''),
+            model_name: klingModel,
+          })
+          if (!kr.ok) {
+            setErr(r.message)
+            return
+          }
+          const urlOut = await poll('kling', kr.pollKind, kr.taskId)
+          if (urlOut) setResultUrl(urlOut)
+          return
+        }
         if (!r.ok) {
           setErr(r.message)
           return
@@ -848,12 +884,52 @@ export default function ShortVideoOptimizationPage() {
             ? txt
             : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
 
-        const r = await postSeedanceVideoStartWithFailover({
+        let r = await startSeedanceVideo({
           model: sdModelEp.trim(),
           prompt: textBlock,
           flags: seedanceFlagsLine,
           images_base64: imgs.length ? imgs : undefined,
         })
+        if (!r.ok && cfg?.klingConfigured && isArkQuotaHopableError(r.message)) {
+          setHint('豆包视频额度不足，正在切换可灵视频模型…')
+          if (genMode === 'text') {
+            const kr = await postKlingVideoStart({
+              kind: 'text2video',
+              prompt: textBlock,
+              duration: durNum,
+              mode: kMode,
+              aspect_ratio: aspect,
+              model_name: klingModel,
+            })
+            if (!kr.ok) {
+              setErr(r.message)
+              return
+            }
+            const urlOut = await poll('kling', kr.pollKind, kr.taskId)
+            if (urlOut) setResultUrl(urlOut)
+            return
+          }
+          if (!imgs.length) {
+            setErr(r.message)
+            return
+          }
+          const kr = await postKlingVideoStart({
+            kind: 'image2video',
+            prompt: textBlock,
+            duration: durNum,
+            mode: kMode,
+            aspect_ratio: aspect,
+            image_base64: extractDataUriPureBase64(imgs[0]),
+            model_name: klingModel,
+          })
+          if (!kr.ok) {
+            setErr(r.message)
+            return
+          }
+          const urlOut = await poll('kling', kr.pollKind, kr.taskId)
+          if (urlOut) setResultUrl(urlOut)
+          return
+        }
         if (!r.ok) {
           setErr(r.message)
           return
