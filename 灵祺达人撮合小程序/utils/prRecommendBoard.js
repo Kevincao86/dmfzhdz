@@ -295,23 +295,7 @@ function buildBoardPool(reg, board) {
 }
 
 function countPrOrdersForBoard(reg, board) {
-  const local = require('./applicationsStore.js').readPublishedOrders()
-  const mpList = Array.isArray(reg?.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const target = boardRecruitTarget(board)
-  let n = 0
-  for (const item of local) {
-    if (!item || !item.mpOrderId) continue
-    const mp = mpList.find((o) => o && o.id === item.mpOrderId)
-    if (!mp) continue
-    if (mp.status !== 'open' && mp.status !== 'collecting') continue
-    const rt = recruitTargetFromMp(mp)
-    if (rt === target) {
-      n += 1
-      continue
-    }
-    if (board === 'edit' && isIceMpOrder(mp)) n += 1
-  }
-  return n
+  return require('./recruitmentAiTags.js').listPrEligibleOrders(reg, { board }).length
 }
 
 module.exports = {

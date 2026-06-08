@@ -1,3 +1,4 @@
+const auth = require('../../utils/auth.js')
 const config = require('../../utils/config.js')
 const { showDemoOrders } = require('../../utils/mpDemoMode.js')
 const api = require('../../utils/api.js')
@@ -312,7 +313,7 @@ Page({
     mpShare.enableShareMenu()
     return mpShare.defaultShare('/pages/recommend/recommend')
   },
-  onShow() {
+  async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/recommend/recommend')
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
@@ -320,6 +321,7 @@ Page({
     const isPr = identity === 'pr'
     const talentTestMode = !isPr && config.MP_TEST_TALENT_ON_RECOMMEND === true
     const isPrMode = isPr || talentTestMode
+    const defaultMatchOptions = prMatchOrderSelect.buildPrMatchOrderOptions([])
     const talentCity = readTalentCity()
     const selfCard = buildSelfTalentTestCard()
     let talentTestHint = ''
@@ -341,11 +343,19 @@ Page({
         : prBoard.boardMatchHint('talent', 0),
       prSearchPlaceholder: prBoard.boardSearchPlaceholder('talent'),
       prAllModeLabel: prBoard.boardAllModeLabel('talent'),
+      prMatchOrderOptions: isPrMode ? defaultMatchOptions : [],
+      prMatchOrderLabels: isPrMode ? defaultMatchOptions.map((o) => o.label) : [],
+      prMatchOrderLabel: isPrMode ? (defaultMatchOptions[0] && defaultMatchOptions[0].label) || '' : '',
     })
     if (userProfile.readIdentity() === 'pr') {
       this._favoriteTalentIds = loadFavoriteIdSet()
     } else {
       this._favoriteTalentIds = new Set()
+    }
+    if (isPr && auth.isLoggedIn()) {
+      try {
+        await require('../../utils/mpAccountClientSync.js').pullAfterLogin()
+      } catch (_) {}
     }
     if (isPrMode) this.loadTalentList()
     else this.loadOrderList()

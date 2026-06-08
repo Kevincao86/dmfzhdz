@@ -54,7 +54,7 @@
     </view>
 
     <view class="rec-pr-controls" wx:if="{{isPrMode}}">
-      <view class="rec-match-order-bar" wx:if="{{prMatchOrderOptions.length > 1}}">
+      <view class="rec-match-order-bar">
         <text class="rec-match-order-label">匹配招募单</text>
         <view class="rec-match-order-picker" bindtap="openPrMatchOrderSheet">
           <view class="rec-match-order-value">

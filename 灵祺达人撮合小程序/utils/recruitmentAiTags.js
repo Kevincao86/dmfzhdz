@@ -1,7 +1,9 @@
 const api = require('./api.js')
+const auth = require('./auth.js')
 const memberStore = require('./talentMember.js')
 const applicationsStore = require('./applicationsStore.js')
 const orderCard = require('./recruitmentOrderCard.js')
+const participant = require('./participant.js')
 const { isIceMpOrder } = require('./recruitmentUrgent.js')
 const userProfile = require('./userProfile.js')
 const identityTypes = require('./identityTypes.js')
@@ -510,19 +512,66 @@ function orderMatchesPrBoard(row, mp, board) {
   return false
 }
 
+function currentPrOrderOwnerKeys() {
+  const account = auth.readAccount()
+  const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+  const keys = new Set()
+  const pk = participant.prParticipantKey(pr)
+  if (pk) keys.add(pk)
+  const lingqiPrId = String((account && account.lingqiPrId) || pr.lingqiPrId || '').trim()
+  if (lingqiPrId) keys.add(lingqiPrId)
+  const registryPrId = String((account && account.registryPrId) || pr.id || '').trim()
+  if (registryPrId) keys.add(registryPrId)
+  const openid = String((account && account.openid) || pr.wxOpenId || '').trim()
+  if (openid) keys.add(openid)
+  const phone = String(pr.contactPhone || (account && account.loginName) || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+  if (phone.length === 11) keys.add(`pr_${phone}`)
+  return keys
+}
+
+function mpOwnedByCurrentPr(mp) {
+  if (!mp || mp.publisherIdentity !== 'pr') return false
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const keys = currentPrOrderOwnerKeys()
+  const prKey = String(meta.prParticipantKey || '').trim()
+  if (prKey && keys.has(prKey)) return true
+  const lingqi = String(meta.lingqiPrId || meta.prLingqiPrId || '').trim()
+  if (lingqi && keys.has(lingqi)) return true
+  const registryId = String(meta.registryPrId || meta.prRegistryId || '').trim()
+  if (registryId && keys.has(registryId)) return true
+  const openid = String(meta.publisherOpenid || meta.prOpenid || '').trim()
+  if (openid && keys.has(openid)) return true
+  return false
+}
+
+function appendEligiblePack(out, seen, mp, reg, board) {
+  if (!mp || !mp.id) return
+  const id = String(mp.id).trim()
+  if (!id || seen.has(id)) return
+  if (mp.status !== 'open' && mp.status !== 'collecting') return
+  const row = orderCard.mapMpOrderRow(mp, reg)
+  if (board && !orderMatchesPrBoard(row, mp, board)) return
+  seen.add(id)
+  out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
+}
+
 function listPrEligibleOrders(reg, opts) {
   const board = (opts && opts.board) || (opts && opts.recruitTarget) || 'talent'
   const local = applicationsStore.readPublishedOrders()
   const mpList = Array.isArray(reg?.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const out = []
+  const seen = new Set()
   for (const item of local) {
     if (!item || !item.mpOrderId) continue
     const mp = mpList.find((o) => o && o.id === item.mpOrderId)
     if (!mp) continue
-    if (mp.status !== 'open' && mp.status !== 'collecting') continue
-    const row = orderCard.mapMpOrderRow(mp, reg)
-    if (board && !orderMatchesPrBoard(row, mp, board)) continue
-    out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
+    appendEligiblePack(out, seen, mp, reg, board)
+  }
+  for (const mp of mpList) {
+    if (!mpOwnedByCurrentPr(mp)) continue
+    appendEligiblePack(out, seen, mp, reg, board)
   }
   return out
 }
