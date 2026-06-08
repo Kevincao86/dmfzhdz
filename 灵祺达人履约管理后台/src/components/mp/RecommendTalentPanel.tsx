@@ -5,9 +5,16 @@ import { getActiveRole } from '../../lib/mpSession'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import {
+  buildPrMatchOrderOptions,
+  matchHintForSelection,
+  PR_MATCH_RECENT,
+  readPrMatchOrderId,
+  writePrMatchOrderId,
+  type PrMatchOrderOption,
+} from '../../lib/mpRecruitment/prMatchOrderSelect'
+import {
   boardAllModeLabel,
   boardEmptyHint,
-  boardMatchHint,
   boardSearchPlaceholder,
   buildBoardPool,
   countPrOrdersForBoard,
@@ -61,6 +68,8 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   const [listEmptyHint, setListEmptyHint] = useState('')
   const [prBoardOrderCount, setPrBoardOrderCount] = useState(0)
   const [prMatchHint, setPrMatchHint] = useState('发达人招募后，将按发单要求智能推荐达人')
+  const [selectedMatchOrderId, setSelectedMatchOrderId] = useState(PR_MATCH_RECENT)
+  const [matchOrderOptions, setMatchOrderOptions] = useState<PrMatchOrderOption[]>([])
   const [registryCache, setRegistryCache] = useState<MpRegistry | null>(null)
   const [boardPools, setBoardPools] = useState<Record<PrBoardId, TalentCardRow[]>>({
     talent: [],
@@ -93,13 +102,25 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       return
     }
 
-    if (prBoardOrderCount > 0 && registryCache && filtered.length) {
+    const matchOrderId = selectedMatchOrderId
+    const hasMatchOrders =
+      matchOrderId !== PR_MATCH_RECENT
+        ? matchOrderOptions.some((o) => o.id === matchOrderId)
+        : prBoardOrderCount > 0
+
+    if (hasMatchOrders && registryCache && filtered.length) {
       setMatching(true)
       try {
-        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, registryCache, { board: prBoard })
+        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, registryCache, {
+          board: prBoard,
+          mpOrderId: matchOrderId,
+        })
         filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
       } catch {
-        const packs = recruitmentAi.resolvePrRecentOrders(registryCache, { board: prBoard })
+        const packs = recruitmentAi.resolvePrMatchOrders(registryCache, {
+          board: prBoard,
+          mpOrderId: matchOrderId,
+        })
         const payloads = packs.map((p) => p.payload)
         filtered = filtered
           .map((t) => {
@@ -118,7 +139,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
 
     let hint = ''
     if (!filtered.length) {
-      hint = boardEmptyHint(prBoard, kw, prBoardOrderCount > 0)
+      hint = boardEmptyHint(prBoard, kw, hasMatchOrders)
     }
     setDisplayRows(filtered.slice(0, 50))
     setListEmptyHint(hint)
@@ -135,6 +156,8 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     prBoard,
     viewMode,
     allModeLabel,
+    selectedMatchOrderId,
+    matchOrderOptions,
   ])
 
   useEffect(() => {
@@ -155,8 +178,17 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       setBoardPools(pools)
       const pool = pools[prBoard]
       const orderCount = countPrOrdersForBoard(reg, prBoard)
+      const eligible = recruitmentAi.listPrEligibleOrders(reg, { board: prBoard })
+      const options = buildPrMatchOrderOptions(eligible)
+      let selected = readPrMatchOrderId(prBoard)
+      if (selected !== PR_MATCH_RECENT && !options.some((o) => o.id === selected)) {
+        selected = PR_MATCH_RECENT
+        writePrMatchOrderId(prBoard, PR_MATCH_RECENT)
+      }
       setPrBoardOrderCount(orderCount)
-      setPrMatchHint(boardMatchHint(prBoard, orderCount))
+      setMatchOrderOptions(options)
+      setSelectedMatchOrderId(selected)
+      setPrMatchHint(matchHintForSelection(prBoard, selected, options, orderCount))
       setAllRows(pool)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
@@ -180,12 +212,28 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     if (id === prBoard) return
     const pool = boardPools[id] || []
     const orderCount = registryCache ? countPrOrdersForBoard(registryCache, id) : 0
+    const eligible = registryCache ? recruitmentAi.listPrEligibleOrders(registryCache, { board: id }) : []
+    const options = buildPrMatchOrderOptions(eligible)
+    let selected = readPrMatchOrderId(id)
+    if (selected !== PR_MATCH_RECENT && !options.some((o) => o.id === selected)) {
+      selected = PR_MATCH_RECENT
+      writePrMatchOrderId(id, PR_MATCH_RECENT)
+    }
     setPrBoard(id)
     setViewMode('ai')
     setAllRows(pool)
     setPrBoardOrderCount(orderCount)
-    setPrMatchHint(boardMatchHint(id, orderCount))
+    setMatchOrderOptions(options)
+    setSelectedMatchOrderId(selected)
+    setPrMatchHint(matchHintForSelection(id, selected, options, orderCount))
     setSearchKeyword('')
+  }
+
+  function onMatchOrderChange(mpOrderId: string) {
+    const next = mpOrderId || PR_MATCH_RECENT
+    setSelectedMatchOrderId(next)
+    writePrMatchOrderId(prBoard, next)
+    setPrMatchHint(matchHintForSelection(prBoard, next, matchOrderOptions, prBoardOrderCount))
   }
 
   async function onChatTap(row: TalentCardRow) {
@@ -247,6 +295,23 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
           </button>
         ))}
       </div>
+
+      {matchOrderOptions.length > 1 ? (
+        <div className="flex flex-wrap gap-2 items-center">
+          <span className="text-xs text-[var(--shell-muted)] shrink-0">匹配招募单</span>
+          <select
+            className="flex-1 min-w-[12rem] rounded-lg panel-input border px-2 py-1.5 text-sm"
+            value={selectedMatchOrderId}
+            onChange={(e) => onMatchOrderChange(e.target.value)}
+          >
+            {matchOrderOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <span className="text-xs text-[var(--shell-muted)] self-center mr-1">浏览模式</span>

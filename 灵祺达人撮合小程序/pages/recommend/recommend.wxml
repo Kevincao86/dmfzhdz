@@ -53,6 +53,22 @@
       </view>
     </view>
 
+    <view class="rec-match-order-bar" wx:if="{{isPrMode && prMatchOrderOptions.length > 1}}">
+      <text class="rec-match-order-label">匹配招募单</text>
+      <picker
+        class="rec-match-order-picker"
+        mode="selector"
+        range="{{prMatchOrderLabels}}"
+        value="{{prMatchOrderIndex}}"
+        bindchange="onPrMatchOrderChange"
+      >
+        <view class="rec-match-order-value">
+          <text class="rec-match-order-text">{{prMatchOrderLabel}}</text>
+          <text class="rec-match-order-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
     <view class="rec-view-mode-bar" wx:if="{{isPrMode}}">
       <text class="rec-view-mode-label">浏览模式</text>
       <view
