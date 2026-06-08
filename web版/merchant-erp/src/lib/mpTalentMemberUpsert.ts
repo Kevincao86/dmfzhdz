@@ -48,11 +48,24 @@ export function upsertMpTalentMember(
 ): RegistryMpTalentMember {
   const list = [...(data.mpTalentMembers ?? [])]
   const openId = String(member.wxOpenId || '').trim()
-  const wxKey = openId || String(member.wechatId || member.wxNickName || '').trim().toLowerCase()
+  const memberId = String(member.id || '').trim()
+  const lingqiId = String(member.lingqiTalentId || '').trim()
+  const phoneKey = String(member.contact || member.wechatId || '')
+    .replace(/\D/g, '')
+    .slice(-11)
   const idx = list.findIndex((m) => {
     if (openId && String(m.wxOpenId || '').trim() === openId) return true
+    if (memberId && String(m.id || '').trim() === memberId) return true
+    if (lingqiId && String(m.lingqiTalentId || '').trim() === lingqiId) return true
+    if (phoneKey.length >= 11) {
+      const mp = String(m.contact || m.wechatId || '')
+        .replace(/\D/g, '')
+        .slice(-11)
+      if (mp === phoneKey) return true
+    }
     const k = String(m.wechatId || m.wxNickName || '').trim().toLowerCase()
-    return wxKey && !openId && k === wxKey
+    const wxKey = String(member.wechatId || member.wxNickName || '').trim().toLowerCase()
+    return wxKey && !openId && k && k === wxKey
   })
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const prev = idx >= 0 ? list[idx]! : null

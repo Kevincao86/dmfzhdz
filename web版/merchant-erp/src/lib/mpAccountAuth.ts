@@ -9,6 +9,7 @@ import {
   allocateLingqiTalentId,
 } from './lingqiIdentity.js'
 import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
+import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
@@ -284,18 +285,32 @@ async function provisionRegistryForAccount(
     if (!existing && phone.length >= 8) {
       existing = (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phone)
     }
-    if (existing?.lingqiTalentId) {
+    if (existing) {
+      let lingqiTalentId = existing.lingqiTalentId
+      if (!lingqiTalentId && memberHasResolvablePlatformInfo(existing)) {
+        lingqiTalentId = allocateLingqiTalentId(data, lingqiTalentId)
+      }
+      const saved = upsertMpTalentMember(data, {
+        ...existing,
+        id: existing.id,
+        lingqiTalentId: lingqiTalentId || existing.lingqiTalentId,
+        wxNickName: nick || existing.wxNickName,
+        wxAvatarUrl: avatar || existing.wxAvatarUrl,
+        wxOpenId: openId || existing.wxOpenId || '',
+        contact: existing.contact || loginLabel || phone,
+        wechatId: existing.wechatId || loginLabel || phone,
+        updatedAt: now,
+      })
+      await io.save(data)
       await updateAccount(rest, account.id, {
-        lingqi_talent_id: existing.lingqiTalentId,
-        registry_member_id: existing.id,
+        lingqi_talent_id: saved.lingqiTalentId || existing.lingqiTalentId,
+        registry_member_id: saved.id,
         active_role: 'talent',
       })
       return (await findAccountById(rest, account.id))!
     }
-    const lingqiTalentId = allocateLingqiTalentId(data)
     const saved = upsertMpTalentMember(data, {
       id: account.registry_member_id || `MTM-${Date.now()}`,
-      lingqiTalentId,
       memberType: 'douyin',
       wxNickName: nick,
       wxAvatarUrl: avatar,
@@ -307,7 +322,7 @@ async function provisionRegistryForAccount(
     })
     await io.save(data)
     await updateAccount(rest, account.id, {
-      lingqi_talent_id: saved.lingqiTalentId || lingqiTalentId,
+      lingqi_talent_id: saved.lingqiTalentId,
       registry_member_id: saved.id,
       active_role: 'talent',
     })

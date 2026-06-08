@@ -219,6 +219,8 @@ function buildTalentPool(reg) {
     if (!memberMatchesBoard(m, 'talent')) continue
     const primary = memberStore.primaryPlatformProfile(m)
     const p = (primary && primary.profile) || {}
+    const platformAccount = String(p.platformAccount || '').trim()
+    if (!platformAccount) continue
     const raw = Number(p.followers) || 0
     const tags = accountTagsFromMember(m)
     const mid = String((m && m.id) || '').trim()

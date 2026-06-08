@@ -52,9 +52,11 @@ Page({
     }
   },
   onShareAppMessage() {
+    const mpShare = require('../../utils/mpShare.js')
+    mpShare.enableShareMenu()
     const v = this.data.view
     return {
-      title: v ? v.title : '灵祺星选平台',
+      title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
   },

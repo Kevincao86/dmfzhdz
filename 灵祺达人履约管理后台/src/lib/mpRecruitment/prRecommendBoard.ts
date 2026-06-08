@@ -178,6 +178,8 @@ function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
     if (!memberMatchesBoard(mem, 'talent')) continue
     const primary = primaryPlatformProfile(mem)
     const p = primary?.profile
+    const platformAccount = String(p?.platformAccount || '').trim()
+    if (!platformAccount) continue
     const raw = Number(p?.followers) || 0
     const nick = String(p?.platformNickname || mem.wxNickName || mem.contact || '').trim()
     if (!nick) continue

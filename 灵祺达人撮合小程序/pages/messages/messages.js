@@ -5,6 +5,7 @@ const userProfile = require('../../utils/userProfile.js')
 const config = require('../../utils/config.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { setTabBarForPage, refreshChatTabBadge } = require('../../utils/tabBar.js')
+const mpShare = require('../../utils/mpShare.js')
 
 Page({
   data: {
@@ -27,7 +28,12 @@ Page({
     this.setData({ showDevTest: !!config.MP_CHAT_DEV_TEST })
     this.applyIdentityCopy()
   },
+  onShareAppMessage() {
+    mpShare.enableShareMenu()
+    return mpShare.defaultShare('/pages/messages/messages')
+  },
   onShow() {
+    mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/messages/messages')
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     participant.clearParticipantOverride()

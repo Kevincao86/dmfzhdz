@@ -72,4 +72,14 @@ function labels(platform) {
   }
 }
 
-module.exports = { normalizePlatform, labels }
+function profileLinkPlaceholder(platform) {
+  const p = labels(platform).platform
+  if (p === '抖音') return '粘贴抖音「分享主页」整段口令（含 https 链接）'
+  if (p === '小红书') return '粘贴小红书「分享主页」整段口令（含 https 链接）'
+  if (p === '快手') return '粘贴快手「分享主页」整段口令（含 https 链接）'
+  if (p === '大众点评') return '粘贴大众点评店铺/达人主页链接（含 https 链接）'
+  if (p === '微信视频号') return '粘贴微信视频号主页链接（含 https 链接）'
+  return `粘贴${p}主页链接或分享口令（含 https 链接）`
+}
+
+module.exports = { normalizePlatform, labels, profileLinkPlaceholder }
