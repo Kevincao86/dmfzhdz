@@ -7,39 +7,71 @@ const MP_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://mofang
 /** 小程序封面分包（高压缩 JPEG，与星选 Web CDN 分离） */
 const MP_COVER_SUBPACK = 'recruitCoversMp'
 const MP_COVER_BUNDLE_ROOT = '/packages/recruit-covers-mp'
+const MP_COVER_REGISTRY = '/packages/recruit-covers-mp/coverAssetRegistry.js'
+
+/** 分包 load 后由 require 解析出的真实本地路径（上传版与预览一致） */
+let bundleUrlByPath = null
+let bundleLoadPromise = null
 
 function useCoverBundle() {
   if (config.MP_COVER_USE_CDN === true && !config.MP_USE_CLOUD_PROXY) return false
   return true
 }
 
+function loadBundleUrlMap() {
+  if (bundleUrlByPath) return bundleUrlByPath
+  try {
+    const mod = require(MP_COVER_REGISTRY)
+    bundleUrlByPath = mod && (mod.byPath || mod)
+  } catch (_) {
+    bundleUrlByPath = null
+  }
+  return bundleUrlByPath
+}
+
 function mpAssetUrl(relPath) {
   const rel = String(relPath || '').replace(/^\/+/, '')
-  if (useCoverBundle()) return `${MP_COVER_BUNDLE_ROOT}/${rel}`
+  if (useCoverBundle()) {
+    const map = bundleUrlByPath || loadBundleUrlMap()
+    if (map && map[rel]) return map[rel]
+    return `${MP_COVER_BUNDLE_ROOT}/${rel}`
+  }
   return `${MP_COVER_ROOT}${rel}`
 }
 
 function loadCoverSubpackages() {
   if (!useCoverBundle()) return Promise.resolve()
-  return new Promise((resolve, reject) => {
+  if (bundleLoadPromise) return bundleLoadPromise
+  bundleLoadPromise = new Promise((resolve, reject) => {
+    const onReady = () => {
+      loadBundleUrlMap()
+      resolve()
+    }
     if (typeof wx.loadSubpackage === 'function') {
       wx.loadSubpackage({
         name: MP_COVER_SUBPACK,
-        success: () => resolve(),
-        fail: (err) => reject(new Error((err && err.errMsg) || '封面分包加载失败')),
+        success: onReady,
+        fail: (err) => {
+          bundleLoadPromise = null
+          reject(new Error((err && err.errMsg) || '封面分包加载失败'))
+        },
       })
       return
     }
     if (typeof wx.preloadSubpackage === 'function') {
       wx.preloadSubpackage({
         name: MP_COVER_SUBPACK,
-        success: () => resolve(),
-        fail: (err) => reject(new Error((err && err.errMsg) || '封面分包预加载失败')),
+        success: onReady,
+        fail: (err) => {
+          bundleLoadPromise = null
+          reject(new Error((err && err.errMsg) || '封面分包预加载失败'))
+        },
       })
       return
     }
-    resolve()
+    onReady()
   })
+  return bundleLoadPromise
 }
 
 function preloadCoverSubpackages() {

@@ -43,4 +43,6 @@ for sub in ("platforms", "tags"):
 print(f"OK: mp covers {count} files, {total/1024:.0f}KB (q={JPEG_QUALITY}, {TARGET[0]}x{TARGET[1]})")
 PY
 
+node "$ROOT/scripts/generate-mp-cover-asset-registry.js"
+
 node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"

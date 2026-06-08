@@ -11,7 +11,7 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260609-cover-mp-bundle',
+  MP_BUILD_ID: 'mp-20260609-cover-upload-fix',
   /** 招募封面图库（须在微信合法域名 mofangdianai.com，勿用 dr 子域） */
   RECRUIT_COVER_CDN_BASE: 'https://mofangdianai.com/recruit-covers',
   /** 备案期默认走分包本地图；备案后可设 MP_COVER_USE_CDN: true 减包体 */
