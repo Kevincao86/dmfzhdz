@@ -400,6 +400,8 @@ export type RegistryFile = {
   helpManualArticles?: RegistryHelpManualArticle[]
 }
 
+export type RegistrySnapshot = RegistryFile
+
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment'
 
 export type RegistryHelpManualCategory = {
