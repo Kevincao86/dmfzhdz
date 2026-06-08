@@ -105,33 +105,50 @@ def draw_cover(path: Path, title: str, subtitle: str, colors, variant: int):
     img.save(path, "PNG", optimize=True)
 
 
-def main():
+def build_manifest() -> dict:
     manifest = {"platforms": {}, "tags": {}}
-    for out_root in OUT_DIRS:
-        for slug, (label, colors) in PLATFORMS.items():
-            items = []
-            for i in range(1, 4):
-                rel = f"platforms/{slug}-{i}.png"
-                full = out_root / rel
-                draw_cover(full, label, f"平台封面 {i}", colors, i)
-                items.append({"id": f"platform-{slug}-{i}", "path": rel, "label": f"{label} · 封面{i}"})
-            manifest["platforms"][label] = items
-        for slug, (label, colors) in TAGS.items():
-            items = []
-            for i in range(1, 3):
-                rel = f"tags/{slug}-{i}.png"
-                full = out_root / rel
-                draw_cover(full, label, f"达人标签 · 封面{i}", colors + [colors[0]], i)
-                items.append({"id": f"tag-{slug}-{i}", "path": rel, "label": f"{label} · 封面{i}"})
-            manifest["tags"][label] = items
+    for slug, (label, _colors) in PLATFORMS.items():
+        items = []
+        for i in range(1, 4):
+            rel = f"platforms/{slug}-{i}.jpg"
+            items.append({"id": f"platform-{slug}-{i}", "path": rel, "label": f"{label} · 封面{i}"})
+        manifest["platforms"][label] = items
+    for slug, (label, _colors) in TAGS.items():
+        items = []
+        for i in range(1, 3):
+            rel = f"tags/{slug}-{i}.jpg"
+            items.append({"id": f"tag-{slug}-{i}", "path": rel, "label": f"{label} · 封面{i}"})
+        manifest["tags"][label] = items
+    return manifest
 
+
+def write_manifest(manifest: dict) -> None:
     manifest_json = json.dumps(manifest, ensure_ascii=False, indent=2)
     mp_manifest_js = ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.js"
     mp_manifest_js.write_text(f"module.exports = {manifest_json}\n", encoding="utf-8")
     (ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.json").write_text(manifest_json, encoding="utf-8")
     fulfillment_manifest = ROOT / "灵祺达人履约管理后台/src/lib/mpSync/recruitCoverLibrary.manifest.json"
     fulfillment_manifest.write_text(manifest_json, encoding="utf-8")
-    print(f"OK: wrote covers to {len(OUT_DIRS)} dirs, manifest -> {mp_manifest_js}")
+    print(f"OK: manifest -> {mp_manifest_js}")
+
+
+def main():
+    import sys
+
+    manifest_only = "--manifest-only" in sys.argv
+    manifest = build_manifest()
+    if not manifest_only:
+        for out_root in OUT_DIRS:
+            for slug, (label, colors) in PLATFORMS.items():
+                for i in range(1, 4):
+                    rel = f"platforms/{slug}-{i}.png"
+                    draw_cover(out_root / rel, label, f"平台封面 {i}", colors, i)
+            for slug, (label, colors) in TAGS.items():
+                for i in range(1, 3):
+                    rel = f"tags/{slug}-{i}.png"
+                    draw_cover(out_root / rel, label, f"达人标签 · 封面{i}", colors + [colors[0]], i)
+        print(f"OK: wrote PIL placeholder covers to {len(OUT_DIRS)} dirs")
+    write_manifest(manifest)
 
 
 if __name__ == "__main__":
