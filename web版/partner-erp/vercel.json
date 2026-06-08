@@ -6,6 +6,14 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/api/meoo-help-manual-public",
+      "destination": "https://mofangdianai.com/erp-api/meoo-help-manual-public"
+    },
+    {
+      "source": "/api/meoo-team-intro-public",
+      "destination": "https://mofangdianai.com/erp-api/meoo-team-intro-public"
+    },
+    {
       "source": "/((?!api/)(?!assets/).*)",
       "destination": "/index.html"
     }
