@@ -5,7 +5,7 @@
 | 称呼 | IP | 职责 |
 |------|-----|------|
 | **轻量** | `139.196.42.5` | Supabase、`meoo-auth-api`、`mofangdianai.com/erp-api` |
-| **ECS** | `8.160.173.236` | 商家 Web `cs.mofangdianai.com` + 已迁 `dr.mofangdianai.com` |
+| **ECS** | `8.160.173.236` | 商家 Web `cs.mofangdianai.com`、服务商 `fws.mofangdianai.com`、履约 `dr.mofangdianai.com` |
 
 浏览器访问 `https://cs.mofangdianai.com`：
 
@@ -50,7 +50,7 @@ VITE_ERP_AUTH_API_BASE=https://mofangdianai.com/erp-api
 # 留空：浏览器走 cs 同源 /api/*（Nginx 反代轻量）
 # VITE_MERCHANT_API_BASE_URL=
 
-# 服务商版仍在线时（fws 未迁 ECS）
+# 服务商版登录跳转（fws 与 cs 同机 ECS）
 VITE_PEER_EDITION_LOGIN_URL=https://fws.mofangdianai.com/login
 ```
 
@@ -101,11 +101,12 @@ MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-w
 
 ---
 
-## 与 dr 同机注意
+## 与 dr / fws 同机注意
 
-- `dr` 与 `cs` 各一个 Nginx 站点：`meoo-talent-fulfillment`、`meoo-merchant-cs`
-- 证书目录分开：`/etc/nginx/ssl/dr.mofangdianai.com/`、`/etc/nginx/ssl/cs.mofangdianai.com/`
-- 改完 `cs` 后勿删除 `dr` 的 sites-enabled
+- `dr`、`cs`、`fws` 各一个 Nginx 站点：`meoo-talent-fulfillment`、`meoo-merchant-cs`、`meoo-partner-fws`
+- 证书目录分开：`/etc/nginx/ssl/dr.mofangdianai.com/`、`/etc/nginx/ssl/cs.mofangdianai.com/`、`/etc/nginx/ssl/fws.mofangdianai.com/`
+- 改完 `cs` 后勿删除 `dr` / `fws` 的 sites-enabled
+- 服务商发版：`bash scripts/ecs-deploy-partner-fws-web.sh`（见 `docs/MIGRATE-VERCEL-TO-ECS-partner-fws.md`）
 
 ---
 

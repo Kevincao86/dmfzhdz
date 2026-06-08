@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 服务商版构建前校验：避免打出「登录服务未配置」的空包。
- * Vercel 用环境变量；ECS/本地可用项目根目录 .env.partner。
+ * ECS 用项目根目录 .env.partner；本地可用 .env.partner.local。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -47,11 +47,11 @@ if (edition && edition !== 'partner') {
 }
 if (missing.length) {
   console.error(
-    '[build:partner] 缺少环境变量（Vercel 配 Environment Variables，或 ECS/本地写 .env.partner）：',
+    '[build:partner] 缺少环境变量（ECS 写 .env.partner，本地可用 .env.partner.local）：',
   )
   for (const k of missing) console.error(`  - ${k}`)
   console.error(
-    '参考：docs/deploy-vercel-partner.md · 配置后 Redeploy，勿仅改代码不补变量。',
+    '参考：docs/MIGRATE-VERCEL-TO-ECS-partner-fws.md · 配置后重新 build。',
   )
   process.exit(1)
 }

@@ -24,10 +24,10 @@ function normalizeErpApiBase(raw: string): string {
 }
 
 export function merchantErpApiBase(): string {
-  // cs 静态站：视频/云剪/注册等 API 固定走轻量 erp-api，避免同源 /api 双跳 pending
+  // cs / fws 静态站：API 固定走轻量 erp-api，避免同源 /api 双跳 pending
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase()
-    if (host === 'cs.mofangdianai.com') {
+    if (ECS_ERP_API_HOSTS.has(host)) {
       return 'https://mofangdianai.com/erp-api'
     }
   }
@@ -60,10 +60,10 @@ export function merchantApiFetchUrls(apiPathWithOptionalQuery: string): string[]
   return merchantErpApiCandidates(apiPathWithOptionalQuery)
 }
 
-const ECS_WEB_HOSTS = new Set(['cs.mofangdianai.com', 'dr.mofangdianai.com'])
+const ECS_ERP_API_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com'])
 
-/** 登录页公开内容（帮助手册 / 团队介绍）：ECS 子域与 fws 优先同源 /api/，再回退 erp-api */
-const PORTAL_PUBLIC_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com', 'dr.mofangdianai.com'])
+/** ECS 静态站（cs / fws / dr）：优先同源 /api/（Nginx → 轻量），再 erp-api */
+const ECS_WEB_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com', 'dr.mofangdianai.com'])
 
 export function publicPortalApiFetchUrls(apiPathWithOptionalQuery: string): string[] {
   const path = apiPathWithOptionalQuery.startsWith('/')
@@ -75,7 +75,7 @@ export function publicPortalApiFetchUrls(apiPathWithOptionalQuery: string): stri
   }
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase()
-    if (PORTAL_PUBLIC_HOSTS.has(host)) {
+    if (ECS_WEB_HOSTS.has(host)) {
       add(`${window.location.origin}${path}`)
     }
   }
@@ -84,7 +84,7 @@ export function publicPortalApiFetchUrls(apiPathWithOptionalQuery: string): stri
   }
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase()
-    if (!PORTAL_PUBLIC_HOSTS.has(host)) {
+    if (!ECS_WEB_HOSTS.has(host)) {
       add(`${window.location.origin}${path}`)
     }
   } else if (!merchantErpApiBase()) {
@@ -153,8 +153,8 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
 
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase()
-    // cs 仅 erp-api 单跳；其它环境保留同源 fallback
-    if (host !== 'cs.mofangdianai.com') {
+    // cs / fws 仅 erp-api 单跳；其它环境保留同源 fallback
+    if (!ECS_ERP_API_HOSTS.has(host)) {
       add(`${window.location.origin}${path}`)
     }
   } else if (!base) {
