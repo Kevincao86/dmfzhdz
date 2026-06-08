@@ -125,11 +125,13 @@ def main():
                 items.append({"id": f"tag-{slug}-{i}", "path": rel, "label": f"{label} · 封面{i}"})
             manifest["tags"][label] = items
 
-    manifest_path = ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.json"
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    manifest_json = json.dumps(manifest, ensure_ascii=False, indent=2)
+    mp_manifest_js = ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.js"
+    mp_manifest_js.write_text(f"module.exports = {manifest_json}\n", encoding="utf-8")
+    (ROOT / "灵祺达人撮合小程序/utils/recruitCoverLibrary.manifest.json").write_text(manifest_json, encoding="utf-8")
     fulfillment_manifest = ROOT / "灵祺达人履约管理后台/src/lib/mpSync/recruitCoverLibrary.manifest.json"
-    fulfillment_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"OK: wrote covers to {len(OUT_DIRS)} dirs, manifest -> {manifest_path}")
+    fulfillment_manifest.write_text(manifest_json, encoding="utf-8")
+    print(f"OK: wrote covers to {len(OUT_DIRS)} dirs, manifest -> {mp_manifest_js}")
 
 
 if __name__ == "__main__":
