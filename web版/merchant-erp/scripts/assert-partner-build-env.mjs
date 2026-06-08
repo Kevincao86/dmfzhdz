@@ -1,8 +1,37 @@
 #!/usr/bin/env node
 /**
- * 服务商版 Vercel 构建前校验：避免打出「登录服务未配置」的空包。
- * 在 partner-erp / merchant-erp 的 build:partner 前执行。
+ * 服务商版构建前校验：避免打出「登录服务未配置」的空包。
+ * Vercel 用环境变量；ECS/本地可用项目根目录 .env.partner。
  */
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+function loadEnvFile(rel) {
+  const p = path.join(ROOT, rel)
+  if (!fs.existsSync(p)) return
+  for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    const eq = t.indexOf('=')
+    if (eq <= 0) continue
+    const key = t.slice(0, eq).trim()
+    let val = t.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (key && !String(process.env[key] ?? '').trim()) process.env[key] = val
+  }
+}
+
+loadEnvFile('.env.partner')
+loadEnvFile('.env.partner.local')
+
 const required = [
   'VITE_SUPABASE_URL',
   'VITE_SUPABASE_ANON_KEY',
@@ -18,7 +47,7 @@ if (edition && edition !== 'partner') {
 }
 if (missing.length) {
   console.error(
-    '[build:partner] 缺少环境变量（请在 Vercel 服务商项目 Environment Variables 配置，与商家站 cs 相同）：',
+    '[build:partner] 缺少环境变量（Vercel 配 Environment Variables，或 ECS/本地写 .env.partner）：',
   )
   for (const k of missing) console.error(`  - ${k}`)
   console.error(
