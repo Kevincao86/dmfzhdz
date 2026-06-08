@@ -21,6 +21,7 @@ export default function PrOrderVideoReviewPage() {
   const [busyId, setBusyId] = useState('')
   const [rejectModal, setRejectModal] = useState<VideoCard | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [previewId, setPreviewId] = useState('')
 
   const load = useCallback(async () => {
     if (!mpOrderId) return
@@ -45,8 +46,13 @@ export default function PrOrderVideoReviewPage() {
           videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : undefined,
         }))
       setCards(rows)
+      setPreviewId((prev) => {
+        if (prev && rows.some((r) => r.id === prev)) return prev
+        return rows[0]?.id || ''
+      })
     } catch {
       setCards([])
+      setPreviewId('')
     } finally {
       setLoading(false)
     }
@@ -66,6 +72,8 @@ export default function PrOrderVideoReviewPage() {
       total: cards.length,
     }
   }, [cards])
+
+  const previewCard = useMemo(() => cards.find((c) => c.id === previewId) || null, [cards, previewId])
 
   async function onPass(card: VideoCard) {
     if (!mpOrderId || busyId) return
@@ -96,7 +104,7 @@ export default function PrOrderVideoReviewPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="max-w-6xl space-y-4">
       <PageHero
         title="视频审核"
         subtitle={`招募单「${title}」的达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。`}
@@ -132,61 +140,129 @@ export default function PrOrderVideoReviewPage() {
         </div>
       ) : null}
 
-      <div className="space-y-3">
-        {cards.map((c) => (
-          <article key={c.id} className="surface-card rounded-xl border p-4">
-            <div className="flex flex-wrap justify-between gap-2 items-start">
-              <div>
-                <h3 className="font-semibold">{c.displayName}</h3>
-                <p className="text-xs text-[var(--shell-muted)] mt-1">
-                  提交于 {c.videoSubmittedAt || '—'}
-                  {c.videoStatus ? ` · ${videoStatusLabel(c.videoStatus)}` : ''}
-                </p>
-              </div>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${
-                  c.videoStatus === 'passed'
-                    ? 'bg-emerald-500/10 text-emerald-700'
-                    : c.videoStatus === 'rejected'
-                      ? 'bg-red-500/10 text-red-700'
-                      : 'bg-amber-500/10 text-amber-700'
+      {cards.length ? (
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1 space-y-3">
+            {cards.map((c) => (
+              <article
+                key={c.id}
+                className={`surface-card rounded-xl border p-4 transition-colors ${
+                  previewId === c.id ? 'border-violet-400 ring-1 ring-violet-400/30' : ''
                 }`}
               >
-                {videoStatusLabel(c.videoStatus) || '待审核'}
-              </span>
-            </div>
-            {c.videoRejectReason ? (
-              <p className="text-xs text-red-600 mt-2 rounded-lg bg-red-50 px-2 py-1.5">驳回原因：{c.videoRejectReason}</p>
-            ) : null}
-            <a href={c.videoUrl} target="_blank" rel="noreferrer" className="text-xs text-violet-600 underline mt-2 inline-block">
-              打开视频
-            </a>
-            {c.videoStatus === 'pending' ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={busyId === c.id}
-                  className="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60"
-                  onClick={() => void onPass(c)}
-                >
-                  通过
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId === c.id}
-                  className="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-60"
-                  onClick={() => {
-                    setRejectModal(c)
-                    setRejectReason('')
-                  }}
-                >
-                  驳回
-                </button>
+                <div className="flex flex-wrap justify-between gap-2 items-start">
+                  <div>
+                    <h3 className="font-semibold">{c.displayName}</h3>
+                    <p className="text-xs text-[var(--shell-muted)] mt-1">
+                      提交于 {c.videoSubmittedAt || '—'}
+                      {c.videoStatus ? ` · ${videoStatusLabel(c.videoStatus)}` : ''}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      c.videoStatus === 'passed'
+                        ? 'bg-emerald-500/10 text-emerald-700'
+                        : c.videoStatus === 'rejected'
+                          ? 'bg-red-500/10 text-red-700'
+                          : 'bg-amber-500/10 text-amber-700'
+                    }`}
+                  >
+                    {videoStatusLabel(c.videoStatus) || '待审核'}
+                  </span>
+                </div>
+                {c.videoRejectReason ? (
+                  <p className="text-xs text-red-600 mt-2 rounded-lg bg-red-50 px-2 py-1.5">
+                    驳回原因：{c.videoRejectReason}
+                  </p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`text-sm px-3 py-1.5 rounded-lg border ${
+                      previewId === c.id
+                        ? 'border-violet-500 bg-violet-600 text-white'
+                        : 'border-violet-500/40 text-violet-600 hover:bg-violet-50'
+                    }`}
+                    onClick={() => setPreviewId(c.id)}
+                  >
+                    视频预览
+                  </button>
+                  <a
+                    href={c.videoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5"
+                  >
+                    新窗口打开
+                  </a>
+                </div>
+                {c.videoStatus === 'pending' ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busyId === c.id}
+                      className="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60"
+                      onClick={() => void onPass(c)}
+                    >
+                      通过
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === c.id}
+                      className="text-sm px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-60"
+                      onClick={() => {
+                        setRejectModal(c)
+                        setRejectReason('')
+                      }}
+                    >
+                      驳回
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+
+          <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[min(100%,400px)] xl:w-[420px]">
+            <div className="surface-card rounded-xl border p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-[var(--shell-text)]">视频预览</h3>
+                {previewCard ? (
+                  <span className="text-xs text-[var(--shell-muted)] truncate">{previewCard.displayName}</span>
+                ) : null}
               </div>
-            ) : null}
-          </article>
-        ))}
-      </div>
+              {previewCard ? (
+                <>
+                  <div className="aspect-video w-full overflow-hidden rounded-lg bg-black/90">
+                    <video
+                      key={previewCard.videoUrl}
+                      src={previewCard.videoUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-contain"
+                    >
+                      您的浏览器不支持视频播放，请使用「新窗口打开」。
+                    </video>
+                  </div>
+                  <p className="mt-2 text-xs text-[var(--shell-muted)]">
+                    提交于 {previewCard.videoSubmittedAt || '—'} · {videoStatusLabel(previewCard.videoStatus) || '待审核'}
+                  </p>
+                  {previewCard.videoRejectReason ? (
+                    <p className="mt-2 text-xs text-red-600 rounded-lg bg-red-50 px-2 py-1.5">
+                      驳回原因：{previewCard.videoRejectReason}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-[var(--shell-border)] bg-white/5 px-4 text-center text-sm text-[var(--shell-muted)]">
+                  点击左侧「视频预览」在此播放成片
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : null}
 
       {rejectModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
