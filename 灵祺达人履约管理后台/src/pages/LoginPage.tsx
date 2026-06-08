@@ -19,7 +19,7 @@ import {
   workIdentityToAccountRole,
   type MpWorkIdentity,
 } from '../lib/mpWorkIdentity'
-import TalentLoginAuthPanel, { type LoginTab } from './login/TalentLoginAuthPanel'
+import TalentLoginAuthPanel, { SCAN_LOGIN_ENABLED, type LoginTab } from './login/TalentLoginAuthPanel'
 
 const AUTH_SHELL = cn(
   'relative w-full max-w-md rounded-[28px] border border-white/80 p-6 sm:p-8',
@@ -66,7 +66,7 @@ export default function LoginPage() {
   }, [roleFromUrl, nav])
 
   useEffect(() => {
-    if (tab !== 'scan' || !roleFromUrl) return
+    if (!SCAN_LOGIN_ENABLED || tab !== 'scan' || !roleFromUrl) return
     let cancelled = false
     ;(async () => {
       try {
@@ -85,7 +85,7 @@ export default function LoginPage() {
   }, [tab, roleFromUrl])
 
   useEffect(() => {
-    if (!ticket || tab !== 'scan' || !roleFromUrl) return
+    if (!SCAN_LOGIN_ENABLED || !ticket || tab !== 'scan' || !roleFromUrl) return
     const t = setInterval(async () => {
       try {
         const r = await scanPoll(ticket)
