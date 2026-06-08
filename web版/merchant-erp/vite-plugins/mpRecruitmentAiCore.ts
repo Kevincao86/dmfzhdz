@@ -48,14 +48,14 @@ export type MpRecruitmentAiTalentInput = {
   applicationHabits?: Record<string, unknown>
 }
 
-const MATCH_SCORE_GUIDE = `严格评分（0-100，禁止普遍给高分）：
-- 平台一致最多 20 分；平台不同通常总分 ≤42
-- 城市/区域：同城 +20、同省 +12、全国商单 +6；跨城不匹配通常 ≤48，不得因平台相同就给 80+
-- 类目与达人标签契合 0-20；无相关标签应 ≤55
-- 报价/预算与身份匹配 0-15
-- 粉丝/带货等级达标 0-15；明显不达标 ≤44
-- 描述与能力/报名习惯 0-10
-参考：仅平台相同且跨城 30-48；同城+平台+部分标签 55-68；多项契合 72-88；招募对象不符 ≤28`
+const MATCH_SCORE_GUIDE = `评分（0-100，须与事实一致）：
+- 招募对象不符（达人/拍摄/剪辑）总分 ≤28
+- 平台不同总分 ≤42；跨城且类目无关 30-48
+- 同城 + 平台一致 + 粉丝/等级达标 + 标签或类目契合：应给 85-95（高匹配）
+- 同城 + 平台一致 + 粉丝达标：应给 78-88
+- 同省 + 平台一致 + 部分标签：65-78
+- 全国商单 + 平台一致：55-72
+禁止在「城市、平台、标签、等级均符合」时仍给 50 分左右的中等分。`
 
 function compactTalent(t: MpRecruitmentAiTalentInput): Record<string, unknown> {
   return {
@@ -331,7 +331,7 @@ ${MATCH_SCORE_GUIDE}
 
 商单列表（含平台、城市、类目、预算、粉丝要求、招募对象 recruitTarget、描述 summary）：${orderJson}
 
-请为每条商单打分；跨城且类目不相关通常 30-48，勿因平台相同就给 80+。`
+请为每条商单打分。若候选与商单同城、同平台、粉丝/等级达标且标签或类目契合，请给 85 分以上。`
       const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0)
       const rawItems = extractJsonArray(text)
         .map(normalizeMatchItem)

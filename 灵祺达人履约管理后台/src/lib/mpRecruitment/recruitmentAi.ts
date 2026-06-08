@@ -108,7 +108,7 @@ function chunk<T>(list: T[], size: number): T[][] {
   return out
 }
 
-const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v2'
+const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
 const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
 
 function readWebMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
