@@ -1,17 +1,21 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "cd ../merchant-erp && npm ci",
+  "installCommand": "cd ../merchant-erp && npm ci && cd ../partner-erp && npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": null,
+  "functions": {
+    "api/meoo-help-manual-public.ts": {
+      "maxDuration": 30
+    },
+    "api/meoo-team-intro-public.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
-      "source": "/api/meoo-help-manual-public",
-      "destination": "https://mofangdianai.com/erp-api/meoo-help-manual-public"
-    },
-    {
-      "source": "/api/meoo-team-intro-public",
-      "destination": "https://mofangdianai.com/erp-api/meoo-team-intro-public"
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
     },
     {
       "source": "/((?!api/)(?!assets/).*)",

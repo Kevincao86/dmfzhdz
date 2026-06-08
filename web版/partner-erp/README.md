@@ -11,7 +11,7 @@
 
 1. 新建 Vercel 项目（或单独 Production 域名），**Root Directory** 填：`web版/partner-erp`（不要用 `灵祺Web版:服务商版本`）。
 2. 本目录 `vercel.json` 已写好 Install / Build / Output；或在控制台等价配置：
-   - Install：`cd ../merchant-erp && npm ci`
+   - Install：`cd ../merchant-erp && npm ci && cd ../partner-erp && npm ci`
    - Build：`npm run build`（内部 `build:partner` + 同步到 `dist/`）
    - Output：`dist`
 3. 环境变量（必配）：
