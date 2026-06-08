@@ -21,6 +21,7 @@ Page({
     timeOptions: appFilters.APPLICATION_TIME_FILTERS,
     categoryOptions: appFilters.CATEGORY_FILTERS,
     cityOptions: ['全部'],
+    keyword: '',
     uploadingKey: '',
   },
   onShow() {
@@ -32,6 +33,7 @@ Page({
       category: this.data.category,
       province: this.data.province,
       city: this.data.city,
+      keyword: this.data.keyword,
     })
   },
   async load() {
@@ -61,7 +63,11 @@ Page({
       const mpList = reg.mpRecruitmentOrders || []
       const enriched = local.map((a) => {
         const mp = mpList.find((o) => o && o.id === a.mpOrderId)
-        return appDisplay.enrichTalentApplicationRow(a, mp, reg)
+        const row = appDisplay.enrichTalentApplicationRow(a, mp, reg)
+        if (row.applicantId && row.applicantId !== a.applicantId) {
+          applicationsStore.updateApplicationApplicantId(a.mpOrderId, row.applicantId)
+        }
+        return row
       })
       const cityOptions = hallFilters.buildCityFilterOptions(enriched)
       this.setData({
@@ -115,21 +121,34 @@ Page({
       filteredRows: this.applyFilters(this.data.rows),
     })
   },
+  onKeywordInput(e) {
+    const keyword = String((e.detail && e.detail.value) || '')
+    this.setData({
+      keyword,
+      filteredRows: this.applyFilters(this.data.rows),
+    })
+  },
   goDetail(e) {
     const id = e.currentTarget.dataset.id
     if (id) wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   },
   onUploadVideo(e) {
-    const { id, applicant } = e.currentTarget.dataset
-    if (!id || !applicant) {
-      wx.showToast({ title: '缺少报名信息', icon: 'none' })
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
+    if (!applicantId && id) {
+      const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+      if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    }
+    if (!id || !applicantId) {
+      wx.showToast({ title: '缺少报名信息，请稍后重试', icon: 'none' })
       return
     }
-    const key = `${id}-${applicant}`
+    const key = `${id}-${applicantId}`
     if (this.data.uploadingKey) return
     this.setData({ uploadingKey: key })
     videoUpload
-      .chooseAndUploadVideo(id, applicant)
+      .chooseAndUploadVideo(id, applicantId)
       .then(() => this.load())
       .catch(() => {})
       .finally(() => this.setData({ uploadingKey: '' }))

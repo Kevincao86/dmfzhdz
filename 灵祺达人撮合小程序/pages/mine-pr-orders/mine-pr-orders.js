@@ -6,6 +6,7 @@ const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
+const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -38,9 +39,17 @@ function mapRow(item, mp) {
   }
 }
 
+function rowById(rows, id) {
+  const mpOrderId = String(id || '').trim()
+  if (!mpOrderId) return null
+  return (rows || []).find((r) => r && r.mpOrderId === mpOrderId) || null
+}
+
 Page({
   data: {
     rows: [],
+    filteredRows: [],
+    keyword: '',
     loading: true,
     err: '',
     deletingId: '',
@@ -50,18 +59,31 @@ Page({
   onShow() {
     this.load()
   },
+  applyFilters(rows) {
+    const keyword = this.data.keyword || ''
+    return (rows || []).filter((r) => listKeywordSearch.matchListKeyword(r, keyword))
+  },
+  onKeywordInput(e) {
+    const keyword = String((e.detail && e.detail.value) || '')
+    this.setData({
+      keyword,
+      filteredRows: this.applyFilters(this.data.rows),
+    })
+  },
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh())
   },
   async load() {
     const local = applicationsStore.readPublishedOrders()
     if (!local.length) {
-      this.setData({ rows: [], loading: false, err: '' })
+      this.setData({ rows: [], filteredRows: [], loading: false, err: '' })
       return
     }
     if (!api.hasApi()) {
+      const rows = local.map((item) => mapRow(item, null))
       this.setData({
-        rows: local.map((item) => mapRow(item, null)),
+        rows,
+        filteredRows: this.applyFilters(rows),
         loading: false,
         err: '未配置后台，无法同步报名人数',
       })
@@ -75,10 +97,12 @@ Page({
         const mp = mpList.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
-      this.setData({ rows, loading: false, err: '' })
+      this.setData({ rows, filteredRows: this.applyFilters(rows), loading: false, err: '' })
     } catch (e) {
+      const rows = local.map((item) => mapRow(item, null))
       this.setData({
-        rows: local.map((item) => mapRow(item, null)),
+        rows,
+        filteredRows: this.applyFilters(rows),
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 60),
       })
@@ -100,8 +124,8 @@ Page({
     wx.switchTab({ url: '/pages/publish/publish' })
   },
   onShare(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const row = this.data.rows[idx]
+    const id = e.currentTarget.dataset.id
+    const row = rowById(this.data.filteredRows, id) || rowById(this.data.rows, id)
     if (!row) return
     const order = orderForShare(row.mp, row)
     if (!order) {
@@ -122,8 +146,7 @@ Page({
   },
   onToggleStatus(e) {
     const id = e.currentTarget.dataset.id
-    const idx = Number(e.currentTarget.dataset.index)
-    const row = this.data.rows[idx]
+    const row = rowById(this.data.filteredRows, id) || rowById(this.data.rows, id)
     if (!id || !row || this.data.togglingId) return
     if (!row.canToggleRecruit) {
       wx.showToast({ title: '当前状态不可切换', icon: 'none' })
@@ -162,8 +185,8 @@ Page({
     })
   },
   async onDownload(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const row = this.data.rows[idx]
+    const id = e.currentTarget.dataset.id
+    const row = rowById(this.data.filteredRows, id) || rowById(this.data.rows, id)
     if (!row || this.data.exportingId) return
     const applicants = row.mp && Array.isArray(row.mp.applicants) ? row.mp.applicants : []
     if (!applicants.length) {

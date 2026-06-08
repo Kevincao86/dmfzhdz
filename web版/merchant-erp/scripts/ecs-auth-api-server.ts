@@ -69,6 +69,7 @@ import mpSupportRelayHandler from '../api/meoo-ops-mp-support-relay.ts'
 import mpRecruitmentIceSubmitHandler from '../api/meoo-ops-mp-recruitment-ice-submit.ts'
 import mpRecruitmentIceConfirmHandler from '../api/meoo-ops-mp-recruitment-ice-confirm.ts'
 import mpRecruitmentVideoUploadInitHandler from '../api/meoo-ops-mp-recruitment-video-upload-init.ts'
+import mpRecruitmentVideoUploadBodyHandler from '../api/meoo-ops-mp-recruitment-video-upload-body.ts'
 import mpRecruitmentVideoSubmitHandler from '../api/meoo-ops-mp-recruitment-video-submit.ts'
 import mpRecruitmentVideoReviewHandler from '../api/meoo-ops-mp-recruitment-video-review.ts'
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
@@ -172,6 +173,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-ice-submit': mpRecruitmentIceSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-ice-confirm': mpRecruitmentIceConfirmHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-upload-init': mpRecruitmentVideoUploadInitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-video-upload-body': mpRecruitmentVideoUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-submit': mpRecruitmentVideoSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-review': mpRecruitmentVideoReviewHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,

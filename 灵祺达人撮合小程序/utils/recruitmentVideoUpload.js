@@ -1,5 +1,7 @@
 const api = require('./api.js')
 
+const MAX_BASE64_MB = 32
+
 function videoStatusLabel(status) {
   if (status === 'passed') return '已通过'
   if (status === 'rejected') return '已驳回'
@@ -21,40 +23,13 @@ async function postPaths(paths, body) {
   throw lastErr || new Error('接口不可用')
 }
 
-function initUpload(fileName, contentType, sizeBytes) {
-  return postPaths(['/api/meoo-ops-mp-recruitment-video-upload-init'], {
-    fileName: fileName || 'recruit-video.mp4',
-    contentType: contentType || 'video/mp4',
-    sizeBytes,
-  })
-}
-
-function submitVideo(mpOrderId, applicantId, videoUrl) {
-  return postPaths(
-    ['/api/meoo-ops-mp-recruitment-video-submit', '/api/ops-sync/mp-recruitment-orders/video-submit'],
-    { mpOrderId, applicantId, videoUrl },
-  )
-}
-
-function putFileToOss(uploadUrl, filePath, contentType) {
+function readFileBase64(filePath) {
   return new Promise((resolve, reject) => {
-    const fs = wx.getFileSystemManager()
-    fs.readFile({
+    wx.getFileSystemManager().readFile({
       filePath,
+      encoding: 'base64',
       success(res) {
-        wx.request({
-          url: uploadUrl,
-          method: 'PUT',
-          header: { 'Content-Type': contentType || 'video/mp4' },
-          data: res.data,
-          success(r) {
-            if (r.statusCode >= 200 && r.statusCode < 300) resolve()
-            else reject(new Error(`上传失败 ${r.statusCode}`))
-          },
-          fail(err) {
-            reject(err || new Error('上传失败'))
-          },
-        })
+        resolve(String(res.data || ''))
       },
       fail(err) {
         reject(err || new Error('读取视频失败'))
@@ -63,7 +38,34 @@ function putFileToOss(uploadUrl, filePath, contentType) {
   })
 }
 
+function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
+  const maxBytes = MAX_BASE64_MB * 1024 * 1024
+  if (sizeBytes > maxBytes) {
+    return Promise.reject(new Error(`视频超过 ${MAX_BASE64_MB}MB，请压缩后重试`))
+  }
+  return readFileBase64(filePath).then((contentBase64) =>
+    postPaths(
+      [
+        '/api/meoo-ops-mp-recruitment-video-upload-body',
+        '/api/ops-sync/mp-recruitment-orders/video-upload-body',
+      ],
+      {
+        mpOrderId,
+        applicantId,
+        fileName: fileName || 'recruit-video.mp4',
+        contentType: 'video/mp4',
+        contentBase64,
+      },
+    ),
+  )
+}
+
 function chooseAndUploadVideo(mpOrderId, applicantId) {
+  const orderId = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  if (!orderId || !aid) {
+    return Promise.reject(new Error('缺少报名信息'))
+  }
   return new Promise((resolve, reject) => {
     wx.chooseVideo({
       sourceType: ['album', 'camera'],
@@ -71,18 +73,10 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
       maxDuration: 300,
       success(chooseRes) {
         const tempPath = chooseRes.tempFilePath
-        const sizeBytes = chooseRes.size || 0
-        const fileName = (tempPath.split('/').pop() || 'recruit-video.mp4').split('?')[0]
+        const sizeBytes = Number(chooseRes.size) || 0
+        const fileName = (String(tempPath).split('/').pop() || 'recruit-video.mp4').split('?')[0]
         wx.showLoading({ title: '上传中…', mask: true })
-        initUpload(fileName, 'video/mp4', sizeBytes)
-          .then((plan) => {
-            const uploadUrl = String(plan.uploadUrl || '').trim()
-            const mediaUrl = String(plan.mediaUrl || '').trim()
-            const contentType = plan.contentType || 'video/mp4'
-            if (!uploadUrl || !mediaUrl) throw new Error('上传凭证无效')
-            return putFileToOss(uploadUrl, tempPath, contentType).then(() => mediaUrl)
-          })
-          .then((mediaUrl) => submitVideo(mpOrderId, applicantId, mediaUrl))
+        uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
           .then(() => {
             wx.hideLoading()
             wx.showToast({ title: '已提交审核', icon: 'success' })
@@ -90,13 +84,21 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
           })
           .catch((e) => {
             wx.hideLoading()
-            const msg = String(e && e.message ? e.message : e || '上传失败')
-            wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
+            const msg = String((e && e.message) || e || '上传失败')
+            wx.showModal({
+              title: '上传失败',
+              content: msg.slice(0, 200),
+              showCancel: false,
+            })
             reject(e)
           })
       },
       fail(err) {
-        if (err && err.errMsg && /cancel/.test(err.errMsg)) return
+        const msg = String((err && err.errMsg) || '')
+        if (/cancel/.test(msg)) {
+          resolve()
+          return
+        }
         reject(err || new Error('未选择视频'))
       },
     })
@@ -106,5 +108,4 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
 module.exports = {
   videoStatusLabel,
   chooseAndUploadVideo,
-  submitVideo,
 }

@@ -72,15 +72,19 @@ function matchRegionFilter(region, filterProvince, filterCity) {
   return true
 }
 
+const listKeywordSearch = require('./listKeywordSearch.js')
+
 function filterApplicationRows(rows, opts) {
   const timeFilter = (opts && opts.timeFilter) || 'all'
   const category = (opts && opts.category) || '全部'
   const province = (opts && opts.province) || '全部'
   const city = (opts && opts.city) || '全部'
+  const keyword = (opts && opts.keyword) || ''
   return (rows || []).filter((r) => {
     if (!matchApplicationTimeFilter(parseAppliedAtMs(r.appliedAt), timeFilter)) return false
     if (!matchCategory(r.category, category)) return false
     if (!matchRegionFilter(r.region, province, city)) return false
+    if (!listKeywordSearch.matchListKeyword(r, keyword)) return false
     return true
   })
 }
