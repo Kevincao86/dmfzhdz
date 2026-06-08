@@ -27,10 +27,13 @@ function prDraftBelongsToAccount(draft, account) {
   if (!draft || typeof draft !== 'object' || !account) return false
   const accPrId = String(account.lingqiPrId || '').trim()
   const draftPrId = String(draft.lingqiPrId || '').trim()
-  if (accPrId && draftPrId && accPrId !== draftPrId) return false
   const loginPhone = digits11(account.loginName)
-  if (!loginPhone) return true
   const contact = digits11(draft.contactPhone)
+  if (accPrId && draftPrId && accPrId !== draftPrId) {
+    if (loginPhone && contact === loginPhone) return true
+    return false
+  }
+  if (!loginPhone) return true
   if (contact && contact !== loginPhone) return false
   return true
 }

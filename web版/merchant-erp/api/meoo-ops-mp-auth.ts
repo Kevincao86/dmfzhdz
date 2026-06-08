@@ -27,6 +27,7 @@ import {
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
 import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
+import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
 
 export const config = { maxDuration: 60 }
 
@@ -332,7 +333,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 401, { ok: false, error: 'invalid_session' })
         return
       }
-      const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, sess.account)
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, ...profile })
       return
     }

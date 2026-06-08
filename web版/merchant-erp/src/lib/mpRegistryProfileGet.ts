@@ -73,14 +73,6 @@ export function findRegistryPrForAccount(
   const openId = String(account.openid || '').trim()
   const phone = accountPhoneKey(account)
 
-  if (prId) {
-    const hit = users.find((u) => u.id === prId)
-    if (hit) return hit
-  }
-  if (lingqiPrId) {
-    const hit = users.find((u) => String(u.lingqiPrId || '').trim() === lingqiPrId)
-    if (hit) return hit
-  }
   if (openId) {
     const hit = users.find((u) => String(u.wxOpenId || '').trim() === openId)
     if (hit) return hit
@@ -88,10 +80,21 @@ export function findRegistryPrForAccount(
   if (phone.length >= 11) {
     const hits = users.filter((u) => prPhoneKey(u) === phone)
     if (hits.length === 1) return hits[0]!
-    if (hits.length > 1 && lingqiPrId) {
-      return hits.find((u) => String(u.lingqiPrId || '').trim() === lingqiPrId) || hits[0]!
+    if (hits.length > 1) {
+      if (lingqiPrId) {
+        const byLq = hits.find((u) => String(u.lingqiPrId || '').trim() === lingqiPrId)
+        if (byLq) return byLq
+      }
+      return [...hits].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0]!
     }
-    return hits[0] || null
+  }
+  if (prId) {
+    const hit = users.find((u) => u.id === prId)
+    if (hit) return hit
+  }
+  if (lingqiPrId) {
+    const hit = users.find((u) => String(u.lingqiPrId || '').trim() === lingqiPrId)
+    if (hit) return hit
   }
   return null
 }
@@ -111,6 +114,8 @@ export async function mpAuthGetRegistryProfile(
   const pr = findRegistryPrForAccount(data, account)
   const accTalentId = String(account.lingqi_talent_id || '').trim()
   const accMemberId = String(account.registry_member_id || '').trim()
+  const accPrId = String(account.lingqi_pr_id || '').trim()
+  const accRegistryPrId = String(account.registry_pr_id || '').trim()
   let talentMember = member ? registryMemberToClientDraft(member) : null
   if (talentMember && typeof talentMember === 'object') {
     talentMember = {
@@ -119,8 +124,16 @@ export async function mpAuthGetRegistryProfile(
       lingqiTalentId: accTalentId || talentMember.lingqiTalentId,
     }
   }
+  let prProfile = pr ? registryPrToClientDraft(pr) : null
+  if (prProfile && typeof prProfile === 'object') {
+    prProfile = {
+      ...prProfile,
+      id: accRegistryPrId || prProfile.id,
+      lingqiPrId: String(pr.lingqiPrId || accPrId || prProfile.lingqiPrId || ''),
+    }
+  }
   return {
     talentMember,
-    prProfile: pr ? registryPrToClientDraft(pr) : null,
+    prProfile,
   }
 }
