@@ -21,7 +21,8 @@ export async function submitMerchantRecruitmentWithMpPublish(
 
   await appendRecruitmentOrderToOps(enriched)
 
-  const mpOrder = buildMpOrderFromMerchantRecruitment(enriched, tierPlan ?? enriched.tierPlan)
+  const resolvedTierPlan = (tierPlan ?? enriched.tierPlan) as RecruitmentTierPlan | undefined
+  const mpOrder = buildMpOrderFromMerchantRecruitment(enriched, resolvedTierPlan)
   const append = await appendMpRecruitmentOrderToOps(mpOrder)
   if (!append.ok) {
     if (append.error === 'duplicate_merchant_order' && append.existingId) {

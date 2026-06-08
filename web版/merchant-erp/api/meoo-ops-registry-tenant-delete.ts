@@ -65,11 +65,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const result = await deleteRegistryTenantFromSnapshot(io, {
+    const result = await deleteRegistryTenantFromSnapshot(
+      io as unknown as import('../../../商家管理后台/src/ops/registrySnapshotIo.js').RegistrySnapshotIo,
+      {
       id: String(body.id || ''),
       merchantName: body.merchantName,
       loginName: body.loginName,
-    })
+      },
+    )
     if (!result.ok) {
       sendOpsJson(res, 400, { ok: false, error: result.error })
       return

@@ -157,7 +157,6 @@ export function buildVideoReviewInboxEntries(
     const member = resolveMemberForApplicant(a, members)
     const role = memberRoleLabel(member)
     if (role === '达人') continue
-    const name = String(a.platformNickname || a.name || role)
     const roleBody = passed
       ? `「${orderTitle}」中达人 ${ownerName} 的视频已通过 PR 审核。`
       : `「${orderTitle}」中达人 ${ownerName} 的视频未通过审核，${reason ? `原因：${reason}。` : ''}请关注后续重传进度。`

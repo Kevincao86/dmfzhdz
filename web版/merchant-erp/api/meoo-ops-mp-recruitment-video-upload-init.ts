@@ -2,8 +2,9 @@
  * POST /api/meoo-ops-mp-recruitment-video-upload-init — 达人探店成片 OSS 直传凭证。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { readAliyunIceConfigFromEnv } from '../vite-plugins/aliyunIceCore.js'
+import { readAliyunIceConfigFromEnv, type AliyunIceConfig } from '../vite-plugins/aliyunIceCore.js'
 import { createIceSourceUploadPlan } from '../vite-plugins/aliyunOssIceUpload.js'
+import type { MerchantAiEnv } from '../vite-plugins/merchantAiUpstream.js'
 import { mergeVideoAiMerchantEnvWithSnapshot } from '../vite-plugins/merchantVideoAiGateway.js'
 
 export const config = { maxDuration: 60 }
@@ -58,8 +59,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const env = await mergeVideoAiMerchantEnvWithSnapshot(process.cwd(), process.env)
-    const cfg = readAliyunIceConfigFromEnv(env)
+    const rawEnv = { ...process.env } as MerchantAiEnv
+    const env = await mergeVideoAiMerchantEnvWithSnapshot(process.cwd(), rawEnv)
+    const cfg = readAliyunIceConfigFromEnv(env) as AliyunIceConfig
     const plan = await createIceSourceUploadPlan(cfg, env, { fileName, contentType, sizeBytes })
     if (!plan.ok) {
       sendOpsJson(res, 503, { ok: false, error: 'upload_plan_failed', message: plan.message })
