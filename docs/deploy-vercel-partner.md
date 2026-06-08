@@ -36,6 +36,10 @@
 - **`VITE_APP_EDITION`**: 不设置或 `merchant`
 - **`VITE_PEER_EDITION_LOGIN_URL`**: 服务商版登录 URL，如 `https://你的服务商域名/login`
 
+## 帮助手册 / 团队介绍（fws 同源 API）
+
+`partner-erp/api/meoo-help-manual-public.ts` 与 `meoo-team-intro-public.ts` 为 **Serverless 反代** 至 `https://mofangdianai.com/erp-api/...`，无需在服务商 Vercel 项目单独配置 Supabase service role。改代码后须 **Redeploy 服务商 Vercel 项目**。
+
 ## 故障：打开 fws 显示「登录服务未配置」
 
 说明 **服务商 Vercel 项目构建时未注入** `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`（前端打包进静态 JS，不是运行时配置）。
