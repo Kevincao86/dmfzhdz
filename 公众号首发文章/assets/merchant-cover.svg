@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="608" viewBox="0 0 1080 608">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.55" stop-color="#115e59"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="1080" height="608" fill="url(#bg)"/>
+  <circle cx="965" cy="92" r="126" fill="#ffffff" opacity="0.08"/>
+  <circle cx="88" cy="528" r="176" fill="#ffffff" opacity="0.06"/>
+  <g filter="url(#shadow)">
+    <rect x="612" y="106" width="328" height="376" rx="26" fill="#f8fafc"/>
+    <rect x="640" y="138" width="272" height="56" rx="16" fill="#0f766e"/>
+    <rect x="640" y="222" width="126" height="88" rx="18" fill="#ccfbf1"/>
+    <rect x="786" y="222" width="126" height="88" rx="18" fill="#fef3c7"/>
+    <rect x="640" y="334" width="272" height="28" rx="14" fill="#cbd5e1"/>
+    <rect x="640" y="382" width="220" height="28" rx="14" fill="#e2e8f0"/>
+    <rect x="640" y="430" width="170" height="28" rx="14" fill="#e2e8f0"/>
+  </g>
+  <text x="92" y="112" fill="#d1fae5" font-size="30" font-family="PingFang SC, Microsoft YaHei, Arial" font-weight="700">灵祺 AI 智能 ERP · 商家版首发</text>
+  <text x="92" y="208" fill="#ffffff" font-size="64" font-family="PingFang SC, Microsoft YaHei, Arial" font-weight="800">把门店经营</text>
+  <text x="92" y="288" fill="#ffffff" font-size="64" font-family="PingFang SC, Microsoft YaHei, Arial" font-weight="800">交给更懂业务的 AI</text>
+  <text x="92" y="360" fill="#ecfeff" font-size="27" font-family="PingFang SC, Microsoft YaHei, Arial">商品 · 达人招募 · 评价 · GEO · 投流 · 财务</text>
+  <text x="92" y="409" fill="#fffbeb" font-size="27" font-family="PingFang SC, Microsoft YaHei, Arial">从“会用工具”到“会经营”的本地生活商家中枢</text>
+  <rect x="92" y="462" width="296" height="58" rx="29" fill="#ffffff"/>
+  <text x="128" y="501" fill="#0f766e" font-size="25" font-family="PingFang SC, Microsoft YaHei, Arial" font-weight="700">V1.0 正式发布</text>
+</svg>

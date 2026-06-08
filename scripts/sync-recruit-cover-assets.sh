@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# 将封面 PNG 同步到小程序 assets 与履约 Web public，并压缩为 750×600
+# 将封面同步到星选 Web public/recruit-covers（JPEG）；小程序走 CDN 不打包
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-$ROOT/.recruit-covers-staging}"
-MP="$ROOT/灵祺达人撮合小程序/assets/recruit-covers"
 WEB="$ROOT/灵祺达人履约管理后台/public/recruit-covers"
 ASSETS="${CURSOR_ASSETS:-$HOME/.cursor/projects/Volumes-OS-Data-Users-damowangOS-AI-ERP/assets}"
 
@@ -12,7 +11,7 @@ if [[ ! -d "$SRC" ]]; then
   exit 1
 fi
 
-mkdir -p "$SRC/platforms" "$SRC/tags" "$MP/platforms" "$MP/tags" "$WEB/platforms" "$WEB/tags"
+mkdir -p "$SRC/platforms" "$SRC/tags" "$WEB/platforms" "$WEB/tags"
 
 # 合并 cursor assets 里已生成的命名文件
 if [[ -d "$ASSETS" ]]; then
@@ -30,12 +29,12 @@ if [[ -d "$ASSETS" ]]; then
   done
 fi
 
-python3 - "$SRC" "$MP" "$WEB" <<'PY'
+python3 - "$SRC" "$WEB" <<'PY'
 import sys
 from pathlib import Path
 from PIL import Image
 
-src, mp, web = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+src, web = Path(sys.argv[1]), Path(sys.argv[2])
 TARGET = (750, 600)
 JPEG_QUALITY = 72
 
@@ -59,19 +58,15 @@ for sub in ("platforms", "tags"):
         continue
     for f in sorted(src_dir.glob("*.png")):
         stem = f.stem
-        for root in (mp, web):
-            old_png = root / sub / f"{stem}.png"
-            if old_png.is_file():
-                old_png.unlink()
-        dest = mp / sub / f"{stem}.jpg"
-        process_one(f, dest)
+        old_png = web / sub / f"{stem}.png"
+        if old_png.is_file():
+            old_png.unlink()
         process_one(f, web / sub / f"{stem}.jpg")
         count += 1
 print(f"processed {count} images -> JPEG q={JPEG_QUALITY}")
 PY
 
-# 仅刷新 manifest，勿用 PIL 重绘覆盖 AI 图
 python3 "$ROOT/scripts/generate-recruit-cover-library.py" --manifest-only
-node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')" 
+node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"
 
-echo "OK: mp platforms=$(ls "$MP/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ') tags=$(ls "$MP/tags"/*.jpg 2>/dev/null | wc -l | tr -d ' ')"
+echo "OK: web platforms=$(ls "$WEB/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ') tags=$(ls "$WEB/tags"/*.jpg 2>/dev/null | wc -l | tr -d ' ') (mp uses CDN)"

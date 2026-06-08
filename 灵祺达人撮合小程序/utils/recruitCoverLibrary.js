@@ -1,6 +1,8 @@
 const manifest = require('./recruitCoverLibrary.manifest.js')
+const config = require('./config.js')
 
-const MP_COVER_ROOT = '/assets/recruit-covers/'
+/** 封面图走星选 Web CDN，不打包进小程序主包 */
+const MP_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://dr.mofangdianai.com/recruit-covers').replace(/\/$/, '')}/`
 
 function mpAssetUrl(relPath) {
   const rel = String(relPath || '').replace(/^\/+/, '')
@@ -89,7 +91,7 @@ function resolveDefaultCover(platform, talentTags) {
     const tagCovers = getTagCovers(tag)
     if (tagCovers.length) return tagCovers[0]
   }
-  return getPlatformCovers('抖音')[0] || { id: 'platform-douyin-1', path: 'platforms/douyin-1.png', url: mpAssetUrl('platforms/douyin-1.png'), label: '默认封面' }
+  return getPlatformCovers('抖音')[0] || { id: 'platform-douyin-1', path: 'platforms/douyin-1.jpg', url: mpAssetUrl('platforms/douyin-1.jpg'), label: '默认封面' }
 }
 
 function coverImageFromOrder(order) {
