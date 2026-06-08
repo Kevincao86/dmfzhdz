@@ -25,6 +25,7 @@ import {
 } from '../meooRegistryShared/mpLibraryRegistryMutations.js'
 import { setHelpManualForEdition } from '../meooRegistryShared/helpManualRegistryCore.js'
 import type { HelpManualEdition } from '../meooRegistryShared/helpManualTypes.js'
+import { setTeamIntro } from '../meooRegistryShared/teamIntroRegistryCore.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
@@ -568,6 +569,20 @@ export async function dispatchOpsRegistrySupabase(opts: {
         status: 200,
         body: { ok: true, categoryCount: categories.length, articleCount: articles.length },
       }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/team-intro/set') {
+      const body = JSON.parse(bodyRaw || '{}') as {
+        intro?: import('../meooRegistryShared/teamIntroTypes.js').RegistryTeamIntro
+      }
+      const intro = body.intro
+      if (!intro || !Array.isArray(intro.paragraphs)) {
+        return { status: 400, body: { ok: false, error: 'invalid_intro' } }
+      }
+      const data = await io.load()
+      setTeamIntro(data, intro)
+      await io.save(data)
+      return { status: 200, body: { ok: true, paragraphCount: intro.paragraphs.length } }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {

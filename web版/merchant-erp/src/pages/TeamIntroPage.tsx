@@ -1,5 +1,8 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LoginPortalNav from '../components/login/LoginPortalNav'
+import { defaultTeamIntro, renderTeamIntroParagraphs } from '../lib/teamIntroDefaults'
+import { fetchTeamIntroPublic } from '../lib/teamIntroApi'
 import type { HelpManualEdition } from '../lib/helpManualTypes'
 import { LEGAL_COMPANY_NAME, productNameForEdition } from '../lib/legalProductMeta'
 
@@ -7,6 +10,27 @@ type Props = { edition: HelpManualEdition }
 
 export default function TeamIntroPage({ edition }: Props) {
   const product = productNameForEdition(edition)
+  const fallback = useMemo(() => defaultTeamIntro(), [])
+  const [subtitle, setSubtitle] = useState(fallback.subtitle ?? LEGAL_COMPANY_NAME)
+  const [paragraphs, setParagraphs] = useState(fallback.paragraphs)
+  const [updatedAt, setUpdatedAt] = useState(fallback.updatedAt)
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    void fetchTeamIntroPublic()
+      .then((intro) => {
+        setSubtitle(intro.subtitle || LEGAL_COMPANY_NAME)
+        setParagraphs(intro.paragraphs.length ? intro.paragraphs : fallback.paragraphs)
+        setUpdatedAt(intro.updatedAt)
+        setErr('')
+      })
+      .catch((e) => {
+        setErr(e instanceof Error ? e.message : '加载失败')
+      })
+  }, [fallback.paragraphs])
+
+  const rendered = useMemo(() => renderTeamIntroParagraphs(paragraphs, product), [paragraphs, product])
+
   return (
     <div className="min-h-[100dvh] bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -19,21 +43,14 @@ export default function TeamIntroPage({ edition }: Props) {
       </header>
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <h1 className="text-2xl font-bold">团队介绍</h1>
-        <p className="mt-2 text-sm text-slate-500">{LEGAL_COMPANY_NAME}</p>
+        <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
+        {err ? <p className="mt-4 text-sm text-rose-600">{err}</p> : null}
         <div className="mt-8 space-y-4 text-sm leading-relaxed text-slate-700">
-          <p>
-            {LEGAL_COMPANY_NAME} 专注本地生活数字化与达人经济基础设施，运营 {product}，
-            为商户、服务商、达人及 PR 提供招募协作、智能运营与履约管理一体化能力。
-          </p>
-          <p>
-            我们相信「简单生意需要简单工具」——通过 AI 辅助、数据打通与多端协同，帮助客户降低运营成本、
-            提升转化效率，共建健康可持续的本地生活达人生态。
-          </p>
-          <p>
-            产品覆盖商家 ERP、服务商协同、星选履约平台与运营管控体系，数据经加密传输与权限隔离，
-            持续迭代以满足行业合规与业务增长需求。
-          </p>
+          {rendered.map((p) => (
+            <p key={p}>{p}</p>
+          ))}
         </div>
+        {updatedAt ? <p className="mt-8 text-xs text-slate-400">更新于 {updatedAt}</p> : null}
       </main>
     </div>
   )
