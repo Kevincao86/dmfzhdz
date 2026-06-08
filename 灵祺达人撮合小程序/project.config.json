@@ -61,18 +61,21 @@
       {
         "type": "glob",
         "value": "assets/recruit-covers/**"
-      }
-    ],
-    "include": [
-      {
-        "type": "glob",
-        "value": "packages/recruit-covers-mp/**/*.jpg"
       },
       {
-        "type": "file",
-        "value": "packages/recruit-covers-mp/coverAssetRegistry.js"
+        "type": "glob",
+        "value": "packages/recruit-covers-mp/**"
+      },
+      {
+        "type": "glob",
+        "value": "封面图库-OSS.md"
+      },
+      {
+        "type": "glob",
+        "value": "备案*.md"
       }
-    ]
+    ],
+    "include": []
   },
   "editorSetting": {}
 }

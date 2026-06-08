@@ -49,9 +49,9 @@ ssh admin@139.196.42.5 'cd ~/app && git pull && bash scripts/ecs-upload-mp-recru
 
 ## 小程序
 
-- `MP_COVER_USE_BUNDLE: false`（不再依赖分包 JPEG）
-- 构建号：`mp-20260609-cover-oss`
-- 清除缓存 → 重新编译 → **上传体验版**
+- 封面图走 OSS，**不上传** `packages/recruit-covers-mp/`（已在 `project.config.json` packOptions.ignore）
+- 构建号：`mp-20260609-cover-oss-slim`
+- 清除缓存 → 重新编译 → **上传体验版**（主包应 < 2MB）
 
 ## OSS 目录公共读
 
