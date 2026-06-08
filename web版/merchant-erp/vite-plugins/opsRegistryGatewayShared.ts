@@ -37,6 +37,11 @@ import {
   type MpLibraryDeleteKind,
 } from '../src/lib/mpLibraryRegistryMutations.js'
 import {
+  helpManualSliceForEdition,
+  setHelpManualForEdition,
+} from '../src/lib/helpManualRegistryCore.js'
+import type { HelpManualEdition } from '../src/lib/helpManualTypes.js'
+import {
   handleIceMpApply,
   handleIceMpConfirm,
   isIceMpOrder,
@@ -165,6 +170,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-mp-recruitment-orders-patch' &&
           url !== '/api/meoo-ops-mp-recruitment-orders-delete' &&
           url !== '/api/meoo-ops-mp-library-delete' &&
+          url !== '/api/meoo-ops-help-manual-set' &&
+          url !== '/api/meoo-help-manual-public' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-talent-member-register' &&
@@ -198,6 +205,45 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
         sendCors()
 
         try {
+          if (method === 'GET' && url === '/api/meoo-help-manual-public') {
+            const editionRaw = new URL(req.url || '', 'http://local').searchParams.get('edition') || 'merchant'
+            const edition = (['merchant', 'partner', 'fulfillment'].includes(String(editionRaw))
+              ? editionRaw
+              : 'merchant') as HelpManualEdition
+            const data = ensureRegistry(viteRoot)
+            const slice = helpManualSliceForEdition(data, edition)
+            json(res, 200, { ok: true, edition, ...slice })
+            return
+          }
+
+          if (method === 'POST' && url === '/api/meoo-ops-help-manual-set') {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              edition?: HelpManualEdition
+              categories?: import('../src/lib/helpManualTypes.js').RegistryHelpManualCategory[]
+              articles?: import('../src/lib/helpManualTypes.js').RegistryHelpManualArticle[]
+            }
+            const edition = body.edition
+            if (!edition || !['merchant', 'partner', 'fulfillment'].includes(edition)) {
+              json(res, 400, { ok: false, error: 'invalid_edition' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            setHelpManualForEdition(
+              data,
+              edition,
+              Array.isArray(body.categories) ? body.categories : [],
+              Array.isArray(body.articles) ? body.articles : [],
+            )
+            writeRegistry(viteRoot, data)
+            json(res, 200, {
+              ok: true,
+              categoryCount: (body.categories ?? []).length,
+              articleCount: (body.articles ?? []).length,
+            })
+            return
+          }
+
           if (method === 'GET' && (url === '/api/ops-sync/registry' || url === '/api/meoo-ops-sync-registry')) {
             let data = ensureRegistry(viteRoot)
             const before = data.recruitmentOrders ?? []

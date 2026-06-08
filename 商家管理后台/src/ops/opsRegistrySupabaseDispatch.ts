@@ -23,6 +23,8 @@ import {
   deleteMpLibraryEntriesFromSnapshot,
   type MpLibraryDeleteKind,
 } from '../meooRegistryShared/mpLibraryRegistryMutations.js'
+import { setHelpManualForEdition } from '../meooRegistryShared/helpManualRegistryCore.js'
+import type { HelpManualEdition } from '../meooRegistryShared/helpManualTypes.js'
 import type { RegistrySnapshotIo } from './registrySnapshotIo.js'
 
 function sha256Hex(plain: string): string {
@@ -581,6 +583,27 @@ export async function dispatchOpsRegistrySupabase(opts: {
       }
       await io.save(data)
       return { status: 200, body: { ok: true, deletedCount: result.deletedCount } }
+    }
+
+    if (method === 'POST' && urlPath === '/api/ops-sync/help-manual/set') {
+      const body = JSON.parse(bodyRaw || '{}') as {
+        edition?: HelpManualEdition
+        categories?: import('../meooRegistryShared/helpManualTypes.js').RegistryHelpManualCategory[]
+        articles?: import('../meooRegistryShared/helpManualTypes.js').RegistryHelpManualArticle[]
+      }
+      const edition = body.edition
+      if (!edition || !['merchant', 'partner', 'fulfillment'].includes(edition)) {
+        return { status: 400, body: { ok: false, error: 'invalid_edition' } }
+      }
+      const categories = Array.isArray(body.categories) ? body.categories : []
+      const articles = Array.isArray(body.articles) ? body.articles : []
+      const data = await io.load()
+      setHelpManualForEdition(data, edition, categories, articles)
+      await io.save(data)
+      return {
+        status: 200,
+        body: { ok: true, categoryCount: categories.length, articleCount: articles.length },
+      }
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/talent-pool/append') {

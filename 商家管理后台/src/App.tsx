@@ -16,12 +16,16 @@ import OpsPrLibraryPage from './ops/pages/OpsPrLibraryPage'
 import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
 import OpsSupportMpWorkbenchPage from './ops/pages/OpsSupportMpWorkbenchPage'
+import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
+import OpsLegalDocPage from './pages/OpsLegalDocPage'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<OpsLoginPage />} />
+        <Route path="/legal/privacy" element={<OpsLegalDocPage doc="privacy" />} />
+        <Route path="/legal/aup" element={<OpsLegalDocPage doc="aup" />} />
         <Route
           path="/"
           element={
@@ -45,6 +49,9 @@ export default function App() {
           <Route path="ai-models" element={<OpsAiModelsPage />} />
           <Route path="support" element={<OpsSupportWorkbenchPage channel="erp" />} />
           <Route path="support-mp" element={<OpsSupportMpWorkbenchPage />} />
+          <Route path="help-manual" element={<OpsHelpManualPage edition="merchant" />} />
+          <Route path="help-manual/partner" element={<OpsHelpManualPage edition="partner" />} />
+          <Route path="help-manual/fulfillment" element={<OpsHelpManualPage edition="fulfillment" />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

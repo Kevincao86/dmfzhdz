@@ -35,6 +35,7 @@ export const OPS_PERMISSION_MODULES = [
     label: '在线客服（小程序达人、PR处理中心）',
     pathPrefix: '/support-mp',
   },
+  { key: 'help_manual', label: '帮助手册管理', pathPrefix: '/help-manual' },
 ] as const
 
 export type OpsPermissionKey = (typeof OPS_PERMISSION_MODULES)[number]['key']

@@ -1,9 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Lock } from 'lucide-react'
 import SecretInput from '../components/SecretInput'
 import ThemeToggle from '../components/ThemeToggle'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
+import {
+  isRememberLoginEnabled,
+  readRememberedLogin,
+  writeRememberedLogin,
+} from '../lib/rememberLogin'
 import {
   ensureOpsMasterAccount,
   firstAllowedOpsPath,
@@ -12,6 +17,8 @@ import {
   verifyOpsLogin,
   writeOpsSession,
 } from './opsStaffAuth'
+
+const REMEMBER_SCOPE = 'ops'
 
 export default function OpsLoginPage() {
   const navigate = useNavigate()
@@ -27,8 +34,18 @@ export default function OpsLoginPage() {
 
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberPassword, setRememberPassword] = useState(() => isRememberLoginEnabled(REMEMBER_SCOPE))
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const saved = readRememberedLogin(REMEMBER_SCOPE)
+    if (saved) {
+      setAccount(saved.loginName)
+      setPassword(saved.password)
+      setRememberPassword(true)
+    }
+  }, [])
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -41,6 +58,11 @@ export default function OpsLoginPage() {
         if (!r.ok) {
           setErr('账号或密码错误')
           return
+        }
+        if (rememberPassword) {
+          writeRememberedLogin(REMEMBER_SCOPE, { loginName: account.trim(), password })
+        } else {
+          writeRememberedLogin(REMEMBER_SCOPE, null)
         }
         writeOpsSession(r.session)
         if (r.session.role === 'super_admin') {
@@ -94,6 +116,15 @@ export default function OpsLoginPage() {
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 text-sm text-slate-400">
+            <input
+              type="checkbox"
+              checked={rememberPassword}
+              onChange={(e) => setRememberPassword(e.target.checked)}
+              className="rounded border-slate-600 text-indigo-500 focus:ring-indigo-500/30"
+            />
+            记住密码
+          </label>
           {err ? <p className="text-sm text-rose-400">{err}</p> : null}
           <button
             type="submit"
@@ -103,6 +134,16 @@ export default function OpsLoginPage() {
             {busy ? '登录中…' : '登录'}
           </button>
         </form>
+        <p className="mt-4 text-center text-xs leading-relaxed text-slate-500">
+          查看{' '}
+          <Link to="/legal/aup" className="text-indigo-400 hover:underline">
+            软件服务及许可协议
+          </Link>{' '}
+          和{' '}
+          <Link to="/legal/privacy" className="text-indigo-400 hover:underline">
+            隐私政策
+          </Link>
+        </p>
         <div className="mt-6">
           <ThemeToggle />
         </div>

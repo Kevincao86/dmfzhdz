@@ -7,6 +7,12 @@ import { supabase } from '../../lib/supabaseClient'
 import { loginNameToTenantEmail } from '../../lib/tenantAuthEmail'
 import { editionLabel, isPartnerEdition } from '../../lib/appEdition'
 import {
+  isRememberLoginEnabled,
+  readRememberedLogin,
+  writeRememberedLogin,
+} from '../../lib/rememberLogin'
+import RememberPasswordRow from '../../components/login/RememberPasswordRow'
+import {
   isCnMobileValid,
   isLoginNameValid,
   isMerchantShortNameValid,
@@ -46,6 +52,8 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
   const [loginSmsCode, setLoginSmsCode] = useState('')
   const [loginSmsCooldown, setLoginSmsCooldown] = useState(0)
   const [loginSmsSending, setLoginSmsSending] = useState(false)
+  const rememberScope = partnerMode ? 'partner' : 'merchant'
+  const [rememberPassword, setRememberPassword] = useState(() => isRememberLoginEnabled(rememberScope))
 
   const [regLoginName, setRegLoginName] = useState('')
   const [merchantName, setMerchantName] = useState('')
@@ -69,6 +77,15 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
     const t = window.setTimeout(() => setLoginSmsCooldown((s) => s - 1), 1000)
     return () => window.clearTimeout(t)
   }, [loginSmsCooldown])
+
+  useEffect(() => {
+    const saved = readRememberedLogin(rememberScope)
+    if (saved) {
+      setLoginName(saved.loginName)
+      setPassword(saved.password)
+      setRememberPassword(true)
+    }
+  }, [rememberScope])
 
   const switchMode = (next: AuthMode) => {
     setMode(next)
@@ -117,6 +134,11 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
       if (!after.session) {
         onErr('登录已成功，但未读到会话。请刷新本页或稍后再试。')
         return
+      }
+      if (rememberPassword) {
+        writeRememberedLogin(rememberScope, { loginName: name, password })
+      } else {
+        writeRememberedLogin(rememberScope, null)
       }
       onLoginSuccess()
     } finally {
@@ -440,6 +462,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
+                <RememberPasswordRow checked={rememberPassword} onChange={setRememberPassword} />
                 {err ? (
                   <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
                 ) : null}
