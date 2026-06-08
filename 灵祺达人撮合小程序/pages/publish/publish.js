@@ -514,6 +514,7 @@ Page({
   },
   openCoverGallery() {
     const f = this.data.form || {}
+    recruitCoverLib.preloadCoverSubpackages()
     this.setData({
       pickerView: 'coverGallery',
       coverGalleryTab: 'recommended',

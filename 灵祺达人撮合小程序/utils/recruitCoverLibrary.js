@@ -4,9 +4,53 @@ const config = require('./config.js')
 /** 封面图走星选 Web CDN，不打包进小程序主包 */
 const MP_COVER_ROOT = `${String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')}/`
 
+/** 标签封面拆成两个分包（各 <2MB）；须与 sync-recruit-cover-assets.sh 一致 */
+const TAG_SUBPACK_A = new Set([
+  'meishi',
+  'muying',
+  'jiaju',
+  'shenghuo',
+  'meizhuang',
+  'jiankang',
+  'yundong',
+  'jiaoyu',
+  'sheying',
+  'lvyou',
+  'wenhua',
+  'xingqu',
+  'shuma',
+])
+
+const COVER_SUBPACK_NAMES = ['recruitCoversPlatforms', 'recruitCoversTags1', 'recruitCoversTags2']
+
+function useCoverBundle() {
+  if (config.MP_COVER_USE_CDN === true && !config.MP_USE_CLOUD_PROXY) return false
+  return true
+}
+
+function mpSubpackRoot(relPath) {
+  const rel = String(relPath || '').replace(/^\/+/, '')
+  if (rel.startsWith('platforms/')) return '/packages/recruit-covers-platforms'
+  if (rel.startsWith('tags/')) {
+    const slug = rel.slice(5).split('-')[0] || ''
+    return TAG_SUBPACK_A.has(slug) ? '/packages/recruit-covers-tags-1' : '/packages/recruit-covers-tags-2'
+  }
+  return '/packages/recruit-covers-platforms'
+}
+
 function mpAssetUrl(relPath) {
   const rel = String(relPath || '').replace(/^\/+/, '')
+  if (useCoverBundle()) return `${mpSubpackRoot(rel)}/${rel}`
   return `${MP_COVER_ROOT}${rel}`
+}
+
+function preloadCoverSubpackages() {
+  if (!useCoverBundle() || typeof wx.preloadSubpackage !== 'function') return
+  for (const name of COVER_SUBPACK_NAMES) {
+    try {
+      wx.preloadSubpackage({ name })
+    } catch (_) {}
+  }
 }
 
 function findCoverById(id) {
@@ -94,6 +138,13 @@ function resolveDefaultCover(platform, talentTags) {
   return getPlatformCovers('抖音')[0] || { id: 'platform-douyin-1', path: 'platforms/douyin-1.jpg', url: mpAssetUrl('platforms/douyin-1.jpg'), label: '默认封面' }
 }
 
+function remapCdnCoverToBundle(url) {
+  const s = String(url || '').trim()
+  const m = s.match(/\/recruit-covers\/((?:platforms|tags)\/[^?#]+)/i)
+  if (m && useCoverBundle()) return mpAssetUrl(m[1])
+  return ''
+}
+
 function coverImageFromOrder(order) {
   if (!order) return ''
   const meta = order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
@@ -101,13 +152,16 @@ function coverImageFromOrder(order) {
 }
 
 function resolveOrderCoverUrl(order) {
-  const custom = coverImageFromOrder(order)
-  if (custom) return custom
   const meta = order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
-  const libId = String(meta.coverLibraryId || '').trim()
+  const libId = String(meta.coverLibraryId || order.coverLibraryId || '').trim()
   if (libId) {
     const hit = findCoverById(libId)
     if (hit) return hit.url
+  }
+  const custom = coverImageFromOrder(order)
+  if (custom) {
+    const bundled = remapCdnCoverToBundle(custom)
+    return bundled || custom
   }
   const platform = String(order.platform || meta.platform || '').trim()
   const tags = Array.isArray(meta.talentTags) ? meta.talentTags : []
@@ -119,7 +173,7 @@ function resolveShareImageUrl(coverUrl) {
   const img = String(coverUrl || '').trim()
   if (!img) return ''
   if (/^https?:\/\//i.test(img)) return img
-  if (img.startsWith('/assets/')) return img
+  if (img.startsWith('/packages/') || img.startsWith('/assets/')) return img
   if (img.startsWith('data:image/')) return img
   if (img.startsWith('wxfile://') || img.startsWith('http://tmp/')) return img
   return img
@@ -154,7 +208,11 @@ function buildCoverFieldsForOrder(form) {
 module.exports = {
   manifest,
   MP_COVER_ROOT,
+  COVER_SUBPACK_NAMES,
+  useCoverBundle,
+  mpSubpackRoot,
   mpAssetUrl,
+  preloadCoverSubpackages,
   findCoverById,
   getPlatformCovers,
   getTagCovers,
