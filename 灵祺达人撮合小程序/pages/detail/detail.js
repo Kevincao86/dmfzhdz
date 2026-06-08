@@ -2,6 +2,7 @@ const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
 const userProfile = require('../../utils/userProfile.js')
+const auth = require('../../utils/auth.js')
 const chat = require('../../utils/talentChat.js')
 const contactGate = require('../../utils/talentContactPrGate.js')
 const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
@@ -331,7 +332,14 @@ Page({
     if (this.data.applyTemplateId) {
       q.push(`templateId=${encodeURIComponent(this.data.applyTemplateId)}`)
     }
-    wx.navigateTo({ url: `/pages/apply/apply?${q.join('&')}` })
+    const applyUrl = `/pages/apply/apply?${q.join('&')}`
+    if (!auth.isLoggedIn()) {
+      wx.navigateTo({
+        url: `/pages/login/login?redirect=${encodeURIComponent(applyUrl)}`,
+      })
+      return
+    }
+    wx.navigateTo({ url: applyUrl })
   },
   copyOrderNo() {
     const v = this.data.view

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-$ROOT/.recruit-covers-staging}"
 WEB="$ROOT/灵祺达人履约管理后台/public/recruit-covers"
+MERCHANT_PUBLIC="$ROOT/web版/merchant-erp/public/recruit-covers"
 ASSETS="${CURSOR_ASSETS:-$HOME/.cursor/projects/Volumes-OS-Data-Users-damowangOS-AI-ERP/assets}"
 
 if [[ ! -d "$SRC" ]]; then
@@ -11,7 +12,7 @@ if [[ ! -d "$SRC" ]]; then
   exit 1
 fi
 
-mkdir -p "$SRC/platforms" "$SRC/tags" "$WEB/platforms" "$WEB/tags"
+mkdir -p "$SRC/platforms" "$SRC/tags" "$WEB/platforms" "$WEB/tags" "$MERCHANT_PUBLIC/platforms" "$MERCHANT_PUBLIC/tags"
 
 # 合并 cursor assets 里已生成的命名文件
 if [[ -d "$ASSETS" ]]; then
@@ -29,12 +30,12 @@ if [[ -d "$ASSETS" ]]; then
   done
 fi
 
-python3 - "$SRC" "$WEB" <<'PY'
+python3 - "$SRC" "$WEB" "$MERCHANT_PUBLIC" <<'PY'
 import sys
 from pathlib import Path
 from PIL import Image
 
-src, web = Path(sys.argv[1]), Path(sys.argv[2])
+src, web, merchant = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
 TARGET = (750, 600)
 JPEG_QUALITY = 72
 
@@ -58,10 +59,11 @@ for sub in ("platforms", "tags"):
         continue
     for f in sorted(src_dir.glob("*.png")):
         stem = f.stem
-        old_png = web / sub / f"{stem}.png"
-        if old_png.is_file():
-            old_png.unlink()
-        process_one(f, web / sub / f"{stem}.jpg")
+        for root in (web, merchant):
+            old_png = root / sub / f"{stem}.png"
+            if old_png.is_file():
+                old_png.unlink()
+            process_one(f, root / sub / f"{stem}.jpg")
         count += 1
 print(f"processed {count} images -> JPEG q={JPEG_QUALITY}")
 PY
@@ -69,4 +71,4 @@ PY
 python3 "$ROOT/scripts/generate-recruit-cover-library.py" --manifest-only
 node -e "require('$ROOT/灵祺达人撮合小程序/utils/recruitCoverLibrary.js'); console.log('manifest ok')"
 
-echo "OK: web platforms=$(ls "$WEB/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ') tags=$(ls "$WEB/tags"/*.jpg 2>/dev/null | wc -l | tr -d ' ') (mp uses CDN)"
+echo "OK: web platforms=$(ls "$WEB/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ') tags=$(ls "$WEB/tags"/*.jpg 2>/dev/null | wc -l | tr -d ' ') merchant=$(ls "$MERCHANT_PUBLIC/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ') (mp CDN: mofangdianai.com/recruit-covers)"
