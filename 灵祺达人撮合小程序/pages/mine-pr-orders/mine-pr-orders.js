@@ -4,6 +4,8 @@ const api = require('../../utils/api.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
+const mpShare = require('../../utils/mpShare.js')
+const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -57,6 +59,18 @@ function rowById(rows, id) {
   return (rows || []).find((r) => r && r.mpOrderId === mpOrderId) || null
 }
 
+function buildOrderSharePayload(order) {
+  if (!order || !order.id) return null
+  const share = {
+    title: shareCopy.buildShareTitle(order) || order.title || '灵祺星选招募',
+    path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
+  }
+  const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
+  const imageUrl = recruitCoverLib.resolveShareImageUrl(coverUrl)
+  if (imageUrl) share.imageUrl = imageUrl
+  return share
+}
+
 Page({
   data: {
     rows: [],
@@ -83,8 +97,12 @@ Page({
     cityLabel: '城市',
     cityOptions: ['全部'],
     filterCountText: '',
+    showShareSheet: false,
+    shareOrder: null,
+    shareTitle: '',
   },
   onShow() {
+    mpShare.enableShareMenu()
     this.load()
   },
   filterOpts() {
@@ -263,11 +281,25 @@ Page({
       wx.showToast({ title: '订单数据缺失', icon: 'none' })
       return
     }
+    this.setData({
+      shareOrder: order,
+      shareTitle: shareCopy.buildShareTitle(order),
+      showShareSheet: true,
+    })
+  },
+  noopShareSheetTap() {},
+  onCloseShareSheet() {
+    this.setData({ showShareSheet: false })
+  },
+  onShareCopyText() {
+    const order = this.data.shareOrder
+    if (!order) return
     wx.showLoading({ title: '生成报名链接', mask: true })
     shareCopy
       .buildGroupCopyTextAsync(order, userProfile.readPrProfile())
       .then((text) => {
         wx.hideLoading()
+        this.setData({ showShareSheet: false })
         wx.setClipboardData({
           data: text,
           success: () => {
@@ -283,6 +315,50 @@ Page({
         wx.hideLoading()
         wx.showToast({ title: '生成链接失败', icon: 'none' })
       })
+  },
+  onShareTimelineTap() {
+    const order = this.data.shareOrder
+    if (!order) return
+    wx.showLoading({ title: '生成招募文案', mask: true })
+    shareCopy
+      .buildGroupCopyTextAsync(order, userProfile.readPrProfile())
+      .then((text) => {
+        wx.hideLoading()
+        this.setData({ showShareSheet: false })
+        wx.setClipboardData({
+          data: text,
+          success: () => {
+            wx.showModal({
+              title: '已复制招募文案',
+              content:
+                '请点击右上角 ···，选择「分享到朋友圈」。小程序卡片会带上本招募单，文案可粘贴到朋友圈正文。',
+              showCancel: false,
+            })
+          },
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '生成文案失败', icon: 'none' })
+      })
+  },
+  onShareAppMessage() {
+    const payload = buildOrderSharePayload(this.data.shareOrder)
+    if (!payload) return mpShare.defaultShare('/pages/index/index')
+    return payload
+  },
+  onShareTimeline() {
+    const order = this.data.shareOrder
+    if (!order || !order.id) {
+      return { title: mpShare.DEFAULT_TITLE, query: '' }
+    }
+    const payload = buildOrderSharePayload(order)
+    const out = {
+      title: payload.title,
+      query: `id=${encodeURIComponent(order.id)}`,
+    }
+    if (payload.imageUrl) out.imageUrl = payload.imageUrl
+    return out
   },
   onToggleStatus(e) {
     const id = e.currentTarget.dataset.id
