@@ -1,4 +1,6 @@
 const api = require('./api.js')
+const auth = require('./auth.js')
+const accountMemberSync = require('./accountMemberSync.js')
 const registryCache = require('./registryCache.js')
 const { withTimeout } = require('./fetchTimeout.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
@@ -89,7 +91,18 @@ async function applyToMpOrder(mpOrderId, applicant) {
   throw lastErr || new Error('报名接口不可用')
 }
 
+function registerAuthHeaders() {
+  try {
+    return auth.authHeaders()
+  } catch (_) {
+    return {}
+  }
+}
+
 async function registerTalentMember(member) {
+  const headers = registerAuthHeaders()
+  const account = auth.readAccount()
+  const payload = accountMemberSync.mergeMemberForCloudRegister(member, account)
   const paths = [
     '/api/meoo-ops-mp-talent-member-register',
     '/api/ops-sync/mp-talent-members/register',
@@ -97,7 +110,7 @@ async function registerTalentMember(member) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, { member })
+      return await api.post(path, { member: payload }, headers)
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -108,6 +121,7 @@ async function registerTalentMember(member) {
 }
 
 async function registerPrUser(prUser) {
+  const headers = registerAuthHeaders()
   const paths = [
     '/api/meoo-ops-mp-pr-user-register',
     '/api/ops-sync/mp-pr-users/register',
@@ -115,7 +129,7 @@ async function registerPrUser(prUser) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, { prUser })
+      return await api.post(path, { prUser }, headers)
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)

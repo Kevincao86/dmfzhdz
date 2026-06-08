@@ -171,9 +171,20 @@ function clearAllMpBrowserCache() {
   })
 }
 
-/** 切换账号 / 退出：清空本机全部灵祺缓存 */
+/** 切换账号 / 退出：清空本机全部灵祺缓存（保留开发者工具稳定 openid，避免同微信号重复建档） */
 function onAccountLogout() {
+  let stableOpenId = ''
+  try {
+    const accountMemberSync = require('./accountMemberSync.js')
+    stableOpenId = accountMemberSync.readStableDevOpenId()
+  } catch (_) {}
   clearAllMpBrowserCache()
+  if (stableOpenId) {
+    try {
+      const accountMemberSync = require('./accountMemberSync.js')
+      accountMemberSync.writeStableDevOpenId(stableOpenId)
+    } catch (_) {}
+  }
 }
 
 function currentScopeId() {

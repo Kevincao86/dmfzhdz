@@ -7,8 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
-import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
-import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import { createMpAuthRest, registerMpTalentMember, resolveSession } from '../src/lib/mpAccountAuth.js'
 
 export const config = { maxDuration: 60 }
 
@@ -20,7 +19,7 @@ function sendOpsJson(res: VercelResponse, status: number, body: Record<string, u
 function sendCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
 }
 
 function rawBody(req: VercelRequest): string {
@@ -32,6 +31,14 @@ function rawBody(req: VercelRequest): string {
   } catch {
     return ''
   }
+}
+
+function sessionToken(req: VercelRequest): string {
+  const mpHdr = req.headers['x-mp-session']
+  if (typeof mpHdr === 'string' && mpHdr.trim()) return mpHdr.trim()
+  const auth = req.headers.authorization
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim()
+  return ''
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -70,21 +77,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const supplierWork = member.workIdentity === 'shoot' || member.workIdentity === 'edit'
-    const openId = String(member.wxOpenId || '').trim()
+    const rest = createMpAuthRest(supabaseUrl, serviceRole)
+    const token = sessionToken(req)
+    const session = token ? await resolveSession(rest, token) : null
+    const account = session?.account ?? null
+    if (!account) {
+      sendOpsJson(res, 401, { ok: false, error: 'login_required' })
+      return
+    }
+
     let contact = String(member.contact || '').trim()
     let wechatId = String(member.wechatId || '').trim()
+    const openId = String(account.openid || member.wxOpenId || '').trim()
     if (!contact && supplierWork) contact = openId || String(member.wxNickName || '').trim()
     if (!wechatId && supplierWork) wechatId = contact || openId
-    member = { ...member, contact, wechatId }
+    member = { ...member, contact, wechatId, wxOpenId: openId || member.wxOpenId }
     if (!contact || !wechatId) {
       sendOpsJson(res, 400, { ok: false, error: 'contact_required' })
       return
     }
 
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
-    const saved = upsertMpTalentMember(data, member)
-    await io.save(data)
+    const saved = await registerMpTalentMember(supabaseUrl, serviceRole, member, account)
     sendOpsJson(res, 200, {
       ok: true,
       id: saved.id,

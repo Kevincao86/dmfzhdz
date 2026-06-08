@@ -63,9 +63,7 @@ export function upsertMpTalentMember(
         .slice(-11)
       if (mp === phoneKey) return true
     }
-    const k = String(m.wechatId || m.wxNickName || '').trim().toLowerCase()
-    const wxKey = String(member.wechatId || member.wxNickName || '').trim().toLowerCase()
-    return wxKey && !openId && k && k === wxKey
+    return false
   })
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   const prev = idx >= 0 ? list[idx]! : null
@@ -101,4 +99,43 @@ export function upsertMpTalentMember(
     })
   }
   return upsertSupplierTeamLibraryFromMember(data, next)
+}
+
+/** 同一微信 openid 仅保留一条达人会员，合并灵祺 ID 避免重复建档 */
+export function dedupeMpTalentMembersByOpenId(
+  data: RegistryFile,
+  openId: string,
+  keepMemberId: string,
+): void {
+  const oid = String(openId || '').trim()
+  const keepId = String(keepMemberId || '').trim()
+  if (!oid || !keepId) return
+  const list = [...(data.mpTalentMembers ?? [])]
+  const keepIdx = list.findIndex((m) => m.id === keepId)
+  if (keepIdx < 0) return
+  const keep = { ...list[keepIdx]! }
+  for (const m of list) {
+    if (m.id === keepId) continue
+    if (String(m.wxOpenId || '').trim() !== oid) continue
+    if (!keep.lingqiTalentId && m.lingqiTalentId) keep.lingqiTalentId = m.lingqiTalentId
+    if (!keep.lingqiShootTeamId && m.lingqiShootTeamId) keep.lingqiShootTeamId = m.lingqiShootTeamId
+    if (!keep.lingqiEditTeamId && m.lingqiEditTeamId) keep.lingqiEditTeamId = m.lingqiEditTeamId
+    if (!keep.contact && m.contact) keep.contact = m.contact
+    if (!keep.wechatId && m.wechatId) keep.wechatId = m.wechatId
+    if (!memberHasResolvablePlatformInfo(keep) && memberHasResolvablePlatformInfo(m)) {
+      Object.assign(keep, {
+        douyin: m.douyin,
+        xiaohongshu: m.xiaohongshu,
+        platformProfiles: m.platformProfiles,
+        province: m.province || keep.province,
+        city: m.city || keep.city,
+      })
+    }
+  }
+  data.mpTalentMembers = list
+    .filter((m) => String(m.wxOpenId || '').trim() !== oid || m.id === keepId)
+    .slice(0, 5000)
+  const finalIdx = data.mpTalentMembers.findIndex((m) => m.id === keepId)
+  if (finalIdx >= 0) data.mpTalentMembers[finalIdx] = keep
+  else data.mpTalentMembers.unshift(keep)
 }
