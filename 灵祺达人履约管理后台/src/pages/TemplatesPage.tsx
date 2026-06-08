@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { getActiveRole } from '../lib/mpSession'
 import {
@@ -23,6 +23,13 @@ export default function TemplatesPage() {
   function refresh() {
     setRows(listCustomTemplates())
   }
+
+  useEffect(() => {
+    void import('../lib/mpAccountClientSync')
+      .then((m) => m.syncClientStateWithServer())
+      .then(() => refresh())
+      .catch(() => {})
+  }, [])
 
   const kindHint =
     kind === 'talent'

@@ -10,11 +10,18 @@ export type MpClientStatePayload = {
   messages?: Record<string, unknown>[]
   inboxSeen?: string[]
   publishWizardDrafts?: Record<string, unknown>[]
+  applyFormTemplates?: Record<string, unknown>[]
+  activeApplyTemplateIds?: Record<string, string>
+  talentFavoriteIds?: string[]
+  groupQrCache?: Record<string, string>
 }
 
 const MAX_LIST = 80
 const MAX_NOTIFY = 100
 const MAX_INBOX_SEEN = 500
+const MAX_TEMPLATES = 30
+const MAX_FAVORITES = 500
+const MAX_GROUP_QR = 20
 
 function parseTime(raw: unknown): number {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw
@@ -79,6 +86,48 @@ function mergeInboxSeen(a?: string[], b?: string[]): string[] {
   return [...set].slice(-MAX_INBOX_SEEN)
 }
 
+function mergeIdSet(a?: string[], b?: string[]): string[] {
+  const set = new Set<string>()
+  for (const id of [...(a || []), ...(b || [])]) {
+    const s = String(id || '').trim()
+    if (s) set.add(s)
+  }
+  return [...set].slice(0, MAX_FAVORITES)
+}
+
+function mergeStringMap(
+  a?: Record<string, string>,
+  b?: Record<string, string>,
+  limit = MAX_GROUP_QR,
+): Record<string, string> {
+  const out: Record<string, string> = { ...(a || {}) }
+  for (const [k, v] of Object.entries(b || {})) {
+    const key = String(k || '').trim()
+    const val = String(v || '').trim()
+    if (!key || !val) continue
+    out[key] = val
+  }
+  const keys = Object.keys(out)
+  if (keys.length <= limit) return out
+  const trimmed: Record<string, string> = {}
+  for (const k of keys.slice(-limit)) trimmed[k] = out[k]!
+  return trimmed
+}
+
+function mergeActiveTemplateIds(
+  a?: Record<string, string>,
+  b?: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = { ...(a || {}) }
+  for (const kind of ['talent', 'shoot', 'edit']) {
+    const av = String(a?.[kind] || '').trim()
+    const bv = String(b?.[kind] || '').trim()
+    if (bv) out[kind] = bv
+    else if (av) out[kind] = av
+  }
+  return out
+}
+
 export function emptyClientStatePayload(): MpClientStatePayload {
   return {
     v: 1,
@@ -90,6 +139,10 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     messages: [],
     inboxSeen: [],
     publishWizardDrafts: [],
+    applyFormTemplates: [],
+    activeApplyTemplateIds: {},
+    talentFavoriteIds: [],
+    groupQrCache: {},
   }
 }
 
@@ -144,6 +197,22 @@ export function mergeClientStatePayload(
       (r) => String(r.id || '').trim(),
       (r) => parseTime(r.savedAt || r.id),
       20,
+    ),
+    applyFormTemplates: mergeListByKey(
+      s.applyFormTemplates,
+      c.applyFormTemplates,
+      (r) => String(r.id || '').trim(),
+      (r) => parseTime(r.updatedAt || r.savedAt || r.id),
+      MAX_TEMPLATES,
+    ),
+    activeApplyTemplateIds: mergeActiveTemplateIds(
+      s.activeApplyTemplateIds as Record<string, string> | undefined,
+      c.activeApplyTemplateIds as Record<string, string> | undefined,
+    ),
+    talentFavoriteIds: mergeIdSet(s.talentFavoriteIds, c.talentFavoriteIds),
+    groupQrCache: mergeStringMap(
+      s.groupQrCache as Record<string, string> | undefined,
+      c.groupQrCache as Record<string, string> | undefined,
     ),
   }
 }

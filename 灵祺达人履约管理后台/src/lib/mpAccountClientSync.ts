@@ -8,6 +8,13 @@ import {
 import { scopedStorageKey } from './mpAccountLocalScope'
 import { readMember } from './mpSync/talentMember'
 import { readPrProfile } from './mpSync/userProfile'
+import {
+  applyTemplatesFromSync,
+  listCustomTemplates,
+  readActiveApplyTemplateIds,
+} from './mpSync/applyFormTemplates'
+import { applyFavoriteIdsFromSync, readFavoriteIds } from './mpSync/talentFavorites'
+import { listPublishDrafts } from './mpSync/publishDraft'
 
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
@@ -24,6 +31,10 @@ export type MpClientStatePayload = {
   messages?: Record<string, unknown>[]
   inboxSeen?: string[]
   publishWizardDrafts?: Record<string, unknown>[]
+  applyFormTemplates?: Record<string, unknown>[]
+  activeApplyTemplateIds?: Record<string, string>
+  talentFavoriteIds?: string[]
+  groupQrCache?: Record<string, string>
 }
 
 let pushTimer: ReturnType<typeof setTimeout> | null = null
@@ -55,7 +66,6 @@ export function collectLocalClientState(): MpClientStatePayload {
   const notifyKey = scopedStorageKey(NOTIFY_KEY, account)
   const msgKey = scopedStorageKey(MSG_KEY, account)
   const inboxKey = scopedStorageKey(INBOX_SEEN_KEY, account)
-  const draftsKey = scopedStorageKey(PUBLISH_DRAFTS_KEY, account)
   return {
     v: 1,
     talentMemberDraft: (readMember() as Record<string, unknown> | null) || null,
@@ -65,7 +75,10 @@ export function collectLocalClientState(): MpClientStatePayload {
     notifications: readList(notifyKey),
     messages: readList(msgKey),
     inboxSeen: readJson<string[]>(inboxKey, []),
-    publishWizardDrafts: readList(draftsKey),
+    publishWizardDrafts: listPublishDrafts() as unknown as Record<string, unknown>[],
+    applyFormTemplates: listCustomTemplates() as unknown as Record<string, unknown>[],
+    activeApplyTemplateIds: readActiveApplyTemplateIds(),
+    talentFavoriteIds: readFavoriteIds(),
   }
 }
 
@@ -75,7 +88,6 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   const appKey = scopedStorageKey(APPLICATIONS_BASE, account)
   const pubKey = scopedStorageKey(PUBLISH_BASE, account)
 
-  // 达人/PR/团队资料以 registry_profile_get（注册表数据库）为准，client_state 仅同步报名/通知等事务数据
   if (state.talentMemberDraft) {
     console.warn('[fulfillment] skip_talent_member_draft: use_registry_profile')
   }
@@ -104,6 +116,15 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   if (Array.isArray(state.publishWizardDrafts)) {
     writeJson(draftsKey, state.publishWizardDrafts.slice(0, 20))
   }
+  if (Array.isArray(state.applyFormTemplates) || state.activeApplyTemplateIds) {
+    applyTemplatesFromSync(
+      state.applyFormTemplates as Parameters<typeof applyTemplatesFromSync>[0],
+      state.activeApplyTemplateIds,
+    )
+  }
+  if (Array.isArray(state.talentFavoriteIds)) {
+    applyFavoriteIdsFromSync(state.talentFavoriteIds)
+  }
 }
 
 export async function syncClientStateWithServer() {
@@ -111,7 +132,7 @@ export async function syncClientStateWithServer() {
   syncing = true
   try {
     const { state } = await apiSyncClientState(collectLocalClientState())
-    applyRemoteClientState(state)
+    applyRemoteClientState(state as MpClientStatePayload)
     return state
   } catch (e) {
     console.warn('[fulfillment] client_state_sync', e instanceof Error ? e.message : String(e))

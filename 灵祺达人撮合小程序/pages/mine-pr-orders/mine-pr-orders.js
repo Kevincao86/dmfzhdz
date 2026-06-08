@@ -263,17 +263,26 @@ Page({
       wx.showToast({ title: '订单数据缺失', icon: 'none' })
       return
     }
-    const text = shareCopy.buildGroupCopyText(order, userProfile.readPrProfile())
-    wx.setClipboardData({
-      data: text,
-      success: () => {
-        wx.showModal({
-          title: '已复制招募信息',
-          content: '请打开微信群，粘贴发送给达人即可。',
-          showCancel: false,
+    wx.showLoading({ title: '生成报名链接', mask: true })
+    shareCopy
+      .buildGroupCopyTextAsync(order, userProfile.readPrProfile())
+      .then((text) => {
+        wx.hideLoading()
+        wx.setClipboardData({
+          data: text,
+          success: () => {
+            wx.showModal({
+              title: '已复制招募信息',
+              content: '请打开微信群，粘贴发送给达人即可。',
+              showCancel: false,
+            })
+          },
         })
-      },
-    })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '生成链接失败', icon: 'none' })
+      })
   },
   onToggleStatus(e) {
     const id = e.currentTarget.dataset.id

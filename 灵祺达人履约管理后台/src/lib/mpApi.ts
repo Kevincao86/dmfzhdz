@@ -304,6 +304,18 @@ export async function syncClientState(state: Record<string, unknown>) {
   }
 }
 
+/** 微信群可点击报名短链（微信 genwxashortlink） */
+export async function fetchMpApplyShortLink(mpOrderId: string, title?: string) {
+  const data = await mpAuthRequest('mp_apply_shortlink_get', {
+    mpOrderId: String(mpOrderId || '').trim(),
+    title: String(title || '').trim(),
+  })
+  return {
+    link: String(data.link || '').trim(),
+    source: String(data.source || '').trim(),
+  }
+}
+
 export async function registerPrUser(prUser: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-pr-user-register', '/api/ops-sync/mp-pr-users/register'],

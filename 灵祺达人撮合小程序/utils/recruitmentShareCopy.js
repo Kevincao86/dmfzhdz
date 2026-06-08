@@ -73,11 +73,11 @@ function formatShareRecruitmentInfo(info) {
   return out.join('\n')
 }
 
-function buildShareGuideBlock(orderId) {
-  const applyLink = buildRecruitmentApplyLink(orderId)
+function buildShareGuideBlock(orderId, applyLink) {
+  const link = applyLink || buildRecruitmentApplyLink(orderId)
   const parts = [GUIDE_DIVIDER, '']
-  if (applyLink) {
-    parts.push(`报名地址：${applyLink}`, OPEN_HINT)
+  if (link) {
+    parts.push(`报名地址：${link}`, OPEN_HINT)
   } else {
     parts.push(OPEN_HINT)
   }
@@ -85,15 +85,34 @@ function buildShareGuideBlock(orderId) {
   return parts.join('\n')
 }
 
-function buildGroupCopyText(order, prProfile) {
+function resolveCachedApplyLink(order) {
+  if (!order || typeof order !== 'object') return ''
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  return String(meta.applyShortLink || order.applyShortLink || '').trim()
+}
+
+function buildGroupCopyText(order, prProfile, applyLink) {
   const raw =
     order.recruitmentInfo || order.taskDetail || order.merchantRequirements || ''
   const info = formatShareRecruitmentInfo(raw)
-  const guide = buildShareGuideBlock(order.id)
+  const guide = buildShareGuideBlock(order.id, applyLink || resolveCachedApplyLink(order))
   const parts = [shareCopyHeader(prProfile), '']
   if (info) parts.push(info, '')
   parts.push(guide)
   return parts.join('\n')
+}
+
+async function buildGroupCopyTextAsync(order, prProfile) {
+  let applyLink = resolveCachedApplyLink(order)
+  if (!applyLink) {
+    try {
+      const mpApplyShortLink = require('./mpApplyShortLink.js')
+      const out = await mpApplyShortLink.fetchApplyShortLink(order.id, order.title)
+      applyLink = out && out.link ? String(out.link).trim() : ''
+    } catch (_) {}
+  }
+  return buildGroupCopyText(order, prProfile, applyLink)
 }
 
 function buildShareTitle(order) {
@@ -107,6 +126,8 @@ module.exports = {
   formatShareRecruitmentInfo,
   buildShareGuideBlock,
   buildGroupCopyText,
+  buildGroupCopyTextAsync,
+  resolveCachedApplyLink,
   buildShareTitle,
   GUIDE_DIVIDER,
   OPEN_HINT,

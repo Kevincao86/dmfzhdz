@@ -25,6 +25,9 @@ function writeIdSet(set) {
   const key = storageKey()
   if (!key) return
   wx.setStorageSync(key, JSON.stringify([...set]))
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
 }
 
 function isFavorite(talentId) {
@@ -41,8 +44,16 @@ function toggleFavorite(talentId) {
   return set.has(id)
 }
 
+function applyFavoriteIdsFromSync(ids) {
+  if (!Array.isArray(ids)) return
+  const key = storageKey()
+  if (!key) return
+  wx.setStorageSync(key, JSON.stringify([...new Set(ids.map(String))].slice(0, 500)))
+}
+
 module.exports = {
   readIdSet,
   isFavorite,
   toggleFavorite,
+  applyFavoriteIdsFromSync,
 }
