@@ -7,6 +7,7 @@ const wxAccount = require('./wxAccount.js')
 const SESSION_KEY = 'meoo_talent_mp_support_sid'
 const GUEST_FP_KEY = 'meoo_talent_mp_support_gfp'
 const POLL_MS = 4000
+const POLL_MS_HUMAN = 2000
 
 const DEFAULT_BOT = {
   id: 'welcome-bot',
@@ -196,6 +197,7 @@ module.exports = {
   SESSION_KEY,
   GUEST_FP_KEY,
   POLL_MS,
+  POLL_MS_HUMAN,
   DEFAULT_BOT,
   canSupport,
   useMerchantChannel,

@@ -156,7 +156,8 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
     typeof import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN === 'string'
       ? import.meta.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN.trim()
       : ''
-  const useHttpPoll = !relayUrl && Boolean(httpPollToken)
+  /** 有 HTTP token 时始终轮询 ECS/Supabase（小程序会话必须走 DB；dev 可与 WS 并存） */
+  const useHttpPoll = Boolean(httpPollToken)
   const maxPollTsRef = useRef(0)
   const [httpPollReady, setHttpPollReady] = useState(false)
   const [httpPollError, setHttpPollError] = useState<string | null>(null)
@@ -543,6 +544,24 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
     }
   }
 
+  const applyOpsReplyLocally = useCallback((sid: string, line: SupportRelayChatLine) => {
+    setReply('')
+    setMsgsBySession((prev) => {
+      const list = prev[sid] ?? []
+      if (list.some((x) => x.id === line.id)) return prev
+      return { ...prev, [sid]: [...list, line] }
+    })
+    setSessions((prev) => ({
+      ...prev,
+      [sid]: {
+        lastText: line.text,
+        lastTs: line.ts,
+        unread: 0,
+      },
+    }))
+    maxPollTsRef.current = Math.max(maxPollTsRef.current, line.ts)
+  }, [])
+
   const sendOpsReply = () => {
     const t = reply.trim()
     const sid = selectedId
@@ -558,53 +577,47 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
     }
 
     const ws = wsRef.current
-    if (relayUrl && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(line))
-      setReply('')
-      setMsgsBySession((prev) => {
-        const list = prev[sid] ?? []
-        if (list.some((x) => x.id === line.id)) return prev
-        return { ...prev, [sid]: [...list, line] }
-      })
-      setSessions((prev) => ({
-        ...prev,
-        [sid]: {
-          lastText: line.text,
-          lastTs: line.ts,
-          unread: 0,
-        },
-      }))
-      maxPollTsRef.current = Math.max(maxPollTsRef.current, line.ts)
+    const wsOpen = Boolean(relayUrl && ws && ws.readyState === WebSocket.OPEN)
+    /** 小程序会话或已配置 HTTP token 时须写入 Supabase，小程序端才能轮询到 */
+    const mustPersistHttp =
+      Boolean(httpPollToken) && (channel === 'mp' || isMpSupportSession(sid) || !wsOpen)
+
+    if (wsOpen) {
+      ws!.send(JSON.stringify(line))
+      applyOpsReplyLocally(sid, line)
+    }
+
+    if (mustPersistHttp) {
+      void (async () => {
+        try {
+          const res = await fetch(supportOpsSendUrl(), {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${httpPollToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sessionId: sid, text: t, id }),
+          })
+          const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
+          if (!res.ok || !data?.ok) {
+            setHttpPollError(
+              data?.error ? `客服回复未写入云端：${data.error}` : `客服回复未写入云端 HTTP ${res.status}`,
+            )
+            if (!wsOpen) return
+            return
+          }
+          if (!wsOpen) applyOpsReplyLocally(sid, line)
+        } catch (e) {
+          setHttpPollError(
+            e instanceof Error ? `${e.message}（请确认 ${supportOpsSendUrl()} 可访问）` : '客服回复写入失败',
+          )
+        }
+      })()
       return
     }
 
-    if (useHttpPoll && httpPollToken) {
-      void (async () => {
-        const res = await fetch(supportOpsSendUrl(), {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${httpPollToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ sessionId: sid, text: t, id }),
-        })
-        if (!res.ok) return
-        setReply('')
-        setMsgsBySession((prev) => {
-          const list = prev[sid] ?? []
-          if (list.some((x) => x.id === line.id)) return prev
-          return { ...prev, [sid]: [...list, line] }
-        })
-        setSessions((prev) => ({
-          ...prev,
-          [sid]: {
-            lastText: line.text,
-            lastTs: line.ts,
-            unread: 0,
-          },
-        }))
-        maxPollTsRef.current = Math.max(maxPollTsRef.current, line.ts)
-      })()
+    if (!wsOpen) {
+      setHttpPollError('未连接客服通道，无法发送回复')
     }
   }
 

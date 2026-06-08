@@ -108,7 +108,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
+  const supabaseUrl = (
+    process.env.MEOO_SUPABASE_ADMIN_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    process.env.SUPABASE_URL ??
+    ''
+  )
+    .trim()
+    .replace(/\/$/, '')
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!supabaseUrl || !serviceRole) {
     sendJson(res, 503, {
