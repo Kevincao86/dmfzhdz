@@ -1,31 +1,81 @@
-<view class="page-shell">
+<view class="pr-page page-shell">
+  <view wx:if="{{rows.length > 0}}" class="pr-list-toolbar">
+    <view class="pr-search-bar">
+      <text class="pr-search-icon" aria-hidden="true">⌕</text>
+      <input
+        class="pr-search-input"
+        type="text"
+        placeholder="搜索招募标题、城市、单号"
+        placeholder-class="pr-search-ph"
+        value="{{keyword}}"
+        bindinput="onKeywordInput"
+        confirm-type="search"
+      />
+    </view>
+    <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+      <view class="pr-target-row">
+        <view
+          wx:for="{{targetOptions}}"
+          wx:key="id"
+          class="pr-target-chip {{filterTarget === item.id ? 'pr-target-chip--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTargetChipTap"
+        >
+          {{item.label}}
+        </view>
+      </view>
+    </scroll-view>
+    <view class="pr-filter-bar">
+      <view class="pr-filter-cell">
+        <picker mode="selector" range="{{platformOptions}}" bindchange="onPlatformChange">
+          <view class="pr-filter-item {{filterPlatform !== '全部' ? 'pr-filter-item--on' : ''}}">
+            <text class="pr-filter-label">{{platformLabel}}</text>
+            <text class="pr-filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="pr-filter-cell">
+        <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
+          <view class="pr-filter-item {{filterCategory !== '全部' ? 'pr-filter-item--on' : ''}}">
+            <text class="pr-filter-label">{{categoryLabel}}</text>
+            <text class="pr-filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="pr-filter-cell">
+        <picker mode="selector" range="{{hallOptions}}" bindchange="onHallChange">
+          <view class="pr-filter-item {{filterHall !== '全部' ? 'pr-filter-item--on' : ''}}">
+            <text class="pr-filter-label">{{hallLabel}}</text>
+            <text class="pr-filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="pr-filter-cell">
+        <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
+          <view class="pr-filter-item {{filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
+            <text class="pr-filter-label">{{cityLabel}}</text>
+            <text class="pr-filter-arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+    <text wx:if="{{filterCountText}}" class="pr-filter-count">{{filterCountText}}</text>
+  </view>
+
   <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
-
-  <view wx:if="{{rows.length > 0}}" class="pr-search-bar">
-    <input
-      class="pr-search-input"
-      type="text"
-      placeholder="搜索招募标题、城市、单号"
-      value="{{keyword}}"
-      bindinput="onKeywordInput"
-      confirm-type="search"
-    />
-  </view>
 
   <view
     wx:for="{{filteredRows}}"
     wx:key="mpOrderId"
     class="card pr-order-card"
-    bindtap="goApplicants"
-    data-id="{{item.mpOrderId}}"
   >
-    <view class="pr-order-head">
+    <view class="pr-order-head" bindtap="goApplicants" data-id="{{item.mpOrderId}}">
       <text class="title-lg">{{item.title || item.mpOrderId}}</text>
       <text class="pr-order-status {{item.recruiting ? 'pr-order-status--on' : 'pr-order-status--off'}}">{{item.statusLabel}}</text>
     </view>
-    <text class="hint">发布于 {{item.publishedAt}} · {{item.hallLabel}}</text>
-    <text class="hint pr-order-deadline">截止：{{item.deadlineDaysText}}</text>
+    <text class="hint" bindtap="goApplicants" data-id="{{item.mpOrderId}}">发布于 {{item.publishedAt}} · {{item.hallLabel}}</text>
+    <text class="hint pr-order-deadline" bindtap="goApplicants" data-id="{{item.mpOrderId}}">截止：{{item.deadlineDaysText}}</text>
     <view class="pr-order-actions">
       <text
         wx:if="{{item.canToggleRecruit}}"
@@ -41,6 +91,11 @@
       <text class="pr-order-badge">{{item.signupLabel}}</text>
       <view class="pr-order-meta-right">
         <text
+          class="pr-order-link pr-order-link--video {{item.pendingVideoCount > 0 ? 'pr-order-link--pending' : ''}}"
+          catchtap="goVideoReview"
+          data-id="{{item.mpOrderId}}"
+        >{{item.videoReviewLabel}}</text>
+        <text
           class="pr-order-link"
           catchtap="onDownload"
           data-id="{{item.mpOrderId}}"
@@ -55,6 +110,6 @@
   </view>
 
   <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
-    <text class="hint">当前搜索条件下暂无发单</text>
+    <text class="hint">当前筛选条件下暂无发单</text>
   </view>
 </view>

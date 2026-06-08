@@ -38,6 +38,23 @@ function submitVideo(mpOrderId, applicantId, videoUrl) {
   )
 }
 
+function reviewVideo(mpOrderId, applicantId, action, rejectReason) {
+  return postPaths(
+    ['/api/meoo-ops-mp-recruitment-video-review', '/api/ops-sync/mp-recruitment-orders/video-review'],
+    {
+      mpOrderId,
+      applicantId,
+      action,
+      rejectReason: action === 'reject' ? String(rejectReason || '').trim() : undefined,
+    },
+  )
+}
+
+function submitCountLabel(count) {
+  const n = Math.max(1, Number(count || 0) || 1)
+  return `第 ${n} 次提交`
+}
+
 function readFileBase64(filePath) {
   return new Promise((resolve, reject) => {
     wx.getFileSystemManager().readFile({
@@ -226,6 +243,8 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
 
 module.exports = {
   videoStatusLabel,
+  submitCountLabel,
   chooseAndUploadVideo,
   submitVideo,
+  reviewVideo,
 }

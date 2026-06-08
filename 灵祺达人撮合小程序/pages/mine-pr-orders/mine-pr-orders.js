@@ -6,7 +6,8 @@ const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
-const listKeywordSearch = require('../../utils/listKeywordSearch.js')
+const hallFilters = require('../../utils/recruitmentHallFilters.js')
+const prOrderFilters = require('../../utils/prOrderListFilters.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -32,10 +33,20 @@ function orderForShare(mp, row) {
 
 function mapRow(item, mp) {
   const enriched = listFilters.enrichMpOrderListItem(mp, item)
+  const pendingVideoCount = prOrderFilters.countPendingVideos(mp)
+  const videoCount = prOrderFilters.countVideos(mp)
   return {
     ...enriched,
     mp: mp || null,
     hallLabel: hallLabel(item, mp),
+    platform: String((mp && mp.platform) || (mp && mp.recruitmentPlatform) || '抖音'),
+    region: String((mp && mp.region) || (mp && mp.storeName) || ''),
+    category: String((mp && mp.category) || '本地生活'),
+    recruitTarget: (mp && mp.recruitTarget) || 'talent',
+    pendingVideoCount,
+    videoCount,
+    videoReviewLabel:
+      pendingVideoCount > 0 ? `视频审核(${pendingVideoCount})` : '视频审核',
   }
 }
 
@@ -55,20 +66,96 @@ Page({
     deletingId: '',
     togglingId: '',
     exportingId: '',
+    filterTarget: 'all',
+    filterTargetLabel: '身份',
+    targetOptions: prOrderFilters.TARGET_FILTERS,
+    filterPlatform: '全部',
+    platformLabel: '平台',
+    platformOptions: hallFilters.PLATFORM_FILTERS,
+    filterCategory: '全部',
+    categoryLabel: '类目',
+    categoryOptions: prOrderFilters.CATEGORY_FILTERS,
+    filterHall: '全部',
+    hallLabel: '大厅',
+    hallOptions: prOrderFilters.HALL_TYPE_FILTERS,
+    filterCity: '全部',
+    cityLabel: '城市',
+    cityOptions: ['全部'],
+    filterCountText: '',
   },
   onShow() {
     this.load()
   },
+  filterOpts() {
+    return {
+      filterTarget: this.data.filterTarget,
+      filterPlatform: this.data.filterPlatform,
+      filterCategory: this.data.filterCategory,
+      filterHall: this.data.filterHall,
+      filterCity: this.data.filterCity,
+      keyword: this.data.keyword,
+    }
+  },
   applyFilters(rows) {
-    const keyword = this.data.keyword || ''
-    return (rows || []).filter((r) => listKeywordSearch.matchListKeyword(r, keyword))
+    const filtered = prOrderFilters.filterPrOrderRows(rows, this.filterOpts())
+    const total = (rows || []).length
+    const filterCountText =
+      filtered.length !== total ? `显示 ${filtered.length} / ${total} 条` : ''
+    return { filtered, filterCountText }
+  },
+  refreshFiltered(rows) {
+    const { filtered, filterCountText } = this.applyFilters(rows || this.data.rows)
+    this.setData({ filteredRows: filtered, filterCountText })
   },
   onKeywordInput(e) {
     const keyword = String((e.detail && e.detail.value) || '')
+    this.setData({ keyword })
+    this.refreshFiltered(this.data.rows)
+  },
+  onTargetChipTap(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || 'all')
+    const opt = (this.data.targetOptions || []).find((t) => t.id === id) || { id: 'all', label: '全部' }
     this.setData({
-      keyword,
-      filteredRows: this.applyFilters(this.data.rows),
+      filterTarget: opt.id,
+      filterTargetLabel: opt.id === 'all' ? '身份' : opt.label,
     })
+    this.refreshFiltered(this.data.rows)
+  },
+  onPlatformChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const val = this.data.platformOptions[idx] || '全部'
+    this.setData({
+      filterPlatform: val,
+      platformLabel: val === '全部' ? '平台' : val,
+    })
+    this.refreshFiltered(this.data.rows)
+  },
+  onCategoryChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const val = this.data.categoryOptions[idx] || '全部'
+    this.setData({
+      filterCategory: val,
+      categoryLabel: val === '全部' ? '类目' : val,
+    })
+    this.refreshFiltered(this.data.rows)
+  },
+  onHallChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const val = this.data.hallOptions[idx] || '全部'
+    this.setData({
+      filterHall: val,
+      hallLabel: val === '全部' ? '大厅' : val,
+    })
+    this.refreshFiltered(this.data.rows)
+  },
+  onCityChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const val = this.data.cityOptions[idx] || '全部'
+    this.setData({
+      filterCity: val,
+      cityLabel: val === '全部' ? '城市' : val,
+    })
+    this.refreshFiltered(this.data.rows)
   },
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh())
@@ -76,14 +163,25 @@ Page({
   async load() {
     const local = applicationsStore.readPublishedOrders()
     if (!local.length) {
-      this.setData({ rows: [], filteredRows: [], loading: false, err: '' })
+      this.setData({
+        rows: [],
+        filteredRows: [],
+        loading: false,
+        err: '',
+        filterCountText: '',
+        cityOptions: ['全部'],
+      })
       return
     }
     if (!api.hasApi()) {
       const rows = local.map((item) => mapRow(item, null))
+      const cityOptions = hallFilters.buildCityFilterOptions(rows)
+      const { filtered, filterCountText } = this.applyFilters(rows)
       this.setData({
         rows,
-        filteredRows: this.applyFilters(rows),
+        filteredRows: filtered,
+        cityOptions,
+        filterCountText,
         loading: false,
         err: '未配置后台，无法同步报名人数',
       })
@@ -97,12 +195,25 @@ Page({
         const mp = mpList.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
-      this.setData({ rows, filteredRows: this.applyFilters(rows), loading: false, err: '' })
-    } catch (e) {
-      const rows = local.map((item) => mapRow(item, null))
+      const cityOptions = hallFilters.buildCityFilterOptions(rows)
+      const { filtered, filterCountText } = this.applyFilters(rows)
       this.setData({
         rows,
-        filteredRows: this.applyFilters(rows),
+        filteredRows: filtered,
+        cityOptions,
+        filterCountText,
+        loading: false,
+        err: '',
+      })
+    } catch (e) {
+      const rows = local.map((item) => mapRow(item, null))
+      const cityOptions = hallFilters.buildCityFilterOptions(rows)
+      const { filtered, filterCountText } = this.applyFilters(rows)
+      this.setData({
+        rows,
+        filteredRows: filtered,
+        cityOptions,
+        filterCountText,
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 60),
       })
@@ -113,6 +224,13 @@ Page({
     if (!id) return
     wx.navigateTo({
       url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}`,
+    })
+  },
+  goVideoReview(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.navigateTo({
+      url: `/pages/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}`,
     })
   },
   onEdit(e) {
