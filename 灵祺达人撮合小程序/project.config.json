@@ -63,7 +63,16 @@
         "value": "assets/recruit-covers/**"
       }
     ],
-    "include": []
+    "include": [
+      {
+        "type": "glob",
+        "value": "packages/recruit-covers-mp/**/*.jpg"
+      },
+      {
+        "type": "file",
+        "value": "packages/recruit-covers-mp/coverAssetRegistry.js"
+      }
+    ]
   },
   "editorSetting": {}
 }

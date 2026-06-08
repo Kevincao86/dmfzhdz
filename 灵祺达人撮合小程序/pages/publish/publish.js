@@ -499,20 +499,27 @@ Page({
   },
   syncCoverPreview() {
     const f = this.data.form || {}
-    let preview = ''
-    let hint = '未选择时将使用对应平台默认封面'
-    if (String(f.coverImage || '').trim()) {
-      preview = f.coverImage
-      hint = '已上传自定义封面'
-    } else if (String(f.coverLibraryId || '').trim()) {
-      const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
-      preview = hit ? hit.url : ''
-      hint = '已选图库封面'
-    } else {
-      const def = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || [])
-      preview = def && def.url ? def.url : ''
+    const applyPreview = () => {
+      let preview = ''
+      let hint = '未选择时将使用对应平台默认封面'
+      if (String(f.coverImage || '').trim()) {
+        preview = f.coverImage
+        hint = '已上传自定义封面'
+      } else if (String(f.coverLibraryId || '').trim()) {
+        const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
+        preview = hit ? hit.url : ''
+        hint = '已选图库封面'
+      } else {
+        const def = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || [])
+        preview = def && def.url ? def.url : ''
+      }
+      this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
     }
-    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
+    if (!recruitCoverLib.useCoverBundle()) {
+      applyPreview()
+      return
+    }
+    recruitCoverLib.loadCoverSubpackages().then(applyPreview).catch(() => applyPreview())
   },
   async onCoverUpload() {
     try {
@@ -609,7 +616,12 @@ Page({
       return
     }
     if (this.data.step === 'done' && this.data.createdOrder) return
-    if (this.data.step === 'form' && this.data.recruitMode) return
+    if (this.data.step === 'form' && this.data.recruitMode) {
+      if (recruitCoverLib.useCoverBundle()) {
+        recruitCoverLib.loadCoverSubpackages().catch(() => {})
+      }
+      return
+    }
     if (this.data.isEditMode) return
     this.resetToTarget()
   },
@@ -746,6 +758,9 @@ Page({
       this.syncDisplayFields()
       this.syncTabBarOverlay()
       this.resetFormScrollToTop()
+      if (recruitCoverLib.useCoverBundle()) {
+        recruitCoverLib.loadCoverSubpackages().catch(() => {})
+      }
     })
   },
   onBackToMode() {
