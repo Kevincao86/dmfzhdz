@@ -3,17 +3,17 @@ const config = require('./config.js')
 
 const GUIDE_DIVIDER = '—— 报名指引 ——'
 const OPEN_HINT =
-  '请打开「灵祺星选平台」小程序或网址（https://dr.mofangdianai.com/），在招募大厅找到本单或联系发布者获取详情页报名。'
-const MP_SHARE_APP_NAME = String(config.MP_SHARE_APP_NAME || '灵祺星选平台').trim() || '灵祺星选平台'
+  '请打开「灵祺星选」小程序或网址（https://dr.mofangdianai.com/），在招募大厅找到本单或联系发布者获取详情页报名。'
+const MP_SHARE_APP_NAME = String(config.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
 
-/** 分享文案标题：优先 PR 端填写的昵称/名称，无资料时回退「灵祺星选平台」 */
+/** 分享文案标题：优先 PR 端填写的昵称/名称，无资料时回退「灵祺星选」 */
 function shareCopyHeader(prProfile) {
   const pr = prProfile || userProfile.readPrProfile()
   if (pr) {
     const name = userProfile.prDisplayName(pr) || String(pr.wxNickName || '').trim()
     if (name) return `【${name}】`
   }
-  return '【灵祺星选平台】'
+  return '【灵祺星选】'
 }
 
 function buildRecruitmentMpPath(orderId) {
