@@ -109,6 +109,29 @@ function clearWxProfileCache() {
   } catch (_) {}
 }
 
+async function applyWxProfileAfterLogin(nick, avatar) {
+  const n = String(nick || '').trim()
+  let av = String(avatar || '').trim()
+  if (av) av = await persistWxAvatarUrl(av)
+  if (n || av) writeWxProfileCache({ wxNickName: n, wxAvatarUrl: av })
+  const auth = require('./auth.js')
+  const wxAccount = require('./wxAccount.js')
+  const accountMemberSync = require('./accountMemberSync.js')
+  if ((n && !isPlaceholderWxNick(n)) || av) {
+    try {
+      await auth.updateWxProfile(n, av)
+    } catch (_) {}
+  }
+  const acct = auth.readAccount()
+  const finalNick = pickWxNick(n, acct && acct.wxNickName)
+  const finalAv = pickWxAvatar(av, acct && acct.wxAvatarUrl)
+  if (finalNick || finalAv) {
+    wxAccount.writeWxAccount({ wxNickName: finalNick, wxAvatarUrl: finalAv })
+  }
+  if (acct) accountMemberSync.syncLocalProfilesFromAccount(acct)
+  return { nick: finalNick, avatar: finalAv }
+}
+
 async function resolveWxProfileForLogin(wxLoginNick, wxLoginAvatar) {
   let nick = String(wxLoginNick || '').trim()
   let avatar = String(wxLoginAvatar || '').trim()
@@ -136,4 +159,5 @@ module.exports = {
   writeWxProfileCache,
   clearWxProfileCache,
   resolveWxProfileForLogin,
+  applyWxProfileAfterLogin,
 }

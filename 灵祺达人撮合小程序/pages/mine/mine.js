@@ -303,10 +303,6 @@ Page({
       wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
       return
     }
-    if (!avatar) {
-      wx.showToast({ title: '请先选择微信头像', icon: 'none' })
-      return
-    }
     const identity = userProfile.readIdentity()
     if (!identityTypes.isWorkIdentity(identity)) {
       wx.showToast({ title: '请先选择登录身份', icon: 'none' })
@@ -317,21 +313,25 @@ Page({
     this.setData({ wxLoginSubmitting: true, profileNick: nick, avatarUrl: avatar, displayName: nick })
     try {
       const role = identityTypes.accountRoleForWorkIdentity(identity)
-      const data = await auth.wxLogin({
-        role,
-        wxNickName: nick,
-        wxAvatarUrl: avatar,
-      })
-      await switchWorkIdentity.applyWorkIdentityAfterLogin(
-        (data && data.token) || auth.readSessionToken(),
-        auth.readAccount() || (data && data.account),
-        identity,
-      )
+      let data
+      if (auth.isLoggedIn()) {
+        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      } else {
+        data = await auth.wxLogin({
+          role,
+          wxNickName: nick,
+          wxAvatarUrl: avatar,
+        })
+        await switchWorkIdentity.applyWorkIdentityAfterLogin(
+          (data && data.token) || auth.readSessionToken(),
+          auth.readAccount() || (data && data.account),
+          identity,
+        )
+        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      }
       try {
         await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
       } catch (_) {}
-      const acct = auth.readAccount()
-      if (acct) require('../../utils/accountMemberSync.js').syncLocalProfilesFromAccount(acct)
       wx.showToast({ title: '登录成功', icon: 'success' })
       this.setData({ showWxLoginSheet: false })
       setTabBarHidden(this, false)
