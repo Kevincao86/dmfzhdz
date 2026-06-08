@@ -7,21 +7,24 @@
 
 两端口会话与本地存储互不影响；登录页「切换到商家版/服务商版」为 **跳转到对端网站**（生产环境配 `VITE_PEER_EDITION_LOGIN_URL`）。
 
-## Vercel 独立站点（与商家版两个项目、两个域名）
+## 生产部署（ECS，与商家 cs 同机）
 
-1. 新建 Vercel 项目（或单独 Production 域名），**Root Directory** 填：`web版/partner-erp`（不要用 `灵祺Web版:服务商版本`）。
-2. 本目录 `vercel.json` 已写好 Install / Build / Output；或在控制台等价配置：
-   - Install：`cd ../merchant-erp && npm ci && cd ../partner-erp && npm ci`
-   - Build：`npm run build`（内部 `build:partner` + 同步到 `dist/`）
-   - Output：`dist`
-3. 环境变量（必配）：
-   - `VITE_APP_EDITION=partner`
-   - `VITE_PEER_EDITION_LOGIN_URL` = 商家版登录页完整地址（如 `https://cs.mofangdianai.com/login`）
-   - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` / `VITE_ERP_AUTH_API_BASE` 与商家站一致
+**域名**：`https://fws.mofangdianai.com`  
+**构建产物**：`../merchant-erp/dist-partner`  
+**环境变量**：`../merchant-erp/.env.partner`（见 `.env.partner.example`）
 
-商家版 Vercel 项目请设 `VITE_PEER_EDITION_LOGIN_URL` 指向服务商域名 `/login`。
+```bash
+cd ~/app && git pull
+MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-partner-fws-web.sh
+```
 
-详见：[`docs/deploy-vercel-partner.md`](../../docs/deploy-vercel-partner.md)
+详见：[`docs/MIGRATE-VERCEL-TO-ECS-partner-fws.md`](../../docs/MIGRATE-VERCEL-TO-ECS-partner-fws.md)
+
+商家版 `.env.production` 请设 `VITE_PEER_EDITION_LOGIN_URL=https://fws.mofangdianai.com/login`。
+
+### 历史：Vercel 独立站点
+
+`vercel.json` 与 `api/*` 仅作归档；新环境不再使用 Vercel。旧说明见 [`docs/deploy-vercel-partner.md`](../../docs/deploy-vercel-partner.md)。
 
 ## 服务商版能力摘要
 

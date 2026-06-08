@@ -1,5 +1,6 @@
 /**
- * 服务商站 fws：同源 /api/meoo-help-manual-public → ECS erp-api（无需在 Vercel 配 Supabase admin）
+ * 历史 Vercel Serverless 反代（fws 已迁 ECS，Nginx 反代轻量 /api/）。
+ * ECS 部署见 scripts/ecs-deploy-partner-fws-web.sh
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 

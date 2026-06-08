@@ -1,3 +1,11 @@
+# 服务商版 · Vercel 部署（已废弃）
+
+> **2026-06 起**：服务商版 `fws.mofangdianai.com` 已迁至 **ECS**，与商家 `cs` 同机。  
+> 请使用 [`docs/MIGRATE-VERCEL-TO-ECS-partner-fws.md`](MIGRATE-VERCEL-TO-ECS-partner-fws.md) 与 `scripts/ecs-deploy-partner-fws-web.sh`。  
+> 下文仅作历史归档。
+
+---
+
 # 服务商版 · 独立 Vercel 站点（与商家版隔离）
 
 商家版与服务商版是 **两个 Vercel 项目、两个域名**，共用同一仓库与同一套 ECS `/erp-api` 后端；前端通过 `VITE_APP_EDITION` 区分，登录页「切换到商家版/服务商版」为 **跨站跳转**（`VITE_PEER_EDITION_LOGIN_URL`）。
