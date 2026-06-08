@@ -2,8 +2,19 @@
   <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
 
+  <view wx:if="{{rows.length > 0}}" class="pr-search-bar">
+    <input
+      class="pr-search-input"
+      type="text"
+      placeholder="搜索招募标题、城市、单号"
+      value="{{keyword}}"
+      bindinput="onKeywordInput"
+      confirm-type="search"
+    />
+  </view>
+
   <view
-    wx:for="{{rows}}"
+    wx:for="{{filteredRows}}"
     wx:key="mpOrderId"
     class="card pr-order-card"
     bindtap="goApplicants"
@@ -21,10 +32,9 @@
         class="pr-order-action"
         catchtap="onToggleStatus"
         data-id="{{item.mpOrderId}}"
-        data-index="{{index}}"
       >{{item.toggleActionLabel}}</text>
       <text class="pr-order-action" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑</text>
-      <text class="pr-order-action" catchtap="onShare" data-index="{{index}}">分享</text>
+      <text class="pr-order-action" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</text>
       <text class="pr-order-action pr-order-action--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</text>
     </view>
     <view class="pr-order-meta">
@@ -33,7 +43,7 @@
         <text
           class="pr-order-link"
           catchtap="onDownload"
-          data-index="{{index}}"
+          data-id="{{item.mpOrderId}}"
         >下载</text>
         <text class="pr-order-link" catchtap="goApplicants" data-id="{{item.mpOrderId}}">查看报名 ›</text>
       </view>
@@ -42,5 +52,9 @@
 
   <view wx:if="{{!loading && rows.length === 0}}" class="card state-empty">
     <text class="hint">暂无发单，去「发招募」创建</text>
+  </view>
+
+  <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">当前搜索条件下暂无发单</text>
   </view>
 </view>

@@ -1,6 +1,7 @@
 const display = require('./recruitmentDisplay.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const hallFilters = require('./recruitmentHallFilters.js')
+const talentContactPrGate = require('./talentContactPrGate.js')
 const memberStore = require('./talentMember.js')
 const { labels } = require('./platformLabels.js')
 const { TALENT_TAGS } = require('./publishFormOptions.js')
@@ -214,7 +215,12 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const merchant = reg ? display.findMerchantOrder(reg, mp?.sourceMerchantOrderId) : null
   const view = mp ? display.enrichMpOrder(mp, merchant) : null
   const platform = view?.platform || mp?.platform || localApp?.platform || '抖音'
-  const me = resolveApplicantOnMp(mp, localApp.applicantId)
+  let applicantId = String(localApp.applicantId || '').trim()
+  if (!applicantId && mp) {
+    const found = talentContactPrGate.findMyApplicant(mp, localApp.mpOrderId)
+    if (found && found.id) applicantId = String(found.id)
+  }
+  const me = resolveApplicantOnMp(mp, applicantId)
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
   const canUploadVideo = !videoStatus || videoStatus === 'rejected'
@@ -222,7 +228,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   return {
     ...localApp,
     mpOrderId: localApp.mpOrderId,
-    applicantId: localApp.applicantId || '',
+    applicantId,
     title: view?.title || localApp.title || mp?.title || localApp.mpOrderId,
     platform,
     platformIcon: hallFilters.platformIcon(platform),

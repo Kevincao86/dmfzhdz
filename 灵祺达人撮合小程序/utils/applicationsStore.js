@@ -70,6 +70,17 @@ function readApplications() {
   return readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
 }
 
+function updateApplicationApplicantId(mpOrderId, applicantId) {
+  const id = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  if (!id || !aid) return
+  const ids = ownerIdsForFilter()
+  const list = readApplicationsRaw()
+    .filter((item) => entryBelongsToCurrentAccount(item, ids))
+    .map((item) => (item && item.mpOrderId === id ? { ...item, applicantId: aid } : item))
+  writeListToKey(scope.scopedStorageKey(APPLICATIONS_BASE), list)
+}
+
 function addApplication(entry) {
   const ids = ownerIdsForFilter()
   const list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
@@ -139,6 +150,7 @@ function updatePublishedOrderTitle(mpOrderId, title) {
 module.exports = {
   readApplications,
   addApplication,
+  updateApplicationApplicantId,
   readPublishedOrders,
   addPublishedOrder,
   removePublishedOrder,

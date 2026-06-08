@@ -15,6 +15,8 @@ import {
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
+import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
+import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import PrOrdersPage from './PrOrdersPage'
 import PageHero from '../components/ui/PageHero'
@@ -47,6 +49,38 @@ function TalentApplicationsPage() {
   const [filterCategory, setFilterCategory] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+  const [filterKeyword, setFilterKeyword] = useState('')
+
+  function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
+    if (!mp) return { ...a }
+    const row = mapMpOrderRow(mp, reg)
+    let applicantId = String(a.applicantId || '').trim()
+    if (!applicantId) {
+      const found = findMyApplicant(mp, a.mpOrderId)
+      if (found && found.id) applicantId = String(found.id)
+    }
+    const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
+    const me = applicants.find((x) => x && String(x.id) === applicantId)
+    const videoStatus = me ? String(me.videoStatus || '') : ''
+    const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
+    const canUploadVideo = !videoStatus || videoStatus === 'rejected'
+    return {
+      ...a,
+      applicantId,
+      title: a.title || row.title,
+      platform: a.platform || row.platform,
+      region: row.region,
+      category: row.category,
+      statusLabel: row.statusLabel,
+      merchantName: row.merchantName,
+      storeName: row.storeName,
+      budgetText: row.budgetText,
+      merchantOrderNo: String(mp.sourceMerchantOrderId || ''),
+      videoStatus,
+      videoRejectReason,
+      canUploadVideo,
+    }
+  }
 
   async function reloadApps() {
     const local = readApplications()
@@ -55,24 +89,7 @@ function TalentApplicationsPage() {
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
       const enriched: EnrichedApplication[] = local.map((a) => {
         const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
-        if (!mp) return { ...a }
-        const row = mapMpOrderRow(mp, reg)
-        const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
-        const me = applicants.find((x) => x && String(x.id) === String(a.applicantId))
-        const videoStatus = me ? String(me.videoStatus || '') : ''
-        const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
-        const canUploadVideo = !videoStatus || videoStatus === 'rejected'
-        return {
-          ...a,
-          title: a.title || row.title,
-          platform: a.platform || row.platform,
-          region: row.region,
-          category: row.category,
-          statusLabel: row.statusLabel,
-          videoStatus,
-          videoRejectReason,
-          canUploadVideo,
-        }
+        return enrichApplicationRow(a, mp, reg)
       })
       setApps(enriched)
     } catch {
@@ -122,26 +139,7 @@ function TalentApplicationsPage() {
         >[]
         const enriched: EnrichedApplication[] = local.map((a) => {
           const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
-          if (!mp) return { ...a }
-          const row = mapMpOrderRow(mp, reg)
-          const applicants = Array.isArray((mp as Record<string, unknown>).applicants)
-            ? ((mp as Record<string, unknown>).applicants as Record<string, unknown>[])
-            : []
-          const me = applicants.find((x) => x && String(x.id) === String(a.applicantId))
-          const videoStatus = me ? String(me.videoStatus || '') : ''
-          const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
-          const canUploadVideo = !videoStatus || videoStatus === 'rejected'
-          return {
-            ...a,
-            title: a.title || row.title,
-            platform: a.platform || row.platform,
-            region: row.region,
-            category: row.category,
-            statusLabel: row.statusLabel,
-            videoStatus,
-            videoRejectReason,
-            canUploadVideo,
-          }
+          return enrichApplicationRow(a, mp, reg)
         })
         if (!cancelled) setApps(enriched)
       } catch {
@@ -171,9 +169,10 @@ function TalentApplicationsPage() {
       if (!matchApplicationTimeFilter(ms, filterTime)) return false
       if (!hallFilters.matchCategory(a.category || '', filterCategory)) return false
       if (!hallFilters.matchRegionFilter(a.region || '', '', filterProvince, filterCity)) return false
+      if (!matchListKeyword(a as Record<string, unknown>, filterKeyword)) return false
       return true
     })
-  }, [apps, filterTime, filterCategory, filterProvince, filterCity])
+  }, [apps, filterTime, filterCategory, filterProvince, filterCity, filterKeyword])
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -196,6 +195,13 @@ function TalentApplicationsPage() {
       </p>
 
       {apps.length > 0 ? (
+        <>
+        <input
+          className="w-full rounded-lg panel-input px-3 py-2.5 text-sm border"
+          placeholder="搜索商单、门店、城市、单号"
+          value={filterKeyword}
+          onChange={(e) => setFilterKeyword(e.target.value)}
+        />
         <div className="filter-strip rounded-xl border p-3 flex flex-wrap gap-2 items-center text-sm">
           <span className="text-xs text-[var(--shell-muted)] mr-1">筛选</span>
           <select
@@ -230,6 +236,7 @@ function TalentApplicationsPage() {
             }}
           />
         </div>
+        </>
       ) : null}
 
       {loading ? <p className="text-[var(--shell-muted)] text-sm px-1">加载报名记录…</p> : null}

@@ -4,6 +4,7 @@ import { fetchMpRegistry, patchMpRecruitmentOrder } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
+import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import { readPublishedOrders } from '../lib/mpRecruitment/publishedOrders'
 import {
   deletePublishDraft,
@@ -63,6 +64,7 @@ export default function PrOrdersPage() {
   const [filterHall, setFilterHall] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+  const [filterKeyword, setFilterKeyword] = useState('')
 
   const refreshDrafts = useCallback(() => {
     setDrafts(listPublishDrafts())
@@ -132,9 +134,25 @@ export default function PrOrdersPage() {
       if (!hallFilters.matchCategory(row.category, filterCategory)) return false
       if (!hallFilters.matchHallType(row.hallLabel, filterHall)) return false
       if (!hallFilters.matchRegionFilter(row.region, '', filterProvince, filterCity)) return false
+      if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
     })
-  }, [rows, filterTarget, filterPlatform, filterCategory, filterHall, filterProvince, filterCity])
+  }, [rows, filterTarget, filterPlatform, filterCategory, filterHall, filterProvince, filterCity, filterKeyword])
+
+  const filteredDrafts = useMemo(() => {
+    const kw = filterKeyword.trim()
+    if (!kw) return drafts
+    return drafts.filter((draft) =>
+      matchListKeyword(
+        {
+          title: draftDisplayTitle(draft),
+          recruitModeLabel: draft.recruitModeLabel,
+        },
+        kw,
+        [draft.form?.title, draft.form?.shootLocation, ...(draft.form?.selectedCities || [])],
+      ),
+    )
+  }, [drafts, filterKeyword])
 
   function setTab(next: Tab) {
     if (next === 'drafts') setSearch({ tab: 'drafts' })
@@ -217,6 +235,15 @@ export default function PrOrdersPage() {
           {!loading && drafts.length ? <span className="ml-1 text-xs opacity-80">({drafts.length})</span> : null}
         </button>
       </div>
+
+      {(tab === 'published' && rows.length > 0) || (tab === 'drafts' && drafts.length > 0) ? (
+        <input
+          className="w-full rounded-lg panel-input px-3 py-2.5 text-sm border"
+          placeholder={tab === 'drafts' ? '搜索草稿标题、门店、城市' : '搜索招募标题、城市、单号'}
+          value={filterKeyword}
+          onChange={(e) => setFilterKeyword(e.target.value)}
+        />
+      ) : null}
 
       {tab === 'published' && rows.length > 0 ? (
         <div className="filter-strip rounded-xl border p-3 space-y-2">
@@ -355,6 +382,9 @@ export default function PrOrdersPage() {
         </>
       ) : (
         <>
+          {!loading && drafts.length && !filteredDrafts.length ? (
+            <p className="text-sm text-[var(--shell-muted)] text-center py-6">当前搜索条件下暂无草稿</p>
+          ) : null}
           {!loading && !drafts.length ? (
             <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
               <p>草稿箱为空</p>
@@ -365,7 +395,7 @@ export default function PrOrdersPage() {
             </div>
           ) : null}
           <div className="space-y-3">
-            {drafts.map((draft) => (
+            {filteredDrafts.map((draft) => (
               <article key={draft.id} className="surface-card rounded-xl border border-amber-500/25 p-4">
                 <div className="flex justify-between gap-2 items-start">
                   <div>

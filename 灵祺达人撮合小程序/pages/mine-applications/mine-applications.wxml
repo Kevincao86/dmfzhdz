@@ -1,4 +1,14 @@
 <view class="app-list-page page-shell">
+  <view wx:if="{{rows.length > 0}}" class="app-search-bar">
+    <input
+      class="app-search-input"
+      type="text"
+      placeholder="搜索商单、门店、城市、单号"
+      value="{{keyword}}"
+      bindinput="onKeywordInput"
+      confirm-type="search"
+    />
+  </view>
   <view wx:if="{{rows.length > 0}}" class="app-filter-bar">
     <view class="app-filter-cell">
       <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
@@ -58,18 +68,16 @@
       <text>驳回原因：{{item.videoRejectReason}}</text>
     </view>
     <view class="app-card__actions">
-      <button
+      <view
         wx:if="{{item.canUploadVideo}}"
-        class="app-card__btn app-card__btn--primary"
-        size="mini"
-        loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
-        disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+        class="app-card__btn app-card__btn--primary {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? 'app-card__btn--disabled' : ''}}"
         catchtap="onUploadVideo"
         data-id="{{item.mpOrderId}}"
-        data-applicant="{{item.applicantId}}"
+        data-applicant-id="{{item.applicantId}}"
       >
-        {{item.uploadBtnLabel}}
-      </button>
+        <text wx:if="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}">上传中…</text>
+        <text wx:else>{{item.uploadBtnLabel}}</text>
+      </view>
       <view class="app-card__foot app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
         <text>查看商单详情</text>
         <text class="app-card__link">›</text>
