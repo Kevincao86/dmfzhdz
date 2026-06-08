@@ -56,8 +56,21 @@ fi
 
 sudo systemctl start "$SERVICE_NAME"
 
-sleep 3
-if curl -sf "http://127.0.0.1:3001/api/meoo-auth-ping" >/dev/null; then
+ping_ok() {
+  curl -sf -m 2 "http://127.0.0.1:3001/api/meoo-auth-ping" >/dev/null 2>&1
+}
+
+PING_OK=0
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  sleep 2
+  if ping_ok; then
+    PING_OK=1
+    break
+  fi
+  echo "等待 :3001 就绪 (${i}/10)…"
+done
+
+if [[ "$PING_OK" == 1 ]]; then
   echo "OK: Auth API 已在 :3001 运行"
   curl -sS "http://127.0.0.1:3001/api/meoo-auth-ping" | head -c 200
   echo
@@ -71,7 +84,16 @@ if curl -sf "http://127.0.0.1:3001/api/meoo-auth-ping" >/dev/null; then
     exit 1
   fi
 else
-  echo "启动后 ping 失败，查看日志: sudo journalctl -u $SERVICE_NAME -n 50 --no-pager"
+  echo "启动后 ping 失败。服务状态与最近日志："
+  sudo systemctl status "$SERVICE_NAME" --no-pager -l 2>/dev/null || true
+  echo ""
+  sudo journalctl -u "$SERVICE_NAME" -n 50 --no-pager 2>/dev/null || true
+  echo ""
+  echo "常见修复（在 ~/app 下依次尝试）："
+  echo "  bash scripts/ecs-verify-auth-api-path.sh"
+  echo "  cd \"$ERP\" && npm ci"
+  echo "  bash scripts/ecs-run-auth-api.sh   # 仅生成 env 后可 Ctrl+C"
+  echo "  bash scripts/ecs-install-auth-api-systemd.sh"
   exit 1
 fi
 
