@@ -8,6 +8,7 @@ const recruitmentAi = require('../../utils/recruitmentAiTags.js')
 const hallIdentity = require('../../utils/hallIdentityBuckets.js')
 const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
+const mpShare = require('../../utils/mpShare.js')
 
 function matchSearch(row, keyword) {
   if (!keyword) return true
@@ -79,7 +80,12 @@ Page({
     applyNavLayout(this)
     console.log('[mp] build', mpBuild.ID)
   },
+  onShareAppMessage() {
+    mpShare.enableShareMenu()
+    return mpShare.defaultShare('/pages/index/index')
+  },
   onShow() {
+    mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
     const identity = userProfile.readIdentity()

@@ -1,4 +1,4 @@
-const { labels } = require('./platformLabels.js')
+const { labels, profileLinkPlaceholder } = require('./platformLabels.js')
 const { TALENT_TAGS } = require('./publishFormOptions.js')
 
 /** 达人「我的信息」支持的平台（与发招募 PLATFORMS 一致） */
@@ -145,6 +145,7 @@ function uiSections(profiles, douyinLevelIndex) {
       profile: prof,
       tagGrid: buildAccountTagGrid(prof.accountTags),
       labels: lb,
+      profileLinkPlaceholder: profileLinkPlaceholder(p.name),
       showSalesLevel: lb.showSalesLevel,
       showTalentGrade: lb.showTalentGrade,
       showReviewCount: lb.showReviewCount,

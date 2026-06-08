@@ -15,6 +15,7 @@ const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
 const participant = require('../../utils/participant.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
+const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
@@ -298,7 +299,12 @@ Page({
   onLoad() {
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
   },
+  onShareAppMessage() {
+    mpShare.enableShareMenu()
+    return mpShare.defaultShare('/pages/recommend/recommend')
+  },
   onShow() {
+    mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/recommend/recommend')
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     const identity = userProfile.readIdentity()

@@ -14,6 +14,7 @@ const wxAccount = require('../../utils/wxAccount.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
+const mpShare = require('../../utils/mpShare.js')
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
@@ -90,7 +91,12 @@ Page({
   onLoad() {
     applyCapsulePadding(this, 'headerInnerStyle')
   },
+  onShareAppMessage() {
+    mpShare.enableShareMenu()
+    return mpShare.defaultShare('/pages/mine/mine')
+  },
   async onShow() {
+    mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/mine/mine')
     try {
       const chat = require('../../utils/talentChat.js')

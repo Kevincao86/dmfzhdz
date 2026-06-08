@@ -1,12 +1,14 @@
 const chatBadgeWatcher = require('./utils/chatBadgeWatcher.js')
 const auth = require('./utils/auth.js')
 const config = require('./utils/config.js')
+const mpShare = require('./utils/mpShare.js')
 
 App({
   globalData: {
     chatBadge: 0,
   },
   onLaunch() {
+    mpShare.enableShareMenu()
     if (config.MP_USE_CLOUD_PROXY && wx.cloud) {
       const env = String(config.MP_CLOUD_ENV || '').trim()
       if (env) {
