@@ -1377,7 +1377,9 @@ Page({
         fields: f.applyFormFields,
       })
       if (f.applyFormTemplateId) applyTemplates.setActiveTemplateId(f.applyFormTemplateId)
-      const { shareTitle, groupCopyText } = this.buildShareTexts(order)
+      const shareTitle = shareCopy.buildShareTitle(order)
+      const prProfile = userProfile.readPrProfile()
+      const groupCopyText = await shareCopy.buildGroupCopyTextAsync(order, prProfile)
       this.setData({ step: 'done', submitting: false, createdOrder: order, shareTitle, groupCopyText })
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
@@ -1397,18 +1399,29 @@ Page({
     return share
   },
   onCopyGroupShare() {
-    const text = this.data.groupCopyText
-    if (!text) return
-    wx.setClipboardData({
-      data: text,
-      success: () => {
-        wx.showModal({
-          title: '已复制招募信息',
-          content: '请打开微信群，粘贴发送给达人即可。',
-          showCancel: false,
+    const order = this.data.createdOrder
+    if (!order) return
+    wx.showLoading({ title: '生成报名链接', mask: true })
+    shareCopy
+      .buildGroupCopyTextAsync(order, userProfile.readPrProfile())
+      .then((text) => {
+        wx.hideLoading()
+        this.setData({ groupCopyText: text })
+        wx.setClipboardData({
+          data: text,
+          success: () => {
+            wx.showModal({
+              title: '已复制招募信息',
+              content: '请打开微信群，粘贴发送给达人即可。',
+              showCancel: false,
+            })
+          },
         })
-      },
-    })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '生成链接失败', icon: 'none' })
+      })
   },
   onFinish() {
     this.resetToTarget()

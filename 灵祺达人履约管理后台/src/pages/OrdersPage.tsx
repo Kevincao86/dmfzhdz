@@ -79,6 +79,12 @@ function TalentApplicationsPage() {
   }
 
   async function reloadApps() {
+    try {
+      const { syncClientStateWithServer } = await import('../lib/mpAccountClientSync')
+      await syncClientStateWithServer().catch(() => null)
+    } catch {
+      /* ignore */
+    }
     const local = readApplications()
     try {
       const reg = await fetchMpRegistry()

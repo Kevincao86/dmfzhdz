@@ -67,14 +67,22 @@ export function formatShareRecruitmentInfo(info: string): string {
   return out.join('\n')
 }
 
-function buildShareGuideBlock(orderId: string): string {
-  const applyLink = buildRecruitmentApplyLink(orderId)
-  const openHint = OPEN_HINT
+function buildShareGuideBlock(orderId: string, applyLink?: string): string {
+  const link = applyLink || buildRecruitmentApplyLink(orderId)
   const parts = [GUIDE_DIVIDER, '']
-  if (applyLink) parts.push(`报名地址：${applyLink}`, openHint)
-  else parts.push(openHint)
+  if (link) parts.push(`报名地址：${link}`, OPEN_HINT)
+  else parts.push(OPEN_HINT)
   parts.push(`招募单号：${orderId}`)
   return parts.join('\n')
+}
+
+export function resolveCachedApplyLink(order: Record<string, unknown> | null | undefined): string {
+  if (!order || typeof order !== 'object') return ''
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  return String(meta.applyShortLink || order.applyShortLink || '').trim()
 }
 
 export function buildGroupCopyText(
@@ -85,27 +93,47 @@ export function buildGroupCopyText(
     recruitmentInfo?: string
     taskDetail?: string
     merchantRequirements?: string
+    mpPublishMeta?: Record<string, unknown>
+    applyShortLink?: string
   },
   prProfile?: ReturnType<typeof readPrProfile> | null,
+  applyLink?: string,
 ): string {
   const raw = order.recruitmentInfo || order.taskDetail || order.merchantRequirements || ''
   const info = formatShareRecruitmentInfo(raw)
-  const guide = buildShareGuideBlock(order.id)
+  const link = applyLink || resolveCachedApplyLink(order as Record<string, unknown>)
+  const guide = buildShareGuideBlock(order.id, link)
   const parts = [shareCopyHeader(prProfile), '']
   if (info) parts.push(info, '')
   parts.push(guide)
   return parts.join('\n')
 }
 
+export async function buildGroupCopyTextAsync(
+  order: Parameters<typeof buildGroupCopyText>[0],
+  prProfile?: ReturnType<typeof readPrProfile> | null,
+): Promise<string> {
+  let applyLink = resolveCachedApplyLink(order as Record<string, unknown>)
+  if (!applyLink) {
+    const { fetchMpApplyShortLink } = await import('../mpApi')
+    try {
+      const out = await fetchMpApplyShortLink(order.id, order.title)
+      applyLink = out.link
+    } catch {
+      applyLink = buildRecruitmentApplyLink(order.id)
+    }
+  }
+  return buildGroupCopyText(order, prProfile, applyLink)
+}
+
 export function buildShareTitle(order: { title?: string; region?: string }): string {
   return `${order.title || '招募'} · ${order.region || '全国'}招募`
 }
 
-/** 达人分享招募单（无 PR 机构抬头） */
 export async function copyRecruitmentShareForTalent(order: Record<string, unknown>) {
   const id = String(order.id || '').trim()
   if (!id) throw new Error('订单数据缺失')
-  const text = buildGroupCopyText(
+  const text = await buildGroupCopyTextAsync(
     {
       id,
       title: String(order.title || ''),
@@ -113,6 +141,10 @@ export async function copyRecruitmentShareForTalent(order: Record<string, unknow
       recruitmentInfo: String(order.recruitmentInfo || ''),
       taskDetail: String(order.taskDetail || ''),
       merchantRequirements: String(order.merchantRequirements || ''),
+      mpPublishMeta:
+        order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+          ? (order.mpPublishMeta as Record<string, unknown>)
+          : undefined,
     },
     null,
   )
@@ -123,7 +155,7 @@ export async function copyRecruitmentShareForTalent(order: Record<string, unknow
 export async function copyRecruitmentShare(order: Record<string, unknown>, prProfile?: ReturnType<typeof readPrProfile> | null) {
   const id = String(order.id || '').trim()
   if (!id) throw new Error('订单数据缺失')
-  const text = buildGroupCopyText(
+  const text = await buildGroupCopyTextAsync(
     {
       id,
       title: String(order.title || ''),
@@ -131,6 +163,10 @@ export async function copyRecruitmentShare(order: Record<string, unknown>, prPro
       recruitmentInfo: String(order.recruitmentInfo || ''),
       taskDetail: String(order.taskDetail || ''),
       merchantRequirements: String(order.merchantRequirements || ''),
+      mpPublishMeta:
+        order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+          ? (order.mpPublishMeta as Record<string, unknown>)
+          : undefined,
     },
     prProfile,
   )

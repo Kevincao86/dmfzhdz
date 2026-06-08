@@ -42,6 +42,13 @@ Page({
   onShow() {
     this.setData({ isPr: userProfile.readIdentity() === 'pr' })
     if (this.data.id) this.syncIceApplicantFromStorage()
+    if (this.data.id && wx.onCopyUrl) {
+      const id = this.data.id
+      wx.onCopyUrl(() => ({ query: `id=${encodeURIComponent(id)}` }))
+    }
+  },
+  onUnload() {
+    if (wx.offCopyUrl) wx.offCopyUrl()
   },
   syncIceApplicantFromStorage() {
     try {

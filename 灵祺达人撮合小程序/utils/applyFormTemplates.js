@@ -283,6 +283,9 @@ function writeCustomTemplates(list) {
   try {
     wx.removeStorageSync(STORAGE_KEY)
   } catch (_) {}
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
 }
 
 /** 用户可见模版列表（仅自定义，不含系统默认） */
@@ -378,6 +381,9 @@ function setActiveTemplateId(id, kind) {
   try {
     wx.removeStorageSync(ACTIVE_TEMPLATE_KEYS[tplKind])
   } catch (_) {}
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
 }
 
 function getTemplateForApply(templateId) {
@@ -450,6 +456,26 @@ function emptyCustomField(type) {
   }
 }
 
+function readActiveApplyTemplateIds() {
+  return {
+    talent: getActiveTemplateId('talent') || '',
+    shoot: getActiveTemplateId('shoot') || '',
+    edit: getActiveTemplateId('edit') || '',
+  }
+}
+
+function applyTemplatesFromSync(templates, activeIds) {
+  if (Array.isArray(templates) && templates.length) {
+    writeCustomTemplates(templates.slice(0, 30))
+  }
+  if (activeIds && typeof activeIds === 'object') {
+    for (const kind of ['talent', 'shoot', 'edit']) {
+      const id = String(activeIds[kind] || '').trim()
+      if (id) setActiveTemplateId(id, kind)
+    }
+  }
+}
+
 module.exports = {
   PLATFORMS,
   FIELD_TYPES,
@@ -477,4 +503,6 @@ module.exports = {
   saveApplyFormForMpOrder,
   validateTemplateFields,
   normalizeFields,
+  readActiveApplyTemplateIds,
+  applyTemplatesFromSync,
 }

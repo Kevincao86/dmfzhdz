@@ -261,6 +261,37 @@ function writeCustomTemplates(list: ApplyTemplate[]) {
   } catch {
     /* ignore */
   }
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
+}
+
+export function readActiveApplyTemplateIds(): Record<string, string> {
+  return {
+    talent: getActiveTemplateId('talent'),
+    shoot: getActiveTemplateId('shoot'),
+    edit: getActiveTemplateId('edit'),
+  }
+}
+
+export function applyTemplatesFromSync(
+  templates: ApplyTemplate[] | undefined,
+  activeIds: Record<string, string> | undefined,
+) {
+  if (Array.isArray(templates) && templates.length) {
+    writeCustomTemplates(
+      templates.map((t) => ({
+        ...t,
+        kind: normalizeTemplateKind(t.kind),
+        isSystem: false,
+        fields: normalizeFields(t.fields, normalizeTemplateKind(t.kind)),
+      })),
+    )
+  }
+  if (activeIds && typeof activeIds === 'object') {
+    for (const kind of ['talent', 'shoot', 'edit'] as TemplateKind[]) {
+      const id = String(activeIds[kind] || '').trim()
+      if (id) setActiveTemplateId(id, kind)
+    }
+  }
 }
 
 export function listCustomTemplates(kind?: TemplateKind) {
@@ -358,6 +389,7 @@ export function setActiveTemplateId(id: string, kind: TemplateKind = 'talent') {
   } catch {
     /* ignore */
   }
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
 function getTemplateForApply(kind: TemplateKind = 'talent') {

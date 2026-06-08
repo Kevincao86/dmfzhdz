@@ -28,6 +28,7 @@ import {
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
 import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
+import { generateRecruitmentApplyShortLink } from '../src/lib/mpRecruitmentApplyShortLink.js'
 
 export const config = { maxDuration: 60 }
 
@@ -339,6 +340,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'mp_apply_shortlink_get') {
+      const mpOrderId = String(body.mpOrderId || body.orderId || pickAuthField(req, body, 'mpOrderId') || '').trim()
+      const title = String(body.title || pickAuthField(req, body, 'title') || '').trim()
+      if (!mpOrderId) {
+        sendJson(res, 400, { ok: false, error: 'missing_mp_order_id' })
+        return
+      }
+      try {
+        const out = await generateRecruitmentApplyShortLink(mpOrderId, title || undefined)
+        sendJson(res, 200, { ok: true, mpOrderId, ...out })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const status = msg === 'wx_not_configured' ? 503 : 500
+        sendJson(res, status, { ok: false, error: msg })
+      }
+      return
+    }
+
     if (action === 'client_state_get' || action === 'client_state_sync') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -379,6 +398,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'client_state_get',
         'client_state_sync',
         'registry_profile_get',
+        'mp_apply_shortlink_get',
       ],
     })
   } catch (e) {
