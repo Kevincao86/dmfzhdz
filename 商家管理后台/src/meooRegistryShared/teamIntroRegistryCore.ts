@@ -15,7 +15,7 @@ function defaultTeamIntro(): RegistryTeamIntro {
   }
 }
 
-export function resolveTeamIntro(data: RegistryFile): RegistryTeamIntro {
+export function resolveTeamIntro(data: { teamIntro?: RegistryTeamIntro | null }): RegistryTeamIntro {
   const stored = data.teamIntro
   if (stored && Array.isArray(stored.paragraphs) && stored.paragraphs.length > 0) {
     return {
