@@ -97,16 +97,22 @@
 
 .vr-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  flex-direction: row;
+  align-items: center;
+  gap: 24rpx;
   margin-top: 16rpx;
 }
 
 .vr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48rpx;
   font-size: 26rpx;
   font-weight: 600;
   color: #6366f1;
   padding: 8rpx 0;
+  line-height: 1.2;
 }
 
 .vr-preview {
@@ -123,18 +129,33 @@
 
 .vr-review-actions {
   display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 16rpx;
   margin-top: 16rpx;
 }
 
-.vr-pass {
+.vr-pass,
+.vr-reject-btn {
   flex: 1;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vr-pass {
   color: #059669 !important;
   border-color: #059669 !important;
 }
 
 .vr-reject-btn {
-  flex: 1;
   color: #dc2626 !important;
   border-color: #dc2626 !important;
 }

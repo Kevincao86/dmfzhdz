@@ -48,14 +48,12 @@
     <text wx:if="{{item.videoRejectReason}}" class="vr-reject">驳回原因：{{item.videoRejectReason}}</text>
 
     <view class="vr-actions">
-      <text class="vr-btn vr-btn--ghost" data-id="{{item.id}}" catchtap="onTogglePreview">
+      <view class="vr-btn" data-id="{{item.id}}" catchtap="onTogglePreview">
         {{item.previewOpen ? '收起预览' : '视频预览'}}
-      </text>
-      <text
-        class="vr-btn vr-btn--ghost"
-        data-id="{{item.id}}"
-        catchtap="onDownload"
-      >{{downloadingId === item.id ? '下载中…' : '下载'}}</text>
+      </view>
+      <view class="vr-btn" data-id="{{item.id}}" catchtap="onDownload">
+        {{downloadingId === item.id ? '下载中…' : '下载'}}
+      </view>
     </view>
 
     <view wx:if="{{item.previewOpen}}" class="vr-preview">
