@@ -5,6 +5,8 @@ const userProfile = require('../../utils/userProfile.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const regionPicker = require('../../utils/regionPicker.js')
 const { notifySavedAndBack } = require('../../utils/profileSaveDone.js')
+const mpApiErrors = require('../../utils/mpApiErrors.js')
+const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const auth = require('../../utils/auth.js')
 const accountMemberSync = require('../../utils/accountMemberSync.js')
 const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
@@ -44,6 +46,7 @@ Page({
     orgLabel: '公司/机构名称',
     orgPlaceholder: '请输入公司或机构全称',
     lingqiPrIdLabel: '',
+    submitting: false,
     ...loginCredPanel.patchFromAccount(null),
   },
   ...credHandlers,
@@ -170,42 +173,109 @@ Page({
       wxAvatarUrl: (wx && wx.wxAvatarUrl) || f.wxAvatarUrl || '',
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     }
+    if (this.data.submitting) return
+    this.setData({ submitting: true })
     userProfile.writePrProfile(saved)
     let cloudWarn = ''
-    if (api.hasApi()) {
-      try {
-        const prUser = {
-          id: saved.id || `MPR-${Date.now()}`,
-          lingqiPrId: saved.lingqiPrId || '',
-          wxOpenId: saved.wxOpenId || '',
-          accountType: saved.accountType,
-          companyName: saved.companyName || '',
-          personalName: saved.personalName || '',
-          contactName: saved.contactName || '',
-          contactPhone: saved.contactPhone || '',
-          wechatId: saved.wechatId || '',
-          province: saved.province || '',
-          city: saved.city || '',
-          intro: saved.intro || '',
-          wxNickName: saved.wxNickName || '',
-          wxAvatarUrl: saved.wxAvatarUrl || '',
-          registeredAt: saved.registeredAt || saved.updatedAt,
-          updatedAt: saved.updatedAt,
+    let credNote = ''
+    try {
+      if (api.hasApi()) {
+        try {
+          await auth.ensureWxAuthSession({
+            role: 'pr',
+            wxNickName: saved.wxNickName,
+            wxAvatarUrl: saved.wxAvatarUrl,
+          })
+          const acct0 = auth.readAccount()
+          if (acct0) {
+            saved.id = String(acct0.registryPrId || saved.id || '').trim() || saved.id
+            saved.lingqiPrId = String(acct0.lingqiPrId || saved.lingqiPrId || '').trim()
+            saved.wxOpenId = String(acct0.openid || saved.wxOpenId || '').trim()
+          }
+        } catch (loginErr) {
+          cloudWarn = mpApiErrors.formatMpApiErr(loginErr, '请先完成微信登录')
         }
-        const reg = await ops.registerPrUser(prUser)
-        if (reg && reg.lingqiPrId) {
-          saved.lingqiPrId = reg.lingqiPrId
-          saved.id = reg.id || saved.id
-          userProfile.writePrProfile(saved)
-        }
-      } catch (_) {
-        cloudWarn = '资料已写入本机，云端同步失败，请稍后重试。'
       }
+      if (api.hasApi() && auth.isLoggedIn() && !cloudWarn) {
+        try {
+          const prUser = {
+            id: saved.id || `MPR-${Date.now()}`,
+            lingqiPrId: saved.lingqiPrId || '',
+            wxOpenId: saved.wxOpenId || '',
+            accountType: saved.accountType,
+            companyName: saved.companyName || '',
+            personalName: saved.personalName || '',
+            contactName: saved.contactName || '',
+            contactPhone: saved.contactPhone || '',
+            wechatId: saved.wechatId || '',
+            province: saved.province || '',
+            city: saved.city || '',
+            intro: saved.intro || '',
+            wxNickName: saved.wxNickName || '',
+            wxAvatarUrl: saved.wxAvatarUrl || '',
+            registeredAt: saved.registeredAt || saved.updatedAt,
+            updatedAt: saved.updatedAt,
+          }
+          const reg = await ops.registerPrUser(prUser)
+          if (reg && reg.lingqiPrId) {
+            saved.lingqiPrId = reg.lingqiPrId
+            saved.id = reg.id || saved.id
+          }
+          userProfile.writePrProfile(saved)
+          try {
+            await auth.refreshSession()
+            accountMemberSync.syncPrProfileFromAccount(auth.readAccount())
+            const acct1 = auth.readAccount()
+            if (acct1?.lingqiPrId) saved.lingqiPrId = acct1.lingqiPrId
+            if (acct1?.registryPrId) saved.id = acct1.registryPrId
+            userProfile.writePrProfile(saved)
+          } catch (_) {}
+        } catch (cloudErr) {
+          console.warn('[pr-profile] cloud sync failed', cloudErr)
+          cloudWarn = `资料已写入本机，云端同步失败：${mpApiErrors.formatMpApiErr(cloudErr, '请稍后重试')}`
+        }
+      }
+      const credPhone = mpPhoneAuth.normalizeMpLoginPhone(
+        this.data.modalLoginName || saved.contactPhone || '',
+      )
+      const credPwd = String(this.data.modalPassword || '')
+      const wantCred =
+        auth.isLoggedIn() &&
+        credPhone &&
+        (credPwd.length >= 6 || this.data.wantWebLogin || this.data.showCredModal)
+      if (wantCred && credPwd.length >= 6) {
+        try {
+          await auth.setLoginCredentials(credPhone, credPwd)
+          await auth.refreshSession()
+          accountMemberSync.syncPrProfileFromAccount(auth.readAccount())
+          credNote = '账号密码已保存'
+          this.setData({
+            ...loginCredPanel.patchFromAccount(auth.readAccount()),
+            showCredModal: false,
+            wantWebLogin: false,
+            modalPassword: '',
+          })
+        } catch (credErr) {
+          const mapped = loginCredPanel.mapCredError(credErr)
+          const acct2 = auth.readAccount()
+          if (/已被注册/.test(mapped) && acct2 && String(acct2.loginName || '').trim() === credPhone) {
+            credNote = '账号密码已保存'
+          } else {
+            credNote = mapped
+          }
+        }
+      }
+      this.setData({
+        form: saved,
+        lingqiPrIdLabel: lingqiIdentity.formatPrIdLabel(saved.lingqiPrId),
+      })
+      let summary = ''
+      if (!cloudWarn) summary = '资料已保存并同步云端'
+      else summary = cloudWarn
+      if (credNote) summary = summary ? `${summary}；${credNote}` : credNote
+      notifySavedAndBack(summary || '您的资料已保存。')
+    } finally {
+      this.setData({ submitting: false })
     }
-    this.setData({
-      form: saved,
-      lingqiPrIdLabel: lingqiIdentity.formatPrIdLabel(saved.lingqiPrId),
-    })
-    notifySavedAndBack(cloudWarn)
   },
 })

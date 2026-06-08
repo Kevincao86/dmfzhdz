@@ -7,8 +7,11 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpPrUser } from '../src/lib/opsRegistryTypes.js'
-import { upsertMpPrUser } from '../src/lib/mpPrUserUpsert.js'
-import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import {
+  createMpAuthRest,
+  registerMpPrUser,
+  resolveSession,
+} from '../src/lib/mpAccountAuth.js'
 
 export const config = { maxDuration: 60 }
 
@@ -20,7 +23,7 @@ function sendOpsJson(res: VercelResponse, status: number, body: Record<string, u
 function sendCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
 }
 
 function rawBody(req: VercelRequest): string {
@@ -32,6 +35,14 @@ function rawBody(req: VercelRequest): string {
   } catch {
     return ''
   }
+}
+
+function sessionToken(req: VercelRequest): string {
+  const mpHdr = req.headers['x-mp-session']
+  if (typeof mpHdr === 'string' && mpHdr.trim()) return mpHdr.trim()
+  const auth = req.headers.authorization
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim()
+  return ''
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -78,10 +89,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
-    const saved = upsertMpPrUser(data, prUser)
-    await io.save(data)
+    const rest = createMpAuthRest(supabaseUrl, serviceRole)
+    const token = sessionToken(req)
+    const session = token ? await resolveSession(rest, token) : null
+    const account = session?.account ?? null
+    if (!account) {
+      sendOpsJson(res, 401, { ok: false, error: 'login_required' })
+      return
+    }
+
+    const saved = await registerMpPrUser(supabaseUrl, serviceRole, prUser, account)
     sendOpsJson(res, 200, {
       ok: true,
       id: saved.id,

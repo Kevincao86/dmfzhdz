@@ -120,9 +120,22 @@ function createHandlers(auth) {
       }
       const name = mpPhoneAuth.normalizeMpLoginPhone(this.data.modalLoginName)
       const pwd = String(this.data.modalPassword || '')
+      const prevAcct = auth.readAccount()
+      if (prevAcct && String(prevAcct.loginName || '').trim() === name && !pwd && prevAcct.hasPassword) {
+        this.setData({
+          showCredModal: false,
+          wantWebLogin: false,
+          credModalErr: '',
+        })
+        wx.showToast({ title: '账号密码已保存', icon: 'success' })
+        return
+      }
       this.setData({ credModalSaving: true, credModalErr: '' })
       try {
         await auth.setLoginCredentials(name, pwd)
+        try {
+          await auth.refreshSession()
+        } catch (_) {}
         const acct = auth.readAccount()
         const patch = patchFromAccount(acct)
         patch.wantWebLogin = false
@@ -130,7 +143,19 @@ function createHandlers(auth) {
         this.setData(patch)
         wx.showToast({ title: '账号密码已保存', icon: 'success' })
       } catch (e) {
-        this.setData({ credModalErr: mapCredError(e) })
+        const mapped = mapCredError(e)
+        if (/已被注册/.test(mapped) && prevAcct && String(prevAcct.loginName || '').trim() === name) {
+          try {
+            await auth.refreshSession()
+          } catch (_) {}
+          const patch = patchFromAccount(auth.readAccount())
+          patch.showCredModal = false
+          patch.wantWebLogin = false
+          this.setData(patch)
+          wx.showToast({ title: '账号密码已保存', icon: 'success' })
+          return
+        }
+        this.setData({ credModalErr: mapped })
       } finally {
         this.setData({ credModalSaving: false })
       }

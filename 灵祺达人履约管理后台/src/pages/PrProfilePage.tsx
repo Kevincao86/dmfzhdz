@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { fetchSession, registerPrUser, setLoginCredentials } from '../lib/mpApi'
+import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSession'
 import { emptyPrProfile, readPrProfile, writePrProfile, type PrProfile } from '../lib/mpSync/userProfile'
 import { readWxAccount } from '../lib/mpSync/wxAccount'
@@ -39,13 +40,17 @@ export default function PrProfilePage() {
         setSession(getToken(), account)
         setLoginName(account.loginName || '')
         setHasPassword(!!account.hasPassword)
-        if (account.lingqiPrId) {
-          setForm((f) => ({
-            ...f,
-            lingqiPrId: account.lingqiPrId || f.lingqiPrId,
-            id: account.registryPrId || f.id,
-          }))
-        }
+        return pullRegistryProfileAfterLogin().then(() => account)
+      })
+      .then((account) => {
+        if (!account) return
+        const pr = readPrProfile()
+        setForm((f) => ({
+          ...f,
+          ...pr,
+          lingqiPrId: account.lingqiPrId || pr?.lingqiPrId || f.lingqiPrId,
+          id: account.registryPrId || pr?.id || f.id,
+        }))
       })
       .catch(() => {})
   }, [])
@@ -127,6 +132,12 @@ export default function PrProfilePage() {
       if (reg?.lingqiPrId) saved.lingqiPrId = reg.lingqiPrId
       if (reg?.id) saved.id = reg.id
       writePrProfile(saved)
+      await pullRegistryProfileAfterLogin()
+      const latest = readPrProfile()
+      if (latest) {
+        saved.lingqiPrId = latest.lingqiPrId || saved.lingqiPrId
+        Object.assign(saved, latest)
+      }
       setForm(saved)
       setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')
     } catch (e) {

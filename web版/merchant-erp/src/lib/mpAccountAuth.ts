@@ -9,7 +9,7 @@ import {
   allocateLingqiTalentId,
 } from './lingqiIdentity.js'
 import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
-import { findRegistryMemberForAccount } from './mpRegistryProfileGet.js'
+import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser } from './mpPrUserUpsert.js'
@@ -239,17 +239,25 @@ export async function accountPayloadWithMemberExtras(
   serviceRole: string,
   account: MpAccountRow,
 ) {
+  let acc = account
+  if (account.active_role === 'pr' || account.lingqi_pr_id || account.login_name) {
+    try {
+      acc = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
+    } catch {
+      /* registry optional */
+    }
+  }
   let extras: { lingqiShootTeamId?: string | null; lingqiEditTeamId?: string | null; workIdentity?: string | null } =
     {}
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const memberId = String(account.registry_member_id || '').trim()
-    const phoneKey = accountPhoneKey(account)
+    const memberId = String(acc.registry_member_id || '').trim()
+    const phoneKey = accountPhoneKey(acc)
     const member =
       (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
       (data.mpTalentMembers ?? []).find(
-        (m) => account.openid && String(m.wxOpenId || '').trim() === String(account.openid).trim(),
+        (m) => acc.openid && String(m.wxOpenId || '').trim() === String(acc.openid).trim(),
       ) ||
       (phoneKey.length >= 8
         ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
@@ -264,7 +272,7 @@ export async function accountPayloadWithMemberExtras(
   } catch {
     /* registry optional */
   }
-  return accountToClientPayload(account, extras)
+  return accountToClientPayload(acc, extras)
 }
 
 function accountPhoneKey(account: MpAccountRow): string {
@@ -483,6 +491,91 @@ export async function registerMpTalentMember(
   return saved
 }
 
+/** 小程序保存 PR 资料：写入注册表并绑定 mp_accounts */
+export async function registerMpPrUser(
+  supabaseUrl: string,
+  serviceRole: string,
+  prUser: RegistryMpPrUser,
+  account: MpAccountRow | null,
+): Promise<RegistryMpPrUser> {
+  if (!account) {
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+    const saved = upsertMpPrUser(data, prUser)
+    await io.save(data)
+    return saved
+  }
+  const saved = await syncRegistryPr(supabaseUrl, serviceRole, account, {
+    ...prUser,
+    wxOpenId: account.openid || prUser.wxOpenId || '',
+    contactPhone:
+      String(prUser.contactPhone || account.login_name || '').trim() || prUser.contactPhone,
+  })
+  const rest = restClient(supabaseUrl, serviceRole)
+  await updateAccount(rest, account.id, {
+    lingqi_pr_id: saved.lingqiPrId,
+    registry_pr_id: saved.id,
+    active_role: 'pr',
+  })
+  return saved
+}
+
+/** 密码登录 / 拉会话时：按 openid、手机号修正账号上的 PR ID */
+export async function reconcileAccountPrFromRegistry(
+  supabaseUrl: string,
+  serviceRole: string,
+  account: MpAccountRow,
+): Promise<MpAccountRow> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  const pr = findRegistryPrForAccount(data, account)
+  if (!pr) return account
+  const accLq = String(account.lingqi_pr_id || '').trim()
+  const accReg = String(account.registry_pr_id || '').trim()
+  if (accLq === String(pr.lingqiPrId || '').trim() && accReg === pr.id) return account
+  await updateAccount(rest, account.id, {
+    lingqi_pr_id: pr.lingqiPrId,
+    registry_pr_id: pr.id,
+    active_role: account.active_role === 'talent' ? account.active_role : 'pr',
+  })
+  return (await findAccountById(rest, account.id)) || account
+}
+
+function prUserPhoneKey(u: RegistryMpPrUser): string {
+  return String(u.contactPhone || u.wechatId || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
+/** 无微信绑定的旧账号占用了手机号时，释放 login_name 供当前微信账号绑定 */
+async function reclaimStaleLoginNameHolder(
+  rest: SupabaseRest,
+  supabaseUrl: string,
+  serviceRole: string,
+  holder: MpAccountRow,
+  loginPhone: string,
+): Promise<boolean> {
+  const phone = String(loginPhone || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+  if (phone.length < 11) return false
+  if (String(holder.openid || '').trim()) return false
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  const prByPhone = (data.mpPrUsers ?? []).find((u) => prUserPhoneKey(u) === phone)
+  if (!prByPhone) return false
+  const holderLq = String(holder.lingqi_pr_id || '').trim()
+  const canonLq = String(prByPhone.lingqiPrId || '').trim()
+  if (!holderLq || holderLq !== canonLq) {
+    await updateAccount(rest, holder.id, {
+      login_name: `released_${holder.id.replace(/-/g, '').slice(0, 12)}`,
+    })
+    return true
+  }
+  return false
+}
+
 async function syncRegistryPr(
   supabaseUrl: string,
   serviceRole: string,
@@ -501,7 +594,6 @@ async function syncRegistryPr(
     ...pr,
     wxOpenId: account.openid || pr.wxOpenId,
     id: account.registry_pr_id || pr.id,
-    lingqiPrId: account.lingqi_pr_id || pr.lingqiPrId,
   })
   await io.save(data)
   return saved
@@ -587,11 +679,12 @@ export async function mpAuthPasswordLogin(
   const rest = restClient(supabaseUrl, serviceRole)
   const name = normalizeMpLoginName(loginName)
   if (!name || !password) throw new Error('invalid_credentials')
-  const account = await findAccountByLoginName(rest, name)
+  let account = await findAccountByLoginName(rest, name)
   if (!account?.password_hash || !account.password_salt) throw new Error('invalid_credentials')
   if (!verifyPassword(password, account.password_hash, account.password_salt)) {
     throw new Error('invalid_credentials')
   }
+  account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
   const token = await createSession(rest, account.id)
   return { token, account }
 }
@@ -672,8 +765,20 @@ export async function mpAuthSetLoginCredentials(
   const cur = await findAccountById(rest, accountId)
   const curName = String(cur?.login_name || '').trim()
   if (name !== curName && !isValidMpLoginPhone(name)) throw new Error('invalid_login_name')
-  const existing = await findAccountByLoginName(rest, name)
-  if (existing && existing.id !== accountId) throw new Error('login_name_taken')
+  let existing = await findAccountByLoginName(rest, name)
+  if (existing && existing.id !== accountId) {
+    const reclaimed = await reclaimStaleLoginNameHolder(
+      rest,
+      supabaseUrl,
+      serviceRole,
+      existing,
+      name,
+    )
+    if (reclaimed) {
+      existing = await findAccountByLoginName(rest, name)
+    }
+    if (existing && existing.id !== accountId) throw new Error('login_name_taken')
+  }
   const patch: Record<string, unknown> = { login_name: name }
   const pwd = String(password || '')
   if (pwd.length > 0) {
