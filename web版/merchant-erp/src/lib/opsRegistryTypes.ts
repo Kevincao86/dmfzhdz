@@ -99,6 +99,9 @@ export type RegistryIceVideoSlot = {
 
 export type KolTierKey = 'v3' | 'v4' | 'v5' | 'v5plus'
 
+/** 与 recruitmentNoviceAllocationAi.KolTierStrategy 保持一致（勿从 src/services 导入，避免 api 编译链污染） */
+export type KolTierStrategy = 'more_v3' | 'more_v4' | 'more_v5'
+
 export type RecruitmentTierPlan = {
   feeType: 'tier' | 'fixed'
   totalHeadcount: number
@@ -106,7 +109,7 @@ export type RecruitmentTierPlan = {
   city: string
   tiers: Partial<Record<KolTierKey, { count: number; unitPriceYuan: number }>>
   fixedPriceYuan?: number
-  strategy?: string
+  strategy?: KolTierStrategy
   source?: 'ai' | 'fallback'
   costHint?: string
 }
