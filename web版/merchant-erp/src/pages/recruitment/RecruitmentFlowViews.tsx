@@ -337,7 +337,6 @@ export function RecruitmentScheduleView({
       let next = await generateRecruitmentScheduleRowsAi(ctx)
       if (next.length === 0) {
         const slots = meta.slots?.length ? meta.slots : ['09:00-12:00', '14:00-17:00']
-        const table = meta.table ?? 4
         const pool =
           selectedTalents.length > 0
             ? selectedTalents.map((t, i) => ({

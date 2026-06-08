@@ -23,6 +23,14 @@ function normalizeErpApiBase(raw: string): string {
   }
 }
 
+/** 单路径 API URL（优先 erp-api 反代） */
+export function apiUrl(apiPath: string): string {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const base = mpErpApiBase()
+  if (base) return buildMpErpApiUrl(base, path)
+  return path
+}
+
 export function mpErpApiBase(): string {
   const fromEnv = normalizeErpApiBase(
     (import.meta.env.VITE_MP_API_BASE as string | undefined) ?? '',

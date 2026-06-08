@@ -27,9 +27,11 @@ export default function PrOrderVideoReviewPage() {
     setLoading(true)
     try {
       const reg = await fetchMpRegistry()
-      const mp = (reg.mpRecruitmentOrders || []).find((o) => o && (o as Record<string, unknown>).id === mpOrderId) as
-        | Record<string, unknown>
-        | undefined
+      const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
+        string,
+        unknown
+      >[]
+      const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
       setTitle(String(mp?.title || mpOrderId))
       const applicants = Array.isArray(mp?.applicants) ? (mp!.applicants as Record<string, unknown>[]) : []
       const rows: VideoCard[] = applicants

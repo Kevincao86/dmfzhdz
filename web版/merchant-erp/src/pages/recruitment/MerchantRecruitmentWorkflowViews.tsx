@@ -9,7 +9,6 @@ import {
   Users,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cn } from '../../cn'
 import {
   inferKolTierFromApplicant,
   kolTierLabel,
