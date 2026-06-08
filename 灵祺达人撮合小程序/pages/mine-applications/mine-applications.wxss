@@ -120,9 +120,12 @@
   font-weight: 600;
 }
 
-.app-card__btn--disabled {
-  opacity: 0.6;
-  pointer-events: none;
+.app-card__btn::after {
+  border: none;
+}
+
+.app-card__btn--hover {
+  opacity: 0.88;
 }
 
 .app-card__tag--video {

@@ -4,11 +4,7 @@ import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { enrichMpOrder } from '../lib/mpSync/recruitmentDisplay'
-import {
-  submitRecruitmentVideo,
-  uploadRecruitmentVideoFile,
-  videoStatusLabel,
-} from '../lib/mpSync/recruitmentVideo'
+import { uploadAndSubmitRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
 import {
   applicationStatusLabel,
   evaluateContactPrGate,
@@ -163,8 +159,7 @@ export default function RecruitmentDetailPage() {
     if (!file || !id || !applicantId) return
     setUploadingVideo(true)
     try {
-      const url = await uploadRecruitmentVideoFile(file)
-      await submitRecruitmentVideo(id, applicantId, url)
+      await uploadAndSubmitRecruitmentVideo(file, id, applicantId)
       window.alert('视频已提交，请等待 PR 审核')
       await reloadOrder()
     } catch (err) {

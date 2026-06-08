@@ -132,7 +132,7 @@ Page({
     const id = e.currentTarget.dataset.id
     if (id) wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   },
-  onUploadVideo(e) {
+  async onUploadVideo(e) {
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
     let applicantId = String(ds.applicantId || ds.applicant || '').trim()
@@ -140,8 +140,33 @@ Page({
       const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
       if (row && row.applicantId) applicantId = String(row.applicantId).trim()
     }
-    if (!id || !applicantId) {
-      wx.showToast({ title: '缺少报名信息，请稍后重试', icon: 'none' })
+    if (!id) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    if (!applicantId && api.hasApi()) {
+      wx.showLoading({ title: '准备上传…', mask: true })
+      try {
+        const reg = await ops.fetchRegistry()
+        const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === id)
+        const talentContactPrGate = require('../../utils/talentContactPrGate.js')
+        const found = mp && talentContactPrGate.findMyApplicant(mp, id)
+        if (found && found.id) {
+          applicantId = String(found.id).trim()
+          applicationsStore.updateApplicationApplicantId(id, applicantId)
+        }
+      } catch (_) {
+        /* 继续用本地数据 */
+      } finally {
+        wx.hideLoading()
+      }
+    }
+    if (!applicantId) {
+      wx.showModal({
+        title: '无法上传',
+        content: '未找到您的报名记录，请返回商单详情确认已报名成功后再试。',
+        showCancel: false,
+      })
       return
     }
     const key = `${id}-${applicantId}`
