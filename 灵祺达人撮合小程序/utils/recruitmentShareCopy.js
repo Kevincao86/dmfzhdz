@@ -3,11 +3,11 @@ const config = require('./config.js')
 
 const GUIDE_DIVIDER = '—— 报名指引 ——'
 
-/** 分享文案标题：公司/机构用 PR 填写名称，个人用「灵祺星选平台」 */
+/** 分享文案标题：优先 PR 端填写的昵称/名称，无资料时回退「灵祺星选平台」 */
 function shareCopyHeader(prProfile) {
   const pr = prProfile || userProfile.readPrProfile()
-  if (pr && pr.accountType === 'company') {
-    const name = userProfile.prDisplayName(pr)
+  if (pr) {
+    const name = userProfile.prDisplayName(pr) || String(pr.wxNickName || '').trim()
     if (name) return `【${name}】`
   }
   return '【灵祺星选平台】'
