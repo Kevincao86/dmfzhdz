@@ -39,6 +39,17 @@ function buildPrMatchOrderOptions(packs) {
   return opts
 }
 
+function filterPrMatchOrderOptions(options, keyword) {
+  const kw = String(keyword || '').trim().toLowerCase()
+  if (!kw) return options || []
+  return (options || []).filter((o) => {
+    const label = String((o && o.label) || '').toLowerCase()
+    const title = String((o && o.title) || '').toLowerCase()
+    const id = String((o && o.id) || '').toLowerCase()
+    return label.includes(kw) || title.includes(kw) || id.includes(kw)
+  })
+}
+
 function matchHintForSelection(board, selectedId, options, recentCount) {
   if (selectedId && selectedId !== PR_MATCH_RECENT) {
     for (let i = 0; i < (options || []).length; i++) {
@@ -60,5 +71,6 @@ module.exports = {
   readPrMatchOrderId,
   writePrMatchOrderId,
   buildPrMatchOrderOptions,
+  filterPrMatchOrderOptions,
   matchHintForSelection,
 }

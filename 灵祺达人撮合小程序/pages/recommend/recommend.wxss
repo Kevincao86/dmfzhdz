@@ -181,11 +181,15 @@
   text-align: center;
 }
 
+.rec-pr-controls {
+  margin: 0 24rpx 12rpx;
+}
+
 .rec-match-order-bar {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  margin: 0 24rpx 12rpx;
+  margin-bottom: 12rpx;
   padding: 0 4rpx;
 }
 
@@ -235,6 +239,11 @@
   gap: 12rpx;
   margin: 0 24rpx 16rpx;
   padding: 8rpx 0;
+}
+
+.rec-view-mode-bar--inline {
+  margin: 0;
+  padding: 0;
 }
 
 .rec-view-mode-label {
@@ -648,4 +657,106 @@
 .rec-foot-hint {
   padding: 16rpx 0 24rpx;
   text-align: center;
+}
+
+.rec-order-sheet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: rgba(53, 50, 74, 0.32);
+  display: flex;
+  align-items: flex-end;
+}
+
+.rec-order-sheet {
+  width: 100%;
+  max-height: 72vh;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+.rec-order-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.rec-order-sheet-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.rec-order-sheet-close {
+  font-size: 44rpx;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 8rpx;
+}
+
+.rec-order-sheet-search {
+  margin-bottom: 16rpx;
+}
+
+.rec-order-sheet-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18rpx 24rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  font-size: 28rpx;
+  color: #0f172a;
+}
+
+.rec-order-sheet-ph {
+  color: #94a3b8;
+}
+
+.rec-order-sheet-list {
+  flex: 1;
+  min-height: 240rpx;
+  max-height: 48vh;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 16rpx;
+}
+
+.rec-order-sheet-item {
+  padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.rec-order-sheet-item--on {
+  background: #ede9fe;
+}
+
+.rec-order-sheet-item-label {
+  display: block;
+  font-size: 28rpx;
+  color: #0f172a;
+}
+
+.rec-order-sheet-item-sub {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-order-sheet-empty {
+  padding: 48rpx 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
 }

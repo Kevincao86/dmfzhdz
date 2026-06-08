@@ -30,6 +30,8 @@ import {
   syncProfile,
 } from '../../lib/mpSync/talentChat'
 import HallCityFilter from './HallCityFilter'
+import PrMatchOrderPicker from './PrMatchOrderPicker'
+import PageHero from '../ui/PageHero'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
@@ -270,9 +272,9 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="hall-page">
       {embedded ? (
-        <p className="text-sm text-[var(--shell-muted)]">{prMatchHint}</p>
+        <PageHero title="推荐大厅" subtitle={prMatchHint} badge="达人匹配" />
       ) : (
         <div>
           <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
@@ -280,68 +282,68 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <span className="text-xs text-[var(--shell-muted)] self-center mr-1">需求身份</span>
-        {PR_BOARD_SEGMENTS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              prBoard === s.id ? 'bg-violet-600 text-white' : 'panel-tab'
-            }`}
-            onClick={() => onBoardChange(s.id)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {matchOrderOptions.length > 1 ? (
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-[var(--shell-muted)] shrink-0">匹配招募单</span>
-          <select
-            className="flex-1 min-w-[12rem] rounded-lg panel-input border px-2 py-1.5 text-sm"
-            value={selectedMatchOrderId}
-            onChange={(e) => onMatchOrderChange(e.target.value)}
-          >
-            {matchOrderOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <span className="text-xs text-[var(--shell-muted)] self-center mr-1">浏览模式</span>
-        <button
-          type="button"
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'ai' ? 'bg-violet-600 text-white' : 'panel-tab'}`}
-          onClick={() => setViewMode('ai')}
-        >
-          智能匹配
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'all' ? 'bg-violet-600 text-white' : 'panel-tab'}`}
-          onClick={() => setViewMode('all')}
-        >
-          {allModeLabel}
-        </button>
-      </div>
-
       <input
-        className="w-full rounded-lg panel-input px-3 py-2.5 text-sm"
+        className="hall-search-input panel-input"
         placeholder={searchPlaceholder}
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
       />
 
-      <div className="flex flex-wrap gap-2 text-sm items-center">
-        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
+      <div className="hall-segment-block">
+        <div className="hall-segment-group">
+          <span className="hall-field-label">需求身份</span>
+          <div className="hall-segment-row">
+            {PR_BOARD_SEGMENTS.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${prBoard === s.id ? 'panel-tab-active' : 'panel-tab'}`}
+                onClick={() => onBoardChange(s.id)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="hall-segment-group">
+          <span className="hall-field-label">浏览模式</span>
+          <div className="hall-segment-row">
+            <button
+              type="button"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'ai' ? 'panel-tab-active' : 'panel-tab'}`}
+              onClick={() => setViewMode('ai')}
+            >
+              智能匹配
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'all' ? 'panel-tab-active' : 'panel-tab'}`}
+              onClick={() => setViewMode('all')}
+            >
+              {allModeLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {matchOrderOptions.length > 1 ? (
+        <PrMatchOrderPicker
+          value={selectedMatchOrderId}
+          options={matchOrderOptions}
+          onChange={onMatchOrderChange}
+        />
+      ) : null}
+
+      <div className="hall-filter-row">
+        <select
+          className="rounded-lg panel-select px-2 py-1.5"
+          value={filterPlatform}
+          onChange={(e) => setFilterPlatform(e.target.value)}
+        >
           {hallFilters.PLATFORM_FILTERS.map((p) => (
-            <option key={p} value={p}>{p === '全部' ? '平台' : p}</option>
+            <option key={p} value={p}>
+              {p === '全部' ? '平台' : p}
+            </option>
           ))}
         </select>
         <HallCityFilter
@@ -353,15 +355,27 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
             setFilterCity(c)
           }}
         />
-        <select className="rounded-lg panel-input border px-2 py-1.5" value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
+        <select
+          className="rounded-lg panel-select px-2 py-1.5"
+          value={filterTag}
+          onChange={(e) => setFilterTag(e.target.value)}
+        >
           {TAG_FILTERS.map((t) => (
-            <option key={t} value={t}>{t === '全部' ? '标签' : t}</option>
+            <option key={t} value={t}>
+              {t === '全部' ? '标签' : t}
+            </option>
           ))}
         </select>
         {prBoard === 'talent' ? (
-          <select className="rounded-lg panel-input border px-2 py-1.5" value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+          <select
+            className="rounded-lg panel-select px-2 py-1.5"
+            value={filterGender}
+            onChange={(e) => setFilterGender(e.target.value)}
+          >
             {GENDER_FILTERS.map((g) => (
-              <option key={g} value={g}>{g === '全部' ? '性别' : g}</option>
+              <option key={g} value={g}>
+                {g === '全部' ? '性别' : g}
+              </option>
             ))}
           </select>
         ) : null}

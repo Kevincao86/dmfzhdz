@@ -53,23 +53,18 @@
       </view>
     </view>
 
-    <view class="rec-match-order-bar" wx:if="{{isPrMode && prMatchOrderOptions.length > 1}}">
-      <text class="rec-match-order-label">匹配招募单</text>
-      <picker
-        class="rec-match-order-picker"
-        mode="selector"
-        range="{{prMatchOrderLabels}}"
-        value="{{prMatchOrderIndex}}"
-        bindchange="onPrMatchOrderChange"
-      >
-        <view class="rec-match-order-value">
-          <text class="rec-match-order-text">{{prMatchOrderLabel}}</text>
-          <text class="rec-match-order-arrow">▼</text>
+    <view class="rec-pr-controls" wx:if="{{isPrMode}}">
+      <view class="rec-match-order-bar" wx:if="{{prMatchOrderOptions.length > 1}}">
+        <text class="rec-match-order-label">匹配招募单</text>
+        <view class="rec-match-order-picker" bindtap="openPrMatchOrderSheet">
+          <view class="rec-match-order-value">
+            <text class="rec-match-order-text">{{prMatchOrderLabel}}</text>
+            <text class="rec-match-order-arrow">▼</text>
+          </view>
         </view>
-      </picker>
-    </view>
+      </view>
 
-    <view class="rec-view-mode-bar" wx:if="{{isPrMode}}">
+      <view class="rec-view-mode-bar rec-view-mode-bar--inline">
       <text class="rec-view-mode-label">浏览模式</text>
       <view
         class="rec-view-mode-item {{prViewMode === 'ai' ? 'rec-view-mode-item--on' : ''}}"
@@ -81,6 +76,7 @@
         data-mode="all"
         bindtap="onPrViewMode"
       >{{prAllModeLabel}}</view>
+      </view>
     </view>
 
     <view class="rec-seg-bar lq-gradient-tabs" wx:if="{{!isPrMode}}">
@@ -302,6 +298,38 @@
         <button class="price-sheet-reset" bindtap="onResetPrice">清空</button>
         <button class="price-sheet-ok" bindtap="onConfirmPrice">确定</button>
       </view>
+    </view>
+  </view>
+
+  <view class="rec-order-sheet-mask" wx:if="{{showPrMatchOrderSheet}}" bindtap="closePrMatchOrderSheet">
+    <view class="rec-order-sheet" catchtap="noopSheetTap">
+      <view class="rec-order-sheet-head">
+        <text class="rec-order-sheet-title">选择招募单</text>
+        <text class="rec-order-sheet-close" bindtap="closePrMatchOrderSheet">×</text>
+      </view>
+      <view class="rec-order-sheet-search">
+        <input
+          class="rec-order-sheet-input"
+          placeholder="搜索招募标题、单号"
+          placeholder-class="rec-order-sheet-ph"
+          value="{{prMatchOrderKeyword}}"
+          bindinput="onPrMatchOrderKeyword"
+          focus="{{showPrMatchOrderSheet}}"
+        />
+      </view>
+      <scroll-view class="rec-order-sheet-list" scroll-y>
+        <view
+          wx:for="{{prMatchOrderFiltered}}"
+          wx:key="id"
+          class="rec-order-sheet-item {{prMatchOrderId === item.id ? 'rec-order-sheet-item--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPrMatchOrderPick"
+        >
+          <text class="rec-order-sheet-item-label">{{item.label}}</text>
+          <text class="rec-order-sheet-item-sub" wx:if="{{item.title && item.title !== item.label}}">{{item.title}}</text>
+        </view>
+        <view wx:if="{{!prMatchOrderFiltered.length}}" class="rec-order-sheet-empty">暂无匹配招募单</view>
+      </scroll-view>
     </view>
   </view>
 </view>
