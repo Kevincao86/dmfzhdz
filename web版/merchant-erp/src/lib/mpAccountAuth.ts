@@ -302,14 +302,19 @@ async function provisionRegistryForAccount(
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const openId = String(account.openid || '').trim()
-    const existing = findRegistryMemberForAccount(data, account) ?? undefined
-    const base = existing
+    const existing = findRegistryMemberForAccount(data, account)
+    const base: RegistryMpTalentMember = existing
       ? { ...existing }
       : {
           id: account.registry_member_id || `MTM-${Date.now()}`,
-          memberType: 'douyin' as const,
+          memberType: 'douyin',
           lingqiTalentId: account.lingqi_talent_id || '',
+          wxNickName: '',
+          wxAvatarUrl: '',
+          contact: '',
+          wechatId: '',
           registeredAt: now,
+          updatedAt: now,
         }
     let lingqiTalentId = base.lingqiTalentId || account.lingqi_talent_id || ''
     if (!lingqiTalentId && memberHasResolvablePlatformInfo(base)) {
