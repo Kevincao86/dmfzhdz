@@ -1,12 +1,15 @@
 import type {
   RegistryAiModels,
   RegistryFile,
+  RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
   RegistryTenant,
   RegistryVideoSubmission,
 } from './opsRegistryTypes'
+import type { MpRecruitmentPatchBody } from './mpRecruitmentOrderRegistryMutations'
+import type { RecruitmentOrderPatchBody } from './recruitmentOrderPatchMutations'
 import { buildMerchantErpApiUrl, merchantErpApiBase } from './merchantErpApiBase'
 import { supabase, supabaseConfigured } from './supabaseClient'
 import {
@@ -197,6 +200,90 @@ export async function setRecruitmentScheduleRowsOnOps(rows: RegistryScheduleRow[
     body,
   )
   if (!res.ok) throw new Error(`schedule set ${res.status}`)
+}
+
+export async function patchRecruitmentOrderOnOps(body: RecruitmentOrderPatchBody): Promise<{ ok: boolean; error?: string }> {
+  const res = await postRegistrySync(
+    '/api/meoo-ops-recruitment-orders-patch',
+    '/api/ops-sync/recruitment-orders/patch',
+    body,
+  )
+  if (!res.ok) {
+    let err = `patch recruitment ${res.status}`
+    try {
+      const j = (await res.json()) as { error?: string }
+      if (j.error) err = j.error
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, error: err }
+  }
+  return { ok: true }
+}
+
+export async function appendMpRecruitmentOrderToOps(
+  order: RegistryMpRecruitmentOrder,
+): Promise<{ ok: boolean; id?: string; error?: string; existingId?: string }> {
+  const res = await postRegistrySync(
+    '/api/meoo-ops-mp-recruitment-orders-append',
+    '/api/ops-sync/mp-recruitment-orders/append',
+    { order },
+  )
+  let data: { ok?: boolean; error?: string; id?: string; existingId?: string } = {}
+  try {
+    data = (await res.json()) as typeof data
+  } catch {
+    /* ignore */
+  }
+  if (!res.ok) {
+    return { ok: false, error: data.error ?? `append mp ${res.status}`, existingId: data.existingId }
+  }
+  return { ok: true, id: data.id ?? order.id }
+}
+
+export async function patchMpRecruitmentOrderOnOps(body: MpRecruitmentPatchBody): Promise<{ ok: boolean; error?: string }> {
+  const res = await postRegistrySync(
+    '/api/meoo-ops-mp-recruitment-orders-patch',
+    '/api/ops-sync/mp-recruitment-orders/patch',
+    body,
+  )
+  if (!res.ok) {
+    let err = `patch mp ${res.status}`
+    try {
+      const j = (await res.json()) as { error?: string }
+      if (j.error) err = j.error
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, error: err }
+  }
+  return { ok: true }
+}
+
+export type TalentInboxEntryInput = {
+  talentMemberId: string
+  title: string
+  body: string
+  category?: 'order' | 'business' | 'system'
+  mpOrderId?: string
+  contact?: string
+  platformAccount?: string
+  applicantId?: string
+  imageUrl?: string
+  noticeType?: 'selection' | 'general'
+}
+
+export async function appendTalentInboxOnOps(entries: TalentInboxEntryInput[]): Promise<{ ok: boolean; count?: number }> {
+  const res = await postRegistrySync('/api/meoo-ops-mp-talent-inbox-append', '/api/ops-sync/mp-talent-inbox/append', {
+    entries,
+  })
+  if (!res.ok) return { ok: false }
+  try {
+    const j = (await res.json()) as { count?: number }
+    return { ok: true, count: j.count }
+  } catch {
+    return { ok: true }
+  }
 }
 
 export async function setRecruitmentVideoSubmissionsOnOps(videos: RegistryVideoSubmission[]): Promise<void> {

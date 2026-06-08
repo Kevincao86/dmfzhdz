@@ -33,6 +33,10 @@ import {
   type MpRecruitmentPatchBody,
 } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
 import {
+  patchRecruitmentOrderInSnapshot,
+  type RecruitmentOrderPatchBody,
+} from '../src/lib/recruitmentOrderPatchMutations.js'
+import {
   deleteMpLibraryEntriesFromSnapshot,
   type MpLibraryDeleteKind,
 } from '../src/lib/mpLibraryRegistryMutations.js'
@@ -163,6 +167,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           !url.startsWith('/api/ops-sync') &&
           url !== '/api/meoo-ops-sync-registry' &&
           url !== '/api/meoo-ops-recruitment-orders-append' &&
+          url !== '/api/meoo-ops-recruitment-orders-patch' &&
+          url !== '/api/meoo-ops-mp-talent-inbox-append' &&
           url !== '/api/meoo-ops-mp-recruitment-orders-append' &&
           url !== '/api/meoo-ops-talent-pool-set' &&
           url !== '/api/meoo-ops-recruitment-schedule-set' &&
@@ -531,49 +537,18 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             return
           }
 
-          if (method === 'POST' && url === '/api/ops-sync/recruitment-orders/patch') {
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/recruitment-orders/patch' ||
+              url === '/api/meoo-ops-recruitment-orders-patch')
+          ) {
             const raw = await readBody(req)
-            const body = JSON.parse(raw || '{}') as {
-              id?: string
-              status?: RegistryRecruitmentOrder['status']
-              acceptMode?: RegistryRecruitmentOrder['acceptMode']
-              linkedMpOrderId?: string
-            }
-            const id = (body.id ?? '').trim()
-            const status = body.status
-            if (!id) {
-              json(res, 400, { ok: false, error: 'invalid_patch' })
-              return
-            }
-            const okStatus =
-              status === undefined ||
-              status === 'pending' ||
-              status === 'accepted' ||
-              status === 'done' ||
-              status === 'cancelled' ||
-              status === 'refunded'
-            if (!okStatus) {
-              json(res, 400, { ok: false, error: 'invalid_patch' })
-              return
-            }
+            const body = JSON.parse(raw || '{}') as RecruitmentOrderPatchBody
             const data = ensureRegistry(viteRoot)
-            const idx = data.recruitmentOrders?.findIndex((o) => o.id === id) ?? -1
-            if (!data.recruitmentOrders || idx < 0) {
-              json(res, 404, { ok: false, error: 'not_found' })
+            const result = patchRecruitmentOrderInSnapshot(data, body)
+            if (!result.ok) {
+              json(res, result.status, { ok: false, error: result.error })
               return
-            }
-            const cur = data.recruitmentOrders[idx]!
-            data.recruitmentOrders[idx] = {
-              ...cur,
-              ...(status !== undefined ? { status } : {}),
-              ...(body.acceptMode === 'manual' ||
-              body.acceptMode === 'miniprogram' ||
-              body.acceptMode === 'ice'
-                ? { acceptMode: body.acceptMode }
-                : {}),
-              ...(typeof body.linkedMpOrderId === 'string' && body.linkedMpOrderId.trim()
-                ? { linkedMpOrderId: body.linkedMpOrderId.trim() }
-                : {}),
             }
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })

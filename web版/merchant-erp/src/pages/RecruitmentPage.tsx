@@ -39,45 +39,48 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../lib/tenantBilling'
 import { getDouyinStores, type DouyinStoreRow } from '../services/douyinMerchantApi'
 import {
-  RecruitmentPaymentView,
   RecruitmentScheduleView,
-  RecruitmentTalentPoolView,
   RecruitmentVideoReviewView,
 } from './recruitment/RecruitmentFlowViews'
+import {
+  MerchantApplicantSelectView,
+  MerchantRecruitmentHubStats,
+  MerchantRecruitmentPaymentView,
+} from './recruitment/MerchantRecruitmentWorkflowViews'
 import NoviceRecruitmentForm from './recruitment/NoviceRecruitmentForm'
 
 const FLOW = [
   {
     title: '发布招募需求',
-    desc: '开环：探店招募条件与预算；云剪闭环：批量成片后派发达人投放',
+    desc: 'AI 按城市达人库生成阶梯/一口价方案，自动发布至星选招募大厅',
     icon: Target,
     color: 'bg-blue-500',
     view: 'createPick' as const,
   },
   {
-    title: 'AI达人池筛选',
-    desc: '通过巨量星图智能匹配符合需求的达人，支持替换和确认操作',
+    title: '达人反选',
+    desc: '星选达人报名后，按 V3/V4/V5 档位反选，上传群码并通知达人',
     icon: UserCheck,
     color: 'bg-indigo-500',
     view: 'confirm' as const,
   },
   {
-    title: 'AI排期编排',
-    desc: '按达人和门店产能自动排布时间，生成排期单，支持冲突替换',
+    title: 'AI探店排期',
+    desc: '填写餐食、拼桌与时段，AI 生成排期并下发星选达人',
     icon: Calendar,
     color: 'bg-cyan-500',
     view: 'schedule' as const,
   },
   {
-    title: '视频审核管理',
-    desc: '达人上传视频后进行审核，AI反馈调整意见，支持发布排期',
+    title: '视频审核',
+    desc: '达人在星选上传成片（OSS），商家审核通过或驳回并重传',
     icon: Video,
     color: 'bg-violet-500',
     view: 'review' as const,
   },
   {
-    title: '结款账单',
-    desc: '视频审核通过并发布后，确认结款，返还账单信息',
+    title: '结算打款',
+    desc: '全部视频通过后确认打款，下载支付宝明细，运营确认后完结',
     icon: FileText,
     color: 'bg-gray-400',
     view: 'payment' as const,
@@ -1186,11 +1189,11 @@ export default function RecruitmentPage() {
     )
   if (screen === 'createNovice') return <NoviceRecruitmentForm onBack={() => setScreen('createPick')} />
   if (screen === 'createPro') return <CreateForm onBack={() => setScreen('createPick')} />
-  if (screen === 'confirm') return <RecruitmentTalentPoolView onBack={() => setScreen('hub')} />
+  if (screen === 'confirm') return <MerchantApplicantSelectView onBack={() => setScreen('hub')} />
   if (screen === 'schedule')
     return <RecruitmentScheduleView onBack={() => setScreen('hub')} onEnterVideo={() => setScreen('review')} />
   if (screen === 'review') return <RecruitmentVideoReviewView onBack={() => setScreen('hub')} />
-  if (screen === 'payment') return <RecruitmentPaymentView onBack={() => setScreen('hub')} />
+  if (screen === 'payment') return <MerchantRecruitmentPaymentView onBack={() => setScreen('hub')} />
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -1270,7 +1273,8 @@ export default function RecruitmentPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="erp-page-title">达人招募管理</h1>
-          <p className="mt-1 text-sm text-gray-500">一站式达人招募、排期、审核与结算管理</p>
+          <p className="mt-1 text-sm text-gray-500">AI 定价 → 星选招募 → 商家反选 → 排期 → 视频审核 → 结算打款</p>
+          <MerchantRecruitmentHubStats />
         </div>
         <button
           type="button"

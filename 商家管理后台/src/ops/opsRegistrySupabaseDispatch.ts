@@ -255,48 +255,12 @@ export async function dispatchOpsRegistrySupabase(opts: {
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/recruitment-orders/patch') {
-      const body = JSON.parse(bodyRaw || '{}') as {
-        id?: string
-        status?: RegistryRecruitmentOrder['status']
-        acceptMode?: RegistryRecruitmentOrder['acceptMode']
-        linkedMpOrderId?: string
-        recruitmentPlatform?: RegistryRecruitmentOrder['recruitmentPlatform']
-      }
-      const id = (body.id ?? '').trim()
-      const status = body.status
-      if (!id) {
-        return { status: 400, body: { ok: false, error: 'invalid_patch' } }
-      }
-      const okStatus =
-        status === undefined ||
-        status === 'pending' ||
-        status === 'accepted' ||
-        status === 'done' ||
-        status === 'cancelled' ||
-        status === 'refunded'
-      if (!okStatus) {
-        return { status: 400, body: { ok: false, error: 'invalid_patch' } }
-      }
+      const body = JSON.parse(bodyRaw || '{}') as import('../meooRegistryShared/recruitmentOrderPatchMutations.js').RecruitmentOrderPatchBody
+      const { patchRecruitmentOrderInSnapshot } = await import('../meooRegistryShared/recruitmentOrderPatchMutations.js')
       const data = await io.load()
-      const idx = data.recruitmentOrders?.findIndex((o) => o.id === id) ?? -1
-      if (!data.recruitmentOrders || idx < 0) {
-        return { status: 404, body: { ok: false, error: 'not_found' } }
-      }
-      const cur = data.recruitmentOrders[idx]!
-      data.recruitmentOrders[idx] = {
-        ...cur,
-        ...(status !== undefined ? { status } : {}),
-        ...(body.acceptMode === 'manual' ||
-        body.acceptMode === 'miniprogram' ||
-        body.acceptMode === 'ice'
-          ? { acceptMode: body.acceptMode }
-          : {}),
-        ...(typeof body.linkedMpOrderId === 'string' && body.linkedMpOrderId.trim()
-          ? { linkedMpOrderId: body.linkedMpOrderId.trim() }
-          : {}),
-        ...(body.recruitmentPlatform === '抖音' || body.recruitmentPlatform === '小红书'
-          ? { recruitmentPlatform: body.recruitmentPlatform }
-          : {}),
+      const result = patchRecruitmentOrderInSnapshot(data, body)
+      if (!result.ok) {
+        return { status: result.status, body: { ok: false, error: result.error } }
       }
       await io.save(data)
       return { status: 200, body: { ok: true } }

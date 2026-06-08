@@ -12,7 +12,8 @@ import {
   type CityKolTierBands,
 } from '../../lib/recruitmentCityTierPricing'
 import { loadRecruitmentIndustryL1Labels } from '../../lib/recruitmentIndustryOptions'
-import { appendRecruitmentOrderToOps } from '../../lib/opsRegistryClient'
+import { buildRecruitmentTierPlan } from '../../lib/merchantRecruitmentTierPlan'
+import { submitMerchantRecruitmentWithMpPublish } from '../../lib/merchantRecruitmentSubmit'
 import type { RegistryRecruitmentOrder } from '../../lib/opsRegistryTypes'
 import { resolveRecruitmentOrderTenantMeta } from '../../lib/recruitmentOrderMeta'
 import { tenantLocalKey } from '../../lib/tenantLocalState'
@@ -83,6 +84,8 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [cityTierSource, setCityTierSource] = useState<CityTierBandsSource | null>(null)
   const [cityTierLoading, setCityTierLoading] = useState(false)
 
+  const [feeType, setFeeType] = useState<'tier' | 'fixed'>('tier')
+  const [targetHeadcount, setTargetHeadcount] = useState(0)
   const [allocation, setAllocation] = useState<NoviceAllocation | null>(null)
   const [allocationFresh, setAllocationFresh] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -267,10 +270,13 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       `${city.trim()} · ${industry}`
     const storeIdsLine = selectedStores.map((s) => s.id).join(',')
     const id = `RO-NV${Date.now()}`
-    const headcount = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
+    const headcountForOrder =
+      targetHeadcount > 0
+        ? targetHeadcount
+        : allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
     const tierLine = isDouyin
       ? `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5以上:${allocation.v5plus}`
-      : `预估达人数:${headcount}`
+      : `预估达人数:${headcountForOrder}`
     const tierPriceRef =
       isDouyin && cityTierBands ? formatCityTierBandsLines(cityTierBands).join('；') : ''
     const tenantMeta = await resolveRecruitmentOrderTenantMeta(supabaseConfigured ? supabase : null)
@@ -281,7 +287,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       storeName,
       talentId: '—',
       talentName: '新手版·待 AI / 运营匹配',
-      fans: headcount,
+      fans: headcountForOrder,
       accountType: deliveryPlatform,
       recruitmentPlatform: deliveryPlatform,
       coopTimes: 0,
@@ -295,15 +301,34 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${city.trim()}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；同城档位参考:${tierPriceRef || '—'}；策略:${kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}档位成本来源:${cityTierSource === 'ai' ? 'AI估算' : cityTierSource === 'static' ? '默认表' : '—'}；分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
+    const tierPlan = buildRecruitmentTierPlan({
+      budgetYuan: budget,
+      targetHeadcount: headcountForOrder,
+      city: city.trim(),
+      strategy,
+      feeType,
+      cityTierBands: cityTierBands ?? undefined,
+      source: allocation.source,
+    })
+
     setSubmitting(true)
     try {
-      await appendRecruitmentOrderToOps(order)
+      const enriched: RegistryRecruitmentOrder = {
+        ...order,
+        fans: headcountForOrder,
+        fulfillmentLoop: 'open',
+        orderKind: 'recruitment',
+        autoPublishMp: true,
+        tierPlan,
+        workflowStage: 'submitted',
+      }
+      const { mpOrderId } = await submitMerchantRecruitmentWithMpPublish(enriched, tierPlan)
       try {
         window.localStorage.setItem(tenantLocalKey('meoo_last_recruitment_order_id'), id)
       } catch {
         /* ignore */
       }
-      window.alert('新手版需求已推送至运营管控台「商家达人招募订单」，状态：待接单。')
+      window.alert(`AI 招募方案已生成并发布至星选大厅（${mpOrderId}）。达人报名后请在「达人反选」中按档位确认。`)
       onBack()
     } catch (e) {
       const detail = e instanceof Error ? e.message.trim() : String(e)
@@ -635,6 +660,45 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           </div>
 
           {aiErr ? <p className="text-sm text-red-600">{aiErr}</p> : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="font-medium text-gray-800">招募人数（目标）</span>
+              <input
+                type="number"
+                min={1}
+                value={targetHeadcount || ''}
+                onChange={(e) => setTargetHeadcount(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
+                placeholder="如 20（留空则用 AI 分配合计）"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </label>
+            <div className="block text-sm">
+              <span className="font-medium text-gray-800">费用模式</span>
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFeeType('tier')}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-sm',
+                    feeType === 'tier' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200',
+                  )}
+                >
+                  阶梯档位
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFeeType('fixed')}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 text-sm',
+                    feeType === 'fixed' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200',
+                  )}
+                >
+                  一口价
+                </button>
+              </div>
+            </div>
+          </div>
 
           {allocation ? (
             <div

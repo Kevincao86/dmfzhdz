@@ -12,7 +12,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
+  appendTalentInboxOnOps,
   fetchOpsRegistryForTenant,
+  patchRecruitmentOrderOnOps,
   setRecruitmentScheduleRowsOnOps,
   setRecruitmentVideoSubmissionsOnOps,
   setTalentPoolCandidatesOnOps,
@@ -267,11 +269,31 @@ export function RecruitmentScheduleView({
   const [rows, setRows] = useState<RegistryScheduleRow[]>([])
   const [busy, setBusy] = useState(false)
   const [loadErr, setLoadErr] = useState<string | null>(null)
+  const [mealCount, setMealCount] = useState(1)
+  const [tableSize, setTableSize] = useState(4)
+  const [shareTable, setShareTable] = useState(true)
+  const [visitSlots, setVisitSlots] = useState('09:00-12:00,14:00-17:00')
+  const [orderId, setOrderId] = useState('')
+  const [mpOrderId, setMpOrderId] = useState('')
 
   const load = useCallback(async () => {
     try {
       const r = await loadTenantScopedRegistry()
       setRows(r.recruitmentScheduleRows ?? [])
+      let lastId = ''
+      try {
+        lastId = window.localStorage.getItem(tenantLocalKey('meoo_last_recruitment_order_id'))?.trim() ?? ''
+      } catch {
+        /* ignore */
+      }
+      const order = (r.recruitmentOrders ?? []).find((o) => o.id === lastId)
+      setOrderId(lastId)
+      setMpOrderId(order?.linkedMpOrderId ?? '')
+      const sm = order?.scheduleMeta
+      if (sm?.mealCount) setMealCount(sm.mealCount)
+      if (sm?.tableSize) setTableSize(sm.tableSize)
+      if (typeof sm?.shareTable === 'boolean') setShareTable(sm.shareTable)
+      if (sm?.visitSlots?.length) setVisitSlots(sm.visitSlots.join(','))
       setLoadErr(null)
     } catch {
       setLoadErr('无法读取注册表')
@@ -287,13 +309,27 @@ export function RecruitmentScheduleView({
     try {
       const tenantId = supabaseConfigured && supabase ? await fetchPrimaryTenantId(supabase) : null
       const meta = readLastSubmitMeta()
+      const reg = await loadTenantScopedRegistry()
+      const order = (reg.recruitmentOrders ?? []).find((o) => o.id === orderId)
+      const mp = order?.linkedMpOrderId
+        ? (reg.mpRecruitmentOrders ?? []).find((m) => m.id === order.linkedMpOrderId)
+        : null
+      const selectedTalents =
+        mp?.applicants?.filter((a) => a.merchantSelected || a.prSelected) ??
+        reg.talentPoolCandidates?.filter((t) => t.status === 'confirmed') ??
+        []
+      const slots = visitSlots.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
       const ctx = JSON.stringify(
         {
           recruitmentName: meta.name,
-          visitSlots: meta.slots,
-          tablePerMeal: meta.table,
+          visitSlots: slots.length ? slots : meta.slots,
+          mealCount,
+          tableSize,
+          shareTable,
+          tablePerMeal: tableSize,
           stores: meta.stores,
-          talentPoolNote: '请结合达人池已确认名单排期（注册表 talentPoolCandidates）',
+          selectedTalents: selectedTalents.map((t) => ('name' in t ? t.name : (t as { platformNickname?: string }).platformNickname)),
+          note: '按已反选达人名单生成探店排期，含餐食与拼桌信息',
         },
         null,
         2,
@@ -302,9 +338,14 @@ export function RecruitmentScheduleView({
       if (next.length === 0) {
         const slots = meta.slots?.length ? meta.slots : ['09:00-12:00', '14:00-17:00']
         const table = meta.table ?? 4
-        const pool = (await loadTenantScopedRegistry()).talentPoolCandidates?.filter((t) => t.status === 'confirmed') ?? []
+        const pool =
+          selectedTalents.length > 0
+            ? selectedTalents.map((t, i) => ({
+                name: 'name' in t ? String(t.name) : String((t as { platformNickname?: string }).platformNickname || `达人${i + 1}`),
+              }))
+            : (await loadTenantScopedRegistry()).talentPoolCandidates?.filter((t) => t.status === 'confirmed') ?? []
         if (pool.length === 0) {
-          window.alert('AI 未返回排期，且达人池中无「已确认」达人，无法生成规则回退排期。请先在达人池确认达人或检查 AI 配置。')
+          window.alert('AI 未返回排期，且无已反选达人。请先在「达人反选」确认名单或检查 AI 配置。')
           await load()
           return
         }
@@ -320,10 +361,9 @@ export function RecruitmentScheduleView({
             time: `${d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })} ${slot}`,
             talentName: row.name,
             storeName: meta.stores?.[0]?.name?.trim() || '待补充门店',
-            tableNote:
-              typeof meta.table === 'number'
-                ? `约 ${table} 人一桌（规则回退，建议检查 AI Key 后重新排期）`
-                : '规则回退排期（建议检查 AI Key 后重新排期）',
+            tableNote: shareTable
+              ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份（规则回退）`
+              : `单独探店 · 餐食 ${mealCount} 份（规则回退）`,
           }
         })
       }
@@ -352,10 +392,32 @@ export function RecruitmentScheduleView({
         <ChevronLeft className="mr-1 h-4 w-4" />
         返回招募管理
       </button>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">探店参数</h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-sm">
+            餐食份数
+            <input type="number" min={1} value={mealCount} onChange={(e) => setMealCount(Number(e.target.value) || 1)} className="mt-1 w-full rounded-lg border px-2 py-1.5" />
+          </label>
+          <label className="text-sm">
+            每桌人数
+            <input type="number" min={1} value={tableSize} onChange={(e) => setTableSize(Number(e.target.value) || 4)} className="mt-1 w-full rounded-lg border px-2 py-1.5" />
+          </label>
+          <label className="text-sm sm:col-span-2">
+            探店时段（逗号分隔）
+            <input value={visitSlots} onChange={(e) => setVisitSlots(e.target.value)} className="mt-1 w-full rounded-lg border px-2 py-1.5" />
+          </label>
+        </div>
+        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={shareTable} onChange={(e) => setShareTable(e.target.checked)} />
+          需要拼桌（多人一桌）
+        </label>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="erp-page-title">AI 自动排期</h1>
-          <p className="mt-1 text-sm text-gray-500">调用已绑定文本模型生成 JSON 排期并写入注册表；失败时按最近提需信息规则回退。</p>
+          <p className="mt-1 text-sm text-gray-500">基于已反选达人生成排期；确认后将通过星选站内信下发各达人探店时间。</p>
           {loadErr ? <p className="mt-1 text-xs text-red-600">{loadErr}</p> : null}
         </div>
         <button
@@ -396,14 +458,80 @@ export function RecruitmentScheduleView({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-100 bg-emerald-50/50 px-4 py-3 text-sm text-emerald-900">
-        <span>排期结果已写入注册表，可与管控台或其它模块对齐。</span>
-        <button
-          type="button"
-          onClick={() => onEnterVideo?.()}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          进入视频审核 →
-        </button>
+        <span>排期已生成。确认后将通知星选达人具体探店时间。</span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || !rows.length || !orderId}
+            onClick={() => {
+              const csv = ['时间,达人,门店,备注', ...rows.map((r) => `${r.time},${r.talentName},${r.storeName},${r.tableNote}`)].join('\n')
+              const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `探店排期-${orderId || 'export'}.csv`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm"
+          >
+            下载 Excel(CSV)
+          </button>
+          <button
+            type="button"
+            disabled={busy || !rows.length || !orderId || !mpOrderId}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                const reg = await loadTenantScopedRegistry()
+                const mp = (reg.mpRecruitmentOrders ?? []).find((m) => m.id === mpOrderId)
+                const selected = mp?.applicants?.filter((a) => a.merchantSelected || a.prSelected) ?? []
+                const lines = rows.map((r) => `${r.talentName}：${r.time} @ ${r.storeName}（${r.tableNote}）`).join('\n')
+                await patchRecruitmentOrderOnOps({
+                  id: orderId,
+                  scheduleMeta: {
+                    mealCount,
+                    tableSize,
+                    shareTable,
+                    visitSlots: visitSlots.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
+                    scheduleConfirmedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+                    scheduleSentAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+                  },
+                  workflowStage: 'video_review',
+                })
+                const { resolveTalentMemberIdForApplicant } = await import('../../lib/merchantRecruitmentInbox')
+                const entries = selected.map((a) => {
+                  const row = rows.find((r) => r.talentName === (a.platformNickname || a.name))
+                  return {
+                    talentMemberId: resolveTalentMemberIdForApplicant(a, reg),
+                    title: '探店排期已确认',
+                    body: row ? `${row.time} · ${row.storeName}\n${row.tableNote}` : lines.slice(0, 400),
+                    category: 'order' as const,
+                    mpOrderId: mpOrderId,
+                    applicantId: a.id,
+                    noticeType: 'general' as const,
+                  }
+                })
+                if (entries.length) await appendTalentInboxOnOps(entries)
+                window.alert('排期已确认并下发至星选达人。')
+              } catch {
+                window.alert('下发失败，请重试')
+              } finally {
+                setBusy(false)
+              }
+            }}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            确认排期并通知达人
+          </button>
+          <button
+            type="button"
+            onClick={() => onEnterVideo?.()}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            进入视频审核 →
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -412,11 +540,45 @@ export function RecruitmentScheduleView({
 export function RecruitmentVideoReviewView({ onBack }: { onBack: () => void }) {
   const [cards, setCards] = useState<RegistryVideoSubmission[]>([])
   const [loading, setLoading] = useState(true)
+  const [mpOrderId, setMpOrderId] = useState('')
 
   const load = useCallback(async () => {
     try {
       const r = await loadTenantScopedRegistry()
-      setCards(r.recruitmentVideoSubmissions ?? [])
+      let lastId = ''
+      try {
+        lastId = window.localStorage.getItem(tenantLocalKey('meoo_last_recruitment_order_id'))?.trim() ?? ''
+      } catch {
+        /* ignore */
+      }
+      const order = (r.recruitmentOrders ?? []).find((o) => o.id === lastId)
+      const mp = order?.linkedMpOrderId
+        ? (r.mpRecruitmentOrders ?? []).find((m) => m.id === order.linkedMpOrderId)
+        : null
+      setMpOrderId(mp?.id ?? '')
+      const fromMp: RegistryVideoSubmission[] = (mp?.applicants ?? [])
+        .filter((a) => (a.merchantSelected || a.prSelected) && a.videoUrl)
+        .map((a) => ({
+          id: `vid-${a.id}`,
+          author: a.platformNickname || a.name,
+          title: '探店审核视频',
+          status:
+            a.videoStatus === 'passed' || a.aiVerifyStatus === 'passed'
+              ? 'passed'
+              : a.videoStatus === 'rejected'
+                ? 'rejected'
+                : 'pending',
+          submittedAt: a.videoSubmittedAt || a.appliedAt,
+          aiNote: a.videoRejectReason || a.aiVerifyNote || '待商家审核',
+          videoUrl: a.videoUrl,
+          applicantId: a.id,
+          mpOrderId: mp?.id,
+          recruitmentOrderId: lastId,
+          rejectReason: a.videoRejectReason,
+        }))
+      const legacy = r.recruitmentVideoSubmissions ?? []
+      const merged = [...fromMp, ...legacy.filter((l) => !fromMp.some((f) => f.id === l.id))]
+      setCards(merged)
     } catch {
       setCards([])
     } finally {
@@ -439,11 +601,32 @@ export function RecruitmentVideoReviewView({ onBack }: { onBack: () => void }) {
     }
   }, [cards])
 
-  const setStatus = async (id: string, status: RegistryVideoSubmission['status']) => {
-    const next = cards.map((c) => (c.id === id ? { ...c, status } : c))
+  const setStatus = async (id: string, status: RegistryVideoSubmission['status'], rejectReason?: string) => {
+    const card = cards.find((c) => c.id === id)
+    const next = cards.map((c) =>
+      c.id === id ? { ...c, status, rejectReason: rejectReason ?? c.rejectReason, aiNote: rejectReason || c.aiNote } : c,
+    )
     setCards(next)
     try {
-      await setRecruitmentVideoSubmissionsOnOps(next)
+      if (card?.applicantId && mpOrderId) {
+        const r = await loadTenantScopedRegistry()
+        const mp = (r.mpRecruitmentOrders ?? []).find((m) => m.id === mpOrderId)
+        if (mp?.applicants) {
+          const applicants = mp.applicants.map((a) =>
+            a.id === card.applicantId
+              ? {
+                  ...a,
+                  videoStatus: status === 'passed' ? ('passed' as const) : status === 'rejected' ? ('rejected' as const) : ('pending' as const),
+                  videoRejectReason: status === 'rejected' ? rejectReason || '请修改后重新上传' : undefined,
+                  aiVerifyStatus: status === 'passed' ? ('passed' as const) : status === 'rejected' ? ('failed' as const) : a.aiVerifyStatus,
+                }
+              : a,
+          )
+          const { patchMpRecruitmentOrderOnOps } = await import('../../lib/opsRegistryClient')
+          await patchMpRecruitmentOrderOnOps({ id: mpOrderId, applicants })
+        }
+      }
+      await setRecruitmentVideoSubmissionsOnOps(next.filter((c) => !c.applicantId))
     } catch {
       window.alert('保存失败')
       void load()
@@ -513,9 +696,14 @@ export function RecruitmentVideoReviewView({ onBack }: { onBack: () => void }) {
                 <div className="text-xs text-gray-500">{c.author}</div>
                 <div className="font-medium text-gray-900">{c.title}</div>
                 <div className="rounded-lg bg-indigo-50/80 p-2 text-xs text-indigo-900">
-                  <span className="font-semibold">AI 说明：</span>
-                  {c.aiNote || '—'}
+                  <span className="font-semibold">说明：</span>
+                  {c.rejectReason || c.aiNote || '—'}
                 </div>
+                {c.videoUrl ? (
+                  <a href={c.videoUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">
+                    打开视频（OSS）
+                  </a>
+                ) : null}
                 <div className="text-xs text-gray-400">提交 {c.submittedAt}</div>
                 <div className="flex flex-wrap gap-2">
                   {c.status === 'pending' ? (
@@ -529,7 +717,11 @@ export function RecruitmentVideoReviewView({ onBack }: { onBack: () => void }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void setStatus(c.id, 'rejected')}
+                        onClick={() => {
+                          const reason = window.prompt('请输入驳回原因（达人将看到并可在星选重新上传）', '')?.trim()
+                          if (!reason) return
+                          void setStatus(c.id, 'rejected', reason)
+                        }}
                         className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
                       >
                         驳回

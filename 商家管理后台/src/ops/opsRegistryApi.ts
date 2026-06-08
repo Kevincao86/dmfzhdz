@@ -530,6 +530,9 @@ export async function patchRecruitmentOrder(body: {
   acceptMode?: RegistryRecruitmentOrder['acceptMode']
   linkedMpOrderId?: string
   recruitmentPlatform?: RegistryRecruitmentOrder['recruitmentPlatform']
+  workflowStage?: string
+  paymentState?: string
+  scheduleMeta?: Record<string, unknown>
 }): Promise<{ ok: boolean; error?: string }> {
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-recruitment-orders-patch', '/api/ops-sync/recruitment-orders/patch'],

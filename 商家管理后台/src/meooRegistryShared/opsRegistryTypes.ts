@@ -133,6 +133,10 @@ export type RegistryRecruitmentOrder = {
   fulfillmentLoop?: RecruitmentFulfillmentLoop
   /** 开环：商家是否选择自动发布小程序招募（运营仍可人工发布） */
   autoPublishMp?: boolean
+  workflowStage?: string
+  tierPlan?: Record<string, unknown>
+  scheduleMeta?: Record<string, unknown>
+  paymentState?: string
 }
 
 /** 小程序达人招募单（运营「小程序招募」接单后生成，供达人端小程序展示与报名） */
