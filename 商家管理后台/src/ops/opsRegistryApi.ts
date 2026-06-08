@@ -203,6 +203,8 @@ export type RegistryMpPrUser = {
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string
+  platformAccount?: string
+  sourceChannel?: 'mp' | 'web'
   registeredAt: string
   updatedAt: string
 }

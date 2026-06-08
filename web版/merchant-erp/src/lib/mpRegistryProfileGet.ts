@@ -74,7 +74,11 @@ export function findRegistryPrForAccount(
   const phone = accountPhoneKey(account)
 
   if (openId) {
-    const hit = users.find((u) => String(u.wxOpenId || '').trim() === openId)
+    const hit = users.find(
+      (u) =>
+        String(u.wxOpenId || '').trim() === openId ||
+        String(u.platformAccount || '').trim() === openId,
+    )
     if (hit) return hit
   }
   if (phone.length >= 11) {

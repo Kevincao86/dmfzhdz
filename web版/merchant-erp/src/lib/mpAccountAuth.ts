@@ -12,7 +12,7 @@ import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentM
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
-import { upsertMpPrUser } from './mpPrUserUpsert.js'
+import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
 import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
@@ -354,7 +354,11 @@ async function provisionRegistryForAccount(
     const data = await io.load()
     const openId = String(account.openid || '').trim()
     let existingPr: RegistryMpPrUser | undefined = openId
-      ? (data.mpPrUsers ?? []).find((u) => String(u.wxOpenId || '').trim() === openId)
+      ? (data.mpPrUsers ?? []).find(
+          (u) =>
+            String(u.wxOpenId || '').trim() === openId ||
+            String(u.platformAccount || '').trim() === openId,
+        )
       : undefined
     if (!existingPr && phone.length >= 8) {
       existingPr = (data.mpPrUsers ?? []).find((u) => {
@@ -385,6 +389,7 @@ async function provisionRegistryForAccount(
       registeredAt: now,
       updatedAt: now,
     })
+    if (openId) dedupeMpPrUsersByOpenId(data, openId, saved.id)
     await io.save(data)
     await updateAccount(rest, account.id, {
       lingqi_pr_id: saved.lingqiPrId,
@@ -407,6 +412,8 @@ async function provisionRegistryForAccount(
         wxOpenId: String(account.openid || prev.wxOpenId || '').trim(),
         updatedAt: now,
       })
+      const openId = String(account.openid || saved.wxOpenId || '').trim()
+      if (openId) dedupeMpPrUsersByOpenId(data, openId, saved.id)
       await io.save(data)
       if (saved.wxNickName !== account.wx_nick_name || saved.wxAvatarUrl !== account.wx_avatar_url) {
         await updateAccount(rest, account.id, {
@@ -531,6 +538,11 @@ export async function reconcileAccountPrFromRegistry(
   const data = await io.load()
   const pr = findRegistryPrForAccount(data, account)
   if (!pr) return account
+  const openId = String(account.openid || '').trim()
+  if (openId) {
+    dedupeMpPrUsersByOpenId(data, openId, pr.id)
+    await io.save(data)
+  }
   const accLq = String(account.lingqi_pr_id || '').trim()
   const accReg = String(account.registry_pr_id || '').trim()
   if (accLq === String(pr.lingqiPrId || '').trim() && accReg === pr.id) return account
@@ -586,7 +598,9 @@ async function syncRegistryPr(
   const data = await io.load()
   if (account.openid) {
     const dup = (data.mpPrUsers ?? []).find(
-      (u) => u.wxOpenId === account.openid && u.id !== account.registry_pr_id,
+      (u) =>
+        u.id !== account.registry_pr_id &&
+        (u.wxOpenId === account.openid || u.platformAccount === account.openid),
     )
     if (dup) throw new Error('openid_pr_conflict')
   }
@@ -595,6 +609,8 @@ async function syncRegistryPr(
     wxOpenId: account.openid || pr.wxOpenId,
     id: account.registry_pr_id || pr.id,
   })
+  const openId = String(account.openid || saved.wxOpenId || '').trim()
+  if (openId) dedupeMpPrUsersByOpenId(data, openId, saved.id)
   await io.save(data)
   return saved
 }
