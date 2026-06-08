@@ -1,15 +1,29 @@
 <view class="app-list-page page-shell">
-  <view wx:if="{{rows.length > 0}}" class="filter-strip card">
-    <text class="filter-strip__label">筛选</text>
-    <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
-      <view class="filter-pill">{{timeFilterLabel}}</view>
-    </picker>
-    <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
-      <view class="filter-pill">{{categoryLabel}}</view>
-    </picker>
-    <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
-      <view class="filter-pill">{{regionLabel}}</view>
-    </picker>
+  <view wx:if="{{rows.length > 0}}" class="app-filter-bar">
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
+        <view class="app-filter-item {{timeFilter !== 'all' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{timeFilterLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
+        <view class="app-filter-item {{category !== '全部' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{categoryLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
+        <view class="app-filter-item {{city !== '全部' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{regionLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
   </view>
 
   <view wx:if="{{loading}}" class="card state-loading">
