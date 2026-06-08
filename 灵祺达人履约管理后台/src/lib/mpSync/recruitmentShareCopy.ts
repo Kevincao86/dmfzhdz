@@ -4,11 +4,11 @@ const GUIDE_DIVIDER = '—— 报名指引 ——'
 
 export function shareCopyHeader(prProfile?: ReturnType<typeof readPrProfile> | null): string {
   const pr = prProfile ?? readPrProfile()
-  if (pr && pr.accountType === 'company') {
-    const name = prDisplayName(pr)
+  if (pr) {
+    const name = prDisplayName(pr) || String(pr.wxNickName || '').trim()
     if (name) return `【${name}】`
   }
-  return '【灵祺撮合平台】'
+  return '【灵祺星选平台】'
 }
 
 function apiBase(): string {
@@ -63,7 +63,7 @@ export function formatShareRecruitmentInfo(info: string): string {
 
 function buildShareGuideBlock(orderId: string): string {
   const applyLink = buildRecruitmentApplyLink(orderId)
-  const openHint = '请打开「灵祺撮合平台」小程序，在招募大厅找到本单或联系发布者获取详情页报名。'
+  const openHint = '请打开「灵祺星选平台」小程序，在招募大厅找到本单或联系发布者获取详情页报名。'
   const parts = [GUIDE_DIVIDER, '']
   if (applyLink) parts.push(`报名地址：${applyLink}`, openHint)
   else parts.push(openHint)
