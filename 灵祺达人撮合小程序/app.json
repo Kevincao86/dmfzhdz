@@ -49,5 +49,28 @@
     "request": 120000,
     "downloadFile": 120000,
     "connectSocket": 60000
+  },
+  "subPackages": [
+    {
+      "root": "packages/recruit-covers-platforms",
+      "name": "recruitCoversPlatforms",
+      "pages": ["pages/stub/stub"]
+    },
+    {
+      "root": "packages/recruit-covers-tags-1",
+      "name": "recruitCoversTags1",
+      "pages": ["pages/stub/stub"]
+    },
+    {
+      "root": "packages/recruit-covers-tags-2",
+      "name": "recruitCoversTags2",
+      "pages": ["pages/stub/stub"]
+    }
+  ],
+  "preloadRule": {
+    "pages/publish/publish": {
+      "network": "all",
+      "packages": ["recruitCoversPlatforms", "recruitCoversTags1", "recruitCoversTags2"]
+    }
   }
 }
