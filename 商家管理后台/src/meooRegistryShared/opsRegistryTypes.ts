@@ -415,6 +415,7 @@ export type RegistryHelpManualCategory = {
   edition: HelpManualEdition
   title: string
   sortOrder: number
+  parentId?: string
 }
 
 export type RegistryHelpManualArticle = {

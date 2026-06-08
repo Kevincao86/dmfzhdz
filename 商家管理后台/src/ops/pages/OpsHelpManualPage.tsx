@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  categoryIdsToDelete,
+  childCategories,
+  firstSelectableCategoryId,
+  hasChildCategories,
+  topLevelCategories,
+} from '../../meooRegistryShared/helpManualCategoryTree.js'
 import { fetchRegistry } from '../opsRegistryApi'
 import {
   saveHelpManualEdition,
@@ -27,17 +34,25 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
   const [draftBody, setDraftBody] = useState('')
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null)
   const [newCatTitle, setNewCatTitle] = useState('')
+  const [newSubCatTitle, setNewSubCatTitle] = useState('')
+  const [subCatParentId, setSubCatParentId] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+
+  const topCats = useMemo(() => topLevelCategories(categories), [categories])
 
   const load = useCallback(async () => {
     try {
       const r = await fetchRegistry()
       const cats = (r.helpManualCategories ?? []).filter((c) => c.edition === edition)
       const arts = (r.helpManualArticles ?? []).filter((a) => a.edition === edition)
-      setCategories(cats.sort((a, b) => a.sortOrder - b.sortOrder))
+      const sortedCats = cats.sort((a, b) => a.sortOrder - b.sortOrder)
+      setCategories(sortedCats)
       setArticles(arts.sort((a, b) => a.sortOrder - b.sortOrder))
-      setActiveCat((cur) => cur || cats[0]?.id || '')
+      const firstId = firstSelectableCategoryId(sortedCats)
+      setActiveCat((cur) => cur || firstId)
+      const firstCat = sortedCats.find((c) => c.id === firstId)
+      setSubCatParentId(firstCat?.parentId || firstCat?.id || topLevelCategories(sortedCats)[0]?.id || '')
     } catch {
       setCategories([])
       setArticles([])
@@ -47,6 +62,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
   useEffect(() => {
     setActiveCat('')
     setEditingArticleId(null)
+    setSubCatParentId('')
     void load()
   }, [edition, load])
 
@@ -80,13 +96,53 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
     setNewCatTitle('')
     void persist(next, articles)
     setActiveCat(id)
+    setSubCatParentId(id)
+  }
+
+  function addSubCategory(parentId: string) {
+    const title = newSubCatTitle.trim()
+    if (!title || !parentId) return
+    const parent = categories.find((c) => c.id === parentId && !c.parentId)
+    if (!parent) {
+      window.alert('请先选择一级分类')
+      return
+    }
+    const siblings = childCategories(categories, parentId)
+    const id = `HMC2-${edition}-${Date.now()}`
+    const next = [
+      ...categories,
+      {
+        id,
+        edition,
+        title,
+        parentId,
+        sortOrder: siblings.length,
+      },
+    ]
+    setNewSubCatTitle('')
+    void persist(next, articles)
+    setActiveCat(id)
   }
 
   function deleteCategory(id: string) {
-    if (!window.confirm('删除分类将同时移除其下文章，确定？')) return
-    const nextCats = categories.filter((c) => c.id !== id)
-    const nextArts = articles.filter((a) => a.categoryId !== id)
+    if (!window.confirm('删除分类将同时移除其下二级分类与文章，确定？')) return
+    const removeIds = new Set(categoryIdsToDelete(categories, id))
+    const nextCats = categories.filter((c) => !removeIds.has(c.id))
+    const nextArts = articles.filter((a) => !removeIds.has(a.categoryId))
     void persist(nextCats, nextArts)
+    if (removeIds.has(activeCat)) {
+      setActiveCat(firstSelectableCategoryId(nextCats))
+    }
+    if (removeIds.has(subCatParentId)) {
+      setSubCatParentId(firstSelectableCategoryId(nextCats.filter((c) => !c.parentId)) || '')
+    }
+  }
+
+  function selectCategory(id: string) {
+    setActiveCat(id)
+    const cat = categories.find((c) => c.id === id)
+    if (cat && !cat.parentId) setSubCatParentId(cat.id)
+    else if (cat?.parentId) setSubCatParentId(cat.parentId)
   }
 
   function saveArticle() {
@@ -94,6 +150,11 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
     const body = draftBody.trim()
     if (!title || !body || !activeCat) {
       window.alert('请选择分类并填写标题与正文')
+      return
+    }
+    const cat = categories.find((c) => c.id === activeCat)
+    if (cat && !cat.parentId && hasChildCategories(categories, cat.id)) {
+      window.alert('该一级分类下已有二级菜单，请将文章保存到具体二级分类')
       return
     }
     const now = nowStr()
@@ -126,7 +187,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
     setEditingArticleId(a.id)
     setDraftTitle(a.title)
     setDraftBody(a.body)
-    setActiveCat(a.categoryId)
+    selectCategory(a.categoryId)
   }
 
   function deleteArticle(id: string) {
@@ -137,11 +198,16 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
     )
   }
 
+  const subCatParent =
+    subCatParentId || (categories.find((c) => c.id === activeCat && !c.parentId)?.id ?? topCats[0]?.id ?? '')
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">帮助手册管理</h1>
-        <p className="mt-1 text-sm text-slate-500">内容同步至各版本登录页「帮助手册」，左侧分类 + 右侧文章列表。</p>
+        <p className="mt-1 text-sm text-slate-500">
+          内容同步至各版本登录页「帮助手册」。一级分类下可增二级菜单；未添加二级时前端仍按一级展示。
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -158,37 +224,101 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="rounded-xl border border-slate-800 bg-slate-900 p-3">
           <p className="px-2 text-xs font-semibold text-slate-500">分类</p>
-          <ul className="mt-2 space-y-1">
-            {categories.map((c) => (
-              <li key={c.id} className="flex items-center gap-1">
+          <ul className="mt-2 space-y-2">
+            {topCats.map((top) => {
+              const children = childCategories(categories, top.id)
+              const topSelectable = children.length === 0
+              return (
+                <li key={top.id}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        selectCategory(top.id)
+                        if (children.length > 0 && children[0]) selectCategory(children[0].id)
+                      }}
+                      className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm ${
+                        activeCat === top.id || children.some((c) => c.id === activeCat)
+                          ? 'bg-indigo-600/20 text-indigo-300'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      } ${!topSelectable ? 'font-medium' : ''}`}
+                    >
+                      {top.title}
+                      {children.length > 0 ? (
+                        <span className="ml-1 text-[10px] text-slate-500">({children.length})</span>
+                      ) : null}
+                    </button>
+                    <button type="button" className="text-xs text-rose-400" onClick={() => deleteCategory(top.id)}>
+                      删
+                    </button>
+                  </div>
+                  {children.length > 0 ? (
+                    <ul className="ml-3 mt-1 space-y-0.5 border-l border-slate-700 pl-2">
+                      {children.map((child) => (
+                        <li key={child.id} className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => selectCategory(child.id)}
+                            className={`min-w-0 flex-1 rounded-lg px-2 py-1 text-left text-xs ${
+                              activeCat === child.id
+                                ? 'bg-indigo-600/30 text-indigo-200'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                            }`}
+                          >
+                            {child.title}
+                          </button>
+                          <button
+                            type="button"
+                            className="text-[10px] text-rose-400"
+                            onClick={() => deleteCategory(child.id)}
+                          >
+                            删
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+          <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+            <div className="flex gap-1">
+              <input
+                value={newCatTitle}
+                onChange={(e) => setNewCatTitle(e.target.value)}
+                placeholder="新一级分类名"
+                className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+              />
+              <button type="button" onClick={addCategory} className="rounded bg-slate-700 px-2 py-1 text-xs text-white">
+                加
+              </button>
+            </div>
+            {subCatParent ? (
+              <div className="flex gap-1">
+                <input
+                  value={newSubCatTitle}
+                  onChange={(e) => setNewSubCatTitle(e.target.value)}
+                  placeholder="新二级分类名"
+                  className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+                />
                 <button
                   type="button"
-                  onClick={() => setActiveCat(c.id)}
-                  className={`min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm ${
-                    activeCat === c.id ? 'bg-indigo-600/20 text-indigo-300' : 'text-slate-300 hover:bg-slate-800'
-                  }`}
+                  onClick={() => addSubCategory(subCatParent)}
+                  className="rounded bg-indigo-700 px-2 py-1 text-xs text-white"
                 >
-                  {c.title}
+                  加
                 </button>
-                <button type="button" className="text-xs text-rose-400" onClick={() => deleteCategory(c.id)}>
-                  删
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3 flex gap-1">
-            <input
-              value={newCatTitle}
-              onChange={(e) => setNewCatTitle(e.target.value)}
-              placeholder="新分类名"
-              className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
-            />
-            <button type="button" onClick={addCategory} className="rounded bg-slate-700 px-2 py-1 text-xs text-white">
-              加
-            </button>
+              </div>
+            ) : null}
+            {subCatParent ? (
+              <p className="text-[10px] text-slate-500">
+                二级分类将挂在一级「{categories.find((c) => c.id === subCatParent)?.title ?? '…'}」下
+              </p>
+            ) : null}
           </div>
         </aside>
 
