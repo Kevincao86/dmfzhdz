@@ -15,7 +15,7 @@ module.exports = {
   /** 招募封面图库 CDN（星选 Web public/recruit-covers，勿打入主包） */
   RECRUIT_COVER_CDN_BASE: 'https://dr.mofangdianai.com/recruit-covers',
   /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */
-  MP_SHARE_APP_NAME: '灵祺星选平台',
+  MP_SHARE_APP_NAME: '灵祺星选',
   /** 正式体验版仅展示数据库商单；开发者工具可在 config.local.js 设为 true 看演示 */
   MP_SHOW_DEMO_ORDERS: false,
 }
