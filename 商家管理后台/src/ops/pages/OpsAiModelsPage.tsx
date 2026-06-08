@@ -36,6 +36,12 @@ import {
   type RegistryVideoAi,
   type RegistryVendorKeys,
 } from '../opsRegistryApi'
+import OpsArkModelEndpointsEditor from '../components/OpsArkModelEndpointsEditor'
+import {
+  catalogEndpointsCsv,
+  DOUBAO_CHAT_CATALOG,
+  DOUBAO_VIDEO_CATALOG,
+} from '../../meooRegistryShared/arkModelCatalogShared'
 
 export default function OpsAiModelsPage() {
   const [catalogFull, setCatalogFull] = useState<AiVendorCatalogEntry[]>([])
@@ -211,6 +217,15 @@ export default function OpsAiModelsPage() {
 
   const beginEditVideoAi = () => {
     videoAiBaseline.current = { ...videoAi }
+    setVideoAi((prev) => {
+      const chat = (prev.arkChatEndpoints ?? '').trim()
+      const video = (prev.arkVideoEndpoints ?? '').trim()
+      return {
+        ...prev,
+        arkChatEndpoints: chat ? prev.arkChatEndpoints : catalogEndpointsCsv(DOUBAO_CHAT_CATALOG),
+        arkVideoEndpoints: video ? prev.arkVideoEndpoints : catalogEndpointsCsv(DOUBAO_VIDEO_CATALOG),
+      }
+    })
     setEditingVideoAi(true)
     setHint(null)
   }
@@ -645,42 +660,26 @@ export default function OpsAiModelsPage() {
               )}
             />
           </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-slate-400">
-              豆包 · 对话模型（逗号分隔「显示名|方舟模型ID或 ep-xxxx」；智能体 / 商品 AI 优先用此列表）
-            </label>
-            <textarea
-              spellCheck={false}
-              rows={2}
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={videoAi.arkChatEndpoints ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, arkChatEndpoints: e.target.value }))}
-              placeholder="Character|doubao-seed-character-251128, Pro|ep-xxxxxxxx"
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs text-slate-400">
-              Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）
-            </label>
-            <textarea
-              spellCheck={false}
-              rows={3}
-              readOnly={!editingVideoAi}
-              disabled={loading}
-              value={videoAi.arkVideoEndpoints ?? ''}
-              onChange={(e) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: e.target.value }))}
-              placeholder="Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215, Pro|ep-xxxxxxxx"
-              className={cn(
-                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
-                !editingVideoAi && 'cursor-default opacity-80',
-              )}
-            />
-          </div>
+          <OpsArkModelEndpointsEditor
+            label="豆包 · 对话模型（逗号分隔「显示名|方舟模型ID或 ep-xxxx」；智能体 / 商品 AI 优先用此列表）"
+            hint="勾选或「一键填入全部」加载系统内置豆包对话模型；保存后商户端额度不足时将按列表顺序自动切换。"
+            placeholder="Character|doubao-seed-character-251128, Pro|ep-xxxxxxxx"
+            catalog={DOUBAO_CHAT_CATALOG}
+            value={videoAi.arkChatEndpoints ?? ''}
+            onChange={(v) => setVideoAi((p) => ({ ...p, arkChatEndpoints: v }))}
+            editing={editingVideoAi}
+            disabled={loading}
+          />
+          <OpsArkModelEndpointsEditor
+            label="Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）"
+            hint="勾选或「一键填入全部」加载系统内置 Seedance / Seaweed / Wan 视频模型；勿填 Doubao-Seed 对话 ep。"
+            placeholder="Seedance 1.5 Pro|doubao-seedance-1-5-pro-251215, Pro|ep-xxxxxxxx"
+            catalog={DOUBAO_VIDEO_CATALOG}
+            value={videoAi.arkVideoEndpoints ?? ''}
+            onChange={(v) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: v }))}
+            editing={editingVideoAi}
+            disabled={loading}
+          />
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs text-slate-400">
               方舟视频专用 API Key（可选；留空则由商户网关使用上方「豆包」Key）

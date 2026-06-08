@@ -8,6 +8,8 @@ import {
   VIDEO_ENGINE_LABEL_KLING,
   VIDEO_ENGINE_LABEL_SEEDANCE,
   VIDEO_MODEL_DEFAULT_LABEL,
+  SEEDANCE_SERVER_AUTO,
+  SEEDANCE_AUTO_LABEL,
 } from '../lib/shortVideoUiLabels'
 import {
   downloadVideoUrlAsBlob,
@@ -16,7 +18,7 @@ import {
   fetchVideoAiConfig,
   postKlingVideoStart,
   postLongformVideoPlan,
-  postSeedanceVideoStart,
+  postSeedanceVideoStartWithFailover,
   type KlingPollPhase,
   type KlingStartKind,
   type LongformPlanMode,
@@ -262,10 +264,7 @@ export default function ShortVideoOptimizationPage() {
     void fetchVideoAiConfig().then((c) => {
       setCfg(c)
       if (c?.arkVideoModels.length) {
-        const preferred =
-          c.arkVideoModels.find((m) => /^doubao-seedance/i.test(m.endpointId)) ??
-          c.arkVideoModels[0]
-        setSdModelEp(preferred.endpointId)
+        setSdModelEp(SEEDANCE_SERVER_AUTO)
       }
       setCfgLoaded(true)
     })
@@ -339,9 +338,8 @@ export default function ShortVideoOptimizationPage() {
       return `当前环境未开通${VIDEO_ENGINE_LABEL_KLING}，请联系管理员。`
     if (engine === 'seedance' && !cfg?.arkKeyConfigured)
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请联系管理员。`
-    if (engine === 'seedance' && !sdModelEp.trim()) {
+    if (engine === 'seedance' && !sdModelEp.trim())
       return cfg?.arkVideoSetupIssue ?? '请先选择视频模型（需配置火山方舟真实 ep- 接入点）。'
-    }
     return null
   }
 
@@ -472,7 +470,7 @@ export default function ShortVideoOptimizationPage() {
           return
         }
       } else {
-        const r = await postSeedanceVideoStart({
+        const r = await postSeedanceVideoStartWithFailover({
           model: sdModelEp.trim(),
           prompt: segPrompt,
           flags: seedanceFlagsLine,
@@ -616,7 +614,7 @@ export default function ShortVideoOptimizationPage() {
         }
       } else {
         if (i === 0 && genMode === 'text') {
-          const r = await postSeedanceVideoStart({
+          const r = await postSeedanceVideoStartWithFailover({
             model: sdModelEp.trim(),
             prompt: segPrompt,
             flags: seedanceFlagsLine,
@@ -654,7 +652,7 @@ export default function ShortVideoOptimizationPage() {
             return
           }
         }
-        const r = await postSeedanceVideoStart({
+        const r = await postSeedanceVideoStartWithFailover({
           model: sdModelEp.trim(),
           prompt: segPrompt,
           flags: seedanceFlagsLine,
@@ -743,7 +741,7 @@ export default function ShortVideoOptimizationPage() {
         const urlOut = await poll('kling', r.pollKind, r.taskId)
         if (urlOut) setResultUrl(urlOut)
       } else {
-        const r = await postSeedanceVideoStart({
+        const r = await postSeedanceVideoStartWithFailover({
           model: sdModelEp.trim(),
           prompt: p,
           flags: seedanceFlagsLine,
@@ -850,7 +848,7 @@ export default function ShortVideoOptimizationPage() {
             ? txt
             : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
 
-        const r = await postSeedanceVideoStart({
+        const r = await postSeedanceVideoStartWithFailover({
           model: sdModelEp.trim(),
           prompt: textBlock,
           flags: seedanceFlagsLine,
@@ -1087,12 +1085,10 @@ export default function ShortVideoOptimizationPage() {
                   disabled={busy}
                   className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                 >
-                  <option value="" disabled hidden>
-                    请选择
-                  </option>
-                  {cfg!.arkVideoModels.map((row, idx) => (
+                  <option value={SEEDANCE_SERVER_AUTO}>{SEEDANCE_AUTO_LABEL}</option>
+                  {cfg!.arkVideoModels.map((row) => (
                     <option key={row.endpointId} value={row.endpointId}>
-                      {idx === 0 ? VIDEO_MODEL_DEFAULT_LABEL : row.label}
+                      {row.label}
                     </option>
                   ))}
                 </select>
