@@ -403,6 +403,7 @@ export type RegistryFile = {
   mpTalentInbox?: RegistryMpTalentInboxItem[]
   helpManualCategories?: RegistryHelpManualCategory[]
   helpManualArticles?: RegistryHelpManualArticle[]
+  teamIntro?: RegistryTeamIntro
 }
 
 export type RegistrySnapshot = RegistryFile
@@ -423,5 +424,11 @@ export type RegistryHelpManualArticle = {
   title: string
   body: string
   sortOrder: number
+  updatedAt: string
+}
+
+export type RegistryTeamIntro = {
+  subtitle?: string
+  paragraphs: string[]
   updatedAt: string
 }

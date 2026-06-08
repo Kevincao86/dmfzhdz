@@ -45,6 +45,8 @@ import {
   setHelpManualForEdition,
 } from '../src/lib/helpManualRegistryCore.js'
 import type { HelpManualEdition } from '../src/lib/helpManualTypes.js'
+import { resolveTeamIntro, setTeamIntro } from '../src/lib/teamIntroRegistryCore.js'
+import type { RegistryTeamIntro } from '../src/lib/teamIntroTypes.js'
 import {
   handleIceMpApply,
   handleIceMpConfirm,
@@ -178,6 +180,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-mp-library-delete' &&
           url !== '/api/meoo-ops-help-manual-set' &&
           url !== '/api/meoo-help-manual-public' &&
+          url !== '/api/meoo-ops-team-intro-set' &&
+          url !== '/api/meoo-team-intro-public' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-talent-member-register' &&
@@ -247,6 +251,28 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               categoryCount: (body.categories ?? []).length,
               articleCount: (body.articles ?? []).length,
             })
+            return
+          }
+
+          if (method === 'GET' && url === '/api/meoo-team-intro-public') {
+            const data = ensureRegistry(viteRoot)
+            const intro = resolveTeamIntro(data)
+            json(res, 200, { ok: true, intro })
+            return
+          }
+
+          if (method === 'POST' && url === '/api/meoo-ops-team-intro-set') {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as { intro?: RegistryTeamIntro }
+            const intro = body.intro
+            if (!intro || !Array.isArray(intro.paragraphs)) {
+              json(res, 400, { ok: false, error: 'invalid_intro' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            setTeamIntro(data, intro)
+            writeRegistry(viteRoot, data)
+            json(res, 200, { ok: true, paragraphCount: intro.paragraphs.length })
             return
           }
 

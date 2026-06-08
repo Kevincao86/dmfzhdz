@@ -17,6 +17,7 @@ import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
 import OpsSupportMpWorkbenchPage from './ops/pages/OpsSupportMpWorkbenchPage'
 import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
+import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
 import OpsLegalDocPage from './pages/OpsLegalDocPage'
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="help-manual" element={<OpsHelpManualPage edition="merchant" />} />
           <Route path="help-manual/partner" element={<OpsHelpManualPage edition="partner" />} />
           <Route path="help-manual/fulfillment" element={<OpsHelpManualPage edition="fulfillment" />} />
+          <Route path="team-intro" element={<OpsTeamIntroPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

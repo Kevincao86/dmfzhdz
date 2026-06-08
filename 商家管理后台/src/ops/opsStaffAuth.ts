@@ -36,6 +36,7 @@ export const OPS_PERMISSION_MODULES = [
     pathPrefix: '/support-mp',
   },
   { key: 'help_manual', label: '帮助手册管理', pathPrefix: '/help-manual' },
+  { key: 'team_intro', label: '团队介绍', pathPrefix: '/team-intro' },
 ] as const
 
 export type OpsPermissionKey = (typeof OPS_PERMISSION_MODULES)[number]['key']

@@ -59,6 +59,7 @@ const OPS_NAV: {
   { to: '/help-manual', label: '帮助手册 · 商家版', icon: BookOpen, permission: 'help_manual' },
   { to: '/help-manual/partner', label: '服务商版', icon: BookOpen, permission: 'help_manual', indent: true },
   { to: '/help-manual/fulfillment', label: '履约平台', icon: BookOpen, permission: 'help_manual', indent: true },
+  { to: '/team-intro', label: '团队介绍', icon: Users, permission: 'team_intro' },
 ]
 
 function navVisible(session: OpsSession, item: (typeof OPS_NAV)[number]): boolean {
