@@ -142,10 +142,14 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
     )
   }
   if (/inference limit|Safe Experience Mode|model service has been paused/i.test(msg)) {
-    const modelId = msg.match(/\[([^\]]+)\]/)?.[1] ?? endpointId
+    const modelId =
+      msg.match(/\*\*([^*]+)\*\*/)?.[1]?.trim() ||
+      msg.match(/for the\s+\*?\*?([^\s*.]+)\*?\*?\s+model/i)?.[1]?.trim() ||
+      msg.match(/model[「\s]+([^」\s.]+)/i)?.[1]?.trim() ||
+      endpointId
     return (
       `火山方舟账号对 Seedance 模型「${modelId}」已达推理限额（安全体验模式），视频生成已暂停。` +
-      `请登录火山方舟控制台 → 模型激活 / 开通管理 → 关闭或调高「安全体验模式」限额，或开通正式计费后再试。` +
+      `系统已尝试切换同账号其它 Seedance 模型及千问视频；若仍失败请到火山方舟控制台关闭或调高「安全体验模式」，或开通正式计费。` +
       `控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/model`
     )
   }
@@ -245,11 +249,11 @@ function arkVideoModelCandidates(
   const merged = mergeCatalogModelIds(DOUBAO_VIDEO_CATALOG, envRaw, preferred, mode)
   const out: string[] = []
   const add = (id: string) => {
-    const t = id.trim()
+    const t = normalizeArkVideoModelParam(id.trim())
     if (t && !out.includes(t)) out.push(t)
   }
   const pref = preferred?.trim()
-  if (pref) add(normalizeArkVideoModelParam(pref))
+  if (pref) add(pref)
   for (const id of fromList) add(id)
   for (const id of merged) add(id)
   if (out.length <= 1) return out
@@ -677,7 +681,8 @@ async function arkCreateVideoTask(
       }
       lastMsg = posted.msg
       lastStatus = posted.status
-      const hopable = isArkQuotaHopableError(posted.rawMsg ?? posted.msg)
+      const hopable =
+        isArkQuotaHopableError(posted.rawMsg ?? '') || isArkQuotaHopableError(posted.msg)
       if (!hopable) {
         const soft = /请填写|无效|placeholder|对话模型|not activated/i.test(posted.msg)
         if (soft) continue
