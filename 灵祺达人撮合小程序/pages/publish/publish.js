@@ -11,6 +11,8 @@ const applyTemplates = applyFormEditor.templates
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const mpOrderRestore = require('../../utils/mpOrderPublishRestore.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
+const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+const recruitCoverImage = require('../../utils/recruitCoverImage.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -62,6 +64,7 @@ const PICKER_FIELD_ANCHOR = {
   fee: 'field-fee',
   signupDeadline: 'field-signup-deadline',
   applyForm: 'field-apply-form',
+  cover: 'field-cover',
 }
 
 function pad2(n) {
@@ -114,6 +117,8 @@ function emptyForm(recruitTarget) {
     applyFormTemplateId: '',
     applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
     applyFormFields: afFields,
+    coverImage: '',
+    coverLibraryId: '',
     ...supplierPublishForm.emptySupplierPublishFields(),
     ...livePublishForm.emptyLiveFields(),
   }
@@ -206,6 +211,9 @@ Page({
     lastScrollAnchor: '',
     applyFormDisplayText: '',
     applyFormPlaceholder: true,
+    coverPreviewUrl: '',
+    coverGalleryItems: [],
+    coverSourceHint: '未选择时将使用对应平台默认封面',
     showApplyTplPicker: false,
     customTemplateList: [],
     applyFormEditorMode: '',
@@ -470,6 +478,57 @@ Page({
           : '请选择报名截止时间',
       signupDeadlinePlaceholder: !urgentWin && !f.signupDeadline,
     })
+    this.syncCoverPreview()
+  },
+  syncCoverPreview() {
+    const f = this.data.form || {}
+    let preview = ''
+    let hint = '未选择时将使用对应平台默认封面'
+    if (String(f.coverImage || '').trim()) {
+      preview = f.coverImage
+      hint = '已上传自定义封面'
+    } else if (String(f.coverLibraryId || '').trim()) {
+      const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
+      preview = hit ? hit.url : ''
+      hint = '已选图库封面'
+    } else {
+      preview = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || []).url
+    }
+    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
+  },
+  async onCoverUpload() {
+    try {
+      const dataUrl = await recruitCoverImage.chooseCoverImageDataUrl()
+      this.setData({ 'form.coverImage': dataUrl, 'form.coverLibraryId': '' })
+      this.syncCoverPreview()
+    } catch (e) {
+      const msg = String((e && e.message) || e || '')
+      if (/cancel/i.test(msg)) return
+      wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })
+    }
+  },
+  openCoverGallery() {
+    const f = this.data.form || {}
+    const items = recruitCoverLib.getSuggestedGalleryItems(f.platform, f.talentTags || [])
+    this.setData({
+      pickerView: 'coverGallery',
+      coverGalleryItems: items,
+    })
+  },
+  onCoverGalleryPick(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this.setData(
+      { 'form.coverImage': '', 'form.coverLibraryId': id, pickerView: '', scrollIntoView: 'field-cover' },
+      () => {
+        this.syncCoverPreview()
+        this.syncTabBarOverlay()
+      },
+    )
+  },
+  onCoverClear() {
+    this.setData({ 'form.coverImage': '', 'form.coverLibraryId': '' })
+    this.syncCoverPreview()
   },
   onShow() {
     if (userProfile.readIdentity() !== 'pr') {
@@ -1104,6 +1163,7 @@ Page({
     const recruitCount = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
     const isUrgent = f.deliveryWindow === 'urgent' && mode.hall !== 'ice'
     const deadline = this.resolveSignupDeadline(f)
+    const coverFields = recruitCoverLib.buildCoverFieldsForOrder(f)
     const order = {
       id: mpId,
       sourceMerchantOrderId:
@@ -1130,6 +1190,7 @@ Page({
       category: mode.category,
       publisherIdentity: 'pr',
       publisherTemplateId: 'publish-wizard-v2',
+      coverImage: coverFields.coverImage,
       mpPublishMeta: (() => {
         const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
         const acct = require('../../utils/auth.js').readAccount()
@@ -1176,6 +1237,9 @@ Page({
           applyFormTemplateId: f.applyFormTemplateId,
           applyFormTemplateName: f.applyFormTemplateName || '',
           applyFormFields: f.applyFormFields || [],
+          coverImage: coverFields.coverImage,
+          coverLibraryId: coverFields.coverLibraryId,
+          coverImageSource: coverFields.coverImageSource,
         },
           f,
         )
@@ -1289,10 +1353,14 @@ Page({
   onShareAppMessage() {
     const order = this.data.createdOrder
     if (!order) return { title: '灵祺星选平台', path: '/pages/index/index' }
-    return {
+    const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
+    const share = {
       title: this.data.shareTitle || order.title,
       path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
     }
+    const imageUrl = recruitCoverLib.resolveShareImageUrl(coverUrl)
+    if (imageUrl) share.imageUrl = imageUrl
+    return share
   },
   onCopyGroupShare() {
     const text = this.data.groupCopyText

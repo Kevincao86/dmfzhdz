@@ -71,6 +71,8 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     applyFormFields: Array.isArray(meta.applyFormFields)
       ? (meta.applyFormFields as PublishForm['applyFormFields']).map((f) => ({ ...f }))
       : [],
+    coverImage: String(mp.coverImage || meta.coverImage || '').trim(),
+    coverLibraryId: String(meta.coverLibraryId || '').trim(),
     shootDate: String(meta.shootDate || ''),
     shootTimeStart: String(meta.shootTimeStart || ''),
     shootTimeEnd: String(meta.shootTimeEnd || ''),

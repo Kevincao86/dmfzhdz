@@ -13,9 +13,15 @@ function shareCopyHeader(prProfile) {
   return '【灵祺星选平台】'
 }
 
+function buildRecruitmentMpPath(orderId) {
+  const id = String(orderId || '').trim()
+  if (!id) return ''
+  return `/pages/detail/detail?id=${encodeURIComponent(id)}`
+}
+
 /**
- * 报名链接：优先 config.MP_SHARE_APPLY_BASE_URL（完整 URL Link 或 H5 落地页），
- * 否则用商家 API 根地址 + /mp-recruit/apply?mpId=
+ * 报名地址：该商单在小程序内的详情页路径（非 H5 落地页）。
+ * 若配置了 MP_SHARE_APPLY_BASE_URL 仍优先自定义链接。
  */
 function buildRecruitmentApplyLink(orderId) {
   const id = String(orderId || '').trim()
@@ -26,11 +32,7 @@ function buildRecruitmentApplyLink(orderId) {
     const sep = custom.includes('?') ? '&' : '?'
     return `${custom}${sep}mpId=${encodeURIComponent(id)}`
   }
-  const api = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
-  if (api) {
-    return `${api}/mp-recruit/apply?mpId=${encodeURIComponent(id)}`
-  }
-  return `pages/detail/detail?id=${encodeURIComponent(id)}`
+  return buildRecruitmentMpPath(id)
 }
 
 /** 分享正文：去掉与费用模式/CPS 重复的「酬劳」「酬劳摘要」等行 */
@@ -69,8 +71,7 @@ function formatShareRecruitmentInfo(info) {
 
 function buildShareGuideBlock(orderId) {
   const applyLink = buildRecruitmentApplyLink(orderId)
-  const openHint =
-    '请打开「灵祺星选平台」小程序，在招募大厅找到本单或联系发布者获取详情页报名。'
+  const openHint = '请打开灵祺星选平台 小程序或网址（https://dr.mofangdianai.com/）'
   const parts = [GUIDE_DIVIDER, '']
   if (applyLink) {
     parts.push(`报名地址：${applyLink}`, openHint)
@@ -98,6 +99,7 @@ function buildShareTitle(order) {
 
 module.exports = {
   shareCopyHeader,
+  buildRecruitmentMpPath,
   buildRecruitmentApplyLink,
   formatShareRecruitmentInfo,
   buildShareGuideBlock,

@@ -9,6 +9,7 @@ import {
   type ApplyField,
 } from '../../lib/mpSync/applyFormTemplates'
 import PublishWizardSheets, { type PickerView } from './PublishWizardSheets'
+import RecruitCoverField from './RecruitCoverField'
 import { formatSignupDeadlineDisplay } from './SignupDeadlineSheet'
 import { formPatchFromMpOrder } from '../../lib/mpSync/mpOrderPublishRestore'
 import { initModalState } from '../../lib/mpSync/publishCityPicker'
@@ -902,6 +903,14 @@ export default function PublishWizard() {
           value={display.applyFormDisplayText}
           placeholder={display.applyFormPlaceholder}
           onClick={() => openPicker('applyMenu')}
+        />
+
+        <RecruitCoverField
+          platform={form.platform}
+          talentTags={form.talentTags}
+          coverImage={form.coverImage}
+          coverLibraryId={form.coverLibraryId}
+          onChange={(patch) => patchForm(patch)}
         />
 
         {err ? <p className="text-red-400 text-sm">{err}</p> : null}

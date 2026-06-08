@@ -448,6 +448,16 @@
               <text class="pub-select-arrow">›</text>
             </view>
           </view>
+          <view class="pub-field" id="field-cover">
+            <text class="pub-label">招募单封面图（选填）</text>
+            <text class="pub-cover-hint">{{coverSourceHint}}</text>
+            <image wx:if="{{coverPreviewUrl}}" class="pub-cover-preview" src="{{coverPreviewUrl}}" mode="aspectFill" bindtap="openCoverGallery" />
+            <view class="pub-cover-actions">
+              <button class="pub-cover-btn" bindtap="onCoverUpload">上传图片</button>
+              <button class="pub-cover-btn" bindtap="openCoverGallery">从图库选择</button>
+              <button wx:if="{{form.coverImage || form.coverLibraryId}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onCoverClear">清除</button>
+            </view>
+          </view>
           <view class="pub-form-submit">
             <button class="btn-primary pub-create-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onCreate">{{isEditMode ? '保存修改' : '创建招募'}}</button>
           </view>
@@ -672,6 +682,31 @@
             data-range="{{item}}"
             bindtap="onFansRangeTap"
           >{{item}}</view>
+        </view>
+      </scroll-view>
+    </view>
+  </block>
+
+  <!-- 全屏：封面图库 -->
+  <block wx:if="{{pickerView === 'coverGallery'}}">
+    <view class="pub-full pub-full--pick">
+      <template is="pubLifeBg" />
+      <view class="pub-full-head" style="{{formHeadStyle}}">
+        <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
+        <text class="pub-full-title">选择封面图</text>
+      </view>
+      <scroll-view class="pub-full-scroll" scroll-y>
+        <view class="pub-cover-grid">
+          <view
+            wx:for="{{coverGalleryItems}}"
+            wx:key="id"
+            class="pub-cover-cell {{form.coverLibraryId === item.id ? 'pub-cover-cell--on' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onCoverGalleryPick"
+          >
+            <image class="pub-cover-cell-img" src="{{item.url}}" mode="aspectFill" />
+            <text class="pub-cover-cell-label">{{item.label}}</text>
+          </view>
         </view>
       </scroll-view>
     </view>
