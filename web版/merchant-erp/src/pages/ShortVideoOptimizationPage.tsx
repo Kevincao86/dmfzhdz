@@ -19,6 +19,7 @@ import {
   fetchVideoAiConfig,
   postKlingVideoStart,
   postLongformVideoPlan,
+  formatVideoAiUserError,
   postSeedanceVideoStartWithFailover,
   type KlingPollPhase,
   type KlingStartKind,
@@ -884,12 +885,16 @@ export default function ShortVideoOptimizationPage() {
             ? txt
             : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
 
+        setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
         let r = await startSeedanceVideo({
           model: sdModelEp.trim(),
           prompt: textBlock,
           flags: seedanceFlagsLine,
           images_base64: imgs.length ? imgs : undefined,
         })
+        if (r.ok && r.modelUsed) {
+          setHint(`已使用视频模型：${r.modelUsed}`)
+        }
         if (!r.ok && cfg?.klingConfigured && isArkQuotaHopableError(r.message)) {
           setHint('豆包视频额度不足，正在切换可灵视频模型…')
           if (genMode === 'text') {
@@ -931,7 +936,7 @@ export default function ShortVideoOptimizationPage() {
           return
         }
         if (!r.ok) {
-          setErr(r.message)
+          setErr(formatVideoAiUserError(r.message))
           return
         }
         const urlOut = await poll('seedance', null, r.taskId)

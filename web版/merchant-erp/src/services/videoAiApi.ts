@@ -1,9 +1,84 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
-import { isArkQuotaHopableError } from '../lib/arkModelCatalog'
+import { DOUBAO_VIDEO_CATALOG, isArkQuotaHopableError } from '../lib/arkModelCatalog'
 import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
 import { normalizeArkVideoModelParam } from '../lib/arkVideoEndpointsConfig'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
+
+/** 安全体验模式限额已满的模型，自动切换时放到队尾再试 */
+const SEEDANCE_DEPRIORITIZE_ID = 'doubao-seedance-1-5-pro-251215'
+
+export function formatVideoAiUserError(msg: string): string {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return raw
+  if (/inference limit|safe experience mode|model service has been paused/i.test(raw)) {
+    const modelId =
+      raw.match(/\*\*([^*]+)\*\*/)?.[1]?.trim() ||
+      raw.match(/for the\s+\*?\*?([^\s*.]+)\*?\*?\s+model/i)?.[1]?.trim() ||
+      raw.match(/模型「([^」]+)」/)?.[1]?.trim() ||
+      'Seedance'
+    return (
+      `火山方舟模型「${modelId}」已达推理限额（安全体验模式），正在尝试其它视频模型。` +
+      `若全部失败请到火山方舟控制台关闭「安全体验模式」或开通正式计费：` +
+      `https://console.volcengine.com/ark/region:ark+cn-beijing/model。原始信息：${raw}`
+    )
+  }
+  return raw
+}
+
+function catalogVideoModelIds(hasImages: boolean): string[] {
+  const kinds = hasImages
+    ? (['video_both', 'video_i2v'] as const)
+    : (['video_both', 'video_t2v'] as const)
+  return [...DOUBAO_VIDEO_CATALOG]
+    .filter((e) => (kinds as readonly string[]).includes(e.kind))
+    .sort((a, b) => a.priority - b.priority)
+    .map((e) => e.modelId)
+}
+
+function buildSeedanceTryOrder(input: {
+  preferred: string
+  poolModels: string[]
+  hasImages: boolean
+}): string[] {
+  const { preferred, poolModels, hasImages } = input
+  const tryOrder: string[] = []
+  const seen = new Set<string>()
+  const push = (raw: string) => {
+    const t = normalizeArkVideoModelParam(raw.trim())
+    if (!t || t === SEEDANCE_SERVER_AUTO || seen.has(t)) return
+    seen.add(t)
+    tryOrder.push(t)
+  }
+
+  const isAuto = !preferred || preferred === SEEDANCE_SERVER_AUTO
+  const catalogIds = catalogVideoModelIds(hasImages)
+  const deprioritized = SEEDANCE_DEPRIORITIZE_ID
+  const pushRest = (ids: string[]) => {
+    for (const id of ids) {
+      if (normalizeArkVideoModelParam(id) === deprioritized) continue
+      push(id)
+    }
+    for (const id of ids) {
+      if (normalizeArkVideoModelParam(id) === deprioritized) push(id)
+    }
+  }
+
+  if (isAuto) {
+    pushRest(poolModels)
+    pushRest(catalogIds)
+    push(SEEDANCE_SERVER_AUTO)
+    return tryOrder
+  }
+
+  push(preferred)
+  pushRest(poolModels.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)))
+  pushRest(
+    catalogIds.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)),
+  )
+  push(SEEDANCE_SERVER_AUTO)
+  return tryOrder
+}
 
 export type VideoAiBackendConfig = {
   klingConfigured: boolean
@@ -434,40 +509,38 @@ export async function postSeedanceVideoStartWithFailover(body: {
   | { ok: false; message: string }
 > {
   const preferred = body.model?.trim() ?? ''
-  const tryOrder: string[] = []
-  const seen = new Set<string>()
-  const push = (raw: string) => {
-    const t = raw.trim()
-    if (!t || seen.has(t)) return
-    seen.add(t)
-    tryOrder.push(t)
-  }
-
-  if (preferred && preferred !== SEEDANCE_SERVER_AUTO) {
-    push(normalizeArkVideoModelParam(preferred))
-  }
-  for (const m of body.poolModels ?? []) {
-    if (m !== SEEDANCE_SERVER_AUTO) push(normalizeArkVideoModelParam(m))
-  }
-  push(SEEDANCE_SERVER_AUTO)
+  const hasImages = Array.isArray(body.images_base64) && body.images_base64.some((x) => String(x).trim())
+  const tryOrder = buildSeedanceTryOrder({
+    preferred,
+    poolModels: body.poolModels ?? [],
+    hasImages,
+  })
 
   let lastMsg = '视频生成失败'
   const tried: string[] = []
   for (const model of tryOrder) {
     const r = await postSeedanceVideoStart({ ...body, model })
-    if (r.ok) return r
+    if (r.ok) {
+      if (tried.length > 0) {
+        return {
+          ...r,
+          modelUsed: r.modelUsed ?? (model === SEEDANCE_SERVER_AUTO ? null : model),
+        }
+      }
+      return r
+    }
     lastMsg = r.message
-    tried.push(model === SEEDANCE_SERVER_AUTO ? '服务端自动轮询' : model)
-    if (!isArkQuotaHopableError(r.message)) return r
+    tried.push(model === SEEDANCE_SERVER_AUTO ? '服务端自动轮询(含千问)' : model)
+    if (!isArkQuotaHopableError(r.message)) {
+      return { ok: false, message: formatVideoAiUserError(r.message) }
+    }
   }
 
-  return {
-    ok: false,
-    message:
-      tried.length > 1
-        ? `${lastMsg}（已依次尝试 ${tried.length} 路：${tried.join(' → ')}）`
-        : lastMsg,
-  }
+  const summary =
+    tried.length > 1
+      ? `${formatVideoAiUserError(lastMsg)}（已依次尝试 ${tried.length} 路：${tried.join(' → ')}）`
+      : formatVideoAiUserError(lastMsg)
+  return { ok: false, message: summary }
 }
 
 export type SeedancePollPhase = 'queued' | 'running' | 'succeeded' | 'failed'
