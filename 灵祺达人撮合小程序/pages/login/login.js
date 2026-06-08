@@ -24,7 +24,7 @@ function requireLoginIdentity(page) {
   return id
 }
 
-async function finishLoginWithIdentity(page, data, workId) {
+async function applyLoginIdentity(data, workId) {
   const role = identityTypes.accountRoleForWorkIdentity(workId)
   if (data && data.token && data.account) {
     if (data.account.activeRole !== role) {
@@ -42,6 +42,9 @@ async function finishLoginWithIdentity(page, data, workId) {
       await switchWorkIdentity.ensureWorkIdentityIfNeeded()
     } catch (_) {}
   }
+}
+
+async function enterAppAfterLogin() {
   const tabBar = require('../../utils/tabBar.js')
   tabBar.refreshTabBar()
   wx.switchTab({ url: '/pages/index/index' })
@@ -74,11 +77,24 @@ Page({
       { tag: '一体', text: '入选·群码·私信同台' },
     ],
     orbitImages: ORBIT_IMAGES,
+    wxNickName: '',
+    wxAvatarUrl: '',
+    showWxProfileSheet: false,
+    profileSaving: false,
   },
 
   onLoad() {
     this.applyLoginNavPadding()
-    this.setData({ err: '', loginIdentity: '', loginIdentityLabel: '' })
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    const cache = wxProfileDisplay.readWxProfileCache()
+    const local = wxAccount.readWxAccount()
+    this.setData({
+      err: '',
+      loginIdentity: '',
+      loginIdentityLabel: '',
+      wxNickName: wxProfileDisplay.pickWxNick(cache && cache.wxNickName, local && local.wxNickName),
+      wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
+    })
     if (auth.isLoggedIn()) {
       wx.switchTab({ url: '/pages/index/index' })
     }
@@ -152,6 +168,55 @@ Page({
     this.setData({ password: e.detail.value })
   },
 
+  onWxChooseAvatar(e) {
+    const url = e.detail && e.detail.avatarUrl
+    if (!url) return
+    this.setData({ wxAvatarUrl: url })
+    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxAvatarUrl: url })
+  },
+
+  onWxNicknameInput(e) {
+    const nick = e.detail.value || ''
+    this.setData({ wxNickName: nick })
+    if (nick) require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+  },
+
+  onWxNicknameReview(e) {
+    const nick = String((e.detail && e.detail.nickname) || (e.detail && e.detail.value) || '').trim()
+    if (!nick) return
+    this.setData({ wxNickName: nick })
+    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+  },
+
+  onCloseWxProfileSheet() {
+    this.setData({ showWxProfileSheet: false })
+  },
+
+  async onConfirmWxProfileSheet() {
+    if (this.data.profileSaving) return
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    const nick = String(this.data.wxNickName || '').trim()
+    const avatar = String(this.data.wxAvatarUrl || '').trim()
+    if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
+      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
+      return
+    }
+    if (!avatar) {
+      wx.showToast({ title: '请先选择微信头像', icon: 'none' })
+      return
+    }
+    this.setData({ profileSaving: true })
+    try {
+      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      this.setData({ showWxProfileSheet: false })
+      await enterAppAfterLogin()
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ profileSaving: false })
+    }
+  },
+
   async onWxLogin() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
@@ -160,17 +225,24 @@ Page({
       const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
       const local = wxAccount.readWxAccount()
       const cache = wxProfileDisplay.readWxProfileCache()
-      let nick = wxProfileDisplay.pickWxNick(cache?.wxNickName, local?.wxNickName)
-      let avatar = wxProfileDisplay.pickWxAvatar(cache?.wxAvatarUrl, local?.wxAvatarUrl)
-      const resolved = await wxProfileDisplay.resolveWxProfileForLogin(nick, avatar)
-      nick = resolved.nick
-      avatar = resolved.avatar
-      if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
-        wx.showToast({ title: '无法获取微信昵称，请在我的页登录', icon: 'none' })
-        return
+      let nick = wxProfileDisplay.pickWxNick(
+        this.data.wxNickName,
+        cache && cache.wxNickName,
+        local && local.wxNickName,
+      )
+      let avatar = wxProfileDisplay.pickWxAvatar(
+        this.data.wxAvatarUrl,
+        cache && cache.wxAvatarUrl,
+        local && local.wxAvatarUrl,
+      )
+      if (wxProfileDisplay.isPlaceholderWxNick(nick) || !avatar) {
+        try {
+          const resolved = await wxProfileDisplay.resolveWxProfileForLogin(nick, avatar)
+          if (resolved.nick) nick = resolved.nick
+          if (resolved.avatar) avatar = resolved.avatar
+        } catch (_) {}
       }
-      wxProfileDisplay.writeWxProfileCache({ wxNickName: nick, wxAvatarUrl: avatar })
-      wxAccount.writeWxAccount({ wxNickName: nick, wxAvatarUrl: avatar })
+      if (avatar) avatar = await wxProfileDisplay.persistWxAvatarUrl(avatar)
       const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
         role,
@@ -193,7 +265,20 @@ Page({
           duration: 2500,
         })
       }
-      await finishLoginWithIdentity(this, data, workId)
+      await applyLoginIdentity(data, workId)
+      const hasProfile =
+        nick && !wxProfileDisplay.isPlaceholderWxNick(nick) && !!avatar
+      if (hasProfile) {
+        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+        await enterAppAfterLogin()
+        return
+      }
+      this.setData({
+        showWxProfileSheet: true,
+        wxNickName: nick,
+        wxAvatarUrl: avatar,
+      })
+      wx.showToast({ title: '登录成功，请完善头像昵称', icon: 'none' })
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
@@ -218,7 +303,8 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
-      await finishLoginWithIdentity(this, data, workId)
+      await applyLoginIdentity(data, workId)
+      await enterAppAfterLogin()
     } catch (e) {
       this.setData({ err: e && e.message ? e.message : '登录失败' })
     } finally {
@@ -279,7 +365,8 @@ Page({
         role,
       })
       wx.showToast({ title: '注册成功', icon: 'success' })
-      await finishLoginWithIdentity(this, data, workId)
+      await applyLoginIdentity(data, workId)
+      await enterAppAfterLogin()
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
     } finally {
