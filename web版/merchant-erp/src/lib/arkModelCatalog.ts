@@ -90,6 +90,7 @@ export function isArkQuotaHopableError(msg: string): boolean {
     )
   )
     return true
+  if (/推理限额|已达推理限额|安全体验模式|模型服务已暂停|尚未开通.*模型/i.test(raw)) return true
   if (/欠费|账户已欠费|余额不足|额度|quota|exceed|resource exhausted/i.test(raw)) return true
   if (/免费额度|额度用完|allocationquota|throttling\.allocation/i.test(raw)) return true
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) return true

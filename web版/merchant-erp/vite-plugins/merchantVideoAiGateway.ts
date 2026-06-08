@@ -23,12 +23,13 @@ import {
   DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   describeArkVideoSetupIssue,
   isDoubaoSeedanceModelId,
-  listValidArkVideoModels,
+  listArkVideoModelsForPicker,
   looksLikeArkPlaceholderEndpointId,
   looksLikeDoubaoChatModelId,
   normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
 } from '../src/lib/arkVideoEndpointsConfig.js'
+import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
@@ -196,7 +197,15 @@ function parseArkVideoModelList(env: MerchantAiEnv): ArkVideoModelOption[] {
     ''
   ).trim()
   const fb = String((env as Record<string, string>).MERCHANT_AI_ARK_VIDEO_FALLBACK_ENDPOINT ?? '').trim()
-  return listValidArkVideoModels(raw, fb, seedanceVideoModelFromEnv(env))
+  return listArkVideoModelsForPicker(raw, fb, seedanceVideoModelFromEnv(env))
+}
+
+const SEEDANCE_SERVER_AUTO = '__server_auto__'
+
+function resolvePreferredVideoModel(raw: unknown): string {
+  const t = typeof raw === 'string' ? raw.trim() : ''
+  if (!t || t === SEEDANCE_SERVER_AUTO) return ''
+  return normalizeArkVideoModelParam(t)
 }
 
 function qwenBearerKey(env: MerchantAiEnv): string | null {
@@ -239,10 +248,14 @@ function arkVideoModelCandidates(
     const t = id.trim()
     if (t && !out.includes(t)) out.push(t)
   }
-  if (preferred?.trim()) add(normalizeArkVideoModelParam(preferred))
+  const pref = preferred?.trim()
+  if (pref) add(normalizeArkVideoModelParam(pref))
   for (const id of fromList) add(id)
   for (const id of merged) add(id)
-  return out
+  if (out.length <= 1) return out
+  if (!pref) return randomRotateModelIds(out)
+  const rest = out.filter((id) => id !== pref)
+  return [pref, ...randomRotateModelIds(rest)]
 }
 
 function qwenVideoCandidatesFromEnv(env: MerchantAiEnv, mode: 't2v' | 'i2v'): string[] {
@@ -645,18 +658,19 @@ async function arkCreateVideoTask(
   | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
 > {
   const key = doubaoBearerKey(env)
-  const preferred =
-    typeof body.model === 'string' ? normalizeArkVideoModelParam(body.model) : ''
+  const preferred = resolvePreferredVideoModel(body.model)
   const candidates = key ? arkVideoModelCandidates(env, body, preferred) : []
 
   let lastMsg = '豆包视频生成失败'
   let lastStatus: number | undefined
+  let tried = 0
 
   if (key && candidates.length > 0) {
     for (const modelId of candidates) {
       if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) continue
       const built = buildArkVideoTaskPayload(modelId, body)
       if (built.ok === false) continue
+      tried += 1
       const posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
       if (posted.ok === true) {
         return { ok: true, taskId: posted.taskId, provider: 'ark', modelUsed: modelId, raw: posted.raw }
@@ -687,7 +701,11 @@ async function arkCreateVideoTask(
 
   return {
     ok: false,
-    msg: key ? `${lastMsg}；${qwen.msg}` : qwen.msg,
+    msg: key
+      ? tried > 1
+        ? `${lastMsg}（已自动尝试 ${tried} 个豆包/Seedance 模型）；${qwen.msg}`
+        : `${lastMsg}；${qwen.msg}`
+      : qwen.msg,
     status: lastStatus,
   }
 }

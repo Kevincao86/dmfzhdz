@@ -2,7 +2,7 @@
  * 运营台 videoAi 切片合入 MerchantAiEnv（商品图 / 云剪 / 智能体豆包共用，避免 merchantVideoAiGateway 与 registryVendorEnv 循环依赖）。
  */
 import { normalizeVendorKeysFromDisk } from '../src/lib/aiVendorCatalogShared.js'
-import { pickMergedArkEndpointsField } from '../src/lib/arkVideoEndpointsConfig.js'
+import { pickMergedArkChatEndpointsField, pickMergedArkEndpointsField } from '../src/lib/arkVideoEndpointsConfig.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
@@ -53,7 +53,7 @@ export function applyRegistryVideoAiToMerchantEnv(
 
   const envChatEp = String(out.MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS ?? '').trim()
   const regChatEp = vx.arkChatEndpoints?.trim() ?? ''
-  const mergedChatEp = pickMergedArkEndpointsField(envChatEp, regChatEp)
+  const mergedChatEp = pickMergedArkChatEndpointsField(envChatEp, regChatEp)
   if (mergedChatEp) {
     out.MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS = mergedChatEp
   } else {

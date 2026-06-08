@@ -1,5 +1,6 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
+import { isArkQuotaHopableError } from '../lib/arkModelCatalog'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export type VideoAiBackendConfig = {
@@ -386,7 +387,10 @@ export async function postSeedanceVideoStart(body: {
   prompt?: string
   flags?: string
   images_base64?: string[]
-}): Promise<{ ok: true; taskId: string } | { ok: false; message: string }> {
+}): Promise<
+  { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
+  | { ok: false; message: string }
+> {
   const paths = [
     '/api/meoo-merchant-ai-video-seedance-start',
     '/api/merchant/ai/video/seedance/start',
@@ -404,13 +408,35 @@ export async function postSeedanceVideoStart(body: {
     }
     const tid = typeof j.taskId === 'string' ? j.taskId : ''
     if (!tid) return { ok: false, message: '服务端未返回 task id' }
-    return { ok: true, taskId: tid }
+    const modelUsed = typeof j.modelUsed === 'string' ? j.modelUsed : null
+    const provider = typeof j.provider === 'string' ? j.provider : undefined
+    return { ok: true, taskId: tid, modelUsed, provider }
   }
   return {
     ok: false,
     message:
       'Seedance/方舟发起失败 HTTP 404（已尝试 meoo 顶路径与 merchant 路径）。请部署 api/meoo-merchant-ai-video-seedance-start.ts。',
   }
+}
+
+/** 额度/限流时让服务端按模型池自动切换（omit 手选 model） */
+export async function postSeedanceVideoStartWithFailover(body: {
+  model?: string
+  prompt?: string
+  flags?: string
+  images_base64?: string[]
+}): Promise<
+  { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
+  | { ok: false; message: string }
+> {
+  const preferred = body.model?.trim()
+  const first = await postSeedanceVideoStart(body)
+  if (first.ok) return first
+  if (!isArkQuotaHopableError(first.message)) return first
+  if (!preferred || preferred === '__server_auto__') return first
+  const retry = await postSeedanceVideoStart({ ...body, model: '__server_auto__' })
+  if (retry.ok) return retry
+  return { ok: false, message: `${first.message}（已尝试自动切换模型：${retry.message}）` }
 }
 
 export type SeedancePollPhase = 'queued' | 'running' | 'succeeded' | 'failed'

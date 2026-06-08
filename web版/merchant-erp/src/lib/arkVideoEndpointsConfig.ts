@@ -2,6 +2,7 @@
 
 import {
   catalogEndpointsCsv,
+  DOUBAO_CHAT_CATALOG,
   DOUBAO_VIDEO_CATALOG,
   isArkGenerativeVideoModelId,
 } from './arkModelCatalog.js'
@@ -67,6 +68,16 @@ function isValidArkVideoModelEntry(m: ArkVideoModelOption): boolean {
   return isArkVideoEndpointId(id) || isDoubaoSeedanceModelId(id)
 }
 
+function isValidArkChatModelEntry(m: ArkVideoModelOption): boolean {
+  const id = m.endpointId.trim()
+  if (!id || looksLikeArkPlaceholderEndpointId(id)) return false
+  if (isArkVideoEndpointId(id)) return true
+  if (looksLikeDoubaoChatModelId(id)) return true
+  if (DOUBAO_CHAT_CATALOG.some((e) => e.modelId === id)) return true
+  if (/^doubao-seed/i.test(id) && !isDoubaoSeedanceModelId(id)) return true
+  return false
+}
+
 export function parseArkVideoEndpointsRaw(raw: string): ArkVideoModelOption[] {
   const out: ArkVideoModelOption[] = []
   for (const part of String(raw ?? '').split(',')) {
@@ -130,6 +141,41 @@ export function pickMergedArkEndpointsField(envRaw: string, registryRaw: string)
   return uniq
     .map((m) => (m.label && m.label !== m.endpointId ? `${m.label}|${m.endpointId}` : m.endpointId))
     .join(', ')
+}
+
+/** 对话模型专用合并（勿用视频校验，避免误删 chat 模型 ID） */
+export function pickMergedArkChatEndpointsField(envRaw: string, registryRaw: string): string {
+  const envModels = parseArkVideoEndpointsRaw(envRaw)
+  const regModels = parseArkVideoEndpointsRaw(registryRaw)
+  const seen = new Set<string>()
+  const uniq: ArkVideoModelOption[] = []
+  for (const m of [...envModels, ...regModels]) {
+    if (!isValidArkChatModelEntry(m)) continue
+    if (seen.has(m.endpointId)) continue
+    seen.add(m.endpointId)
+    uniq.push(m)
+  }
+  if (uniq.length === 0) return catalogEndpointsCsv(DOUBAO_CHAT_CATALOG)
+  return uniq
+    .map((m) => (m.label && m.label !== m.endpointId ? `${m.label}|${m.endpointId}` : m.endpointId))
+    .join(', ')
+}
+
+/** 商户端下拉：运营配置 + 内置目录（去重） */
+export function listArkVideoModelsForPicker(
+  endpointsRaw: string,
+  fallbackEp?: string,
+  seedanceModelId?: string,
+): ArkVideoModelOption[] {
+  const configured = listValidArkVideoModels(endpointsRaw, fallbackEp, seedanceModelId)
+  const seen = new Set(configured.map((m) => m.endpointId))
+  const out = [...configured]
+  for (const e of DOUBAO_VIDEO_CATALOG) {
+    if (seen.has(e.modelId)) continue
+    seen.add(e.modelId)
+    out.push({ label: e.label, endpointId: e.modelId })
+  }
+  return out
 }
 
 export function listValidArkVideoModels(
