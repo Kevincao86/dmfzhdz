@@ -1132,12 +1132,15 @@ Page({
       publisherTemplateId: 'publish-wizard-v2',
       mpPublishMeta: (() => {
         const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+        const acct = require('../../utils/auth.js').readAccount()
         return livePublishForm.patchLiveMeta(
           {
           prParticipantKey: participant.prParticipantKey(pr),
           prDisplayName: userProfile.prDisplayName(pr),
           prWxNickName: String(pr.wxNickName || '').trim(),
           prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
+          lingqiPrId: String((acct && acct.lingqiPrId) || pr.lingqiPrId || '').trim(),
+          registryPrId: String((acct && acct.registryPrId) || pr.id || '').trim(),
           deliveryWindow: f.deliveryWindow,
           recruitMode: mode.id,
           recruitTarget: this.data.recruitTarget || 'talent',
