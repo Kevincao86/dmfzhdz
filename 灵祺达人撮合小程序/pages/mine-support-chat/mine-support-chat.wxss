@@ -1,3 +1,5 @@
+@import '../../styles/theme.wxss';
+
 .page {
   height: 100vh;
   display: flex;
@@ -8,7 +10,7 @@
 .status-bar {
   flex-shrink: 0;
   padding: 20rpx 24rpx;
-  background: linear-gradient(95deg, #4f46e5, #7c3aed);
+  background: var(--lq-gradient-header);
   color: #fff;
 }
 
@@ -56,7 +58,7 @@
 }
 
 .bubble-user {
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  background: var(--lq-gradient-tab);
   color: #fff;
   border-bottom-right-radius: 6rpx;
 }
@@ -101,7 +103,7 @@
 .human-btn {
   margin-bottom: 12rpx;
   font-size: 24rpx;
-  color: #4f46e5;
+  color: var(--lq-primary-dark);
   background: #eef2ff;
   border: 1rpx solid #c7d2fe;
   border-radius: 16rpx;
@@ -128,7 +130,7 @@
   height: 72rpx;
   line-height: 72rpx;
   font-size: 26rpx;
-  background: linear-gradient(95deg, #6366f1, #4f46e5);
+  background: var(--lq-gradient-tab);
   color: #fff;
   border-radius: 16rpx;
   border: none;
