@@ -66,11 +66,5 @@
       "name": "recruitCoversTags2",
       "pages": ["pages/stub/stub"]
     }
-  ],
-  "preloadRule": {
-    "pages/publish/publish": {
-      "network": "all",
-      "packages": ["recruitCoversPlatforms", "recruitCoversTags1", "recruitCoversTags2"]
-    }
-  }
+  ]
 }

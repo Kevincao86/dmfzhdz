@@ -44,13 +44,69 @@ function mpAssetUrl(relPath) {
   return `${MP_COVER_ROOT}${rel}`
 }
 
-function preloadCoverSubpackages() {
-  if (!useCoverBundle() || typeof wx.preloadSubpackage !== 'function') return
-  for (const name of COVER_SUBPACK_NAMES) {
-    try {
-      wx.preloadSubpackage({ name })
-    } catch (_) {}
+function preloadCoverSubpackages(names) {
+  return loadCoverSubpackages(names)
+}
+
+function loadCoverSubpackages(names) {
+  if (!useCoverBundle()) return Promise.resolve()
+  const list = names && names.length ? names : COVER_SUBPACK_NAMES
+  const loadOne = (name) =>
+    new Promise((resolve) => {
+      if (typeof wx.loadSubpackage === 'function') {
+        wx.loadSubpackage({ name, success: () => resolve(), fail: () => resolve() })
+        return
+      }
+      if (typeof wx.preloadSubpackage === 'function') {
+        try {
+          wx.preloadSubpackage({ name, success: () => resolve(), fail: () => resolve() })
+        } catch (_) {
+          resolve()
+        }
+        return
+      }
+      resolve()
+    })
+  return Promise.all(list.map(loadOne))
+}
+
+function subpackNameForTagSlug(slug) {
+  return TAG_SUBPACK_A.has(String(slug || '').trim()) ? 'recruitCoversTags1' : 'recruitCoversTags2'
+}
+
+function tagSlugFromLabel(tagLabel) {
+  const label = String(tagLabel || '').trim()
+  for (const list of Object.values(manifest.tags || {})) {
+    for (const item of list || []) {
+      if (item && item.label && String(item.label).startsWith(label)) {
+        const m = String(item.path || '').match(/^tags\/([^-]+)-/)
+        if (m) return m[1]
+      }
+    }
   }
+  return ''
+}
+
+/** 按图库 Tab 只加载需要的分包（避免 preloadRule 超 2MB 上传限制） */
+function subpackNamesForGalleryTab(tab, platform, talentTags, subKey) {
+  const names = new Set(['recruitCoversPlatforms'])
+  const t = String(tab || 'recommended')
+  if (t === 'all') {
+    names.add('recruitCoversTags1')
+    names.add('recruitCoversTags2')
+    return [...names]
+  }
+  if (t === 'tag') {
+    const tagKey = String(subKey || (talentTags && talentTags[0]) || '美食').trim()
+    names.add(subpackNameForTagSlug(tagSlugFromLabel(tagKey) || 'meishi'))
+    return [...names]
+  }
+  if (t === 'recommended') {
+    for (const tag of talentTags || []) {
+      names.add(subpackNameForTagSlug(tagSlugFromLabel(tag) || 'meishi'))
+    }
+  }
+  return [...names]
 }
 
 function findCoverById(id) {
@@ -213,6 +269,8 @@ module.exports = {
   mpSubpackRoot,
   mpAssetUrl,
   preloadCoverSubpackages,
+  loadCoverSubpackages,
+  subpackNamesForGalleryTab,
   findCoverById,
   getPlatformCovers,
   getTagCovers,
