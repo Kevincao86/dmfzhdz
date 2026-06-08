@@ -17,7 +17,7 @@ function normalizeErpApiBase(raw: string): string {
       const tail = u.pathname === '/' ? '' : u.pathname
       u.pathname = `/erp-api${tail}`
     }
-    return u.toString().replace(/\/$/, '')
+    return u.toString().replace(/\/$/, '').replace(/\/erp-api\/api$/i, '/erp-api')
   } catch {
     return ''
   }
@@ -61,6 +61,60 @@ export function merchantApiFetchUrls(apiPathWithOptionalQuery: string): string[]
 }
 
 const ECS_WEB_HOSTS = new Set(['cs.mofangdianai.com', 'dr.mofangdianai.com'])
+
+/** 登录页公开内容（帮助手册 / 团队介绍）：ECS 子域与 fws 优先同源 /api/，再回退 erp-api */
+const PORTAL_PUBLIC_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com', 'dr.mofangdianai.com'])
+
+export function publicPortalApiFetchUrls(apiPathWithOptionalQuery: string): string[] {
+  const path = apiPathWithOptionalQuery.startsWith('/')
+    ? apiPathWithOptionalQuery
+    : `/${apiPathWithOptionalQuery}`
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (PORTAL_PUBLIC_HOSTS.has(host)) {
+      add(`${window.location.origin}${path}`)
+    }
+  }
+  for (const u of merchantErpApiCandidates(path)) {
+    add(u)
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (!PORTAL_PUBLIC_HOSTS.has(host)) {
+      add(`${window.location.origin}${path}`)
+    }
+  } else if (!merchantErpApiBase()) {
+    add(path)
+  }
+  return urls
+}
+
+export async function fetchPublicPortalJson<T extends { ok?: boolean; error?: string }>(
+  apiPathWithOptionalQuery: string,
+): Promise<T> {
+  const urls = publicPortalApiFetchUrls(apiPathWithOptionalQuery)
+  let lastErr = 'fetch_failed'
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const res = await fetch(urls[i]!, { cache: 'no-store' })
+      const data = (await res.json().catch(() => ({}))) as T
+      if (res.ok && data.ok === true) return data
+      lastErr = String(data.error || `http_${res.status}`)
+      const retry =
+        (res.status === 404 || lastErr === 'not_found' || res.status >= 502) && i < urls.length - 1
+      if (retry) continue
+      break
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (i < urls.length - 1) continue
+    }
+  }
+  throw new Error(lastErr)
+}
 
 /**
  * 二进制下载（云剪 MP4 等）：ECS 静态站优先走同源 /api/（Nginx → 轻量 IP，避免跨域 erp-api 二进制 500）。
