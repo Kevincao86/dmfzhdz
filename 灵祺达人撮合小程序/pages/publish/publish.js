@@ -213,6 +213,10 @@ Page({
     applyFormPlaceholder: true,
     coverPreviewUrl: '',
     coverGalleryItems: [],
+    coverGalleryTab: 'recommended',
+    coverGallerySubKey: '',
+    coverPlatformNames: [],
+    coverTagNames: [],
     coverSourceHint: '未选择时将使用对应平台默认封面',
     showApplyTplPicker: false,
     customTemplateList: [],
@@ -510,11 +514,40 @@ Page({
   },
   openCoverGallery() {
     const f = this.data.form || {}
-    const items = recruitCoverLib.getSuggestedGalleryItems(f.platform, f.talentTags || [])
     this.setData({
       pickerView: 'coverGallery',
-      coverGalleryItems: items,
+      coverGalleryTab: 'recommended',
+      coverGallerySubKey: '',
+      coverPlatformNames: recruitCoverLib.listCoverPlatformNames(),
+      coverTagNames: recruitCoverLib.listCoverTagNames(),
     })
+    this.refreshCoverGalleryItems('recommended', '', f.platform, f.talentTags || [])
+  },
+  refreshCoverGalleryItems(tab, subKey, platform, talentTags) {
+    const items = recruitCoverLib.getGalleryItemsForTab(
+      tab || this.data.coverGalleryTab,
+      platform || this.data.form.platform,
+      talentTags || this.data.form.talentTags || [],
+      subKey !== undefined ? subKey : this.data.coverGallerySubKey,
+    )
+    this.setData({ coverGalleryItems: items })
+  },
+  onCoverGalleryTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    if (!tab) return
+    const f = this.data.form || {}
+    let subKey = ''
+    if (tab === 'platform') subKey = f.platform || (this.data.coverPlatformNames[0] || '抖音')
+    if (tab === 'tag') subKey = (f.talentTags && f.talentTags[0]) || (this.data.coverTagNames[0] || '美食')
+    this.setData({ coverGalleryTab: tab, coverGallerySubKey: subKey })
+    this.refreshCoverGalleryItems(tab, subKey, f.platform, f.talentTags || [])
+  },
+  onCoverGallerySubPick(e) {
+    const key = e.currentTarget.dataset.key
+    if (!key) return
+    const f = this.data.form || {}
+    this.setData({ coverGallerySubKey: key })
+    this.refreshCoverGalleryItems(this.data.coverGalleryTab, key, f.platform, f.talentTags || [])
   },
   onCoverGalleryPick(e) {
     const id = e.currentTarget.dataset.id

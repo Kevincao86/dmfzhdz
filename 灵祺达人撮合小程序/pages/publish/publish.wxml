@@ -693,9 +693,25 @@
       <template is="pubLifeBg" />
       <view class="pub-full-head" style="{{formHeadStyle}}">
         <text class="pub-full-back" bindtap="onPickerBack">‹ 返回</text>
-        <text class="pub-full-title">选择封面图</text>
+        <text class="pub-full-title">封面图库</text>
       </view>
-      <scroll-view class="pub-full-scroll" scroll-y>
+      <view class="pub-cover-tabs">
+        <text class="pub-cover-tab {{coverGalleryTab === 'recommended' ? 'pub-cover-tab--on' : ''}}" data-tab="recommended" bindtap="onCoverGalleryTab">推荐</text>
+        <text class="pub-cover-tab {{coverGalleryTab === 'all' ? 'pub-cover-tab--on' : ''}}" data-tab="all" bindtap="onCoverGalleryTab">全部</text>
+        <text class="pub-cover-tab {{coverGalleryTab === 'platform' ? 'pub-cover-tab--on' : ''}}" data-tab="platform" bindtap="onCoverGalleryTab">平台</text>
+        <text class="pub-cover-tab {{coverGalleryTab === 'tag' ? 'pub-cover-tab--on' : ''}}" data-tab="tag" bindtap="onCoverGalleryTab">标签</text>
+      </view>
+      <scroll-view wx:if="{{coverGalleryTab === 'platform'}}" class="pub-cover-sub-scroll" scroll-x enable-flex>
+        <view class="pub-cover-sub-row">
+          <text wx:for="{{coverPlatformNames}}" wx:key="*this" class="pub-cover-sub {{coverGallerySubKey === item ? 'pub-cover-sub--on' : ''}}" data-key="{{item}}" bindtap="onCoverGallerySubPick">{{item}}</text>
+        </view>
+      </scroll-view>
+      <scroll-view wx:if="{{coverGalleryTab === 'tag'}}" class="pub-cover-sub-scroll" scroll-x enable-flex>
+        <view class="pub-cover-sub-row">
+          <text wx:for="{{coverTagNames}}" wx:key="*this" class="pub-cover-sub {{coverGallerySubKey === item ? 'pub-cover-sub--on' : ''}}" data-key="{{item}}" bindtap="onCoverGallerySubPick">{{item}}</text>
+        </view>
+      </scroll-view>
+      <scroll-view class="pub-full-scroll pub-full-scroll--cover" scroll-y>
         <view class="pub-cover-grid">
           <view
             wx:for="{{coverGalleryItems}}"
