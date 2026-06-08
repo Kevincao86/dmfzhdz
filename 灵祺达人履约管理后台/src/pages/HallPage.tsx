@@ -33,7 +33,7 @@ export default function HallPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="max-w-3xl space-y-4">
       <div className="flex gap-2 border-b border-[var(--shell-border)] pb-2">
         {TABS.map((t) => (
           <button
