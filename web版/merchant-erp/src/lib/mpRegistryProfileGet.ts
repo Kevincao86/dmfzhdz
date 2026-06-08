@@ -125,7 +125,7 @@ export async function mpAuthGetRegistryProfile(
     }
   }
   let prProfile = pr ? registryPrToClientDraft(pr) : null
-  if (prProfile && typeof prProfile === 'object') {
+  if (pr && prProfile && typeof prProfile === 'object') {
     prProfile = {
       ...prProfile,
       id: accRegistryPrId || prProfile.id,

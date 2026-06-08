@@ -1,5 +1,6 @@
-import { LEGAL_COMPANY_NAME } from './legalProductMeta.js'
 import type { RegistryTeamIntro } from './teamIntroTypes.js'
+
+const LEGAL_COMPANY_NAME = '宁波墨典网络科技有限公司'
 
 export function defaultTeamIntroParagraphs(): string[] {
   return [
