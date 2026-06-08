@@ -499,27 +499,20 @@ Page({
   },
   syncCoverPreview() {
     const f = this.data.form || {}
-    const applyPreview = () => {
-      let preview = ''
-      let hint = '未选择时将使用对应平台默认封面'
-      if (String(f.coverImage || '').trim()) {
-        preview = f.coverImage
-        hint = '已上传自定义封面'
-      } else if (String(f.coverLibraryId || '').trim()) {
-        const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
-        preview = hit ? hit.url : ''
-        hint = '已选图库封面'
-      } else {
-        const def = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || [])
-        preview = def && def.url ? def.url : ''
-      }
-      this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
+    let preview = ''
+    let hint = '未选择时将使用对应平台默认封面'
+    if (String(f.coverImage || '').trim()) {
+      preview = f.coverImage
+      hint = '已上传自定义封面'
+    } else if (String(f.coverLibraryId || '').trim()) {
+      const hit = recruitCoverLib.findCoverById(f.coverLibraryId)
+      preview = hit ? hit.url : ''
+      hint = '已选图库封面'
+    } else {
+      const def = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || [])
+      preview = def && def.url ? def.url : ''
     }
-    if (!recruitCoverLib.useCoverBundle()) {
-      applyPreview()
-      return
-    }
-    recruitCoverLib.loadCoverSubpackages().then(applyPreview).catch(() => applyPreview())
+    this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
   },
   async onCoverUpload() {
     try {
@@ -535,24 +528,31 @@ Page({
   openCoverGallery() {
     const f = this.data.form || {}
     const tab = 'recommended'
-    wx.showLoading({ title: '加载图库', mask: true })
-    recruitCoverLib
-      .loadCoverSubpackages()
-      .then(() => {
-        wx.hideLoading()
-        this.setData({
-          pickerView: 'coverGallery',
-          coverGalleryTab: tab,
-          coverGallerySubKey: '',
-          coverPlatformNames: recruitCoverLib.listCoverPlatformNames(),
-          coverTagNames: recruitCoverLib.listCoverTagNames(),
+    const open = () => {
+      this.setData({
+        pickerView: 'coverGallery',
+        coverGalleryTab: tab,
+        coverGallerySubKey: '',
+        coverPlatformNames: recruitCoverLib.listCoverPlatformNames(),
+        coverTagNames: recruitCoverLib.listCoverTagNames(),
+      })
+      this.refreshCoverGalleryItems(tab, '', f.platform, f.talentTags || [])
+    }
+    if (recruitCoverLib.useCoverBundle()) {
+      wx.showLoading({ title: '加载图库', mask: true })
+      recruitCoverLib
+        .loadCoverSubpackages()
+        .then(() => {
+          wx.hideLoading()
+          open()
         })
-        this.refreshCoverGalleryItems(tab, '', f.platform, f.talentTags || [])
-      })
-      .catch((err) => {
-        wx.hideLoading()
-        wx.showToast({ title: String((err && err.message) || err || '图库加载失败').slice(0, 28), icon: 'none' })
-      })
+        .catch((err) => {
+          wx.hideLoading()
+          wx.showToast({ title: String((err && err.message) || err || '图库加载失败').slice(0, 28), icon: 'none' })
+        })
+      return
+    }
+    open()
   },
   refreshCoverGalleryItems(tab, subKey, platform, talentTags) {
     const items = recruitCoverLib.getGalleryItemsForTab(
@@ -616,12 +616,7 @@ Page({
       return
     }
     if (this.data.step === 'done' && this.data.createdOrder) return
-    if (this.data.step === 'form' && this.data.recruitMode) {
-      if (recruitCoverLib.useCoverBundle()) {
-        recruitCoverLib.loadCoverSubpackages().catch(() => {})
-      }
-      return
-    }
+    if (this.data.step === 'form' && this.data.recruitMode) return
     if (this.data.isEditMode) return
     this.resetToTarget()
   },
@@ -758,9 +753,6 @@ Page({
       this.syncDisplayFields()
       this.syncTabBarOverlay()
       this.resetFormScrollToTop()
-      if (recruitCoverLib.useCoverBundle()) {
-        recruitCoverLib.loadCoverSubpackages().catch(() => {})
-      }
     })
   },
   onBackToMode() {

@@ -49,12 +49,5 @@
     "request": 120000,
     "downloadFile": 120000,
     "connectSocket": 60000
-  },
-  "subPackages": [
-    {
-      "root": "packages/recruit-covers-mp",
-      "name": "recruitCoversMp",
-      "pages": ["pages/stub/stub"]
-    }
-  ]
+  }
 }
