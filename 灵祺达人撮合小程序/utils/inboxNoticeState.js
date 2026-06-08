@@ -36,6 +36,12 @@ function isSelectionNotice(row) {
   return /恭喜入选/.test(String(row.title || ''))
 }
 
+function isVideoRejectNotice(row) {
+  if (!row) return false
+  if (row.noticeType === 'video_reject') return true
+  return /探店视频需重新上传/.test(String(row.title || ''))
+}
+
 function getHandledAction(row) {
   const key = noticeActionKey(row)
   if (!key) return ''
@@ -43,7 +49,10 @@ function getHandledAction(row) {
 }
 
 function isPinned(row) {
-  return isSelectionNotice(row) && !getHandledAction(row)
+  if (!row) return false
+  if (isSelectionNotice(row)) return !getHandledAction(row)
+  if (isVideoRejectNotice(row) || row.pinned === true) return !row.read
+  return false
 }
 
 function markHandled(row, action) {
@@ -69,14 +78,15 @@ function sortRows(rows) {
 
 function enrichRow(row) {
   const handled = getHandledAction(row)
-  const pinned = isPinned(row)
-  const read = !!row.read || !!handled
+  const isSel = isSelectionNotice(row)
+  const read = !!row.read || (isSel && !!handled)
+  const pinned = isPinned({ ...row, read })
   return {
     ...row,
     pinned,
     read,
     readLabel: read ? '已读' : '未读',
-    showSelectionActions: isSelectionNotice(row) && pinned,
+    showSelectionActions: isSel && pinned,
     handledAction: handled,
   }
 }
@@ -84,6 +94,7 @@ function enrichRow(row) {
 module.exports = {
   noticeActionKey,
   isSelectionNotice,
+  isVideoRejectNotice,
   isPinned,
   getHandledAction,
   markHandled,

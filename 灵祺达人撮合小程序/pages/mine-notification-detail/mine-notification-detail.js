@@ -16,6 +16,7 @@ Page({
     const row = inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(raw))
     this.setData({ row })
     if (!row.read) {
+      messagesStore.markNotificationsRead([row.id])
       messagesStore.markInboxSeen([row.id])
     }
   },

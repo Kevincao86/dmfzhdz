@@ -11,6 +11,12 @@ type VideoCard = {
   videoStatus: string
   videoRejectReason?: string
   videoSubmittedAt?: string
+  videoSubmitCount?: number
+}
+
+function submitCountLabel(count?: number): string {
+  const n = Math.max(1, Number(count || 0) || 1)
+  return `第 ${n} 次提交`
 }
 
 export default function PrOrderVideoReviewPage() {
@@ -47,6 +53,7 @@ export default function PrOrderVideoReviewPage() {
           videoStatus: String(a.videoStatus || 'pending'),
           videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : undefined,
           videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : undefined,
+          videoSubmitCount: a.videoSubmitCount != null ? Number(a.videoSubmitCount) : undefined,
         }))
       setCards(rows)
       setPreviewId((prev) => {
@@ -192,6 +199,7 @@ export default function PrOrderVideoReviewPage() {
                     <h3 className="font-semibold">{c.displayName}</h3>
                     <p className="text-xs text-[var(--shell-muted)] mt-1">
                       提交于 {c.videoSubmittedAt || '—'}
+                      {` · ${submitCountLabel(c.videoSubmitCount)}`}
                       {c.videoStatus ? ` · ${videoStatusLabel(c.videoStatus)}` : ''}
                     </p>
                   </div>
@@ -289,7 +297,8 @@ export default function PrOrderVideoReviewPage() {
                   </video>
                 </div>
                 <p className="mt-2 text-xs text-[var(--shell-muted)]">
-                  提交于 {previewCard.videoSubmittedAt || '—'} · {videoStatusLabel(previewCard.videoStatus) || '待审核'}
+                  提交于 {previewCard.videoSubmittedAt || '—'} · {submitCountLabel(previewCard.videoSubmitCount)} ·{' '}
+                  {videoStatusLabel(previewCard.videoStatus) || '待审核'}
                 </p>
                 {previewCard.videoRejectReason ? (
                   <p className="mt-2 text-xs text-red-600 rounded-lg bg-red-50 px-2 py-1.5">

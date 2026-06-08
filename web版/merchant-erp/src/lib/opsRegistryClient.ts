@@ -270,7 +270,7 @@ export type TalentInboxEntryInput = {
   platformAccount?: string
   applicantId?: string
   imageUrl?: string
-  noticeType?: 'selection' | 'general'
+  noticeType?: 'selection' | 'general' | 'video_reject'
 }
 
 export async function appendTalentInboxOnOps(entries: TalentInboxEntryInput[]): Promise<{ ok: boolean; count?: number }> {

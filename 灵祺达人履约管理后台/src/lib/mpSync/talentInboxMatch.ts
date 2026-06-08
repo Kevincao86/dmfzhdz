@@ -220,7 +220,10 @@ export function inboxRowsForTalent(reg: MpRegistry, member: Record<string, unkno
         noticeType: String(r.noticeType || (isSel ? 'selection' : '')),
         mpOrderId: String(r.mpOrderId || ''),
         applicantId: String(r.applicantId || ''),
-        pinned: !!r.pinned,
+        pinned:
+          !!r.pinned ||
+          (r.noticeType === 'video_reject' && !r.read) ||
+          (/探店视频需重新上传/.test(String(r.title || '')) && !r.read),
       }
     })
 }

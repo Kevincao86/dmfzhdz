@@ -81,8 +81,30 @@ function writeList(key: string, list: NotificationRow[]) {
 }
 
 function sortTsFromId(id: string) {
-  const m = String(id || '').match(/(?:msg|ntf)-(\d+)/)
+  const s = String(id || '')
+  const m = s.match(/(?:msg|ntf|inbox)-(\d+)/)
   return m ? Number(m[1]) : 0
+}
+
+function isVideoRejectNotice(row: NotificationRow): boolean {
+  return row.noticeType === 'video_reject' || /探店视频需重新上传/.test(String(row.title || ''))
+}
+
+export function isPinnedUnread(row: NotificationRow): boolean {
+  if (row.read) return false
+  if (row.pinned) return true
+  return isVideoRejectNotice(row)
+}
+
+export function sortNotificationRows(rows: NotificationRow[]): NotificationRow[] {
+  return [...rows].sort((a, b) => {
+    const pa = isPinnedUnread(a) ? 1 : 0
+    const pb = isPinnedUnread(b) ? 1 : 0
+    if (pa !== pb) return pb - pa
+    const ta = sortTsFromId(a.id) || Date.parse(String(a.createdAt || '').replace(/\//g, '-')) || 0
+    const tb = sortTsFromId(b.id) || Date.parse(String(b.createdAt || '').replace(/\//g, '-')) || 0
+    return tb - ta
+  })
 }
 
 function normalizeCategory(cat: unknown): keyof typeof CATEGORY_LABELS {
@@ -100,7 +122,7 @@ function mapNotificationRow(row: NotificationRow): NotificationRow {
 
 export function readAllNotificationRows(): NotificationRow[] {
   const merged = [...readList(NOTIFY_KEY), ...readList(MSG_KEY)]
-  return merged.map(mapNotificationRow).sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+  return sortNotificationRows(merged.map(mapNotificationRow))
 }
 
 /** 合并 registry 站内信 + 本机通知（达人身份） */
@@ -116,7 +138,7 @@ export function mergeNotificationsWithRegistry(
   const local = localRows ?? readAllNotificationRows()
   const remoteIds = new Set(remote.map((r) => r.id))
   const rest = local.filter((r) => !remoteIds.has(r.id))
-  return [...remote, ...rest].sort((a, b) => sortTsFromId(b.id) - sortTsFromId(a.id))
+  return sortNotificationRows([...remote, ...rest])
 }
 
 export function pushNotification(item: Partial<NotificationRow> & { title?: string; body?: string }) {
