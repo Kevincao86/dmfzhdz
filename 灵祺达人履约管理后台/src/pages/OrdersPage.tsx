@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { readApplications, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
+import {
+  submitRecruitmentVideo,
+  uploadRecruitmentVideoFile,
+  videoStatusLabel,
+} from '../lib/mpSync/recruitmentVideo'
 import {
   APPLICATION_TIME_FILTERS,
   matchApplicationTimeFilter,
@@ -19,6 +24,9 @@ type EnrichedApplication = ApplicationLocal & {
   region?: string
   category?: string
   statusLabel?: string
+  videoStatus?: string
+  videoRejectReason?: string
+  canUploadVideo?: boolean
 }
 
 /** 达人：我的报名；PR：我的发单 */
@@ -32,10 +40,74 @@ function TalentApplicationsPage() {
   const acc = getAccount()
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploadingKey, setUploadingKey] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const pendingUpload = useRef<EnrichedApplication | null>(null)
   const [filterTime, setFilterTime] = useState<ApplicationTimeFilterId>('all')
   const [filterCategory, setFilterCategory] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+
+  async function reloadApps() {
+    const local = readApplications()
+    try {
+      const reg = await fetchMpRegistry()
+      const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
+      const enriched: EnrichedApplication[] = local.map((a) => {
+        const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
+        if (!mp) return { ...a }
+        const row = mapMpOrderRow(mp, reg)
+        const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
+        const me = applicants.find((x) => x && String(x.id) === String(a.applicantId))
+        const videoStatus = me ? String(me.videoStatus || '') : ''
+        const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
+        const canUploadVideo = !videoStatus || videoStatus === 'rejected'
+        return {
+          ...a,
+          title: a.title || row.title,
+          platform: a.platform || row.platform,
+          region: row.region,
+          category: row.category,
+          statusLabel: row.statusLabel,
+          videoStatus,
+          videoRejectReason,
+          canUploadVideo,
+        }
+      })
+      setApps(enriched)
+    } catch {
+      setApps(local)
+    }
+  }
+
+  function onPickVideo(app: EnrichedApplication) {
+    if (!app.applicantId) {
+      alert('缺少报名 ID，请重新报名后再上传')
+      return
+    }
+    pendingUpload.current = app
+    fileRef.current?.click()
+  }
+
+  async function onVideoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const app = pendingUpload.current
+    e.target.value = ''
+    pendingUpload.current = null
+    if (!file || !app?.mpOrderId || !app.applicantId) return
+    const key = `${app.mpOrderId}-${app.applicantId}`
+    setUploadingKey(key)
+    try {
+      const url = await uploadRecruitmentVideoFile(file)
+      await submitRecruitmentVideo(app.mpOrderId, app.applicantId, url)
+      alert('视频已提交，请等待 PR 审核')
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '上传失败')
+    } finally {
+      setUploadingKey('')
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +124,13 @@ function TalentApplicationsPage() {
           const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
           if (!mp) return { ...a }
           const row = mapMpOrderRow(mp, reg)
+          const applicants = Array.isArray((mp as Record<string, unknown>).applicants)
+            ? ((mp as Record<string, unknown>).applicants as Record<string, unknown>[])
+            : []
+          const me = applicants.find((x) => x && String(x.id) === String(a.applicantId))
+          const videoStatus = me ? String(me.videoStatus || '') : ''
+          const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
+          const canUploadVideo = !videoStatus || videoStatus === 'rejected'
           return {
             ...a,
             title: a.title || row.title,
@@ -59,6 +138,9 @@ function TalentApplicationsPage() {
             region: row.region,
             category: row.category,
             statusLabel: row.statusLabel,
+            videoStatus,
+            videoRejectReason,
+            canUploadVideo,
           }
         })
         if (!cancelled) setApps(enriched)
@@ -73,6 +155,16 @@ function TalentApplicationsPage() {
     }
   }, [])
 
+  const uploadInput = (
+    <input
+      ref={fileRef}
+      type="file"
+      accept="video/mp4,video/quicktime,video/*"
+      className="hidden"
+      onChange={(e) => void onVideoFileChange(e)}
+    />
+  )
+
   const filtered = useMemo(() => {
     return apps.filter((a) => {
       const ms = parseAppliedAtMs(a.appliedAt)
@@ -85,6 +177,7 @@ function TalentApplicationsPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
+      {uploadInput}
       <PageHero
         title="我的报名"
         subtitle="查看已提交的招募报名，可按时间、类目与城市筛选，快速回到商单详情。"
@@ -177,18 +270,52 @@ function TalentApplicationsPage() {
                     {a.statusLabel}
                   </span>
                 ) : null}
+                {a.videoStatus ? (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      a.videoStatus === 'passed'
+                        ? 'bg-emerald-500/10 text-emerald-700'
+                        : a.videoStatus === 'rejected'
+                          ? 'bg-red-500/10 text-red-700'
+                          : 'bg-amber-500/10 text-amber-700'
+                    }`}
+                  >
+                    视频{videoStatusLabel(a.videoStatus)}
+                  </span>
+                ) : null}
               </div>
               <h3 className="font-semibold text-[var(--shell-text)] truncate">{a.title || a.mpOrderId}</h3>
               <p className="text-xs text-[var(--shell-muted)] mt-1.5">
                 {a.region || '—'} · 报名于 {a.appliedAt || '—'}
               </p>
+              {a.videoStatus === 'rejected' && a.videoRejectReason ? (
+                <p className="text-xs text-red-600 mt-1.5 rounded-lg bg-red-50 px-2 py-1">
+                  驳回原因：{a.videoRejectReason}
+                </p>
+              ) : null}
             </div>
-            <Link
-              to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
-              className="shrink-0 text-sm px-4 py-2 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50 text-center"
-            >
-              查看招募详情
-            </Link>
+            <div className="shrink-0 flex flex-col gap-2">
+              {a.canUploadVideo ? (
+                <button
+                  type="button"
+                  disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
+                  className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-60"
+                  onClick={() => onPickVideo(a)}
+                >
+                  {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
+                    ? '上传中…'
+                    : a.videoStatus === 'rejected'
+                      ? '重新上传视频'
+                      : '上传视频'}
+                </button>
+              ) : null}
+              <Link
+                to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
+                className="text-sm px-4 py-2 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50 text-center"
+              >
+                查看招募详情
+              </Link>
+            </div>
           </article>
         ))}
       </div>

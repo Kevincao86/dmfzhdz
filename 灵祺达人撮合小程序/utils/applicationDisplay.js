@@ -203,11 +203,22 @@ function enrichApplicantRow(applicant, index, reg) {
   }
 }
 
+function resolveApplicantOnMp(mp, applicantId) {
+  if (!mp || !applicantId) return null
+  const list = Array.isArray(mp.applicants) ? mp.applicants : []
+  return list.find((a) => a && String(a.id) === String(applicantId)) || null
+}
+
 /** 达人「我的报名」列表行 */
 function enrichTalentApplicationRow(localApp, mp, reg) {
   const merchant = reg ? display.findMerchantOrder(reg, mp?.sourceMerchantOrderId) : null
   const view = mp ? display.enrichMpOrder(mp, merchant) : null
   const platform = view?.platform || mp?.platform || localApp?.platform || '抖音'
+  const me = resolveApplicantOnMp(mp, localApp.applicantId)
+  const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
+  const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
+  const canUploadVideo = !videoStatus || videoStatus === 'rejected'
+  const category = view?.category || mp?.category || '其他'
   return {
     ...localApp,
     mpOrderId: localApp.mpOrderId,
@@ -216,6 +227,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     platform,
     platformIcon: hallFilters.platformIcon(platform),
     region: view?.region || mp?.region || '—',
+    category,
     storeName: view?.storeName || mp?.storeName || '—',
     merchantName: view?.merchantName || mp?.customerName || '—',
     budgetText: view?.budgetText || mp?.budgetText || '面议',
@@ -224,6 +236,17 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     statusLabel: statusLabel(mp?.status),
     appliedAt: localApp.appliedAt || '—',
     merchantOrderNo: view?.merchantOrderNo || mp?.sourceMerchantOrderId || '',
+    videoStatus,
+    videoRejectReason,
+    canUploadVideo,
+    videoStatusLabel: videoStatus
+      ? videoStatus === 'passed'
+        ? '视频已通过'
+        : videoStatus === 'rejected'
+          ? '视频已驳回'
+          : '视频待审核'
+      : '',
+    uploadBtnLabel: videoStatus === 'rejected' ? '重新上传视频' : '上传视频',
   }
 }
 

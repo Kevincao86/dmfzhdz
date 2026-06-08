@@ -325,6 +325,12 @@ export default function PrOrdersPage() {
                   >
                     编辑招募
                   </Link>
+                  <Link
+                    to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
+                    className="text-sm px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-700 hover:bg-amber-50"
+                  >
+                    视频审核
+                  </Link>
                   <button
                     type="button"
                     className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"

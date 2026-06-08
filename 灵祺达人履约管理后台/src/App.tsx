@@ -16,6 +16,7 @@ import TalentProfilePage from './pages/TalentProfilePage'
 import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrProfilePage from './pages/PrProfilePage'
 import PrOrderApplicantsPage from './pages/PrOrderApplicantsPage'
+import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
 import PublishPage from './pages/PublishPage'
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="/templates/edit" element={<TemplateEditPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
+        <Route path="/orders/:id/video-review" element={<PrOrderVideoReviewPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />

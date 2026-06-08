@@ -1,16 +1,27 @@
 <view class="app-list-page page-shell">
+  <view wx:if="{{rows.length > 0}}" class="filter-strip card">
+    <text class="filter-strip__label">筛选</text>
+    <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
+      <view class="filter-pill">{{timeFilterLabel}}</view>
+    </picker>
+    <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
+      <view class="filter-pill">{{categoryLabel}}</view>
+    </picker>
+    <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
+      <view class="filter-pill">{{regionLabel}}</view>
+    </picker>
+  </view>
+
   <view wx:if="{{loading}}" class="card state-loading">
     <text class="hint">加载报名记录…</text>
   </view>
 
   <view
-    wx:for="{{rows}}"
+    wx:for="{{filteredRows}}"
     wx:key="mpOrderId"
-    class="app-card app-card--tap"
-    bindtap="goDetail"
-    data-id="{{item.mpOrderId}}"
+    class="app-card"
   >
-    <view class="app-card__head">
+    <view class="app-card__head app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
       <image class="app-card__icon" src="{{item.platformIcon}}" mode="aspectFill" />
       <view class="app-card__main">
         <text class="app-card__title">{{item.title}}</text>
@@ -21,6 +32,7 @@
       <text class="app-card__tag app-card__tag--status">{{item.statusLabel}}</text>
       <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
       <text class="app-card__tag">{{item.platform}}</text>
+      <text wx:if="{{item.videoStatusLabel}}" class="app-card__tag app-card__tag--video">{{item.videoStatusLabel}}</text>
     </view>
     <view class="app-card__meta-grid">
       <text class="app-card__meta-item">酬劳 {{item.budgetText}}</text>
@@ -28,9 +40,26 @@
       <text class="app-card__meta-item">报名 {{item.appliedAt}}</text>
       <text class="app-card__meta-item" wx:if="{{item.merchantOrderNo}}">单号 {{item.merchantOrderNo}}</text>
     </view>
-    <view class="app-card__foot">
-      <text>查看商单详情</text>
-      <text class="app-card__link">›</text>
+    <view wx:if="{{item.videoStatus === 'rejected' && item.videoRejectReason}}" class="app-card__reject">
+      <text>驳回原因：{{item.videoRejectReason}}</text>
+    </view>
+    <view class="app-card__actions">
+      <button
+        wx:if="{{item.canUploadVideo}}"
+        class="app-card__btn app-card__btn--primary"
+        size="mini"
+        loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+        disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+        catchtap="onUploadVideo"
+        data-id="{{item.mpOrderId}}"
+        data-applicant="{{item.applicantId}}"
+      >
+        {{item.uploadBtnLabel}}
+      </button>
+      <view class="app-card__foot app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
+        <text>查看商单详情</text>
+        <text class="app-card__link">›</text>
+      </view>
     </view>
   </view>
 
@@ -38,5 +67,9 @@
     <text class="state-empty-icon">📋</text>
     <text class="empty-title">暂无报名记录</text>
     <text class="hint">在招募大厅报名后，将在此展示商单与报名状态</text>
+  </view>
+
+  <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">当前筛选条件下暂无报名</text>
   </view>
 </view>
