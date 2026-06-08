@@ -1,4 +1,4 @@
-export type RegistryTenantSource = 'erp' | 'ops_manual'
+export type RegistryTenantSource = 'erp' | 'ops_manual' | 'supabase'
 
 /** 短视频：可灵 JWT + Seedance（方舟）接入绑定；由运营管控台维护。 */
 export type RegistryVideoAi = {

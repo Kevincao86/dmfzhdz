@@ -2,7 +2,7 @@ import { defaultTeamIntro } from './teamIntroDefaults.js'
 import type { RegistryTeamIntro } from './teamIntroTypes.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
 
-export function resolveTeamIntro(data: RegistrySnapshot): RegistryTeamIntro {
+export function resolveTeamIntro(data: { teamIntro?: RegistryTeamIntro | null }): RegistryTeamIntro {
   const stored = data.teamIntro
   if (stored && Array.isArray(stored.paragraphs) && stored.paragraphs.length > 0) {
     return {
