@@ -181,6 +181,53 @@
   text-align: center;
 }
 
+.rec-match-order-bar {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 0 24rpx 12rpx;
+  padding: 0 4rpx;
+}
+
+.rec-match-order-label {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.rec-match-order-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-match-order-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  padding: 14rpx 20rpx;
+  border-radius: 16rpx;
+  background: #fff;
+  border: 1rpx solid #e5e7eb;
+  box-shadow: 0 2rpx 8rpx rgba(15, 23, 42, 0.04);
+}
+
+.rec-match-order-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-match-order-arrow {
+  flex-shrink: 0;
+  font-size: 18rpx;
+  color: #9ca3af;
+}
+
 .rec-view-mode-bar {
   display: flex;
   flex-wrap: wrap;

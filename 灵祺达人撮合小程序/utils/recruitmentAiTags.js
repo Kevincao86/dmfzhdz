@@ -510,8 +510,7 @@ function orderMatchesPrBoard(row, mp, board) {
   return false
 }
 
-/** PR 本地发单 + 注册表，取最近开放中的招募单（最多 6 条），可按板块筛选 */
-function resolvePrRecentOrders(reg, opts) {
+function listPrEligibleOrders(reg, opts) {
   const board = (opts && opts.board) || (opts && opts.recruitTarget) || 'talent'
   const local = applicationsStore.readPublishedOrders()
   const mpList = Array.isArray(reg?.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
@@ -524,9 +523,23 @@ function resolvePrRecentOrders(reg, opts) {
     const row = orderCard.mapMpOrderRow(mp, reg)
     if (board && !orderMatchesPrBoard(row, mp, board)) continue
     out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
-    if (out.length >= 6) break
   }
   return out
+}
+
+function resolvePrMatchOrders(reg, opts) {
+  const all = listPrEligibleOrders(reg, opts)
+  const selected = String((opts && opts.mpOrderId) || '').trim()
+  if (selected && selected !== 'recent') {
+    const hit = all.filter((p) => String(p.row.id) === selected)
+    if (hit.length) return hit
+  }
+  return all.slice(0, 6)
+}
+
+/** PR 本地发单 + 注册表，取最近开放中的招募单（最多 6 条），可按板块筛选 */
+function resolvePrRecentOrders(reg, opts) {
+  return resolvePrMatchOrders(reg, opts)
 }
 
 function talentAiPayload(row, board) {
@@ -645,7 +658,7 @@ function applyTalentMatchMap(talents, map, orderPayloads, board) {
 async function enrichTalentMatchesForPr(talents, reg, opts) {
   const board = (opts && opts.board) || 'talent'
   const list = (talents || []).filter((t) => t && t.id && !t.isPreview)
-  const packs = resolvePrRecentOrders(reg, opts)
+  const packs = resolvePrMatchOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
   if (!orderPayloads.length) {
     return list.map((t) => ({
@@ -694,6 +707,8 @@ module.exports = {
   enrichOrderTags,
   enrichOrderMatches,
   enrichTalentMatchesForPr,
+  listPrEligibleOrders,
+  resolvePrMatchOrders,
   resolvePrRecentOrders,
   orderMatchesPrBoard,
   fallbackTagForRow,

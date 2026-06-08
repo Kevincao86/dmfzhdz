@@ -242,7 +242,7 @@ export function orderMatchesPrBoard(row: RecruitmentOrderRow, mp: Record<string,
   return false
 }
 
-export function resolvePrRecentOrders(reg: MpRegistry, opts?: { board?: PrBoardId; recruitTarget?: PrBoardId }) {
+export function listPrEligibleOrders(reg: MpRegistry, opts?: { board?: PrBoardId; recruitTarget?: PrBoardId }) {
   const board = opts?.board || opts?.recruitTarget || 'talent'
   const local = readPublishedOrders()
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
@@ -254,9 +254,26 @@ export function resolvePrRecentOrders(reg: MpRegistry, opts?: { board?: PrBoardI
     const row = mapMpOrderRow(mp, reg)
     if (board && !orderMatchesPrBoard(row, mp, board)) continue
     out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
-    if (out.length >= 6) break
   }
   return out
+}
+
+export function resolvePrMatchOrders(
+  reg: MpRegistry,
+  opts?: { board?: PrBoardId; recruitTarget?: PrBoardId; mpOrderId?: string | null },
+) {
+  const all = listPrEligibleOrders(reg, opts)
+  const selected = String(opts?.mpOrderId || '').trim()
+  if (selected && selected !== 'recent') {
+    const hit = all.filter((p) => String(p.row.id) === selected)
+    if (hit.length) return hit
+  }
+  return all.slice(0, 6)
+}
+
+/** @deprecated 使用 resolvePrMatchOrders */
+export function resolvePrRecentOrders(reg: MpRegistry, opts?: { board?: PrBoardId; recruitTarget?: PrBoardId }) {
+  return resolvePrMatchOrders(reg, opts)
 }
 
 export function fallbackTalentScore(
@@ -320,11 +337,11 @@ function talentAiPayload(row: TalentCardRow, board?: PrBoardId) {
 export async function enrichTalentMatchesForPr(
   rows: TalentCardRow[],
   reg: MpRegistry,
-  opts?: { board?: PrBoardId },
+  opts?: { board?: PrBoardId; mpOrderId?: string | null },
 ) {
   const board = opts?.board || 'talent'
   const list = rows.filter((t) => t?.id && !t.isPreview)
-  const packs = resolvePrRecentOrders(reg, opts)
+  const packs = resolvePrMatchOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
   if (!orderPayloads.length) return list
   const map: Record<string, { score: number; tag: string; tone: string }> = {}

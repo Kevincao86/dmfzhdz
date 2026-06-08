@@ -11,6 +11,7 @@ const recruitmentAi = require('../../utils/recruitmentAiTags.js')
 const hallIdentity = require('../../utils/hallIdentityBuckets.js')
 const identityTypes = require('../../utils/identityTypes.js')
 const prBoard = require('../../utils/prRecommendBoard.js')
+const prMatchOrderSelect = require('../../utils/prMatchOrderSelect.js')
 const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
 const participant = require('../../utils/participant.js')
@@ -277,6 +278,11 @@ Page({
     prSearchPlaceholder: '搜索达人昵称、ID',
     prOrderCount: 0,
     prMatchHint: '',
+    prMatchOrderId: prMatchOrderSelect.PR_MATCH_RECENT,
+    prMatchOrderOptions: [],
+    prMatchOrderLabels: [],
+    prMatchOrderIndex: 0,
+    prMatchOrderLabel: '',
     registryCache: null,
     prViewMode: 'ai',
     prAllModeLabel: '全部达人',
@@ -364,6 +370,20 @@ Page({
       }
       const pool = this._boardPools[board] || []
       const prBoardOrderCount = prBoard.countPrOrdersForBoard(reg, board)
+      const eligible = recruitmentAi.listPrEligibleOrders(reg, { board })
+      const matchOptions = prMatchOrderSelect.buildPrMatchOrderOptions(eligible)
+      let matchOrderId = prMatchOrderSelect.readPrMatchOrderId(board)
+      if (
+        matchOrderId !== prMatchOrderSelect.PR_MATCH_RECENT &&
+        !matchOptions.some((o) => o.id === matchOrderId)
+      ) {
+        matchOrderId = prMatchOrderSelect.PR_MATCH_RECENT
+        prMatchOrderSelect.writePrMatchOrderId(board, matchOrderId)
+      }
+      const matchOrderIndex = Math.max(
+        0,
+        matchOptions.findIndex((o) => o.id === matchOrderId),
+      )
       const prOrderCount = recruitmentAi.resolvePrRecentOrders(reg).length
       const rowsForCity = [
         ...this._boardPools.talent,
@@ -375,7 +395,17 @@ Page({
         cityFilters: hallFilters.buildCityFilterOptions(rowsForCity),
         prOrderCount,
         prBoardOrderCount,
-        prMatchHint: prBoard.boardMatchHint(board, prBoardOrderCount),
+        prMatchOrderId: matchOrderId,
+        prMatchOrderOptions: matchOptions,
+        prMatchOrderLabels: matchOptions.map((o) => o.label),
+        prMatchOrderIndex: matchOrderIndex,
+        prMatchOrderLabel: (matchOptions[matchOrderIndex] || matchOptions[0] || {}).label || '',
+        prMatchHint: prMatchOrderSelect.matchHintForSelection(
+          board,
+          matchOrderId,
+          matchOptions,
+          prBoardOrderCount,
+        ),
         prSearchPlaceholder: prBoard.boardSearchPlaceholder(board),
         registryCache: reg,
         loading: false,
@@ -473,14 +503,24 @@ Page({
       return
     }
 
-    if (this.data.prBoardOrderCount > 0 && this.data.registryCache && filtered.length) {
+    const matchOrderId = this.data.prMatchOrderId || prMatchOrderSelect.PR_MATCH_RECENT
+    const hasMatchOrders =
+      matchOrderId !== prMatchOrderSelect.PR_MATCH_RECENT
+        ? (this.data.prMatchOrderOptions || []).some((o) => o.id === matchOrderId)
+        : this.data.prBoardOrderCount > 0
+
+    if (hasMatchOrders && this.data.registryCache && filtered.length) {
       wx.showLoading({ title: '智能匹配中…', mask: false })
       try {
         filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
           board,
+          mpOrderId: matchOrderId,
         })
       } catch (_) {
-        const packs = recruitmentAi.resolvePrRecentOrders(this.data.registryCache, { board })
+        const packs = recruitmentAi.resolvePrMatchOrders(this.data.registryCache, {
+          board,
+          mpOrderId: matchOrderId,
+        })
         const payloads = packs.map((p) => p.payload)
         filtered = filtered.map((t) => {
           const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
@@ -509,15 +549,14 @@ Page({
       filtered = prependSelfTalentTest(filtered)
     }
 
-    const showPreview =
-      !kw && !this.data.prBoardOrderCount && filtered.length === 0 && board === 'talent'
+    const showPreview = !kw && !hasMatchOrders && filtered.length === 0 && board === 'talent'
     let displayRows = filtered.slice(0, 50)
     if (showPreview) {
       displayRows = [MOCK_PREVIEW]
     }
     let listEmptyHint = ''
     if (displayRows.length === 0) {
-      listEmptyHint = prBoard.boardEmptyHint(board, kw, this.data.prBoardOrderCount > 0)
+      listEmptyHint = prBoard.boardEmptyHint(board, kw, hasMatchOrders)
     } else if (showPreview && displayRows.length === 1 && displayRows[0].isPreview) {
       listEmptyHint = '发招募后可在此查看 AI 匹配的达人'
     }
@@ -541,14 +580,58 @@ Page({
     const pool = (this._boardPools && this._boardPools[id]) || []
     const reg = this.data.registryCache
     const prBoardOrderCount = reg ? prBoard.countPrOrdersForBoard(reg, id) : 0
+    const eligible = reg ? recruitmentAi.listPrEligibleOrders(reg, { board: id }) : []
+    const matchOptions = prMatchOrderSelect.buildPrMatchOrderOptions(eligible)
+    let matchOrderId = prMatchOrderSelect.readPrMatchOrderId(id)
+    if (
+      matchOrderId !== prMatchOrderSelect.PR_MATCH_RECENT &&
+      !matchOptions.some((o) => o.id === matchOrderId)
+    ) {
+      matchOrderId = prMatchOrderSelect.PR_MATCH_RECENT
+      prMatchOrderSelect.writePrMatchOrderId(id, matchOrderId)
+    }
+    const matchOrderIndex = Math.max(
+      0,
+      matchOptions.findIndex((o) => o.id === matchOrderId),
+    )
     this.setData({
       prBoard: id,
       prViewMode: 'ai',
       allRows: pool,
       prBoardOrderCount,
-      prMatchHint: prBoard.boardMatchHint(id, prBoardOrderCount),
+      prMatchOrderId: matchOrderId,
+      prMatchOrderOptions: matchOptions,
+      prMatchOrderLabels: matchOptions.map((o) => o.label),
+      prMatchOrderIndex: matchOrderIndex,
+      prMatchOrderLabel: (matchOptions[matchOrderIndex] || matchOptions[0] || {}).label || '',
+      prMatchHint: prMatchOrderSelect.matchHintForSelection(
+        id,
+        matchOrderId,
+        matchOptions,
+        prBoardOrderCount,
+      ),
       prSearchPlaceholder: prBoard.boardSearchPlaceholder(id),
       prAllModeLabel: prBoard.boardAllModeLabel(id),
+    })
+    this.applyTalentFilters()
+  },
+  onPrMatchOrderChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const opts = this.data.prMatchOrderOptions || []
+    const hit = opts[idx]
+    if (!hit) return
+    const board = this.data.prBoard || 'talent'
+    prMatchOrderSelect.writePrMatchOrderId(board, hit.id)
+    this.setData({
+      prMatchOrderId: hit.id,
+      prMatchOrderIndex: idx,
+      prMatchOrderLabel: hit.label,
+      prMatchHint: prMatchOrderSelect.matchHintForSelection(
+        board,
+        hit.id,
+        opts,
+        this.data.prBoardOrderCount,
+      ),
     })
     this.applyTalentFilters()
   },
