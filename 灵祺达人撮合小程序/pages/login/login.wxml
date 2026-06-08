@@ -67,27 +67,11 @@
         </view>
 
         <block wx:if="{{tab==='wx'}}">
-          <view class="login-wx-profile">
-            <button class="login-wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onWxChooseAvatar">
-              <image class="login-wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
-              <view class="login-wx-avatar login-wx-avatar--ph" wx:else>
-                <text>微信头像</text>
-              </view>
-            </button>
-            <input
-              class="login-wx-nick"
-              type="nickname"
-              placeholder="点击选用微信昵称"
-              value="{{wxNickName}}"
-              bindinput="onWxNicknameInput"
-              bindnicknamereview="onWxNicknameReview"
-            />
-          </view>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{!loginIdentity || loading}}" bindtap="onWxLogin">
             <text class="login-btn-icon">◎</text>
             <text>微信一键登录</text>
           </button>
-          <text class="login-hint">一键登录绑定微信；头像昵称将同步到「我的」</text>
+          <text class="login-hint">首次登录将绑定本微信，生成唯一灵祺 ID</text>
         </block>
 
         <block wx:elif="{{tab==='pwd'}}">
@@ -192,30 +176,35 @@
   </view>
   </view>
 
-  <view class="login-id-sheet-mask" wx:if="{{showWxProfileSheet}}" bindtap="onCloseWxProfileSheet">
+  <view class="login-id-sheet-mask" wx:if="{{showWxAuthSheet}}" bindtap="onCloseWxAuthSheet">
     <view class="login-id-sheet" catchtap="noopSheetTap">
       <view class="login-id-sheet-head">
-        <text class="login-id-sheet-title">完善微信资料</text>
-        <text class="login-id-sheet-close" bindtap="onCloseWxProfileSheet">×</text>
+        <text class="login-id-sheet-title">{{wxAuthStep === 'avatar' ? '获取微信头像' : '获取微信昵称'}}</text>
+        <text class="login-id-sheet-close" bindtap="onCloseWxAuthSheet">×</text>
       </view>
-      <text class="login-id-sheet-hint">已登录成功，请授权头像与昵称后进入首页</text>
-      <view class="login-wx-profile login-wx-profile--sheet">
-        <button class="login-wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onWxChooseAvatar">
-          <image class="login-wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
-          <view class="login-wx-avatar login-wx-avatar--ph" wx:else>
-            <text>选头像</text>
+      <text class="login-id-sheet-hint" wx:if="{{wxAuthStep === 'avatar'}}">请点击下方头像按钮，授权您的微信头像</text>
+      <text class="login-id-sheet-hint" wx:else>请点击输入框，选用您的微信昵称</text>
+      <view class="login-wx-auth-step" wx:if="{{wxAuthStep === 'avatar'}}">
+        <button class="login-wx-avatar-btn login-wx-avatar-btn--lg" open-type="chooseAvatar" bindchooseavatar="onWxChooseAvatar">
+          <image class="login-wx-avatar login-wx-avatar--lg" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+          <view class="login-wx-avatar login-wx-avatar--lg login-wx-avatar--ph" wx:else>
+            <text>点击授权头像</text>
           </view>
         </button>
+      </view>
+      <view class="login-wx-auth-step" wx:else>
+        <image class="login-wx-avatar login-wx-avatar--sm" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
         <input
-          class="login-wx-nick"
+          class="login-wx-nick login-wx-nick--sheet"
           type="nickname"
           placeholder="点击选用微信昵称"
           value="{{wxNickName}}"
           bindinput="onWxNicknameInput"
           bindnicknamereview="onWxNicknameReview"
+          focus="{{wxAuthStep === 'nick'}}"
         />
+        <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
       </view>
-      <button class="login-btn login-btn--wx" loading="{{profileSaving}}" bindtap="onConfirmWxProfileSheet">完成并进入</button>
     </view>
   </view>
 

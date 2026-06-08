@@ -79,8 +79,9 @@ Page({
     orbitImages: ORBIT_IMAGES,
     wxNickName: '',
     wxAvatarUrl: '',
-    showWxProfileSheet: false,
-    profileSaving: false,
+    showWxAuthSheet: false,
+    wxAuthStep: 'avatar',
+    pendingWorkId: '',
   },
 
   onLoad() {
@@ -171,8 +172,13 @@ Page({
   onWxChooseAvatar(e) {
     const url = e.detail && e.detail.avatarUrl
     if (!url) return
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
     this.setData({ wxAvatarUrl: url })
-    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxAvatarUrl: url })
+    wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
+    if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'avatar') {
+      this.setData({ wxAuthStep: 'nick' })
+      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
+    }
   },
 
   onWxNicknameInput(e) {
@@ -186,63 +192,56 @@ Page({
     if (!nick) return
     this.setData({ wxNickName: nick })
     require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
-  },
-
-  onCloseWxProfileSheet() {
-    this.setData({ showWxProfileSheet: false })
-  },
-
-  async onConfirmWxProfileSheet() {
-    if (this.data.profileSaving) return
-    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
-    const nick = String(this.data.wxNickName || '').trim()
-    const avatar = String(this.data.wxAvatarUrl || '').trim()
-    if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
-      return
-    }
-    if (!avatar) {
-      wx.showToast({ title: '请先选择微信头像', icon: 'none' })
-      return
-    }
-    this.setData({ profileSaving: true })
-    try {
-      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-      this.setData({ showWxProfileSheet: false })
-      await enterAppAfterLogin()
-    } catch (e) {
-      wx.showToast({ title: String((e && e.message) || e).slice(0, 36), icon: 'none' })
-    } finally {
-      this.setData({ profileSaving: false })
+    if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'nick') {
+      void this.finishWxAuthAndLogin()
     }
   },
 
-  async onWxLogin() {
+  onCloseWxAuthSheet() {
+    this.setData({ showWxAuthSheet: false, wxAuthStep: 'avatar', pendingWorkId: '' })
+  },
+
+  onConfirmWxNickStep() {
+    void this.finishWxAuthAndLogin()
+  },
+
+  onWxLogin() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
+    this.setData({
+      err: '',
+      showWxAuthSheet: true,
+      wxAuthStep: 'avatar',
+      pendingWorkId: workId,
+      wxNickName: '',
+      wxAvatarUrl: '',
+    })
+    wx.showToast({ title: '请授权微信头像', icon: 'none' })
+  },
+
+  async finishWxAuthAndLogin() {
+    if (this.data.loading) return
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    const workId = this.data.pendingWorkId
+    if (!workId) {
+      this.onCloseWxAuthSheet()
+      return
+    }
+    const nick = String(this.data.wxNickName || '').trim()
+    let avatar = String(this.data.wxAvatarUrl || '').trim()
+    if (!avatar) {
+      wx.showToast({ title: '请先授权微信头像', icon: 'none' })
+      this.setData({ wxAuthStep: 'avatar' })
+      return
+    }
+    if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
+      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
+      this.setData({ wxAuthStep: 'nick' })
+      return
+    }
     this.setData({ loading: true, err: '' })
     try {
-      const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
-      const local = wxAccount.readWxAccount()
-      const cache = wxProfileDisplay.readWxProfileCache()
-      let nick = wxProfileDisplay.pickWxNick(
-        this.data.wxNickName,
-        cache && cache.wxNickName,
-        local && local.wxNickName,
-      )
-      let avatar = wxProfileDisplay.pickWxAvatar(
-        this.data.wxAvatarUrl,
-        cache && cache.wxAvatarUrl,
-        local && local.wxAvatarUrl,
-      )
-      if (wxProfileDisplay.isPlaceholderWxNick(nick) || !avatar) {
-        try {
-          const resolved = await wxProfileDisplay.resolveWxProfileForLogin(nick, avatar)
-          if (resolved.nick) nick = resolved.nick
-          if (resolved.avatar) avatar = resolved.avatar
-        } catch (_) {}
-      }
-      if (avatar) avatar = await wxProfileDisplay.persistWxAvatarUrl(avatar)
+      avatar = await wxProfileDisplay.persistWxAvatarUrl(avatar)
       const role = identityTypes.accountRoleForWorkIdentity(workId)
       const data = await auth.wxLogin({
         role,
@@ -266,19 +265,9 @@ Page({
         })
       }
       await applyLoginIdentity(data, workId)
-      const hasProfile =
-        nick && !wxProfileDisplay.isPlaceholderWxNick(nick) && !!avatar
-      if (hasProfile) {
-        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-        await enterAppAfterLogin()
-        return
-      }
-      this.setData({
-        showWxProfileSheet: true,
-        wxNickName: nick,
-        wxAvatarUrl: avatar,
-      })
-      wx.showToast({ title: '登录成功，请完善头像昵称', icon: 'none' })
+      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      this.setData({ showWxAuthSheet: false, pendingWorkId: '' })
+      await enterAppAfterLogin()
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg

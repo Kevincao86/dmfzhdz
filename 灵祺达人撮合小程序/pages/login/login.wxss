@@ -395,6 +395,35 @@
   border: 1rpx solid #e2e8f0;
 }
 
+.login-wx-auth-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+  margin: 28rpx 0 8rpx;
+}
+
+.login-wx-avatar-btn--lg {
+  display: block;
+}
+
+.login-wx-avatar--lg {
+  width: 160rpx;
+  height: 160rpx;
+}
+
+.login-wx-avatar--sm {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  border: 2rpx solid #e2e8f0;
+}
+
+.login-wx-nick--sheet {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .login-err {
   display: block;
   margin-top: 16rpx;
