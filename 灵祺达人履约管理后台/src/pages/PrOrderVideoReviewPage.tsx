@@ -22,10 +22,13 @@ export default function PrOrderVideoReviewPage() {
   const [rejectModal, setRejectModal] = useState<VideoCard | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [previewId, setPreviewId] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [downloadingId, setDownloadingId] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!mpOrderId) return
-    setLoading(true)
+    const silent = !!opts?.silent
+    if (!silent) setLoading(true)
     try {
       const reg = await fetchMpRegistry()
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
@@ -47,20 +50,21 @@ export default function PrOrderVideoReviewPage() {
         }))
       setCards(rows)
       setPreviewId((prev) => {
-        if (prev && rows.some((r) => r.id === prev)) return prev
-        return rows[0]?.id || ''
+        if (!prev || !rows.some((r) => r.id === prev)) return ''
+        return prev
       })
     } catch {
       setCards([])
       setPreviewId('')
+      setPreviewOpen(false)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [mpOrderId])
 
   useEffect(() => {
     void load()
-    const t = window.setInterval(() => void load(), 8000)
+    const t = window.setInterval(() => void load({ silent: true }), 8000)
     return () => window.clearInterval(t)
   }, [load])
 
@@ -74,6 +78,37 @@ export default function PrOrderVideoReviewPage() {
   }, [cards])
 
   const previewCard = useMemo(() => cards.find((c) => c.id === previewId) || null, [cards, previewId])
+
+  function openPreview(card: VideoCard) {
+    setPreviewId(card.id)
+    setPreviewOpen(true)
+  }
+
+  async function onDownloadVideo(card: VideoCard) {
+    if (!card.videoUrl || downloadingId) return
+    setDownloadingId(card.id)
+    const fileName = `${card.displayName || '探店成片'}.mp4`.replace(/[/\\?%*:|"<>]/g, '_')
+    try {
+      const res = await fetch(card.videoUrl)
+      if (!res.ok) throw new Error(`下载失败 ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      const a = document.createElement('a')
+      a.href = card.videoUrl
+      a.download = fileName
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      a.click()
+    } finally {
+      setDownloadingId('')
+    }
+  }
 
   async function onPass(card: VideoCard) {
     if (!mpOrderId || busyId) return
@@ -132,7 +167,9 @@ export default function PrOrderVideoReviewPage() {
         ))}
       </div>
 
-      {loading ? <p className="text-sm text-[var(--shell-muted)]">加载中…</p> : null}
+      <div className="min-h-[1.25rem]">
+        {loading ? <p className="text-sm text-[var(--shell-muted)]">加载中…</p> : null}
+      </div>
 
       {!loading && !cards.length ? (
         <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
@@ -141,13 +178,13 @@ export default function PrOrderVideoReviewPage() {
       ) : null}
 
       {cards.length ? (
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="min-w-0 flex-1 space-y-3">
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className={`min-w-0 space-y-3 ${previewOpen ? 'lg:flex-1' : 'w-full'}`}>
             {cards.map((c) => (
               <article
                 key={c.id}
-                className={`surface-card rounded-xl border p-4 transition-colors ${
-                  previewId === c.id ? 'border-violet-400 ring-1 ring-violet-400/30' : ''
+                className={`surface-card rounded-xl border p-4 ${
+                  previewOpen && previewId === c.id ? 'border-violet-400 ring-1 ring-violet-400/30' : ''
                 }`}
               >
                 <div className="flex flex-wrap justify-between gap-2 items-start">
@@ -179,22 +216,22 @@ export default function PrOrderVideoReviewPage() {
                   <button
                     type="button"
                     className={`text-sm px-3 py-1.5 rounded-lg border ${
-                      previewId === c.id
+                      previewOpen && previewId === c.id
                         ? 'border-violet-500 bg-violet-600 text-white'
                         : 'border-violet-500/40 text-violet-600 hover:bg-violet-50'
                     }`}
-                    onClick={() => setPreviewId(c.id)}
+                    onClick={() => openPreview(c)}
                   >
                     视频预览
                   </button>
-                  <a
-                    href={c.videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5"
+                  <button
+                    type="button"
+                    disabled={downloadingId === c.id}
+                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5 disabled:opacity-60"
+                    onClick={() => void onDownloadVideo(c)}
                   >
-                    新窗口打开
-                  </a>
+                    {downloadingId === c.id ? '下载中…' : '下载'}
+                  </button>
                 </div>
                 {c.videoStatus === 'pending' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -223,44 +260,45 @@ export default function PrOrderVideoReviewPage() {
             ))}
           </div>
 
-          <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[min(100%,400px)] xl:w-[420px]">
-            <div className="surface-card rounded-xl border p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[var(--shell-text)]">视频预览</h3>
-                {previewCard ? (
-                  <span className="text-xs text-[var(--shell-muted)] truncate">{previewCard.displayName}</span>
+          {previewOpen && previewCard ? (
+            <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[min(100%,400px)] xl:w-[420px]">
+              <div className="surface-card rounded-xl border p-4 shadow-lg lg:shadow-none">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-[var(--shell-text)]">视频预览</h3>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs text-[var(--shell-muted)] truncate">{previewCard.displayName}</span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs text-[var(--shell-muted)] hover:text-[var(--shell-text)] px-1.5 py-0.5 rounded border border-[var(--shell-border)]"
+                      onClick={() => setPreviewOpen(false)}
+                    >
+                      关闭
+                    </button>
+                  </div>
+                </div>
+                <div className="aspect-video w-full overflow-hidden rounded-lg bg-black/90">
+                  <video
+                    key={previewCard.videoUrl}
+                    src={previewCard.videoUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="h-full w-full object-contain"
+                  >
+                    您的浏览器不支持视频播放，请使用「下载」保存后观看。
+                  </video>
+                </div>
+                <p className="mt-2 text-xs text-[var(--shell-muted)]">
+                  提交于 {previewCard.videoSubmittedAt || '—'} · {videoStatusLabel(previewCard.videoStatus) || '待审核'}
+                </p>
+                {previewCard.videoRejectReason ? (
+                  <p className="mt-2 text-xs text-red-600 rounded-lg bg-red-50 px-2 py-1.5">
+                    驳回原因：{previewCard.videoRejectReason}
+                  </p>
                 ) : null}
               </div>
-              {previewCard ? (
-                <>
-                  <div className="aspect-video w-full overflow-hidden rounded-lg bg-black/90">
-                    <video
-                      key={previewCard.videoUrl}
-                      src={previewCard.videoUrl}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="h-full w-full object-contain"
-                    >
-                      您的浏览器不支持视频播放，请使用「新窗口打开」。
-                    </video>
-                  </div>
-                  <p className="mt-2 text-xs text-[var(--shell-muted)]">
-                    提交于 {previewCard.videoSubmittedAt || '—'} · {videoStatusLabel(previewCard.videoStatus) || '待审核'}
-                  </p>
-                  {previewCard.videoRejectReason ? (
-                    <p className="mt-2 text-xs text-red-600 rounded-lg bg-red-50 px-2 py-1.5">
-                      驳回原因：{previewCard.videoRejectReason}
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <div className="flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-[var(--shell-border)] bg-white/5 px-4 text-center text-sm text-[var(--shell-muted)]">
-                  点击左侧「视频预览」在此播放成片
-                </div>
-              )}
-            </div>
-          </aside>
+            </aside>
+          ) : null}
         </div>
       ) : null}
 
