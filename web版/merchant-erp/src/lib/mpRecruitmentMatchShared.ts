@@ -67,22 +67,125 @@ export function talentMatchCacheKey(talent: TalentMatchProfile | null | undefine
     .slice(0, 200)
 }
 
+/** 商单侧可检索城市/区域的文本（region 常为门店名，需合并标题与摘要） */
+export function orderLocationText(order: Pick<OrderMatchPayload, 'region' | 'title' | 'summary' | 'category'>): string {
+  return [order.region, order.title, order.summary, order.category].filter(Boolean).join(' · ')
+}
+
 export function regionMatchesTalent(
   region: string,
   city: string,
   province: string,
+  extraContext = '',
 ): RegionMatchLevel {
-  const r = String(region || '').trim()
+  const r = [String(region || '').trim(), String(extraContext || '').trim()].filter(Boolean).join(' · ')
   if (!r) return 'unknown'
   if (r.includes('全国')) return 'national'
   const c = String(city || '').trim()
   const p = String(province || '').trim()
   const cShort = c.replace(/市$/, '')
-  const pShort = p.replace(/省$/, '')
+  const pShort = p.replace(/省$/, '').replace(/市$/, '')
   if (c && (r.includes(c) || (cShort.length >= 2 && r.includes(cShort)))) return 'same_city'
   if (pShort.length >= 2 && r.includes(pShort)) return 'same_province'
   if (c || p) return 'mismatch'
   return 'unknown'
+}
+
+function fansRequirementMet(fansReq: string, followers: number): boolean {
+  const req = String(fansReq || '').trim()
+  if (!req || /不限|档位|按招募|按云剪|协商/.test(req)) return true
+  const f = Number(followers) || 0
+  const fm = req.match(/([\d.]+)\s*万/)
+  const need = fm ? Number(fm[1]) * 10000 : Number((req.match(/(\d+)/) || [])[1] || 0)
+  if (need <= 0) return true
+  if (f <= 0) return true
+  return f >= need * 0.85
+}
+
+function tagsOrCategoryAlign(order: OrderMatchPayload, talent: TalentMatchProfile): boolean {
+  const cat = String(order.category || '').trim()
+  const blob = orderLocationText(order)
+  const tags = [...(talent.accountTags || []), ...(talent.tags || []), ...(talent.supplierSkills || [])].filter(
+    Boolean,
+  )
+  if (cat && tags.some((t) => cat.includes(t) || t.includes(cat))) return true
+  if (tags.some((t) => t.length >= 2 && blob.includes(t))) return true
+  return false
+}
+
+function salesLevelAligns(order: OrderMatchPayload, talent: TalentMatchProfile): boolean {
+  const level = String(talent.douyinSalesLevel || '').trim()
+  if (!level) return true
+  const blob = orderLocationText(order) + String(order.fansRequirement || '')
+  if (/不限|档位|按招募/.test(blob)) return true
+  const lvNum = level.replace(/\D/g, '')
+  if (lvNum && blob.includes(lvNum)) return true
+  if (/V[345]|Lv[345]|三级|四级|五级|带货/.test(blob) && level) return true
+  return false
+}
+
+export type MatchFactSignals = {
+  recruitTargetOk: boolean
+  platformOk: boolean
+  region: RegionMatchLevel
+  fansOk: boolean
+  tagsOk: boolean
+  levelOk: boolean
+}
+
+export function analyzeMatchFacts(order: OrderMatchPayload, talent: TalentMatchProfile): MatchFactSignals {
+  const loc = regionMatchesTalent(
+    order.region || '',
+    talent.city || '',
+    talent.province || '',
+    orderLocationText(order),
+  )
+  const plat = String(order.platform || '')
+  const tPlat = String(talent.platform || '')
+  const platformOk = !plat || !tPlat || plat === tPlat
+  return {
+    recruitTargetOk: recruitTargetMatchesOrder(order, talent),
+    platformOk,
+    region: loc,
+    fansOk: fansRequirementMet(String(order.fansRequirement || ''), Number(talent.followers) || 0),
+    tagsOk: tagsOrCategoryAlign(order, talent),
+    levelOk: salesLevelAligns(order, talent),
+  }
+}
+
+/** 事实高度一致时的分数下限（防止模型保守给 50 分） */
+export function strongMatchScoreFloor(signals: MatchFactSignals): number {
+  if (!signals.recruitTargetOk || !signals.platformOk) return 0
+  if (signals.region === 'mismatch') return 0
+
+  const regional =
+    signals.region === 'same_city'
+      ? 78
+      : signals.region === 'same_province'
+        ? 62
+        : signals.region === 'national'
+          ? 55
+          : signals.region === 'unknown'
+            ? 50
+            : 0
+
+  let floor = regional
+  if (signals.fansOk) floor += 6
+  if (signals.tagsOk) floor += 8
+  if (signals.levelOk) floor += 4
+
+  const core =
+    signals.region === 'same_city' &&
+    signals.platformOk &&
+    signals.fansOk &&
+    (signals.tagsOk || signals.levelOk)
+
+  if (core) floor = Math.max(floor, 88)
+  else if (signals.region === 'same_city' && signals.platformOk && signals.fansOk) {
+    floor = Math.max(floor, 80)
+  }
+
+  return Math.min(95, floor)
 }
 
 export function recruitTargetMatchesOrder(
@@ -96,7 +199,7 @@ export function recruitTargetMatchesOrder(
   return false
 }
 
-/** AI / 本地分统一事实校准：跨城、平台不符、身份不符不得虚高 */
+/** AI / 本地分统一事实校准：跨城、平台不符、身份不符不得虚高；高度契合则抬升下限 */
 export function clampMatchScoreByFacts(
   score: number,
   order: OrderMatchPayload,
@@ -105,29 +208,25 @@ export function clampMatchScoreByFacts(
   let s = Number(score)
   if (!Number.isFinite(s)) s = 0
 
-  if (!recruitTargetMatchesOrder(order, talent)) {
+  const facts = analyzeMatchFacts(order, talent)
+
+  if (!facts.recruitTargetOk) {
     return Math.max(0, Math.min(100, Math.round(Math.min(s, 28))))
   }
 
-  const plat = String(order.platform || '')
-  const tPlat = String(talent.platform || '')
-  if (plat && tPlat && plat !== tPlat) {
+  if (!facts.platformOk) {
     s = Math.min(s, 42)
   }
 
-  const loc = regionMatchesTalent(order.region || '', talent.city || '', talent.province || '')
-  if (loc === 'mismatch') s = Math.min(s, 48)
-  else if (loc === 'unknown' && !String(order.region || '').includes('全国')) s = Math.min(s, 52)
-  else if (loc === 'same_province' && s > 68) s = Math.min(s, 68)
-  else if (loc === 'national' && s > 72) s = Math.min(s, 72)
-
-  const fansReq = String(order.fansRequirement || '')
-  const f = Number(talent.followers) || 0
-  if (fansReq && !fansReq.includes('不限')) {
-    const fm = fansReq.match(/([\d.]+)\s*万/)
-    const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
-    if (need > 0 && f > 0 && f < need * 0.85) s = Math.min(s, 44)
+  if (facts.region === 'mismatch') s = Math.min(s, 48)
+  else if (facts.region === 'unknown' && !String(order.region || '').includes('全国')) {
+    s = Math.min(s, 58)
   }
+
+  if (!facts.fansOk) s = Math.min(s, 44)
+
+  const floor = strongMatchScoreFloor(facts)
+  if (floor > 0) s = Math.max(s, floor)
 
   return Math.max(0, Math.min(100, Math.round(s)))
 }
@@ -178,27 +277,26 @@ export function fallbackOrderMatchScore(
   if (plat && tPlat && plat === tPlat) s += 14
   else if (plat && tPlat) s -= 6
 
-  const loc = regionMatchesTalent(order.region || '', talent.city || '', talent.province || '')
-  if (loc === 'same_city') s += 24
-  else if (loc === 'same_province') s += 12
-  else if (loc === 'national') s += 6
-  else if (loc === 'mismatch') s -= 8
+  const loc = regionMatchesTalent(
+    order.region || '',
+    talent.city || '',
+    talent.province || '',
+    orderLocationText(order),
+  )
+  if (loc === 'same_city') s += 28
+  else if (loc === 'same_province') s += 14
+  else if (loc === 'national') s += 8
+  else if (loc === 'mismatch') s -= 10
 
-  const cat = String(order.category || '')
-  const tags = [...(talent.accountTags || []), ...(talent.tags || []), ...(talent.supplierSkills || [])]
-  if (cat && tags.some((t) => t && (cat.includes(t) || t.includes(cat)))) s += 12
+  if (tagsOrCategoryAlign(order, talent)) s += 14
+  if (salesLevelAligns(order, talent)) s += 6
 
-  const fansReq = String(order.fansRequirement || '')
   const f = Number(talent.followers) || 0
-  if (fansReq.includes('不限')) s += 2
-  else {
-    const fm = fansReq.match(/([\d.]+)\s*万/)
-    const need = fm ? Number(fm[1]) * 10000 : Number((fansReq.match(/(\d+)/) || [])[1] || 0)
-    if (need > 0 && f >= need) s += 10
-    else if (need > 0 && f > 0) s -= 8
-  }
+  if (fansRequirementMet(String(order.fansRequirement || ''), f)) s += 10
+  else if (f > 0) s -= 10
 
   const habits = talent.applicationHabits
+  const cat = String(order.category || '')
   if (habits?.preferredPlatforms?.includes(plat)) s += 3
   if (cat && habits?.preferredCategories?.some((c) => cat.includes(c) || c.includes(cat))) s += 2
   if (order.urgent && (habits?.urgentApplyRatio || 0) > 25) s += 2
