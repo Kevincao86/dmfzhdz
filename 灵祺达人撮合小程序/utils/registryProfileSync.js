@@ -4,6 +4,7 @@ const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
 const clientStateGuard = require('./mpClientStateGuard.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
+const wxProfileDisplay = require('./wxProfileDisplay.js')
 
 function digits11(raw) {
   const d = String(raw == null ? '' : raw).replace(/\D/g, '')
@@ -44,6 +45,9 @@ async function pullRegistryProfileAfterLogin() {
         lingqiTalentId: String(account.lingqiTalentId || migrated.lingqiTalentId || '').trim(),
         lingqiShootTeamId: String(account.lingqiShootTeamId || migrated.lingqiShootTeamId || '').trim(),
         lingqiEditTeamId: String(account.lingqiEditTeamId || migrated.lingqiEditTeamId || '').trim(),
+        wxNickName: wxProfileDisplay.pickWxNick(account.wxNickName, migrated.wxNickName),
+        wxAvatarUrl: wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl, migrated.wxAvatarUrl),
+        wxOpenId: String(account.openid || migrated.wxOpenId || '').trim(),
       })
       applied = true
     }
@@ -57,6 +61,9 @@ async function pullRegistryProfileAfterLogin() {
         ...base,
         id: String(account.registryPrId || base.id || '').trim(),
         lingqiPrId: String(account.lingqiPrId || base.lingqiPrId || '').trim(),
+        wxNickName: wxProfileDisplay.pickWxNick(account.wxNickName, base.wxNickName),
+        wxAvatarUrl: wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl, base.wxAvatarUrl),
+        wxOpenId: String(account.openid || base.wxOpenId || '').trim(),
       })
       applied = true
     }
