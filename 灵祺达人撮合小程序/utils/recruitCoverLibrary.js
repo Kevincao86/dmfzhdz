@@ -1,4 +1,4 @@
-const manifest = require('./recruitCoverLibrary.manifest.json')
+const manifest = require('./recruitCoverLibrary.manifest.js')
 
 const MP_COVER_ROOT = '/assets/recruit-covers/'
 

@@ -492,7 +492,8 @@ Page({
       preview = hit ? hit.url : ''
       hint = '已选图库封面'
     } else {
-      preview = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || []).url
+      const def = recruitCoverLib.resolveDefaultCover(f.platform, f.talentTags || [])
+      preview = def && def.url ? def.url : ''
     }
     this.setData({ coverPreviewUrl: preview, coverSourceHint: hint })
   },
