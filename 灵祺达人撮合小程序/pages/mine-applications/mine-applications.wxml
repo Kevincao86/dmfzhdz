@@ -1,15 +1,18 @@
 <view class="app-list-page page-shell">
-  <view wx:if="{{rows.length > 0}}" class="app-search-bar">
+  <view wx:if="{{rows.length > 0}}" class="app-list-toolbar">
+  <view class="app-search-bar">
+    <text class="app-search-icon" aria-hidden="true">⌕</text>
     <input
       class="app-search-input"
       type="text"
       placeholder="搜索商单、门店、城市、单号"
+      placeholder-class="app-search-ph"
       value="{{keyword}}"
       bindinput="onKeywordInput"
       confirm-type="search"
     />
   </view>
-  <view wx:if="{{rows.length > 0}}" class="app-filter-bar">
+  <view class="app-filter-bar">
     <view class="app-filter-cell">
       <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
         <view class="app-filter-item {{timeFilter !== 'all' ? 'app-filter-item--on' : ''}}">
@@ -34,6 +37,7 @@
         </view>
       </picker>
     </view>
+  </view>
   </view>
 
   <view wx:if="{{loading}}" class="card state-loading">
