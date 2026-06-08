@@ -12,12 +12,12 @@ Page({
     filteredRows: [],
     loading: true,
     timeFilter: 'all',
-    timeFilterLabel: '全部时间',
+    timeFilterLabel: '时间',
     category: '全部',
-    categoryLabel: '全部类目',
+    categoryLabel: '类目',
     province: '全部',
     city: '全部',
-    regionLabel: '全部省份',
+    regionLabel: '城市',
     timeOptions: appFilters.APPLICATION_TIME_FILTERS,
     categoryOptions: appFilters.CATEGORY_FILTERS,
     cityOptions: ['全部'],
@@ -92,7 +92,7 @@ Page({
     const opt = this.data.timeOptions[idx] || this.data.timeOptions[0]
     this.setData({
       timeFilter: opt.id,
-      timeFilterLabel: opt.label,
+      timeFilterLabel: opt.id === 'all' ? '时间' : opt.label,
       filteredRows: this.applyFilters(this.data.rows),
     })
   },
@@ -101,7 +101,7 @@ Page({
     const val = this.data.categoryOptions[idx] || '全部'
     this.setData({
       category: val,
-      categoryLabel: val === '全部' ? '全部类目' : val,
+      categoryLabel: val === '全部' ? '类目' : val,
       filteredRows: this.applyFilters(this.data.rows),
     })
   },
@@ -111,7 +111,7 @@ Page({
     this.setData({
       city: val,
       province: '全部',
-      regionLabel: val === '全部' ? '全部省份' : val,
+      regionLabel: val === '全部' ? '城市' : val,
       filteredRows: this.applyFilters(this.data.rows),
     })
   },
