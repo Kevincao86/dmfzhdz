@@ -3,7 +3,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { rawBody, sendMerchantJson } from './merchantGatewayShared.js'
-import { mergeVideoAiMerchantEnvWithSnapshot } from '../../vite-plugins/registryVideoAiEnvMerge.js'
+import { mergeVideoAiMerchantEnvWithSnapshot } from '../../vite-plugins/merchantVideoAiGateway.js'
 import { fetchRemoteVideoBuffer } from '../../vite-plugins/videoDownloadProxyCore.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls } from '../../vite-plugins/videoConcatServer.js'
 
