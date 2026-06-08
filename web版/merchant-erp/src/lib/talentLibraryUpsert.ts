@@ -58,6 +58,16 @@ export function upsertTalentLibraryFromApplicant(
     lastMerchantOrderNo: opts.merchantOrderNo,
     province: String(opts.applicant.province || (idx >= 0 ? list[idx]!.province : '') || '').trim() || undefined,
     city: String(opts.applicant.city || (idx >= 0 ? list[idx]!.city : '') || '').trim() || undefined,
+    gender:
+      String(opts.applicant.gender || (idx >= 0 ? list[idx]!.gender : '') || '').trim() || undefined,
+    accountTags: (() => {
+      const fromApplicant = Array.isArray(opts.applicant.accountTags)
+        ? opts.applicant.accountTags.map((t) => String(t || '').trim()).filter(Boolean)
+        : []
+      if (fromApplicant.length) return fromApplicant
+      const prev = idx >= 0 ? list[idx]!.accountTags : undefined
+      return Array.isArray(prev) && prev.length ? prev : undefined
+    })(),
   }
 
   if (idx >= 0) {
