@@ -9,6 +9,7 @@ import {
   Library,
   LogOut,
   Megaphone,
+  BookOpen,
   Shield,
   Smartphone,
   UserSearch,
@@ -55,6 +56,9 @@ const OPS_NAV: {
     icon: Headphones,
     permission: 'support_mp',
   },
+  { to: '/help-manual', label: '帮助手册 · 商家版', icon: BookOpen, permission: 'help_manual' },
+  { to: '/help-manual/partner', label: '服务商版', icon: BookOpen, permission: 'help_manual', indent: true },
+  { to: '/help-manual/fulfillment', label: '履约平台', icon: BookOpen, permission: 'help_manual', indent: true },
 ]
 
 function navVisible(session: OpsSession, item: (typeof OPS_NAV)[number]): boolean {

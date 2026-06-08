@@ -8,6 +8,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import EditionLandingToggle from './landing/EditionLandingToggle'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingSection3 from './landing/LandingSection3'
+import LoginPortalNav from '../components/login/LoginPortalNav'
 import {
   EDITION_LABEL,
   getLandingConfig,
@@ -75,13 +76,19 @@ export default function LandingPage() {
                 <p className="text-base font-bold sm:text-lg">{config.productTitle}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => (onSameEdition ? nav('/login') : goAuth())}
-              className="rounded-full bg-white px-6 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-white/95"
-            >
-              登录
-            </button>
+            <div className="flex items-center gap-4 sm:gap-6">
+              <LoginPortalNav
+                linkClassName="text-white/70 hover:text-white"
+                activeClassName="text-white font-semibold"
+              />
+              <button
+                type="button"
+                onClick={() => (onSameEdition ? nav('/login') : goAuth())}
+                className="rounded-full bg-white px-6 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-white/95"
+              >
+                登录
+              </button>
+            </div>
           </header>
 
           <div className="pointer-events-none absolute bottom-28 left-6 z-10 max-w-xl sm:left-10 lg:left-14 lg:bottom-32">

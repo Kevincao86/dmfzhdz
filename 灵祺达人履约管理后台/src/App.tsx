@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
+import HelpManualPage from '@merchant/pages/HelpManualPage'
+import TeamIntroPage from '@merchant/pages/TeamIntroPage'
+import LegalDocPage from '@merchant/pages/legal/LegalDocPage'
 import AppShell from './components/AppShell'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
@@ -42,6 +45,11 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/help" element={<HelpManualPage edition="fulfillment" />} />
+      <Route path="/help/:articleId" element={<HelpManualPage edition="fulfillment" />} />
+      <Route path="/team" element={<TeamIntroPage edition="fulfillment" />} />
+      <Route path="/legal/privacy" element={<LegalDocPage edition="fulfillment" doc="privacy" />} />
+      <Route path="/legal/aup" element={<LegalDocPage edition="fulfillment" doc="aup" />} />
       <Route
         element={
           <RequireAuth>

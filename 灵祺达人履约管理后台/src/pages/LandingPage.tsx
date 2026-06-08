@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
+import LoginPortalNav from '@merchant/components/login/LoginPortalNav'
 import { cn } from '../cn'
 import { getToken } from '../lib/mpSession'
 import WorkIdentityToggle from '../components/WorkIdentityToggle'
@@ -76,13 +77,19 @@ export default function LandingPage() {
                 <p className="text-base font-bold sm:text-lg">灵祺星选平台</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setLoginPickerOpen(true)}
-              className="rounded-full bg-white px-6 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-white/95"
-            >
-              登录
-            </button>
+            <div className="flex items-center gap-4 sm:gap-6">
+              <LoginPortalNav
+                linkClassName="text-white/70 hover:text-white"
+                activeClassName="text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setLoginPickerOpen(true)}
+                className="rounded-full bg-white px-6 py-2 text-sm font-semibold text-slate-900 shadow-lg transition hover:bg-white/95"
+              >
+                登录
+              </button>
+            </div>
           </header>
 
           <div className="pointer-events-none absolute bottom-28 left-6 z-10 max-w-xl sm:left-10 lg:left-14 lg:bottom-32">

@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import { cn } from '../../cn'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
@@ -27,6 +28,8 @@ type Props = {
   workIdentity: MpWorkIdentity
   showDevPreview?: boolean
   onDevPreview?: () => void
+  rememberPassword?: boolean
+  onRememberPasswordChange?: (v: boolean) => void
 }
 
 export default function TalentLoginAuthPanel({
@@ -44,6 +47,8 @@ export default function TalentLoginAuthPanel({
   workIdentity,
   showDevPreview,
   onDevPreview,
+  rememberPassword,
+  onRememberPasswordChange,
 }: Props) {
   function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -125,6 +130,13 @@ export default function TalentLoginAuthPanel({
               onChange={(e) => onPasswordChange(e.target.value)}
             />
           </div>
+          {typeof rememberPassword === 'boolean' && onRememberPasswordChange ? (
+            <RememberPasswordRow
+              checked={rememberPassword}
+              onChange={onRememberPasswordChange}
+              className="flex items-center gap-2 text-sm text-slate-600"
+            />
+          ) : null}
           {err ? (
             <p className="rounded-xl bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-100">{err}</p>
           ) : null}

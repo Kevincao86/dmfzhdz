@@ -92,6 +92,8 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const recruitmentVideoSubmissions: RegistryVideoSubmission[] = Array.isArray(parsed?.recruitmentVideoSubmissions)
     ? (parsed!.recruitmentVideoSubmissions as RegistryVideoSubmission[])
     : []
+  const helpManualCategories = Array.isArray(parsed?.helpManualCategories) ? parsed!.helpManualCategories : []
+  const helpManualArticles = Array.isArray(parsed?.helpManualArticles) ? parsed!.helpManualArticles : []
   const videoAi = normalizeRegistryVideoAi(parsed?.videoAi)
   const videoAiUpdatedAt =
     typeof parsed?.videoAiUpdatedAt === 'string' && parsed.videoAiUpdatedAt
@@ -118,6 +120,8 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     talentPoolCandidates,
     recruitmentScheduleRows,
     recruitmentVideoSubmissions,
+    helpManualCategories,
+    helpManualArticles,
   }
 }
 

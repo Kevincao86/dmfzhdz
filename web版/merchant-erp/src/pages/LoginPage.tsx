@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 import { cn } from '../cn'
+import LoginLegalFooter from '../components/login/LoginLegalFooter'
+import LoginPortalNav from '../components/login/LoginPortalNav'
 import { editionLabel, isPartnerEdition } from '../lib/appEdition'
 import { BRAND_LOGO_URL, BRAND_NAME, BRAND_NAME_SHORT } from '../lib/brand'
 import { supabase, supabaseConfigured, missingSupabaseClientEnvKeys } from '../lib/supabaseClient'
@@ -94,15 +95,19 @@ export default function LoginPage() {
         `,
       }}
     >
-      <Link
-        to="/"
-        className="absolute left-4 top-[max(1rem,env(safe-area-inset-top))] z-10 inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-3 py-2 text-sm text-slate-600 shadow-sm backdrop-blur-sm hover:text-cyan-700 sm:left-8"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden />
-        返回首页
-      </Link>
+      <header className="absolute left-0 right-0 top-[max(0.75rem,env(safe-area-inset-top))] z-10 px-4 sm:px-8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+          <LoginPortalNav />
+          <Link
+            to="/login"
+            className="rounded-full bg-gradient-to-r from-cyan-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+          >
+            登录
+          </Link>
+        </div>
+      </header>
 
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 mt-14 flex items-center gap-3">
         <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-11 w-11 object-contain drop-shadow-sm" />
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
@@ -128,9 +133,7 @@ export default function LoginPage() {
           onErr={setErr}
           onLoginSuccess={() => navigate('/home', { replace: true })}
         />
-        <p className="mt-6 text-center text-[11px] leading-relaxed text-slate-500">
-          登录即表示同意平台服务条款与隐私政策 · 数据经加密传输与存储
-        </p>
+        <LoginLegalFooter />
       </div>
     </div>
   )

@@ -31,8 +31,17 @@ import LocalPromotionLeadsPage from './pages/LocalPromotionLeadsPage'
 import WalletPage from './pages/WalletPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import HelpManualPage from './pages/HelpManualPage'
+import TeamIntroPage from './pages/TeamIntroPage'
+import LegalDocPage from './pages/legal/LegalDocPage'
+import { isPartnerEdition } from './lib/appEdition'
+
+function portalEdition() {
+  return isPartnerEdition() ? ('partner' as const) : ('merchant' as const)
+}
 
 export default function App() {
+  const pubEdition = portalEdition()
   return (
     <BrowserRouter>
       <MembershipProvider>
@@ -41,6 +50,11 @@ export default function App() {
         <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/help" element={<HelpManualPage edition={pubEdition} />} />
+        <Route path="/help/:articleId" element={<HelpManualPage edition={pubEdition} />} />
+        <Route path="/team" element={<TeamIntroPage edition={pubEdition} />} />
+        <Route path="/legal/privacy" element={<LegalDocPage edition={pubEdition} doc="privacy" />} />
+        <Route path="/legal/aup" element={<LegalDocPage edition={pubEdition} doc="aup" />} />
         <Route
           element={
             <RequireSupabaseAuth>
