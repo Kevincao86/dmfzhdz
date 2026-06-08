@@ -4,12 +4,20 @@ type Props = {
   title: string
   subtitle?: string
   badge?: string
+  /** 嵌入大厅工具栏卡片时去掉外层边框，避免双层卡片 */
+  inset?: boolean
   children?: ReactNode
 }
 
-export default function PageHero({ title, subtitle, badge, children }: Props) {
+export default function PageHero({ title, subtitle, badge, inset = false, children }: Props) {
   return (
-    <header className="page-hero rounded-2xl border p-5 md:p-6">
+    <header
+      className={
+        inset
+          ? 'page-hero page-hero--inset'
+          : 'page-hero rounded-2xl border p-5 md:p-6'
+      }
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {badge ? <span className="page-hero-badge">{badge}</span> : null}
