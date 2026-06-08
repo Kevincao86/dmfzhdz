@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="520" viewBox="0 0 1080 520">
+  <rect width="1080" height="520" fill="#eff6ff"/>
+  <text x="72" y="78" fill="#111827" font-size="42" font-family="PingFang SC, Microsoft YaHei, Arial" font-weight="800">服务商 ERP：把多个客户放进一张经营地图</text>
+  <text x="72" y="122" fill="#475569" font-size="24" font-family="PingFang SC, Microsoft YaHei, Arial">同源商家 ERP 能力，叠加服务商身份、客户绑定与客户视图切换。</text>
+  <g font-family="PingFang SC, Microsoft YaHei, Arial">
+    <rect x="80" y="196" width="220" height="160" rx="24" fill="#1e40af"/>
+    <text x="121" y="258" fill="#fff" font-size="30" font-weight="800">服务商账号</text>
+    <text x="124" y="304" fill="#dbeafe" font-size="22">独立租户/权限</text>
+    <rect x="430" y="162" width="180" height="92" rx="20" fill="#fff"/>
+    <text x="471" y="219" fill="#0f172a" font-size="25" font-weight="800">客户 A</text>
+    <rect x="430" y="290" width="180" height="92" rx="20" fill="#fff"/>
+    <text x="471" y="347" fill="#0f172a" font-size="25" font-weight="800">客户 B</text>
+    <rect x="740" y="196" width="220" height="160" rx="24" fill="#0f766e"/>
+    <text x="775" y="258" fill="#fff" font-size="30" font-weight="800">经营工作台</text>
+    <text x="779" y="304" fill="#ccfbf1" font-size="22">汇总/单客户视图</text>
+    <path d="M310 276 H410 M620 208 H720 M620 336 H720" stroke="#93c5fd" stroke-width="8" stroke-linecap="round"/>
+    <path d="M720 208 l-18 -14 v28z M720 336 l-18 -14 v28z M410 276 l-18 -14 v28z" fill="#93c5fd"/>
+  </g>
+  <rect x="72" y="420" width="936" height="56" rx="28" fill="#ffffff"/>
+  <text x="112" y="457" fill="#1e40af" font-size="24" font-family="PingFang SC, Microsoft YaHei, Arial" font-weight="700">适合代运营、本地生活服务商、区域运营团队、连锁品牌托管团队</text>
+</svg>

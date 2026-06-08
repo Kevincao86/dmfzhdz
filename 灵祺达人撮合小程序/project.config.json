@@ -57,6 +57,10 @@
       {
         "type": "glob",
         "value": "images/login-orbit/*.png"
+      },
+      {
+        "type": "glob",
+        "value": "assets/recruit-covers/**"
       }
     ],
     "include": []

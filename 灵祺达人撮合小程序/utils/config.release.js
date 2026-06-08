@@ -11,7 +11,11 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260607-pack-slim',
+  MP_BUILD_ID: 'mp-20260608-cdn-covers',
+  /** 招募封面图库 CDN（星选 Web public/recruit-covers，勿打入主包） */
+  RECRUIT_COVER_CDN_BASE: 'https://dr.mofangdianai.com/recruit-covers',
+  /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */
+  MP_SHARE_APP_NAME: '灵祺星选平台',
   /** 正式体验版仅展示数据库商单；开发者工具可在 config.local.js 设为 true 看演示 */
   MP_SHOW_DEMO_ORDERS: false,
 }
