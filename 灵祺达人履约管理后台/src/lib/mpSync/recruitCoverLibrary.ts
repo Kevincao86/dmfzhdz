@@ -52,6 +52,52 @@ export function getSuggestedGalleryItems(platform: string, talentTags: string[])
   return out
 }
 
+export function listCoverPlatformNames(): string[] {
+  return Object.keys((manifest.platforms || {}) as Record<string, CoverLibraryItem[]>)
+}
+
+export function listCoverTagNames(): string[] {
+  return Object.keys((manifest.tags || {}) as Record<string, CoverLibraryItem[]>)
+}
+
+export function getAllGalleryItems(): CoverLibraryItem[] {
+  const out: CoverLibraryItem[] = []
+  const seen = new Set<string>()
+  const add = (item: CoverLibraryItem) => {
+    if (!item || seen.has(item.id)) return
+    seen.add(item.id)
+    out.push({ ...item, url: webAssetUrl(item.path) })
+  }
+  for (const list of Object.values((manifest.platforms || {}) as Record<string, CoverLibraryItem[]>)) {
+    ;(list || []).forEach(add)
+  }
+  for (const list of Object.values((manifest.tags || {}) as Record<string, CoverLibraryItem[]>)) {
+    ;(list || []).forEach(add)
+  }
+  return out
+}
+
+export type CoverGalleryTab = 'recommended' | 'all' | 'platform' | 'tag'
+
+export function getGalleryItemsForTab(
+  tab: CoverGalleryTab,
+  platform: string,
+  talentTags: string[],
+  subKey = '',
+): CoverLibraryItem[] {
+  if (tab === 'recommended') return getSuggestedGalleryItems(platform, talentTags)
+  if (tab === 'all') return getAllGalleryItems()
+  if (tab === 'platform') {
+    const key = subKey || platform || '抖音'
+    return getPlatformCovers(key)
+  }
+  if (tab === 'tag') {
+    const key = subKey || talentTags[0] || listCoverTagNames()[0] || '美食'
+    return getTagCovers(key)
+  }
+  return getAllGalleryItems()
+}
+
 export function resolveDefaultCover(platform: string, talentTags: string[]): CoverLibraryItem {
   const platformCovers = getPlatformCovers(platform)
   if (platformCovers.length) return platformCovers[0]

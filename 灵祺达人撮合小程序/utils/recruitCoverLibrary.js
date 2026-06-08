@@ -45,6 +45,43 @@ function getSuggestedGalleryItems(platform, talentTags) {
   return out
 }
 
+function listCoverPlatformNames() {
+  return Object.keys(manifest.platforms || {})
+}
+
+function listCoverTagNames() {
+  return Object.keys(manifest.tags || {})
+}
+
+function getAllGalleryItems() {
+  const out = []
+  const seen = new Set()
+  const add = (item) => {
+    if (!item || seen.has(item.id)) return
+    seen.add(item.id)
+    out.push({ ...item, url: mpAssetUrl(item.path) })
+  }
+  for (const list of Object.values(manifest.platforms || {})) {
+    ;(list || []).forEach(add)
+  }
+  for (const list of Object.values(manifest.tags || {})) {
+    ;(list || []).forEach(add)
+  }
+  return out
+}
+
+function getGalleryItemsForTab(tab, platform, talentTags, subKey) {
+  const key = String(subKey || '').trim()
+  if (tab === 'recommended') return getSuggestedGalleryItems(platform, talentTags)
+  if (tab === 'all') return getAllGalleryItems()
+  if (tab === 'platform') return getPlatformCovers(key || platform || '抖音')
+  if (tab === 'tag') {
+    const tagKey = key || (talentTags && talentTags[0]) || listCoverTagNames()[0] || '美食'
+    return getTagCovers(tagKey)
+  }
+  return getAllGalleryItems()
+}
+
 function resolveDefaultCover(platform, talentTags) {
   const platformCovers = getPlatformCovers(platform)
   if (platformCovers.length) return platformCovers[0]
@@ -120,6 +157,10 @@ module.exports = {
   getPlatformCovers,
   getTagCovers,
   getSuggestedGalleryItems,
+  listCoverPlatformNames,
+  listCoverTagNames,
+  getAllGalleryItems,
+  getGalleryItemsForTab,
   resolveDefaultCover,
   coverImageFromOrder,
   resolveOrderCoverUrl,

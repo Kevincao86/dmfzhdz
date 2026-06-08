@@ -1335,3 +1335,56 @@
   font-size: 22rpx;
   color: #475569;
 }
+
+.pub-cover-tabs {
+  display: flex;
+  gap: 12rpx;
+  padding: 0 24rpx 16rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.pub-cover-tab {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.pub-cover-tab--on {
+  color: #fff;
+  background: #7c3aed;
+}
+
+.pub-cover-sub-scroll {
+  white-space: nowrap;
+  padding: 0 0 12rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.pub-cover-sub-row {
+  display: inline-flex;
+  gap: 12rpx;
+  padding: 0 24rpx;
+}
+
+.pub-cover-sub {
+  display: inline-block;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.pub-cover-sub--on {
+  color: #fff;
+  background: #0891b2;
+}
+
+.pub-full-scroll--cover {
+  flex: 1;
+  min-height: 0;
+}
