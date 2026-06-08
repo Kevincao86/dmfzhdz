@@ -7,6 +7,9 @@ import { ROLE_LABEL } from '../landing/landingCopy'
 
 export type LoginTab = 'password' | 'scan'
 
+/** 微信开放平台网站应用资质就绪后改为 true */
+export const SCAN_LOGIN_ENABLED = false
+
 const inputClass =
   'w-full rounded-xl border border-slate-200/90 bg-white/90 px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-500/15 sm:text-sm'
 
@@ -144,7 +147,7 @@ export default function TalentLoginAuthPanel({
             {loading ? '登录中…' : '进入星选平台'}
           </button>
         </form>
-      ) : (
+      ) : SCAN_LOGIN_ENABLED ? (
         <div className="space-y-4 text-center">
           <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-inner">
             <span className="break-all text-xs leading-snug text-slate-700">{qrPayload || '加载二维码…'}</span>
@@ -153,6 +156,14 @@ export default function TalentLoginAuthPanel({
           <p className="text-xs text-amber-700/90">
             接口已打通；微信开放平台网站应用资质齐全后可展示正式二维码
           </p>
+        </div>
+      ) : (
+        <div className="space-y-4 py-8 text-center">
+          <div className="mx-auto flex h-52 w-52 flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-6">
+            <p className="text-base font-semibold text-slate-800">正在接入中</p>
+            <p className="mt-2 text-sm text-slate-500">尽情期待</p>
+          </div>
+          <p className="text-sm text-slate-500">微信扫码登录即将上线，请先用账号密码登录</p>
         </div>
       )}
 
