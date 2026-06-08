@@ -2,7 +2,9 @@
 page {
   --lq-primary: #7c83ff;
   --lq-primary-dark: #6d72f0;
-  --lq-primary-deep: #5b61e8;
+  --lq-primary-deep: #6d72f0;
+  /** 与 app.json navigationBarBackgroundColor 保持一致 */
+  --lq-nav-bar: #9b87f5;
   --lq-primary-soft: #a5abff;
   --lq-primary-50: #f3f1ff;
   --lq-primary-100: #e8e4ff;
