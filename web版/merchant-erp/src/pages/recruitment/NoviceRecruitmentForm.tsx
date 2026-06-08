@@ -1,6 +1,9 @@
 import { ChevronLeft, RefreshCw, Sparkles, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MeooPayQrModal from '../../components/MeooPayQrModal'
+import RecruitmentCityPickerModal, {
+  RecruitmentCityField,
+} from '../../components/recruitment/RecruitmentCityPickerModal'
 import DouyinStorePickerModal from '../../components/store/DouyinStorePickerModal'
 import { cn } from '../../cn'
 import { buildErpRegistryTenant } from '../../lib/buildErpRegistryTenant'
@@ -11,6 +14,11 @@ import {
   resolveCityKolTierBands,
   type CityKolTierBands,
 } from '../../lib/recruitmentCityTierPricing'
+import {
+  formatRecruitmentCitySummary,
+  hasRecruitmentCitySelection,
+  primaryRecruitmentCity,
+} from '../../lib/recruitmentCityPicker'
 import { loadRecruitmentIndustryL1Labels } from '../../lib/recruitmentIndustryOptions'
 import { buildRecruitmentTierPlan } from '../../lib/merchantRecruitmentTierPlan'
 import { submitMerchantRecruitmentWithMpPublish } from '../../lib/merchantRecruitmentSubmit'
@@ -64,7 +72,9 @@ type Props = {
 
 export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [deliveryPlatform, setDeliveryPlatform] = useState<NoviceDeliveryPlatform>('抖音')
-  const [city, setCity] = useState('')
+  const [cityNational, setCityNational] = useState(false)
+  const [selectedCities, setSelectedCities] = useState<string[]>([])
+  const [cityPickerOpen, setCityPickerOpen] = useState(false)
   const [industry, setIndustry] = useState('餐饮')
   const [industryOptions, setIndustryOptions] = useState<string[]>(['餐饮'])
   const [packageNote, setPackageNote] = useState('')
@@ -113,7 +123,8 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   useEffect(() => {
     setAllocationFresh(false)
   }, [
-    city,
+    cityNational,
+    selectedCities,
     industry,
     packageNote,
     budget,
@@ -129,6 +140,9 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   ])
 
   const isDouyin = deliveryPlatform === '抖音'
+  const citySummary = formatRecruitmentCitySummary(cityNational, selectedCities)
+  const primaryCity = primaryRecruitmentCity(cityNational, selectedCities)
+  const hasCity = hasRecruitmentCitySelection(cityNational, selectedCities)
 
   const tierBandLines = useMemo(
     () => (cityTierBands ? formatCityTierBandsLines(cityTierBands) : []),
@@ -145,7 +159,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   }, [])
 
   useEffect(() => {
-    if (!isDouyin || !city.trim()) {
+    if (!isDouyin || !hasCity || cityNational || !primaryCity) {
       setCityTierBands(null)
       setCityTierSource(null)
       setCityTierLoading(false)
@@ -154,7 +168,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     let cancelled = false
     const timer = window.setTimeout(() => {
       setCityTierLoading(true)
-      void resolveCityKolTierBandsSmart({ city: city.trim(), industry })
+      void resolveCityKolTierBandsSmart({ city: primaryCity, industry })
         .then(({ bands, source }) => {
           if (cancelled) return
           setCityTierBands(bands)
@@ -162,7 +176,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
         })
         .catch(() => {
           if (cancelled) return
-          setCityTierBands(resolveCityKolTierBands(city))
+          setCityTierBands(resolveCityKolTierBands(primaryCity))
           setCityTierSource('static')
         })
         .finally(() => {
@@ -173,12 +187,12 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [city, industry, isDouyin])
+  }, [cityNational, hasCity, industry, isDouyin, primaryCity])
 
   const runAllocation = useCallback(async () => {
     setAiErr(null)
-    if (!city.trim()) {
-      setAiErr('请填写城市，便于按同城达人行情估算档位')
+    if (!hasCity) {
+      setAiErr('请选择招募城市，便于按同城达人行情估算档位')
       return
     }
     if (!Number.isFinite(budget) || budget <= 0) {
@@ -189,7 +203,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     try {
       const res = isDouyin
         ? await generateNoviceKolAllocation({
-            city: city.trim(),
+            city: primaryCity,
             industry,
             packageNote,
             budgetYuan: budget,
@@ -205,7 +219,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     } finally {
       setAiLoading(false)
     }
-  }, [budget, city, cityTierBands, industry, isDouyin, kolCommissionInput, packageNote, strategy])
+  }, [budget, cityTierBands, hasCity, industry, isDouyin, kolCommissionInput, packageNote, primaryCity, strategy])
 
   const submit = async () => {
     setPushErr(null)
@@ -213,8 +227,8 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       setPushErr('请至少选择一家已绑定的探店门店')
       return
     }
-    if (!city.trim()) {
-      setPushErr('请填写城市')
+    if (!hasCity) {
+      setPushErr('请选择招募城市')
       return
     }
     if (!Number.isFinite(budget) || budget <= 0) {
@@ -264,10 +278,10 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     const kolPct = isDouyin ? parseKolCommissionPctFromDraft(kolCommissionInput) : 0
     const tenant = buildErpRegistryTenant()
     const customerName = tenant?.merchantName ?? '灵祺 ERP 商户'
-    const storeName = selectedStores.map((s) => s.name).join('、') || city.trim()
+    const storeName = selectedStores.map((s) => s.name).join('、') || citySummary
     const storeAddress =
       selectedStores.map((s) => (s.address?.trim() ? `${s.name}（${s.address.trim()}）` : s.name)).join('；') ||
-      `${city.trim()} · ${industry}`
+      `${citySummary} · ${industry}`
     const storeIdsLine = selectedStores.map((s) => s.id).join(',')
     const id = `RO-NV${Date.now()}`
     const headcountForOrder =
@@ -298,13 +312,13 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${city.trim()}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；同城档位参考:${tierPriceRef || '—'}；策略:${kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}档位成本来源:${cityTierSource === 'ai' ? 'AI估算' : cityTierSource === 'static' ? '默认表' : '—'}；分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；同城档位参考:${tierPriceRef || '—'}；策略:${kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}档位成本来源:${cityTierSource === 'ai' ? 'AI估算' : cityTierSource === 'static' ? '默认表' : '—'}；分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     const tierPlan = buildRecruitmentTierPlan({
       budgetYuan: budget,
       targetHeadcount: headcountForOrder,
-      city: city.trim(),
+      city: primaryCity,
       strategy,
       feeType,
       cityTierBands: cityTierBands ?? undefined,
@@ -466,15 +480,14 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
 
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">
-              城市 <span className="text-red-500">*</span>
+              招募城市 <span className="text-red-500">*</span>
             </label>
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="例如：成都"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            <RecruitmentCityField
+              cityNational={cityNational}
+              selectedCities={selectedCities}
+              onClick={() => setCityPickerOpen(true)}
             />
-            {isDouyin && city.trim() ? (
+            {isDouyin && hasCity && !cityNational && primaryCity ? (
               <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-xs text-indigo-900">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <p className="font-medium text-indigo-950">同城达人档位参考成本（元/人次，估算）</p>
@@ -778,6 +791,16 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           </div>
         </div>
       </div>
+
+      <RecruitmentCityPickerModal
+        open={cityPickerOpen}
+        value={{ cityNational, selectedCities }}
+        onClose={() => setCityPickerOpen(false)}
+        onConfirm={(next) => {
+          setCityNational(next.cityNational)
+          setSelectedCities(next.selectedCities)
+        }}
+      />
 
       <DouyinStorePickerModal
         open={storePickerOpen}
