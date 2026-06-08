@@ -5,6 +5,8 @@ export type RegistryHelpManualCategory = {
   edition: HelpManualEdition
   title: string
   sortOrder: number
+  /** 一级分类为空；有值则为二级分类 */
+  parentId?: string
 }
 
 export type RegistryHelpManualArticle = {

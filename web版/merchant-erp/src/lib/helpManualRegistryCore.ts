@@ -3,6 +3,7 @@ import type {
   RegistryHelpManualArticle,
   RegistryHelpManualCategory,
 } from './helpManualTypes.js'
+import { normalizeHelpManualCategories } from './helpManualCategoryTree.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
 
 export function helpManualSliceForEdition(
@@ -26,6 +27,6 @@ export function setHelpManualForEdition(
 ): void {
   const restCat = (data.helpManualCategories ?? []).filter((c) => c.edition !== edition)
   const restArt = (data.helpManualArticles ?? []).filter((a) => a.edition !== edition)
-  data.helpManualCategories = [...restCat, ...categories].slice(0, 500)
+  data.helpManualCategories = [...restCat, ...normalizeHelpManualCategories(categories)].slice(0, 500)
   data.helpManualArticles = [...restArt, ...articles].slice(0, 2000)
 }
