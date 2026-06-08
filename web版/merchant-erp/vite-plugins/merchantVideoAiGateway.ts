@@ -12,13 +12,18 @@ import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
   DOUBAO_VIDEO_CATALOG,
   isArkQuotaHopableError,
+  isQwenVideoModelHopableError,
   isQwenVideoTaskId,
   mergeCatalogModelIds,
   stripQwenVideoTaskPrefix,
   wrapQwenVideoTaskId,
 } from '../src/lib/arkModelCatalog.js'
 import { qwenVideoModelCandidates } from '../src/lib/qwenVisionCatalog.js'
-import { buildQwenVisionVideoRequest } from '../src/lib/qwenVisionApi.js'
+import {
+  buildQwenVisionVideoRequest,
+  isQwenWan27I2vModel,
+  isQwenWan27VideoModel,
+} from '../src/lib/qwenVisionApi.js'
 import {
   DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   describeArkVideoSetupIssue,
@@ -287,6 +292,74 @@ function firstImageUrlFromBody(body: Record<string, unknown>): string | undefine
   return undefined
 }
 
+function parseImageRefToBuffer(
+  imgUrl: string,
+): { buffer: Buffer; contentType: string; fileName: string } | null {
+  const t = imgUrl.trim()
+  if (!t) return null
+  const dataMatch = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(t)
+  if (dataMatch) {
+    const contentType = dataMatch[1]!.toLowerCase()
+    const b64 = dataMatch[2]!.replace(/\s/g, '')
+    if (!b64) return null
+    const buffer = Buffer.from(b64, 'base64')
+    if (!buffer.length) return null
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+    return { buffer, contentType, fileName: `qwen-i2v-${Date.now()}.${ext}` }
+  }
+  if (/^https?:\/\//i.test(t)) return null
+  const pure = t.replace(/\s/g, '')
+  if (!/^[a-z0-9+/=]+$/i.test(pure)) return null
+  const buffer = Buffer.from(pure, 'base64')
+  if (!buffer.length) return null
+  return { buffer, contentType: 'image/jpeg', fileName: `qwen-i2v-${Date.now()}.jpg` }
+}
+
+async function ensurePublicHttpsImageUrl(
+  viteRoot: string | undefined,
+  env: MerchantAiEnv,
+  imgUrl: string,
+): Promise<string | null> {
+  const t = imgUrl.trim()
+  if (/^https?:\/\//i.test(t)) return t
+  const parsed = parseImageRefToBuffer(t)
+  if (!parsed) return null
+  try {
+    const { loadIceGatewayConfig } = await import('./aliyunIceGateway.js')
+    const { putIceSourceObject } = await import('./aliyunOssIceUpload.js')
+    const cfg = await loadIceGatewayConfig(viteRoot ?? process.cwd(), env as Record<string, string | undefined>)
+    if (!cfg) return null
+    const put = await putIceSourceObject(cfg, env as Record<string, string | undefined>, {
+      fileName: parsed.fileName,
+      contentType: parsed.contentType,
+      buffer: parsed.buffer,
+    })
+    return put.ok ? put.mediaUrl : null
+  } catch {
+    return null
+  }
+}
+
+function extractQwenApiErrorMessage(j: Record<string, unknown>, fallback: string): string {
+  const direct = typeof j.message === 'string' ? j.message.trim() : ''
+  if (direct) return direct
+  const code = typeof j.code === 'string' ? j.code.trim() : ''
+  if (code) return code
+  const details = j.details
+  if (Array.isArray(details)) {
+    for (const row of details) {
+      if (!row || typeof row !== 'object') continue
+      const msg = (row as { message?: unknown }).message
+      if (typeof msg === 'string' && msg.trim()) return msg.trim()
+    }
+  }
+  return fallback
+}
+
+function isQwenVideoTaskHopableError(msg: string): boolean {
+  return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
+}
+
 async function qwenPollVideoTask(apiKey: string, taskId: string): Promise<ArkPollState> {
   const url = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
   for (let i = 0; i < 120; i++) {
@@ -320,6 +393,7 @@ async function qwenPollVideoTask(apiKey: string, taskId: string): Promise<ArkPol
 async function qwenPostVideoTask(
   env: MerchantAiEnv,
   body: Record<string, unknown>,
+  viteRoot?: string,
 ): Promise<{ ok: false; msg: string } | { ok: true; taskId: string; modelUsed: string }> {
   const key = qwenBearerKey(env)
   if (!key) {
@@ -331,8 +405,8 @@ async function qwenPostVideoTask(
   const mode = detectVideoInputMode(body)
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const flags = parseSeedanceCliFlags(typeof body.flags === 'string' ? body.flags : '')
-  const imgUrl = mode === 'i2v' ? firstImageUrlFromBody(body) : undefined
-  if (mode === 'i2v' && !imgUrl) {
+  const rawImgUrl = mode === 'i2v' ? firstImageUrlFromBody(body) : undefined
+  if (mode === 'i2v' && !rawImgUrl) {
     return { ok: false, msg: '图生视频缺少参考图，无法切换千问 i2v 模型。' }
   }
   if (!prompt && mode === 't2v') {
@@ -341,6 +415,16 @@ async function qwenPostVideoTask(
 
   let lastMsg = '千问视频生成失败'
   for (const modelId of qwenVideoCandidatesFromEnv(env, mode)) {
+    let imgUrl = rawImgUrl
+    if (imgUrl && isQwenWan27VideoModel(modelId) && isQwenWan27I2vModel(modelId)) {
+      const publicUrl = await ensurePublicHttpsImageUrl(viteRoot, env, imgUrl)
+      if (!publicUrl) {
+        lastMsg =
+          '千问 wan2.7 图生视频需要公网 https 参考图，临时上传 OSS 失败。请在运营台配置云剪 OSS 前缀后重试。'
+        continue
+      }
+      imgUrl = publicUrl
+    }
     const built = buildQwenVisionVideoRequest(modelId, prompt, {
       imgUrl,
       duration: flags.duration,
@@ -358,11 +442,8 @@ async function qwenPostVideoTask(
       })
       const j = await readJsonResponse(res)
       if (!res.ok) {
-        lastMsg =
-          (typeof j.message === 'string' && j.message) ||
-          (typeof j.code === 'string' && j.code) ||
-          `千问视频创建失败 HTTP ${res.status}`
-        if (!isArkQuotaHopableError(lastMsg)) continue
+        lastMsg = extractQwenApiErrorMessage(j, `千问视频创建失败 HTTP ${res.status}`)
+        if (!isQwenVideoTaskHopableError(lastMsg)) continue
         continue
       }
       const output = j.output as Record<string, unknown> | undefined
@@ -374,7 +455,7 @@ async function qwenPostVideoTask(
       return { ok: true, taskId, modelUsed: modelId }
     } catch (e) {
       lastMsg = e instanceof Error ? e.message : String(e)
-      if (!isArkQuotaHopableError(lastMsg)) continue
+      if (!isQwenVideoTaskHopableError(lastMsg)) continue
     }
   }
   return {
@@ -659,6 +740,7 @@ async function arkPostVideoGenerationTask(
 async function arkCreateVideoTask(
   env: MerchantAiEnv,
   body: Record<string, unknown>,
+  viteRoot?: string,
 ): Promise<
   | { ok: false; msg: string; status?: number }
   | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
@@ -702,7 +784,7 @@ async function arkCreateVideoTask(
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
   }
 
-  const qwen = await qwenPostVideoTask(env, body)
+  const qwen = await qwenPostVideoTask(env, body, viteRoot)
   if (qwen.ok === true) {
     return {
       ok: true,
@@ -1177,7 +1259,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
       return true
     }
-    const r = await arkCreateVideoTask(env, parsed)
+    const r = await arkCreateVideoTask(env, parsed, input.viteRoot)
     if (r.ok === true) {
       json(res, 200, {
         ok: true,

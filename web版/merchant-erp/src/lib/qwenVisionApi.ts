@@ -125,6 +125,22 @@ export function extractQwenVisionImageUrls(output: Record<string, unknown> | und
   return urls
 }
 
+/** wan2.7 图生视频新协议：input.media 必填，url 须为公网 https */
+export function isQwenWan27VideoModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  return /^wan2\.7-/.test(m) || m === 'wan2.7-i2v' || m === 'wan2.7-t2v' || m === 'wan2.7-r2v'
+}
+
+export function isQwenWan27I2vModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  return /-i2v/.test(m) || m === 'wan2.7-r2v'
+}
+
+function wan27ResolutionFromRatio(ratio?: string): string {
+  if (ratio === '16:9' || ratio === '1:1') return '720P'
+  return '720P'
+}
+
 /** 构建视频合成请求 */
 export function buildQwenVisionVideoRequest(
   modelId: string,
@@ -135,10 +151,31 @@ export function buildQwenVisionVideoRequest(
     ratio?: string
   },
 ): QwenVisionRequest {
-  const input: Record<string, unknown> = {
-    prompt: prompt || '生成连贯竖屏口播短视频，人物口型自然。',
-  }
+  const text = prompt || '生成连贯竖屏口播短视频，人物口型自然。'
   const img = opts?.imgUrl?.trim()
+  const useWan27 = isQwenWan27VideoModel(modelId)
+
+  if (useWan27) {
+    const input: Record<string, unknown> = { prompt: text }
+    if (img && isQwenWan27I2vModel(modelId)) {
+      input.media = [{ type: 'first_frame', url: img }]
+    }
+    const parameters: Record<string, unknown> = {
+      resolution: wan27ResolutionFromRatio(opts?.ratio),
+      prompt_extend: true,
+      watermark: false,
+    }
+    const dur = opts?.duration
+    if (dur && Number.isFinite(dur)) {
+      parameters.duration = Math.max(2, Math.min(15, Math.round(dur)))
+    }
+    return {
+      url: `${DASHSCOPE}/api/v1/services/aigc/video-generation/video-synthesis`,
+      body: { model: modelId, input, parameters },
+    }
+  }
+
+  const input: Record<string, unknown> = { prompt: text }
   if (img) {
     input.img_url = img
     input.first_frame_url = img

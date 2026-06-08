@@ -17,13 +17,17 @@ import {
   postSeedanceVideoStart,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
-import { isArkQuotaHopableError } from './arkModelCatalog'
+import { isArkQuotaHopableError, isQwenVideoModelHopableError } from './arkModelCatalog'
 import { KLING_DEFAULT_MODEL_ID } from './shortVideoUiLabels'
 
 const SEGMENT_DURATION_SEC = 10
 const POLL_MS = 4500
 const POLL_MAX = 200
 const CHARS_PER_SEGMENT = 88
+
+function isSeedanceModelHopableError(msg: string): boolean {
+  return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
+}
 
 export type DhVideoEngine = 'seedance' | 'kling'
 
@@ -222,7 +226,7 @@ async function generateSeedanceSegmentWithFailover(opts: {
       )
       if (!r.ok) {
         lastErr = r.message
-        if (isArkQuotaHopableError(r.message)) continue
+        if (isSeedanceModelHopableError(r.message)) continue
         throw new Error(r.message)
       }
       const url = await waitSeedanceVideo(r.taskId)
@@ -249,7 +253,7 @@ async function generateSeedanceSegmentWithFailover(opts: {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       lastErr = msg
-      if (isArkQuotaHopableError(msg)) continue
+      if (isSeedanceModelHopableError(msg)) continue
       throw e instanceof Error ? e : new Error(msg)
     }
   }

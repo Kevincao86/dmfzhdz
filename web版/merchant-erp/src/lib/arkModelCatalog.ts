@@ -103,6 +103,17 @@ export function isArkQuotaHopableError(msg: string): boolean {
   return false
 }
 
+/** 千问视频协议/参数不匹配时可切换同型模型（如 wan2.7 需 input.media） */
+export function isQwenVideoModelHopableError(msg: string): boolean {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return false
+  if (/field required:\s*input[_\.]?media/i.test(raw)) return true
+  if (/input[_\.]?media/i.test(raw) && /required|必填|必须|missing/i.test(raw)) return true
+  if (/必须提供图片|图生视频.*必须|media.*required/i.test(raw)) return true
+  if (/invalid.*url|url.*not.*valid|图片.*url|参考图.*https/i.test(raw)) return true
+  return false
+}
+
 function parseEnvModelList(raw: string): string[] {
   const out: string[] = []
   for (const part of String(raw ?? '').split(',')) {

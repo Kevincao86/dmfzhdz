@@ -1,6 +1,10 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
-import { DOUBAO_VIDEO_CATALOG, isArkQuotaHopableError } from '../lib/arkModelCatalog'
+import {
+  DOUBAO_VIDEO_CATALOG,
+  isArkQuotaHopableError,
+  isQwenVideoModelHopableError,
+} from '../lib/arkModelCatalog'
 import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
 import { normalizeArkVideoModelParam } from '../lib/arkVideoEndpointsConfig'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
@@ -553,7 +557,7 @@ export async function postSeedanceVideoStartWithFailover(body: {
     }
     lastMsg = r.message
     tried.push(model === SEEDANCE_SERVER_AUTO ? '服务端自动轮询(含千问)' : model)
-    if (!isArkQuotaHopableError(r.message)) {
+    if (!isArkQuotaHopableError(r.message) && !isQwenVideoModelHopableError(r.message)) {
       return { ok: false, message: formatVideoAiUserError(r.message) }
     }
   }
