@@ -33,7 +33,8 @@ import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
-import { bufferLooksLikeVideo, concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
+import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
+import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
 function applyRegistrySliceToVideoAiEnv(
   out: MerchantAiEnv,
@@ -989,66 +990,17 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '缺少有效的 http(s) URL。' })
       return true
     }
-    const maxBytes = 100 * 1024 * 1024
-    try {
-      const u = new URL(urlStr)
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
-        json(res, 400, { ok: false, message: '仅支持 http(s) URL。' })
-        return true
-      }
-      let buf: Buffer | null = null
-      let lastFetchMsg = '下载失败'
-      for (let attempt = 0; attempt < 4; attempt++) {
-        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500 * attempt))
-        const upstream = await fetch(urlStr, {
-          redirect: 'follow',
-          headers: {
-            'User-Agent': 'meoo-merchant-erp-video-proxy/1.0',
-            Accept: 'video/mp4,video/*,*/*',
-          },
-        })
-        if (!upstream.ok) {
-          lastFetchMsg = `下载失败 HTTP ${upstream.status}`
-          continue
-        }
-        const len = upstream.headers.get('content-length')
-        if (len && Number(len) > maxBytes) {
-          json(res, 400, { ok: false, message: '视频文件过大。' })
-          return true
-        }
-        const chunk = Buffer.from(await upstream.arrayBuffer())
-        if (chunk.length > maxBytes) {
-          json(res, 400, { ok: false, message: '视频文件过大。' })
-          return true
-        }
-        if (chunk.length < 1024) {
-          lastFetchMsg = `成片尚未就绪（${chunk.length} 字节）`
-          continue
-        }
-        if (!bufferLooksLikeVideo(chunk)) {
-          lastFetchMsg = '拉取到的不是有效视频文件（可能为封面图或错误页）'
-          continue
-        }
-        buf = chunk
-        break
-      }
-      if (!buf) {
-        json(res, 502, { ok: false, message: lastFetchMsg })
-        return true
-      }
-      const ct = 'video/mp4'
-      res.statusCode = 200
-      res.setHeader('Content-Type', ct)
-      res.setHeader('Content-Length', String(buf.length))
-      res.end(buf)
-      return true
-    } catch (e) {
-      json(res, 502, {
-        ok: false,
-        message: e instanceof Error ? e.message : '下载失败',
-      })
+    const bearer = doubaoBearerKey(env) ?? undefined
+    const fetched = await fetchRemoteVideoBuffer(urlStr, { bearer })
+    if (!fetched.ok) {
+      json(res, 502, { ok: false, message: fetched.message })
       return true
     }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Content-Length', String(fetched.buffer.length))
+    res.end(fetched.buffer)
+    return true
   }
 
   if (method === 'POST' && pathname === '/api/merchant/ai/video/kling/start') {

@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
 const MAX_SEGMENT_BYTES = 80 * 1024 * 1024
 const MAX_SEGMENTS = 12
@@ -181,25 +182,13 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
   try {
     const localFiles: string[] = []
     for (let i = 0; i < list.length; i++) {
-      const res = await fetch(list[i]!, {
-        redirect: 'follow',
-        headers: { 'User-Agent': 'meoo-merchant-erp-video-concat/1.0' },
-      })
-      if (!res.ok) {
-        return { ok: false, message: `下载第 ${i + 1} 段失败 HTTP ${res.status}` }
+      const fetched = await fetchRemoteVideoBuffer(list[i]!)
+      if (!fetched.ok) {
+        return { ok: false, message: `下载第 ${i + 1} 段失败：${fetched.message}` }
       }
-      const buf = Buffer.from(await res.arrayBuffer())
-      if (buf.length === 0) {
-        return { ok: false, message: `第 ${i + 1} 段视频为空` }
-      }
+      const buf = fetched.buffer
       if (buf.length > MAX_SEGMENT_BYTES) {
         return { ok: false, message: `第 ${i + 1} 段视频过大（>${MAX_SEGMENT_BYTES / 1024 / 1024}MB）` }
-      }
-      if (!bufferLooksLikeVideo(buf)) {
-        return {
-          ok: false,
-          message: `第 ${i + 1} 段不是可识别的视频（${buf.length} 字节），请重新生成`,
-        }
       }
       const fp = path.join(tmpDir, `s${i}.bin`)
       fs.writeFileSync(fp, buf)

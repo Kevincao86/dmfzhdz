@@ -352,7 +352,27 @@ export async function concatVideoBlobsOnServer(blobs: Blob[]): Promise<Blob> {
   throw new Error('Blob 云端拼接失败：视频 AI 接口未部署或不可达')
 }
 
-/** 经网关二进制代理拉取成片（cs 同源 /api 优先，避免 erp-api 大文件 500/空体） */
+/** 豆包/可灵 CDN 偶发允许浏览器直拉；代理失败时兜底 */
+async function tryDirectVideoBlob(url: string): Promise<Blob | null> {
+  const trimmed = url.trim()
+  if (!/^https?:\/\//i.test(trimmed)) return null
+  try {
+    const res = await fetch(trimmed, {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { Accept: 'video/mp4,video/*,application/octet-stream,*/*' },
+      signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS),
+    })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    return blob.size >= 1024 ? blob : null
+  } catch {
+    return null
+  }
+}
+
+/** 经网关二进制代理拉取成片（直连 handler 写 Buffer，避免 node-mocks-http 0 字节） */
 export async function downloadVideoUrlAsBlob(url: string): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-download-url',
@@ -369,11 +389,13 @@ export async function downloadVideoUrlAsBlob(url: string): Promise<Blob> {
     }
     const blob = await res.blob()
     if (blob.size < 1024) {
-      lastErr = `下载视频为空（${blob.size} 字节），成片可能尚未落盘，请稍后重试`
+      lastErr = `下载视频为空（${blob.size} 字节），或与后端连接异常，请稍后重试`
       continue
     }
     return blob
   }
+  const direct = await tryDirectVideoBlob(url)
+  if (direct) return direct
   throw new Error(`下载视频失败：${lastErr}`)
 }
 
