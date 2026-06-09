@@ -25,6 +25,8 @@ type EnrichedApplication = ApplicationLocal & {
   videoStatus?: string
   videoRejectReason?: string
   canUploadVideo?: boolean
+  isIce?: boolean
+  iceActionLabel?: string
 }
 
 /** 达人：我的报名；PR：我的发单 */
@@ -59,7 +61,17 @@ function TalentApplicationsPage() {
     const me = applicants.find((x) => x && String(x.id) === applicantId)
     const videoStatus = me ? String(me.videoStatus || '') : ''
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
-    const canUploadVideo = !videoStatus || videoStatus === 'rejected'
+    const isIce = row.isIce
+    const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
+    let iceActionLabel = ''
+    if (isIce && me) {
+      const assigned = String(me.assignedVideoDownloadUrl || '').trim()
+      const verified = me.aiVerifyStatus === 'passed'
+      const pendingConfirm = me.taskStatus === 'pending_confirm' || (!me.taskStatus && !assigned)
+      if (pendingConfirm) iceActionLabel = '确认接收'
+      else if (assigned && !verified) iceActionLabel = '提交链接'
+      else iceActionLabel = '查看云剪任务'
+    }
     return {
       ...a,
       applicantId,
@@ -75,6 +87,8 @@ function TalentApplicationsPage() {
       videoStatus,
       videoRejectReason,
       canUploadVideo,
+      isIce,
+      iceActionLabel,
     }
   }
 
@@ -270,7 +284,9 @@ function TalentApplicationsPage() {
                 {a.platform ? (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600">{a.platform}</span>
                 ) : null}
-                {a.category ? (
+                {a.isIce ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-700">云剪任务</span>
+                ) : a.category ? (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{a.category}</span>
                 ) : null}
                 {a.statusLabel ? (
@@ -303,6 +319,14 @@ function TalentApplicationsPage() {
               ) : null}
             </div>
             <div className="shrink-0 flex flex-col gap-2">
+              {a.isIce && a.iceActionLabel ? (
+                <Link
+                  to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
+                  className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 text-center"
+                >
+                  {a.iceActionLabel}
+                </Link>
+              ) : null}
               {a.canUploadVideo ? (
                 <button
                   type="button"
