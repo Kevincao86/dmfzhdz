@@ -696,6 +696,49 @@ async function resolveDouyinLinkTarget(inputUrl: string): Promise<DouyinLinkTarg
   return { url, videoId, shortLinkUnresolved, linkKind }
 }
 
+export type DouyinVideoPublishResolve =
+  | { ok: true; normalizedUrl: string; note: string }
+  | { ok: false; error: string }
+
+/** 云剪回链：从分享口令提取链接、解析短链并归一化为视频作品页 */
+export async function resolveDouyinVideoPublishUrl(raw: string): Promise<DouyinVideoPublishResolve> {
+  const t = raw.trim()
+  if (!t) return { ok: false, error: '请粘贴抖音分享口令或作品链接' }
+
+  const share = extractDouyinShareFromText(t)
+  let inputUrl = share.url
+  if (!inputUrl && share.videoId) {
+    inputUrl = `https://www.douyin.com/video/${share.videoId}`
+  }
+  if (!inputUrl) {
+    return {
+      ok: false,
+      error: '未从分享口令中识别到抖音链接，请粘贴抖音「分享」复制的整段文案（含 https://v.douyin.com/…）',
+    }
+  }
+
+  const target = await resolveDouyinLinkTarget(inputUrl)
+  const videoId = target.videoId ?? share.videoId
+
+  if (target.linkKind === 'user_profile') {
+    return { ok: false, error: '该链接是达人主页，请打开具体视频作品后再分享提交' }
+  }
+  if ((target.linkKind === 'homepage' || target.shortLinkUnresolved) && !videoId) {
+    return { ok: false, error: '短链未能解析到具体视频，请换一条视频分享口令重试' }
+  }
+
+  const normalizedUrl = videoId ? `https://www.douyin.com/video/${videoId}` : target.url
+  if (!normalizedUrl || normalizedUrl.length < 12) {
+    return { ok: false, error: '请提交抖音视频作品链接（douyin.com）' }
+  }
+
+  let note = '链接格式符合抖音作品页'
+  if (t !== inputUrl && t !== normalizedUrl) note = '已从分享口令识别并解析视频链接'
+  else if (/v\.douyin\.com/i.test(inputUrl) && videoId) note = '短链已解析为视频作品页'
+
+  return { ok: true, normalizedUrl, note }
+}
+
 async function fetchIesdouyinItemById(awemeId: string): Promise<DouyinAwemeItem | null> {
   const apiUrl = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?reflow_source=reflow_page&item_ids=${encodeURIComponent(awemeId)}`
   try {

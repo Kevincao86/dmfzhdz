@@ -39,14 +39,63 @@ export function isDouyinVideoUrl(raw: string): boolean {
   }
 }
 
-/** 简易 AI 核查：链接形态 + 非空路径（可后续接真实模型） */
-export function verifyDouyinPublishLink(url: string): { passed: boolean; note: string } {
-  if (!isDouyinVideoUrl(url)) {
-    return { passed: false, note: '请提交抖音视频作品链接（douyin.com）' }
+/** 从分享口令/整段文案中提取抖音链接（同步，不做短链跳转） */
+export function normalizeDouyinPublishInput(raw: string): string | null {
+  const t = raw.trim()
+  if (!t) return null
+  const share = extractDouyinShareFromText(t)
+  if (share.url) return share.url
+  if (share.videoId) return `https://www.douyin.com/video/${share.videoId}`
+  if (isDouyinVideoUrl(t)) return t
+  return null
+}
+
+function extractDouyinShareFromText(raw: string): { url: string | null; videoId: string | null } {
+  const t = raw.trim()
+  if (!t) return { url: null, videoId: null }
+  const videoPatterns = [
+    /\/video\/(\d{15,22})/,
+    /\/share\/video\/(\d{15,22})/,
+    /[?&](?:modal_id|item_id|aweme_id)=(\d{15,22})/,
+  ]
+  let videoId: string | null = null
+  for (const re of videoPatterns) {
+    const m = re.exec(t)
+    if (m?.[1]) {
+      videoId = m[1]
+      break
+    }
   }
-  const t = url.trim()
-  if (t.length < 12) return { passed: false, note: '链接过短' }
-  return { passed: true, note: '链接格式符合抖音作品页' }
+  const httpsRe =
+    /https?:\/\/(?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?|(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff「」【】《》]+)/gi
+  for (const m of t.matchAll(httpsRe)) {
+    if (m[0]) return { url: m[0].replace(/[/，。！？、；：'"）】\]>]+$/u, ''), videoId }
+  }
+  const bareRe =
+    /(?:^|[\s「」【】《】])((?:v\.douyin\.com\/[A-Za-z0-9_-]+\/?)|(?:(?:www\.)?(?:douyin|iesdouyin)\.com\/[^\s\u4e00-\u9fff「」【】《》]+))/gi
+  for (const m of t.matchAll(bareRe)) {
+    if (m[1]) {
+      const u = m[1].startsWith('http') ? m[1] : `https://${m[1]}`
+      return { url: u.replace(/[/，。！？、；：'"）】\]>]+$/u, ''), videoId }
+    }
+  }
+  return { url: videoId ? `https://www.douyin.com/video/${videoId}` : null, videoId }
+}
+
+/** 简易 AI 核查：链接形态 + 非空路径（可后续接真实模型） */
+export function verifyDouyinPublishLink(raw: string): { passed: boolean; note: string; normalizedUrl?: string } {
+  const normalized = normalizeDouyinPublishInput(raw)
+  const url = normalized ?? raw.trim()
+  if (!isDouyinVideoUrl(url)) {
+    return {
+      passed: false,
+      note: '未识别到抖音作品链接，请粘贴抖音「分享」复制的整段文案（含链接）',
+    }
+  }
+  if (url.length < 12) return { passed: false, note: '链接过短' }
+  const note =
+    normalized && normalized !== raw.trim() ? '已从分享口令识别链接' : '链接格式符合抖音作品页'
+  return { passed: true, note, normalizedUrl: url }
 }
 
 export function maybeAdvanceIceMpToSettlement(
@@ -241,12 +290,13 @@ function upsertApplicant(
   return applicants
 }
 
-export function submitIceDouyinForApplicant(
+export async function submitIceDouyinForApplicant(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   douyinPublishUrl: string,
-): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
-  const url = douyinPublishUrl.trim()
+): Promise<{ ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string }> {
+  const normalized = normalizeDouyinPublishInput(douyinPublishUrl)
+  const url = normalized ?? douyinPublishUrl.trim()
   const verify = verifyDouyinPublishLink(url)
   if (!verify.passed) return { ok: false, error: verify.note }
 
@@ -266,7 +316,7 @@ export function submitIceDouyinForApplicant(
 
   applicants[idx] = {
     ...app,
-    douyinPublishUrl: url,
+    douyinPublishUrl: verify.normalizedUrl || url,
     aiVerifyStatus: 'passed',
     aiVerifyNote: verify.note,
     completedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
