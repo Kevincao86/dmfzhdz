@@ -32,20 +32,28 @@ function clampInt(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, Math.floor(n)))
 }
 
-/** 离线估算：按预算与策略拆分档位人数（AI 不可用时使用） */
+/** 离线估算：按目标人数与费用模式拆分档位（AI 不可用时使用） */
 export function fallbackNoviceKolAllocation(
   budgetYuan: number,
-  strategy: KolTierStrategy,
+  targetHeadcount: number,
+  feeType: 'tier' | 'fixed',
   cityForHint?: string,
 ): NoviceAllocation {
   const b = Number.isFinite(budgetYuan) && budgetYuan > 0 ? budgetYuan : 0
-  const totalPeople = clampInt(b / 1200, 3, 36)
-  const w =
-    strategy === 'more_v3'
-      ? ([0.42, 0.32, 0.16, 0.1] as const)
-      : strategy === 'more_v4'
-        ? ([0.18, 0.42, 0.22, 0.18] as const)
-        : ([0.12, 0.18, 0.3, 0.4] as const)
+  const totalPeople = clampInt(Number(targetHeadcount) || 0, 1, 200)
+  if (feeType === 'fixed') {
+    const per = totalPeople > 0 ? Math.round(b / totalPeople) : 0
+    return {
+      v3: 0,
+      v4: 0,
+      v5: 0,
+      v5plus: totalPeople,
+      notes: '当前为离线规则估算（一口价模式）。',
+      costHint: `总预算约 ¥${b.toLocaleString('zh-CN')}，招募 ${totalPeople} 人，人均约 ¥${per}/人（仅供参考）。`,
+      source: 'fallback',
+    }
+  }
+  const w = [0.18, 0.42, 0.22, 0.18] as const
   let v3 = Math.round(totalPeople * w[0])
   let v4 = Math.round(totalPeople * w[1])
   let v5 = Math.round(totalPeople * w[2])
@@ -79,8 +87,8 @@ export function fallbackNoviceKolAllocation(
     v4: Math.max(0, v4),
     v5: Math.max(0, v5),
     v5plus: Math.max(0, v5plus),
-    notes: '当前为离线规则估算；连接 AI 成功后将结合城市行情优化。',
-    costHint: `${tierHint ? `${tierHint} ` : ''}按总预算约 ¥${b.toLocaleString('zh-CN')}、合计约 ${v3 + v4 + v5 + v5plus} 人次档位建议（仅供参考）。`,
+    notes: '当前为离线规则估算；连接 AI 成功后将结合预算与城市行情优化。',
+    costHint: `${tierHint ? `${tierHint} ` : ''}总预算约 ¥${b.toLocaleString('zh-CN')}、目标 ${totalPeople} 人（仅供参考）。`,
     source: 'fallback',
   }
 }
@@ -234,23 +242,25 @@ export async function requestNoviceKolAllocationAi(params: {
   industry: string
   packageNote: string
   budgetYuan: number
-  strategy: KolTierStrategy
+  targetHeadcount: number
+  feeType: 'tier' | 'fixed'
   kolCommissionPct: number
   cityTierBands?: CityKolTierBands
 }): Promise<NoviceAllocation | null> {
   const model = resolveTextAiModelForRequest() as AiModelId
-  const stratZh = kolTierStrategyLabel(params.strategy)
   const bands = params.cityTierBands ?? resolveCityKolTierBands(params.city)
   const tierDoc = formatCityTierBandsSummary(bands)
   const comm = Math.max(0, Math.min(80, Math.round(Number(params.kolCommissionPct) || 0)))
+  const feeZh = params.feeType === 'fixed' ? '一口价（人均成本优先）' : '阶梯档位（按 V3–V5+ 拆分）'
   const titleDraft = `你是本地生活达人招募成本顾问。根据城市达人撮合的行情，为商家做一次「档位人数」分配建议。
 
 硬性要求：
 1. 仅输出一个 JSON 对象，不要 Markdown、不要代码围栏、不要解释正文外的文字。
 2. 字段必须为：v3、v4、v5、v5plus（均为非负整数），可选 notes（一句话）、cost_hint（一句话说明成本假设）。
-3. 总人数应与总预算量级相符；档位越高通常单人成本越高；须参考下列同城档位成本带，人数分配与预算不要明显违背该成本结构。
-4. 策略偏好：${stratZh}
-5. 商家填写的达人佣金（占售价/结算口径的百分比，仅作理解，勿写入 JSON）：${comm}%（本地生活纯佣金常见 1～5%，默认 3%；勿按电商 CPS 理解）
+3. v3+v4+v5+v5plus 必须等于目标招募人数 ${params.targetHeadcount}；总成本量级须与总预算 ¥${params.budgetYuan} 相符。
+4. 费用模式：${feeZh}
+5. 须参考下列同城档位成本带，人数分配与预算不要明显违背该成本结构。
+6. 商家填写的达人佣金（占售价/结算口径的百分比，仅作理解，勿写入 JSON）：${comm}%（本地生活纯佣金常见 1～5%，默认 3%；勿按电商 CPS 理解）
 
 同城档位单人参考成本带（元/人次，非承诺报价）：
 ${tierDoc}
@@ -260,6 +270,7 @@ ${tierDoc}
 - 行业：${params.industry.trim()}
 - 套餐/项目说明：${params.packageNote.trim().slice(0, 800)}
 - 总预算（元）：${params.budgetYuan}
+- 目标招募人数：${params.targetHeadcount}
 
 请输出 JSON。`
 
@@ -298,25 +309,30 @@ export async function generateNoviceKolAllocation(params: {
   industry: string
   packageNote: string
   budgetYuan: number
-  strategy: KolTierStrategy
+  targetHeadcount: number
+  feeType: 'tier' | 'fixed'
   kolCommissionPct: number
   cityTierBands?: CityKolTierBands
 }): Promise<NoviceAllocation> {
+  const headcount = clampInt(Number(params.targetHeadcount) || 0, 1, 200)
   try {
-    const ai = await requestNoviceKolAllocationAi(params)
+    const ai = await requestNoviceKolAllocationAi({ ...params, targetHeadcount: headcount })
     if (ai) {
-      const bands = params.cityTierBands ?? resolveCityKolTierBands(params.city)
-      const tierLine = formatCityTierBandsSummary(bands)
-      if (!ai.costHint?.includes('参考城市')) {
-        return {
-          ...ai,
-          costHint: [tierLine, ai.costHint].filter(Boolean).join(' '),
+      const sum = ai.v3 + ai.v4 + ai.v5 + ai.v5plus
+      if (sum === headcount) {
+        const bands = params.cityTierBands ?? resolveCityKolTierBands(params.city)
+        const tierLine = formatCityTierBandsSummary(bands)
+        if (!ai.costHint?.includes('参考城市')) {
+          return {
+            ...ai,
+            costHint: [tierLine, ai.costHint].filter(Boolean).join(' '),
+          }
         }
+        return ai
       }
-      return ai
     }
   } catch {
     /* ignore */
   }
-  return fallbackNoviceKolAllocation(params.budgetYuan, params.strategy, params.city)
+  return fallbackNoviceKolAllocation(params.budgetYuan, headcount, params.feeType, params.city)
 }

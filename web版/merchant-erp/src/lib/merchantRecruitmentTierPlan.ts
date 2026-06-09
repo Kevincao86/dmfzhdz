@@ -5,7 +5,6 @@ import {
   type KolTierBand,
 } from './recruitmentCityTierPricing'
 import type { KolTierStrategy } from '../services/recruitmentNoviceAllocationAi'
-import { kolTierStrategyLabel } from '../services/recruitmentNoviceAllocationAi'
 
 export type KolTierKey = 'v3' | 'v4' | 'v5' | 'v5plus'
 
@@ -77,10 +76,11 @@ export function buildRecruitmentTierPlan(params: {
   budgetYuan: number
   targetHeadcount: number
   city: string
-  strategy: KolTierStrategy
+  strategy?: KolTierStrategy
   feeType: 'tier' | 'fixed'
   cityTierBands?: CityKolTierBands
   source?: 'ai' | 'fallback'
+  allocation?: { v3: number; v4: number; v5: number; v5plus: number }
 }): RecruitmentTierPlan {
   const budget = Math.max(0, Number(params.budgetYuan) || 0)
   const total = clampInt(Number(params.targetHeadcount) || 0, 1, 200)
@@ -96,13 +96,20 @@ export function buildRecruitmentTierPlan(params: {
       city: params.city.trim(),
       tiers: {},
       fixedPriceYuan: fixed,
-      strategy: params.strategy,
       source: params.source ?? 'fallback',
       costHint: `一口价约 ¥${fixed}/人；总预算 ¥${budget.toLocaleString('zh-CN')}，招募 ${total} 人。${tierLine}`,
     }
   }
 
-  const raw = allocateCountsForTarget(total, params.strategy)
+  const fromAllocation = params.allocation
+  const raw = fromAllocation
+    ? {
+        v3: { count: fromAllocation.v3, unitPriceYuan: 0 },
+        v4: { count: fromAllocation.v4, unitPriceYuan: 0 },
+        v5: { count: fromAllocation.v5, unitPriceYuan: 0 },
+        v5plus: { count: fromAllocation.v5plus, unitPriceYuan: 0 },
+      }
+    : allocateCountsForTarget(total, params.strategy ?? 'more_v4')
   const tiers: RecruitmentTierPlan['tiers'] = {
     v3: { count: raw.v3!.count, unitPriceYuan: bandMid(bands.v3) },
     v4: { count: raw.v4!.count, unitPriceYuan: bandMid(bands.v4) },
@@ -121,9 +128,8 @@ export function buildRecruitmentTierPlan(params: {
     budgetYuan: budget,
     city: params.city.trim(),
     tiers,
-    strategy: params.strategy,
     source: params.source ?? 'fallback',
-    costHint: `${tierLine}；策略：${kolTierStrategyLabel(params.strategy)}；预估档位成本约 ¥${estCost.toLocaleString('zh-CN')}（参考同城达人库，非承诺报价）。`,
+    costHint: `${tierLine}；预估档位成本约 ¥${estCost.toLocaleString('zh-CN')}（参考同城达人库，非承诺报价）。`,
   }
 }
 

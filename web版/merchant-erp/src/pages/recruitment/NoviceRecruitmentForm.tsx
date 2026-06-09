@@ -21,6 +21,7 @@ import {
 } from '../../lib/recruitmentCityPicker'
 import { loadRecruitmentIndustryL1Labels } from '../../lib/recruitmentIndustryOptions'
 import { buildRecruitmentTierPlan } from '../../lib/merchantRecruitmentTierPlan'
+import { SHOW_NOVICE_CITY_TIER_COST_REF } from '../../lib/recruitmentNoviceUiFlags'
 import { submitMerchantRecruitmentWithMpPublish } from '../../lib/merchantRecruitmentSubmit'
 import type { RegistryRecruitmentOrder } from '../../lib/opsRegistryTypes'
 import { resolveRecruitmentOrderTenantMeta } from '../../lib/recruitmentOrderMeta'
@@ -36,10 +37,8 @@ import {
 import {
   fallbackXiaohongshuNoviceAllocation,
   generateNoviceKolAllocation,
-  kolTierStrategyLabel,
   resolveCityKolTierBandsSmart,
   type CityTierBandsSource,
-  type KolTierStrategy,
   type NoviceAllocation,
 } from '../../services/recruitmentNoviceAllocationAi'
 
@@ -83,7 +82,6 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [recruitEnd, setRecruitEnd] = useState('')
   const [visitStart, setVisitStart] = useState('')
   const [visitEnd, setVisitEnd] = useState('')
-  const [strategy, setStrategy] = useState<KolTierStrategy>('more_v4')
   const [kolCommissionInput, setKolCommissionInput] = useState(String(LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT))
 
   const [selectedStores, setSelectedStores] = useState<SelectedStore[]>([])
@@ -128,7 +126,6 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     industry,
     packageNote,
     budget,
-    strategy,
     recruitStart,
     recruitEnd,
     visitStart,
@@ -137,6 +134,8 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     deliveryPlatform,
     selectedStores,
     cityTierBands,
+    targetHeadcount,
+    feeType,
   ])
 
   const isDouyin = deliveryPlatform === '抖音'
@@ -159,10 +158,16 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   }, [])
 
   useEffect(() => {
-    if (!isDouyin || !hasCity || cityNational || !primaryCity) {
-      setCityTierBands(null)
-      setCityTierSource(null)
-      setCityTierLoading(false)
+    if (!SHOW_NOVICE_CITY_TIER_COST_REF || !isDouyin || !hasCity || cityNational || !primaryCity) {
+      if (!SHOW_NOVICE_CITY_TIER_COST_REF) {
+        setCityTierBands(null)
+        setCityTierSource(null)
+        setCityTierLoading(false)
+      } else if (!isDouyin || !hasCity || cityNational || !primaryCity) {
+        setCityTierBands(null)
+        setCityTierSource(null)
+        setCityTierLoading(false)
+      }
       return
     }
     let cancelled = false
@@ -199,17 +204,33 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       setAiErr('请填写总预算（大于 0）')
       return
     }
+    if (!targetHeadcount || targetHeadcount < 1) {
+      setAiErr('请填写招募人数（目标）')
+      return
+    }
     setAiLoading(true)
     try {
+      let bands = cityTierBands
+      let bandsSource = cityTierSource
+      if (isDouyin && primaryCity && !cityNational) {
+        const resolved = await resolveCityKolTierBandsSmart({ city: primaryCity, industry })
+        bands = resolved.bands
+        bandsSource = resolved.source
+        if (SHOW_NOVICE_CITY_TIER_COST_REF) {
+          setCityTierBands(bands)
+          setCityTierSource(bandsSource)
+        }
+      }
       const res = isDouyin
         ? await generateNoviceKolAllocation({
             city: primaryCity,
             industry,
             packageNote,
             budgetYuan: budget,
-            strategy,
+            targetHeadcount,
+            feeType,
             kolCommissionPct: parseKolCommissionPctFromDraft(kolCommissionInput),
-            cityTierBands: cityTierBands ?? undefined,
+            cityTierBands: bands ?? undefined,
           })
         : fallbackXiaohongshuNoviceAllocation(budget)
       setAllocation(res)
@@ -219,7 +240,20 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     } finally {
       setAiLoading(false)
     }
-  }, [budget, cityTierBands, hasCity, industry, isDouyin, kolCommissionInput, packageNote, primaryCity, strategy])
+  }, [
+    budget,
+    cityNational,
+    cityTierBands,
+    cityTierSource,
+    feeType,
+    hasCity,
+    industry,
+    isDouyin,
+    kolCommissionInput,
+    packageNote,
+    primaryCity,
+    targetHeadcount,
+  ])
 
   const submit = async () => {
     setPushErr(null)
@@ -246,7 +280,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     if (!allocation || !allocationFresh) {
       setPushErr(
         isDouyin
-          ? '请先点击「AI 智能分配达人档位」，并在修改预算或策略后重新分配'
+          ? '请先点击「AI 智能分配达人档位」，并在修改预算、人数或费用模式后重新分配'
           : '请先点击「估算小红书达人数」，并在修改预算后重新估算',
       )
       return
@@ -291,8 +325,6 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     const tierLine = isDouyin
       ? `V3:${allocation.v3} V4:${allocation.v4} V5:${allocation.v5} V5以上:${allocation.v5plus}`
       : `预估达人数:${headcountForOrder}`
-    const tierPriceRef =
-      isDouyin && cityTierBands ? formatCityTierBandsLines(cityTierBands).join('；') : ''
     const tenantMeta = await resolveRecruitmentOrderTenantMeta(supabaseConfigured ? supabase : null)
     const order: RegistryRecruitmentOrder = {
       id,
@@ -312,17 +344,19 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；同城档位参考:${tierPriceRef || '—'}；策略:${kolTierStrategyLabel(strategy)}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}档位成本来源:${cityTierSource === 'ai' ? 'AI估算' : cityTierSource === 'static' ? '默认表' : '—'}；分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；目标人数:${headcountForOrder}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     const tierPlan = buildRecruitmentTierPlan({
       budgetYuan: budget,
       targetHeadcount: headcountForOrder,
       city: primaryCity,
-      strategy,
       feeType,
       cityTierBands: cityTierBands ?? undefined,
       source: allocation.source,
+      allocation: isDouyin
+        ? { v3: allocation.v3, v4: allocation.v4, v5: allocation.v5, v5plus: allocation.v5plus }
+        : undefined,
     })
 
     setSubmitting(true)
@@ -371,8 +405,6 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     await submit()
   }
 
-  const strategies: KolTierStrategy[] = ['more_v3', 'more_v4', 'more_v5']
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <button
@@ -392,7 +424,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">新手版 · AI 纯智能处理</h1>
             <p className="mt-1 text-sm text-gray-500">
-              选择已绑定门店（可多选）、城市与行业后，抖音将结合 AI 估算的同城档位参考成本分配 V3–V5+ 人数；小红书按预算估算达人数（不展示达人佣金与带货档位）。
+              选择已绑定门店（可多选）、城市与行业后，填写招募人数与费用模式，由 AI 分配 V3–V5+ 人数；小红书按预算估算达人数（不展示达人佣金与带货档位）。
             </p>
           </div>
         </div>
@@ -487,7 +519,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               selectedCities={selectedCities}
               onClick={() => setCityPickerOpen(true)}
             />
-            {isDouyin && hasCity && !cityNational && primaryCity ? (
+            {SHOW_NOVICE_CITY_TIER_COST_REF && isDouyin && hasCity && !cityNational && primaryCity ? (
               <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-xs text-indigo-900">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <p className="font-medium text-indigo-950">同城达人档位参考成本（元/人次，估算）</p>
@@ -631,31 +663,48 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             </div>
           </div>
 
-          {isDouyin ? (
-            <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">档位偏好策略</p>
-              <div className="flex flex-col gap-2">
-                {strategies.map((s) => (
-                  <label
-                    key={s}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="font-medium text-gray-800">
+                招募人数（目标） <span className="text-red-500">*</span>
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={targetHeadcount || ''}
+                onChange={(e) => setTargetHeadcount(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
+                placeholder="如 20"
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </label>
+            {isDouyin ? (
+              <div className="block text-sm">
+                <span className="font-medium text-gray-800">费用模式</span>
+                <div className="mt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFeeType('tier')}
                     className={cn(
-                      'flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors',
-                      strategy === s ? 'border-blue-500 bg-blue-50/80' : 'border-gray-200 hover:bg-gray-50',
+                      'rounded-lg border px-3 py-2 text-sm',
+                      feeType === 'tier' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200',
                     )}
                   >
-                    <input
-                      type="radio"
-                      name="kol-strategy"
-                      checked={strategy === s}
-                      onChange={() => setStrategy(s)}
-                      className="mt-1"
-                    />
-                    <span className="text-gray-800">{kolTierStrategyLabel(s)}</span>
-                  </label>
-                ))}
+                    阶梯档位
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeeType('fixed')}
+                    className={cn(
+                      'rounded-lg border px-3 py-2 text-sm',
+                      feeType === 'fixed' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200',
+                    )}
+                  >
+                    一口价
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
             <button
@@ -673,45 +722,6 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           </div>
 
           {aiErr ? <p className="text-sm text-red-600">{aiErr}</p> : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="font-medium text-gray-800">招募人数（目标）</span>
-              <input
-                type="number"
-                min={1}
-                value={targetHeadcount || ''}
-                onChange={(e) => setTargetHeadcount(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-                placeholder="如 20（留空则用 AI 分配合计）"
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              />
-            </label>
-            <div className="block text-sm">
-              <span className="font-medium text-gray-800">费用模式</span>
-              <div className="mt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFeeType('tier')}
-                  className={cn(
-                    'rounded-lg border px-3 py-2 text-sm',
-                    feeType === 'tier' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200',
-                  )}
-                >
-                  阶梯档位
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFeeType('fixed')}
-                  className={cn(
-                    'rounded-lg border px-3 py-2 text-sm',
-                    feeType === 'fixed' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-gray-200',
-                  )}
-                >
-                  一口价
-                </button>
-              </div>
-            </div>
-          </div>
 
           {allocation ? (
             <div
