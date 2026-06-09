@@ -110,7 +110,7 @@ export type RecruitmentTierPlan = {
   tiers: Partial<Record<KolTierKey, { count: number; unitPriceYuan: number }>>
   fixedPriceYuan?: number
   strategy?: KolTierStrategy
-  source?: 'ai' | 'fallback'
+  source?: 'library' | 'ai' | 'fallback'
   costHint?: string
 }
 

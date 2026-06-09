@@ -16,7 +16,7 @@ export type RecruitmentTierPlan = {
   tiers: Partial<Record<KolTierKey, { count: number; unitPriceYuan: number }>>
   fixedPriceYuan?: number
   strategy?: KolTierStrategy
-  source: 'ai' | 'fallback'
+  source: 'library' | 'ai' | 'fallback'
   costHint?: string
 }
 
@@ -79,7 +79,7 @@ export function buildRecruitmentTierPlan(params: {
   strategy?: KolTierStrategy
   feeType: 'tier' | 'fixed'
   cityTierBands?: CityKolTierBands
-  source?: 'ai' | 'fallback'
+  source?: 'library' | 'ai' | 'fallback'
   allocation?: { v3: number; v4: number; v5: number; v5plus: number }
 }): RecruitmentTierPlan {
   const budget = Math.max(0, Number(params.budgetYuan) || 0)

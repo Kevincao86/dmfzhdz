@@ -1,9 +1,16 @@
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import {
   formatCityTierBandsSummary,
   resolveCityKolTierBands,
   type CityKolTierBands,
   type KolTierBand,
 } from '../lib/recruitmentCityTierPricing'
+import { readMerchantSession } from '../lib/merchantSession'
+import {
+  allocateTierCountsByBudget,
+  computeTalentLibraryTierAverages,
+  formatTierAvgSummary,
+} from '../lib/talentLibraryTierPricing'
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
 import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
 
@@ -19,7 +26,7 @@ export type NoviceAllocation = {
   v5plus: number
   notes?: string
   costHint?: string
-  source: 'ai' | 'fallback'
+  source: 'library' | 'ai' | 'fallback'
 }
 
 export function kolTierStrategyLabel(s: KolTierStrategy): string {
@@ -53,42 +60,31 @@ export function fallbackNoviceKolAllocation(
       source: 'fallback',
     }
   }
-  const w = [0.18, 0.42, 0.22, 0.18] as const
-  let v3 = Math.round(totalPeople * w[0])
-  let v4 = Math.round(totalPeople * w[1])
-  let v5 = Math.round(totalPeople * w[2])
-  let v5plus = Math.round(totalPeople * w[3])
-  let gap = totalPeople - (v3 + v4 + v5 + v5plus)
-  let guard = 0
-  while (gap !== 0 && guard++ < 48) {
-    if (gap > 0) {
-      v5plus += 1
-      gap -= 1
-    } else if (v3 > 0) {
-      v3 -= 1
-      gap += 1
-    } else if (v4 > 0) {
-      v4 -= 1
-      gap += 1
-    } else if (v5 > 0) {
-      v5 -= 1
-      gap += 1
-    } else if (v5plus > 0) {
-      v5plus -= 1
-      gap += 1
-    } else {
-      break
-    }
+  const bands = cityForHint ? resolveCityKolTierBands(cityForHint) : resolveCityKolTierBands('')
+  const ctx = computeTalentLibraryTierAverages({ entries: [], city: cityForHint ?? '', platform: '抖音' })
+  const tierPrices = {
+    v3: ctx.tierAvgs.v3.avgYuan,
+    v4: ctx.tierAvgs.v4.avgYuan,
+    v5: ctx.tierAvgs.v5.avgYuan,
+    v5plus: ctx.tierAvgs.v5plus.avgYuan,
   }
-  const bands = cityForHint ? resolveCityKolTierBands(cityForHint) : null
-  const tierHint = bands ? formatCityTierBandsSummary(bands) : ''
+  const alloc = allocateTierCountsByBudget({
+    budgetYuan: b,
+    targetHeadcount: totalPeople,
+    tierPrices,
+  })
+  const tierHint = formatCityTierBandsSummary(bands)
+  const avgLine = formatTierAvgSummary(ctx)
+  const budgetNote = alloc.withinBudget
+    ? `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}`
+    : `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}（高于预算，已尽量降档）`
   return {
-    v3: Math.max(0, v3),
-    v4: Math.max(0, v4),
-    v5: Math.max(0, v5),
-    v5plus: Math.max(0, v5plus),
-    notes: '当前为离线规则估算；连接 AI 成功后将结合预算与城市行情优化。',
-    costHint: `${tierHint ? `${tierHint} ` : ''}总预算约 ¥${b.toLocaleString('zh-CN')}、目标 ${totalPeople} 人（仅供参考）。`,
+    v3: alloc.v3,
+    v4: alloc.v4,
+    v5: alloc.v5,
+    v5plus: alloc.v5plus,
+    notes: '达人库接口不可用，已按城市档位参考价离线估算。',
+    costHint: `${avgLine}。目标 ${totalPeople} 人；${budgetNote}。${tierHint}`,
     source: 'fallback',
   }
 }
@@ -303,7 +299,61 @@ export function fallbackXiaohongshuNoviceAllocation(budgetYuan: number): NoviceA
   }
 }
 
-/** AI + 离线兜底 */
+function libraryAllocationAuthHeaders(): HeadersInit {
+  const token = readMerchantSession('meoo_douyin_merchant_token')
+  const h: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+  if (token) h.Authorization = `Bearer ${token}`
+  return h
+}
+
+/** 经 ECS 读取达人库各档均价并分配人数（主路径） */
+export async function requestNoviceKolAllocationFromLibrary(params: {
+  city: string
+  budgetYuan: number
+  targetHeadcount: number
+  feeType: 'tier' | 'fixed'
+  platform?: string
+}): Promise<NoviceAllocation | null> {
+  const payload = JSON.stringify({
+    city: params.city.trim(),
+    budgetYuan: params.budgetYuan,
+    targetHeadcount: params.targetHeadcount,
+    feeType: params.feeType,
+    platform: params.platform ?? '抖音',
+  })
+  const headers = libraryAllocationAuthHeaders()
+  for (const url of merchantApiFetchUrls('/api/meoo-ops-novice-kol-allocation')) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: payload })
+      if (!res.ok) continue
+      const j = (await res.json()) as {
+        ok?: boolean
+        allocation?: NoviceAllocation
+      }
+      if (!j.ok || !j.allocation) continue
+      const a = j.allocation
+      const sum = a.v3 + a.v4 + a.v5 + a.v5plus
+      if (sum <= 0) continue
+      return {
+        v3: a.v3,
+        v4: a.v4,
+        v5: a.v5,
+        v5plus: a.v5plus,
+        notes: a.notes,
+        costHint: a.costHint,
+        source: a.source === 'library' ? 'library' : 'fallback',
+      }
+    } catch {
+      /* try next base */
+    }
+  }
+  return null
+}
+
+/** 达人库均价 + 离线兜底（不再依赖 LLM 拆档） */
 export async function generateNoviceKolAllocation(params: {
   city: string
   industry: string
@@ -316,20 +366,16 @@ export async function generateNoviceKolAllocation(params: {
 }): Promise<NoviceAllocation> {
   const headcount = clampInt(Number(params.targetHeadcount) || 0, 1, 200)
   try {
-    const ai = await requestNoviceKolAllocationAi({ ...params, targetHeadcount: headcount })
-    if (ai) {
-      const sum = ai.v3 + ai.v4 + ai.v5 + ai.v5plus
-      if (sum === headcount) {
-        const bands = params.cityTierBands ?? resolveCityKolTierBands(params.city)
-        const tierLine = formatCityTierBandsSummary(bands)
-        if (!ai.costHint?.includes('参考城市')) {
-          return {
-            ...ai,
-            costHint: [tierLine, ai.costHint].filter(Boolean).join(' '),
-          }
-        }
-        return ai
-      }
+    const fromLibrary = await requestNoviceKolAllocationFromLibrary({
+      city: params.city,
+      budgetYuan: params.budgetYuan,
+      targetHeadcount: headcount,
+      feeType: params.feeType,
+      platform: '抖音',
+    })
+    if (fromLibrary) {
+      const sum = fromLibrary.v3 + fromLibrary.v4 + fromLibrary.v5 + fromLibrary.v5plus
+      if (sum === headcount || params.feeType === 'fixed') return fromLibrary
     }
   } catch {
     /* ignore */

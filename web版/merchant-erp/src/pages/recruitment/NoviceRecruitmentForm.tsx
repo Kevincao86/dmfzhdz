@@ -344,7 +344,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；目标人数:${headcountForOrder}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；目标人数:${headcountForOrder}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${allocation.source === 'library' ? '达人库测算' : allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     const tierPlan = buildRecruitmentTierPlan({
@@ -727,7 +727,9 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             <div
               className={cn(
                 'rounded-xl border p-4',
-                allocation.source === 'ai' ? 'border-emerald-200 bg-emerald-50/50' : 'border-gray-200 bg-gray-50',
+                allocation.source === 'library' || allocation.source === 'ai'
+                  ? 'border-emerald-200 bg-emerald-50/50'
+                  : 'border-gray-200 bg-gray-50',
               )}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -737,10 +739,16 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-xs font-medium',
-                    allocation.source === 'ai' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700',
+                    allocation.source === 'library' || allocation.source === 'ai'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-gray-200 text-gray-700',
                   )}
                 >
-                  {allocation.source === 'ai' ? 'AI 模型' : '离线估算'}
+                  {allocation.source === 'library'
+                    ? '达人库测算'
+                    : allocation.source === 'ai'
+                      ? 'AI 模型'
+                      : '离线估算'}
                 </span>
               </div>
               {isDouyin ? (
