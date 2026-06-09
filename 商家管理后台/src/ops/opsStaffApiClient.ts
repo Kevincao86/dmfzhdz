@@ -1,8 +1,14 @@
+import { fetchOpsErpApi } from '../lib/opsErpApiBase'
 import type { OpsPermissionKey, OpsSession, OpsStaffAccount, OpsStaffRole } from './opsStaffAuth'
 
 const OPS_STAFF_LOGIN_PATH = '/api/meoo-ops-staff-login'
 const OPS_STAFF_LIST_PATH = '/api/meoo-ops-staff-list'
 const OPS_STAFF_MUTATE_PATH = '/api/meoo-ops-staff-mutate'
+
+/** 子账号读写须走 ECS erp-api（Vercel Function 无法访问轻量 Postgres） */
+async function fetchOpsStaffApi(path: string, init?: RequestInit): Promise<Response> {
+  return fetchOpsErpApi(path, init, { ecsOnly: true })
+}
 
 export type OpsStaffApiAccount = Omit<OpsStaffAccount, 'passwordHash'>
 
@@ -28,7 +34,7 @@ export async function apiOpsStaffLogin(
   | { ok: false; useLocalFallback: boolean; error?: string }
 > {
   try {
-    const res = await fetch(OPS_STAFF_LOGIN_PATH, {
+    const res = await fetchOpsStaffApi(OPS_STAFF_LOGIN_PATH, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ phone, password }),
@@ -39,7 +45,11 @@ export async function apiOpsStaffLogin(
       data.error === 'supabase_admin_not_configured' ||
       data.error === 'ops_staff_table_missing'
     ) {
-      return { ok: false, useLocalFallback: true }
+      return {
+        ok: false,
+        useLocalFallback: true,
+        error: String(data.error ?? 'cloud_unavailable'),
+      }
     }
     // 云端尚无该账号（子账号未迁移等）时，回退本机 localStorage 校验
     if (res.status === 401 && data.code === 'not_found') {
@@ -94,7 +104,7 @@ export async function apiOpsStaffList(
   | { ok: false; useLocalFallback: boolean; unauthorized?: boolean }
 > {
   try {
-    const res = await fetch(OPS_STAFF_LIST_PATH, {
+    const res = await fetchOpsStaffApi(OPS_STAFF_LIST_PATH, {
       method: 'GET',
       headers: authHeaders(sessionToken),
     })
@@ -116,7 +126,7 @@ export async function apiOpsStaffMutate(
   body: Record<string, unknown>,
 ): Promise<{ ok: true; account?: OpsStaffAccount; imported?: number } | { ok: false; error: string }> {
   try {
-    const res = await fetch(OPS_STAFF_MUTATE_PATH, {
+    const res = await fetchOpsStaffApi(OPS_STAFF_MUTATE_PATH, {
       method: 'POST',
       headers: authHeaders(sessionToken),
       body: JSON.stringify(body),

@@ -95,7 +95,8 @@ export async function fetchOpsErpApi(
   const supportRelayLike =
     options?.ecsOnly ||
     apiPath.includes('support-poll') ||
-    apiPath.includes('support-ops-send')
+    apiPath.includes('support-ops-send') ||
+    apiPath.includes('meoo-ops-staff-')
   const candidates = supportRelayLike
     ? [opsErpApiUrl(apiPath), ...(typeof window !== 'undefined' && !opsErpApiBase() ? [`${window.location.origin}${apiPath.startsWith('/') ? apiPath : `/${apiPath}`}`] : [])].filter(Boolean)
     : registryLike
