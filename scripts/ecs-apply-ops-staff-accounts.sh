@@ -65,7 +65,7 @@ INSERT INTO public.ops_staff_accounts (
   '超级管理员',
   'super_admin',
   '973e095059955e0c458333ac4bb54113de5c54011390d3ad2869ed1c9af493e0',
-  '["customers","announcements","payment_orders","recruitment_orders","mp_recruitment_orders","talent_library","ai_models","support"]'::jsonb,
+  '["customers","announcements","payment_orders","recruitment_orders","mp_recruitment_orders","talent_library","shoot_team_library","edit_team_library","pr_library","ai_models","support","support_mp","help_manual","team_intro"]'::jsonb,
   'active',
   now(),
   now()
