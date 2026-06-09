@@ -46,9 +46,13 @@ if [[ ! -f "$HOME/stack/auth-api.env" ]]; then
   sleep 3
   pkill -f ecs-auth-api-server 2>/dev/null || true
 fi
-if [[ ! -d "$ERP/node_modules/@supabase/supabase-js" ]]; then
-  echo "== 2b) 安装 merchant-erp 依赖 =="
+if [[ ! -d "$ERP/node_modules/@supabase/supabase-js" || ! -d "$ERP/node_modules/ws" ]]; then
+  echo "== 2b) 安装 merchant-erp 依赖（含 ws，Node 20 supabase-js 必需）==="
   (cd "$ERP" && npm ci)
+fi
+if [[ ! -d "$ERP/node_modules/ws" ]]; then
+  echo "FATAL: 缺少 ws 包。请 git pull 后确认 web版/merchant-erp/package.json 中 ws 在 dependencies"
+  exit 1
 fi
 
 bash "$ROOT/scripts/ecs-install-auth-api-systemd.sh"

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { nodeSupabaseClientOptions } from './nodeSupabaseClientOptions.js'
 
 export type OpsServiceClientResult =
   | { ok: true; admin: SupabaseClient }
@@ -44,9 +45,7 @@ export function createOpsServiceRoleClient(): OpsServiceClientResult {
   }
 
   try {
-    const admin = createClient(supabaseUrl, serviceRole, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    })
+    const admin = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
     return { ok: true, admin }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -56,6 +55,9 @@ export function createOpsServiceRoleClient(): OpsServiceClientResult {
       body: {
         ok: false,
         error: 'supabase_client_init_failed',
+        hint: /WebSocket|transport: ws/i.test(msg)
+          ? 'ECS: git pull && bash scripts/ecs-fix-erp-api-502.sh（须安装 ws 依赖）'
+          : undefined,
         detail: msg.slice(0, 400),
       },
     }

@@ -42,6 +42,8 @@ if [[ "$HTTP" != "200" ]] || ! echo "$JSON" | grep -q 'sessionToken'; then
   echo "FAIL: 云端登录未成功（http=${HTTP:-000}）。"
   if [[ "${HTTP:-}" == "000" ]]; then
     echo "  多为 :${PORT} 未启动，请执行: bash scripts/ecs-ensure-auth-api.sh"
+  elif echo "$JSON" | grep -q 'supabase_client_init_failed\|WebSocket\|transport: ws'; then
+    echo "  Node 20 缺少 ws：git pull && bash scripts/ecs-fix-erp-api-502.sh"
   else
     echo "  若含 ops_staff_table_missing / permission denied，请执行:"
     echo "  bash scripts/ecs-apply-ops-staff-accounts.sh"
