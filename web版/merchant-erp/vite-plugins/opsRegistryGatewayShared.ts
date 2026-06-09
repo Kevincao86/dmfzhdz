@@ -44,6 +44,11 @@ import {
   helpManualSliceForEdition,
   setHelpManualForEdition,
 } from '../src/lib/helpManualRegistryCore.js'
+import {
+  getAllHelpManualSeeds,
+  getHelpManualSeedForEdition,
+  HELP_MANUAL_SEED_VERSION,
+} from '../src/lib/helpManualSeedContent.js'
 import type { HelpManualEdition } from '../src/lib/helpManualTypes.js'
 import { resolveTeamIntro, setTeamIntro } from '../src/lib/teamIntroRegistryCore.js'
 import type { RegistryTeamIntro } from '../src/lib/teamIntroTypes.js'
@@ -181,6 +186,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-mp-library-delete' &&
           url !== '/api/meoo-ops-help-manual-set' &&
           url !== '/api/meoo-help-manual-public' &&
+          url !== '/api/meoo-help-manual-defaults' &&
           url !== '/api/meoo-ops-team-intro-set' &&
           url !== '/api/meoo-team-intro-public' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
@@ -225,6 +231,18 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             const data = ensureRegistry(viteRoot)
             const slice = helpManualSliceForEdition(data, edition)
             json(res, 200, { ok: true, edition, ...slice })
+            return
+          }
+
+          if (method === 'GET' && url.startsWith('/api/meoo-help-manual-defaults')) {
+            const editionRaw = new URL(req.url || '', 'http://local').searchParams.get('edition') || 'all'
+            const raw = String(editionRaw).trim().toLowerCase()
+            if (raw === 'all') {
+              json(res, 200, { ok: true, version: HELP_MANUAL_SEED_VERSION, editions: getAllHelpManualSeeds() })
+              return
+            }
+            const edition = (['merchant', 'partner', 'fulfillment'].includes(raw) ? raw : 'merchant') as HelpManualEdition
+            json(res, 200, { ok: true, version: HELP_MANUAL_SEED_VERSION, edition, ...getHelpManualSeedForEdition(edition) })
             return
           }
 
