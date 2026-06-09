@@ -2,13 +2,39 @@
 const config = require('./config.js')
 
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
+const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
 const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配达人招募'
 
-/** 仅当显式配置 MP_SHARE_COVER_URL 时用 HTTPS；勿自动拼 OSS（文件可能未上传 → 404 → 分享回退截图） */
+let cachedShareCoverPath = ''
+
+function cdnShareCoverUrl() {
+  const cdn = String(config.RECRUIT_COVER_CDN_BASE || '').trim().replace(/\/$/, '')
+  if (!/^https?:\/\//i.test(cdn)) return ''
+  return `${cdn}/${SHARE_COVER_FILE}`
+}
+
+/** HTTPS 优先（mofangdianai.com/recruit-covers），失败再回退包内 JPG */
 function shareCoverImageUrl() {
   const fromConfig = String(config.MP_SHARE_COVER_URL || '').trim()
   if (/^https?:\/\//i.test(fromConfig)) return fromConfig
+  const cdn = cdnShareCoverUrl()
+  if (cdn) return cdn
   return LOCAL_SHARE_COVER
+}
+
+function loadLocalCover(done) {
+  wx.getImageInfo({
+    src: LOCAL_SHARE_COVER,
+    success(res) {
+      const p = res.path || LOCAL_SHARE_COVER
+      cachedShareCoverPath = p
+      done(p)
+    },
+    fail(err) {
+      console.warn('[mpShare] local cover getImageInfo failed', err)
+      done(LOCAL_SHARE_COVER)
+    },
+  })
 }
 
 function resolveCoverPath(src, done) {
@@ -17,26 +43,24 @@ function resolveCoverPath(src, done) {
     wx.downloadFile({
       url,
       success(res) {
-        done(res.statusCode === 200 && res.tempFilePath ? res.tempFilePath : url)
+        if (res.statusCode === 200 && res.tempFilePath) {
+          cachedShareCoverPath = res.tempFilePath
+          done(res.tempFilePath)
+          return
+        }
+        console.warn('[mpShare] download cover HTTP', res.statusCode, url)
+        loadLocalCover(done)
       },
-      fail() {
-        done(url)
+      fail(err) {
+        console.warn('[mpShare] download cover fail', url, err)
+        loadLocalCover(done)
       },
     })
     return
   }
-  wx.getImageInfo({
-    src: url,
-    success(res) {
-      done(res.path || url)
-    },
-    fail() {
-      done(url)
-    },
-  })
+  loadLocalCover(done)
 }
 
-/** 微信 2.10+：promise resolve 后再出分享卡，避免 imageUrl 未就绪时回退为页面截图 */
 function buildSharePayload(path, opts, forTimeline) {
   const title =
     opts && opts.title ? String(opts.title).trim() || DEFAULT_TITLE : DEFAULT_TITLE
@@ -44,14 +68,17 @@ function buildSharePayload(path, opts, forTimeline) {
   const query = opts && opts.query ? String(opts.query) : ''
   const src = (opts && opts.imageUrl) || shareCoverImageUrl()
 
-  const base = forTimeline ? { title, query } : { title, path: sharePath }
+  const finish = (imageUrl) =>
+    forTimeline ? { title, query, imageUrl } : { title, path: sharePath, imageUrl }
+
+  if (cachedShareCoverPath) {
+    return finish(cachedShareCoverPath)
+  }
 
   return {
-    ...base,
+    ...(forTimeline ? { title, query } : { title, path: sharePath }),
     promise: new Promise((resolve) => {
-      resolveCoverPath(src, (imageUrl) => {
-        resolve(forTimeline ? { title, query, imageUrl } : { title, path: sharePath, imageUrl })
-      })
+      resolveCoverPath(src, (imageUrl) => resolve(finish(imageUrl)))
     }),
   }
 }
@@ -74,7 +101,6 @@ function enableShareMenu() {
   } catch (_) {}
 }
 
-/** 页面 onLoad 时可预热（可选） */
 function preloadShareCover() {
   resolveCoverPath(shareCoverImageUrl(), () => {})
 }
