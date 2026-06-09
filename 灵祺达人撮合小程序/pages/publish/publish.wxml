@@ -304,14 +304,14 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">成片交付 *</text>
-              <view class="account-tag-grid">
-                <view wx:for="{{deliverableGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="deliverables" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view wx:for="{{deliverableGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="deliverables" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
             </view>
             <view class="pub-field">
               <text class="pub-label">设备要求</text>
-              <view class="account-tag-grid">
-                <view wx:for="{{equipmentReqGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="equipmentRequired" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view wx:for="{{equipmentReqGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="equipmentRequired" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
             </view>
           </block>
@@ -340,14 +340,14 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">剪辑风格 *</text>
-              <view class="account-tag-grid">
-                <view wx:for="{{styleTagGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="styleTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view wx:for="{{styleTagGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="styleTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
             </view>
             <view class="pub-field">
               <text class="pub-label">包装要求</text>
-              <view class="account-tag-grid">
-                <view wx:for="{{packageTagGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="packageTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
+              <view class="pub-radio-pair pub-radio-pair--wrap">
+                <view wx:for="{{packageTagGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="packageTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>
             </view>
             <view class="pub-field">

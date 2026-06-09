@@ -82,6 +82,20 @@ function defaultSignupDate() {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
+const SINGLE_SELECT_SUPPLIER_FIELDS = { styleTags: true, packageTags: true }
+
+function toggleSupplierListField(form, field, name) {
+  let cur = Array.isArray(form[field]) ? [...form[field]] : []
+  if (SINGLE_SELECT_SUPPLIER_FIELDS[field]) {
+    cur = cur.includes(name) ? [] : [name]
+  } else {
+    const idx = cur.indexOf(name)
+    if (idx >= 0) cur.splice(idx, 1)
+    else cur.push(name)
+  }
+  return { ...form, [field]: cur }
+}
+
 function buildFansRequirementText(f) {
   if (f.fansLimitMode === 'unlimited') return '不限'
   const min = String(f.fansMin ?? '').trim()
@@ -651,6 +665,13 @@ Page({
         }
       }
       const today = defaultSignupDate()
+      const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+      let recruitTargetId = String(meta.recruitTarget || mp.recruitTarget || '').trim()
+      if (!recruitTargetId) {
+        if (mode.hall === 'ice' || mode.id === 'edit_ice') recruitTargetId = 'edit'
+        else recruitTargetId = 'talent'
+      }
+      const isSupplier = recruitTargetId === 'shoot' || recruitTargetId === 'edit'
       this.setData({
         step: 'form',
         pickerView: '',
@@ -658,6 +679,8 @@ Page({
         editingOrder: mp,
         isEditMode: true,
         editLoadDone: true,
+        recruitTarget: recruitTargetId,
+        isSupplierPublish: isSupplier,
         recruitMode: mode.id,
         recruitModeLabel: mode.label,
         form: restored.patch,
@@ -665,6 +688,7 @@ Page({
         signupDeadlineDate: restored.signupDeadlineDate || '',
         signupDeadlineTime: restored.signupDeadlineTime || '23:59',
       })
+      if (isSupplier) this.syncSupplierPublishGrids(restored.patch)
       this.syncDisplayFields()
       this.syncTabBarOverlay()
       this.resetFormScrollToTop()
@@ -765,6 +789,9 @@ Page({
       patch['form.applyFormTemplateName'] = '直播达人报名默认项'
     }
     this.setData(patch, () => {
+      if (this.data.isSupplierPublish) {
+        this.syncSupplierPublishGrids(this.data.form)
+      }
       this.syncDisplayFields()
       this.syncTabBarOverlay()
       this.resetFormScrollToTop()
@@ -1208,12 +1235,9 @@ Page({
     const field = e.currentTarget.dataset.field
     const name = e.currentTarget.dataset.name
     if (!field || !name) return
-    const cur = Array.isArray(this.data.form[field]) ? [...this.data.form[field]] : []
-    const idx = cur.indexOf(name)
-    if (idx >= 0) cur.splice(idx, 1)
-    else cur.push(name)
-    this.setData({ [`form.${field}`]: cur })
-    this.syncSupplierPublishGrids({ ...this.data.form, [field]: cur })
+    const nextForm = toggleSupplierListField(this.data.form, field, name)
+    this.setData({ [`form.${field}`]: nextForm[field] })
+    this.syncSupplierPublishGrids(nextForm)
   },
   onMaterialSourcePick(e) {
     const val = e.currentTarget.dataset.val

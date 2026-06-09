@@ -37,6 +37,8 @@ import {
   PACKAGE_TAGS,
   SHOOT_EQUIPMENT,
   TARGET_DURATIONS,
+  toggleMultiTagList,
+  toggleSingleTagList,
 } from '../../lib/mpSync/supplierPublishForm'
 import {
   defaultLiveApplyFields,
@@ -618,7 +620,13 @@ export default function PublishWizard() {
             <PubLabel>成片交付 *</PubLabel>
             <div className="flex flex-wrap gap-2">
               {DELIVERABLES.map((d) => (
-                <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.deliverables.includes(d) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ deliverables: form.deliverables.includes(d) ? form.deliverables.filter((x) => x !== d) : [...form.deliverables, d] })}>{d}</button>
+                <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.deliverables.includes(d) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ deliverables: toggleMultiTagList(form.deliverables, d) })}>{d}</button>
+              ))}
+            </div>
+            <PubLabel>设备要求</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {SHOOT_EQUIPMENT.map((d) => (
+                <button key={d} type="button" className={`px-2 py-1 rounded text-xs ${form.equipmentRequired.includes(d) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ equipmentRequired: toggleMultiTagList(form.equipmentRequired, d) })}>{d}</button>
               ))}
             </div>
           </div>
@@ -649,9 +657,17 @@ export default function PublishWizard() {
             <PubLabel>剪辑风格 *</PubLabel>
             <div className="flex flex-wrap gap-2">
               {EDIT_STYLES.map((s) => (
-                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.styleTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ styleTags: form.styleTags.includes(s) ? form.styleTags.filter((x) => x !== s) : [...form.styleTags, s] })}>{s}</button>
+                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.styleTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ styleTags: toggleSingleTagList(form.styleTags, s) })}>{s}</button>
               ))}
             </div>
+            <PubLabel>包装要求</PubLabel>
+            <div className="flex flex-wrap gap-2">
+              {PACKAGE_TAGS.map((s) => (
+                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.packageTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ packageTags: toggleSingleTagList(form.packageTags, s) })}>{s}</button>
+              ))}
+            </div>
+            <PubLabel>参考片链接</PubLabel>
+            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.referenceUrl} onChange={(e) => patchForm({ referenceUrl: e.target.value })} />
             <PubLabel>交付截止时间 *</PubLabel>
             <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.deliveryDeadline} onChange={(e) => patchForm({ deliveryDeadline: e.target.value })} />
           </div>
