@@ -13,13 +13,15 @@ function cdnShareCoverUrl() {
   return `${cdn}/${SHARE_COVER_FILE}`
 }
 
-/** HTTPS 优先（mofangdianai.com/recruit-covers），失败再回退包内 JPG */
+/** 分享封面：包内 JPG 优先（备案期远程 downloadFile 易失败）；远程仅作可选回退 */
 function shareCoverImageUrl() {
+  return LOCAL_SHARE_COVER
+}
+
+function remoteShareCoverUrl() {
   const fromConfig = String(config.MP_SHARE_COVER_URL || '').trim()
   if (/^https?:\/\//i.test(fromConfig)) return fromConfig
-  const cdn = cdnShareCoverUrl()
-  if (cdn) return cdn
-  return LOCAL_SHARE_COVER
+  return cdnShareCoverUrl()
 }
 
 function loadLocalCover(done) {
@@ -32,33 +34,56 @@ function loadLocalCover(done) {
     },
     fail(err) {
       console.warn('[mpShare] local cover getImageInfo failed', err)
+      const remote = remoteShareCoverUrl()
+      if (remote) {
+        downloadRemoteCover(remote, () => done(LOCAL_SHARE_COVER))
+        return
+      }
       done(LOCAL_SHARE_COVER)
+    },
+  })
+}
+
+function downloadRemoteCover(url, onFail) {
+  wx.downloadFile({
+    url,
+    success(res) {
+      if (res.statusCode === 200 && res.tempFilePath) {
+        cachedShareCoverPath = res.tempFilePath
+        return
+      }
+      console.warn('[mpShare] download cover HTTP', res.statusCode, url)
+      if (typeof onFail === 'function') onFail()
+    },
+    fail(err) {
+      console.warn('[mpShare] download cover fail', url, err)
+      if (typeof onFail === 'function') onFail()
     },
   })
 }
 
 function resolveCoverPath(src, done) {
   const url = String(src || '').trim() || LOCAL_SHARE_COVER
-  if (/^https?:\/\//i.test(url)) {
-    wx.downloadFile({
-      url,
-      success(res) {
-        if (res.statusCode === 200 && res.tempFilePath) {
-          cachedShareCoverPath = res.tempFilePath
-          done(res.tempFilePath)
-          return
-        }
-        console.warn('[mpShare] download cover HTTP', res.statusCode, url)
-        loadLocalCover(done)
-      },
-      fail(err) {
-        console.warn('[mpShare] download cover fail', url, err)
-        loadLocalCover(done)
-      },
-    })
+  if (!/^https?:\/\//i.test(url)) {
+    loadLocalCover(done)
     return
   }
-  loadLocalCover(done)
+  wx.downloadFile({
+    url,
+    success(res) {
+      if (res.statusCode === 200 && res.tempFilePath) {
+        cachedShareCoverPath = res.tempFilePath
+        done(res.tempFilePath)
+        return
+      }
+      console.warn('[mpShare] download cover HTTP', res.statusCode, url)
+      loadLocalCover(done)
+    },
+    fail(err) {
+      console.warn('[mpShare] download cover fail', url, err)
+      loadLocalCover(done)
+    },
+  })
 }
 
 function buildSharePayload(path, opts, forTimeline) {
@@ -102,7 +127,8 @@ function enableShareMenu() {
 }
 
 function preloadShareCover() {
-  resolveCoverPath(shareCoverImageUrl(), () => {})
+  if (cachedShareCoverPath) return
+  loadLocalCover(() => {})
 }
 
 module.exports = {
