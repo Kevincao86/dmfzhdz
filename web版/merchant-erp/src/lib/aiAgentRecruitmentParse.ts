@@ -1,4 +1,4 @@
-import type { KolTierStrategy } from '../services/recruitmentNoviceAllocationAi'
+import type { KolTierStrategy } from './opsRegistryTypes'
 import { LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT } from './localLifeKolCommission'
 
 /** 从用户自然语言中解析招募意图（预算、人数、城市、平台等） */

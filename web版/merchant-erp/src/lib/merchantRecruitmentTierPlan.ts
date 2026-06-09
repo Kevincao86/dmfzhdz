@@ -4,7 +4,7 @@ import {
   type CityKolTierBands,
   type KolTierBand,
 } from './recruitmentCityTierPricing'
-import type { KolTierStrategy } from '../services/recruitmentNoviceAllocationAi'
+import type { KolTierStrategy } from './opsRegistryTypes'
 
 export type KolTierKey = 'v3' | 'v4' | 'v5' | 'v5plus'
 

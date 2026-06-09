@@ -14,10 +14,12 @@ import {
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
 import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
 
+import type { KolTierStrategy } from '../lib/opsRegistryTypes'
+
 export type CityTierBandsSource = 'ai' | 'static'
 
 /** 达人档位分配策略（影响 AI / 离线估算权重） */
-export type KolTierStrategy = 'more_v3' | 'more_v4' | 'more_v5'
+export type { KolTierStrategy }
 
 export type NoviceAllocation = {
   v3: number
