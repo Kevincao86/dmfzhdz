@@ -13,8 +13,8 @@ function primaryRecruitTargetForIdentity(identity) {
 function orderMatchesIdentity(row, identity) {
   if (!row) return false
   if (row.isIce) return true
-  /** PR 运营：大厅可见全部招募对象（含剪辑/拍摄单） */
-  if (identity === 'pr') return true
+  /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
+  if (identity === 'pr' || identity === 'talent') return true
   return row.recruitTarget === primaryRecruitTargetForIdentity(identity)
 }
 
@@ -36,7 +36,7 @@ function bucketOrdersForIdentity(mapped, identity, opts) {
   let editRows = []
   if (id === 'shoot') shootRows = primaryRows
   else if (id === 'edit') editRows = primaryRows
-  else if (id === 'pr') {
+  else if (id === 'pr' || id === 'talent') {
     shootRows = primaryRows.filter((r) => r.recruitTarget === 'shoot')
     editRows = primaryRows.filter((r) => r.recruitTarget === 'edit')
   }
