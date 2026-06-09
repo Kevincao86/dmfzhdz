@@ -208,13 +208,11 @@ function buildEditorRows(fields, previewPlatform, kind) {
     })
 }
 
-function resolveApplyRows(template, platform, options) {
+function mapApplyRowFields(fields, platform, options) {
   const p = normalizePlatform(platform)
   const lb = labels(p)
   const isIce = options && options.isIceMode
-  const tpl = template && typeof template === 'object' ? template : builtinMinimalTemplate()
-  const kind = normalizeTemplateKind(tpl.kind || (options && options.recruitTarget) || 'talent')
-  return normalizeFields(tpl.fields || [], kind)
+  return fields
     .filter((f) => fieldVisibleForPlatform(f, p))
     .filter((f) => {
       if (isIce && ['visitDate', 'visitTimeStart', 'visitTimeEnd', 'quotePrice', 'alipayAccount'].includes(f.role)) {
@@ -239,6 +237,14 @@ function resolveApplyRows(template, platform, options) {
         placeholder: f.placeholder || defaultPlaceholder(f, p),
       }
     })
+}
+
+function resolveApplyRows(template, platform, options) {
+  const tpl = template && typeof template === 'object' ? template : builtinMinimalTemplate()
+  const kind = normalizeTemplateKind(tpl.kind || (options && options.recruitTarget) || 'talent')
+  const rows = mapApplyRowFields(normalizeFields(tpl.fields || [], kind), platform, options)
+  if (rows.length > 0) return rows
+  return mapApplyRowFields(normalizeFields(builtinMinimalTemplate().fields, 'talent'), platform, options)
 }
 
 function defaultPlaceholder(field, platform) {
@@ -408,17 +414,34 @@ function mpApplyFormStorageKey(mpOrderId) {
 function saveApplyFormForMpOrder(mpOrderId, payload) {
   if (!mpOrderId || !payload) return
   try {
+    const kind = templateKindFromRecruitTarget(payload.recruitTarget || 'talent')
+    const fields = normalizeFields(payload.fields, kind)
+    if (!fields.length) return
     wx.setStorageSync(
       mpApplyFormStorageKey(mpOrderId),
       JSON.stringify({
         templateId: payload.templateId,
         templateName: payload.templateName,
-        fields: normalizeFields(payload.fields),
+        recruitTarget: kind,
+        fields,
       }),
     )
   } catch {
     /* ignore */
   }
+}
+
+/** 从招募单云端元数据写入本机缓存（详情页/报名页共用） */
+function cacheApplyFormFromMpOrder(mp) {
+  if (!mp || !mp.id) return
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  if (!meta || !Array.isArray(meta.applyFormFields) || !meta.applyFormFields.length) return
+  saveApplyFormForMpOrder(mp.id, {
+    templateId: meta.applyFormTemplateId,
+    templateName: meta.applyFormTemplateName,
+    recruitTarget: meta.recruitTarget,
+    fields: meta.applyFormFields,
+  })
 }
 
 function configFromOrderMeta(orderMeta, templateId) {
@@ -522,6 +545,7 @@ module.exports = {
   setActiveTemplateId,
   getTemplateForApply,
   configFromOrderMeta,
+  cacheApplyFormFromMpOrder,
   getApplyConfigForMpOrder,
   saveApplyFormForMpOrder,
   validateTemplateFields,
