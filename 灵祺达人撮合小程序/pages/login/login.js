@@ -106,7 +106,6 @@ Page({
 
   onLoad(options) {
     mpShare.enableShareMenu()
-    mpShare.preloadShareCover()
     this.applyLoginNavPadding()
     const redirect =
       options && options.redirect ? decodeURIComponent(String(options.redirect)) : ''
