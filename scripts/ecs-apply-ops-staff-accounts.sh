@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 运营管控台 ops_staff_accounts → 轻量 ECS Postgres（PostgREST + meoo-auth-api）
 #
-# 在轻量 ECS 上（推荐）：
+# 在轻量 ECS 上（推荐，须 admin 用户执行，勿 sudo bash）：
 #   cd ~/app && git pull gitee main && bash scripts/ecs-apply-ops-staff-accounts.sh
 #
 # 本机经 SSH（需能 ssh admin@139.196.42.5）：
@@ -33,19 +33,27 @@ run_apply() {
   fi
   # shellcheck disable=SC1090
   source "$HOME/stack/db-credentials.txt"
-  export PGPASSWORD="$POSTGRES_PASSWORD"
+  export PGPASSWORD="${POSTGRES_PASSWORD:-}"
+  if [[ -z "$PGPASSWORD" ]]; then
+    echo "FATAL: db-credentials.txt 中 POSTGRES_PASSWORD 为空"
+    exit 1
+  fi
+
+  psql_admin() {
+    psql -h 127.0.0.1 -p "$PG_PORT" -U postgres -d "$PG_DB" "$@"
+  }
 
   echo "=== 1) 应用迁移 $MIGRATION ==="
-  sudo -u postgres psql -h 127.0.0.1 -p "$PG_PORT" -d "$PG_DB" -v ON_ERROR_STOP=1 -f "$mig_path"
+  psql_admin -v ON_ERROR_STOP=1 -f "$mig_path"
 
   local grants="$app_root/supabase/ecs_service_role_grants.sql"
   if [[ -f "$grants" ]]; then
     echo "=== 2) GRANT service_role（PostgREST 可读写）==="
-    sudo -u postgres psql -h 127.0.0.1 -p "$PG_PORT" -d "$PG_DB" -v ON_ERROR_STOP=1 -f "$grants"
+    psql_admin -v ON_ERROR_STOP=1 -f "$grants"
   fi
 
   echo "=== 3) 写入主账号 18768501283（默认密码 kaiyedaji888 的 SHA-256）==="
-  sudo -u postgres psql -h 127.0.0.1 -p "$PG_PORT" -d "$PG_DB" -v ON_ERROR_STOP=1 <<'EOSQL'
+  psql_admin -v ON_ERROR_STOP=1 <<'EOSQL'
 DELETE FROM public.ops_staff_accounts
  WHERE phone = '18768581283' AND role = 'super_admin';
 
@@ -73,7 +81,7 @@ ON CONFLICT (id) DO UPDATE SET
 EOSQL
 
   echo "=== 4) 校验 ==="
-  sudo -u postgres psql -h 127.0.0.1 -p "$PG_PORT" -d "$PG_DB" -c "
+  psql_admin -c "
 SELECT to_regclass('public.ops_staff_accounts') AS ops_staff_accounts;
 SELECT id, phone, role, status FROM public.ops_staff_accounts ORDER BY created_at;
 "
