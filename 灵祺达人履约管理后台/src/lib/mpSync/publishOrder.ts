@@ -45,6 +45,7 @@ export type PublishForm = {
   recruitDetail: string
   signupDeadline: string
   iceVideoUrl: string
+  iceVerifyMode: 'ai' | 'pr'
   applyFormTemplateId: string
   applyFormTemplateName: string
   applyFormFields: ApplyField[]
@@ -94,6 +95,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     recruitDetail: '',
     signupDeadline: '',
     iceVideoUrl: '',
+    iceVerifyMode: 'ai',
     applyFormTemplateId: '',
     applyFormTemplateName: isSupplier ? '团队报名默认项' : '',
     applyFormFields: isSupplier
@@ -219,6 +221,7 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
   if (recruitDetail) lines.push(recruitDetail)
   if ((recruitModeId === 'ice' || recruitModeId === 'edit_ice') && String(f.iceVideoUrl || '').trim()) {
     lines.push(`云剪参考成片：${String(f.iceVideoUrl).trim()}`)
+    lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
   }
   return lines.join('\n')
 }
@@ -372,7 +375,12 @@ export function buildPublishOrder(
   const nowMs = Date.now()
   const existing = options?.existing
   const editId = options?.editId
-  const mpId = editId && existing ? editId : buildMpRecruitmentOrderId('RO', nowMs)
+  const mpId =
+    editId && existing
+      ? editId
+      : mode.hall === 'ice'
+        ? buildMpRecruitmentOrderId('ICE', nowMs)
+        : buildMpRecruitmentOrderId('RO', nowMs)
   const recruitCount = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
   const isUrgent = form.deliveryWindow === 'urgent'
   const recruitTarget = options?.recruitTarget === 'shoot' || options?.recruitTarget === 'edit'
@@ -465,8 +473,19 @@ export function buildPublishOrder(
       coverImage: coverFields.coverImage,
       coverLibraryId: coverFields.coverLibraryId,
       coverImageSource: coverFields.coverImageSource,
+      iceVideoUrl: String(form.iceVideoUrl || '').trim(),
+      iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
     },
   }
-  order.hall = 'normal'
+  if (mode.hall === 'ice' || recruitModeId === 'edit_ice') {
+    order.orderKind = 'recruitment_ice'
+    order.hall = 'ice'
+    order.fulfillmentLoop = 'closed'
+    const url = String(form.iceVideoUrl || '').trim()
+    const ts = mpId.split('-').pop() || String(nowMs)
+    order.iceVideoSlots = [{ slotId: `SLOT-${ts}`, label: '成片1', downloadUrl: url, iceJobId: '' }]
+  } else {
+    order.hall = 'normal'
+  }
   return order
 }

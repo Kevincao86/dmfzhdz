@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { readApplications, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
-import { uploadAndSubmitRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
+import { uploadAndSubmitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import {
   APPLICATION_TIME_FILTERS,
   matchApplicationTimeFilter,
   parseAppliedAtMs,
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
+import {
+  resolveTalentApplicationProgress,
+  TALENT_APP_PROGRESS_FILTERS,
+  type TalentAppProgressId,
+} from '../lib/mpRecruitment/talentApplicationStatus'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
@@ -27,6 +32,9 @@ type EnrichedApplication = ApplicationLocal & {
   canUploadVideo?: boolean
   isIce?: boolean
   iceActionLabel?: string
+  progressId?: string
+  progressLabel?: string
+  videoStatusLabel?: string
 }
 
 /** 达人：我的报名；PR：我的发单 */
@@ -48,6 +56,7 @@ function TalentApplicationsPage() {
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
   const [filterKeyword, setFilterKeyword] = useState('')
+  const [filterProgress, setFilterProgress] = useState<TalentAppProgressId>('all')
 
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
     if (!mp) return { ...a }
@@ -58,20 +67,43 @@ function TalentApplicationsPage() {
       if (found && found.id) applicantId = String(found.id)
     }
     const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
-    const me = applicants.find((x) => x && String(x.id) === applicantId)
+    const me = applicants.find((x) => x && String(x.id) === applicantId) || null
     const videoStatus = me ? String(me.videoStatus || '') : ''
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
     const isIce = row.isIce
     const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
+    const progress = resolveTalentApplicationProgress(mp, me)
     let iceActionLabel = ''
-    if (isIce && me) {
-      const assigned = String(me.assignedVideoDownloadUrl || '').trim()
-      const verified = me.aiVerifyStatus === 'passed'
-      const pendingConfirm = me.taskStatus === 'pending_confirm' || (!me.taskStatus && !assigned)
-      if (pendingConfirm) iceActionLabel = '确认接收'
-      else if (assigned && !verified) iceActionLabel = '提交链接'
-      else iceActionLabel = '查看云剪任务'
+    if (isIce) {
+      if (progress.id === 'completed') iceActionLabel = ''
+      else if (me && me.taskStatus === 'pending_confirm') iceActionLabel = '确认接收'
+      else if (
+        me &&
+        String(me.assignedVideoDownloadUrl || '').trim() &&
+        me.aiVerifyStatus !== 'passed' &&
+        me.videoStatus !== 'passed'
+      ) {
+        iceActionLabel =
+          me.aiVerifyStatus === 'failed' || me.videoStatus === 'rejected' ? '重新提交链接' : '提交链接'
+      } else iceActionLabel = '查看云剪任务'
     }
+    const videoStatusLabelText = isIce
+      ? progress.id === 'completed'
+        ? '已完成'
+        : me && me.aiVerifyStatus === 'failed'
+          ? 'AI 核查未通过'
+          : me && me.videoStatus === 'rejected'
+            ? '链接已驳回'
+            : me && (me.aiVerifyStatus === 'pending' || me.videoStatus === 'pending')
+              ? '待 PR 审核'
+              : progress.label
+      : videoStatus
+        ? videoStatus === 'passed'
+          ? '视频已通过'
+          : videoStatus === 'rejected'
+            ? '视频已驳回'
+            : '视频待审核'
+        : ''
     return {
       ...a,
       applicantId,
@@ -89,6 +121,9 @@ function TalentApplicationsPage() {
       canUploadVideo,
       isIce,
       iceActionLabel,
+      progressId: progress.id,
+      progressLabel: progress.label,
+      videoStatusLabel: videoStatusLabelText,
     }
   }
 
@@ -185,9 +220,10 @@ function TalentApplicationsPage() {
       if (!hallFilters.matchCategory(a.category || '', filterCategory)) return false
       if (!hallFilters.matchRegionFilter(a.region || '', '', filterProvince, filterCity)) return false
       if (!matchListKeyword(a as Record<string, unknown>, filterKeyword)) return false
+      if (filterProgress !== 'all' && String(a.progressId || '') !== filterProgress) return false
       return true
     })
-  }, [apps, filterTime, filterCategory, filterProvince, filterCity, filterKeyword])
+  }, [apps, filterTime, filterCategory, filterProvince, filterCity, filterKeyword, filterProgress])
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -241,6 +277,17 @@ function TalentApplicationsPage() {
               </option>
             ))}
           </select>
+          <select
+            className="rounded-lg panel-input border px-2 py-1.5"
+            value={filterProgress}
+            onChange={(e) => setFilterProgress(e.target.value as TalentAppProgressId)}
+          >
+            {TALENT_APP_PROGRESS_FILTERS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
           <HallCityFilter
             compact
             province={filterProvince}
@@ -289,22 +336,27 @@ function TalentApplicationsPage() {
                 ) : a.category ? (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{a.category}</span>
                 ) : null}
+                {a.progressLabel ? (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-700">
+                    {a.progressLabel}
+                  </span>
+                ) : null}
                 {a.statusLabel ? (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
                     {a.statusLabel}
                   </span>
                 ) : null}
-                {a.videoStatus ? (
+                {a.videoStatusLabel ? (
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${
-                      a.videoStatus === 'passed'
+                      a.progressId === 'completed' || a.videoStatus === 'passed'
                         ? 'bg-emerald-500/10 text-emerald-700'
-                        : a.videoStatus === 'rejected'
+                        : a.videoStatus === 'rejected' || a.videoStatusLabel?.includes('未通过') || a.videoStatusLabel?.includes('驳回')
                           ? 'bg-red-500/10 text-red-700'
                           : 'bg-amber-500/10 text-amber-700'
                     }`}
                   >
-                    视频{videoStatusLabel(a.videoStatus)}
+                    {a.videoStatusLabel}
                   </span>
                 ) : null}
               </div>
@@ -319,7 +371,7 @@ function TalentApplicationsPage() {
               ) : null}
             </div>
             <div className="shrink-0 flex flex-col gap-2">
-              {a.isIce && a.iceActionLabel ? (
+              {a.isIce && a.iceActionLabel && a.progressId !== 'completed' ? (
                 <Link
                   to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
                   className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 text-center"

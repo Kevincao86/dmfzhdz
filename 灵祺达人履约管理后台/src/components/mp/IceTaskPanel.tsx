@@ -69,7 +69,7 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
     setSubmitting(true)
     try {
       await submitIceDouyin(mpOrderId, state.applicantId, url)
-      window.alert('AI 核查通过')
+      window.alert(state.iceVerifyMode === 'pr' ? '链接已提交，请等待 PR 审核' : 'AI 核查通过')
       await onRefresh()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '提交失败')
@@ -129,9 +129,14 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
           复制下载链接
         </button>
         {state.iceVerified ? (
-          <p className="text-sm font-medium text-emerald-700">✓ AI 核查已通过</p>
+          <p className="text-sm font-medium text-emerald-700">✓ 已完成</p>
+        ) : state.icePendingPrReview ? (
+          <p className="text-sm text-amber-800">{state.iceStatusHint}</p>
         ) : (
           <div className="space-y-2 pt-1">
+            {state.iceStatusHint ? (
+              <p className="text-xs text-amber-700 rounded-lg bg-amber-50 px-2 py-1.5">{state.iceStatusHint}</p>
+            ) : null}
             <p className="text-xs text-slate-600">发布抖音后粘贴作品链接：</p>
             <input
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
@@ -145,7 +150,7 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
               className="w-full py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 disabled:opacity-60"
               onClick={() => void onSubmitDouyin()}
             >
-              {submitting ? '提交中…' : '提交链接 · AI 核查'}
+              {submitting ? '提交中…' : state.iceSubmitLabel}
             </button>
           </div>
         )}

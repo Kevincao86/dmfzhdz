@@ -130,6 +130,7 @@ function emptyForm(recruitTarget) {
     recruitDetail: '',
     signupDeadline: '',
     iceVideoUrl: '',
+    iceVerifyMode: 'ai',
     applyFormTemplateId: '',
     applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
     applyFormFields: afFields,
@@ -181,6 +182,7 @@ Page({
     signupDeadlinePlaceholder: true,
     recruitMode: '',
     recruitModeLabel: '',
+    iceVerifyModes: publishOpts.ICE_VERIFY_MODES,
     form: emptyForm('talent'),
     isSupplierPublish: false,
     deliverableGrid: [],
@@ -1249,6 +1251,7 @@ Page({
     if (recruitDetail) lines.push(recruitDetail)
     if ((mode.hall === 'ice' || mode.id === 'edit_ice') && String(f.iceVideoUrl || '').trim()) {
       lines.push(`云剪参考成片：${String(f.iceVideoUrl).trim()}`)
+      lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
     }
     return lines.join('\n')
   },
@@ -1264,6 +1267,11 @@ Page({
     const val = e.currentTarget.dataset.val
     if (!val) return
     this.setData({ 'form.materialSource': val })
+  },
+  onIceVerifyModePick(e) {
+    const mode = e.currentTarget.dataset.mode
+    if (!mode) return
+    this.setData({ 'form.iceVerifyMode': mode === 'pr' ? 'pr' : 'ai' })
   },
   onAspectRatioPick(e) {
     const val = e.currentTarget.dataset.val
@@ -1369,6 +1377,8 @@ Page({
           coverImage: coverFields.coverImage,
           coverLibraryId: coverFields.coverLibraryId,
           coverImageSource: coverFields.coverImageSource,
+          iceVideoUrl: String(f.iceVideoUrl || '').trim(),
+          iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
         },
           f,
         )

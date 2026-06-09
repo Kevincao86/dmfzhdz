@@ -24,6 +24,12 @@ Page({
     icePendingConfirm: false,
     iceRejected: false,
     iceConfirming: false,
+    iceVerifyMode: 'ai',
+    icePendingPrReview: false,
+    iceLinkRejected: false,
+    iceAiFailedNote: '',
+    iceSubmitLabel: '提交链接 · AI 核查',
+    iceStatusHint: '',
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -109,23 +115,40 @@ Page({
       let iceVerified = false
       let icePendingConfirm = false
       let iceRejected = false
+      let icePendingPrReview = false
+      let iceLinkRejected = false
+      let iceAiFailedNote = ''
+      let iceRejectReason = ''
+      const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+      let iceVerifyMode = String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim().toLowerCase() === 'pr' ? 'pr' : 'ai'
       if (isIce && iceApplicantId) {
         const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
         if (app) {
           assignedVideoUrl = app.assignedVideoDownloadUrl || ''
           assignedVideoLabel = app.assignedVideoLabel || ''
-          iceVerified = app.aiVerifyStatus === 'passed'
+          iceVerified =
+            app.aiVerifyStatus === 'passed' ||
+            app.videoStatus === 'passed' ||
+            !!String(app.completedAt || '').trim()
           icePendingConfirm = app.taskStatus === 'pending_confirm' || (!app.taskStatus && !assignedVideoUrl)
           iceRejected = app.taskStatus === 'rejected'
+          icePendingPrReview = app.videoStatus === 'pending' && !iceVerified
+          iceLinkRejected = app.videoStatus === 'rejected'
+          iceRejectReason = String(app.videoRejectReason || '').trim()
+          iceAiFailedNote = app.aiVerifyStatus === 'failed' ? String(app.aiVerifyNote || 'AI核查不通过，视频与订单无关') : ''
           if (app.douyinPublishUrl) {
             this.setData({ douyinUrl: app.douyinPublishUrl })
           }
         }
       }
+      const iceSubmitLabel = iceVerifyMode === 'pr' ? '提交链接 · PR 审核' : '提交链接 · AI 核查'
+      let iceStatusHint = ''
+      if (iceVerified) iceStatusHint = '已完成'
+      else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
+      else if (iceLinkRejected) iceStatusHint = iceRejectReason || '链接已驳回，请重新提交'
+      else if (iceAiFailedNote) iceStatusHint = iceAiFailedNote
       const iceApplied = Boolean(iceApplicantId)
-      const applyTemplateId =
-        (mp.mpPublishMeta && mp.mpPublishMeta.applyFormTemplateId) || ''
-      const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+      const applyTemplateId = meta.applyFormTemplateId || ''
       const prChatMeta = meta.prParticipantKey
         ? {
             prParticipantKey: meta.prParticipantKey,
@@ -153,6 +176,12 @@ Page({
         iceVerified,
         icePendingConfirm,
         iceRejected,
+        iceVerifyMode,
+        icePendingPrReview,
+        iceLinkRejected,
+        iceAiFailedNote,
+        iceSubmitLabel,
+        iceStatusHint,
         applied: hasApplied,
       })
     } catch (e) {
@@ -240,9 +269,13 @@ Page({
     }
     this.setData({ iceSubmitting: true })
     try {
-      await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
-      wx.showToast({ title: 'AI 核查通过', icon: 'success' })
-      this.setData({ iceVerified: true })
+      const res = await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
+      const pending = res && (res.aiVerifyStatus === 'pending' || res.status === 'pending')
+      wx.showToast({
+        title: pending ? '已提交，待 PR 审核' : '核查通过',
+        icon: 'success',
+      })
+      if (!pending) this.setData({ iceVerified: true })
       await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })

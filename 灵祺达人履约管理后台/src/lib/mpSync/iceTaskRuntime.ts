@@ -11,6 +11,12 @@ export type IceApplicantState = {
   iceVerified: boolean
   icePendingConfirm: boolean
   iceRejected: boolean
+  icePendingPrReview: boolean
+  iceLinkRejected: boolean
+  iceAiFailedNote: string
+  iceVerifyMode: 'ai' | 'pr'
+  iceSubmitLabel: string
+  iceStatusHint: string
   douyinPublishUrl: string
 }
 
@@ -66,15 +72,42 @@ export function resolveIceApplicantState(
       iceVerified: false,
       icePendingConfirm: false,
       iceRejected: false,
+      icePendingPrReview: false,
+      iceLinkRejected: false,
+      iceAiFailedNote: '',
+      iceVerifyMode: 'ai',
+      iceSubmitLabel: '提交链接 · AI 核查',
+      iceStatusHint: '',
       douyinPublishUrl: '',
     }
   }
+  const meta =
+    mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const iceVerifyMode =
+    String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim().toLowerCase() === 'pr' ? 'pr' : 'ai'
   const assignedVideoUrl = String(applicant.assignedVideoDownloadUrl || '').trim()
   const assignedVideoLabel = String(applicant.assignedVideoLabel || '').trim()
-  const iceVerified = applicant.aiVerifyStatus === 'passed'
+  const iceVerified =
+    applicant.aiVerifyStatus === 'passed' ||
+    applicant.videoStatus === 'passed' ||
+    !!String(applicant.completedAt || '').trim()
   const iceRejected = applicant.taskStatus === 'rejected'
   const icePendingConfirm =
     applicant.taskStatus === 'pending_confirm' || (!applicant.taskStatus && !assignedVideoUrl)
+  const icePendingPrReview = applicant.videoStatus === 'pending' && !iceVerified
+  const iceLinkRejected = applicant.videoStatus === 'rejected'
+  const iceAiFailedNote =
+    applicant.aiVerifyStatus === 'failed'
+      ? String(applicant.aiVerifyNote || 'AI核查不通过，视频与订单无关')
+      : ''
+  const iceSubmitLabel = iceVerifyMode === 'pr' ? '提交链接 · PR 审核' : '提交链接 · AI 核查'
+  let iceStatusHint = ''
+  if (iceVerified) iceStatusHint = '已完成'
+  else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
+  else if (iceLinkRejected) iceStatusHint = String(applicant.videoRejectReason || '链接已驳回，请重新提交')
+  else if (iceAiFailedNote) iceStatusHint = iceAiFailedNote
   return {
     isIce,
     applicantId,
@@ -83,6 +116,12 @@ export function resolveIceApplicantState(
     iceVerified,
     icePendingConfirm,
     iceRejected,
+    icePendingPrReview,
+    iceLinkRejected,
+    iceAiFailedNote,
+    iceVerifyMode,
+    iceSubmitLabel,
+    iceStatusHint,
     douyinPublishUrl: String(applicant.douyinPublishUrl || '').trim(),
   }
 }

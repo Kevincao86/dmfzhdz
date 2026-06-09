@@ -84,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
+    const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl, process.env as Record<string, string>)
     if (!result.ok) {
       sendOpsJson(res, 400, { ok: false, error: 'verify_failed', message: result.error })
       return
@@ -95,7 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendOpsJson(res, 200, {
       ok: true,
       status: result.mp.status,
-      aiVerifyStatus: 'passed',
+      aiVerifyStatus: result.aiVerifyStatus,
+      message: result.message,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -5,6 +5,7 @@ import type {
   RegistrySnapshot,
 } from './opsRegistryTypes.js'
 import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
+import { isIceMpOrder, maybeAdvanceIceMpToSettlement } from './mpRecruitmentIceCore.js'
 
 function nowCn() {
   return new Date().toLocaleString('zh-CN', { hour12: false })
@@ -101,12 +102,22 @@ export function patchApplicantVideoReview(
   let target: RegistryMpRecruitmentApplicant | null = null
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
+    const isIceLink = !!(a.douyinPublishUrl?.trim() && isIceMpOrder(mp))
     target = {
       ...a,
       videoStatus: action === 'pass' ? ('passed' as const) : ('rejected' as const),
-      videoRejectReason: action === 'reject' ? String(rejectReason || '请修改后重新上传').trim() : undefined,
+      videoRejectReason: action === 'reject' ? String(rejectReason || '请修改后重新提交').trim() : undefined,
       aiVerifyStatus: action === 'pass' ? ('passed' as const) : ('failed' as const),
-      aiVerifyNote: action === 'pass' ? '视频已通过审核' : String(rejectReason || '视频未通过审核'),
+      aiVerifyNote:
+        action === 'pass'
+          ? isIceLink
+            ? 'PR 已通过链接审核'
+            : '视频已通过审核'
+          : String(rejectReason || (isIceLink ? '链接未通过审核' : '视频未通过审核')),
+      completedAt:
+        action === 'pass'
+          ? new Date().toLocaleString('zh-CN', { hour12: false })
+          : a.completedAt,
     }
     return target
   })
@@ -124,13 +135,24 @@ export function buildVideoReviewInboxEntries(
   const orderTitle = String(mp.title || mp.id)
   const ownerName = String(reviewedApplicant.platformNickname || reviewedApplicant.name || '达人')
   const passed = action === 'pass'
-  const title = passed ? '探店视频已通过' : '探店视频需重新上传'
+  const isIceLink = !!(reviewedApplicant.douyinPublishUrl?.trim() && isIceMpOrder(mp))
+  const title = passed
+    ? isIceLink
+      ? '云剪链接已通过'
+      : '探店视频已通过'
+    : isIceLink
+      ? '云剪链接需重新提交'
+      : '探店视频需重新上传'
   const reason = String(rejectReason || '').trim()
   const submitNo = Math.max(1, Number(reviewedApplicant.videoSubmitCount || 0) || 1)
   const submitLabel = `（第 ${submitNo} 次提交）`
   const body = passed
-    ? `您在「${orderTitle}」提交的视频已通过 PR 审核${submitLabel}。`
-    : `您在「${orderTitle}」提交的视频未通过审核${submitLabel}。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新上传视频。`
+    ? isIceLink
+      ? `您在「${orderTitle}」提交的抖音链接已通过 PR 审核${submitLabel}。`
+      : `您在「${orderTitle}」提交的视频已通过 PR 审核${submitLabel}。`
+    : isIceLink
+      ? `您在「${orderTitle}」提交的抖音链接未通过审核${submitLabel}。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新提交链接。`
+      : `您在「${orderTitle}」提交的视频未通过审核${submitLabel}。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新上传视频。`
 
   const entries: MpTalentInboxEntryInput[] = []
   const seen = new Set<string>()
@@ -171,9 +193,13 @@ export function buildVideoReviewInboxEntries(
     const role = memberRoleLabel(member)
     if (role === '达人') continue
     const roleBody = passed
-      ? `「${orderTitle}」中达人 ${ownerName} 的视频已通过 PR 审核。`
-      : `「${orderTitle}」中达人 ${ownerName} 的视频未通过审核，${reason ? `原因：${reason}。` : ''}请关注后续重传进度。`
-    pushEntry(a, passed ? `${role}通知：视频已通过` : `${role}通知：视频已驳回`, roleBody)
+      ? isIceLink
+        ? `「${orderTitle}」中达人 ${ownerName} 的抖音链接已通过 PR 审核。`
+        : `「${orderTitle}」中达人 ${ownerName} 的视频已通过 PR 审核。`
+      : isIceLink
+        ? `「${orderTitle}」中达人 ${ownerName} 的抖音链接未通过审核，${reason ? `原因：${reason}。` : ''}请关注后续重提进度。`
+        : `「${orderTitle}」中达人 ${ownerName} 的视频未通过审核，${reason ? `原因：${reason}。` : ''}请关注后续重传进度。`
+    pushEntry(a, passed ? `${role}通知：${isIceLink ? '链接已通过' : '视频已通过'}` : `${role}通知：${isIceLink ? '链接已驳回' : '视频已驳回'}`, roleBody)
   }
   return entries
 }
@@ -191,7 +217,11 @@ export function applyVideoReviewToSnapshot(
   const cur = data.mpRecruitmentOrders[idx]!
   const patched = patchApplicantVideoReview(cur, applicantId, action, rejectReason)
   if (!patched.ok) return { ok: false, error: patched.error, status: 400 }
-  data.mpRecruitmentOrders[idx] = patched.mp
+  let nextMp = patched.mp
+  if (action === 'pass' && isIceMpOrder(nextMp)) {
+    nextMp = maybeAdvanceIceMpToSettlement(nextMp)
+  }
+  data.mpRecruitmentOrders[idx] = nextMp
   const inbox = buildVideoReviewInboxEntries(data, patched.mp, patched.applicant, action, rejectReason)
   if (inbox.length) {
     const appended = appendMpTalentInboxInSnapshot(data, inbox)

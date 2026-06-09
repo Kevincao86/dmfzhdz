@@ -21,6 +21,9 @@ Page({
     timeOptions: appFilters.APPLICATION_TIME_FILTERS,
     categoryOptions: appFilters.CATEGORY_FILTERS,
     cityOptions: ['全部'],
+    progressFilter: 'all',
+    progressFilterLabel: '状态',
+    progressOptions: appFilters.TALENT_APP_PROGRESS_FILTERS,
     keyword: '',
     uploadingKey: '',
   },
@@ -34,6 +37,7 @@ Page({
       province: this.data.province,
       city: this.data.city,
       keyword: this.data.keyword,
+      progressFilter: this.data.progressFilter,
     })
   },
   async load() {
@@ -45,8 +49,12 @@ Page({
         statusLabel: '—',
         platformIcon: '/images/platforms/douyin.png',
         category: '其他',
-        canUploadVideo: true,
-        uploadBtnLabel: '上传视频',
+        canUploadVideo: !/^MP-ICE-/i.test(String(a.mpOrderId || '')),
+        isIce: /^MP-ICE-/i.test(String(a.mpOrderId || '')),
+        progressId: 'pr_pending',
+        progressLabel: 'PR 待选中',
+        iceActionLabel: '查看云剪任务',
+        hallLabel: /^MP-ICE-/i.test(String(a.mpOrderId || '')) ? '云剪任务' : '招募大厅',
       }))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
       this.setData({
@@ -83,8 +91,11 @@ Page({
         statusLabel: '—',
         platformIcon: '/images/platforms/douyin.png',
         category: '其他',
-        canUploadVideo: true,
-        uploadBtnLabel: '上传视频',
+        canUploadVideo: !/^MP-ICE-/i.test(String(a.mpOrderId || '')),
+        isIce: /^MP-ICE-/i.test(String(a.mpOrderId || '')),
+        progressId: 'pr_pending',
+        progressLabel: 'PR 待选中',
+        iceActionLabel: '查看云剪任务',
       }))
       this.setData({
         rows,
@@ -92,6 +103,15 @@ Page({
         loading: false,
       })
     }
+  },
+  onProgressFilterChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const opt = this.data.progressOptions[idx] || this.data.progressOptions[0]
+    this.setData({
+      progressFilter: opt.id,
+      progressFilterLabel: opt.id === 'all' ? '状态' : opt.label,
+      filteredRows: this.applyFilters(this.data.rows),
+    })
   },
   onTimeFilterChange(e) {
     const idx = Number(e.detail.value) || 0

@@ -112,12 +112,19 @@
       <text class="success-title">✓ 已分配成片</text>
       <text class="hint" style="display:block;margin-top:12rpx;">{{assignedVideoLabel || '云剪成片'}}</text>
       <button class="btn-primary" style="margin-top:20rpx;" bindtap="openDownload">复制下载链接</button>
-      <view wx:if="{{!iceVerified}}" style="margin-top:24rpx;">
+      <view wx:if="{{iceVerified}}" style="margin-top:24rpx;">
+        <text class="success-title">✓ 已完成</text>
+        <text class="hint" style="display:block;margin-top:12rpx;">云剪任务已通过审核，可在「我的报名」查看状态。</text>
+      </view>
+      <view wx:elif="{{icePendingPrReview}}" style="margin-top:24rpx;">
+        <text class="hint">{{iceStatusHint}}</text>
+      </view>
+      <view wx:elif="{{!iceVerified}}" style="margin-top:24rpx;">
+        <text wx:if="{{iceStatusHint}}" class="hint" style="display:block;margin-bottom:12rpx;color:#b45309;">{{iceStatusHint}}</text>
         <text class="hint">发布抖音后粘贴作品链接：</text>
         <input class="ice-input" placeholder="粘贴抖音分享口令或作品链接" value="{{douyinUrl}}" bindinput="onDouyinField" />
-        <button class="btn-primary" style="margin-top:16rpx;" loading="{{iceSubmitting}}" bindtap="submitIceDouyin">提交链接 · AI 核查</button>
+        <button class="btn-primary" style="margin-top:16rpx;" loading="{{iceSubmitting}}" bindtap="submitIceDouyin">{{iceSubmitLabel}}</button>
       </view>
-      <text wx:else class="success-title" style="display:block;margin-top:16rpx;">✓ AI 核查已通过</text>
     </view>
 
     <view class="card card--success" wx:elif="{{applied && isIce}}">

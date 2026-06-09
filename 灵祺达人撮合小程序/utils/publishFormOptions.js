@@ -24,6 +24,11 @@ const RECRUIT_MODES = [
   { id: 'edit_ice', label: '云剪合成', sub: '素材链接 → 云端成片', hall: 'ice', category: '云剪', target: 'edit' },
 ]
 
+const ICE_VERIFY_MODES = [
+  { id: 'ai', label: 'AI 核查' },
+  { id: 'pr', label: 'PR 审核' },
+]
+
 function modesForTarget(targetId) {
   const tid = targetId || 'talent'
   return RECRUIT_MODES.filter((m) => (m.target || 'talent') === tid)
@@ -138,6 +143,7 @@ module.exports = {
   DELIVERY_WINDOWS,
   RECRUIT_TARGETS,
   RECRUIT_MODES,
+  ICE_VERIFY_MODES,
   modesForTarget,
   PLATFORMS,
   TALENT_TAGS,
