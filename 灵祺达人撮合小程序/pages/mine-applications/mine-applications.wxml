@@ -73,6 +73,16 @@
     </view>
     <view class="app-card__actions">
       <button
+        wx:if="{{item.isIce && item.iceActionLabel}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        {{item.iceActionLabel}}
+      </button>
+      <button
         wx:if="{{item.canUploadVideo}}"
         class="app-card__btn app-card__btn--primary"
         plain

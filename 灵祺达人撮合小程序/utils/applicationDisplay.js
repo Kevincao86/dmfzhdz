@@ -6,6 +6,7 @@ const memberStore = require('./talentMember.js')
 const { labels } = require('./platformLabels.js')
 const { TALENT_TAGS } = require('./publishFormOptions.js')
 
+const { isIceMpOrder } = require('./recruitmentUrgent.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 
 const MP_STATUS_LABEL = {
@@ -263,7 +264,17 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const me = resolveApplicantOnMp(mp, applicantId)
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
-  const canUploadVideo = !videoStatus || videoStatus === 'rejected'
+  const isIce = mp ? isIceMpOrder(mp) : false
+  const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
+  let iceActionLabel = ''
+  if (isIce && me) {
+    const assigned = String(me.assignedVideoDownloadUrl || '').trim()
+    const verified = me.aiVerifyStatus === 'passed'
+    const pendingConfirm = me.taskStatus === 'pending_confirm' || (!me.taskStatus && !assigned)
+    if (pendingConfirm) iceActionLabel = '确认接收'
+    else if (assigned && !verified) iceActionLabel = '提交链接'
+    else iceActionLabel = '查看云剪任务'
+  }
   const category = view?.category || mp?.category || '其他'
   return {
     ...localApp,
@@ -285,6 +296,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     videoStatus,
     videoRejectReason,
     canUploadVideo,
+    isIce,
+    iceActionLabel,
     videoStatusLabel: videoStatus
       ? videoStatus === 'passed'
         ? '视频已通过'

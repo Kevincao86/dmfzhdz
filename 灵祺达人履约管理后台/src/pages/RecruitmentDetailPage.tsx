@@ -17,6 +17,8 @@ import {
   syncProfile,
 } from '../lib/mpSync/talentChat'
 import { copyRecruitmentShareForTalent } from '../lib/mpSync/recruitmentShareCopy'
+import IceTaskPanel from '../components/mp/IceTaskPanel'
+import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -38,7 +40,8 @@ export default function RecruitmentDetailPage() {
   const myApplicant = contactGate.applicant
   const videoStatus = myApplicant ? String(myApplicant.videoStatus || '') : ''
   const videoRejectReason = myApplicant && myApplicant.videoRejectReason ? String(myApplicant.videoRejectReason) : ''
-  const canUploadVideo = applied && (!videoStatus || videoStatus === 'rejected')
+  const canUploadVideo = applied && !view?.isIce && (!videoStatus || videoStatus === 'rejected')
+  const iceState = resolveIceApplicantState(mpRaw, id || '')
 
   useEffect(() => {
     if (!id) {
@@ -216,7 +219,11 @@ export default function RecruitmentDetailPage() {
             </div>
           ) : null}
 
-          {role === 'talent' && applied ? (
+          {role === 'talent' && applied && view.isIce ? (
+            <IceTaskPanel mpOrderId={id || ''} state={iceState} onRefresh={reloadOrder} />
+          ) : null}
+
+          {role === 'talent' && applied && !view.isIce ? (
             <section className="surface-card rounded-xl border p-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="font-medium">探店成片</h3>
