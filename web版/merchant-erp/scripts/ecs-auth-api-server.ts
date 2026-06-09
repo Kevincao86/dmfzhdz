@@ -54,6 +54,7 @@ import iceOpenshotExportDownloadHandler from '../api/meoo-merchant-ai-video-open
 import iceOpenshotExportHandler from '../api/meoo-merchant-ai-video-openshot-export.ts'
 import digitalHumanTtsHandler from '../api/meoo-digital-human-tts.ts'
 import digitalHumanDouyinLinkHandler from '../api/meoo-digital-human-douyin-link.ts'
+import recruitmentOrdersAppendHandler from '../api/meoo-ops-recruitment-orders-append.ts'
 import recruitmentOrdersPatchHandler from '../api/meoo-ops-recruitment-orders-patch.ts'
 import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-apply.ts'
 import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
@@ -86,7 +87,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260601-registry-no-loop-ice-ram'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260609-recruitment-orders-append'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -159,10 +160,14 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-ice-job-download': iceJobDownloadHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-openshot-export-download':
     iceOpenshotExportDownloadHandler as VercelLikeHandler,
-  /** 灵祺达人招募小程序（与 Vercel 根 api/ 同名路由） */
+  /** 商家 ERP 达人招募推送 + 小程序侧（与 Vercel 根 api/ 同名路由） */
+  '/api/meoo-ops-recruitment-orders-append': recruitmentOrdersAppendHandler as VercelLikeHandler,
+  '/api/ops-sync/recruitment-orders/append': recruitmentOrdersAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-recruitment-orders-patch': recruitmentOrdersPatchHandler as VercelLikeHandler,
+  '/api/ops-sync/recruitment-orders/patch': recruitmentOrdersPatchHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-apply': mpRecruitmentApplyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-append': mpRecruitmentAppendHandler as VercelLikeHandler,
+  '/api/ops-sync/mp-recruitment-orders/append': mpRecruitmentAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-patch': mpRecruitmentPatchHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-delete': mpRecruitmentDeleteHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-library-delete': mpLibraryDeleteHandler as VercelLikeHandler,
