@@ -91,16 +91,20 @@ function filterApplicationRows(rows, opts) {
     if (!matchCategory(r.category, category)) return false
     if (!matchRegionFilter(r.region, province, city)) return false
     if (!listKeywordSearch.matchListKeyword(r, keyword)) return false
-    if (
-      progressFilter !== 'all' &&
-      !talentAppStatus.matchTalentApplicationProgress(
-        progressFilter,
-        r._progressMp || null,
-        r._progressMe || null,
-        r.mpOrderId,
-      )
-    ) {
-      return false
+    if (progressFilter !== 'all') {
+      const rowProgressId = String(r.progressId || '').trim()
+      if (rowProgressId) {
+        if (rowProgressId !== progressFilter) return false
+      } else if (
+        !talentAppStatus.matchTalentApplicationProgress(
+          progressFilter,
+          r.progressMp || null,
+          r.progressMe || null,
+          r.mpOrderId,
+        )
+      ) {
+        return false
+      }
     }
     return true
   })

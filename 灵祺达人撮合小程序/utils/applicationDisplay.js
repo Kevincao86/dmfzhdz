@@ -309,8 +309,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     iceActionLabel,
     progressId: progress.id,
     progressLabel: progress.label,
-    _progressMp: mp || null,
-    _progressMe: me || null,
+    progressMp: mp || null,
+    progressMe: me || null,
     videoStatusLabel: isIce
       ? progress.id === 'completed'
         ? ''
