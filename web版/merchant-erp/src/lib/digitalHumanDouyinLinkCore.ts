@@ -912,6 +912,45 @@ async function loadDouyinMediaContext(
   return page
 }
 
+function extractDouyinShareCaptionText(raw: string): string {
+  const t = raw.trim()
+  if (!t) return ''
+  const bracket = /【([^】]{2,80})】([^]*)/.exec(t)
+  if (bracket) {
+    const title = bracket[1].trim()
+    const rest = bracket[2]
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/复制打开抖音[，,]?/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const combined = `${title}${rest ? ` ${rest}` : ''}`.trim()
+    if (combined.length >= 4) return combined.slice(0, 280)
+  }
+  const cleaned = t
+    .replace(/^\d+(?:\.\d+)?\s*/, '')
+    .replace(/复制打开抖音[，,]?/g, '')
+    .replace(/^看看/g, '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned.length >= 4 ? cleaned.slice(0, 280) : ''
+}
+
+/** 云剪 AI 核查：多源拉取作品文案（页面/API + 分享口令兜底） */
+export async function fetchDouyinPublishCaptionText(
+  normalizedUrl: string,
+  rawShareInput?: string,
+): Promise<string> {
+  const videoId = extractDouyinVideoId(normalizedUrl)
+  const ctx = await loadDouyinMediaContext(normalizedUrl, videoId)
+  for (const candidate of [ctx.caption, ctx.title, ctx.description, ctx.awemeItem?.desc]) {
+    if (!candidate) continue
+    const text = stripDouyinMetaBoilerplate(String(candidate))
+    if (text.length >= 6) return text.slice(0, 280)
+  }
+  return extractDouyinShareCaptionText(String(rawShareInput || ''))
+}
+
 function parseAiJsonBlock(text: string): { script?: string; motionInstructions?: string } | null {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
   const raw = (fenced?.[1] ?? text).trim()
