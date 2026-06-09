@@ -141,10 +141,40 @@ export function mpRecruitmentOrdersForTalentHall(file: RegistryFile) {
     .map(sanitizeMpRecruitmentOrderForTalentHall)
 }
 
+export type PrOwnerKeys = {
+  lingqiPrId?: string
+  registryPrId?: string
+  prParticipantKey?: string
+}
+
+/** 注册表商单是否由指定 PR 账号发布 */
+export function mpOrderOwnedByPrKeys(
+  o: RegistryMpRecruitmentOrder,
+  keys: PrOwnerKeys,
+): boolean {
+  const pub = String(o.publisherIdentity || '').trim()
+  if (pub && pub !== 'pr') return false
+  const meta =
+    o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
+      ? (o.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const prId = String(keys.lingqiPrId || '').trim()
+  const registryPrId = String(keys.registryPrId || '').trim()
+  const metaPrId = String(meta.lingqiPrId || '').trim()
+  const metaRegistryPrId = String(meta.registryPrId || '').trim()
+  if (prId && metaPrId && prId === metaPrId) return true
+  if (registryPrId && metaRegistryPrId && registryPrId === metaRegistryPrId) return true
+  const myKey = String(keys.prParticipantKey || '').trim()
+  const metaKey = String(meta.prParticipantKey || '').trim()
+  if (myKey && metaKey && myKey === metaKey) return true
+  return false
+}
+
 /** 大厅开放单 + 客户端指定的历史单（已结束/待结算等，供我的报名、我的发单、详情页） */
 export function mergeMpRecruitmentOrdersForHallContext(
   allOrders: RegistryMpRecruitmentOrder[],
   includeMpOrderIds?: string[],
+  prOwnerKeys?: PrOwnerKeys,
 ): RegistryMpRecruitmentOrder[] {
   const hall = mpRecruitmentOrdersForTalentHall({ mpRecruitmentOrders: allOrders } as RegistryFile)
   const seen = new Set(hall.map((o) => String(o.id)))
@@ -158,6 +188,16 @@ export function mergeMpRecruitmentOrdersForHallContext(
     if (seen.has(id) || !includeSet.has(id)) continue
     seen.add(id)
     extra.push(sanitizeMpRecruitmentOrderForTalentHall(o))
+  }
+  if (prOwnerKeys) {
+    for (const o of allOrders) {
+      if (!o?.id) continue
+      const id = String(o.id)
+      if (seen.has(id)) continue
+      if (!mpOrderOwnedByPrKeys(o, prOwnerKeys)) continue
+      seen.add(id)
+      extra.push(sanitizeMpRecruitmentOrderForTalentHall(o))
+    }
   }
   return [...hall, ...extra]
 }

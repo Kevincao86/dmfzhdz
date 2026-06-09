@@ -192,11 +192,14 @@ function collectIncludeMpOrderIds(extra?: string[]): string[] {
   return [...ids].slice(0, 120)
 }
 
-export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[] }) {
+export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[]; includePrOwned?: boolean }) {
   const includeMpOrderIds = collectIncludeMpOrderIds(opts?.includeMpOrderIds)
-  if (includeMpOrderIds.length) {
+  if (includeMpOrderIds.length || opts?.includePrOwned) {
     try {
-      const data = await mpAuthRequest('hall_registry', { includeMpOrderIds })
+      const data = await mpAuthRequest('hall_registry', {
+        includeMpOrderIds,
+        ...(opts?.includePrOwned ? { includePrOwned: true } : {}),
+      })
       return data
     } catch {
       /* fallback GET */

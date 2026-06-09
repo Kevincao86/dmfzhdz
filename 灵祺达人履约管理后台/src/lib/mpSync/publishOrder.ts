@@ -11,6 +11,7 @@ import {
 } from './publishFormOptions'
 import { prDisplayName, readPrProfile } from './userProfile'
 import { prParticipantKey } from './participant'
+import { getAccount } from '../mpSession'
 import { emptySupplierPublishFields, validateSupplierPublish } from './supplierPublishForm'
 import { defaultSupplierApplyFields } from './supplierPublishForm'
 import {
@@ -46,6 +47,8 @@ export type PublishForm = {
   signupDeadline: string
   iceVideoUrl: string
   iceVerifyMode: 'ai' | 'pr'
+  /** 云剪 AI 核查：群结算二维码（data URL） */
+  groupQrImage?: string
   applyFormTemplateId: string
   applyFormTemplateName: string
   applyFormFields: ApplyField[]
@@ -298,6 +301,13 @@ export function validatePublishForm(
   if ((recruitMode === 'ice' || recruitMode === 'edit_ice') && !resolveIceReferenceVideoUrl(f)) {
     return '云剪任务请填写参考片链接'
   }
+  if (
+    (recruitMode === 'ice' || recruitMode === 'edit_ice') &&
+    (f.iceVerifyMode || 'ai') === 'ai' &&
+    !String(f.groupQrImage || '').trim()
+  ) {
+    return 'AI 核查模式请上传群二维码'
+  }
   if (!(f.applyFormFields || []).length) {
     return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
   }
@@ -393,7 +403,9 @@ export function buildPublishOrder(
   const deadline = resolveSignupDeadline(form)
   const recruitmentInfo = buildRecruitmentInfo(form, recruitModeId, recruitTarget)
   const pr = readPrProfile()
+  const account = getAccount()
   const coverFields = buildCoverFieldsForOrder(form)
+  const groupQrImage = String(form.groupQrImage || '').trim()
   const order: Record<string, unknown> = {
     id: mpId,
     sourceMerchantOrderId:
@@ -420,6 +432,8 @@ export function buildPublishOrder(
     publisherTemplateId: 'publish-wizard-v2',
     coverImage: coverFields.coverImage,
     mpPublishMeta: {
+      lingqiPrId: String(account?.lingqiPrId || '').trim(),
+      registryPrId: String(account?.registryPrId || account?.registryMemberId || '').trim(),
       prParticipantKey: prParticipantKey(pr),
       prDisplayName: prDisplayName(pr),
       prWxNickName: String(pr?.wxNickName || '').trim(),
@@ -479,7 +493,11 @@ export function buildPublishOrder(
       coverImageSource: coverFields.coverImageSource,
       iceVideoUrl: resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+      ...(groupQrImage ? { groupQrImage } : {}),
     },
+  }
+  if (groupQrImage) {
+    order.groupQrImage = groupQrImage
   }
   if (mode.hall === 'ice' || recruitModeId === 'edit_ice') {
     order.orderKind = 'recruitment_ice'

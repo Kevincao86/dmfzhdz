@@ -6,7 +6,7 @@ import { readPrProfile } from '../mpSync/userProfile'
 
 function hallFromMp(mp: Record<string, unknown>): string {
   if (mp.hall === 'urgent' || mp.urgent) return 'urgent'
-  if (mp.hall === 'ice' || mp.orderKind === 'ice') return 'ice'
+  if (mp.hall === 'ice' || mp.orderKind === 'recruitment_ice' || mp.orderKind === 'ice') return 'ice'
   return 'normal'
 }
 
