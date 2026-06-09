@@ -26,6 +26,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
   const info = String(mp.recruitmentInfo || mp.merchantRequirements || '')
   const mode = modeById(String(meta.recruitMode || 'visit'))
   const deadlineParts = parseDeadlineParts(String(meta.signupDeadline || mp.deadline || ''))
+  const deliveryParts = parseDeadlineParts(String(meta.deliveryDeadline || ''))
   const fansReq = String(mp.fansRequirement || meta.fansRequirement || '').trim()
   let fansLimitMode: 'unlimited' | 'limit' = (meta.fansLimitMode as 'unlimited' | 'limit') || 'unlimited'
   let fansMin = String(meta.fansMin ?? '').trim()
@@ -116,6 +117,8 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     recruitModeLabel: mode.label,
     signupDeadlineDate: deadlineParts.date,
     signupDeadlineTime: deadlineParts.time,
+    deliveryDeadlineDate: deliveryParts.date,
+    deliveryDeadlineTime: deliveryParts.time || '18:00',
   }
 }
 

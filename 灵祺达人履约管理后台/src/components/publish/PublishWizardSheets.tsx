@@ -44,6 +44,11 @@ type Props = {
   signupDeadlineDate: string
   signupDeadlineTime: string
   onDeadlineConfirm: (date: string, time: string) => void
+  showDeliveryDeadlineSheet: boolean
+  setShowDeliveryDeadlineSheet: (v: boolean) => void
+  deliveryDeadlineDate: string
+  deliveryDeadlineTime: string
+  onDeliveryDeadlineConfirm: (date: string, time: string) => void
   form: PublishForm
   patchForm: (patch: Partial<PublishForm>) => void
   setErr: (msg: string) => void
@@ -81,6 +86,11 @@ export default function PublishWizardSheets(props: Props) {
     signupDeadlineDate,
     signupDeadlineTime,
     onDeadlineConfirm,
+    showDeliveryDeadlineSheet,
+    setShowDeliveryDeadlineSheet,
+    deliveryDeadlineDate,
+    deliveryDeadlineTime,
+    onDeliveryDeadlineConfirm,
     form,
     patchForm,
     setErr,
@@ -142,6 +152,19 @@ export default function PublishWizardSheets(props: Props) {
         onConfirm={(date, time) => {
           onDeadlineConfirm(date, time)
           setShowDeadlineSheet(false)
+        }}
+      />
+
+      <SignupDeadlineSheet
+        open={showDeliveryDeadlineSheet}
+        minDate={todayDate}
+        date={deliveryDeadlineDate}
+        time={deliveryDeadlineTime}
+        title="交付截止时间"
+        onClose={() => setShowDeliveryDeadlineSheet(false)}
+        onConfirm={(date, time) => {
+          onDeliveryDeadlineConfirm(date, time)
+          setShowDeliveryDeadlineSheet(false)
         }}
       />
 
