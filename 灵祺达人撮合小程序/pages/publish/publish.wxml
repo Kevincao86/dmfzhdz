@@ -58,7 +58,7 @@
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
-      <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
+      <text class="pub-hero-back" bindtap="onBackFromMode">‹ 返回</text>
       <text class="pub-hero-title">选择招募模式</text>
       <text class="pub-hero-sub">探店 · 品宣 · 直播达人</text>
     </view>
