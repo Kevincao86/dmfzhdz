@@ -1,6 +1,7 @@
 const publishOpts = require('./publishFormOptions.js')
 const applyTemplates = require('./applyFormTemplates.js')
 const livePublishForm = require('./livePublishForm.js')
+const supplierPublishForm = require('./supplierPublishForm.js')
 
 const { modeById, newLevelTier, newFansTier } = publishOpts
 
@@ -25,6 +26,7 @@ function formPatchFromMpOrder(mp) {
   const info = mp?.recruitmentInfo || mp?.merchantRequirements || ''
   const mode = modeById(meta.recruitMode) || modeById('visit')
   const deadlineParts = parseDeadlineParts(meta.signupDeadline || mp?.deadline)
+  const deliveryParts = parseDeadlineParts(meta.deliveryDeadline)
   const fansReq = String(mp?.fansRequirement || meta.fansRequirement || '').trim()
   let fansLimitMode = meta.fansLimitMode || 'unlimited'
   let fansMin = String(meta.fansMin ?? '').trim()
@@ -71,6 +73,20 @@ function formPatchFromMpOrder(mp) {
       : [],
     coverImage: String(mp?.coverImage || meta.coverImage || '').trim(),
     coverLibraryId: String(meta.coverLibraryId || '').trim(),
+    shootDate: String(meta.shootDate || ''),
+    shootTimeStart: String(meta.shootTimeStart || ''),
+    shootTimeEnd: String(meta.shootTimeEnd || ''),
+    shootLocation: String(meta.shootLocation || ''),
+    deliverables: Array.isArray(meta.deliverables) ? [...meta.deliverables] : [],
+    equipmentRequired: Array.isArray(meta.equipmentRequired) ? [...meta.equipmentRequired] : [],
+    materialSource: String(meta.materialSource || ''),
+    materialUrl: String(meta.materialUrl || ''),
+    aspectRatio: String(meta.aspectRatio || ''),
+    targetDuration: String(meta.targetDuration || ''),
+    styleTags: Array.isArray(meta.styleTags) ? [...meta.styleTags] : [],
+    packageTags: Array.isArray(meta.packageTags) ? [...meta.packageTags] : [],
+    deliveryDeadline: String(meta.deliveryDeadline || ''),
+    referenceUrl: String(meta.referenceUrl || ''),
     ...livePublishForm.restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp?.region && mp.region !== '全国') {
@@ -93,6 +109,8 @@ function formPatchFromMpOrder(mp) {
     recruitModeLabel: mode.label,
     signupDeadlineDate: deadlineParts.date,
     signupDeadlineTime: deadlineParts.time,
+    deliveryDeadlineDate: deliveryParts.date,
+    deliveryDeadlineTime: deliveryParts.time || '18:00',
     hall: mp?.hall || mode.hall,
   }
 }

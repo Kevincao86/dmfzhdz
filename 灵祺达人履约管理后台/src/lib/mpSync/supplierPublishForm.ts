@@ -104,7 +104,7 @@ export function validateSupplierPublish(
     if (!String(f.aspectRatio || '').trim()) return '请选择成片画幅'
     if (!String(f.targetDuration || '').trim()) return '请选择目标时长'
     if (!(f.styleTags || []).length) return '请选择剪辑风格'
-    if (!String(f.deliveryDeadline || '').trim()) return '请填写交付截止时间'
+    if (!String(f.deliveryDeadline || '').trim()) return '请选择交付截止时间'
     if (recruitMode === 'edit_ice' && !String(f.iceVideoUrl || '').trim()) {
       return '云剪任务请填写参考成片链接'
     }

@@ -134,6 +134,7 @@ type Props = {
   minDate: string
   date: string
   time: string
+  title?: string
   onClose: () => void
   onConfirm: (date: string, time: string) => void
 }
@@ -142,7 +143,7 @@ export function formatSignupDeadlineDisplay(date: string, time: string) {
   return formatDisplay(date, time)
 }
 
-export default function SignupDeadlineSheet({ open, minDate, date, time, onClose, onConfirm }: Props) {
+export default function SignupDeadlineSheet({ open, minDate, date, time, title, onClose, onConfirm }: Props) {
   const min = useMemo(() => parseYmd(minDate) || startOfDay(new Date()), [minDate])
   const initial = parseYmd(date) || min
   const [viewYear, setViewYear] = useState(initial.getFullYear())
@@ -202,7 +203,7 @@ export default function SignupDeadlineSheet({ open, minDate, date, time, onClose
     <PublishSheet
       open={open}
       tall
-      title="招募报名截止时间"
+      title={title || '招募报名截止时间'}
       onClose={onClose}
       pinnedBottom={<DeadlineTimeWheel value={selTime} onChange={setSelTime} />}
       onConfirm={() => {

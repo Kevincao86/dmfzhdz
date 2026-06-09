@@ -138,6 +138,9 @@ export default function PublishWizard() {
   const [applyEditorTplId, setApplyEditorTplId] = useState('')
   const [applyEditorMode, setApplyEditorMode] = useState<'new' | 'template'>('new')
   const [showDeadlineSheet, setShowDeadlineSheet] = useState(false)
+  const [deliveryDeadlineDate, setDeliveryDeadlineDate] = useState('')
+  const [deliveryDeadlineTime, setDeliveryDeadlineTime] = useState('18:00')
+  const [showDeliveryDeadlineSheet, setShowDeliveryDeadlineSheet] = useState(false)
 
   const display = useMemo(() => computePublishDisplay(form, recruitMode), [form, recruitMode])
   const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
@@ -149,6 +152,14 @@ export default function PublishWizard() {
       return
     }
     setForm((f) => ({ ...f, signupDeadline: `${date} ${time || '23:59'}:00` }))
+  }, [])
+
+  const syncDeliveryDeadline = useCallback((date: string, time: string) => {
+    if (!date) {
+      setForm((f) => ({ ...f, deliveryDeadline: '' }))
+      return
+    }
+    setForm((f) => ({ ...f, deliveryDeadline: `${date} ${time || '18:00'}:00` }))
   }, [])
 
   const refreshCityUi = useCallback(
@@ -169,6 +180,8 @@ export default function PublishWizard() {
     setForm(draft.form)
     setSignupDeadlineDate(draft.signupDeadlineDate || '')
     setSignupDeadlineTime(draft.signupDeadlineTime || '23:59')
+    setDeliveryDeadlineDate(draft.deliveryDeadlineDate || '')
+    setDeliveryDeadlineTime(draft.deliveryDeadlineTime || '18:00')
     setTagSelected(new Set(draft.talentTags || []))
     setReqLevelSelected(new Set(draft.douyinSalesLevels?.length ? draft.douyinSalesLevels : ['不限']))
     if (draft.recruitModeLabel) setRecruitModeLabel(draft.recruitModeLabel)
@@ -211,6 +224,8 @@ export default function PublishWizard() {
     setForm(restored.patch)
     setSignupDeadlineDate(restored.signupDeadlineDate)
     setSignupDeadlineTime(restored.signupDeadlineTime)
+    setDeliveryDeadlineDate(restored.deliveryDeadlineDate)
+    setDeliveryDeadlineTime(restored.deliveryDeadlineTime)
     setTagSelected(new Set(restored.patch.talentTags))
     setReqLevelSelected(new Set(restored.patch.douyinSalesLevels))
     setEditMpId(mpId)
@@ -262,6 +277,12 @@ export default function PublishWizard() {
   const deadlineDisplayText = signupDeadlineDate
     ? formatSignupDeadlineDisplay(signupDeadlineDate, signupDeadlineTime)
     : display.signupDeadlineDisplay
+
+  const deliveryDeadlineDisplayText = deliveryDeadlineDate
+    ? formatSignupDeadlineDisplay(deliveryDeadlineDate, deliveryDeadlineTime)
+    : form.deliveryDeadline
+      ? String(form.deliveryDeadline).slice(0, 16)
+      : ''
 
   async function onSubmit() {
     const vErr = validatePublishForm(form, recruitMode, recruitTarget || 'talent')
@@ -315,6 +336,8 @@ export default function PublishWizard() {
           form,
           signupDeadlineDate,
           signupDeadlineTime,
+          deliveryDeadlineDate,
+          deliveryDeadlineTime,
           talentTags: [...tagSelected],
           douyinSalesLevels: [...reqLevelSelected],
         },
@@ -668,8 +691,12 @@ export default function PublishWizard() {
             </div>
             <PubLabel>参考片链接</PubLabel>
             <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.referenceUrl} onChange={(e) => patchForm({ referenceUrl: e.target.value })} />
-            <PubLabel>交付截止时间 *</PubLabel>
-            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.deliveryDeadline} onChange={(e) => patchForm({ deliveryDeadline: e.target.value })} />
+            <PubSelectRow
+              label="交付截止时间 *"
+              value={deliveryDeadlineDisplayText}
+              placeholder={!deliveryDeadlineDate}
+              onClick={() => setShowDeliveryDeadlineSheet(true)}
+            />
           </div>
         ) : null}
 
@@ -967,6 +994,15 @@ export default function PublishWizard() {
         setSignupDeadlineDate(date)
         setSignupDeadlineTime(time)
         syncDeadline(date, time)
+      }}
+      showDeliveryDeadlineSheet={showDeliveryDeadlineSheet}
+      setShowDeliveryDeadlineSheet={setShowDeliveryDeadlineSheet}
+      deliveryDeadlineDate={deliveryDeadlineDate}
+      deliveryDeadlineTime={deliveryDeadlineTime}
+      onDeliveryDeadlineConfirm={(date, time) => {
+        setDeliveryDeadlineDate(date)
+        setDeliveryDeadlineTime(time)
+        syncDeliveryDeadline(date, time)
       }}
       form={form}
       patchForm={patchForm}

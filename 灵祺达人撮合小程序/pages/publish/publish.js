@@ -174,6 +174,8 @@ Page({
     todayDate: defaultSignupDate(),
     signupDeadlineDate: '',
     signupDeadlineTime: '23:59',
+    deliveryDeadlineDate: '',
+    deliveryDeadlineTime: '18:00',
     showSignupDeadline: true,
     signupDeadlineDisplay: '请选择报名截止时间',
     signupDeadlinePlaceholder: true,
@@ -297,6 +299,15 @@ Page({
       signupDeadlinePlaceholder: false,
     })
   },
+  syncDeliveryDeadlineFromParts() {
+    const d = this.data.deliveryDeadlineDate
+    const t = this.data.deliveryDeadlineTime || '18:00'
+    if (!d) {
+      this.setData({ 'form.deliveryDeadline': '' })
+      return
+    }
+    this.setData({ 'form.deliveryDeadline': `${d} ${t}:00` })
+  },
   onDeliveryWindowTap(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.form.deliveryWindow) return
@@ -341,6 +352,12 @@ Page({
   },
   onSignupDeadlineTime(e) {
     this.setData({ signupDeadlineTime: e.detail.value }, () => this.syncDeadlineFromParts())
+  },
+  onDeliveryDeadlineDate(e) {
+    this.setData({ deliveryDeadlineDate: e.detail.value }, () => this.syncDeliveryDeadlineFromParts())
+  },
+  onDeliveryDeadlineTime(e) {
+    this.setData({ deliveryDeadlineTime: e.detail.value }, () => this.syncDeliveryDeadlineFromParts())
   },
   onPickerBack() {
     this.setData({ pickerView: '' }, () => this.syncTabBarOverlay())
@@ -687,7 +704,9 @@ Page({
         todayDate: today,
         signupDeadlineDate: restored.signupDeadlineDate || '',
         signupDeadlineTime: restored.signupDeadlineTime || '23:59',
-      })
+        deliveryDeadlineDate: restored.deliveryDeadlineDate || '',
+        deliveryDeadlineTime: restored.deliveryDeadlineTime || '18:00',
+      }, () => this.syncDeliveryDeadlineFromParts())
       if (isSupplier) this.syncSupplierPublishGrids(restored.patch)
       this.syncDisplayFields()
       this.syncTabBarOverlay()
@@ -783,6 +802,8 @@ Page({
       todayDate: today,
       signupDeadlineDate: '',
       signupDeadlineTime: '23:59',
+      deliveryDeadlineDate: '',
+      deliveryDeadlineTime: '18:00',
     }
     if (mode.id === 'live') {
       patch['form.applyFormFields'] = livePublishForm.defaultLiveApplyFields()

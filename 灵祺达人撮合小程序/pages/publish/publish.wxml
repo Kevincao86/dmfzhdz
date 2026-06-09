@@ -352,7 +352,18 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">交付截止时间 *</text>
-              <input class="pub-input" placeholder="如 2026-06-10 18:00" value="{{form.deliveryDeadline}}" data-key="deliveryDeadline" bindinput="onFieldInput" />
+              <view class="pub-deadline-row">
+                <picker class="pub-deadline-pick" mode="date" value="{{deliveryDeadlineDate}}" start="{{todayDate}}" bindchange="onDeliveryDeadlineDate">
+                  <view class="pub-select pub-select--half">
+                    <text class="pub-select-text {{deliveryDeadlineDate ? '' : 'pub-select-text--ph'}}">{{deliveryDeadlineDate || '选择日期'}}</text>
+                  </view>
+                </picker>
+                <picker class="pub-deadline-pick" mode="time" value="{{deliveryDeadlineTime}}" bindchange="onDeliveryDeadlineTime">
+                  <view class="pub-select pub-select--half">
+                    <text class="pub-select-text">{{deliveryDeadlineTime || '18:00'}}</text>
+                  </view>
+                </picker>
+              </view>
             </view>
             <view class="pub-field">
               <text class="pub-label">参考片链接</text>

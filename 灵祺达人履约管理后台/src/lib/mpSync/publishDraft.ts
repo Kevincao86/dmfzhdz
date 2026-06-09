@@ -15,6 +15,8 @@ export type PublishWizardDraft = {
   form: PublishForm
   signupDeadlineDate: string
   signupDeadlineTime: string
+  deliveryDeadlineDate: string
+  deliveryDeadlineTime: string
   talentTags: string[]
   douyinSalesLevels: string[]
   savedAt: number
@@ -52,6 +54,8 @@ function migrateLegacyDraft(): PublishWizardDraft[] {
       form: d.form,
       signupDeadlineDate: d.signupDeadlineDate || '',
       signupDeadlineTime: d.signupDeadlineTime || '23:59',
+      deliveryDeadlineDate: d.deliveryDeadlineDate || '',
+      deliveryDeadlineTime: d.deliveryDeadlineTime || '18:00',
       talentTags: d.talentTags || [],
       douyinSalesLevels: d.douyinSalesLevels || ['不限'],
       savedAt: d.savedAt || Date.now(),
