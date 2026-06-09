@@ -39,7 +39,9 @@ if [[ "$(id -un)" == "root" && "${HOME:-}" == "/root" ]]; then
 fi
 
 echo "== 0) 代码 =="
-if [[ -d "$ROOT/.git" ]]; then
+if [[ -f "$ROOT/scripts/ecs-git-pull-gitee.sh" ]]; then
+  bash "$ROOT/scripts/ecs-git-pull-gitee.sh"
+elif [[ -d "$ROOT/.git" ]]; then
   (cd "$ROOT" && git pull --ff-only) || (cd "$ROOT" && git pull)
 fi
 

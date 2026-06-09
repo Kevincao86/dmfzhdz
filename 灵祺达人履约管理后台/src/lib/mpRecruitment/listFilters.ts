@@ -106,6 +106,7 @@ function buildMockRecruitmentRowCore(partial?: Partial<MockRecruitmentRow>) {
     merchantName: '静安网红火锅',
     storeName: '静安寺店',
     title: '静安网红火锅·双人探店套餐招募',
+    mpStatus: 'open',
     statusLabel: '招募中',
     platform: '抖音',
     region: '上海',
