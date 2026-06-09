@@ -264,7 +264,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     const found = talentContactPrGate.findMyApplicant(mp, localApp.mpOrderId)
     if (found && found.id) applicantId = String(found.id)
   }
-  const me = resolveApplicantOnMp(mp, applicantId)
+  const me = resolveApplicantOnMp(mp, applicantId) || (mp ? talentContactPrGate.findMyApplicant(mp, localApp.mpOrderId) : null)
   const isIce = mp ? isIceMpOrder(mp) : /^MP-ICE-/i.test(String(localApp.mpOrderId || ''))
   const orderType = resolveOrderTypeFromMp(mp, localApp)
   const isUrgent = !!(mp && mp.urgent && !isIce)
@@ -309,6 +309,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     iceActionLabel,
     progressId: progress.id,
     progressLabel: progress.label,
+    _progressMp: mp || null,
+    _progressMe: me || null,
     videoStatusLabel: isIce
       ? progress.id === 'completed'
         ? ''

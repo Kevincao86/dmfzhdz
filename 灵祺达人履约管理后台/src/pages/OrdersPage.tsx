@@ -11,6 +11,7 @@ import {
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
 import {
+  matchTalentApplicationProgress,
   resolveTalentApplicationProgress,
   TALENT_APP_PROGRESS_FILTERS,
   type TalentAppProgressId,
@@ -35,6 +36,8 @@ type EnrichedApplication = ApplicationLocal & {
   progressId?: string
   progressLabel?: string
   videoStatusLabel?: string
+  _progressMp?: Record<string, unknown> | null
+  _progressMe?: Record<string, unknown> | null
 }
 
 /** 达人：我的报名；PR：我的发单 */
@@ -67,7 +70,11 @@ function TalentApplicationsPage() {
       if (found && found.id) applicantId = String(found.id)
     }
     const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
-    const me = applicants.find((x) => x && String(x.id) === applicantId) || null
+    let me = applicants.find((x) => x && String(x.id) === applicantId) || null
+    if (!me) {
+      const found = findMyApplicant(mp, a.mpOrderId)
+      if (found) me = found as Record<string, unknown>
+    }
     const videoStatus = me ? String(me.videoStatus || '') : ''
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
     const isIce = row.isIce
@@ -123,6 +130,8 @@ function TalentApplicationsPage() {
       iceActionLabel,
       progressId: progress.id,
       progressLabel: progress.label,
+      _progressMp: mp,
+      _progressMe: me,
       videoStatusLabel: videoStatusLabelText,
     }
   }
@@ -220,7 +229,12 @@ function TalentApplicationsPage() {
       if (!hallFilters.matchCategory(a.category || '', filterCategory)) return false
       if (!hallFilters.matchRegionFilter(a.region || '', '', filterProvince, filterCity)) return false
       if (!matchListKeyword(a as Record<string, unknown>, filterKeyword)) return false
-      if (filterProgress !== 'all' && String(a.progressId || '') !== filterProgress) return false
+      if (
+        filterProgress !== 'all' &&
+        !matchTalentApplicationProgress(filterProgress, a._progressMp || null, a._progressMe || null, a.mpOrderId)
+      ) {
+        return false
+      }
       return true
     })
   }, [apps, filterTime, filterCategory, filterProvince, filterCity, filterKeyword, filterProgress])

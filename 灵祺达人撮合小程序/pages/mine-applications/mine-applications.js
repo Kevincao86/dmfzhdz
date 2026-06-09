@@ -111,9 +111,12 @@ Page({
   onProgressFilterChange(e) {
     const idx = Number(e.detail.value) || 0
     const opt = this.data.progressOptions[idx] || this.data.progressOptions[0]
+    const progressFilter = opt && opt.id ? opt.id : 'all'
+    const progressFilterLabel =
+      progressFilter === 'all' ? '状态' : opt && opt.label ? opt.label : '状态'
     this.setData({
-      progressFilter: opt.id,
-      progressFilterLabel: opt.id === 'all' ? '状态' : opt.label,
+      progressFilter,
+      progressFilterLabel,
       filteredRows: this.applyFilters(this.data.rows),
     })
   },
