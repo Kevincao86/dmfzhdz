@@ -155,3 +155,25 @@ export function buildIceCanonicalOssUrl(prefix: ParsedOssPrefix, objectKey: stri
   const key = objectKey.replace(/^\/+/, '')
   return ensureIceHttpsUrl(`https://${prefix.bucket}.oss-${prefix.region}.aliyuncs.com/${key}`)
 }
+
+const ICE_OSS_HTTPS_RE = /^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\/.+/i
+
+/** 提交云剪前校验；返回 null 表示可用 */
+export function validateIcePipelineImageUrl(url: string): string | null {
+  const raw = String(url || '').trim()
+  if (!raw) return '图片地址为空'
+  if (/your-cdn\.com|example\.com|placeholder/i.test(raw)) {
+    return '检测到示例占位链接，请删除后使用「本地上传」写入 OSS'
+  }
+  if (/localhost|127\.0\.0\.1|blob:/i.test(raw)) {
+    return '图片须为公网 OSS 地址，请使用「本地上传」'
+  }
+  if (/[?#].*signature/i.test(raw) || raw.includes('?')) {
+    return '勿使用带 ?Signature= 的签名链接，请重新本地上传（系统会生成无签名 OSS 直链）'
+  }
+  const oss = toIceTimelineOssUrl(raw)
+  if (!ICE_OSS_HTTPS_RE.test(oss)) {
+    return '须为阿里云 OSS 直链（形如 https://bucket.oss-cn-xxx.aliyuncs.com/路径），请本地上传后提交'
+  }
+  return null
+}
