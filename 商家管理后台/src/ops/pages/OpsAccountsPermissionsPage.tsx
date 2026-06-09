@@ -8,6 +8,7 @@ import {
   deleteOpsSubAccount,
   ensureOpsMasterAccount,
   fetchOpsStaffAccountsRemote,
+  hasOpsCloudSession,
   isSuperAdmin,
   migrateLocalOpsStaffToRemoteIfNeeded,
   OPS_MASTER_PHONE,
@@ -125,13 +126,22 @@ export default function OpsAccountsPermissionsPage() {
           phone_exists: '该手机号已存在',
           password_too_short: '密码至少 6 位',
           permissions_required: '请至少勾选一个功能模块',
+          cloud_session_required:
+            '当前未连接云端数据库。请退出后使用主账号重新登录（须出现云端会话），再创建子账号。',
         }
         setFormErr(msg[r.error] ?? r.error)
         return
       }
       resetForm()
       reloadStaff()
-      window.alert('子账号已创建')
+      if (r.cloudSynced) {
+        await migrateLocalOpsStaffToRemoteIfNeeded()
+        window.alert('子账号已创建并写入云端，其他设备可使用该手机号登录。')
+      } else {
+        window.alert(
+          '子账号仅保存在本浏览器，其他同事无法登录。请主账号退出后用正确主号重新登录后再创建。',
+        )
+      }
     } finally {
       setBusy(false)
     }
@@ -194,6 +204,12 @@ export default function OpsAccountsPermissionsPage() {
         <p className="mt-1 text-sm text-slate-500">
           管理运营管控台登录账号。主账号 {OPS_MASTER_PHONE} 拥有全部权限；可创建子账号并分配菜单模块。
         </p>
+        {!hasOpsCloudSession() ? (
+          <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+            当前为<strong className="font-medium">本机离线会话</strong>（未连接云端数据库）。此页面看到的子账号可能仅存在本浏览器，其他设备无法登录。请退出后使用主账号{' '}
+            <span className="font-mono">{OPS_MASTER_PHONE}</span> 重新登录，再创建或编辑子账号。
+          </p>
+        ) : null}
       </div>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">

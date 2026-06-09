@@ -136,6 +136,18 @@ function sessionTokenFromStorage(): string | undefined {
   return readOpsSession()?.sessionToken
 }
 
+export function hasOpsCloudSession(): boolean {
+  return !!sessionTokenFromStorage()
+}
+
+function isOpsProductionHost(): boolean {
+  try {
+    return /mofangdianai\.com$/i.test(window.location.hostname)
+  } catch {
+    return false
+  }
+}
+
 /** 确保主账号存在（本地回退路径） */
 export async function ensureOpsMasterAccountLocal(): Promise<void> {
   const list = readOpsStaffAccountsLocal()
@@ -357,8 +369,11 @@ export async function createOpsSubAccount(input: {
   displayName: string
   password: string
   permissions: OpsPermissionKey[]
-}): Promise<{ ok: true; account: OpsStaffAccount } | { ok: false; error: string }> {
+}): Promise<{ ok: true; account: OpsStaffAccount; cloudSynced: boolean } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
+  if (!token && isOpsProductionHost()) {
+    return { ok: false, error: 'cloud_session_required' }
+  }
   if (token) {
     const r = await apiOpsStaffMutate(token, {
       action: 'create',
@@ -367,7 +382,7 @@ export async function createOpsSubAccount(input: {
       password: input.password,
       permissions: input.permissions,
     })
-    if (r.ok && r.account) return { ok: true, account: r.account }
+    if (r.ok && r.account) return { ok: true, account: r.account, cloudSynced: true }
     if (r.ok) return { ok: false, error: 'invalid_response' }
     return { ok: false, error: r.error }
   }
@@ -396,7 +411,7 @@ export async function createOpsSubAccount(input: {
     updatedAt: now,
   }
   writeOpsStaffAccountsLocal([...list, account])
-  return { ok: true, account }
+  return { ok: true, account, cloudSynced: false }
 }
 
 export async function updateOpsSubAccount(
