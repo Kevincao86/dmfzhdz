@@ -11,8 +11,9 @@ const orderCard = require('./recruitmentOrderCard.js')
 const hallIdentity = require('./hallIdentityBuckets.js')
 const userProfile = require('./userProfile.js')
 
-const LOAD_MS = 52000
-const WATCHDOG_MS = 12000
+const LOAD_MS = 55000
+const WATCHDOG_MS = 18000
+const BG_REFRESH_MS = 8000
 
 function errHint(msg) {
   const m = String(msg || '')
@@ -86,6 +87,26 @@ async function loadHallList(page) {
     if (typeof page.applyFilters === 'function') page.applyFilters()
   }
 
+  const scheduleBgRefresh = () => {
+    if (page._hallBgRefreshTimer) clearTimeout(page._hallBgRefreshTimer)
+    page._hallBgRefreshTimer = setTimeout(() => {
+      if (page._hallLoadSeq !== seq) return
+      void ops
+        .fetchRegistry()
+        .then((reg) => {
+          if (page._hallLoadSeq !== seq) return
+          if (reg && reg._registryStale) {
+            scheduleBgRefresh()
+            return
+          }
+          applyRows(mapRegistryToRows(reg))
+        })
+        .catch(() => {
+          if (page._hallLoadSeq === seq) scheduleBgRefresh()
+        })
+    }, BG_REFRESH_MS)
+  }
+
   if (!api.hasApi()) {
     const demo = showDemoOrders() ? listFilters.mergeHallDisplayRows([], { allowDemo: true }) : []
     finish({
@@ -120,12 +141,14 @@ async function loadHallList(page) {
     const stale = registryCache.load({ allowStale: true })
     if (stale && stale.data && (stale.data.mpRecruitmentOrders || []).length) {
       try {
-        applyRows({ ...mapRegistryToRows(stale.data), err: '加载较慢，已显示缓存' })
+        applyRows(mapRegistryToRows(stale.data))
+        scheduleBgRefresh()
         return
       } catch (_) {}
     }
     if (hadRows || showedOffline) {
-      applyRows({ err: '加载超时，请下拉刷新' })
+      page.setData({ loading: false })
+      scheduleBgRefresh()
       return
     }
     finish({ err: '加载超时，请下拉刷新' })
@@ -148,23 +171,27 @@ async function loadHallList(page) {
       }
     }
     if (page._hallLoadSeq !== seq) return
+    stopWatchdog()
     const rows = mapRegistryToRows(reg)
     if (reg && reg._registryStale) {
-      const age = registryCache.formatAgeHint(reg._registryCacheAgeMs)
-      applyRows({ ...rows, err: `网络较慢，显示 ${age} 的缓存，下拉可刷新` })
+      applyRows(rows)
+      scheduleBgRefresh()
       return
     }
     applyRows(rows)
   } catch (e) {
     if (page._hallLoadSeq !== seq) return
+    stopWatchdog()
     if (showedOffline || hadRows) {
-      applyRows({ err: errHint(e && e.message ? e.message : e) || '刷新失败，请下拉重试' })
+      page.setData({ loading: false })
+      scheduleBgRefresh()
       return
     }
     const stale = registryCache.load({ allowStale: true })
     if (stale && stale.data && (stale.data.mpRecruitmentOrders || []).length) {
       try {
-        applyRows({ ...mapRegistryToRows(stale.data), err: '网络不稳定，已显示缓存' })
+        applyRows(mapRegistryToRows(stale.data))
+        scheduleBgRefresh()
         return
       } catch (_) {}
     }

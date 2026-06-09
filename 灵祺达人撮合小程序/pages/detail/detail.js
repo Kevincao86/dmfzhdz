@@ -95,14 +95,13 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
-      const cacheHint = reg && reg._registryStale ? '网络较慢，已显示缓存数据' : ''
       const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = list.find((o) => o && o.id === id)
       if (!mp) {
         this.setData({
           loading: false,
-          err: cacheHint
-            ? `${cacheHint}，但未找到该招募单（请稍后重试或先打开招募大厅刷新）`
+          err: reg && reg._registryStale
+            ? '暂未加载到该招募单，请返回招募大厅下拉刷新后重试'
             : '招募单不存在或已结束',
         })
         return
@@ -207,9 +206,6 @@ Page({
         : null
       const hasApplied = this.data.applied || iceApplied || gate.hasApplication
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
-      if (cacheHint) {
-        wx.showToast({ title: cacheHint, icon: 'none', duration: 2800 })
-      }
       this.setData({
         view,
         loading: false,
