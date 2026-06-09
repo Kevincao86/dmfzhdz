@@ -89,6 +89,7 @@ Page({
   },
   onShow() {
     mpShare.enableShareMenu()
+    mpShare.preloadShareCover()
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
     const identity = userProfile.readIdentity()

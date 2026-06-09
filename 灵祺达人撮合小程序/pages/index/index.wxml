@@ -238,4 +238,6 @@
       </view>
     </view>
   </view>
+  <!-- 强制打包分享封面，真机分享 imageUrl 须能读到包内图 -->
+  <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
 </view>

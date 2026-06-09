@@ -6,84 +6,98 @@ const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
 const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配达人招募'
 
 let cachedShareCoverPath = ''
+let coverPreparePromise = null
 
-function cdnShareCoverUrl() {
-  const cdn = String(config.RECRUIT_COVER_CDN_BASE || '').trim().replace(/\/$/, '')
-  if (!/^https?:\/\//i.test(cdn)) return ''
-  return `${cdn}/${SHARE_COVER_FILE}`
+function persistCoverPath(path) {
+  const p = String(path || '').trim()
+  if (!p) return ''
+  cachedShareCoverPath = p
+  try {
+    const app = getApp()
+    if (app && app.globalData) app.globalData.shareCoverPath = p
+  } catch (_) {}
+  return p
 }
 
-/** 分享封面：包内 JPG 优先（备案期远程 downloadFile 易失败）；远程仅作可选回退 */
-function shareCoverImageUrl() {
-  return LOCAL_SHARE_COVER
+function readCoverPath() {
+  if (cachedShareCoverPath) return cachedShareCoverPath
+  try {
+    const app = getApp()
+    const g = app && app.globalData && app.globalData.shareCoverPath
+    if (g) {
+      cachedShareCoverPath = String(g)
+      return cachedShareCoverPath
+    }
+  } catch (_) {}
+  return ''
 }
 
 function remoteShareCoverUrl() {
   const fromConfig = String(config.MP_SHARE_COVER_URL || '').trim()
   if (/^https?:\/\//i.test(fromConfig)) return fromConfig
-  return cdnShareCoverUrl()
+  const cdn = String(config.RECRUIT_COVER_CDN_BASE || '').trim().replace(/\/$/, '')
+  if (!/^https?:\/\//i.test(cdn)) return ''
+  return `${cdn}/${SHARE_COVER_FILE}`
 }
 
-function loadLocalCover(done) {
-  wx.getImageInfo({
-    src: LOCAL_SHARE_COVER,
-    success(res) {
-      const p = res.path || LOCAL_SHARE_COVER
-      cachedShareCoverPath = p
-      done(p)
-    },
-    fail(err) {
-      console.warn('[mpShare] local cover getImageInfo failed', err)
-      const remote = remoteShareCoverUrl()
-      if (remote) {
-        downloadRemoteCover(remote, () => done(LOCAL_SHARE_COVER))
-        return
-      }
-      done(LOCAL_SHARE_COVER)
-    },
-  })
-}
-
-function downloadRemoteCover(url, onFail) {
-  wx.downloadFile({
-    url,
-    success(res) {
-      if (res.statusCode === 200 && res.tempFilePath) {
-        cachedShareCoverPath = res.tempFilePath
-        return
-      }
-      console.warn('[mpShare] download cover HTTP', res.statusCode, url)
-      if (typeof onFail === 'function') onFail()
-    },
-    fail(err) {
-      console.warn('[mpShare] download cover fail', url, err)
-      if (typeof onFail === 'function') onFail()
-    },
-  })
-}
-
-function resolveCoverPath(src, done) {
-  const url = String(src || '').trim() || LOCAL_SHARE_COVER
-  if (!/^https?:\/\//i.test(url)) {
-    loadLocalCover(done)
-    return
+/** 分享封面：包内 JPG；复制到 USER_DATA_PATH 后 imageUrl 真机才稳定生效 */
+function prepareShareCoverPath() {
+  const existing = readCoverPath()
+  if (existing && existing.indexOf(wx.env.USER_DATA_PATH) === 0) {
+    return Promise.resolve(existing)
   }
-  wx.downloadFile({
-    url,
-    success(res) {
-      if (res.statusCode === 200 && res.tempFilePath) {
-        cachedShareCoverPath = res.tempFilePath
-        done(res.tempFilePath)
-        return
-      }
-      console.warn('[mpShare] download cover HTTP', res.statusCode, url)
-      loadLocalCover(done)
-    },
-    fail(err) {
-      console.warn('[mpShare] download cover fail', url, err)
-      loadLocalCover(done)
-    },
+  if (coverPreparePromise) return coverPreparePromise
+
+  coverPreparePromise = new Promise((resolve) => {
+    const dest = `${wx.env.USER_DATA_PATH}/share-cover-ai-match.jpg`
+    const fs = wx.getFileSystemManager()
+
+    const finishGetImageInfo = () => {
+      wx.getImageInfo({
+        src: LOCAL_SHARE_COVER,
+        success(res) {
+          resolve(persistCoverPath(res.path || LOCAL_SHARE_COVER))
+        },
+        fail(err) {
+          console.warn('[mpShare] getImageInfo failed', err)
+          const remote = remoteShareCoverUrl()
+          if (!remote) {
+            resolve(persistCoverPath(LOCAL_SHARE_COVER))
+            return
+          }
+          wx.downloadFile({
+            url: remote,
+            success(dl) {
+              if (dl.statusCode === 200 && dl.tempFilePath) {
+                resolve(persistCoverPath(dl.tempFilePath))
+                return
+              }
+              resolve(persistCoverPath(LOCAL_SHARE_COVER))
+            },
+            fail() {
+              resolve(persistCoverPath(LOCAL_SHARE_COVER))
+            },
+          })
+        },
+      })
+    }
+
+    fs.copyFile({
+      srcPath: LOCAL_SHARE_COVER,
+      destPath: dest,
+      success() {
+        resolve(persistCoverPath(dest))
+      },
+      fail(err) {
+        console.warn('[mpShare] copyFile failed, fallback getImageInfo', err)
+        finishGetImageInfo()
+      },
+    })
+  }).finally(() => {
+    coverPreparePromise = null
   })
+
+  return coverPreparePromise
 }
 
 function buildSharePayload(path, opts, forTimeline) {
@@ -91,20 +105,21 @@ function buildSharePayload(path, opts, forTimeline) {
     opts && opts.title ? String(opts.title).trim() || DEFAULT_TITLE : DEFAULT_TITLE
   const sharePath = path || '/pages/index/index'
   const query = opts && opts.query ? String(opts.query) : ''
-  const src = (opts && opts.imageUrl) || shareCoverImageUrl()
+  const customImage = opts && opts.imageUrl ? String(opts.imageUrl).trim() : ''
 
-  const finish = (imageUrl) =>
-    forTimeline ? { title, query, imageUrl } : { title, path: sharePath, imageUrl }
-
-  if (cachedShareCoverPath) {
-    return finish(cachedShareCoverPath)
+  const finish = (imageUrl) => {
+    const url = String(imageUrl || readCoverPath() || LOCAL_SHARE_COVER).trim()
+    return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
   }
+
+  if (customImage) return finish(customImage)
+
+  const ready = readCoverPath()
+  if (ready) return finish(ready)
 
   return {
     ...(forTimeline ? { title, query } : { title, path: sharePath }),
-    promise: new Promise((resolve) => {
-      resolveCoverPath(src, (imageUrl) => resolve(finish(imageUrl)))
-    }),
+    promise: prepareShareCoverPath().then((imageUrl) => finish(imageUrl)),
   }
 }
 
@@ -127,15 +142,14 @@ function enableShareMenu() {
 }
 
 function preloadShareCover() {
-  if (cachedShareCoverPath) return
-  loadLocalCover(() => {})
+  void prepareShareCoverPath()
 }
 
 module.exports = {
   LOCAL_SHARE_COVER,
   SHARE_COVER_IMAGE: LOCAL_SHARE_COVER,
   DEFAULT_TITLE,
-  shareCoverImageUrl,
+  prepareShareCoverPath,
   defaultShare,
   defaultTimelineShare,
   enableShareMenu,
