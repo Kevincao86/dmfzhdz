@@ -14,6 +14,7 @@ import {
   ensureOpsMasterAccount,
   firstAllowedOpsPath,
   hasOpsCloudSession,
+  isOpsMasterPhone,
   migrateLocalOpsStaffToRemoteIfNeeded,
   readOpsSession,
   verifyOpsLogin,
@@ -58,11 +59,17 @@ export default function OpsLoginPage() {
         await ensureOpsMasterAccount()
         const r = await verifyOpsLogin(account, password)
         if (!r.ok) {
+          const master = isOpsMasterPhone(account)
           const msg: Record<string, string> = {
-            not_found:
-              '该手机号未在云端注册。子账号须由主账号在「云端会话」下创建；请主账号退出后用 18768501283 重新登录后再建号。',
-            bad_password: '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
-            bad_credentials: '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
+            not_found: master
+              ? '主账号密码错误或云端未就绪。请确认密码（默认 kaiyedaji888），或联系技术检查云端 ops_staff_accounts 表与 Supabase 环境变量。'
+              : '该手机号未在云端注册。子账号须由主账号在「云端会话」下创建；请主账号用 18768501283 登录后再建号。',
+            bad_password: master
+              ? '主账号密码错误。若忘记密码，默认密码为 kaiyedaji888（若已改过请用新密码）。'
+              : '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
+            bad_credentials: master
+              ? '主账号密码错误。若忘记密码，默认密码为 kaiyedaji888（若已改过请用新密码）。'
+              : '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
             disabled: '该账号已停用，请联系主账号启用。',
             invalid_phone: '请输入 11 位手机号。',
           }
@@ -77,10 +84,11 @@ export default function OpsLoginPage() {
         writeOpsSession(r.session)
         if (!hasOpsCloudSession()) {
           const onProd = /mofangdianai\.com$/i.test(window.location.hostname)
-          if (onProd) {
+          /** 仅子账号须阻断；主账号可先进入并在「账号与权限」查看云端连接状态 */
+          if (onProd && r.session.role !== 'super_admin') {
             clearOpsSession()
             setErr(
-              '登录未获得云端会话（缺少 sessionToken）。子账号无法写入数据库、换浏览器后会消失。请确认运营台已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后重新部署，再用主账号 18768501283 登录。',
+              '登录未获得云端会话（缺少 sessionToken）。请确认运营台已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后重新部署，再由主账号创建子账号。',
             )
             return
           }

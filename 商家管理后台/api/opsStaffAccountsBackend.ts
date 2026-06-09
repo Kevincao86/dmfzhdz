@@ -170,7 +170,8 @@ async function fetchRowById(admin: SupabaseClient, id: string): Promise<OpsStaff
 export async function ensureOpsMasterAccountInDb(admin: SupabaseClient): Promise<void> {
   const legacyWrong = await fetchRowByPhone(admin, OPS_MASTER_PHONE_LEGACY_WRONG)
   if (legacyWrong?.role === 'super_admin') {
-    await admin.from('ops_staff_accounts').delete().eq('id', legacyWrong.id)
+    const { error: delErr } = await admin.from('ops_staff_accounts').delete().eq('id', legacyWrong.id)
+    if (delErr) throw new Error(delErr.message)
   }
 
   const existing = await fetchRowByPhone(admin, OPS_MASTER_PHONE)
@@ -184,7 +185,7 @@ export async function ensureOpsMasterAccountInDb(admin: SupabaseClient): Promise
       existing.status !== 'active' ||
       existing.display_name !== '超级管理员'
     if (needsUpdate) {
-      await admin
+      const { error: updErr } = await admin
         .from('ops_staff_accounts')
         .update({
           role: 'super_admin',
@@ -195,11 +196,12 @@ export async function ensureOpsMasterAccountInDb(admin: SupabaseClient): Promise
           updated_at: now,
         })
         .eq('id', existing.id)
+      if (updErr) throw new Error(updErr.message)
     }
     return
   }
 
-  await admin.from('ops_staff_accounts').insert({
+  const { error: insErr } = await admin.from('ops_staff_accounts').insert({
     id: 'ops_master',
     phone: OPS_MASTER_PHONE,
     display_name: '超级管理员',
@@ -210,6 +212,7 @@ export async function ensureOpsMasterAccountInDb(admin: SupabaseClient): Promise
     created_at: now,
     updated_at: now,
   })
+  if (insErr) throw new Error(insErr.message)
 }
 
 export async function listOpsStaffAccountsPublic(admin: SupabaseClient): Promise<OpsStaffAccountPublic[]> {
