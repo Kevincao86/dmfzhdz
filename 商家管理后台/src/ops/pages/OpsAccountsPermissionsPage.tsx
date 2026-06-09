@@ -125,14 +125,21 @@ export default function OpsAccountsPermissionsPage() {
       const r = await reconnectOpsCloudSession(session.phone, password)
       if (!r.ok) {
         const msg: Record<string, string> = {
-          bad_password: '密码错误，请重试。',
-          bad_credentials: '密码错误，请重试。',
+          bad_password: '密码错误。主账号默认密码为 kaiyedaji888（非商家 ERP 密码）。',
+          bad_credentials: '密码错误。主账号默认密码为 kaiyedaji888（非商家 ERP 密码）。',
           ops_staff_table_missing:
-            '云端数据库缺少 ops_staff_accounts 表。请在轻量 ECS 执行 bash scripts/ecs-apply-ops-staff-accounts.sh',
+            '云端数据库缺少 ops_staff_accounts 表或权限未授予。请在轻量 ECS 执行：bash scripts/ecs-apply-ops-staff-accounts.sh',
+          server_error:
+            'ECS 接口返回 500（非密码问题）。请在轻量 ECS 执行 bash scripts/ecs-apply-ops-staff-accounts.sh，并查看 journalctl -u meoo-auth-api -n 30',
           cloud_login_failed:
             '无法连接 ECS（https://mofangdianai.com/erp-api）。请确认轻量 auth-api 已启动。',
         }
-        window.alert(msg[r.error] ?? `连接云端失败：${r.error}`)
+        const detail = 'detail' in r && typeof r.detail === 'string' ? r.detail : ''
+        window.alert(
+          detail && r.error === 'server_error'
+            ? `${msg.server_error}\n\n详情：${detail}`
+            : (msg[r.error] ?? `连接云端失败：${r.error}`),
+        )
         return
       }
       reloadStaff()

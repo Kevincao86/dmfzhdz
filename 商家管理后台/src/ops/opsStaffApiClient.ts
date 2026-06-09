@@ -31,7 +31,7 @@ export async function apiOpsStaffLogin(
   password: string,
 ): Promise<
   | { ok: true; session: OpsSession; sessionToken: string; account: OpsStaffAccount }
-  | { ok: false; useLocalFallback: boolean; error?: string }
+  | { ok: false; useLocalFallback: boolean; error?: string; detail?: string }
 > {
   try {
     const res = await fetchOpsStaffApi(OPS_STAFF_LOGIN_PATH, {
@@ -56,8 +56,19 @@ export async function apiOpsStaffLogin(
       return { ok: false, useLocalFallback: true, error: 'not_found' }
     }
     if (!res.ok || data.ok === false) {
-      const code = String(data.code ?? 'bad_credentials').trim() || 'bad_credentials'
-      return { ok: false, useLocalFallback: false, error: code }
+      if (res.status >= 500) {
+        const detail = String(data.message ?? data.detail ?? data.error ?? res.status).slice(0, 300)
+        return { ok: false, useLocalFallback: false, error: 'server_error', detail }
+      }
+      const code = String(data.code ?? data.error ?? '').trim()
+      if (res.status === 401) {
+        return {
+          ok: false,
+          useLocalFallback: false,
+          error: code === 'not_found' ? 'not_found' : 'bad_password',
+        }
+      }
+      return { ok: false, useLocalFallback: false, error: code || 'request_failed' }
     }
     const sessionRaw = data.session as Record<string, unknown> | undefined
     const sessionToken = String(data.sessionToken ?? '').trim()

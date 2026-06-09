@@ -55,15 +55,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (/ops_staff_accounts|does not exist|Could not find|schema cache/i.test(msg)) {
+    if (
+      /ops_staff_accounts|does not exist|Could not find|schema cache|permission denied/i.test(
+        msg,
+      )
+    ) {
       sendOpsJson(res, 503, {
         ok: false,
+        code: 'ops_staff_table_missing',
         error: 'ops_staff_table_missing',
-        hint: '请在 Supabase 执行迁移 20260524120000_ops_staff_accounts.sql',
+        hint: '请在轻量 ECS 执行 bash scripts/ecs-apply-ops-staff-accounts.sh',
         detail: msg.slice(0, 200),
       })
       return
     }
-    sendOpsJson(res, 500, { ok: false, message: msg.slice(0, 400) })
+    sendOpsJson(res, 500, {
+      ok: false,
+      code: 'server_error',
+      error: 'server_error',
+      message: msg.slice(0, 400),
+    })
   }
 }

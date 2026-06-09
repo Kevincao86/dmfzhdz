@@ -6,7 +6,14 @@ export type OpsServiceClientResult =
 
 /** 与 api/ops-supabase/tenants 一致：线上订单管理等同理依赖 Service Role。 */
 export function createOpsServiceRoleClient(): OpsServiceClientResult {
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim().replace(/\/$/, '')
+  const supabaseUrl = (
+    process.env.MEOO_SUPABASE_ADMIN_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    process.env.SUPABASE_URL ??
+    ''
+  )
+    .trim()
+    .replace(/\/$/, '')
   const serviceRole = (
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
     process.env.SUPABASE_SERVICE_ROLE ??
