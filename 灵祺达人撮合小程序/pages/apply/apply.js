@@ -11,6 +11,7 @@ const messagesStore = require('../../utils/messagesStore.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const applyRuntime = require('../../utils/applyTemplateRuntime.js')
 const platformForm = require('../../utils/platformForm.js')
+const iceOrderStats = require('../../utils/iceOrderStats.js')
 
 const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
@@ -237,7 +238,7 @@ Page({
       })
       if (this.data.isIceMode) {
         try {
-          wx.setStorageSync(`meoo_ice_applicant_v1_${this.data.mpOrderId}`, applicantId)
+          wx.setStorageSync(iceOrderStats.iceApplicantStorageKey(this.data.mpOrderId), applicantId)
         } catch {
           /* ignore */
         }

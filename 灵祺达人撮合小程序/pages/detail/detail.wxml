@@ -127,9 +127,9 @@
       </view>
     </view>
 
-    <view class="card card--success" wx:elif="{{applied && isIce}}">
+    <view class="card card--success" wx:elif="{{applied && isIce && !icePendingConfirm && !iceRejected && !assignedVideoUrl}}">
       <text class="success-title">✓ 认领成功</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">请在下方确认接收任务。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">正在同步任务状态，请下拉刷新；若长时间无响应请返回重进。</text>
     </view>
 
     <view class="card card--success" wx:elif="{{applied && !isIce}}">

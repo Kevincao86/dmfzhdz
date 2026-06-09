@@ -6,7 +6,6 @@ const auth = require('../../utils/auth.js')
 const chat = require('../../utils/talentChat.js')
 const contactGate = require('../../utils/talentContactPrGate.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
-const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
 
 Page({
   data: {
@@ -61,7 +60,7 @@ Page({
   },
   syncIceApplicantFromStorage() {
     try {
-      const raw = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${this.data.id}`)
+      const raw = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(this.data.id))
       if (raw) this.setData({ iceApplicantId: String(raw) })
     } catch {
       /* ignore */
@@ -105,12 +104,27 @@ Page({
       const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
       const view = display.enrichMpOrder(mp, merchantOrder)
       const isIce = !!view.isIce
+      const gate = contactGate.evaluate(mp, id)
       let iceApplicantId = this.data.iceApplicantId
       try {
-        const stored = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${id}`)
+        const stored = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(id))
         if (stored) iceApplicantId = String(stored)
       } catch {
         /* ignore */
+      }
+      if (isIce && !iceApplicantId) {
+        const localId = contactGate.localApplicantIdForOrder(id)
+        if (localId) iceApplicantId = localId
+      }
+      if (isIce && !iceApplicantId && gate.applicant && gate.applicant.id) {
+        iceApplicantId = String(gate.applicant.id)
+      }
+      if (isIce && iceApplicantId) {
+        try {
+          wx.setStorageSync(iceOrderStats.iceApplicantStorageKey(id), iceApplicantId)
+        } catch {
+          /* ignore */
+        }
       }
       let assignedVideoUrl = ''
       let assignedVideoLabel = ''
@@ -123,8 +137,10 @@ Page({
       let iceRejectReason = ''
       const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
       let iceVerifyMode = iceOrderStats.getIceVerifyMode(mp)
-      if (isIce && iceApplicantId) {
-        const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
+      if (isIce) {
+        let app =
+          iceApplicantId && (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
+        if (!app && gate.applicant) app = gate.applicant
         if (app) {
           assignedVideoUrl = app.assignedVideoDownloadUrl || ''
           assignedVideoLabel = app.assignedVideoLabel || ''
@@ -145,6 +161,7 @@ Page({
           if (app.douyinPublishUrl) {
             this.setData({ douyinUrl: app.douyinPublishUrl })
           }
+          if (!iceApplicantId && app.id) iceApplicantId = String(app.id)
         }
       }
       const iceSubmitLabel = iceVerifyMode === 'pr' ? '提交链接 · PR 审核' : '提交链接 · AI 核查'
@@ -157,7 +174,7 @@ Page({
       else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
       else if (iceLinkRejected) iceStatusHint = iceRejectReason || '链接已驳回，请重新提交'
       else if (iceAiFailedNote) iceStatusHint = iceAiFailedNote
-      const iceApplied = Boolean(iceApplicantId)
+      const iceApplied = Boolean(iceApplicantId) || (isIce && gate.hasApplication)
       const applyTemplateId = meta.applyFormTemplateId || ''
       const prChatMeta = meta.prParticipantKey
         ? {
@@ -167,7 +184,6 @@ Page({
             prWxAvatarUrl: meta.prWxAvatarUrl || '',
           }
         : null
-      const gate = contactGate.evaluate(mp, id)
       const hasApplied = this.data.applied || iceApplied || gate.hasApplication
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
       this.setData({
