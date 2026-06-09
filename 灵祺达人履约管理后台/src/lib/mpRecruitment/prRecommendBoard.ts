@@ -40,12 +40,14 @@ export function boardAllModeLabel(board: PrBoardId): string {
 
 export function boardEmptyHint(board: PrBoardId, kw: string, hasOrders: boolean): string {
   if (kw) return `未找到「${kw}」相关的${boardLabel(board)}`
-  if (!hasOrders) {
-    if (board === 'shoot') return '发拍摄招募后，将按发单要求智能推荐拍摄团队'
-    if (board === 'edit') return '发剪辑招募后，将按发单要求智能推荐剪辑团队'
-    return '发达人招募后，将按发单要求智能推荐达人'
-  }
+  if (!hasOrders) return smartMatchNeedRecruitHint(board)
   return `暂无高匹配${boardLabel(board)}，可调整筛选条件`
+}
+
+export function smartMatchNeedRecruitHint(board: PrBoardId): string {
+  if (board === 'shoot') return '请创建拍摄招募，以便AI匹配拍摄团队'
+  if (board === 'edit') return '请创建剪辑招募，以便AI匹配剪辑团队'
+  return '请创建招募，以便AI匹配达人'
 }
 
 export function boardMatchHint(board: PrBoardId, orderCount: number): string {

@@ -522,6 +522,15 @@ Page({
         ? (this.data.prMatchOrderOptions || []).some((o) => o.id === matchOrderId)
         : this.data.prBoardOrderCount > 0
 
+    if (!hasMatchOrders) {
+      if (this._talentFilterToken !== token) return
+      this.setData({
+        displayRows: [],
+        listEmptyHint: prBoard.smartMatchNeedRecruitHint(board),
+      })
+      return
+    }
+
     if (hasMatchOrders && this.data.registryCache && filtered.length) {
       wx.showLoading({ title: '智能匹配中…', mask: false })
       try {
@@ -552,26 +561,16 @@ Page({
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
-    } else {
-      filtered = filtered
-        .slice()
-        .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     }
 
     if (board === 'talent' && this.data.talentTestMode) {
       filtered = prependSelfTalentTest(filtered)
     }
 
-    const showPreview = !kw && !hasMatchOrders && filtered.length === 0 && board === 'talent'
     let displayRows = filtered.slice(0, 50)
-    if (showPreview) {
-      displayRows = [MOCK_PREVIEW]
-    }
     let listEmptyHint = ''
     if (displayRows.length === 0) {
       listEmptyHint = prBoard.boardEmptyHint(board, kw, hasMatchOrders)
-    } else if (showPreview && displayRows.length === 1 && displayRows[0].isPreview) {
-      listEmptyHint = '发招募后可在此查看 AI 匹配的达人'
     }
     if (userProfile.readIdentity() === 'pr') {
       if (!this._favoriteTalentIds) this._favoriteTalentIds = loadFavoriteIdSet()
@@ -582,7 +581,7 @@ Page({
       )
       displayRows = applyStatusFilters(displayRows, this.data.filterStatus)
     }
-    if (displayRows.length === 0 && !showPreview && this.data.filterStatus !== '全部') {
+    if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
       listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
     }
     this.setData({ displayRows, listEmptyHint })
@@ -678,6 +677,14 @@ Page({
     const segment = this.data.orderSegment
     const talentCity = this.data.talentCity
     const identity = this.data.identity || userProfile.readIdentity()
+    const member = memberStore.readMember()
+    if (segment === 'match' && !memberStore.hasFilledPlatform(member)) {
+      this.setData({
+        orderDisplayRows: [],
+        orderEmptyHint: '请补充平台资料，以便AI匹配商单',
+      })
+      return
+    }
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
     const cf = this.data.filterCity
@@ -693,7 +700,6 @@ Page({
     })
     let real = rows.filter((r) => r && !r.isMock)
     const mocks = showDemoOrders() ? rows.filter((r) => r && r.isMock) : []
-    const member = memberStore.readMember()
     if (api.hasApi() && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
     } else if (real.length) {

@@ -8,7 +8,7 @@ import { orderVisibleToWorkIdentity } from '../../lib/mpRecruitment/roleHallFilt
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
-import { readMember } from '../../lib/mpSync/talentMember'
+import { readMember, hasFilledPlatform, TALENT_SMART_MATCH_NEED_PROFILE_HINT } from '../../lib/mpSync/talentMember'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
 import HallToolbarCard from './HallToolbarCard'
@@ -30,10 +30,17 @@ function SupplierRecommendOrders() {
   const [err, setErr] = useState('')
   const [allOrderRows, setAllOrderRows] = useState<RecruitmentOrderRow[]>([])
   const [orderDisplayRows, setOrderDisplayRows] = useState<RecruitmentOrderRow[]>([])
-  const talentCity = readMember()?.city || readMember()?.province || ''
+  const [orderEmptyHint, setOrderEmptyHint] = useState('')
+  const member = readMember()
+  const talentCity = member?.city || member?.province || ''
 
   const applyOrderFilters = useCallback(async () => {
-    const member = readMember()
+    if (!hasFilledPlatform(readMember())) {
+      setOrderDisplayRows([])
+      setOrderEmptyHint(TALENT_SMART_MATCH_NEED_PROFILE_HINT)
+      return
+    }
+    const memberRow = readMember()
     const kw = searchKeyword.trim()
     let rows = allOrderRows.filter((r) => {
       if (!orderVisibleToWorkIdentity(r, workId)) return false
@@ -47,9 +54,10 @@ function SupplierRecommendOrders() {
     const mocks = rows.filter((r) => r.isMock)
     let real = rows.filter((r) => !r.isMock)
     if (real.length) {
-      real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: workId })
+      real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
     }
     setOrderDisplayRows([...real, ...mocks].slice(0, 50))
+    setOrderEmptyHint('')
   }, [allOrderRows, searchKeyword, filterPlatform, filterProvince, filterCity, priceSelected, workId])
 
   useEffect(() => {
@@ -113,7 +121,7 @@ function SupplierRecommendOrders() {
       {err ? <p className="text-amber-600 text-sm">{err}</p> : null}
       {!loading && !orderDisplayRows.length ? (
         <p className="text-[var(--shell-muted)] text-sm">
-          {talentCity ? '暂无高匹配商单，可调整筛选条件' : '请先在「我的」完善资料，以获得更精准推荐'}
+          {orderEmptyHint || (talentCity ? '暂无高匹配商单，可调整筛选条件' : '请先在「我的」完善资料，以获得更精准推荐')}
         </p>
       ) : null}
       <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
