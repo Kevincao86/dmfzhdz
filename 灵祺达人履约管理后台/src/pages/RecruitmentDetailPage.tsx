@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
-import { getActiveRole } from '../lib/mpSession'
+import { getAccount, getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
+import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/publishedOrders'
 import { enrichMpOrder } from '../lib/mpSync/recruitmentDisplay'
 import { uploadAndSubmitRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
 import {
@@ -33,6 +34,7 @@ export default function RecruitmentDetailPage() {
   const [prChatMeta, setPrChatMeta] = useState<ReturnType<typeof extractPrChatMeta>>(null)
   const [contacting, setContacting] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [readOnlyEnded, setReadOnlyEnded] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const appliedFromUrl = search.get('applied') === '1'
@@ -53,21 +55,29 @@ export default function RecruitmentDetailPage() {
       setLoading(true)
       setErr('')
       try {
-        const reg = await fetchMpRegistry()
+        const reg = await fetchMpRegistry({ includeMpOrderIds: [id] })
         const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
         const mp = list.find((o) => o && o.id === id)
         if (!mp) {
           setErr('招募单不存在或已结束')
           return
         }
-        if (mp.status === 'closed' || mp.status === 'done') {
+        const rawStatus = String(mp.status || '')
+        const isEnded =
+          rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
+        const gate = evaluateContactPrGate(mp, id)
+        const canViewEnded =
+          gate.hasApplication ||
+          hasAppliedToOrder(id) ||
+          (role === 'pr' && mpOrderOwnedByCurrentPr(mp, getAccount()))
+        if (isEnded && !canViewEnded) {
           setErr('该招募已结束')
           return
         }
         const enriched = enrichMpOrder(mp)
         setMpRaw(mp)
         setView(enriched)
-        const gate = evaluateContactPrGate(mp, id)
+        setReadOnlyEnded(isEnded && canViewEnded)
         setContactGate(gate)
         setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
       } catch (e) {
@@ -134,14 +144,23 @@ export default function RecruitmentDetailPage() {
 
   async function reloadOrder() {
     if (!id) return
-    const reg = await fetchMpRegistry()
+    const reg = await fetchMpRegistry({ includeMpOrderIds: [id] })
     const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
     const mp = list.find((o) => o && o.id === id)
     if (!mp) return
+    const rawStatus = String(mp.status || '')
+    const isEnded =
+      rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
+    const gate = evaluateContactPrGate(mp, id)
+    const canViewEnded =
+      gate.hasApplication ||
+      hasAppliedToOrder(id) ||
+      (role === 'pr' && mpOrderOwnedByCurrentPr(mp, getAccount()))
+    if (isEnded && !canViewEnded) return
     const enriched = enrichMpOrder(mp)
     setMpRaw(mp)
     setView(enriched)
-    const gate = evaluateContactPrGate(mp, id)
+    setReadOnlyEnded(isEnded && canViewEnded)
     setContactGate(gate)
     setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
   }
@@ -274,8 +293,14 @@ export default function RecruitmentDetailPage() {
             </section>
           ) : null}
 
+          {readOnlyEnded ? (
+            <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200">
+              该招募已结束，当前为只读查看。
+            </p>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
-            {role === 'talent' && !applied ? (
+            {role === 'talent' && !applied && !readOnlyEnded ? (
               <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
                 {view.isIce ? '认领云剪任务' : '立即报名'}
               </button>

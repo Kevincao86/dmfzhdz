@@ -5,7 +5,7 @@ import {
 import type { RegistryFile, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
-import { mpRecruitmentOrdersForTalentHall } from './registryTenantIsolation.js'
+import { mergeMpRecruitmentOrdersForHallContext } from './registryTenantIsolation.js'
 
 const HALL_FETCH_MS = 20_000
 
@@ -52,12 +52,14 @@ function sliceRegistryList<T>(raw: unknown, max = 5000): T[] {
   return Array.isArray(raw) ? (raw as T[]).slice(0, max) : []
 }
 
-function buildHallPayload(partial: Partial<RegistryFile>): Record<string, unknown> {
+function buildHallPayload(
+  partial: Partial<RegistryFile>,
+  includeMpOrderIds?: string[],
+): Record<string, unknown> {
   const mpRaw = Array.isArray(partial.mpRecruitmentOrders)
     ? (partial.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
     : []
-  const stub = { mpRecruitmentOrders: mpRaw } as RegistryFile
-  const mpRecruitmentOrders = mpRecruitmentOrdersForTalentHall(stub)
+  const mpRecruitmentOrders = mergeMpRecruitmentOrdersForHallContext(mpRaw, includeMpOrderIds)
   return {
     ok: true,
     mpRecruitmentOrders,
@@ -69,14 +71,20 @@ function buildHallPayload(partial: Partial<RegistryFile>): Record<string, unknow
   }
 }
 
-export async function loadMpHallRegistryPayload(): Promise<Record<string, unknown>> {
+export async function loadMpHallRegistryPayload(opts?: {
+  includeMpOrderIds?: string[]
+}): Promise<Record<string, unknown>> {
+  const includeMpOrderIds = (opts?.includeMpOrderIds ?? [])
+    .map((id) => String(id).trim())
+    .filter(Boolean)
+    .slice(0, 120)
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const attempts: string[] = []
 
   if (missingParts.length === 0) {
     try {
       const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
-      return buildHallPayload(partial)
+      return buildHallPayload(partial, includeMpOrderIds)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       attempts.push(`registry_direct:${msg.slice(0, 240)}`)
@@ -94,9 +102,9 @@ export async function loadMpHallRegistryPayload(): Promise<Record<string, unknow
     try {
       const remote = await proxyGetErpApi('/api/meoo-ops-mp-hall-registry')
       if (remote && Array.isArray(remote.mpRecruitmentOrders)) {
-        return buildHallPayload(remote as Partial<RegistryFile>)
+        return buildHallPayload(remote as Partial<RegistryFile>, includeMpOrderIds)
       }
-      return buildHallPayload(remote as Partial<RegistryFile>)
+      return buildHallPayload(remote as Partial<RegistryFile>, includeMpOrderIds)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       attempts.push(`ecs_proxy:${msg.slice(0, 240)}`)

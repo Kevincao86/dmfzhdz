@@ -23,14 +23,24 @@ function isApplicantPrSelected(mp: Record<string, unknown> | null, applicant: Re
   return false
 }
 
+function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: string): boolean {
+  if (isIceMpOrder(mp)) return true
+  const orderId = String(mpOrderId || mp?.id || '').trim()
+  return /^MP-ICE-/i.test(orderId)
+}
+
 export function resolveTalentApplicationProgress(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
 ): { id: Exclude<TalentAppProgressId, 'all'>; label: string } {
-  if (!applicant) return { id: 'pr_pending', label: 'PR 待选中' }
+  const ice = resolveIceContext(mp, mpOrderId)
+  if (!applicant) {
+    if (ice) return { id: 'in_progress', label: '进行中' }
+    return { id: 'pr_pending', label: 'PR 待选中' }
+  }
   if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
 
-  const ice = isIceMpOrder(mp)
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
     if (taskStatus === 'pending_confirm' || (!taskStatus && !applicant.assignedVideoDownloadUrl)) {

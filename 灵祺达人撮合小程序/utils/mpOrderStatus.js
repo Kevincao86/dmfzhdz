@@ -21,7 +21,7 @@ function matchHallStatusFilter(label, filterLabel) {
 function resolveEffectiveMpStatus(rawStatus, deadlineMs, nowMs) {
   const now = nowMs != null && Number.isFinite(nowMs) ? nowMs : Date.now()
   let raw = String(rawStatus || 'open').trim() || 'open'
-  if (raw === 'pending_settlement') raw = 'closed'
+  if (raw === 'pending_settlement') raw = 'done'
   if (raw === 'closed' || raw === 'done') return raw
   if (deadlineMs && Number(deadlineMs) > 0 && now >= Number(deadlineMs)) return 'done'
   return raw

@@ -1,5 +1,6 @@
 import type {
   RegistryFile,
+  RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
@@ -112,29 +113,53 @@ export function filterRegistrySnapshotForMerchant(authTenantId: string, file: Re
   }
 }
 
+/** 单条招募单脱敏（隐藏群码，补全 prSelected） */
+export function sanitizeMpRecruitmentOrderForTalentHall(o: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
+  const selectedSet = new Set(
+    (Array.isArray(o.selectedApplicantIds) ? o.selectedApplicantIds : []).map((id) => String(id)),
+  )
+  const meta =
+    o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
+      ? { ...o.mpPublishMeta, groupQrImage: undefined }
+      : o.mpPublishMeta
+  const applicants = (o.applicants ?? []).map((a) => ({
+    ...a,
+    prSelected: a.prSelected === true || selectedSet.has(String(a.id)),
+  }))
+  return {
+    ...o,
+    groupQrImage: undefined,
+    applicants,
+    mpPublishMeta: meta,
+  }
+}
+
 /** 达人招募小程序大厅可读：开放中的小程序招募单（不含群码，保留 PR 确认状态供达人侧展示） */
 export function mpRecruitmentOrdersForTalentHall(file: RegistryFile) {
   return (file.mpRecruitmentOrders ?? [])
     .filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
-    .map((o) => {
-      const selectedSet = new Set(
-        (Array.isArray(o.selectedApplicantIds) ? o.selectedApplicantIds : []).map((id) => String(id)),
-      )
-      const meta =
-        o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
-          ? { ...o.mpPublishMeta, groupQrImage: undefined }
-          : o.mpPublishMeta
-      const applicants = (o.applicants ?? []).map((a) => ({
-        ...a,
-        prSelected: a.prSelected === true || selectedSet.has(String(a.id)),
-      }))
-      return {
-        ...o,
-        groupQrImage: undefined,
-        applicants,
-        mpPublishMeta: meta,
-      }
-    })
+    .map(sanitizeMpRecruitmentOrderForTalentHall)
+}
+
+/** 大厅开放单 + 客户端指定的历史单（已结束/待结算等，供我的报名、我的发单、详情页） */
+export function mergeMpRecruitmentOrdersForHallContext(
+  allOrders: RegistryMpRecruitmentOrder[],
+  includeMpOrderIds?: string[],
+): RegistryMpRecruitmentOrder[] {
+  const hall = mpRecruitmentOrdersForTalentHall({ mpRecruitmentOrders: allOrders } as RegistryFile)
+  const seen = new Set(hall.map((o) => String(o.id)))
+  const includeSet = new Set(
+    (includeMpOrderIds ?? []).map((id) => String(id).trim()).filter(Boolean),
+  )
+  const extra: RegistryMpRecruitmentOrder[] = []
+  for (const o of allOrders) {
+    if (!o?.id) continue
+    const id = String(o.id)
+    if (seen.has(id) || !includeSet.has(id)) continue
+    seen.add(id)
+    extra.push(sanitizeMpRecruitmentOrderForTalentHall(o))
+  }
+  return [...hall, ...extra]
 }
 
 /** 未登录或无法识别租户时：隐藏商户侧招募；保留小程序招募大厅公开单 */

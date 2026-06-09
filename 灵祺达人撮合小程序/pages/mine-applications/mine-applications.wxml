@@ -92,6 +92,16 @@
     </view>
     <view class="app-card__actions">
       <button
+        wx:if="{{item.isIce && item.progressId === 'completed'}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        查看详情
+      </button>
+      <button
         wx:if="{{item.isIce && item.iceActionLabel && item.progressId !== 'completed'}}"
         class="app-card__btn app-card__btn--primary"
         plain

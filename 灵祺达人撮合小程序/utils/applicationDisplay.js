@@ -271,7 +271,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
   const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
-  const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me)
+  const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''
   if (isIce) {

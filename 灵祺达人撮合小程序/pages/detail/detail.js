@@ -3,9 +3,11 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const display = require('../../utils/recruitmentDisplay.js')
 const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
+const applicationsStore = require('../../utils/applicationsStore.js')
 const chat = require('../../utils/talentChat.js')
 const contactGate = require('../../utils/talentContactPrGate.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
+const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 
 Page({
   data: {
@@ -38,6 +40,7 @@ Page({
     isPr: false,
     canContactPr: false,
     contactPrPending: false,
+    readOnlyEnded: false,
     mpOrder: null,
   },
   onLoad(options) {
@@ -90,21 +93,31 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
       const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = list.find((o) => o && o.id === id)
       if (!mp) {
         this.setData({ loading: false, err: '招募单不存在或已结束' })
         return
       }
-      if (mp.status === 'closed' || mp.status === 'done') {
+      const rawStatus = String(mp.status || '')
+      const isEnded =
+        rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
+      const gate = contactGate.evaluate(mp, id)
+      const account = auth.readAccount()
+      const isPrViewer = userProfile.readIdentity() === 'pr'
+      const isPrOwner = isPrViewer && prPublishedOrders.mpOrderOwnedByCurrentPr(mp, account)
+      const hasLocalApplication = applicationsStore.readApplications().some(
+        (a) => a && String(a.mpOrderId || '') === id,
+      )
+      const canViewEnded = gate.hasApplication || isPrOwner || hasLocalApplication
+      if (isEnded && !canViewEnded) {
         this.setData({ loading: false, err: '该招募已结束' })
         return
       }
       const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
       const view = display.enrichMpOrder(mp, merchantOrder)
       const isIce = !!view.isIce
-      const gate = contactGate.evaluate(mp, id)
       let iceApplicantId = this.data.iceApplicantId
       try {
         const stored = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(id))
@@ -211,6 +224,7 @@ Page({
         iceStatusHint,
         iceStep3Hint,
         applied: hasApplied,
+        readOnlyEnded: isEnded && canViewEnded,
       })
     } catch (e) {
       const msg = String(e.message || e)
