@@ -1,33 +1,14 @@
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import { routeAiChat } from '../../vite-plugins/aiGateway/chatRouter.js'
-import { extractDouyinVideoId, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
+import {
+  extractDouyinVideoId,
+  fetchDouyinPublishCaptionText,
+  resolveDouyinVideoPublishUrl,
+} from './digitalHumanDouyinLinkCore.js'
 
 export type IceDouyinAiVerifyResult =
   | { passed: true; note: string }
   | { passed: false; note: string }
-
-const MOBILE_UA =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-
-async function fetchDouyinItemDesc(videoId: string): Promise<string> {
-  const apiUrl = `https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?reflow_source=reflow_page&item_ids=${encodeURIComponent(videoId)}`
-  try {
-    const res = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': MOBILE_UA,
-        Accept: 'application/json, text/plain, */*',
-        Referer: 'https://www.douyin.com/',
-      },
-      signal: AbortSignal.timeout(12_000),
-    })
-    if (!res.ok) return ''
-    const j = (await res.json()) as { item_list?: { desc?: string; video_text?: string }[] }
-    const item = j.item_list?.[0]
-    return String(item?.desc || item?.video_text || '').trim()
-  } catch {
-    return ''
-  }
-}
 
 function orderContextLines(mp: RegistryMpRecruitmentOrder): string[] {
   const meta = (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
@@ -111,10 +92,16 @@ export async function verifyIceDouyinPublishWithAi(
   if (!resolved.ok) return { passed: false, note: resolved.error }
 
   const videoId = extractDouyinVideoId(resolved.normalizedUrl)
-  const publishDesc = videoId ? await fetchDouyinItemDesc(videoId) : ''
+  const publishDesc = await fetchDouyinPublishCaptionText(resolved.normalizedUrl, rawPublishInput)
   const orderContext = orderContextLines(mp).join(' | ')
 
   if (!publishDesc) {
+    if (videoId) {
+      return {
+        passed: true,
+        note: '链接已解析，作品文案暂不可读，已按链接格式通过',
+      }
+    }
     return { passed: false, note: '无法读取抖音作品信息，请确认链接可公开访问后重试' }
   }
 
