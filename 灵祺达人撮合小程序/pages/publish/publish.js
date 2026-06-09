@@ -144,6 +144,8 @@ function emptyForm(recruitTarget) {
 function resolveIceReferenceVideoUrl(f) {
   return String((f && f.referenceUrl) || (f && f.materialUrl) || (f && f.iceVideoUrl) || '').trim()
 }
+
+function buildTagGrid(selected) {
   const set = new Set(selected || [])
   return TALENT_TAGS.map((name) => ({ name, on: set.has(name), disabled: false }))
 }
