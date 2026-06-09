@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { fetchMpRegistry, patchMpRecruitmentOrder } from '../lib/mpApi'
+import { fetchMpRegistry, patchMpRecruitmentOrder, deleteMpRecruitmentOrder } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
-import { readPublishedOrders, listPublishedOrdersForCurrentPr } from '../lib/mpRecruitment/publishedOrders'
+import {
+  readPublishedOrders,
+  listPublishedOrdersForCurrentPr,
+  pruneOrphanPublishedOrders,
+  removePublishedOrder,
+} from '../lib/mpRecruitment/publishedOrders'
 import { syncClientStateWithServer } from '../lib/mpAccountClientSync'
 import {
   deletePublishDraft,
@@ -59,6 +64,7 @@ export default function PrOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
+  const [deletingId, setDeletingId] = useState('')
   const [filterTarget, setFilterTarget] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
@@ -80,6 +86,7 @@ export default function PrOrdersPage() {
         string,
         unknown
       >[]
+      pruneOrphanPublishedOrders(mpList)
       const local = listPublishedOrdersForCurrentPr(mpList)
       if (!local.length) {
         setRows([])
@@ -198,6 +205,25 @@ export default function PrOrdersPage() {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
       setTogglingId('')
+    }
+  }
+
+  async function onDeletePublished(row: PrOrderRow) {
+    if (deletingId) return
+    if (
+      !confirm('删除后达人将无法在招募大厅看到该单，已报名信息将一并移除。确定删除？')
+    ) {
+      return
+    }
+    setDeletingId(row.mpOrderId)
+    try {
+      await deleteMpRecruitmentOrder(row.mpOrderId)
+      removePublishedOrder(row.mpOrderId)
+      setRows((prev) => prev.filter((r) => r.mpOrderId !== row.mpOrderId))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setDeletingId('')
     }
   }
 
@@ -381,6 +407,14 @@ export default function PrOrdersPage() {
                       {row.toggleActionLabel}招募
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    disabled={deletingId === row.mpOrderId}
+                    className="text-sm px-3 py-1.5 rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50"
+                    onClick={() => void onDeletePublished(row)}
+                  >
+                    删除
+                  </button>
                 </div>
               </article>
             ))}

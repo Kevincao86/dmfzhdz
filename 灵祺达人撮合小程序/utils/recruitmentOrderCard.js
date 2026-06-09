@@ -9,7 +9,7 @@ const STATUS_LABEL = {
   open: '招募中',
   collecting: '收集中',
   pending_settlement: '待结算',
-  closed: '已关闭',
+  closed: '已停止',
   done: '已完成',
 }
 

@@ -238,6 +238,13 @@ export async function patchMpRecruitmentOrder(body: Record<string, unknown>) {
   )
 }
 
+export async function deleteMpRecruitmentOrder(id: string) {
+  return postMpWithFallback(
+    ['/api/meoo-ops-mp-recruitment-orders-delete', '/api/ops-sync/mp-recruitment-orders/delete'],
+    { id: String(id || '').trim() },
+  )
+}
+
 async function postMpWithFallback(paths: string[], body: Record<string, unknown>) {
   let lastErr = 'request_failed'
   for (const path of paths) {
