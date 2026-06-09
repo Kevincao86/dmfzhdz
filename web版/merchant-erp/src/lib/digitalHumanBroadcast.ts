@@ -365,6 +365,31 @@ export const BACKGROUND_OPTIONS = [
   { id: 'custom', label: '自定义图片/视频' },
 ]
 
+/** 视频生成 prompt 中的中文场景描述（勿直接传 option id） */
+export function backgroundPromptForDraft(draft: DigitalHumanDraft): string {
+  switch (draft.background) {
+    case 'studio':
+      return '专业电视演播室背景，柔和灯光，干净简洁'
+    case 'store':
+      return '真实门店内景，餐饮或零售场景，自然光线，生活化氛围'
+    case 'green':
+      return '均匀打光的纯绿色绿幕背景，无杂色，便于后期抠像'
+    case 'solid-blue':
+      return '品牌蓝色纯色背景，简洁专业，适合口播短视频'
+    case 'custom':
+      return '与品牌一致的自定义室内场景，简洁明亮，突出人物'
+    default: {
+      const opt = BACKGROUND_OPTIONS.find((b) => b.id === draft.background)
+      return opt?.label ?? '专业演播室背景'
+    }
+  }
+}
+
+/** 形象预览图多为演播室灰底；非演播室场景首段勿用参考图，避免 i2v 冲突导致生成失败 */
+export function useAvatarReferenceForFirstSegment(draft: DigitalHumanDraft): boolean {
+  return draft.background === 'studio'
+}
+
 export const GESTURE_PRESETS = [
   { id: 'none', label: '无手势' },
   { id: 'emphasis', label: '强调（双手展开）' },

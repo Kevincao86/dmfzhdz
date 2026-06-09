@@ -1059,6 +1059,42 @@ export async function handleMerchantAiVideoRoutes(input: {
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/mux-audio') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const videoB64 = String(parsed.videoBase64 ?? '').trim()
+    const audioB64 = String(parsed.audioBase64 ?? '').trim()
+    if (!videoB64 || !audioB64) {
+      json(res, 400, { ok: false, message: '缺少 videoBase64 或 audioBase64' })
+      return true
+    }
+    let videoBuf: Buffer
+    let audioBuf: Buffer
+    try {
+      videoBuf = Buffer.from(videoB64, 'base64')
+      audioBuf = Buffer.from(audioB64, 'base64')
+    } catch {
+      json(res, 400, { ok: false, message: 'base64 无效' })
+      return true
+    }
+    const { muxLocalVideoAudio } = await import('./videoConcatServer.js')
+    const merged = await muxLocalVideoAudio(videoBuf, audioBuf)
+    if (!merged.ok) {
+      json(res, 502, { ok: false, message: merged.message })
+      return true
+    }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Content-Length', String(merged.buffer.length))
+    res.end(merged.buffer)
+    return true
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/ai/video/download-url') {
     let parsed: Record<string, unknown>
     try {

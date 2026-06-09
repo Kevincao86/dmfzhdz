@@ -42,7 +42,7 @@ async function blobToBytes(blob: Blob): Promise<Uint8Array> {
   return new Uint8Array(await blob.arrayBuffer())
 }
 
-async function loadFfmpeg(): Promise<FFmpeg> {
+export async function loadFfmpeg(): Promise<FFmpeg> {
   if (ffmpegRef?.loaded) return ffmpegRef
   if (loadPromise) return loadPromise
 
@@ -240,4 +240,107 @@ export async function concatVideoSegmentsToMp4(blobs: Blob[]): Promise<Blob> {
   }
 
   throw new Error('浏览器拼接失败：片段编码不一致或内存不足，将尝试云端拼接')
+}
+
+/** 多段 MP3 拼接为一条口播音轨 */
+export async function concatAudioMp3Blobs(blobs: Blob[]): Promise<Blob> {
+  if (blobs.length === 0) throw new Error('没有可拼接的音频')
+  if (blobs.length === 1) return blobs[0]!
+
+  const ffmpeg = await loadFfmpeg()
+  const workspace = ['out.mp3']
+  for (let i = 0; i < blobs.length; i++) workspace.push(`a${i}.mp3`)
+  await cleanupWorkspace(ffmpeg, workspace)
+
+  for (let i = 0; i < blobs.length; i++) {
+    await ffmpeg.writeFile(`a${i}.mp3`, await blobToBytes(blobs[i]!))
+  }
+
+  const inputs = blobs.flatMap((_, i) => ['-i', `a${i}.mp3`])
+  const filter = `${blobs.map((_, i) => `[${i}:a]`).join('')}concat=n=${blobs.length}:v=0:a=1[aout]`
+  const ok = await execOk(ffmpeg, [
+    ...inputs,
+    '-filter_complex',
+    filter,
+    '-map',
+    '[aout]',
+    '-c:a',
+    'libmp3lame',
+    '-q:a',
+    '4',
+    'out.mp3',
+  ])
+  if (!ok) throw new Error('口播音频拼接失败')
+
+  try {
+    const raw = await ffmpeg.readFile('out.mp3')
+    if (typeof raw === 'string') throw new Error('read_failed')
+    return new Blob([raw.slice()], { type: 'audio/mpeg' })
+  } catch {
+    throw new Error('口播音频拼接失败')
+  }
+}
+
+/** 将 TTS 口播音轨混入无声视频 MP4 */
+export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+  const ffmpeg = await loadFfmpeg()
+  await cleanupWorkspace(ffmpeg, ['v.mp4', 'a.mp3', 'out.mp4'])
+  await ffmpeg.writeFile('v.mp4', await blobToBytes(videoBlob))
+  await ffmpeg.writeFile('a.mp3', await blobToBytes(audioBlob))
+
+  const strategies = [
+    [
+      '-i',
+      'v.mp4',
+      '-i',
+      'a.mp3',
+      '-map',
+      '0:v:0',
+      '-map',
+      '1:a:0',
+      '-c:v',
+      'copy',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-shortest',
+      '-movflags',
+      '+faststart',
+      'out.mp4',
+    ],
+    [
+      '-i',
+      'v.mp4',
+      '-i',
+      'a.mp3',
+      '-map',
+      '0:v:0',
+      '-map',
+      '1:a:0',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '23',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-shortest',
+      '-movflags',
+      '+faststart',
+      'out.mp4',
+    ],
+  ] as const
+
+  for (const tail of strategies) {
+    const ok = await execOk(ffmpeg, ['-y', ...tail])
+    if (!ok) continue
+    const out = await readOutputMp4(ffmpeg, 'out.mp4')
+    if (out) return new Blob([out.slice()], { type: 'video/mp4' })
+  }
+
+  throw new Error('浏览器音视频合成失败，将尝试云端合成')
 }

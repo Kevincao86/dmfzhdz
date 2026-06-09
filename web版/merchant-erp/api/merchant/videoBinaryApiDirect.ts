@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { rawBody, sendMerchantJson } from './merchantGatewayShared.js'
 import { mergeVideoAiMerchantEnvWithSnapshot } from '../../vite-plugins/merchantVideoAiGateway.js'
 import { fetchRemoteVideoBuffer } from '../../vite-plugins/videoDownloadProxyCore.js'
-import { concatLocalMp4Buffers, concatRemoteMp4Urls } from '../../vite-plugins/videoConcatServer.js'
+import { concatLocalMp4Buffers, concatRemoteMp4Urls, muxLocalVideoAudio } from '../../vite-plugins/videoConcatServer.js'
 
 function readBearer(env: Record<string, string | undefined>): string | undefined {
   const t = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
@@ -122,6 +122,49 @@ export async function handleVideoConcatBlobsDirect(req: VercelRequest, res: Verc
   }
 
   const merged = await concatLocalMp4Buffers(buffers)
+  if (!merged.ok) {
+    sendMerchantJson(res, 502, { ok: false, message: merged.message })
+    return
+  }
+
+  res.status(200)
+  res.setHeader('Content-Type', 'video/mp4')
+  res.setHeader('Content-Length', String(merged.buffer.length))
+  res.send(merged.buffer)
+}
+
+export async function handleVideoMuxAudioDirect(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if ((req.method ?? 'POST').toUpperCase() !== 'POST') {
+    sendMerchantJson(res, 405, { ok: false, message: 'Method Not Allowed' })
+    return
+  }
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
+  } catch {
+    sendMerchantJson(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+    return
+  }
+
+  const videoB64 = String(parsed.videoBase64 ?? '').trim()
+  const audioB64 = String(parsed.audioBase64 ?? '').trim()
+  if (!videoB64 || !audioB64) {
+    sendMerchantJson(res, 400, { ok: false, message: '缺少 videoBase64 或 audioBase64' })
+    return
+  }
+
+  let videoBuf: Buffer
+  let audioBuf: Buffer
+  try {
+    videoBuf = Buffer.from(videoB64, 'base64')
+    audioBuf = Buffer.from(audioB64, 'base64')
+  } catch {
+    sendMerchantJson(res, 400, { ok: false, message: 'base64 无效' })
+    return
+  }
+
+  const merged = await muxLocalVideoAudio(videoBuf, audioBuf)
   if (!merged.ok) {
     sendMerchantJson(res, 502, { ok: false, message: merged.message })
     return

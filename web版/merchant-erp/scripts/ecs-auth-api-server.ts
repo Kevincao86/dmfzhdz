@@ -40,6 +40,7 @@ import videoLongformPlanHandler from '../api/meoo-merchant-ai-video-longform-pla
 import videoDownloadUrlHandler from '../api/meoo-merchant-ai-video-download-url.ts'
 import videoConcatUrlsHandler from '../api/meoo-merchant-ai-video-concat-urls.ts'
 import videoConcatBlobsHandler from '../api/meoo-merchant-ai-video-concat-blobs.ts'
+import videoMuxAudioHandler from '../api/meoo-merchant-ai-video-mux-audio.ts'
 import douyinGoodsAiAssistHandler from '../api/meoo-douyin-goods-ai-assist.ts'
 import iceConfigHandler from '../api/meoo-merchant-ai-video-ice-config.ts'
 import iceOpenshotConfigHandler from '../api/meoo-merchant-ai-video-openshot-config.ts'
@@ -147,6 +148,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-download-url': videoDownloadUrlHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-concat-urls': videoConcatUrlsHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-concat-blobs': videoConcatBlobsHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-mux-audio': videoMuxAudioHandler as VercelLikeHandler,
   /** AI 文章与话题（抖音来客文案） */
   '/api/meoo-douyin-goods-ai-assist': douyinGoodsAiAssistHandler as VercelLikeHandler,
   /** 灵祺AI云剪：读运营台 videoAi 注册表，须走 ECS 勿仅靠 Vercel */
