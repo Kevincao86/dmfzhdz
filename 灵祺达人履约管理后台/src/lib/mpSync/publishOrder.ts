@@ -106,7 +106,9 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
   }
 }
 
-export function buildFansRequirementText(f: PublishForm) {
+export function resolveIceReferenceVideoUrl(f: Pick<PublishForm, 'referenceUrl' | 'materialUrl' | 'iceVideoUrl'>) {
+  return String(f.referenceUrl || f.materialUrl || f.iceVideoUrl || '').trim()
+}
   if (f.fansLimitMode === 'unlimited') return '不限'
   const min = String(f.fansMin ?? '').trim()
   return min ? `粉丝≥${min}` : ''
@@ -219,8 +221,8 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
   lines.push('招募详情：')
   const recruitDetail = String(f.recruitDetail || '').trim()
   if (recruitDetail) lines.push(recruitDetail)
-  if ((recruitModeId === 'ice' || recruitModeId === 'edit_ice') && String(f.iceVideoUrl || '').trim()) {
-    lines.push(`云剪参考成片：${String(f.iceVideoUrl).trim()}`)
+  if ((recruitModeId === 'ice' || recruitModeId === 'edit_ice') && resolveIceReferenceVideoUrl(f)) {
+    lines.push(`云剪参考成片：${resolveIceReferenceVideoUrl(f)}`)
     lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
   }
   return lines.join('\n')
@@ -291,8 +293,8 @@ export function validatePublishForm(
     const sErr = validateSupplierPublish(recruitTarget, f, recruitMode)
     if (sErr) return sErr
   }
-  if ((recruitMode === 'ice' || recruitMode === 'edit_ice') && !String(f.iceVideoUrl || '').trim()) {
-    return '云剪任务请填写参考成片链接'
+  if ((recruitMode === 'ice' || recruitMode === 'edit_ice') && !resolveIceReferenceVideoUrl(f)) {
+    return '云剪任务请填写参考片链接'
   }
   if (!(f.applyFormFields || []).length) {
     return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
@@ -473,7 +475,7 @@ export function buildPublishOrder(
       coverImage: coverFields.coverImage,
       coverLibraryId: coverFields.coverLibraryId,
       coverImageSource: coverFields.coverImageSource,
-      iceVideoUrl: String(form.iceVideoUrl || '').trim(),
+      iceVideoUrl: resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
     },
   }
@@ -481,7 +483,7 @@ export function buildPublishOrder(
     order.orderKind = 'recruitment_ice'
     order.hall = 'ice'
     order.fulfillmentLoop = 'closed'
-    const url = String(form.iceVideoUrl || '').trim()
+    const url = resolveIceReferenceVideoUrl(form)
     const ts = mpId.split('-').pop() || String(nowMs)
     order.iceVideoSlots = [{ slotId: `SLOT-${ts}`, label: '成片1', downloadUrl: url, iceJobId: '' }]
   } else {

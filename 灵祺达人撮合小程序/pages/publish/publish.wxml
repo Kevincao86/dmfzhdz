@@ -366,8 +366,8 @@
               </view>
             </view>
             <view class="pub-field">
-              <text class="pub-label">参考片链接</text>
-              <input class="pub-input" placeholder="选填" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
+              <text class="pub-label">{{recruitMode === 'edit_ice' ? '参考片链接 *' : '参考片链接'}}</text>
+              <input class="pub-input" placeholder="{{recruitMode === 'edit_ice' ? 'https://…mp4 云剪成片下载链接' : '选填'}}" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
             </view>
           </block>
           <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel && !isSupplierPublish}}">
@@ -450,21 +450,17 @@
             />
           </view>
           <view class="pub-field" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
-            <text class="pub-label">云剪参考成片链接 *</text>
-            <input class="pub-input" placeholder="https://…mp4" value="{{form.iceVideoUrl}}" data-key="iceVideoUrl" bindinput="onFieldInput" />
-          </view>
-          <view class="pub-field" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
             <text class="pub-label">云剪审核方式 *</text>
-            <view class="pub-tag-grid">
+            <view class="pub-radio-pair">
               <view
-                class="pub-tag-cell {{form.iceVerifyMode !== 'pr' ? 'pub-tag-cell--on' : ''}}"
-                data-mode="ai"
-                bindtap="onIceVerifyModePick"
+                class="pub-radio-opt {{form.iceVerifyMode !== 'pr' ? 'pub-radio-opt--on' : ''}}"
+                data-val="ai"
+                catchtap="onIceVerifyModePick"
               >AI 核查</view>
               <view
-                class="pub-tag-cell {{form.iceVerifyMode === 'pr' ? 'pub-tag-cell--on' : ''}}"
-                data-mode="pr"
-                bindtap="onIceVerifyModePick"
+                class="pub-radio-opt {{form.iceVerifyMode === 'pr' ? 'pub-radio-opt--on' : ''}}"
+                data-val="pr"
+                catchtap="onIceVerifyModePick"
               >PR 审核</view>
             </view>
             <text class="pub-cover-hint">AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。</text>
