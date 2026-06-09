@@ -24,6 +24,8 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
 本地 dev 在 5176 端口内置商家 `/api` 网关（`merchantApiMock` 等），环境变量从 `web版/merchant-erp/.env*` 读取。  
 「AI 文章与话题」需商家抖音来客 token（`meoo_douyin_merchant_token`），与商家版相同。
 
+**增值服务灰测**：在 `.env.production`（或本地 `.env.local`）配置 `VITE_MP_ADDON_BETA_ALLOWLIST`，填入灰测用户的 `accountId`、`loginName`、`lingqiTalentId` 或 `lingqiPrId`（逗号分隔）。未命中白名单的登录用户进入「增值服务」将看到「即将开放使用」。全量开放后设 `VITE_MP_ADDON_OPEN_ALL=true`。
+
 构建时会将 `web版/merchant-erp/public`（`digital-human`、`ai-vendors` 等）合并进 `dist`，与商家 Web 静态资源路径一致。
 
 ## 登录方式
