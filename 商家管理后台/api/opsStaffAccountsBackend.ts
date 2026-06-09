@@ -10,6 +10,7 @@ export const OPS_MASTER_DEFAULT_PASSWORD = 'kaiyedaji888'
 export const OPS_MASTER_PASSWORD_HASH =
   '973e095059955e0c458333ac4bb54113de5c54011390d3ad2869ed1c9af493e0'
 
+/** 须与 src/ops/opsStaffAuth.ts OPS_PERMISSION_MODULES 的 key 保持一致 */
 export const OPS_PERMISSION_MODULE_KEYS = [
   'customers',
   'announcements',
@@ -17,8 +18,14 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'recruitment_orders',
   'mp_recruitment_orders',
   'talent_library',
+  'shoot_team_library',
+  'edit_team_library',
+  'pr_library',
   'ai_models',
   'support',
+  'support_mp',
+  'help_manual',
+  'team_intro',
 ] as const
 
 export type OpsPermissionKey = (typeof OPS_PERMISSION_MODULE_KEYS)[number]
@@ -312,7 +319,9 @@ export async function updateOpsSubAccountInDb(
 
   let permissions = parsePermissions(row.permissions, 'sub_admin')
   if (patch.permissions) {
-    permissions = [...new Set(patch.permissions)]
+    permissions = [...new Set(patch.permissions)].filter((p) =>
+      OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
+    )
     if (permissions.length === 0) return { ok: false, error: 'permissions_required' }
   }
   let passwordHash = row.password_hash
