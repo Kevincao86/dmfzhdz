@@ -24,7 +24,11 @@ function isDevtools() {
 if (isDevtools()) {
   try {
     const loc = require('./config.local.js')
-    if (loc && loc.MERCHANT_API_BASE_URL) Object.assign(out, loc)
+    if (loc) {
+      if (loc.MERCHANT_API_BASE_URL) Object.assign(out, loc)
+      // 开发者工具可直连 erp-api 调试，避免云函数多跳被误判为「网络慢」
+      if (loc.MP_USE_CLOUD_PROXY === false) out.MP_USE_CLOUD_PROXY = false
+    }
   } catch (_) {}
 }
 

@@ -1,5 +1,5 @@
 /**
- * 首页招募大厅加载：统一结束 loading，避免未捕获异常导致一直转圈
+ * 首页招募大厅加载：优先轻量 ECS，失败才用本地缓存
  */
 const api = require('./api.js')
 const { showDemoOrders } = require('./mpDemoMode.js')
@@ -11,15 +11,13 @@ const orderCard = require('./recruitmentOrderCard.js')
 const hallIdentity = require('./hallIdentityBuckets.js')
 const userProfile = require('./userProfile.js')
 
-const LOAD_MS = 55000
-const WATCHDOG_MS = 18000
-const BG_REFRESH_MS = 8000
-
 function errHint(msg) {
   const m = String(msg || '')
   if (/timeout|超时|云函数超时/i.test(m)) return '加载超时，请下拉刷新'
   if (/url not in domain list|合法域名/i.test(m)) return '网络配置异常，请联系管理员'
-  if (/reset|errcode:-101|cronet|cloud:callFunction/i.test(m)) return '网络不稳定，请下拉刷新'
+  if (/reset|errcode:-101|cronet|cloud:callFunction|500|cloud_proxy/i.test(m)) {
+    return '无法连接轻量服务器，请下拉刷新'
+  }
   if (/云开发未就绪|MP_CLOUD_ENV/i.test(m)) return '云开发未配置，请检查 MP_CLOUD_ENV'
   return m.slice(0, 120) || '加载失败，请下拉刷新'
 }
@@ -54,18 +52,9 @@ function mapRegistryToRows(reg, identity) {
  */
 async function loadHallList(page) {
   const seq = (page._hallLoadSeq = (page._hallLoadSeq || 0) + 1)
-  let watchdog = null
-
-  const stopWatchdog = () => {
-    if (watchdog) {
-      clearTimeout(watchdog)
-      watchdog = null
-    }
-  }
 
   const finish = (patch) => {
     if (page._hallLoadSeq !== seq) return
-    stopWatchdog()
     const base = {
       loading: false,
       unconfigured: false,
@@ -87,26 +76,6 @@ async function loadHallList(page) {
     if (typeof page.applyFilters === 'function') page.applyFilters()
   }
 
-  const scheduleBgRefresh = () => {
-    if (page._hallBgRefreshTimer) clearTimeout(page._hallBgRefreshTimer)
-    page._hallBgRefreshTimer = setTimeout(() => {
-      if (page._hallLoadSeq !== seq) return
-      void ops
-        .fetchRegistry()
-        .then((reg) => {
-          if (page._hallLoadSeq !== seq) return
-          if (reg && reg._registryStale) {
-            scheduleBgRefresh()
-            return
-          }
-          applyRows(mapRegistryToRows(reg))
-        })
-        .catch(() => {
-          if (page._hallLoadSeq === seq) scheduleBgRefresh()
-        })
-    }, BG_REFRESH_MS)
-  }
-
   if (!api.hasApi()) {
     const demo = showDemoOrders() ? listFilters.mergeHallDisplayRows([], { allowDemo: true }) : []
     finish({
@@ -118,80 +87,18 @@ async function loadHallList(page) {
     return
   }
 
-  const hadRows =
-    (page.data.normalRows && page.data.normalRows.length) ||
-    (page.data.displayRows && page.data.displayRows.length)
   page.setData({ loading: true, err: '' })
 
-  const offline = registryCache.load({ allowStale: true })
-  const offlineMp = offline && offline.data && offline.data.mpRecruitmentOrders
-  let showedOffline = false
-  if (offline && offline.data && Array.isArray(offlineMp) && offlineMp.length > 0) {
-    showedOffline = true
-    try {
-      applyRows(mapRegistryToRows(offline.data))
-    } catch (_) {
-      showedOffline = false
-    }
-  }
-
-  watchdog = setTimeout(() => {
-    if (page._hallLoadSeq !== seq) return
-    if (!page.data.loading) return
-    const stale = registryCache.load({ allowStale: true })
-    if (stale && stale.data && (stale.data.mpRecruitmentOrders || []).length) {
-      try {
-        applyRows(mapRegistryToRows(stale.data))
-        scheduleBgRefresh()
-        return
-      } catch (_) {}
-    }
-    if (hadRows || showedOffline) {
-      page.setData({ loading: false })
-      scheduleBgRefresh()
-      return
-    }
-    finish({ err: '加载超时，请下拉刷新' })
-  }, WATCHDOG_MS)
-
   try {
-    let reg
-    try {
-      reg = await Promise.race([
-        ops.fetchRegistry(),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`招募大厅超时（${LOAD_MS / 1000}s）`)), LOAD_MS),
-        ),
-      ])
-    } catch (e) {
-      if (e && e.fromCache && e.cachedData) {
-        reg = e.cachedData
-      } else {
-        throw e
-      }
-    }
+    const reg = await ops.fetchRegistry()
     if (page._hallLoadSeq !== seq) return
-    stopWatchdog()
-    const rows = mapRegistryToRows(reg)
-    if (reg && reg._registryStale) {
-      applyRows(rows)
-      scheduleBgRefresh()
-      return
-    }
-    applyRows(rows)
+    applyRows(mapRegistryToRows(reg))
   } catch (e) {
     if (page._hallLoadSeq !== seq) return
-    stopWatchdog()
-    if (showedOffline || hadRows) {
-      page.setData({ loading: false })
-      scheduleBgRefresh()
-      return
-    }
     const stale = registryCache.load({ allowStale: true })
     if (stale && stale.data && (stale.data.mpRecruitmentOrders || []).length) {
       try {
         applyRows(mapRegistryToRows(stale.data))
-        scheduleBgRefresh()
         return
       } catch (_) {}
     }
@@ -199,4 +106,4 @@ async function loadHallList(page) {
   }
 }
 
-module.exports = { loadHallList, mapRegistryToRows, WATCHDOG_MS }
+module.exports = { loadHallList, mapRegistryToRows }

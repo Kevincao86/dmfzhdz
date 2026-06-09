@@ -3,44 +3,35 @@ const auth = require('./auth.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const applicationsStore = require('./applicationsStore.js')
 const registryCache = require('./registryCache.js')
-const { withTimeout } = require('./fetchTimeout.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
-
-/** 与云函数 registry 45s、客户端 cloudEcs 50s 对齐，减轻慢网误落缓存 */
-const REGISTRY_FETCH_MS = 50000
 
 function isRetryableRegistryErr(e) {
   const msg = String((e && e.message) || e || '')
-  return /超时|timeout|reset|errcode:-101|cronet|cloud:callFunction|request:fail/i.test(msg)
-}
-
-function attachStaleMeta(data, ageMs, attempts) {
-  return {
-    ...data,
-    _registryStale: true,
-    _registryCacheAgeMs: ageMs,
-    _registryFetchAttempts: attempts,
-  }
+  return /超时|timeout|reset|errcode:-101|cronet|cloud:callFunction|request:fail|cloud_proxy/i.test(msg)
 }
 
 function hasMpOrders(data) {
   const mp = data && data.mpRecruitmentOrders
   return Array.isArray(mp) && mp.length > 0
 }
+
+function findMpOrderInRegistry(reg, mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !reg) return null
+  const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  return list.find((o) => o && String(o.id) === id) || null
+}
+
+function registryRequestKey(opts) {
+  const ids = collectIncludeMpOrderIds(opts && opts.includeMpOrderIds)
+  return ids.length ? `inc:${ids.slice().sort().join(',')}` : 'hall'
+}
+
+/** 仅合并同一时刻的并行请求，不跳过轻量拉取 */
+const inflightByKey = new Map()
+
 const HALL_GET = '/api/meoo-ops-mp-hall-registry'
 const HALL_POST = '/api/meoo-ops-mp-auth'
-
-function useCacheIfHallEmpty(data) {
-  const mp = data && data.mpRecruitmentOrders
-  if (Array.isArray(mp) && mp.length > 0) return data
-  const cached = registryCache.load({ allowStale: true })
-  const prevMp = cached && cached.data && cached.data.mpRecruitmentOrders
-  if (Array.isArray(prevMp) && prevMp.length > 0) {
-    console.warn('[mp] hall_registry 空响应，使用本地缓存', prevMp.length)
-    return cached.data
-  }
-  return data
-}
 
 function collectIncludeMpOrderIds(extraIds) {
   const ids = new Set()
@@ -59,18 +50,31 @@ function collectIncludeMpOrderIds(extraIds) {
   return [...ids].slice(0, 120)
 }
 
+/**
+ * 拉取大厅注册表。
+ * 优先 GET：mpErpProxy 对 GET 有多路上游重试；POST 为单次（避免 wx code 重试），不宜放首位。
+ * 超时仅由 cloudEcs（50s）一层控制，避免双层 withTimeout 误杀。
+ */
 async function fetchRegistryOnce(includeMpOrderIds) {
+  let lastErr
   try {
-    const raw = await withTimeout(
-      api.post(HALL_POST, { action: 'hall_registry', includeMpOrderIds }, registerAuthHeaders()),
-      REGISTRY_FETCH_MS,
-      '招募大厅',
-    )
-    return useCacheIfHallEmpty(normalizeHallPayload(raw))
+    const raw = await api.get(HALL_GET)
+    return normalizeHallPayload(raw)
   } catch (e) {
-    console.warn('[mp] hall_registry POST failed', String(e.message || e).slice(0, 160))
-    const raw = await withTimeout(api.get(HALL_GET), REGISTRY_FETCH_MS, '招募大厅')
-    return useCacheIfHallEmpty(normalizeHallPayload(raw))
+    lastErr = e
+    console.warn('[mp] hall_registry GET failed', String(e.message || e).slice(0, 200))
+  }
+  try {
+    const raw = await api.post(
+      HALL_POST,
+      { action: 'hall_registry', includeMpOrderIds },
+      registerAuthHeaders(),
+    )
+    return normalizeHallPayload(raw)
+  } catch (e2) {
+    const msg = String(e2 && e2.message ? e2.message : e2)
+    console.warn('[mp] hall_registry POST failed', msg.slice(0, 200))
+    throw lastErr || e2 || new Error(msg || 'hall_fetch_failed')
   }
 }
 
@@ -80,12 +84,12 @@ async function fetchRegistryViaErpApi(opts) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const data = await fetchRegistryOnce(includeMpOrderIds)
-      registryCache.save(data, attempt === 0 ? `${HALL_POST}:hall_registry` : `${HALL_GET}:retry`)
+      registryCache.save(data, attempt === 0 ? HALL_GET : `${HALL_POST}:retry`)
       return data
     } catch (e) {
       lastErr = e
       if (attempt === 0 && isRetryableRegistryErr(e)) {
-        await new Promise((r) => setTimeout(r, 600))
+        await new Promise((r) => setTimeout(r, 400))
         continue
       }
       break
@@ -94,27 +98,43 @@ async function fetchRegistryViaErpApi(opts) {
   throw lastErr || new Error('hall_fetch_failed')
 }
 
-async function fetchRegistry(opts) {
-  const attempts = []
-  let lastErr
-  try {
-    const data = await fetchRegistryViaErpApi(opts)
-    registryCache.save(data, 'erp-api:hall-registry')
-    return data
-  } catch (e) {
-    lastErr = e
-    attempts.push(`[erp-api] ${String(e && e.message ? e.message : e).slice(0, 200)}`)
-    console.warn('[mp] fetchRegistry erp-api failed', attempts[attempts.length - 1])
-  }
-
+function readRegistryCache() {
   const cached = registryCache.load({ allowStale: true })
-  if (cached && cached.data && hasMpOrders(cached.data)) {
-    console.warn('[mp] fetchRegistry 使用本地缓存', cached.ageMs)
-    return attachStaleMeta(cached.data, cached.ageMs, attempts)
-  }
-  const err = lastErr || new Error('无法拉取招募大厅数据')
-  err.attempts = attempts
-  throw err
+  return cached && cached.data ? cached.data : null
+}
+
+async function fetchRegistryFromServer(opts) {
+  const data = await fetchRegistryViaErpApi(opts)
+  registryCache.save(data, 'erp-api:hall-registry')
+  return data
+}
+
+/**
+ * 始终优先请求轻量 ECS；仅当云函数/接口彻底失败时才回退本地缓存。
+ * 并行重复请求合并为一次，避免打爆云函数。
+ */
+async function fetchRegistry(opts) {
+  const key = registryRequestKey(opts)
+  const pending = inflightByKey.get(key)
+  if (pending) return pending
+
+  const task = (async () => {
+    try {
+      return await fetchRegistryFromServer(opts)
+    } catch (e) {
+      console.warn('[mp] fetchRegistry server failed', String(e && e.message ? e.message : e).slice(0, 240))
+      const cached = readRegistryCache()
+      if (cached && hasMpOrders(cached)) {
+        console.warn('[mp] fetchRegistry use cache after server fail')
+        return cached
+      }
+      throw e
+    }
+  })().finally(() => {
+    if (inflightByKey.get(key) === task) inflightByKey.delete(key)
+  })
+  inflightByKey.set(key, task)
+  return task
 }
 
 async function applyToMpOrder(mpOrderId, applicant) {
@@ -257,6 +277,8 @@ async function appendTalentInbox(entries) {
 
 module.exports = {
   fetchRegistry,
+  findMpOrderInRegistry,
+  readRegistryCache,
   applyToMpOrder,
   registerTalentMember,
   registerPrUser,
