@@ -75,7 +75,16 @@ export function opsErpApiCandidates(apiPath: string): string[] {
 }
 
 /** 优先 ECS erp-api，失败再回退运营台同源 /api（注册表等同源会 307 至 erp-api） */
-export async function fetchOpsErpApi(apiPath: string, init?: RequestInit): Promise<Response> {
+export type FetchOpsErpApiOptions = {
+  /** 在线客服 relay 仅走 ECS erp-api，禁止回退 Vercel /api（避免写入云端 Supabase） */
+  ecsOnly?: boolean
+}
+
+export async function fetchOpsErpApi(
+  apiPath: string,
+  init?: RequestInit,
+  options?: FetchOpsErpApiOptions,
+): Promise<Response> {
   const registryLike =
     apiPath.includes('ops-sync') ||
     apiPath.includes('meoo-ops-sync-registry') ||
@@ -83,7 +92,15 @@ export async function fetchOpsErpApi(apiPath: string, init?: RequestInit): Promi
     apiPath.includes('tenants/delete') ||
     apiPath.includes('vendor-keys') ||
     apiPath.includes('video-ai')
-  const candidates = registryLike ? opsRegistryApiUrls(apiPath) : opsErpApiCandidates(apiPath)
+  const supportRelayLike =
+    options?.ecsOnly ||
+    apiPath.includes('support-poll') ||
+    apiPath.includes('support-ops-send')
+  const candidates = supportRelayLike
+    ? [opsErpApiUrl(apiPath), ...(typeof window !== 'undefined' && !opsErpApiBase() ? [`${window.location.origin}${apiPath.startsWith('/') ? apiPath : `/${apiPath}`}`] : [])].filter(Boolean)
+    : registryLike
+      ? opsRegistryApiUrls(apiPath)
+      : opsErpApiCandidates(apiPath)
   let last: unknown
   for (let i = 0; i < candidates.length; i++) {
     try {

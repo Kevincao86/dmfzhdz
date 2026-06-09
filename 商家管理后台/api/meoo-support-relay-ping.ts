@@ -1,7 +1,12 @@
 /**
- * GET /api/meoo-support-relay-ping — 诊断运营台 Vercel 能否用 service_role 读取 support_relay_messages。
+ * GET /api/meoo-support-relay-ping — 诊断运营台能否用 service_role 读取 ECS support_relay_messages。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  readSupportRelaySupabaseAdminEnv,
+  supportRelayAdminFetch,
+  supportRelaySupabaseEnvConfigureHint,
+} from '../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 
@@ -16,8 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
   const hasPollToken = Boolean(process.env.MEOO_SUPPORT_OPS_HTTP_TOKEN?.trim())
   const hasClientPollToken = Boolean(process.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN?.trim())
 
@@ -39,11 +43,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     checks: {} as Record<string, unknown>,
   }
 
-  if (!supabaseUrl || !serviceRole) {
+  if (missingParts.length > 0) {
     sendJson(res, 503, {
       ...out,
       error: 'supabase_service_not_configured',
-      hint: '配置 SUPABASE_URL（或 VITE_SUPABASE_URL）与 SUPABASE_SERVICE_ROLE_KEY，指向 ECS 根域 https://mofangdianai.com',
+      missing: missingParts,
+      hint: supportRelaySupabaseEnvConfigureHint(missingParts),
     })
     return
   }
@@ -56,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const checks = out.checks as Record<string, unknown>
 
   try {
-    const countRes = await fetch(
+    const countRes = await supportRelayAdminFetch(
       `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id&limit=1`,
       { headers },
     )
@@ -71,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    const latestRes = await fetch(
+    const latestRes = await supportRelayAdminFetch(
       `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,from_role,text,ts&order=ts.desc&limit=3`,
       { headers },
     )

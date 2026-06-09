@@ -1,7 +1,12 @@
 /**
- * 运营台通过 HTTP 发送客服回复，写入 Supabase（service_role，Node 运行时）。
+ * 运营台通过 HTTP 发送客服回复，写入 ECS Postgres support_relay_messages（service_role）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  readSupportRelaySupabaseAdminEnv,
+  supportRelayAdminFetch,
+  supportRelaySupabaseEnvConfigureHint,
+} from '../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 
@@ -43,17 +48,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const supabaseUrl = (
-    process.env.MEOO_SUPABASE_ADMIN_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    process.env.SUPABASE_URL ??
-    ''
-  )
-    .trim()
-    .replace(/\/$/, '')
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-  if (!supabaseUrl || !serviceRole) {
-    sendJson(res, 503, { ok: false, error: 'supabase_service_not_configured' })
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
+  if (missingParts.length > 0) {
+    sendJson(res, 503, {
+      ok: false,
+      error: 'supabase_service_not_configured',
+      missing: missingParts,
+      hint: supportRelaySupabaseEnvConfigureHint(missingParts),
+    })
     return
   }
 
@@ -88,8 +90,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     author_user_id: null,
   }
 
+  let supabaseHost = ''
   try {
-    const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
+    supabaseHost = new URL(supabaseUrl).host
+  } catch {
+    supabaseHost = supabaseUrl
+  }
+
+  try {
+    const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
       method: 'POST',
       headers: {
         apikey: serviceRole,
@@ -102,16 +111,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     if (!r.ok) {
       const t = await r.text()
-      sendJson(res, 502, { ok: false, error: 'supabase_insert_failed', detail: t.slice(0, 500) })
+      sendJson(res, 502, {
+        ok: false,
+        error: 'supabase_insert_failed',
+        detail: t.slice(0, 500),
+        supabaseHost,
+      })
       return
     }
 
-    sendJson(res, 200, { ok: true })
+    sendJson(res, 200, { ok: true, supabaseHost })
   } catch (e) {
     sendJson(res, 502, {
       ok: false,
       error: 'support_send_failed',
       detail: e instanceof Error ? e.message : String(e),
+      supabaseHost,
     })
   }
 }
