@@ -5,6 +5,7 @@ import type {
 } from './helpManualTypes.js'
 import { normalizeHelpManualCategories } from './helpManualCategoryTree.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
+import { getHelpManualSeedForEdition } from './helpManualSeedContent.js'
 
 export function helpManualSliceForEdition(
   data: RegistrySnapshot,
@@ -16,6 +17,9 @@ export function helpManualSliceForEdition(
   const articles = (data.helpManualArticles ?? [])
     .filter((a) => a && a.edition === edition)
     .sort((a, b) => a.sortOrder - b.sortOrder || b.updatedAt.localeCompare(a.updatedAt))
+  if (categories.length === 0 && articles.length === 0) {
+    return getHelpManualSeedForEdition(edition)
+  }
   return { categories, articles }
 }
 

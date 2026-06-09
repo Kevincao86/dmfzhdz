@@ -8,6 +8,7 @@ import {
 } from '../../meooRegistryShared/helpManualCategoryTree.js'
 import { fetchRegistry } from '../opsRegistryApi'
 import {
+  fetchHelpManualDefaults,
   saveHelpManualEdition,
   type HelpManualEdition,
   type RegistryHelpManualArticle,
@@ -37,6 +38,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
   const [newSubCatTitle, setNewSubCatTitle] = useState('')
   const [subCatParentId, setSubCatParentId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [msg, setMsg] = useState('')
 
   const topCats = useMemo(() => topLevelCategories(categories), [categories])
@@ -85,6 +87,30 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
       setMsg('已保存，各版本前端刷新帮助手册即可看到更新')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function importDefaults() {
+    const label = EDITION_TABS.find((t) => t.id === edition)?.label ?? edition
+    if (
+      !window.confirm(
+        `将载入「${label}」内置使用手册与常见问题，覆盖当前版本已有分类与文章。确定继续？`,
+      )
+    ) {
+      return
+    }
+    setImporting(true)
+    setMsg('')
+    try {
+      const r = await fetchHelpManualDefaults(edition)
+      if (!r.ok || !r.categories || !r.articles) {
+        setMsg(r.error ?? '载入失败')
+        return
+      }
+      await persist(r.categories, r.articles)
+      setMsg(`已载入内置手册（${r.version ?? '默认'}），各版本前端刷新帮助页即可看到`)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -210,7 +236,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {EDITION_TABS.map((t) => (
           <a
             key={t.id}
@@ -222,6 +248,14 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
             {t.label}
           </a>
         ))}
+        <button
+          type="button"
+          disabled={importing || saving}
+          onClick={() => void importDefaults()}
+          className="ml-auto rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-300 disabled:opacity-50"
+        >
+          {importing ? '载入中…' : '载入默认手册'}
+        </button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">

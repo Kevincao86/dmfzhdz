@@ -62,6 +62,7 @@ import mpRecruitmentPatchHandler from '../api/meoo-ops-mp-recruitment-orders-pat
 import mpRecruitmentDeleteHandler from '../api/meoo-ops-mp-recruitment-orders-delete.ts'
 import mpLibraryDeleteHandler from '../api/meoo-ops-mp-library-delete.ts'
 import helpManualPublicHandler from '../api/meoo-help-manual-public.ts'
+import helpManualDefaultsHandler from '../api/meoo-help-manual-defaults.ts'
 import helpManualSetHandler from '../api/meoo-ops-help-manual-set.ts'
 import teamIntroPublicHandler from '../api/meoo-team-intro-public.ts'
 import teamIntroSetHandler from '../api/meoo-ops-team-intro-set.ts'
@@ -173,6 +174,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-orders-delete': mpRecruitmentDeleteHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-library-delete': mpLibraryDeleteHandler as VercelLikeHandler,
   '/api/meoo-help-manual-public': helpManualPublicHandler as VercelLikeHandler,
+  '/api/meoo-help-manual-defaults': helpManualDefaultsHandler as VercelLikeHandler,
   '/api/meoo-ops-help-manual-set': helpManualSetHandler as VercelLikeHandler,
   '/api/meoo-team-intro-public': teamIntroPublicHandler as VercelLikeHandler,
   '/api/meoo-ops-team-intro-set': teamIntroSetHandler as VercelLikeHandler,
