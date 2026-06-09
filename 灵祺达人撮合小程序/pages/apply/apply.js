@@ -82,14 +82,48 @@ Page({
       })
       return
     }
-    const mpOrderId = options && options.mpId ? decodeURIComponent(options.mpId) : ''
-    const merchantOrderNo =
-      options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
-    const platform = normalizePlatform(options && options.platform ? decodeURIComponent(options.platform) : '抖音')
-    const isIceMode = options && options.ice === '1'
-    const templateId = options && options.templateId ? decodeURIComponent(options.templateId) : ''
-    const tpl = applyTemplates.getApplyConfigForMpOrder(mpOrderId, templateId)
-    const applyRowsRaw = applyTemplates.resolveApplyRows(tpl, platform, { isIceMode })
+    void this.initApplyPage(options || {})
+  },
+  async initApplyPage(options) {
+    const mpOrderId = options.mpId ? decodeURIComponent(options.mpId) : ''
+    let merchantOrderNo = options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
+    let platform = normalizePlatform(options.platform ? decodeURIComponent(options.platform) : '抖音')
+    const isIceMode = options.ice === '1'
+    const templateId = options.templateId ? decodeURIComponent(options.templateId) : ''
+    let orderMeta = null
+    let recruitTarget = 'talent'
+
+    if (mpOrderId && api.hasApi()) {
+      try {
+        const reg = await ops.fetchRegistry({ includeMpOrderIds: [mpOrderId] })
+        const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
+        if (mp) {
+          if (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object') {
+            orderMeta = mp.mpPublishMeta
+            recruitTarget = String(orderMeta.recruitTarget || 'talent')
+          }
+          if (!merchantOrderNo) {
+            merchantOrderNo = String(mp.sourceMerchantOrderId || mp.title || '').trim()
+          }
+          if (mp.platform) platform = normalizePlatform(mp.platform)
+        }
+      } catch (e) {
+        console.warn('[apply] fetchRegistry', e)
+      }
+    }
+
+    const tpl = applyTemplates.getApplyConfigForMpOrder(mpOrderId, templateId, orderMeta)
+    const applyRowsRaw = applyTemplates.resolveApplyRows(tpl, platform, {
+      isIceMode,
+      recruitTarget,
+    })
+    if (orderMeta && Array.isArray(orderMeta.applyFormFields) && orderMeta.applyFormFields.length) {
+      applyTemplates.saveApplyFormForMpOrder(mpOrderId, {
+        templateId: orderMeta.applyFormTemplateId || templateId,
+        templateName: orderMeta.applyFormTemplateName || tpl.name,
+        fields: orderMeta.applyFormFields,
+      })
+    }
     const member = memberStore.readMember()
     const canSyncMember = memberSyncAvailable(member, platform)
     const patch = {
@@ -114,6 +148,10 @@ Page({
     this.setData(patch, () => syncApplyRows(this))
     if (!mpOrderId) {
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
+      return
+    }
+    if (!applyRowsRaw.length) {
+      wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
     }
   },
   onSyncMemberChange(e) {
@@ -190,6 +228,14 @@ Page({
   async onSubmit() {
     if (!api.hasApi()) {
       wx.showToast({ title: '未配置后台地址', icon: 'none' })
+      return
+    }
+    if (!this.data.mpOrderId) {
+      wx.showToast({ title: '缺少招募单号', icon: 'none' })
+      return
+    }
+    if (!(this.data.applyRowsRaw || []).length) {
+      wx.showToast({ title: '报名表单未加载，请返回详情页重试', icon: 'none' })
       return
     }
     const errMsg = this.validateForm()

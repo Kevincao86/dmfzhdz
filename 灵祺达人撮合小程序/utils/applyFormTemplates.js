@@ -212,7 +212,9 @@ function resolveApplyRows(template, platform, options) {
   const p = normalizePlatform(platform)
   const lb = labels(p)
   const isIce = options && options.isIceMode
-  return normalizeFields(template.fields || [])
+  const tpl = template && typeof template === 'object' ? template : builtinMinimalTemplate()
+  const kind = normalizeTemplateKind(tpl.kind || (options && options.recruitTarget) || 'talent')
+  return normalizeFields(tpl.fields || [], kind)
     .filter((f) => fieldVisibleForPlatform(f, p))
     .filter((f) => {
       if (isIce && ['visitDate', 'visitTimeStart', 'visitTimeEnd', 'quotePrice', 'alipayAccount'].includes(f.role)) {
@@ -419,21 +421,41 @@ function saveApplyFormForMpOrder(mpOrderId, payload) {
   }
 }
 
-function getApplyConfigForMpOrder(mpOrderId, templateId) {
+function configFromOrderMeta(orderMeta, templateId) {
+  const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : null
+  if (!meta || !Array.isArray(meta.applyFormFields) || !meta.applyFormFields.length) return null
+  const kind = templateKindFromRecruitTarget(meta.recruitTarget || 'talent')
+  return {
+    id: String(meta.applyFormTemplateId || templateId || 'order-meta').trim() || 'order-meta',
+    name: String(meta.applyFormTemplateName || '报名模版').trim() || '报名模版',
+    kind,
+    fields: normalizeFields(meta.applyFormFields, kind),
+  }
+}
+
+function getApplyConfigForMpOrder(mpOrderId, templateId, orderMeta) {
+  const fromCloud = configFromOrderMeta(orderMeta, templateId)
+  if (fromCloud) return fromCloud
+
   try {
     const raw = wx.getStorageSync(mpApplyFormStorageKey(mpOrderId))
     const j = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (j && Array.isArray(j.fields) && j.fields.length) {
+      const kind = templateKindFromRecruitTarget(j.recruitTarget || 'talent')
       return {
         id: j.templateId || templateId || 'builtin-minimal',
         name: j.templateName || '报名模版',
-        fields: normalizeFields(j.fields),
+        kind,
+        fields: normalizeFields(j.fields, kind),
       }
     }
   } catch {
     /* ignore */
   }
-  if (templateId) return getTemplateById(templateId)
+  if (templateId) {
+    const t = getTemplateById(templateId)
+    if (t) return t
+  }
   return getTemplateForApply()
 }
 
@@ -499,6 +521,7 @@ module.exports = {
   getActiveTemplateId,
   setActiveTemplateId,
   getTemplateForApply,
+  configFromOrderMeta,
   getApplyConfigForMpOrder,
   saveApplyFormForMpOrder,
   validateTemplateFields,
