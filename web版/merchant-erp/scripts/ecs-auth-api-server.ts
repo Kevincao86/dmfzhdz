@@ -79,6 +79,7 @@ import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.t
 import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
+import noviceKolAllocationHandler from '../api/meoo-ops-novice-kol-allocation.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 import douyinBindHandler from '../api/douyin-bind.ts'
@@ -87,7 +88,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260609-recruitment-orders-append'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260608-novice-kol-allocation'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -189,6 +190,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-profile-link-parse': mpProfileLinkParseHandler as VercelLikeHandler,
+  '/api/meoo-ops-novice-kol-allocation': noviceKolAllocationHandler as VercelLikeHandler,
   '/api/douyin-bind': douyinBindHandler as VercelLikeHandler,
   '/api/meoo-douyin-bind': douyinBindHandler as VercelLikeHandler,
   '/api/merchant/douyin/bind': douyinBindHandler as VercelLikeHandler,

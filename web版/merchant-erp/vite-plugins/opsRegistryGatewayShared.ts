@@ -55,6 +55,7 @@ import {
 } from '../src/lib/mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
 import { syncSupplierTeamLibraries, type SupplierTeamRole } from '../src/lib/supplierTeamLibrarySync.js'
+import { buildNoviceAllocationFromTalentLibrary } from '../src/lib/talentLibraryTierPricing.js'
 import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
 import {
   appendRecruitmentOrderForTenant,
@@ -185,7 +186,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
           url !== '/api/meoo-ops-mp-talent-member-register' &&
-          url !== '/api/meoo-ops-supplier-team-library-sync'
+          url !== '/api/meoo-ops-supplier-team-library-sync' &&
+          url !== '/api/meoo-ops-novice-kol-allocation'
         )
           return next()
 
@@ -876,6 +878,73 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             data.talentPoolCandidates = list.slice(0, 240)
             writeRegistry(viteRoot, data)
             json(res, 200, { ok: true })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            url === '/api/meoo-ops-novice-kol-allocation'
+          ) {
+            const auth = await requireMerchantRegistryAuthFromHeaders(authHeader)
+            if (!auth.ok) {
+              json(res, auth.status, { ok: false, error: auth.error, message: auth.message })
+              return
+            }
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              city?: string
+              budgetYuan?: number
+              targetHeadcount?: number
+              feeType?: 'tier' | 'fixed'
+              platform?: string
+            }
+            const city = String(body.city ?? '').trim()
+            const budgetYuan = Number(body.budgetYuan)
+            const targetHeadcount = Number(body.targetHeadcount)
+            const feeType = body.feeType === 'fixed' ? 'fixed' : 'tier'
+            if (!city) {
+              json(res, 400, { ok: false, error: 'city_required' })
+              return
+            }
+            if (!Number.isFinite(budgetYuan) || budgetYuan <= 0) {
+              json(res, 400, { ok: false, error: 'invalid_budget' })
+              return
+            }
+            if (!Number.isFinite(targetHeadcount) || targetHeadcount < 1) {
+              json(res, 400, { ok: false, error: 'invalid_headcount' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            const platformRaw = String(body.platform ?? '抖音').trim()
+            const platform =
+              platformRaw === '小红书' ||
+              platformRaw === '大众点评' ||
+              platformRaw === '快手' ||
+              platformRaw === '微信视频号'
+                ? platformRaw
+                : '抖音'
+            const allocation = buildNoviceAllocationFromTalentLibrary({
+              entries: data.talentLibraryEntries ?? [],
+              city,
+              budgetYuan,
+              targetHeadcount,
+              feeType,
+              platform,
+            })
+            const { pricingContext, ...publicAllocation } = allocation
+            json(res, 200, {
+              ok: true,
+              allocation: publicAllocation,
+              pricing: pricingContext
+                ? {
+                    priceSource: pricingContext.priceSource,
+                    matchedEntries: pricingContext.matchedEntries,
+                    filterCity: pricingContext.filterCity,
+                    filterPlatform: pricingContext.filterPlatform,
+                    tierAvgs: pricingContext.tierAvgs,
+                  }
+                : undefined,
+            })
             return
           }
 

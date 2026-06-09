@@ -82,7 +82,7 @@ export function buildRecruitmentOrderFromAgentBrief(
       `【智能体·开环招募】平台:${platform}；城市:${intent.city || '—'}；预算¥${intent.budgetYuan}；`,
       isXhs ? '' : `达人佣金:${intent.kolCommissionPct}%；`,
       isXhs ? '' : `策略:${kolTierStrategyLabel(intent.strategy)}；`,
-      `档位:${tierLine}；分配:${allocation.source === 'ai' ? 'AI模型' : '规则估算'}；`,
+      `档位:${tierLine}；分配:${allocation.source === 'library' ? '达人库测算' : allocation.source === 'ai' ? 'AI模型' : '规则估算'}；`,
       `主推:${brief.mainProductName}；标签:${tags}；`,
       `Brief:${(brief.briefText || '').slice(0, 500)}`,
       allocation.costHint ? `；${allocation.costHint}` : '',

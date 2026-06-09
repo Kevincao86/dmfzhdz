@@ -127,7 +127,7 @@ function AllocationBlock({
     <div
       className={cn(
         'rounded-lg border p-3',
-        order.allocation.source === 'ai'
+        order.allocation.source === 'library' || order.allocation.source === 'ai'
           ? 'border-emerald-200 bg-emerald-50/50'
           : 'border-slate-200 bg-slate-50/80',
       )}
@@ -138,10 +138,16 @@ function AllocationBlock({
         <span
           className={cn(
             'rounded px-1.5 py-0.5 text-[10px] font-medium',
-            order.allocation.source === 'ai' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700',
+            order.allocation.source === 'library' || order.allocation.source === 'ai'
+              ? 'bg-emerald-100 text-emerald-800'
+              : 'bg-slate-200 text-slate-700',
           )}
         >
-          {order.allocation.source === 'ai' ? '模型估算' : '规则估算'}
+          {order.allocation.source === 'library'
+            ? '达人库测算'
+            : order.allocation.source === 'ai'
+              ? '模型估算'
+              : '规则估算'}
         </span>
       </div>
       <div className="grid grid-cols-4 gap-2 text-center">
