@@ -12,11 +12,20 @@
       confirm-type="search"
     />
   </view>
+  <scroll-view class="app-filter-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
   <view class="app-filter-bar">
     <view class="app-filter-cell">
       <picker mode="selector" range="{{timeOptions}}" range-key="label" bindchange="onTimeFilterChange">
         <view class="app-filter-item {{timeFilter !== 'all' ? 'app-filter-item--on' : ''}}">
           <text class="app-filter-label">{{timeFilterLabel}}</text>
+          <text class="app-filter-arrow">▾</text>
+        </view>
+      </picker>
+    </view>
+    <view class="app-filter-cell">
+      <picker mode="selector" range="{{orderTypeOptions}}" range-key="label" bindchange="onOrderTypeFilterChange">
+        <view class="app-filter-item {{orderTypeFilter !== 'all' ? 'app-filter-item--on' : ''}}">
+          <text class="app-filter-label">{{orderTypeFilterLabel}}</text>
           <text class="app-filter-arrow">▾</text>
         </view>
       </picker>
@@ -46,6 +55,7 @@
       </picker>
     </view>
   </view>
+  </scroll-view>
   </view>
 
   <view wx:if="{{loading}}" class="card state-loading">
@@ -66,6 +76,7 @@
     </view>
     <view class="app-card__tags">
       <text class="app-card__tag app-card__tag--progress">{{item.progressLabel || item.statusLabel}}</text>
+      <text wx:if="{{item.orderTypeLabel}}" class="app-card__tag app-card__tag--type">{{item.orderTypeLabel}}</text>
       <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
       <text class="app-card__tag">{{item.platform}}</text>
       <text wx:if="{{item.videoStatusLabel}}" class="app-card__tag app-card__tag--video">{{item.videoStatusLabel}}</text>

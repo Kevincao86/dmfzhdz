@@ -8,6 +8,7 @@ const { TALENT_TAGS } = require('./publishFormOptions.js')
 
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { getIceVerifyMode } = require('./iceOrderStats.js')
+const { resolveOrderTypeFromMp } = require('./applicationOrderType.js')
 const talentAppStatus = require('./talentApplicationStatus.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 
@@ -265,6 +266,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   }
   const me = resolveApplicantOnMp(mp, applicantId)
   const isIce = mp ? isIceMpOrder(mp) : /^MP-ICE-/i.test(String(localApp.mpOrderId || ''))
+  const orderType = resolveOrderTypeFromMp(mp, localApp)
+  const isUrgent = !!(mp && mp.urgent && !isIce)
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
   const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
@@ -300,19 +303,24 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     videoRejectReason,
     canUploadVideo,
     isIce,
+    isUrgent,
+    orderTypeId: orderType.id,
+    orderTypeLabel: orderType.label,
     iceActionLabel,
     progressId: progress.id,
     progressLabel: progress.label,
     videoStatusLabel: isIce
       ? progress.id === 'completed'
-        ? '已完成'
+        ? ''
         : me && me.aiVerifyStatus === 'failed'
           ? 'AI 核查未通过'
           : me && me.videoStatus === 'rejected'
             ? '链接已驳回'
             : me && iceVerifyMode === 'pr' && (me.aiVerifyStatus === 'pending' || me.videoStatus === 'pending')
               ? '待 PR 审核链接'
-              : progress.label
+              : me && iceVerifyMode === 'ai' && me.aiVerifyStatus === 'pending' && String(me.douyinPublishUrl || '').trim()
+                ? 'AI 核查中'
+                : ''
       : videoStatus
       ? videoStatus === 'passed'
         ? '视频已通过'

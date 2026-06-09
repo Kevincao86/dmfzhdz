@@ -24,6 +24,9 @@ Page({
     progressFilter: 'all',
     progressFilterLabel: '状态',
     progressOptions: appFilters.TALENT_APP_PROGRESS_FILTERS,
+    orderTypeFilter: 'all',
+    orderTypeFilterLabel: '类型',
+    orderTypeOptions: appFilters.TALENT_ORDER_TYPE_FILTERS,
     keyword: '',
     uploadingKey: '',
   },
@@ -38,6 +41,7 @@ Page({
       city: this.data.city,
       keyword: this.data.keyword,
       progressFilter: this.data.progressFilter,
+      orderTypeFilter: this.data.orderTypeFilter,
     })
   },
   async load() {
@@ -110,6 +114,15 @@ Page({
     this.setData({
       progressFilter: opt.id,
       progressFilterLabel: opt.id === 'all' ? '状态' : opt.label,
+      filteredRows: this.applyFilters(this.data.rows),
+    })
+  },
+  onOrderTypeFilterChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const opt = this.data.orderTypeOptions[idx] || this.data.orderTypeOptions[0]
+    this.setData({
+      orderTypeFilter: opt.id,
+      orderTypeFilterLabel: opt.id === 'all' ? '类型' : opt.label,
       filteredRows: this.applyFilters(this.data.rows),
     })
   },

@@ -53,9 +53,15 @@
   font-size: 26rpx;
 }
 
+.app-filter-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
 .app-filter-bar {
-  display: flex;
+  display: inline-flex;
   align-items: stretch;
+  min-width: 100%;
   margin: 0 24rpx 16rpx;
   padding: 8rpx 0;
   background: var(--lq-gradient-filter);
@@ -65,8 +71,8 @@
 }
 
 .app-filter-cell {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 20%;
+  min-width: 128rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -162,4 +168,14 @@
 .app-card__tag--video {
   background: rgba(245, 158, 11, 0.12);
   color: #b45309;
+}
+
+.app-card__tag--progress {
+  color: #fff;
+  background: var(--lq-gradient-tab);
+}
+
+.app-card__tag--type {
+  color: #4338ca;
+  background: #eef2ff;
 }
