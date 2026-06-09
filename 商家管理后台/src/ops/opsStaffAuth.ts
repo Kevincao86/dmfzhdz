@@ -14,7 +14,14 @@ import {
 export const OPS_SESSION_KEY = 'meoo_ops_login_v2'
 
 export const OPS_MASTER_PHONE = '18768501283'
+/** 历史误写主号，登录时按 01283 处理 */
+export const OPS_MASTER_PHONE_LEGACY_WRONG = '18768581283'
 export const OPS_MASTER_DEFAULT_PASSWORD = 'kaiyedaji888'
+
+export function isOpsMasterPhone(phone: string): boolean {
+  const p = phone.replace(/\D/g, '').slice(0, 11)
+  return p === OPS_MASTER_PHONE || p === OPS_MASTER_PHONE_LEGACY_WRONG
+}
 
 const OPS_STAFF_STORAGE_KEY = 'meoo_ops_staff_accounts_v1'
 
@@ -275,7 +282,8 @@ async function verifyOpsLoginLocal(
   await ensureOpsMasterAccountLocal()
   const p = phone.replace(/\D/g, '').slice(0, 11)
   if (p.length !== 11) return { ok: false, error: 'invalid_phone' }
-  const account = getOpsAccountByPhone(p)
+  const lookupPhone = p === OPS_MASTER_PHONE_LEGACY_WRONG ? OPS_MASTER_PHONE : p
+  const account = getOpsAccountByPhone(lookupPhone)
   if (!account) return { ok: false, error: 'not_found' }
   if (account.status === 'disabled') return { ok: false, error: 'disabled' }
   const hash = await hashOpsPassword(password)
@@ -294,6 +302,22 @@ export async function verifyOpsLogin(
   if (remote.ok) {
     return { ok: true, account: remote.account, session: remote.session }
   }
+
+  /** 主账号：云端未就绪或未建表时仍可用本机校验，避免运营台被锁死 */
+  if (isOpsMasterPhone(phone)) {
+    const localMaster = await verifyOpsLoginLocal(phone, password)
+    if (localMaster.ok) {
+      return {
+        ok: true,
+        account: localMaster.account,
+        session: buildOpsSession(localMaster.account),
+      }
+    }
+    if (remote.error === 'bad_password' || remote.error === 'bad_credentials') {
+      return { ok: false, error: 'bad_password' }
+    }
+  }
+
   const allowLocalFallback = remote.useLocalFallback && !isOpsProductionHost()
   if (!allowLocalFallback) {
     return { ok: false, error: remote.error ?? 'bad_password' }
