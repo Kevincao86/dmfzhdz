@@ -13,6 +13,7 @@ const mpOrderRestore = require('../../utils/mpOrderPublishRestore.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
+const recruitTarget = require('../../utils/recruitTarget.js')
 const mpRecruitmentOrderId = require('../../utils/mpRecruitmentOrderId.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
@@ -1136,7 +1137,7 @@ Page({
     const lines = [
       `招募标题：${String(f.title || '').trim()}`,
       `投放窗口：${windowLabel}`,
-      `招募对象：${this.data.recruitTargetLabel || target}`,
+      `招募对象：${recruitTarget.recruitTargetLabel(this.data.recruitTargetLabel || this.data.recruitTarget || target)}`,
       `招募模式：${mode.label}`,
       `招募城市：${this.buildRegionText(f)}`,
       `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
