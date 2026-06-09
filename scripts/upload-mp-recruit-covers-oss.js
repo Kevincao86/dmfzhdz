@@ -126,6 +126,19 @@ async function main() {
   }
   console.log('')
   writeOssBase(publicBase)
+
+  const shareLocal = path.join(MP, 'images/share/share-cover-ai-match.jpg')
+  if (fs.existsSync(shareLocal)) {
+    const shareKey = `${cfg.prefix}/share/share-cover-ai-match.jpg`
+    await client.put(shareKey, shareLocal, {
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+    console.log(`OK: share card -> ${publicBase}/share/share-cover-ai-match.jpg`)
+  }
+
   console.log(`OK: ${ok} files -> ${publicBase}/`)
   console.log('请在微信公众平台 → 开发 → 开发管理 → 服务器域名 → downloadFile 合法域名 添加：')
   console.log(`  https://${cfg.bucket}.${cfg.region}.aliyuncs.com`)

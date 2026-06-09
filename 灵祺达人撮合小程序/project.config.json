@@ -75,7 +75,12 @@
         "value": "备案*.md"
       }
     ],
-    "include": []
+    "include": [
+      {
+        "type": "glob",
+        "value": "images/share/**"
+      }
+    ]
   },
   "editorSetting": {}
 }
