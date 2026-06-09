@@ -7,6 +7,7 @@ const { labels } = require('./platformLabels.js')
 const { TALENT_TAGS } = require('./publishFormOptions.js')
 
 const { isIceMpOrder } = require('./iceOrderDetect.js')
+const { getIceVerifyMode } = require('./iceOrderStats.js')
 const talentAppStatus = require('./talentApplicationStatus.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 
@@ -268,6 +269,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
   const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me)
+  const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''
   if (isIce) {
     if (progress.id === 'completed') iceActionLabel = ''
@@ -308,8 +310,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
           ? 'AI 核查未通过'
           : me && me.videoStatus === 'rejected'
             ? '链接已驳回'
-            : me && (me.aiVerifyStatus === 'pending' || me.videoStatus === 'pending')
-              ? '待 PR 审核'
+            : me && iceVerifyMode === 'pr' && (me.aiVerifyStatus === 'pending' || me.videoStatus === 'pending')
+              ? '待 PR 审核链接'
               : progress.label
       : videoStatus
       ? videoStatus === 'passed'

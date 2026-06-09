@@ -198,3 +198,135 @@
 .pr-selected-close::after {
   border: none;
 }
+
+.applicant-card-v2__ice-status {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark);
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: #eef2ff;
+}
+
+.ice-app-block {
+  margin: 12rpx 0 0;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  border: 1rpx solid var(--lq-primary-100);
+}
+
+.ice-app-link-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.ice-app-link-label {
+  font-size: 22rpx;
+  color: var(--lq-text-secondary);
+}
+
+.ice-app-link {
+  font-size: 22rpx;
+  color: #2563eb;
+  word-break: break-all;
+}
+
+.ice-app-copy {
+  align-self: flex-start;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark);
+  padding: 4rpx 0;
+}
+
+.ice-app-reject-note {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #dc2626;
+}
+
+.ice-app-review {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.ice-app-pass,
+.ice-app-reject {
+  margin: 0;
+  flex: 1;
+  font-size: 24rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+}
+
+.ice-app-pass {
+  color: #047857 !important;
+  border-color: #a7f3d0 !important;
+  background: #ecfdf5 !important;
+}
+
+.ice-app-reject {
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+  background: #fef2f2 !important;
+}
+
+.ice-app-pass::after,
+.ice-app-reject::after {
+  border: none;
+}
+
+.pr-app-footer--ice {
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+}
+
+.ice-reject-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+}
+
+.ice-reject-modal {
+  width: 100%;
+  max-width: 640rpx;
+  padding: 28rpx;
+  border-radius: 24rpx;
+  background: #fff;
+}
+
+.ice-reject-hint {
+  display: block;
+  margin: 12rpx 0 16rpx;
+}
+
+.ice-reject-textarea {
+  width: 100%;
+  min-height: 160rpx;
+  padding: 16rpx;
+  box-sizing: border-box;
+  border-radius: 16rpx;
+  border: 2rpx solid var(--lq-primary-100);
+  font-size: 26rpx;
+}
+
+.ice-reject-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.ice-reject-confirm {
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+}

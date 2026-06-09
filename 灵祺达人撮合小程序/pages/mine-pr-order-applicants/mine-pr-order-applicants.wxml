@@ -5,8 +5,9 @@
       <view class="app-list-hero__tags">
         <text class="app-list-hero__pill">{{hallLabel}}</text>
         <text class="app-list-hero__pill">{{statusLabel}}</text>
-        <text class="app-list-hero__pill">已报名 {{applicants.length}} 人</text>
-        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{selectedCount > 0}}">已选 {{selectedCount}} 人</text>
+        <text class="app-list-hero__pill" wx:if="{{isIce}}">认领 {{iceClaimed}} · 已完成 {{iceCompleted}}</text>
+        <text class="app-list-hero__pill" wx:else>已报名 {{applicants.length}} 人</text>
+        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && selectedCount > 0}}">已选 {{selectedCount}} 人</text>
       </view>
     </view>
     <view class="app-list-hero__side">
@@ -31,6 +32,7 @@
     <view class="applicant-card-v2__top">
       <view class="applicant-card-v2__top-main">
         <view
+          wx:if="{{!isIce}}"
           class="applicant-card-v2__check {{checkedIds.indexOf(item.id) >= 0 ? 'applicant-card-v2__check--on' : ''}}"
           data-id="{{item.id}}"
           catchtap="onToggleCheck"
@@ -64,11 +66,13 @@
         </view>
       </view>
       <button
+        wx:if="{{!isIce}}"
         class="applicant-card-v2__pick {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
         loading="{{savingSelect}}"
         data-index="{{index}}"
         catchtap="onToggleSelect"
       >{{item.selected ? '已选择' : '确认选择'}}</button>
+      <text wx:else class="applicant-card-v2__ice-status">{{item.iceTaskStatus}}</text>
     </view>
 
     <view class="applicant-card-v2__grid">
@@ -98,6 +102,33 @@
       </view>
     </view>
 
+    <view wx:if="{{isIce}}" class="ice-app-block">
+      <view wx:if="{{item.iceDouyinUrl}}" class="ice-app-link-row">
+        <text class="ice-app-link-label">抖音链接</text>
+        <text class="ice-app-link">{{item.iceDouyinUrl}}</text>
+        <text class="ice-app-copy" data-index="{{index}}" catchtap="onCopyIceLink">复制链接</text>
+      </view>
+      <text wx:if="{{item.iceRejectReason && item.iceTaskStatus === '链接已驳回'}}" class="ice-app-reject-note">驳回原因：{{item.iceRejectReason}}</text>
+      <view wx:if="{{item.canReviewIceLink}}" class="ice-app-review">
+        <button
+          class="ice-app-pass"
+          size="mini"
+          plain
+          disabled="{{iceReviewBusyId === item.id}}"
+          data-index="{{index}}"
+          catchtap="onIcePass"
+        >通过</button>
+        <button
+          class="ice-app-reject"
+          size="mini"
+          plain
+          disabled="{{iceReviewBusyId === item.id}}"
+          data-index="{{index}}"
+          catchtap="onIceOpenReject"
+        >驳回</button>
+      </view>
+    </view>
+
     <view class="applicant-card-v2__actions" catchtap="noop">
       <button
         wx:if="{{item.hasProfileLink}}"
@@ -117,10 +148,10 @@
   </view>
 
   <view wx:if="{{!loading && !err && applicants.length === 0}}" class="card state-empty">
-    <text class="hint">暂无达人报名，分享招募后等待达人提交</text>
+    <text class="hint">{{isIce ? '暂无达人认领，分享招募后等待达人认领' : '暂无达人报名，分享招募后等待达人提交'}}</text>
   </view>
 
-  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0}}">
+  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce}}">
     <view class="pr-app-toolbar">
       <button class="pr-app-tool-btn" bindtap="onViewSelected">查看已选名单</button>
       <button
@@ -154,6 +185,19 @@
     <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
     <text class="hint pr-app-footer-hint" wx:else>已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
   </view>
+
+  <view class="pr-app-footer pr-app-footer--ice" wx:if="{{!loading && isIce && applicants.length > 0}}">
+    <view class="pr-app-toolbar">
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{exportingAll}}"
+        bindtap="onExportAll"
+      >下载全部明细</button>
+    </view>
+    <text class="hint pr-app-footer-hint" wx:if="{{iceVerifyMode === 'pr' && icePendingReview > 0}}">{{icePendingReview}} 条链接待审核 · 请在卡片上通过或驳回</text>
+    <text class="hint pr-app-footer-hint" wx:elif="{{iceVerifyMode === 'ai'}}">AI 核查模式 · 达人提交链接后自动完成</text>
+    <text class="hint pr-app-footer-hint" wx:else>PR 审核模式 · 达人回传链接后请审核</text>
+  </view>
 </view>
 
 <view
@@ -180,5 +224,29 @@
       </view>
     </scroll-view>
     <button class="pr-selected-close" bindtap="onCloseSelectedPanel">关闭</button>
+  </view>
+</view>
+
+<view wx:if="{{iceRejectModal}}" class="ice-reject-mask" catchtap="onIceCloseReject">
+  <view class="ice-reject-modal" catchtap="noop">
+    <text class="title-lg">驳回链接 · {{iceRejectTargetName}}</text>
+    <text class="hint ice-reject-hint">请填写驳回原因，达人将收到通知并可在任务详情重新提交。</text>
+    <textarea
+      class="ice-reject-textarea"
+      placeholder="请输入驳回原因"
+      value="{{iceRejectReason}}"
+      bindinput="onIceRejectReasonInput"
+      maxlength="200"
+    />
+    <view class="ice-reject-actions">
+      <button size="mini" plain catchtap="onIceCloseReject">取消</button>
+      <button
+        size="mini"
+        class="ice-reject-confirm"
+        plain
+        disabled="{{!iceRejectReason || iceReviewBusyId === iceRejectTargetId}}"
+        catchtap="onIceConfirmReject"
+      >确认驳回</button>
+    </view>
   </view>
 </view>
