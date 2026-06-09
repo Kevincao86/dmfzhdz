@@ -10,6 +10,7 @@ App({
   },
   onLaunch() {
     mpShare.enableShareMenu()
+    mpShare.preloadShareCover()
     if (config.MP_USE_CLOUD_PROXY && wx.cloud) {
       const env = String(config.MP_CLOUD_ENV || '').trim()
       if (env) {
