@@ -1,4 +1,5 @@
 import { readPrProfile, prDisplayName } from './userProfile'
+import { recruitTargetLabel } from '../mpRecruitment/recruitTargetLabel'
 
 const GUIDE_DIVIDER = '—— 报名指引 ——'
 const OPEN_HINT =
@@ -54,6 +55,11 @@ export function formatShareRecruitmentInfo(info: string): string {
     if (/^酬劳[:：]/.test(line)) {
       if (feeMode === '纯置换' && /纯置换/.test(line)) continue
       if (feeMode === '一口价' && /一口价|¥/.test(line)) continue
+    }
+    const targetMatch = line.match(/^招募对象[:：]\s*(.+)$/)
+    if (targetMatch) {
+      out.push(`招募对象：${recruitTargetLabel(targetMatch[1])}`)
+      continue
     }
     const detailMatch = line.match(/^招募详情[:：]\s*(.*)$/)
     if (detailMatch) {
