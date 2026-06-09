@@ -50,6 +50,36 @@ function save(data, path) {
   } catch (_) {}
 }
 
+function patchMpOrder(id, patch) {
+  const mpOrderId = String(id || '').trim()
+  if (!mpOrderId || !patch || typeof patch !== 'object') return
+  try {
+    const entry = parseEntry(wx.getStorageSync(KEY))
+    if (!entry || !entry.data || !Array.isArray(entry.data.mpRecruitmentOrders)) return
+    const idx = entry.data.mpRecruitmentOrders.findIndex((o) => o && o.id === mpOrderId)
+    if (idx < 0) return
+    entry.data.mpRecruitmentOrders[idx] = {
+      ...entry.data.mpRecruitmentOrders[idx],
+      ...patch,
+      id: mpOrderId,
+    }
+    save(entry.data, `${entry.path || 'cache'}:patch`)
+  } catch (_) {}
+}
+
+function removeMpOrder(id) {
+  const mpOrderId = String(id || '').trim()
+  if (!mpOrderId) return
+  try {
+    const entry = parseEntry(wx.getStorageSync(KEY))
+    if (!entry || !entry.data || !Array.isArray(entry.data.mpRecruitmentOrders)) return
+    entry.data.mpRecruitmentOrders = entry.data.mpRecruitmentOrders.filter(
+      (o) => !o || o.id !== mpOrderId,
+    )
+    save(entry.data, `${entry.path || 'cache'}:delete`)
+  } catch (_) {}
+}
+
 function formatSavedAt(ts) {
   try {
     const d = new Date(Number(ts) || 0)
@@ -76,6 +106,8 @@ function formatAgeHint(ageMs) {
 module.exports = {
   load,
   save,
+  patchMpOrder,
+  removeMpOrder,
   formatSavedAt,
   formatAgeHint,
   FRESH_TTL_MS,

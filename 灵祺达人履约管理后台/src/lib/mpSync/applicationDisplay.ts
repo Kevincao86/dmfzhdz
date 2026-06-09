@@ -10,17 +10,16 @@ import {
   resolveTalentProfileHref,
 } from './talentProfileLink'
 
+import { MP_STATUS_LABEL as CORE_STATUS_LABEL, statusLabel as coreStatusLabel } from '../mpRecruitment/mpOrderStatus'
+
 export const MP_STATUS_LABEL: Record<string, string> = {
-  open: '招募中',
-  collecting: '收集中',
-  pending_settlement: '待结算',
-  closed: '已停止',
-  done: '已完成',
+  ...CORE_STATUS_LABEL,
   unknown: '未知',
 }
 
 export function statusLabel(status: unknown): string {
-  return MP_STATUS_LABEL[String(status || '')] || String(status || '—')
+  const s = String(status || '')
+  return MP_STATUS_LABEL[s] || coreStatusLabel(s) || '—'
 }
 
 export function hallLabelFromMp(mp: Record<string, unknown> | null): string {

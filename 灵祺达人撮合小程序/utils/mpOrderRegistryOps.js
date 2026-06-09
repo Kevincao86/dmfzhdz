@@ -1,10 +1,15 @@
 const api = require('./api.js')
+const registryCache = require('./registryCache.js')
 
 async function postJson(paths, body) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, body)
+      const data = await api.post(path, body)
+      if (data && data.ok === false) {
+        throw new Error(String(data.detail || data.error || '操作失败'))
+      }
+      return data
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -31,7 +36,10 @@ function deleteMpRecruitmentOrder(mpOrderId) {
       '/api/ops-sync/mp-recruitment-orders/delete',
     ],
     { id: mpOrderId },
-  )
+  ).then((res) => {
+    registryCache.removeMpOrder(String(mpOrderId || '').trim())
+    return res
+  })
 }
 
 function patchMpRecruitmentOrderStatus(mpOrderId, status) {
@@ -44,7 +52,10 @@ function patchMpRecruitmentOrderStatus(mpOrderId, status) {
       '/api/ops-sync/mp-recruitment-orders/patch',
     ],
     { id, status: s },
-  )
+  ).then((res) => {
+    registryCache.patchMpOrder(id, { status: s })
+    return res
+  })
 }
 
 function patchSelectedApplicantIds(mpOrderId, selectedApplicantIds) {
