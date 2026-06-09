@@ -18,6 +18,7 @@ import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
 import HallToolbarCard from './HallToolbarCard'
 import PageHero from '../ui/PageHero'
+import { showDemoOrders } from '../../lib/mpDemoMode'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
 type HallTab = 'normal' | 'urgent' | 'paichian'
@@ -69,6 +70,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     }
     const kw = searchKeyword.trim()
     rows = rows.filter((r) => {
+      if (!showDemoOrders() && r.isMock) return false
       if (!matchSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
       if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
@@ -121,8 +123,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
         const mapped = loadAllOrderRows(reg)
         const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
           splitRoleHallRows(mapped, hallIdentity)
-        const normal = n.length > 0 ? n : hallIdentity === 'pr' ? [] : []
-        setNormalRows(normal.length ? normal : hallIdentity === 'talent' ? [listFilters.buildMockRecruitmentRow()] : [])
+        setNormalRows(listFilters.mergeHallDisplayRows(n, { allowDemo: showDemoOrders() }))
         setUrgentRows(u)
         setShootRows(sh)
         setEditRows(ed)

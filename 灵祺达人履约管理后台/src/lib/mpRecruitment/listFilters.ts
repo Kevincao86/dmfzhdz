@@ -232,3 +232,17 @@ export function resolveDeadlineMsFromMp(mp: Record<string, unknown>, summary: st
   const pub = resolvePublishedMs(mp)
   return pub > 0 ? pub + 7 * 86400000 : 0
 }
+
+/** 招募大厅：默认仅真实商单；VITE_MP_SHOW_DEMO_ORDERS=true 且无真实单时才补演示 */
+export function mergeHallDisplayRows<T extends { id?: string; isMock?: boolean; isIce?: boolean }>(
+  realRows: T[],
+  opts?: { allowDemo?: boolean },
+): T[] {
+  const real = (realRows || []).filter((r) => r && !r.isMock)
+  if (!opts?.allowDemo) return real
+  const demos = buildMockRecruitmentRows().filter((d) => !d.isIce) as unknown as T[]
+  if (!real.length) return demos.length ? demos : ([buildMockRecruitmentRow()] as unknown as T[])
+  const ids = new Set(real.map((r) => String(r.id || '')))
+  const extra = demos.filter((d) => !ids.has(String(d.id || '')))
+  return [...real, ...extra]
+}

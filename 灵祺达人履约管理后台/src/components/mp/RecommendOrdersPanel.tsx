@@ -10,6 +10,7 @@ import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { readMember, hasFilledPlatform, TALENT_SMART_MATCH_NEED_PROFILE_HINT } from '../../lib/mpSync/talentMember'
+import { showDemoOrders } from '../../lib/mpDemoMode'
 
 const ORDER_SEGMENTS = [
   { id: 'match', label: '为你匹配' },
@@ -71,7 +72,8 @@ export default function RecommendOrdersPanel() {
       if (!matchOrderSegment(r, orderSegment, talentCity)) return false
       return true
     })
-    const mocks = rows.filter((r) => r.isMock)
+    const allowDemo = showDemoOrders()
+    const mocks = allowDemo ? rows.filter((r) => r.isMock) : []
     let real = rows.filter((r) => !r.isMock)
     if (memberRow && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: getWorkIdentity() })
@@ -101,13 +103,17 @@ export default function RecommendOrdersPanel() {
       setLoading(true)
       try {
         const reg = await fetchMpRegistry()
-        let rows = loadOpenOrderRows(reg)
-        if (!rows.length) rows = listFilters.buildMockRecruitmentRows()
-        else rows = [...listFilters.buildMockRecruitmentRows(), ...rows]
+        const real = loadOpenOrderRows(reg)
+        const rows =
+          showDemoOrders() && !real.length
+            ? listFilters.buildMockRecruitmentRows()
+            : showDemoOrders()
+              ? [...listFilters.buildMockRecruitmentRows(), ...real]
+              : real
         setAllOrderRows(rows)
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
-        setAllOrderRows(listFilters.buildMockRecruitmentRows())
+        setAllOrderRows(showDemoOrders() ? listFilters.buildMockRecruitmentRows() : [])
       } finally {
         setLoading(false)
       }

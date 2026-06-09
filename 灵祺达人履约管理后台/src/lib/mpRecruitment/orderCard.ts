@@ -114,6 +114,6 @@ export function splitHallRows(reg: MpRegistry) {
   const iceRows = mapped.filter((r) => r.isIce)
   const urgentRows = mapped.filter((r) => r.urgent && !r.isIce && r.recruitTarget === 'talent')
   const realNormal = mapped.filter((r) => !r.urgent && !r.isIce && r.recruitTarget === 'talent')
-  const normalRows = realNormal.length > 0 ? realNormal : [listFilters.buildMockRecruitmentRow()]
+  const normalRows = realNormal
   return { normalRows, urgentRows, shootRows, editRows, iceRows, todayCount: mapped.length }
 }
