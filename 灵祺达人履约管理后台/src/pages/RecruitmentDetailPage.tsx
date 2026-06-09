@@ -20,6 +20,7 @@ import {
 import { copyRecruitmentShareForTalent } from '../lib/mpSync/recruitmentShareCopy'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
+import { canTalentUploadRecruitmentVideo } from '../lib/mpRecruitment/talentApplicationStatus'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -42,7 +43,13 @@ export default function RecruitmentDetailPage() {
   const myApplicant = contactGate.applicant
   const videoStatus = myApplicant ? String(myApplicant.videoStatus || '') : ''
   const videoRejectReason = myApplicant && myApplicant.videoRejectReason ? String(myApplicant.videoRejectReason) : ''
-  const canUploadVideo = applied && !view?.isIce && (!videoStatus || videoStatus === 'rejected')
+  const canUploadVideo =
+    applied &&
+    canTalentUploadRecruitmentVideo(
+      mpRaw as Record<string, unknown> | null,
+      myApplicant as Record<string, unknown> | null,
+      !!view?.isIce,
+    )
   const iceState = resolveIceApplicantState(mpRaw, id || '')
 
   useEffect(() => {

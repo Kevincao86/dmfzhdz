@@ -11,6 +11,7 @@ import {
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
 import {
+  canTalentUploadRecruitmentVideo,
   matchTalentApplicationProgress,
   resolveTalentApplicationProgress,
   TALENT_APP_PROGRESS_FILTERS,
@@ -78,7 +79,7 @@ function TalentApplicationsPage() {
     const videoStatus = me ? String(me.videoStatus || '') : ''
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
     const isIce = row.isIce
-    const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
+    const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     let iceActionLabel = ''
     if (isIce) {
