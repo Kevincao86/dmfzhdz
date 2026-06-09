@@ -84,11 +84,11 @@ export default function OpsLoginPage() {
         writeOpsSession(r.session)
         if (!hasOpsCloudSession()) {
           const onProd = /mofangdianai\.com$/i.test(window.location.hostname)
-          /** 仅子账号须阻断；主账号可先进入并在「账号与权限」查看云端连接状态 */
+          /** 仅子账号须阻断；主账号可先进入并在「账号与权限」点「连接云端数据库」 */
           if (onProd && r.session.role !== 'super_admin') {
             clearOpsSession()
             setErr(
-              '登录未获得云端会话（缺少 sessionToken）。请确认运营台已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后重新部署，再由主账号创建子账号。',
+              '子账号登录须连接云端数据库。请确认 https://mofangdianai.com/erp-api 可访问，或由主账号在「账号与权限」创建子账号后再登录。',
             )
             return
           }

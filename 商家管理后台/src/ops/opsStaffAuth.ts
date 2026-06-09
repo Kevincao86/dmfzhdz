@@ -523,6 +523,23 @@ export async function deleteOpsSubAccount(id: string): Promise<{ ok: true } | { 
   return { ok: true }
 }
 
+/** 主账号已登录但缺 sessionToken 时，用密码重新向 ECS 申请云端会话（无需退出） */
+export async function reconnectOpsCloudSession(
+  phone: string,
+  password: string,
+): Promise<{ ok: true; session: OpsSession } | { ok: false; error: string }> {
+  const remote = await apiOpsStaffLogin(phone, password)
+  if (!remote.ok) {
+    return { ok: false, error: remote.error ?? 'cloud_login_failed' }
+  }
+  const session: OpsSession = { ...remote.session, sessionToken: remote.sessionToken }
+  writeOpsSession(session)
+  if (session.role === 'super_admin') {
+    await migrateLocalOpsStaffToRemoteIfNeeded()
+  }
+  return { ok: true, session }
+}
+
 export function refreshOpsSessionFromStorage(): OpsSession | null {
   const cur = readOpsSession()
   if (!cur) return null

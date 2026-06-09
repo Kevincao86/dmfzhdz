@@ -12,6 +12,7 @@ import {
   isSuperAdmin,
   migrateLocalOpsStaffToRemoteIfNeeded,
   OPS_MASTER_PHONE,
+  reconnectOpsCloudSession,
   syncLocalOpsStaffToCloud,
   OPS_PERMISSION_MODULES,
   readOpsSession,
@@ -112,6 +113,35 @@ export default function OpsAccountsPermissionsPage() {
     }))
   }
 
+  const handleReconnectCloud = async () => {
+    const session = readOpsSession()
+    if (!session || session.role !== 'super_admin') return
+    const password = window.prompt(
+      `账号已是主号 ${session.phone}，但尚未连上云端数据库。\n\n请输入主账号密码以建立云端会话（非换号登录）：`,
+    )
+    if (!password) return
+    setBusy(true)
+    try {
+      const r = await reconnectOpsCloudSession(session.phone, password)
+      if (!r.ok) {
+        const msg: Record<string, string> = {
+          bad_password: '密码错误，请重试。',
+          bad_credentials: '密码错误，请重试。',
+          ops_staff_table_missing:
+            '云端数据库缺少 ops_staff_accounts 表。请在轻量 ECS 执行 bash scripts/ecs-apply-ops-staff-accounts.sh',
+          cloud_login_failed:
+            '无法连接 ECS（https://mofangdianai.com/erp-api）。请确认轻量 auth-api 已启动。',
+        }
+        window.alert(msg[r.error] ?? `连接云端失败：${r.error}`)
+        return
+      }
+      reloadStaff()
+      window.alert('已连接云端数据库，现在可以创建子账号并在其他浏览器登录。')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleSyncLocalToCloud = async () => {
     setBusy(true)
     try {
@@ -119,7 +149,7 @@ export default function OpsAccountsPermissionsPage() {
       if (!r.ok) {
         window.alert(
           r.error === 'cloud_session_required'
-            ? '请先退出并用主账号重新登录（须获得云端 sessionToken），再点同步。'
+            ? '请先点「连接云端数据库」输入主账号密码，获得云端会话后再同步。'
             : `同步失败：${r.error}`,
         )
         return
@@ -137,7 +167,7 @@ export default function OpsAccountsPermissionsPage() {
 
   const handleCreate = async () => {
     if (!hasOpsCloudSession()) {
-      setFormErr('请先退出并用主账号重新登录，确认已获得云端会话后再创建子账号。')
+      setFormErr('请先点「连接云端数据库」输入主账号密码，确认已连上云端后再创建子账号。')
       return
     }
     setFormErr(null)
@@ -157,7 +187,7 @@ export default function OpsAccountsPermissionsPage() {
           password_too_short: '密码至少 6 位',
           permissions_required: '请至少勾选一个功能模块',
           cloud_session_required:
-            '当前未连接云端数据库。请退出后使用主账号重新登录（须出现云端会话），再创建子账号。',
+            '当前未连接云端数据库。请点「连接云端数据库」输入主账号密码后再创建子账号。',
         }
         setFormErr(msg[r.error] ?? r.error)
         return
@@ -243,17 +273,27 @@ export default function OpsAccountsPermissionsPage() {
         {!hasOpsCloudSession() ? (
           <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
             <p>
-              当前为<strong className="font-medium">本机离线会话</strong>（未连接云端数据库）。子账号仅存在本浏览器，换浏览器后会消失、无法登录。请退出后用主账号{' '}
-              <span className="font-mono">{OPS_MASTER_PHONE}</span> 重新登录。
+              您已用主账号 <span className="font-mono">{OPS_MASTER_PHONE}</span> 登录，但<strong className="font-medium">尚未连上云端数据库</strong>
+              （非账号错误）。运营台需经 ECS 读写子账号；此前请求走了 Vercel 接口无法访问轻量库，因此处于本机离线模式。子账号仅存在本浏览器，换设备后无法登录。
             </p>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleSyncLocalToCloud()}
-              className="mt-2 rounded-md border border-amber-400/50 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
-            >
-              尝试将本机子账号同步到云端
-            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleReconnectCloud()}
+                className="rounded-md border border-amber-300/60 bg-amber-500/20 px-2 py-1 text-[11px] font-medium text-amber-50 hover:bg-amber-500/30 disabled:opacity-50"
+              >
+                连接云端数据库
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleSyncLocalToCloud()}
+                className="rounded-md border border-amber-400/50 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
+              >
+                将本机子账号同步到云端
+              </button>
+            </div>
           </div>
         ) : (
           <p className="mt-2 text-xs text-emerald-400/90">已连接云端数据库，新建的子账号可跨浏览器登录。</p>
