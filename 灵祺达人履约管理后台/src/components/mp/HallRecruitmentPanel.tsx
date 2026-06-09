@@ -8,6 +8,7 @@ import {
   prioritizeActiveStatus,
   splitRoleHallRows,
   STATUS_FILTER_OPTIONS,
+  HALL_DEFAULT_STATUS_FILTER,
 } from '../../lib/mpRecruitment/roleHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
@@ -42,7 +43,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
-  const [filterStatus, setFilterStatus] = useState('招募中')
+  const [filterStatus, setFilterStatus] = useState(HALL_DEFAULT_STATUS_FILTER)
   const [filterCategory, setFilterCategory] = useState('全部')
   const [priceSelected, setPriceSelected] = useState<string[]>([])
   const [priceFilterLabel, setPriceFilterLabel] = useState('价格筛选')
@@ -76,7 +77,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       if (!matchStatusLabel(r, filterStatus)) return false
       return true
     })
-    if (hallTab === 'normal' && filterStatus === '全部' && sortBy === '发布时间') {
+    if (
+      hallTab === 'normal' &&
+      (filterStatus === '全部' || filterStatus === HALL_DEFAULT_STATUS_FILTER) &&
+      sortBy === '发布时间'
+    ) {
       rows = prioritizeActiveStatus(rows)
     } else {
       rows = listFilters.sortRecruitmentRows(rows, sortBy)

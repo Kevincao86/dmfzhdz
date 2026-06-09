@@ -6,7 +6,17 @@ export const MP_STATUS_LABEL: Record<string, string> = {
   done: '已完成',
 }
 
-export const HALL_STATUS_FILTERS = ['全部', '招募中', '收集中', '已停止', '已完成'] as const
+export const HALL_STATUS_FILTERS = ['全部', '招募中/收集中', '招募中', '收集中', '已停止', '已完成'] as const
+
+export const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
+
+export function matchHallStatusFilter(statusLabelText: string, filter: string): boolean {
+  if (!filter || filter === '全部') return true
+  if (filter === HALL_DEFAULT_STATUS_FILTER) {
+    return statusLabelText === '招募中' || statusLabelText === '收集中'
+  }
+  return statusLabelText === filter
+}
 
 export function resolveEffectiveMpStatus(
   rawStatus: unknown,

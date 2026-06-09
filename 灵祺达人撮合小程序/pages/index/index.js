@@ -60,7 +60,7 @@ Page({
     priceFilterLabel: '价格筛选',
     showPriceSheet: false,
     sortBy: '发布时间',
-    filterStatus: '招募中',
+    filterStatus: listFilters.HALL_DEFAULT_STATUS_FILTER || '招募中/收集中',
     statusFilters: listFilters.HALL_STATUS_FILTERS,
     workIdentity: 'talent',
     platformFilters: hallFilters.PLATFORM_FILTERS,
