@@ -609,6 +609,16 @@
   background: linear-gradient(180deg, #f8f6ff 0%, #f3f0ff 45%, #ebe6ff 100%);
 }
 
+.share-cover-preload {
+  position: fixed;
+  left: -9999rpx;
+  top: -9999rpx;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .login-field--row {
   display: flex;
   gap: 12rpx;
