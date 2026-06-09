@@ -8,6 +8,14 @@ export const ASPECT_RATIOS = ['9:16 竖屏', '16:9 横屏', '1:1'] as const
 export const TARGET_DURATIONS = ['15s', '30s', '60s', '90s+', '自定义'] as const
 export const PACKAGE_TAGS = ['字幕', '贴纸', 'BGM', '调色', '封面'] as const
 
+export function toggleSingleTagList(current: string[], tag: string): string[] {
+  return current.includes(tag) ? [] : [tag]
+}
+
+export function toggleMultiTagList(current: string[], tag: string): string[] {
+  return current.includes(tag) ? current.filter((x) => x !== tag) : [...current, tag]
+}
+
 export type SupplierPublishFields = {
   shootDate: string
   shootTimeStart: string
