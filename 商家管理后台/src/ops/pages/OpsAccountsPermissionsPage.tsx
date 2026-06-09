@@ -12,6 +12,7 @@ import {
   isSuperAdmin,
   migrateLocalOpsStaffToRemoteIfNeeded,
   OPS_MASTER_PHONE,
+  syncLocalOpsStaffToCloud,
   OPS_PERMISSION_MODULES,
   readOpsSession,
   refreshOpsSessionFromStorage,
@@ -111,7 +112,34 @@ export default function OpsAccountsPermissionsPage() {
     }))
   }
 
+  const handleSyncLocalToCloud = async () => {
+    setBusy(true)
+    try {
+      const r = await syncLocalOpsStaffToCloud()
+      if (!r.ok) {
+        window.alert(
+          r.error === 'cloud_session_required'
+            ? '请先退出并用主账号重新登录（须获得云端 sessionToken），再点同步。'
+            : `同步失败：${r.error}`,
+        )
+        return
+      }
+      reloadStaff()
+      window.alert(
+        r.imported > 0
+          ? `已将 ${r.imported} 个子账号写入云端数据库，换浏览器后仍可见。`
+          : '本机没有待同步的子账号（或云端已存在相同手机号）。',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const handleCreate = async () => {
+    if (!hasOpsCloudSession()) {
+      setFormErr('请先退出并用主账号重新登录，确认已获得云端会话后再创建子账号。')
+      return
+    }
     setFormErr(null)
     setBusy(true)
     try {
@@ -213,11 +241,23 @@ export default function OpsAccountsPermissionsPage() {
           管理运营管控台登录账号。主账号 {OPS_MASTER_PHONE} 拥有全部权限；可创建子账号并分配菜单模块。
         </p>
         {!hasOpsCloudSession() ? (
-          <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
-            当前为<strong className="font-medium">本机离线会话</strong>（未连接云端数据库）。此页面看到的子账号可能仅存在本浏览器，其他设备无法登录。请退出后使用主账号{' '}
-            <span className="font-mono">{OPS_MASTER_PHONE}</span> 重新登录，再创建或编辑子账号。
-          </p>
-        ) : null}
+          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+            <p>
+              当前为<strong className="font-medium">本机离线会话</strong>（未连接云端数据库）。子账号仅存在本浏览器，换浏览器后会消失、无法登录。请退出后用主账号{' '}
+              <span className="font-mono">{OPS_MASTER_PHONE}</span> 重新登录。
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleSyncLocalToCloud()}
+              className="mt-2 rounded-md border border-amber-400/50 px-2 py-1 text-[11px] text-amber-200 hover:bg-amber-500/10 disabled:opacity-50"
+            >
+              尝试将本机子账号同步到云端
+            </button>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-emerald-400/90">已连接云端数据库，新建的子账号可跨浏览器登录。</p>
+        )}
       </div>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
@@ -242,11 +282,13 @@ export default function OpsAccountsPermissionsPage() {
           </h2>
           <button
             type="button"
+            disabled={!hasOpsCloudSession() || busy}
+            title={hasOpsCloudSession() ? '' : '须先云端登录后再创建'}
             onClick={() => {
               resetForm()
               setCreateOpen(true)
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="h-3.5 w-3.5" />
             创建子账号

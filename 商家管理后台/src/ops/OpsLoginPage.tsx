@@ -10,8 +10,10 @@ import {
   writeRememberedLogin,
 } from '../lib/rememberLogin'
 import {
+  clearOpsSession,
   ensureOpsMasterAccount,
   firstAllowedOpsPath,
+  hasOpsCloudSession,
   migrateLocalOpsStaffToRemoteIfNeeded,
   readOpsSession,
   verifyOpsLogin,
@@ -73,6 +75,16 @@ export default function OpsLoginPage() {
           writeRememberedLogin(REMEMBER_SCOPE, null)
         }
         writeOpsSession(r.session)
+        if (!hasOpsCloudSession()) {
+          const onProd = /mofangdianai\.com$/i.test(window.location.hostname)
+          if (onProd) {
+            clearOpsSession()
+            setErr(
+              '登录未获得云端会话（缺少 sessionToken）。子账号无法写入数据库、换浏览器后会消失。请确认运营台已配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后重新部署，再用主账号 18768501283 登录。',
+            )
+            return
+          }
+        }
         if (r.session.role === 'super_admin') {
           await migrateLocalOpsStaffToRemoteIfNeeded()
         }
