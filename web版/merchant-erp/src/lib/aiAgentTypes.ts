@@ -111,7 +111,7 @@ export type AiRecruitmentOrderDetail = {
     v4: number
     v5: number
     v5plus: number
-    source: 'ai' | 'fallback'
+    source: 'library' | 'ai' | 'fallback'
     notes?: string
     costHint?: string
   }
