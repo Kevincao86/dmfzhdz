@@ -92,16 +92,13 @@ SELECT id, phone, role, status FROM public.ops_staff_accounts ORDER BY created_a
     sleep 2
   fi
 
-  if systemctl list-unit-files meoo-auth-api.service &>/dev/null; then
-    echo "=== 6) 重启 meoo-auth-api ==="
-    sudo systemctl restart meoo-auth-api || true
-    sleep 2
-  fi
+  echo "=== 6) 确保 meoo-auth-api 在 :${AUTH_API_PORT:-3001} 监听 ==="
+  bash "$app_root/scripts/ecs-ensure-auth-api.sh"
 
-  echo "=== 7) 探活（可选）==="
-  curl -sS -m 8 "https://mofangdianai.com/erp-api/meoo-erp-api-health" | head -c 400 || true
+  echo "=== 7) 探活云端登录 ==="
+  bash "$app_root/scripts/ecs-verify-ops-staff-login.sh" || true
   echo
-  echo "完成。请在 Vercel 运营台用 18768501283 登录，Network 中 POST /api/meoo-ops-staff-login 应返回 200 且含 sessionToken。"
+  echo "完成。运营台点「连接云端数据库」，密码 kaiyedaji888。"
 }
 
 if [[ "${1:-}" == "--remote" ]]; then
