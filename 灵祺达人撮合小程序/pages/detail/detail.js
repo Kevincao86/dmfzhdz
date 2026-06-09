@@ -94,11 +94,27 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
+      let reg
+      let cacheHint = ''
+      try {
+        reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
+      } catch (e) {
+        if (e && e.fromCache && e.cachedData) {
+          reg = e.cachedData
+          cacheHint = '网络不稳定，已显示缓存数据'
+        } else {
+          throw e
+        }
+      }
       const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = list.find((o) => o && o.id === id)
       if (!mp) {
-        this.setData({ loading: false, err: '招募单不存在或已结束' })
+        this.setData({
+          loading: false,
+          err: cacheHint
+            ? `${cacheHint}，但未找到该招募单（请稍后重试或先打开招募大厅刷新）`
+            : '招募单不存在或已结束',
+        })
         return
       }
       const rawStatus = String(mp.status || '')
@@ -201,6 +217,9 @@ Page({
         : null
       const hasApplied = this.data.applied || iceApplied || gate.hasApplication
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
+      if (cacheHint) {
+        wx.showToast({ title: cacheHint, icon: 'none', duration: 2800 })
+      }
       this.setData({
         view,
         loading: false,
@@ -230,9 +249,12 @@ Page({
       })
     } catch (e) {
       const msg = String(e.message || e)
-      const hint = msg.includes('fail')
-        ? '无法加载订单，请确认 dev 服务已启动且已勾选「不校验合法域名」'
-        : msg
+      let hint = msg
+      if (/fail|reset|cronet|超时|timeout/i.test(msg)) {
+        hint = '无法连接后台服务，请稍后重试或检查网络'
+      } else if (msg === '已使用本地缓存') {
+        hint = '无法连接后台服务，且本地无该任务缓存，请打开招募大厅刷新后重试'
+      }
       this.setData({ loading: false, err: hint })
     }
   },
