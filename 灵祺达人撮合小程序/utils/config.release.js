@@ -11,9 +11,9 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260609-share-promise',
-  /** 分享封面 HTTPS（可选；须已上传 OSS，见 scripts/upload-mp-recruit-covers-oss.js） */
-  // MP_SHARE_COVER_URL: 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/share/share-cover-ai-match.jpg',
+  MP_BUILD_ID: 'mp-20260609-share-cdn',
+  /** 分享封面：须 ECS 已同步 public/recruit-covers/share/（bash scripts/ecs-sync-mp-share-cover.sh） */
+  MP_SHARE_COVER_URL: 'https://mofangdianai.com/recruit-covers/share/share-cover-ai-match.jpg',
   /** 星选 Web 封面 CDN（备案后可用；小程序图库走 OSS，见 recruitCoverOssBase.js） */
   RECRUIT_COVER_CDN_BASE: 'https://mofangdianai.com/recruit-covers',
   /** 小程序封面图库：OSS 公网 URL（upload-mp-recruit-covers-oss.js 写入 recruitCoverOssBase.js） */
