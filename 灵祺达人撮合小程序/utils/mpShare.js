@@ -4,43 +4,64 @@ const config = require('./config.js')
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配达人招募'
 
-function ossShareCoverUrl() {
-  try {
-    const base = String(require('./recruitCoverOssBase.js') || '')
-      .trim()
-      .replace(/\/$/, '')
-    if (!/^https?:\/\//i.test(base)) return ''
-    return `${base}/share/share-cover-ai-match.jpg`
-  } catch (_) {
-    return ''
-  }
-}
-
-/** 分享卡片 imageUrl：优先 config / OSS HTTPS，否则包内 JPG（须 packOptions.include） */
+/** 仅当显式配置 MP_SHARE_COVER_URL 时用 HTTPS；勿自动拼 OSS（文件可能未上传 → 404 → 分享回退截图） */
 function shareCoverImageUrl() {
   const fromConfig = String(config.MP_SHARE_COVER_URL || '').trim()
   if (/^https?:\/\//i.test(fromConfig)) return fromConfig
-  const oss = ossShareCoverUrl()
-  if (oss) return oss
   return LOCAL_SHARE_COVER
 }
 
-function defaultShare(path, opts) {
-  const title = opts && opts.title ? String(opts.title).trim() : DEFAULT_TITLE
+function resolveCoverPath(src, done) {
+  const url = String(src || '').trim() || LOCAL_SHARE_COVER
+  if (/^https?:\/\//i.test(url)) {
+    wx.downloadFile({
+      url,
+      success(res) {
+        done(res.statusCode === 200 && res.tempFilePath ? res.tempFilePath : url)
+      },
+      fail() {
+        done(url)
+      },
+    })
+    return
+  }
+  wx.getImageInfo({
+    src: url,
+    success(res) {
+      done(res.path || url)
+    },
+    fail() {
+      done(url)
+    },
+  })
+}
+
+/** 微信 2.10+：promise resolve 后再出分享卡，避免 imageUrl 未就绪时回退为页面截图 */
+function buildSharePayload(path, opts, forTimeline) {
+  const title =
+    opts && opts.title ? String(opts.title).trim() || DEFAULT_TITLE : DEFAULT_TITLE
+  const sharePath = path || '/pages/index/index'
+  const query = opts && opts.query ? String(opts.query) : ''
+  const src = (opts && opts.imageUrl) || shareCoverImageUrl()
+
+  const base = forTimeline ? { title, query } : { title, path: sharePath }
+
   return {
-    title: title || DEFAULT_TITLE,
-    path: path || '/pages/index/index',
-    imageUrl: shareCoverImageUrl(),
+    ...base,
+    promise: new Promise((resolve) => {
+      resolveCoverPath(src, (imageUrl) => {
+        resolve(forTimeline ? { title, query, imageUrl } : { title, path: sharePath, imageUrl })
+      })
+    }),
   }
 }
 
+function defaultShare(path, opts) {
+  return buildSharePayload(path, opts, false)
+}
+
 function defaultTimelineShare(opts) {
-  const title = opts && opts.title ? String(opts.title).trim() : DEFAULT_TITLE
-  return {
-    title: title || DEFAULT_TITLE,
-    query: opts && opts.query ? String(opts.query) : '',
-    imageUrl: shareCoverImageUrl(),
-  }
+  return buildSharePayload('/pages/index/index', opts, true)
 }
 
 function enableShareMenu() {
@@ -53,6 +74,11 @@ function enableShareMenu() {
   } catch (_) {}
 }
 
+/** 页面 onLoad 时可预热（可选） */
+function preloadShareCover() {
+  resolveCoverPath(shareCoverImageUrl(), () => {})
+}
+
 module.exports = {
   LOCAL_SHARE_COVER,
   SHARE_COVER_IMAGE: LOCAL_SHARE_COVER,
@@ -61,4 +87,5 @@ module.exports = {
   defaultShare,
   defaultTimelineShare,
   enableShareMenu,
+  preloadShareCover,
 }

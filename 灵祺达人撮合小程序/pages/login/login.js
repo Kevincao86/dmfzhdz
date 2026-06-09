@@ -9,6 +9,7 @@ const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 const { attachLoginIdentityIcons, loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
+const mpShare = require('../../utils/mpShare.js')
 
 const IDENTITY_OPTIONS = attachLoginIdentityIcons(
   identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
@@ -104,6 +105,8 @@ Page({
   },
 
   onLoad(options) {
+    mpShare.enableShareMenu()
+    mpShare.preloadShareCover()
     this.applyLoginNavPadding()
     const redirect =
       options && options.redirect ? decodeURIComponent(String(options.redirect)) : ''
@@ -124,7 +127,16 @@ Page({
   },
 
   onShow() {
+    mpShare.enableShareMenu()
     this.applyLoginNavPadding()
+  },
+
+  onShareAppMessage() {
+    return mpShare.defaultShare('/pages/index/index')
+  },
+
+  onShareTimeline() {
+    return mpShare.defaultTimelineShare()
   },
 
   applyLoginNavPadding() {

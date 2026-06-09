@@ -12,7 +12,7 @@
     "uglifyFileName": false,
     "uploadWithSourceMap": false,
     "ignoreDevUnusedFiles": true,
-    "ignoreUploadUnusedFiles": true,
+    "ignoreUploadUnusedFiles": false,
     "enhance": false,
     "packNpmManually": false,
     "packNpmRelationList": [],
