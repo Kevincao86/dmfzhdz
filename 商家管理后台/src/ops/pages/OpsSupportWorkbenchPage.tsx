@@ -19,7 +19,7 @@ import {
   type SupportRelayExportResultMessage,
   type SupportRelaySessionMetaMessage,
 } from '../../lib/supportRelay'
-import { supportOpsSendUrl, supportPollUrl } from '../../lib/supportOpsHttpApi'
+import { supportOpsSendUrl, postSupportOpsSend, supportPollUrl } from '../../lib/supportOpsHttpApi'
 
 type SessionRow = { lastText: string; lastTs: number; unread: number }
 
@@ -161,7 +161,10 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
   const maxPollTsRef = useRef(0)
   const [httpPollReady, setHttpPollReady] = useState(false)
   const [httpPollError, setHttpPollError] = useState<string | null>(null)
-  const channelReady = relayUrl ? relayReady : useHttpPoll ? httpPollReady : false
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [sendBusy, setSendBusy] = useState(false)
+  const channelReady =
+    (useHttpPoll && httpPollReady) || (Boolean(relayUrl) && relayReady)
 
   useEffect(() => {
     selectedIdRef.current = selectedId
@@ -565,7 +568,19 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
   const sendOpsReply = () => {
     const t = reply.trim()
     const sid = selectedId
-    if (!t || !sid) return
+    if (!t || !sid || sendBusy) return
+
+    const isMpSession = channel === 'mp' || isMpSupportSession(sid)
+    const ws = wsRef.current
+    const wsOpen = Boolean(relayUrl && ws && ws.readyState === WebSocket.OPEN)
+    /** 小程序会话必须写 Supabase；生产/有 token 时 ERP 会话也走 HTTP */
+    const useHttp = Boolean(httpPollToken) && (isMpSession || !wsOpen)
+
+    if (!useHttp && !wsOpen) {
+      setSendError('未连接客服通道：请确认云端轮询已启用，或开发环境已启动 WebSocket 服务')
+      return
+    }
+
     const id = `ops_${Date.now()}_${Math.random().toString(36).slice(2)}`
     const line: SupportRelayChatLine = {
       type: 'chat',
@@ -576,49 +591,38 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
       id,
     }
 
-    const ws = wsRef.current
-    const wsOpen = Boolean(relayUrl && ws && ws.readyState === WebSocket.OPEN)
-    /** 小程序会话或已配置 HTTP token 时须写入 Supabase，小程序端才能轮询到 */
-    const mustPersistHttp =
-      Boolean(httpPollToken) && (channel === 'mp' || isMpSupportSession(sid) || !wsOpen)
-
-    if (wsOpen) {
-      ws!.send(JSON.stringify(line))
-      applyOpsReplyLocally(sid, line)
-    }
-
-    if (mustPersistHttp) {
+    if (useHttp) {
+      setSendBusy(true)
+      setSendError(null)
       void (async () => {
         try {
-          const res = await fetch(supportOpsSendUrl(), {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${httpPollToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ sessionId: sid, text: t, id }),
-          })
-          const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
-          if (!res.ok || !data?.ok) {
-            setHttpPollError(
-              data?.error ? `客服回复未写入云端：${data.error}` : `客服回复未写入云端 HTTP ${res.status}`,
+          const out = await postSupportOpsSend(httpPollToken, { sessionId: sid, text: t, id })
+          if (!out.ok) {
+            const msg = [out.error, out.detail].filter(Boolean).join(' · ')
+            setSendError(
+              msg
+                ? `客服回复未写入云端：${msg}（接口 ${supportOpsSendUrl()}）`
+                : `客服回复未写入云端 HTTP ${out.status}`,
             )
-            if (!wsOpen) return
             return
           }
-          if (!wsOpen) applyOpsReplyLocally(sid, line)
+          applyOpsReplyLocally(sid, line)
         } catch (e) {
-          setHttpPollError(
-            e instanceof Error ? `${e.message}（请确认 ${supportOpsSendUrl()} 可访问）` : '客服回复写入失败',
+          setSendError(
+            e instanceof Error
+              ? `${e.message}（请确认 ${supportOpsSendUrl()} 可访问）`
+              : '客服回复写入失败',
           )
+        } finally {
+          setSendBusy(false)
         }
       })()
       return
     }
 
-    if (!wsOpen) {
-      setHttpPollError('未连接客服通道，无法发送回复')
-    }
+    ws!.send(JSON.stringify(line))
+    applyOpsReplyLocally(sid, line)
+    setSendError(null)
   }
 
   const lines = selectedId ? (msgsBySession[selectedId] ?? []) : []
@@ -1061,20 +1065,21 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
                         sendOpsReply()
                       }
                     }}
-                    disabled={!selectedId || !channelReady}
+                    disabled={!selectedId || !channelReady || sendBusy}
                     placeholder={selectedId ? '输入回复…' : '请先选择会话'}
                     className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={sendOpsReply}
-                    disabled={!selectedId || !channelReady}
+                    disabled={!selectedId || !channelReady || sendBusy || !reply.trim()}
                     className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500 disabled:pointer-events-none disabled:opacity-40"
                   >
                     <Send className="h-3.5 w-3.5" />
-                    发送
+                    {sendBusy ? '发送中…' : '发送'}
                   </button>
                 </div>
+                {sendError ? <p className="mt-2 text-xs text-rose-400">{sendError}</p> : null}
               </div>
             </section>
           </div>
@@ -1087,7 +1092,12 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
               使用说明
             </h3>
             <ul className="space-y-2 text-xs text-slate-400">
-              <li className="flex gap-2">
+              {channel === 'mp' ? (
+            <li>
+              小程序会话编号以 <code className="rounded bg-black/30 px-1">lq-mp-</code> 开头；请在本页（非 ERP 客服页）选中对应会话后再回复，消息写入云端后小程序约 2 秒内可见。
+            </li>
+          ) : null}
+          <li className="flex gap-2">
                 <Clock className="mt-0.5 h-3 w-3 shrink-0 text-slate-600" />
                 先启动本后台 dev，再开商家 ERP dev；会话与回复经本机内存广播（刷新会丢失未持久化历史）。
               </li>
