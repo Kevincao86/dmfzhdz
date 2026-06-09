@@ -146,6 +146,7 @@ Page({
       .then(() => {
         this.setData({ humanMode: true, connecting: false, showHumanBtn: false, input: '' })
         this.startPoll()
+        void this.syncFromCloud()
       })
       .catch((e) => {
         this.setData({ connecting: false })

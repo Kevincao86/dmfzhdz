@@ -14,7 +14,7 @@ export function supportOpsSendUrl(): string {
   return opsErpApiUrl('/api/support-ops-send')
 }
 
-/** 运营回复写入 Supabase（优先 ECS erp-api，失败回退同源 /api） */
+/** 运营回复写入 ECS Postgres（仅 erp-api，禁止回退 Vercel /api 以免写入云端 Supabase） */
 export async function postSupportOpsSend(
   token: string,
   body: { sessionId: string; text: string; id: string },
@@ -26,7 +26,11 @@ export async function postSupportOpsSend(
     Accept: 'application/json',
   }
   try {
-    const res = await fetchOpsErpApi('/api/support-ops-send', { method: 'POST', headers, body: payload })
+    const res = await fetchOpsErpApi(
+      '/api/support-ops-send',
+      { method: 'POST', headers, body: payload },
+      { ecsOnly: true },
+    )
     let data: { ok?: boolean; error?: string; detail?: string } = {}
     try {
       data = (await res.json()) as typeof data

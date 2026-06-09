@@ -3,6 +3,10 @@
  * GET /api/meoo-ops-ping?check=support — 额外检测 service_role 能否读 support_relay_messages
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  readSupportRelaySupabaseAdminEnv,
+  supportRelayAdminFetch,
+} from '../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 
@@ -29,8 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const supabaseUrl = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL)?.trim().replace(/\/$/, '')
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
   let host = ''
   try {
     host = supabaseUrl ? new URL(supabaseUrl).host : ''
@@ -45,12 +48,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     hasClientPollToken: Boolean(process.env.VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN?.trim()),
   }
 
-  if (!supabaseUrl || !serviceRole) {
+  if (missingParts.length > 0) {
     out.ok = false
     sendJson(res, 503, {
       ...out,
       error: 'supabase_service_not_configured',
-      hint: '配置 SUPABASE_URL=https://mofangdianai.com 与 SUPABASE_SERVICE_ROLE_KEY',
+      missing: missingParts,
+      hint: '配置 MEOO_SUPABASE_ADMIN_URL=https://mofangdianai.com 与 ECS SUPABASE_SERVICE_ROLE_KEY',
     })
     return
   }
@@ -62,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    const r = await fetch(
+    const r = await supportRelayAdminFetch(
       `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,from_role,text,ts&order=ts.desc&limit=3`,
       { headers },
     )

@@ -1,6 +1,7 @@
 import {
-  merchantSupabaseAdminEnvConfigureHint,
-  readMerchantSupabaseAdminEnv,
+  readSupportRelaySupabaseAdminEnv,
+  supportRelayAdminFetch,
+  supportRelaySupabaseEnvConfigureHint,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 
 const MP_SESSION_RE = /^lq-mp[-:]/i
@@ -55,7 +56,7 @@ async function adminFetchMessages(
   const q =
     `session_id=eq.${encodeURIComponent(sessionId)}` +
     '&select=from_role,text,ts,client_msg_id&order=ts.asc&limit=200'
-  const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
+  const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
     headers: {
       apikey: serviceRole,
       Authorization: `Bearer ${serviceRole}`,
@@ -73,7 +74,7 @@ async function adminInsertMessage(
   serviceRole: string,
   row: Record<string, unknown>,
 ): Promise<void> {
-  const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
+  const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages`, {
     method: 'POST',
     headers: {
       apikey: serviceRole,
@@ -91,7 +92,7 @@ async function adminInsertMessage(
 export async function handleMpSupportRelayBody(
   body: MpSupportRelayBody,
 ): Promise<{ status: number; data: Record<string, unknown> }> {
-  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
   if (missingParts.length > 0) {
     return {
       status: 503,
@@ -99,7 +100,7 @@ export async function handleMpSupportRelayBody(
         ok: false,
         error: 'supabase_admin_not_configured',
         missing: missingParts,
-        hint: merchantSupabaseAdminEnvConfigureHint(missingParts),
+        hint: supportRelaySupabaseEnvConfigureHint(missingParts),
       },
     }
   }

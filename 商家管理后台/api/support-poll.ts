@@ -1,9 +1,14 @@
 /**
- * 运营台轮询 Supabase 客服消息（service_role，Node 运行时以便稳定访问 ECS）。
+ * 运营台轮询 ECS Postgres 客服消息（service_role）。
  * 增量轮询到新商户消息时推送飞书群通知（去重字段 feishu_notified_at）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { sendSupportMerchantMessageFeishu } from './supportFeishuNotify.js'
+import {
+  readSupportRelaySupabaseAdminEnv,
+  supportRelayAdminFetch,
+  supportRelaySupabaseEnvConfigureHint,
+} from '../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 
@@ -42,7 +47,7 @@ async function claimSupportFeishuNotify(
     feishu_notified_at: 'is.null',
   })
   try {
-    const r = await fetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
+    const r = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/support_relay_messages?${q}`, {
       method: 'PATCH',
       headers: {
         ...serviceHeaders(serviceRole),
@@ -95,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 503, {
       ok: false,
       error: 'support_poll_not_configured',
-      hint: '配置 Vercel 环境变量 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY（及 SUPABASE_URL / VITE_SUPABASE_URL）。',
+      hint: '配置 Vercel 环境变量 MEOO_SUPPORT_OPS_HTTP_TOKEN 与 SUPABASE_SERVICE_ROLE_KEY（及 MEOO_SUPABASE_ADMIN_URL=https://mofangdianai.com）。',
     })
     return
   }
@@ -108,22 +113,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const supabaseUrl = (
-    process.env.MEOO_SUPABASE_ADMIN_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    process.env.SUPABASE_URL ??
-    ''
-  )
-    .trim()
-    .replace(/\/$/, '')
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-  if (!supabaseUrl || !serviceRole) {
+  const { supabaseUrl, serviceRole, missingParts } = readSupportRelaySupabaseAdminEnv()
+  if (missingParts.length > 0) {
     sendJson(res, 503, {
       ok: false,
       error: 'supabase_service_not_configured',
-      hint: '在商家管理后台 Vercel 项目中配置 SUPABASE_SERVICE_ROLE_KEY 与 SUPABASE_URL（或 VITE_SUPABASE_URL）。',
+      missing: missingParts,
+      hint: supportRelaySupabaseEnvConfigureHint(missingParts),
     })
     return
+  }
+
+  let supabaseHost = ''
+  try {
+    supabaseHost = new URL(supabaseUrl).host
+  } catch {
+    supabaseHost = supabaseUrl
   }
 
   const sinceRaw = typeof req.query.sinceTs === 'string' ? req.query.sinceTs : undefined
@@ -134,24 +139,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let rows: DbRow[]
     const incremental = Number.isFinite(sinceTs) && sinceTs > 0
     if (!incremental) {
-      const r = await fetch(
+      const r = await supportRelayAdminFetch(
         `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,customer_id,enterprise_name,from_role,text,ts,client_msg_id&order=ts.desc&limit=400`,
         { headers },
       )
       if (!r.ok) {
         const t = await r.text()
-        sendJson(res, 502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+        sendJson(res, 502, {
+          ok: false,
+          error: 'supabase_fetch_failed',
+          detail: t.slice(0, 500),
+          supabaseHost,
+        })
         return
       }
       rows = ((await r.json()) as DbRow[]).reverse()
     } else {
-      const r = await fetch(
+      const r = await supportRelayAdminFetch(
         `${supabaseUrl}/rest/v1/support_relay_messages?select=session_id,customer_id,enterprise_name,from_role,text,ts,client_msg_id&ts=gt.${sinceTs}&order=ts.asc`,
         { headers },
       )
       if (!r.ok) {
         const t = await r.text()
-        sendJson(res, 502, { ok: false, error: 'supabase_fetch_failed', detail: t.slice(0, 500) })
+        sendJson(res, 502, {
+          ok: false,
+          error: 'supabase_fetch_failed',
+          detail: t.slice(0, 500),
+          supabaseHost,
+        })
         return
       }
       rows = (await r.json()) as DbRow[]
@@ -172,12 +187,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       enterpriseName: row.enterprise_name ?? undefined,
     }))
 
-    sendJson(res, 200, { ok: true, messages })
+    sendJson(res, 200, { ok: true, messages, supabaseHost })
   } catch (e) {
     sendJson(res, 502, {
       ok: false,
       error: 'support_poll_failed',
       detail: e instanceof Error ? e.message : String(e),
+      supabaseHost,
     })
   }
 }
