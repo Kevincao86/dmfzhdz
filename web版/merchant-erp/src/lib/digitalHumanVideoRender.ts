@@ -2,8 +2,14 @@
  * 数字人口播高清 MP4：豆包 Seedance / 可灵生成，千问或豆包策划分镜，超长口播自动分段后拼接。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, PresetAvatar } from './digitalHumanBroadcast'
-import { findPresetAvatarForDraft } from './digitalHumanBroadcast'
-import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4 } from './concatVideoSegments'
+import {
+  backgroundPromptForDraft,
+  findPresetAvatarForDraft,
+  GESTURE_PRESETS,
+  useAvatarReferenceForFirstSegment,
+} from './digitalHumanBroadcast'
+import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
+import { synthesizeDigitalHumanNarration } from './digitalHumanRenderAudio'
 import { extractVideoLastFramePureBase64, imageUrlToPureBase64 } from './videoFrameUtils'
 import {
   concatVideoBlobsOnServer,
@@ -12,6 +18,7 @@ import {
   fetchKlingVideoStatus,
   fetchSeedanceVideoStatus,
   fetchVideoAiConfig,
+  muxVideoAudioOnServer,
   postKlingVideoStart,
   postLongformVideoPlan,
   postSeedanceVideoStart,
@@ -32,7 +39,7 @@ function isSeedanceModelHopableError(msg: string): boolean {
 export type DhVideoEngine = 'seedance' | 'kling'
 
 export type DhRenderProgress = {
-  phase: 'planning' | 'generating' | 'merging'
+  phase: 'planning' | 'generating' | 'merging' | 'audio'
   segmentIndex: number
   segmentTotal: number
   progress: number
@@ -102,16 +109,20 @@ function seedanceStartPayload(
   }
 }
 
+function gesturePrompt(draft: DigitalHumanDraft): string {
+  if (draft.motionInstructions.trim()) return draft.motionInstructions.trim()
+  const g = GESTURE_PRESETS.find((x) => x.id === draft.gesturePreset)
+  return g && g.id !== 'none' ? `手势：${g.label}` : '自然讲解手势'
+}
+
 function buildOverallPrompt(draft: DigitalHumanDraft, avatar: PresetAvatar | null): string {
   const script = draft.script.trim()
   const who = avatar ? `${avatar.name}（${avatar.tag}）` : '数字人主播'
   const frame = draft.frameMode === 'full' ? '全身' : '半身'
-  const motion =
-    draft.motionInstructions.trim() ||
-    (draft.gesturePreset ? `手势：${draft.gesturePreset}` : '自然讲解手势')
+  const bg = backgroundPromptForDraft(draft)
   return [
-    `竖屏 9:16 高清数字人口播短视频，主播 ${who}，${draft.outfit}，${frame}出镜，背景风格 ${draft.background}。`,
-    motion,
+    `竖屏 9:16 高清数字人口播短视频，主播 ${who}，${draft.outfit}，${frame}出镜，${bg}。`,
+    gesturePrompt(draft),
     `完整口播文案：\n${script}`,
     `请按约 ${SEGMENT_DURATION_SEC} 秒/段拆成连贯分镜提示词，同一主播稳定出镜，口型与当段口播匹配，镜头连贯。`,
   ].join('\n')
@@ -119,7 +130,14 @@ function buildOverallPrompt(draft: DigitalHumanDraft, avatar: PresetAvatar | nul
 
 function buildSingleSegmentPrompt(draft: DigitalHumanDraft, avatar: PresetAvatar | null): string {
   const who = avatar ? `${avatar.name}数字人主播` : '数字人主播'
-  return `${who}竖屏口播讲解，${draft.outfit}，${draft.script.trim().slice(0, 500)}`
+  const frame = draft.frameMode === 'full' ? '全身' : '半身'
+  const bg = backgroundPromptForDraft(draft)
+  return [
+    `竖屏 9:16 高清数字人口播，${who}，${draft.outfit}，${frame}出镜，${bg}。`,
+    gesturePrompt(draft),
+    `口播内容：${draft.script.trim().slice(0, 500)}`,
+    '口型与讲解内容匹配，稳定正面镜头，自然手势。',
+  ].join('\n')
 }
 
 async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | null> {
@@ -411,13 +429,15 @@ export async function renderDigitalHumanMp4(
       progress: pctBase,
     })
 
-    let frameB64: string | null = avatarB64
+    let frameB64: string | null = null
     if (i > 0 && prevBlob) {
       try {
         frameB64 = await extractVideoLastFramePureBase64(prevBlob)
       } catch {
-        frameB64 = avatarB64
+        frameB64 = useAvatarReferenceForFirstSegment(draft) ? avatarB64 : null
       }
+    } else if (useAvatarReferenceForFirstSegment(draft)) {
+      frameB64 = avatarB64
     }
 
     try {
@@ -438,7 +458,7 @@ export async function renderDigitalHumanMp4(
     }
   }
 
-  onProgress?.({ phase: 'merging', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 92 })
+  onProgress?.({ phase: 'merging', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 88 })
 
   let finalBlob: Blob
   try {
@@ -446,6 +466,25 @@ export async function renderDigitalHumanMp4(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `多段合并失败：${msg}` }
+  }
+
+  onProgress?.({ phase: 'audio', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 92 })
+
+  const narration = await synthesizeDigitalHumanNarration(draft)
+  if (!narration.ok) {
+    return { ok: false, message: `口播音频合成失败：${narration.message}` }
+  }
+
+  try {
+    finalBlob = await muxAudioWithVideoBlob(finalBlob, narration.audioBlob)
+  } catch (browserMuxErr) {
+    try {
+      finalBlob = await muxVideoAudioOnServer(finalBlob, narration.audioBlob)
+    } catch (serverMuxErr) {
+      const bMsg = browserMuxErr instanceof Error ? browserMuxErr.message : String(browserMuxErr)
+      const sMsg = serverMuxErr instanceof Error ? serverMuxErr.message : String(serverMuxErr)
+      return { ok: false, message: `音视频合成失败：${bMsg}；${sMsg}` }
+    }
   }
 
   const outputMp4Url = URL.createObjectURL(finalBlob)

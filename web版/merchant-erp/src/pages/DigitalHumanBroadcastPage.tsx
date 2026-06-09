@@ -195,7 +195,7 @@ export default function DigitalHumanBroadcastPage() {
         videoEngine: result.engine,
         plannerModel: result.plannerModel,
         segmentCount: result.segmentCount,
-        previewNote: `高清 MP4 已生成（${result.engine === 'seedance' ? '豆包' : '可灵'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''}）`,
+        previewNote: `高清 MP4 已生成（${result.engine === 'seedance' ? '豆包' : '可灵'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
       })
       if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
     } else {

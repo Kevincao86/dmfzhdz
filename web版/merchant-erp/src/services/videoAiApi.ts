@@ -356,6 +356,30 @@ export async function concatVideoBlobsOnServer(blobs: Blob[]): Promise<Blob> {
   throw new Error('Blob 云端拼接失败：视频 AI 接口未部署或不可达')
 }
 
+/** 服务端 ffmpeg 将 TTS 口播混入无声视频（浏览器 wasm 失败时兜底） */
+export async function muxVideoAudioOnServer(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+  const paths = [
+    '/api/meoo-merchant-ai-video-mux-audio',
+    '/api/merchant/ai/video/mux-audio',
+  ] as const
+  const body = {
+    videoBase64: await blobToBase64(videoBlob),
+    audioBase64: await blobToBase64(audioBlob),
+  }
+  for (const p of paths) {
+    const res = await fetchVideoPostBinary(p, body, 300_000)
+    if (!res) continue
+    if (!res.ok) {
+      const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
+      throw new Error(j?.message || `云端音视频合成失败 HTTP ${res.status}`)
+    }
+    const out = await res.blob()
+    if (out.size < 1024) throw new Error('云端音视频合成返回空文件')
+    return out
+  }
+  throw new Error('云端音视频合成失败：视频 AI 接口未部署或不可达')
+}
+
 /** 豆包/可灵 CDN 偶发允许浏览器直拉；代理失败时兜底 */
 async function tryDirectVideoBlob(url: string): Promise<Blob | null> {
   const trimmed = url.trim()

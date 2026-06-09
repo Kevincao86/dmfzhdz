@@ -287,3 +287,107 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 }
+
+const MAX_MUX_VIDEO_BYTES = 80 * 1024 * 1024
+const MAX_MUX_AUDIO_BYTES = 20 * 1024 * 1024
+
+/** 将 TTS 口播 MP3 混入无声视频 MP4 */
+export async function muxLocalVideoAudio(
+  videoBuf: Buffer,
+  audioBuf: Buffer,
+): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
+  if (videoBuf.length < 1024) {
+    return { ok: false, message: '视频文件过小或无效' }
+  }
+  if (audioBuf.length < 128) {
+    return { ok: false, message: '口播音频过小或无效' }
+  }
+  if (videoBuf.length > MAX_MUX_VIDEO_BYTES) {
+    return { ok: false, message: '视频文件过大，无法云端合成' }
+  }
+  if (audioBuf.length > MAX_MUX_AUDIO_BYTES) {
+    return { ok: false, message: '口播音频过大，无法云端合成' }
+  }
+
+  const ffmpeg = resolveFfmpegBin()
+  if (!ffmpeg) {
+    return {
+      ok: false,
+      message: '服务端未安装 ffmpeg，无法云端合成音视频。请在 ECS 执行：sudo apt-get install -y ffmpeg',
+    }
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-mux-'))
+  const videoPath = path.join(tmpDir, 'v.mp4')
+  const audioPath = path.join(tmpDir, 'a.mp3')
+  const outPath = path.join(tmpDir, 'out.mp4')
+
+  try {
+    fs.writeFileSync(videoPath, videoBuf)
+    fs.writeFileSync(audioPath, audioBuf)
+
+    const attempts = [
+      [
+        '-y',
+        '-i',
+        videoPath,
+        '-i',
+        audioPath,
+        '-map',
+        '0:v:0',
+        '-map',
+        '1:a:0',
+        '-c:v',
+        'copy',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '128k',
+        '-shortest',
+        '-movflags',
+        '+faststart',
+        outPath,
+      ],
+      [
+        '-y',
+        '-i',
+        videoPath,
+        '-i',
+        audioPath,
+        '-map',
+        '0:v:0',
+        '-map',
+        '1:a:0',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'veryfast',
+        '-crf',
+        '23',
+        '-c:a',
+        'aac',
+        '-b:a',
+        '128k',
+        '-shortest',
+        '-movflags',
+        '+faststart',
+        outPath,
+      ],
+    ]
+
+    let lastErr = 'ffmpeg 音视频合成失败'
+    for (const args of attempts) {
+      const r = runFfmpeg(ffmpeg, args)
+      if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
+        return { ok: true, buffer: fs.readFileSync(outPath) }
+      }
+      if (r.stderr) lastErr = r.stderr.slice(-600)
+    }
+
+    return { ok: false, message: lastErr }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '云端音视频合成异常' }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
