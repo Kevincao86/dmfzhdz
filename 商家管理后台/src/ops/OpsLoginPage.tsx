@@ -57,8 +57,10 @@ export default function OpsLoginPage() {
         const r = await verifyOpsLogin(account, password)
         if (!r.ok) {
           const msg: Record<string, string> = {
-            not_found: '该手机号未在云端注册。请主账号登录后重新创建子账号，或确认手机号无误。',
+            not_found:
+              '该手机号未在云端注册。子账号须由主账号在「云端会话」下创建；请主账号退出后用 18768501283 重新登录后再建号。',
             bad_password: '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
+            bad_credentials: '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
             disabled: '该账号已停用，请联系主账号启用。',
             invalid_phone: '请输入 11 位手机号。',
           }
@@ -88,6 +90,7 @@ export default function OpsLoginPage() {
           <img src={BRAND_LOGO_URL} alt={BRAND_NAME} className="h-16 w-16 rounded-xl object-contain" />
           <h1 className="mt-4 text-xl font-semibold text-white">运营管控台</h1>
           <p className="mt-2 text-sm text-slate-500">请使用授权手机号登录</p>
+          <p className="mt-1 text-xs text-slate-600">主账号：18768501283（勿用旧号 81283）</p>
         </div>
 
         <form className="space-y-4" onSubmit={submit}>

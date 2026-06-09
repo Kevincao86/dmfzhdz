@@ -216,6 +216,7 @@ export async function fetchOpsStaffAccountsRemote(): Promise<OpsStaffAccount[]> 
   const token = sessionTokenFromStorage()
   if (!token) {
     await ensureOpsMasterAccountLocal()
+    if (isOpsProductionHost()) return []
     return readOpsStaffAccountsLocal()
   }
   const r = await apiOpsStaffList(token)
@@ -272,7 +273,8 @@ export async function verifyOpsLogin(
   if (remote.ok) {
     return { ok: true, account: remote.account, session: remote.session }
   }
-  if (!remote.useLocalFallback) {
+  const allowLocalFallback = remote.useLocalFallback && !isOpsProductionHost()
+  if (!allowLocalFallback) {
     return { ok: false, error: remote.error ?? 'bad_password' }
   }
 
@@ -422,11 +424,14 @@ export async function updateOpsSubAccount(
     status?: 'active' | 'disabled'
     password?: string
   },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; cloudSynced: boolean } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
+  if (!token && isOpsProductionHost()) {
+    return { ok: false, error: 'cloud_session_required' }
+  }
   if (token) {
     const r = await apiOpsStaffMutate(token, { action: 'update', id, ...patch })
-    if (r.ok) return { ok: true }
+    if (r.ok) return { ok: true, cloudSynced: true }
     return { ok: false, error: r.error }
   }
 
@@ -457,11 +462,14 @@ export async function updateOpsSubAccount(
     updatedAt: now,
   }
   writeOpsStaffAccountsLocal(list)
-  return { ok: true }
+  return { ok: true, cloudSynced: false }
 }
 
 export async function deleteOpsSubAccount(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
+  if (!token && isOpsProductionHost()) {
+    return { ok: false, error: 'cloud_session_required' }
+  }
   if (token) {
     const r = await apiOpsStaffMutate(token, { action: 'delete', id })
     if (r.ok) return { ok: true }

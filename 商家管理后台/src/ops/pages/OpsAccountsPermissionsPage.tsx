@@ -50,7 +50,9 @@ export default function OpsAccountsPermissionsPage() {
     let cancelled = false
     void (async () => {
       await ensureOpsMasterAccount()
-      await migrateLocalOpsStaffToRemoteIfNeeded()
+      if (hasOpsCloudSession()) {
+        await migrateLocalOpsStaffToRemoteIfNeeded()
+      }
       if (!cancelled) await fetchOpsStaffAccountsRemote().then(setStaff)
     })()
     const onChange = () => reloadStaff()
@@ -162,6 +164,8 @@ export default function OpsAccountsPermissionsPage() {
           permissions_required: '请至少勾选一个功能模块',
           password_too_short: '密码至少 6 位',
           cannot_edit_master: '无法修改主账号',
+          cloud_session_required:
+            '当前未连接云端数据库，密码修改仅会保存在本浏览器。请退出后用主账号 18768501283 重新登录后再重置。',
         }
         setFormErr(msg[r.error] ?? r.error)
         return
@@ -169,7 +173,11 @@ export default function OpsAccountsPermissionsPage() {
       refreshOpsSessionFromStorage()
       resetForm()
       reloadStaff()
-      window.alert('已保存')
+      if (r.cloudSynced) {
+        window.alert('已保存到云端数据库，子账号可使用新密码登录。')
+      } else {
+        window.alert('已保存到本浏览器。其他设备无法使用新密码，请主账号重新云端登录后再重置。')
+      }
     } finally {
       setBusy(false)
     }
