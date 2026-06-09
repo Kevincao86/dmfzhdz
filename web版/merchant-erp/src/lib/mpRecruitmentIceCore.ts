@@ -5,7 +5,7 @@ import type {
   RegistryMpRecruitmentOrder,
 } from './opsRegistryTypes.js'
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
-import { getIceVerifyMode, isIceMpOrder } from './iceOrderDetect.js'
+import { getIceVerifyMode } from './iceOrderDetect.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
 
 export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel } from './iceOrderDetect.js'
