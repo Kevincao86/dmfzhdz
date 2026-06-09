@@ -14,6 +14,7 @@ const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
+const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -245,6 +246,9 @@ Page({
   },
   onHide() {
     setTabBarHidden(this, false)
+    if (this.data.step === 'mode' && !this.data.isEditMode) {
+      this.resetToTarget()
+    }
   },
   onUnload() {
     setTabBarHidden(this, false)
@@ -690,6 +694,16 @@ Page({
   },
   onBackFromTarget() {
     wx.switchTab({ url: '/pages/index/index' })
+  },
+  onBackFromMode() {
+    this.setData({
+      step: 'target',
+      recruitTarget: '',
+      recruitTargetLabel: '',
+      recruitMode: '',
+      recruitModeLabel: '',
+    })
+    this.syncTabBarOverlay()
   },
   syncSupplierPublishGrids(form) {
     const f = form || this.data.form
