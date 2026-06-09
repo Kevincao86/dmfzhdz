@@ -14,6 +14,9 @@ import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/support-poll.ts'
 import supportOpsSendHandler from '../../../商家管理后台/api/support-ops-send.ts'
+import opsStaffLoginHandler from '../../../商家管理后台/api/meoo-ops-staff-login.ts'
+import opsStaffListHandler from '../../../商家管理后台/api/meoo-ops-staff-list.ts'
+import opsStaffMutateHandler from '../../../商家管理后台/api/meoo-ops-staff-mutate.ts'
 import tenantsListHandler from '../../../商家管理后台/api/meoo-supabase-tenants-list.ts'
 import tenantsPatchHandler from '../../../商家管理后台/api/meoo-supabase-tenants-patch.ts'
 import tenantsResetPwdHandler from '../../../商家管理后台/api/meoo-supabase-tenants-reset-password.ts'
@@ -113,6 +116,10 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,
   '/api/support-ops-send': supportOpsSendHandler as VercelLikeHandler,
+  /** 运营管控台子账号：须写入 ECS Postgres ops_staff_accounts */
+  '/api/meoo-ops-staff-login': opsStaffLoginHandler as VercelLikeHandler,
+  '/api/meoo-ops-staff-list': opsStaffListHandler as VercelLikeHandler,
+  '/api/meoo-ops-staff-mutate': opsStaffMutateHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-patch': tenantsPatchHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-reset-password': tenantsResetPwdHandler as VercelLikeHandler,

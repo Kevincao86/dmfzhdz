@@ -230,12 +230,33 @@ export async function fetchOpsStaffAccountsRemote(): Promise<OpsStaffAccount[]> 
 }
 
 /** 主账号登录后，将本机 localStorage 子账号一次性导入云端（仅导入云端尚不存在的手机号） */
-export async function migrateLocalOpsStaffToRemoteIfNeeded(): Promise<void> {
+export async function migrateLocalOpsStaffToRemoteIfNeeded(): Promise<number> {
   const session = readOpsSession()
-  if (!session?.sessionToken || session.role !== 'super_admin') return
+  if (!session?.sessionToken || session.role !== 'super_admin') return 0
   const local = readOpsStaffAccountsLocal().filter((a) => a.role === 'sub_admin')
-  if (local.length === 0) return
-  await apiMigrateLocalStaff(session.sessionToken, local)
+  if (local.length === 0) return 0
+  const r = await apiMigrateLocalStaff(session.sessionToken, local)
+  return r.ok ? r.imported : 0
+}
+
+/** 手动将本机子账号同步到云端（主账号须已云端登录） */
+export async function syncLocalOpsStaffToCloud(): Promise<
+  { ok: true; imported: number } | { ok: false; error: string }
+> {
+  const session = readOpsSession()
+  if (!session?.sessionToken) {
+    return { ok: false, error: 'cloud_session_required' }
+  }
+  if (session.role !== 'super_admin') {
+    return { ok: false, error: 'super_admin_required' }
+  }
+  const local = readOpsStaffAccountsLocal().filter((a) => a.role === 'sub_admin')
+  if (local.length === 0) {
+    return { ok: true, imported: 0 }
+  }
+  const r = await apiMigrateLocalStaff(session.sessionToken, local)
+  if (!r.ok) return { ok: false, error: r.error }
+  return { ok: true, imported: r.imported }
 }
 
 export function getOpsAccountById(id: string): OpsStaffAccount | null {
@@ -373,10 +394,8 @@ export async function createOpsSubAccount(input: {
   permissions: OpsPermissionKey[]
 }): Promise<{ ok: true; account: OpsStaffAccount; cloudSynced: boolean } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
-  if (!token && isOpsProductionHost()) {
-    return { ok: false, error: 'cloud_session_required' }
-  }
-  if (token) {
+  if (isOpsProductionHost() || token) {
+    if (!token) return { ok: false, error: 'cloud_session_required' }
     const r = await apiOpsStaffMutate(token, {
       action: 'create',
       phone: input.phone,
@@ -426,10 +445,8 @@ export async function updateOpsSubAccount(
   },
 ): Promise<{ ok: true; cloudSynced: boolean } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
-  if (!token && isOpsProductionHost()) {
-    return { ok: false, error: 'cloud_session_required' }
-  }
-  if (token) {
+  if (isOpsProductionHost() || token) {
+    if (!token) return { ok: false, error: 'cloud_session_required' }
     const r = await apiOpsStaffMutate(token, { action: 'update', id, ...patch })
     if (r.ok) return { ok: true, cloudSynced: true }
     return { ok: false, error: r.error }
@@ -467,10 +484,8 @@ export async function updateOpsSubAccount(
 
 export async function deleteOpsSubAccount(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
-  if (!token && isOpsProductionHost()) {
-    return { ok: false, error: 'cloud_session_required' }
-  }
-  if (token) {
+  if (isOpsProductionHost() || token) {
+    if (!token) return { ok: false, error: 'cloud_session_required' }
     const r = await apiOpsStaffMutate(token, { action: 'delete', id })
     if (r.ok) return { ok: true }
     return { ok: false, error: r.error }
