@@ -137,6 +137,23 @@ function removePublishedOrder(mpOrderId) {
   writePublishedOrders(list)
 }
 
+function touchPublishedOrderSnapshot(mpOrderId, patch) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item && item.mpOrderId === id)
+  if (idx < 0) return
+  list[idx] = { ...list[idx], ...patch, mpOrderId: id }
+  writePublishedOrders(list)
+}
+
+function markPublishedOrderDeleted(mpOrderId) {
+  touchPublishedOrderSnapshot(mpOrderId, {
+    deletedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  })
+}
+
 function updatePublishedOrderTitle(mpOrderId, title) {
   const id = String(mpOrderId || '').trim()
   if (!id) return
@@ -155,4 +172,6 @@ module.exports = {
   addPublishedOrder,
   removePublishedOrder,
   updatePublishedOrderTitle,
+  touchPublishedOrderSnapshot,
+  markPublishedOrderDeleted,
 }

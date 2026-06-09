@@ -76,7 +76,7 @@
     </view>
     <text class="hint" bindtap="goApplicants" data-id="{{item.mpOrderId}}">发布于 {{item.publishedAt}} · {{item.hallLabel}}</text>
     <text class="hint pr-order-deadline" bindtap="goApplicants" data-id="{{item.mpOrderId}}">截止：{{item.deadlineDaysText}}</text>
-    <view class="pr-order-actions">
+    <view class="pr-order-actions" wx:if="{{!item.isRemovedFromRegistry}}">
       <text
         wx:if="{{item.canToggleRecruit}}"
         class="pr-order-action"
@@ -87,7 +87,8 @@
       <text class="pr-order-action" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</text>
       <text class="pr-order-action pr-order-action--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</text>
     </view>
-    <view class="pr-order-meta">
+    <text wx:if="{{item.isRemovedFromRegistry}}" class="hint pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
+    <view class="pr-order-meta" wx:if="{{!item.isRemovedFromRegistry}}">
       <text class="pr-order-badge">{{item.signupLabel}}</text>
       <view class="pr-order-meta-right">
         <text

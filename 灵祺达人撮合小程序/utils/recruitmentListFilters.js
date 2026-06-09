@@ -86,21 +86,49 @@ function formatDeadlineDaysText(deadlineMs) {
   return `剩余 ${days} 天`
 }
 
+function hallLabelFromLocal(localItem) {
+  if (localItem && localItem.hall === 'urgent') return '急单大厅'
+  if (localItem && localItem.hall === 'ice') return '云剪任务'
+  return '招募大厅'
+}
+
 function enrichMpOrderListItem(mp, localItem) {
-  const summary = mp
-    ? [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
-    : ''
-  const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
-  const applicantCount = mp && Array.isArray(mp.applicants) ? mp.applicants.length : 0
+  if (!mp) {
+    const status = localItem && localItem.deletedAt
+      ? 'deleted'
+      : mpOrderStatus.resolveEffectiveMpStatus(localItem && localItem.lastStatus, 0)
+    const recruiting = isMpOrderRecruiting(status)
+    return {
+      ...localItem,
+      title: (localItem && localItem.title) || (localItem && localItem.mpOrderId) || '历史发单',
+      status,
+      statusLabel: mpOrderStatus.statusLabel(status),
+      recruiting,
+      canToggleRecruit: false,
+      toggleActionLabel: '',
+      toggleNextStatus: '',
+      applicantCount: 0,
+      recruitCount: 0,
+      signupLabel: '—',
+      deadlineDaysText: localItem && localItem.deletedAt ? '—' : '已结束',
+      deadlineMs: 0,
+      isRemovedFromRegistry: true,
+      hallLabel: hallLabelFromLocal(localItem),
+    }
+  }
+
+  const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const recruitCount = parseRecruitCountFromMp(mp)
+  const applicantCount = Array.isArray(mp.applicants) ? mp.applicants.length : 0
   const isIce = iceOrderStats.isIceMpOrder(mp)
   const iceStats = isIce ? iceOrderStats.countIceOrderStats(mp) : null
-  const deadlineMs = mp ? resolveDeadlineMs(mp, summary) : 0
-  const status = mpOrderStatus.resolveEffectiveMpStatus(mp?.status, deadlineMs)
+  const deadlineMs = resolveDeadlineMs(mp, summary)
+  const status = mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
   const canToggleRecruit = status !== 'done'
   return {
     ...localItem,
-    title: localItem.title || mp?.title || mp?.customerName || localItem.mpOrderId,
+    title: localItem.title || mp.title || mp.customerName || localItem.mpOrderId,
     status,
     statusLabel: mpOrderStatus.statusLabel(status),
     recruiting,
@@ -114,6 +142,7 @@ function enrichMpOrderListItem(mp, localItem) {
       : `报名 ${applicantCount}/${recruitCount} 人`,
     deadlineDaysText: formatDeadlineDaysText(deadlineMs),
     deadlineMs,
+    isRemovedFromRegistry: false,
   }
 }
 

@@ -1,7 +1,7 @@
 import { scopeIdFromAccount } from '../mpAccountLocalScope'
 import { getAccount, type MpAccount } from '../mpSession'
 import { prParticipantKey } from '../mpSync/participant'
-import { readPublishedOrders, removePublishedOrder, type PublishedOrderLocal } from '../mpSync/applicationsStore'
+import { readPublishedOrders, type PublishedOrderLocal } from '../mpSync/applicationsStore'
 import { readPrProfile } from '../mpSync/userProfile'
 
 function hallFromMp(mp: Record<string, unknown>): string {
@@ -39,34 +39,44 @@ export function mpOrderOwnedByCurrentPr(
   return false
 }
 
-/** 注册表为权威数据源：仅展示仍存在于 mpRecruitmentOrders 的本 PR 发单 */
+/** 本地发单历史 + 注册表：展示全部本 PR 发单（含已删除、已完成） */
 export function mergePublishedOrdersFromRegistry(
   local: PublishedOrderLocal[],
   mpList: Record<string, unknown>[],
   account: MpAccount | null,
 ): PublishedOrderLocal[] {
-  const localById = new Map<string, PublishedOrderLocal>()
-  for (const item of local) {
-    const id = String(item?.mpOrderId || '').trim()
-    if (id) localById.set(id, item)
-  }
-
-  const out: PublishedOrderLocal[] = []
+  const mpById = new Map<string, Record<string, unknown>>()
   for (const mp of mpList) {
     if (!mp || typeof mp !== 'object') continue
     const id = String(mp.id || '').trim()
-    if (!id || !mpOrderOwnedByCurrentPr(mp, account)) continue
-    const cached = localById.get(id)
-    out.push(
-      cached ?? {
-        mpOrderId: id,
-        title: String(mp.title || mp.customerName || id),
-        publishedAt: String(mp.createdAt || mp.updatedAt || ''),
-        hall: hallFromMp(mp),
-        ownerAccountId: scopeIdFromAccount(account),
-        ownerPrId: String(account?.lingqiPrId || '').trim(),
-      },
-    )
+    if (id) mpById.set(id, mp)
+  }
+
+  const out: PublishedOrderLocal[] = []
+  const seen = new Set<string>()
+
+  for (const item of local) {
+    const id = String(item?.mpOrderId || '').trim()
+    if (!id || seen.has(id)) continue
+    const mp = mpById.get(id)
+    if (mp && !mpOrderOwnedByCurrentPr(mp, account)) continue
+    seen.add(id)
+    out.push(item)
+  }
+
+  for (const mp of mpList) {
+    if (!mp || typeof mp !== 'object') continue
+    const id = String(mp.id || '').trim()
+    if (!id || seen.has(id) || !mpOrderOwnedByCurrentPr(mp, account)) continue
+    seen.add(id)
+    out.push({
+      mpOrderId: id,
+      title: String(mp.title || mp.customerName || id),
+      publishedAt: String(mp.createdAt || mp.updatedAt || ''),
+      hall: hallFromMp(mp),
+      ownerAccountId: scopeIdFromAccount(account),
+      ownerPrId: String(account?.lingqiPrId || '').trim(),
+    })
   }
 
   return out.sort((a, b) => {
@@ -76,15 +86,9 @@ export function mergePublishedOrdersFromRegistry(
   })
 }
 
-/** 清理本地缓存里已从注册表删除的发单 */
-export function pruneOrphanPublishedOrders(mpList: Record<string, unknown>[]): void {
-  const ids = new Set(
-    mpList.map((o) => String(o?.id || '').trim()).filter(Boolean),
-  )
-  for (const item of readPublishedOrders()) {
-    const id = String(item.mpOrderId || '').trim()
-    if (id && !ids.has(id)) removePublishedOrder(id)
-  }
+/** 保留本地发单历史，供「我的发单」展示已删除/已完成订单 */
+export function pruneOrphanPublishedOrders(_mpList: Record<string, unknown>[]): void {
+  /* no-op */
 }
 
 export function listPublishedOrdersForCurrentPr(mpList: Record<string, unknown>[]): PublishedOrderLocal[] {
