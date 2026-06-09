@@ -19,6 +19,7 @@ import {
   buildBoardPool,
   countPrOrdersForBoard,
   PR_BOARD_SEGMENTS,
+  smartMatchNeedRecruitHint,
   type PrBoardId,
 } from '../../lib/mpRecruitment/prRecommendBoard'
 import type { MpRegistry, TalentCardRow } from '../../lib/mpRecruitment/types'
@@ -111,6 +112,12 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         ? matchOrderOptions.some((o) => o.id === matchOrderId)
         : prBoardOrderCount > 0
 
+    if (!hasMatchOrders) {
+      setDisplayRows([])
+      setListEmptyHint(smartMatchNeedRecruitHint(prBoard))
+      return
+    }
+
     if (hasMatchOrders && registryCache && filtered.length) {
       setMatching(true)
       try {
@@ -134,8 +141,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       } finally {
         setMatching(false)
       }
-    } else {
-      filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     }
 
     filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))

@@ -43,6 +43,13 @@ export function writeMember(member: TalentMember) {
   import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
 }
 
+export const TALENT_SMART_MATCH_NEED_PROFILE_HINT = '请补充平台资料，以便AI匹配商单'
+
+export function hasFilledPlatform(member: TalentMember | null): boolean {
+  if (!member?.platformProfiles) return false
+  return TALENT_PLATFORMS.some((p) => profileFilled(member.platformProfiles[p.id]))
+}
+
 export function memberCoversPlatform(member: TalentMember | null, platform: string) {
   if (!member?.platformProfiles) return false
   const id = platformIdFromName(platform)

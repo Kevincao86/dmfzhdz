@@ -9,7 +9,7 @@ import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
-import { readMember } from '../../lib/mpSync/talentMember'
+import { readMember, hasFilledPlatform, TALENT_SMART_MATCH_NEED_PROFILE_HINT } from '../../lib/mpSync/talentMember'
 
 const ORDER_SEGMENTS = [
   { id: 'match', label: '为你匹配' },
@@ -55,6 +55,12 @@ export default function RecommendOrdersPanel() {
   const talentCity = member?.city || member?.province || ''
 
   const applyOrderFilters = useCallback(async () => {
+    const memberRow = readMember()
+    if (orderSegment === 'match' && !hasFilledPlatform(memberRow)) {
+      setOrderDisplayRows([])
+      setOrderEmptyHint(TALENT_SMART_MATCH_NEED_PROFILE_HINT)
+      return
+    }
     const kw = searchKeyword.trim()
     const priceSel = priceSelected
     let rows = allOrderRows.filter((r) => {
@@ -67,7 +73,6 @@ export default function RecommendOrdersPanel() {
     })
     const mocks = rows.filter((r) => r.isMock)
     let real = rows.filter((r) => !r.isMock)
-    const memberRow = readMember()
     if (memberRow && real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: getWorkIdentity() })
     } else if (real.length) {
