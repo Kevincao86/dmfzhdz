@@ -1,5 +1,6 @@
 const memberStore = require('./talentMember.js')
 const regionPicker = require('./regionPicker.js')
+const talentPlatforms = require('./talentPlatformProfiles.js')
 
 /** 报名表单空白初始值（探店时间每次需重新选择） */
 function emptyApplyFields(douyinLevels) {
@@ -108,9 +109,76 @@ function enrichApplicantFromMember(applicant, member, platform) {
   return next
 }
 
+function strEmpty(v) {
+  return !String(v == null ? '' : v).trim()
+}
+
+/** 报名成功后：仅将「我的信息」中空缺项写回对应平台资料 */
+function persistApplicantToMemberProfile(member, applicant, platform) {
+  if (!applicant) return member
+  const base =
+    member && typeof member === 'object'
+      ? { ...member }
+      : { platformProfiles: talentPlatforms.emptyAllProfiles() }
+  if (!base.platformProfiles) base.platformProfiles = talentPlatforms.emptyAllProfiles()
+  const pid = talentPlatforms.platformIdFromName(platform)
+  const profiles = { ...base.platformProfiles }
+  const cur = talentPlatforms.normalizeProfile(profiles[pid])
+  const next = { ...cur, enabled: true }
+  let profileChanged = false
+
+  const fillProf = (key, val) => {
+    if (strEmpty(cur[key]) && !strEmpty(val)) {
+      next[key] = String(val).trim()
+      profileChanged = true
+    }
+  }
+
+  fillProf('platformAccount', applicant.platformAccount)
+  fillProf('platformNickname', applicant.platformNickname)
+  fillProf('profileLink', applicant.profileLink)
+  if (strEmpty(cur.followers) && applicant.followers != null && String(applicant.followers).trim()) {
+    next.followers = String(applicant.followers)
+    profileChanged = true
+  }
+  fillProf('douyinSalesLevel', applicant.douyinSalesLevel)
+  fillProf('quotePrice', applicant.quotePrice)
+  if (Array.isArray(applicant.accountTags) && applicant.accountTags.length && !(cur.accountTags || []).length) {
+    next.accountTags = [...applicant.accountTags]
+    profileChanged = true
+  }
+
+  if (profileChanged) profiles[pid] = next
+  let memberChanged = profileChanged
+  if (strEmpty(base.contact) && applicant.contact) {
+    base.contact = String(applicant.contact).trim()
+    memberChanged = true
+  }
+  if (strEmpty(base.wechatId) && applicant.wechatId) {
+    base.wechatId = String(applicant.wechatId).trim()
+    memberChanged = true
+  }
+  if (strEmpty(base.alipayAccount) && applicant.alipayAccount) {
+    base.alipayAccount = String(applicant.alipayAccount).trim()
+    memberChanged = true
+  }
+  if (strEmpty(base.province) && applicant.province) {
+    base.province = String(applicant.province).trim()
+    memberChanged = true
+  }
+  if (strEmpty(base.city) && applicant.city) {
+    base.city = String(applicant.city).trim()
+    memberChanged = true
+  }
+  if (!memberChanged) return member
+  base.platformProfiles = profiles
+  return talentPlatforms.migrateMember(base)
+}
+
 module.exports = {
   emptyApplyFields,
   memberSyncAvailable,
   applyFieldsFromMember,
   enrichApplicantFromMember,
+  persistApplicantToMemberProfile,
 }

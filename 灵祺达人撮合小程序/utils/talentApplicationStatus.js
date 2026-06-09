@@ -23,6 +23,14 @@ function isApplicantPrSelected(mp, applicant) {
   return ids.map(String).includes(String(applicant.id || ''))
 }
 
+/** 探店/拍摄类：仅 PR 选中达人后才可上传成片 */
+function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
+  if (isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const videoStatus = String(applicant.videoStatus || '')
+  return !videoStatus || videoStatus === 'rejected'
+}
+
 function resolveIceContext(mp, mpOrderId) {
   if (isIceMpOrder(mp)) return true
   const orderId = String(mpOrderId || (mp && mp.id) || '').trim()
@@ -75,6 +83,8 @@ function matchTalentApplicationProgress(progressId, mp, applicant, mpOrderId) {
 
 module.exports = {
   TALENT_APP_PROGRESS_FILTERS,
+  isApplicantPrSelected,
+  canTalentUploadRecruitmentVideo,
   resolveTalentApplicationProgress,
   matchTalentApplicationProgress,
 }

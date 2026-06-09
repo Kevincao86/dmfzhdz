@@ -5,7 +5,12 @@ import { applyToMpOrder, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { addApplication } from '../lib/mpSync/applicationsStore'
 import { getApplyConfigForMpOrder, resolveApplyRows } from '../lib/mpSync/applyFormTemplates'
-import { applyFieldsFromMember, emptyApplyFields, memberSyncAvailable } from '../lib/mpSync/applyFormState'
+import {
+  applyFieldsFromMember,
+  emptyApplyFields,
+  memberSyncAvailable,
+  persistApplicantToMemberProfile,
+} from '../lib/mpSync/applyFormState'
 import { buildApplicantFromRows, validateApplyRows } from '../lib/mpSync/applyTemplateRuntime'
 import type { ApplyRow } from '../lib/mpSync/applyFormTemplates'
 import { labels, normalizePlatform } from '../lib/mpSync/platformLabels'
@@ -74,6 +79,8 @@ export default function RecruitmentApplyPage() {
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
       await applyToMpOrder(orderId, applicant)
+      const persisted = persistApplicantToMemberProfile(readMember(), applicant, platform)
+      if (persisted) writeMember(persisted)
       if (member && syncMember) {
         try {
           await registerTalentMember(member as unknown as Record<string, unknown>)

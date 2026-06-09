@@ -17,10 +17,25 @@ function isApplicantPassed(applicant: Record<string, unknown>): boolean {
   return false
 }
 
-function isApplicantPrSelected(mp: Record<string, unknown> | null, applicant: Record<string, unknown>): boolean {
+export function isApplicantPrSelected(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown>,
+): boolean {
   if (applicant.prSelected === true || applicant.merchantSelected === true) return true
   const ids = Array.isArray(mp?.selectedApplicantIds) ? (mp!.selectedApplicantIds as unknown[]) : []
   return ids.map(String).includes(String(applicant.id || ''))
+}
+
+/** 探店/拍摄类：仅 PR 选中达人后才可上传成片 */
+export function canTalentUploadRecruitmentVideo(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  isIce: boolean,
+): boolean {
+  if (isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const videoStatus = String(applicant.videoStatus || '')
+  return !videoStatus || videoStatus === 'rejected'
 }
 
 function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: string): boolean {

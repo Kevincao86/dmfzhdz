@@ -18,6 +18,7 @@ const {
   memberSyncAvailable,
   applyFieldsFromMember,
   enrichApplicantFromMember,
+  persistApplicantToMemberProfile,
 } = applyFormState
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
 
@@ -262,6 +263,12 @@ Page({
         return
       }
       await ops.applyToMpOrder(this.data.mpOrderId, applicant)
+      const persisted = persistApplicantToMemberProfile(
+        memberStore.readMember(),
+        applicant,
+        this.data.platform,
+      )
+      if (persisted) memberStore.writeMember(persisted)
       const member = memberStore.readMember()
       if (member && String(member.wxNickName || '').trim() && String(member.contact || '').trim()) {
         try {
