@@ -1,4 +1,5 @@
 const talentAppStatus = require('./talentApplicationStatus.js')
+const appOrderType = require('./applicationOrderType.js')
 
 const APPLICATION_TIME_FILTERS = [
   { id: 'all', label: '全部时间' },
@@ -83,8 +84,10 @@ function filterApplicationRows(rows, opts) {
   const city = (opts && opts.city) || '全部'
   const keyword = (opts && opts.keyword) || ''
   const progressFilter = (opts && opts.progressFilter) || 'all'
+  const orderTypeFilter = (opts && opts.orderTypeFilter) || 'all'
   return (rows || []).filter((r) => {
     if (!matchApplicationTimeFilter(parseAppliedAtMs(r.appliedAt), timeFilter)) return false
+    if (!appOrderType.matchOrderTypeFilter(r, orderTypeFilter)) return false
     if (!matchCategory(r.category, category)) return false
     if (!matchRegionFilter(r.region, province, city)) return false
     if (!listKeywordSearch.matchListKeyword(r, keyword)) return false
@@ -96,6 +99,7 @@ function filterApplicationRows(rows, opts) {
 module.exports = {
   APPLICATION_TIME_FILTERS,
   TALENT_APP_PROGRESS_FILTERS: talentAppStatus.TALENT_APP_PROGRESS_FILTERS,
+  TALENT_ORDER_TYPE_FILTERS: appOrderType.TALENT_ORDER_TYPE_FILTERS,
   CATEGORY_FILTERS,
   parseAppliedAtMs,
   matchApplicationTimeFilter,
