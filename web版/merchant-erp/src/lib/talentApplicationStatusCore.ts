@@ -39,12 +39,14 @@ export function resolveTalentApplicationProgress(
     if (ice) return { id: 'in_progress', label: '进行中' }
     return { id: 'pr_pending', label: 'PR 待选中' }
   }
-  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
 
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
+    if (isApplicantPassed(applicant) && taskStatus === 'confirmed') {
+      return { id: 'completed', label: '已完成' }
+    }
     if (taskStatus === 'pending_confirm' || (!taskStatus && !applicant.assignedVideoDownloadUrl)) {
-      return { id: 'in_progress', label: '进行中' }
+      return { id: 'in_progress', label: '待确认接收' }
     }
     if (taskStatus === 'confirmed') {
       const link = String(applicant.douyinPublishUrl || '').trim()
@@ -53,12 +55,13 @@ export function resolveTalentApplicationProgress(
         applicant.videoStatus === 'pending' ||
         (link && applicant.aiVerifyStatus !== 'passed' && applicant.videoStatus !== 'passed')
       if (pendingReview) return { id: 'in_progress', label: '进行中' }
-      if (!link) return { id: 'in_progress', label: '进行中' }
+      if (!link) return { id: 'in_progress', label: '待回传链接' }
     }
-    if (taskStatus === 'rejected') return { id: 'pr_pending', label: 'PR 待选中' }
+    if (taskStatus === 'rejected') return { id: 'in_progress', label: '已拒绝' }
     return { id: 'in_progress', label: '进行中' }
   }
 
+  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
   if (!isApplicantPrSelected(mp, applicant)) return { id: 'pr_pending', label: 'PR 待选中' }
   return { id: 'in_progress', label: '进行中' }
 }
@@ -67,7 +70,8 @@ export function matchTalentApplicationProgress(
   progressId: TalentAppProgressId,
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
 ): boolean {
   if (progressId === 'all') return true
-  return resolveTalentApplicationProgress(mp, applicant).id === progressId
+  return resolveTalentApplicationProgress(mp, applicant, mpOrderId).id === progressId
 }

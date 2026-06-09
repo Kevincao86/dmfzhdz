@@ -35,10 +35,12 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
     if (ice) return { id: 'in_progress', label: '进行中' }
     return { id: 'pr_pending', label: 'PR 待选中' }
   }
-  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
 
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
+    if (isApplicantPassed(applicant) && taskStatus === 'confirmed') {
+      return { id: 'completed', label: '已完成' }
+    }
     if (taskStatus === 'rejected') return { id: 'in_progress', label: '已拒绝' }
     if (taskStatus === 'pending_confirm' || taskStatus === 'applied' || (!taskStatus && !applicant.assignedVideoDownloadUrl)) {
       return { id: 'in_progress', label: '待确认接收' }
@@ -56,12 +58,12 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
         return { id: 'in_progress', label: applicant.videoStatus === 'rejected' ? '链接已驳回' : 'AI 核查未通过' }
       }
       if (!link) return { id: 'in_progress', label: '待回传链接' }
-      if (verifyMode === 'ai' && isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
       return { id: 'in_progress', label: '进行中' }
     }
     return { id: 'in_progress', label: '进行中' }
   }
 
+  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
   if (!isApplicantPrSelected(mp, applicant)) return { id: 'pr_pending', label: 'PR 待选中' }
   return { id: 'in_progress', label: '进行中' }
 }

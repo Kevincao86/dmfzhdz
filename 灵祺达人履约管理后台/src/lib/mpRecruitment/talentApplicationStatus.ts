@@ -39,10 +39,12 @@ export function resolveTalentApplicationProgress(
     if (ice) return { id: 'in_progress', label: '进行中' }
     return { id: 'pr_pending', label: 'PR 待选中' }
   }
-  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
 
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
+    if (isApplicantPassed(applicant) && taskStatus === 'confirmed') {
+      return { id: 'completed', label: '已完成' }
+    }
     if (taskStatus === 'rejected') return { id: 'in_progress', label: '已拒绝' }
     if (
       taskStatus === 'pending_confirm' ||
@@ -72,6 +74,17 @@ export function resolveTalentApplicationProgress(
     return { id: 'in_progress', label: '进行中' }
   }
 
+  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
   if (!isApplicantPrSelected(mp, applicant)) return { id: 'pr_pending', label: 'PR 待选中' }
   return { id: 'in_progress', label: '进行中' }
+}
+
+export function matchTalentApplicationProgress(
+  progressId: TalentAppProgressId,
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
+): boolean {
+  if (progressId === 'all') return true
+  return resolveTalentApplicationProgress(mp, applicant, mpOrderId).id === progressId
 }

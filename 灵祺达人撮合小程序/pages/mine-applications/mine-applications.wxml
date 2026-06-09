@@ -75,7 +75,7 @@
       </view>
     </view>
     <view class="app-card__tags">
-      <text class="app-card__tag app-card__tag--progress">{{item.progressLabel || item.statusLabel}}</text>
+      <text class="app-card__tag app-card__tag--progress">{{item.progressLabel}}</text>
       <text wx:if="{{item.orderTypeLabel}}" class="app-card__tag app-card__tag--type">{{item.orderTypeLabel}}</text>
       <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
       <text class="app-card__tag">{{item.platform}}</text>
