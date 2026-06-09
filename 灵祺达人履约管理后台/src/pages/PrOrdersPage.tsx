@@ -4,6 +4,7 @@ import { fetchMpRegistry, patchMpRecruitmentOrder, deleteMpRecruitmentOrder } fr
 import { getAccount } from '../lib/mpSession'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
+import { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter } from '../lib/mpRecruitment/mpOrderStatus'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import {
   cachePublishedOrdersFromMpList,
@@ -34,6 +35,16 @@ const TARGET_FILTERS = [
   { id: 'talent', label: '达人' },
   { id: 'shoot', label: '拍摄' },
   { id: 'edit', label: '剪辑' },
+] as const
+
+const PR_ORDER_STATUS_FILTERS = [
+  { value: HALL_DEFAULT_STATUS_FILTER, label: '招募中/收集中' },
+  { value: '全部', label: '全部状态' },
+  { value: '招募中', label: '招募中' },
+  { value: '收集中', label: '收集中' },
+  { value: '已停止', label: '已停止' },
+  { value: '已完成', label: '已完成' },
+  { value: '已删除', label: '已删除' },
 ] as const
 
 type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
@@ -74,6 +85,7 @@ export default function PrOrdersPage() {
   const [filterHall, setFilterHall] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+  const [filterStatus, setFilterStatus] = useState<string>(HALL_DEFAULT_STATUS_FILTER)
   const [filterKeyword, setFilterKeyword] = useState('')
 
   const refreshDrafts = useCallback(() => {
@@ -160,10 +172,11 @@ export default function PrOrdersPage() {
       if (!hallFilters.matchCategory(row.category, filterCategory)) return false
       if (!hallFilters.matchHallType(row.hallLabel, filterHall)) return false
       if (!hallFilters.matchRegionFilter(row.region, '', filterProvince, filterCity)) return false
+      if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
       if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
     })
-  }, [rows, filterTarget, filterPlatform, filterCategory, filterHall, filterProvince, filterCity, filterKeyword])
+  }, [rows, filterTarget, filterPlatform, filterCategory, filterHall, filterProvince, filterCity, filterStatus, filterKeyword])
 
   const filteredDrafts = useMemo(() => {
     const kw = filterKeyword.trim()
@@ -244,7 +257,7 @@ export default function PrOrdersPage() {
     <div className="max-w-3xl space-y-4">
       <PageHero
         title="我的发单"
-        subtitle="管理已发布招募单与草稿，支持按身份、平台、城市、类目与大厅类型筛选。"
+        subtitle="管理已发布招募单与草稿，支持按身份、状态、平台、城市、类目与大厅类型筛选。"
         badge={tab === 'published' ? `${filteredRows.length} 条发单` : `${drafts.length} 草稿`}
       >
         <Link
@@ -342,6 +355,17 @@ export default function PrOrdersPage() {
                 setFilterCity(c)
               }}
             />
+            <select
+              className="rounded-lg panel-input border px-2 py-1.5"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              {PR_ORDER_STATUS_FILTERS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
           {filteredRows.length !== rows.length ? (
             <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {rows.length} 条</p>
