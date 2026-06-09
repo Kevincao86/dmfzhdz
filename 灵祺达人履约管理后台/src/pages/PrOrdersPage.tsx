@@ -6,6 +6,7 @@ import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import {
+  cachePublishedOrdersFromMpList,
   markPublishedOrderDeleted,
   readPublishedOrders,
   listPublishedOrdersForCurrentPr,
@@ -88,6 +89,7 @@ export default function PrOrdersPage() {
         string,
         unknown
       >[]
+      cachePublishedOrdersFromMpList(mpList)
       pruneOrphanPublishedOrders(mpList)
       const local = listPublishedOrdersForCurrentPr(mpList)
       if (!local.length) {
