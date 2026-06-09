@@ -97,9 +97,10 @@ function formPatchFromMpOrder(mp) {
       .filter(Boolean)
   }
   if (mp?.region === '全国') patch.cityNational = true
-  if (!patch.iceVideoUrl && Array.isArray(mp?.iceVideoSlots) && mp.iceVideoSlots[0]) {
-    patch.iceVideoUrl = String(mp.iceVideoSlots[0].downloadUrl || '').trim()
+  if (!patch.referenceUrl && Array.isArray(mp?.iceVideoSlots) && mp.iceVideoSlots[0]) {
+    patch.referenceUrl = String(mp.iceVideoSlots[0].downloadUrl || '').trim()
   }
+  if (!patch.referenceUrl && patch.iceVideoUrl) patch.referenceUrl = patch.iceVideoUrl
   if (!patch.applyFormFields.length && meta.applyFormTemplateId) {
     const tpl = applyTemplates.getTemplateById(meta.applyFormTemplateId)
     if (tpl && tpl.fields) patch.applyFormFields = tpl.fields.map((f) => ({ ...f }))

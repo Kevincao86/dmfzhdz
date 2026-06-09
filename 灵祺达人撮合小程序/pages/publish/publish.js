@@ -141,7 +141,9 @@ function emptyForm(recruitTarget) {
   }
 }
 
-function buildTagGrid(selected) {
+function resolveIceReferenceVideoUrl(f) {
+  return String((f && f.referenceUrl) || (f && f.materialUrl) || (f && f.iceVideoUrl) || '').trim()
+}
   const set = new Set(selected || [])
   return TALENT_TAGS.map((name) => ({ name, on: set.has(name), disabled: false }))
 }
@@ -1159,7 +1161,7 @@ Page({
       if (sErr) return sErr
     }
     if (this.data.recruitMode === 'ice' || this.data.recruitMode === 'edit_ice') {
-      if (!String(f.iceVideoUrl || '').trim()) return '云剪任务请填写参考成片链接'
+      if (!resolveIceReferenceVideoUrl(f)) return '云剪任务请填写参考片链接'
     }
     if (!(f.applyFormFields || []).length) {
       return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
@@ -1249,8 +1251,8 @@ Page({
     lines.push('招募详情：')
     const recruitDetail = String(f.recruitDetail || '').trim()
     if (recruitDetail) lines.push(recruitDetail)
-    if ((mode.hall === 'ice' || mode.id === 'edit_ice') && String(f.iceVideoUrl || '').trim()) {
-      lines.push(`云剪参考成片：${String(f.iceVideoUrl).trim()}`)
+    if ((mode.hall === 'ice' || mode.id === 'edit_ice') && resolveIceReferenceVideoUrl(f)) {
+      lines.push(`云剪参考成片：${resolveIceReferenceVideoUrl(f)}`)
       lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
     }
     return lines.join('\n')
@@ -1269,9 +1271,10 @@ Page({
     this.setData({ 'form.materialSource': val })
   },
   onIceVerifyModePick(e) {
-    const mode = e.currentTarget.dataset.mode
-    if (!mode) return
-    this.setData({ 'form.iceVerifyMode': mode === 'pr' ? 'pr' : 'ai' })
+    const val = e.currentTarget.dataset.val
+    if (!val) return
+    const iceVerifyMode = val === 'pr' ? 'pr' : 'ai'
+    this.setData({ form: { ...this.data.form, iceVerifyMode } })
   },
   onAspectRatioPick(e) {
     const val = e.currentTarget.dataset.val
@@ -1377,7 +1380,7 @@ Page({
           coverImage: coverFields.coverImage,
           coverLibraryId: coverFields.coverLibraryId,
           coverImageSource: coverFields.coverImageSource,
-          iceVideoUrl: String(f.iceVideoUrl || '').trim(),
+          iceVideoUrl: resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
         },
           f,
@@ -1388,7 +1391,7 @@ Page({
       order.orderKind = 'recruitment_ice'
       order.hall = 'ice'
       order.fulfillmentLoop = 'closed'
-      const url = String(f.iceVideoUrl || '').trim()
+      const url = resolveIceReferenceVideoUrl(f)
       order.iceVideoSlots = [{ slotId: `SLOT-${ts}`, label: '成片1', downloadUrl: url, iceJobId: '' }]
     } else {
       order.hall = 'normal'

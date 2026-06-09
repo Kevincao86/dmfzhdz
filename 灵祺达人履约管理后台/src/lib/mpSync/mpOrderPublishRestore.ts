@@ -99,9 +99,10 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
   }
   if (mp.region === '全国') patch.cityNational = true
   const slots = mp.iceVideoSlots as { downloadUrl?: string }[] | undefined
-  if (!patch.iceVideoUrl && Array.isArray(slots) && slots[0]) {
-    patch.iceVideoUrl = String(slots[0].downloadUrl || '').trim()
+  if (!patch.referenceUrl && Array.isArray(slots) && slots[0]) {
+    patch.referenceUrl = String(slots[0].downloadUrl || '').trim()
   }
+  if (!patch.referenceUrl && patch.iceVideoUrl) patch.referenceUrl = patch.iceVideoUrl
   if (!patch.applyFormFields.length && meta.applyFormTemplateId) {
     const tpl = getTemplateById(String(meta.applyFormTemplateId))
     if (tpl?.fields) patch.applyFormFields = tpl.fields.map((f) => ({ ...f }))

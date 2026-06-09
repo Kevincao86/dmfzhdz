@@ -1,5 +1,5 @@
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
-import { routeAiChat } from '../vite-plugins/aiGateway/chatRouter.js'
+import { routeAiChat } from '../../vite-plugins/aiGateway/chatRouter.js'
 import { extractDouyinVideoId, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 
 export type IceDouyinAiVerifyResult =
@@ -36,6 +36,7 @@ function orderContextLines(mp: RegistryMpRecruitmentOrder): string[] {
   const lines = [
     String(mp.title || '').trim(),
     String(mp.recruitmentInfo || mp.merchantRequirements || '').trim().slice(0, 400),
+    String(meta.referenceUrl || '').trim(),
     String(meta.iceVideoUrl || '').trim(),
     String(meta.materialUrl || '').trim(),
   ].filter(Boolean)
