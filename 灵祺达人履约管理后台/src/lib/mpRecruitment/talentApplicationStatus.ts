@@ -27,13 +27,16 @@ export function resolveTalentApplicationProgress(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
 ): { id: Exclude<TalentAppProgressId, 'all'>; label: string } {
-  if (!applicant) return { id: 'pr_pending', label: 'PR 待选中' }
+  const ice = isIceMpOrder(mp)
+  if (!applicant) {
+    if (ice) return { id: 'in_progress', label: '进行中' }
+    return { id: 'pr_pending', label: 'PR 待选中' }
+  }
   if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
 
-  const ice = isIceMpOrder(mp)
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
-    if (taskStatus === 'rejected') return { id: 'pr_pending', label: '已拒绝' }
+    if (taskStatus === 'rejected') return { id: 'in_progress', label: '已拒绝' }
     if (
       taskStatus === 'pending_confirm' ||
       taskStatus === 'applied' ||
@@ -46,6 +49,9 @@ export function resolveTalentApplicationProgress(
       const verifyMode = getIceVerifyMode(mp)
       if (verifyMode === 'pr' && applicant.videoStatus === 'pending' && !isApplicantPassed(applicant)) {
         return { id: 'in_progress', label: '链接待 PR 审核' }
+      }
+      if (verifyMode === 'ai' && applicant.aiVerifyStatus === 'pending' && link) {
+        return { id: 'in_progress', label: 'AI 核查中' }
       }
       if (applicant.aiVerifyStatus === 'failed' || applicant.videoStatus === 'rejected') {
         return {
