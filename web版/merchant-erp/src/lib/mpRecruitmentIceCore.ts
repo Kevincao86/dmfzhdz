@@ -4,6 +4,7 @@ import type {
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
 } from './opsRegistryTypes.js'
+import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 
 export function isIceMpOrder(mp: RegistryMpRecruitmentOrder): boolean {
   return mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
@@ -39,14 +40,31 @@ export function isDouyinVideoUrl(raw: string): boolean {
   }
 }
 
+/** 从分享口令/整段文案中提取抖音链接（同步，不做短链跳转） */
+export function normalizeDouyinPublishInput(raw: string): string | null {
+  const t = raw.trim()
+  if (!t) return null
+  const share = extractDouyinShareFromText(t)
+  if (share.url) return share.url
+  if (share.videoId) return `https://www.douyin.com/video/${share.videoId}`
+  if (isDouyinVideoUrl(t)) return t
+  return null
+}
+
 /** 简易 AI 核查：链接形态 + 非空路径（可后续接真实模型） */
-export function verifyDouyinPublishLink(url: string): { passed: boolean; note: string } {
+export function verifyDouyinPublishLink(raw: string): { passed: boolean; note: string; normalizedUrl?: string } {
+  const normalized = normalizeDouyinPublishInput(raw)
+  const url = normalized ?? raw.trim()
   if (!isDouyinVideoUrl(url)) {
-    return { passed: false, note: '请提交抖音视频作品链接（douyin.com）' }
+    return {
+      passed: false,
+      note: '未识别到抖音作品链接，请粘贴抖音「分享」复制的整段文案（含链接）',
+    }
   }
-  const t = url.trim()
-  if (t.length < 12) return { passed: false, note: '链接过短' }
-  return { passed: true, note: '链接格式符合抖音作品页' }
+  if (url.length < 12) return { passed: false, note: '链接过短' }
+  const note =
+    normalized && normalized !== raw.trim() ? '已从分享口令识别链接' : '链接格式符合抖音作品页'
+  return { passed: true, note, normalizedUrl: url }
 }
 
 export function maybeAdvanceIceMpToSettlement(
@@ -241,12 +259,14 @@ function upsertApplicant(
   return applicants
 }
 
-export function submitIceDouyinForApplicant(
+export async function submitIceDouyinForApplicant(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   douyinPublishUrl: string,
-): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
-  const url = douyinPublishUrl.trim()
+): Promise<{ ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string }> {
+  const resolved = await resolveDouyinVideoPublishUrl(douyinPublishUrl)
+  if (!resolved.ok) return { ok: false, error: resolved.error }
+  const url = resolved.normalizedUrl
   const verify = verifyDouyinPublishLink(url)
   if (!verify.passed) return { ok: false, error: verify.note }
 
@@ -268,7 +288,7 @@ export function submitIceDouyinForApplicant(
     ...app,
     douyinPublishUrl: url,
     aiVerifyStatus: 'passed',
-    aiVerifyNote: verify.note,
+    aiVerifyNote: resolved.note,
     completedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
 

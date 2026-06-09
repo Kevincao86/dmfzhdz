@@ -135,7 +135,7 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
             <p className="text-xs text-slate-600">发布抖音后粘贴作品链接：</p>
             <input
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
-              placeholder="https://www.douyin.com/..."
+              placeholder="粘贴抖音分享口令或作品链接"
               value={douyinUrl}
               onChange={(e) => setDouyinUrl(e.target.value)}
             />

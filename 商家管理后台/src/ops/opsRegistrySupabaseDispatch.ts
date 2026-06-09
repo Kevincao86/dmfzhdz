@@ -485,7 +485,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       if (!isIceMpOrder(cur)) {
         return { status: 400, body: { ok: false, error: 'not_ice_order' } }
       }
-      const result = submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
+      const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
       if (!result.ok) {
         return { status: 400, body: { ok: false, error: 'verify_failed', message: result.error } }
       }

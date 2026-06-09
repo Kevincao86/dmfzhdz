@@ -829,7 +829,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               json(res, 400, { ok: false, error: 'not_ice_order' })
               return
             }
-            const result = submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
+            const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
             if (!result.ok) {
               json(res, 400, { ok: false, error: 'verify_failed', message: result.error })
               return
