@@ -234,7 +234,10 @@ export async function verifyOpsStaffLogin(
   await ensureOpsMasterAccountInDb(admin)
   const phone = normalizePhone(phoneRaw)
   if (phone.length !== 11) return { ok: false, error: 'invalid_phone' }
-  const row = await fetchRowByPhone(admin, phone)
+  /** 历史误写主号 81283 → 统一按 01283 查库 */
+  const lookupPhone =
+    phone === OPS_MASTER_PHONE_LEGACY_WRONG ? OPS_MASTER_PHONE : phone
+  const row = await fetchRowByPhone(admin, lookupPhone)
   if (!row) return { ok: false, error: 'not_found' }
   if (row.status === 'disabled') return { ok: false, error: 'disabled' }
   const hash = hashOpsPasswordSync(password)

@@ -46,7 +46,8 @@ export async function apiOpsStaffLogin(
       return { ok: false, useLocalFallback: true, error: 'not_found' }
     }
     if (!res.ok || data.ok === false) {
-      return { ok: false, useLocalFallback: false, error: 'bad_credentials' }
+      const code = String(data.code ?? 'bad_credentials').trim() || 'bad_credentials'
+      return { ok: false, useLocalFallback: false, error: code }
     }
     const sessionRaw = data.session as Record<string, unknown> | undefined
     const sessionToken = String(data.sessionToken ?? '').trim()
