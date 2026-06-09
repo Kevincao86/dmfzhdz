@@ -5,6 +5,7 @@ const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
 const chat = require('../../utils/talentChat.js')
 const contactGate = require('../../utils/talentContactPrGate.js')
+const iceOrderStats = require('../../utils/iceOrderStats.js')
 const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
 
 Page({
@@ -30,6 +31,7 @@ Page({
     iceAiFailedNote: '',
     iceSubmitLabel: '提交链接 · AI 核查',
     iceStatusHint: '',
+    iceStep3Hint: '发布抖音并回传链接，AI 核查通过后自动完成',
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -120,7 +122,7 @@ Page({
       let iceAiFailedNote = ''
       let iceRejectReason = ''
       const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
-      let iceVerifyMode = String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim().toLowerCase() === 'pr' ? 'pr' : 'ai'
+      let iceVerifyMode = iceOrderStats.getIceVerifyMode(mp)
       if (isIce && iceApplicantId) {
         const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
         if (app) {
@@ -130,9 +132,13 @@ Page({
             app.aiVerifyStatus === 'passed' ||
             app.videoStatus === 'passed' ||
             !!String(app.completedAt || '').trim()
-          icePendingConfirm = app.taskStatus === 'pending_confirm' || (!app.taskStatus && !assignedVideoUrl)
+          icePendingConfirm =
+            app.taskStatus === 'pending_confirm' ||
+            app.taskStatus === 'applied' ||
+            (!app.taskStatus && !assignedVideoUrl)
           iceRejected = app.taskStatus === 'rejected'
-          icePendingPrReview = app.videoStatus === 'pending' && !iceVerified
+          icePendingPrReview =
+            iceVerifyMode === 'pr' && app.videoStatus === 'pending' && !iceVerified
           iceLinkRejected = app.videoStatus === 'rejected'
           iceRejectReason = String(app.videoRejectReason || '').trim()
           iceAiFailedNote = app.aiVerifyStatus === 'failed' ? String(app.aiVerifyNote || 'AI核查不通过，视频与订单无关') : ''
@@ -142,6 +148,10 @@ Page({
         }
       }
       const iceSubmitLabel = iceVerifyMode === 'pr' ? '提交链接 · PR 审核' : '提交链接 · AI 核查'
+      const iceStep3Hint =
+        iceVerifyMode === 'pr'
+          ? '发布抖音并回传链接，PR 审核通过后完成'
+          : '发布抖音并回传链接，AI 核查通过后自动完成'
       let iceStatusHint = ''
       if (iceVerified) iceStatusHint = '已完成'
       else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
@@ -159,6 +169,7 @@ Page({
         : null
       const gate = contactGate.evaluate(mp, id)
       const hasApplied = this.data.applied || iceApplied || gate.hasApplication
+      const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
       this.setData({
         view,
         loading: false,
@@ -168,7 +179,7 @@ Page({
         chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
         prChatMeta,
         canContactPr: gate.canContact,
-        contactPrPending: hasApplied && prChatMeta && !gate.canContact,
+        contactPrPending,
         isIce,
         iceApplicantId,
         assignedVideoUrl,
@@ -182,6 +193,7 @@ Page({
         iceAiFailedNote,
         iceSubmitLabel,
         iceStatusHint,
+        iceStep3Hint,
         applied: hasApplied,
       })
     } catch (e) {
@@ -270,9 +282,9 @@ Page({
     this.setData({ iceSubmitting: true })
     try {
       const res = await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
-      const pending = res && (res.aiVerifyStatus === 'pending' || res.status === 'pending')
+      const pending = this.data.iceVerifyMode === 'pr' && res && (res.aiVerifyStatus === 'pending' || res.status === 'pending')
       wx.showToast({
-        title: pending ? '已提交，待 PR 审核' : '核查通过',
+        title: pending ? '已提交，待 PR 审核' : this.data.iceVerifyMode === 'pr' ? '已提交' : 'AI 核查通过',
         icon: 'success',
       })
       if (!pending) this.setData({ iceVerified: true })

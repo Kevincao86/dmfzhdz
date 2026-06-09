@@ -393,7 +393,9 @@ export async function submitIceDouyinForApplicant(
   applicants[idx] = {
     ...app,
     douyinPublishUrl: url,
+    videoUrl: url,
     aiVerifyStatus: 'passed',
+    videoStatus: 'passed',
     aiVerifyNote: aiCheck.note,
     completedAt: now,
   }

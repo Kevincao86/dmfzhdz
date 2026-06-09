@@ -8,6 +8,8 @@ const selection = require('../../utils/mpApplicantSelection.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 const mpGroupQr = require('../../utils/mpGroupQr.js')
+const iceOrderStats = require('../../utils/iceOrderStats.js')
+const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 
 Page({
   data: {
@@ -21,6 +23,11 @@ Page({
     status: '',
     statusLabel: '',
     hallLabel: '',
+    isIce: false,
+    iceVerifyMode: 'ai',
+    iceClaimed: 0,
+    iceCompleted: 0,
+    icePendingReview: 0,
     applicants: [],
     selectedIds: [],
     selectedCount: 0,
@@ -38,6 +45,11 @@ Page({
     chatEnabled: false,
     chattingId: '',
     mpOrder: null,
+    iceReviewBusyId: '',
+    iceRejectModal: false,
+    iceRejectTargetId: '',
+    iceRejectTargetName: '',
+    iceRejectReason: '',
   },
   onShow() {
     this.setData({ chatEnabled: chat.canChat() && userProfile.readIdentity() === 'pr' })
@@ -86,9 +98,25 @@ Page({
         return
       }
       const meta = heroMeta.buildMpOrderHeroMeta(mp)
+      const isIce = iceOrderStats.isIceMpOrder(mp)
+      const iceVerifyMode = iceOrderStats.getIceVerifyMode(mp)
+      const iceStats = iceOrderStats.countIceOrderStats(mp)
+      let icePendingReview = 0
       let selectedIds = selection.selectedIdsFromMp(mp)
       if (!selectedIds.length) selectedIds = selection.readLocalSelectedIds(mpOrderId)
-      const applicants = (mp.applicants || []).map((a, i) => appDisplay.enrichApplicantRow(a, i, reg))
+      const applicants = (mp.applicants || []).map((a, i) => {
+        const row = appDisplay.enrichApplicantRow(a, i, reg)
+        if (!isIce) return row
+        const canReview = iceOrderStats.canReviewIceLink(a, mp)
+        if (canReview) icePendingReview += 1
+        return {
+          ...row,
+          iceTaskStatus: iceOrderStats.applicantTaskStatusLabel(a),
+          iceDouyinUrl: String(a.douyinPublishUrl || a.videoUrl || '').trim(),
+          iceRejectReason: String(a.videoRejectReason || a.aiVerifyNote || '').trim(),
+          canReviewIceLink: canReview,
+        }
+      })
       this.setData({
         loading: false,
         title: mp.title || mp.customerName || mpOrderId,
@@ -98,6 +126,11 @@ Page({
         status: mp.status || 'open',
         statusLabel: appDisplay.statusLabel(mp.status),
         hallLabel: appDisplay.hallLabelFromMp(mp),
+        isIce,
+        iceVerifyMode,
+        iceClaimed: iceStats.claimed,
+        iceCompleted: iceStats.completed,
+        icePendingReview,
         mpOrder: mp,
         groupQrImage: mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
@@ -408,8 +441,77 @@ Page({
       `联系：${a.contact || ''}`,
       `微信：${a.wechatId || ''}`,
       `主页：${a.profileLink || ''}`,
+      a.iceDouyinUrl ? `抖音链接：${a.iceDouyinUrl}` : '',
+      a.iceTaskStatus ? `任务状态：${a.iceTaskStatus}` : '',
       a.selected ? '状态：已入选' : '',
     ].filter(Boolean)
     wx.setClipboardData({ data: lines.join('\n') })
+  },
+  onCopyIceLink(e) {
+    const idx = Number(e.currentTarget.dataset.index)
+    const a = this.data.applicants[idx]
+    const url = a && a.iceDouyinUrl ? String(a.iceDouyinUrl) : ''
+    if (!url) return
+    wx.setClipboardData({ data: url })
+  },
+  async onIcePass(e) {
+    const idx = Number(e.currentTarget.dataset.index)
+    const a = this.data.applicants[idx]
+    if (!a || !a.id || this.data.iceReviewBusyId) return
+    this.setData({ iceReviewBusyId: a.id })
+    wx.showLoading({ title: '提交中…', mask: true })
+    try {
+      await videoUpload.reviewVideo(this.data.mpOrderId, a.id, 'pass')
+      wx.showToast({ title: '已通过', icon: 'success' })
+      await this.loadOrder()
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '审核失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ iceReviewBusyId: '' })
+    }
+  },
+  onIceOpenReject(e) {
+    const idx = Number(e.currentTarget.dataset.index)
+    const a = this.data.applicants[idx]
+    if (!a || !a.id) return
+    this.setData({
+      iceRejectModal: true,
+      iceRejectTargetId: a.id,
+      iceRejectTargetName: a.displayName || '达人',
+      iceRejectReason: '',
+    })
+  },
+  onIceRejectReasonInput(e) {
+    this.setData({ iceRejectReason: String((e.detail && e.detail.value) || '') })
+  },
+  onIceCloseReject() {
+    this.setData({
+      iceRejectModal: false,
+      iceRejectTargetId: '',
+      iceRejectTargetName: '',
+      iceRejectReason: '',
+    })
+  },
+  async onIceConfirmReject() {
+    const id = this.data.iceRejectTargetId
+    const reason = String(this.data.iceRejectReason || '').trim()
+    if (!id || !reason || this.data.iceReviewBusyId) {
+      wx.showToast({ title: '请填写驳回原因', icon: 'none' })
+      return
+    }
+    this.setData({ iceReviewBusyId: id })
+    wx.showLoading({ title: '提交中…', mask: true })
+    try {
+      await videoUpload.reviewVideo(this.data.mpOrderId, id, 'reject', reason)
+      wx.showToast({ title: '已驳回', icon: 'success' })
+      this.onIceCloseReject()
+      await this.loadOrder()
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '驳回失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ iceReviewBusyId: '' })
+    }
   },
 })

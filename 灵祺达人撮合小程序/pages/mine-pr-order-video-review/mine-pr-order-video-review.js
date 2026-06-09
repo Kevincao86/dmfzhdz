@@ -8,11 +8,11 @@ function submitCountLabel(count) {
 
 function mapCards(applicants) {
   return (applicants || [])
-    .filter((a) => a && String(a.videoUrl || '').trim())
+    .filter((a) => a && String(a.videoUrl || a.douyinPublishUrl || '').trim())
     .map((a) => ({
       id: String(a.id || ''),
       displayName: String(a.platformNickname || a.name || '达人'),
-      videoUrl: String(a.videoUrl || ''),
+      videoUrl: String(a.videoUrl || a.douyinPublishUrl || ''),
       videoStatus: String(a.videoStatus || 'pending'),
       videoStatusLabel: videoUpload.videoStatusLabel(a.videoStatus || 'pending') || '待审核',
       videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : '',

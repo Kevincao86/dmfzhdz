@@ -2,6 +2,7 @@ const applicationsStore = require('./applicationsStore.js')
 const selection = require('./mpApplicantSelection.js')
 const talentMember = require('./talentMember.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
+const { isIceMpOrder } = require('./iceOrderDetect.js')
 
 const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1_'
 
@@ -60,6 +61,24 @@ function evaluate(mp, mpOrderId) {
       reason: 'not_applied',
       message: '请先报名，招募方 PR 审核通过后方可联系',
       applicant: null,
+    }
+  }
+  if (isIceMpOrder(mp)) {
+    if (applicant.taskStatus === 'rejected') {
+      return {
+        canContact: false,
+        hasApplication: true,
+        reason: 'rejected',
+        message: '您已拒绝该云剪任务',
+        applicant,
+      }
+    }
+    return {
+      canContact: true,
+      hasApplication: true,
+      reason: 'ice_claimed',
+      message: '',
+      applicant,
     }
   }
   const selectedIds = selection.selectedIdsFromMp(mp)
