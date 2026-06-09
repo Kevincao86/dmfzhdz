@@ -23,6 +23,7 @@ import {
   resolveMpOrderForMerchantOrder,
 } from '../mpRecruitmentDedup'
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
+import { buildMpRecruitmentOrderId } from '../mpRecruitmentOrderId'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
 
 const ALERT_PREFS_KEY = 'meoo_ops_recruitment_alert_v1'
@@ -403,7 +404,7 @@ export default function OpsRecruitmentOrdersPage() {
       }
 
       const now = new Date().toLocaleString('zh-CN', { hour12: false })
-      const mpId = `MP-RO-${Date.now()}`
+      const mpId = buildMpRecruitmentOrderId('RO')
       const platform = mpRecruitPlatform
       const urgent = mpHallKind === 'urgent'
       const fields = buildMpRecruitmentFieldsFromMerchant(order, { platform, urgent })
@@ -483,7 +484,7 @@ export default function OpsRecruitmentOrdersPage() {
       }
 
       const now = new Date().toLocaleString('zh-CN', { hour12: false })
-      const mpId = `MP-ICE-${Date.now()}`
+      const mpId = buildMpRecruitmentOrderId('ICE')
       const fields = buildMpRecruitmentFieldsForIce(order)
       const mpOrder: RegistryMpRecruitmentOrder = {
         id: mpId,

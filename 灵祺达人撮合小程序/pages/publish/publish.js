@@ -1,6 +1,6 @@
 const api = require('../../utils/api.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const userProfile = require('../../utils/userProfile.js')
+const mpRecruitmentOrderId = require('../../utils/mpRecruitmentOrderId.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const participant = require('../../utils/participant.js')
@@ -13,6 +13,7 @@ const mpOrderRestore = require('../../utils/mpOrderPublishRestore.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
+const mpRecruitmentOrderId = require('../../utils/mpRecruitmentOrderId.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -1219,15 +1220,16 @@ Page({
     const f = this.data.form
     const mode = modeById(this.data.recruitMode)
     const now = new Date().toLocaleString('zh-CN', { hour12: false })
-    const ts = Date.now()
+    const nowMs = Date.now()
+    const ts = mpRecruitmentOrderId.mpOrderTimeSuffix(nowMs)
     const existing = this.data.editingOrder
     const editId = this.data.editMpId
     const mpId =
       editId && existing
         ? editId
         : mode.hall === 'ice'
-          ? `MP-ICE-${ts}`
-          : `MP-RO-${ts}`
+          ? mpRecruitmentOrderId.buildMpRecruitmentOrderId('ICE', nowMs)
+          : mpRecruitmentOrderId.buildMpRecruitmentOrderId('RO', nowMs)
     const recruitCount = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
     const isUrgent = f.deliveryWindow === 'urgent' && mode.hall !== 'ice'
     const deadline = this.resolveSignupDeadline(f)
@@ -1237,7 +1239,7 @@ Page({
       sourceMerchantOrderId:
         existing && existing.sourceMerchantOrderId
           ? existing.sourceMerchantOrderId
-          : `MP-USER-${ts}`,
+          : mpRecruitmentOrderId.buildMpRecruitmentOrderId('USER', nowMs),
       customerName: String(f.title || '').trim().slice(0, 24),
       storeName: this.buildRegionText(f),
       merchantRequirements: this.buildRecruitmentInfo(f, mode),
