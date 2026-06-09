@@ -4,6 +4,7 @@ const MP_STATUS_LABEL = {
   collecting: '收集中',
   closed: '已停止',
   done: '已完成',
+  deleted: '已删除',
 }
 
 const HALL_STATUS_FILTERS = ['全部', '招募中/收集中', '招募中', '收集中', '已停止', '已完成']

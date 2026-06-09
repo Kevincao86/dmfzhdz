@@ -29,6 +29,10 @@ export type PublishedOrderLocal = {
   hall?: string
   ownerAccountId?: string
   ownerPrId?: string
+  /** 用户主动删除发单时写入，供「我的发单」展示已删除记录 */
+  deletedAt?: string
+  /** 最近一次从注册表同步到的状态（注册表暂未返回时用于展示已完成等） */
+  lastStatus?: string
 }
 
 function ownerIdsForFilter() {
@@ -143,6 +147,28 @@ export function removePublishedOrder(mpOrderId: string): void {
   const list = readPublishedOrdersRaw()
     .filter((item) => entryBelongsToCurrentAccount(item, ids))
     .filter((item) => item.mpOrderId !== id)
+  writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
+}
+
+export function markPublishedOrderDeleted(mpOrderId: string): void {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  touchPublishedOrderSnapshot(id, {
+    deletedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  })
+}
+
+export function touchPublishedOrderSnapshot(
+  mpOrderId: string,
+  patch: Partial<PublishedOrderLocal>,
+): void {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item.mpOrderId === id)
+  if (idx < 0) return
+  list[idx] = { ...list[idx], ...patch, mpOrderId: id }
   writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
 }
 

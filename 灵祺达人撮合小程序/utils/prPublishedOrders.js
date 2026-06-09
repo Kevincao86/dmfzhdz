@@ -32,31 +32,41 @@ function mpOrderOwnedByCurrentPr(mp, account) {
   return false
 }
 
-/** 注册表为权威数据源：仅展示仍存在于 mpRecruitmentOrders 的本 PR 发单 */
+/** 本地发单历史 + 注册表：展示全部本 PR 发单（含已删除、已完成） */
 function mergePublishedOrdersFromRegistry(local, mpList, account) {
-  const localById = new Map()
-  ;(local || []).forEach((item) => {
-    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
-    if (id) localById.set(id, item)
-  })
-
   const scope = require('./mpAccountLocalScope.js')
-  const out = []
+  const mpById = new Map()
   ;(mpList || []).forEach((mp) => {
     if (!mp || typeof mp !== 'object') return
     const id = String(mp.id || '').trim()
-    if (!id || !mpOrderOwnedByCurrentPr(mp, account)) return
-    const cached = localById.get(id)
-    out.push(
-      cached || {
-        mpOrderId: id,
-        title: String(mp.title || mp.customerName || id),
-        publishedAt: String(mp.createdAt || mp.updatedAt || ''),
-        hall: hallFromMp(mp),
-        ownerAccountId: scope.scopeIdFromAccount(account),
-        ownerPrId: String(account.lingqiPrId || '').trim(),
-      },
-    )
+    if (id) mpById.set(id, mp)
+  })
+
+  const out = []
+  const seen = new Set()
+
+  ;(local || []).forEach((item) => {
+    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
+    if (!id || seen.has(id)) return
+    const mp = mpById.get(id)
+    if (mp && !mpOrderOwnedByCurrentPr(mp, account)) return
+    seen.add(id)
+    out.push(item)
+  })
+
+  ;(mpList || []).forEach((mp) => {
+    if (!mp || typeof mp !== 'object') return
+    const id = String(mp.id || '').trim()
+    if (!id || seen.has(id) || !mpOrderOwnedByCurrentPr(mp, account)) return
+    seen.add(id)
+    out.push({
+      mpOrderId: id,
+      title: String(mp.title || mp.customerName || id),
+      publishedAt: String(mp.createdAt || mp.updatedAt || ''),
+      hall: hallFromMp(mp),
+      ownerAccountId: scope.scopeIdFromAccount(account),
+      ownerPrId: String(account.lingqiPrId || '').trim(),
+    })
   })
 
   return out.sort((a, b) => {
@@ -66,17 +76,9 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
   })
 }
 
-/** 清理本地缓存里已从注册表删除的发单 */
-function pruneOrphanPublishedOrders(mpList) {
-  const ids = new Set(
-    (mpList || [])
-      .map((o) => String(o && o.id ? o.id : '').trim())
-      .filter(Boolean),
-  )
-  for (const item of applicationsStore.readPublishedOrders()) {
-    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
-    if (id && !ids.has(id)) applicationsStore.removePublishedOrder(id)
-  }
+/** 保留本地发单历史，供「我的发单」展示已删除/已完成订单 */
+function pruneOrphanPublishedOrders() {
+  /* no-op */
 }
 
 function listPublishedOrdersForCurrentPr(mpList) {

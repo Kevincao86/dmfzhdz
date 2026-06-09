@@ -173,14 +173,50 @@ function recruitTargetFromMp(mp: Record<string, unknown> | null): 'talent' | 'sh
   return 'talent'
 }
 
+function hallLabelFromLocal(localItem: { hall?: string }): string {
+  if (localItem.hall === 'urgent') return '急单大厅'
+  if (localItem.hall === 'ice') return '云剪任务'
+  return '招募大厅'
+}
+
 export function enrichMpOrderListItem(
   mp: Record<string, unknown> | null,
-  localItem: { title?: string; mpOrderId?: string; hall?: string },
+  localItem: {
+    title?: string
+    mpOrderId?: string
+    hall?: string
+    deletedAt?: string
+    lastStatus?: string
+  },
 ) {
-  const summary = mp
-    ? [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
-    : ''
-  const deadlineMs = mp ? resolveDeadlineMsFromMp(mp, summary) : 0
+  if (!mp) {
+    const status = localItem.deletedAt
+      ? 'deleted'
+      : resolveEffectiveMpStatus(localItem.lastStatus, 0)
+    const recruiting = isMpOrderRecruiting(status)
+    return {
+      ...localItem,
+      title: localItem.title || String(localItem.mpOrderId || '历史发单'),
+      status,
+      statusLabel: statusLabel(status),
+      recruiting,
+      canToggleRecruit: false,
+      toggleActionLabel: '',
+      toggleNextStatus: '',
+      applicantCount: 0,
+      recruitCount: 0,
+      signupLabel: '—',
+      deadlineDaysText: localItem.deletedAt ? '—' : '已结束',
+      deadlineMs: 0,
+      platform: '—',
+      recruitTarget: 'talent' as const,
+      hallLabel: hallLabelFromLocal(localItem),
+      isRemovedFromRegistry: true,
+    }
+  }
+
+  const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const deadlineMs = resolveDeadlineMsFromMp(mp, summary)
   const status = resolveEffectiveMpStatus(mp?.status, deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
   const applicantCount = Array.isArray(mp?.applicants) ? mp.applicants.length : 0
@@ -209,6 +245,7 @@ export function enrichMpOrderListItem(
         : mp?.hall === 'ice' || mp?.orderKind === 'recruitment_ice'
           ? '云剪任务'
           : '招募大厅',
+    isRemovedFromRegistry: false,
   }
 }
 

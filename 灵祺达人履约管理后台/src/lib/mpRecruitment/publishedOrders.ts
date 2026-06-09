@@ -1,4 +1,10 @@
-export { readPublishedOrders, removePublishedOrder, type PublishedOrderLocal } from '../mpSync/applicationsStore'
+export {
+  markPublishedOrderDeleted,
+  readPublishedOrders,
+  removePublishedOrder,
+  touchPublishedOrderSnapshot,
+  type PublishedOrderLocal,
+} from '../mpSync/applicationsStore'
 export {
   listPublishedOrdersForCurrentPr,
   mergePublishedOrdersFromRegistry,

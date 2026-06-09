@@ -35,13 +35,20 @@ function orderForShare(mp, row) {
 }
 
 function mapRow(item, mp) {
+  if (mp) {
+    applicationsStore.touchPublishedOrderSnapshot(item.mpOrderId, {
+      title: String(mp.title || mp.customerName || item.title || item.mpOrderId),
+      lastStatus: String(mp.status || 'open'),
+      hall: mp.hall === 'urgent' || mp.urgent ? 'urgent' : mp.hall === 'ice' || mp.orderKind === 'ice' ? 'ice' : 'normal',
+    })
+  }
   const enriched = listFilters.enrichMpOrderListItem(mp, item)
   const pendingVideoCount = prOrderFilters.countPendingVideos(mp)
   const videoCount = prOrderFilters.countVideos(mp)
   return {
     ...enriched,
     mp: mp || null,
-    hallLabel: hallLabel(item, mp),
+    hallLabel: enriched.hallLabel || hallLabel(item, mp),
     platform: String((mp && mp.platform) || (mp && mp.recruitmentPlatform) || '抖音'),
     region: String((mp && mp.region) || (mp && mp.storeName) || ''),
     category: String((mp && mp.category) || '本地生活'),
@@ -468,10 +475,7 @@ Page({
         wx.showLoading({ title: '删除中…', mask: true })
         try {
           await mpOrderRegistryOps.deleteMpRecruitmentOrder(id)
-          applicationsStore.removePublishedOrder(id)
-          const nextRows = (this.data.rows || []).filter((r) => r && r.mpOrderId !== id)
-          const { filtered, filterCountText } = this.applyFilters(nextRows)
-          this.setData({ rows: nextRows, filteredRows: filtered, filterCountText })
+          applicationsStore.markPublishedOrderDeleted(id)
           wx.showToast({ title: '已删除', icon: 'success' })
           await this.load()
         } catch (err) {

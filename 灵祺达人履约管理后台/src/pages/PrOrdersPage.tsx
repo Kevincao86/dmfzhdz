@@ -6,10 +6,11 @@ import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import {
+  markPublishedOrderDeleted,
   readPublishedOrders,
   listPublishedOrdersForCurrentPr,
   pruneOrphanPublishedOrders,
-  removePublishedOrder,
+  touchPublishedOrderSnapshot,
 } from '../lib/mpRecruitment/publishedOrders'
 import { syncClientStateWithServer } from '../lib/mpAccountClientSync'
 import {
@@ -42,6 +43,7 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   category: string
   recruitTarget: 'talent' | 'shoot' | 'edit'
   mp: Record<string, unknown> | null
+  isRemovedFromRegistry: boolean
 }
 
 function deliveryWindowLabel(id: string) {
@@ -94,7 +96,14 @@ export default function PrOrdersPage() {
       }
       setRows(
         local.map((item) => {
-          const mp = mpList.find((o) => o && o.id === item.mpOrderId)
+          const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
+          if (mp) {
+            touchPublishedOrderSnapshot(item.mpOrderId, {
+              title: String(mp.title || mp.customerName || item.title || item.mpOrderId),
+              lastStatus: String(mp.status || 'open'),
+              hall: mp.hall === 'urgent' || mp.urgent ? 'urgent' : mp.hall === 'ice' || mp.orderKind === 'ice' ? 'ice' : 'normal',
+            })
+          }
           const enriched = listFilters.enrichMpOrderListItem(mp || null, item)
           return {
             ...enriched,
@@ -105,6 +114,7 @@ export default function PrOrdersPage() {
             category: String(mp?.category || '本地生活'),
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
             mp: mp || null,
+            isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
           }
         }),
       )
@@ -117,12 +127,13 @@ export default function PrOrdersPage() {
           return {
             ...enriched,
             mpOrderId: item.mpOrderId,
-            hallLabel: '招募大厅',
+            hallLabel: enriched.hallLabel as string,
             platform: '抖音',
             region: '',
             category: '本地生活',
             recruitTarget: 'talent' as const,
             mp: null,
+            isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
           }
         }),
       )
@@ -218,8 +229,8 @@ export default function PrOrdersPage() {
     setDeletingId(row.mpOrderId)
     try {
       await deleteMpRecruitmentOrder(row.mpOrderId)
-      removePublishedOrder(row.mpOrderId)
-      setRows((prev) => prev.filter((r) => r.mpOrderId !== row.mpOrderId))
+      markPublishedOrderDeleted(row.mpOrderId)
+      await loadPublished()
     } catch (e) {
       alert(e instanceof Error ? e.message : '删除失败')
     } finally {
@@ -355,7 +366,10 @@ export default function PrOrdersPage() {
           ) : null}
           <div className="space-y-3">
             {filteredRows.map((row) => (
-              <article key={row.mpOrderId} className="surface-card rounded-xl border p-4">
+              <article
+                key={row.mpOrderId}
+                className={`surface-card rounded-xl border p-4${row.isRemovedFromRegistry ? ' opacity-75' : ''}`}
+              >
                 <div className="flex justify-between gap-2 items-start">
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-1.5">
@@ -371,50 +385,56 @@ export default function PrOrdersPage() {
                   <span className="text-xs px-2 py-0.5 rounded bg-white/10 shrink-0">{row.statusLabel}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
-                    className="text-sm px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500"
-                  >
-                    报名管理
-                    {row.applicantCount ? <span className="ml-1 opacity-80">({row.applicantCount})</span> : null}
-                  </Link>
-                  <Link
-                    to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
-                    className="text-sm px-3 py-1.5 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50"
-                  >
-                    编辑招募
-                  </Link>
-                  <Link
-                    to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
-                    className="text-sm px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-700 hover:bg-amber-50"
-                  >
-                    视频审核
-                  </Link>
-                  <button
-                    type="button"
-                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
-                    onClick={() => void onShare(row)}
-                  >
-                    分享
-                  </button>
-                  {row.canToggleRecruit ? (
-                    <button
-                      type="button"
-                      disabled={togglingId === row.mpOrderId}
-                      className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
-                      onClick={() => void onToggle(row)}
-                    >
-                      {row.toggleActionLabel}招募
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={deletingId === row.mpOrderId}
-                    className="text-sm px-3 py-1.5 rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50"
-                    onClick={() => void onDeletePublished(row)}
-                  >
-                    删除
-                  </button>
+                  {!row.isRemovedFromRegistry ? (
+                    <>
+                      <Link
+                        to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                        className="text-sm px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500"
+                      >
+                        报名管理
+                        {row.applicantCount ? <span className="ml-1 opacity-80">({row.applicantCount})</span> : null}
+                      </Link>
+                      <Link
+                        to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
+                        className="text-sm px-3 py-1.5 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50"
+                      >
+                        编辑招募
+                      </Link>
+                      <Link
+                        to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
+                        className="text-sm px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-700 hover:bg-amber-50"
+                      >
+                        视频审核
+                      </Link>
+                      <button
+                        type="button"
+                        className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
+                        onClick={() => void onShare(row)}
+                      >
+                        分享
+                      </button>
+                      {row.canToggleRecruit ? (
+                        <button
+                          type="button"
+                          disabled={togglingId === row.mpOrderId}
+                          className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
+                          onClick={() => void onToggle(row)}
+                        >
+                          {row.toggleActionLabel}招募
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={deletingId === row.mpOrderId}
+                        className="text-sm px-3 py-1.5 rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50"
+                        onClick={() => void onDeletePublished(row)}
+                      >
+                        删除
+                      </button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-[var(--shell-muted)]">该发单已从招募大厅移除，仅保留历史记录</p>
+                  )}
                 </div>
               </article>
             ))}
