@@ -7,7 +7,8 @@ export const STATUS_FILTER_OPTIONS = HALL_STATUS_FILTERS
 export { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter }
 
 function matchesRoleRecruit(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
-  if (identity === 'pr') return (row.recruitTarget || 'talent') === 'talent'
+  /** PR 运营视角：招募大厅展示全部对象（达人/拍摄/剪辑），与运营台、我的发单一致 */
+  if (identity === 'pr') return true
   if (identity === 'talent') return (row.recruitTarget || 'talent') === 'talent'
   if (identity === 'shoot') return row.recruitTarget === 'shoot'
   if (identity === 'edit') return row.recruitTarget === 'edit'
@@ -62,6 +63,10 @@ export function splitRoleHallRows(rows: RecruitmentOrderRow[], identity: MpWorkI
   let editRows: RecruitmentOrderRow[] = []
   if (identity === 'shoot') shootRows = primaryRows
   else if (identity === 'edit') editRows = primaryRows
+  else if (identity === 'pr') {
+    shootRows = primaryRows.filter((r) => r.recruitTarget === 'shoot')
+    editRows = primaryRows.filter((r) => r.recruitTarget === 'edit')
+  }
   /** 招募大厅 Tab：非急单全部可见（含云剪），再由状态筛选项过滤 */
   const normalRows = nonUrgent
   const todayStart = new Date()
