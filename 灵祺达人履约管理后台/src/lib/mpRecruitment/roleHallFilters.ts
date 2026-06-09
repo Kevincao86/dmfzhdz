@@ -52,13 +52,20 @@ export type RoleHallBuckets = {
 
 export function splitRoleHallRows(rows: RecruitmentOrderRow[], identity: MpWorkIdentity): RoleHallBuckets {
   const visible = rows.filter((r) => orderVisibleToWorkIdentity(r, identity))
-  const iceRows = visible.filter((r) => r.isIce)
-  const shootRows = visible.filter((r) => r.recruitTarget === 'shoot' && !r.isIce)
-  const editRows = visible.filter((r) => r.recruitTarget === 'edit' && !r.isIce)
-  const urgentRows = visible.filter((r) => r.urgent && !r.isIce && matchesRoleRecruit(r, identity))
-  const normalRows = visible.filter((r) => !r.urgent && !r.isIce && matchesRoleRecruit(r, identity))
+  /** 与小程序 hallIdentityBuckets 对齐：云剪单始终入池；非云剪按身份匹配 */
+  const pool = visible.filter((r) => r.isIce || matchesRoleRecruit(r, identity))
+  const urgentRows = pool.filter((r) => r.urgent)
+  const nonUrgent = pool.filter((r) => !r.urgent)
+  const primaryRows = pool.filter((r) => !r.isIce)
+  const iceRows = pool.filter((r) => r.isIce)
+  let shootRows: RecruitmentOrderRow[] = []
+  let editRows: RecruitmentOrderRow[] = []
+  if (identity === 'shoot') shootRows = primaryRows
+  else if (identity === 'edit') editRows = primaryRows
+  /** 招募大厅 Tab：非急单全部可见（含云剪），再由状态筛选项过滤 */
+  const normalRows = nonUrgent
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
-  const todayCount = visible.filter((r) => (r.publishedAtMs || 0) >= todayStart.getTime()).length
+  const todayCount = pool.filter((r) => (r.publishedAtMs || 0) >= todayStart.getTime()).length
   return { normalRows, urgentRows, shootRows, editRows, iceRows, todayCount }
 }
