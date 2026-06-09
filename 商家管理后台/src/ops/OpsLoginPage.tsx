@@ -56,7 +56,13 @@ export default function OpsLoginPage() {
         await ensureOpsMasterAccount()
         const r = await verifyOpsLogin(account, password)
         if (!r.ok) {
-          setErr('账号或密码错误')
+          const msg: Record<string, string> = {
+            not_found: '该手机号未在云端注册。请主账号登录后重新创建子账号，或确认手机号无误。',
+            bad_password: '密码错误，请重试或请主账号在「账号与权限」中重置密码。',
+            disabled: '该账号已停用，请联系主账号启用。',
+            invalid_phone: '请输入 11 位手机号。',
+          }
+          setErr(msg[r.error] ?? '账号或密码错误')
           return
         }
         if (rememberPassword) {
