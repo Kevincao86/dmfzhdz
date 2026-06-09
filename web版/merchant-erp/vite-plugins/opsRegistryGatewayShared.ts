@@ -829,14 +829,19 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               json(res, 400, { ok: false, error: 'not_ice_order' })
               return
             }
-            const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl)
+            const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl, process.env as Record<string, string>)
             if (!result.ok) {
               json(res, 400, { ok: false, error: 'verify_failed', message: result.error })
               return
             }
             data.mpRecruitmentOrders[idx] = result.mp
             writeRegistry(viteRoot, data)
-            json(res, 200, { ok: true, status: result.mp.status, aiVerifyStatus: 'passed' })
+            json(res, 200, {
+              ok: true,
+              status: result.mp.status,
+              aiVerifyStatus: result.aiVerifyStatus,
+              message: result.message,
+            })
             return
           }
 

@@ -5,22 +5,23 @@ import type {
   RegistryMpRecruitmentOrder,
 } from './opsRegistryTypes.js'
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
+import { getIceVerifyMode, isIceMpOrder } from './iceOrderDetect.js'
+import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
 
-export function isIceMpOrder(mp: RegistryMpRecruitmentOrder): boolean {
-  return mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
-}
+export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel } from './iceOrderDetect.js'
+export type { IceVerifyMode } from './iceOrderDetect.js'
 
 export function iceSlotsFilledCount(mp: RegistryMpRecruitmentOrder): number {
   return (mp.iceVideoSlots ?? []).filter((s) => s.assignedApplicantId?.trim()).length
 }
 
 export function iceSlotsPassedCount(mp: RegistryMpRecruitmentOrder): number {
-  const ids = new Set(
+  const passedIds = new Set(
     (mp.applicants ?? [])
-      .filter((a) => a.aiVerifyStatus === 'passed')
+      .filter((a) => a.aiVerifyStatus === 'passed' || a.videoStatus === 'passed')
       .map((a) => a.id),
   )
-  return (mp.iceVideoSlots ?? []).filter((s) => s.assignedApplicantId && ids.has(s.assignedApplicantId!))
+  return (mp.iceVideoSlots ?? []).filter((s) => s.assignedApplicantId && passedIds.has(s.assignedApplicantId!))
     .length
 }
 
@@ -77,7 +78,7 @@ export function maybeAdvanceIceMpToSettlement(
     const aid = s.assignedApplicantId?.trim()
     if (!aid) return false
     const app = (mp.applicants ?? []).find((a) => a.id === aid)
-    return app?.aiVerifyStatus === 'passed'
+    return app?.aiVerifyStatus === 'passed' || app?.videoStatus === 'passed'
   })
   if (allAssigned && allPassed && mp.status !== 'done' && mp.status !== 'closed') {
     return {
@@ -263,7 +264,11 @@ export async function submitIceDouyinForApplicant(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   douyinPublishUrl: string,
-): Promise<{ ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string }> {
+  env: Record<string, string> = process.env as Record<string, string>,
+): Promise<
+  | { ok: true; mp: RegistryMpRecruitmentOrder; aiVerifyStatus: 'passed' | 'pending'; message?: string }
+  | { ok: false; error: string }
+> {
   const resolved = await resolveDouyinVideoPublishUrl(douyinPublishUrl)
   if (!resolved.ok) return { ok: false, error: resolved.error }
   const url = resolved.normalizedUrl
@@ -284,22 +289,50 @@ export async function submitIceDouyinForApplicant(
   const slotIdx = slots.findIndex((s) => s.slotId === app.assignedIceSlotId)
   if (slotIdx < 0) return { ok: false, error: '成片槽位无效' }
 
+  const verifyMode = getIceVerifyMode(mp)
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+
+  if (verifyMode === 'pr') {
+    const prevCount = Math.max(0, Number(app.videoSubmitCount || 0))
+    applicants[idx] = {
+      ...app,
+      douyinPublishUrl: url,
+      videoUrl: url,
+      videoStatus: 'pending',
+      videoRejectReason: undefined,
+      videoSubmittedAt: now,
+      videoSubmitCount: prevCount + 1,
+      aiVerifyStatus: 'pending',
+      aiVerifyNote: '待 PR 审核链接',
+    }
+    let next: RegistryMpRecruitmentOrder = {
+      ...mp,
+      applicants,
+      iceVideoSlots: slots,
+      updatedAt: now,
+    }
+    return { ok: true, mp: next, aiVerifyStatus: 'pending', message: '链接已提交，请等待 PR 审核' }
+  }
+
+  const aiCheck = await verifyIceDouyinPublishWithAi(mp, douyinPublishUrl, env)
+  if (!aiCheck.passed) return { ok: false, error: aiCheck.note }
+
   applicants[idx] = {
     ...app,
     douyinPublishUrl: url,
     aiVerifyStatus: 'passed',
-    aiVerifyNote: resolved.note,
-    completedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    aiVerifyNote: aiCheck.note,
+    completedAt: now,
   }
 
   let next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,
     iceVideoSlots: slots,
-    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    updatedAt: now,
   }
   next = maybeAdvanceIceMpToSettlement(next)
-  return { ok: true, mp: next }
+  return { ok: true, mp: next, aiVerifyStatus: 'passed', message: aiCheck.note }
 }
 
 export function handleIceMpApply(

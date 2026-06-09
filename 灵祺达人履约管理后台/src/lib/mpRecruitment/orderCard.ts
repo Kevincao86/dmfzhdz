@@ -7,8 +7,16 @@ function isUrgentMpOrder(mp: Record<string, unknown>): boolean {
   return mp.urgent === true
 }
 
-export function isIceMpOrder(mp: Record<string, unknown>): boolean {
-  return mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
+export function isIceMpOrder(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!mp) return false
+  if (mp.hall === 'ice' || mp.orderKind === 'recruitment_ice' || mp.orderKind === 'ice') return true
+  const id = String(mp.id || '').trim()
+  if (/^MP-ICE-/i.test(id)) return true
+  if (String(mp.category || '').trim() === '云剪') return true
+  const meta = mp.mpPublishMeta as Record<string, unknown> | undefined
+  const mode = String(meta?.recruitMode || '').trim()
+  if (mode === 'ice' || mode === 'edit_ice') return true
+  return false
 }
 
 export function recruitTargetFromMp(mp: Record<string, unknown>): 'talent' | 'shoot' | 'edit' {

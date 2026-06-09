@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
+import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { reviewRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
 import PageHero from '../components/ui/PageHero'
 
@@ -8,6 +9,7 @@ type VideoCard = {
   id: string
   displayName: string
   videoUrl: string
+  isIceLink: boolean
   videoStatus: string
   videoRejectReason?: string
   videoSubmittedAt?: string
@@ -22,6 +24,7 @@ function submitCountLabel(count?: number): string {
 export default function PrOrderVideoReviewPage() {
   const { id: mpOrderId = '' } = useParams()
   const [title, setTitle] = useState('')
+  const [isIceOrder, setIsIceOrder] = useState(false)
   const [cards, setCards] = useState<VideoCard[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState('')
@@ -42,19 +45,30 @@ export default function PrOrderVideoReviewPage() {
         unknown
       >[]
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
+      const ice = mp ? isIceMpOrder(mp) : false
       setTitle(String(mp?.title || mpOrderId))
+      setIsIceOrder(ice)
       const applicants = Array.isArray(mp?.applicants) ? (mp!.applicants as Record<string, unknown>[]) : []
       const rows: VideoCard[] = applicants
-        .filter((a) => a && String(a.videoUrl || '').trim())
-        .map((a) => ({
-          id: String(a.id || ''),
-          displayName: String(a.platformNickname || a.name || '达人'),
-          videoUrl: String(a.videoUrl || ''),
-          videoStatus: String(a.videoStatus || 'pending'),
-          videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : undefined,
-          videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : undefined,
-          videoSubmitCount: a.videoSubmitCount != null ? Number(a.videoSubmitCount) : undefined,
-        }))
+        .filter((a) => {
+          if (!a) return false
+          const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
+          return !!url
+        })
+        .map((a) => {
+          const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
+          const isIceLink = ice && !!String(a.douyinPublishUrl || '').trim()
+          return {
+            id: String(a.id || ''),
+            displayName: String(a.platformNickname || a.name || '达人'),
+            videoUrl: url,
+            isIceLink,
+            videoStatus: String(a.videoStatus || 'pending'),
+            videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : undefined,
+            videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : undefined,
+            videoSubmitCount: a.videoSubmitCount != null ? Number(a.videoSubmitCount) : undefined,
+          }
+        })
       setCards(rows)
       setPreviewId((prev) => {
         if (!prev || !rows.some((r) => r.id === prev)) return ''
@@ -87,12 +101,16 @@ export default function PrOrderVideoReviewPage() {
   const previewCard = useMemo(() => cards.find((c) => c.id === previewId) || null, [cards, previewId])
 
   function openPreview(card: VideoCard) {
+    if (card.isIceLink) {
+      window.open(card.videoUrl, '_blank', 'noopener,noreferrer')
+      return
+    }
     setPreviewId(card.id)
     setPreviewOpen(true)
   }
 
   async function onDownloadVideo(card: VideoCard) {
-    if (!card.videoUrl || downloadingId) return
+    if (!card.videoUrl || downloadingId || card.isIceLink) return
     setDownloadingId(card.id)
     const fileName = `${card.displayName || '探店成片'}.mp4`.replace(/[/\\?%*:|"<>]/g, '_')
     try {
@@ -145,12 +163,19 @@ export default function PrOrderVideoReviewPage() {
     }
   }
 
+  const reviewLabel = isIceOrder ? '链接审核' : '视频审核'
+  const itemLabel = isIceOrder ? '链接' : '视频'
+
   return (
     <div className="max-w-6xl space-y-4">
       <PageHero
-        title="视频审核"
-        subtitle={`招募单「${title}」的达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。`}
-        badge={`${stats.total} 条视频`}
+        title={reviewLabel}
+        subtitle={
+          isIceOrder
+            ? `云剪单「${title}」的达人抖音链接审核，通过或驳回后将自动通知达人。`
+            : `招募单「${title}」的达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。`
+        }
+        badge={`${stats.total} 条${itemLabel}`}
       >
         <Link
           to="/orders"
@@ -165,7 +190,7 @@ export default function PrOrderVideoReviewPage() {
           { label: '待审核', v: stats.pending },
           { label: '已通过', v: stats.passed },
           { label: '已驳回', v: stats.rejected },
-          { label: '总视频', v: stats.total },
+          { label: `总${itemLabel}`, v: stats.total },
         ].map((x) => (
           <div key={x.label} className="surface-card rounded-xl border p-3 text-center">
             <div className="text-xs text-[var(--shell-muted)]">{x.label}</div>
@@ -180,7 +205,9 @@ export default function PrOrderVideoReviewPage() {
 
       {!loading && !cards.length ? (
         <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
-          暂无达人上传视频。达人可在「我的报名」中点击「上传视频」提交成片。
+          {isIceOrder
+            ? '暂无达人提交链接。达人可在商单详情中提交抖音作品链接。'
+            : '暂无达人上传视频。达人可在「我的报名」中点击「上传视频」提交成片。'}
         </div>
       ) : null}
 
@@ -202,6 +229,9 @@ export default function PrOrderVideoReviewPage() {
                       {` · ${submitCountLabel(c.videoSubmitCount)}`}
                       {c.videoStatus ? ` · ${videoStatusLabel(c.videoStatus)}` : ''}
                     </p>
+                    {c.isIceLink ? (
+                      <p className="text-xs text-violet-600 mt-1 break-all">{c.videoUrl}</p>
+                    ) : null}
                   </div>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${
@@ -230,16 +260,18 @@ export default function PrOrderVideoReviewPage() {
                     }`}
                     onClick={() => openPreview(c)}
                   >
-                    视频预览
+                    {c.isIceLink ? '打开链接' : '视频预览'}
                   </button>
-                  <button
-                    type="button"
-                    disabled={downloadingId === c.id}
-                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5 disabled:opacity-60"
-                    onClick={() => void onDownloadVideo(c)}
-                  >
-                    {downloadingId === c.id ? '下载中…' : '下载'}
-                  </button>
+                  {!c.isIceLink ? (
+                    <button
+                      type="button"
+                      disabled={downloadingId === c.id}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5 disabled:opacity-60"
+                      onClick={() => void onDownloadVideo(c)}
+                    >
+                      {downloadingId === c.id ? '下载中…' : '下载'}
+                    </button>
+                  ) : null}
                 </div>
                 {c.videoStatus === 'pending' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -268,7 +300,7 @@ export default function PrOrderVideoReviewPage() {
             ))}
           </div>
 
-          {previewOpen && previewCard ? (
+          {previewOpen && previewCard && !previewCard.isIceLink ? (
             <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[min(100%,400px)] xl:w-[420px]">
               <div className="surface-card rounded-xl border p-4 shadow-lg lg:shadow-none">
                 <div className="mb-3 flex items-center justify-between gap-2">
@@ -314,8 +346,12 @@ export default function PrOrderVideoReviewPage() {
       {rejectModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="surface-card rounded-xl border p-5 w-full max-w-md shadow-xl">
-            <h3 className="font-semibold">驳回视频 · {rejectModal.displayName}</h3>
-            <p className="text-xs text-[var(--shell-muted)] mt-1">请填写驳回原因，达人将收到通知并可在「我的报名」重新上传。</p>
+            <h3 className="font-semibold">
+              驳回{rejectModal.isIceLink ? '链接' : '视频'} · {rejectModal.displayName}
+            </h3>
+            <p className="text-xs text-[var(--shell-muted)] mt-1">
+              请填写驳回原因，达人将收到通知并可在「我的报名」{rejectModal.isIceLink ? '重新提交链接' : '重新上传'}。
+            </p>
             <textarea
               className="mt-3 w-full rounded-lg border panel-input px-3 py-2 text-sm min-h-[96px]"
               placeholder="请输入驳回原因"

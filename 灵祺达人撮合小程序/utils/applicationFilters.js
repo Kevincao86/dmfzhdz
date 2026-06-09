@@ -1,3 +1,5 @@
+const talentAppStatus = require('./talentApplicationStatus.js')
+
 const APPLICATION_TIME_FILTERS = [
   { id: 'all', label: '全部时间' },
   { id: '7d', label: '近7天' },
@@ -80,17 +82,20 @@ function filterApplicationRows(rows, opts) {
   const province = (opts && opts.province) || '全部'
   const city = (opts && opts.city) || '全部'
   const keyword = (opts && opts.keyword) || ''
+  const progressFilter = (opts && opts.progressFilter) || 'all'
   return (rows || []).filter((r) => {
     if (!matchApplicationTimeFilter(parseAppliedAtMs(r.appliedAt), timeFilter)) return false
     if (!matchCategory(r.category, category)) return false
     if (!matchRegionFilter(r.region, province, city)) return false
     if (!listKeywordSearch.matchListKeyword(r, keyword)) return false
+    if (progressFilter !== 'all' && String(r.progressId || '') !== progressFilter) return false
     return true
   })
 }
 
 module.exports = {
   APPLICATION_TIME_FILTERS,
+  TALENT_APP_PROGRESS_FILTERS: talentAppStatus.TALENT_APP_PROGRESS_FILTERS,
   CATEGORY_FILTERS,
   parseAppliedAtMs,
   matchApplicationTimeFilter,

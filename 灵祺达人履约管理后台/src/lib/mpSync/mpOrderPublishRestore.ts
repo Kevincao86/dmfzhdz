@@ -67,6 +67,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     recruitDetail: String(meta.recruitDetail || pickField(info, '招募详情') || '').trim(),
     signupDeadline: String(meta.signupDeadline || mp.deadline || '').trim(),
     iceVideoUrl: String(meta.iceVideoUrl || '').trim(),
+    iceVerifyMode: String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim() === 'pr' ? 'pr' : 'ai',
     applyFormTemplateId: String(meta.applyFormTemplateId || ''),
     applyFormTemplateName: String(meta.applyFormTemplateName || ''),
     applyFormFields: Array.isArray(meta.applyFormFields)

@@ -66,6 +66,7 @@ function formPatchFromMpOrder(mp) {
     recruitDetail: String(meta.recruitDetail || pickField(info, '招募详情') || '').trim(),
     signupDeadline: String(meta.signupDeadline || mp?.deadline || '').trim(),
     iceVideoUrl: String(meta.iceVideoUrl || '').trim(),
+    iceVerifyMode: String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim() === 'pr' ? 'pr' : 'ai',
     applyFormTemplateId: meta.applyFormTemplateId || '',
     applyFormTemplateName: meta.applyFormTemplateName || '',
     applyFormFields: Array.isArray(meta.applyFormFields)

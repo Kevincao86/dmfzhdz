@@ -27,6 +27,7 @@ import {
   newLevelTier,
   RECRUIT_MODES,
   RECRUIT_TARGETS,
+  ICE_VERIFY_MODES,
   modesForTarget,
 } from '../../lib/mpSync/publishFormOptions'
 import {
@@ -938,6 +939,31 @@ export default function PublishWizard() {
               value={form.iceVideoUrl}
               onChange={(e) => patchForm({ iceVideoUrl: e.target.value })}
             />
+          </div>
+        ) : null}
+
+        {recruitMode === 'ice' || recruitMode === 'edit_ice' ? (
+          <div>
+            <PubLabel>云剪审核方式 *</PubLabel>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ICE_VERIFY_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`text-sm px-3 py-1.5 rounded-lg border ${
+                    (form.iceVerifyMode || 'ai') === m.id
+                      ? 'border-violet-500 bg-violet-600 text-white'
+                      : 'border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-white/5'
+                  }`}
+                  onClick={() => patchForm({ iceVerifyMode: m.id as 'ai' | 'pr' })}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-[var(--shell-muted)]">
+              AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。
+            </p>
           </div>
         ) : null}
 

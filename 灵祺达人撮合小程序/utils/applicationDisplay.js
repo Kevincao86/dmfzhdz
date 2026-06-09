@@ -6,7 +6,8 @@ const memberStore = require('./talentMember.js')
 const { labels } = require('./platformLabels.js')
 const { TALENT_TAGS } = require('./publishFormOptions.js')
 
-const { isIceMpOrder } = require('./recruitmentUrgent.js')
+const { isIceMpOrder } = require('./iceOrderDetect.js')
+const talentAppStatus = require('./talentApplicationStatus.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 
 const MP_STATUS_LABEL = {
@@ -262,18 +263,18 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     if (found && found.id) applicantId = String(found.id)
   }
   const me = resolveApplicantOnMp(mp, applicantId)
+  const isIce = mp ? isIceMpOrder(mp) : /^MP-ICE-/i.test(String(localApp.mpOrderId || ''))
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
-  const isIce = mp ? isIceMpOrder(mp) : false
   const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
+  const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me)
   let iceActionLabel = ''
-  if (isIce && me) {
-    const assigned = String(me.assignedVideoDownloadUrl || '').trim()
-    const verified = me.aiVerifyStatus === 'passed'
-    const pendingConfirm = me.taskStatus === 'pending_confirm' || (!me.taskStatus && !assigned)
-    if (pendingConfirm) iceActionLabel = '确认接收'
-    else if (assigned && !verified) iceActionLabel = '提交链接'
-    else iceActionLabel = '查看云剪任务'
+  if (isIce) {
+    if (progress.id === 'completed') iceActionLabel = ''
+    else if (me && me.taskStatus === 'pending_confirm') iceActionLabel = '确认接收'
+    else if (me && String(me.assignedVideoDownloadUrl || '').trim() && me.aiVerifyStatus !== 'passed' && me.videoStatus !== 'passed') {
+      iceActionLabel = me.aiVerifyStatus === 'failed' || me.videoStatus === 'rejected' ? '重新提交链接' : '提交链接'
+    } else iceActionLabel = '查看云剪任务'
   }
   const category = view?.category || mp?.category || '其他'
   return {
@@ -298,7 +299,19 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     canUploadVideo,
     isIce,
     iceActionLabel,
-    videoStatusLabel: videoStatus
+    progressId: progress.id,
+    progressLabel: progress.label,
+    videoStatusLabel: isIce
+      ? progress.id === 'completed'
+        ? '已完成'
+        : me && me.aiVerifyStatus === 'failed'
+          ? 'AI 核查未通过'
+          : me && me.videoStatus === 'rejected'
+            ? '链接已驳回'
+            : me && (me.aiVerifyStatus === 'pending' || me.videoStatus === 'pending')
+              ? '待 PR 审核'
+              : progress.label
+      : videoStatus
       ? videoStatus === 'passed'
         ? '视频已通过'
         : videoStatus === 'rejected'
