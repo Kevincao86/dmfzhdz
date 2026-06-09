@@ -95,15 +95,9 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
-      const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-      const mp = list.find((o) => o && o.id === id)
+      const mp = ops.findMpOrderInRegistry(reg, id)
       if (!mp) {
-        this.setData({
-          loading: false,
-          err: reg && reg._registryStale
-            ? '暂未加载到该招募单，请返回招募大厅下拉刷新后重试'
-            : '招募单不存在或已结束',
-        })
+        this.setData({ loading: false, err: '招募单不存在或已结束' })
         return
       }
       const rawStatus = String(mp.status || '')
