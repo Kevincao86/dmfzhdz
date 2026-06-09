@@ -11,8 +11,8 @@ const orderCard = require('./recruitmentOrderCard.js')
 const hallIdentity = require('./hallIdentityBuckets.js')
 const userProfile = require('./userProfile.js')
 
-const LOAD_MS = 22000
-const WATCHDOG_MS = 14000
+const LOAD_MS = 52000
+const WATCHDOG_MS = 12000
 
 function errHint(msg) {
   const m = String(msg || '')
@@ -148,7 +148,13 @@ async function loadHallList(page) {
       }
     }
     if (page._hallLoadSeq !== seq) return
-    applyRows(mapRegistryToRows(reg))
+    const rows = mapRegistryToRows(reg)
+    if (reg && reg._registryStale) {
+      const age = registryCache.formatAgeHint(reg._registryCacheAgeMs)
+      applyRows({ ...rows, err: `网络较慢，显示 ${age} 的缓存，下拉可刷新` })
+      return
+    }
+    applyRows(rows)
   } catch (e) {
     if (page._hallLoadSeq !== seq) return
     if (showedOffline || hadRows) {

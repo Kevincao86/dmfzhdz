@@ -6,7 +6,27 @@ const registryCache = require('./registryCache.js')
 const { withTimeout } = require('./fetchTimeout.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
 
-const REGISTRY_FETCH_MS = 20000
+/** 与云函数 registry 45s、客户端 cloudEcs 50s 对齐，减轻慢网误落缓存 */
+const REGISTRY_FETCH_MS = 50000
+
+function isRetryableRegistryErr(e) {
+  const msg = String((e && e.message) || e || '')
+  return /超时|timeout|reset|errcode:-101|cronet|cloud:callFunction|request:fail/i.test(msg)
+}
+
+function attachStaleMeta(data, ageMs, attempts) {
+  return {
+    ...data,
+    _registryStale: true,
+    _registryCacheAgeMs: ageMs,
+    _registryFetchAttempts: attempts,
+  }
+}
+
+function hasMpOrders(data) {
+  const mp = data && data.mpRecruitmentOrders
+  return Array.isArray(mp) && mp.length > 0
+}
 const HALL_GET = '/api/meoo-ops-mp-hall-registry'
 const HALL_POST = '/api/meoo-ops-mp-auth'
 
@@ -39,31 +59,39 @@ function collectIncludeMpOrderIds(extraIds) {
   return [...ids].slice(0, 120)
 }
 
-async function fetchRegistryViaErpApi(opts) {
-  const includeMpOrderIds = collectIncludeMpOrderIds(opts && opts.includeMpOrderIds)
-  let lastErr
+async function fetchRegistryOnce(includeMpOrderIds) {
   try {
     const raw = await withTimeout(
       api.post(HALL_POST, { action: 'hall_registry', includeMpOrderIds }, registerAuthHeaders()),
       REGISTRY_FETCH_MS,
       '招募大厅',
     )
-    const data = useCacheIfHallEmpty(normalizeHallPayload(raw))
-    registryCache.save(data, `${HALL_POST}:hall_registry`)
-    return data
+    return useCacheIfHallEmpty(normalizeHallPayload(raw))
   } catch (e) {
-    lastErr = e
     console.warn('[mp] hall_registry POST failed', String(e.message || e).slice(0, 160))
-  }
-  try {
     const raw = await withTimeout(api.get(HALL_GET), REGISTRY_FETCH_MS, '招募大厅')
-    const data = useCacheIfHallEmpty(normalizeHallPayload(raw))
-    registryCache.save(data, HALL_GET)
-    return data
-  } catch (e2) {
-    const msg = String(e2 && e2.message ? e2.message : e2)
-    throw lastErr || e2 || new Error(msg || 'hall_fetch_failed')
+    return useCacheIfHallEmpty(normalizeHallPayload(raw))
   }
+}
+
+async function fetchRegistryViaErpApi(opts) {
+  const includeMpOrderIds = collectIncludeMpOrderIds(opts && opts.includeMpOrderIds)
+  let lastErr
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const data = await fetchRegistryOnce(includeMpOrderIds)
+      registryCache.save(data, attempt === 0 ? `${HALL_POST}:hall_registry` : `${HALL_GET}:retry`)
+      return data
+    } catch (e) {
+      lastErr = e
+      if (attempt === 0 && isRetryableRegistryErr(e)) {
+        await new Promise((r) => setTimeout(r, 600))
+        continue
+      }
+      break
+    }
+  }
+  throw lastErr || new Error('hall_fetch_failed')
 }
 
 async function fetchRegistry(opts) {
@@ -80,12 +108,9 @@ async function fetchRegistry(opts) {
   }
 
   const cached = registryCache.load({ allowStale: true })
-  if (cached && cached.data) {
-    const err = new Error('已使用本地缓存')
-    err.fromCache = true
-    err.cachedData = cached.data
-    err.attempts = attempts
-    throw err
+  if (cached && cached.data && hasMpOrders(cached.data)) {
+    console.warn('[mp] fetchRegistry 使用本地缓存', cached.ageMs)
+    return attachStaleMeta(cached.data, cached.ageMs, attempts)
   }
   const err = lastErr || new Error('无法拉取招募大厅数据')
   err.attempts = attempts

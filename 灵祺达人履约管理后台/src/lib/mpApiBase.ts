@@ -32,6 +32,13 @@ export function apiUrl(apiPath: string): string {
 }
 
 export function mpErpApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    // dr 履约站：优先同源 /erp-api（Nginx 反代轻量），避免跨域直连主域卡住
+    if (/^dr\./i.test(host)) {
+      return `${window.location.origin}/erp-api`
+    }
+  }
   const fromEnv = normalizeErpApiBase(
     (import.meta.env.VITE_MP_API_BASE as string | undefined) ?? '',
   )

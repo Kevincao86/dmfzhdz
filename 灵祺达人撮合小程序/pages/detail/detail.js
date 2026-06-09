@@ -94,18 +94,8 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      let reg
-      let cacheHint = ''
-      try {
-        reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
-      } catch (e) {
-        if (e && e.fromCache && e.cachedData) {
-          reg = e.cachedData
-          cacheHint = '网络不稳定，已显示缓存数据'
-        } else {
-          throw e
-        }
-      }
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
+      const cacheHint = reg && reg._registryStale ? '网络较慢，已显示缓存数据' : ''
       const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = list.find((o) => o && o.id === id)
       if (!mp) {

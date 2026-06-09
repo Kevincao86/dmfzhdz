@@ -6,7 +6,16 @@ const { withTimeout } = require('./fetchTimeout.js')
 
 const FN = 'mpErpProxy'
 const CLOUD_CALL_MS = 24000
+/** 注册表体量大 + 云函数→轻量多跳，须与 mpErpProxy registry 45s 对齐，避免慢网误超时 */
+const CLOUD_CALL_REGISTRY_MS = 50000
 const CLOUD_CALL_UPLOAD_MS = 125000
+
+function cloudCallTimeoutMs(path) {
+  const p = String(path || '')
+  if (/video-upload/i.test(p)) return CLOUD_CALL_UPLOAD_MS
+  if (/registry|hall-registry|hall_registry|meoo-ops-mp-auth/i.test(p)) return CLOUD_CALL_REGISTRY_MS
+  return CLOUD_CALL_MS
+}
 
 function cloudReady() {
   return !!(config.MP_USE_CLOUD_PROXY && String(config.MP_CLOUD_ENV || '').trim() && wx.cloud)
@@ -48,8 +57,7 @@ function callCloud(method, path, data, headers) {
       },
     })
   })
-  const ms = /video-upload/i.test(String(path || '')) ? CLOUD_CALL_UPLOAD_MS : CLOUD_CALL_MS
-  return withTimeout(run, ms, '云函数')
+  return withTimeout(run, cloudCallTimeoutMs(path), '云函数')
 }
 
 module.exports = {
