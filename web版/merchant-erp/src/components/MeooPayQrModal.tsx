@@ -8,6 +8,7 @@ import {
   yuanInputToCents,
   type PaymentTier,
 } from '../lib/meooPaymentTiers'
+import { resolvePayQrImageUrl } from '../lib/payQrAssets'
 
 function formatThrown(e: unknown): string {
   if (e instanceof Error) return e.message
@@ -176,7 +177,7 @@ export default function MeooPayQrModal({
               </p>
             ) : null}
             <p className="relative text-sm leading-relaxed text-slate-400">
-              支付时请备注<strong className="text-cyan-200">账号ID或商户名</strong>；以下为示意二维码。
+              支付时请备注<strong className="text-cyan-200">账号ID或商户名</strong>；请扫描对应金额收款码。
             </p>
 
             <div className="relative mt-4 space-y-3">
@@ -257,11 +258,10 @@ export default function MeooPayQrModal({
               {payChannel === 'wechat' ? '请使用微信扫描二维码完成支付' : '请使用支付宝扫描二维码完成支付'}
             </p>
             <img
-              src={
-                payChannel === 'wechat'
-                  ? `${import.meta.env.BASE_URL}subscription/wechat-pay-qr.png`
-                  : `${import.meta.env.BASE_URL}subscription/alipay-qr.png`
-              }
+              src={resolvePayQrImageUrl(payChannel!, {
+                useCustom: mode === 'subscription' ? true : useCustom,
+                tierIndex,
+              })}
               alt={payChannel === 'wechat' ? '微信支付二维码' : '支付宝二维码'}
               className="mt-4 w-60 max-w-full rounded-xl border border-white/10 bg-white p-2 shadow-lg sm:w-64"
             />

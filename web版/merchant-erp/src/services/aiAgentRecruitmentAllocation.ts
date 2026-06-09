@@ -48,47 +48,21 @@ export async function buildAgentRecruitmentAllocation(
     /* ignore */
   }
 
-  let allocation = await generateNoviceKolAllocation({
+  const headcount =
+    intent.headcountHint && intent.headcountHint > 0
+      ? intent.headcountHint
+      : Math.max(3, Math.min(36, Math.round(intent.budgetYuan / 1200)))
+
+  const allocation = await generateNoviceKolAllocation({
     city,
     industry: intent.industry,
     packageNote,
     budgetYuan: intent.budgetYuan,
-    strategy: intent.strategy,
+    targetHeadcount: headcount,
+    feeType: 'tier',
     kolCommissionPct: intent.kolCommissionPct,
     cityTierBands,
   })
-
-  if (intent.headcountHint && intent.headcountHint > 0) {
-    const target = intent.headcountHint
-    const cur = allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus
-    if (cur > 0 && cur !== target) {
-      const scale = target / cur
-      allocation = {
-        ...allocation,
-        v3: Math.max(0, Math.round(allocation.v3 * scale)),
-        v4: Math.max(0, Math.round(allocation.v4 * scale)),
-        v5: Math.max(0, Math.round(allocation.v5 * scale)),
-        v5plus: Math.max(0, Math.round(allocation.v5plus * scale)),
-        notes: [allocation.notes, `已按您指定的约 ${target} 人目标微调档位人数。`].filter(Boolean).join(' '),
-      }
-      let gap = target - (allocation.v3 + allocation.v4 + allocation.v5 + allocation.v5plus)
-      let guard = 0
-      while (gap !== 0 && guard++ < 48) {
-        if (gap > 0) {
-          allocation = { ...allocation, v5plus: allocation.v5plus + 1 }
-          gap -= 1
-        } else if (allocation.v3 > 0) {
-          allocation = { ...allocation, v3: allocation.v3 - 1 }
-          gap += 1
-        } else if (allocation.v4 > 0) {
-          allocation = { ...allocation, v4: allocation.v4 - 1 }
-          gap += 1
-        } else {
-          break
-        }
-      }
-    }
-  }
 
   return { intent, allocation, cityTierSource }
 }
