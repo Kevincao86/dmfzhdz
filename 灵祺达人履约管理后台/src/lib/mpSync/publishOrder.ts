@@ -109,6 +109,8 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
 export function resolveIceReferenceVideoUrl(f: Pick<PublishForm, 'referenceUrl' | 'materialUrl' | 'iceVideoUrl'>) {
   return String(f.referenceUrl || f.materialUrl || f.iceVideoUrl || '').trim()
 }
+
+export function buildFansRequirementText(f: PublishForm) {
   if (f.fansLimitMode === 'unlimited') return '不限'
   const min = String(f.fansMin ?? '').trim()
   return min ? `粉丝≥${min}` : ''

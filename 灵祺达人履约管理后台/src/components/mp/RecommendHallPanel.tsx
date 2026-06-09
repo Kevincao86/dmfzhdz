@@ -15,6 +15,7 @@ import HallToolbarCard from './HallToolbarCard'
 import RecommendTalentPanel from './RecommendTalentPanel'
 import PageHero from '../ui/PageHero'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
+import { showDemoOrders } from '../../lib/mpDemoMode'
 
 function SupplierRecommendOrders() {
   const goDetail = useRecruitmentNav()
@@ -51,7 +52,8 @@ function SupplierRecommendOrders() {
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
       return true
     })
-    const mocks = rows.filter((r) => r.isMock)
+    const allowDemo = showDemoOrders()
+    const mocks = allowDemo ? rows.filter((r) => r.isMock) : []
     let real = rows.filter((r) => !r.isMock)
     if (real.length) {
       real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
@@ -69,9 +71,12 @@ function SupplierRecommendOrders() {
       setLoading(true)
       try {
         const reg = await fetchMpRegistry()
-        let rows = loadOpenOrderRows(reg).filter((r) => orderVisibleToWorkIdentity(r, workId))
-        if (!rows.length) rows = listFilters.buildMockRecruitmentRows()
-        setAllOrderRows(rows)
+        const rows = loadOpenOrderRows(reg).filter((r) => orderVisibleToWorkIdentity(r, workId))
+        setAllOrderRows(
+          rows.length || !showDemoOrders()
+            ? rows
+            : listFilters.buildMockRecruitmentRows(),
+        )
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
