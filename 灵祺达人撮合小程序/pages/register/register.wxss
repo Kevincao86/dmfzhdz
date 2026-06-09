@@ -165,6 +165,44 @@
   font-size: 30rpx;
   font-weight: 700;
   color: #0f172a;
+  min-width: 0;
+}
+
+.platform-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.platform-detail-btn {
+  display: flex;
+  align-items: center;
+  gap: 2rpx;
+  padding: 8rpx 14rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #6366f1;
+  background: #eef2ff;
+  border-radius: 999rpx;
+}
+
+.platform-detail-arrow {
+  display: inline-block;
+  font-size: 26rpx;
+  line-height: 1;
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.platform-detail-arrow--up {
+  transform: rotate(-90deg);
+}
+
+.platform-card-summary {
+  margin: 4rpx 0 12rpx 64rpx;
+  font-size: 24rpx;
+  color: #64748b;
 }
 
 .platform-card-switch {

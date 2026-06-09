@@ -202,16 +202,31 @@
     <view class="platform-card-head">
       <image class="platform-card-icon" src="{{item.icon}}" mode="aspectFit" />
       <text class="platform-card-title">{{item.name}}</text>
-      <switch
-        class="platform-card-switch"
-        checked="{{item.enabled}}"
-        color="#6366f1"
-        data-id="{{item.id}}"
-        bindchange="onTogglePlatformEnable"
-      />
+      <view class="platform-card-actions">
+        <view
+          wx:if="{{item.enabled}}"
+          class="platform-detail-btn"
+          data-id="{{item.id}}"
+          catchtap="onTogglePlatformDetail"
+        >
+          <text>{{item.expanded ? '收起' : '查看详情'}}</text>
+          <text class="platform-detail-arrow {{item.expanded ? 'platform-detail-arrow--up' : ''}}">›</text>
+        </view>
+        <switch
+          class="platform-card-switch"
+          checked="{{item.enabled}}"
+          color="#6366f1"
+          data-id="{{item.id}}"
+          bindchange="onTogglePlatformEnable"
+        />
+      </view>
+    </view>
+    <view class="platform-card-summary" wx:if="{{item.enabled && !item.expanded && item.profile.platformNickname}}">
+      <text>{{item.profile.platformNickname}}</text>
+      <text wx:if="{{item.profile.followers}}"> · 粉丝 {{item.profile.followers}}</text>
     </view>
 
-    <block wx:if="{{item.enabled}}">
+    <block wx:if="{{item.enabled && item.expanded}}">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">
         <text class="form-label">{{item.labels.profileLink}}</text>

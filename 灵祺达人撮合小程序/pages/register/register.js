@@ -48,12 +48,33 @@ function buildServerProfile(platformName, profile) {
   return base
 }
 
-function syncUiFromProfiles(page, profiles, douyinLevelIndex) {
+function syncUiFromProfiles(page, profiles, douyinLevelIndex, expandedMap) {
+  const expanded = expandedMap || page.data.platformExpanded || {}
+  const platformSections = talentPlatforms.uiSections(profiles, douyinLevelIndex).map((s) => ({
+    ...s,
+    expanded: !!expanded[s.id],
+  }))
   page.setData({
     platformProfiles: profiles,
-    platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
+    platformSections,
+    platformExpanded: expanded,
     douyinLevelIndex: douyinLevelIndex || 0,
   })
+}
+
+function buildInitialExpanded(profiles) {
+  const out = {}
+  for (const p of talentPlatforms.TALENT_PLATFORMS) {
+    const prof = profiles && profiles[p.id]
+    out[p.id] = !!(prof && prof.enabled && !talentPlatforms.profileFilled(prof))
+  }
+  return out
+}
+
+function collapseAllPlatforms() {
+  const out = {}
+  for (const p of talentPlatforms.TALENT_PLATFORMS) out[p.id] = false
+  return out
 }
 
 Page({
@@ -69,6 +90,7 @@ Page({
     profileAutofillPlatform: '',
     platformProfiles: talentPlatforms.emptyAllProfiles(),
     platformSections: [],
+    platformExpanded: {},
     douyinLevels: DOUYIN_LEVELS,
     douyinLevelIndex: 0,
     submitting: false,
@@ -161,6 +183,7 @@ Page({
     }
     const region = setupRegionState(cur?.province, cur?.city)
     const supplierProf = supplierTeamProfile.normalizeSupplierProfile(cur?.supplierProfile)
+    const platformExpanded = buildInitialExpanded(profiles)
     const patch = {
       ...region,
       editMode: edit,
@@ -168,7 +191,11 @@ Page({
       isSupplier,
       supplierProfile: supplierProf,
       platformProfiles: profiles,
-      platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
+      platformExpanded,
+      platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex).map((s) => ({
+        ...s,
+        expanded: !!platformExpanded[s.id],
+      })),
       douyinLevelIndex,
     }
     const acct = auth.readAccount()
@@ -185,7 +212,10 @@ Page({
         alipayAccount: cur.alipayAccount || '',
         gender: cur.gender || '',
         platformProfiles: profiles,
-        platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex),
+        platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex).map((s) => ({
+          ...s,
+          expanded: !!platformExpanded[s.id],
+        })),
       })
     } else if (acct) {
       Object.assign(patch, {
@@ -384,7 +414,17 @@ Page({
     const cur = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}) }
     cur.enabled = !!e.detail.value
     profiles[id] = cur
-    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+    const expanded = { ...this.data.platformExpanded, [id]: cur.enabled }
+    if (!cur.enabled) expanded[id] = false
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, expanded)
+  },
+  onTogglePlatformDetail(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
+    if (!prof.enabled) return
+    const expanded = { ...this.data.platformExpanded, [id]: !this.data.platformExpanded[id] }
+    syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
   },
   onPlatformField(e) {
     const id = e.currentTarget.dataset.id
@@ -542,6 +582,7 @@ Page({
         }
       }
       this.applyIdentityIdLabels(workId)
+      syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, collapseAllPlatforms())
       notifySavedAndBack(cloudWarn)
     } finally {
       this.setData({ submitting: false })
