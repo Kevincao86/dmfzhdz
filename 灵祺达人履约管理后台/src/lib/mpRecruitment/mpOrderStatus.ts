@@ -24,6 +24,7 @@ export function statusLabel(status: string): string {
   return MP_STATUS_LABEL[status] || status
 }
 
-export function isMpOrderRecruiting(status: string): boolean {
-  return status === 'open' || status === 'collecting'
+export function isMpOrderRecruiting(status: string | undefined): boolean {
+  const s = status || 'open'
+  return s === 'open' || s === 'collecting'
 }
