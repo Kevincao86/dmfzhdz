@@ -1,5 +1,5 @@
-import { cn } from '../cn'
-import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../lib/recruitmentInfoFilter'
+import { cn } from '../../cn'
+import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../../lib/recruitmentInfoFilter'
 
 type Props = {
   value: RecruitmentPlatform
