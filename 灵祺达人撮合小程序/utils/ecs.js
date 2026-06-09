@@ -46,7 +46,10 @@ function parseBody(raw) {
 function errMsg(status, data) {
   const mpApiErrors = require('./mpApiErrors.js')
   const d = parseBody(data)
-  const detail = String(d.message || d.detail || d.hint || '').trim()
+  let detail = String(d.message || d.detail || d.hint || '').trim()
+  if (/请在轻量执行|git pull|ecs-deploy-auth-api/i.test(detail)) {
+    detail = '后台服务未更新，暂无法停止/编辑招募单，请稍后再试或联系管理员'
+  }
   const code = String(d.error || `http_${status}`).trim()
   if (detail && /[\u4e00-\u9fa5]/.test(detail)) return detail
   return mpApiErrors.formatMpApiErr(new Error(code), detail || '请求失败，请稍后重试')
