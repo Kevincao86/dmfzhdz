@@ -73,6 +73,20 @@ function toMinimaxPitch(speechPitch: number): number {
   return Math.round(clamp((speechPitch - 1) * 18, -8, 8))
 }
 
+/**
+ * 浏览器语速 0.5–2.0 → MiniMax t2a_v2 整型 speed。
+ * 国内网关实测要求 integer 且范围 [1, 45]；浮点如 0.94 会报 duration must be in [1, 45]。
+ */
+export function toMinimaxSpeedInt(speechRate: number): number {
+  const r = clamp(Number(speechRate) || 1, 0.5, 2)
+  const scaled = Math.round(((r - 0.5) / 1.5) * 44 + 1)
+  return Math.max(1, Math.min(45, scaled))
+}
+
+function toMinimaxVolInt(vol = 1): number {
+  return Math.max(1, Math.min(10, Math.round(vol)))
+}
+
 function hexToBase64(hex: string): string {
   const clean = hex.replace(/\s/g, '')
   if (!clean || clean.length % 2 !== 0) throw new Error('invalid_audio_hex')
@@ -141,6 +155,12 @@ function formatTtsError(raw: string): string {
   if (/voice_id|音色/i.test(t)) {
     return '云端音色不可用，将尝试浏览器试听'
   }
+  if (/duration must be in \[1,\s*45\]/i.test(t)) {
+    return 'MiniMax 语速参数无效（需整型 1–45）。请刷新页面后重试；若仍失败请联系管理员更新 ECS。'
+  }
+  if (/invalid params|Mismatch type int64|status_code=2013/i.test(t)) {
+    return 'MiniMax 语音参数格式异常，请刷新页面后重试'
+  }
   return t.slice(0, 300)
 }
 
@@ -198,8 +218,8 @@ export async function runDigitalHumanTtsCore(
         text_normalization: true,
         voice_setting: {
           voice_id: preset.cloudVoiceId,
-          speed: speechRate,
-          vol: 1,
+          speed: toMinimaxSpeedInt(speechRate),
+          vol: toMinimaxVolInt(1),
           pitch: toMinimaxPitch(speechPitch),
         },
         audio_setting: {

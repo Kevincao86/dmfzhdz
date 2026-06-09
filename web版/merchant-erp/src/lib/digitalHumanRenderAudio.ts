@@ -26,7 +26,22 @@ function chunkScriptForTts(script: string, maxLen = 480): string[] {
     rest = rest.slice(cut + 1).trim()
   }
   if (rest) chunks.push(rest)
-  return chunks.filter(Boolean)
+  return normalizeTtsChunks(chunks.filter(Boolean))
+}
+
+/** 合并过短分段，避免 MiniMax 拒收单字/标点 chunk */
+function normalizeTtsChunks(chunks: string[]): string[] {
+  const out: string[] = []
+  for (const raw of chunks) {
+    const t = raw.trim()
+    if (!t) continue
+    if (t.length < 2) {
+      if (out.length) out[out.length - 1] = `${out[out.length - 1]!}${t}`
+      continue
+    }
+    out.push(t)
+  }
+  return out.filter((c) => c.length >= 2)
 }
 
 function base64ToBlob(b64: string, mime: string): Blob {
