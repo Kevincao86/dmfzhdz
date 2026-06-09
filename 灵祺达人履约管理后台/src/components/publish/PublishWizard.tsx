@@ -56,6 +56,7 @@ import {
   type PublishWizardDraft,
 } from '../../lib/mpSync/publishDraft'
 import { readPrProfile } from '../../lib/mpSync/userProfile'
+import { readImageFileAsDataUrl } from '../../lib/mpSync/mpGroupQr'
 import PageHero from '../ui/PageHero'
 
 const PUBLISH_EDIT_KEY = 'meoo_publish_edit_mp_id'
@@ -142,6 +143,8 @@ export default function PublishWizard() {
   const [deliveryDeadlineDate, setDeliveryDeadlineDate] = useState('')
   const [deliveryDeadlineTime, setDeliveryDeadlineTime] = useState('18:00')
   const [showDeliveryDeadlineSheet, setShowDeliveryDeadlineSheet] = useState(false)
+  const groupQrInputRef = useRef<HTMLInputElement>(null)
+  const [groupQrUploading, setGroupQrUploading] = useState(false)
 
   const display = useMemo(() => computePublishDisplay(form, recruitMode), [form, recruitMode])
   const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
@@ -263,6 +266,20 @@ export default function PublishWizard() {
     setForm((f) => ({ ...f, ...patch }))
   }
 
+  async function onUploadGroupQr(file: File) {
+    if (groupQrUploading) return
+    setGroupQrUploading(true)
+    setErr('')
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file)
+      patchForm({ groupQrImage: dataUrl })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '群二维码上传失败')
+    } finally {
+      setGroupQrUploading(false)
+    }
+  }
+
   function openPicker(view: PickerView) {
     setErr('')
     if (view === 'applyMenu' && !form.platform) {
@@ -304,7 +321,12 @@ export default function PublishWizard() {
         await updateMpRecruitmentOrder(order)
       } else {
         await appendMpRecruitmentOrder(order)
-        const pubHall = form.deliveryWindow === 'urgent' ? 'urgent' : 'normal'
+        const pubHall =
+          recruitMode === 'ice' || recruitMode === 'edit_ice'
+            ? 'ice'
+            : form.deliveryWindow === 'urgent'
+              ? 'urgent'
+              : 'normal'
         addPublishedOrder({ mpOrderId: String(order.id), title: String(order.title), hall: pubHall })
         if (draftId) clearPublishDraft(draftId)
       }
@@ -952,6 +974,54 @@ export default function PublishWizard() {
             <p className="mt-1 text-xs text-[var(--shell-muted)]">
               AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。参考片链接见上方「参考片链接」。
             </p>
+            {(form.iceVerifyMode || 'ai') === 'ai' ? (
+              <div className="mt-3">
+                <PubLabel hint="订单完成后用于群结算，达人入选通知将附带此二维码">
+                  上传群二维码 *
+                </PubLabel>
+                <input
+                  ref={groupQrInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) void onUploadGroupQr(file)
+                  }}
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={groupQrUploading}
+                    className={`text-sm px-3 py-1.5 rounded-lg border ${
+                      form.groupQrImage ? 'border-green-500 text-green-700' : ''
+                    }`}
+                    onClick={() => groupQrInputRef.current?.click()}
+                  >
+                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '已上传群码' : '选择群二维码图片'}
+                  </button>
+                  {form.groupQrImage ? (
+                    <button
+                      type="button"
+                      className="text-xs text-[var(--shell-muted)] underline"
+                      onClick={() => patchForm({ groupQrImage: '' })}
+                    >
+                      清除
+                    </button>
+                  ) : null}
+                </div>
+                {form.groupQrImage ? (
+                  <button
+                    type="button"
+                    className="mt-2 block"
+                    onClick={() => window.open(form.groupQrImage, '_blank')}
+                  >
+                    <img src={form.groupQrImage} alt="群二维码" className="h-16 rounded border" />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 

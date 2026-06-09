@@ -190,10 +190,16 @@ export function enrichMpOrderListItem(
   },
 ) {
   if (!mp) {
-    const status = localItem.deletedAt
-      ? 'deleted'
-      : resolveEffectiveMpStatus(localItem.lastStatus, 0)
+    let status: string
+    if (localItem.deletedAt) {
+      status = 'deleted'
+    } else {
+      const resolved = resolveEffectiveMpStatus(localItem.lastStatus, 0)
+      status = resolved === 'done' ? 'done' : 'deleted'
+    }
     const recruiting = isMpOrderRecruiting(status)
+    const deadlineDaysText =
+      status === 'done' ? '已完成' : status === 'deleted' ? '—' : '已结束'
     return {
       ...localItem,
       title: localItem.title || String(localItem.mpOrderId || '历史发单'),
@@ -206,7 +212,7 @@ export function enrichMpOrderListItem(
       applicantCount: 0,
       recruitCount: 0,
       signupLabel: '—',
-      deadlineDaysText: localItem.deletedAt ? '—' : '已结束',
+      deadlineDaysText,
       deadlineMs: 0,
       platform: '—',
       recruitTarget: 'talent' as const,
@@ -235,7 +241,7 @@ export function enrichMpOrderListItem(
     applicantCount,
     recruitCount,
     signupLabel: `报名 ${applicantCount}/${recruitCount} 人`,
-    deadlineDaysText: formatDeadlineDaysText(deadlineMs),
+        deadlineDaysText: status === 'done' ? '已完成' : formatDeadlineDaysText(deadlineMs),
     deadlineMs,
     platform,
     recruitTarget: recruitTargetFromMp(mp),

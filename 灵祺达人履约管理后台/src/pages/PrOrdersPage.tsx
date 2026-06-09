@@ -83,7 +83,7 @@ export default function PrOrdersPage() {
     setErr('')
     try {
       await syncClientStateWithServer().catch(() => null)
-      const reg = await fetchMpRegistry()
+      const reg = await fetchMpRegistry({ includePrOwned: true })
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
         unknown

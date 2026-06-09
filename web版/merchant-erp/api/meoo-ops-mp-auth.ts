@@ -326,7 +326,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const includeMpOrderIds = Array.isArray(includeRaw)
         ? includeRaw.map((id) => String(id).trim()).filter(Boolean).slice(0, 120)
         : []
-      const payload = await loadMpHallRegistryPayload({ includeMpOrderIds })
+      let prOwnerKeys: { lingqiPrId?: string; registryPrId?: string } | undefined
+      if (body.includePrOwned === true) {
+        const token = sessionToken(req, body)
+        const sess = await resolveSession(rest, token)
+        if (sess?.account) {
+          const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+          prOwnerKeys = {
+            lingqiPrId: String(account.lingqiPrId || '').trim(),
+            registryPrId: String(account.registryPrId || account.registryMemberId || '').trim(),
+          }
+        }
+      }
+      const payload = await loadMpHallRegistryPayload({ includeMpOrderIds, prOwnerKeys })
       sendJson(res, 200, { ok: true, ...payload })
       return
     }

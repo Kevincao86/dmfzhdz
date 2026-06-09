@@ -153,9 +153,23 @@ export function removePublishedOrder(mpOrderId: string): void {
 export function markPublishedOrderDeleted(mpOrderId: string): void {
   const id = String(mpOrderId || '').trim()
   if (!id) return
-  touchPublishedOrderSnapshot(id, {
-    deletedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-  })
+  const deletedAt = new Date().toLocaleString('zh-CN', { hour12: false })
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item.mpOrderId === id)
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], deletedAt, mpOrderId: id }
+  } else {
+    list.unshift({
+      mpOrderId: id,
+      title: id,
+      publishedAt: deletedAt,
+      deletedAt,
+      ownerAccountId: ids.ownerAccountId,
+      ownerPrId: ids.prId,
+    })
+  }
+  writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
 }
 
 export function touchPublishedOrderSnapshot(
