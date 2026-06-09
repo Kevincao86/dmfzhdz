@@ -19,7 +19,22 @@ import { groupQrFromMp, isGroupQrExpired, patchGroupQrImage, readImageFileAsData
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { copyRecruitmentShare } from '../lib/mpSync/recruitmentShareCopy'
+import { reviewRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { readPrProfile } from '../lib/mpSync/userProfile'
+import {
+  applicantTaskStatusLabel,
+  canReviewIceLink,
+  countIceOrderStats,
+  getIceVerifyMode,
+  isIceMpOrder,
+} from '../lib/mpRecruitment/iceOrderStats'
+
+type IceApplicantRow = EnrichedApplicantRow & {
+  iceTaskStatus?: string
+  iceDouyinUrl?: string
+  iceRejectReason?: string
+  canReviewIceLink?: boolean
+}
 
 export default function PrOrderApplicantsPage() {
   const { id: mpOrderId = '' } = useParams()
@@ -46,6 +61,16 @@ export default function PrOrderApplicantsPage() {
   const [batchConfirming, setBatchConfirming] = useState(false)
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
   const [profileModalApplicant, setProfileModalApplicant] = useState<EnrichedApplicantRow | null>(null)
+  const [isIce, setIsIce] = useState(false)
+  const [iceVerifyMode, setIceVerifyMode] = useState<'ai' | 'pr'>('ai')
+  const [iceClaimed, setIceClaimed] = useState(0)
+  const [iceCompleted, setIceCompleted] = useState(0)
+  const [icePendingReview, setIcePendingReview] = useState(0)
+  const [iceReviewBusyId, setIceReviewBusyId] = useState('')
+  const [iceRejectModal, setIceRejectModal] = useState(false)
+  const [iceRejectTargetId, setIceRejectTargetId] = useState('')
+  const [iceRejectTargetName, setIceRejectTargetName] = useState('')
+  const [iceRejectReason, setIceRejectReason] = useState('')
 
   const selectedCount = selectedIds.length
   const checkedCount = checkedIds.length
@@ -80,15 +105,34 @@ export default function PrOrderApplicantsPage() {
       const meta = buildMpOrderHeroMeta(mp)
       let ids = selectedIdsFromMp(mp)
       if (!ids.length) ids = readLocalSelectedIds(mpOrderId)
-      const rows = (Array.isArray(mp.applicants) ? mp.applicants : []).map((a, i) =>
-        enrichApplicantRow(a as Record<string, unknown>, i, reg),
-      )
+      const ice = isIceMpOrder(mp)
+      const verifyMode = getIceVerifyMode(mp)
+      const iceStats = countIceOrderStats(mp)
+      let pendingReview = 0
+      const rows = (Array.isArray(mp.applicants) ? mp.applicants : []).map((a, i) => {
+        const row = enrichApplicantRow(a as Record<string, unknown>, i, reg) as IceApplicantRow
+        if (!ice) return row
+        const canReview = canReviewIceLink(a as Record<string, unknown>, mp)
+        if (canReview) pendingReview += 1
+        return {
+          ...row,
+          iceTaskStatus: applicantTaskStatusLabel(a as Record<string, unknown>),
+          iceDouyinUrl: String((a as Record<string, unknown>).douyinPublishUrl || (a as Record<string, unknown>).videoUrl || '').trim(),
+          iceRejectReason: String((a as Record<string, unknown>).videoRejectReason || (a as Record<string, unknown>).aiVerifyNote || '').trim(),
+          canReviewIceLink: canReview,
+        }
+      })
       setTitle(String(mp.title || mp.customerName || mpOrderId))
       setOrderNo(meta.orderNo)
       setPublishedAt(meta.publishedAt)
       setDeadlineText(meta.deadlineText)
       setStatusLabelText(statusLabel(mp.status))
       setHallLabel(hallLabelFromMp(mp))
+      setIsIce(ice)
+      setIceVerifyMode(verifyMode)
+      setIceClaimed(iceStats.claimed)
+      setIceCompleted(iceStats.completed)
+      setIcePendingReview(pendingReview)
       setMpOrder(mp)
       setGroupQrImage(groupQrFromMp(mp))
       setGroupQrExpired(isGroupQrExpired(mp))
@@ -299,6 +343,50 @@ export default function PrOrderApplicantsPage() {
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
+  async function onIcePass(a: IceApplicantRow) {
+    if (!a?.id || iceReviewBusyId) return
+    setIceReviewBusyId(String(a.id))
+    try {
+      await reviewRecruitmentVideo(mpOrderId, String(a.id), 'pass')
+      alert('已通过')
+      await loadOrder()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '审核失败')
+    } finally {
+      setIceReviewBusyId('')
+    }
+  }
+
+  function onIceOpenReject(a: IceApplicantRow) {
+    if (!a?.id) return
+    setIceRejectModal(true)
+    setIceRejectTargetId(String(a.id))
+    setIceRejectTargetName(String(a.displayName || '达人'))
+    setIceRejectReason('')
+  }
+
+  async function onIceConfirmReject() {
+    const reason = iceRejectReason.trim()
+    if (!iceRejectTargetId || !reason || iceReviewBusyId) {
+      alert('请填写驳回原因')
+      return
+    }
+    setIceReviewBusyId(iceRejectTargetId)
+    try {
+      await reviewRecruitmentVideo(mpOrderId, iceRejectTargetId, 'reject', reason)
+      alert('已驳回')
+      setIceRejectModal(false)
+      setIceRejectTargetId('')
+      setIceRejectTargetName('')
+      setIceRejectReason('')
+      await loadOrder()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '驳回失败')
+    } finally {
+      setIceReviewBusyId('')
+    }
+  }
+
   return (
     <div className="max-w-4xl space-y-4 pb-28">
       <div className="flex items-center gap-2 text-sm">
@@ -315,8 +403,14 @@ export default function PrOrderApplicantsPage() {
             <div className="flex flex-wrap gap-2 mt-2">
               <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">{hallLabel}</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{statusLabelText}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已报名 {applicants.length} 人</span>
-              {selectedCount > 0 ? (
+              {isIce ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  认领 {iceClaimed} · 已完成 {iceCompleted}
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已报名 {applicants.length} 人</span>
+              )}
+              {!isIce && selectedCount > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已选 {selectedCount} 人</span>
               ) : null}
             </div>
@@ -335,21 +429,23 @@ export default function PrOrderApplicantsPage() {
       ) : null}
 
       <div className="space-y-3">
-        {applicants.map((a) => (
+        {(applicants as IceApplicantRow[]).map((a) => (
           <article
             key={String(a.id)}
-            className={`surface-card rounded-xl border p-4 ${a.selected ? 'border-orange-400/60 bg-orange-50/30' : ''}`}
+            className={`surface-card rounded-xl border p-4 ${!isIce && a.selected ? 'border-orange-400/60 bg-orange-50/30' : ''}`}
           >
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 justify-between">
               <div className="flex gap-3 min-w-0">
-                <label className="flex items-start pt-1 shrink-0 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1 rounded border-slate-300"
-                    checked={checkedIds.includes(String(a.id))}
-                    onChange={() => void onToggleCheck(a)}
-                  />
-                </label>
+                {!isIce ? (
+                  <label className="flex items-start pt-1 shrink-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1 rounded border-slate-300"
+                      checked={checkedIds.includes(String(a.id))}
+                      onChange={() => void onToggleCheck(a)}
+                    />
+                  </label>
+                ) : null}
                 {a.avatar ? (
                   <img src={String(a.avatar)} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
                 ) : (
@@ -374,17 +470,57 @@ export default function PrOrderApplicantsPage() {
                   ) : null}
                 </div>
               </div>
-              <button
-                type="button"
-                disabled={savingSelect}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium ${
-                  a.selected ? 'bg-orange-600 text-white' : 'border border-violet-400 text-violet-600'
-                }`}
-                onClick={() => void onToggleSelect(a)}
-              >
-                {a.selected ? '已选择' : '确认选择'}
-              </button>
+              {isIce ? (
+                <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700">
+                  {String(a.iceTaskStatus || '—')}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={savingSelect}
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium ${
+                    a.selected ? 'bg-orange-600 text-white' : 'border border-violet-400 text-violet-600'
+                  }`}
+                  onClick={() => void onToggleSelect(a)}
+                >
+                  {a.selected ? '已选择' : '确认选择'}
+                </button>
+              )}
             </div>
+
+            {isIce && a.iceDouyinUrl ? (
+              <div className="mt-3 p-3 rounded-lg bg-slate-50 border text-xs space-y-2">
+                <div>
+                  <span className="text-[var(--shell-muted)]">抖音链接 </span>
+                  <a href={a.iceDouyinUrl} target="_blank" rel="noreferrer" className="text-blue-600 break-all">
+                    {a.iceDouyinUrl}
+                  </a>
+                </div>
+                {a.iceRejectReason && a.iceTaskStatus === '链接已驳回' ? (
+                  <p className="text-red-600">驳回原因：{a.iceRejectReason}</p>
+                ) : null}
+                {a.canReviewIceLink ? (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={iceReviewBusyId === String(a.id)}
+                      className="px-3 py-1 rounded-lg border border-green-500 text-green-700 text-sm"
+                      onClick={() => void onIcePass(a)}
+                    >
+                      通过
+                    </button>
+                    <button
+                      type="button"
+                      disabled={iceReviewBusyId === String(a.id)}
+                      className="px-3 py-1 rounded-lg border border-red-400 text-red-600 text-sm"
+                      onClick={() => onIceOpenReject(a)}
+                    >
+                      驳回
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 text-xs">
               {a.platformAccount ? (
@@ -422,10 +558,34 @@ export default function PrOrderApplicantsPage() {
       </div>
 
       {!loading && !err && !applicants.length ? (
-        <p className="text-sm text-[var(--shell-muted)] text-center py-8">暂无达人报名，分享招募后等待达人提交</p>
+        <p className="text-sm text-[var(--shell-muted)] text-center py-8">
+          {isIce ? '暂无达人认领，分享招募后等待达人认领' : '暂无达人报名，分享招募后等待达人提交'}
+        </p>
       ) : null}
 
-      {!loading && applicants.length > 0 ? (
+      {!loading && applicants.length > 0 && isIce ? (
+        <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-[var(--shell-bg)]/95 backdrop-blur p-4 md:pl-64">
+          <div className="max-w-4xl mx-auto flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm"
+              disabled={exportingAll}
+              onClick={() => void onExportAll()}
+            >
+              下载全部明细
+            </button>
+            <p className="text-xs text-[var(--shell-muted)]">
+              {iceVerifyMode === 'pr' && icePendingReview > 0
+                ? `${icePendingReview} 条链接待审核 · 请在卡片上通过或驳回`
+                : iceVerifyMode === 'ai'
+                  ? 'AI 核查模式 · 达人提交链接后自动完成'
+                  : 'PR 审核模式 · 达人回传链接后请审核'}
+            </p>
+          </div>
+        </footer>
+      ) : null}
+
+      {!loading && applicants.length > 0 && !isIce ? (
         <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-[var(--shell-bg)]/95 backdrop-blur p-4 md:pl-64">
           <div className="max-w-4xl mx-auto flex flex-wrap gap-2">
             <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={() => setShowSelectedPanel(true)}>
@@ -585,6 +745,35 @@ export default function PrOrderApplicantsPage() {
                   复制链接
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {iceRejectModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setIceRejectModal(false)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold">驳回链接 · {iceRejectTargetName}</h3>
+            <p className="text-sm text-slate-500 mt-2">请填写驳回原因，达人将收到通知并可在任务详情重新提交。</p>
+            <textarea
+              className="mt-3 w-full min-h-28 rounded-lg border px-3 py-2 text-sm"
+              placeholder="请输入驳回原因"
+              value={iceRejectReason}
+              onChange={(e) => setIceRejectReason(e.target.value)}
+              maxLength={200}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="px-3 py-1.5 rounded-lg border text-sm" onClick={() => setIceRejectModal(false)}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-lg border border-red-400 text-red-600 text-sm disabled:opacity-50"
+                disabled={!iceRejectReason.trim() || iceReviewBusyId === iceRejectTargetId}
+                onClick={() => void onIceConfirmReject()}
+              >
+                确认驳回
+              </button>
             </div>
           </div>
         </div>

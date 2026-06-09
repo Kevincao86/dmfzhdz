@@ -1,5 +1,6 @@
 /** 首页招募大厅：排序（价格区间见 recruitmentHallFilters） */
 const mpOrderStatus = require('./mpOrderStatus.js')
+const iceOrderStats = require('./iceOrderStats.js')
 
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
@@ -91,6 +92,8 @@ function enrichMpOrderListItem(mp, localItem) {
     : ''
   const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
   const applicantCount = mp && Array.isArray(mp.applicants) ? mp.applicants.length : 0
+  const isIce = iceOrderStats.isIceMpOrder(mp)
+  const iceStats = isIce ? iceOrderStats.countIceOrderStats(mp) : null
   const deadlineMs = mp ? resolveDeadlineMs(mp, summary) : 0
   const status = mpOrderStatus.resolveEffectiveMpStatus(mp?.status, deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
@@ -106,7 +109,9 @@ function enrichMpOrderListItem(mp, localItem) {
     toggleNextStatus: recruiting ? 'closed' : 'open',
     applicantCount,
     recruitCount,
-    signupLabel: `报名 ${applicantCount}/${recruitCount} 人`,
+    signupLabel: isIce
+      ? `认领 ${iceStats.claimed}/${recruitCount} · 已完成 ${iceStats.completed}`
+      : `报名 ${applicantCount}/${recruitCount} 人`,
     deadlineDaysText: formatDeadlineDaysText(deadlineMs),
     deadlineMs,
   }

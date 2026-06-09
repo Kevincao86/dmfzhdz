@@ -1,4 +1,5 @@
 import { isIceMpOrder } from './orderCard'
+import { getIceVerifyMode } from './iceOrderStats'
 
 export type TalentAppProgressId = 'all' | 'pr_pending' | 'in_progress' | 'completed'
 
@@ -32,19 +33,29 @@ export function resolveTalentApplicationProgress(
   const ice = isIceMpOrder(mp)
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
-    if (taskStatus === 'pending_confirm' || (!taskStatus && !applicant.assignedVideoDownloadUrl)) {
-      return { id: 'in_progress', label: '进行中' }
+    if (taskStatus === 'rejected') return { id: 'pr_pending', label: '已拒绝' }
+    if (
+      taskStatus === 'pending_confirm' ||
+      taskStatus === 'applied' ||
+      (!taskStatus && !applicant.assignedVideoDownloadUrl)
+    ) {
+      return { id: 'in_progress', label: '待确认接收' }
     }
     if (taskStatus === 'confirmed') {
       const link = String(applicant.douyinPublishUrl || '').trim()
-      const pendingReview =
-        applicant.aiVerifyStatus === 'pending' ||
-        applicant.videoStatus === 'pending' ||
-        (link && applicant.aiVerifyStatus !== 'passed' && applicant.videoStatus !== 'passed')
-      if (pendingReview) return { id: 'in_progress', label: '进行中' }
-      if (!link) return { id: 'in_progress', label: '进行中' }
+      const verifyMode = getIceVerifyMode(mp)
+      if (verifyMode === 'pr' && applicant.videoStatus === 'pending' && !isApplicantPassed(applicant)) {
+        return { id: 'in_progress', label: '链接待 PR 审核' }
+      }
+      if (applicant.aiVerifyStatus === 'failed' || applicant.videoStatus === 'rejected') {
+        return {
+          id: 'in_progress',
+          label: applicant.videoStatus === 'rejected' ? '链接已驳回' : 'AI 核查未通过',
+        }
+      }
+      if (!link) return { id: 'in_progress', label: '待回传链接' }
+      return { id: 'in_progress', label: '进行中' }
     }
-    if (taskStatus === 'rejected') return { id: 'pr_pending', label: 'PR 待选中' }
     return { id: 'in_progress', label: '进行中' }
   }
 

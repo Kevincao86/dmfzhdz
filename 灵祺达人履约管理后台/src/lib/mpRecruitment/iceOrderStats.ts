@@ -1,31 +1,28 @@
-const { isIceMpOrder } = require('./iceOrderDetect.js')
+import { isIceMpOrder } from './orderCard'
 
-const ICE_APPLICANT_STORAGE_PREFIX = 'meoo_ice_applicant_v1_'
-
-function iceApplicantStorageKey(mpOrderId) {
-  return `${ICE_APPLICANT_STORAGE_PREFIX}${String(mpOrderId || '').trim()}`
-}
-
-function getIceVerifyMode(mp) {
-  const meta = mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+export function getIceVerifyMode(mp: Record<string, unknown> | null | undefined): 'ai' | 'pr' {
+  const meta =
+    mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
   return String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim().toLowerCase() === 'pr' ? 'pr' : 'ai'
 }
 
-function isIceApplicantCompleted(applicant) {
+export function isIceApplicantCompleted(applicant: Record<string, unknown> | null | undefined): boolean {
   if (!applicant) return false
   if (applicant.aiVerifyStatus === 'passed' || applicant.videoStatus === 'passed') return true
   return !!String(applicant.completedAt || '').trim()
 }
 
-function isIceApplicantClaimed(applicant) {
+export function isIceApplicantClaimed(applicant: Record<string, unknown> | null | undefined): boolean {
   if (!applicant || applicant.taskStatus === 'rejected') return false
   const ts = String(applicant.taskStatus || '')
   if (ts === 'pending_confirm' || ts === 'confirmed' || ts === 'applied') return true
-  return !!String(applicant.appliedAt || '').trim()
+  return !ts && !!String(applicant.appliedAt || '').trim()
 }
 
-function countIceOrderStats(mp) {
-  const applicants = Array.isArray(mp && mp.applicants) ? mp.applicants : []
+export function countIceOrderStats(mp: Record<string, unknown> | null | undefined): { claimed: number; completed: number } {
+  const applicants = Array.isArray(mp?.applicants) ? (mp!.applicants as Record<string, unknown>[]) : []
   let claimed = 0
   let completed = 0
   for (const a of applicants) {
@@ -39,7 +36,7 @@ function countIceOrderStats(mp) {
   return { claimed, completed }
 }
 
-function applicantTaskStatusLabel(applicant) {
+export function applicantTaskStatusLabel(applicant: Record<string, unknown> | null | undefined): string {
   if (!applicant) return '—'
   if (isIceApplicantCompleted(applicant)) return '已完成'
   if (applicant.taskStatus === 'rejected') return '已拒绝'
@@ -51,7 +48,10 @@ function applicantTaskStatusLabel(applicant) {
   return '已认领'
 }
 
-function canReviewIceLink(applicant, mp) {
+export function canReviewIceLink(
+  applicant: Record<string, unknown> | null | undefined,
+  mp: Record<string, unknown> | null | undefined,
+): boolean {
   if (!applicant || getIceVerifyMode(mp) !== 'pr') return false
   const url = String(applicant.douyinPublishUrl || applicant.videoUrl || '').trim()
   if (!url) return false
@@ -59,13 +59,4 @@ function canReviewIceLink(applicant, mp) {
   return applicant.videoStatus === 'pending' || applicant.aiVerifyStatus === 'pending'
 }
 
-module.exports = {
-  isIceMpOrder,
-  getIceVerifyMode,
-  isIceApplicantCompleted,
-  isIceApplicantClaimed,
-  countIceOrderStats,
-  applicantTaskStatusLabel,
-  canReviewIceLink,
-  iceApplicantStorageKey,
-}
+export { isIceMpOrder }

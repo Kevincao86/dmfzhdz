@@ -3,8 +3,7 @@ const selection = require('./mpApplicantSelection.js')
 const talentMember = require('./talentMember.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const { isIceMpOrder } = require('./iceOrderDetect.js')
-
-const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1_'
+const { iceApplicantStorageKey } = require('./iceOrderStats.js')
 
 function localApplicantIdForOrder(mpOrderId) {
   const id = String(mpOrderId || '').trim()
@@ -13,7 +12,7 @@ function localApplicantIdForOrder(mpOrderId) {
   const hit = apps.find((a) => a && String(a.mpOrderId || '') === id)
   if (hit && hit.applicantId) return String(hit.applicantId).trim()
   try {
-    const ice = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${id}`)
+    const ice = wx.getStorageSync(iceApplicantStorageKey(id))
     if (ice) return String(ice).trim()
   } catch {
     /* ignore */

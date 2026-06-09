@@ -38,17 +38,21 @@ function matchHallType(hallLabel, filterHall) {
   return String(hallLabel || '').trim() === filterHall
 }
 
+function applicantVideoUrl(a) {
+  return String((a && (a.videoUrl || a.douyinPublishUrl)) || '').trim()
+}
+
 function countPendingVideos(mp) {
   if (!mp || !Array.isArray(mp.applicants)) return 0
   return mp.applicants.filter((a) => {
-    if (!a || !String(a.videoUrl || '').trim()) return false
+    if (!a || !applicantVideoUrl(a)) return false
     return String(a.videoStatus || 'pending') === 'pending'
   }).length
 }
 
 function countVideos(mp) {
   if (!mp || !Array.isArray(mp.applicants)) return 0
-  return mp.applicants.filter((a) => a && String(a.videoUrl || '').trim()).length
+  return mp.applicants.filter((a) => a && applicantVideoUrl(a)).length
 }
 
 function filterPrOrderRows(rows, opts) {
