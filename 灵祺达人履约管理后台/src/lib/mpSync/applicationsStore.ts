@@ -172,7 +172,7 @@ export function markPublishedOrderDeleted(mpOrderId: string): void {
   writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
 }
 
-export function touchPublishedOrderSnapshot(
+export function upsertPublishedOrderSnapshot(
   mpOrderId: string,
   patch: Partial<PublishedOrderLocal>,
 ): void {
@@ -181,9 +181,27 @@ export function touchPublishedOrderSnapshot(
   const ids = ownerIdsForFilter()
   const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
   const idx = list.findIndex((item) => item.mpOrderId === id)
-  if (idx < 0) return
-  list[idx] = { ...list[idx], ...patch, mpOrderId: id }
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...patch, mpOrderId: id }
+  } else {
+    list.unshift({
+      mpOrderId: id,
+      title: patch.title || id,
+      publishedAt: patch.publishedAt || new Date().toLocaleString('zh-CN', { hour12: false }),
+      hall: patch.hall || 'normal',
+      ownerAccountId: ids.ownerAccountId,
+      ownerPrId: ids.prId,
+      ...patch,
+    })
+  }
   writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
+}
+
+export function touchPublishedOrderSnapshot(
+  mpOrderId: string,
+  patch: Partial<PublishedOrderLocal>,
+): void {
+  upsertPublishedOrderSnapshot(mpOrderId, patch)
 }
 
 export function hasAppliedToOrder(mpOrderId: string) {

@@ -1,7 +1,11 @@
 import { scopeIdFromAccount } from '../mpAccountLocalScope'
 import { getAccount, type MpAccount } from '../mpSession'
 import { prParticipantKey } from '../mpSync/participant'
-import { readPublishedOrders, type PublishedOrderLocal } from '../mpSync/applicationsStore'
+import {
+  readPublishedOrders,
+  upsertPublishedOrderSnapshot,
+  type PublishedOrderLocal,
+} from '../mpSync/applicationsStore'
 import { readPrProfile } from '../mpSync/userProfile'
 
 function hallFromMp(mp: Record<string, unknown>): string {
@@ -24,15 +28,18 @@ export function mpOrderOwnedByCurrentPr(
       ? (mp.mpPublishMeta as Record<string, unknown>)
       : {}
 
-  const prId = String(account.lingqiPrId || '').trim()
-  const registryPrId = String(account.registryPrId || account.registryMemberId || '').trim()
+  const prProfile = readPrProfile()
+  const prId = String(account.lingqiPrId || prProfile?.lingqiPrId || '').trim()
+  const registryPrId = String(
+    account.registryPrId || account.registryMemberId || prProfile?.id || '',
+  ).trim()
   const metaPrId = String(meta.lingqiPrId || '').trim()
   const metaRegistryPrId = String(meta.registryPrId || '').trim()
 
   if (prId && metaPrId && prId === metaPrId) return true
   if (registryPrId && metaRegistryPrId && registryPrId === metaRegistryPrId) return true
 
-  const myKey = prParticipantKey(readPrProfile())
+  const myKey = prParticipantKey(prProfile)
   const metaKey = String(meta.prParticipantKey || '').trim()
   if (myKey && metaKey && myKey === metaKey) return true
 
@@ -93,4 +100,21 @@ export function pruneOrphanPublishedOrders(_mpList: Record<string, unknown>[]): 
 
 export function listPublishedOrdersForCurrentPr(mpList: Record<string, unknown>[]): PublishedOrderLocal[] {
   return mergePublishedOrdersFromRegistry(readPublishedOrders(), mpList, getAccount())
+}
+
+/** 将注册表中的 PR 发单写入本地历史，便于 includeMpOrderIds 与离线展示 */
+export function cachePublishedOrdersFromMpList(mpList: Record<string, unknown>[]): void {
+  const account = getAccount()
+  if (!account) return
+  for (const mp of mpList) {
+    if (!mp || typeof mp !== 'object' || !mpOrderOwnedByCurrentPr(mp, account)) continue
+    const id = String(mp.id || '').trim()
+    if (!id) continue
+    upsertPublishedOrderSnapshot(id, {
+      title: String(mp.title || mp.customerName || id),
+      lastStatus: String(mp.status || 'open'),
+      hall: hallFromMp(mp),
+      publishedAt: String(mp.createdAt || mp.updatedAt || ''),
+    })
+  }
 }

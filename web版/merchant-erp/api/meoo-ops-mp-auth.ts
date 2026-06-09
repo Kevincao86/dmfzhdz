@@ -326,16 +326,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const includeMpOrderIds = Array.isArray(includeRaw)
         ? includeRaw.map((id) => String(id).trim()).filter(Boolean).slice(0, 120)
         : []
-      let prOwnerKeys: { lingqiPrId?: string; registryPrId?: string } | undefined
+      let prOwnerKeys:
+        | { lingqiPrId?: string; registryPrId?: string; prParticipantKey?: string }
+        | undefined
       if (body.includePrOwned === true) {
         const token = sessionToken(req, body)
         const sess = await resolveSession(rest, token)
-        if (sess?.account) {
-          const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
-          prOwnerKeys = {
-            lingqiPrId: String(account.lingqiPrId || '').trim(),
-            registryPrId: String(account.registryPrId || account.registryMemberId || '').trim(),
+        if (!sess) {
+          sendJson(res, 401, { ok: false, error: 'invalid_session' })
+          return
+        }
+        const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+        prOwnerKeys = {
+          lingqiPrId: String(
+            account.lingqi_pr_id || body.lingqiPrId || '',
+          ).trim(),
+          registryPrId: String(
+            account.registry_pr_id || body.registryPrId || '',
+          ).trim(),
+          prParticipantKey: String(body.prParticipantKey || '').trim(),
+        }
+        try {
+          const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, account)
+          const prDraft =
+            profile.prProfile && typeof profile.prProfile === 'object'
+              ? (profile.prProfile as Record<string, unknown>)
+              : null
+          const phone = String(prDraft?.contactPhone || '').trim()
+          if (phone) {
+            prOwnerKeys.prParticipantKey = `pr_${phone.replace(/\D/g, '').slice(-11) || phone}`
           }
+          const profileLq = String(prDraft?.lingqiPrId || '').trim()
+          const profileReg = String(prDraft?.id || '').trim()
+          if (profileLq) prOwnerKeys.lingqiPrId = profileLq
+          if (profileReg) prOwnerKeys.registryPrId = profileReg
+        } catch {
+          /* profile optional */
         }
       }
       const payload = await loadMpHallRegistryPayload({ includeMpOrderIds, prOwnerKeys })

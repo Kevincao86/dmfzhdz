@@ -1,6 +1,8 @@
 import type { MpAccount } from './mpSession'
-import { getToken } from './mpSession'
+import { getAccount, getToken } from './mpSession'
 import { readApplications, readPublishedOrders } from './mpSync/applicationsStore'
+import { prParticipantKey } from './mpSync/participant'
+import { readPrProfile } from './mpSync/userProfile'
 import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 
@@ -192,17 +194,31 @@ function collectIncludeMpOrderIds(extra?: string[]): string[] {
   return [...ids].slice(0, 120)
 }
 
+function buildHallRegistryOwnerPayload() {
+  const acc = getAccount()
+  const pr = readPrProfile()
+  return {
+    lingqiPrId: String(acc?.lingqiPrId || pr?.lingqiPrId || '').trim(),
+    registryPrId: String(acc?.registryPrId || acc?.registryMemberId || pr?.id || '').trim(),
+    prParticipantKey: prParticipantKey(pr),
+  }
+}
+
 export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[]; includePrOwned?: boolean }) {
   const includeMpOrderIds = collectIncludeMpOrderIds(opts?.includeMpOrderIds)
-  if (includeMpOrderIds.length || opts?.includePrOwned) {
+  const includePrOwned = opts?.includePrOwned === true
+  if (includeMpOrderIds.length || includePrOwned) {
     try {
       const data = await mpAuthRequest('hall_registry', {
         includeMpOrderIds,
-        ...(opts?.includePrOwned ? { includePrOwned: true } : {}),
+        ...(includePrOwned
+          ? { includePrOwned: true, ...buildHallRegistryOwnerPayload() }
+          : {}),
       })
       return data
-    } catch {
-      /* fallback GET */
+    } catch (e) {
+      if (includePrOwned) throw e
+      /* fallback GET only when not requesting PR-owned orders */
     }
   }
   const paths = ['/api/meoo-ops-mp-hall-registry', '/api/meoo-ops-sync-registry', '/api/ops-sync/registry']

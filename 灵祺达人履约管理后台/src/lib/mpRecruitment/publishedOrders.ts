@@ -6,6 +6,7 @@ export {
   type PublishedOrderLocal,
 } from '../mpSync/applicationsStore'
 export {
+  cachePublishedOrdersFromMpList,
   listPublishedOrdersForCurrentPr,
   mergePublishedOrdersFromRegistry,
   mpOrderOwnedByCurrentPr,
