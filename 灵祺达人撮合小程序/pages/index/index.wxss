@@ -6,6 +6,16 @@
   background: var(--lq-bg);
 }
 
+.share-cover-preload {
+  position: fixed;
+  left: -9999rpx;
+  top: -9999rpx;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .home-header,
 .home-toolbar,
 .home-filters {
