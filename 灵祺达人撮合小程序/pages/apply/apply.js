@@ -13,7 +13,12 @@ const applyRuntime = require('../../utils/applyTemplateRuntime.js')
 const platformForm = require('../../utils/platformForm.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 
-const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
+const {
+  emptyApplyFields,
+  memberSyncAvailable,
+  applyFieldsFromMember,
+  enrichApplicantFromMember,
+} = applyFormState
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
 
 function syncApplyRows(page) {
@@ -98,6 +103,7 @@ Page({
         const reg = await ops.fetchRegistry({ includeMpOrderIds: [mpOrderId] })
         const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
         if (mp) {
+          applyTemplates.cacheApplyFormFromMpOrder(mp)
           if (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object') {
             orderMeta = mp.mpPublishMeta
             recruitTarget = String(orderMeta.recruitTarget || 'talent')
@@ -117,15 +123,9 @@ Page({
       isIceMode,
       recruitTarget,
     })
-    if (orderMeta && Array.isArray(orderMeta.applyFormFields) && orderMeta.applyFormFields.length) {
-      applyTemplates.saveApplyFormForMpOrder(mpOrderId, {
-        templateId: orderMeta.applyFormTemplateId || templateId,
-        templateName: orderMeta.applyFormTemplateName || tpl.name,
-        fields: orderMeta.applyFormFields,
-      })
-    }
     const member = memberStore.readMember()
     const canSyncMember = memberSyncAvailable(member, platform)
+    const memberFields = canSyncMember ? applyFieldsFromMember(member, platform, DOUYIN_LEVELS) : null
     const patch = {
       mpOrderId,
       merchantOrderNo,
@@ -135,12 +135,12 @@ Page({
       applyRowsRaw,
       hasMember: !!member,
       canSyncMember,
-      syncMemberProfile: false,
+      syncMemberProfile: !!memberFields,
       memberTypeLabel: member ? memberStore.memberTypeLabel(member) : '',
       isIceMode,
       customFields: {},
-      ...emptyApplyFields(DOUYIN_LEVELS),
-      likesCollects: '',
+      ...(memberFields || emptyApplyFields(DOUYIN_LEVELS)),
+      likesCollects: memberFields && memberFields.likesCollects != null ? String(memberFields.likesCollects) : '',
     }
     if (!patch.provinces?.length) {
       Object.assign(patch, setupRegionState('', ''))
@@ -247,7 +247,7 @@ Page({
     this.setData({ submitting: true })
     try {
       const applicantId = `app-${Date.now()}`
-      const applicant = applyRuntime.buildApplicantFromRows(this.data.applyRowsRaw, this.data, {
+      let applicant = applyRuntime.buildApplicantFromRows(this.data.applyRowsRaw, this.data, {
         platform: this.data.platform,
         isIceMode: this.data.isIceMode,
         mpOrderId: this.data.mpOrderId,
@@ -255,6 +255,12 @@ Page({
         applicantId,
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
+      const memberForApply = memberStore.readMember()
+      applicant = enrichApplicantFromMember(applicant, memberForApply, this.data.platform)
+      if (!String(applicant.platformNickname || applicant.name || '').trim()) {
+        wx.showToast({ title: '请填写抖音昵称或完善我的信息', icon: 'none' })
+        return
+      }
       await ops.applyToMpOrder(this.data.mpOrderId, applicant)
       const member = memberStore.readMember()
       if (member && String(member.wxNickName || '').trim() && String(member.contact || '').trim()) {

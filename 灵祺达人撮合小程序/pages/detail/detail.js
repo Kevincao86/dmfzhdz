@@ -8,6 +8,7 @@ const chat = require('../../utils/talentChat.js')
 const contactGate = require('../../utils/talentContactPrGate.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
+const applyTemplates = require('../../utils/applyFormTemplates.js')
 
 Page({
   data: {
@@ -115,6 +116,7 @@ Page({
         this.setData({ loading: false, err: '该招募已结束' })
         return
       }
+      applyTemplates.cacheApplyFormFromMpOrder(mp)
       const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
       const view = display.enrichMpOrder(mp, merchantOrder)
       const isIce = !!view.isIce
@@ -398,6 +400,7 @@ Page({
     }
     const v = this.data.view
     if (!v || !this.data.id) return
+    if (this.data.mpOrder) applyTemplates.cacheApplyFormFromMpOrder(this.data.mpOrder)
     const q = [
       `mpId=${encodeURIComponent(this.data.id)}`,
       `merchantOrderNo=${encodeURIComponent(v.merchantOrderNo || '')}`,
