@@ -21,6 +21,7 @@ import {
   type LivePublishFields,
 } from './livePublishForm'
 import { buildCoverFieldsForOrder } from './recruitCoverLibrary'
+import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -368,10 +369,10 @@ export function buildPublishOrder(
 ) {
   const mode = modeById(recruitModeId)
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
-  const ts = Date.now()
+  const nowMs = Date.now()
   const existing = options?.existing
   const editId = options?.editId
-  const mpId = editId && existing ? editId : `MP-RO-${ts}`
+  const mpId = editId && existing ? editId : buildMpRecruitmentOrderId('RO', nowMs)
   const recruitCount = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
   const isUrgent = form.deliveryWindow === 'urgent'
   const recruitTarget = options?.recruitTarget === 'shoot' || options?.recruitTarget === 'edit'
@@ -384,7 +385,7 @@ export function buildPublishOrder(
   const order: Record<string, unknown> = {
     id: mpId,
     sourceMerchantOrderId:
-      existing && existing.sourceMerchantOrderId ? existing.sourceMerchantOrderId : `MP-USER-${ts}`,
+      existing && existing.sourceMerchantOrderId ? existing.sourceMerchantOrderId : buildMpRecruitmentOrderId('USER', nowMs),
     customerName: String(form.title || '').trim().slice(0, 24),
     storeName: buildRegionText(form),
     merchantRequirements: recruitmentInfo,

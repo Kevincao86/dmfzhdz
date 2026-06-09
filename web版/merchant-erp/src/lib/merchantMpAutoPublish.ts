@@ -4,6 +4,7 @@ import type {
 } from './opsRegistryTypes'
 import type { RecruitmentTierPlan } from './merchantRecruitmentTierPlan'
 import { tierPlanSummaryLines } from './merchantRecruitmentTierPlan'
+import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 
 function pickPlatform(order: RegistryRecruitmentOrder): '抖音' | '小红书' {
   const p = order.recruitmentPlatform || order.accountType || ''
@@ -22,7 +23,7 @@ export function buildMpOrderFromMerchantRecruitment(
   tierPlan?: RecruitmentTierPlan,
 ): RegistryMpRecruitmentOrder {
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
-  const mpId = `MP-RO-${Date.now()}`
+  const mpId = buildMpRecruitmentOrderId('RO')
   const platform = pickPlatform(order)
   const budget = Math.max(0, order.serviceAmount || 0)
   const recruitCount = tierPlan?.totalHeadcount ?? (order.fans > 0 ? order.fans : 1)
