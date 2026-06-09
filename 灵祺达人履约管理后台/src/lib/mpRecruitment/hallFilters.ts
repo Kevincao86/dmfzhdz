@@ -78,14 +78,16 @@ export function matchCity(region: string, storeName: string, cityFilter: string)
 export function matchRegionFilter(region: string, storeName: string, province: string, city: string): boolean {
   const prov = String(province || '').trim()
   const c = String(city || '').trim()
-  if ((!prov || prov === '全部') && (!c || c === '全部')) return true
+  const provAll = !prov || prov === '全部' || prov === '全部省份'
+  const cityAll = !c || c === '全部' || c === '全部城市'
+  if (provAll && cityAll) return true
   const blob = [region, storeName].filter(Boolean).join(' ')
   if (!blob || blob === '—') return false
-  if (prov && prov !== '全部') {
+  if (!provAll) {
     const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
     if (pShort.length >= 2 && !blob.includes(pShort) && !blob.includes(prov)) return false
   }
-  if (c && c !== '全部') return matchCity(region, storeName, c)
+  if (!cityAll) return matchCity(region, storeName, c)
   return true
 }
 
