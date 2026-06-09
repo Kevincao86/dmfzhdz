@@ -11,7 +11,7 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260609-share-cdn',
+  MP_BUILD_ID: 'mp-20260609-hall-all-targets',
   /** 分享封面：须 ECS 已同步 public/recruit-covers/share/（bash scripts/ecs-sync-mp-share-cover.sh） */
   MP_SHARE_COVER_URL: 'https://mofangdianai.com/recruit-covers/share/share-cover-ai-match.jpg',
   /** 星选 Web 封面 CDN（备案后可用；小程序图库走 OSS，见 recruitCoverOssBase.js） */
