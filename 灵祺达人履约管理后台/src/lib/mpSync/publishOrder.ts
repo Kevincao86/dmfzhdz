@@ -487,7 +487,13 @@ export function buildPublishOrder(
     order.fulfillmentLoop = 'closed'
     const url = resolveIceReferenceVideoUrl(form)
     const ts = mpId.split('-').pop() || String(nowMs)
-    order.iceVideoSlots = [{ slotId: `SLOT-${ts}`, label: '成片1', downloadUrl: url, iceJobId: '' }]
+    const slotN = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
+    order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
+      slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
+      label: `成片${i + 1}`,
+      downloadUrl: url,
+      iceJobId: '',
+    }))
   } else {
     order.hall = 'normal'
   }

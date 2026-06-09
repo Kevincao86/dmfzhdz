@@ -11,6 +11,79 @@ import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
 export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel } from './iceOrderDetect.js'
 export type { IceVerifyMode } from './iceOrderDetect.js'
 
+function parseIceRecruitCapacity(mp: RegistryMpRecruitmentOrder): number {
+  if (mp.recruitCount != null) {
+    const n = Number.parseInt(String(mp.recruitCount), 10)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const metaN = Number.parseInt(String(meta.recruitCount ?? ''), 10)
+  if (Number.isFinite(metaN) && metaN > 0) return metaN
+  const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const m = String(summary).match(/招募人数[:：]\s*(\d+)/)
+  if (m) return Math.max(1, Number.parseInt(m[1], 10) || 1)
+  return Math.max(1, (mp.iceVideoSlots ?? []).length)
+}
+
+function resolveIceReferenceDownloadUrl(mp: RegistryMpRecruitmentOrder): string {
+  const fromSlot = (mp.iceVideoSlots ?? []).find((s) => String(s.downloadUrl || '').trim())?.downloadUrl
+  if (fromSlot?.trim()) return fromSlot.trim()
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  return String(meta.iceVideoUrl || meta.referenceUrl || meta.materialUrl || '').trim()
+}
+
+/** 云剪直派：按 recruitCount 补齐成片槽（同一下载链接可多人认领） */
+export function ensureIceVideoSlots(mp: RegistryMpRecruitmentOrder): RegistryIceVideoSlot[] {
+  const capacity = parseIceRecruitCapacity(mp)
+  const existing = [...(mp.iceVideoSlots ?? [])]
+  const downloadUrl = resolveIceReferenceDownloadUrl(mp)
+  const template = existing[0]
+  if (existing.length >= capacity) return existing
+  while (existing.length < capacity) {
+    const i = existing.length + 1
+    existing.push({
+      slotId: template && i === 1 ? template.slotId : `SLOT-${String(mp.id || 'ICE').replace(/\s/g, '')}-${i}`,
+      label: `成片${i}`,
+      downloadUrl: template?.downloadUrl?.trim() || downloadUrl,
+      iceJobId: template?.iceJobId ?? '',
+    })
+  }
+  return existing
+}
+
+export function buildIceVideoSlotsForRecruitCount(
+  recruitCount: number,
+  downloadUrl: string,
+  idSeed: string,
+): RegistryIceVideoSlot[] {
+  const url = String(downloadUrl || '').trim()
+  const n = Math.max(1, Number.parseInt(String(recruitCount), 10) || 1)
+  const seed = String(idSeed || Date.now()).replace(/\s/g, '')
+  return Array.from({ length: n }, (_, i) => ({
+    slotId: i === 0 ? `SLOT-${seed}` : `SLOT-${seed}-${i + 1}`,
+    label: `成片${i + 1}`,
+    downloadUrl: url,
+    iceJobId: '',
+  }))
+}
+
+function countActiveIceApplicants(mp: RegistryMpRecruitmentOrder, excludeApplicantId?: string): number {
+  return (mp.applicants ?? []).filter((a) => {
+    if (excludeApplicantId && a.id === excludeApplicantId) return false
+    if (a.taskStatus === 'rejected') return false
+    if (a.taskStatus === 'confirmed' || a.taskStatus === 'pending_confirm' || a.taskStatus === 'applied') {
+      return true
+    }
+    return !a.taskStatus && !!String(a.appliedAt || '').trim()
+  }).length
+}
+
 export function iceSlotsFilledCount(mp: RegistryMpRecruitmentOrder): number {
   return (mp.iceVideoSlots ?? []).filter((s) => s.assignedApplicantId?.trim()).length
 }
@@ -95,13 +168,19 @@ export type ClaimIceMpResult =
   | { ok: true; applicant: RegistryMpRecruitmentApplicant; needConfirm: false; slot: RegistryIceVideoSlot }
   | { ok: false; error: string; code?: string }
 
+export type ConfirmIceMpResult =
+  | { ok: true; applicant: RegistryMpRecruitmentApplicant; slot: RegistryIceVideoSlot; iceVideoSlots: RegistryIceVideoSlot[] }
+  | { ok: false; error: string; code?: string }
+
 /** 闭环第一步：认领任务，待达人确认接收（不立即分配成片） */
 export function claimIceMpRecruitment(
   mp: RegistryMpRecruitmentOrder,
   applicant: RegistryMpRecruitmentApplicant,
 ): ClaimIceMpResult {
-  const slots = [...(mp.iceVideoSlots ?? [])]
-  if (!slots.length) return { ok: false, error: '云剪任务未配置成片', code: 'no_slots' }
+  const slots = ensureIceVideoSlots(mp)
+  if (!slots.length || !resolveIceReferenceDownloadUrl(mp)) {
+    return { ok: false, error: '云剪任务未配置成片', code: 'no_slots' }
+  }
 
   const existing = (mp.applicants ?? []).find((a) => a.id === applicant.id)
   if (existing) {
@@ -119,11 +198,9 @@ export function claimIceMpRecruitment(
     }
   }
 
-  const taken = slots.filter((s) => s.assignedApplicantId?.trim()).length
-  const pending = (mp.applicants ?? []).filter(
-    (a) => a.taskStatus === 'pending_confirm' && a.id !== applicant.id,
-  ).length
-  if (taken + pending >= slots.length) {
+  const capacity = parseIceRecruitCapacity(mp)
+  const occupied = countActiveIceApplicants(mp, applicant.id)
+  if (occupied >= capacity) {
     return { ok: false, error: '任务已满，暂无可用名额', code: 'slots_full' }
   }
 
@@ -137,16 +214,12 @@ export function claimIceMpRecruitment(
   return { ok: true, applicant: row, needConfirm: true }
 }
 
-export type ConfirmIceMpResult =
-  | { ok: true; applicant: RegistryMpRecruitmentApplicant; slot: RegistryIceVideoSlot }
-  | { ok: false; error: string; code?: string }
-
 /** 闭环第二步：确认接收并分配成片槽位 */
 export function confirmIceMpReceipt(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
 ): ConfirmIceMpResult {
-  const slots = [...(mp.iceVideoSlots ?? [])]
+  const slots = ensureIceVideoSlots(mp)
   const applicants = [...(mp.applicants ?? [])]
   const idx = applicants.findIndex((a) => a.id === applicantId)
   if (idx < 0) return { ok: false, error: '未找到认领记录', code: 'not_found' }
@@ -155,7 +228,7 @@ export function confirmIceMpReceipt(
   if (app.taskStatus === 'rejected') return { ok: false, error: '任务已拒绝', code: 'rejected' }
   if (app.taskStatus === 'confirmed' && app.assignedIceSlotId) {
     const slot = slots.find((s) => s.slotId === app.assignedIceSlotId)
-    if (slot) return { ok: true, applicant: app, slot }
+    if (slot) return { ok: true, applicant: app, slot, iceVideoSlots: slots }
   }
   if (app.taskStatus !== 'pending_confirm' && app.taskStatus !== 'applied' && !app.taskStatus) {
     return { ok: false, error: '当前状态不可确认接收', code: 'invalid_state' }
@@ -171,7 +244,7 @@ export function confirmIceMpReceipt(
       assignedVideoLabel: existingSlot.label,
     }
     applicants[idx] = row
-    return { ok: true, applicant: row, slot: existingSlot }
+    return { ok: true, applicant: row, slot: existingSlot, iceVideoSlots: slots }
   }
 
   const freeIdx = slots.findIndex((s) => !s.assignedApplicantId?.trim())
@@ -189,7 +262,7 @@ export function confirmIceMpReceipt(
     aiVerifyStatus: 'pending',
   }
   applicants[idx] = row
-  return { ok: true, applicant: row, slot: slots[freeIdx]! }
+  return { ok: true, applicant: row, slot: slots[freeIdx]!, iceVideoSlots: slots }
 }
 
 export function rejectIceMpTask(
@@ -246,7 +319,7 @@ export function applyIceMpRecruitment(
     }
     return confirmIceMpReceipt(merged, claim.applicant.id)
   }
-  return { ok: true, applicant: claim.applicant, slot: claim.slot }
+  return { ok: true, applicant: claim.applicant, slot: claim.slot, iceVideoSlots: ensureIceVideoSlots(mp) }
 }
 
 function upsertApplicant(
@@ -371,6 +444,7 @@ export function handleIceMpApply(
   const next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,
+    iceVideoSlots: ensureIceVideoSlots(mp),
     status: mp.status === 'open' ? 'collecting' : mp.status,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
@@ -396,13 +470,10 @@ export function handleIceMpConfirm(
   const result = confirmIceMpReceipt(mp, applicantId)
   if (!result.ok) return result
   const applicants = upsertApplicant(mp.applicants, result.applicant)
-  const iceVideoSlots = mp.iceVideoSlots?.map((s) =>
-    s.slotId === result.slot.slotId ? result.slot : s,
-  )
   const next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,
-    iceVideoSlots,
+    iceVideoSlots: result.iceVideoSlots,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
   return {
