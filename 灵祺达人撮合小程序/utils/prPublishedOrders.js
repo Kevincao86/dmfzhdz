@@ -32,32 +32,51 @@ function mpOrderOwnedByCurrentPr(mp, account) {
   return false
 }
 
+/** 注册表为权威数据源：仅展示仍存在于 mpRecruitmentOrders 的本 PR 发单 */
 function mergePublishedOrdersFromRegistry(local, mpList, account) {
-  const map = new Map()
+  const localById = new Map()
   ;(local || []).forEach((item) => {
-    const id = String(item && item.mpOrderId || '').trim()
-    if (id) map.set(id, item)
+    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
+    if (id) localById.set(id, item)
   })
+
+  const scope = require('./mpAccountLocalScope.js')
+  const out = []
   ;(mpList || []).forEach((mp) => {
     if (!mp || typeof mp !== 'object') return
     const id = String(mp.id || '').trim()
-    if (!id || map.has(id)) return
-    if (!mpOrderOwnedByCurrentPr(mp, account)) return
-    const scope = require('./mpAccountLocalScope.js')
-    map.set(id, {
-      mpOrderId: id,
-      title: String(mp.title || mp.customerName || id),
-      publishedAt: String(mp.createdAt || mp.updatedAt || ''),
-      hall: hallFromMp(mp),
-      ownerAccountId: scope.scopeIdFromAccount(account),
-      ownerPrId: String(account.lingqiPrId || '').trim(),
-    })
+    if (!id || !mpOrderOwnedByCurrentPr(mp, account)) return
+    const cached = localById.get(id)
+    out.push(
+      cached || {
+        mpOrderId: id,
+        title: String(mp.title || mp.customerName || id),
+        publishedAt: String(mp.createdAt || mp.updatedAt || ''),
+        hall: hallFromMp(mp),
+        ownerAccountId: scope.scopeIdFromAccount(account),
+        ownerPrId: String(account.lingqiPrId || '').trim(),
+      },
+    )
   })
-  return Array.from(map.values()).sort((a, b) => {
+
+  return out.sort((a, b) => {
     const ta = Date.parse(String(a.publishedAt || '').replace(/\//g, '-')) || 0
     const tb = Date.parse(String(b.publishedAt || '').replace(/\//g, '-')) || 0
     return tb - ta
   })
+}
+
+/** 清理本地缓存里已从注册表删除的发单 */
+function pruneOrphanPublishedOrders(mpList) {
+  const ids = new Set(
+    (mpList || [])
+      .map((o) => String(o && o.id ? o.id : '').trim())
+      .filter(Boolean),
+  )
+  for (const item of applicationsStore.readPublishedOrders()) {
+    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
+    if (id && !ids.has(id)) applicationsStore.removePublishedOrder(id)
+  }
 }
 
 function listPublishedOrdersForCurrentPr(mpList) {
@@ -68,5 +87,6 @@ function listPublishedOrdersForCurrentPr(mpList) {
 module.exports = {
   mpOrderOwnedByCurrentPr,
   mergePublishedOrdersFromRegistry,
+  pruneOrphanPublishedOrders,
   listPublishedOrdersForCurrentPr,
 }

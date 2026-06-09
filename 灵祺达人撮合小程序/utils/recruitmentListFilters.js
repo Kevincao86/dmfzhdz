@@ -1,13 +1,13 @@
 /** 首页招募大厅：排序（价格区间见 recruitmentHallFilters） */
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
-const HALL_STATUS_FILTERS = ['全部', '招募中', '收集中', '待结算', '已关闭', '已完成']
+const HALL_STATUS_FILTERS = ['全部', '招募中', '收集中', '待结算', '已停止', '已完成']
 
 const MP_STATUS_LABEL = {
   open: '招募中',
   collecting: '收集中',
   pending_settlement: '待结算',
-  closed: '已关闭',
+  closed: '已停止',
   done: '已完成',
 }
 

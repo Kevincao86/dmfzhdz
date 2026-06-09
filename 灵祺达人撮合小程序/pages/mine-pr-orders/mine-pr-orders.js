@@ -210,6 +210,7 @@ Page({
     try {
       const reg = await ops.fetchRegistry()
       const mpList = reg.mpRecruitmentOrders || []
+      prPublishedOrders.pruneOrphanPublishedOrders(mpList)
       const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)
       if (!local.length) {
         this.setData({
@@ -237,7 +238,8 @@ Page({
         err: '',
       })
     } catch (e) {
-      const rows = local.map((item) => mapRow(item, null))
+      const fallbackLocal = applicationsStore.readPublishedOrders()
+      const rows = fallbackLocal.map((item) => mapRow(item, null))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
       const { filtered, filterCountText } = this.applyFilters(rows)
       this.setData({
@@ -387,6 +389,19 @@ Page({
         try {
           await mpOrderRegistryOps.patchMpRecruitmentOrderStatus(id, next)
           wx.showToast({ title: `已${action}`, icon: 'success' })
+          const mpList = (await ops.fetchRegistry()).mpRecruitmentOrders || []
+          const mp = mpList.find((o) => o && o.id === id) || null
+          const patchRow = (rows) =>
+            (rows || []).map((r) => {
+              if (!r || r.mpOrderId !== id) return r
+              return mapRow(
+                { ...r, ...(applicationsStore.readPublishedOrders().find((x) => x.mpOrderId === id) || {}) },
+                mp,
+              )
+            })
+          const nextRows = patchRow(this.data.rows)
+          const { filtered, filterCountText } = this.applyFilters(nextRows)
+          this.setData({ rows: nextRows, filteredRows: filtered, filterCountText })
           await this.load()
         } catch (err) {
           wx.showToast({
@@ -453,8 +468,11 @@ Page({
         try {
           await mpOrderRegistryOps.deleteMpRecruitmentOrder(id)
           applicationsStore.removePublishedOrder(id)
+          const nextRows = (this.data.rows || []).filter((r) => r && r.mpOrderId !== id)
+          const { filtered, filterCountText } = this.applyFilters(nextRows)
+          this.setData({ rows: nextRows, filteredRows: filtered, filterCountText })
           wx.showToast({ title: '已删除', icon: 'success' })
-          this.load()
+          await this.load()
         } catch (err) {
           wx.showToast({
             title: String(err && err.message ? err.message : err).slice(0, 28),

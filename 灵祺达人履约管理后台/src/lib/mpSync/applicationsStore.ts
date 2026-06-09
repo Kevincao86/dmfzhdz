@@ -136,6 +136,16 @@ export function addPublishedOrder(entry: PublishedOrderLocal) {
   writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
 }
 
+export function removePublishedOrder(mpOrderId: string): void {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const ids = ownerIdsForFilter()
+  const list = readPublishedOrdersRaw()
+    .filter((item) => entryBelongsToCurrentAccount(item, ids))
+    .filter((item) => item.mpOrderId !== id)
+  writeListToKey(scopedStorageKey(PUBLISH_BASE), list)
+}
+
 export function hasAppliedToOrder(mpOrderId: string) {
   return readApplications().some((a) => a.mpOrderId === mpOrderId)
 }

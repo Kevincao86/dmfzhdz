@@ -14,7 +14,6 @@ const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
-const mpRecruitmentOrderId = require('../../utils/mpRecruitmentOrderId.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
