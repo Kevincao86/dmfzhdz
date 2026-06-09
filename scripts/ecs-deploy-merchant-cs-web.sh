@@ -37,7 +37,9 @@ if [[ "$(id -un)" == "root" && "${HOME:-}" == "/root" ]]; then
 fi
 
 echo "== 0) 代码 =="
-if [[ -d "$ROOT/.git" ]]; then
+if [[ -f "$ROOT/scripts/ecs-git-pull-gitee.sh" ]]; then
+  bash "$ROOT/scripts/ecs-git-pull-gitee.sh"
+elif [[ -d "$ROOT/.git" ]]; then
   (cd "$ROOT" && git pull --ff-only) || (cd "$ROOT" && git pull)
 fi
 
@@ -159,4 +161,4 @@ echo "完成。"
 echo "  商家 Web: https://${MERCHANT_DOMAIN}"
 echo "  API 轻量: curl -sS https://mofangdianai.com/erp-api/meoo-erp-api-health"
 echo ""
-echo "日常发版: cd ~/app && git pull && MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-web.sh"
+echo "日常发版: cd ~/app && bash scripts/ecs-git-pull-gitee.sh && MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-web.sh"
