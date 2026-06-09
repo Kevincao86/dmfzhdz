@@ -1,32 +1,26 @@
 /** 首页招募大厅：排序（价格区间见 recruitmentHallFilters） */
+const mpOrderStatus = require('./mpOrderStatus.js')
+
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
-const HALL_STATUS_FILTERS = ['全部', '招募中', '收集中', '待结算', '已停止', '已完成']
-
-const MP_STATUS_LABEL = {
-  open: '招募中',
-  collecting: '收集中',
-  pending_settlement: '待结算',
-  closed: '已停止',
-  done: '已完成',
-}
+const HALL_STATUS_FILTERS = mpOrderStatus.HALL_STATUS_FILTERS
+const MP_STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
 function isMpOrderRecruiting(status) {
-  return status === 'open' || status === 'collecting'
+  return mpOrderStatus.isMpOrderRecruiting(status)
 }
 
 function statusPriority(status) {
   if (status === 'open') return 0
   if (status === 'collecting') return 1
-  if (status === 'pending_settlement') return 2
-  if (status === 'closed') return 3
-  if (status === 'done') return 4
-  return 5
+  if (status === 'closed') return 2
+  if (status === 'done') return 3
+  return 4
 }
 
 function matchHallStatus(row, filterLabel) {
   if (!filterLabel || filterLabel === '全部') return true
-  const label = MP_STATUS_LABEL[row && row.status] || row.statusLabel || ''
+  const label = row && row.statusLabel ? row.statusLabel : mpOrderStatus.statusLabel(row && row.status)
   return label === filterLabel
 }
 
@@ -96,17 +90,17 @@ function enrichMpOrderListItem(mp, localItem) {
   const summary = mp
     ? [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
     : ''
-  const deadlineMs = mp ? resolveDeadlineMs(mp, summary) : 0
   const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
   const applicantCount = mp && Array.isArray(mp.applicants) ? mp.applicants.length : 0
-  const status = mp?.status || 'open'
+  const deadlineMs = mp ? resolveDeadlineMs(mp, summary) : 0
+  const status = mpOrderStatus.resolveEffectiveMpStatus(mp?.status, deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
-  const canToggleRecruit = status !== 'done' && status !== 'pending_settlement'
+  const canToggleRecruit = status !== 'done'
   return {
     ...localItem,
     title: localItem.title || mp?.title || mp?.customerName || localItem.mpOrderId,
     status,
-    statusLabel: MP_STATUS_LABEL[status] || status,
+    statusLabel: mpOrderStatus.statusLabel(status),
     recruiting,
     canToggleRecruit,
     toggleActionLabel: recruiting ? '停止' : '开始',

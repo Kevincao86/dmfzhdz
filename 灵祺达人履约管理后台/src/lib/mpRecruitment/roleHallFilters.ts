@@ -1,7 +1,9 @@
 import type { MpWorkIdentity } from '../mpWorkIdentity'
 import type { RecruitmentOrderRow } from './types'
 
-export const STATUS_FILTER_OPTIONS = ['全部', '招募中', '收集中', '待结算', '已停止', '已完成'] as const
+import { HALL_STATUS_FILTERS } from './mpOrderStatus'
+
+export const STATUS_FILTER_OPTIONS = HALL_STATUS_FILTERS
 
 function matchesRoleRecruit(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
   if (identity === 'pr') return (row.recruitTarget || 'talent') === 'talent'

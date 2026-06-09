@@ -389,15 +389,16 @@ Page({
         try {
           await mpOrderRegistryOps.patchMpRecruitmentOrderStatus(id, next)
           wx.showToast({ title: `已${action}`, icon: 'success' })
-          const mpList = (await ops.fetchRegistry()).mpRecruitmentOrders || []
-          const mp = mpList.find((o) => o && o.id === id) || null
+          const localItem =
+            applicationsStore.readPublishedOrders().find((x) => x.mpOrderId === id) || {
+              mpOrderId: id,
+              title: row.title,
+            }
+          const optimisticMp = row.mp ? { ...row.mp, status: next } : { id, status: next }
           const patchRow = (rows) =>
             (rows || []).map((r) => {
               if (!r || r.mpOrderId !== id) return r
-              return mapRow(
-                { ...r, ...(applicationsStore.readPublishedOrders().find((x) => x.mpOrderId === id) || {}) },
-                mp,
-              )
+              return mapRow(localItem, optimisticMp)
             })
           const nextRows = patchRow(this.data.rows)
           const { filtered, filterCountText } = this.applyFilters(nextRows)

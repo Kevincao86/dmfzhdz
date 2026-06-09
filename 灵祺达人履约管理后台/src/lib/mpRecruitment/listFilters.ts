@@ -1,14 +1,15 @@
 import type { BudgetDisplay } from './types'
+import {
+  HALL_STATUS_FILTERS,
+  MP_STATUS_LABEL,
+  isMpOrderRecruiting,
+  resolveEffectiveMpStatus,
+  statusLabel,
+} from './mpOrderStatus'
+
+export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
 export const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低'] as const
-
-const MP_STATUS_LABEL: Record<string, string> = {
-  open: '招募中',
-  collecting: '收集中',
-  pending_settlement: '待结算',
-  closed: '已停止',
-  done: '已完成',
-}
 
 export function parseTs(text: unknown): number {
   if (!text) return 0
@@ -175,20 +176,23 @@ export function enrichMpOrderListItem(
   mp: Record<string, unknown> | null,
   localItem: { title?: string; mpOrderId?: string; hall?: string },
 ) {
-  const status = String(mp?.status || 'open')
-  const recruiting = status === 'open' || status === 'collecting'
+  const summary = mp
+    ? [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+    : ''
+  const deadlineMs = mp ? resolveDeadlineMsFromMp(mp, summary) : 0
+  const status = resolveEffectiveMpStatus(mp?.status, deadlineMs)
+  const recruiting = isMpOrderRecruiting(status)
   const applicantCount = Array.isArray(mp?.applicants) ? mp.applicants.length : 0
   const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
-  const deadlineMs = mp ? resolvePublishedMs(mp) + 7 * 86400000 : 0
   const meta = mp?.mpPublishMeta as Record<string, unknown> | undefined
   const platform = String(mp?.platform || meta?.platform || '抖音').trim() || '抖音'
   return {
     ...localItem,
     title: localItem.title || String(mp?.title || mp?.customerName || localItem.mpOrderId),
     status,
-    statusLabel: MP_STATUS_LABEL[status] || status,
+    statusLabel: statusLabel(status),
     recruiting,
-    canToggleRecruit: status !== 'done' && status !== 'pending_settlement',
+    canToggleRecruit: status !== 'done',
     toggleActionLabel: recruiting ? '停止' : '开始',
     toggleNextStatus: recruiting ? 'closed' : 'open',
     applicantCount,
@@ -205,4 +209,25 @@ export function enrichMpOrderListItem(
           ? '云剪任务'
           : '招募大厅',
   }
+}
+
+function pickField(summary: string, key: string) {
+  const re = new RegExp(`${key}[:：]([^；;\\n]+)`)
+  const m = String(summary || '').match(re)
+  return m ? m[1].trim() : ''
+}
+
+export function resolveDeadlineMsFromMp(mp: Record<string, unknown>, summary: string): number {
+  const fromField =
+    parseTs(mp.deadline) ||
+    parseTs(pickField(summary, '报名截止')) ||
+    parseTs(pickField(summary, '截止')) ||
+    parseTs(pickField(summary, '截止时间'))
+  if (fromField > 0) return fromField
+  if (mp.urgent) {
+    const pub = resolvePublishedMs(mp)
+    if (pub > 0) return pub + 86400000
+  }
+  const pub = resolvePublishedMs(mp)
+  return pub > 0 ? pub + 7 * 86400000 : 0
 }

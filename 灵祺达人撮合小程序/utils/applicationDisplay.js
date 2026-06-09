@@ -6,17 +6,15 @@ const memberStore = require('./talentMember.js')
 const { labels } = require('./platformLabels.js')
 const { TALENT_TAGS } = require('./publishFormOptions.js')
 
+const mpOrderStatus = require('./mpOrderStatus.js')
+
 const MP_STATUS_LABEL = {
-  open: '招募中',
-  collecting: '收集中',
-  pending_settlement: '待结算',
-  closed: '已停止',
-  done: '已完成',
+  ...mpOrderStatus.MP_STATUS_LABEL,
   unknown: '未知',
 }
 
 function statusLabel(status) {
-  return MP_STATUS_LABEL[status] || status || '—'
+  return MP_STATUS_LABEL[status] || mpOrderStatus.statusLabel(status) || '—'
 }
 
 function hallLabelFromMp(mp) {

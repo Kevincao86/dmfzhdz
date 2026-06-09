@@ -1,6 +1,7 @@
 import type { MpRegistry, RecruitmentOrderRow } from './types'
 import { normalizeHallPlatform } from './hallFilters'
 import * as listFilters from './listFilters'
+import { isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel } from './mpOrderStatus'
 
 function isUrgentMpOrder(mp: Record<string, unknown>): boolean {
   return mp.urgent === true
@@ -51,10 +52,13 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     hideBudget ? '' : String(mp.budgetText || (serviceAmount > 0 ? `¥${serviceAmount.toLocaleString('zh-CN')}` : '面议'))
   const priceAmount = listFilters.resolvePriceAmount(mp, budgetText)
   const publishedAtMs = listFilters.resolvePublishedMs(mp)
+  const summaryText = String(mp.recruitmentInfo || mp.merchantRequirements || '').trim()
+  const deadlineMs = listFilters.resolveDeadlineMsFromMp(mp, summaryText)
   const applicantCount = Array.isArray(mp.applicants) ? mp.applicants.length : 0
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   let title = String(mp.title || '').trim()
   if (!title) title = `${customerName}·${storeName}达人招募`
+  const effectiveStatus = resolveEffectiveMpStatus(mp.status, deadlineMs)
 
   return {
     id: String(mp.id),
@@ -62,15 +66,8 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     merchantName: customerName,
     storeName,
     title,
-    mpStatus: String(mp.status || 'open'),
-    statusLabel:
-      {
-        open: '招募中',
-        collecting: '收集中',
-        pending_settlement: '待结算',
-        closed: '已停止',
-        done: '已完成',
-      }[String(mp.status)] || String(mp.status),
+    mpStatus: effectiveStatus,
+    statusLabel: statusLabel(effectiveStatus),
     platform,
     region,
     category: String(mp.category || '本地生活'),
@@ -88,7 +85,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     recommended: urgent || applicantCount >= 3 || priceAmount >= 1000,
     priceAmount,
     publishedAtMs,
-    deadlineMs: publishedAtMs + (urgent ? 86400000 : 7 * 86400000),
+    deadlineMs,
   }
 }
 
@@ -99,7 +96,7 @@ export function loadAllOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
 }
 
 export function loadOpenOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
-  return loadAllOrderRows(reg).filter((r) => r.mpStatus === 'open' || r.mpStatus === 'collecting')
+  return loadAllOrderRows(reg).filter((r) => isMpOrderRecruiting(r.mpStatus))
 }
 
 export function splitHallRows(reg: MpRegistry) {

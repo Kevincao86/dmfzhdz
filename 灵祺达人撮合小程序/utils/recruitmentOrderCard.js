@@ -4,14 +4,9 @@ const { isUrgentMpOrder, isIceMpOrder } = require('./recruitmentUrgent.js')
 const { recruitTargetFromMp } = require('./recruitTarget.js')
 const { isMerchantSyncedMpOrder } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
+const mpOrderStatus = require('./mpOrderStatus.js')
 
-const STATUS_LABEL = {
-  open: '招募中',
-  collecting: '收集中',
-  pending_settlement: '待结算',
-  closed: '已停止',
-  done: '已完成',
-}
+const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
 const {
   platformIcon,
@@ -35,6 +30,7 @@ function mapMpOrderRow(mp, reg) {
   const applicantCount = view.applicantCount || 0
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   const overRecruitHot = recruitCap > 0 && applicantCount > recruitCap
+  const effectiveStatus = mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs)
   return {
     id: mp.id,
     isMock: false,
@@ -42,8 +38,8 @@ function mapMpOrderRow(mp, reg) {
     merchantName: view.merchantName,
     storeName: view.storeName,
     title: view.title,
-    status: mp.status || 'open',
-    statusLabel: STATUS_LABEL[mp.status] || mp.status,
+    status: effectiveStatus,
+    statusLabel: mpOrderStatus.statusLabel(effectiveStatus),
     platform,
     platformIcon: platformIcon(platform),
     region: view.region,
@@ -70,7 +66,13 @@ function mapMpOrderRow(mp, reg) {
 
 function loadOpenOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
+  const openList = mpList.filter((o) => {
+    if (!o) return false
+    const summary = String(o.merchantRequirements || '').trim()
+    const deadlineMs = listFilters.resolveDeadlineMs(o, summary)
+    const status = mpOrderStatus.resolveEffectiveMpStatus(o.status, deadlineMs)
+    return mpOrderStatus.isHallRecruitingVisible(status)
+  })
   return openList.map((mp) => mapMpOrderRow(mp, reg))
 }
 
