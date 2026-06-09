@@ -1,6 +1,9 @@
 import { Copy, Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiModelAutoPicker from '../components/AiModelAutoPicker'
+import RecruitmentPlatformChips, {
+  type RecruitmentPlatform,
+} from '../components/recruitment/RecruitmentPlatformChips'
 import { cn } from '../cn'
 import { readMerchantSession } from '../lib/merchantSession'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
@@ -14,14 +17,7 @@ import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalo
 import { resolveTextAiModelForRequest } from '../services/merchantAiModelStorage'
 
 type MainTab = 'article' | 'topic'
-type PlatformId = 'douyin' | 'meituan' | 'xhs'
 type ScopeMode = 'brand' | 'store'
-
-const PLATFORM_OPTIONS: { id: PlatformId; label: string; disabled?: boolean }[] = [
-  { id: 'douyin', label: '抖音来客' },
-  { id: 'meituan', label: '美团点评', disabled: true },
-  { id: 'xhs', label: '小红书', disabled: true },
-]
 
 function readDouyinToken(): string | null {
   return readMerchantSession('meoo_douyin_merchant_token')
@@ -50,7 +46,8 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
 
 export default function AiOperationContentPage() {
   const [mainTab, setMainTab] = useState<MainTab>('article')
-  const [platformId, setPlatformId] = useState<PlatformId>('douyin')
+  const [deliveryPlatform, setDeliveryPlatform] = useState<RecruitmentPlatform>('抖音')
+  const isDouyin = deliveryPlatform === '抖音'
   const [scopeMode, setScopeMode] = useState<ScopeMode>('brand')
   const [brandName, setBrandName] = useState('')
   const [storeName, setStoreName] = useState('')
@@ -89,22 +86,21 @@ export default function AiOperationContentPage() {
   const [topicCopyTip, setTopicCopyTip] = useState<string | null>(null)
 
   const buildContextProductName = useCallback((): string => {
-    const plat = PLATFORM_OPTIONS.find((x) => x.id === platformId)?.label ?? '抖音来客'
-    if (platformId !== 'douyin') {
-      return `${plat}（当前仅抖音来客支持 AI 生成）`
+    if (!isDouyin) {
+      return `${deliveryPlatform}（当前仅「抖音」支持 AI 生成）`
     }
     if (scopeMode === 'brand') {
-      return `${plat}；品牌：${brandName.trim() || '（未填写）'}`
+      return `${deliveryPlatform}；品牌：${brandName.trim() || '（未填写）'}`
     }
-    return `${plat}；门店：${storeName.trim() || '（未填写）'}`
-  }, [platformId, scopeMode, brandName, storeName])
+    return `${deliveryPlatform}；门店：${storeName.trim() || '（未填写）'}`
+  }, [deliveryPlatform, isDouyin, scopeMode, brandName, storeName])
 
   const runAssist = useCallback(
     async (action: AiAssistAction, title_draft: string) => {
-      if (platformId !== 'douyin') {
+      if (!isDouyin) {
         return {
           ok: false as const,
-          message: '当前仅「抖音来客」平台支持 AI 生成，请先选择抖音来客。',
+          message: '当前仅「抖音」平台支持 AI 文章与话题生成，请先选择抖音。',
         }
       }
       if (!readDouyinToken()) {
@@ -120,7 +116,7 @@ export default function AiOperationContentPage() {
         title_draft: title_draft.trim(),
       })
     },
-    [platformId, buildContextProductName],
+    [isDouyin, buildContextProductName],
   )
 
   const onGenerateArticle = async () => {
@@ -182,7 +178,7 @@ export default function AiOperationContentPage() {
       <div>
         <h1 className="erp-page-title">AI 文章与话题</h1>
         <p className="mt-1 text-sm embed-text-muted">
-          选择平台与品牌或适用门店后，使用下方文案模型生成内容（需已完成抖音来客绑定）。
+          选择投放平台与品牌或适用门店后，使用下方文案模型生成内容（抖音平台需已完成来客绑定）。
         </p>
         <div className="mt-4 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
           <button
@@ -215,22 +211,19 @@ export default function AiOperationContentPage() {
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium embed-text-primary">平台</label>
-            <select
-              value={platformId}
-              onChange={(e) => setPlatformId(e.target.value as PlatformId)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              {PLATFORM_OPTIONS.map((p) => (
-                <option key={p.id} value={p.id} disabled={p.disabled}>
-                  {p.label}
-                  {p.disabled ? '（即将支持）' : ''}
-                </option>
-              ))}
-            </select>
-            {platformId !== 'douyin' && (
-              <p className="mt-1 text-xs text-amber-800">AI 生成请先选择「抖音来客」。</p>
-            )}
+            <RecruitmentPlatformChips
+              value={deliveryPlatform}
+              onChange={setDeliveryPlatform}
+              label="平台"
+              required
+            />
+            {!isDouyin ? (
+              <p className="mt-2 text-xs text-amber-800">
+                {deliveryPlatform === '小红书'
+                  ? '小红书平台 AI 文案即将支持；当前请切换为「抖音」生成内容。'
+                  : `「${deliveryPlatform}」平台 AI 文案即将支持；当前请切换为「抖音」生成内容。`}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -313,7 +306,7 @@ export default function AiOperationContentPage() {
             {articleErr && <p className="mt-2 text-sm text-red-600">{articleErr}</p>}
             <button
               type="button"
-              disabled={articleBusy || platformId !== 'douyin'}
+              disabled={articleBusy || !isDouyin}
               onClick={() => void onGenerateArticle()}
               className="mt-4 inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -357,7 +350,7 @@ export default function AiOperationContentPage() {
             {topicErr && <p className="mt-2 text-sm text-red-600">{topicErr}</p>}
             <button
               type="button"
-              disabled={topicBusy || platformId !== 'douyin'}
+              disabled={topicBusy || !isDouyin}
               onClick={() => void onGenerateTopic()}
               className="mt-4 inline-flex items-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
