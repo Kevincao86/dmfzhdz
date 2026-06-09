@@ -38,6 +38,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { composeIceEditBrief, splitIceEditBrief } from '../lib/iceEditBriefCompose'
 import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
+import { findInvalidIcePipelineImageUrl } from '../lib/icePipelineImageUrl'
 import { snapshotUploadFiles, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
 
 const POLL_MS = 5000
@@ -461,6 +462,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('请粘贴至少一条图片 https 链接（.jpg / .png / .webp 等）')
       return
     }
+    const invalid = findInvalidIcePipelineImageUrl(urls)
+    if (invalid) {
+      setErr(invalid)
+      return
+    }
     setErr(null)
     setMaterialTab('images')
     setImageItems((prev) => [
@@ -469,6 +475,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         id: newJobId(),
         label: `图片 ${prev.length + i + 1}`,
         mediaUrl,
+        pipelineUrl: mediaUrl,
         previewUrl: mediaUrl,
       })),
     ])
@@ -587,9 +594,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       return
     }
     const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
-    const badUrl = imageUrls.find((u) => /localhost|127\.0\.0\.1|blob:/i.test(u))
-    if (badUrl) {
-      setErr('图片须为公网可访问地址，请使用「本地上传」写入 OSS 后再成片')
+    const invalidUrls = findInvalidIcePipelineImageUrl(imageUrls)
+    if (invalidUrls) {
+      setErr(invalidUrls)
       return
     }
     const localId = newJobId()
@@ -700,9 +707,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     }
     const pending = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed')
     const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
-    const badUrl = imageUrls.find((u) => /localhost|127\.0\.0\.1|blob:/i.test(u))
-    if (badUrl) {
-      setErr('图片须为公网可访问地址，请使用「本地上传」写入 OSS 后再批量剪辑')
+    const invalidUrls = findInvalidIcePipelineImageUrl(imageUrls)
+    if (invalidUrls) {
+      setErr(invalidUrls)
       return
     }
     const runImageBatch = batchGenerateEnabled && imageUrls.length > 0
@@ -1162,7 +1169,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 value={imageUrlText}
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => setImageUrlText(e.target.value)}
-                placeholder={'https://your-cdn.com/photo-01.jpg\nhttps://your-cdn.com/photo-02.png'}
+                placeholder={'https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/photo-01.jpg\n（建议用「本地上传」，勿粘贴示例或外链）'}
                 className="min-h-[72px] w-full rounded-lg border border-violet-200 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
               />
               <div className="flex flex-wrap gap-2">
