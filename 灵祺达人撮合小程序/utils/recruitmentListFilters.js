@@ -19,9 +19,8 @@ function statusPriority(status) {
 }
 
 function matchHallStatus(row, filterLabel) {
-  if (!filterLabel || filterLabel === '全部') return true
   const label = row && row.statusLabel ? row.statusLabel : mpOrderStatus.statusLabel(row && row.status)
-  return label === filterLabel
+  return mpOrderStatus.matchHallStatusFilter(label, filterLabel)
 }
 
 function parseTs(text) {
@@ -239,6 +238,7 @@ function buildMockRecruitmentRows() {
 module.exports = {
   SORT_OPTIONS,
   HALL_STATUS_FILTERS,
+  HALL_DEFAULT_STATUS_FILTER: mpOrderStatus.HALL_DEFAULT_STATUS_FILTER,
   MP_STATUS_LABEL,
   isMpOrderRecruiting,
   matchHallStatus,

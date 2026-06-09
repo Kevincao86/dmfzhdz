@@ -1,9 +1,10 @@
 import type { MpWorkIdentity } from '../mpWorkIdentity'
 import type { RecruitmentOrderRow } from './types'
 
-import { HALL_STATUS_FILTERS } from './mpOrderStatus'
+import { HALL_DEFAULT_STATUS_FILTER, HALL_STATUS_FILTERS, matchHallStatusFilter } from './mpOrderStatus'
 
 export const STATUS_FILTER_OPTIONS = HALL_STATUS_FILTERS
+export { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter }
 
 function matchesRoleRecruit(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
   if (identity === 'pr') return (row.recruitTarget || 'talent') === 'talent'
@@ -24,8 +25,7 @@ export function orderVisibleToWorkIdentity(row: RecruitmentOrderRow, identity: M
 }
 
 export function matchStatusLabel(row: RecruitmentOrderRow, filter: string): boolean {
-  if (!filter || filter === '全部') return true
-  return row.statusLabel === filter
+  return matchHallStatusFilter(String(row.statusLabel || ''), filter)
 }
 
 export function prioritizeActiveStatus<T extends { statusLabel?: string; publishedAtMs?: number }>(rows: T[]): T[] {
