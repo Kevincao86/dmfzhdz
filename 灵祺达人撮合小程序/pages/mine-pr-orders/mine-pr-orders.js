@@ -359,7 +359,7 @@ Page({
   onShareTimeline() {
     const order = this.data.shareOrder
     if (!order || !order.id) {
-      return { title: mpShare.DEFAULT_TITLE, query: '' }
+      return mpShare.defaultTimelineShare()
     }
     const payload = buildOrderSharePayload(order)
     const out = {

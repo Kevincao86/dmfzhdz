@@ -84,6 +84,9 @@ Page({
     mpShare.enableShareMenu()
     return mpShare.defaultShare('/pages/index/index')
   },
+  onShareTimeline() {
+    return mpShare.defaultTimelineShare()
+  },
   onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/index/index')

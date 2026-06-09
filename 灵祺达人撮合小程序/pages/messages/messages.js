@@ -32,6 +32,9 @@ Page({
     mpShare.enableShareMenu()
     return mpShare.defaultShare('/pages/messages/messages')
   },
+  onShareTimeline() {
+    return mpShare.defaultTimelineShare()
+  },
   onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/messages/messages')
