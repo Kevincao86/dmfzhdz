@@ -2,7 +2,9 @@ import type { MpRegistry, RecruitmentOrderRow, TalentCardRow } from './types'
 import { postMpRecruitmentAi } from '../mpApi'
 import { isIceMpOrder, mapMpOrderRow } from './orderCard'
 import { readPublishedOrders } from './publishedOrders'
+import { mpOrderOwnedByCurrentPr } from './prPublishedOrders'
 import type { PrBoardId } from './prRecommendBoard'
+import { getAccount } from '../mpSession'
 import { readApplications } from '../mpSync/applicationsStore'
 import { primaryPlatformProfile, readMember, type TalentMember } from '../mpSync/talentMember'
 import { getWorkIdentity, workIdentityLabel, type MpWorkIdentity } from '../mpWorkIdentity'
@@ -242,18 +244,48 @@ export function orderMatchesPrBoard(row: RecruitmentOrderRow, mp: Record<string,
   return false
 }
 
+type PrEligibleOrderPack = {
+  mp: Record<string, unknown>
+  row: RecruitmentOrderRow
+  payload: Record<string, unknown>
+}
+
+function appendEligiblePack(
+  out: PrEligibleOrderPack[],
+  seen: Set<string>,
+  mp: Record<string, unknown>,
+  reg: MpRegistry,
+  board: PrBoardId,
+) {
+  const id = String(mp.id || '').trim()
+  if (!id || seen.has(id)) return
+  if (mp.status !== 'open' && mp.status !== 'collecting') return
+  const row = mapMpOrderRow(mp, reg)
+  if (board && !orderMatchesPrBoard(row, mp, board)) return
+  seen.add(id)
+  out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
+}
+
+/** 本地发单 + 注册表当前 PR 归属，与小程序 recruitmentAiTags.listPrEligibleOrders 对齐 */
 export function listPrEligibleOrders(reg: MpRegistry, opts?: { board?: PrBoardId; recruitTarget?: PrBoardId }) {
   const board = opts?.board || opts?.recruitTarget || 'talent'
   const local = readPublishedOrders()
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const out: { mp: Record<string, unknown>; row: RecruitmentOrderRow; payload: Record<string, unknown> }[] = []
+  const out: PrEligibleOrderPack[] = []
+  const seen = new Set<string>()
+  const account = getAccount()
+
   for (const item of local) {
     if (!item?.mpOrderId) continue
     const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
-    if (!mp || (mp.status !== 'open' && mp.status !== 'collecting')) continue
-    const row = mapMpOrderRow(mp, reg)
-    if (board && !orderMatchesPrBoard(row, mp, board)) continue
-    out.push({ mp, row, payload: prOrderAiPayload(mp, row) })
+    if (!mp) continue
+    appendEligiblePack(out, seen, mp, reg, board)
+  }
+  for (const mp of mpList) {
+    if (!mp || typeof mp !== 'object') continue
+    const row = mp as Record<string, unknown>
+    if (!mpOrderOwnedByCurrentPr(row, account)) continue
+    appendEligiblePack(out, seen, row, reg, board)
   }
   return out
 }

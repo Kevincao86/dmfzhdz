@@ -1,6 +1,6 @@
 import type { MpRegistry, TalentCardRow } from './types'
 import { isIceMpOrder, recruitTargetFromMp } from './orderCard'
-import { readPublishedOrders } from './publishedOrders'
+import { listPrEligibleOrders } from './recruitmentAi'
 import { formatTalent } from './talentFormat'
 import { primaryPlatformProfile } from '../mpSync/talentMember'
 import { canonicalTalentMemberIdFromRegistry } from '../mpSync/talentChatKeys'
@@ -260,21 +260,5 @@ export function buildBoardPool(reg: MpRegistry, board: PrBoardId): TalentCardRow
 }
 
 export function countPrOrdersForBoard(reg: MpRegistry, board: PrBoardId): number {
-  const local = readPublishedOrders()
-  const mpList = Array.isArray(reg?.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const target = boardRecruitTarget(board)
-  let n = 0
-  for (const item of local) {
-    if (!item?.mpOrderId) continue
-    const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
-    if (!mp) continue
-    if (mp.status !== 'open' && mp.status !== 'collecting') continue
-    const rt = recruitTargetFromMp(mp)
-    if (rt === target) {
-      n += 1
-      continue
-    }
-    if (board === 'edit' && isIceMpOrder(mp)) n += 1
-  }
-  return n
+  return listPrEligibleOrders(reg, { board }).length
 }
