@@ -96,6 +96,9 @@ Page({
     mpShare.enableShareMenu()
     return mpShare.defaultShare('/pages/mine/mine')
   },
+  onShareTimeline() {
+    return mpShare.defaultTimelineShare()
+  },
   async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/mine/mine')

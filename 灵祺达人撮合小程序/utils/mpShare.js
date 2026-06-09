@@ -1,9 +1,22 @@
-const DEFAULT_TITLE = '灵祺星选平台 · 达人招募与商单撮合'
+/** 小程序默认分享（卡片封面 + 标题） */
+const SHARE_COVER_IMAGE = '/images/share/share-cover-ai-match.jpg'
+const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配达人招募'
 
-function defaultShare(path) {
+function defaultShare(path, opts) {
+  const title = opts && opts.title ? String(opts.title).trim() : DEFAULT_TITLE
   return {
-    title: DEFAULT_TITLE,
+    title: title || DEFAULT_TITLE,
     path: path || '/pages/index/index',
+    imageUrl: SHARE_COVER_IMAGE,
+  }
+}
+
+function defaultTimelineShare(opts) {
+  const title = opts && opts.title ? String(opts.title).trim() : DEFAULT_TITLE
+  return {
+    title: title || DEFAULT_TITLE,
+    query: opts && opts.query ? String(opts.query) : '',
+    imageUrl: SHARE_COVER_IMAGE,
   }
 }
 
@@ -18,7 +31,9 @@ function enableShareMenu() {
 }
 
 module.exports = {
+  SHARE_COVER_IMAGE,
   DEFAULT_TITLE,
   defaultShare,
+  defaultTimelineShare,
   enableShareMenu,
 }

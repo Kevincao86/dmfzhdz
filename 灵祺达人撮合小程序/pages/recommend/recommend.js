@@ -313,6 +313,9 @@ Page({
     mpShare.enableShareMenu()
     return mpShare.defaultShare('/pages/recommend/recommend')
   },
+  onShareTimeline() {
+    return mpShare.defaultTimelineShare()
+  },
   async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/recommend/recommend')
