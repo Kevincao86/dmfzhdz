@@ -24,7 +24,7 @@ export function resolveEffectiveMpStatus(
   nowMs: number = Date.now(),
 ): string {
   let raw = String(rawStatus || 'open').trim() || 'open'
-  if (raw === 'pending_settlement') raw = 'closed'
+  if (raw === 'pending_settlement') raw = 'done'
   if (raw === 'closed' || raw === 'done') return raw
   if (deadlineMs > 0 && nowMs >= deadlineMs) return 'done'
   return raw

@@ -23,11 +23,18 @@ function isApplicantPrSelected(mp: Record<string, unknown> | null, applicant: Re
   return ids.map(String).includes(String(applicant.id || ''))
 }
 
+function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: string): boolean {
+  if (isIceMpOrder(mp)) return true
+  const orderId = String(mpOrderId || mp?.id || '').trim()
+  return /^MP-ICE-/i.test(orderId)
+}
+
 export function resolveTalentApplicationProgress(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
 ): { id: Exclude<TalentAppProgressId, 'all'>; label: string } {
-  const ice = isIceMpOrder(mp)
+  const ice = resolveIceContext(mp, mpOrderId)
   if (!applicant) {
     if (ice) return { id: 'in_progress', label: '进行中' }
     return { id: 'pr_pending', label: 'PR 待选中' }

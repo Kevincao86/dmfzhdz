@@ -72,7 +72,7 @@ function TalentApplicationsPage() {
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
     const isIce = row.isIce
     const canUploadVideo = !isIce && (!videoStatus || videoStatus === 'rejected')
-    const progress = resolveTalentApplicationProgress(mp, me)
+    const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     let iceActionLabel = ''
     if (isIce) {
       if (progress.id === 'completed') iceActionLabel = ''

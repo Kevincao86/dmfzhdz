@@ -23,8 +23,14 @@ function isApplicantPrSelected(mp, applicant) {
   return ids.map(String).includes(String(applicant.id || ''))
 }
 
-function resolveTalentApplicationProgress(mp, applicant) {
-  const ice = isIceMpOrder(mp)
+function resolveIceContext(mp, mpOrderId) {
+  if (isIceMpOrder(mp)) return true
+  const orderId = String(mpOrderId || (mp && mp.id) || '').trim()
+  return /^MP-ICE-/i.test(orderId)
+}
+
+function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
+  const ice = resolveIceContext(mp, mpOrderId)
   if (!applicant) {
     if (ice) return { id: 'in_progress', label: '进行中' }
     return { id: 'pr_pending', label: 'PR 待选中' }
@@ -60,9 +66,9 @@ function resolveTalentApplicationProgress(mp, applicant) {
   return { id: 'in_progress', label: '进行中' }
 }
 
-function matchTalentApplicationProgress(progressId, mp, applicant) {
+function matchTalentApplicationProgress(progressId, mp, applicant, mpOrderId) {
   if (!progressId || progressId === 'all') return true
-  return resolveTalentApplicationProgress(mp, applicant).id === progressId
+  return resolveTalentApplicationProgress(mp, applicant, mpOrderId).id === progressId
 }
 
 module.exports = {

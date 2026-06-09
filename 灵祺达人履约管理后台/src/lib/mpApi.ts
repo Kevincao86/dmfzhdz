@@ -1,5 +1,6 @@
 import type { MpAccount } from './mpSession'
 import { getToken } from './mpSession'
+import { readApplications, readPublishedOrders } from './mpSync/applicationsStore'
 import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 
@@ -174,7 +175,33 @@ export async function phoneRegister(input: {
   }
 }
 
-export async function fetchMpRegistry() {
+function collectIncludeMpOrderIds(extra?: string[]): string[] {
+  const ids = new Set<string>()
+  for (const a of readApplications()) {
+    const id = String(a.mpOrderId || '').trim()
+    if (id) ids.add(id)
+  }
+  for (const p of readPublishedOrders()) {
+    const id = String(p.mpOrderId || '').trim()
+    if (id) ids.add(id)
+  }
+  for (const id of extra || []) {
+    const s = String(id || '').trim()
+    if (s) ids.add(s)
+  }
+  return [...ids].slice(0, 120)
+}
+
+export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[] }) {
+  const includeMpOrderIds = collectIncludeMpOrderIds(opts?.includeMpOrderIds)
+  if (includeMpOrderIds.length) {
+    try {
+      const data = await mpAuthRequest('hall_registry', { includeMpOrderIds })
+      return data
+    } catch {
+      /* fallback GET */
+    }
+  }
   const paths = ['/api/meoo-ops-mp-hall-registry', '/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
   let lastErr = 'registry_failed'
   for (const path of paths) {

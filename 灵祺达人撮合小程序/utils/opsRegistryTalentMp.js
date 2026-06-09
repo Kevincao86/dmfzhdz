@@ -1,6 +1,7 @@
 const api = require('./api.js')
 const auth = require('./auth.js')
 const accountMemberSync = require('./accountMemberSync.js')
+const applicationsStore = require('./applicationsStore.js')
 const registryCache = require('./registryCache.js')
 const { withTimeout } = require('./fetchTimeout.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
@@ -21,11 +22,29 @@ function useCacheIfHallEmpty(data) {
   return data
 }
 
-async function fetchRegistryViaErpApi() {
+function collectIncludeMpOrderIds(extraIds) {
+  const ids = new Set()
+  for (const a of applicationsStore.readApplications()) {
+    const id = String(a && a.mpOrderId ? a.mpOrderId : '').trim()
+    if (id) ids.add(id)
+  }
+  for (const p of applicationsStore.readPublishedOrders()) {
+    const id = String(p && p.mpOrderId ? p.mpOrderId : '').trim()
+    if (id) ids.add(id)
+  }
+  for (const id of extraIds || []) {
+    const s = String(id || '').trim()
+    if (s) ids.add(s)
+  }
+  return [...ids].slice(0, 120)
+}
+
+async function fetchRegistryViaErpApi(opts) {
+  const includeMpOrderIds = collectIncludeMpOrderIds(opts && opts.includeMpOrderIds)
   let lastErr
   try {
     const raw = await withTimeout(
-      api.post(HALL_POST, { action: 'hall_registry' }),
+      api.post(HALL_POST, { action: 'hall_registry', includeMpOrderIds }, registerAuthHeaders()),
       REGISTRY_FETCH_MS,
       '招募大厅',
     )
@@ -47,11 +66,11 @@ async function fetchRegistryViaErpApi() {
   }
 }
 
-async function fetchRegistry() {
+async function fetchRegistry(opts) {
   const attempts = []
   let lastErr
   try {
-    const data = await fetchRegistryViaErpApi()
+    const data = await fetchRegistryViaErpApi(opts)
     registryCache.save(data, 'erp-api:hall-registry')
     return data
   } catch (e) {

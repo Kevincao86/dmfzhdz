@@ -322,7 +322,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     /** 招募大厅：与 wx_login 同走 POST，云函数代理更稳 */
     if (action === 'hall_registry') {
-      const payload = await loadMpHallRegistryPayload()
+      const includeRaw = body.includeMpOrderIds
+      const includeMpOrderIds = Array.isArray(includeRaw)
+        ? includeRaw.map((id) => String(id).trim()).filter(Boolean).slice(0, 120)
+        : []
+      const payload = await loadMpHallRegistryPayload({ includeMpOrderIds })
       sendJson(res, 200, { ok: true, ...payload })
       return
     }
