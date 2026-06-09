@@ -6,6 +6,14 @@ import { readPrProfile } from './mpSync/userProfile'
 import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 
+const REGISTRY_FETCH_MS = 25_000
+
+function registryFetchSignal(): AbortSignal | undefined {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(REGISTRY_FETCH_MS)
+  return undefined
+}
+
 async function parseJsonRes(res: Response) {
   const text = await res.text()
   if (!text.trim()) {
@@ -225,7 +233,7 @@ export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[]; inc
   let lastErr = 'registry_failed'
   for (const path of paths) {
     try {
-      const res = await fetch(apiUrl(path))
+      const res = await fetch(apiUrl(path), { signal: registryFetchSignal() })
       const data = await parseJsonRes(res)
       if (!res.ok || data.ok === false) {
         lastErr = String(data.error || data.detail || `http_${res.status}`)
@@ -233,7 +241,8 @@ export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[]; inc
       }
       return data
     } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr = /abort/i.test(msg) ? '招募大厅加载超时，请刷新重试' : msg
     }
   }
   throw new Error(lastErr)

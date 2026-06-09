@@ -103,7 +103,18 @@ export default function HallHomeDashboard() {
       </div>
 
       {loading ? <p className="text-[var(--shell-muted)]">加载数据中…</p> : null}
-      {err ? <p className="text-red-500 text-sm">{err}</p> : null}
+      {err ? (
+        <p className="text-red-500 text-sm">
+          {err}
+          <button
+            type="button"
+            className="ml-2 text-violet-600 underline"
+            onClick={() => window.location.reload()}
+          >
+            刷新重试
+          </button>
+        </p>
+      ) : null}
 
       {stats ? (
         <>
