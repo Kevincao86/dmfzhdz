@@ -85,7 +85,7 @@
       <text class="app-card__meta-item">酬劳 {{item.budgetText}}</text>
       <text class="app-card__meta-item">地区 {{item.region}}</text>
       <text class="app-card__meta-item">报名 {{item.appliedAt}}</text>
-      <text class="app-card__meta-item" wx:if="{{item.merchantOrderNo}}">单号 {{item.merchantOrderNo}}</text>
+      <text class="app-card__meta-item" wx:if="{{item.mpOrderId || item.merchantOrderNo}}">单号 {{item.mpOrderId || item.merchantOrderNo}}</text>
     </view>
     <view wx:if="{{item.videoStatus === 'rejected' && item.videoRejectReason}}" class="app-card__reject">
       <text>驳回原因：{{item.videoRejectReason}}</text>
@@ -113,7 +113,7 @@
       </button>
       <button
         wx:if="{{item.canUploadVideo}}"
-        class="app-card__btn app-card__btn--primary"
+        class="app-card__btn app-card__btn--upload"
         plain
         hover-class="app-card__btn--hover"
         loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"

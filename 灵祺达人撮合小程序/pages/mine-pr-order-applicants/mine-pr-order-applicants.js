@@ -10,6 +10,8 @@ const { exportApplicantsExcel, formatExportError } = require('../../utils/mpAppl
 const mpGroupQr = require('../../utils/mpGroupQr.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
+const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
 
 Page({
   data: {
@@ -50,6 +52,8 @@ Page({
     iceRejectTargetId: '',
     iceRejectTargetName: '',
     iceRejectReason: '',
+    canCompleteIce: false,
+    completingIce: false,
   },
   onShow() {
     this.setData({ chatEnabled: chat.canChat() && userProfile.readIdentity() === 'pr' })
@@ -101,6 +105,8 @@ Page({
       const isIce = iceOrderStats.isIceMpOrder(mp)
       const iceVerifyMode = iceOrderStats.getIceVerifyMode(mp)
       const iceStats = iceOrderStats.countIceOrderStats(mp)
+      const prStatus = mpOrderIce.resolveIcePrStatus(mp)
+      const prStatusLabel = mpOrderIce.displayStatusLabel(prStatus, mp, 'pr')
       let icePendingReview = 0
       let selectedIds = selection.selectedIdsFromMp(mp)
       if (!selectedIds.length) selectedIds = selection.readLocalSelectedIds(mpOrderId)
@@ -124,13 +130,14 @@ Page({
         publishedAt: meta.publishedAt,
         deadlineText: meta.deadlineText,
         status: mp.status || 'open',
-        statusLabel: appDisplay.statusLabel(mp.status),
+        statusLabel: isIce ? prStatusLabel : appDisplay.statusLabel(mp.status),
         hallLabel: appDisplay.hallLabelFromMp(mp),
         isIce,
         iceVerifyMode,
         iceClaimed: iceStats.claimed,
         iceCompleted: iceStats.completed,
         icePendingReview,
+        canCompleteIce: mpOrderIce.canPrCompleteIceOrder(mp),
         mpOrder: mp,
         groupQrImage: mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
@@ -513,5 +520,30 @@ Page({
       wx.hideLoading()
       this.setData({ iceReviewBusyId: '' })
     }
+  },
+  onCompleteIceOrder() {
+    if (this.data.completingIce || !this.data.canCompleteIce) return
+    wx.showModal({
+      title: '完成云剪订单',
+      content: '确认所有达人视频链接均已审核通过后，将订单标记为已完成。',
+      success: async (res) => {
+        if (!res.confirm) return
+        this.setData({ completingIce: true })
+        wx.showLoading({ title: '提交中…', mask: true })
+        try {
+          await mpOrderRegistryOps.patchMpRecruitmentOrderStatus(this.data.mpOrderId, 'done')
+          wx.showToast({ title: '订单已完成', icon: 'success' })
+          await this.loadOrder()
+        } catch (err) {
+          wx.showToast({
+            title: String(err && err.message ? err.message : err).slice(0, 28),
+            icon: 'none',
+          })
+        } finally {
+          wx.hideLoading()
+          this.setData({ completingIce: false })
+        }
+      },
+    })
   },
 })

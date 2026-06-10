@@ -193,6 +193,12 @@
         loading="{{exportingAll}}"
         bindtap="onExportAll"
       >下载全部明细</button>
+      <button
+        wx:if="{{canCompleteIce}}"
+        class="pr-app-tool-btn pr-app-tool-btn--notify"
+        loading="{{completingIce}}"
+        bindtap="onCompleteIceOrder"
+      >完成订单</button>
     </view>
     <text class="hint pr-app-footer-hint" wx:if="{{iceVerifyMode === 'pr' && icePendingReview > 0}}">{{icePendingReview}} 条链接待审核 · 请在卡片上通过或驳回</text>
     <text class="hint pr-app-footer-hint" wx:elif="{{iceVerifyMode === 'ai'}}">AI 核查模式 · 达人提交链接后自动完成</text>

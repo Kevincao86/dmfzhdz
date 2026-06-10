@@ -5,6 +5,7 @@ const { recruitTargetFromMp } = require('./recruitTarget.js')
 const { isMerchantSyncedMpOrder } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
+const mpOrderIce = require('./mpOrderIceStatus.js')
 
 const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
@@ -30,7 +31,7 @@ function mapMpOrderRow(mp, reg) {
   const applicantCount = view.applicantCount || 0
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   const overRecruitHot = recruitCap > 0 && applicantCount > recruitCap
-  const effectiveStatus = mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs)
+  const effectiveStatus = mpOrderIce.resolveDisplayStatus(mp, 'hall', deadlineMs)
   return {
     id: mp.id,
     isMock: false,
@@ -68,6 +69,7 @@ function loadOpenOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const openList = mpList.filter((o) => {
     if (!o) return false
+    if (isIceMpOrder(o)) return mpOrderIce.shouldShowIceInHall(o)
     const summary = String(o.merchantRequirements || '').trim()
     const deadlineMs = listFilters.resolveDeadlineMs(o, summary)
     const status = mpOrderStatus.resolveEffectiveMpStatus(o.status, deadlineMs)

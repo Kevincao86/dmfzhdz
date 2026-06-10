@@ -314,7 +314,10 @@ async function listMutualTalentKeysForPr(part) {
 
 function formatTime(ts) {
   try {
-    const d = new Date(Number(ts) || 0)
+    const n = Number(ts)
+    if (!Number.isFinite(n) || n <= 0) return ''
+    const d = new Date(n)
+    if (Number.isNaN(d.getTime())) return ''
     const now = new Date()
     const isToday = d.toDateString() === now.toDateString()
     if (isToday) {
