@@ -44,6 +44,12 @@ export function resolveEffectiveMpOrderStatus(
   return raw as RegistryMpRecruitmentOrder['status']
 }
 
+/** 招募大厅仍展示：招募中/收集中/已停止（closed = 运营台「已关闭」） */
+export function isMpOrderHallVisible(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
+  const s = resolveEffectiveMpOrderStatus(mp, nowMs)
+  return s === 'open' || s === 'collecting' || s === 'closed'
+}
+
 export function isMpOrderHallRecruiting(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
   const s = resolveEffectiveMpOrderStatus(mp, nowMs)
   return s === 'open' || s === 'collecting'
