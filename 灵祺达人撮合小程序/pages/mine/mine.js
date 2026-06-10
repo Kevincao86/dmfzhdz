@@ -269,6 +269,9 @@ Page({
       wxLoginAvatar: wx?.wxAvatarUrl || '',
     })
   },
+  onGoLoginPage() {
+    guestRoutes.redirectToLogin('/pages/mine/mine')
+  },
   onCloseWxLoginSheet() {
     this.setData({ showWxLoginSheet: false })
     setTabBarHidden(this, false)
@@ -460,8 +463,12 @@ Page({
     const key = e.currentTarget.dataset.key
     const url = MENU_URLS[key]
     if (!url) return
-    if ((key === 'profile' || key === 'prProfile') && !auth.isLoggedIn()) {
-      guestRoutes.redirectToLogin(url)
+    if (key === 'profile' || key === 'prProfile') {
+      if (!auth.isLoggedIn()) {
+        guestRoutes.redirectToLogin(url)
+        return
+      }
+      wx.navigateTo({ url })
       return
     }
     if (!this.ensureWxLoggedIn()) return
@@ -474,7 +481,6 @@ Page({
       guestRoutes.redirectToLogin(url)
       return
     }
-    if (!this.ensureWxLoggedIn()) return
     wx.navigateTo({ url })
   },
 })

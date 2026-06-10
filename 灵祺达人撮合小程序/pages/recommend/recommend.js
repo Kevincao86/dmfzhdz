@@ -825,7 +825,12 @@ Page({
     wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   },
   goEditSelfProfile() {
-    wx.navigateTo({ url: '/pages/register/register?edit=1' })
+    const url = '/pages/register/register?edit=1'
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(url)
+      return
+    }
+    wx.navigateTo({ url })
   },
   onToggleFavorite(e) {
     if (userProfile.readIdentity() !== 'pr') {
