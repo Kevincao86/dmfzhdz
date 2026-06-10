@@ -27,15 +27,16 @@
   z-index: 3;
   padding-left: 28rpx;
   padding-right: 28rpx;
-  padding-bottom: 20rpx;
+  padding-bottom: 72rpx;
   min-height: 180rpx;
   box-sizing: border-box;
 }
 
 .mine-header-foot {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4rpx;
+  position: absolute;
+  right: 28rpx;
+  bottom: 20rpx;
+  z-index: 4;
 }
 
 .mine-identity-switch {

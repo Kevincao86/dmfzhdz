@@ -391,10 +391,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         }
       }
       const includeRecommendPool = body.includeRecommendPool === true
-      if (includeRecommendPool && !hallSess) {
-        sendJson(res, 401, { ok: false, error: 'invalid_session' })
-        return
-      }
       const payload = await loadMpHallRegistryPayload({
         includeMpOrderIds,
         prOwnerKeys,
