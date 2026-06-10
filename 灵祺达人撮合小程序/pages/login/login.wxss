@@ -347,26 +347,33 @@
 
 .login-legal-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   flex-wrap: nowrap;
-  gap: 10rpx;
   margin-top: 20rpx;
-  padding: 0 4rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .login-legal-check {
-  flex-shrink: 0;
-  width: 28rpx;
-  height: 28rpx;
+  flex: none;
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 8rpx;
   border-radius: 50%;
   border: 2rpx solid rgba(124, 58, 237, 0.45);
   background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18rpx;
-  color: #fff;
   box-sizing: border-box;
+}
+
+.login-legal-check__mark {
+  font-size: 16rpx;
+  line-height: 1;
+  color: #fff;
 }
 
 .login-legal-check--on {
@@ -374,22 +381,19 @@
   border-color: transparent;
 }
 
-.login-legal-text-wrap {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.login-legal-line {
-  display: inline;
+.login-legal-txt,
+.login-legal-link {
+  flex: none;
   font-size: 22rpx;
-  line-height: 32rpx;
-  color: #64748b;
+  line-height: 26rpx;
   white-space: nowrap;
 }
 
+.login-legal-txt {
+  color: #64748b;
+}
+
 .login-legal-link {
-  display: inline;
   color: #6366f1;
   font-weight: 600;
 }
