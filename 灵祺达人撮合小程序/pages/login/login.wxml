@@ -14,6 +14,7 @@
     </view>
 
     <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
+      <view class="login-nav-spacer" aria-hidden="true" />
       <view class="login-brand-row">
         <image class="login-logo" src="/images/logo.png" mode="aspectFit" />
         <view class="login-hero-text">
