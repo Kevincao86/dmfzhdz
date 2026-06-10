@@ -72,7 +72,6 @@
             <text class="login-btn-icon">◎</text>
             <text>微信一键登录</text>
           </button>
-          <text class="login-guest-link" bindtap="onGuestLogin">游客登录</text>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>

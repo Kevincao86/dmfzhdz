@@ -10,7 +10,6 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 const { attachLoginIdentityIcons, loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
-const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 const IDENTITY_OPTIONS = attachLoginIdentityIcons(
   identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
@@ -219,10 +218,6 @@ Page({
     })
     if (auth.isLoggedIn()) {
       void navigateAfterLogin(this)
-      return
-    }
-    if (guestRoutes.isGuestBrowsing() && !redirect) {
-      wx.switchTab({ url: '/pages/index/index' })
     }
   },
 
@@ -275,14 +270,6 @@ Page({
   },
   onTabReg() {
     this.setData({ tab: 'reg', err: '' })
-  },
-
-  onGuestLogin() {
-    guestRoutes.enterGuestBrowse()
-    if (!identityTypes.isWorkIdentity(this.data.loginIdentity)) {
-      userProfile.writeIdentity('talent')
-    }
-    navigateAfterLogin(this)
   },
 
   onLoginName(e) {

@@ -22,7 +22,7 @@
             <image class="profile-avatar-logo" src="/images/logo.png" mode="aspectFit" />
           </view>
         </button>
-        <view wx:else class="profile-avatar-wrap" bindtap="onOpenWxLoginSheet">
+        <view wx:else class="profile-avatar-wrap" bindtap="goEditProfile">
           <image
             class="profile-avatar"
             src="{{avatarUrl}}"
@@ -60,7 +60,7 @@
 
   <view class="wx-login-banner card--accent" wx:if="{{!wxLoggedIn}}">
     <text class="vip-text">使用微信昵称头像登录，即可发招募、报名与导出</text>
-    <button class="vip-btn" bindtap="onOpenWxLoginSheet">微信登录</button>
+    <button class="vip-btn" bindtap="onGoLoginPage">微信登录</button>
   </view>
 
   <scroll-view class="mine-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">

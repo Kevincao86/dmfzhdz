@@ -27,9 +27,6 @@ function writeSession(token, account) {
   const merged = mergeAccountProfile(readAccount(), account)
   sessionStore.writeSessionPair(token, merged)
   mpAccountLocalScope.onAccountLogin(merged)
-  try {
-    require('./mpGuestRoutes.js').clearGuestBrowse()
-  } catch (_) {}
   const registryProfileSync = require('./registryProfileSync.js')
   void registryProfileSync
     .pullRegistryProfileAfterLogin()
@@ -47,9 +44,6 @@ function clearSession() {
   sessionStore.clearSessionPair()
   mpAccountLocalScope.onAccountLogout()
   wxProfileDisplay.clearWxProfileCache()
-  try {
-    require('./mpGuestRoutes.js').clearGuestBrowse()
-  } catch (_) {}
 }
 
 function isLoggedIn() {
