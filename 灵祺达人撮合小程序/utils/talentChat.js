@@ -80,13 +80,18 @@ function canChat() {
 async function syncProfile(p) {
   const part = p || participant.getCurrentParticipant()
   const snap = sanitizeSnapshot(part.memberSnapshot)
+  const wxProfileDisplay = require('./wxProfileDisplay.js')
+  let avatarUrl = String(part.avatarUrl || '').trim()
+  if (avatarUrl && wxProfileDisplay.isLocalTempAvatar(avatarUrl)) {
+    avatarUrl = await wxProfileDisplay.persistWxAvatarUrl(avatarUrl)
+  }
   await viaApi({
     action: 'sync_profile',
     participantKey: part.participantKey,
     deviceSecret: part.deviceSecret,
     role: part.role,
     displayName: part.displayName,
-    avatarUrl: part.avatarUrl,
+    avatarUrl,
     memberSnapshot: snap,
   })
 }

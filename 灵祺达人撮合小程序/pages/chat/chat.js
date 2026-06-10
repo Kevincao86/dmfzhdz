@@ -2,6 +2,7 @@ const chat = require('../../utils/talentChat.js')
 const participant = require('../../utils/participant.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const chatBadgeWatcher = require('../../utils/chatBadgeWatcher.js')
+const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 
 function toRawMessages(uiList) {
   return (uiList || []).map((m) => ({
@@ -38,7 +39,9 @@ Page({
     const sessionId = options && options.sessionId ? decodeURIComponent(options.sessionId) : ''
     const peerName = options && options.peerName ? decodeURIComponent(options.peerName) : '会话'
     const peerId = options && options.peerId ? decodeURIComponent(options.peerId) : ''
-    const peerAvatar = options && options.peerAvatar ? decodeURIComponent(options.peerAvatar) : ''
+    const peerAvatar = wxProfileDisplay.sanitizeDisplayAvatar(
+      options && options.peerAvatar ? decodeURIComponent(options.peerAvatar) : '',
+    )
     const me = participant.getCurrentParticipant()
     this._sessionId = sessionId
     this._sinceTs = 0
@@ -49,7 +52,7 @@ Page({
       peerName,
       peerId,
       peerAvatar,
-      myAvatar: me.avatarUrl || '/images/logo.png',
+      myAvatar: wxProfileDisplay.sanitizeDisplayAvatar(me.avatarUrl) || '/images/logo.png',
     })
     void this.bootstrap()
   },

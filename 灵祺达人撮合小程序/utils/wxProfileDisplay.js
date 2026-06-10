@@ -11,7 +11,16 @@ function isLocalTempAvatar(url) {
   if (u.startsWith('wxfile://')) return true
   if (u.startsWith('http://tmp')) return true
   if (u.startsWith('http://usr/')) return true
+  if (u.includes('/__tmp__/')) return true
+  if (/^https?:\/\/127\.0\.0\.1(?::\d+)?\//i.test(u)) return true
   return false
+}
+
+/** 列表/聊天展示用：临时路径视为无头像，由 WXML 回退 logo */
+function sanitizeDisplayAvatar(url) {
+  const u = String(url || '').trim()
+  if (!u || isLocalTempAvatar(u)) return ''
+  return u
 }
 
 function pickWxNick(...values) {
@@ -152,6 +161,7 @@ async function resolveWxProfileForLogin(wxLoginNick, wxLoginAvatar) {
 module.exports = {
   isPlaceholderWxNick,
   isLocalTempAvatar,
+  sanitizeDisplayAvatar,
   pickWxNick,
   pickWxAvatar,
   persistWxAvatarUrl,
