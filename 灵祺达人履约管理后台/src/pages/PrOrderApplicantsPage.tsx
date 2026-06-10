@@ -541,6 +541,24 @@ export default function PrOrderApplicantsPage() {
               {a.contact ? <div><span className="text-[var(--shell-muted)]">手机 </span>{String(a.contact)}</div> : null}
               {a.wechatId ? <div><span className="text-[var(--shell-muted)]">微信 </span>{String(a.wechatId)}</div> : null}
               <div><span className="text-[var(--shell-muted)]">报名时间 </span>{String(a.displayAppliedAt)}</div>
+              {!isIce ? (
+                <div>
+                  <span className="text-[var(--shell-muted)]">视频上传 </span>
+                  <span
+                    className={
+                      a.videoUploadTone === 'passed'
+                        ? 'text-emerald-700 font-medium'
+                        : a.videoUploadTone === 'rejected'
+                          ? 'text-red-600 font-medium'
+                          : a.videoUploadTone === 'uploaded'
+                            ? 'text-amber-950 font-medium'
+                            : 'text-[var(--shell-muted)]'
+                    }
+                  >
+                    {String(a.videoUploadLabel || '未上传')}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2 mt-3">
