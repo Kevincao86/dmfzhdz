@@ -68,12 +68,11 @@ function mapMpOrderRow(mp, reg) {
 function loadOpenOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const openList = mpList.filter((o) => {
-    if (!o) return false
-    if (isIceMpOrder(o)) return mpOrderIce.shouldShowIceInHall(o)
+    if (!o || !o.id || String(o.status) === 'deleted') return false
     const summary = String(o.merchantRequirements || '').trim()
     const deadlineMs = listFilters.resolveDeadlineMs(o, summary)
     const status = mpOrderStatus.resolveEffectiveMpStatus(o.status, deadlineMs)
-    return mpOrderStatus.isHallRecruitingVisible(status)
+    return mpOrderStatus.isMpOrderRecruiting(status)
   })
   return openList.map((mp) => mapMpOrderRow(mp, reg))
 }

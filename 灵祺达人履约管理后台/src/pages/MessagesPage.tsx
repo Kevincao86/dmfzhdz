@@ -72,7 +72,7 @@ export default function MessagesPage() {
       await syncProfile()
       let reg: Record<string, unknown> | null = null
       try {
-        reg = (await fetchMpRegistry()) as Record<string, unknown>
+        reg = (await fetchMpRegistry({ scope: 'full' })) as Record<string, unknown>
         setRegistryForChat(reg)
       } catch {
         reg = registryForChat
@@ -97,7 +97,7 @@ export default function MessagesPage() {
       await pullClientStateAfterLogin()
       let merged = readAllNotificationRows()
       if (role !== 'pr') {
-        const reg = await fetchMpRegistry()
+        const reg = await fetchMpRegistry({ scope: 'full' })
         const member = readMember() as Record<string, unknown> | null
         const registryRows = [
           ...buildSelectionNoticeRows(reg, member),

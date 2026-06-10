@@ -52,9 +52,6 @@ async function fetchRegistryPartialFromDb(
   return reg as Partial<RegistryFile>
 }
 
-function sliceRegistryList<T>(raw: unknown, max = 5000): T[] {
-  return Array.isArray(raw) ? (raw as T[]).slice(0, max) : []
-}
 
 function buildHallPayload(
   partial: Partial<RegistryFile>,
@@ -77,11 +74,6 @@ function buildHallPayload(
     payload: {
       ok: true,
       mpRecruitmentOrders,
-      mpTalentMembers: sliceRegistryList(file.mpTalentMembers),
-      mpTalentInbox: sliceRegistryList(file.mpTalentInbox),
-      talentLibraryEntries: sliceRegistryList(file.talentLibraryEntries),
-      shootTeamLibraryEntries: sliceRegistryList(file.shootTeamLibraryEntries),
-      editTeamLibraryEntries: sliceRegistryList(file.editTeamLibraryEntries),
     },
   }
 }
@@ -134,12 +126,10 @@ export async function loadMpHallRegistryPayload(opts?: {
       const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
       const built = buildHallPayload(partial, includeMpOrderIds, prOwnerKeys)
       if (built.needPersist) {
-        try {
-          await persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial)
-        } catch (e) {
+        void persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial).catch((e) => {
           const msg = e instanceof Error ? e.message : String(e)
-          console.warn('[hall_registry] persist skipped:', msg.slice(0, 200))
-        }
+          console.warn('[hall_registry] async persist failed:', msg.slice(0, 200))
+        })
       }
       return built.payload
     } catch (e) {
