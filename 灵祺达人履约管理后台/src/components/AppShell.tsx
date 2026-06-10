@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
 import { clearSession, getAccount, getActiveRole, type MpAccountRole } from '../lib/mpSession'
+import { clearMpRegistryCache } from '../lib/mpApi'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
@@ -46,6 +47,7 @@ export default function AppShell() {
       return
     }
     clearSession()
+    clearMpRegistryCache()
     nav('/', { replace: true })
   }
 

@@ -9,9 +9,9 @@ import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBas
 const REGISTRY_FETCH_MS = 25_000
 const HALL_REGISTRY_CACHE_MS = 45_000
 
-let hallRegistryInflight: Partial<Record<'hall' | 'full', Promise<Record<string, unknown>>>> = {}
+let hallRegistryInflight: Partial<Record<string, Promise<Record<string, unknown>>>> = {}
 let hallRegistryCache: Partial<
-  Record<'hall' | 'full', { data: Record<string, unknown>; expiresAt: number }>
+  Record<string, { data: Record<string, unknown>; expiresAt: number }>
 > = {}
 
 function registryFetchSignal(): AbortSignal | undefined {
@@ -221,13 +221,31 @@ function buildHallRegistryOwnerPayload() {
   }
 }
 
+function hallRegistryCacheKey(scope: 'hall' | 'full'): string {
+  const acc = getAccount()
+  const owner = String(acc?.registryPrId || acc?.lingqiPrId || acc?.registryMemberId || 'anon').trim() || 'anon'
+  return `${scope}:${owner}`
+}
+
+export function clearMpRegistryCache(): void {
+  hallRegistryCache = {}
+  hallRegistryInflight = {}
+}
+
 export async function fetchMpRegistry(opts?: {
   includeMpOrderIds?: string[]
   includePrOwned?: boolean
+  /** 合并本机报名/发单中的 mpOrderId（仅「我的报名」等场景，大厅勿开） */
+  includeLocalContext?: boolean
   /** hall：仅招募单（大厅列表）；full：完整注册表（消息/聊天等） */
   scope?: 'hall' | 'full'
 }) {
-  const includeMpOrderIds = collectIncludeMpOrderIds(opts?.includeMpOrderIds)
+  const explicitIds = (opts?.includeMpOrderIds ?? [])
+    .map((id) => String(id).trim())
+    .filter(Boolean)
+  const includeMpOrderIds = opts?.includeLocalContext
+    ? collectIncludeMpOrderIds(explicitIds)
+    : [...new Set(explicitIds)].slice(0, 120)
   const includePrOwned = opts?.includePrOwned === true
   const scope = opts?.scope === 'full' ? 'full' : 'hall'
   if (includeMpOrderIds.length || includePrOwned) {
@@ -268,22 +286,23 @@ export async function fetchMpRegistry(opts?: {
   }
 
   const now = Date.now()
-  const cached = hallRegistryCache[scope]
+  const cacheKey = hallRegistryCacheKey(scope)
+  const cached = hallRegistryCache[cacheKey]
   if (cached && cached.expiresAt > now) {
     return cached.data
   }
-  const inflight = hallRegistryInflight[scope]
+  const inflight = hallRegistryInflight[cacheKey]
   if (inflight) return inflight
 
   const pending = fetchOnce()
     .then((data) => {
-      hallRegistryCache[scope] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
+      hallRegistryCache[cacheKey] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
       return data
     })
     .finally(() => {
-      delete hallRegistryInflight[scope]
+      delete hallRegistryInflight[cacheKey]
     })
-  hallRegistryInflight[scope] = pending
+  hallRegistryInflight[cacheKey] = pending
   return pending
 }
 

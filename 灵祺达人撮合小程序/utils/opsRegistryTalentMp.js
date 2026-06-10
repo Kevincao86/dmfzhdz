@@ -22,9 +22,22 @@ function findMpOrderInRegistry(reg, mpOrderId) {
   return list.find((o) => o && String(o.id) === id) || null
 }
 
+function resolveIncludeMpOrderIds(opts) {
+  const explicit = []
+  for (const id of (opts && opts.includeMpOrderIds) || []) {
+    const s = String(id || '').trim()
+    if (s) explicit.push(s)
+  }
+  if (opts && opts.includeLocalContext) {
+    return collectIncludeMpOrderIds(explicit)
+  }
+  return [...new Set(explicit)].slice(0, 120)
+}
+
 function registryRequestKey(opts) {
-  const ids = collectIncludeMpOrderIds(opts && opts.includeMpOrderIds)
-  return ids.length ? `inc:${ids.slice().sort().join(',')}` : 'hall'
+  const ids = resolveIncludeMpOrderIds(opts)
+  const prOwned = opts && opts.includePrOwned ? 'pr' : ''
+  return ids.length ? `inc:${ids.slice().sort().join(',')}` : prOwned ? 'pr-owned' : 'hall'
 }
 
 /** 仅合并同一时刻的并行请求，不跳过轻量拉取 */
@@ -79,7 +92,7 @@ async function fetchRegistryOnce(includeMpOrderIds) {
 }
 
 async function fetchRegistryViaErpApi(opts) {
-  const includeMpOrderIds = collectIncludeMpOrderIds(opts && opts.includeMpOrderIds)
+  const includeMpOrderIds = resolveIncludeMpOrderIds(opts)
   let lastErr
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {

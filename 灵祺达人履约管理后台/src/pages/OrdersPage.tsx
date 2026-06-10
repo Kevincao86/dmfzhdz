@@ -146,7 +146,7 @@ function TalentApplicationsPage() {
     }
     const local = readApplications()
     try {
-      const reg = await fetchMpRegistry()
+      const reg = await fetchMpRegistry({ includeLocalContext: true })
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
       const enriched: EnrichedApplication[] = local.map((a) => {
         const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
@@ -192,7 +192,7 @@ function TalentApplicationsPage() {
       setLoading(true)
       const local = readApplications()
       try {
-        const reg = await fetchMpRegistry()
+        const reg = await fetchMpRegistry({ includeLocalContext: true })
         const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
           string,
           unknown
