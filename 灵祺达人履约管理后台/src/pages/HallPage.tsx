@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import HallHomeDashboard from '../components/mp/HallHomeDashboard'
 import HallRecruitmentPanel from '../components/mp/HallRecruitmentPanel'
@@ -17,18 +16,10 @@ export default function HallPage() {
   const role = getActiveRole()
   const [params, setParams] = useSearchParams()
   const tabParam = params.get('tab') as HallMainTab | null
-  const [tab, setTab] = useState<HallMainTab>(() =>
-    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'home',
-  )
-
-  useEffect(() => {
-    if (tabParam && TABS.some((t) => t.id === tabParam) && tabParam !== tab) {
-      setTab(tabParam)
-    }
-  }, [tabParam, tab])
+  const tab: HallMainTab =
+    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'home'
 
   function selectTab(next: HallMainTab) {
-    setTab(next)
     setParams(next === 'home' ? {} : { tab: next }, { replace: true })
   }
 

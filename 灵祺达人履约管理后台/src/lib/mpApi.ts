@@ -239,6 +239,8 @@ export async function fetchMpRegistry(opts?: {
   includeLocalContext?: boolean
   /** hall：仅招募单（大厅列表）；full：完整注册表（消息/聊天等） */
   scope?: 'hall' | 'full'
+  /** PR 推荐大厅：经 hall_registry POST 附带达人/团队库（须已登录） */
+  includeRecommendPool?: boolean
 }) {
   const explicitIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
@@ -247,18 +249,20 @@ export async function fetchMpRegistry(opts?: {
     ? collectIncludeMpOrderIds(explicitIds)
     : [...new Set(explicitIds)].slice(0, 120)
   const includePrOwned = opts?.includePrOwned === true
+  const includeRecommendPool = opts?.includeRecommendPool === true
   const scope = opts?.scope === 'full' ? 'full' : 'hall'
-  if (includeMpOrderIds.length || includePrOwned) {
+  if (includeMpOrderIds.length || includePrOwned || includeRecommendPool) {
     try {
       const data = await mpAuthRequest('hall_registry', {
         includeMpOrderIds,
         ...(includePrOwned
           ? { includePrOwned: true, ...buildHallRegistryOwnerPayload() }
           : {}),
+        ...(includeRecommendPool ? { includeRecommendPool: true } : {}),
       })
       return data
     } catch (e) {
-      if (includePrOwned) throw e
+      if (includePrOwned || includeRecommendPool) throw e
       /* fallback GET only when not requesting PR-owned orders */
     }
   }

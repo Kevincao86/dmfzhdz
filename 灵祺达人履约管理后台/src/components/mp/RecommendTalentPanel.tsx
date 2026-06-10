@@ -176,7 +176,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     setLoading(true)
     setErr('')
     try {
-      const reg = await fetchMpRegistry()
+      const reg = await fetchMpRegistry({ includeRecommendPool: true })
       setRegistryCache(reg)
       const pools = {
         talent: buildBoardPool(reg, 'talent'),

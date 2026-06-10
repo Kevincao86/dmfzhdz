@@ -66,6 +66,7 @@ function buildHallPayload(
   prOwnerKeys?: PrOwnerKeys,
   talentMember?: RegistryMpTalentMember | null,
   talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null },
+  includeRecommendPool?: boolean,
 ): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
   const deduped = syncDedupeApplicantsInSnapshot(file)
@@ -86,15 +87,26 @@ function buildHallPayload(
   const mpGroupQrByOrderId = talentMember
     ? buildMpGroupQrByOrderIdForTalent(file, talentMember)
     : {}
+  const payload: Record<string, unknown> = {
+    ok: true,
+    mpRecruitmentOrders,
+    ...(mpTalentInbox.length ? { mpTalentInbox } : {}),
+    ...(Object.keys(mpGroupQrByOrderId).length ? { mpGroupQrByOrderId } : {}),
+  }
+  if (includeRecommendPool) {
+    const members = Array.isArray(file.mpTalentMembers) ? file.mpTalentMembers : []
+    const library = Array.isArray(file.talentLibraryEntries) ? file.talentLibraryEntries : []
+    const shootLib = Array.isArray(file.shootTeamLibraryEntries) ? file.shootTeamLibraryEntries : []
+    const editLib = Array.isArray(file.editTeamLibraryEntries) ? file.editTeamLibraryEntries : []
+    if (members.length) payload.mpTalentMembers = members
+    if (library.length) payload.talentLibraryEntries = library
+    if (shootLib.length) payload.shootTeamLibraryEntries = shootLib
+    if (editLib.length) payload.editTeamLibraryEntries = editLib
+  }
   return {
     needPersist: expired.syncedIds.length > 0 || deduped.syncedOrderIds.length > 0,
     partial: file,
-    payload: {
-      ok: true,
-      mpRecruitmentOrders,
-      ...(mpTalentInbox.length ? { mpTalentInbox } : {}),
-      ...(Object.keys(mpGroupQrByOrderId).length ? { mpGroupQrByOrderId } : {}),
-    },
+    payload,
   }
 }
 
@@ -134,6 +146,8 @@ export async function loadMpHallRegistryPayload(opts?: {
   prOwnerKeys?: PrOwnerKeys
   talentMember?: RegistryMpTalentMember | null
   talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null }
+  /** 已登录 PR 推荐大厅：附带达人/团队库（轻量大厅默认不含） */
+  includeRecommendPool?: boolean
 }): Promise<Record<string, unknown>> {
   const includeMpOrderIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
@@ -142,13 +156,21 @@ export async function loadMpHallRegistryPayload(opts?: {
   const prOwnerKeys = opts?.prOwnerKeys
   const talentMember = opts?.talentMember
   const talentAccount = opts?.talentAccount
+  const includeRecommendPool = opts?.includeRecommendPool === true
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const attempts: string[] = []
 
   if (missingParts.length === 0) {
     try {
       const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
-      const built = buildHallPayload(partial, includeMpOrderIds, prOwnerKeys, talentMember, talentAccount)
+      const built = buildHallPayload(
+        partial,
+        includeMpOrderIds,
+        prOwnerKeys,
+        talentMember,
+        talentAccount,
+        includeRecommendPool,
+      )
       if (built.needPersist) {
         void persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial).catch((e) => {
           const msg = e instanceof Error ? e.message : String(e)
@@ -172,7 +194,14 @@ export async function loadMpHallRegistryPayload(opts?: {
   if (isVercelServerless()) {
     try {
       const remote = await proxyGetErpApi('/api/meoo-ops-mp-hall-registry')
-      const built = buildHallPayload(remote as Partial<RegistryFile>, includeMpOrderIds, prOwnerKeys)
+      const built = buildHallPayload(
+        remote as Partial<RegistryFile>,
+        includeMpOrderIds,
+        prOwnerKeys,
+        talentMember,
+        talentAccount,
+        includeRecommendPool,
+      )
       return built.payload
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)

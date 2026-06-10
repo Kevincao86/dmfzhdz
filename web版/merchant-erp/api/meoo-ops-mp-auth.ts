@@ -370,8 +370,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         | { lingqi_talent_id?: string | null; registry_member_id?: string | null }
         | undefined
       const hallToken = sessionToken(req, body)
+      let hallSess: Awaited<ReturnType<typeof resolveSession>> | null = null
       if (hallToken) {
-        const hallSess = await resolveSession(rest, hallToken)
+        hallSess = await resolveSession(rest, hallToken)
         if (hallSess) {
           try {
             const hallAccount = hallSess.account
@@ -389,11 +390,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           }
         }
       }
+      const includeRecommendPool = body.includeRecommendPool === true
+      if (includeRecommendPool && !hallSess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
       const payload = await loadMpHallRegistryPayload({
         includeMpOrderIds,
         prOwnerKeys,
         talentMember,
         talentAccount,
+        includeRecommendPool,
       })
       sendJson(res, 200, { ok: true, ...payload })
       return
