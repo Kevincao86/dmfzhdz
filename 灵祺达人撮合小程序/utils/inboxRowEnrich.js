@@ -4,6 +4,8 @@ const inboxNoticeState = require('./inboxNoticeState.js')
 function groupQrForMpOrder(reg, mpOrderId) {
   const id = String(mpOrderId || '').trim()
   if (!id || !reg) return ''
+  const map = reg.mpGroupQrByOrderId && typeof reg.mpGroupQrByOrderId === 'object' ? reg.mpGroupQrByOrderId : null
+  if (map && map[id]) return String(map[id]).trim()
   const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === id)
   return mp ? mpGroupQr.groupQrFromMp(mp) : ''
 }

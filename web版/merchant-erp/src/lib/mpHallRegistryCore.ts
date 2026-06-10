@@ -15,6 +15,7 @@ import {
   filterTalentInboxForHall,
   talentInboxMatchKeysFromProfile,
 } from './mpTalentInboxHallFilter.js'
+import { buildMpGroupQrByOrderIdForTalent } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 
 const HALL_FETCH_MS = 20_000
@@ -82,6 +83,9 @@ function buildHallPayload(
       ? talentInboxMatchKeysFromProfile(talentAccount, talentMember)
       : new Set<string>()
   const mpTalentInbox = filterTalentInboxForHall(file.mpTalentInbox, inboxKeys)
+  const mpGroupQrByOrderId = talentMember
+    ? buildMpGroupQrByOrderIdForTalent(file, talentMember)
+    : {}
   return {
     needPersist: expired.syncedIds.length > 0 || deduped.syncedOrderIds.length > 0,
     partial: file,
@@ -89,6 +93,7 @@ function buildHallPayload(
       ok: true,
       mpRecruitmentOrders,
       ...(mpTalentInbox.length ? { mpTalentInbox } : {}),
+      ...(Object.keys(mpGroupQrByOrderId).length ? { mpGroupQrByOrderId } : {}),
     },
   }
 }

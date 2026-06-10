@@ -39,6 +39,15 @@ function groupQrFromMp(mp) {
   return id ? readLocalGroupQr(id) : ''
 }
 
+function groupQrFromRegistry(reg, mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !reg) return ''
+  const map = reg.mpGroupQrByOrderId && typeof reg.mpGroupQrByOrderId === 'object' ? reg.mpGroupQrByOrderId : null
+  if (map && map[id]) return String(map[id]).trim()
+  const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === id)
+  return groupQrFromMp(mp)
+}
+
 function formatPatchError(e) {
   const msg = String((e && e.message) || e || '保存失败')
   if (/group_qr_too_large|过大/i.test(msg)) return '二维码图片过大，请换一张截图重试'
@@ -140,6 +149,7 @@ module.exports = {
   readLocalGroupQr,
   writeLocalGroupQr,
   groupQrFromMp,
+  groupQrFromRegistry,
   patchGroupQrImage,
   chooseAndReadImageDataUrl,
   isGroupQrExpired: mpGroupQrExpiry.isGroupQrExpired,

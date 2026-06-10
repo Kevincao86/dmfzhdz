@@ -43,13 +43,14 @@ function resolveMemberForApplicant(
 ): RegistryMpTalentMember | null {
   const contact = String(applicant.contact || '').trim()
   const account = normalizeAccount(applicant.platformAccount)
+  const wxFromApplicant = String((applicant as { wxOpenId?: string }).wxOpenId || '').trim()
   for (const m of members) {
     if (applicant.talentMemberId && String(m.id) === String(applicant.talentMemberId)) return m
-    if (contact && String(m.contact || '').trim() === contact) return m
-    const wxOpenId = String(m.wxOpenId || '').trim()
-    if (wxOpenId && applicant.talentMemberId && String(m.lingqiTalentId || m.id) === String(applicant.talentMemberId)) {
+    if (applicant.talentMemberId && m.lingqiTalentId && String(m.lingqiTalentId) === String(applicant.talentMemberId)) {
       return m
     }
+    if (wxFromApplicant && String(m.wxOpenId || '').trim() === wxFromApplicant) return m
+    if (contact && String(m.contact || '').trim() === contact) return m
     const profs = m.platformProfiles || {}
     for (const p of Object.values(profs)) {
       if (!p) continue
@@ -73,7 +74,18 @@ export function resolveOpenIdForApplicant(
 
 function detailPagePath(mpOrderId: string): string {
   const id = encodeURIComponent(String(mpOrderId || '').trim())
-  return `pages/detail/detail?id=${id}`
+  return `pages/mine-notifications/mine-notifications`
+}
+
+function subscribeMiniprogramState(): 'formal' | 'trial' | 'developer' {
+  const raw = String(process.env.MP_SUBSCRIBE_MINIPROGRAM_STATE || process.env.MP_MINIPROGRAM_STATE || '')
+    .trim()
+    .toLowerCase()
+  if (raw === 'formal' || raw === 'release' || raw === '正式') return 'formal'
+  if (raw === 'developer' || raw === 'develop' || raw === '开发') return 'developer'
+  if (raw === 'trial' || raw === 'preview' || raw === '体验') return 'trial'
+  // 未配置时默认 trial：体验版/开发者工具可收到；正式版上线请在 ECS 设 MP_SUBSCRIBE_MINIPROGRAM_STATE=formal
+  return 'trial'
 }
 
 async function postSubscribeMessage(openId: string, templateId: string, data: SubscribeData, page: string) {
@@ -87,7 +99,7 @@ async function postSubscribeMessage(openId: string, templateId: string, data: Su
         touser: openId,
         template_id: templateId,
         page,
-        miniprogram_state: 'formal',
+        miniprogram_state: subscribeMiniprogramState(),
         lang: 'zh_CN',
         data,
       }),
@@ -144,9 +156,12 @@ export async function notifyAuditPassSubscribe(
 export async function notifyAuditPassForSelectionInboxEntries(
   reg: RegistrySnapshot,
   entries: MpTalentInboxEntryInput[],
-): Promise<void> {
+): Promise<{ sent: number; skipped: number; failed: string[] }> {
   const auditedAt = new Date().toLocaleString('zh-CN', { hour12: false })
   const seen = new Set<string>()
+  let sent = 0
+  let skipped = 0
+  const failed: string[] = []
   for (const row of entries) {
     if (row.noticeType !== 'selection') continue
     const mpOrderId = String(row.mpOrderId || '').trim()
@@ -157,7 +172,10 @@ export async function notifyAuditPassForSelectionInboxEntries(
     seen.add(dedupeKey)
 
     const mp = (reg.mpRecruitmentOrders ?? []).find((o) => o && o.id === mpOrderId)
-    if (!mp) continue
+    if (!mp) {
+      skipped += 1
+      continue
+    }
 
     let applicant: RegistryMpRecruitmentApplicant | undefined
     if (applicantId) {
@@ -172,14 +190,32 @@ export async function notifyAuditPassForSelectionInboxEntries(
         return false
       })
     }
-    if (!applicant) continue
+    if (!applicant) {
+      skipped += 1
+      continue
+    }
+
+    const openId = resolveOpenIdForApplicant(reg, applicant)
+    if (!openId) {
+      skipped += 1
+      failed.push(`no_openid:${applicantId || contactKeyFromRow(row)}`)
+      continue
+    }
 
     try {
       await notifyAuditPassSubscribe(reg, mp, applicant, auditedAt)
+      sent += 1
     } catch (e) {
-      console.warn('[inbox] audit subscribe failed', e instanceof Error ? e.message : e)
+      const msg = e instanceof Error ? e.message : String(e)
+      failed.push(msg.slice(0, 120))
+      console.warn('[inbox] audit subscribe failed', msg)
     }
   }
+  return { sent, skipped, failed }
+}
+
+function contactKeyFromRow(row: MpTalentInboxEntryInput): string {
+  return String(row.contact || row.talentMemberId || '').trim()
 }
 
 export async function notifyVideoRejectSubscribe(
