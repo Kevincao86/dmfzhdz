@@ -7,6 +7,7 @@ const regionPicker = require('../../utils/regionPicker.js')
 const { setupRegionState, onProvincePick, onCityPick } = regionPicker
 const applyFormState = require('../../utils/applyFormState.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
+const talentContactPrGate = require('../../utils/talentContactPrGate.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const applyRuntime = require('../../utils/applyTemplateRuntime.js')
@@ -99,12 +100,14 @@ Page({
     const templateId = options.templateId ? decodeURIComponent(options.templateId) : ''
     let orderMeta = null
     let recruitTarget = 'talent'
+    let loadedMp = null
 
     if (mpOrderId && api.hasApi()) {
       try {
         const reg = await ops.fetchRegistry({ includeMpOrderIds: [mpOrderId] })
         const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
         if (mp) {
+          loadedMp = mp
           applyTemplates.cacheApplyFormFromMpOrder(mp)
           if (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object') {
             orderMeta = mp.mpPublishMeta
@@ -150,6 +153,24 @@ Page({
     this.setData(patch, () => syncApplyRows(this))
     if (!mpOrderId) {
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
+      return
+    }
+    if (applicationsStore.hasAppliedToOrder(mpOrderId)) {
+      wx.showToast({ title: '您已报名该招募', icon: 'none' })
+      setTimeout(() => {
+        wx.redirectTo({
+          url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
+        })
+      }, 800)
+      return
+    }
+    if (loadedMp && talentContactPrGate.evaluate(loadedMp, mpOrderId).hasApplication) {
+      wx.showToast({ title: '您已报名该招募', icon: 'none' })
+      setTimeout(() => {
+        wx.redirectTo({
+          url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
+        })
+      }, 800)
       return
     }
     if (!applyRowsRaw.length) {
@@ -243,6 +264,10 @@ Page({
     const errMsg = this.validateForm()
     if (errMsg) {
       wx.showToast({ title: errMsg, icon: 'none' })
+      return
+    }
+    if (applicationsStore.hasAppliedToOrder(this.data.mpOrderId)) {
+      wx.showToast({ title: '您已报名该招募', icon: 'none' })
       return
     }
 

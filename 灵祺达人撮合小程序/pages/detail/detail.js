@@ -402,6 +402,14 @@ Page({
     }
     const v = this.data.view
     if (!v || !this.data.id) return
+    if (
+      this.data.applied ||
+      applicationsStore.hasAppliedToOrder(this.data.id) ||
+      (this.data.mpOrder && contactGate.evaluate(this.data.mpOrder, this.data.id).hasApplication)
+    ) {
+      wx.showToast({ title: '您已报名该招募', icon: 'none' })
+      return
+    }
     if (this.data.mpOrder) applyTemplates.cacheApplyFormFromMpOrder(this.data.mpOrder)
     const q = [
       `mpId=${encodeURIComponent(this.data.id)}`,

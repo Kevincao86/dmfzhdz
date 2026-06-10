@@ -164,6 +164,12 @@ function updatePublishedOrderTitle(mpOrderId, title) {
   writePublishedOrders(list)
 }
 
+function hasAppliedToOrder(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return false
+  return readApplications().some((a) => a && String(a.mpOrderId || '').trim() === id)
+}
+
 module.exports = {
   readApplications,
   addApplication,
@@ -174,4 +180,5 @@ module.exports = {
   updatePublishedOrderTitle,
   touchPublishedOrderSnapshot,
   markPublishedOrderDeleted,
+  hasAppliedToOrder,
 }

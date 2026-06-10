@@ -7,6 +7,7 @@ import type {
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 import { getIceVerifyMode } from './iceOrderDetect.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
+import { findDuplicateApplicant } from './mpApplicantIdentity.js'
 
 export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel } from './iceOrderDetect.js'
 export type { IceVerifyMode } from './iceOrderDetect.js'
@@ -459,6 +460,13 @@ export function handleIceMpApply(
   }
   if (dup?.taskStatus === 'rejected') {
     return { ok: false, error: '您已拒绝该任务', code: 'rejected' }
+  }
+
+  if (!dup) {
+    const identityDup = findDuplicateApplicant(mp.applicants, row, mp.platform || '抖音')
+    if (identityDup) {
+      return { ok: false, error: '您已报名该招募，请勿重复提交', code: 'already_applied' }
+    }
   }
 
   const claim = claimIceMpRecruitment(mp, row)
