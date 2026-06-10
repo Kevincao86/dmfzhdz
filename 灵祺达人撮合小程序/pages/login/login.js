@@ -103,6 +103,8 @@ Page({
     pendingWorkId: '',
     redirect: '',
     legalAgreed: false,
+    showLegalPrompt: false,
+    legalPromptWorkId: '',
   },
 
   onLoad(options) {
@@ -255,11 +257,33 @@ Page({
     const workId = requireLoginIdentity(this)
     if (!workId) return
     if (!this.data.legalAgreed && !loginLegalAgree.readAgreed()) {
-      loginLegalAgree.ensureAgreedOrPrompt(() => {
-        this.setData({ legalAgreed: true, err: '' })
-      })
+      this.setData({ showLegalPrompt: true, legalPromptWorkId: workId, err: '' })
       return
     }
+    this.startWxLoginFlow(workId)
+  },
+
+  onLegalDecline() {
+    this.setData({ showLegalPrompt: false, legalPromptWorkId: '' })
+  },
+
+  onLegalAgreeLogin() {
+    const workId = this.data.legalPromptWorkId
+    if (!workId) {
+      this.setData({ showLegalPrompt: false })
+      return
+    }
+    loginLegalAgree.writeAgreed(true)
+    this.setData({
+      legalAgreed: true,
+      showLegalPrompt: false,
+      legalPromptWorkId: '',
+      err: '',
+    })
+    this.startWxLoginFlow(workId)
+  },
+
+  startWxLoginFlow(workId) {
     if (this.data.legalAgreed && !loginLegalAgree.readAgreed()) {
       loginLegalAgree.writeAgreed(true)
     }

@@ -184,6 +184,13 @@
   align-items: flex-end;
 }
 
+.login-id-sheet-mask--center {
+  align-items: center;
+  justify-content: center;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+}
+
 .login-id-sheet {
   width: 100%;
   padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
@@ -385,6 +392,69 @@
   display: inline;
   color: #6366f1;
   font-weight: 600;
+}
+
+.login-legal-modal {
+  width: 620rpx;
+  margin: auto;
+  padding: 40rpx 36rpx 32rpx;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 32rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16rpx 48rpx rgba(45, 27, 78, 0.18);
+}
+
+.login-legal-modal-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--lq-text);
+  text-align: center;
+  line-height: 1.35;
+}
+
+.login-legal-modal-content {
+  display: block;
+  margin-top: 24rpx;
+  font-size: 28rpx;
+  line-height: 1.55;
+  color: var(--lq-text-secondary);
+  text-align: center;
+}
+
+.login-legal-modal-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 20rpx;
+  margin-top: 36rpx;
+}
+
+.login-legal-modal-btn {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.login-legal-modal-btn::after {
+  border: none;
+}
+
+.login-legal-modal-btn--decline {
+  color: #64748b;
+  background: #f1f5f9;
+  border: 2rpx solid #e2e8f0;
+}
+
+.login-legal-modal-btn--agree {
+  color: #fff;
+  background: var(--lq-gradient-tab);
+  box-shadow: var(--lq-shadow-tab);
 }
 
 .login-wx-profile {

@@ -190,6 +190,17 @@
   <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
   </view>
 
+  <view class="login-id-sheet-mask login-id-sheet-mask--center" wx:if="{{showLegalPrompt}}" catchtouchmove="noopSheetTap">
+    <view class="login-legal-modal" catchtap="noopSheetTap">
+      <text class="login-legal-modal-title">请先阅读并同意协议</text>
+      <text class="login-legal-modal-content">使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。</text>
+      <view class="login-legal-modal-actions">
+        <button class="login-legal-modal-btn login-legal-modal-btn--decline" bindtap="onLegalDecline">不同意</button>
+        <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onLegalAgreeLogin">同意并登录</button>
+      </view>
+    </view>
+  </view>
+
   <view class="login-id-sheet-mask" wx:if="{{showWxAuthSheet}}" bindtap="onCloseWxAuthSheet">
     <view class="login-id-sheet" catchtap="noopSheetTap">
       <view class="login-id-sheet-head">
