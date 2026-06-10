@@ -104,7 +104,7 @@ async function persistRegistryIfNeeded(
   partial: Partial<RegistryFile>,
 ): Promise<void> {
   const base = supabaseUrl.replace(/\/$/, '')
-  const { registryForPersistentFile } = await import('./opsRegistryGatewayCore.js')
+  const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
   const persist = registryForPersistentFile(partial as RegistryFile)
   const nowIso = new Date().toISOString()
   const body = JSON.stringify({
