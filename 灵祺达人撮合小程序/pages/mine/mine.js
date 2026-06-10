@@ -68,6 +68,13 @@ const MENU_URLS = {
   prOrders: '/pages/mine-pr-orders/mine-pr-orders',
 }
 
+function profileMenuLabel(identity) {
+  if (identity === 'pr') return '我的 PR 信息'
+  if (identity === 'shoot') return '拍摄团队信息'
+  if (identity === 'edit') return '剪辑团队信息'
+  return '我的信息'
+}
+
 Page({
   data: {
     identity: 'talent',
@@ -271,6 +278,18 @@ Page({
   },
   onGoLoginPage() {
     guestRoutes.redirectToLogin('/pages/mine/mine')
+  },
+  onSwitchIdentity() {
+    if (auth.isLoggedIn()) {
+      const label = profileMenuLabel(userProfile.readIdentity())
+      wx.showModal({
+        title: '请先退出登录',
+        content: `请先在「${label}」中退出登录，关闭小程序后重新打开并选择身份进入。`,
+        showCancel: false,
+      })
+      return
+    }
+    wx.reLaunch({ url: '/pages/welcome/welcome' })
   },
   onCloseWxLoginSheet() {
     this.setData({ showWxLoginSheet: false })

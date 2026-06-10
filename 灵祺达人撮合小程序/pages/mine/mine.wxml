@@ -4,6 +4,11 @@
       <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
     </view>
     <view class="mine-header-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
+      <view class="mine-header-toolbar">
+        <view class="mine-identity-switch" bindtap="onSwitchIdentity" hover-class="mine-identity-switch--hover">
+          身份切换
+        </view>
+      </view>
       <view class="profile-row">
         <button
           wx:if="{{wxLoggedIn}}"
