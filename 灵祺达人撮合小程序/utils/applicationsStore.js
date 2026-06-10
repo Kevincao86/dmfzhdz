@@ -82,16 +82,36 @@ function updateApplicationApplicantId(mpOrderId, applicantId) {
 }
 
 function addApplication(entry) {
+  upsertApplication(entry)
+}
+
+function upsertApplication(entry) {
   const ids = ownerIdsForFilter()
-  const list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
-  list.unshift({
+  const mpOrderId = String(entry && entry.mpOrderId ? entry.mpOrderId : '').trim()
+  if (!mpOrderId) return 'skipped'
+  let list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item && String(item.mpOrderId || '').trim() === mpOrderId)
+  const base = {
     appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     ownerAccountId: ids.ownerAccountId,
     ownerMemberId: ids.memberId,
     ownerTalentId: ids.talentId,
     ...entry,
-  })
+    mpOrderId,
+  }
+  if (idx >= 0) {
+    const prev = list[idx] || {}
+    const nextApplicantId = String(base.applicantId || prev.applicantId || '').trim()
+    const changed =
+      nextApplicantId !== String(prev.applicantId || '').trim() ||
+      String(base.title || '') !== String(prev.title || '')
+    list[idx] = { ...prev, ...base, applicantId: nextApplicantId || prev.applicantId }
+    writeListToKey(scope.scopedStorageKey(APPLICATIONS_BASE), list)
+    return changed ? 'updated' : 'unchanged'
+  }
+  list.unshift(base)
   writeListToKey(scope.scopedStorageKey(APPLICATIONS_BASE), list)
+  return 'added'
 }
 
 function readPublishedOrdersRaw() {
@@ -173,6 +193,7 @@ function hasAppliedToOrder(mpOrderId) {
 module.exports = {
   readApplications,
   addApplication,
+  upsertApplication,
   updateApplicationApplicantId,
   readPublishedOrders,
   addPublishedOrder,

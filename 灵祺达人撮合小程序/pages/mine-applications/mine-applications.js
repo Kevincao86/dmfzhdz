@@ -1,4 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
+const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
@@ -72,7 +73,8 @@ Page({
     }
     this.setData({ loading: true })
     try {
-      const reg = await ops.fetchRegistry({ includeLocalContext: true })
+      const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
+      const local = applicationsStore.readApplications()
       const mpList = reg.mpRecruitmentOrders || []
       const enriched = local.map((a) => {
         const mp = mpList.find((o) => o && o.id === a.mpOrderId)
