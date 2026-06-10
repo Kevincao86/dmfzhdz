@@ -215,10 +215,11 @@
           type="nickname"
           placeholder="点击选用微信昵称"
           value="{{wxNickName}}"
+          bindfocus="onWxNicknameFocus"
           bindinput="onWxNicknameInput"
           bindblur="onWxNicknameBlur"
           bindnicknamereview="onWxNicknameReview"
-          focus="{{wxAuthStep === 'nick'}}"
+          focus="{{wxNickInputFocus}}"
         />
         <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
       </view>

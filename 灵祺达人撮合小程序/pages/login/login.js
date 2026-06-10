@@ -87,6 +87,26 @@ function readWxNickInput(page) {
   })
 }
 
+function dismissWxNickPicker(page) {
+  page.setData({ wxNickInputFocus: false })
+  const hide = () => {
+    try {
+      wx.hideKeyboard()
+    } catch (_) {}
+  }
+  hide()
+  setTimeout(hide, 80)
+}
+
+function applyWxNick(page, nick) {
+  const name = String(nick || '').trim()
+  if (!name) return false
+  page.setData({ wxNickName: name })
+  require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: name })
+  dismissWxNickPicker(page)
+  return true
+}
+
 Page({
   data: {
     tab: 'wx',
@@ -117,6 +137,7 @@ Page({
     wxAvatarUrl: '',
     showWxAuthSheet: false,
     wxAuthStep: 'avatar',
+    wxNickInputFocus: false,
     pendingWorkId: '',
     redirect: '',
     legalAgreed: false,
@@ -219,23 +240,23 @@ Page({
     this.setData({ wxAvatarUrl: url })
     wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
     if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'avatar') {
-      this.setData({ wxAuthStep: 'nick' })
+      this.setData({ wxAuthStep: 'nick', wxNickInputFocus: true })
       wx.showToast({ title: '请选用微信昵称', icon: 'none' })
     }
   },
 
+  onWxNicknameFocus() {
+    this.setData({ wxNickInputFocus: true })
+  },
+
   onWxNicknameInput(e) {
     const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
-    if (!nick) return
-    this.setData({ wxNickName: nick })
-    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+    applyWxNick(this, nick)
   },
 
   onWxNicknameBlur(e) {
     const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
-    if (!nick) return
-    this.setData({ wxNickName: nick })
-    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+    applyWxNick(this, nick)
   },
 
   onWxNicknameReview(e) {
@@ -245,22 +266,19 @@ Page({
       return
     }
     const nick = wxNickFromDetail(detail)
-    if (!nick) return
-    this.setData({ wxNickName: nick })
-    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+    applyWxNick(this, nick)
   },
 
   onCloseWxAuthSheet() {
+    dismissWxNickPicker(this)
     this.setData({ showWxAuthSheet: false, wxAuthStep: 'avatar', pendingWorkId: '' })
   },
 
   onConfirmWxNickStep() {
     void (async () => {
+      dismissWxNickPicker(this)
       const nick = await readWxNickInput(this)
-      if (nick) {
-        this.setData({ wxNickName: nick })
-        require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
-      }
+      if (nick) applyWxNick(this, nick)
       await this.finishWxAuthAndLogin()
     })()
   },
@@ -318,6 +336,7 @@ Page({
       err: '',
       showWxAuthSheet: true,
       wxAuthStep: 'avatar',
+      wxNickInputFocus: false,
       pendingWorkId: workId,
       wxNickName: '',
       wxAvatarUrl: '',
