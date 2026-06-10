@@ -6,6 +6,7 @@ import type { RegistryFile, RegistryMpRecruitmentOrder } from './opsRegistryType
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
 import { syncExpiredMpOrdersInSnapshot } from './mpGroupQrCleanup.js'
+import { syncDedupeApplicantsInSnapshot } from './mpApplicantIdentity.js'
 import {
   mergeMpRecruitmentOrdersForHallContext,
   type PrOwnerKeys,
@@ -59,6 +60,7 @@ function buildHallPayload(
   prOwnerKeys?: PrOwnerKeys,
 ): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
+  const deduped = syncDedupeApplicantsInSnapshot(file)
   const expired = syncExpiredMpOrdersInSnapshot(file)
   const mpRaw = Array.isArray(file.mpRecruitmentOrders)
     ? (file.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
@@ -69,7 +71,7 @@ function buildHallPayload(
     prOwnerKeys,
   )
   return {
-    needPersist: expired.syncedIds.length > 0,
+    needPersist: expired.syncedIds.length > 0 || deduped.syncedOrderIds.length > 0,
     partial: file,
     payload: {
       ok: true,

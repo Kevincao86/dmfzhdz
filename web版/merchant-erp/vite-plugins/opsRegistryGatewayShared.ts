@@ -58,7 +58,7 @@ import {
   isIceMpOrder,
   submitIceDouyinForApplicant,
 } from '../src/lib/mpRecruitmentIceCore.js'
-import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
+import { applyToMpRecruitmentOrderInSnapshot } from '../src/lib/mpRecruitmentApplyCore.js'
 import { syncSupplierTeamLibraries, type SupplierTeamRole } from '../src/lib/supplierTeamLibrarySync.js'
 import { buildNoviceAllocationFromTalentLibrary } from '../src/lib/talentLibraryTierPricing.js'
 import { requireMerchantRegistryAuthFromHeaders } from '../src/lib/merchantRegistryAuth.js'
@@ -707,56 +707,18 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             applicant.platformNickname = nick
             applicant.name = nick
             const data = ensureRegistry(viteRoot)
-            const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
-            if (!data.mpRecruitmentOrders || idx < 0) {
-              json(res, 404, { ok: false, error: 'not_found' })
-              return
-            }
-            const cur = data.mpRecruitmentOrders[idx]!
-            const merchantOrderNo = cur.sourceMerchantOrderId
-            const platform = cur.platform || '抖音'
-            const row = {
-              ...applicant,
-              mpOrderId,
-              merchantOrderNo,
-              paymentMethod:
-                applicant.paymentMethod ||
-                (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
-            }
-            if (isIceMpOrder(cur)) {
-              const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' })
-              if (!iceResult.ok) {
-                json(res, 409, { ok: false, error: iceResult.code ?? 'apply_failed', message: iceResult.error })
-                return
-              }
-              data.mpRecruitmentOrders[idx] = iceResult.mp
-              const savedApplicant =
-                (iceResult.mp.applicants ?? []).find((a) => a.id === row.id) ?? row
-              upsertTalentLibraryFromApplicant(data, {
-                platform,
-                applicant: savedApplicant,
-                mpOrderId,
-                merchantOrderNo,
+            const result = applyToMpRecruitmentOrderInSnapshot(data, mpOrderId, applicant)
+            if (!result.ok) {
+              json(res, result.status, {
+                ok: false,
+                error: result.error,
+                code: result.code,
+                message: result.message,
               })
-              writeRegistry(viteRoot, data)
-              json(res, 200, iceResult.body)
               return
             }
-            const applicants = [{ ...row, taskStatus: row.taskStatus ?? 'applied' }, ...(cur.applicants ?? [])]
-            data.mpRecruitmentOrders[idx] = {
-              ...cur,
-              applicants: applicants.slice(0, 500),
-              status: cur.status === 'open' ? 'collecting' : cur.status,
-              updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-            }
-            upsertTalentLibraryFromApplicant(data, {
-              platform,
-              applicant: row,
-              mpOrderId,
-              merchantOrderNo,
-            })
-            writeRegistry(viteRoot, data)
-            json(res, 200, { ok: true, taskStatus: 'applied' })
+            writeRegistry(viteRoot, result.data)
+            json(res, 200, result.body)
             return
           }
 

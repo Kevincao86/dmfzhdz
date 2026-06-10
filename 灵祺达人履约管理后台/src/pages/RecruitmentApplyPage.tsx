@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-r
 import RegionSelect from '../components/mp/RegionSelect'
 import { applyToMpOrder, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
-import { addApplication } from '../lib/mpSync/applicationsStore'
+import { addApplication, hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { getApplyConfigForMpOrder, resolveApplyRows } from '../lib/mpSync/applyFormTemplates'
 import {
   applyFieldsFromMember,
@@ -66,6 +66,10 @@ export default function RecruitmentApplyPage() {
       setErr(errMsg)
       return
     }
+    if (hasAppliedToOrder(orderId)) {
+      setErr('您已报名该招募，请勿重复提交')
+      return
+    }
     setSubmitting(true)
     setErr('')
     try {
@@ -99,7 +103,12 @@ export default function RecruitmentApplyPage() {
       if (isIceMode) localStorage.setItem(`meoo_ice_applicant_v1_${orderId}`, applicantId)
       nav(`/recruitment/${encodeURIComponent(orderId)}?applied=1`)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '报名失败')
+      const msg = e instanceof Error ? e.message : '报名失败'
+      if (/already_applied|已报名/i.test(msg)) {
+        setErr('您已报名该招募，请勿重复提交')
+      } else {
+        setErr(msg)
+      }
     } finally {
       setSubmitting(false)
     }
