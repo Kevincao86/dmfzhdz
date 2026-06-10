@@ -10,6 +10,7 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
@@ -255,6 +256,25 @@ Page({
   },
   onTabReg() {
     this.setData({ tab: 'reg', err: '' })
+  },
+
+  onGuestMode() {
+    guestRoutes.enterGuestBrowse()
+    const redirect = String(this.data.redirect || '').trim()
+    const authRequired =
+      redirect.includes('/pages/apply/') ||
+      redirect.includes('/pages/register/') ||
+      redirect.includes('/pages/mine-pr-profile/')
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        if (redirect && !authRequired) {
+          navigateAfterLogin(this)
+          return
+        }
+        wx.switchTab({ url: '/pages/index/index' })
+      },
+    })
   },
 
   onLoginName(e) {
