@@ -488,9 +488,11 @@ export function buildPublishOrder(
       applyFormTemplateId: form.applyFormTemplateId,
       applyFormTemplateName: form.applyFormTemplateName || '',
       applyFormFields: form.applyFormFields || [],
-      coverImage: coverFields.coverImage,
       coverLibraryId: coverFields.coverLibraryId,
       coverImageSource: coverFields.coverImageSource,
+      ...(coverFields.coverImageSource === 'library' && coverFields.coverImage
+        ? { coverImage: coverFields.coverImage }
+        : {}),
       iceVideoUrl: resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
       ...(groupQrImage ? { groupQrImage } : {}),

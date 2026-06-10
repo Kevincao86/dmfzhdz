@@ -26,6 +26,9 @@ async function parseJsonRes(res: Response) {
   try {
     return JSON.parse(text) as Record<string, unknown>
   } catch {
+    if (res.status === 413 || /Request Entity Too Large/i.test(text)) {
+      throw new Error('request_entity_too_large')
+    }
     throw new Error(`接口返回非 JSON（HTTP ${res.status}）`)
   }
 }

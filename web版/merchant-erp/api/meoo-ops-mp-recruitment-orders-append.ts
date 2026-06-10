@@ -7,6 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
+import { normalizeMpRecruitmentOrderForRegistryPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -82,15 +83,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       })
       return
     }
-    list.unshift(order)
+    list.unshift(normalizeMpRecruitmentOrderForRegistryPersist(order))
     data.mpRecruitmentOrders = list.slice(0, 200)
     await io.save(data)
     sendOpsJson(res, 200, { ok: true, id: order.id })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    sendOpsJson(res, 500, {
+    const tooLarge = /413|Request Entity Too Large|entity too large/i.test(msg)
+    sendOpsJson(res, tooLarge ? 413 : 500, {
       ok: false,
       error: 'meoo_ops_mp_recruitment_orders_append_failed',
+      code: tooLarge ? 'request_entity_too_large' : 'append_failed',
+      hint: tooLarge
+        ? '注册表保存体积过大。请在 ECS 执行 bash scripts/ecs-hotfix-nginx-body-size.sh，或换更小封面/选图库封面后重试'
+        : undefined,
       detail: msg.slice(0, 800),
     })
   }
