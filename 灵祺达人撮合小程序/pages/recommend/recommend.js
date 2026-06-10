@@ -19,6 +19,7 @@ const participant = require('../../utils/participant.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -850,6 +851,10 @@ Page({
   },
   async onChatTap(e) {
     const id = e.currentTarget.dataset.id
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin('/pages/recommend/recommend')
+      return
+    }
     const chat = require('../../utils/talentChat.js')
     if (this.data.talentTestMode && this.data.identity !== 'pr') {
       wx.showModal({
