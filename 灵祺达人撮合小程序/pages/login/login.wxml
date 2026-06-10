@@ -152,17 +152,6 @@
       </view>
 
       <view class="login-spark">
-        <view class="login-spark-head">
-          <view class="login-spark-orb">
-            <text class="login-spark-orb__txt">AI</text>
-            <view class="login-spark-orb__ring" aria-hidden="true" />
-          </view>
-          <view class="login-spark-copy">
-            <text class="login-spark-title">智能星选</text>
-            <text class="login-spark-sub">{{promoLead}}</text>
-          </view>
-        </view>
-
         <view class="login-spark-grid">
           <view
             class="login-spark-pill login-spark-pill--{{index}}"
