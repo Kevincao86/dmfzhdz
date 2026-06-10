@@ -194,12 +194,19 @@ export function enrichMpOrderListItem(
     if (localItem.deletedAt) {
       status = 'deleted'
     } else {
-      const resolved = resolveEffectiveMpStatus(localItem.lastStatus, 0)
-      status = resolved === 'done' ? 'done' : 'deleted'
+      status = resolveEffectiveMpStatus(localItem.lastStatus, 0)
     }
     const recruiting = isMpOrderRecruiting(status)
     const deadlineDaysText =
-      status === 'done' ? '已完成' : status === 'deleted' ? '—' : '已结束'
+      status === 'done'
+        ? '已完成'
+        : status === 'deleted'
+          ? '—'
+          : recruiting
+            ? '招募中'
+            : status === 'closed'
+              ? '已停止'
+              : '未同步'
     return {
       ...localItem,
       title: localItem.title || String(localItem.mpOrderId || '历史发单'),

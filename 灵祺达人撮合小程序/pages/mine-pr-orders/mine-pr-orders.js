@@ -215,7 +215,7 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includePrOwned: true })
       const mpList = reg.mpRecruitmentOrders || []
       prPublishedOrders.pruneOrphanPublishedOrders(mpList)
       const local = prPublishedOrders.listPublishedOrdersForCurrentPr(mpList)

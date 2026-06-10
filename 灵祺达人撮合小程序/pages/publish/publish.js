@@ -1474,6 +1474,9 @@ Page({
         return
       }
       await ops.appendMpRecruitmentOrder(order)
+      try {
+        wx.removeStorageSync('meoo_mp_registry_cache_v1')
+      } catch (_) {}
       const mode = modeById(this.data.recruitMode)
       const pubHall = order.urgent ? 'urgent' : mode.hall === 'ice' ? 'ice' : 'normal'
       applicationsStore.addPublishedOrder({ mpOrderId: order.id, title: order.title, hall: pubHall })

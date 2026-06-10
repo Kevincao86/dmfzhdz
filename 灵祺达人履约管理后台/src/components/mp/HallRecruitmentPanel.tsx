@@ -27,7 +27,9 @@ type PaichianSubTab = 'shoot' | 'edit' | 'ice'
 function matchSearch(row: RecruitmentOrderRow, keyword: string) {
   if (!keyword) return true
   const k = keyword.toLowerCase()
-  const blob = [row.title, row.merchantName, row.storeName, row.region, row.category].join(' ').toLowerCase()
+  const blob = [row.id, row.title, row.merchantName, row.storeName, row.region, row.category]
+    .join(' ')
+    .toLowerCase()
   return blob.includes(k)
 }
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { appendMpRecruitmentOrder, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
+import { appendMpRecruitmentOrder, clearMpRegistryCache, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
 import { addPublishedOrder } from '../../lib/mpSync/applicationsStore'
 import {
   saveApplyFormForMpOrder,
@@ -321,6 +321,7 @@ export default function PublishWizard() {
         await updateMpRecruitmentOrder(order)
       } else {
         await appendMpRecruitmentOrder(order)
+        clearMpRegistryCache()
         const pubHall =
           recruitMode === 'ice' || recruitMode === 'edit_ice'
             ? 'ice'
