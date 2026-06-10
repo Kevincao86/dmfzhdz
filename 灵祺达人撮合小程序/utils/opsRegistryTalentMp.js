@@ -1,5 +1,6 @@
 const api = require('./api.js')
 const auth = require('./auth.js')
+const userProfile = require('./userProfile.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const applicationsStore = require('./applicationsStore.js')
 const registryCache = require('./registryCache.js')
@@ -28,7 +29,7 @@ function resolveIncludeMpOrderIds(opts) {
     const s = String(id || '').trim()
     if (s) explicit.push(s)
   }
-  if (opts && opts.includeLocalContext) {
+  if (opts && (opts.includeLocalContext || opts.includePrOwned)) {
     return collectIncludeMpOrderIds(explicit)
   }
   return [...new Set(explicit)].slice(0, 120)
@@ -68,21 +69,31 @@ function collectIncludeMpOrderIds(extraIds) {
  * 优先 GET：mpErpProxy 对 GET 有多路上游重试；POST 为单次（避免 wx code 重试），不宜放首位。
  * 超时仅由 cloudEcs（50s）一层控制，避免双层 withTimeout 误杀。
  */
-async function fetchRegistryOnce(includeMpOrderIds) {
+async function fetchRegistryOnce(opts) {
+  const includeMpOrderIds = resolveIncludeMpOrderIds(opts)
+  const includePrOwned = !!(opts && opts.includePrOwned)
   let lastErr
-  try {
-    const raw = await api.get(HALL_GET)
-    return normalizeHallPayload(raw)
-  } catch (e) {
-    lastErr = e
-    console.warn('[mp] hall_registry GET failed', String(e.message || e).slice(0, 200))
+  if (!includePrOwned && !includeMpOrderIds.length) {
+    try {
+      const raw = await api.get(HALL_GET)
+      return normalizeHallPayload(raw)
+    } catch (e) {
+      lastErr = e
+      console.warn('[mp] hall_registry GET failed', String(e.message || e).slice(0, 200))
+    }
   }
   try {
-    const raw = await api.post(
-      HALL_POST,
-      { action: 'hall_registry', includeMpOrderIds },
-      registerAuthHeaders(),
-    )
+    const body = { action: 'hall_registry', includeMpOrderIds }
+    if (includePrOwned) {
+      body.includePrOwned = true
+      const acc = auth.readAccount()
+      const pr = userProfile.readPrProfile()
+      body.lingqiPrId = String((acc && acc.lingqiPrId) || (pr && pr.lingqiPrId) || '').trim()
+      body.registryPrId = String(
+        (acc && (acc.registryPrId || acc.registryMemberId)) || (pr && pr.id) || '',
+      ).trim()
+    }
+    const raw = await api.post(HALL_POST, body, registerAuthHeaders())
     return normalizeHallPayload(raw)
   } catch (e2) {
     const msg = String(e2 && e2.message ? e2.message : e2)
@@ -92,11 +103,10 @@ async function fetchRegistryOnce(includeMpOrderIds) {
 }
 
 async function fetchRegistryViaErpApi(opts) {
-  const includeMpOrderIds = resolveIncludeMpOrderIds(opts)
   let lastErr
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const data = await fetchRegistryOnce(includeMpOrderIds)
+      const data = await fetchRegistryOnce(opts)
       registryCache.save(data, attempt === 0 ? HALL_GET : `${HALL_POST}:retry`)
       return data
     } catch (e) {

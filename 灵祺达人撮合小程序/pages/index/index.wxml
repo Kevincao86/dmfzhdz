@@ -55,7 +55,7 @@
         bindtap="onHallTab"
       >
         招募大厅
-        <text class="tab-count lq-gradient-tabs__count" wx:if="{{normalRows.length}}">{{normalRows.length}}</text>
+        <text class="tab-count lq-gradient-tabs__count" wx:if="{{tabCounts.normal}}">{{tabCounts.normal}}</text>
       </view>
       <view
         class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'urgent' ? 'lq-gradient-tabs__item--on active' : ''}}"
@@ -63,7 +63,7 @@
         bindtap="onHallTab"
       >
         急单大厅
-        <text class="tab-count lq-gradient-tabs__count" wx:if="{{urgentRows.length}}">{{urgentRows.length}}</text>
+        <text class="tab-count lq-gradient-tabs__count" wx:if="{{tabCounts.urgent}}">{{tabCounts.urgent}}</text>
       </view>
       <view
         class="hall-tab-pro lq-gradient-tabs__item {{hallTab === 'paichian' ? 'lq-gradient-tabs__item--on active' : ''}}"

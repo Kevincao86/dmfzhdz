@@ -66,6 +66,7 @@ Page({
     editRows: [],
     iceRows: [],
     displayRows: [],
+    tabCounts: { normal: 0, urgent: 0, shoot: 0, edit: 0, ice: 0 },
     mpBuildId: mpBuild.ID,
   },
   onLoad() {
@@ -136,6 +137,23 @@ Page({
       return true
     })
     rows = listFilters.sortHallRecruitmentRows(rows, this.data.sortBy)
+    const countFiltered = (list) =>
+      (list || []).filter((r) => {
+        if (!showDemoOrders() && r && r.isMock) return false
+        if (!listKeywordSearch.matchListKeyword(r, kw)) return false
+        if (!hallFilters.matchPlatform(r.platform, pf)) return false
+        if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
+        if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
+        if (!listFilters.matchHallStatus(r, statusF)) return false
+        return true
+      }).length
+    const tabCounts = {
+      normal: countFiltered(this.data.normalRows),
+      urgent: countFiltered(this.data.urgentRows),
+      shoot: countFiltered(this.data.shootRows),
+      edit: countFiltered(this.data.editRows),
+      ice: countFiltered(this.data.iceRows),
+    }
     const baseRows = rows.map((r) => ({
       ...r,
       ...recruitmentAi.fallbackTagForRow(r),
@@ -143,7 +161,7 @@ Page({
     }))
     const token = Date.now()
     this._aiTagToken = token
-    this.setData({ displayRows: baseRows })
+    this.setData({ displayRows: baseRows, tabCounts })
     recruitmentAi.enrichOrderTags(baseRows, {}).then((enriched) => {
       if (this._aiTagToken !== token || this.data.hallTab !== tab) return
       this.setData({ displayRows: enriched })

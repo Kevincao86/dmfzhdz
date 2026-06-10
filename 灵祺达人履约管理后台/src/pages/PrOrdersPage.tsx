@@ -395,7 +395,11 @@ export default function PrOrdersPage() {
             </div>
           ) : null}
           {!loading && rows.length && !filteredRows.length ? (
-            <p className="text-sm text-[var(--shell-muted)] text-center py-6">当前筛选条件下暂无招募单</p>
+            <p className="text-sm text-[var(--shell-muted)] text-center py-6">
+              当前筛选条件下暂无招募单
+              {filterStatus !== '全部' ? '，可尝试将状态改为「全部状态」' : ''}
+              {rows.some((r) => r.isRemovedFromRegistry) ? '；部分发单可能尚未同步到服务器，请刷新页面或重新发布' : ''}
+            </p>
           ) : null}
           <div className="space-y-3">
             {filteredRows.map((row) => (
@@ -407,6 +411,9 @@ export default function PrOrdersPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap gap-1.5">
                       <span className="text-xs text-violet-500">{row.hallLabel}</span>
+                      {row.isRemovedFromRegistry ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">未同步</span>
+                      ) : null}
                       <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{recruitTargetLabel(row.recruitTarget)}</span>
                       <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{row.platform}</span>
                     </div>
