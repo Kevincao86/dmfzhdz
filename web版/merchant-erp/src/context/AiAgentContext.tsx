@@ -27,7 +27,6 @@ import type {
 import {
   briefProductNameHint,
   buildPlanExecutionConsultation,
-  isPlanOrNineScenarioQuery,
   coerceAgentDisplayError,
   coerceAgentTextField,
   formatAssistantDisplayText,
@@ -42,7 +41,6 @@ import {
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
   planIncludesRecruitInfluencer,
-  isExplicitExecutionIntent,
   isInformationalOnlyQuery,
   shouldDeferTaskPreview,
   shouldUseFullAgentSystemPrompt,

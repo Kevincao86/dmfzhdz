@@ -376,7 +376,7 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeRecommendPool: true })
       const board = this.data.prBoard || 'talent'
       this._boardPools = {
         talent: prBoard.buildBoardPool(reg, 'talent'),

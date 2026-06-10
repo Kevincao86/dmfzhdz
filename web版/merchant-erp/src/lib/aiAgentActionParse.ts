@@ -2,7 +2,6 @@ import type { AiTaskType } from './aiAgentTypes'
 import {
   isAgentShortcutTaskLine,
   isInformationalOnlyQuery,
-  isPlanDesignQuery,
   isPlanOrNineScenarioQuery,
 } from './aiAgentSystemPromptRoute'
 import { resolveAssistantVisibleText } from './assistantThinkingText'

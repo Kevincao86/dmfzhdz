@@ -37,7 +37,9 @@ function pseudoApplicantFromMember(
     contact: member.contact || '',
     talentMemberId: member.id,
     wxOpenId: member.wxOpenId,
-  } as RegistryMpRecruitmentApplicant
+    followers: Number(prof?.followers) || 0,
+    appliedAt: '',
+  } as unknown as RegistryMpRecruitmentApplicant
 }
 
 function applicantSelectedForMember(
