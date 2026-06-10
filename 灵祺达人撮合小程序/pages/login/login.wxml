@@ -228,18 +228,25 @@
       <view class="login-wx-auth-step" wx:else>
         <image class="login-wx-avatar login-wx-avatar--sm" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
         <input
+          wx:if="{{wxNickInputVisible}}"
           id="login-wx-nick-input"
           class="login-wx-nick login-wx-nick--sheet"
           type="nickname"
           placeholder="点击选用微信昵称"
           value="{{wxNickName}}"
+          adjust-position="{{true}}"
+          hold-keyboard="{{false}}"
           bindfocus="onWxNicknameFocus"
           bindinput="onWxNicknameInput"
           bindblur="onWxNicknameBlur"
           bindnicknamereview="onWxNicknameReview"
           focus="{{wxNickInputFocus}}"
         />
-        <button class="login-btn login-btn--wx" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
+        <view wx:else class="login-wx-nick-display login-wx-nick--sheet" bindtap="onReEditWxNick">
+          <text class="login-wx-nick-display__text">{{wxNickName}}</text>
+          <text class="login-wx-nick-display__edit">更换</text>
+        </view>
+        <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
       </view>
     </view>
   </view>

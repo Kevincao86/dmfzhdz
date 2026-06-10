@@ -555,6 +555,40 @@
   box-sizing: border-box;
 }
 
+.login-wx-nick-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  min-height: 72rpx;
+  padding: 0 20rpx;
+  background: #fff;
+  border-radius: 14rpx;
+  border: 1rpx solid #e2e8f0;
+}
+
+.login-wx-nick-display__text {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  color: var(--lq-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.login-wx-nick-display__edit {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #6366f1;
+}
+
+.login-btn--sheet {
+  width: 100%;
+  margin-top: 8rpx;
+}
+
 .login-err {
   display: block;
   margin-top: 16rpx;

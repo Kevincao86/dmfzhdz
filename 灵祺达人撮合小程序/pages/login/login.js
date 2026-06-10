@@ -115,7 +115,7 @@ function readWxNickInput(page) {
 }
 
 function dismissWxNickPicker(page) {
-  page.setData({ wxNickInputFocus: false })
+  page.setData({ wxNickInputFocus: false, wxNickInputVisible: false })
   const hide = () => {
     try {
       wx.hideKeyboard()
@@ -123,12 +123,17 @@ function dismissWxNickPicker(page) {
   }
   hide()
   setTimeout(hide, 80)
+  setTimeout(hide, 200)
 }
 
 function applyWxNick(page, nick) {
   const name = String(nick || '').trim()
   if (!name) return false
-  page.setData({ wxNickName: name })
+  page.setData({
+    wxNickName: name,
+    wxNickInputFocus: false,
+    wxNickInputVisible: false,
+  })
   require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: name })
   dismissWxNickPicker(page)
   return true
@@ -165,6 +170,7 @@ Page({
     showWxAuthSheet: false,
     wxAuthStep: 'avatar',
     wxNickInputFocus: false,
+    wxNickInputVisible: true,
     pendingWorkId: '',
     redirect: '',
     legalAgreed: false,
@@ -270,9 +276,15 @@ Page({
     this.setData({ wxAvatarUrl: url })
     wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
     if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'avatar') {
-      this.setData({ wxAuthStep: 'nick', wxNickInputFocus: true })
+      this.setData({ wxAuthStep: 'nick', wxNickInputVisible: true, wxNickInputFocus: true })
       wx.showToast({ title: '请选用微信昵称', icon: 'none' })
     }
+  },
+
+  onReEditWxNick() {
+    this.setData({ wxNickInputVisible: true, wxNickInputFocus: false, wxNickName: '' }, () => {
+      this.setData({ wxNickInputFocus: true })
+    })
   },
 
   onWxNicknameFocus() {
@@ -296,12 +308,18 @@ Page({
       return
     }
     const nick = wxNickFromDetail(detail)
-    applyWxNick(this, nick)
+    if (!applyWxNick(this, nick)) return
+    setTimeout(() => dismissWxNickPicker(this), 120)
   },
 
   onCloseWxAuthSheet() {
     dismissWxNickPicker(this)
-    this.setData({ showWxAuthSheet: false, wxAuthStep: 'avatar', pendingWorkId: '' })
+    this.setData({
+      showWxAuthSheet: false,
+      wxAuthStep: 'avatar',
+      wxNickInputVisible: true,
+      pendingWorkId: '',
+    })
   },
 
   onConfirmWxNickStep() {
@@ -377,6 +395,7 @@ Page({
       showWxAuthSheet: true,
       wxAuthStep: 'avatar',
       wxNickInputFocus: false,
+      wxNickInputVisible: true,
       pendingWorkId: workId,
       wxNickName: '',
       wxAvatarUrl: '',
