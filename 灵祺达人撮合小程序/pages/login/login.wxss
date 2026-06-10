@@ -19,7 +19,7 @@
 .login-top {
   position: relative;
   overflow: hidden;
-  padding-bottom: 56rpx;
+  padding-bottom: 48rpx;
   flex-shrink: 0;
 }
 
@@ -96,7 +96,7 @@
 }
 
 .login-stack {
-  margin-top: -48rpx;
+  margin-top: -32rpx;
   padding: 0 28rpx;
   position: relative;
   z-index: 4;
@@ -563,7 +563,7 @@
 
 .login-spark {
   position: relative;
-  padding: 24rpx 0 22rpx;
+  padding: 12rpx 0 10rpx;
   background: linear-gradient(
     165deg,
     rgba(243, 241, 255, 0.35) 0%,
@@ -665,8 +665,8 @@
 
 .login-spark-grid {
   display: flex;
-  gap: 12rpx;
-  padding: 0 20rpx 12rpx;
+  gap: 10rpx;
+  padding: 0 20rpx 6rpx;
   box-sizing: border-box;
 }
 
@@ -676,7 +676,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: 14rpx 12rpx 16rpx;
+  padding: 10rpx 10rpx 12rpx;
   border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.88);
   border: 2rpx solid rgba(216, 200, 255, 0.5);
@@ -717,10 +717,10 @@
 
 .login-spark-flow {
   display: block;
-  padding: 0 24rpx;
-  font-size: 21rpx;
+  padding: 0 24rpx 2rpx;
+  font-size: 20rpx;
   color: var(--lq-text-secondary);
-  line-height: 1.5;
+  line-height: 1.45;
   text-align: center;
 }
 
