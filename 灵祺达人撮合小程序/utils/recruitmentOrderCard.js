@@ -80,7 +80,9 @@ function loadOpenOrderRows(reg) {
 
 function loadAllOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  return mpList.filter((o) => o && o.id).map((mp) => mapMpOrderRow(mp, reg))
+  return mpList
+    .filter((o) => o && o.id && String(o.status) !== 'deleted')
+    .map((mp) => mapMpOrderRow(mp, reg))
 }
 
 module.exports = {
