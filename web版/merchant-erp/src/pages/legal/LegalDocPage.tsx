@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom'
 import type { HelpManualEdition } from '../../lib/helpManualTypes'
 import { buildAupSections, buildPrivacySections, type LegalSection } from '../../lib/legalContent'
-import { LEGAL_COMPANY_NAME, productNameForEdition } from '../../lib/legalProductMeta'
+import {
+  LEGAL_COMPANY_NAME,
+  LEGAL_CONTACT_PHONE,
+  LEGAL_EFFECTIVE_DATE,
+  productNameForEdition,
+} from '../../lib/legalProductMeta'
 import LoginPortalNav from '../../components/login/LoginPortalNav'
 
 type Props = {
@@ -28,7 +33,12 @@ function LegalBody({ sections }: { sections: LegalSection[] }) {
 
 export default function LegalDocPage({ edition, doc }: Props) {
   const product = productNameForEdition(edition)
-  const title = doc === 'privacy' ? '隐私政策' : '软件服务及许可协议'
+  const title =
+    doc === 'privacy'
+      ? '隐私政策'
+      : edition === 'fulfillment'
+        ? '用户协议'
+        : '软件服务及许可协议'
   const sections = doc === 'privacy' ? buildPrivacySections(edition) : buildAupSections(edition)
 
   return (
@@ -46,7 +56,10 @@ export default function LegalDocPage({ edition, doc }: Props) {
         <h1 className="mt-1 text-2xl font-bold">
           {product} · {title}
         </h1>
-        <p className="mt-2 text-sm text-slate-500">发布与生效日期：2026年6月7日</p>
+        <p className="mt-2 text-sm text-slate-500">发布与生效日期：{LEGAL_EFFECTIVE_DATE}</p>
+        {edition === 'fulfillment' ? (
+          <p className="mt-1 text-sm text-slate-500">个人信息保护联系电话：{LEGAL_CONTACT_PHONE}</p>
+        ) : null}
         <div className="mt-8">
           <LegalBody sections={sections} />
         </div>

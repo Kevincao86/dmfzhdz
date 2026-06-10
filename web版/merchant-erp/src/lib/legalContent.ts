@@ -1,9 +1,11 @@
 import type { HelpManualEdition } from './helpManualTypes.js'
+import { buildFulfillmentAupSections, buildFulfillmentPrivacySections } from './legalContentFulfillment.js'
 import { LEGAL_COMPANY_NAME, productNameForEdition } from './legalProductMeta.js'
 
 export type LegalSection = { title: string; paragraphs: string[] }
 
 export function buildPrivacySections(edition: HelpManualEdition): LegalSection[] {
+  if (edition === 'fulfillment') return buildFulfillmentPrivacySections()
   const product = productNameForEdition(edition)
   const company = LEGAL_COMPANY_NAME
   return [
@@ -62,6 +64,7 @@ export function buildPrivacySections(edition: HelpManualEdition): LegalSection[]
 }
 
 export function buildAupSections(edition: HelpManualEdition): LegalSection[] {
+  if (edition === 'fulfillment') return buildFulfillmentAupSections()
   const product = productNameForEdition(edition)
   const company = LEGAL_COMPANY_NAME
   return [
