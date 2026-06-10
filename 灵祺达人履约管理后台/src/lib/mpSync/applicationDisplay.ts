@@ -256,3 +256,16 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
         : profileLink,
   }
 }
+
+/** 视频审核等场景：昵称后小字展示粉丝与带货等级 */
+export function buildApplicantTalentMeta(row: {
+  displayFollowers?: string
+  displaySalesLevel?: string
+}): string {
+  const parts: string[] = []
+  const fans = String(row.displayFollowers || '').trim()
+  const level = String(row.displaySalesLevel || '').trim()
+  if (fans && fans !== '—') parts.push(`粉丝 ${fans}`)
+  if (level && level !== '—') parts.push(`带货 ${level}`)
+  return parts.join(' · ')
+}

@@ -3,11 +3,14 @@ import { Link, useParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { reviewRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
+import { buildApplicantTalentMeta, enrichApplicantRow } from '../lib/mpSync/applicationDisplay'
+import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PageHero from '../components/ui/PageHero'
 
 type VideoCard = {
   id: string
   displayName: string
+  talentMeta: string
   videoUrl: string
   isIceLink: boolean
   videoStatus: string
@@ -40,6 +43,7 @@ export default function PrOrderVideoReviewPage() {
     if (!silent) setLoading(true)
     try {
       const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
+      const regTyped = reg as MpRegistry
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
         unknown
@@ -55,12 +59,14 @@ export default function PrOrderVideoReviewPage() {
           const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
           return !!url
         })
-        .map((a) => {
+        .map((a, i) => {
+          const enriched = enrichApplicantRow(a, i, regTyped)
           const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
           const isIceLink = ice && !!String(a.douyinPublishUrl || '').trim()
           return {
             id: String(a.id || ''),
-            displayName: String(a.platformNickname || a.name || '达人'),
+            displayName: enriched.displayName,
+            talentMeta: buildApplicantTalentMeta(enriched),
             videoUrl: url,
             isIceLink,
             videoStatus: String(a.videoStatus || 'pending'),
@@ -223,7 +229,12 @@ export default function PrOrderVideoReviewPage() {
               >
                 <div className="flex flex-wrap justify-between gap-2 items-start">
                   <div>
-                    <h3 className="font-semibold">{c.displayName}</h3>
+                    <h3 className="font-semibold">
+                      {c.displayName}
+                      {c.talentMeta ? (
+                        <span className="ml-2 text-xs font-normal text-[var(--shell-muted)]">{c.talentMeta}</span>
+                      ) : null}
+                    </h3>
                     <p className="text-xs text-[var(--shell-muted)] mt-1">
                       提交于 {c.videoSubmittedAt || '—'}
                       {` · ${submitCountLabel(c.videoSubmitCount)}`}
@@ -306,7 +317,10 @@ export default function PrOrderVideoReviewPage() {
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-[var(--shell-text)]">视频预览</h3>
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs text-[var(--shell-muted)] truncate">{previewCard.displayName}</span>
+                    <span className="text-xs text-[var(--shell-muted)] truncate">
+                      {previewCard.displayName}
+                      {previewCard.talentMeta ? ` · ${previewCard.talentMeta}` : ''}
+                    </span>
                     <button
                       type="button"
                       className="shrink-0 text-xs text-[var(--shell-muted)] hover:text-[var(--shell-text)] px-1.5 py-0.5 rounded border border-[var(--shell-border)]"

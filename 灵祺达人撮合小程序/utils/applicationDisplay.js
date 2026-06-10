@@ -334,6 +334,15 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   }
 }
 
+function buildApplicantTalentMeta(row) {
+  const parts = []
+  const fans = String((row && row.displayFollowers) || '').trim()
+  const level = String((row && row.displaySalesLevel) || '').trim()
+  if (fans && fans !== '—') parts.push(`粉丝 ${fans}`)
+  if (level && level !== '—') parts.push(`带货 ${level}`)
+  return parts.join(' · ')
+}
+
 module.exports = {
   MP_STATUS_LABEL,
   statusLabel,
@@ -345,4 +354,5 @@ module.exports = {
   resolveApplicantAvatar,
   enrichApplicantRow,
   enrichTalentApplicationRow,
+  buildApplicantTalentMeta,
 }

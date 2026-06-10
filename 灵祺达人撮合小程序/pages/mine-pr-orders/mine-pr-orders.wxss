@@ -234,7 +234,7 @@
 }
 
 .pr-order-link--pending {
-  color: #dc2626;
+  color: #78350f;
   font-weight: 700;
 }
 

@@ -57,6 +57,12 @@
   min-width: 0;
 }
 
+.vr-talent-meta {
+  font-size: 24rpx;
+  font-weight: 400;
+  color: #64748b;
+}
+
 .vr-meta {
   display: block;
   margin-top: 8rpx;
