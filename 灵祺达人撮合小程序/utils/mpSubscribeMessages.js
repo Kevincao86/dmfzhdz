@@ -17,12 +17,12 @@ function requestIds(tmplIds) {
   })
 }
 
-/** 报名提交前：预授权 PR 审核入选通知 */
+/** 报名提交前：一次性预授权入选 + 视频审核通过/驳回（微信单次最多 3 个模板） */
 function requestForAuditPass() {
-  return requestIds([TEMPLATES.auditPass])
+  return requestIds([TEMPLATES.auditPass, TEMPLATES.videoPass, TEMPLATES.videoReject])
 }
 
-/** 上传视频/链接前：视频审核通过 + 驳回 */
+/** 上传视频/链接前：补授权（报名时若未勾选视频类模板） */
 function requestForVideoReview() {
   return requestIds([TEMPLATES.videoPass, TEMPLATES.videoReject])
 }
