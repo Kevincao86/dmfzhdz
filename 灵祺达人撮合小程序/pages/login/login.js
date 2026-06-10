@@ -115,28 +115,46 @@ function readWxNickInput(page) {
 }
 
 function dismissWxNickPicker(page) {
-  page.setData({ wxNickInputFocus: false, wxNickInputVisible: false })
+  if (page._nickDismissTimer) {
+    clearTimeout(page._nickDismissTimer)
+    page._nickDismissTimer = null
+  }
+  page.setData({ wxNickInputFocus: false })
   const hide = () => {
     try {
       wx.hideKeyboard()
     } catch (_) {}
   }
   hide()
-  setTimeout(hide, 80)
-  setTimeout(hide, 200)
+  setTimeout(() => {
+    page.setData({ wxNickInputVisible: false })
+    hide()
+  }, 60)
+  setTimeout(hide, 180)
+  setTimeout(hide, 360)
 }
 
-function applyWxNick(page, nick) {
+function applyWxNick(page, nick, opts) {
+  const options = opts || {}
   const name = String(nick || '').trim()
   if (!name) return false
   page.setData({
     wxNickName: name,
     wxNickInputFocus: false,
-    wxNickInputVisible: false,
+    ...(options.keepInputVisible ? {} : { wxNickInputVisible: false }),
   })
   require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: name })
-  dismissWxNickPicker(page)
+  if (!options.keepInputVisible) dismissWxNickPicker(page)
   return true
+}
+
+function finalizeWxNickFromInput(page) {
+  return readWxNickInput(page).then((nick) => {
+    const fromState = String((page.data && page.data.wxNickName) || '').trim()
+    const name = String(nick || fromState).trim()
+    if (!name) return false
+    return applyWxNick(page, name)
+  })
 }
 
 Page({
@@ -293,12 +311,25 @@ Page({
 
   onWxNicknameInput(e) {
     const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
-    applyWxNick(this, nick)
+    if (!nick) return
+    this.setData({ wxNickName: nick })
+    if (this._nickDismissTimer) clearTimeout(this._nickDismissTimer)
+    this._nickDismissTimer = setTimeout(() => {
+      this._nickDismissTimer = null
+      const latest = String(this.data.wxNickName || '').trim()
+      if (latest) applyWxNick(this, latest)
+    }, 320)
   },
 
   onWxNicknameBlur(e) {
+    if (this._nickDismissTimer) {
+      clearTimeout(this._nickDismissTimer)
+      this._nickDismissTimer = null
+    }
     const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
-    applyWxNick(this, nick)
+    void finalizeWxNickFromInput(this).then((ok) => {
+      if (!ok && nick) applyWxNick(this, nick)
+    })
   },
 
   onWxNicknameReview(e) {
@@ -307,9 +338,21 @@ Page({
       wx.showToast({ title: '昵称需重新选用', icon: 'none' })
       return
     }
-    const nick = wxNickFromDetail(detail)
-    if (!applyWxNick(this, nick)) return
-    setTimeout(() => dismissWxNickPicker(this), 120)
+    if (this._nickDismissTimer) {
+      clearTimeout(this._nickDismissTimer)
+      this._nickDismissTimer = null
+    }
+    setTimeout(() => {
+      void finalizeWxNickFromInput(this)
+    }, 100)
+  },
+
+  onWxNicknameConfirm() {
+    if (this._nickDismissTimer) {
+      clearTimeout(this._nickDismissTimer)
+      this._nickDismissTimer = null
+    }
+    void finalizeWxNickFromInput(this)
   },
 
   onCloseWxAuthSheet() {
@@ -325,8 +368,7 @@ Page({
   onConfirmWxNickStep() {
     void (async () => {
       dismissWxNickPicker(this)
-      const nick = await readWxNickInput(this)
-      if (nick) applyWxNick(this, nick)
+      await finalizeWxNickFromInput(this)
       await this.finishWxAuthAndLogin()
     })()
   },
