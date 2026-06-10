@@ -28,7 +28,7 @@ import { readPrProfile } from '../lib/mpSync/userProfile'
 import PageHero from '../components/ui/PageHero'
 import HallCityFilter from '../components/mp/HallCityFilter'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
-import { countPendingVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
+import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
 
 type Tab = 'published' | 'drafts'
 
@@ -59,6 +59,7 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   mp: Record<string, unknown> | null
   isRemovedFromRegistry: boolean
   pendingVideoCount: number
+  videoCount: number
 }
 
 function deliveryWindowLabel(id: string) {
@@ -135,6 +136,7 @@ export default function PrOrdersPage() {
             mp: mp || null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
             pendingVideoCount: countPendingVideos(mp || null),
+            videoCount: countVideos(mp || null),
           }
         }),
       )
@@ -155,6 +157,7 @@ export default function PrOrdersPage() {
             mp: null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
             pendingVideoCount: 0,
+            videoCount: 0,
           }
         }),
       )
@@ -453,8 +456,8 @@ export default function PrOrdersPage() {
                         }`}
                       >
                         视频审核
-                        {row.pendingVideoCount > 0 ? (
-                          <span className="ml-1 opacity-90">({row.pendingVideoCount})</span>
+                        {row.videoCount > 0 ? (
+                          <span className="ml-1 opacity-90">({row.videoCount})</span>
                         ) : null}
                       </Link>
                       <button

@@ -56,7 +56,7 @@ function mapRow(item, mp) {
     pendingVideoCount,
     videoCount,
     videoReviewLabel:
-      pendingVideoCount > 0 ? `视频审核(${pendingVideoCount})` : '视频审核',
+      videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
   }
 }
 

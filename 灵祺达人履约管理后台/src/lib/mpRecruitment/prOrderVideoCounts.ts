@@ -11,3 +11,9 @@ export function countPendingVideos(mp: Record<string, unknown> | null | undefine
     return String(a.videoStatus || 'pending') === 'pending'
   }).length
 }
+
+/** 与视频审核页「总视频」一致：已上传视频/链接条数 */
+export function countVideos(mp: Record<string, unknown> | null | undefined): number {
+  if (!mp || !Array.isArray(mp.applicants)) return 0
+  return (mp.applicants as Record<string, unknown>[]).filter((a) => a && applicantVideoUrl(a)).length
+}
