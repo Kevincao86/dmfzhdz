@@ -436,15 +436,10 @@ Page({
     wx.showLoading({ title: '生成 Excel…', mask: true })
     try {
       const res = await exportApplicantsExcel(applicants, row.mpOrderId)
-      if (res.mode === 'clipboard') {
+      if (res.mode === 'disk') {
+        wx.showToast({ title: 'Excel 已保存到手机', icon: 'success', duration: 2500 })
+      } else if (res.mode === 'clipboard') {
         wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
-      } else if (res.mode === 'saved') {
-        wx.showModal({
-          title: '表格已生成',
-          content: 'CSV 已保存到本机。若无法自动打开，可将表格内容粘贴到 Excel / WPS。',
-          showCancel: false,
-          confirmText: '知道了',
-        })
       }
     } catch (err) {
       wx.showToast({

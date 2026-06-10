@@ -260,19 +260,13 @@ Page({
     }
     if (this.data[flagKey]) return
     this.setData({ [flagKey]: true })
-    wx.showLoading({ title: '生成表格…', mask: true })
+    wx.showLoading({ title: '生成 Excel…', mask: true })
     try {
       const res = await exportApplicantsExcel(list, this.data.mpOrderId)
-      if (res.mode === 'clipboard') {
+      if (res.mode === 'disk') {
+        wx.showToast({ title: 'Excel 已保存到手机', icon: 'success', duration: 2500 })
+      } else if (res.mode === 'clipboard') {
         wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
-      } else if (res.mode === 'saved') {
-        wx.showModal({
-          title: '表格已生成',
-          content:
-            'CSV 已保存到本机。当前环境无法自动打开时，请用电脑微信打开小程序，或长按复制报名页「复制全部资料」。',
-          showCancel: false,
-          confirmText: '知道了',
-        })
       }
     } catch (e) {
       wx.showToast({
