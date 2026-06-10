@@ -1,3 +1,4 @@
+import { copyTextToClipboard } from '../copyTextToClipboard'
 import { readPrProfile, prDisplayName } from './userProfile'
 import { recruitTargetLabel } from '../mpRecruitment/recruitTargetLabel'
 
@@ -136,46 +137,41 @@ export function buildShareTitle(order: { title?: string; region?: string }): str
   return `${order.title || '招募'} · ${order.region || '全国'}招募`
 }
 
-export async function copyRecruitmentShareForTalent(order: Record<string, unknown>) {
+function orderToShareInput(order: Record<string, unknown>) {
   const id = String(order.id || '').trim()
   if (!id) throw new Error('订单数据缺失')
-  const text = await buildGroupCopyTextAsync(
-    {
-      id,
-      title: String(order.title || ''),
-      region: String(order.region || '全国'),
-      recruitmentInfo: String(order.recruitmentInfo || ''),
-      taskDetail: String(order.taskDetail || ''),
-      merchantRequirements: String(order.merchantRequirements || ''),
-      mpPublishMeta:
-        order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
-          ? (order.mpPublishMeta as Record<string, unknown>)
-          : undefined,
-    },
-    null,
-  )
-  await navigator.clipboard.writeText(text)
+  return {
+    id,
+    title: String(order.title || ''),
+    region: String(order.region || '全国'),
+    recruitmentInfo: String(order.recruitmentInfo || ''),
+    taskDetail: String(order.taskDetail || ''),
+    merchantRequirements: String(order.merchantRequirements || ''),
+    mpPublishMeta:
+      order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+        ? (order.mpPublishMeta as Record<string, unknown>)
+        : undefined,
+  }
+}
+
+/** 生成分享文案（含异步短链）；配合 RecruitmentShareSheet，避免异步后直接写剪贴板 */
+export async function prepareRecruitmentSharePayload(
+  order: Record<string, unknown>,
+  prProfile?: ReturnType<typeof readPrProfile> | null,
+): Promise<{ text: string; title: string }> {
+  const input = orderToShareInput(order)
+  const text = await buildGroupCopyTextAsync(input, prProfile)
+  return { text, title: buildShareTitle(input) }
+}
+
+export async function copyRecruitmentShareForTalent(order: Record<string, unknown>) {
+  const { text } = await prepareRecruitmentSharePayload(order, null)
+  await copyTextToClipboard(text)
   return text
 }
 
 export async function copyRecruitmentShare(order: Record<string, unknown>, prProfile?: ReturnType<typeof readPrProfile> | null) {
-  const id = String(order.id || '').trim()
-  if (!id) throw new Error('订单数据缺失')
-  const text = await buildGroupCopyTextAsync(
-    {
-      id,
-      title: String(order.title || ''),
-      region: String(order.region || '全国'),
-      recruitmentInfo: String(order.recruitmentInfo || ''),
-      taskDetail: String(order.taskDetail || ''),
-      merchantRequirements: String(order.merchantRequirements || ''),
-      mpPublishMeta:
-        order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
-          ? (order.mpPublishMeta as Record<string, unknown>)
-          : undefined,
-    },
-    prProfile,
-  )
-  await navigator.clipboard.writeText(text)
+  const { text } = await prepareRecruitmentSharePayload(order, prProfile)
+  await copyTextToClipboard(text)
   return text
 }

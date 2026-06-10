@@ -18,9 +18,10 @@ import { copyApplicantProfile, downloadApplicantsCsv } from '../lib/mpSync/mpApp
 import { groupQrFromMp, isGroupQrExpired, patchGroupQrImage, readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
-import { copyRecruitmentShare } from '../lib/mpSync/recruitmentShareCopy'
+import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import { reviewRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { readPrProfile } from '../lib/mpSync/userProfile'
+import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import {
   applicantTaskStatusLabel,
   canReviewIceLink,
@@ -71,6 +72,8 @@ export default function PrOrderApplicantsPage() {
   const [iceRejectTargetId, setIceRejectTargetId] = useState('')
   const [iceRejectTargetName, setIceRejectTargetName] = useState('')
   const [iceRejectReason, setIceRejectReason] = useState('')
+  const [sharingOrder, setSharingOrder] = useState(false)
+  const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
 
   const selectedCount = selectedIds.length
   const checkedCount = checkedIds.length
@@ -313,15 +316,15 @@ export default function PrOrderApplicantsPage() {
   }
 
   async function onShareOrder() {
-    if (!mpOrder) {
-      alert('订单数据缺失')
-      return
-    }
+    if (!mpOrder || sharingOrder) return
+    setSharingOrder(true)
     try {
-      await copyRecruitmentShare(mpOrder, readPrProfile())
-      alert('已复制招募信息，请打开微信群粘贴发送给达人。')
+      const payload = await prepareRecruitmentSharePayload(mpOrder, readPrProfile())
+      setShareSheet(payload)
     } catch (e) {
       alert(e instanceof Error ? e.message : '分享失败')
+    } finally {
+      setSharingOrder(false)
     }
   }
 
@@ -416,8 +419,13 @@ export default function PrOrderApplicantsPage() {
             </div>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-2">
-            <button type="button" className="text-sm px-3 py-1.5 rounded-lg border" onClick={() => void onShareOrder()}>
-              分享招募
+            <button
+              type="button"
+              disabled={sharingOrder}
+              className="text-sm px-3 py-1.5 rounded-lg border disabled:opacity-50"
+              onClick={() => void onShareOrder()}
+            >
+              {sharingOrder ? '生成中…' : '分享招募'}
             </button>
             <dl className="text-xs text-[var(--shell-muted)] space-y-1 text-right">
               <div>单号 {orderNo}</div>
@@ -777,6 +785,14 @@ export default function PrOrderApplicantsPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {shareSheet ? (
+        <RecruitmentShareSheet
+          text={shareSheet.text}
+          title={shareSheet.title}
+          onClose={() => setShareSheet(null)}
+        />
       ) : null}
     </div>
   )

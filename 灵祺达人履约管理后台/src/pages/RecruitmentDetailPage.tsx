@@ -17,8 +17,9 @@ import {
   formatChatError,
   syncProfile,
 } from '../lib/mpSync/talentChat'
-import { copyRecruitmentShareForTalent } from '../lib/mpSync/recruitmentShareCopy'
+import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
+import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
 import { canTalentUploadRecruitmentVideo } from '../lib/mpRecruitment/talentApplicationStatus'
 
@@ -35,6 +36,7 @@ export default function RecruitmentDetailPage() {
   const [prChatMeta, setPrChatMeta] = useState<ReturnType<typeof extractPrChatMeta>>(null)
   const [contacting, setContacting] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
   const [readOnlyEnded, setReadOnlyEnded] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -137,11 +139,11 @@ export default function RecruitmentDetailPage() {
   }
 
   async function onShare() {
-    if (!mpRaw) return
+    if (!mpRaw || sharing) return
     setSharing(true)
     try {
-      await copyRecruitmentShareForTalent(mpRaw)
-      window.alert('招募信息已复制，可粘贴到微信等渠道分享')
+      const payload = await prepareRecruitmentSharePayload(mpRaw)
+      setShareSheet(payload)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '分享失败')
     } finally {
@@ -319,7 +321,7 @@ export default function RecruitmentDetailPage() {
                 disabled={sharing}
                 onClick={() => void onShare()}
               >
-                {sharing ? '复制中…' : '分享招募'}
+                {sharing ? '生成中…' : '分享招募'}
               </button>
             ) : null}
           </div>
@@ -347,6 +349,14 @@ export default function RecruitmentDetailPage() {
             <p className="text-sm text-slate-500">PR 账号仅可浏览大厅，报名请退出后以达人 / 拍摄 / 剪辑身份登录。</p>
           ) : null}
         </>
+      ) : null}
+
+      {shareSheet ? (
+        <RecruitmentShareSheet
+          text={shareSheet.text}
+          title={shareSheet.title}
+          onClose={() => setShareSheet(null)}
+        />
       ) : null}
     </div>
   )

@@ -23,10 +23,11 @@ import {
   type PublishWizardDraft,
 } from '../lib/mpSync/publishDraft'
 import { DELIVERY_WINDOWS } from '../lib/mpSync/publishFormOptions'
-import { copyRecruitmentShare } from '../lib/mpSync/recruitmentShareCopy'
+import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import PageHero from '../components/ui/PageHero'
 import HallCityFilter from '../components/mp/HallCityFilter'
+import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 
 type Tab = 'published' | 'drafts'
 
@@ -79,6 +80,8 @@ export default function PrOrdersPage() {
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
   const [deletingId, setDeletingId] = useState('')
+  const [sharingId, setSharingId] = useState('')
+  const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
   const [filterTarget, setFilterTarget] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
@@ -205,17 +208,21 @@ export default function PrOrdersPage() {
   }
 
   async function onShare(row: PrOrderRow) {
+    if (sharingId) return
     const order = row.mp || {
       id: row.mpOrderId,
       title: row.title,
       region: '全国',
       recruitmentInfo: '',
     }
+    setSharingId(row.mpOrderId)
     try {
-      await copyRecruitmentShare(order as Record<string, unknown>, readPrProfile())
-      alert('已复制招募信息，请打开微信群粘贴发送给达人。')
+      const payload = await prepareRecruitmentSharePayload(order as Record<string, unknown>, readPrProfile())
+      setShareSheet(payload)
     } catch (e) {
       alert(e instanceof Error ? e.message : '分享失败')
+    } finally {
+      setSharingId('')
     }
   }
 
@@ -434,10 +441,11 @@ export default function PrOrdersPage() {
                       </Link>
                       <button
                         type="button"
-                        className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
+                        disabled={sharingId === row.mpOrderId}
+                        className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] disabled:opacity-50"
                         onClick={() => void onShare(row)}
                       >
-                        分享
+                        {sharingId === row.mpOrderId ? '生成中…' : '分享'}
                       </button>
                       {row.canToggleRecruit ? (
                         <button
@@ -513,6 +521,14 @@ export default function PrOrdersPage() {
           </div>
         </>
       )}
+
+      {shareSheet ? (
+        <RecruitmentShareSheet
+          text={shareSheet.text}
+          title={shareSheet.title}
+          onClose={() => setShareSheet(null)}
+        />
+      ) : null}
     </div>
   )
 }
