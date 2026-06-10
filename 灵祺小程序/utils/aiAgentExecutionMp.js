@@ -18,9 +18,45 @@ function stripQuote(text) {
     .trim()
 }
 
+function isAgentShortcutTaskLine(text) {
+  return /^使用快捷任务：/.test(stripQuote(text))
+}
+
+function isInformationalOnlyQuery(text) {
+  const x = stripQuote(text)
+  if (!x) return false
+  if (isAgentShortcutTaskLine(x) || isExplicitExecutionIntent(x)) return false
+  if (/ICP|EDI|备案|资质|许可证|托管协议|域名证书|通信管理局|增值电信|经营性|非经营性|电信业务/.test(x)) {
+    return true
+  }
+  if (
+    /(?:是否|是不是|要不要|需不需要|有没有必要|应该选择|选哪个|怎么选|如何选择|有什么区别|区别是|哪个更|还是做|抑或)/.test(
+      x,
+    ) &&
+    !/(?:创建|上架|组品|上传|发布|帮我做|帮我上|立即|确认执行|开始创建)/.test(x)
+  ) {
+    return true
+  }
+  if (
+    /^(?:请问|帮我看|了解一下|想知道|咨询一下|咨询|想了解|能否解释|解释一下)/.test(x) &&
+    !/(?:创建|上架|组品|上传|发布|帮我做|帮我上|立即|确认执行|开始创建)/.test(x)
+  ) {
+    return true
+  }
+  return false
+}
+
 function inferTaskTypeFromText(t) {
   const x = stripQuote(t)
-  if (/创建|商品|套餐|上架|团购|代金券|组品/.test(x)) return 'create_product'
+  if (isInformationalOnlyQuery(x)) return undefined
+  if (
+    /创建|上架|组品|上传.*(商品|套餐|券)|发布.*(?:商品|套餐|团购)|帮我.*(?:上架|创建|组品)|做(?:一|个).*(?:商品|套餐|团购)/.test(
+      x,
+    ) ||
+    (/团购|套餐|代金券|商品/.test(x) && /帮我|我要|需要|请|想要|打算|准备|立即|马上/.test(x))
+  ) {
+    return 'create_product'
+  }
   if (/达人|招募|探店|brief|种草/.test(x)) return 'recruit_influencer'
   if (/差评|评价|评论/.test(x)) return 'handle_review'
   if (/分析|原因|异常/.test(x)) return 'analyze_exception'
@@ -103,9 +139,19 @@ function looksLikePlanDocument(content) {
   return false
 }
 
+function isPlanOrNineScenarioQuery(text) {
+  const x = stripQuote(text)
+  if (!x) return false
+  if (isAgentShortcutTaskLine(x)) return true
+  if (/9\s*大\s*场景|九大场景|九\s*大/.test(x)) return true
+  if (/方案/.test(x)) return true
+  return isPlanDesignQuery(x)
+}
+
 function inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType) {
   const types = new Set()
-  if (assistantContent) {
+  const planIntent = isPlanOrNineScenarioQuery(userText) && !isInformationalOnlyQuery(userText)
+  if (assistantContent && planIntent) {
     for (const t of collectAgentActionTypes(assistantContent)) types.add(t)
     const c = assistantContent
     if (/商品|套餐|组品|团购|上架|代金券/.test(c)) types.add('create_product')
@@ -116,7 +162,7 @@ function inferTaskTypesFromCombinedContext(userText, assistantContent, explicitT
   const userType = inferTaskTypeFromText(userText)
   if (userType) types.add(userType)
 
-  if (explicitTaskType && !types.size) types.add(explicitTaskType)
+  if (explicitTaskType && (isAgentShortcutTaskLine(userText) || planIntent)) types.add(explicitTaskType)
   return [...types]
 }
 
@@ -126,10 +172,15 @@ function hasCombinedProductAndRecruitPlan(userText, assistantContent, explicitTa
 }
 
 function shouldDeferTaskPreview(userText, assistantContent, explicitTaskType) {
+  if (isAgentShortcutTaskLine(userText)) return false
+  if (isExplicitExecutionIntent(userText)) return false
+  if (isInformationalOnlyQuery(userText)) return true
+  if (inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType).length > 0) {
+    return true
+  }
   if (hasCombinedProductAndRecruitPlan(userText, assistantContent, explicitTaskType)) return true
   if (assistantContent && tryParseJsonObject(assistantContent)?.confirmRequired === true) return true
-  if (parseAgentActionType(assistantContent || '')) return false
-  if (isExplicitExecutionIntent(userText)) return false
+  if (isPlanOrNineScenarioQuery(userText)) return true
   if (isPlanDesignQuery(userText)) return true
   if (assistantContent && looksLikePlanDocument(assistantContent)) return true
   return false
