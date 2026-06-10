@@ -1,7 +1,5 @@
 /** 灵祺达人撮合小程序 — 微信订阅消息模板（公众平台「我的模板」） */
 export const MP_SUBSCRIBE_TEMPLATES = {
-  /** 报名结果提醒 */
-  applyResult: 'p-ZBJVOIX_vnpydcB82JdKRq6SYeBHgcjdmP4r9Y4YY',
   /** 报名审核通知（PR 入选） */
   auditPass: 'HR_2V9NYdv7epS8peQqB6rijOXhPgTYAZmwaon3Gsrg',
   /** 审核驳回通知（视频/链接驳回） */

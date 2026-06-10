@@ -1,6 +1,5 @@
 /** 微信订阅消息：在用户点击时请求授权（每次授权可下发一条） */
 const TEMPLATES = {
-  applyResult: 'p-ZBJVOIX_vnpydcB82JdKRq6SYeBHgcjdmP4r9Y4YY',
   auditPass: 'HR_2V9NYdv7epS8peQqB6rijOXhPgTYAZmwaon3Gsrg',
   videoReject: 'RBI40YXz-Q4M8fAruxuT3oZ7o09le-_zstFx4VyJEuA',
   videoPass: '50rPxvWW1aBLLLK0cyqV9YJbhlENqbyR4EZc68LDmUI',
@@ -18,9 +17,9 @@ function requestIds(tmplIds) {
   })
 }
 
-/** 报名提交前：报名结果 + 审核入选（微信单次最多 3 个模板） */
-function requestForApply() {
-  return requestIds([TEMPLATES.applyResult, TEMPLATES.auditPass])
+/** 报名提交前：预授权 PR 审核入选通知 */
+function requestForAuditPass() {
+  return requestIds([TEMPLATES.auditPass])
 }
 
 /** 上传视频/链接前：视频审核通过 + 驳回 */
@@ -30,6 +29,6 @@ function requestForVideoReview() {
 
 module.exports = {
   TEMPLATES,
-  requestForApply,
+  requestForAuditPass,
   requestForVideoReview,
 }
