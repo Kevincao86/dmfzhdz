@@ -51,11 +51,22 @@ function resolvePublishedMs(mp) {
 }
 
 function resolveDeadlineMs(mp, summary) {
+  const meta =
+    mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  const text = [
+    summary,
+    mp && mp.recruitmentInfo,
+    mp && mp.taskDetail,
+    mp && mp.merchantRequirements,
+  ]
+    .filter(Boolean)
+    .join('\n')
   const fromField =
     (mp && mp.deadline && parseTs(mp.deadline)) ||
-    parseTs(pickField(summary, '报名截止')) ||
-    parseTs(pickField(summary, '截止')) ||
-    parseTs(pickField(summary, '截止时间'))
+    (meta && meta.signupDeadline && parseTs(meta.signupDeadline)) ||
+    parseTs(pickField(text, '报名截止')) ||
+    parseTs(pickField(text, '截止')) ||
+    parseTs(pickField(text, '截止时间'))
   if (fromField > 0) return fromField
   if (mp && mp.urgent) {
     const pub = resolvePublishedMs(mp)

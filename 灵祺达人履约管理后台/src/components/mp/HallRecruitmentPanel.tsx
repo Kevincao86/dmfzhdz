@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
-import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
 import {
   matchStatusLabel,
   prioritizeActiveStatus,
@@ -120,7 +120,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       setErr('')
       try {
         const reg = await fetchMpRegistry()
-        const mapped = loadAllOrderRows(reg)
+        const mapped = loadOpenOrderRows(reg)
         const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
           splitRoleHallRows(mapped, hallIdentity)
         setNormalRows(listFilters.mergeHallDisplayRows(n, { allowDemo: showDemoOrders() }))

@@ -2,6 +2,7 @@
  * Supabase public.ops_registry_snapshot：Service Role + fetch PostgREST（无 supabase-js）。
  * normalize / persist 对 opsRegistryGatewayCore 使用动态 import，减轻 GET 注册表冷启动体积，降低 FUNCTION_INVOCATION_FAILED。
  */
+import { syncExpiredMpOrdersInSnapshot } from '../src/meooRegistryShared/mpOrderEffectiveStatus.js'
 import { filterLegacyDemoRecruitmentOrders } from '../src/meooRegistryShared/recruitmentLegacyDemoOrders.js'
 import type { RegistryFile } from '../src/meooRegistryShared/opsRegistryTypes.js'
 import type { RegistrySnapshotIo } from '../src/ops/registrySnapshotIo.js'
@@ -80,16 +81,21 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
 /** 运营台 /api/meoo-ops-sync-registry GET：与 dispatch GET 行为一致，避免拉入含 node:crypto 的整包 dispatch（降低 Vercel 运行时崩溃风险） */
 export async function loadRegistrySnapshotForGet(io: RegistrySnapshotIo): Promise<RegistryFile> {
   const data = await io.load()
+  let needSave = false
   const before = data.recruitmentOrders ?? []
   const cleaned = filterLegacyDemoRecruitmentOrders(before)
   if (cleaned.length !== before.length) {
     data.recruitmentOrders = cleaned
+    needSave = true
+  }
+  const expired = syncExpiredMpOrdersInSnapshot(data)
+  if (expired.syncedIds.length > 0) needSave = true
+  if (needSave) {
     try {
       await io.save(data)
     } catch (e) {
-      // GET 仍以清理后的内存结果响应；持久化失败不应拖垮整次 Function（否则 Vercel 直接 FUNCTION_INVOCATION_FAILED / 502）
       const msg = e instanceof Error ? e.message : String(e)
-      console.error('[loadRegistrySnapshotForGet] persist cleaned recruitmentOrders failed:', msg.slice(0, 500))
+      console.error('[loadRegistrySnapshotForGet] persist registry cleanup failed:', msg.slice(0, 500))
     }
   }
   return data

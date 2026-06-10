@@ -38,7 +38,9 @@ function bucketOrdersForIdentity(mapped, identity, opts) {
   else if (id === 'edit') editRows = primaryRows
   else if (id === 'pr' || id === 'talent') {
     shootRows = primaryRows.filter((r) => r.recruitTarget === 'shoot')
-    editRows = primaryRows.filter((r) => r.recruitTarget === 'edit')
+    editRows = primaryRows
+      .filter((r) => r.recruitTarget === 'edit')
+      .concat(iceRows.filter((r) => r.recruitTarget === 'edit'))
   }
 
   const normalRows = listFilters.mergeHallDisplayRows(nonUrgent, {

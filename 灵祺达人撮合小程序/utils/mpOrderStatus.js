@@ -24,7 +24,7 @@ function resolveEffectiveMpStatus(rawStatus, deadlineMs, nowMs) {
   let raw = String(rawStatus || 'open').trim() || 'open'
   if (raw === 'pending_settlement') raw = 'done'
   if (raw === 'closed' || raw === 'done') return raw
-  if (deadlineMs && Number(deadlineMs) > 0 && now >= Number(deadlineMs)) return 'done'
+  if (deadlineMs && Number(deadlineMs) > 0 && now >= Number(deadlineMs) && raw !== 'collecting') return 'done'
   return raw
 }
 

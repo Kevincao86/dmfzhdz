@@ -63,7 +63,10 @@ export function splitRoleHallRows(rows: RecruitmentOrderRow[], identity: MpWorkI
   else if (identity === 'edit') editRows = primaryRows
   else if (identity === 'pr' || identity === 'talent') {
     shootRows = primaryRows.filter((r) => r.recruitTarget === 'shoot')
-    editRows = primaryRows.filter((r) => r.recruitTarget === 'edit')
+    editRows = [
+      ...primaryRows.filter((r) => r.recruitTarget === 'edit'),
+      ...iceRows.filter((r) => r.recruitTarget === 'edit'),
+    ]
   }
   /** 招募大厅 Tab：非急单全部可见（含云剪），再由状态筛选项过滤 */
   const normalRows = nonUrgent
