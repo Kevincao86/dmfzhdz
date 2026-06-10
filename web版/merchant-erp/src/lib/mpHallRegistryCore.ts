@@ -5,6 +5,7 @@ import {
 import type { RegistryFile, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
+import { syncExpiredMpOrdersInSnapshot } from './mpGroupQrCleanup.js'
 import {
   mergeMpRecruitmentOrdersForHallContext,
   type PrOwnerKeys,
@@ -59,9 +60,11 @@ function buildHallPayload(
   partial: Partial<RegistryFile>,
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
-): Record<string, unknown> {
-  const mpRaw = Array.isArray(partial.mpRecruitmentOrders)
-    ? (partial.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
+  const file = partial as RegistryFile
+  const expired = syncExpiredMpOrdersInSnapshot(file)
+  const mpRaw = Array.isArray(file.mpRecruitmentOrders)
+    ? (file.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
     : []
   const mpRecruitmentOrders = mergeMpRecruitmentOrdersForHallContext(
     mpRaw,
@@ -69,13 +72,48 @@ function buildHallPayload(
     prOwnerKeys,
   )
   return {
-    ok: true,
-    mpRecruitmentOrders,
-    mpTalentMembers: sliceRegistryList(partial.mpTalentMembers),
-    mpTalentInbox: sliceRegistryList(partial.mpTalentInbox),
-    talentLibraryEntries: sliceRegistryList(partial.talentLibraryEntries),
-    shootTeamLibraryEntries: sliceRegistryList(partial.shootTeamLibraryEntries),
-    editTeamLibraryEntries: sliceRegistryList(partial.editTeamLibraryEntries),
+    needPersist: expired.syncedIds.length > 0,
+    partial: file,
+    payload: {
+      ok: true,
+      mpRecruitmentOrders,
+      mpTalentMembers: sliceRegistryList(file.mpTalentMembers),
+      mpTalentInbox: sliceRegistryList(file.mpTalentInbox),
+      talentLibraryEntries: sliceRegistryList(file.talentLibraryEntries),
+      shootTeamLibraryEntries: sliceRegistryList(file.shootTeamLibraryEntries),
+      editTeamLibraryEntries: sliceRegistryList(file.editTeamLibraryEntries),
+    },
+  }
+}
+
+async function persistRegistryIfNeeded(
+  supabaseUrl: string,
+  serviceRole: string,
+  partial: Partial<RegistryFile>,
+): Promise<void> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const { registryForPersistentFile } = await import('./opsRegistryGatewayCore.js')
+  const persist = registryForPersistentFile(partial as RegistryFile)
+  const nowIso = new Date().toISOString()
+  const body = JSON.stringify({
+    id: 1,
+    registry: persist as unknown as Record<string, unknown>,
+    updated_at: nowIso,
+  })
+  const res = await fetch(`${base}/rest/v1/ops_registry_snapshot`, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body,
+    signal: hallFetchSignal(),
+  })
+  if (!res.ok) {
+    const t = await res.text()
+    console.warn('[hall_registry] persist expired sync failed:', t.slice(0, 240))
   }
 }
 
@@ -94,7 +132,16 @@ export async function loadMpHallRegistryPayload(opts?: {
   if (missingParts.length === 0) {
     try {
       const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
-      return buildHallPayload(partial, includeMpOrderIds, prOwnerKeys)
+      const built = buildHallPayload(partial, includeMpOrderIds, prOwnerKeys)
+      if (built.needPersist) {
+        try {
+          await persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.warn('[hall_registry] persist skipped:', msg.slice(0, 200))
+        }
+      }
+      return built.payload
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       attempts.push(`registry_direct:${msg.slice(0, 240)}`)
@@ -111,10 +158,8 @@ export async function loadMpHallRegistryPayload(opts?: {
   if (isVercelServerless()) {
     try {
       const remote = await proxyGetErpApi('/api/meoo-ops-mp-hall-registry')
-      if (remote && Array.isArray(remote.mpRecruitmentOrders)) {
-        return buildHallPayload(remote as Partial<RegistryFile>, includeMpOrderIds, prOwnerKeys)
-      }
-      return buildHallPayload(remote as Partial<RegistryFile>, includeMpOrderIds, prOwnerKeys)
+      const built = buildHallPayload(remote as Partial<RegistryFile>, includeMpOrderIds, prOwnerKeys)
+      return built.payload
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       attempts.push(`ecs_proxy:${msg.slice(0, 240)}`)

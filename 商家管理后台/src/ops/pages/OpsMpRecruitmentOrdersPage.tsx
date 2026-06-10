@@ -11,6 +11,7 @@ import {
   reviewOpenMpApplicant,
   type ReviewOpenApplicantAction,
 } from '../../meooRegistryShared/mpRecruitmentOpenCore'
+import { resolveEffectiveMpOrderStatus } from '../../meooRegistryShared/mpOrderEffectiveStatus'
 import {
   fulfillmentLoopLabel,
   inferFulfillmentLoop,
@@ -71,6 +72,19 @@ function mpStatusStyle(s: MpStatus): string {
   return 'bg-slate-600 text-slate-300'
 }
 
+function mpOrderStatusView(o: RegistryMpRecruitmentOrder): {
+  effective: MpStatus
+  staleRaw: boolean
+  hallVisible: boolean
+} {
+  const effective = resolveEffectiveMpOrderStatus(o) as MpStatus
+  const raw = o.status
+  const staleRaw =
+    (raw === 'open' || raw === 'collecting') && effective !== raw
+  const hallVisible = effective === 'open' || effective === 'collecting'
+  return { effective, staleRaw, hallVisible }
+}
+
 function loopBadgeStyle(loop: RecruitmentFulfillmentLoop): string {
   return loop === 'closed' ? 'bg-amber-500/15 text-amber-300' : 'bg-teal-500/15 text-teal-300'
 }
@@ -108,7 +122,7 @@ export default function OpsMpRecruitmentOrdersPage() {
 
   const rows = useMemo(() => {
     return sorted.filter((o) => {
-      if (status !== 'all' && o.status !== status) return false
+      if (status !== 'all' && resolveEffectiveMpOrderStatus(o) !== status) return false
       if (loopFilter !== 'all' && inferFulfillmentLoop(o) !== loopFilter) return false
       if (targetFilter !== 'all' && inferRecruitTarget(o) !== targetFilter) return false
       if (publisherFilter === 'pr' && o.publisherIdentity !== 'pr') return false
@@ -353,9 +367,29 @@ export default function OpsMpRecruitmentOrdersPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', mpStatusStyle(o.status))}>
-                          {mpStatusLabel(o.status)}
-                        </span>
+                        {(() => {
+                          const sv = mpOrderStatusView(o)
+                          return (
+                            <div className="space-y-0.5">
+                              <span
+                                className={cn(
+                                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                                  mpStatusStyle(sv.effective),
+                                )}
+                              >
+                                {mpStatusLabel(sv.effective)}
+                              </span>
+                              {sv.staleRaw ? (
+                                <p className="text-[10px] leading-tight text-amber-400/90">
+                                  库内仍标「{mpStatusLabel(o.status)}」· 报名已截止，大厅不可见
+                                </p>
+                              ) : null}
+                              {!sv.hallVisible && !sv.staleRaw ? (
+                                <p className="text-[10px] leading-tight text-slate-500">大厅不可见</p>
+                              ) : null}
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="px-3 py-2 tabular-nums text-slate-300">{(o.applicants ?? []).length}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-slate-500">{o.createdAt}</td>

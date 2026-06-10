@@ -261,12 +261,25 @@ function pickField(summary: string, key: string) {
   return m ? m[1].trim() : ''
 }
 
-export function resolveDeadlineMsFromMp(mp: Record<string, unknown>, summary: string): number {
+export function resolveDeadlineMsFromMp(mp: Record<string, unknown>, summary?: string): number {
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const text = [
+    summary,
+    mp.recruitmentInfo,
+    mp.taskDetail,
+    mp.merchantRequirements,
+  ]
+    .filter(Boolean)
+    .join('\n')
   const fromField =
     parseTs(mp.deadline) ||
-    parseTs(pickField(summary, '报名截止')) ||
-    parseTs(pickField(summary, '截止')) ||
-    parseTs(pickField(summary, '截止时间'))
+    parseTs(meta?.signupDeadline) ||
+    parseTs(pickField(text, '报名截止')) ||
+    parseTs(pickField(text, '截止')) ||
+    parseTs(pickField(text, '截止时间'))
   if (fromField > 0) return fromField
   if (mp.urgent) {
     const pub = resolvePublishedMs(mp)

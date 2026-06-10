@@ -23,16 +23,12 @@ function errHint(msg) {
 }
 
 function mapRegistryToRows(reg, identity) {
-  const mpList = Array.isArray(reg && reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const workIdentity = identity || userProfile.readIdentity()
-  const mapped = []
-  for (const mp of mpList) {
-    if (!mp || !mp.id) continue
-    try {
-      mapped.push(orderCard.mapMpOrderRow(mp, reg))
-    } catch (e) {
-      console.warn('[hallLoad] skip bad order', mp && mp.id, e)
-    }
+  let mapped = []
+  try {
+    mapped = orderCard.loadOpenOrderRows(reg)
+  } catch (e) {
+    console.warn('[hallLoad] loadOpenOrderRows failed', e)
   }
   const buckets = hallIdentity.bucketOrdersForIdentity(mapped, workIdentity, {
     allowDemo: showDemoOrders(),
