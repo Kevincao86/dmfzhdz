@@ -10,7 +10,6 @@ import {
 } from '../../lib/mpRecruitment/listKeywordSearch'
 import {
   matchStatusLabel,
-  matchHallTabCountStatusFilter,
   prioritizeActiveStatus,
   splitRoleHallRows,
   STATUS_FILTER_OPTIONS,
@@ -54,10 +53,8 @@ function filterHallRows(
     if (!hallFilters.matchCategory(r.category, opts.filterCategory)) return false
     if (!hallFilters.matchPriceBuckets(r.priceAmount, opts.priceSelected)) return false
     if (searchByOrderNo && matchesOrderIdKeyword(row, kw)) return true
-    const statusOk = forTabCount
-      ? matchHallTabCountStatusFilter(String(r.statusLabel || ''), opts.filterStatus)
-      : matchStatusLabel(r, opts.filterStatus)
-    if (!statusOk) return false
+    // Tab 角标：统计该分类招募单总数，不受状态筛选项影响
+    if (!forTabCount && !matchStatusLabel(r, opts.filterStatus)) return false
     return true
   })
 }
@@ -212,6 +209,16 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     { id: 'ice', label: '云剪任务', count: tabCounts.ice },
   ]
 
+  const heroBadgeCount = useMemo(() => {
+    if (hallTab === 'urgent') return tabCounts.urgent
+    if (hallTab === 'paichian') {
+      if (paichianSubTab === 'edit') return tabCounts.edit
+      if (paichianSubTab === 'ice') return tabCounts.ice
+      return tabCounts.shoot
+    }
+    return tabCounts.normal
+  }, [hallTab, paichianSubTab, tabCounts])
+
   const listTwoCol = displayRows.length > 1
 
   return (
@@ -221,7 +228,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           inset
           title="招募大厅"
           subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
-          badge={`${displayRows.length} 条`}
+          badge={`${heroBadgeCount} 条`}
         />
 
         <input
