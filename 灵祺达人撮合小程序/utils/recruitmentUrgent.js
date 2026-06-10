@@ -3,9 +3,7 @@ function isUrgentMpOrder(mp) {
   return !!(mp && mp.urgent === true)
 }
 
-/** 云剪任务大厅（有素材仅发布） */
-function isIceMpOrder(mp) {
-  return !!(mp && (mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'))
-}
+/** 云剪任务（与 iceOrderDetect / Web orderCard 一致） */
+const { isIceMpOrder } = require('./iceOrderDetect.js')
 
 module.exports = { isUrgentMpOrder, isIceMpOrder }

@@ -7,6 +7,12 @@ import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 
 const REGISTRY_FETCH_MS = 25_000
+const HALL_REGISTRY_CACHE_MS = 45_000
+
+let hallRegistryInflight: Partial<Record<'hall' | 'full', Promise<Record<string, unknown>>>> = {}
+let hallRegistryCache: Partial<
+  Record<'hall' | 'full', { data: Record<string, unknown>; expiresAt: number }>
+> = {}
 
 function registryFetchSignal(): AbortSignal | undefined {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
@@ -215,9 +221,15 @@ function buildHallRegistryOwnerPayload() {
   }
 }
 
-export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[]; includePrOwned?: boolean }) {
+export async function fetchMpRegistry(opts?: {
+  includeMpOrderIds?: string[]
+  includePrOwned?: boolean
+  /** hall：仅招募单（大厅列表）；full：完整注册表（消息/聊天等） */
+  scope?: 'hall' | 'full'
+}) {
   const includeMpOrderIds = collectIncludeMpOrderIds(opts?.includeMpOrderIds)
   const includePrOwned = opts?.includePrOwned === true
+  const scope = opts?.scope === 'full' ? 'full' : 'hall'
   if (includeMpOrderIds.length || includePrOwned) {
     try {
       const data = await mpAuthRequest('hall_registry', {
@@ -232,23 +244,47 @@ export async function fetchMpRegistry(opts?: { includeMpOrderIds?: string[]; inc
       /* fallback GET only when not requesting PR-owned orders */
     }
   }
-  const paths = ['/api/meoo-ops-mp-hall-registry', '/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
+  const paths =
+    scope === 'full'
+      ? ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
+      : ['/api/meoo-ops-mp-hall-registry', '/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
   let lastErr = 'registry_failed'
-  for (const path of paths) {
-    try {
-      const res = await fetch(apiUrl(path), { signal: registryFetchSignal() })
-      const data = await parseJsonRes(res)
-      if (!res.ok || data.ok === false) {
-        lastErr = String(data.error || data.detail || `http_${res.status}`)
-        continue
+  const fetchOnce = async () => {
+    for (const path of paths) {
+      try {
+        const res = await fetch(apiUrl(path), { signal: registryFetchSignal() })
+        const data = await parseJsonRes(res)
+        if (!res.ok || data.ok === false) {
+          lastErr = String(data.error || data.detail || `http_${res.status}`)
+          continue
+        }
+        return data
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        lastErr = /abort/i.test(msg) ? '招募大厅加载超时，请刷新重试' : msg
       }
-      return data
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      lastErr = /abort/i.test(msg) ? '招募大厅加载超时，请刷新重试' : msg
     }
+    throw new Error(lastErr)
   }
-  throw new Error(lastErr)
+
+  const now = Date.now()
+  const cached = hallRegistryCache[scope]
+  if (cached && cached.expiresAt > now) {
+    return cached.data
+  }
+  const inflight = hallRegistryInflight[scope]
+  if (inflight) return inflight
+
+  const pending = fetchOnce()
+    .then((data) => {
+      hallRegistryCache[scope] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
+      return data
+    })
+    .finally(() => {
+      delete hallRegistryInflight[scope]
+    })
+  hallRegistryInflight[scope] = pending
+  return pending
 }
 
 /** @deprecated use fetchMpRegistry */

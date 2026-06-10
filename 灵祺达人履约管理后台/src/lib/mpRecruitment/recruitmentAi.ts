@@ -111,7 +111,31 @@ function chunk<T>(list: T[], size: number): T[][] {
 }
 
 const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
+const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v1'
 const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
+
+function readWebTagCache(): Record<string, { tag: string; tone: string }> {
+  try {
+    const raw = sessionStorage.getItem(WEB_TAG_CACHE_KEY)
+    if (!raw) return {}
+    const j = JSON.parse(raw) as { expiresAt?: number; data?: Record<string, { tag: string; tone: string }> }
+    if (j.expiresAt && Date.now() > j.expiresAt) return {}
+    return j.data && typeof j.data === 'object' ? j.data : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeWebTagCache(data: Record<string, { tag: string; tone: string }>) {
+  try {
+    sessionStorage.setItem(
+      WEB_TAG_CACHE_KEY,
+      JSON.stringify({ expiresAt: Date.now() + WEB_MATCH_CACHE_TTL_MS, data }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
 
 function readWebMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
   try {
@@ -177,20 +201,37 @@ async function fetchOrderMatchMap(
 
 export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = '') {
   const list = rows.filter((r) => r.id)
-  const withLocal = list.map((r) => ({ ...r, ...fallbackTagForRow(r, talentCity), aiTagSource: 'local' }))
+  const withLocal = list.map((r) => ({ ...r, ...fallbackTagForRow(r, talentCity), aiTagSource: 'local' as const }))
   if (!list.length) return withLocal
+
+  const cache = readWebTagCache()
+  const missing: RecruitmentOrderRow[] = []
   const map: Record<string, { tag: string; tone: string }> = {}
-  for (const part of chunk(list, 8)) {
-    try {
-      const res = await postMpRecruitmentAi({ mode: 'tag', orders: part.map(orderAiPayload) })
-      const items = Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (it?.id && it.tag) map[String(it.id)] = { tag: String(it.tag), tone: String(it.tone || 'default') }
-      }
-    } catch {
-      break
-    }
+  for (const row of list) {
+    const ck = `${row.id}:${hallKey(row)}`
+    if (cache[ck]) map[row.id] = cache[ck]
+    else missing.push(row)
   }
+
+  if (missing.length) {
+    for (const part of chunk(missing, 8)) {
+      try {
+        const res = await postMpRecruitmentAi({ mode: 'tag', orders: part.map(orderAiPayload) })
+        const items = Array.isArray(res.items) ? res.items : []
+        for (const it of items) {
+          if (it?.id && it.tag) map[String(it.id)] = { tag: String(it.tag), tone: String(it.tone || 'default') }
+        }
+        for (const row of part) {
+          const ck = `${row.id}:${hallKey(row)}`
+          if (map[row.id]) cache[ck] = map[row.id]
+        }
+      } catch {
+        break
+      }
+    }
+    writeWebTagCache(cache)
+  }
+
   return list.map((row) => {
     const hit = map[row.id]
     if (hit?.tag) return { ...row, aiTag: hit.tag, aiTagTone: hit.tone, aiTagSource: 'ai' as const }

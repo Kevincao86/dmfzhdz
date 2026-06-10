@@ -41,6 +41,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [hallTab, setHallTab] = useState<HallTab>('normal')
   const [paichianSubTab, setPaichianSubTab] = useState<PaichianSubTab>('shoot')
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [debouncedSearchKeyword, setDebouncedSearchKeyword] = useState('')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
@@ -60,6 +61,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [iceRows, setIceRows] = useState<RecruitmentOrderRow[]>([])
   const [displayRows, setDisplayRows] = useState<RecruitmentOrderRow[]>([])
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchKeyword(searchKeyword), 300)
+    return () => clearTimeout(t)
+  }, [searchKeyword])
+
   const applyFilters = useCallback(async () => {
     let rows = normalRows
     if (hallTab === 'urgent') rows = urgentRows
@@ -68,7 +74,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       else if (paichianSubTab === 'ice') rows = iceRows
       else rows = shootRows
     }
-    const kw = searchKeyword.trim()
+    const kw = debouncedSearchKeyword.trim()
     rows = rows.filter((r) => {
       if (!showDemoOrders() && r.isMock) return false
       if (!matchSearch(r, kw)) return false
@@ -100,7 +106,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     editRows,
     iceRows,
     normalRows,
-    searchKeyword,
+    debouncedSearchKeyword,
     filterPlatform,
     filterProvince,
     filterCity,
