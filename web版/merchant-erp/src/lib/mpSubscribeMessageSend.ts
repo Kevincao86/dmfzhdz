@@ -119,33 +119,6 @@ export function orderTitle(mp: RegistryMpRecruitmentOrder): string {
   return customer || store || String(mp.id || '招募单')
 }
 
-export function orderNo(mp: RegistryMpRecruitmentOrder): string {
-  return String(mp.sourceMerchantOrderId || mp.id || '').trim()
-}
-
-export async function notifyApplyResultSubscribe(
-  reg: RegistrySnapshot,
-  mp: RegistryMpRecruitmentOrder,
-  applicant: RegistryMpRecruitmentApplicant,
-  appliedAt?: string,
-): Promise<void> {
-  const openId = resolveOpenIdForApplicant(reg, applicant)
-  if (!openId) return
-  const title = orderTitle(mp)
-  const no = orderNo(mp)
-  await sendMpSubscribeMessage({
-    openId,
-    templateKey: 'applyResult',
-    page: detailPagePath(mp.id),
-    data: {
-      thing1: { value: clipThing(title) },
-      thing2: { value: clipThing(no) },
-      time3: { value: appliedAt || formatTimeCn() },
-      thing10: { value: clipThing('已报名') },
-    },
-  })
-}
-
 export async function notifyAuditPassSubscribe(
   reg: RegistrySnapshot,
   mp: RegistryMpRecruitmentOrder,

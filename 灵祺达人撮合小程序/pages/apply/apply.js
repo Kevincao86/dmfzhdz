@@ -248,7 +248,7 @@ Page({
 
     this.setData({ submitting: true })
     try {
-      await mpSubscribeMessages.requestForApply()
+      await mpSubscribeMessages.requestForAuditPass()
       const applicantId = `app-${Date.now()}`
       let applicant = applyRuntime.buildApplicantFromRows(this.data.applyRowsRaw, this.data, {
         platform: this.data.platform,
