@@ -14,6 +14,7 @@ import {
   inferTaskTypesFromCombinedContext,
   isAgentShortcutTaskLine,
   isExplicitExecutionIntent,
+  isInformationalOnlyQuery,
   isPlanOrNineScenarioQuery,
   isUserDecliningProductImages,
   planIncludesRecruitInfluencer,
@@ -176,6 +177,7 @@ export function recoverPlanFromMessages(messages: AiAgentMessage[]): AgentExecut
     ) {
       continue
     }
+    if (isInformationalOnlyQuery(userBrief)) continue
     const taskTypes = filterScenarioTaskTypes(
       inferTaskTypesFromCombinedContext(userBrief, content, undefined),
     )

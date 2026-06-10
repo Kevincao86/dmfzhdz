@@ -1,6 +1,7 @@
 import type { AiTaskType } from './aiAgentTypes'
 import {
   isAgentShortcutTaskLine,
+  isInformationalOnlyQuery,
   isPlanDesignQuery,
   isPlanOrNineScenarioQuery,
 } from './aiAgentSystemPromptRoute'
@@ -61,10 +62,13 @@ export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
   const x = t.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   // 文生图/主图/海报等像素出图，勿误判为创建团购商品（否则会拉 GEO/竞品，分钟级卡住）
   if (detectImageGenerationIntent(x)) return undefined
+  if (isInformationalOnlyQuery(x)) return undefined
   if (
-    /创建|商品|套餐|上架|双人|单人|三人|四人|火锅|团购|代金券|代\s*\d+|抵\s*\d+|券面|上传.*(商品|套餐|券)/.test(
+    /创建|上架|组品|上传.*(商品|套餐|券)|发布.*(?:商品|套餐|团购)|帮我.*(?:上架|创建|组品)|做(?:一|个).*(?:商品|套餐|团购)/.test(
       x,
-    )
+    ) ||
+    (/团购|套餐|代金券|双人|单人|三人|四人|火锅|代\s*\d+|抵\s*\d+|券面|商品/.test(x) &&
+      /帮我|我要|需要|请|想要|打算|准备|立即|马上/.test(x))
   ) {
     return 'create_product'
   }
@@ -363,6 +367,7 @@ export function formatAssistantDisplayText(content: string): string {
 
 export {
   isAgentShortcutTaskLine,
+  isInformationalOnlyQuery,
   isPlanDesignQuery,
   isPlanOrNineScenarioQuery,
   shouldUseFullAgentSystemPrompt,
@@ -399,7 +404,7 @@ export function inferTaskTypesFromCombinedContext(
   explicitTaskType?: AiTaskType,
 ): AiTaskType[] {
   const types = new Set<AiTaskType>()
-  const planIntent = isPlanOrNineScenarioQuery(userText)
+  const planIntent = isPlanOrNineScenarioQuery(userText) && !isInformationalOnlyQuery(userText)
 
   if (assistantContent && planIntent) {
     for (const t of collectAgentActionTypes(assistantContent)) types.add(t)
@@ -448,6 +453,8 @@ export function resolveAutoTaskPreviewType(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): AiTaskType | undefined {
+  if (isInformationalOnlyQuery(userText)) return undefined
+  if (!isAgentShortcutTaskLine(userText) && !isExplicitExecutionIntent(userText)) return undefined
   if (explicitTaskType) return explicitTaskType
   const fromJson = assistantContent ? parseAgentActionType(assistantContent) : undefined
   if (fromJson === 'recruit_influencer' && !shouldAutoRecruitInfluencerPreview(userText, assistantContent)) {
@@ -1114,13 +1121,19 @@ export function shouldDeferTaskPreview(
   assistantContent?: string,
   explicitTaskType?: AiTaskType,
 ): boolean {
-  if (parseAgentActionType(assistantContent ?? '')) return false
-  if (isExplicitExecutionIntent(userText)) return true
-  if (!isPlanOrNineScenarioQuery(userText)) return false
+  if (isAgentShortcutTaskLine(userText)) return false
+  if (isExplicitExecutionIntent(userText)) return false
+  if (isInformationalOnlyQuery(userText)) return true
+  if (
+    filterScenarioTaskTypes(
+      inferTaskTypesFromCombinedContext(userText, assistantContent, explicitTaskType),
+    ).length > 0
+  ) {
+    return true
+  }
   if (hasCombinedProductAndRecruitPlan(userText, assistantContent, explicitTaskType)) return true
   if (assistantContent && parseAgentConfirmRequired(assistantContent)) return true
-  if (explicitTaskType && !isPlanDesignQuery(userText) && !isAgentShortcutTaskLine(userText)) return false
-  if (isPlanDesignQuery(userText)) return true
+  if (isPlanOrNineScenarioQuery(userText)) return true
   if (assistantContent && looksLikePlanDocument(assistantContent)) return true
   return false
 }

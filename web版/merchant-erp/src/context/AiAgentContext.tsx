@@ -42,6 +42,8 @@ import {
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
   planIncludesRecruitInfluencer,
+  isExplicitExecutionIntent,
+  isInformationalOnlyQuery,
   shouldDeferTaskPreview,
   shouldUseFullAgentSystemPrompt,
   summarizeAssistantContent,
@@ -1144,6 +1146,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const scheduleTaskPreview = useCallback(
     (trimmed: string, assistantContent: string | undefined, explicitTaskType: AiTaskType | undefined, pageLabel?: string) => {
+      if (isInformationalOnlyQuery(trimmed)) return
       if (shouldDeferTaskPreview(trimmed, assistantContent, explicitTaskType)) return
       if (shouldSkipAutoTaskPreview(executionStateRef.current, trimmed, assistantContent, explicitTaskType))
         return
@@ -1310,7 +1313,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           display = formatAssistantDisplayText(thinking.trim() || res.content.trim())
         }
 
-        if (deferPreview && isPlanOrNineScenarioQuery(trimmed)) {
+        if (deferPreview && !isInformationalOnlyQuery(trimmed)) {
           const taskTypes = inferDeferredTaskTypes(trimmed, res.content, taskType ?? inferTaskTypeFromText(trimmed))
           if (taskTypes.length && canAcceptDeferredPlan(executionStateRef.current)) {
             executionStateRef.current = storeDeferredPlan(
