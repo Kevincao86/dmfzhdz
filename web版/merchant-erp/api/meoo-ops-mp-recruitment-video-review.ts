@@ -9,6 +9,7 @@ import {
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { applyVideoReviewToSnapshot } from '../src/lib/mpRecruitmentVideoCore.js'
 import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
+import { notifyVideoPassSubscribe, notifyVideoRejectSubscribe } from '../src/lib/mpSubscribeMessageSend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -81,12 +82,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     purgeExpiredGroupQrsInSnapshot(data)
+    const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+    const beforeMp = idx >= 0 ? data.mpRecruitmentOrders![idx]! : null
     const result = applyVideoReviewToSnapshot(data, mpOrderId, applicantId, action, rejectReason)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
+    if (beforeMp) {
+      const mp = (data.mpRecruitmentOrders ?? []).find((o) => o.id === mpOrderId)
+      const applicant = mp?.applicants?.find((a) => String(a.id) === applicantId)
+      if (mp && applicant) {
+        const reviewedAt = new Date().toLocaleString('zh-CN', { hour12: false })
+        const notify =
+          action === 'pass'
+            ? notifyVideoPassSubscribe(data, mp, applicant, reviewedAt)
+            : notifyVideoRejectSubscribe(data, mp, applicant, rejectReason)
+        void notify.catch((e) => {
+          console.warn('[video_review] subscribe failed', e instanceof Error ? e.message : e)
+        })
+      }
+    }
     sendOpsJson(res, 200, { ok: true, action })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

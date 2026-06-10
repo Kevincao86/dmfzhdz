@@ -4,6 +4,7 @@ const api = require('../../utils/api.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
 const appFilters = require('../../utils/applicationFilters.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
 Page({
@@ -208,6 +209,9 @@ Page({
     const key = `${id}-${applicantId}`
     if (this.data.uploadingKey) return
     this.setData({ uploadingKey: key })
+    try {
+      await mpSubscribeMessages.requestForVideoReview()
+    } catch (_) {}
     videoUpload
       .chooseAndUploadVideo(id, applicantId)
       .then(() => this.load())

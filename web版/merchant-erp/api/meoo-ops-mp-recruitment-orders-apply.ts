@@ -10,6 +10,7 @@ import type { RegistryMpRecruitmentApplicant } from '../src/lib/opsRegistryTypes
 import { handleIceMpApply, isIceMpOrder } from '../src/lib/mpRecruitmentIceCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { upsertTalentLibraryFromApplicant } from '../src/lib/talentLibraryUpsert.js'
+import { notifyApplyResultSubscribe } from '../src/lib/mpSubscribeMessageSend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -107,6 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         merchantOrderNo,
       })
       await io.save(data)
+      void notifyApplyResultSubscribe(data, iceResult.mp, savedApplicant, savedApplicant.appliedAt).catch((e) => {
+        console.warn('[apply] subscribe notify failed', e instanceof Error ? e.message : e)
+      })
       sendOpsJson(res, 200, iceResult.body)
       return
     }
@@ -125,6 +129,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       merchantOrderNo,
     })
     await io.save(data)
+    const savedMp = data.mpRecruitmentOrders[idx]!
+    const savedApplicant = (savedMp.applicants ?? []).find((a) => a.id === row.id) ?? row
+    void notifyApplyResultSubscribe(data, savedMp, savedApplicant, row.appliedAt).catch((e) => {
+      console.warn('[apply] subscribe notify failed', e instanceof Error ? e.message : e)
+    })
     sendOpsJson(res, 200, { ok: true, taskStatus: 'applied' })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

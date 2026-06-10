@@ -12,6 +12,7 @@ const applyTemplates = require('../../utils/applyFormTemplates.js')
 const applyRuntime = require('../../utils/applyTemplateRuntime.js')
 const platformForm = require('../../utils/platformForm.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
+const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 
 const {
   emptyApplyFields,
@@ -247,6 +248,7 @@ Page({
 
     this.setData({ submitting: true })
     try {
+      await mpSubscribeMessages.requestForApply()
       const applicantId = `app-${Date.now()}`
       let applicant = applyRuntime.buildApplicantFromRows(this.data.applyRowsRaw, this.data, {
         platform: this.data.platform,
@@ -258,6 +260,10 @@ Page({
       })
       const memberForApply = memberStore.readMember()
       applicant = enrichApplicantFromMember(applicant, memberForApply, this.data.platform)
+      const acct = auth.readAccount()
+      if (acct && acct.openid) {
+        applicant.wxOpenId = String(acct.openid).trim()
+      }
       if (!String(applicant.platformNickname || applicant.name || '').trim()) {
         wx.showToast({ title: '请填写抖音昵称或完善我的信息', icon: 'none' })
         return
