@@ -9,7 +9,7 @@ const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
 const { attachLoginIdentityIcons, loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
-const mpShare = require('../../utils/mpShare.js')
+const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 
 const IDENTITY_OPTIONS = attachLoginIdentityIcons(
   identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
@@ -102,6 +102,7 @@ Page({
     wxAuthStep: 'avatar',
     pendingWorkId: '',
     redirect: '',
+    legalAgreed: false,
   },
 
   onLoad(options) {
@@ -117,6 +118,7 @@ Page({
       loginIdentity: '',
       loginIdentityLabel: '',
       redirect,
+      legalAgreed: loginLegalAgree.readAgreed(),
       wxNickName: wxProfileDisplay.pickWxNick(cache && cache.wxNickName, local && local.wxNickName),
       wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
     })
@@ -238,9 +240,21 @@ Page({
     void this.finishWxAuthAndLogin()
   },
 
+  onToggleLegalAgree() {
+    const next = !this.data.legalAgreed
+    loginLegalAgree.writeAgreed(next)
+    this.setData({ legalAgreed: next, err: '' })
+  },
+
+  onOpenLegal(e) {
+    const doc = e.currentTarget.dataset.doc === 'aup' ? 'aup' : 'privacy'
+    wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
+  },
+
   onWxLogin() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
+    if (!loginLegalAgree.ensureAgreedOrPrompt()) return
     this.setData({
       err: '',
       showWxAuthSheet: true,

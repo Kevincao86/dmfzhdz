@@ -21,7 +21,8 @@
     "pages/mine-pr-orders/mine-pr-orders",
     "pages/mine-pr-order-applicants/mine-pr-order-applicants",
     "pages/mine-pr-order-video-review/mine-pr-order-video-review",
-    "pages/chat/chat"
+    "pages/chat/chat",
+    "pages/legal/legal"
   ],
   "window": {
     "navigationBarTitleText": "灵祺星选平台",

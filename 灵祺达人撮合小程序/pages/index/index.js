@@ -9,15 +9,7 @@ const hallIdentity = require('../../utils/hallIdentityBuckets.js')
 const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
-
-function matchSearch(row, keyword) {
-  if (!keyword) return true
-  const k = keyword.toLowerCase()
-  const blob = [row.title, row.merchantName, row.storeName, row.region, row.category]
-    .join(' ')
-    .toLowerCase()
-  return blob.includes(k)
-}
+const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
 function applyNavLayout(page) {
@@ -136,7 +128,7 @@ Page({
     const priceSel = this.data.priceSelected
     const statusF = this.data.filterStatus
     rows = rows.filter((r) => {
-      if (!matchSearch(r, kw)) return false
+      if (!listKeywordSearch.matchListKeyword(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
       if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false

@@ -98,6 +98,26 @@ export function iceSlotsPassedCount(mp: RegistryMpRecruitmentOrder): number {
     .length
 }
 
+function isIceRecruitFull(mp: RegistryMpRecruitmentOrder): boolean {
+  const cap = parseIceRecruitCapacity(mp)
+  return cap > 0 && countActiveIceApplicants(mp) >= cap
+}
+
+/** 云剪满额：大厅展示已停止，PR 发单仍履约中 */
+export function maybeCloseIceWhenFull(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
+  if (!isIceRecruitFull(mp)) return mp
+  const raw = String(mp.status || 'open')
+  if (raw === 'done' || raw === 'deleted' || raw === 'pending_settlement') return mp
+  if (raw === 'open' || raw === 'collecting') {
+    return {
+      ...mp,
+      status: 'closed',
+      updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+    }
+  }
+  return mp
+}
+
 export function isDouyinVideoUrl(raw: string): boolean {
   const t = raw.trim()
   if (!/^https?:\/\//i.test(t)) return false
@@ -154,9 +174,10 @@ export function maybeAdvanceIceMpToSettlement(
     return app?.aiVerifyStatus === 'passed' || app?.videoStatus === 'passed'
   })
   if (allAssigned && allPassed && mp.status !== 'done' && mp.status !== 'closed') {
+    const verifyMode = getIceVerifyMode(mp)
     return {
       ...mp,
-      status: 'pending_settlement',
+      status: verifyMode === 'ai' ? 'done' : 'pending_settlement',
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     }
   }
@@ -443,13 +464,14 @@ export function handleIceMpApply(
   const claim = claimIceMpRecruitment(mp, row)
   if (!claim.ok) return claim
   const applicants = upsertApplicant(mp.applicants, claim.applicant)
-  const next: RegistryMpRecruitmentOrder = {
+  let next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,
     iceVideoSlots: ensureIceVideoSlots(mp),
     status: mp.status === 'open' ? 'collecting' : mp.status,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
+  next = maybeCloseIceWhenFull(next)
   return {
     ok: true,
     mp: next,
@@ -472,12 +494,13 @@ export function handleIceMpConfirm(
   const result = confirmIceMpReceipt(mp, applicantId)
   if (!result.ok) return result
   const applicants = upsertApplicant(mp.applicants, result.applicant)
-  const next: RegistryMpRecruitmentOrder = {
+  let next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,
     iceVideoSlots: result.iceVideoSlots,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
+  next = maybeCloseIceWhenFull(next)
   return {
     ok: true,
     mp: next,

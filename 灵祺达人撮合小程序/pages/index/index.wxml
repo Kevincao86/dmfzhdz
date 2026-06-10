@@ -32,7 +32,7 @@
         <text class="search-icon">⌕</text>
         <input
           class="search-input"
-          placeholder="搜索招募、门店、城市"
+          placeholder="搜索招募、门店、城市、单号"
           placeholder-class="search-ph"
           value="{{searchKeyword}}"
           bindinput="onSearchInput"

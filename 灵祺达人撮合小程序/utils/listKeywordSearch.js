@@ -7,6 +7,7 @@ function matchListKeyword(row, keyword, extraFields) {
   if (!k) return true
   const r = row || {}
   const parts = [
+    r.id,
     r.title,
     r.mpOrderId,
     r.merchantName,

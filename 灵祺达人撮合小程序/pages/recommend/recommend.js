@@ -219,11 +219,10 @@ function matchTalentSearch(row, keyword) {
   return blob.includes(k)
 }
 
+const listKeywordSearch = require('../../utils/listKeywordSearch.js')
+
 function matchOrderSearch(row, keyword) {
-  if (!keyword) return true
-  const k = keyword.toLowerCase()
-  const blob = [row.title, row.merchantName, row.region, row.platform, row.category].join(' ').toLowerCase()
-  return blob.includes(k)
+  return listKeywordSearch.matchListKeyword(row, keyword)
 }
 
 function matchOrderSegment(row, segment, talentCity) {

@@ -71,7 +71,17 @@
             <text class="login-btn-icon">◎</text>
             <text>微信一键登录</text>
           </button>
-          <text class="login-hint">首次登录将绑定本微信，生成唯一灵祺 ID</text>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}">✓</text>
+            </view>
+            <text class="login-legal-text">
+              我已阅读并同意
+              <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+              和
+              <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+            </text>
+          </view>
         </block>
 
         <block wx:elif="{{tab==='pwd'}}">
