@@ -12,6 +12,11 @@ import {
   type MpRecruitmentPatchBody,
 } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
 import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
+import {
+  notifyAuditPassSubscribe,
+  selectedApplicantIdSet,
+} from '../src/lib/mpSubscribeMessageSend.js'
+import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
 
 export const config = { maxDuration: 60 }
 
@@ -71,12 +76,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     purgeExpiredGroupQrsInSnapshot(data)
+    const patchId = String(body.id || body.order?.id || '').trim()
+    const beforeMp = patchId
+      ? (data.mpRecruitmentOrders ?? []).find((o) => o.id === patchId) ?? null
+      : null
+    const beforeSelected = beforeMp ? selectedApplicantIdSet(beforeMp) : new Set<string>()
     const result = patchMpRecruitmentOrderInSnapshot(data, body)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
+    if (beforeMp && patchId) {
+      const afterMp = (data.mpRecruitmentOrders ?? []).find((o) => o.id === patchId) as
+        | RegistryMpRecruitmentOrder
+        | undefined
+      if (afterMp) {
+        const afterSelected = selectedApplicantIdSet(afterMp)
+        const newlySelected = [...afterSelected].filter((id) => !beforeSelected.has(id))
+        const auditedAt = new Date().toLocaleString('zh-CN', { hour12: false })
+        for (const aid of newlySelected) {
+          const applicant = (afterMp.applicants ?? []).find((a) => String(a.id) === aid)
+          if (!applicant) continue
+          void notifyAuditPassSubscribe(data, afterMp, applicant, auditedAt).catch((e) => {
+            console.warn('[patch] audit subscribe failed', e instanceof Error ? e.message : e)
+          })
+        }
+      }
+    }
     sendOpsJson(res, 200, { ok: true })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
