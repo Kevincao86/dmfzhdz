@@ -144,7 +144,7 @@ Page({
         if (!hallFilters.matchPlatform(r.platform, pf)) return false
         if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
         if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
-        if (!listFilters.matchHallStatus(r, statusF)) return false
+        if (!listFilters.matchHallTabCountStatus(r, statusF)) return false
         return true
       }).length
     const tabCounts = {

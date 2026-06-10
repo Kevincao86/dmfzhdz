@@ -19,6 +19,15 @@ function matchHallStatusFilter(label, filterLabel) {
   return label === filterLabel
 }
 
+/** Tab 角标：默认筛选项下计入「已停止」（大厅仍展示的单） */
+function matchHallTabCountStatusFilter(label, filterLabel) {
+  if (!filterLabel || filterLabel === '全部') return true
+  if (filterLabel === HALL_DEFAULT_STATUS_FILTER) {
+    return label === '招募中' || label === '收集中' || label === '已停止'
+  }
+  return matchHallStatusFilter(label, filterLabel)
+}
+
 function resolveEffectiveMpStatus(rawStatus, deadlineMs, nowMs) {
   const now = nowMs != null && Number.isFinite(nowMs) ? nowMs : Date.now()
   let raw = String(rawStatus || 'open').trim() || 'open'
@@ -45,6 +54,7 @@ module.exports = {
   HALL_STATUS_FILTERS,
   HALL_DEFAULT_STATUS_FILTER,
   matchHallStatusFilter,
+  matchHallTabCountStatusFilter,
   resolveEffectiveMpStatus,
   statusLabel,
   isMpOrderRecruiting,

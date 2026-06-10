@@ -26,6 +26,11 @@ function matchHallStatus(row, filterLabel) {
   return mpOrderStatus.matchHallStatusFilter(label, filterLabel)
 }
 
+function matchHallTabCountStatus(row, filterLabel) {
+  const label = row && row.statusLabel ? row.statusLabel : mpOrderStatus.statusLabel(row && row.status)
+  return mpOrderStatus.matchHallTabCountStatusFilter(label, filterLabel)
+}
+
 function parseTs(text) {
   if (!text) return 0
   const t = Date.parse(String(text).trim().replace(/-/g, '/'))
@@ -281,6 +286,7 @@ module.exports = {
   MP_STATUS_LABEL,
   isMpOrderRecruiting,
   matchHallStatus,
+  matchHallTabCountStatus,
   sortHallRecruitmentRows,
   resolvePriceAmount,
   resolvePublishedMs,
