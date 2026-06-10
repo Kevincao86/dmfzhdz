@@ -254,7 +254,15 @@ Page({
   onWxLogin() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
-    if (!loginLegalAgree.ensureAgreedOrPrompt()) return
+    if (!this.data.legalAgreed && !loginLegalAgree.readAgreed()) {
+      loginLegalAgree.ensureAgreedOrPrompt(() => {
+        this.setData({ legalAgreed: true, err: '' })
+      })
+      return
+    }
+    if (this.data.legalAgreed && !loginLegalAgree.readAgreed()) {
+      loginLegalAgree.writeAgreed(true)
+    }
     this.setData({
       err: '',
       showWxAuthSheet: true,

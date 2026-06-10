@@ -75,12 +75,14 @@
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}">✓</text>
             </view>
-            <text class="login-legal-text">
-              我已阅读并同意
-              <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
-              和
-              <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
-            </text>
+            <view class="login-legal-text-wrap">
+              <text class="login-legal-line">
+                我已阅读并同意
+                <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+                和
+                <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+              </text>
+            </view>
           </view>
         </block>
 
