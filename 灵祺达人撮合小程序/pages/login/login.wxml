@@ -106,6 +106,15 @@
             />
           </view>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{!loginIdentity || loading}}" bindtap="onPwdLogin">登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
         </block>
 
         <block wx:else>
@@ -146,6 +155,15 @@
             />
           </view>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{!loginIdentity || loading}}" bindtap="onRegister">注册并登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
         </block>
 
         <text class="login-err" wx:if="{{err}}">{{err}}</text>
@@ -183,10 +201,10 @@
   >
     <view class="login-legal-modal" catchtap="noopSheetTap">
       <text class="login-legal-modal-title">请先阅读并同意协议</text>
-      <text class="login-legal-modal-content">使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。</text>
+      <text class="login-legal-modal-content">{{legalPromptText}}</text>
       <view class="login-legal-modal-actions">
         <button class="login-legal-modal-btn login-legal-modal-btn--decline" bindtap="onLegalDecline">不同意</button>
-        <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onLegalAgreeLogin">同意并登录</button>
+        <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onLegalAgreeLogin">{{legalPromptAgreeLabel}}</button>
       </view>
     </view>
   </view>

@@ -15,6 +15,33 @@ const IDENTITY_OPTIONS = attachLoginIdentityIcons(
   identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
 )
 
+const LEGAL_PROMPT_COPY = {
+  wx: {
+    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  pwd: {
+    text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  reg: {
+    text: '注册前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并注册',
+  },
+}
+
+function openLegalPrompt(page, workId, action) {
+  const copy = LEGAL_PROMPT_COPY[action] || LEGAL_PROMPT_COPY.wx
+  page.setData({
+    showLegalPrompt: true,
+    legalPromptWorkId: workId,
+    legalPromptAction: action,
+    legalPromptText: copy.text,
+    legalPromptAgreeLabel: copy.agree,
+    err: '',
+  })
+}
+
 function requireLoginIdentity(page) {
   const id = page.data.loginIdentity
   if (!identityTypes.isWorkIdentity(id)) {
@@ -143,6 +170,9 @@ Page({
     legalAgreed: false,
     showLegalPrompt: false,
     legalPromptWorkId: '',
+    legalPromptAction: 'wx',
+    legalPromptText: LEGAL_PROMPT_COPY.wx.text,
+    legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
   },
 
   onLoad(options) {
@@ -298,18 +328,19 @@ Page({
     const workId = requireLoginIdentity(this)
     if (!workId) return
     if (!this.data.legalAgreed) {
-      this.setData({ showLegalPrompt: true, legalPromptWorkId: workId, err: '' })
+      openLegalPrompt(this, workId, 'wx')
       return
     }
     this.startWxLoginFlow(workId)
   },
 
   onLegalDecline() {
-    this.setData({ showLegalPrompt: false, legalPromptWorkId: '' })
+    this.setData({ showLegalPrompt: false, legalPromptWorkId: '', legalPromptAction: 'wx' })
   },
 
   onLegalAgreeLogin() {
     const workId = this.data.legalPromptWorkId
+    const action = this.data.legalPromptAction || 'wx'
     if (!workId) {
       this.setData({ showLegalPrompt: false })
       return
@@ -319,14 +350,23 @@ Page({
       legalAgreed: true,
       showLegalPrompt: false,
       legalPromptWorkId: '',
+      legalPromptAction: 'wx',
       err: '',
     })
+    if (action === 'pwd') {
+      void this.doPwdLogin(workId)
+      return
+    }
+    if (action === 'reg') {
+      void this.doRegister(workId)
+      return
+    }
     this.startWxLoginFlow(workId)
   },
 
   startWxLoginFlow(workId) {
     if (!this.data.legalAgreed) {
-      this.setData({ showLegalPrompt: true, legalPromptWorkId: workId, err: '' })
+      openLegalPrompt(this, workId, 'wx')
       return
     }
     if (!loginLegalAgree.readAgreed()) {
@@ -419,6 +459,14 @@ Page({
   async onPwdLogin() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'pwd')
+      return
+    }
+    await this.doPwdLogin(workId)
+  },
+
+  async doPwdLogin(workId) {
     this.setData({ loading: true, err: '' })
     try {
       const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
@@ -461,6 +509,14 @@ Page({
   async onRegister() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'reg')
+      return
+    }
+    await this.doRegister(workId)
+  },
+
+  async doRegister(workId) {
     const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
     if (phoneErr) {
       this.setData({ err: phoneErr })
