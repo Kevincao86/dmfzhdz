@@ -78,6 +78,35 @@ export function talentMatchKeys(member: Record<string, unknown> | null): Set<str
   return keys
 }
 
+function rowMatchesMemberIdentity(
+  row: Record<string, unknown>,
+  keys: Set<string>,
+  member: Record<string, unknown> | null,
+): boolean {
+  if (!row || !member) return false
+  const strictIds = strictTalentIds(member)
+  const mid = String(row.talentMemberId || '').trim()
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
+  if (mid && keys.has(mid)) return true
+
+  const contact = String(row.contact || '').trim()
+  if (contact) {
+    if (keys.has(contact) || keys.has(contactKey(contact))) return true
+    if (String(member.contact || '').trim() === contact) return true
+  }
+
+  const plat = String(row.platform || '抖音')
+  const acct = String(row.platformAccount || '').trim().toLowerCase()
+  if (acct) {
+    if (keys.has(accountKey(plat, acct))) return true
+    if (applicantMatchesLocalMember({ platform: plat, platformAccount: acct, contact: row.contact }, member)) {
+      return true
+    }
+  }
+  return false
+}
+
 export function inboxRowMatchesTalent(
   row: Record<string, unknown>,
   keys: Set<string>,
@@ -90,32 +119,17 @@ export function inboxRowMatchesTalent(
   const isSelection =
     row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
 
+  if (isSelection) {
+    return rowMatchesMemberIdentity(row, keys, member)
+  }
+
   if (mid && strictIds.has(mid)) return true
   if (mid && looksLikeRegistryMemberId(mid)) return false
 
-  if (applicantId) {
-    if (!userOwnsApplicantId(applicantId)) return false
-    if (isSelection) return true
-  }
+  if (rowMatchesMemberIdentity(row, keys, member)) return true
+  if (applicantId && userOwnsApplicantId(applicantId)) return true
+  if (mid && keys.has(mid) && (!applicantId || userOwnsApplicantId(applicantId))) return true
 
-  if (mid && keys.has(mid)) {
-    if (!applicantId || userOwnsApplicantId(applicantId)) return true
-  }
-
-  const contact = String(row.contact || '').trim()
-  if (contact && applicantId && userOwnsApplicantId(applicantId)) {
-    if (keys.has(contact) || keys.has(contactKey(contact))) return true
-    if (String(member.contact || '').trim() === contact) return true
-  }
-
-  const plat = String(row.platform || '抖音')
-  const acct = String(row.platformAccount || '').trim().toLowerCase()
-  if (acct && applicantId && userOwnsApplicantId(applicantId)) {
-    if (keys.has(accountKey(plat, acct))) return true
-    if (applicantMatchesLocalMember({ platform: plat, platformAccount: acct }, member)) return true
-  }
-
-  if (isSelection) return false
   return false
 }
 
@@ -138,9 +152,35 @@ function registryHasSelectionForApplicant(
 
 export function buildSelectionNoticeRows(reg: MpRegistry, member: Record<string, unknown> | null) {
   if (!reg || !member) return [] as NotificationLike[]
-  const apps = readApplications()
   const rows: NotificationLike[] = []
+  const seen = new Set<string>()
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+
+  function pushRow(mp: Record<string, unknown>, applicantId: string) {
+    const mpOrderId = String(mp.id || '').trim()
+    const aid = String(applicantId || '').trim()
+    if (!mpOrderId || !aid || seen.has(`${mpOrderId}:${aid}`)) return
+    if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
+    seen.add(`${mpOrderId}:${aid}`)
+    const qr = groupQrFromMp(mp)
+    rows.push({
+      id: `sel-reg-${mpOrderId}-${aid}`,
+      title: '恭喜入选招募',
+      body: `您已被选入「${mp.title || mpOrderId}」。请扫码加入项目群，二维码见下图。`,
+      category: 'business',
+      categoryLabel: '业务',
+      createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      read: false,
+      fromRegistry: true,
+      noticeType: 'selection',
+      mpOrderId,
+      applicantId: aid,
+      imageUrl: qr || '',
+      pinned: true,
+    })
+  }
+
+  const apps = readApplications()
   for (let i = 0; i < apps.length; i++) {
     const app = apps[i]
     if (!app?.mpOrderId || !app.applicantId) continue
@@ -154,24 +194,22 @@ export function buildSelectionNoticeRows(reg: MpRegistry, member: Record<string,
       (a) => a && typeof a === 'object' && (a as Record<string, unknown>).id === app.applicantId,
     ) as Record<string, unknown> | undefined
     if (applicant && !applicantMatchesLocalMember(applicant, member)) continue
-    if (registryHasSelectionForApplicant(reg, member, app.mpOrderId, String(app.applicantId))) continue
-    const qr = groupQrFromMp(mp)
-    rows.push({
-      id: `sel-reg-${app.mpOrderId}-${app.applicantId}`,
-      title: '恭喜入选招募',
-      body: `您已被选入「${mp.title || app.title || app.mpOrderId}」。请扫码加入项目群，二维码见下图。`,
-      category: 'business',
-      categoryLabel: '业务',
-      createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      read: false,
-      fromRegistry: true,
-      noticeType: 'selection',
-      mpOrderId: app.mpOrderId,
-      applicantId: app.applicantId,
-      imageUrl: qr || '',
-      pinned: true,
-    })
+    pushRow(mp, String(app.applicantId))
   }
+
+  for (const mp of mpList) {
+    const m = mp as Record<string, unknown>
+    if (!m?.id) continue
+    const selected = selectedIdsFromMp(m)
+    for (const sid of selected) {
+      const applicant = ((m.applicants as unknown[]) || []).find(
+        (a) => a && typeof a === 'object' && String((a as Record<string, unknown>).id) === String(sid),
+      ) as Record<string, unknown> | undefined
+      if (!applicant || !applicantMatchesLocalMember(applicant, member)) continue
+      pushRow(m, String(sid))
+    }
+  }
+
   return rows
 }
 

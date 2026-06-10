@@ -38,7 +38,10 @@ function resolveIncludeMpOrderIds(opts) {
 function registryRequestKey(opts) {
   const ids = resolveIncludeMpOrderIds(opts)
   const prOwned = opts && opts.includePrOwned ? 'pr' : ''
-  return ids.length ? `inc:${ids.slice().sort().join(',')}` : prOwned ? 'pr-owned' : 'hall'
+  const ctx = opts && opts.includeLocalContext ? 'ctx' : ''
+  if (ids.length) return `inc:${ids.slice().sort().join(',')}${ctx ? ':ctx' : ''}`
+  if (prOwned) return 'pr-owned'
+  return ctx ? 'hall-ctx' : 'hall'
 }
 
 /** 仅合并同一时刻的并行请求，不跳过轻量拉取 */
@@ -73,7 +76,7 @@ async function fetchRegistryOnce(opts) {
   const includeMpOrderIds = resolveIncludeMpOrderIds(opts)
   const includePrOwned = !!(opts && opts.includePrOwned)
   let lastErr
-  if (!includePrOwned && !includeMpOrderIds.length) {
+  if (!includePrOwned && !includeMpOrderIds.length && !(opts && opts.includeLocalContext)) {
     try {
       const raw = await api.get(HALL_GET)
       return normalizeHallPayload(raw)

@@ -9,6 +9,8 @@ const contactGate = require('../../utils/talentContactPrGate.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
+const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
+const talentMember = require('../../utils/talentMember.js')
 
 Page({
   data: {
@@ -94,7 +96,8 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
+      appRegistrySync.reconcileApplicationsFromRegistry(reg, talentMember.readMember())
       const mp = ops.findMpOrderInRegistry(reg, id)
       if (!mp) {
         this.setData({ loading: false, err: '招募单不存在或已结束' })

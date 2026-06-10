@@ -6,6 +6,7 @@ const userProfile = require('../../utils/userProfile.js')
 const inboxNoticeState = require('../../utils/inboxNoticeState.js')
 const inboxCatalog = require('../../utils/inboxNoticeCatalog.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
+const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 
 const TABS = [
   { id: 'all', label: '全部' },
@@ -77,7 +78,7 @@ Page({
       try {
         const member = talentMember.readMember()
         if (member && (member.id || member.contact)) {
-          const reg = await ops.fetchRegistry()
+          const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
           rows = enrichAll(messagesStore.mergeRegistryInboxForTalent(reg, member))
         }
       } catch (_) {

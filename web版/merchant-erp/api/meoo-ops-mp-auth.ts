@@ -27,6 +27,7 @@ import {
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
 import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
+import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
 import { generateRecruitmentApplyShortLink } from '../src/lib/mpRecruitmentApplyShortLink.js'
 
@@ -364,7 +365,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           /* profile optional */
         }
       }
-      const payload = await loadMpHallRegistryPayload({ includeMpOrderIds, prOwnerKeys })
+      let talentMember = null
+      let talentAccount:
+        | { lingqi_talent_id?: string | null; registry_member_id?: string | null }
+        | undefined
+      const hallToken = sessionToken(req, body)
+      if (hallToken) {
+        const hallSess = await resolveSession(rest, hallToken)
+        if (hallSess) {
+          try {
+            const hallAccount = hallSess.account
+            const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, hallAccount)
+            talentMember =
+              profile.talentMember && typeof profile.talentMember === 'object'
+                ? (profile.talentMember as RegistryMpTalentMember)
+                : null
+            talentAccount = {
+              lingqi_talent_id: hallAccount.lingqi_talent_id,
+              registry_member_id: hallAccount.registry_member_id,
+            }
+          } catch {
+            /* inbox slice optional */
+          }
+        }
+      }
+      const payload = await loadMpHallRegistryPayload({
+        includeMpOrderIds,
+        prOwnerKeys,
+        talentMember,
+        talentAccount,
+      })
       sendJson(res, 200, { ok: true, ...payload })
       return
     }

@@ -39,6 +39,38 @@ function userOwnsApplicantId(applicantId) {
   return applicationsStore.readApplications().some((a) => a && String(a.applicantId || '') === aid)
 }
 
+function rowMatchesMemberIdentity(row, keys, member) {
+  if (!row || !member) return false
+  const strictIds = strictTalentIds(member)
+  const mid = String(row.talentMemberId || '').trim()
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
+  if (mid && keys.has(mid)) return true
+
+  const contact = String(row.contact || '').trim()
+  if (contact) {
+    if (keys.has(contact)) return true
+    const ck = contactKey(contact)
+    if (ck && keys.has(ck)) return true
+    if (String(member.contact || '').trim() === contact) return true
+  }
+
+  const plat = row.platform || '抖音'
+  const acct = String(row.platformAccount || '').trim().toLowerCase()
+  if (acct) {
+    if (keys.has(accountKey(plat, acct))) return true
+    if (
+      selection.applicantMatchesLocalMember(
+        { platform: plat, platformAccount: acct, contact: row.contact },
+        member,
+      )
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 /** PR 写入站内信时用的 talentMemberId（无会员 id 时用手机号/账号兜底） */
 function resolveTalentInboxTarget(applicant, reg) {
   const a = applicant || {}
@@ -83,34 +115,25 @@ function inboxRowMatchesTalent(row, keys, member) {
   const applicantId = String(row.applicantId || '').trim()
   const isSelection = row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
 
+  if (isSelection) {
+    return rowMatchesMemberIdentity(row, keys, member)
+  }
+
   if (mid && strictIds.has(mid)) return true
   if (mid && looksLikeRegistryMemberId(mid)) return false
 
-  if (applicantId) {
-    if (!userOwnsApplicantId(applicantId)) return false
-    if (isSelection) return true
+  if (rowMatchesMemberIdentity(row, keys, member)) {
+    if (!applicantId) return true
+    if (userOwnsApplicantId(applicantId)) return true
+    return true
   }
+
+  if (applicantId && userOwnsApplicantId(applicantId)) return true
 
   if (mid && keys.has(mid)) {
     if (!applicantId || userOwnsApplicantId(applicantId)) return true
   }
 
-  const contact = String(row.contact || '').trim()
-  if (contact && applicantId && userOwnsApplicantId(applicantId)) {
-    if (keys.has(contact)) return true
-    const ck = contactKey(contact)
-    if (ck && keys.has(ck)) return true
-    if (String(member.contact || '').trim() === contact) return true
-  }
-
-  const plat = row.platform || '抖音'
-  const acct = String(row.platformAccount || '').trim().toLowerCase()
-  if (acct && applicantId && userOwnsApplicantId(applicantId)) {
-    if (keys.has(accountKey(plat, acct))) return true
-    if (selection.applicantMatchesLocalMember({ platform: plat, platformAccount: acct }, member)) return true
-  }
-
-  if (isSelection) return false
   return false
 }
 
@@ -147,9 +170,38 @@ function markSelectionNoticeSent(key) {
 /** 注册表已选名单 → 本地通知（PR 通知接口失败或 talentMemberId 不一致时仍能提示） */
 function buildSelectionNoticeRows(reg, member) {
   if (!reg || !member) return []
-  const apps = applicationsStore.readApplications()
   const rows = []
+  const seen = new Set()
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+
+  function pushSelectionRow(mp, applicantId) {
+    const mpOrderId = String(mp.id || '').trim()
+    const aid = String(applicantId || '').trim()
+    if (!mpOrderId || !aid) return
+    const dedupe = `sel-${mpOrderId}-${aid}`
+    if (seen.has(dedupe)) return
+    if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
+    if (inboxNoticeState.getHandledAction({ dedupeKey: dedupe })) return
+    seen.add(dedupe)
+    const qr = mpGroupQr.groupQrFromMp(mp)
+    rows.push({
+      id: `sel-local-${mpOrderId}-${aid}`,
+      title: '恭喜入选招募',
+      body: `您已被选入「${mp.title || mpOrderId}」。请扫码加入项目群，二维码见下图。`,
+      category: 'business',
+      categoryLabel: '业务',
+      createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      read: false,
+      fromSelection: true,
+      noticeType: 'selection',
+      mpOrderId,
+      applicantId: aid,
+      dedupeKey: dedupe,
+      imageUrl: qr || '',
+    })
+  }
+
+  const apps = applicationsStore.readApplications()
   for (let i = 0; i < apps.length; i++) {
     const app = apps[i]
     if (!app || !app.mpOrderId || !app.applicantId) continue
@@ -159,26 +211,22 @@ function buildSelectionNoticeRows(reg, member) {
     if (!selected.includes(String(app.applicantId))) continue
     const applicant = (mp.applicants || []).find((a) => a && a.id === app.applicantId)
     if (applicant && !selection.applicantMatchesLocalMember(applicant, member)) continue
-    if (registryHasSelectionForApplicant(reg, member, app.mpOrderId, String(app.applicantId))) continue
-    const dedupe = `sel-${app.mpOrderId}-${app.applicantId}`
-    if (inboxNoticeState.getHandledAction({ dedupeKey: dedupe })) continue
-    const qr = mpGroupQr.groupQrFromMp(mp)
-    rows.push({
-      id: `sel-local-${app.mpOrderId}-${app.applicantId}`,
-      title: '恭喜入选招募',
-      body: `您已被选入「${mp.title || app.title || app.mpOrderId}」。请扫码加入项目群，二维码见下图。`,
-      category: 'business',
-      categoryLabel: '业务',
-      createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      read: false,
-      fromSelection: true,
-      noticeType: 'selection',
-      mpOrderId: app.mpOrderId,
-      applicantId: app.applicantId,
-      dedupeKey: dedupe,
-      imageUrl: qr || '',
-    })
+    pushSelectionRow(mp, app.applicantId)
   }
+
+  for (let i = 0; i < mpList.length; i++) {
+    const mp = mpList[i]
+    if (!mp || !mp.id) continue
+    const selected = selection.selectedIdsFromMp(mp)
+    for (let j = 0; j < selected.length; j++) {
+      const aid = String(selected[j] || '').trim()
+      if (!aid) continue
+      const applicant = (mp.applicants || []).find((a) => a && String(a.id) === aid)
+      if (!applicant || !selection.applicantMatchesLocalMember(applicant, member)) continue
+      pushSelectionRow(mp, aid)
+    }
+  }
+
   return rows
 }
 

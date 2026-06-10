@@ -11,6 +11,11 @@ import {
   mergeMpRecruitmentOrdersForHallContext,
   type PrOwnerKeys,
 } from './registryTenantIsolation.js'
+import {
+  filterTalentInboxForHall,
+  talentInboxMatchKeysFromProfile,
+} from './mpTalentInboxHallFilter.js'
+import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 
 const HALL_FETCH_MS = 20_000
 
@@ -58,6 +63,8 @@ function buildHallPayload(
   partial: Partial<RegistryFile>,
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
+  talentMember?: RegistryMpTalentMember | null,
+  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null },
 ): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
   const deduped = syncDedupeApplicantsInSnapshot(file)
@@ -70,12 +77,18 @@ function buildHallPayload(
     includeMpOrderIds,
     prOwnerKeys,
   )
+  const inboxKeys =
+    talentAccount && talentMember
+      ? talentInboxMatchKeysFromProfile(talentAccount, talentMember)
+      : new Set<string>()
+  const mpTalentInbox = filterTalentInboxForHall(file.mpTalentInbox, inboxKeys)
   return {
     needPersist: expired.syncedIds.length > 0 || deduped.syncedOrderIds.length > 0,
     partial: file,
     payload: {
       ok: true,
       mpRecruitmentOrders,
+      ...(mpTalentInbox.length ? { mpTalentInbox } : {}),
     },
   }
 }
@@ -114,19 +127,23 @@ async function persistRegistryIfNeeded(
 export async function loadMpHallRegistryPayload(opts?: {
   includeMpOrderIds?: string[]
   prOwnerKeys?: PrOwnerKeys
+  talentMember?: RegistryMpTalentMember | null
+  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null }
 }): Promise<Record<string, unknown>> {
   const includeMpOrderIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
     .filter(Boolean)
     .slice(0, 120)
   const prOwnerKeys = opts?.prOwnerKeys
+  const talentMember = opts?.talentMember
+  const talentAccount = opts?.talentAccount
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const attempts: string[] = []
 
   if (missingParts.length === 0) {
     try {
       const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
-      const built = buildHallPayload(partial, includeMpOrderIds, prOwnerKeys)
+      const built = buildHallPayload(partial, includeMpOrderIds, prOwnerKeys, talentMember, talentAccount)
       if (built.needPersist) {
         void persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial).catch((e) => {
           const msg = e instanceof Error ? e.message : String(e)
