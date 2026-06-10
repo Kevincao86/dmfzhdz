@@ -37,7 +37,7 @@
   >
     <view class="vr-card-head">
       <view class="vr-card-info">
-        <text class="title-lg">{{item.displayName}}</text>
+        <text class="title-lg">{{item.displayName}}<text wx:if="{{item.talentMeta}}" class="vr-talent-meta"> {{item.talentMeta}}</text></text>
         <text class="hint vr-meta">
           提交于 {{item.videoSubmittedAt || '—'}} · {{item.submitCountLabel}} · {{item.videoStatusLabel}}
         </text>

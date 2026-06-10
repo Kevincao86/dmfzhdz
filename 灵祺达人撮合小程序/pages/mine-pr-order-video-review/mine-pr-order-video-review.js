@@ -6,12 +6,17 @@ function submitCountLabel(count) {
   return videoUpload.submitCountLabel(count)
 }
 
-function mapCards(applicants) {
+const appDisplay = require('../../utils/applicationDisplay.js')
+
+function mapCards(applicants, reg) {
   return (applicants || [])
     .filter((a) => a && String(a.videoUrl || a.douyinPublishUrl || '').trim())
-    .map((a) => ({
+    .map((a, i) => {
+      const enriched = appDisplay.enrichApplicantRow(a, i, reg || {})
+      return {
       id: String(a.id || ''),
-      displayName: String(a.platformNickname || a.name || '达人'),
+      displayName: enriched.displayName,
+      talentMeta: appDisplay.buildApplicantTalentMeta(enriched),
       videoUrl: String(a.videoUrl || a.douyinPublishUrl || ''),
       videoStatus: String(a.videoStatus || 'pending'),
       videoStatusLabel: videoUpload.videoStatusLabel(a.videoStatus || 'pending') || '待审核',
@@ -19,7 +24,8 @@ function mapCards(applicants) {
       videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : '',
       submitCountLabel: submitCountLabel(a.videoSubmitCount),
       previewOpen: false,
-    }))
+    }
+    })
 }
 
 function buildStats(cards) {
@@ -80,7 +86,7 @@ Page({
       const mpList = reg.mpRecruitmentOrders || []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
       const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
-      const cards = mapCards(applicants)
+      const cards = mapCards(applicants, reg)
       const prevOpen = new Set((this.data.cards || []).filter((c) => c.previewOpen).map((c) => c.id))
       const merged = cards.map((c) => ({ ...c, previewOpen: prevOpen.has(c.id) }))
       this.setData({

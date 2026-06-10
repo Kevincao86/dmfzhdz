@@ -28,6 +28,7 @@ import { readPrProfile } from '../lib/mpSync/userProfile'
 import PageHero from '../components/ui/PageHero'
 import HallCityFilter from '../components/mp/HallCityFilter'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
+import { countPendingVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
 
 type Tab = 'published' | 'drafts'
 
@@ -57,6 +58,7 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   recruitTarget: 'talent' | 'shoot' | 'edit'
   mp: Record<string, unknown> | null
   isRemovedFromRegistry: boolean
+  pendingVideoCount: number
 }
 
 function deliveryWindowLabel(id: string) {
@@ -132,6 +134,7 @@ export default function PrOrdersPage() {
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
             mp: mp || null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
+            pendingVideoCount: countPendingVideos(mp || null),
           }
         }),
       )
@@ -151,6 +154,7 @@ export default function PrOrdersPage() {
             recruitTarget: 'talent' as const,
             mp: null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
+            pendingVideoCount: 0,
           }
         }),
       )
@@ -442,9 +446,16 @@ export default function PrOrdersPage() {
                       </Link>
                       <Link
                         to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
-                        className="text-sm px-3 py-1.5 rounded-lg border border-amber-500/40 text-amber-700 hover:bg-amber-50"
+                        className={`text-sm px-3 py-1.5 rounded-lg border ${
+                          row.pendingVideoCount > 0
+                            ? 'border-amber-950/35 text-amber-950 hover:bg-amber-950/5 font-semibold'
+                            : 'border-amber-500/40 text-amber-700 hover:bg-amber-50'
+                        }`}
                       >
                         视频审核
+                        {row.pendingVideoCount > 0 ? (
+                          <span className="ml-1 opacity-90">({row.pendingVideoCount})</span>
+                        ) : null}
                       </Link>
                       <button
                         type="button"
