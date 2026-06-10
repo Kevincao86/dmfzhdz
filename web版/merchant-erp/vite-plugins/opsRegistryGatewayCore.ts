@@ -8,6 +8,7 @@ import {
   normalizeCatalogLogoUrl,
   normalizeVendorKeysFromDisk,
 } from '../src/lib/aiVendorCatalogShared.js'
+import { registryFileForPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 import type {
   AiVendorCatalogEntry,
   RegistryAiModels,
@@ -134,9 +135,9 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
 
 export function registryForPersistentFile(data: RegistryFile): RegistryFile {
   const vendorKeys = normalizeVendorKeysFromDisk(data.vendorKeys)
-  return {
+  return registryFileForPersist({
     ...data,
     vendorKeys,
     aiVendorCatalog: catalogCustomEntriesOnly(data.aiVendorCatalog ?? []),
-  }
+  })
 }

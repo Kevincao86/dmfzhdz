@@ -37,6 +37,9 @@ export function formatMpApiErr(e: unknown, fallback = '操作失败，请稍后�
   if (/sms_code_invalid/i.test(msg)) return ZH.sms_code_invalid
   if (/login_name_taken/i.test(msg)) return ZH.login_name_taken
   if (/not_found/i.test(msg)) return ZH.not_found
+  if (/413|Request Entity Too Large|request_entity_too_large/i.test(msg)) {
+    return '提交内容过大（多为封面图）。请换更小图片、选图库封面，或联系运维执行 ecs-hotfix-nginx-body-size.sh'
+  }
   if (/[\u4e00-\u9fa5]/.test(msg)) return msg
   return fallback
 }

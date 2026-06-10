@@ -16,11 +16,13 @@ server {
     server_name localhost;
 
     location /auth/v1/ {
+        client_max_body_size 64m;
         proxy_pass http://127.0.0.1:9999/;
         proxy_set_header Host $host;
     }
 
     location /rest/v1/ {
+        client_max_body_size 64m;
         proxy_pass http://127.0.0.1:3000/;
         proxy_set_header Host $host;
     }
