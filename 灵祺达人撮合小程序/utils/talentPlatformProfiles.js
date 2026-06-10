@@ -171,6 +171,7 @@ module.exports = {
   buildAccountTagGrid,
   emptyProfile,
   emptyAllProfiles,
+  normalizeProfile,
   platformIdFromName,
   profileFilled,
   migrateMember,
