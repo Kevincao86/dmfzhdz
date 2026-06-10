@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
-import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
+import {
+  matchListKeyword,
+  matchesOrderIdKeyword,
+  looksLikeOrderNoSearch,
+} from '../../lib/mpRecruitment/listKeywordSearch'
 import {
   matchStatusLabel,
   prioritizeActiveStatus,
@@ -24,15 +29,6 @@ import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 type HallTab = 'normal' | 'urgent' | 'paichian'
 type PaichianSubTab = 'shoot' | 'edit' | 'ice'
 
-function matchSearch(row: RecruitmentOrderRow, keyword: string) {
-  if (!keyword) return true
-  const k = keyword.toLowerCase()
-  const blob = [row.id, row.title, row.merchantName, row.storeName, row.region, row.category]
-    .join(' ')
-    .toLowerCase()
-  return blob.includes(k)
-}
-
 function filterHallRows(
   rows: RecruitmentOrderRow[],
   opts: {
@@ -46,13 +42,16 @@ function filterHallRows(
   },
 ): RecruitmentOrderRow[] {
   const kw = opts.keyword.trim()
+  const searchByOrderNo = looksLikeOrderNoSearch(kw)
   return rows.filter((r) => {
     if (!showDemoOrders() && r.isMock) return false
-    if (!matchSearch(r, kw)) return false
+    const row = r as unknown as Record<string, unknown>
+    if (!matchListKeyword(row, kw)) return false
     if (!hallFilters.matchPlatform(r.platform, opts.filterPlatform)) return false
     if (!hallFilters.matchRegionFilter(r.region, r.storeName, opts.filterProvince, opts.filterCity)) return false
     if (!hallFilters.matchCategory(r.category, opts.filterCategory)) return false
     if (!hallFilters.matchPriceBuckets(r.priceAmount, opts.priceSelected)) return false
+    if (searchByOrderNo && matchesOrderIdKeyword(row, kw)) return true
     if (!matchStatusLabel(r, opts.filterStatus)) return false
     return true
   })
@@ -168,7 +167,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       setErr('')
       try {
         const reg = await fetchMpRegistry()
-        const mapped = loadOpenOrderRows(reg)
+        const mapped = loadAllOrderRows(reg)
         const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
           splitRoleHallRows(mapped, hallIdentity)
         setNormalRows(listFilters.mergeHallDisplayRows(n, { allowDemo: showDemoOrders() }))
@@ -222,7 +221,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
 
         <input
           className="hall-search-input panel-input"
-          placeholder="搜索招募、门店、城市"
+          placeholder="搜索招募、门店、城市、单号"
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
         />
