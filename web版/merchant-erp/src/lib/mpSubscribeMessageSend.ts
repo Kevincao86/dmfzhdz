@@ -4,6 +4,7 @@ import type {
   RegistryMpTalentMember,
   RegistrySnapshot,
 } from './opsRegistryTypes.js'
+import type { MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
 import { getMpMiniProgramAccessToken } from './mpWechatMiniProgramAccess.js'
 import { MP_SUBSCRIBE_TEMPLATES, type MpSubscribeTemplateKey } from './mpSubscribeMessageTemplates.js'
 
@@ -137,6 +138,48 @@ export async function notifyAuditPassSubscribe(
       thing14: { value: clipThing('已被入选') },
     },
   })
+}
+
+/** PR/商家点击「通知已选达人」时，对入选站内信条目发送报名审核通过订阅 */
+export async function notifyAuditPassForSelectionInboxEntries(
+  reg: RegistrySnapshot,
+  entries: MpTalentInboxEntryInput[],
+): Promise<void> {
+  const auditedAt = new Date().toLocaleString('zh-CN', { hour12: false })
+  const seen = new Set<string>()
+  for (const row of entries) {
+    if (row.noticeType !== 'selection') continue
+    const mpOrderId = String(row.mpOrderId || '').trim()
+    if (!mpOrderId) continue
+    const applicantId = String(row.applicantId || '').trim()
+    const dedupeKey = applicantId ? `${mpOrderId}:${applicantId}` : `${mpOrderId}:${row.talentMemberId}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+
+    const mp = (reg.mpRecruitmentOrders ?? []).find((o) => o && o.id === mpOrderId)
+    if (!mp) continue
+
+    let applicant: RegistryMpRecruitmentApplicant | undefined
+    if (applicantId) {
+      applicant = (mp.applicants ?? []).find((a) => String(a.id) === applicantId)
+    }
+    if (!applicant) {
+      const contact = String(row.contact || '').trim()
+      const account = normalizeAccount(row.platformAccount)
+      applicant = (mp.applicants ?? []).find((a) => {
+        if (contact && String(a.contact || '').trim() === contact) return true
+        if (account && normalizeAccount(a.platformAccount) === account) return true
+        return false
+      })
+    }
+    if (!applicant) continue
+
+    try {
+      await notifyAuditPassSubscribe(reg, mp, applicant, auditedAt)
+    } catch (e) {
+      console.warn('[inbox] audit subscribe failed', e instanceof Error ? e.message : e)
+    }
+  }
 }
 
 export async function notifyVideoRejectSubscribe(

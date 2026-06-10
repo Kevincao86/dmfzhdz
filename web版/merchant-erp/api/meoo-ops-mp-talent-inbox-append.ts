@@ -12,6 +12,7 @@ import {
   type MpTalentInboxEntryInput,
 } from '../src/lib/mpTalentInboxMutations.js'
 import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
+import { notifyAuditPassForSelectionInboxEntries } from '../src/lib/mpSubscribeMessageSend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -71,12 +72,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     purgeExpiredGroupQrsInSnapshot(data)
-    const result = appendMpTalentInboxInSnapshot(data, body.entries ?? [])
+    const entries = body.entries ?? []
+    const result = appendMpTalentInboxInSnapshot(data, entries)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
+    void notifyAuditPassForSelectionInboxEntries(data, entries).catch((e) => {
+      console.warn('[inbox] selection subscribe batch failed', e instanceof Error ? e.message : e)
+    })
     sendOpsJson(res, 200, { ok: true, count: result.count })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
