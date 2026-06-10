@@ -53,7 +53,6 @@ import type { HelpManualEdition } from '../src/lib/helpManualTypes.js'
 import { resolveTeamIntro, setTeamIntro } from '../src/lib/teamIntroRegistryCore.js'
 import type { RegistryTeamIntro } from '../src/lib/teamIntroTypes.js'
 import {
-  handleIceMpApply,
   handleIceMpConfirm,
   isIceMpOrder,
   submitIceDouyinForApplicant,

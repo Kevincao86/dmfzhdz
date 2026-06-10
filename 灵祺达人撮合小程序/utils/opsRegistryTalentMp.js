@@ -39,8 +39,10 @@ function registryRequestKey(opts) {
   const ids = resolveIncludeMpOrderIds(opts)
   const prOwned = opts && opts.includePrOwned ? 'pr' : ''
   const ctx = opts && opts.includeLocalContext ? 'ctx' : ''
+  const recommend = opts && opts.includeRecommendPool ? 'recommend' : ''
   if (ids.length) return `inc:${ids.slice().sort().join(',')}${ctx ? ':ctx' : ''}`
   if (prOwned) return 'pr-owned'
+  if (recommend) return 'recommend-pool'
   return ctx ? 'hall-ctx' : 'hall'
 }
 
@@ -75,8 +77,14 @@ function collectIncludeMpOrderIds(extraIds) {
 async function fetchRegistryOnce(opts) {
   const includeMpOrderIds = resolveIncludeMpOrderIds(opts)
   const includePrOwned = !!(opts && opts.includePrOwned)
+  const includeRecommendPool = !!(opts && opts.includeRecommendPool)
   let lastErr
-  if (!includePrOwned && !includeMpOrderIds.length && !(opts && opts.includeLocalContext)) {
+  if (
+    !includePrOwned &&
+    !includeMpOrderIds.length &&
+    !(opts && opts.includeLocalContext) &&
+    !includeRecommendPool
+  ) {
     try {
       const raw = await api.get(HALL_GET)
       return normalizeHallPayload(raw)
@@ -96,6 +104,7 @@ async function fetchRegistryOnce(opts) {
         (acc && (acc.registryPrId || acc.registryMemberId)) || (pr && pr.id) || '',
       ).trim()
     }
+    if (includeRecommendPool) body.includeRecommendPool = true
     const raw = await api.post(HALL_POST, body, registerAuthHeaders())
     return normalizeHallPayload(raw)
   } catch (e2) {

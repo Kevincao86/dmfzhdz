@@ -72,8 +72,7 @@ export function resolveOpenIdForApplicant(
   return fromApplicant
 }
 
-function detailPagePath(mpOrderId: string): string {
-  const id = encodeURIComponent(String(mpOrderId || '').trim())
+function detailPagePath(_mpOrderId: string): string {
   return `pages/mine-notifications/mine-notifications`
 }
 
