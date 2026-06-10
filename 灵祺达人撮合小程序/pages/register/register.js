@@ -24,6 +24,7 @@ const profileLinkParse = require('../../utils/profileLinkParse.js')
 const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
 const accountSessionActions = require('../../utils/accountSessionActions.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
@@ -171,6 +172,11 @@ Page({
     })
   },
   onLoad(options) {
+    if (!auth.isLoggedIn()) {
+      const q = options && options.edit != null ? `?edit=${encodeURIComponent(String(options.edit))}` : '?edit=1'
+      guestRoutes.redirectToLogin(`/pages/register/register${q}`, { replace: true })
+      return
+    }
     const edit = !options || options.edit !== '0'
     const workIdentity = userProfile.readIdentity()
     const isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
