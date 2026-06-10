@@ -25,7 +25,7 @@
   </view>
 
   <view
-    wx:for="{{applicants}}"
+    wx:for="{{displayApplicants}}"
     wx:key="id"
     class="applicant-card-v2 {{item.selected ? 'applicant-card-v2--selected' : ''}}"
   >
@@ -69,7 +69,7 @@
         wx:if="{{!isIce}}"
         class="applicant-card-v2__pick {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
         loading="{{savingSelect}}"
-        data-index="{{index}}"
+        data-id="{{item.id}}"
         catchtap="onToggleSelect"
       >{{item.selected ? '已选择' : '确认选择'}}</button>
       <text wx:else class="applicant-card-v2__ice-status">{{item.iceTaskStatus}}</text>
@@ -110,7 +110,7 @@
       <view wx:if="{{item.iceDouyinUrl}}" class="ice-app-link-row">
         <text class="ice-app-link-label">抖音链接</text>
         <text class="ice-app-link">{{item.iceDouyinUrl}}</text>
-        <text class="ice-app-copy" data-index="{{index}}" catchtap="onCopyIceLink">复制链接</text>
+        <text class="ice-app-copy" data-id="{{item.id}}" catchtap="onCopyIceLink">复制链接</text>
       </view>
       <text wx:if="{{item.iceRejectReason && item.iceTaskStatus === '链接已驳回'}}" class="ice-app-reject-note">驳回原因：{{item.iceRejectReason}}</text>
       <view wx:if="{{item.canReviewIceLink}}" class="ice-app-review">
@@ -119,7 +119,7 @@
           size="mini"
           plain
           disabled="{{iceReviewBusyId === item.id}}"
-          data-index="{{index}}"
+          data-id="{{item.id}}"
           catchtap="onIcePass"
         >通过</button>
         <button
@@ -127,7 +127,7 @@
           size="mini"
           plain
           disabled="{{iceReviewBusyId === item.id}}"
-          data-index="{{index}}"
+          data-id="{{item.id}}"
           catchtap="onIceOpenReject"
         >驳回</button>
       </view>
@@ -137,27 +137,34 @@
       <button
         wx:if="{{item.hasProfileLink}}"
         class="applicant-card-v2__btn applicant-card-v2__btn--link"
-        data-index="{{index}}"
+        data-id="{{item.id}}"
         catchtap="onOpenProfile"
       >复制主页链接</button>
       <button
         wx:if="{{chatEnabled}}"
         class="applicant-card-v2__btn applicant-card-v2__btn--primary"
         loading="{{chattingId === item.id}}"
-        data-index="{{index}}"
+        data-id="{{item.id}}"
         catchtap="onChatApplicant"
       >私信沟通</button>
-      <text class="applicant-card-v2__copy" bindtap="onCopyApplicant" data-index="{{index}}">复制全部资料</text>
+      <text class="applicant-card-v2__copy" bindtap="onCopyApplicant" data-id="{{item.id}}">复制全部资料</text>
     </view>
   </view>
 
-  <view wx:if="{{!loading && !err && applicants.length === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && !err && filterSelectedOnly && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
+    <text class="hint">暂无已选达人</text>
+  </view>
+
+  <view wx:if="{{!loading && !err && !filterSelectedOnly && applicants.length === 0}}" class="card state-empty">
     <text class="hint">{{isIce ? '暂无达人认领，分享招募后等待达人认领' : '暂无达人报名，分享招募后等待达人提交'}}</text>
   </view>
 
   <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce}}">
     <view class="pr-app-toolbar">
-      <button class="pr-app-tool-btn" bindtap="onViewSelected">查看已选名单</button>
+      <button
+        class="pr-app-tool-btn {{filterSelectedOnly ? 'pr-app-tool-btn--active' : ''}}"
+        bindtap="onViewSelected"
+      >{{filterSelectedOnly ? '查看全部报名' : '查看已选名单'}}{{filterSelectedOnly ? '' : selectedCount ? ' (' + selectedCount + ')' : ''}}</button>
       <button
         wx:if="{{checkedCount > 0}}"
         class="pr-app-tool-btn pr-app-tool-btn--batch"

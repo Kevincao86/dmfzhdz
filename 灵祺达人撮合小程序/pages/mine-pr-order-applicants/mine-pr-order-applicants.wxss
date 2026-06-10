@@ -54,6 +54,12 @@
   background: #fff7ed;
 }
 
+.pr-app-tool-btn--active {
+  color: #5b21b6;
+  border-color: #a78bfa;
+  background: #f5f3ff;
+}
+
 .applicant-card-v2__check {
   width: 40rpx;
   height: 40rpx;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { appendTalentInbox, fetchMpRegistry } from '../lib/mpApi'
 import {
@@ -51,7 +51,7 @@ export default function PrOrderApplicantsPage() {
   const [hallLabel, setHallLabel] = useState('')
   const [applicants, setApplicants] = useState<EnrichedApplicantRow[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [showSelectedPanel, setShowSelectedPanel] = useState(false)
+  const [filterSelectedOnly, setFilterSelectedOnly] = useState(false)
   const [exportingAll, setExportingAll] = useState(false)
   const [groupQrImage, setGroupQrImage] = useState('')
   const [groupQrExpired, setGroupQrExpired] = useState(false)
@@ -78,6 +78,18 @@ export default function PrOrderApplicantsPage() {
   const selectedCount = selectedIds.length
   const checkedCount = checkedIds.length
   const selectedApplicants = filterSelectedApplicants(applicants, selectedIds)
+  const displayApplicants = useMemo(
+    () => (filterSelectedOnly ? applicants.filter((a) => a.selected) : applicants),
+    [applicants, filterSelectedOnly],
+  )
+
+  function onToggleViewSelected() {
+    if (!filterSelectedOnly && selectedCount === 0) {
+      alert('请先确认选择达人')
+      return
+    }
+    setFilterSelectedOnly((v) => !v)
+  }
 
   const applyApplicantsState = useCallback((rows: EnrichedApplicantRow[], ids: string[]) => {
     setApplicants(stampApplicantsSelected(rows, ids) as EnrichedApplicantRow[])
@@ -158,23 +170,7 @@ export default function PrOrderApplicantsPage() {
     else set.add(String(a.id))
     const next = [...set]
     applyApplicantsState(applicants, next)
-    setSavingSelect(true)
-    try {
-      await persistSelectedIds(mpOrderId, next)
-      if (mpOrder) setMpOrder({ ...mpOrder, selectedApplicantIds: next })
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '保存失败')
-      await loadOrder()
-    } finally {
-      setSavingSelect(false)
-    }
-  }
-
-  async function onDeselectFromPanel(id: string) {
-    if (!id || savingSelect) return
-    const next = selectedIds.filter((x) => x !== id)
-    applyApplicantsState(applicants, next)
-    if (!next.length) setShowSelectedPanel(false)
+    if (!next.length) setFilterSelectedOnly(false)
     setSavingSelect(true)
     try {
       await persistSelectedIds(mpOrderId, next)
@@ -437,7 +433,7 @@ export default function PrOrderApplicantsPage() {
       ) : null}
 
       <div className="space-y-3">
-        {(applicants as IceApplicantRow[]).map((a) => (
+        {(displayApplicants as IceApplicantRow[]).map((a) => (
           <article
             key={String(a.id)}
             className={`surface-card rounded-xl border p-4 ${!isIce && a.selected ? 'border-orange-400/60 bg-orange-50/30' : ''}`}
@@ -583,7 +579,11 @@ export default function PrOrderApplicantsPage() {
         ))}
       </div>
 
-      {!loading && !err && !applicants.length ? (
+      {!loading && !err && filterSelectedOnly && applicants.length > 0 && !displayApplicants.length ? (
+        <p className="text-sm text-[var(--shell-muted)] text-center py-8">暂无已选达人</p>
+      ) : null}
+
+      {!loading && !err && !filterSelectedOnly && !applicants.length ? (
         <p className="text-sm text-[var(--shell-muted)] text-center py-8">
           {isIce ? '暂无达人认领，分享招募后等待达人认领' : '暂无达人报名，分享招募后等待达人提交'}
         </p>
@@ -614,8 +614,14 @@ export default function PrOrderApplicantsPage() {
       {!loading && applicants.length > 0 && !isIce ? (
         <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-[var(--shell-bg)]/95 backdrop-blur p-4 md:pl-64">
           <div className="max-w-4xl mx-auto flex flex-wrap gap-2">
-            <button type="button" className="px-3 py-2 rounded-lg border text-sm" onClick={() => setShowSelectedPanel(true)}>
-              查看已选名单 ({selectedCount})
+            <button
+              type="button"
+              className={`px-3 py-2 rounded-lg border text-sm ${
+                filterSelectedOnly ? 'border-violet-500 bg-violet-50 text-violet-700' : ''
+              }`}
+              onClick={onToggleViewSelected}
+            >
+              {filterSelectedOnly ? '查看全部报名' : `查看已选名单 (${selectedCount})`}
             </button>
             <button
               type="button"
@@ -667,31 +673,6 @@ export default function PrOrderApplicantsPage() {
             <p className="text-xs text-amber-600 mt-2">报名截止已满 7 天，群二维码已从服务器自动清理</p>
           ) : null}
         </footer>
-      ) : null}
-
-      {showSelectedPanel ? (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => setShowSelectedPanel(false)}>
-          <div className="w-full max-w-md rounded-2xl panel-card p-4 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold mb-3">已选达人 ({selectedCount})</h3>
-            {selectedApplicants.length ? (
-              <ul className="space-y-2">
-                {selectedApplicants.map((a) => (
-                  <li key={String(a.id)} className="flex justify-between items-center text-sm border-b pb-2">
-                    <span>{String(a.displayName)}</span>
-                    <button type="button" className="text-red-500 text-xs" onClick={() => void onDeselectFromPanel(String(a.id))}>
-                      取消
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-[var(--shell-muted)]">暂无已选达人</p>
-            )}
-            <button type="button" className="w-full mt-4 py-2 rounded-lg panel-tab-active" onClick={() => setShowSelectedPanel(false)}>
-              关闭
-            </button>
-          </div>
-        </div>
       ) : null}
 
       {profileModalApplicant ? (

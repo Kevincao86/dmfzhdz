@@ -13,6 +13,12 @@ const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
 
+function findApplicantById(applicants, id) {
+  const aid = String(id || '').trim()
+  if (!aid) return null
+  return (applicants || []).find((a) => a && String(a.id) === aid) || null
+}
+
 Page({
   data: {
     mpOrderId: '',
@@ -38,6 +44,8 @@ Page({
     checkedCount: 0,
     batchConfirming: false,
     showSelectedPanel: false,
+    filterSelectedOnly: false,
+    displayApplicants: [],
     exportingAll: false,
     groupQrImage: '',
     groupQrExpired: false,
@@ -70,12 +78,17 @@ Page({
   onPullDownRefresh() {
     this.loadOrder().finally(() => wx.stopPullDownRefresh())
   },
-  applyApplicantsState(applicants, selectedIds) {
+  applyApplicantsState(applicants, selectedIds, opts) {
     const ids = selection.normalizeSelectedIds(selectedIds)
     const stamped = selection.stampApplicantsSelected(applicants, ids)
     const selectedApplicants = selection.filterSelectedApplicants(stamped, ids)
+    const filterSelectedOnly =
+      opts && opts.filterSelectedOnly != null ? opts.filterSelectedOnly : this.data.filterSelectedOnly
+    const displayApplicants = filterSelectedOnly ? stamped.filter((a) => a && a.selected) : stamped
     this.setData({
       applicants: stamped,
+      displayApplicants,
+      filterSelectedOnly,
       selectedIds: ids,
       selectedCount: ids.length,
       selectedApplicants,
@@ -186,14 +199,15 @@ Page({
     }
   },
   async onToggleSelect(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const id = String(e.currentTarget.dataset.id || '').trim()
+    const a = findApplicantById(this.data.applicants, id)
     if (!a || !a.id || this.data.savingSelect) return
     const set = new Set(this.data.selectedIds)
     if (set.has(a.id)) set.delete(a.id)
     else set.add(a.id)
     const selectedIds = [...set]
-    this.applyApplicantsState(this.data.applicants, selectedIds)
+    const filterSelectedOnly = selectedIds.length ? this.data.filterSelectedOnly : false
+    this.applyApplicantsState(this.data.applicants, selectedIds, { filterSelectedOnly })
     this.setData({ savingSelect: true })
     try {
       await selection.persistSelectedIds(this.data.mpOrderId, selectedIds)
@@ -207,11 +221,15 @@ Page({
     }
   },
   onViewSelected() {
-    if (!this.data.selectedCount) {
+    if (!this.data.filterSelectedOnly && !this.data.selectedCount) {
       wx.showToast({ title: '请先确认选择达人', icon: 'none' })
       return
     }
-    this.setData({ showSelectedPanel: true })
+    const filterSelectedOnly = !this.data.filterSelectedOnly
+    const displayApplicants = filterSelectedOnly
+      ? (this.data.applicants || []).filter((a) => a && a.selected)
+      : this.data.applicants || []
+    this.setData({ filterSelectedOnly, displayApplicants })
   },
   onCloseSelectedPanel() {
     this.setData({ showSelectedPanel: false })
@@ -388,8 +406,7 @@ Page({
     }
   },
   async onChatApplicant(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a || !a.id) return
     if (!this.data.chatEnabled) {
       wx.showToast({ title: '请先配置后台地址', icon: 'none' })
@@ -424,15 +441,13 @@ Page({
     }
   },
   onOpenProfile(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a) return
     appDisplay.copyTalentProfileLink(a.profileLink)
   },
   noop() {},
   onCopyApplicant(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a) return
     const tagLine =
       Array.isArray(a.accountTags) && a.accountTags.length ? a.accountTags.join('、') : ''
@@ -455,15 +470,13 @@ Page({
     wx.setClipboardData({ data: lines.join('\n') })
   },
   onCopyIceLink(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     const url = a && a.iceDouyinUrl ? String(a.iceDouyinUrl) : ''
     if (!url) return
     wx.setClipboardData({ data: url })
   },
   async onIcePass(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a || !a.id || this.data.iceReviewBusyId) return
     this.setData({ iceReviewBusyId: a.id })
     wx.showLoading({ title: '提交中…', mask: true })
@@ -479,8 +492,7 @@ Page({
     }
   },
   onIceOpenReject(e) {
-    const idx = Number(e.currentTarget.dataset.index)
-    const a = this.data.applicants[idx]
+    const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a || !a.id) return
     this.setData({
       iceRejectModal: true,
