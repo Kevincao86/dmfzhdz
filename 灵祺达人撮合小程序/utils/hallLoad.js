@@ -26,9 +26,9 @@ function mapRegistryToRows(reg, identity) {
   const workIdentity = identity || userProfile.readIdentity()
   let mapped = []
   try {
-    mapped = orderCard.loadOpenOrderRows(reg)
+    mapped = orderCard.loadAllOrderRows(reg)
   } catch (e) {
-    console.warn('[hallLoad] loadOpenOrderRows failed', e)
+    console.warn('[hallLoad] loadAllOrderRows failed', e)
   }
   const buckets = hallIdentity.bucketOrdersForIdentity(mapped, workIdentity, {
     allowDemo: showDemoOrders(),
