@@ -71,7 +71,7 @@ export function buildAupSections(edition: HelpManualEdition): LegalSection[] {
     {
       title: 'A. 一般',
       paragraphs: [
-        `${product}为${edition === 'fulfillment' ? '达人、PR、拍摄、剪辑等从业者及招募方' : edition === 'partner' ? '服务商及其客户' : '本地生活商户'}提供数字化经营、招募协作、AI 辅助及数据管理等网络应用服务。`,
+        `${product}为${edition === 'partner' ? '服务商及其客户' : '本地生活商户'}提供数字化经营、招募协作、AI 辅助及数据管理等网络应用服务。`,
         `为确保服务品质与系统安全，本《软件服务及许可协议》（下称「本协议」）对可接受的使用进行定义。使用${product}即表示您同意遵守本协议。`,
         `您对通过本平台访问、发布、传输或以其他方式利用服务的内容与行为承担全部责任。`,
       ],
