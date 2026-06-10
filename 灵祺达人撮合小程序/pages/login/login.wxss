@@ -196,6 +196,10 @@
   box-sizing: border-box;
 }
 
+.login-legal-mask {
+  z-index: 10100;
+}
+
 .login-id-sheet {
   width: 100%;
   padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));

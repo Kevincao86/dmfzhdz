@@ -244,7 +244,7 @@ Page({
   onWxLogin() {
     const workId = requireLoginIdentity(this)
     if (!workId) return
-    if (!this.data.legalAgreed && !loginLegalAgree.readAgreed()) {
+    if (!this.data.legalAgreed) {
       this.setData({ showLegalPrompt: true, legalPromptWorkId: workId, err: '' })
       return
     }
@@ -272,7 +272,11 @@ Page({
   },
 
   startWxLoginFlow(workId) {
-    if (this.data.legalAgreed && !loginLegalAgree.readAgreed()) {
+    if (!this.data.legalAgreed) {
+      this.setData({ showLegalPrompt: true, legalPromptWorkId: workId, err: '' })
+      return
+    }
+    if (!loginLegalAgree.readAgreed()) {
       loginLegalAgree.writeAgreed(true)
     }
     this.setData({
