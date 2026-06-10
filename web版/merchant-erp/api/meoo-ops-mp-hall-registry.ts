@@ -26,7 +26,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
 
-    const payload = await loadMpHallRegistryPayload()
+    const includeRecommendPool =
+      String(req.query?.includeRecommendPool || '').trim() === '1' ||
+      String(req.query?.includeRecommendPool || '').toLowerCase() === 'true'
+    const payload = await loadMpHallRegistryPayload({
+      includeRecommendPool,
+    })
 
     if (!payload || !Array.isArray(payload.mpRecruitmentOrders)) {
       res.status(502).send(

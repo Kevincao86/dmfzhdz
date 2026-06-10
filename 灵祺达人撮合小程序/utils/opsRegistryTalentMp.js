@@ -79,14 +79,10 @@ async function fetchRegistryOnce(opts) {
   const includePrOwned = !!(opts && opts.includePrOwned)
   const includeRecommendPool = !!(opts && opts.includeRecommendPool)
   let lastErr
-  if (
-    !includePrOwned &&
-    !includeMpOrderIds.length &&
-    !(opts && opts.includeLocalContext) &&
-    !includeRecommendPool
-  ) {
+  if (!includePrOwned && !includeMpOrderIds.length && !(opts && opts.includeLocalContext)) {
     try {
-      const raw = await api.get(HALL_GET)
+      const hallPath = includeRecommendPool ? `${HALL_GET}?includeRecommendPool=1` : HALL_GET
+      const raw = await api.get(hallPath)
       return normalizeHallPayload(raw)
     } catch (e) {
       lastErr = e
