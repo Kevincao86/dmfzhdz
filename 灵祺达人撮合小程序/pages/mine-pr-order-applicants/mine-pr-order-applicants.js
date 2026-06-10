@@ -90,7 +90,7 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
       const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
       if (!mp) {
         this.setData({

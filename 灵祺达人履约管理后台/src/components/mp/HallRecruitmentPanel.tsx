@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchMpRegistry } from '../../lib/mpApi'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
@@ -31,6 +31,31 @@ function matchSearch(row: RecruitmentOrderRow, keyword: string) {
   return blob.includes(k)
 }
 
+function filterHallRows(
+  rows: RecruitmentOrderRow[],
+  opts: {
+    keyword: string
+    filterPlatform: string
+    filterProvince: string
+    filterCity: string
+    filterCategory: string
+    filterStatus: string
+    priceSelected: string[]
+  },
+): RecruitmentOrderRow[] {
+  const kw = opts.keyword.trim()
+  return rows.filter((r) => {
+    if (!showDemoOrders() && r.isMock) return false
+    if (!matchSearch(r, kw)) return false
+    if (!hallFilters.matchPlatform(r.platform, opts.filterPlatform)) return false
+    if (!hallFilters.matchRegionFilter(r.region, r.storeName, opts.filterProvince, opts.filterCity)) return false
+    if (!hallFilters.matchCategory(r.category, opts.filterCategory)) return false
+    if (!hallFilters.matchPriceBuckets(r.priceAmount, opts.priceSelected)) return false
+    if (!matchStatusLabel(r, opts.filterStatus)) return false
+    return true
+  })
+}
+
 type Props = { prMode?: boolean }
 
 export default function HallRecruitmentPanel({ prMode = false }: Props) {
@@ -61,10 +86,35 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [iceRows, setIceRows] = useState<RecruitmentOrderRow[]>([])
   const [displayRows, setDisplayRows] = useState<RecruitmentOrderRow[]>([])
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearchKeyword(searchKeyword), 300)
-    return () => clearTimeout(t)
-  }, [searchKeyword])
+  const filterOpts = useMemo(
+    () => ({
+      keyword: debouncedSearchKeyword,
+      filterPlatform,
+      filterProvince,
+      filterCity,
+      filterCategory,
+      filterStatus,
+      priceSelected,
+    }),
+    [
+      debouncedSearchKeyword,
+      filterPlatform,
+      filterProvince,
+      filterCity,
+      filterCategory,
+      filterStatus,
+      priceSelected,
+    ],
+  )
+
+  const tabCounts = useMemo(() => {
+    const normal = filterHallRows(normalRows, filterOpts).length
+    const urgent = filterHallRows(urgentRows, filterOpts).length
+    const shoot = filterHallRows(shootRows, filterOpts).length
+    const edit = filterHallRows(editRows, filterOpts).length
+    const ice = filterHallRows(iceRows, filterOpts).length
+    return { normal, urgent, paichian: shoot + edit + ice, shoot, edit, ice }
+  }, [normalRows, urgentRows, shootRows, editRows, iceRows, filterOpts])
 
   const applyFilters = useCallback(async () => {
     let rows = normalRows
@@ -74,17 +124,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       else if (paichianSubTab === 'ice') rows = iceRows
       else rows = shootRows
     }
-    const kw = debouncedSearchKeyword.trim()
-    rows = rows.filter((r) => {
-      if (!showDemoOrders() && r.isMock) return false
-      if (!matchSearch(r, kw)) return false
-      if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
-      if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
-      if (!hallFilters.matchCategory(r.category, filterCategory)) return false
-      if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
-      if (!matchStatusLabel(r, filterStatus)) return false
-      return true
-    })
+    rows = filterHallRows(rows, filterOpts)
     if (
       hallTab === 'normal' &&
       (filterStatus === '全部' || filterStatus === HALL_DEFAULT_STATUS_FILTER) &&
@@ -106,15 +146,15 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     editRows,
     iceRows,
     normalRows,
-    debouncedSearchKeyword,
-    filterPlatform,
-    filterProvince,
-    filterCity,
-    filterCategory,
+    filterOpts,
     filterStatus,
-    priceSelected,
     sortBy,
   ])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchKeyword(searchKeyword), 300)
+    return () => clearTimeout(t)
+  }, [searchKeyword])
 
   useEffect(() => {
     void applyFilters()
@@ -152,18 +192,18 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       : `${WORK_EDITION_LABEL[hallIdentity]} · ${workIdentityLabel(hallIdentity)}招募 + 云剪任务`
 
   const tabs: { id: HallTab; label: string; count: number }[] = [
-    { id: 'normal', label: '招募大厅', count: normalRows.length },
-    { id: 'urgent', label: '急单大厅', count: urgentRows.length },
+    { id: 'normal', label: '招募大厅', count: tabCounts.normal },
+    { id: 'urgent', label: '急单大厅', count: tabCounts.urgent },
     {
       id: 'paichian',
       label: '拍剪任务',
-      count: shootRows.length + editRows.length + iceRows.length,
+      count: tabCounts.paichian,
     },
   ]
   const paichianSubs: { id: PaichianSubTab; label: string; count: number }[] = [
-    { id: 'shoot', label: '拍摄任务', count: shootRows.length },
-    { id: 'edit', label: '剪辑任务', count: editRows.length },
-    { id: 'ice', label: '云剪任务', count: iceRows.length },
+    { id: 'shoot', label: '拍摄任务', count: tabCounts.shoot },
+    { id: 'edit', label: '剪辑任务', count: tabCounts.edit },
+    { id: 'ice', label: '云剪任务', count: tabCounts.ice },
   ]
 
   const listTwoCol = displayRows.length > 1

@@ -93,7 +93,7 @@ export default function PrOrderApplicantsPage() {
     setLoading(true)
     setErr('')
     try {
-      const reg = await fetchMpRegistry()
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = mpList.find((o) => o && (o as Record<string, unknown>).id === mpOrderId) as
         | Record<string, unknown>

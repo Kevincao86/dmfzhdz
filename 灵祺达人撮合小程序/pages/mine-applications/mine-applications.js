@@ -72,7 +72,7 @@ Page({
     }
     this.setData({ loading: true })
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeLocalContext: true })
       const mpList = reg.mpRecruitmentOrders || []
       const enriched = local.map((a) => {
         const mp = mpList.find((o) => o && o.id === a.mpOrderId)
@@ -184,7 +184,7 @@ Page({
     if (!applicantId && api.hasApi()) {
       wx.showLoading({ title: '准备上传…', mask: true })
       try {
-        const reg = await ops.fetchRegistry()
+        const reg = await ops.fetchRegistry({ includeLocalContext: true })
         const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === id)
         const talentContactPrGate = require('../../utils/talentContactPrGate.js')
         const found = mp && talentContactPrGate.findMyApplicant(mp, id)

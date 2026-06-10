@@ -39,7 +39,7 @@ export default function PrOrderVideoReviewPage() {
     const silent = !!opts?.silent
     if (!silent) setLoading(true)
     try {
-      const reg = await fetchMpRegistry()
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
         unknown
