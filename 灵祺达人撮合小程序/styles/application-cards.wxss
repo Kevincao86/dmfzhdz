@@ -338,6 +338,23 @@
   word-break: break-all;
 }
 
+.applicant-card-v2__video-muted {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.applicant-card-v2__video-uploaded {
+  color: #78350f;
+}
+
+.applicant-card-v2__video-rejected {
+  color: #dc2626;
+}
+
+.applicant-card-v2__video-passed {
+  color: #15803d;
+}
+
 .applicant-card-v2__actions {
   display: flex;
   flex-wrap: wrap;

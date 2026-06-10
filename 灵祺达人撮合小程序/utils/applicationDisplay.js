@@ -211,6 +211,16 @@ function resolveDisplaySalesLevel(applicant, reg) {
   return '—'
 }
 
+function resolveApplicantVideoUploadStatus(applicant) {
+  const a = applicant || {}
+  const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
+  const status = String(a.videoStatus || '').trim()
+  if (!url) return { label: '未上传', tone: 'muted' }
+  if (status === 'passed') return { label: '视频审核通过', tone: 'passed' }
+  if (status === 'rejected') return { label: '视频驳回待重新回传', tone: 'rejected' }
+  return { label: '已上传', tone: 'uploaded' }
+}
+
 function enrichApplicantRow(applicant, index, reg) {
   const a = applicant || {}
   const profileLink = resolveApplicantProfileLinkRaw(a, reg) || String(a.profileLink || '').trim()
@@ -228,6 +238,7 @@ function enrichApplicantRow(applicant, index, reg) {
     String(a.douyinSalesLevel || '').trim() ||
     (prof && prof.douyinSalesLevel) ||
     ''
+  const videoUpload = resolveApplicantVideoUploadStatus(a)
 
   return {
     ...a,
@@ -241,6 +252,8 @@ function enrichApplicantRow(applicant, index, reg) {
     accountTags,
     hasAccountTags: accountTags.length > 0,
     douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
+    videoUploadLabel: videoUpload.label,
+    videoUploadTone: videoUpload.tone,
     avatar: resolveApplicantAvatar(a, reg),
     profileLink,
     hasProfileLink: !!profileLink,
@@ -355,4 +368,5 @@ module.exports = {
   enrichApplicantRow,
   enrichTalentApplicationRow,
   buildApplicantTalentMeta,
+  resolveApplicantVideoUploadStatus,
 }

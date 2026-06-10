@@ -207,6 +207,22 @@ export type EnrichedApplicantRow = Record<string, unknown> & {
   hasProfileLink: boolean
   profileLinkShort: string
   selected?: boolean
+  videoUploadLabel?: string
+  videoUploadTone?: 'muted' | 'uploaded' | 'rejected' | 'passed'
+}
+
+export type ApplicantVideoUploadTone = 'muted' | 'uploaded' | 'rejected' | 'passed'
+
+export function resolveApplicantVideoUploadStatus(applicant: Record<string, unknown>): {
+  label: string
+  tone: ApplicantVideoUploadTone
+} {
+  const url = String(applicant.videoUrl || applicant.douyinPublishUrl || '').trim()
+  const status = String(applicant.videoStatus || '').trim()
+  if (!url) return { label: '未上传', tone: 'muted' }
+  if (status === 'passed') return { label: '视频审核通过', tone: 'passed' }
+  if (status === 'rejected') return { label: '视频驳回待重新回传', tone: 'rejected' }
+  return { label: '已上传', tone: 'uploaded' }
 }
 
 export function enrichApplicantRow(applicant: Record<string, unknown>, index: number, reg: MpRegistry): EnrichedApplicantRow {
@@ -229,6 +245,7 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
   const displaySalesLevel = resolveDisplaySalesLevel(a, reg)
   const prof = resolveApplicantMemberProfile(a, reg)
   const douyinSalesLevel = String(a.douyinSalesLevel || '').trim() || prof?.douyinSalesLevel || ''
+  const videoUpload = resolveApplicantVideoUploadStatus(a)
 
   return {
     ...a,
@@ -241,6 +258,8 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
     accountTags,
     hasAccountTags: accountTags.length > 0,
     douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
+    videoUploadLabel: videoUpload.label,
+    videoUploadTone: videoUpload.tone,
     avatar: resolveApplicantAvatar(a, reg),
     profileLink,
     resolvedProfileHref,
