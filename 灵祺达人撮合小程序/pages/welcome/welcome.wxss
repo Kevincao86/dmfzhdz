@@ -1,0 +1,158 @@
+@import '../../styles/theme.wxss';
+@import '../../styles/hero-deco.wxss';
+
+.welcome-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--lq-bg);
+}
+
+.welcome-top {
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 56rpx;
+  flex-shrink: 0;
+}
+
+.welcome-top-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 72rpx;
+  background: linear-gradient(180deg, transparent 0%, var(--lq-bg) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.welcome-top-inner {
+  position: relative;
+  z-index: 3;
+  padding-left: 32rpx;
+  box-sizing: border-box;
+}
+
+.welcome-nav-spacer {
+  height: 80rpx;
+  margin-bottom: 8rpx;
+}
+
+.welcome-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding-bottom: 8rpx;
+}
+
+.welcome-logo {
+  width: 92rpx;
+  height: 92rpx;
+  flex-shrink: 0;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10rpx 0 rgba(91, 97, 232, 0.2);
+}
+
+.welcome-hero-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.welcome-brand {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.welcome-tagline {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.welcome-body {
+  flex: 1;
+  padding: 8rpx 28rpx calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.welcome-card {
+  padding: 32rpx 28rpx 36rpx;
+  border-radius: 32rpx;
+  background: var(--lq-card);
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8rpx 0 rgba(196, 181, 253, 0.2);
+}
+
+.welcome-card-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--lq-text);
+}
+
+.welcome-card-hint {
+  display: block;
+  margin-top: 10rpx;
+  margin-bottom: 28rpx;
+  font-size: 24rpx;
+  color: var(--lq-text-secondary);
+  line-height: 1.5;
+}
+
+.welcome-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+}
+
+.welcome-id-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28rpx 16rpx 24rpx;
+  border-radius: 28rpx;
+  background: #faf5ff;
+  border: 3rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4rpx 0 rgba(196, 181, 253, 0.15);
+}
+
+.welcome-id-btn--hover {
+  background: var(--lq-primary-50);
+  border-color: #c4b5fd;
+}
+
+.welcome-id-btn__icon-wrap {
+  width: 88rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22rpx;
+  background: #f5f3ff;
+  border: 1rpx solid #ede9fe;
+  margin-bottom: 14rpx;
+}
+
+.welcome-id-btn__icon {
+  width: 52rpx;
+  height: 52rpx;
+}
+
+.welcome-id-btn__label {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--lq-primary-deep);
+}
+
+.welcome-id-btn__sub {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: var(--lq-text-secondary);
+  text-align: center;
+  line-height: 1.35;
+}

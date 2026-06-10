@@ -1,0 +1,48 @@
+<view class="welcome-page">
+  <view class="welcome-top lq-hero-header" style="{{navBandStyle}}">
+    <view class="lq-hero-bg lq-hero-bg--login" aria-hidden="true">
+      <view class="lq-hero-bg__pattern" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
+      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
+      <view class="lq-hero-bg__mesh" />
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--ai">AI</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--shop">探店</text>
+      <text class="lq-hero-bg__icon lq-hero-bg__icon--clip">云剪</text>
+    </view>
+
+    <view class="welcome-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
+      <view class="welcome-nav-spacer" aria-hidden="true" />
+      <view class="welcome-brand-row">
+        <image class="welcome-logo" src="/images/logo.png" mode="aspectFit" />
+        <view class="welcome-hero-text">
+          <text class="welcome-brand">灵祺星选平台</text>
+          <text class="welcome-tagline">请选择您的身份进入</text>
+        </view>
+      </view>
+    </view>
+    <view class="welcome-top-fade" aria-hidden="true" />
+  </view>
+
+  <view class="welcome-body">
+    <view class="welcome-card">
+      <text class="welcome-card-title">选择身份</text>
+      <text class="welcome-card-hint">达人 / PR / 拍摄 / 剪辑 · 进入后可浏览，需登录时再授权</text>
+      <view class="welcome-grid">
+        <view
+          wx:for="{{identityOptions}}"
+          wx:key="id"
+          class="welcome-id-btn"
+          data-id="{{item.id}}"
+          bindtap="onPickIdentity"
+          hover-class="welcome-id-btn--hover"
+        >
+          <view class="welcome-id-btn__icon-wrap">
+            <image class="welcome-id-btn__icon" src="{{item.icon}}" mode="aspectFit" />
+          </view>
+          <text class="welcome-id-btn__label">{{item.label}}</text>
+          <text class="welcome-id-btn__sub">{{item.sub}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

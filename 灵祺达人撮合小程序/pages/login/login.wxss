@@ -166,6 +166,10 @@
   color: #b45309;
 }
 
+.login-identity-row--readonly {
+  justify-content: flex-start;
+}
+
 .login-identity-switch {
   flex-shrink: 0;
   padding: 14rpx 22rpx;

@@ -8,12 +8,8 @@ const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
-const { attachLoginIdentityIcons, loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
+const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
-
-const IDENTITY_OPTIONS = attachLoginIdentityIcons(
-  identityTypes.WORK_ID_LIST.map((id) => identityTypes.WORK_IDENTITIES[id]),
-)
 
 const LEGAL_PROMPT_COPY = {
   wx: {
@@ -43,13 +39,26 @@ function openLegalPrompt(page, workId, action) {
 }
 
 function requireLoginIdentity(page) {
-  const id = page.data.loginIdentity
+  const id = identityTypes.isWorkIdentity(page.data.loginIdentity)
+    ? page.data.loginIdentity
+    : userProfile.readIdentity()
   if (!identityTypes.isWorkIdentity(id)) {
-    page.setData({ err: '请先选择登录身份（达人 / 拍摄 / 剪辑 / PR）' })
+    page.setData({ err: '请返回开屏页重新选择身份' })
     return null
   }
   userProfile.writeIdentity(id)
+  syncLoginIdentityFromProfile(page)
   return id
+}
+
+function syncLoginIdentityFromProfile(page) {
+  const id = userProfile.readIdentity()
+  const meta = identityTypes.WORK_IDENTITIES[id] || identityTypes.WORK_IDENTITIES.talent
+  page.setData({
+    loginIdentity: id,
+    loginIdentityLabel: meta.label,
+    loginIdentityIcon: loginIdentityIcon(id),
+  })
 }
 
 async function applyLoginIdentity(data, workId) {
@@ -163,8 +172,6 @@ Page({
     loginIdentity: '',
     loginIdentityLabel: '',
     loginIdentityIcon: '',
-    showIdentitySheet: false,
-    identityOptions: IDENTITY_OPTIONS,
     loginName: '',
     password: '',
     regPhone: '',
@@ -209,13 +216,12 @@ Page({
     const local = wxAccount.readWxAccount()
     this.setData({
       err: '',
-      loginIdentity: '',
-      loginIdentityLabel: '',
       redirect,
       legalAgreed: loginLegalAgree.readAgreed(),
       wxNickName: wxProfileDisplay.pickWxNick(cache && cache.wxNickName, local && local.wxNickName),
       wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
     })
+    syncLoginIdentityFromProfile(this)
     if (auth.isLoggedIn()) {
       void navigateAfterLogin(this)
     }
@@ -224,6 +230,7 @@ Page({
   onShow() {
     mpShare.enableShareMenu()
     this.applyLoginNavPadding()
+    syncLoginIdentityFromProfile(this)
   },
 
   onShareAppMessage() {
@@ -238,29 +245,7 @@ Page({
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
   },
 
-  onOpenIdentitySheet() {
-    this.setData({ showIdentitySheet: true, err: '' })
-  },
-
-  onCloseIdentitySheet() {
-    this.setData({ showIdentitySheet: false })
-  },
-
   noopSheetTap() {},
-
-  onPickLoginIdentity(e) {
-    const id = e.currentTarget.dataset.id
-    if (!identityTypes.isWorkIdentity(id)) return
-    const meta = identityTypes.WORK_IDENTITIES[id]
-    userProfile.writeIdentity(id)
-    this.setData({
-      loginIdentity: id,
-      loginIdentityLabel: meta.label,
-      loginIdentityIcon: loginIdentityIcon(id),
-      showIdentitySheet: false,
-      err: '',
-    })
-  },
 
   onTabWx() {
     this.setData({ tab: 'wx', err: '' })
