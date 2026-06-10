@@ -6,6 +6,7 @@ const config = require('../../utils/config.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { setTabBarForPage, refreshChatTabBadge } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
+const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 
 Page({
   data: {
@@ -113,7 +114,7 @@ Page({
       id: s.id,
       peerName: peer.name,
       peerId: peer.peerId || '',
-      peerAvatar: peer.avatar,
+      peerAvatar: wxProfileDisplay.sanitizeDisplayAvatar(peer.avatar),
       lastText: s.last_text || '',
       timeText: chat.sessionPreviewTime(s.last_ts),
       unread: participant.unreadForMe(s, myKey),
