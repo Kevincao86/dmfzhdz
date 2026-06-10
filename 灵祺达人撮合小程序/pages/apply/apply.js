@@ -14,6 +14,7 @@ const applyRuntime = require('../../utils/applyTemplateRuntime.js')
 const platformForm = require('../../utils/platformForm.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 const {
   emptyApplyFields,
@@ -85,9 +86,7 @@ Page({
         })
       }
       const applyUrl = `/pages/apply/apply${q.length ? `?${q.join('&')}` : ''}`
-      wx.redirectTo({
-        url: `/pages/login/login?redirect=${encodeURIComponent(applyUrl)}`,
-      })
+      guestRoutes.redirectToLogin(applyUrl, { replace: true })
       return
     }
     void this.initApplyPage(options || {})

@@ -22,7 +22,7 @@ App({
     chatBadgeWatcher.start()
     if (!auth.isLoggedIn()) {
       const route = guestRoutes.currentRoutePath()
-      if (!guestRoutes.isGuestAllowedPath(route)) {
+      if (!guestRoutes.canBrowseWithoutLogin(route)) {
         wx.reLaunch({ url: '/pages/login/login' })
       }
     } else {

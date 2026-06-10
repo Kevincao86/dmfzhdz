@@ -16,6 +16,7 @@ const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const mpShare = require('../../utils/mpShare.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
@@ -456,18 +457,24 @@ Page({
     }
   },
   onMenuTap(e) {
-    if (!this.ensureWxLoggedIn()) return
     const key = e.currentTarget.dataset.key
     const url = MENU_URLS[key]
     if (!url) return
+    if ((key === 'profile' || key === 'prProfile') && !auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(url)
+      return
+    }
+    if (!this.ensureWxLoggedIn()) return
     wx.navigateTo({ url })
   },
   goEditProfile() {
-    if (!this.ensureWxLoggedIn()) return
-    if (this.data.identity === 'pr') {
-      wx.navigateTo({ url: '/pages/mine-pr-profile/mine-pr-profile' })
-    } else {
-      wx.navigateTo({ url: '/pages/register/register?edit=1' })
+    const url =
+      this.data.identity === 'pr' ? '/pages/mine-pr-profile/mine-pr-profile' : '/pages/register/register?edit=1'
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(url)
+      return
     }
+    if (!this.ensureWxLoggedIn()) return
+    wx.navigateTo({ url })
   },
 })

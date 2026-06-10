@@ -11,6 +11,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const talentMember = require('../../utils/talentMember.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 Page({
   data: {
@@ -425,9 +426,7 @@ Page({
     }
     const applyUrl = `/pages/apply/apply?${q.join('&')}`
     if (!auth.isLoggedIn()) {
-      wx.navigateTo({
-        url: `/pages/login/login?redirect=${encodeURIComponent(applyUrl)}`,
-      })
+      guestRoutes.redirectToLogin(applyUrl)
       return
     }
     wx.navigateTo({ url: applyUrl })
