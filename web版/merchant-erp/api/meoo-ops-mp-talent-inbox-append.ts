@@ -79,10 +79,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     await io.save(data)
-    void notifyAuditPassForSelectionInboxEntries(data, entries).catch((e) => {
-      console.warn('[inbox] selection subscribe batch failed', e instanceof Error ? e.message : e)
+    const subscribe = await notifyAuditPassForSelectionInboxEntries(data, entries).catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[inbox] selection subscribe batch failed', msg)
+      return { sent: 0, skipped: entries.length, failed: [msg.slice(0, 120)] }
     })
-    sendOpsJson(res, 200, { ok: true, count: result.count })
+    sendOpsJson(res, 200, { ok: true, count: result.count, subscribe })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

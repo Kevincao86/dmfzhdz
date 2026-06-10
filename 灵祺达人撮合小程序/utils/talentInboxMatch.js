@@ -183,7 +183,7 @@ function buildSelectionNoticeRows(reg, member) {
     if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
     if (inboxNoticeState.getHandledAction({ dedupeKey: dedupe })) return
     seen.add(dedupe)
-    const qr = mpGroupQr.groupQrFromMp(mp)
+    const qr = mpGroupQr.groupQrFromRegistry(reg, mp.id) || mpGroupQr.groupQrFromMp(mp)
     rows.push({
       id: `sel-local-${mpOrderId}-${aid}`,
       title: '恭喜入选招募',

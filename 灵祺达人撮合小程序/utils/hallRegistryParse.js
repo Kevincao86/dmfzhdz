@@ -17,11 +17,21 @@ function normalizeHallPayload(data) {
   if (!Array.isArray(inbox) && data.registry && typeof data.registry === 'object') {
     inbox = data.registry.mpTalentInbox
   }
+  let mpGroupQrByOrderId = data.mpGroupQrByOrderId
+  if (
+    (!mpGroupQrByOrderId || typeof mpGroupQrByOrderId !== 'object') &&
+    data.registry &&
+    typeof data.registry === 'object'
+  ) {
+    mpGroupQrByOrderId = data.registry.mpGroupQrByOrderId
+  }
   return {
     mpRecruitmentOrders: mp,
     recruitmentOrders: Array.isArray(data.recruitmentOrders) ? data.recruitmentOrders : [],
     mpTalentMembers: Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers : [],
     mpTalentInbox: Array.isArray(inbox) ? inbox : [],
+    mpGroupQrByOrderId:
+      mpGroupQrByOrderId && typeof mpGroupQrByOrderId === 'object' ? mpGroupQrByOrderId : {},
     talentLibraryEntries: Array.isArray(data.talentLibraryEntries) ? data.talentLibraryEntries : [],
     shootTeamLibraryEntries: Array.isArray(data.shootTeamLibraryEntries) ? data.shootTeamLibraryEntries : [],
     editTeamLibraryEntries: Array.isArray(data.editTeamLibraryEntries) ? data.editTeamLibraryEntries : [],
