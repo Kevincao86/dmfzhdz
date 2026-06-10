@@ -42,12 +42,15 @@
   position: relative;
   z-index: 3;
   padding-left: 32rpx;
-  padding-bottom: 12rpx;
   box-sizing: border-box;
 }
 
+.login-nav-spacer {
+  height: 56rpx;
+  margin-bottom: 4rpx;
+}
+
 .login-brand-row {
-  margin-top: 24rpx;
   display: flex;
   align-items: center;
   gap: 20rpx;
@@ -93,10 +96,10 @@
 }
 
 .login-stack {
-  margin-top: 20rpx;
+  margin-top: -48rpx;
   padding: 0 28rpx;
   position: relative;
-  z-index: 2;
+  z-index: 4;
   flex-shrink: 0;
 }
 
