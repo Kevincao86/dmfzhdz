@@ -81,7 +81,7 @@ function mpOrderStatusView(o: RegistryMpRecruitmentOrder): {
   const raw = o.status
   const staleRaw =
     (raw === 'open' || raw === 'collecting') && effective !== raw
-  const hallVisible = effective === 'open' || effective === 'collecting'
+  const hallVisible = effective === 'open' || effective === 'collecting' || effective === 'closed'
   return { effective, staleRaw, hallVisible }
 }
 

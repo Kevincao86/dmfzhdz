@@ -5,7 +5,7 @@ import type {
   RegistryScheduleRow,
   RegistryTalentPoolRow,
 } from './opsRegistryTypes.js'
-import { isMpOrderHallRecruiting } from './mpGroupQrCleanup.js'
+import { isMpOrderHallVisible } from './mpGroupQrCleanup.js'
 import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 import {
   filterRegistryForTenant,
@@ -135,10 +135,10 @@ export function sanitizeMpRecruitmentOrderForTalentHall(o: RegistryMpRecruitment
   }
 }
 
-/** 达人招募小程序大厅可读：有效招募中/收集中（含截止判断，与运营台 mpOrderEffectiveStatus 一致） */
+/** 达人招募小程序大厅可读：招募中/收集中/已停止（closed，含截止判断） */
 export function mpRecruitmentOrdersForTalentHall(file: RegistryFile, nowMs = Date.now()) {
   return (file.mpRecruitmentOrders ?? [])
-    .filter((o) => o && isMpOrderHallRecruiting(o, nowMs))
+    .filter((o) => o && isMpOrderHallVisible(o, nowMs))
     .map(sanitizeMpRecruitmentOrderForTalentHall)
 }
 
