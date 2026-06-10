@@ -3,7 +3,8 @@ import { fetchMpRegistry } from '../../lib/mpApi'
 import { getActiveRole } from '../../lib/mpSession'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
-import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { matchListKeyword } from '../../lib/mpRecruitment/listKeywordSearch'
 import { orderVisibleToWorkIdentity } from '../../lib/mpRecruitment/roleHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
@@ -45,8 +46,7 @@ function SupplierRecommendOrders() {
     const kw = searchKeyword.trim()
     let rows = allOrderRows.filter((r) => {
       if (!orderVisibleToWorkIdentity(r, workId)) return false
-      const blob = [r.title, r.merchantName, r.region, r.platform].join(' ').toLowerCase()
-      if (kw && !blob.includes(kw.toLowerCase())) return false
+      if (kw && !matchListKeyword(r as unknown as Record<string, unknown>, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
       if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
@@ -71,7 +71,7 @@ function SupplierRecommendOrders() {
       setLoading(true)
       try {
         const reg = await fetchMpRegistry()
-        const rows = loadOpenOrderRows(reg).filter((r) => orderVisibleToWorkIdentity(r, workId))
+        const rows = loadAllOrderRows(reg).filter((r) => orderVisibleToWorkIdentity(r, workId))
         setAllOrderRows(
           rows.length || !showDemoOrders()
             ? rows
@@ -98,7 +98,7 @@ function SupplierRecommendOrders() {
         />
         <input
           className="hall-search-input panel-input"
-          placeholder="搜索商单、门店、城市"
+          placeholder="搜索商单、门店、城市、单号"
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
         />

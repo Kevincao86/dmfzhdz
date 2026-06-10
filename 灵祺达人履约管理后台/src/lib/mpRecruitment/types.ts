@@ -11,6 +11,10 @@ export type BudgetDisplay =
 
 export type RecruitmentOrderRow = {
   id: string
+  /** 商单号（通常与 id 相同，如 MP-RO-xxx） */
+  merchantOrderNo?: string
+  /** 关联商家 ERP 招募单号 */
+  sourceMerchantOrderId?: string
   isMock?: boolean
   title: string
   merchantName: string

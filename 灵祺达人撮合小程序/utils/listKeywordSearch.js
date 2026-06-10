@@ -16,6 +16,7 @@ function matchListKeyword(row, keyword, extraFields) {
     r.category,
     r.platform,
     r.merchantOrderNo,
+    r.sourceMerchantOrderId,
     r.statusLabel,
     r.hallLabel,
     r.budgetText,

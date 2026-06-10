@@ -70,6 +70,8 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
 
   return {
     id: String(mp.id),
+    merchantOrderNo: String(mp.id || '').trim(),
+    sourceMerchantOrderId: String(mp.sourceMerchantOrderId || '').trim(),
     isMock: false,
     merchantName: customerName,
     storeName,

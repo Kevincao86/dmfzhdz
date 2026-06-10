@@ -36,6 +36,7 @@ function mapMpOrderRow(mp, reg) {
     id: mp.id,
     isMock: false,
     merchantOrderNo: view.merchantOrderNo,
+    sourceMerchantOrderId: String(mp.sourceMerchantOrderId || '').trim(),
     merchantName: view.merchantName,
     storeName: view.storeName,
     title: view.title,

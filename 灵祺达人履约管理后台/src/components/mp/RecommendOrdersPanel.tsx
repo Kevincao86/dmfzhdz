@@ -3,7 +3,8 @@ import { fetchMpRegistry } from '../../lib/mpApi'
 import { getWorkIdentity } from '../../lib/mpWorkIdentity'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
-import { loadOpenOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { matchListKeyword } from '../../lib/mpRecruitment/listKeywordSearch'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
@@ -20,9 +21,7 @@ const ORDER_SEGMENTS = [
 ] as const
 
 function matchOrderSearch(row: RecruitmentOrderRow, keyword: string) {
-  if (!keyword) return true
-  const k = keyword.toLowerCase()
-  return [row.title, row.merchantName, row.region, row.platform].join(' ').toLowerCase().includes(k)
+  return matchListKeyword(row as unknown as Record<string, unknown>, keyword)
 }
 
 function matchOrderSegment(row: RecruitmentOrderRow, segment: string, talentCity: string) {
@@ -103,7 +102,7 @@ export default function RecommendOrdersPanel() {
       setLoading(true)
       try {
         const reg = await fetchMpRegistry()
-        const real = loadOpenOrderRows(reg)
+        const real = loadAllOrderRows(reg)
         const rows =
           showDemoOrders() && !real.length
             ? listFilters.buildMockRecruitmentRows()
@@ -128,7 +127,7 @@ export default function RecommendOrdersPanel() {
       </div>
       <input
         className="w-full rounded-lg panel-input border px-3 py-2.5 text-sm"
-        placeholder="搜索商单、门店、城市"
+        placeholder="搜索商单、门店、城市、单号"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
       />
