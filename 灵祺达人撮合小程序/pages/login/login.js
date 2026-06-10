@@ -45,7 +45,7 @@ async function applyLoginIdentity(data, workId) {
   }
 }
 
-async function navigateAfterLogin(page) {
+function navigateAfterLogin(page) {
   const tabBar = require('../../utils/tabBar.js')
   tabBar.refreshTabBar()
   const redirect = page && page.data && page.data.redirect ? String(page.data.redirect).trim() : ''
@@ -67,6 +67,24 @@ async function navigateAfterLogin(page) {
     return
   }
   wx.switchTab({ url: '/pages/index/index' })
+}
+
+function wxNickFromDetail(detail) {
+  if (!detail || typeof detail !== 'object') return ''
+  return String(detail.nickname || detail.nickName || detail.value || '').trim()
+}
+
+function readWxNickInput(page) {
+  return new Promise((resolve) => {
+    page
+      .createSelectorQuery()
+      .select('#login-wx-nick-input')
+      .fields({ properties: ['value'] })
+      .exec((res) => {
+        const qv = res && res[0] && res[0].value
+        resolve(String(qv || (page.data && page.data.wxNickName) || '').trim())
+      })
+  })
 }
 
 Page({
@@ -207,19 +225,29 @@ Page({
   },
 
   onWxNicknameInput(e) {
-    const nick = e.detail.value || ''
-    this.setData({ wxNickName: nick })
-    if (nick) require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
-  },
-
-  onWxNicknameReview(e) {
-    const nick = String((e.detail && e.detail.nickname) || (e.detail && e.detail.value) || '').trim()
+    const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
     if (!nick) return
     this.setData({ wxNickName: nick })
     require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
-    if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'nick') {
-      void this.finishWxAuthAndLogin()
+  },
+
+  onWxNicknameBlur(e) {
+    const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
+    if (!nick) return
+    this.setData({ wxNickName: nick })
+    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+  },
+
+  onWxNicknameReview(e) {
+    const detail = (e && e.detail) || {}
+    if (detail.pass === false) {
+      wx.showToast({ title: '昵称需重新选用', icon: 'none' })
+      return
     }
+    const nick = wxNickFromDetail(detail)
+    if (!nick) return
+    this.setData({ wxNickName: nick })
+    require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
   },
 
   onCloseWxAuthSheet() {
@@ -227,7 +255,14 @@ Page({
   },
 
   onConfirmWxNickStep() {
-    void this.finishWxAuthAndLogin()
+    void (async () => {
+      const nick = await readWxNickInput(this)
+      if (nick) {
+        this.setData({ wxNickName: nick })
+        require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: nick })
+      }
+      await this.finishWxAuthAndLogin()
+    })()
   },
 
   onToggleLegalAgree() {
@@ -298,7 +333,12 @@ Page({
       this.onCloseWxAuthSheet()
       return
     }
-    const nick = String(this.data.wxNickName || '').trim()
+    const nickFromState = String(this.data.wxNickName || '').trim()
+    let nick = nickFromState
+    if (!nick) {
+      nick = await readWxNickInput(this)
+      if (nick) this.setData({ wxNickName: nick })
+    }
     let avatar = String(this.data.wxAvatarUrl || '').trim()
     if (!avatar) {
       wx.showToast({ title: '请先授权微信头像', icon: 'none' })

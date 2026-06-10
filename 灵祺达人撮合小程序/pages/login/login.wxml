@@ -210,11 +210,13 @@
       <view class="login-wx-auth-step" wx:else>
         <image class="login-wx-avatar login-wx-avatar--sm" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
         <input
+          id="login-wx-nick-input"
           class="login-wx-nick login-wx-nick--sheet"
           type="nickname"
           placeholder="点击选用微信昵称"
           value="{{wxNickName}}"
           bindinput="onWxNicknameInput"
+          bindblur="onWxNicknameBlur"
           bindnicknamereview="onWxNicknameReview"
           focus="{{wxAuthStep === 'nick'}}"
         />
