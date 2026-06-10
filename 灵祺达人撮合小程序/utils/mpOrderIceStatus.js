@@ -2,11 +2,11 @@
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
-const listFilters = require('./recruitmentListFilters.js')
+const { parseRecruitCountFromMp } = require('./mpRecruitCount.js')
 
 function isIceRecruitFull(mp) {
   if (!mp || !isIceMpOrder(mp)) return false
-  const cap = listFilters.parseRecruitCountFromMp(mp)
+  const cap = parseRecruitCountFromMp(mp)
   const { claimed } = iceOrderStats.countIceOrderStats(mp)
   return cap > 0 && claimed >= cap
 }
@@ -15,7 +15,7 @@ function isIceOrderFulfilled(mp) {
   if (!mp || !isIceMpOrder(mp)) return false
   const raw = String(mp.status || '').trim()
   if (raw === 'done' || raw === 'pending_settlement') return true
-  const cap = listFilters.parseRecruitCountFromMp(mp)
+  const cap = parseRecruitCountFromMp(mp)
   if (cap <= 0) return false
   const { claimed, completed } = iceOrderStats.countIceOrderStats(mp)
   if (claimed < cap) return false
@@ -75,7 +75,7 @@ function canPrCompleteIceOrder(mp) {
   if (!mp || !isIceMpOrder(mp)) return false
   if (String(mp.status || '') === 'done') return false
   if (iceOrderStats.getIceVerifyMode(mp) !== 'pr') return false
-  const cap = listFilters.parseRecruitCountFromMp(mp)
+  const cap = parseRecruitCountFromMp(mp)
   const apps = (Array.isArray(mp.applicants) ? mp.applicants : []).filter(
     (a) => a && iceOrderStats.isIceApplicantClaimed(a),
   )

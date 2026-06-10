@@ -2,6 +2,7 @@
 const mpOrderStatus = require('./mpOrderStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
+const { parseRecruitCountFromMp } = require('./mpRecruitCount.js')
 
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
@@ -75,17 +76,6 @@ function resolveDeadlineMs(mp, summary) {
   }
   const pub = resolvePublishedMs(mp)
   return pub > 0 ? pub + 7 * 86400000 : 0
-}
-
-function parseRecruitCountFromMp(mp) {
-  if (mp && mp.recruitCount != null) {
-    const n = Number.parseInt(String(mp.recruitCount), 10)
-    if (Number.isFinite(n) && n > 0) return n
-  }
-  const summary = [mp?.merchantRequirements, mp?.recruitmentInfo].filter(Boolean).join('\n')
-  const m = String(summary).match(/招募人数[:：]\s*(\d+)/)
-  if (m) return Math.max(1, Number.parseInt(m[1], 10) || 1)
-  return 1
 }
 
 /** 发单列表：剩余天数 / 已截止 */
