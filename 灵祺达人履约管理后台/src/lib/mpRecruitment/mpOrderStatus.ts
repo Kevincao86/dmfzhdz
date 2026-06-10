@@ -19,6 +19,15 @@ export function matchHallStatusFilter(statusLabelText: string, filter: string): 
   return statusLabelText === filter
 }
 
+/** Tab 角标：默认筛选项下计入「已停止」（大厅仍展示的单） */
+export function matchHallTabCountStatusFilter(statusLabelText: string, filter: string): boolean {
+  if (!filter || filter === '全部') return true
+  if (filter === HALL_DEFAULT_STATUS_FILTER) {
+    return statusLabelText === '招募中' || statusLabelText === '收集中' || statusLabelText === '已停止'
+  }
+  return matchHallStatusFilter(statusLabelText, filter)
+}
+
 export function resolveEffectiveMpStatus(
   rawStatus: unknown,
   deadlineMs: number,

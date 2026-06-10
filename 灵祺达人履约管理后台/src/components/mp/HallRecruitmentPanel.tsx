@@ -10,6 +10,7 @@ import {
 } from '../../lib/mpRecruitment/listKeywordSearch'
 import {
   matchStatusLabel,
+  matchHallTabCountStatusFilter,
   prioritizeActiveStatus,
   splitRoleHallRows,
   STATUS_FILTER_OPTIONS,
@@ -40,6 +41,7 @@ function filterHallRows(
     filterStatus: string
     priceSelected: string[]
   },
+  forTabCount = false,
 ): RecruitmentOrderRow[] {
   const kw = opts.keyword.trim()
   const searchByOrderNo = looksLikeOrderNoSearch(kw)
@@ -52,7 +54,10 @@ function filterHallRows(
     if (!hallFilters.matchCategory(r.category, opts.filterCategory)) return false
     if (!hallFilters.matchPriceBuckets(r.priceAmount, opts.priceSelected)) return false
     if (searchByOrderNo && matchesOrderIdKeyword(row, kw)) return true
-    if (!matchStatusLabel(r, opts.filterStatus)) return false
+    const statusOk = forTabCount
+      ? matchHallTabCountStatusFilter(String(r.statusLabel || ''), opts.filterStatus)
+      : matchStatusLabel(r, opts.filterStatus)
+    if (!statusOk) return false
     return true
   })
 }
@@ -109,11 +114,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   )
 
   const tabCounts = useMemo(() => {
-    const normal = filterHallRows(normalRows, filterOpts).length
-    const urgent = filterHallRows(urgentRows, filterOpts).length
-    const shoot = filterHallRows(shootRows, filterOpts).length
-    const edit = filterHallRows(editRows, filterOpts).length
-    const ice = filterHallRows(iceRows, filterOpts).length
+    const normal = filterHallRows(normalRows, filterOpts, true).length
+    const urgent = filterHallRows(urgentRows, filterOpts, true).length
+    const shoot = filterHallRows(shootRows, filterOpts, true).length
+    const edit = filterHallRows(editRows, filterOpts, true).length
+    const ice = filterHallRows(iceRows, filterOpts, true).length
     return { normal, urgent, paichian: shoot + edit + ice, shoot, edit, ice }
   }, [normalRows, urgentRows, shootRows, editRows, iceRows, filterOpts])
 

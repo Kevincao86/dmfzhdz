@@ -1,10 +1,15 @@
 import type { MpWorkIdentity } from '../mpWorkIdentity'
 import type { RecruitmentOrderRow } from './types'
 
-import { HALL_DEFAULT_STATUS_FILTER, HALL_STATUS_FILTERS, matchHallStatusFilter } from './mpOrderStatus'
+import {
+  HALL_DEFAULT_STATUS_FILTER,
+  HALL_STATUS_FILTERS,
+  matchHallStatusFilter,
+  matchHallTabCountStatusFilter,
+} from './mpOrderStatus'
 
 export const STATUS_FILTER_OPTIONS = HALL_STATUS_FILTERS
-export { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter }
+export { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter, matchHallTabCountStatusFilter }
 
 function matchesRoleRecruit(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
   /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
