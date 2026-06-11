@@ -37,7 +37,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function RootRedirect() {
-  if (getToken()) return <Navigate to="/hall" replace />
+  if (getToken()) return <Navigate to="/hall?tab=hall" replace />
   return <Navigate to="/" replace />
 }
 

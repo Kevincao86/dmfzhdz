@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
@@ -35,9 +35,11 @@ import {
   resolveSignupCountdownTone,
   SIGNUP_COUNTDOWN_TONE_CLASS,
 } from '../lib/mpRecruitment/listFilters'
+import { HALL_RECRUITMENT_LIST_PATH } from '../lib/useRecruitmentNav'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
+  const location = useLocation()
   const [search] = useSearchParams()
   const nav = useNavigate()
   const role = getActiveRole()
@@ -260,6 +262,10 @@ export default function RecruitmentDetailPage() {
 
   const statusLabel = applicationStatusLabel(contactGate)
   const chatEnabled = role === 'talent' && canChat() && !!prChatMeta
+  const hallReturnTo =
+    typeof (location.state as { returnTo?: string } | null)?.returnTo === 'string'
+      ? String((location.state as { returnTo: string }).returnTo)
+      : HALL_RECRUITMENT_LIST_PATH
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -270,7 +276,7 @@ export default function RecruitmentDetailPage() {
         className="hidden"
         onChange={(e) => void onVideoFileChange(e)}
       />
-      <Link to="/hall?tab=hall" className="recruitment-detail-back text-sm hover:underline">
+      <Link to={hallReturnTo} className="recruitment-detail-back text-sm hover:underline">
         ← 返回招募大厅
       </Link>
       {loading ? <p className="recruitment-detail-muted">加载中…</p> : null}
