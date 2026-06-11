@@ -82,7 +82,15 @@ PY
   fi
 
   echo ""
-  echo "=== 2) 从 mpTalentMembers 扫描补全拍摄/剪辑团队库 ==="
+  echo "=== 2) 全量恢复：mp_accounts + 订单 applicants → 达人/PR/团队库 ==="
+  RECOVER_BODY="$(curl -sS -m 120 -X POST "${API}/api/meoo-ops-registry-recover-libraries" \
+    -H "Content-Type: application/json" \
+    -d '{}' || true)"
+  echo "${RECOVER_BODY}" | head -c 600
+  echo ""
+
+  echo ""
+  echo "=== 3) 补扫拍摄/剪辑团队库 ==="
   SYNC_BODY="$(curl -sS -m 60 -X POST "${API}/api/meoo-ops-supplier-team-library-sync" \
     -H "Content-Type: application/json" \
     -d '{"roles":["shoot","edit"]}' || true)"
@@ -90,7 +98,7 @@ PY
   echo ""
 
   echo ""
-  echo "=== 3) 再次计数（扫描后）==="
+  echo "=== 4) 再次计数（恢复后）==="
   curl -sS -m 20 \
     "${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=registry" \
     -H "apikey: ${key}" \

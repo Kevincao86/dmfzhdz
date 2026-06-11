@@ -88,13 +88,15 @@ import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
 import noviceKolAllocationHandler from '../api/meoo-ops-novice-kol-allocation.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
+import registryRecoverLibrariesHandler from '../api/meoo-ops-registry-recover-libraries.ts'
+import supplierTeamLibrarySyncHandler from '../api/meoo-ops-supplier-team-library-sync.ts'
 import douyinBindHandler from '../api/douyin-bind.ts'
 import kuaishouBindHandler from '../api/kuaishou-bind.ts'
 import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260608-novice-kol-allocation'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260610-registry-recover-libraries'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -132,6 +134,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-hall-registry': mpHallRegistryHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
+  '/api/meoo-ops-registry-recover-libraries': registryRecoverLibrariesHandler as VercelLikeHandler,
+  '/api/meoo-ops-supplier-team-library-sync': supplierTeamLibrarySyncHandler as VercelLikeHandler,
   '/api/ops-sync/registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/ops-sync/vendor-keys': opsSyncVendorKeysHandler as VercelLikeHandler,
   '/api/ops-sync/ai': opsSyncAiHandler as VercelLikeHandler,
