@@ -43,8 +43,14 @@ function buildPrInfoText(mp) {
   return lines.join('\n')
 }
 
-function renderPrQrImage(page, text, canvasSelector) {
-  const content = String(text || '').trim()
+function buildPrQrScanUrl(mp) {
+  const id = String((mp && mp.id) || '').trim()
+  if (!id) return ''
+  return `https://dr.mofangdianai.com/pr-info/${encodeURIComponent(id)}`
+}
+
+function renderPrQrImage(page, payload, canvasSelector) {
+  const content = String(payload || '').trim()
   if (!content || !page) return Promise.resolve('')
   const selector = canvasSelector || '#detailPrQrCanvas'
   const UQRCode = require('./uqrcode.js')
@@ -97,5 +103,6 @@ function renderPrQrImage(page, text, canvasSelector) {
 module.exports = {
   buildPrProfileSnapshot,
   buildPrInfoText,
+  buildPrQrScanUrl,
   renderPrQrImage,
 }

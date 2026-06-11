@@ -456,6 +456,88 @@ html:not([data-theme='dark']) .border-white\/10 {
   border-color: #e2e8f0 !important;
 }
 
+/* 招募详情：白光模式黑色正文 + 倒计时可读色 */
+html[data-theme='light'] .recruitment-detail-body,
+html:not([data-theme='dark']) .recruitment-detail-body {
+  color: #0f172a !important;
+}
+
+html[data-theme='dark'] .recruitment-detail-body {
+  color: #cbd5e1 !important;
+}
+
+html[data-theme='light'] .recruitment-detail-city,
+html:not([data-theme='dark']) .recruitment-detail-city {
+  color: #334155 !important;
+}
+
+html[data-theme='dark'] .recruitment-detail-city {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+html[data-theme='light'] .recruitment-detail-muted,
+html:not([data-theme='dark']) .recruitment-detail-muted {
+  color: #475569 !important;
+}
+
+html[data-theme='dark'] .recruitment-detail-muted {
+  color: #94a3b8 !important;
+}
+
+html[data-theme='light'] .recruitment-detail-back,
+html:not([data-theme='dark']) .recruitment-detail-back {
+  color: #475569 !important;
+}
+
+html[data-theme='dark'] .recruitment-detail-back {
+  color: #94a3b8 !important;
+}
+
+html[data-theme='light'] .signup-countdown--green,
+html:not([data-theme='dark']) .signup-countdown--green {
+  color: #047857 !important;
+}
+
+html[data-theme='light'] .signup-countdown--orange,
+html:not([data-theme='dark']) .signup-countdown--orange {
+  color: #c2410c !important;
+}
+
+html[data-theme='light'] .signup-countdown--danger,
+html:not([data-theme='dark']) .signup-countdown--danger {
+  color: #b91c1c !important;
+}
+
+html[data-theme='light'] .signup-countdown--ended,
+html:not([data-theme='dark']) .signup-countdown--ended {
+  color: #334155 !important;
+}
+
+html[data-theme='light'] .signup-countdown--unknown,
+html:not([data-theme='dark']) .signup-countdown--unknown {
+  color: #b45309 !important;
+}
+
+html[data-theme='dark'] .signup-countdown--green {
+  color: #86efac !important;
+}
+
+html[data-theme='dark'] .signup-countdown--orange {
+  color: #fdba74 !important;
+}
+
+html[data-theme='dark'] .signup-countdown--danger {
+  color: #fecaca !important;
+}
+
+html[data-theme='dark'] .signup-countdown--ended {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+html[data-theme='dark'] .signup-countdown--unknown {
+  color: #fde68a !important;
+}
+
 @keyframes hero-crossfade {
   0%,
   26% {

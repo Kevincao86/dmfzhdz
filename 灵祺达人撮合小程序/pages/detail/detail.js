@@ -143,10 +143,10 @@ Page({
     const mp = this.data.mpOrder
     if (!mp) return
     const prRecruitQr = require('../../utils/prRecruitQr.js')
-    const text = prRecruitQr.buildPrInfoText(mp)
-    if (!text) return
+    const scanUrl = prRecruitQr.buildPrQrScanUrl(mp)
+    if (!scanUrl) return
     setTimeout(() => {
-      prRecruitQr.renderPrQrImage(this, text).then((path) => {
+      prRecruitQr.renderPrQrImage(this, scanUrl).then((path) => {
         if (path) this.setData({ prQrImage: path })
       })
     }, 120)

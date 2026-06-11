@@ -18,6 +18,7 @@ import {
   syncProfile,
 } from '../lib/mpSync/talentChat'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
+import PrRecruitQrCard from '../components/mp/PrRecruitQrCard'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
@@ -52,7 +53,7 @@ export default function RecruitmentDetailPage() {
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
   const [readOnlyEnded, setReadOnlyEnded] = useState(false)
   const [signupCountdownText, setSignupCountdownText] = useState('')
-  const [signupCountdownToneClass, setSignupCountdownToneClass] = useState('text-amber-200')
+  const [signupCountdownToneClass, setSignupCountdownToneClass] = useState('signup-countdown signup-countdown--unknown')
   const [signupClosed, setSignupClosed] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -269,27 +270,30 @@ export default function RecruitmentDetailPage() {
         className="hidden"
         onChange={(e) => void onVideoFileChange(e)}
       />
-      <Link to="/hall" className="text-sm text-slate-400 hover:text-white">
+      <Link to="/hall" className="recruitment-detail-back text-sm hover:underline">
         ← 返回招募大厅
       </Link>
-      {loading ? <p className="text-slate-400">加载中…</p> : null}
-      {err ? <p className="text-red-400">{err}</p> : null}
+      {loading ? <p className="recruitment-detail-muted">加载中…</p> : null}
+      {err ? <p className="text-red-600">{err}</p> : null}
       {view ? (
         <>
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold leading-tight">
-              {view.title}
-              {view.region && view.region !== '—' ? (
-                <span className="text-white/80 font-semibold"> · {view.region}</span>
-              ) : null}
-            </h2>
-            <p className="font-mono text-xs text-slate-500">招募单号 {view.mpOrderId}</p>
-            <p className={`text-sm font-medium ${signupCountdownToneClass}`}>
-              报名倒计时 {signupCountdownText || '—'}
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1">
+              <h2 className="text-2xl font-bold leading-tight text-[var(--shell-text)]">
+                {view.title}
+                {view.region && view.region !== '—' ? (
+                  <span className="recruitment-detail-city font-semibold"> · {view.region}</span>
+                ) : null}
+              </h2>
+              <p className="font-mono text-xs recruitment-detail-muted">招募单号 {view.mpOrderId}</p>
+              <p className={`text-sm font-medium ${signupCountdownToneClass}`}>
+                报名倒计时 {signupCountdownText || '—'}
+              </p>
+            </div>
+            {id ? <PrRecruitQrCard mpOrderId={id} /> : null}
           </div>
-          <p className="text-amber-400 font-semibold">{view.budgetText}</p>
-          <div className="text-sm text-slate-400 space-y-1">
+          <p className="text-amber-600 font-semibold">{view.budgetText}</p>
+          <div className="text-sm recruitment-detail-muted space-y-1">
             <p>
               {view.platform} · 报名 {view.applicantCount}/{view.recruitCount}
             </p>
@@ -360,12 +364,12 @@ export default function RecruitmentDetailPage() {
 
           <section className="surface-card rounded-xl border p-4">
             <h3 className="font-medium mb-2">招募说明</h3>
-            <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans">{view.recruitmentInfo}</pre>
+            <pre className="recruitment-detail-body text-sm whitespace-pre-wrap font-sans">{view.recruitmentInfo}</pre>
           </section>
           {view.taskDetail !== view.recruitmentInfo ? (
             <section className="surface-card rounded-xl border p-4">
               <h3 className="font-medium mb-2">任务说明</h3>
-              <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans">{view.taskDetail}</pre>
+              <pre className="recruitment-detail-body text-sm whitespace-pre-wrap font-sans">{view.taskDetail}</pre>
             </section>
           ) : null}
 

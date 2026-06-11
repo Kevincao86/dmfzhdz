@@ -17,6 +17,7 @@ import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrProfilePage from './pages/PrProfilePage'
 import PrOrderApplicantsPage from './pages/PrOrderApplicantsPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
+import PublicPrInfoPage from './pages/PublicPrInfoPage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
 import PublishPage from './pages/PublishPage'
@@ -51,6 +52,7 @@ export default function App() {
       <Route path="/team" element={<TeamIntroPage edition="fulfillment" />} />
       <Route path="/legal/privacy" element={<LegalDocPage edition="fulfillment" doc="privacy" />} />
       <Route path="/legal/aup" element={<LegalDocPage edition="fulfillment" doc="aup" />} />
+      <Route path="/pr-info/:orderId" element={<PublicPrInfoPage />} />
       <Route
         element={
           <RequireAuth>
