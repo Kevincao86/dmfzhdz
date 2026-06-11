@@ -1,15 +1,18 @@
 const userProfile = require('./userProfile.js')
 const config = require('./config.js')
 const recruitTarget = require('./recruitTarget.js')
+const prRecruitQr = require('./prRecruitQr.js')
 
 const GUIDE_DIVIDER = '—— 报名指引 ——'
 const OPEN_HINT =
   '请打开「灵祺星选」小程序或网址（https://dr.mofangdianai.com/），在招募大厅找到本单或联系发布者获取详情页报名。'
 const MP_SHARE_APP_NAME = String(config.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
 
-/** 分享文案标题：优先 PR 端填写的昵称/名称，无资料时回退「灵祺星选」 */
-function shareCopyHeader(prProfile) {
-  const pr = prProfile || userProfile.readPrProfile()
+/** 分享文案标题：优先发布单上的 PR/机构名，无则回退传入的 prProfile，再回退「灵祺星选」 */
+function shareCopyHeader(order, prProfile) {
+  const fromOrder = prRecruitQr.resolveOrderPublisherDisplayName(order)
+  if (fromOrder) return `【${fromOrder}】`
+  const pr = prProfile || null
   if (pr) {
     const name = userProfile.prDisplayName(pr) || String(pr.wxNickName || '').trim()
     if (name) return `【${name}】`
@@ -103,7 +106,7 @@ function buildGroupCopyText(order, prProfile, applyLink) {
     order.recruitmentInfo || order.taskDetail || order.merchantRequirements || ''
   const info = formatShareRecruitmentInfo(raw)
   const guide = buildShareGuideBlock(order.id, applyLink || resolveCachedApplyLink(order))
-  const parts = [shareCopyHeader(prProfile), '']
+  const parts = [shareCopyHeader(order, prProfile), '']
   if (info) parts.push(info, '')
   parts.push(guide)
   return parts.join('\n')

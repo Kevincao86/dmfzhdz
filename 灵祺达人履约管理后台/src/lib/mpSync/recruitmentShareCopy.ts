@@ -1,5 +1,6 @@
 import { copyTextToClipboard } from '../copyTextToClipboard'
 import { readPrProfile, prDisplayName } from './userProfile'
+import { resolveOrderPublisherDisplayName } from './prRecruitQr'
 import { recruitTargetLabel } from '../mpRecruitment/recruitTargetLabel'
 
 const GUIDE_DIVIDER = '—— 报名指引 ——'
@@ -7,8 +8,13 @@ const OPEN_HINT =
   '请打开「灵祺星选」小程序或网址（https://dr.mofangdianai.com/），在招募大厅找到本单或联系发布者获取详情页报名。'
 const MP_SHARE_APP_NAME = String(import.meta.env.VITE_MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
 
-export function shareCopyHeader(prProfile?: ReturnType<typeof readPrProfile> | null): string {
-  const pr = prProfile ?? readPrProfile()
+export function shareCopyHeader(
+  order?: Record<string, unknown> | null,
+  prProfile?: ReturnType<typeof readPrProfile> | null,
+): string {
+  const fromOrder = resolveOrderPublisherDisplayName(order)
+  if (fromOrder) return `【${fromOrder}】`
+  const pr = prProfile ?? null
   if (pr) {
     const name = prDisplayName(pr) || String(pr.wxNickName || '').trim()
     if (name) return `【${name}】`
@@ -110,7 +116,7 @@ export function buildGroupCopyText(
   const info = formatShareRecruitmentInfo(raw)
   const link = applyLink || resolveCachedApplyLink(order as Record<string, unknown>)
   const guide = buildShareGuideBlock(order.id, link)
-  const parts = [shareCopyHeader(prProfile), '']
+  const parts = [shareCopyHeader(order as Record<string, unknown>, prProfile), '']
   if (info) parts.push(info, '')
   parts.push(guide)
   return parts.join('\n')
@@ -144,6 +150,7 @@ function orderToShareInput(order: Record<string, unknown>) {
     id,
     title: String(order.title || ''),
     region: String(order.region || '全国'),
+    customerName: String(order.customerName || ''),
     recruitmentInfo: String(order.recruitmentInfo || ''),
     taskDetail: String(order.taskDetail || ''),
     merchantRequirements: String(order.merchantRequirements || ''),

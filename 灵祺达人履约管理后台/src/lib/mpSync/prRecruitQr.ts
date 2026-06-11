@@ -23,6 +23,20 @@ function resolvePrName(
   return String(snap.companyName || snap.contactName || mp.customerName || '').trim()
 }
 
+/** 分享文案 / 公开页：优先取发布时写入的 PR 机构名，而非当前登录用户 */
+export function resolveOrderPublisherDisplayName(mp: Record<string, unknown> | null | undefined): string {
+  if (!mp || typeof mp !== 'object') return ''
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
+      ? (meta.prProfileSnapshot as PrProfileSnapshot)
+      : {}
+  return resolvePrName(meta, snap, mp)
+}
+
 export function buildPrInfoText(mp: Record<string, unknown> | null | undefined): string {
   if (!mp) return ''
   const meta =
