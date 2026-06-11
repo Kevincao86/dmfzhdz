@@ -16,7 +16,7 @@ import {
 import { buildMpGroupQrByOrderIdForSession } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
-import { slimRecommendHallPayload } from './slimRecommendHallPayload.js'
+import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
 
 const HALL_FETCH_MS = 20_000
 
@@ -242,10 +242,9 @@ function buildHallPayload(
     if (editLib.length) payload.editTeamLibraryEntries = editLib
     if (prUsers.length) payload.mpPrUsers = prUsers
   }
-  const finalPayload = includeRecommendPool ? slimRecommendHallPayload(payload) : payload
   return {
     partial: file,
-    payload: finalPayload,
+    payload,
   }
 }
 
@@ -291,10 +290,7 @@ function buildHallPayloadSafe(
       if (prUsers.length) payload.mpPrUsers = prUsers
     }
     if (mp.length || Object.keys(payload).length > 2) {
-      return {
-        payload: includeRecommendPool ? slimRecommendHallPayload(payload) : payload,
-        partial,
-      }
+      return { payload, partial }
     }
     return { payload: emptyHallPayload(), partial: {} }
   }
@@ -320,6 +316,15 @@ async function tryLoadHallFromPartial(
     opts.includeRecommendPool,
   )
   return built.payload
+}
+
+async function finalizeRecommendHallPayload(
+  payload: Record<string, unknown> | null | undefined,
+  includeRecommendPool: boolean,
+): Promise<Record<string, unknown>> {
+  if (!payload || typeof payload !== 'object') return payload || { ok: true, mpRecruitmentOrders: [] }
+  if (!includeRecommendPool) return payload
+  return hydrateRecommendHallInlineImagesToOss(payload)
 }
 
 export async function loadMpHallRegistryPayload(opts?: {
@@ -366,7 +371,9 @@ export async function loadMpHallRegistryPayload(opts?: {
         const payload = await tryLoadHallFromPartial(async () => partial, buildOpts)
         const orders = hallOrderCount(payload)
         const pool = includeRecommendPool ? recommendPoolCount(partial) : 0
-        if (orders > 0 || (includeRecommendPool && pool > 0)) return payload!
+        if (orders > 0 || (includeRecommendPool && pool > 0)) {
+          return finalizeRecommendHallPayload(payload!, includeRecommendPool)
+        }
         lastPayload = payload
         attempts.push(`loader_${i}:built_empty`)
       } catch (e) {
@@ -374,7 +381,7 @@ export async function loadMpHallRegistryPayload(opts?: {
         attempts.push(msg.slice(0, 240))
       }
     }
-    if (lastPayload) return lastPayload
+    if (lastPayload) return finalizeRecommendHallPayload(lastPayload, includeRecommendPool)
   } else if (isVercelServerless()) {
     attempts.push(`registry_env_missing:${missingParts.join(',')}`)
   } else {
@@ -397,7 +404,7 @@ export async function loadMpHallRegistryPayload(opts?: {
         talentAccount,
         includeRecommendPool,
       )
-      return built.payload
+      return finalizeRecommendHallPayload(built.payload, includeRecommendPool)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       attempts.push(`ecs_proxy:${msg.slice(0, 240)}`)

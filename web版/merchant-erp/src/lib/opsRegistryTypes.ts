@@ -385,7 +385,7 @@ export type RegistryMpRecruitmentOrder = {
   createdAt: string
   updatedAt: string
   applicants?: RegistryMpRecruitmentApplicant[]
-  /** 推荐大厅 slim 响应：报名明细剥离后保留计数 */
+  /** 可选：部分接口写入的报名计数（有 applicants 时以 applicants 为准） */
   applicantCount?: number
   orderKind?: RecruitmentOrderKind
   hall?: MpRecruitmentHall
