@@ -5,12 +5,34 @@
   background: var(--lq-bg, #f5f6fa);
 }
 
+.ntf-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
 .ntf-tabs {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   gap: 12rpx;
-  margin-bottom: 20rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.ntf-read-all {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 12rpx 20rpx !important;
+  line-height: 1.2 !important;
+  font-size: 24rpx !important;
+  font-weight: 600;
+  color: #7c3aed !important;
+  background: #fff !important;
+  border: 2rpx solid #ddd6fe !important;
+  border-radius: 999rpx !important;
 }
 
 .ntf-tab {

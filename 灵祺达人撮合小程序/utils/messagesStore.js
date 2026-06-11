@@ -214,6 +214,12 @@ function mergeRegistryInboxForTalent(reg, member) {
   return inboxRowEnrich.enrichAndSort(reg, [...merged, ...rest])
 }
 
+function markAllNotificationsRead() {
+  markNotificationsRead()
+  const rows = readAllNotificationRows()
+  markInboxSeen(rows.map((r) => r.id))
+}
+
 module.exports = {
   CATEGORY_LABELS,
   readMessages,
@@ -224,6 +230,7 @@ module.exports = {
   unreadNotificationCount,
   markMessagesRead,
   markNotificationsRead,
+  markAllNotificationsRead,
   inboxRowsForTalent,
   inboxRowsForTalentMember: inboxRowsForTalent,
   mergeRegistryInboxForTalent,

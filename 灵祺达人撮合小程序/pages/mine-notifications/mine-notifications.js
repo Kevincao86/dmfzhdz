@@ -66,6 +66,7 @@ Page({
     activeTab: 'all',
     sections: [],
     totalCount: 0,
+    unreadCount: 0,
     emptyHint: '',
   },
   async onPullDownRefresh() {
@@ -91,10 +92,12 @@ Page({
     const mine = pages.length >= 2 ? pages[pages.length - 2] : null
     if (mine && typeof mine.refresh === 'function') mine.refresh()
     const counts = inboxCatalog.tabCounts(rows)
+    const unreadCount = rows.filter((r) => !r.read).length
     this.setData({
       tabs: buildTabs(counts),
       sections: buildSections(rows, this.data.activeTab),
       totalCount: rows.length,
+      unreadCount,
       emptyHint:
         rows.length === 0
           ? 'PR 通知入选后，请下拉刷新；入口在「我的 → 消息通知」（不是底部「消息」）'
@@ -165,6 +168,17 @@ Page({
       title: action === 'joined' ? '已标记入群' : '已确认',
       icon: 'success',
     })
+    void this.loadRows()
+  },
+  onMarkAllRead() {
+    const rows = this._allRows || []
+    const unreadIds = rows.filter((r) => r && !r.read).map((r) => r.id)
+    if (!unreadIds.length) {
+      wx.showToast({ title: '暂无未读消息', icon: 'none' })
+      return
+    }
+    messagesStore.markAllNotificationsRead()
+    wx.showToast({ title: '已全部标为已读', icon: 'success' })
     void this.loadRows()
   },
 })

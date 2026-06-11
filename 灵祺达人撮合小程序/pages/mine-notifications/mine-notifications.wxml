@@ -1,15 +1,23 @@
 <view class="ntf-page page-shell">
-  <view wx:if="{{totalCount > 0}}" class="ntf-tabs">
-    <view
-      wx:for="{{tabs}}"
-      wx:key="id"
-      class="ntf-tab {{activeTab === item.id ? 'ntf-tab--on' : ''}}"
-      data-id="{{item.id}}"
-      bindtap="onTabChange"
-    >
-      <text class="ntf-tab-label">{{item.label}}</text>
-      <text wx:if="{{item.badge}}" class="ntf-tab-badge">{{item.badge}}</text>
+  <view wx:if="{{totalCount > 0}}" class="ntf-head">
+    <view class="ntf-tabs">
+      <view
+        wx:for="{{tabs}}"
+        wx:key="id"
+        class="ntf-tab {{activeTab === item.id ? 'ntf-tab--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onTabChange"
+      >
+        <text class="ntf-tab-label">{{item.label}}</text>
+        <text wx:if="{{item.badge}}" class="ntf-tab-badge">{{item.badge}}</text>
+      </view>
     </view>
+    <button
+      wx:if="{{unreadCount > 0}}"
+      class="ntf-read-all"
+      size="mini"
+      bindtap="onMarkAllRead"
+    >全部已读</button>
   </view>
 
   <view wx:if="{{totalCount === 0}}" class="card state-empty ntf-empty">
