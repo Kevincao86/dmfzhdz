@@ -124,33 +124,13 @@ Page({
     return share
   },
   onShareTimeline() {
-    return this.buildTimelineSharePayload()
-  },
-  buildTimelineSharePayload() {
-    const mpShare = require('../../utils/mpShare.js')
-    mpShare.enableShareMenu()
-    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
-    const recruitShareCover = require('../../utils/recruitShareCover.js')
-    const v = this.data.view
-    const mp = this.data.mpOrder
-    const id = this.data.id
-    if (!id) return mpShare.defaultTimelineShare()
-    const base = {
-      title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
-      query: `id=${encodeURIComponent(id)}`,
-    }
-    const ready = String(this.data.shareCoverPath || '').trim()
-    if (recruitShareCover.isLocalSharePath(ready)) {
-      return { ...base, imageUrl: ready }
-    }
-    if (mp) {
-      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-      const cached = recruitShareCover.readCached(coverUrl)
-      if (cached) return { ...base, imageUrl: cached }
-    }
-    const fallback = mpShare.LOCAL_SHARE_COVER || mpShare.SHARE_COVER_IMAGE
-    if (fallback) return { ...base, imageUrl: fallback }
-    return base
+    const { buildTimelineSharePayload } = require('../../utils/shareTimelinePayload.js')
+    return buildTimelineSharePayload({
+      id: this.data.id,
+      title: this.data.view && this.data.view.title,
+      shareCoverPath: this.data.shareCoverPath,
+      mp: this.data.mpOrder,
+    })
   },
   async loadOrder(id) {
     if (!api.hasApi()) {
@@ -547,6 +527,20 @@ Page({
   },
   onCloseShareSheet() {
     this.setData({ showShareSheet: false })
+  },
+  onPickShareTimeline() {
+    const id = String(this.data.id || '').trim()
+    if (!id) {
+      wx.showToast({ title: '招募单未就绪', icon: 'none' })
+      return
+    }
+    const title = (this.data.view && this.data.view.title) || this.data.shareTitle || ''
+    this.setData({ showShareSheet: false })
+    wx.navigateTo({
+      url:
+        `/pages/share-timeline/share-timeline?id=${encodeURIComponent(id)}` +
+        `&title=${encodeURIComponent(title)}`,
+    })
   },
   onContactPrPending() {
     const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
