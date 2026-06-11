@@ -40,6 +40,10 @@ export function formatMpApiErr(e: unknown, fallback = '操作失败，请稍后�
   if (/413|Request Entity Too Large|request_entity_too_large/i.test(msg)) {
     return '提交内容过大（多为封面图）。请换更小图片、选图库封面，或联系运维执行 ecs-hotfix-nginx-body-size.sh'
   }
+  if (/meoo_ops_sync_registry_failed|meoo_ops_mp_hall_registry_failed|registry_snapshot_fetch_timeout|registry_failed/i.test(msg)) {
+    return '招募数据加载失败，请刷新重试；若持续失败请联系运维检查 ECS 注册表服务'
+  }
+  if (/招募大厅加载超时/i.test(msg)) return msg
   if (/[\u4e00-\u9fa5]/.test(msg)) return msg
   return fallback
 }

@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       includeRecommendPool,
     })
 
-    if (!payload || !Array.isArray(payload.mpRecruitmentOrders)) {
+    if (!payload || typeof payload !== 'object') {
       res.status(502).send(
         JSON.stringify({
           ok: false,
@@ -42,6 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         }),
       )
       return
+    }
+    if (!Array.isArray(payload.mpRecruitmentOrders)) {
+      payload.mpRecruitmentOrders = []
     }
     res.status(200).send(JSON.stringify(payload))
   } catch (e) {

@@ -54,7 +54,19 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
       }
       const parsed = (rows[0]?.registry ?? null) as Partial<RegistryFile> | null
       const { normalizeRegistryFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
-      return normalizeRegistryFile(parsed)
+      try {
+        return normalizeRegistryFile(parsed)
+      } catch (normalizeErr) {
+        const hint = normalizeErr instanceof Error ? normalizeErr.message : String(normalizeErr)
+        console.error('[registrySnapshotIoFetch] normalizeRegistryFile failed:', hint.slice(0, 400))
+        return normalizeRegistryFile({
+          mpRecruitmentOrders: Array.isArray(parsed?.mpRecruitmentOrders) ? parsed!.mpRecruitmentOrders : [],
+          recruitmentOrders: Array.isArray(parsed?.recruitmentOrders) ? parsed!.recruitmentOrders : [],
+          mpTalentMembers: Array.isArray(parsed?.mpTalentMembers) ? parsed!.mpTalentMembers : [],
+          mpPrUsers: Array.isArray(parsed?.mpPrUsers) ? parsed!.mpPrUsers : [],
+          mpTalentInbox: Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : [],
+        })
+      }
     },
 
     async save(data: RegistryFile): Promise<void> {
