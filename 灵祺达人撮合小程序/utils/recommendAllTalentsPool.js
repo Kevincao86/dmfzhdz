@@ -212,8 +212,7 @@ function buildAllTalentsPool(reg) {
 function registryHasRecommendTalentPool(reg) {
   if (!reg || typeof reg !== 'object') return false
   const lib = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries.length : 0
-  const mem = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers.length : 0
-  return lib + mem > 0
+  return lib > 0
 }
 
 module.exports = {
