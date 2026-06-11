@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
-# 紧急：运营台达人库/PR库 0 条 — sync-registry 500（isIceMpOrder）+ 恢复库数据
-# 轻量 admin 控制台粘贴执行:
-#   cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-hotfix-sync-registry-read.sh
+# ⚠️ 会写 ops_registry_snapshot（动库）— 须项目方人工确认 10 次后再跑
+#
+# 默认请用不写库的:
+#   cd ~/app && bash scripts/ecs-deploy-light-safe.sh
+#
+# 仅当明确要「从 mp_accounts 重建注册表切片」时:
+#   CONFIRM_REGISTRY_WRITE=YES cd ~/app && bash scripts/ecs-hotfix-sync-registry-read.sh
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+if [[ "${CONFIRM_REGISTRY_WRITE:-}" != "YES" ]]; then
+  echo "FAIL: 本脚本会写入 ops_registry_snapshot（动库）。"
+  echo "若只需部署 API，请执行: bash scripts/ecs-deploy-light-safe.sh"
+  echo "若确需重建达人/PR 库切片，请设置: CONFIRM_REGISTRY_WRITE=YES"
+  exit 1
+fi
 
 bash "$ROOT/scripts/ecs-deploy-auth-api.sh"
 bash "$ROOT/scripts/ecs-repair-registry-talent-libraries.sh"
