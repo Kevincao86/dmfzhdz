@@ -66,8 +66,11 @@ Page({
     mpOrder: null,
     shareCoverPath: '',
     deadlineMs: 0,
+    publishedMs: 0,
     signupCountdownText: '—',
-    signupCountdownEnded: false,
+    signupCountdownTone: 'unknown',
+    signupClosed: false,
+    prQrImage: '',
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -109,17 +112,49 @@ Page({
     }
   },
   refreshSignupCountdown() {
+    this.syncSignupState()
+  },
+  syncSignupState() {
+    const mp = this.data.mpOrder
     const deadlineMs = Number(this.data.deadlineMs) || 0
-    if (!deadlineMs) {
-      this.setData({ signupCountdownText: '截止日期待定', signupCountdownEnded: false })
-      return
-    }
+    const publishedMs = Number(this.data.publishedMs) || 0
     const listFilters = require('../../utils/recruitmentListFilters.js')
-    const text = listFilters.formatSignupCountdownText(deadlineMs)
-    const ended = text === '已截止'
-    const patch = { signupCountdownText: text, signupCountdownEnded: ended }
-    if (ended) this.stopSignupCountdownTimer()
+    const mpOrderStatus = require('../../utils/mpOrderStatus.js')
+    const now = Date.now()
+    const text = deadlineMs
+      ? listFilters.formatSignupCountdownText(deadlineMs, now)
+      : '截止日期待定'
+    const tone = listFilters.resolveSignupCountdownTone(deadlineMs, publishedMs, now)
+    const effectiveStatus = mp
+      ? mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs, now)
+      : 'closed'
+    const recruiting = mpOrderStatus.isMpOrderRecruiting(effectiveStatus)
+    const deadlineEnded = deadlineMs > 0 && now >= deadlineMs
+    const signupClosed = Boolean(this.data.readOnlyEnded || !recruiting || deadlineEnded)
+    const patch = {
+      signupCountdownText: text,
+      signupCountdownTone: tone,
+      signupClosed,
+    }
+    if (deadlineEnded) this.stopSignupCountdownTimer()
     this.setData(patch)
+  },
+  renderPrQrImage() {
+    const mp = this.data.mpOrder
+    if (!mp) return
+    const prRecruitQr = require('../../utils/prRecruitQr.js')
+    const text = prRecruitQr.buildPrInfoText(mp)
+    if (!text) return
+    setTimeout(() => {
+      prRecruitQr.renderPrQrImage(this, text).then((path) => {
+        if (path) this.setData({ prQrImage: path })
+      })
+    }, 120)
+  },
+  onPreviewPrQr() {
+    const url = String(this.data.prQrImage || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
   },
   syncIceApplicantFromStorage() {
     try {
@@ -184,6 +219,7 @@ Page({
       return
     }
     this.setData({ loading: true, err: '' })
+    const listFilters = require('../../utils/recruitmentListFilters.js')
     try {
       const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
       appRegistrySync.reconcileApplicationsFromRegistry(reg)
@@ -338,6 +374,7 @@ Page({
         loading: false,
         mpOrder: mp,
         deadlineMs: Number(view.deadlineMs) || 0,
+        publishedMs: listFilters.resolvePublishedMs(mp),
         isPr: userProfile.readIdentity() === 'pr',
         applyTemplateId,
         chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
@@ -376,8 +413,9 @@ Page({
         applyGateHint,
         iceSlotsFull,
       })
-      this.refreshSignupCountdown()
+      this.syncSignupState()
       this.startSignupCountdownTimer()
+      this.renderPrQrImage()
       try {
         const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
         const recruitShareCover = require('../../utils/recruitShareCover.js')
@@ -618,6 +656,10 @@ Page({
     }
   },
   goApply() {
+    if (this.data.signupClosed) {
+      wx.showToast({ title: '报名已截止', icon: 'none' })
+      return
+    }
     if (this.data.isPr) {
       wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
       return

@@ -109,6 +109,22 @@ function formatSignupCountdownText(deadlineMs, nowMs) {
   return '剩余不足 1 分'
 }
 
+/** 详情页倒计时色调：充裕绿 / 过半橙 / 余1/3深红 / 已截止灰 */
+function resolveSignupCountdownTone(deadlineMs, publishedMs, nowMs) {
+  if (!deadlineMs || !Number.isFinite(deadlineMs)) return 'unknown'
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now()
+  if (deadlineMs <= now) return 'ended'
+  const start =
+    publishedMs > 0 && publishedMs < deadlineMs ? publishedMs : deadlineMs - 7 * 86400000
+  const total = deadlineMs - start
+  if (total <= 0) return 'green'
+  const remain = deadlineMs - now
+  const ratio = remain / total
+  if (ratio > 0.5) return 'green'
+  if (ratio > 1 / 3) return 'orange'
+  return 'danger'
+}
+
 function hallLabelFromLocal(localItem) {
   if (localItem && localItem.hall === 'urgent') return '急单大厅'
   if (localItem && localItem.hall === 'ice') return '云剪任务'
@@ -323,6 +339,7 @@ module.exports = {
   parseRecruitCountFromMp,
   formatDeadlineDaysText,
   formatSignupCountdownText,
+  resolveSignupCountdownTone,
   enrichMpOrderListItem,
   sortRecruitmentRows,
   buildMockRecruitmentRow,

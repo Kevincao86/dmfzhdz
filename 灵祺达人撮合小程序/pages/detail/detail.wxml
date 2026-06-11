@@ -15,17 +15,24 @@
   <block wx:elif="{{view}}">
     <view class="card detail-hero">
       <view class="detail-hero-top">
-        <text class="title-lg detail-hero-title">
-          {{view.title}}<text wx:if="{{view.region && view.region !== '—'}}" class="detail-hero-city"> · {{view.region}}</text>
-        </text>
-        <view class="order-no detail-hero-order-no" bindtap="copyOrderNo">
-          招募单号 {{view.merchantOrderNo}}
-          <text class="order-copy">复制</text>
+        <view class="detail-hero-main">
+          <text class="title-lg detail-hero-title">
+            {{view.title}}<text wx:if="{{view.region && view.region !== '—'}}" class="detail-hero-city"> · {{view.region}}</text>
+          </text>
+          <view class="order-no detail-hero-order-no" bindtap="copyOrderNo">
+            招募单号 {{view.merchantOrderNo}}
+            <text class="order-copy">复制</text>
+          </view>
+          <text class="detail-hero-countdown detail-hero-countdown--{{signupCountdownTone}}">报名倒计时 {{signupCountdownText}}</text>
+          <view>
+            <text wx:for="{{view.tags}}" wx:key="text" class="tag tag-{{item.tone}}">{{item.text}}</text>
+          </view>
         </view>
-        <text class="detail-hero-countdown {{signupCountdownEnded ? 'detail-hero-countdown--ended' : ''}}">报名倒计时 {{signupCountdownText}}</text>
-        <view>
-          <text wx:for="{{view.tags}}" wx:key="text" class="tag tag-{{item.tone}}">{{item.text}}</text>
+        <view class="detail-hero-qr-wrap" wx:if="{{prQrImage}}">
+          <image class="detail-hero-qr-img" src="{{prQrImage}}" mode="aspectFit" bindtap="onPreviewPrQr" show-menu-by-longpress="{{true}}" />
+          <text class="detail-hero-qr-cap">招募方</text>
         </view>
+        <canvas type="2d" id="detailPrQrCanvas" class="detail-hero-qr-canvas" />
       </view>
       <view class="detail-body">
         <view class="metrics">
@@ -251,21 +258,22 @@
       bindtap="onContactPrPending"
     >待 PR 审核</button>
     <button
-      wx:if="{{canReclaimIce && !isPr && !applyGateHint}}"
+      wx:if="{{canReclaimIce && !isPr && !applyGateHint && !signupClosed}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
     >{{isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}}</button>
     <button
-      wx:elif="{{!applied && !isPr && !applyGateHint && !iceSlotsFull}}"
+      wx:elif="{{!applied && !isPr && !applyGateHint && !iceSlotsFull && !signupClosed}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
     >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : '我要报名'}}</button>
     <button
-      wx:if="{{!applied && !isPr && applyGateHint && !iceSlotsFull}}"
+      wx:if="{{!applied && !isPr && applyGateHint && !iceSlotsFull && !signupClosed}}"
       class="btn-secondary bottom-cta bottom-cta--muted"
       bindtap="goApply"
     >{{applyGateHint}}</button>
-    <view wx:if="{{!applied && !isPr && iceSlotsFull}}" class="bottom-cta bottom-cta--muted bottom-cta--text">已收满</view>
+    <view wx:if="{{!applied && !isPr && iceSlotsFull && !signupClosed}}" class="bottom-cta bottom-cta--muted bottom-cta--text">已收满</view>
+    <view wx:if="{{!applied && !isPr && signupClosed}}" class="bottom-cta bottom-cta--muted bottom-cta--text">报名已截止</view>
     <button
       wx:if="{{!applied && isPr}}"
       class="btn-secondary bottom-cta bottom-cta--muted"

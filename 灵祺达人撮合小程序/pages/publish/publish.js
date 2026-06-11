@@ -1417,6 +1417,7 @@ Page({
           {
           prParticipantKey: participant.prParticipantKey(pr),
           prDisplayName: userProfile.prDisplayName(pr),
+          prProfileSnapshot: require('../../utils/prRecruitQr.js').buildPrProfileSnapshot(pr),
           prWxNickName: String(pr.wxNickName || '').trim(),
           prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
           lingqiPrId: String((acct && acct.lingqiPrId) || pr.lingqiPrId || '').trim(),

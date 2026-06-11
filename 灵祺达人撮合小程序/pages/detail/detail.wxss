@@ -10,6 +10,47 @@
   margin: -32rpx -32rpx 0;
   padding: 28rpx 32rpx 24rpx;
   background: var(--lq-gradient-deep);
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.detail-hero-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-hero-qr-wrap {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4rpx;
+}
+
+.detail-hero-qr-img {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 12rpx;
+  background: #fff;
+  padding: 6rpx;
+  box-sizing: border-box;
+}
+
+.detail-hero-qr-cap {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.detail-hero-qr-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 120px;
+  height: 120px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .detail-hero-top .order-no {
@@ -39,12 +80,27 @@
   margin-top: 10rpx;
   font-size: 26rpx;
   font-weight: 600;
-  color: #fde68a;
   line-height: 1.45;
 }
 
-.detail-hero-top .detail-hero-countdown--ended {
+.detail-hero-countdown--green {
+  color: #86efac;
+}
+
+.detail-hero-countdown--orange {
+  color: #fdba74;
+}
+
+.detail-hero-countdown--danger {
+  color: #fecaca;
+}
+
+.detail-hero-countdown--ended {
   color: rgba(255, 255, 255, 0.55);
+}
+
+.detail-hero-countdown--unknown {
+  color: #fde68a;
 }
 
 .detail-hero-top .detail-hero-city {
