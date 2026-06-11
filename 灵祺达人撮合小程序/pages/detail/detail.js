@@ -103,7 +103,7 @@ Page({
     if (!this.data.deadlineMs) return
     this._signupCountdownTimer = setInterval(() => {
       this.refreshSignupCountdown()
-    }, 60000)
+    }, 1000)
   },
   stopSignupCountdownTimer() {
     if (this._signupCountdownTimer) {

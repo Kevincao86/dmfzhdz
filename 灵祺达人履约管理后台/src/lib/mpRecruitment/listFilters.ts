@@ -60,19 +60,21 @@ export function formatDeadlineDaysText(deadlineMs: number): string {
 
 export type SignupCountdownTone = 'green' | 'orange' | 'danger' | 'ended' | 'unknown'
 
-/** 详情页：报名倒计时（天/时/分） */
+/** 详情页：报名倒计时（天/时/分/秒） */
 export function formatSignupCountdownText(deadlineMs: number, nowMs: number = Date.now()): string {
   if (!deadlineMs) return '截止日期待定'
   const diff = deadlineMs - nowMs
   if (diff <= 0) return '已截止'
-  const totalMin = Math.floor(diff / 60000)
-  const days = Math.floor(totalMin / (24 * 60))
-  const hours = Math.floor((totalMin - days * 24 * 60) / 60)
-  const mins = totalMin % 60
-  if (days > 0) return `剩余 ${days}天 ${hours}小时 ${mins}分`
-  if (hours > 0) return `剩余 ${hours}小时 ${mins}分`
-  if (mins > 0) return `剩余 ${mins}分`
-  return '剩余不足 1 分'
+  const totalSec = Math.floor(diff / 1000)
+  const days = Math.floor(totalSec / 86400)
+  const hours = Math.floor((totalSec % 86400) / 3600)
+  const mins = Math.floor((totalSec % 3600) / 60)
+  const secs = totalSec % 60
+  if (days > 0) return `剩余 ${days}天 ${hours}小时 ${mins}分 ${secs}秒`
+  if (hours > 0) return `剩余 ${hours}小时 ${mins}分 ${secs}秒`
+  if (mins > 0) return `剩余 ${mins}分 ${secs}秒`
+  if (secs > 0) return `剩余 ${secs}秒`
+  return '剩余不足 1 秒'
 }
 
 /** 详情页倒计时色调：充裕绿 / 过半橙 / 余1/3深红 / 已截止灰 */

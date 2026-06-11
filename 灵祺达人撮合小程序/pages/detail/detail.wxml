@@ -30,7 +30,7 @@
         </view>
         <view class="detail-hero-qr-wrap" wx:if="{{prQrImage}}">
           <image class="detail-hero-qr-img" src="{{prQrImage}}" mode="aspectFit" bindtap="onPreviewPrQr" show-menu-by-longpress="{{true}}" />
-          <text class="detail-hero-qr-cap">招募方</text>
+          <text class="detail-hero-qr-cap">灵祺官方认证</text>
         </view>
         <canvas type="2d" id="detailPrQrCanvas" class="detail-hero-qr-canvas" />
       </view>

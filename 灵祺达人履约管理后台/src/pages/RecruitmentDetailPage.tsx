@@ -141,7 +141,7 @@ export default function RecruitmentDetailPage() {
     }
     refresh()
     if (!deadlineMs) return
-    const timer = window.setInterval(refresh, 60000)
+    const timer = window.setInterval(refresh, 1000)
     return () => window.clearInterval(timer)
   }, [view, mpRaw, readOnlyEnded])
 
