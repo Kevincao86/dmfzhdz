@@ -57,6 +57,8 @@ export type RecruitmentOrderRow = {
   signupCountdownTone?: 'green' | 'orange' | 'danger' | 'ended' | 'unknown'
   aiTag?: string
   aiTagTone?: string
+  aiTagBg?: string
+  aiTagFg?: string
   aiTagSource?: 'persisted' | 'ai' | 'local' | 'pending' | string
   matchScore?: number
   aiMatch?: boolean

@@ -221,21 +221,23 @@ function applyOrderMatchResults(rows, map, talent, talentCity) {
     const hit = map[row.id]
     if (hit && hit.score > 0) {
       const score = clampMatchScoreByFacts(hit.score, row, profile)
+      const tag = hit.tag || (score >= 72 ? '高匹配' : '')
+      const tone = hit.tone || (score >= 72 ? 'match' : 'default')
+      const styled = orderHighlightTag.withHallAiTagColors(tag, tone)
       return {
         ...row,
         matchScore: score,
-        aiTag: hit.tag || (score >= 72 ? '高匹配' : ''),
-        aiTagTone: hit.tone || (score >= 72 ? 'match' : 'default'),
+        ...styled,
         aiMatch: score >= 58,
         aiTagSource: 'ai',
       }
     }
     const fb = fallbackOrderMatchScore(row, profile)
+    const styled = orderHighlightTag.withHallAiTagColors(fb.tag, fb.tone)
     return {
       ...row,
       matchScore: fb.score,
-      aiTag: fb.tag,
-      aiTagTone: fb.tone,
+      ...styled,
       aiMatch: fb.score >= 55,
       aiTagSource: 'local',
     }
@@ -284,19 +286,23 @@ function applyTagMap(rows, map, talentCity, opts) {
     if (hit && hit.tag) {
       const sanitized = orderHighlightTag.sanitizeAiOrderTag(hit.tag, hit.tone, orderAiPayload(row))
       if (sanitized) {
+        const styled = orderHighlightTag.withHallAiTagColors(sanitized.tag, sanitized.tone, {
+          bg: String(hit.bg || '').trim(),
+          fg: String(hit.fg || '').trim(),
+        })
         return {
           ...row,
-          aiTag: sanitized.tag,
-          aiTagTone: sanitized.tone,
+          ...styled,
           aiTagSource: hit.source === 'persisted' ? 'persisted' : 'ai',
         }
       }
     }
     if (allowLocal) {
       const fb = fallbackTagForRow(row, talentCity)
-      return { ...row, ...fb, aiTagSource: 'local' }
+      const styled = orderHighlightTag.withHallAiTagColors(fb.aiTag, fb.aiTagTone)
+      return { ...row, ...styled, aiTagSource: 'local' }
     }
-    return { ...row, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' }
+    return { ...row, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
   })
 }
 
@@ -443,6 +449,8 @@ function mergeCardAiTags(scored, tagged) {
       ...row,
       aiTag: tagFromAi ? t.aiTag : t.aiTag || row.aiTag,
       aiTagTone: tagFromAi ? t.aiTagTone : t.aiTagTone || row.aiTagTone,
+      aiTagBg: tagFromAi ? t.aiTagBg : t.aiTagBg || row.aiTagBg,
+      aiTagFg: tagFromAi ? t.aiTagFg : t.aiTagFg || row.aiTagFg,
       aiTagSource: tagFromAi ? 'ai' : t.aiTagSource || row.aiTagSource,
     }
   })

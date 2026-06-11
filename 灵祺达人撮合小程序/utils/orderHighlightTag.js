@@ -1,5 +1,7 @@
 /** 大厅卡片 AI 标签兜底/校验（与 web版 merchant-erp mpRecruitmentMatchShared 对齐） */
 
+const hallAiTagStyle = require('./hallAiTagStyle')
+
 const COMMISSION_TAG_RE = /佣金友好|高佣优选|高佣/
 
 function parseCpsPercentFromBudget(budgetText) {
@@ -69,9 +71,16 @@ function readHallAiTagFromMeta(meta) {
   if (!raw || typeof raw !== 'object') return null
   const tag = String(raw.tag || '').trim().slice(0, 6)
   if (!tag) return null
+  const tone = String(raw.tone || 'default').trim().slice(0, 16) || 'default'
+  const styled = hallAiTagStyle.withHallAiTagColors(tag, tone, {
+    bg: String(raw.bg || '').trim(),
+    fg: String(raw.fg || '').trim(),
+  })
   return {
-    tag,
-    tone: String(raw.tone || 'default').trim().slice(0, 16) || 'default',
+    tag: styled.aiTag,
+    tone: styled.aiTagTone,
+    bg: styled.aiTagBg,
+    fg: styled.aiTagFg,
     provider: String(raw.provider || '').trim() || undefined,
     taggedAt: String(raw.taggedAt || '').trim() || undefined,
   }
@@ -117,4 +126,5 @@ module.exports = {
   fallbackOrderHighlightTag,
   sanitizeAiOrderTag,
   enrichOrderAiPayload,
+  withHallAiTagColors: hallAiTagStyle.withHallAiTagColors,
 }

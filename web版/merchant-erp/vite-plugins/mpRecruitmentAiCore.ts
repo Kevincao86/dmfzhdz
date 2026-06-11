@@ -5,6 +5,7 @@ import {
   clampTalentScoreForOrders,
   fallbackOrderHighlightTag,
   sanitizeAiOrderTag,
+  withHallAiTagColors,
   type OrderMatchPayload,
   type TalentMatchProfile,
 } from '../src/lib/mpRecruitmentMatchShared.js'
@@ -193,14 +194,15 @@ function extractJsonArray(text: string): unknown[] {
   return []
 }
 
-function normalizeTagItem(x: unknown): { id: string; tag: string; tone: string } | null {
+function normalizeTagItem(x: unknown): { id: string; tag: string; tone: string; bg: string; fg: string } | null {
   if (!x || typeof x !== 'object') return null
   const o = x as Record<string, unknown>
   const id = String(o.id ?? '').trim()
   const tag = String(o.tag ?? o.label ?? '').trim().slice(0, 6)
   if (!id || !tag) return null
   const tone = String(o.tone ?? 'default').trim().slice(0, 16) || 'default'
-  return { id, tag, tone }
+  const styled = withHallAiTagColors(tag, tone)
+  return { id, tag: styled.aiTag, tone: styled.aiTagTone, bg: styled.aiTagBg, fg: styled.aiTagFg }
 }
 
 function normalizeMatchItem(x: unknown): { id: string; score: number; tag: string; tone: string } | null {
@@ -389,9 +391,13 @@ ${MATCH_SCORE_GUIDE}
         const order = orderById.get(item.id)
         if (!order) return item
         const sanitized = sanitizeAiOrderTag(item.tag, item.tone, order)
-        if (sanitized) return { ...item, tag: sanitized.tag, tone: sanitized.tone }
+        if (sanitized) {
+          const styled = withHallAiTagColors(sanitized.tag, sanitized.tone)
+          return { ...item, tag: styled.aiTag, tone: styled.aiTagTone, bg: styled.aiTagBg, fg: styled.aiTagFg }
+        }
         const fb = fallbackOrderHighlightTag(order)
-        return { ...item, tag: fb.aiTag, tone: fb.aiTagTone }
+        const styled = withHallAiTagColors(fb.aiTag, fb.aiTagTone)
+        return { ...item, tag: styled.aiTag, tone: styled.aiTagTone, bg: styled.aiTagBg, fg: styled.aiTagFg }
       })
     return { status: 200, body: { ok: true, provider, mode: 'tag', items } }
   } catch (e) {

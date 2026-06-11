@@ -1,5 +1,7 @@
 /** 招募推荐匹配：达人/拍摄/剪辑 ↔ 商单 的 payload 与本地兜底（Web + 小程序逻辑对齐） */
 
+import { ensureTagTextColor, resolveHallAiTagStyle } from './hallAiTagStyle.js'
+
 export type ApplicationHabits = {
   recentApplyCount?: number
   preferredPlatforms?: string[]
@@ -157,8 +159,27 @@ export function buildRecruitContentForAi(mp: {
 export type HallAiTagRecord = {
   tag: string
   tone: string
+  bg: string
+  fg: string
   provider?: string
   taggedAt?: string
+}
+
+export function withHallAiTagColors(
+  tag: string,
+  tone: string,
+  stored?: { bg?: string; fg?: string },
+): { aiTag: string; aiTagTone: string; aiTagBg: string; aiTagFg: string } {
+  const text = String(tag || '').trim().slice(0, 6)
+  const toneKey = String(tone || 'default').trim() || 'default'
+  const storedBg = String(stored?.bg || '').trim()
+  const storedFg = String(stored?.fg || '').trim()
+  if (storedBg) {
+    const fg = ensureTagTextColor(storedBg, storedFg || undefined)
+    return { aiTag: text, aiTagTone: toneKey, aiTagBg: storedBg, aiTagFg: fg }
+  }
+  const s = resolveHallAiTagStyle(text, toneKey)
+  return { aiTag: s.tag, aiTagTone: s.tone, aiTagBg: s.bg, aiTagFg: s.fg }
 }
 
 export function readHallAiTagFromMeta(meta: unknown): HallAiTagRecord | null {
@@ -168,9 +189,16 @@ export function readHallAiTagFromMeta(meta: unknown): HallAiTagRecord | null {
   const t = raw as Record<string, unknown>
   const tag = String(t.tag || '').trim().slice(0, 6)
   if (!tag) return null
+  const tone = String(t.tone || 'default').trim().slice(0, 16) || 'default'
+  const styled = withHallAiTagColors(tag, tone, {
+    bg: String(t.bg || '').trim(),
+    fg: String(t.fg || '').trim(),
+  })
   return {
-    tag,
-    tone: String(t.tone || 'default').trim().slice(0, 16) || 'default',
+    tag: styled.aiTag,
+    tone: styled.aiTagTone,
+    bg: styled.aiTagBg,
+    fg: styled.aiTagFg,
     provider: String(t.provider || '').trim() || undefined,
     taggedAt: String(t.taggedAt || '').trim() || undefined,
   }
@@ -464,10 +492,9 @@ export function fallbackOrderMatchScore(
   return { score, tag, tone: score >= 58 ? 'match' : 'default' }
 }
 
-export function mergeCardAiTags<T extends { id: string; aiTag?: string; aiTagTone?: string; aiTagSource?: string }>(
-  scored: T[],
-  tagged: T[],
-): T[] {
+export function mergeCardAiTags<
+  T extends { id: string; aiTag?: string; aiTagTone?: string; aiTagBg?: string; aiTagFg?: string; aiTagSource?: string },
+>(scored: T[], tagged: T[]): T[] {
   const byId = new Map(tagged.map((r) => [r.id, r]))
   return scored.map((row) => {
     const t = byId.get(row.id)
@@ -477,6 +504,8 @@ export function mergeCardAiTags<T extends { id: string; aiTag?: string; aiTagTon
       ...row,
       aiTag: tagFromAi ? t.aiTag : t.aiTag || row.aiTag,
       aiTagTone: tagFromAi ? t.aiTagTone : t.aiTagTone || row.aiTagTone,
+      aiTagBg: tagFromAi ? t.aiTagBg : t.aiTagBg || row.aiTagBg,
+      aiTagFg: tagFromAi ? t.aiTagFg : t.aiTagFg || row.aiTagFg,
       aiTagSource: tagFromAi ? 'ai' : t.aiTagSource || row.aiTagSource,
     }
   })
@@ -492,6 +521,8 @@ export function applyOrderMatchResults<T extends OrderMatchPayload & { id: strin
     matchScore: number
     aiTag: string
     aiTagTone: string
+    aiTagBg: string
+    aiTagFg: string
     aiMatch: boolean
     aiTagSource: 'ai' | 'local'
   }
@@ -501,21 +532,29 @@ export function applyOrderMatchResults<T extends OrderMatchPayload & { id: strin
     const hit = map[row.id]
     if (hit && hit.score > 0) {
       const score = clampMatchScoreByFacts(hit.score, row, profile)
+      const tag = hit.tag || (score >= 72 ? '高匹配' : '')
+      const tone = hit.tone || (score >= 72 ? 'match' : 'default')
+      const styled = withHallAiTagColors(tag, tone)
       return {
         ...row,
         matchScore: score,
-        aiTag: hit.tag || (score >= 72 ? '高匹配' : ''),
-        aiTagTone: hit.tone || (score >= 72 ? 'match' : 'default'),
+        aiTag: styled.aiTag,
+        aiTagTone: styled.aiTagTone,
+        aiTagBg: styled.aiTagBg,
+        aiTagFg: styled.aiTagFg,
         aiMatch: score >= 58,
         aiTagSource: 'ai' as const,
       }
     }
     const fb = fallbackOrderMatchScore(row, profile)
+    const styled = withHallAiTagColors(fb.tag, fb.tone)
     return {
       ...row,
       matchScore: fb.score,
-      aiTag: fb.tag,
-      aiTagTone: fb.tone,
+      aiTag: styled.aiTag,
+      aiTagTone: styled.aiTagTone,
+      aiTagBg: styled.aiTagBg,
+      aiTagFg: styled.aiTagFg,
       aiMatch: fb.score >= 55,
       aiTagSource: 'local' as const,
     }
