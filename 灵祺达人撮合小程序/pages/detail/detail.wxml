@@ -35,7 +35,7 @@
             <view class="metric-label">预算</view>
             <view class="metric-value">{{view.budgetText}}</view>
           </view>
-          <view class="metric-cell" wx:if="{{isEditIce}}">
+          <view class="metric-cell" wx:if="{{isPackIce}}">
             <view class="metric-label">成片位</view>
             <view class="metric-value accent">{{iceSlotTotal}} 位</view>
           </view>
@@ -48,7 +48,7 @@
             <view class="metric-value">{{view.recruitCount}} 人</view>
           </view>
         </view>
-        <view class="metrics metrics--ice" wx:if="{{isEditIce}}">
+        <view class="metrics metrics--ice" wx:if="{{isPackIce}}">
           <view class="metric-cell">
             <view class="metric-label">已认领</view>
             <view class="metric-value">{{orderClaimedSlots}}/{{iceSlotTotal}} 条</view>

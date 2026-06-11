@@ -37,6 +37,14 @@ export function isEditTeamIceMpOrder(mp: Record<string, unknown> | null | undefi
   return target === 'edit' || mode === 'edit_ice'
 }
 
+/** 多成片位云剪包：按条数认领/统计（含 edit_ice 与 iceVideoSlots>1） */
+export function isPackSlotIceOrder(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!isIceMpOrder(mp)) return false
+  if (isEditTeamIceMpOrder(mp)) return true
+  const slots = Array.isArray(mp?.iceVideoSlots) ? mp!.iceVideoSlots : []
+  return slots.length > 1
+}
+
 export function getEditGroupQrFromMp(mp: Record<string, unknown> | null | undefined): string {
   if (!mp) return ''
   const meta = (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'

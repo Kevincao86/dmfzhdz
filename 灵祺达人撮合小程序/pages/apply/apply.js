@@ -82,6 +82,7 @@ Page({
     memberTypeLabel: '',
     isIceMode: false,
     isEditIce: false,
+    isPackIce: false,
     recruitTarget: 'talent',
     isSupplierApply: false,
     supplierWorkId: 'talent',
@@ -145,6 +146,7 @@ Page({
     })
     const member = memberStore.readMember()
     const isEditIce = loadedMp ? iceOrderDetect.isEditTeamIceMpOrder(loadedMp) : false
+    const isPackIce = loadedMp ? iceOrderDetect.isPackSlotIceOrder(loadedMp) : false
     const isSupplierApply = recruitTarget === 'shoot' || recruitTarget === 'edit'
     const supplierWorkId = recruitTarget === 'edit' ? 'edit' : recruitTarget === 'shoot' ? 'shoot' : 'talent'
     const freeEditSlots = loadedMp ? editIceSlots.countFreeEditPackSlots(loadedMp) : 0
@@ -172,6 +174,7 @@ Page({
       memberTypeLabel: member ? memberStore.memberTypeLabel(member) : '',
       isIceMode,
       isEditIce,
+      isPackIce,
       recruitTarget,
       isSupplierApply,
       supplierWorkId,
@@ -325,7 +328,7 @@ Page({
       wx.showToast({ title: this.data.gateMessage, icon: 'none' })
       return
     }
-    if (this.data.isEditIce) {
+    if (this.data.isPackIce) {
       const n = Math.max(1, Number.parseInt(String(this.data.claimSlotCount || '1'), 10) || 1)
       if (n > this.data.freeEditSlots) {
         wx.showToast({ title: `剩余可认领 ${this.data.freeEditSlots} 条`, icon: 'none' })
@@ -373,7 +376,7 @@ Page({
         return
       }
       const workIdentity = userProfile.readIdentity()
-      const claimSlots = this.data.isEditIce
+      const claimSlots = this.data.isPackIce
         ? Math.max(1, Number.parseInt(String(this.data.claimSlotCount || '1'), 10) || 1)
         : undefined
       await ops.applyToMpOrder(this.data.mpOrderId, applicant, workIdentity, claimSlots)

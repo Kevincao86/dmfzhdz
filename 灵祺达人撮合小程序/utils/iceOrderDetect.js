@@ -26,6 +26,14 @@ function isEditTeamIceMpOrder(mp) {
   return target === 'edit' || mode === 'edit_ice'
 }
 
+/** 多成片位云剪包：按条数认领/统计（含 edit_ice 与 iceVideoSlots>1） */
+function isPackSlotIceOrder(mp) {
+  if (!isIceMpOrder(mp)) return false
+  if (isEditTeamIceMpOrder(mp)) return true
+  const slots = Array.isArray(mp && mp.iceVideoSlots) ? mp.iceVideoSlots : []
+  return slots.length > 1
+}
+
 function getEditGroupQrFromMp(mp) {
   if (!mp) return ''
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
@@ -43,6 +51,7 @@ module.exports = {
   isIceMpOrder,
   getIceVerifyMode,
   isEditTeamIceMpOrder,
+  isPackSlotIceOrder,
   getEditGroupQrFromMp,
   getTalentGroupQrFromMp,
 }

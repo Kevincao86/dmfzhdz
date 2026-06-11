@@ -42,6 +42,7 @@ Page({
     iceStatusHint: '',
     iceStep3Hint: '发布抖音并回传链接，AI 核查通过后自动完成',
     isEditIce: false,
+    isPackIce: false,
     iceSlotTotal: 0,
     orderClaimedSlots: 0,
     claimedSlotCount: 1,
@@ -142,6 +143,7 @@ Page({
       const view = display.enrichMpOrder(mp, merchantOrder)
       const isIce = !!view.isIce
       const isEditIce = isIce && iceOrderDetect.isEditTeamIceMpOrder(mp)
+      const isPackIce = isIce && iceOrderDetect.isPackSlotIceOrder(mp)
       const workId = userProfile.readIdentity()
       const applyGateHint = recruitApplyGate.claimBlockHint(mp, workId)
       let iceApplicantId = this.data.iceApplicantId
@@ -217,7 +219,7 @@ Page({
       let iceConfirmed = false
       let editGroupQrImage = ''
       let deliverText = ''
-      if (isEditIce) {
+      if (isPackIce) {
         iceSlotTotal = parseIceSlotTotalFromMp(mp)
         const orderProgress = iceOrderStats.countIceClaimedSlots(mp, iceSlotTotal)
         orderClaimedSlots = orderProgress.claimed
@@ -283,6 +285,7 @@ Page({
         applied: hasApplied,
         readOnlyEnded: isEnded && canViewEnded,
         isEditIce,
+        isPackIce,
         iceSlotTotal,
         orderClaimedSlots,
         claimedSlotCount,

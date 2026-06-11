@@ -1,5 +1,5 @@
 import { isIceMpOrder } from './orderCard'
-import { isEditTeamIceMpOrder } from '../mpSync/iceOrderDetect'
+import { isPackSlotIceOrder } from '../mpSync/iceOrderDetect'
 import { parseIceSlotTotalFromMp } from './listFilters'
 
 export function getIceVerifyMode(mp: Record<string, unknown> | null | undefined): 'ai' | 'pr' {
@@ -69,7 +69,7 @@ export function countIceClaimedSlots(
   const total = parseIceSlotTotalFromMp(mp || {}) || Math.max(0, Number(recruitCap) || 0)
   if (!total) return { claimed: 0, total: 0 }
 
-  if (isEditTeamIceMpOrder(mp)) {
+  if (isPackSlotIceOrder(mp)) {
     return {
       claimed: countEditIceAssignedSlots(mp) + countEditIceReservedSlots(mp),
       total,

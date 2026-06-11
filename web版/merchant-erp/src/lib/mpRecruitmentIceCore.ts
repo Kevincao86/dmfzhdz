@@ -5,15 +5,15 @@ import type {
   RegistryMpRecruitmentOrder,
 } from './opsRegistryTypes.js'
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
-import { getIceVerifyMode, isEditTeamIceMpOrder } from './iceOrderDetect.js'
+import { getIceVerifyMode, isEditTeamIceMpOrder, isPackSlotIceOrder } from './iceOrderDetect.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
 import { findDuplicateApplicant } from './mpApplicantIdentity.js'
 
-export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel, isEditTeamIceMpOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
+export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel, isEditTeamIceMpOrder, isPackSlotIceOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
 export type { IceVerifyMode } from './iceOrderDetect.js'
 
 function parseIceRecruitCapacity(mp: RegistryMpRecruitmentOrder): number {
-  if (isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)) {
+  if (isPackSlotIceOrder(mp as unknown as Record<string, unknown>)) {
     return Math.max(1, (mp.iceVideoSlots ?? []).length)
   }
   if (mp.recruitCount != null) {
@@ -186,8 +186,8 @@ function isIceRecruitFull(mp: RegistryMpRecruitmentOrder): boolean {
 
 /** 云剪满额：大厅展示已停止，PR 发单仍履约中 */
 export function maybeCloseIceWhenFull(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
-  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
-  const full = isEditTeam ? isEditPackFull(mp) : isIceRecruitFull(mp)
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
+  const full = isPack ? isEditPackFull(mp) : isIceRecruitFull(mp)
   if (!full) return mp
   const raw = String(mp.status || 'open')
   if (raw === 'done' || raw === 'deleted' || raw === 'pending_settlement') return mp
@@ -247,11 +247,11 @@ export function verifyDouyinPublishLink(raw: string): { passed: boolean; note: s
 export function maybeAdvanceIceMpToSettlement(
   mp: RegistryMpRecruitmentOrder,
 ): RegistryMpRecruitmentOrder {
-  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
   const slots = mp.iceVideoSlots ?? []
   if (!slots.length) return mp
 
-  if (isEditTeam) {
+  if (isPack) {
     if (!allEditPackSlotsReviewed(mp)) return mp
     if (mp.status === 'done' || mp.status === 'closed') return mp
     const verifyMode = getIceVerifyMode(mp)
@@ -295,10 +295,10 @@ export function claimIceMpRecruitment(
   applicant: RegistryMpRecruitmentApplicant,
   claimSlotCount?: number,
 ): ClaimIceMpResult {
-  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
   const packSlots = [...(mp.iceVideoSlots ?? [])]
-  const slots = isEditTeam ? packSlots : ensureIceVideoSlots(mp)
-  if (isEditTeam) {
+  const slots = isPack ? packSlots : ensureIceVideoSlots(mp)
+  if (isPack) {
     if (!packSlots.length) return { ok: false, error: '任务未配置成片位', code: 'no_slots' }
   } else if (!slots.length || !resolveIceReferenceDownloadUrl(mp)) {
     return { ok: false, error: '云剪任务未配置成片', code: 'no_slots' }
@@ -321,7 +321,7 @@ export function claimIceMpRecruitment(
     }
   }
 
-  if (isEditTeam) {
+  if (isPack) {
     const n = Math.max(1, Number.parseInt(String(claimSlotCount ?? applicant.claimedSlotCount ?? 1), 10) || 1)
     const free = countFreeEditPackSlots(mp)
     if (n > free) {
@@ -359,8 +359,8 @@ export function confirmIceMpReceipt(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
 ): ConfirmIceMpResult {
-  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
-  const slots = isEditTeam ? [...(mp.iceVideoSlots ?? [])] : ensureIceVideoSlots(mp)
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
+  const slots = isPack ? [...(mp.iceVideoSlots ?? [])] : ensureIceVideoSlots(mp)
   const applicants = [...(mp.applicants ?? [])]
   const idx = applicants.findIndex((a) => a.id === applicantId)
   if (idx < 0) return { ok: false, error: '未找到认领记录', code: 'not_found' }
@@ -376,7 +376,7 @@ export function confirmIceMpReceipt(
     return { ok: false, error: '当前状态不可确认接收', code: 'invalid_state' }
   }
 
-  if (isEditTeam) {
+  if (isPack) {
     const n = Math.max(1, Number.parseInt(String(app.claimedSlotCount ?? 1), 10) || 1)
     const freeCount = slots.filter((s) => !String(s.assignedApplicantId || '').trim()).length
     if (freeCount < n) return { ok: false, error: `剩余名额不足，仅剩 ${freeCount} 条`, code: 'slots_full' }
@@ -718,7 +718,7 @@ export function handleIceMpApply(
 ):
   | { ok: true; mp: RegistryMpRecruitmentOrder; body: Record<string, unknown> }
   | { ok: false; error: string; code?: string } {
-  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
   const dup = (mp.applicants ?? []).find((a) => a.id === row.id)
   if (dup?.taskStatus === 'confirmed' && (dup.assignedIceSlotIds?.length || dup.assignedVideoDownloadUrl)) {
     return {
@@ -734,10 +734,41 @@ export function handleIceMpApply(
     }
   }
   if (dup?.taskStatus === 'pending_confirm') {
+    if (isPack && claimSlotCount != null) {
+      const n = Math.max(1, Number.parseInt(String(claimSlotCount), 10) || 1)
+      const prev = Math.max(1, Number.parseInt(String(dup.claimedSlotCount ?? 1), 10) || 1)
+      if (n !== prev) {
+        const free = countFreeEditPackSlots(mp) + prev
+        if (n > free) {
+          return {
+            ok: false,
+            error: `剩余可认领 ${Math.max(0, free - prev)} 条，无法认领 ${n} 条`,
+            code: 'slots_insufficient',
+          }
+        }
+        const updated: RegistryMpRecruitmentApplicant = { ...dup, claimedSlotCount: n }
+        const applicants = upsertApplicant(mp.applicants, updated)
+        const next: RegistryMpRecruitmentOrder = {
+          ...mp,
+          applicants,
+          updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+        }
+        return {
+          ok: true,
+          mp: next,
+          body: { ok: true, needConfirm: true, taskStatus: 'pending_confirm', claimedSlotCount: n },
+        }
+      }
+    }
     return {
       ok: true,
       mp,
-      body: { ok: true, needConfirm: true, taskStatus: 'pending_confirm' },
+      body: {
+        ok: true,
+        needConfirm: true,
+        taskStatus: 'pending_confirm',
+        claimedSlotCount: dup.claimedSlotCount,
+      },
     }
   }
   if (dup?.taskStatus === 'rejected') {
@@ -761,7 +792,7 @@ export function handleIceMpApply(
   let next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,
-    iceVideoSlots: isEditTeam ? [...(mp.iceVideoSlots ?? [])] : ensureIceVideoSlots(mp),
+    iceVideoSlots: isPack ? [...(mp.iceVideoSlots ?? [])] : ensureIceVideoSlots(mp),
     status: mp.status === 'open' ? 'collecting' : mp.status,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
   }
