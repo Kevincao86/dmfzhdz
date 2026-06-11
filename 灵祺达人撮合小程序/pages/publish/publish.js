@@ -15,6 +15,10 @@ const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
 const userProfile = require('../../utils/userProfile.js')
+const auth = require('../../utils/auth.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const publishPendingAfterLogin = require('../../utils/publishPendingAfterLogin.js')
+const wxAccount = require('../../utils/wxAccount.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -660,10 +664,45 @@ Page({
       this.loadEditOrder(this.data.editMpId)
       return
     }
+    const pendingDraft = publishPendingAfterLogin.read()
+    if (pendingDraft) {
+      if (auth.isLoggedIn()) {
+        void this.tryResumePublishAfterLogin()
+      } else {
+        publishPendingAfterLogin.applyToPage(this, pendingDraft, () => {
+          this.syncTabBarOverlay()
+        })
+      }
+      return
+    }
     if (this.data.step === 'done' && this.data.createdOrder) return
     if (this.data.step === 'form' && this.data.recruitMode) return
     if (this.data.isEditMode) return
     this.resetToTarget()
+  },
+  async tryResumePublishAfterLogin() {
+    if (this._resumePublishRunning) return
+    const pending = publishPendingAfterLogin.read()
+    if (!pending || !pending.autoSubmit) return
+    this._resumePublishRunning = true
+    publishPendingAfterLogin.clear()
+    try {
+      await new Promise((resolve) => {
+        publishPendingAfterLogin.applyToPage(this, pending, resolve)
+      })
+      const err = this.validate()
+      if (err) {
+        wx.showToast({ title: err, icon: 'none' })
+        return
+      }
+      wx.showLoading({ title: '正在发布…', mask: true })
+      await this.submitPublishOrder()
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this._resumePublishRunning = false
+    }
   },
   async loadEditOrder(mpId) {
     if (!api.hasApi()) {
@@ -1456,33 +1495,13 @@ Page({
       groupCopyText: shareCopy.buildGroupCopyText(order, prProfile),
     }
   },
-  ensureWxLoginBeforePublish() {
-    try {
-      const wxAcc = require('../../utils/wxAccount.js')
-      if (wxAcc.isWxLoggedIn()) return true
-    } catch (_) {}
-    wx.showModal({
-      title: '需要微信登录',
-      content: '发布招募前请先在「我的」完成微信昵称登录。',
-      confirmText: '去登录',
-      cancelText: '稍后',
-      success: (r) => {
-        if (r.confirm) wx.switchTab({ url: '/pages/mine/mine' })
-      },
-    })
+  promptLoginBeforePublish() {
+    if (wxAccount.isWxLoggedIn()) return true
+    publishPendingAfterLogin.saveFromPage(this)
+    guestRoutes.redirectToLogin('/pages/publish/publish')
     return false
   },
-  async onCreate() {
-    if (!this.ensureWxLoginBeforePublish()) return
-    const err = this.validate()
-    if (err) {
-      wx.showToast({ title: err, icon: 'none' })
-      return
-    }
-    if (!api.hasApi()) {
-      wx.showToast({ title: '未配置后台地址', icon: 'none' })
-      return
-    }
+  async submitPublishOrder() {
     const order = this.buildOrder()
     const isEdit = !!(this.data.editMpId && this.data.editingOrder)
     this.setData({ submitting: true })
@@ -1546,6 +1565,24 @@ Page({
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
       this.setData({ submitting: false })
+      throw e
+    }
+  },
+  async onCreate() {
+    const err = this.validate()
+    if (err) {
+      wx.showToast({ title: err, icon: 'none' })
+      return
+    }
+    if (!api.hasApi()) {
+      wx.showToast({ title: '未配置后台地址', icon: 'none' })
+      return
+    }
+    if (!this.promptLoginBeforePublish()) return
+    try {
+      await this.submitPublishOrder()
+    } catch (_) {
+      /* submitPublishOrder 已 toast */
     }
   },
   onShareAppMessage() {

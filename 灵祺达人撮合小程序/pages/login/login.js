@@ -85,6 +85,10 @@ async function applyLoginIdentity(data, workId) {
 function navigateAfterLogin(page) {
   const tabBar = require('../../utils/tabBar.js')
   tabBar.refreshTabBar()
+  const pendingPublish = require('../utils/publishPendingAfterLogin.js').read()
+  if (pendingPublish && pendingPublish.autoSubmit) {
+    wx.showToast({ title: '登录成功，正在发布招募', icon: 'none', duration: 2200 })
+  }
   const redirect = page && page.data && page.data.redirect ? String(page.data.redirect).trim() : ''
   if (redirect && redirect.startsWith('/pages/')) {
     const pathOnly = redirect.split('?')[0].replace(/^\//, '')
