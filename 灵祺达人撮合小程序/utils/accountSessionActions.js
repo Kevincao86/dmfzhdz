@@ -2,23 +2,24 @@ const auth = require('./auth.js')
 const wxAccount = require('./wxAccount.js')
 
 function goLogin() {
-  wx.reLaunch({ url: '/pages/login/login' })
+  wx.reLaunch({ url: '/pages/login/login?switch=1' })
 }
 
 function goWelcome() {
   wx.reLaunch({ url: '/pages/welcome/welcome' })
 }
 
-/** 切换账号：清除服务端会话与本机报名/通知缓存，回到开屏选身份 */
+/** 切换账号：清除会话与缓存，前往登录页换号 */
 function switchAccount() {
   wx.showModal({
     title: '切换账号',
-    content: '将退出当前灵祺账号；本机报名记录与消息通知缓存会清空，避免串到其他账号。',
-    confirmText: '去选择身份',
+    content: '将退出当前灵祺账号并前往登录页，可使用微信或其他账号密码登录。',
+    confirmText: '去登录',
     success(res) {
       if (!res.confirm) return
       auth.clearSession()
-      goWelcome()
+      wxAccount.clearWxAccount()
+      goLogin()
     },
   })
 }
