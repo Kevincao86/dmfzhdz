@@ -3,6 +3,7 @@
  */
 const userProfile = require('./userProfile.js')
 const listFilters = require('./recruitmentListFilters.js')
+const recruitApplyGate = require('./recruitApplyGate.js')
 
 function primaryRecruitTargetForIdentity(identity) {
   if (identity === 'shoot') return 'shoot'
@@ -11,11 +12,7 @@ function primaryRecruitTargetForIdentity(identity) {
 }
 
 function orderMatchesIdentity(row, identity) {
-  if (!row) return false
-  if (row.isIce) return true
-  /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
-  if (identity === 'pr' || identity === 'talent') return true
-  return row.recruitTarget === primaryRecruitTargetForIdentity(identity)
+  return recruitApplyGate.hallOrderMatchesIdentity(row, identity || userProfile.readIdentity())
 }
 
 function defaultPaichianSubTab(identity) {

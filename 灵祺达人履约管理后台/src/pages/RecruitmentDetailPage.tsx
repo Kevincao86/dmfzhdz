@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
+import { canClaimRecruitment, claimBlockHint, isEditTeamRecruitment } from '../lib/mpSync/recruitApplyGate'
 import { hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/publishedOrders'
 import { enrichMpOrder } from '../lib/mpSync/recruitmentDisplay'
@@ -56,9 +58,14 @@ export default function RecruitmentDetailPage() {
       !!view?.isIce,
     )
   const iceState = resolveIceApplicantState(mpRaw, id || '')
-  const claimGroupQrHint = mpRaw && isEditTeamIceMpOrder(mpRaw)
-    ? '认领成功，请尽快扫码进入剪辑师群沟通交付'
-    : '认领成功，请尽快扫码进入达人群沟通发布与结算'
+  const workIdentity = getWorkIdentity()
+  const canClaim = mpRaw ? canClaimRecruitment(mpRaw, workIdentity) : false
+  const claimBlockHintText = mpRaw ? claimBlockHint(mpRaw, workIdentity) : ''
+  const isEditTeamIce = mpRaw ? isEditTeamRecruitment(mpRaw) : false
+  const claimGroupQrHint =
+    mpRaw && isEditTeamIceMpOrder(mpRaw)
+      ? '认领成功，请尽快扫码进入剪辑师群沟通交付'
+      : '认领成功，请尽快扫码进入达人群沟通发布与结算'
 
   useEffect(() => {
     if (!id) {
@@ -106,6 +113,10 @@ export default function RecruitmentDetailPage() {
 
   function goApply() {
     if (!view || !id) return
+    if (!canClaim) {
+      window.alert(claimBlockHintText || '当前身份不可报名')
+      return
+    }
     const meta = mpRaw?.mpPublishMeta as { applyFormTemplateId?: string } | undefined
     const q = new URLSearchParams({
       platform: view.platform,
@@ -255,7 +266,7 @@ export default function RecruitmentDetailPage() {
             </div>
           ) : null}
 
-          {role === 'talent' && applied && view.isIce ? (
+          {role !== 'pr' && applied && view.isIce ? (
             <IceTaskPanel
               mpOrderId={id || ''}
               state={iceState}
@@ -323,12 +334,17 @@ export default function RecruitmentDetailPage() {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            {role === 'talent' && !applied && !readOnlyEnded ? (
+            {role !== 'pr' && !applied && !readOnlyEnded && canClaim ? (
               <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
-                {view.isIce ? '认领云剪任务' : '立即报名'}
+                {view.isIce ? (isEditTeamIce ? '认领剪辑任务' : '认领云剪任务') : '立即报名'}
               </button>
             ) : null}
-            {role === 'talent' ? (
+            {role !== 'pr' && !applied && !readOnlyEnded && !canClaim ? (
+              <p className="flex-1 text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200">
+                {claimBlockHintText || '当前身份不可报名'}
+              </p>
+            ) : null}
+            {role !== 'pr' ? (
               <button
                 type="button"
                 className="px-4 py-3 rounded-xl border border-[var(--shell-border)] panel-tab text-sm font-medium"
@@ -340,7 +356,7 @@ export default function RecruitmentDetailPage() {
             ) : null}
           </div>
 
-          {applied && role === 'talent' && !contactGate.canContact ? (
+          {applied && role !== 'pr' && !contactGate.canContact ? (
             <p className="text-sm text-emerald-400">您已报名该招募，可在「我的报名」查看记录。</p>
           ) : null}
 

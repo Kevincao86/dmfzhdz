@@ -1,5 +1,9 @@
 import type { MpWorkIdentity } from '../mpWorkIdentity'
 import type { RecruitmentOrderRow } from './types'
+import {
+  hallOrderMatchesIdentityPool,
+  hallOrderVisibleToIdentity,
+} from '../mpSync/recruitApplyGate'
 
 import {
   HALL_DEFAULT_STATUS_FILTER,
@@ -12,20 +16,11 @@ export const STATUS_FILTER_OPTIONS = HALL_STATUS_FILTERS
 export { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter, matchHallTabCountStatusFilter }
 
 function matchesRoleRecruit(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
-  /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
-  if (identity === 'pr' || identity === 'talent') return true
-  if (identity === 'shoot') return row.recruitTarget === 'shoot'
-  if (identity === 'edit') return row.recruitTarget === 'edit'
-  return true
+  return hallOrderMatchesIdentityPool(row, identity)
 }
 
 export function orderVisibleToWorkIdentity(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
-  if (identity === 'pr' || identity === 'talent') return true
-  if (row.isIce) return true
-  const target = row.recruitTarget || 'talent'
-  if (identity === 'shoot') return target === 'shoot'
-  if (identity === 'edit') return target === 'edit'
-  return true
+  return hallOrderVisibleToIdentity(row, identity)
 }
 
 export function matchStatusLabel(row: RecruitmentOrderRow, filter: string): boolean {
