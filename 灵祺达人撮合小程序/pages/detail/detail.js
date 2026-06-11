@@ -67,11 +67,13 @@ Page({
     shareCoverPath: '',
     showShareSheet: false,
     shareTitle: '',
+    timelineGuidePending: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
     const applied = options && options.applied === '1'
-    this.setData({ id, applied })
+    const timelineGuidePending = options && options.timelineGuide === '1'
+    this.setData({ id, applied, timelineGuidePending })
     if (id) this.loadOrder(id)
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
@@ -125,6 +127,8 @@ Page({
   },
   onShareTimeline() {
     const { buildTimelineSharePayload } = require('../../utils/shareTimelinePayload.js')
+    const mpShare = require('../../utils/mpShare.js')
+    mpShare.enableShareMenu()
     return buildTimelineSharePayload({
       id: this.data.id,
       title: this.data.view && this.data.view.title,
@@ -341,6 +345,15 @@ Page({
       } catch (_) {
         /* ignore preload */
       }
+      if (this.data.timelineGuidePending) {
+        this.setData({ timelineGuidePending: false })
+        const { startTimelineShareFlow } = require('../../utils/shareTimelineGuide.js')
+        void startTimelineShareFlow({
+          id: this.data.id,
+          title: view && view.title,
+          mp,
+        })
+      }
     } catch (e) {
       const msg = String(e.message || e)
       let hint = msg
@@ -536,10 +549,11 @@ Page({
     }
     const title = (this.data.view && this.data.view.title) || this.data.shareTitle || ''
     this.setData({ showShareSheet: false })
-    wx.navigateTo({
-      url:
-        `/pages/share-timeline/share-timeline?id=${encodeURIComponent(id)}` +
-        `&title=${encodeURIComponent(title)}`,
+    const { startTimelineShareFlow } = require('../../utils/shareTimelineGuide.js')
+    void startTimelineShareFlow({
+      id,
+      title,
+      mp: this.data.mpOrder,
     })
   },
   onContactPrPending() {

@@ -1,9 +1,3 @@
 <view class="share-timeline-page">
-  <view class="share-timeline-card">
-    <text class="share-timeline-label">招募单</text>
-    <text class="share-timeline-title">{{title}}</text>
-    <text class="share-timeline-hint">点击下方按钮，将本招募单分享到微信朋友圈</text>
-    <button class="share-timeline-btn" open-type="shareTimeline" hover-class="none">分享到朋友圈</button>
-  </view>
-  <button class="share-timeline-back" bindtap="onGoBack" hover-class="none">返回详情</button>
+  <text class="share-timeline-hint">正在打开招募详情…</text>
 </view>
