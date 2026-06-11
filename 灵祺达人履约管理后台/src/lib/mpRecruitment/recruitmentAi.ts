@@ -12,8 +12,11 @@ import {
   applicationHabitsFromApps,
   applyOrderMatchResults,
   clampTalentScoreForOrders,
+  enrichOrderAiPayload,
+  fallbackOrderHighlightTag,
   fallbackOrderMatchScore,
   mergeCardAiTags,
+  sanitizeAiOrderTag,
   talentMatchCacheKey,
   type ApplicationHabits,
   type OrderMatchPayload,
@@ -27,21 +30,24 @@ function hallKey(row: RecruitmentOrderRow) {
 }
 
 function orderAiPayload(row: RecruitmentOrderRow): OrderMatchPayload {
-  return {
+  return enrichOrderAiPayload({
     id: row.id,
     title: row.title,
     platform: row.platform,
     region: row.region,
     category: row.category,
+    categoryTagsText: row.categoryTagsText,
     budgetText: row.budgetText,
+    budgetDisplay: row.budgetDisplay,
     fansRequirement: row.fansRequirement,
     recruitTarget: row.recruitTarget || 'talent',
     hall: hallKey(row),
     urgent: row.urgent,
     isIce: row.isIce,
+    isMock: row.isMock,
     summary: row.summary || '',
     priceAmount: row.priceAmount || 0,
-  }
+  })
 }
 
 function primaryRecruitTargetForIdentity(id: MpWorkIdentity): 'talent' | 'shoot' | 'edit' {
@@ -87,21 +93,8 @@ export function talentProfileFromMember(
   }
 }
 
-export function fallbackTagForRow(row: RecruitmentOrderRow, talentCity = ''): {
-  aiTag: string
-  aiTagTone: string
-} {
-  if (row.isMock) return { aiTag: '演示', aiTagTone: 'default' }
-  if (row.isIce) return { aiTag: '云剪直派', aiTagTone: 'ice' }
-  if (row.urgent) return { aiTag: '急单速报', aiTagTone: 'urgent' }
-  const region = String(row.region || '')
-  if (talentCity && region.includes(talentCity) && !region.includes('全国')) {
-    return { aiTag: '同城优选', aiTagTone: 'match' }
-  }
-  if ((row.priceAmount || 0) >= 1000) return { aiTag: '高佣优选', aiTagTone: 'budget' }
-  if (row.budgetText.includes('CPS')) return { aiTag: '佣金友好', aiTagTone: 'hot' }
-  if (row.fansRequirement.includes('不限')) return { aiTag: '门槛低', aiTagTone: 'niche' }
-  return { aiTag: '值得看看', aiTagTone: 'default' }
+export function fallbackTagForRow(row: RecruitmentOrderRow, talentCity = '') {
+  return fallbackOrderHighlightTag(orderAiPayload(row), talentCity)
 }
 
 function chunk<T>(list: T[], size: number): T[][] {
@@ -111,7 +104,7 @@ function chunk<T>(list: T[], size: number): T[][] {
 }
 
 const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
-const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v1'
+const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v2'
 const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
 
 function readWebTagCache(): Record<string, { tag: string; tone: string }> {
@@ -234,7 +227,12 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
 
   return list.map((row) => {
     const hit = map[row.id]
-    if (hit?.tag) return { ...row, aiTag: hit.tag, aiTagTone: hit.tone, aiTagSource: 'ai' as const }
+    if (hit?.tag) {
+      const sanitized = sanitizeAiOrderTag(hit.tag, hit.tone, orderAiPayload(row))
+      if (sanitized) {
+        return { ...row, aiTag: sanitized.tag, aiTagTone: sanitized.tone, aiTagSource: 'ai' as const }
+      }
+    }
     return { ...row, ...fallbackTagForRow(row, talentCity), aiTagSource: 'local' as const }
   })
 }

@@ -7,8 +7,9 @@ const participant = require('./participant.js')
 const { isIceMpOrder } = require('./recruitmentUrgent.js')
 const userProfile = require('./userProfile.js')
 const identityTypes = require('./identityTypes.js')
+const orderHighlightTag = require('./orderHighlightTag.js')
 
-const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v1'
+const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v2'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v3'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
 const CACHE_TTL_MS = 6 * 3600 * 1000
@@ -48,21 +49,24 @@ function hallKey(row) {
 }
 
 function orderAiPayload(row) {
-  return {
+  return orderHighlightTag.enrichOrderAiPayload({
     id: row.id,
     title: row.title,
     platform: row.platform,
     region: row.region,
     category: row.category,
+    categoryTagsText: row.categoryTagsText,
     budgetText: row.budgetText,
+    budgetDisplay: row.budgetDisplay,
     fansRequirement: row.fansRequirement,
     recruitTarget: row.recruitTarget || 'talent',
     hall: hallKey(row),
     urgent: !!row.urgent,
     isIce: !!row.isIce,
+    isMock: !!row.isMock,
     summary: row.summary || '',
     priceAmount: row.priceAmount || 0,
-  }
+  })
 }
 
 function talentMatchCacheKey(talent) {
@@ -272,28 +276,21 @@ function applicationHabitsFromStore() {
 }
 
 function fallbackTagForRow(row, talentCity) {
-  if (row.isMock) return { aiTag: '演示', aiTagTone: 'default' }
-  if (row.isIce) return { aiTag: '云剪直派', aiTagTone: 'ice' }
-  if (row.urgent) return { aiTag: '急单速报', aiTagTone: 'urgent' }
-  const region = String(row.region || '')
-  if (talentCity && region && region.includes(talentCity) && !region.includes('全国')) {
-    return { aiTag: '同城优选', aiTagTone: 'match' }
-  }
-  if ((row.priceAmount || 0) >= 1000) return { aiTag: '高佣优选', aiTagTone: 'budget' }
-  if (String(row.budgetText || '').includes('CPS')) return { aiTag: '佣金友好', aiTagTone: 'hot' }
-  if (String(row.fansRequirement || '').includes('不限')) return { aiTag: '门槛低', aiTagTone: 'niche' }
-  return { aiTag: '值得看看', aiTagTone: 'default' }
+  return orderHighlightTag.fallbackOrderHighlightTag(orderAiPayload(row), talentCity)
 }
 
 function applyTagMap(rows, map, talentCity) {
   return rows.map((row) => {
     const hit = map[row.id]
     if (hit && hit.tag) {
-      return {
-        ...row,
-        aiTag: hit.tag,
-        aiTagTone: hit.tone || 'default',
-        aiTagSource: 'ai',
+      const sanitized = orderHighlightTag.sanitizeAiOrderTag(hit.tag, hit.tone, orderAiPayload(row))
+      if (sanitized) {
+        return {
+          ...row,
+          aiTag: sanitized.tag,
+          aiTagTone: sanitized.tone,
+          aiTagSource: 'ai',
+        }
       }
     }
     const fb = fallbackTagForRow(row, talentCity)
