@@ -233,8 +233,7 @@
 
 <view wx:if="{{view && !loading}}" class="bottom-bar">
   <view class="bottom-bar__tools">
-    <button class="bottom-icon" open-type="share">分享</button>
-    <button class="bottom-icon bottom-icon--timeline" open-type="shareTimeline">分享朋友圈</button>
+    <button class="bottom-icon" bindtap="onOpenShareSheet">分享</button>
     <button class="bottom-icon" bindtap="goHome">首页</button>
   </view>
   <view class="bottom-bar__actions">
@@ -271,5 +270,18 @@
       bindtap="goApply"
     >请切换身份后再报名</button>
     <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
+  </view>
+</view>
+
+<view class="detail-share-sheet-mask" wx:if="{{showShareSheet}}" bindtap="onCloseShareSheet">
+  <view class="detail-share-sheet" catchtap="noopShareSheetTap">
+    <view class="detail-share-sheet-head">
+      <text class="detail-share-sheet-title">分享招募</text>
+      <text class="detail-share-sheet-close" bindtap="onCloseShareSheet">×</text>
+    </view>
+    <text wx:if="{{shareTitle}}" class="detail-share-sheet-sub">{{shareTitle}}</text>
+    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share">分享小程序</button>
+    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="shareTimeline">分享朋友圈</button>
+    <view class="detail-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
   </view>
 </view>
