@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 16rpx;
   margin: 8rpx 28rpx 48rpx;
+  position: relative;
+  z-index: 2;
 }
 
 .account-session-btn {
@@ -26,4 +28,8 @@
   background: #f8fafc;
   border-color: #e2e8f0;
   font-weight: 500;
+}
+
+.account-session-btn--hover {
+  opacity: 0.88;
 }
