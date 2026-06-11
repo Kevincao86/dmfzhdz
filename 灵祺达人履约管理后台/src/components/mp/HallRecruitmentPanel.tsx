@@ -10,6 +10,7 @@ import {
 } from '../../lib/mpRecruitment/listKeywordSearch'
 import {
   matchStatusLabel,
+  matchHallTabCountStatusFilter,
   splitRoleHallRows,
   STATUS_FILTER_OPTIONS,
   HALL_DEFAULT_STATUS_FILTER,
@@ -39,6 +40,7 @@ function filterHallRows(
     filterStatus: string
     priceSelected: string[]
   },
+  forTabCount = false,
 ): RecruitmentOrderRow[] {
   const kw = opts.keyword.trim()
   const searchByOrderNo = looksLikeOrderNoSearch(kw)
@@ -51,7 +53,11 @@ function filterHallRows(
     if (!hallFilters.matchCategory(r.category, opts.filterCategory)) return false
     if (!hallFilters.matchPriceBuckets(r.priceAmount, opts.priceSelected)) return false
     if (searchByOrderNo && matchesOrderIdKeyword(row, kw)) return true
-    if (!matchStatusLabel(r, opts.filterStatus)) return false
+    if (forTabCount) {
+      if (!matchHallTabCountStatusFilter(String(r.statusLabel || ''), opts.filterStatus)) return false
+    } else if (!matchStatusLabel(r, opts.filterStatus)) {
+      return false
+    }
     return true
   })
 }
@@ -108,11 +114,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   )
 
   const tabCounts = useMemo(() => {
-    const normal = filterHallRows(normalRows, filterOpts).length
-    const urgent = filterHallRows(urgentRows, filterOpts).length
-    const shoot = filterHallRows(shootRows, filterOpts).length
-    const edit = filterHallRows(editRows, filterOpts).length
-    const ice = filterHallRows(iceRows, filterOpts).length
+    const normal = filterHallRows(normalRows, filterOpts, true).length
+    const urgent = filterHallRows(urgentRows, filterOpts, true).length
+    const shoot = filterHallRows(shootRows, filterOpts, true).length
+    const edit = filterHallRows(editRows, filterOpts, true).length
+    const ice = filterHallRows(iceRows, filterOpts, true).length
     return { normal, urgent, paichian: shoot + edit + ice, shoot, edit, ice }
   }, [normalRows, urgentRows, shootRows, editRows, iceRows, filterOpts])
 
@@ -198,8 +204,15 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     { id: 'ice', label: '云剪任务', count: tabCounts.ice },
   ]
 
-  /** 顶部条数与当前列表同源，避免 Tab 角标（分类总数）与卡片数不一致 */
-  const heroBadgeCount = displayRows.length
+  const heroBadgeCount = useMemo(() => {
+    if (hallTab === 'urgent') return tabCounts.urgent
+    if (hallTab === 'paichian') {
+      if (paichianSubTab === 'edit') return tabCounts.edit
+      if (paichianSubTab === 'ice') return tabCounts.ice
+      return tabCounts.shoot
+    }
+    return tabCounts.normal
+  }, [hallTab, paichianSubTab, tabCounts])
 
   const listTwoCol = displayRows.length > 1
 

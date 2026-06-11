@@ -20,9 +20,9 @@ export function matchHallStatusFilter(statusLabelText: string, filter: string): 
   return statusLabelText === filter
 }
 
-/** Tab 角标与列表展示使用同一套状态规则 */
-export function matchHallTabCountStatusFilter(statusLabelText: string, filter: string): boolean {
-  return matchHallStatusFilter(statusLabelText, filter)
+/** Tab 角标：统计分类内全部状态，不受状态筛选项影响 */
+export function matchHallTabCountStatusFilter(_statusLabelText: string, _filter: string): boolean {
+  return true
 }
 
 export function resolveEffectiveMpStatus(
