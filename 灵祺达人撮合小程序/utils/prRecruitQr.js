@@ -22,6 +22,16 @@ function resolvePrName(meta, snap, mp) {
   return String(snap.companyName || snap.contactName || mp.customerName || '').trim()
 }
 
+function resolveOrderPublisherDisplayName(mp) {
+  if (!mp || typeof mp !== 'object') return ''
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
+      ? meta.prProfileSnapshot
+      : {}
+  return resolvePrName(meta, snap, mp)
+}
+
 function buildPrInfoText(mp) {
   if (!mp) return ''
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
@@ -105,4 +115,5 @@ module.exports = {
   buildPrInfoText,
   buildPrQrScanUrl,
   renderPrQrImage,
+  resolveOrderPublisherDisplayName,
 }
