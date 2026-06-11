@@ -150,6 +150,7 @@ module.exports = {
   SHARE_COVER_IMAGE: LOCAL_SHARE_COVER,
   DEFAULT_TITLE,
   prepareShareCoverPath,
+  readCoverPath,
   defaultShare,
   defaultTimelineShare,
   enableShareMenu,
