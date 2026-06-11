@@ -23,6 +23,7 @@ function matchListKeyword(row, keyword, extraFields) {
     r.appliedAt,
     r.publishedAt,
     r.signupLabel,
+    r.signupCountText,
     r.deadlineDaysText,
     ...(Array.isArray(extraFields) ? extraFields : []),
   ]

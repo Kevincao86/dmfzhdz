@@ -44,7 +44,7 @@ export default function RecruitmentOrderCard({ row, onClick, showMatchScore = fa
         ) : null}
         <span className="order-chip order-chip--status">{row.statusLabel}</span>
         <span className="order-chip order-chip--meta">
-          报名{row.applicantCount}/{row.recruitCount}
+          {row.signupCountText || `报名${row.applicantCount}/${row.recruitCount}`}
         </span>
         {row.urgent ? (
           <span className="order-chip order-chip--urgent">急单</span>

@@ -31,6 +31,8 @@ export type RecruitmentOrderRow = {
   summary: string
   applicantCount: number
   recruitCount: number | string
+  claimedSlotCount?: number
+  signupCountText?: string
   overRecruitHot?: boolean
   urgent: boolean
   isIce: boolean

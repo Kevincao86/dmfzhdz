@@ -41,6 +41,7 @@ export function matchListKeyword(row: Record<string, unknown>, keyword: string, 
     row.appliedAt,
     row.publishedAt,
     row.signupLabel,
+    row.signupCountText,
     row.deadlineDaysText,
     ...extraFields,
   ]
