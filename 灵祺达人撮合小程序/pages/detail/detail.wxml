@@ -19,8 +19,9 @@
           招募单号 {{view.merchantOrderNo}}
           <text class="order-copy">复制</text>
         </view>
-        <text class="merchant-name">{{view.merchantName}} · {{view.storeName}}</text>
-        <text class="title-lg">{{view.title}}</text>
+        <text class="title-lg detail-hero-title">
+          {{view.title}}<text wx:if="{{view.region && view.region !== '—'}}" class="detail-hero-city"> · {{view.region}}</text>
+        </text>
         <view>
           <text wx:for="{{view.tags}}" wx:key="text" class="tag tag-{{item.tone}}">{{item.text}}</text>
         </view>

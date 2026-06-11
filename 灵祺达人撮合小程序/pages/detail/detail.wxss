@@ -22,13 +22,19 @@
   font-size: 24rpx;
 }
 
-.detail-hero-top .merchant-name {
-  color: rgba(255, 255, 255, 0.85);
+.detail-hero-top .detail-hero-title {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #fff;
 }
 
-.detail-hero-top .title-lg {
-  color: #fff;
-  margin-top: 16rpx;
+.detail-hero-top .detail-hero-city {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .detail-hero-top .tag {
