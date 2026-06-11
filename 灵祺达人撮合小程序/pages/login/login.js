@@ -85,7 +85,7 @@ async function applyLoginIdentity(data, workId) {
 function navigateAfterLogin(page) {
   const tabBar = require('../../utils/tabBar.js')
   tabBar.refreshTabBar()
-  const pendingPublish = require('../utils/publishPendingAfterLogin.js').read()
+  const pendingPublish = require('../../utils/publishPendingAfterLogin.js').read()
   if (pendingPublish && pendingPublish.autoSubmit) {
     wx.showToast({ title: '登录成功，正在发布招募', icon: 'none', duration: 2200 })
   }
