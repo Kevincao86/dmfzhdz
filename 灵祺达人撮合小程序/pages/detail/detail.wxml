@@ -174,7 +174,7 @@
       </view>
       <view wx:elif="{{!iceVerified}}" style="margin-top:24rpx;">
         <text wx:if="{{iceStatusHint}}" class="hint" style="display:block;margin-bottom:12rpx;color:#b45309;">{{iceStatusHint}}</text>
-        <text class="hint">粘贴 {{claimedSlotCount}} 条成片 https 链接（每行一条）：</text>
+        <text class="hint">粘贴 {{claimedSlotCount}} 条成片 https 链接（每行一条，已识别 {{deliverParsedCount}}/{{claimedSlotCount}}）：</text>
         <textarea class="ice-input ice-textarea" placeholder="https://…" value="{{deliverText}}" bindinput="onDeliverField" />
         <button class="btn-primary" style="margin-top:16rpx;" loading="{{editDeliverSubmitting}}" bindtap="submitEditDeliver">提交成片链接</button>
       </view>

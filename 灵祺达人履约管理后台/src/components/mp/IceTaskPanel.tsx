@@ -8,6 +8,7 @@ import {
   submitEditDeliverLinks,
   submitIceDouyin,
 } from '../../lib/mpSync/iceTaskRuntime'
+import { clampDeliverText } from '../../lib/mpSync/editDeliverLinks'
 import { removeApplication } from '../../lib/mpSync/applicationsStore'
 
 type Props = {
@@ -69,6 +70,10 @@ function EditIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
     const links = parseBatchDeliverUrls(deliverText)
     if (!links.length) {
       window.alert('请粘贴至少一条 https 成片链接')
+      return
+    }
+    if (links.length > needCount) {
+      window.alert(`链接数不能超过认领条数 ${needCount}`)
       return
     }
     if (links.length !== needCount) {
@@ -168,7 +173,13 @@ function EditIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm min-h-[120px]"
               placeholder={'https://…\nhttps://…'}
               value={deliverText}
-              onChange={(e) => setDeliverText(e.target.value)}
+              onChange={(e) => {
+                const next = clampDeliverText(e.target.value, needCount)
+                if (next.length < e.target.value.length) {
+                  window.alert(`最多 ${needCount} 条链接`)
+                }
+                setDeliverText(next)
+              }}
             />
             <button
               type="button"

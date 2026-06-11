@@ -51,6 +51,7 @@ Page({
     iceConfirmed: false,
     editGroupQrImage: '',
     deliverText: '',
+    deliverParsedCount: 0,
     editDeliverSubmitting: false,
     applyGateHint: '',
     iceSlotsFull: false,
@@ -298,6 +299,9 @@ Page({
         iceConfirmed,
         editGroupQrImage,
         deliverText,
+        deliverParsedCount: deliverText
+          ? editDeliverLinks.parseBatchDeliverUrls(deliverText).length
+          : 0,
         applyGateHint,
         iceSlotsFull,
       })
@@ -316,7 +320,15 @@ Page({
     this.setData({ douyinUrl: e.detail.value })
   },
   onDeliverField(e) {
-    this.setData({ deliverText: e.detail.value })
+    const max = Math.max(1, Number(this.data.claimedSlotCount) || 1)
+    let text = String(e.detail.value || '')
+    const clamped = editDeliverLinks.clampDeliverText(text, max)
+    if (clamped !== text) {
+      wx.showToast({ title: `最多 ${max} 条链接`, icon: 'none' })
+      text = clamped
+    }
+    const deliverParsedCount = editDeliverLinks.parseBatchDeliverUrls(text).length
+    this.setData({ deliverText: text, deliverParsedCount })
   },
   previewEditGroupQr() {
     const url = String(this.data.editGroupQrImage || '').trim()
@@ -329,6 +341,10 @@ Page({
     const need = this.data.claimedSlotCount || 1
     if (!links.length) {
       wx.showToast({ title: '请粘贴 https 成片链接', icon: 'none' })
+      return
+    }
+    if (links.length > need) {
+      wx.showToast({ title: `不能超过认领 ${need} 条`, icon: 'none' })
       return
     }
     if (links.length !== need) {
