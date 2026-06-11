@@ -1,4 +1,5 @@
 import type { RegistryMpRecruitmentOrder, RegistryMpTalentInboxItem, RegistrySnapshot } from './opsRegistryTypes.js'
+import { isIceMpOrder } from './iceOrderDetect.js'
 
 /** 报名截止后保留群二维码的天数 */
 export const GROUP_QR_RETENTION_DAYS = 7
@@ -16,13 +17,33 @@ function pickField(summary: string, key: string): string {
   return m ? m[1].trim() : ''
 }
 
-/** 与小程序 recruitmentListFilters.resolveDeadlineMs 一致 */
-export function resolveMpOrderDeadlineMs(mp: RegistryMpRecruitmentOrder): number {
+function resolveSignupDeadlineMs(mp: RegistryMpRecruitmentOrder, summary: string): number {
   const meta =
     mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
       ? (mp.mpPublishMeta as Record<string, unknown>)
       : null
+  const fromSignup =
+    parseTs(meta?.signupDeadline) || parseTs(pickField(summary, '报名截止'))
+  if (fromSignup > 0) return fromSignup
+  const deliveryMs =
+    parseTs(meta?.deliveryDeadline) || parseTs(pickField(summary, '交付截止'))
+  const deadlineField = parseTs(mp.deadline)
+  if (deadlineField > 0 && (!deliveryMs || deadlineField !== deliveryMs)) return deadlineField
+  const pub = parseTs(mp.createdAt || mp.updatedAt)
+  if (mp.urgent && pub > 0) return pub + 86400000
+  return pub > 0 ? pub + 7 * 86400000 : 0
+}
+
+/** 与小程序 recruitmentListFilters.resolveDeadlineMs 一致（云剪单仅看报名截止） */
+export function resolveMpOrderDeadlineMs(mp: RegistryMpRecruitmentOrder): number {
   const summary = [mp.recruitmentInfo, mp.taskDetail, mp.merchantRequirements].filter(Boolean).join('\n')
+  if (isIceMpOrder(mp as unknown as Record<string, unknown>)) {
+    return resolveSignupDeadlineMs(mp, summary)
+  }
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
   const fromField =
     parseTs(mp.deadline) ||
     parseTs(meta?.signupDeadline) ||

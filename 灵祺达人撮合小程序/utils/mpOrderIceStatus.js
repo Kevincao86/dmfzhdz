@@ -44,13 +44,20 @@ function resolveIcePrStatus(mp) {
 }
 
 function resolveDisplayStatus(mp, view, deadlineMs, nowMs) {
+  const now = nowMs != null && Number.isFinite(nowMs) ? nowMs : Date.now()
   if (mp && isIceMpOrder(mp)) {
-    return view === 'pr' ? resolveIcePrStatus(mp) : resolveIceHallStatus(mp)
+    const base = view === 'pr' ? resolveIcePrStatus(mp) : resolveIceHallStatus(mp)
+    const signupMs = Number(deadlineMs) > 0 ? Number(deadlineMs) : 0
+    if (signupMs > 0 && now >= signupMs && (base === 'open' || base === 'collecting')) {
+      return 'expired'
+    }
+    return base
   }
   return mpOrderStatus.resolveEffectiveMpStatus(mp && mp.status, deadlineMs, nowMs)
 }
 
 function displayStatusLabel(status, mp, view) {
+  if (status === 'expired') return mpOrderStatus.statusLabel('expired')
   if (
     mp &&
     isIceMpOrder(mp) &&
