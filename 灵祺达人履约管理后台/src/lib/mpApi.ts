@@ -5,6 +5,7 @@ import { prParticipantKey } from './mpSync/participant'
 import { readPrProfile } from './mpSync/userProfile'
 import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
+import { normalizeHallRegistryPayload } from './mpSync/hallRegistryParse'
 
 const REGISTRY_FETCH_MS = 25_000
 const HALL_REGISTRY_CACHE_MS = 45_000
@@ -227,6 +228,83 @@ function hallRegistryCacheKey(scope: 'hall' | 'full'): string {
   return `${scope}:${owner}`
 }
 
+function isRetryableRegistryErr(msg: string): boolean {
+  return /timeout|abort|reset|502|503|504|ECONNRESET|registry_snapshot|meoo_ops|hall_registry/i.test(msg)
+}
+
+async function fetchHallRegistryRemote(opts: {
+  includeMpOrderIds: string[]
+  includePrOwned: boolean
+  includeRecommendPool: boolean
+}): Promise<Record<string, unknown>> {
+  const { includeMpOrderIds, includePrOwned, includeRecommendPool } = opts
+  let lastErr = 'registry_failed'
+
+  if (!includePrOwned && !includeMpOrderIds.length) {
+    const getPath = includeRecommendPool
+      ? '/api/meoo-ops-mp-hall-registry?includeRecommendPool=1'
+      : '/api/meoo-ops-mp-hall-registry'
+    try {
+      const res = await fetch(apiUrl(getPath), { signal: registryFetchSignal() })
+      const data = await parseJsonRes(res)
+      if (res.ok && data.ok !== false) {
+        return normalizeHallRegistryPayload(data)
+      }
+      lastErr = String(data.error || data.detail || `http_${res.status}`)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr = /abort/i.test(msg) ? '招募大厅加载超时，请刷新重试' : msg
+    }
+  }
+
+  try {
+    const data = await mpAuthRequest('hall_registry', {
+      includeMpOrderIds,
+      ...(includePrOwned
+        ? { includePrOwned: true, ...buildHallRegistryOwnerPayload() }
+        : {}),
+      ...(includeRecommendPool ? { includeRecommendPool: true } : {}),
+    })
+    return normalizeHallRegistryPayload(data)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(msg || lastErr)
+  }
+}
+
+async function fetchFullRegistryRemote(): Promise<Record<string, unknown>> {
+  const paths = ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
+  let lastErr = 'registry_failed'
+  for (const path of paths) {
+    try {
+      const res = await fetch(apiUrl(path), { signal: registryFetchSignal() })
+      const data = await parseJsonRes(res)
+      if (!res.ok || data.ok === false) {
+        lastErr = String(data.error || data.detail || `http_${res.status}`)
+        continue
+      }
+      return data
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr = /abort/i.test(msg) ? '招募大厅加载超时，请刷新重试' : msg
+    }
+  }
+  throw new Error(formatMpApiErr(new Error(lastErr), '招募数据加载失败，请刷新重试'))
+}
+
+async function fetchRegistryRemoteWithRetry(
+  fetchOnce: () => Promise<Record<string, unknown>>,
+): Promise<Record<string, unknown>> {
+  try {
+    return await fetchOnce()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (!isRetryableRegistryErr(msg)) throw e
+    await new Promise((r) => setTimeout(r, 400))
+    return fetchOnce()
+  }
+}
+
 export function clearMpRegistryCache(): void {
   hallRegistryCache = {}
   hallRegistryInflight = {}
@@ -251,43 +329,6 @@ export async function fetchMpRegistry(opts?: {
   const includePrOwned = opts?.includePrOwned === true
   const includeRecommendPool = opts?.includeRecommendPool === true
   const scope = opts?.scope === 'full' ? 'full' : 'hall'
-  if (includeMpOrderIds.length || includePrOwned || includeRecommendPool) {
-    try {
-      const data = await mpAuthRequest('hall_registry', {
-        includeMpOrderIds,
-        ...(includePrOwned
-          ? { includePrOwned: true, ...buildHallRegistryOwnerPayload() }
-          : {}),
-        ...(includeRecommendPool ? { includeRecommendPool: true } : {}),
-      })
-      return data
-    } catch (e) {
-      if (includePrOwned || includeRecommendPool) throw e
-      /* fallback GET only when not requesting PR-owned orders */
-    }
-  }
-  const paths =
-    scope === 'full'
-      ? ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
-      : ['/api/meoo-ops-mp-hall-registry', '/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
-  let lastErr = 'registry_failed'
-  const fetchOnce = async () => {
-    for (const path of paths) {
-      try {
-        const res = await fetch(apiUrl(path), { signal: registryFetchSignal() })
-        const data = await parseJsonRes(res)
-        if (!res.ok || data.ok === false) {
-          lastErr = String(data.error || data.detail || `http_${res.status}`)
-          continue
-        }
-        return data
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        lastErr = /abort/i.test(msg) ? '招募大厅加载超时，请刷新重试' : msg
-      }
-    }
-    throw new Error(lastErr)
-  }
 
   const now = Date.now()
   const cacheKey = hallRegistryCacheKey(scope)
@@ -298,10 +339,26 @@ export async function fetchMpRegistry(opts?: {
   const inflight = hallRegistryInflight[cacheKey]
   if (inflight) return inflight
 
-  const pending = fetchOnce()
+  const fetchOnce = async () => {
+    if (scope === 'full') {
+      return fetchFullRegistryRemote()
+    }
+    return fetchHallRegistryRemote({
+      includeMpOrderIds,
+      includePrOwned,
+      includeRecommendPool,
+    })
+  }
+
+  const pending = fetchRegistryRemoteWithRetry(fetchOnce)
     .then((data) => {
       hallRegistryCache[cacheKey] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
       return data
+    })
+    .catch((e) => {
+      if (cached?.data) return cached.data
+      const msg = e instanceof Error ? e.message : String(e)
+      throw new Error(formatMpApiErr(new Error(msg), '招募数据加载失败，请刷新重试'))
     })
     .finally(() => {
       delete hallRegistryInflight[cacheKey]
