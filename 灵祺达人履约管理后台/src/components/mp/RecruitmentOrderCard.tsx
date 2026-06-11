@@ -39,7 +39,9 @@ export default function RecruitmentOrderCard({ row, onClick, showMatchScore = fa
       ) : null}
       <h3 className="font-semibold text-[15px] leading-snug pr-2 text-[var(--shell-text)]">{row.title}</h3>
       <div className="flex flex-wrap gap-1.5 mt-2">
-        {row.overRecruitHot ? (
+        {row.iceSlotsFull ? (
+          <span className="order-chip order-chip--status">已收满</span>
+        ) : row.overRecruitHot ? (
           <span className="order-chip order-chip--urgent">爆满</span>
         ) : null}
         <span className="order-chip order-chip--status">{row.statusLabel}</span>

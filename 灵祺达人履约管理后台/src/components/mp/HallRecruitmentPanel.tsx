@@ -10,7 +10,6 @@ import {
 } from '../../lib/mpRecruitment/listKeywordSearch'
 import {
   matchStatusLabel,
-  prioritizeActiveStatus,
   splitRoleHallRows,
   STATUS_FILTER_OPTIONS,
   HALL_DEFAULT_STATUS_FILTER,
@@ -128,15 +127,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       else rows = shootRows
     }
     rows = filterHallRows(rows, filterOpts)
-    if (
-      hallTab === 'normal' &&
-      (filterStatus === '全部' || filterStatus === HALL_DEFAULT_STATUS_FILTER) &&
-      sortBy === '发布时间'
-    ) {
-      rows = prioritizeActiveStatus(rows)
-    } else {
-      rows = listFilters.sortRecruitmentRows(rows, sortBy)
-    }
+    rows = listFilters.sortHallRecruitmentRows(rows, sortBy)
     const base = rows.map((r) => ({ ...r, ...recruitmentAi.fallbackTagForRow(r), aiTagSource: 'local' }))
     setDisplayRows(base)
     const enriched = await recruitmentAi.enrichOrderTags(base)

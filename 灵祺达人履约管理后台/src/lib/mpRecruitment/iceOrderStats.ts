@@ -96,8 +96,28 @@ export function buildSignupProgressLabel(
     return hall ? `报名${applicantCount}/${cap}` : `报名 ${applicantCount}/${cap} 人`
   }
   const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
-  const cap = total > 0 ? total : recruitCap > 0 ? recruitCap : hall ? '不限' : '—'
-  return hall ? `认领 ${claimed}/${cap} 条` : `认领 ${claimed}/${cap} 条`
+  const capNum = total > 0 ? total : recruitCap > 0 ? recruitCap : 0
+  const shown = capNum > 0 ? Math.min(claimed, capNum) : claimed
+  const cap = capNum > 0 ? capNum : hall ? '不限' : '—'
+  return hall ? `认领 ${shown}/${cap} 条` : `认领 ${shown}/${cap} 条`
+}
+
+export function isIceSlotsFull(
+  mp: Record<string, unknown> | null | undefined,
+  recruitCap: number,
+): boolean {
+  const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
+  const cap = total > 0 ? total : Math.max(0, Number(recruitCap) || 0)
+  return cap > 0 && claimed >= cap
+}
+
+export function countRemainingIceSlots(
+  mp: Record<string, unknown> | null | undefined,
+  recruitCap: number,
+): number {
+  const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
+  const cap = total > 0 ? total : Math.max(0, Number(recruitCap) || 0)
+  return Math.max(0, cap - Math.min(claimed, cap))
 }
 
 export function buildHallSignupCountText(

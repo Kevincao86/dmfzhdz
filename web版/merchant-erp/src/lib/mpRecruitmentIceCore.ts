@@ -12,7 +12,7 @@ import { findDuplicateApplicant, applicantsSamePerson } from './mpApplicantIdent
 export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel, isEditTeamIceMpOrder, isPackSlotIceOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
 export type { IceVerifyMode } from './iceOrderDetect.js'
 
-function parseIceRecruitCapacity(mp: RegistryMpRecruitmentOrder): number {
+export function parseIceRecruitCapacity(mp: RegistryMpRecruitmentOrder): number {
   if (isPackSlotIceOrder(mp as unknown as Record<string, unknown>)) {
     return Math.max(1, (mp.iceVideoSlots ?? []).length)
   }
@@ -33,7 +33,30 @@ function parseIceRecruitCapacity(mp: RegistryMpRecruitmentOrder): number {
 }
 
 export function countFreeEditPackSlots(mp: RegistryMpRecruitmentOrder): number {
-  return (mp.iceVideoSlots ?? []).filter((s) => !String(s.assignedApplicantId || '').trim()).length
+  const cap = parseIceRecruitCapacity(mp)
+  if (!isPackSlotIceOrder(mp as unknown as Record<string, unknown>)) {
+    return Math.max(0, cap - countActiveIceApplicants(mp))
+  }
+  return Math.max(0, cap - countEditPackClaimedSlots(mp))
+}
+
+function countEditIceReservedSlots(mp: RegistryMpRecruitmentOrder): number {
+  let reserved = 0
+  for (const a of mp.applicants ?? []) {
+    if (!a || a.taskStatus === 'rejected') continue
+    const ts = String(a.taskStatus || '')
+    const assignedN = a.assignedIceSlotIds?.length ?? 0
+    if (assignedN > 0 || ts === 'confirmed') continue
+    if ((ts === 'pending_confirm' || ts === 'applied' || !ts) && String(a.appliedAt || '').trim()) {
+      reserved += Math.max(1, Number.parseInt(String(a.claimedSlotCount ?? 1), 10) || 1)
+    }
+  }
+  return reserved
+}
+
+function countEditPackClaimedSlots(mp: RegistryMpRecruitmentOrder): number {
+  const assigned = (mp.iceVideoSlots ?? []).filter((s) => String(s.assignedApplicantId || '').trim()).length
+  return assigned + countEditIceReservedSlots(mp)
 }
 
 export function isVideoDeliverUrl(raw: string): boolean {
@@ -69,9 +92,9 @@ export function verifyVideoDeliverLink(raw: string): { passed: boolean; note: st
 }
 
 function isEditPackFull(mp: RegistryMpRecruitmentOrder): boolean {
-  const slots = mp.iceVideoSlots ?? []
-  if (!slots.length) return false
-  return slots.every((s) => String(s.assignedApplicantId || '').trim())
+  const cap = parseIceRecruitCapacity(mp)
+  if (cap <= 0) return false
+  return countEditPackClaimedSlots(mp) >= cap
 }
 
 function allEditPackSlotsReviewed(mp: RegistryMpRecruitmentOrder): boolean {
@@ -180,8 +203,11 @@ export function iceSlotsPassedCount(mp: RegistryMpRecruitmentOrder): number {
 }
 
 function isIceRecruitFull(mp: RegistryMpRecruitmentOrder): boolean {
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
   const cap = parseIceRecruitCapacity(mp)
-  return cap > 0 && countActiveIceApplicants(mp) >= cap
+  if (cap <= 0) return false
+  if (isPack) return countEditPackClaimedSlots(mp) >= cap
+  return countActiveIceApplicants(mp) >= cap
 }
 
 /** 云剪满额：大厅展示已停止，PR 发单仍履约中 */

@@ -1,5 +1,6 @@
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
-import { isEditTeamIceMpOrder } from './iceOrderDetect.js'
+import { isEditTeamIceMpOrder, isIceMpOrder } from './iceOrderDetect.js'
+import { countFreeEditPackSlots, parseIceRecruitCapacity } from './mpRecruitmentIceCore.js'
 
 export type MpWorkIdentity = 'talent' | 'shoot' | 'edit' | 'pr'
 
@@ -44,6 +45,13 @@ export function hallOrderMatchesIdentityPool(
   return hallOrderVisibleToIdentity(row, identity)
 }
 
+function isIceSlotsFull(mp: RegistryMpRecruitmentOrder | Record<string, unknown>): boolean {
+  if (!isIceMpOrder(mp as Record<string, unknown>)) return false
+  const cap = parseIceRecruitCapacity(mp as RegistryMpRecruitmentOrder)
+  if (cap <= 0) return false
+  return countFreeEditPackSlots(mp as RegistryMpRecruitmentOrder) <= 0
+}
+
 export function validateRecruitmentClaim(
   mp: RegistryMpRecruitmentOrder | Record<string, unknown>,
   workIdentity?: string | null,
@@ -64,6 +72,9 @@ export function validateRecruitmentClaim(
     if (wid !== 'edit') {
       return { ok: false, message: '该任务仅限剪辑身份认领', code: 'edit_only' }
     }
+    if (isIceSlotsFull(mp)) {
+      return { ok: false, message: '任务已收满', code: 'slots_full' }
+    }
     return { ok: true }
   }
   if (target === 'shoot') {
@@ -74,6 +85,9 @@ export function validateRecruitmentClaim(
   }
   if (wid !== 'talent') {
     return { ok: false, message: '该任务仅限达人身份认领', code: 'talent_only' }
+  }
+  if (isIceMpOrder(mp as Record<string, unknown>) && isIceSlotsFull(mp)) {
+    return { ok: false, message: '任务已收满', code: 'slots_full' }
   }
   return { ok: true }
 }

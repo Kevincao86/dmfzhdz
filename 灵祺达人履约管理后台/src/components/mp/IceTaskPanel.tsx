@@ -50,7 +50,13 @@ function EditIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
           /* ignore */
         }
       }
-      window.alert(action === 'confirm' ? '已确认接收' : '已拒绝，可重新认领')
+      window.alert(
+        action === 'confirm'
+          ? state.isEditTeamIce
+            ? '剪辑认领成功，请尽快加入微信群'
+            : '认领成功，请尽快完成后续步骤'
+          : '已拒绝，可重新认领',
+      )
       await onRefresh()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '操作失败')
@@ -215,7 +221,13 @@ function TalentIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
           /* ignore */
         }
       }
-      window.alert(action === 'confirm' ? '已确认接收' : '已拒绝，可重新认领')
+      window.alert(
+        action === 'confirm'
+          ? state.isEditTeamIce
+            ? '剪辑认领成功，请尽快加入微信群'
+            : '认领成功，请尽快完成后续步骤'
+          : '已拒绝，可重新认领',
+      )
       await onRefresh()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '操作失败')

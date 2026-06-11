@@ -75,6 +75,42 @@ export function sortRecruitmentRows<T extends { deadlineMs?: number; priceAmount
   return list
 }
 
+function statusPriority(status?: string): number {
+  if (status === 'open') return 0
+  if (status === 'collecting') return 1
+  if (status === 'closed') return 2
+  if (status === 'done') return 3
+  return 4
+}
+
+export function sortHallRecruitmentRows<
+  T extends {
+    status?: string
+    iceSlotsFull?: boolean
+    recruitCount?: number | string
+    applicantCount?: number
+    deadlineMs?: number
+    priceAmount?: number
+    publishedAtMs?: number
+  },
+>(rows: T[], sortBy: string): T[] {
+  const list = [...rows]
+  list.sort((a, b) => {
+    const sp = statusPriority(a.status) - statusPriority(b.status)
+    if (sp !== 0) return sp
+    const fullA = a.iceSlotsFull ? 1 : 0
+    const fullB = b.iceSlotsFull ? 1 : 0
+    if (fullA !== fullB) return fullA - fullB
+    const da = a.deadlineMs || 9e15
+    const db = b.deadlineMs || 9e15
+    if (da !== db) return da - db
+    if (sortBy === '截止时间') return da - db
+    if (sortBy === '价格从高到低') return (b.priceAmount || 0) - (a.priceAmount || 0)
+    return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+  })
+  return list
+}
+
 function buildBudgetDisplay(budgetText: string): BudgetDisplay {
   const raw = budgetText.trim() || '面议'
   if (raw.length > 32) return { kind: 'text', line: `${raw.slice(0, 30)}…`, full: raw }

@@ -53,6 +53,7 @@ Page({
     deliverText: '',
     editDeliverSubmitting: false,
     applyGateHint: '',
+    iceSlotsFull: false,
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -147,6 +148,7 @@ Page({
       const isPackIce = isIce && iceOrderDetect.isPackSlotIceOrder(mp)
       const workId = userProfile.readIdentity()
       const applyGateHint = recruitApplyGate.claimBlockHint(mp, workId)
+      const iceSlotsFull = isIce && iceOrderStats.isIceSlotsFull(mp, parseIceSlotTotalFromMp(mp))
       let iceApplicantId = this.data.iceApplicantId
       try {
         const stored = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(id))
@@ -297,6 +299,7 @@ Page({
         editGroupQrImage,
         deliverText,
         applyGateHint,
+        iceSlotsFull,
       })
     } catch (e) {
       const msg = String(e.message || e)
@@ -384,7 +387,10 @@ Page({
     this.setData({ iceConfirming: true })
     try {
       await ops.confirmIceTask(this.data.id, this.data.iceApplicantId, 'confirm')
-      wx.showToast({ title: '已确认接收', icon: 'success' })
+      const tip = this.data.isEditIce
+        ? '剪辑认领成功，请尽快加入微信群'
+        : '认领成功，请尽快完成后续步骤'
+      wx.showToast({ title: tip, icon: 'none', duration: 2800 })
       await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })

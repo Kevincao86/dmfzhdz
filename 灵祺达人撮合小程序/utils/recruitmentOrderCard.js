@@ -33,10 +33,14 @@ function mapMpOrderRow(mp, reg) {
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   const isIce = isIceMpOrder(mp)
   const iceProgress = isIce ? iceOrderStats.countIceClaimedSlots(mp, recruitCap) : null
+  const iceSlotsFull =
+    isIce && iceProgress && iceProgress.total > 0 && iceProgress.claimed >= iceProgress.total
   const overRecruitHot = isIce
     ? iceProgress && iceProgress.total > 0 && iceProgress.claimed > iceProgress.total
     : recruitCap > 0 && applicantCount > recruitCap
   const effectiveStatus = mpOrderIce.resolveDisplayStatus(mp, 'hall', deadlineMs)
+  let rowStatusLabel = mpOrderStatus.statusLabel(effectiveStatus)
+  if (iceSlotsFull) rowStatusLabel = '已收满'
   return {
     id: mp.id,
     isMock: false,
@@ -46,7 +50,7 @@ function mapMpOrderRow(mp, reg) {
     storeName: view.storeName,
     title: view.title,
     status: effectiveStatus,
-    statusLabel: mpOrderStatus.statusLabel(effectiveStatus),
+    statusLabel: rowStatusLabel,
     platform,
     platformIcon: platformIcon(platform),
     region: view.region,
@@ -60,8 +64,14 @@ function mapMpOrderRow(mp, reg) {
     summary: view.summaryShort,
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : view.recruitCount || '不限',
-    claimedSlotCount: iceProgress ? iceProgress.claimed : 0,
+    claimedSlotCount: iceProgress ? Math.min(iceProgress.claimed, iceProgress.total || iceProgress.claimed) : 0,
     signupCountText: iceOrderStats.buildHallSignupCountText(mp, applicantCount, recruitCap),
+    iceSlotsFull: !!iceSlotsFull,
+    slotsRemaining: iceProgress
+      ? Math.max(0, (iceProgress.total || recruitCap) - Math.min(iceProgress.claimed, iceProgress.total || iceProgress.claimed))
+      : recruitCap > 0
+        ? Math.max(0, recruitCap - applicantCount)
+        : 999,
     overRecruitHot,
     urgent,
     isIce: isIceMpOrder(mp),
@@ -77,6 +87,7 @@ function loadOpenOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const openList = mpList.filter((o) => {
     if (!o || !o.id || String(o.status) === 'deleted') return false
+    if (isIceMpOrder(o)) return mpOrderIce.shouldShowIceInHall(o)
     const summary = String(o.merchantRequirements || '').trim()
     const deadlineMs = listFilters.resolveDeadlineMs(o, summary)
     const status = mpOrderStatus.resolveEffectiveMpStatus(o.status, deadlineMs)

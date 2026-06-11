@@ -254,15 +254,16 @@
       bindtap="goApply"
     >{{isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}}</button>
     <button
-      wx:elif="{{!applied && !isPr && !applyGateHint}}"
+      wx:elif="{{!applied && !isPr && !applyGateHint && !iceSlotsFull}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
     >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : '我要报名'}}</button>
     <button
-      wx:if="{{!applied && !isPr && applyGateHint}}"
+      wx:if="{{!applied && !isPr && applyGateHint && !iceSlotsFull}}"
       class="btn-secondary bottom-cta bottom-cta--muted"
       bindtap="goApply"
     >{{applyGateHint}}</button>
+    <view wx:if="{{!applied && !isPr && iceSlotsFull}}" class="bottom-cta bottom-cta--muted bottom-cta--text">已收满</view>
     <button
       wx:if="{{!applied && isPr}}"
       class="btn-secondary bottom-cta bottom-cta--muted"

@@ -1,4 +1,7 @@
+import { countRemainingIceSlots } from '../mpRecruitment/iceOrderStats'
+import { parseIceSlotTotalFromMp } from '../mpRecruitment/listFilters'
+
 export function countFreeEditPackSlots(mp: Record<string, unknown>): number {
-  const slots = (mp.iceVideoSlots || []) as { assignedApplicantId?: string }[]
-  return slots.filter((s) => !String(s.assignedApplicantId || '').trim()).length
+  const cap = parseIceSlotTotalFromMp(mp)
+  return countRemainingIceSlots(mp, cap)
 }

@@ -151,9 +151,11 @@ Page({
     const isSupplierApply = recruitTarget === 'shoot' || recruitTarget === 'edit'
     const supplierWorkId = recruitTarget === 'edit' ? 'edit' : recruitTarget === 'shoot' ? 'shoot' : 'talent'
     const freeEditSlots = loadedMp ? editIceSlots.countFreeEditPackSlots(loadedMp) : 0
-    const gate = loadedMp
-      ? recruitApplyGate.validateRecruitmentClaim(loadedMp, userProfile.readIdentity())
-      : { ok: true }
+    const workIdentity = userProfile.readIdentity()
+    const canReclaim = loadedMp ? talentContactPrGate.canReclaimIceOrder(loadedMp, mpOrderId) : false
+    const applyBlockHint = loadedMp ? recruitApplyGate.claimBlockHint(loadedMp, workIdentity) : ''
+    const gate = loadedMp ? recruitApplyGate.validateRecruitmentClaim(loadedMp, workIdentity) : { ok: true }
+    const gateMessage = applyBlockHint || (gate.ok ? '' : gate.message)
     const canSyncMember = isSupplierApply
       ? supplierMemberSyncAvailable(member, supplierWorkId)
       : memberSyncAvailable(member, platform)
@@ -180,7 +182,7 @@ Page({
       isSupplierApply,
       supplierWorkId,
       freeEditSlots,
-      gateMessage: gate.ok ? '' : gate.message,
+      gateMessage,
       canReclaim,
       customFields: {},
       ...(memberFields ||
@@ -196,7 +198,6 @@ Page({
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
       return
     }
-    const canReclaim = loadedMp ? talentContactPrGate.canReclaimIceOrder(loadedMp, mpOrderId) : false
     if (canReclaim) {
       talentContactPrGate.clearLocalIceApplyState(mpOrderId)
     } else if (applicationsStore.hasAppliedToOrder(mpOrderId)) {
@@ -219,6 +220,15 @@ Page({
     }
     if (!applyRowsRaw.length) {
       wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
+    }
+    if (gateMessage && !canReclaim) {
+      wx.showModal({
+        title: '无法认领',
+        content: gateMessage,
+        showCancel: false,
+        success: () => wx.navigateBack(),
+      })
+      return
     }
     if (!gate.ok) {
       wx.showModal({
@@ -423,8 +433,10 @@ Page({
         appliedAt: applicant.appliedAt,
       })
       messagesStore.pushNotification({
-        title: '报名已提交',
-        body: `您已报名 ${this.data.merchantOrderNo || this.data.mpOrderId}`,
+        title: '认领已提交',
+        body: isEditIce
+          ? `请到「我的报名」确认接收 ${this.data.merchantOrderNo || this.data.mpOrderId}`
+          : `您已报名 ${this.data.merchantOrderNo || this.data.mpOrderId}`,
         category: 'business',
         mpOrderId: this.data.mpOrderId,
         applicantId,
@@ -436,15 +448,22 @@ Page({
           /* ignore */
         }
       }
-      wx.showToast({
-        title: this.data.isIceMode ? '认领成功，请确认接收' : '报名成功',
-        icon: 'success',
-      })
-      setTimeout(() => {
-        wx.redirectTo({
-          url: `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`,
+      const detailUrl = `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`
+      if (this.data.isIceMode && this.data.isEditIce) {
+        wx.showModal({
+          title: '认领成功',
+          content: '请到「我的报名」中确认接收订单',
+          showCancel: false,
+          confirmText: '知道了',
+          success: () => wx.redirectTo({ url: detailUrl }),
         })
-      }, 600)
+      } else {
+        wx.showToast({
+          title: this.data.isIceMode ? '认领成功，请到我的报名确认' : '报名成功',
+          icon: 'success',
+        })
+        setTimeout(() => wx.redirectTo({ url: detailUrl }), 600)
+      }
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 40), icon: 'none' })
     } finally {
