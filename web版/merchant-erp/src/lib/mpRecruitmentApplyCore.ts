@@ -2,6 +2,7 @@ import type { RegistryFile, RegistryMpRecruitmentApplicant } from './opsRegistry
 import { dedupeMpOrderApplicants, findDuplicateApplicant } from './mpApplicantIdentity.js'
 import { handleIceMpApply, isIceMpOrder } from './mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
+import { validateRecruitmentClaim } from './mpRecruitApplyGate.js'
 
 export type ApplyMpRecruitmentResult =
   | { ok: true; data: RegistryFile; body: Record<string, unknown> }
@@ -11,6 +12,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
   data: RegistryFile,
   mpOrderId: string,
   applicant: RegistryMpRecruitmentApplicant,
+  workIdentity?: string | null,
 ): ApplyMpRecruitmentResult {
   const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
   if (!data.mpRecruitmentOrders || idx < 0) {
@@ -18,6 +20,16 @@ export function applyToMpRecruitmentOrderInSnapshot(
   }
 
   let cur = data.mpRecruitmentOrders[idx]!
+  const claimGate = validateRecruitmentClaim(cur, workIdentity)
+  if (!claimGate.ok) {
+    return {
+      ok: false,
+      status: 403,
+      error: claimGate.code,
+      code: claimGate.code,
+      message: claimGate.message,
+    }
+  }
   const platform = cur.platform || '抖音'
   const deduped = dedupeMpOrderApplicants(cur.applicants, platform)
   if (deduped.removedIds.length > 0) {

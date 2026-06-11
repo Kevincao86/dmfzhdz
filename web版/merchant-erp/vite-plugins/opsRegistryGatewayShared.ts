@@ -706,7 +706,12 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             applicant.platformNickname = nick
             applicant.name = nick
             const data = ensureRegistry(viteRoot)
-            const result = applyToMpRecruitmentOrderInSnapshot(data, mpOrderId, applicant)
+            const result = applyToMpRecruitmentOrderInSnapshot(
+              data,
+              mpOrderId,
+              applicant,
+              body.workIdentity,
+            )
             if (!result.ok) {
               json(res, result.status, {
                 ok: false,
