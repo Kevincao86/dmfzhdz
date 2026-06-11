@@ -5,7 +5,11 @@ import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../../lib/mpRecruitment/listFilters'
 import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
 import { matchListKeyword } from '../../lib/mpRecruitment/listKeywordSearch'
-import { orderVisibleToWorkIdentity } from '../../lib/mpRecruitment/roleHallFilters'
+import {
+  filterRecommendHallOrders,
+  isRecommendHallRecruitingStatus,
+  orderMatchesRecommendHallIdentity,
+} from '../../lib/mpRecruitment/recommendHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
@@ -45,7 +49,8 @@ function SupplierRecommendOrders() {
     const memberRow = readMember()
     const kw = searchKeyword.trim()
     let rows = allOrderRows.filter((r) => {
-      if (!orderVisibleToWorkIdentity(r, workId)) return false
+      if (!orderMatchesRecommendHallIdentity(r, workId)) return false
+      if (!isRecommendHallRecruitingStatus(r)) return false
       if (kw && !matchListKeyword(r as unknown as Record<string, unknown>, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
       if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
@@ -71,7 +76,7 @@ function SupplierRecommendOrders() {
       setLoading(true)
       try {
         const reg = await fetchMpRegistry()
-        const rows = loadAllOrderRows(reg).filter((r) => orderVisibleToWorkIdentity(r, workId))
+        const rows = filterRecommendHallOrders(loadAllOrderRows(reg), workId)
         setAllOrderRows(
           rows.length || !showDemoOrders()
             ? rows
