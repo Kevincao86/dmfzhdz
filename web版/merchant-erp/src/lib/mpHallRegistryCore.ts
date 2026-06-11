@@ -18,6 +18,7 @@ import {
 } from './mpTalentInboxHallFilter.js'
 import { buildMpGroupQrByOrderIdForSession } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
+import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 
 const HALL_FETCH_MS = 20_000
 
@@ -37,7 +38,7 @@ async function fetchRegistryPartialFromDb(
 ): Promise<Partial<RegistryFile>> {
   const base = supabaseUrl.replace(/\/$/, '')
   const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=registry`
-  const res = await fetch(url, {
+  const res = await supabaseAdminFetch(url, {
     headers: {
       apikey: serviceRole,
       Authorization: `Bearer ${serviceRole}`,
@@ -60,6 +61,50 @@ async function fetchRegistryPartialFromDb(
   return reg as Partial<RegistryFile>
 }
 
+/** PostgREST RPC：库内过滤大厅单，避免 Node 拉全量 registry 解析失败 */
+async function fetchHallRegistryViaRpc(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<Partial<RegistryFile>> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/rpc/mp_talent_fetch_hall_registry`
+  const res = await supabaseAdminFetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: '{}',
+    signal: hallFetchSignal(),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`hall_rpc_${res.status}:${text.slice(0, 240)}`)
+  }
+  let data: Record<string, unknown>
+  try {
+    data = JSON.parse(text || '{}') as Record<string, unknown>
+  } catch {
+    throw new Error(`hall_rpc_parse:${text.slice(0, 120)}`)
+  }
+  if (data.ok === false) {
+    throw new Error(String(data.error || data.detail || 'hall_rpc_failed'))
+  }
+  return {
+    mpRecruitmentOrders: Array.isArray(data.mpRecruitmentOrders)
+      ? (data.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+      : [],
+    recruitmentOrders: Array.isArray(data.recruitmentOrders) ? data.recruitmentOrders : [],
+    mpTalentInbox: Array.isArray(data.mpTalentInbox) ? data.mpTalentInbox : [],
+    mpTalentMembers: Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers : [],
+  }
+}
+
+function emptyHallPayload(): Record<string, unknown> {
+  return { ok: true, mpRecruitmentOrders: [] }
+}
 
 function buildHallPayload(
   partial: Partial<RegistryFile>,
@@ -121,6 +166,60 @@ function buildHallPayload(
   }
 }
 
+function buildHallPayloadSafe(
+  partial: Partial<RegistryFile>,
+  includeMpOrderIds?: string[],
+  prOwnerKeys?: PrOwnerKeys,
+  talentMember?: RegistryMpTalentMember | null,
+  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null },
+  includeRecommendPool?: boolean,
+): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
+  try {
+    return buildHallPayload(
+      partial,
+      includeMpOrderIds,
+      prOwnerKeys,
+      talentMember,
+      talentAccount,
+      includeRecommendPool,
+    )
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[hall_registry] buildHallPayload failed:', msg.slice(0, 400))
+    return { payload: emptyHallPayload(), needPersist: false, partial: {} }
+  }
+}
+
+async function tryLoadHallFromPartial(
+  partialLoader: () => Promise<Partial<RegistryFile>>,
+  supabaseUrl: string,
+  serviceRole: string,
+  opts: {
+    includeMpOrderIds: string[]
+    prOwnerKeys?: PrOwnerKeys
+    talentMember?: RegistryMpTalentMember | null
+    talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
+    includeRecommendPool: boolean
+  },
+): Promise<Record<string, unknown> | null> {
+  const partial = await partialLoader()
+  const built = buildHallPayloadSafe(
+    partial,
+    opts.includeMpOrderIds,
+    opts.prOwnerKeys,
+    opts.talentMember,
+    opts.talentAccount,
+    opts.includeRecommendPool,
+  )
+  if (built.needPersist) {
+    void persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial).catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn('[hall_registry] async persist failed:', msg.slice(0, 200))
+    })
+  }
+  return built.payload
+}
+
 async function persistRegistryIfNeeded(
   supabaseUrl: string,
   serviceRole: string,
@@ -135,7 +234,7 @@ async function persistRegistryIfNeeded(
     registry: persist as unknown as Record<string, unknown>,
     updated_at: nowIso,
   })
-  const res = await fetch(`${base}/rest/v1/ops_registry_snapshot`, {
+  const res = await supabaseAdminFetch(`${base}/rest/v1/ops_registry_snapshot`, {
     method: 'POST',
     headers: {
       apikey: serviceRole,
@@ -170,42 +269,45 @@ export async function loadMpHallRegistryPayload(opts?: {
   const includeRecommendPool = opts?.includeRecommendPool === true
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const attempts: string[] = []
+  const buildOpts = {
+    includeMpOrderIds,
+    prOwnerKeys,
+    talentMember,
+    talentAccount,
+    includeRecommendPool,
+  }
 
   if (missingParts.length === 0) {
-    try {
-      const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
-      const built = buildHallPayload(
-        partial,
-        includeMpOrderIds,
-        prOwnerKeys,
-        talentMember,
-        talentAccount,
-        includeRecommendPool,
-      )
-      if (built.needPersist) {
-        void persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial).catch((e) => {
-          const msg = e instanceof Error ? e.message : String(e)
-          console.warn('[hall_registry] async persist failed:', msg.slice(0, 200))
-        })
+    const loaders: Array<() => Promise<Partial<RegistryFile>>> = includeRecommendPool
+      ? [() => fetchRegistryPartialFromDb(supabaseUrl, serviceRole)]
+      : [
+          () => fetchHallRegistryViaRpc(supabaseUrl, serviceRole),
+          () => fetchRegistryPartialFromDb(supabaseUrl, serviceRole),
+        ]
+    for (const loader of loaders) {
+      try {
+        const payload = await tryLoadHallFromPartial(loader, supabaseUrl, serviceRole, buildOpts)
+        if (payload) return payload
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        attempts.push(msg.slice(0, 240))
       }
-      return built.payload
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      attempts.push(`registry_direct:${msg.slice(0, 240)}`)
-      if (!isVercelServerless()) throw e
     }
   } else if (isVercelServerless()) {
     attempts.push(`registry_env_missing:${missingParts.join(',')}`)
   } else {
-    throw new Error(
-      `supabase_admin_not_configured: ${missingParts.join(',')} — ${merchantSupabaseAdminEnvConfigureHint(missingParts)}`,
+    console.error(
+      '[hall_registry] supabase_admin_not_configured:',
+      missingParts.join(','),
+      merchantSupabaseAdminEnvConfigureHint(missingParts),
     )
+    return emptyHallPayload()
   }
 
   if (isVercelServerless()) {
     try {
       const remote = await proxyGetErpApi('/api/meoo-ops-mp-hall-registry')
-      const built = buildHallPayload(
+      const built = buildHallPayloadSafe(
         remote as Partial<RegistryFile>,
         includeMpOrderIds,
         prOwnerKeys,
@@ -217,14 +319,9 @@ export async function loadMpHallRegistryPayload(opts?: {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       attempts.push(`ecs_proxy:${msg.slice(0, 240)}`)
-      const hint = missingParts.length
-        ? '请在 Vercel Production 配置 SUPABASE_URL 与 SUPABASE_SERVICE_ROLE_KEY 后 Redeploy。'
-        : '直连注册表与 ECS 代理均失败。'
-      throw new Error(`${attempts.join(' | ')} — ${hint}`)
     }
   }
 
-  throw new Error(
-    `supabase_admin_not_configured: ${missingParts.join(',')} — ${merchantSupabaseAdminEnvConfigureHint(missingParts)}`,
-  )
+  console.error('[hall_registry] all paths failed:', attempts.join(' | '))
+  return emptyHallPayload()
 }
