@@ -132,7 +132,11 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     }
     rows = filterHallRows(rows, filterOpts)
     rows = listFilters.sortHallRecruitmentRows(rows, sortBy)
-    const base = rows.map((r) => ({ ...r, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' as const }))
+    const base = rows.map((r) =>
+      r.aiTagSource === 'persisted' && r.aiTag
+        ? r
+        : { ...r, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' as const },
+    )
     setDisplayRows(listFilters.attachHallSignupCountdowns(base))
     const enriched = await recruitmentAi.enrichOrderTags(base)
     setDisplayRows(listFilters.attachHallSignupCountdowns(enriched))

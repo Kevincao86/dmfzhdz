@@ -107,9 +107,16 @@ function hasKey(env: Record<string, string>, provider: AIProvider): boolean {
   if (provider === 'minimax') {
     return Boolean((env.MERCHANT_AI_MINIMAX_KEY ?? env.MINIMAX_API_KEY ?? '').trim())
   }
+  if (provider === 'deepseek') {
+    return Boolean((env.DEEPSEEK_API_KEY ?? env.MERCHANT_AI_DEEPSEEK_KEY ?? '').trim())
+  }
+  if (provider === 'kimi') {
+    return Boolean((env.MOONSHOT_API_KEY ?? env.MERCHANT_AI_KIMI_KEY ?? env.KIMI_API_KEY ?? '').trim())
+  }
   return false
 }
 
+/** 招募打标：额度不足时按顺序自动切换（与运营台 AI 模型页厂商一致） */
 function providerChain(env: Record<string, string>, preferred?: string): AIProvider[] {
   const chain: AIProvider[] = []
   const add = (p: AIProvider) => {
@@ -117,7 +124,7 @@ function providerChain(env: Record<string, string>, preferred?: string): AIProvi
   }
   const want = String(preferred || env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim() as AIProvider
   add(want)
-  for (const p of ['doubao', 'qwen', 'minimax'] as AIProvider[]) add(p)
+  for (const p of ['doubao', 'qwen', 'minimax', 'kimi', 'deepseek'] as AIProvider[]) add(p)
   return chain
 }
 
@@ -317,7 +324,7 @@ export async function runMpRecruitmentAiCore(
       body: {
         ok: false,
         error: 'ai_not_configured',
-        hint: '请在服务端配置 MERCHANT_AI_DOUBAO_KEY、MERCHANT_AI_QWEN_KEY 或 MERCHANT_AI_MINIMAX_KEY',
+        hint: '请在运营台「AI 模型」或 ~/stack/auth-api.env 配置至少一个厂商 Key：doubao / qwen / minimax / kimi / deepseek',
       },
     }
   }

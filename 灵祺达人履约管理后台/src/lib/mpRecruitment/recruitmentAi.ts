@@ -109,27 +109,23 @@ function chunk<T>(list: T[], size: number): T[][] {
 }
 
 const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
-const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v3'
+const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v4'
 const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
 
-function readWebTagCache(): Record<string, { tag: string; tone: string }> {
+function readWebTagCache(): Record<string, { tag: string; tone: string; source?: string }> {
   try {
     const raw = sessionStorage.getItem(WEB_TAG_CACHE_KEY)
     if (!raw) return {}
-    const j = JSON.parse(raw) as { expiresAt?: number; data?: Record<string, { tag: string; tone: string }> }
-    if (j.expiresAt && Date.now() > j.expiresAt) return {}
+    const j = JSON.parse(raw) as { data?: Record<string, { tag: string; tone: string; source?: string }> }
     return j.data && typeof j.data === 'object' ? j.data : {}
   } catch {
     return {}
   }
 }
 
-function writeWebTagCache(data: Record<string, { tag: string; tone: string }>) {
+function writeWebTagCache(data: Record<string, { tag: string; tone: string; source?: string }>) {
   try {
-    sessionStorage.setItem(
-      WEB_TAG_CACHE_KEY,
-      JSON.stringify({ expiresAt: Date.now() + WEB_MATCH_CACHE_TTL_MS, data }),
-    )
+    sessionStorage.setItem(WEB_TAG_CACHE_KEY, JSON.stringify({ data }))
   } catch {
     /* ignore */
   }
@@ -201,10 +197,14 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
   const list = rows.filter((r) => r.id)
   if (!list.length) return list
 
+  const persisted = list.filter((r) => r.aiTagSource === 'persisted' && r.aiTag)
+  const pending = list.filter((r) => r.aiTagSource !== 'persisted')
+  if (!pending.length) return list
+
   const cache = readWebTagCache()
   const missing: RecruitmentOrderRow[] = []
-  const map: Record<string, { tag: string; tone: string }> = {}
-  for (const row of list) {
+  const map: Record<string, { tag: string; tone: string; source?: string }> = {}
+  for (const row of pending) {
     const ck = `${row.id}:${hallKey(row)}`
     if (cache[ck]) map[row.id] = cache[ck]
     else missing.push(row)
@@ -218,7 +218,13 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
         const items = Array.isArray(res.items) ? res.items : []
         if (items.length) aiHit = true
         for (const it of items) {
-          if (it?.id && it.tag) map[String(it.id)] = { tag: String(it.tag), tone: String(it.tone || 'default') }
+          if (it?.id && it.tag) {
+            map[String(it.id)] = {
+              tag: String(it.tag),
+              tone: String(it.tone || 'default'),
+              source: String((it as { source?: string }).source || 'ai'),
+            }
+          }
         }
         for (const row of part) {
           const ck = `${row.id}:${hallKey(row)}`
@@ -232,12 +238,13 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
     writeWebTagCache(cache)
   }
 
-  return list.map((row) => {
+  const tagged = pending.map((row) => {
     const hit = map[row.id]
     if (hit?.tag) {
       const sanitized = sanitizeAiOrderTag(hit.tag, hit.tone, orderAiPayload(row))
       if (sanitized) {
-        return { ...row, aiTag: sanitized.tag, aiTagTone: sanitized.tone, aiTagSource: 'ai' as const }
+        const src = hit.source === 'persisted' ? ('persisted' as const) : ('ai' as const)
+        return { ...row, aiTag: sanitized.tag, aiTagTone: sanitized.tone, aiTagSource: src }
       }
     }
     if (!aiHit) {
@@ -245,6 +252,9 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
     }
     return { ...row, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' as const }
   })
+
+  const byId = new Map([...persisted, ...tagged].map((r) => [r.id, r]))
+  return list.map((r) => byId.get(r.id) || r)
 }
 
 export async function enrichOrderMatches(

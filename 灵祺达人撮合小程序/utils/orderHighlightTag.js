@@ -63,6 +63,20 @@ function sanitizeAiOrderTag(tag, tone, row) {
   return { tag: t, tone: String(tone || 'default').trim() || 'default' }
 }
 
+function readHallAiTagFromMeta(meta) {
+  if (!meta || typeof meta !== 'object') return null
+  const raw = meta.hallAiTag
+  if (!raw || typeof raw !== 'object') return null
+  const tag = String(raw.tag || '').trim().slice(0, 6)
+  if (!tag) return null
+  return {
+    tag,
+    tone: String(raw.tone || 'default').trim().slice(0, 16) || 'default',
+    provider: String(raw.provider || '').trim() || undefined,
+    taggedAt: String(raw.taggedAt || '').trim() || undefined,
+  }
+}
+
 function buildRecruitContentForAi(mp) {
   const parts = []
   const title = String((mp && mp.title) || '').trim()
@@ -98,6 +112,7 @@ function enrichOrderAiPayload(row) {
 }
 
 module.exports = {
+  readHallAiTagFromMeta,
   buildRecruitContentForAi,
   fallbackOrderHighlightTag,
   sanitizeAiOrderTag,

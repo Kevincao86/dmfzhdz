@@ -53,6 +53,7 @@ function mapMpOrderRow(mp, reg) {
     recruitmentInfo,
     taskDetail,
   })
+  const hallAiTag = orderHighlightTag.readHallAiTagFromMeta(meta)
   return {
     id: mp.id,
     isMock: false,
@@ -80,6 +81,9 @@ function mapMpOrderRow(mp, reg) {
     merchantRequirements,
     taskDetail,
     recruitContent,
+    aiTag: hallAiTag ? hallAiTag.tag : '',
+    aiTagTone: hallAiTag ? hallAiTag.tone : 'default',
+    aiTagSource: hallAiTag ? 'persisted' : 'pending',
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : view.recruitCount || '不限',
     claimedSlotCount: iceProgress ? Math.min(iceProgress.claimed, iceProgress.total || iceProgress.claimed) : 0,

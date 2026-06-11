@@ -25,8 +25,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       process.cwd(),
       process.env as Record<string, string>,
     )
-    const { runMpRecruitmentAiCore } = await import('../vite-plugins/mpRecruitmentAiCore.js')
-    const out = await runMpRecruitmentAiCore(rawBody(req), env)
+    const bodyPeek = JSON.parse(rawBody(req) || '{}') as { mode?: string }
+    const mode = String(bodyPeek.mode || 'tag').trim()
+    const out =
+      mode === 'tag'
+        ? await (
+            await import('../vite-plugins/mpRecruitmentHallAiTagPersist.js')
+          ).runTagModeWithPersist(rawBody(req), env)
+        : await (await import('../vite-plugins/mpRecruitmentAiCore.js')).runMpRecruitmentAiCore(
+            rawBody(req),
+            env,
+          )
     sendMerchantJson(res, out.status, out.body)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
