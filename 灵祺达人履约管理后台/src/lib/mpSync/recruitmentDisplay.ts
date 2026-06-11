@@ -1,3 +1,6 @@
+import {
+  resolveDeadlineMsFromMp,
+} from '../mpRecruitment/listFilters'
 import { normalizePlatform } from './platformLabels'
 
 export type EnrichedMpOrder = {
@@ -19,6 +22,7 @@ export type EnrichedMpOrder = {
   applicantCount: number
   status: string
   isIce: boolean
+  deadlineMs: number
 }
 
 function splitLines(text: string) {
@@ -42,6 +46,11 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
   const recruitmentInfo = String(mp.recruitmentInfo || mp.merchantRequirements || '—')
   const taskDetail = String(mp.taskDetail || mp.merchantRequirements || recruitmentInfo)
   const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
+  const summaryForDeadline = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const deadlineMs = resolveDeadlineMsFromMp(mp, summaryForDeadline)
+  let recruitmentInfoLines = splitLines(recruitmentInfo).filter(
+    (l) => !/^招募标题[:：]/.test(String(l || '').trim()),
+  )
   return {
     mpOrderId: String(mp.id || ''),
     merchantOrderNo: String(mp.id || '—'),
@@ -55,11 +64,12 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
     budgetText,
     recruitCount,
     recruitmentInfo,
-    recruitmentInfoLines: splitLines(recruitmentInfo),
+    recruitmentInfoLines,
     taskDetail,
     taskDetailLines: splitLines(taskDetail),
     applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
     status: String(mp.status || 'open'),
     isIce,
+    deadlineMs,
   }
 }

@@ -31,6 +31,7 @@ import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrder
 import { claimBlockHint, recruitTargetFromMpOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
 import { countFreeEditPackSlots } from '../lib/mpSync/editIceSlots'
 import { evaluateContactPrGate } from '../lib/mpSync/talentContactPrGate'
+import { resolveSignupClosed } from '../lib/mpRecruitment/listFilters'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -140,7 +141,12 @@ export default function RecruitmentApplyPage() {
   const gate = mpOrder ? validateRecruitmentClaim(mpOrder, workIdentity) : { ok: true as const }
   const canReclaim = mpOrder ? canReclaimIceOrder(mpOrder, orderId) : false
   const applyBlockHint = mpOrder ? claimBlockHint(mpOrder, workIdentity) : ''
-  const gateMessage = canReclaim ? '' : applyBlockHint || (!gate.ok ? gate.message : '')
+  const signupClosed = mpOrder ? resolveSignupClosed(mpOrder) : false
+  const gateMessage = canReclaim
+    ? ''
+    : signupClosed
+      ? '报名已截止'
+      : applyBlockHint || (!gate.ok ? gate.message : '')
 
   function setField(key: string, value: string) {
     if (key.startsWith('custom_')) {
@@ -161,6 +167,10 @@ export default function RecruitmentApplyPage() {
   async function onSubmit() {
     if (gateMessage) {
       setErr(gateMessage)
+      return
+    }
+    if (signupClosed) {
+      setErr('报名已截止')
       return
     }
     const errMsg = validateApplyRows(rows, form as unknown as Record<string, unknown>, platform, {
@@ -357,7 +367,7 @@ export default function RecruitmentApplyPage() {
       {err ? <p className="text-red-400 text-sm">{err}</p> : null}
       <button
         type="button"
-        disabled={submitting}
+        disabled={submitting || signupClosed}
         className="w-full py-3 rounded-xl bg-violet-600 font-medium disabled:opacity-50"
         onClick={() => void onSubmit()}
       >
