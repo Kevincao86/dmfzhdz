@@ -19,10 +19,8 @@ function applicationFromMpOrder(mp, applicant) {
   }
 }
 
-function listApplicationsFromRegistry(reg, member) {
+function listApplicationsFromRegistry(reg) {
   if (!reg) return []
-  const m = member || talentMember.readMember()
-  if (!m) return []
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const rows = []
   const seen = new Set()
@@ -39,9 +37,25 @@ function listApplicationsFromRegistry(reg, member) {
   return rows
 }
 
+function collectIceClaimedOrderIds() {
+  const ids = []
+  try {
+    const info = wx.getStorageSync ? wx.getStorageInfoSync() : { keys: [] }
+    const prefix = 'meoo_ice_applicant_v1_'
+    const keys = Array.isArray(info.keys) ? info.keys : []
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i]
+      if (!k || k.indexOf(prefix) !== 0) continue
+      const id = String(k.slice(prefix.length) || '').trim()
+      if (id) ids.push(id)
+    }
+  } catch (_) {}
+  return ids
+}
+
 /** @returns {{ added: number, updated: number, total: number }} */
-function reconcileApplicationsFromRegistry(reg, member) {
-  const remote = listApplicationsFromRegistry(reg, member)
+function reconcileApplicationsFromRegistry(reg) {
+  const remote = listApplicationsFromRegistry(reg)
   if (!remote.length) {
     return { added: 0, updated: 0, total: applicationsStore.readApplications().length }
   }
@@ -83,22 +97,41 @@ function collectMissingApplicationOrderIds(reg, member) {
 async function fetchRegistryAndReconcileApplications(fetchOpts) {
   const ops = require('./opsRegistryTalentMp.js')
   const member = talentMember.readMember()
-  let reg = await ops.fetchRegistry(fetchOpts || { includeLocalContext: true })
-  reconcileApplicationsFromRegistry(reg, member)
-  const extraIds = collectMissingApplicationOrderIds(reg, member)
+  const baseOpts = fetchOpts || { includeLocalContext: true }
+  const iceIds = collectIceClaimedOrderIds()
+  const mergedIds = [
+    ...new Set([
+      ...((baseOpts && baseOpts.includeMpOrderIds) || []),
+      ...iceIds,
+    ]),
+  ].slice(0, 120)
+  const firstOpts =
+    mergedIds.length > 0
+      ? { ...baseOpts, includeMpOrderIds: mergedIds, includeLocalContext: true }
+      : baseOpts
+  let reg = await ops.fetchRegistry(firstOpts)
+  reconcileApplicationsFromRegistry(reg)
+  const extraIds = [
+    ...new Set([...collectMissingApplicationOrderIds(reg, member), ...iceIds]),
+  ].filter((id) => {
+    const loaded = new Set((reg.mpRecruitmentOrders || []).filter(Boolean).map((o) => String(o.id)))
+    return id && !loaded.has(id)
+  })
   if (extraIds.length) {
     reg = await ops.fetchRegistry({
-      includeMpOrderIds: extraIds,
+      includeMpOrderIds: extraIds.slice(0, 120),
       includeLocalContext: true,
     })
-    reconcileApplicationsFromRegistry(reg, member)
+    reconcileApplicationsFromRegistry(reg)
   }
   return reg
 }
 
 module.exports = {
+  applicationFromMpOrder,
   listApplicationsFromRegistry,
   reconcileApplicationsFromRegistry,
+  collectIceClaimedOrderIds,
   collectMissingApplicationOrderIds,
   fetchRegistryAndReconcileApplications,
 }
