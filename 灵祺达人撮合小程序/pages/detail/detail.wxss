@@ -24,11 +24,27 @@
 
 .detail-hero-top .detail-hero-title {
   display: block;
-  margin-top: 16rpx;
   font-size: 40rpx;
   font-weight: 700;
   line-height: 1.4;
   color: #fff;
+}
+
+.detail-hero-top .detail-hero-order-no {
+  margin-top: 12rpx;
+}
+
+.detail-hero-top .detail-hero-countdown {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #fde68a;
+  line-height: 1.45;
+}
+
+.detail-hero-top .detail-hero-countdown--ended {
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .detail-hero-top .detail-hero-city {
