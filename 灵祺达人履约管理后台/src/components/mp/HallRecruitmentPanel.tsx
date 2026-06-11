@@ -198,15 +198,8 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     { id: 'ice', label: '云剪任务', count: tabCounts.ice },
   ]
 
-  const heroBadgeCount = useMemo(() => {
-    if (hallTab === 'urgent') return tabCounts.urgent
-    if (hallTab === 'paichian') {
-      if (paichianSubTab === 'edit') return tabCounts.edit
-      if (paichianSubTab === 'ice') return tabCounts.ice
-      return tabCounts.shoot
-    }
-    return tabCounts.normal
-  }, [hallTab, paichianSubTab, tabCounts])
+  /** 顶部条数与当前列表同源，避免 Tab 角标（分类总数）与卡片数不一致 */
+  const heroBadgeCount = displayRows.length
 
   const listTwoCol = displayRows.length > 1
 
