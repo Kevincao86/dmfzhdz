@@ -20,6 +20,8 @@ export type RecruitmentOrderRow = {
   merchantName: string
   storeName: string
   mpStatus: string
+  /** 与 mpStatus 一致，供大厅排序使用 */
+  status?: string
   statusLabel: string
   platform: string
   region: string
@@ -32,6 +34,7 @@ export type RecruitmentOrderRow = {
   applicantCount: number
   recruitCount: number | string
   claimedSlotCount?: number
+  slotsRemaining?: number
   signupCountText?: string
   overRecruitHot?: boolean
   iceSlotsFull?: boolean

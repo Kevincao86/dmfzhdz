@@ -23,8 +23,10 @@ import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
 import { canTalentUploadRecruitmentVideo } from '../lib/mpRecruitment/talentApplicationStatus'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
-import { isEditTeamIceMpOrder } from '../lib/mpSync/iceOrderDetect'
+import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
 import { claimBlockHint } from '../lib/mpSync/recruitApplyGate'
+import { isIceSlotsFull } from '../lib/mpRecruitment/iceOrderStats'
+import { parseIceSlotTotalFromMp } from '../lib/mpRecruitment/listFilters'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -62,7 +64,10 @@ export default function RecruitmentDetailPage() {
     )
   const workIdentity = getWorkIdentity()
   const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
-  const applyGateHint = mpRaw && role !== 'pr' ? claimBlockHint(mpRaw, workIdentity) : ''
+  const iceSlotsFull =
+    !!view?.isIce && mpRaw ? isIceSlotsFull(mpRaw, parseIceSlotTotalFromMp(mpRaw)) : false
+  const applyGateHint =
+    mpRaw && role !== 'pr' && !canReclaimIce ? claimBlockHint(mpRaw, workIdentity) : ''
 
   useEffect(() => {
     if (!id) {
@@ -110,6 +115,10 @@ export default function RecruitmentDetailPage() {
 
   function goApply() {
     if (!view || !id) return
+    if (applyGateHint) {
+      window.alert(applyGateHint)
+      return
+    }
     const meta = mpRaw?.mpPublishMeta as { applyFormTemplateId?: string } | undefined
     const q = new URLSearchParams({
       platform: view.platform,
@@ -325,7 +334,7 @@ export default function RecruitmentDetailPage() {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            {role === 'talent' && !applied && !readOnlyEnded ? (
+            {role === 'talent' && !applied && !readOnlyEnded && !iceSlotsFull ? (
               applyGateHint ? (
                 <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200 flex-1">
                   {applyGateHint}
@@ -343,6 +352,16 @@ export default function RecruitmentDetailPage() {
                       : '立即报名'}
                 </button>
               )
+            ) : null}
+            {role === 'talent' && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce ? (
+              <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
+                已收满
+              </p>
+            ) : null}
+            {role === 'talent' && canReclaimIce && !readOnlyEnded && !applyGateHint ? (
+              <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
+                {isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}
+              </button>
             ) : null}
             {role === 'talent' ? (
               <button

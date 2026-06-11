@@ -3,6 +3,7 @@ import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import {
+  markAllNotificationsRead,
   markInboxSeen,
   markNotificationsRead,
   mergeNotificationsWithRegistry,
@@ -124,10 +125,9 @@ export default function MessagesPage() {
   }, [msgTab, refreshSessions])
 
   function onMarkAllRead() {
-    const ids = rows.map((r) => r.id)
-    markNotificationsRead(ids)
-    markInboxSeen(ids)
-    void refreshFromRegistry()
+    markAllNotificationsRead(rows.filter((r) => r.fromRegistry))
+    setRows((prev) => prev.map((r) => ({ ...r, read: true })))
+    setUnread(0)
   }
 
   function onOpenSystemMessage(row: NotificationRow) {
@@ -151,7 +151,7 @@ export default function MessagesPage() {
         <h2 className="text-xl font-bold text-[var(--shell-text)]">消息</h2>
         {unread > 0 && msgTab === 'system' ? (
           <button type="button" className="text-sm text-teal-600 hover:text-teal-700" onClick={onMarkAllRead}>
-            全部标为已读
+            全部已读
           </button>
         ) : null}
       </div>

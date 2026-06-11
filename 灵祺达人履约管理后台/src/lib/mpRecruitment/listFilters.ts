@@ -86,6 +86,7 @@ function statusPriority(status?: string): number {
 export function sortHallRecruitmentRows<
   T extends {
     status?: string
+    mpStatus?: string
     iceSlotsFull?: boolean
     recruitCount?: number | string
     applicantCount?: number
@@ -96,10 +97,14 @@ export function sortHallRecruitmentRows<
 >(rows: T[], sortBy: string): T[] {
   const list = [...rows]
   list.sort((a, b) => {
-    const sp = statusPriority(a.status) - statusPriority(b.status)
+    const sp = statusPriority(a.status || a.mpStatus) - statusPriority(b.status || b.mpStatus)
     if (sp !== 0) return sp
-    const fullA = a.iceSlotsFull ? 1 : 0
-    const fullB = b.iceSlotsFull ? 1 : 0
+    const fullA =
+      (a.iceSlotsFull ? 1 : 0) ||
+      (Number(a.recruitCount) > 0 && Number(a.applicantCount) >= Number(a.recruitCount) ? 1 : 0)
+    const fullB =
+      (b.iceSlotsFull ? 1 : 0) ||
+      (Number(b.recruitCount) > 0 && Number(b.applicantCount) >= Number(b.recruitCount) ? 1 : 0)
     if (fullA !== fullB) return fullA - fullB
     const da = a.deadlineMs || 9e15
     const db = b.deadlineMs || 9e15

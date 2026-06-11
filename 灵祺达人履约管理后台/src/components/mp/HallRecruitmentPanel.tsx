@@ -8,6 +8,7 @@ import {
   matchesOrderIdKeyword,
   looksLikeOrderNoSearch,
 } from '../../lib/mpRecruitment/listKeywordSearch'
+import { matchHallTabCountStatusFilter } from '../../lib/mpRecruitment/mpOrderStatus'
 import {
   matchStatusLabel,
   splitRoleHallRows,
@@ -52,8 +53,11 @@ function filterHallRows(
     if (!hallFilters.matchCategory(r.category, opts.filterCategory)) return false
     if (!hallFilters.matchPriceBuckets(r.priceAmount, opts.priceSelected)) return false
     if (searchByOrderNo && matchesOrderIdKeyword(row, kw)) return true
-    // Tab 角标：统计该分类招募单总数，不受状态筛选项影响
-    if (!forTabCount && !matchStatusLabel(r, opts.filterStatus)) return false
+    if (forTabCount) {
+      if (!matchHallTabCountStatusFilter(String(r.statusLabel || ''), opts.filterStatus)) return false
+    } else if (!matchStatusLabel(r, opts.filterStatus)) {
+      return false
+    }
     return true
   })
 }

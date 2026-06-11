@@ -1,8 +1,13 @@
 import type { MpRegistry, RecruitmentOrderRow } from './types'
 import { normalizeHallPlatform } from './hallFilters'
 import * as listFilters from './listFilters'
-import { isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel } from './mpOrderStatus'
+import { isMpOrderRecruiting } from './mpOrderStatus'
 import { buildHallSignupCountText, countIceClaimedSlots, isIceSlotsFull } from './iceOrderStats'
+import {
+  displayStatusLabel,
+  resolveDisplayStatus,
+  shouldShowIceInHall,
+} from '../mpSync/mpOrderIceStatus'
 
 function isUrgentMpOrder(mp: Record<string, unknown>): boolean {
   return mp.urgent === true
@@ -67,11 +72,25 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   const isIce = isIceMpOrder(mp)
   const iceProgress = isIce ? countIceClaimedSlots(mp, recruitCap) : null
-  const iceSlotsFull =
-    isIce && iceProgress && iceProgress.total > 0 && iceProgress.claimed >= iceProgress.total
+  const iceSlotsFull = isIce && isIceSlotsFull(mp, recruitCap)
   let title = String(mp.title || '').trim()
   if (!title) title = `${customerName}·${storeName}达人招募`
-  const effectiveStatus = resolveEffectiveMpStatus(mp.status, deadlineMs)
+  const effectiveStatus = resolveDisplayStatus(mp, 'hall', deadlineMs)
+  const capNum =
+    iceProgress && iceProgress.total > 0
+      ? iceProgress.total
+      : typeof recruitCap === 'number' && recruitCap > 0
+        ? recruitCap
+        : 0
+  const shownClaimed =
+    iceProgress && capNum > 0 ? Math.min(iceProgress.claimed, capNum) : iceProgress?.claimed || 0
+  const slotsRemaining = isIce
+    ? capNum > 0
+      ? Math.max(0, capNum - shownClaimed)
+      : 999
+    : typeof recruitCap === 'number' && recruitCap > 0
+      ? Math.max(0, recruitCap - applicantCount)
+      : 999
 
   return {
     id: String(mp.id),
@@ -82,7 +101,8 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     storeName,
     title,
     mpStatus: effectiveStatus,
-    statusLabel: iceSlotsFull ? '已收满' : statusLabel(effectiveStatus),
+    status: effectiveStatus,
+    statusLabel: displayStatusLabel(effectiveStatus, mp, 'hall'),
     platform,
     region,
     category: String(mp.category || '本地生活'),
@@ -93,8 +113,9 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     summary: String(mp.recruitmentInfo || mp.merchantRequirements || '').slice(0, 120),
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : '不限',
-    claimedSlotCount: iceProgress ? iceProgress.claimed : 0,
+    claimedSlotCount: shownClaimed,
     signupCountText: buildHallSignupCountText(mp, applicantCount, recruitCap),
+    slotsRemaining,
     overRecruitHot: isIce
       ? !!(iceProgress && iceProgress.total > 0 && iceProgress.claimed > iceProgress.total)
       : recruitCap > 0 && applicantCount > recruitCap,
@@ -116,7 +137,17 @@ export function loadAllOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
 }
 
 export function loadOpenOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
-  return loadAllOrderRows(reg).filter((r) => isMpOrderRecruiting(r.mpStatus))
+  const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  const openList = mpList.filter((o) => {
+    if (!o || o.status === 'deleted') return false
+    const mp = o as Record<string, unknown>
+    if (isIceMpOrder(mp)) return shouldShowIceInHall(mp)
+    const summary = String(mp.merchantRequirements || mp.recruitmentInfo || '').trim()
+    const deadlineMs = listFilters.resolveDeadlineMsFromMp(mp, summary)
+    const status = resolveDisplayStatus(mp, 'hall', deadlineMs)
+    return isMpOrderRecruiting(status)
+  })
+  return openList.map((mp) => mapMpOrderRow(mp as Record<string, unknown>, reg))
 }
 
 export function splitHallRows(reg: MpRegistry) {

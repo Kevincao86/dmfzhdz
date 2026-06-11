@@ -81,7 +81,7 @@ export function clearLocalIceApplyState(mpOrderId: string) {
 export type ContactPrGate = {
   canContact: boolean
   hasApplication: boolean
-  reason: 'not_applied' | 'pending_pr_review' | 'approved' | 'rejected'
+  reason: 'not_applied' | 'pending_pr_review' | 'approved' | 'rejected' | 'ice_claimed'
   message: string
   applicant: Record<string, unknown> | null
 }
@@ -103,6 +103,15 @@ export function evaluateContactPrGate(mp: Record<string, unknown> | null, mpOrde
       hasApplication: false,
       reason: 'rejected',
       message: '任务已拒绝，名额已释放，可重新认领',
+      applicant,
+    }
+  }
+  if (isIceMpOrder(mp)) {
+    return {
+      canContact: true,
+      hasApplication: true,
+      reason: 'ice_claimed',
+      message: '',
       applicant,
     }
   }

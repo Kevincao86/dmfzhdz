@@ -1,6 +1,6 @@
 import { isEditTeamIceMpOrder, isIceMpOrder } from './iceOrderDetect'
 import { isIceSlotsFull } from '../mpRecruitment/iceOrderStats'
-import { parseIceSlotTotalFromMp } from '../mpRecruitment/listFilters'
+import { parseRecruitCountFromMp } from '../mpRecruitment/listFilters'
 
 export type MpWorkIdentity = 'talent' | 'shoot' | 'edit' | 'pr'
 
@@ -64,6 +64,12 @@ export function validateRecruitmentClaim(
     if (wid !== 'edit') {
       return { ok: false, message: '该任务仅限剪辑身份认领', code: 'edit_only' }
     }
+    if (isIceMpOrder(mp)) {
+      const cap = parseRecruitCountFromMp(mp)
+      if (isIceSlotsFull(mp, cap)) {
+        return { ok: false, message: '任务已收满', code: 'slots_full' }
+      }
+    }
     return { ok: true }
   }
   if (target === 'shoot') {
@@ -85,7 +91,7 @@ export function claimBlockHint(
   const v = validateRecruitmentClaim((mp || {}) as Record<string, unknown>, workIdentity)
   if (!v.ok) return v.message
   if (mp && isIceMpOrder(mp)) {
-    const cap = parseIceSlotTotalFromMp(mp)
+    const cap = parseRecruitCountFromMp(mp)
     if (isIceSlotsFull(mp, cap)) return '任务已收满'
   }
   return ''
