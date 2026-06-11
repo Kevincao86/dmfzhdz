@@ -75,18 +75,34 @@ export function sortRecruitmentRows<T extends { deadlineMs?: number; priceAmount
   return list
 }
 
-function statusPriority(status?: string): number {
-  if (status === 'open') return 0
-  if (status === 'collecting') return 1
-  if (status === 'closed') return 2
-  if (status === 'done') return 3
-  return 4
+function isHallRowRecruitFull(row: {
+  iceSlotsFull?: boolean
+  recruitCount?: number | string
+  applicantCount?: number
+}): boolean {
+  if (row.iceSlotsFull) return true
+  const cap = Number(row.recruitCount)
+  const n = Number(row.applicantCount)
+  return cap > 0 && n >= cap
+}
+
+/** 大厅排序：爆火优先 → 未满临期 → 其他 */
+function hallRecruitmentSortTier(row: {
+  overRecruitHot?: boolean
+  iceSlotsFull?: boolean
+  recruitCount?: number | string
+  applicantCount?: number
+}): number {
+  if (row.overRecruitHot) return 0
+  if (!isHallRowRecruitFull(row)) return 1
+  return 2
 }
 
 export function sortHallRecruitmentRows<
   T extends {
     status?: string
     mpStatus?: string
+    overRecruitHot?: boolean
     iceSlotsFull?: boolean
     recruitCount?: number | string
     applicantCount?: number
@@ -97,18 +113,12 @@ export function sortHallRecruitmentRows<
 >(rows: T[], sortBy: string): T[] {
   const list = [...rows]
   list.sort((a, b) => {
-    const sp = statusPriority(a.status || a.mpStatus) - statusPriority(b.status || b.mpStatus)
-    if (sp !== 0) return sp
-    const fullA =
-      (a.iceSlotsFull ? 1 : 0) ||
-      (Number(a.recruitCount) > 0 && Number(a.applicantCount) >= Number(a.recruitCount) ? 1 : 0)
-    const fullB =
-      (b.iceSlotsFull ? 1 : 0) ||
-      (Number(b.recruitCount) > 0 && Number(b.applicantCount) >= Number(b.recruitCount) ? 1 : 0)
-    if (fullA !== fullB) return fullA - fullB
+    const ta = hallRecruitmentSortTier(a)
+    const tb = hallRecruitmentSortTier(b)
+    if (ta !== tb) return ta - tb
     const da = a.deadlineMs || 9e15
     const db = b.deadlineMs || 9e15
-    if (da !== db) return da - db
+    if (ta <= 1 && da !== db) return da - db
     if (sortBy === '截止时间') return da - db
     if (sortBy === '价格从高到低') return (b.priceAmount || 0) - (a.priceAmount || 0)
     return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)

@@ -14,17 +14,18 @@ const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
 function matchHallStatusFilter(label, filterLabel) {
   if (!filterLabel || filterLabel === '全部') return true
   if (filterLabel === HALL_DEFAULT_STATUS_FILTER) {
-    return label === '招募中' || label === '收集中'
+    return (
+      label === '招募中' ||
+      label === '收集中' ||
+      label === '已停止' ||
+      label === '已收满'
+    )
   }
   return label === filterLabel
 }
 
-/** Tab 角标：默认筛选项下计入「已停止」（大厅仍展示的单） */
+/** Tab 角标与列表展示使用同一套状态规则 */
 function matchHallTabCountStatusFilter(label, filterLabel) {
-  if (!filterLabel || filterLabel === '全部') return true
-  if (filterLabel === HALL_DEFAULT_STATUS_FILTER) {
-    return label === '招募中' || label === '收集中' || label === '已停止'
-  }
   return matchHallStatusFilter(label, filterLabel)
 }
 
