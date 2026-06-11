@@ -6,6 +6,7 @@ const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpShare = require('../../utils/mpShare.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+const recruitShareCover = require('../../utils/recruitShareCover.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -73,9 +74,7 @@ function buildOrderSharePayload(order) {
     path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
   }
   const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
-  const imageUrl = recruitCoverLib.resolveShareImageUrl(coverUrl)
-  if (imageUrl) share.imageUrl = imageUrl
-  return share
+  return recruitShareCover.attachShareCoverPromise(share, coverUrl)
 }
 
 Page({
@@ -365,6 +364,15 @@ Page({
     const out = {
       title: payload.title,
       query: `id=${encodeURIComponent(order.id)}`,
+    }
+    if (payload.promise) {
+      return {
+        ...out,
+        promise: payload.promise.then((p) => ({
+          ...out,
+          imageUrl: p.imageUrl,
+        })),
+      }
     }
     if (payload.imageUrl) out.imageUrl = payload.imageUrl
     return out
