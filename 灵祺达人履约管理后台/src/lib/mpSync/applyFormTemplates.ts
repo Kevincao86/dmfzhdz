@@ -198,32 +198,63 @@ export type ApplyRow = ApplyField & {
   placeholder?: string
 }
 
-export function resolveApplyRows(template: ApplyTemplate, platform: string, options?: { isIceMode?: boolean }): ApplyRow[] {
+export function resolveApplyRows(
+  template: ApplyTemplate,
+  platform: string,
+  options?: { isIceMode?: boolean; recruitTarget?: string },
+): ApplyRow[] {
+  const tpl = template && typeof template === 'object' ? template : builtinMinimalTemplate()
+  const kind = normalizeTemplateKind(tpl.kind || options?.recruitTarget || 'talent')
   const isIce = options?.isIceMode
-  return normalizeFields(template.fields)
-    .filter((f) => fieldVisibleForPlatform(f, platform))
-    .filter((f) => {
-      if (isIce && f.role && ['visitDate', 'visitTimeStart', 'visitTimeEnd', 'quotePrice', 'alipayAccount'].includes(f.role)) {
-        return false
-      }
-      return true
-    })
-    .map((f) => {
-      const meta = f.role ? ROLE_META[f.role] : null
-      const bindKey = meta ? meta.bindKey : `custom_${f.id}`
-      const type = f.type || (meta && meta.type) || 'text'
-      return {
-        ...f,
-        bindKey,
-        displayLabel: resolveFieldLabel(f, platform),
-        type,
-        isRegion: type === 'regionProvince' || type === 'regionCity',
-        isPicker: type === 'picker',
-        isDate: type === 'date',
-        isTime: type === 'time',
-        placeholder: f.placeholder || '',
-      }
-    })
+  const isSupplier = kind === 'shoot' || kind === 'edit'
+  const talentPlatformRoles = new Set([
+    'platformNickname',
+    'platformAccount',
+    'followers',
+    'likesCollects',
+    'douyinSalesLevel',
+    'profileLink',
+    'visitDate',
+    'visitTimeStart',
+    'visitTimeEnd',
+  ])
+  const mapRows = (fields: ApplyField[]) =>
+    normalizeFields(fields, kind)
+      .filter((f) => fieldVisibleForPlatform(f, platform))
+      .filter((f) => {
+        if (isSupplier && f.role && talentPlatformRoles.has(f.role)) return false
+        if (
+          isIce &&
+          f.role &&
+          ['visitDate', 'visitTimeStart', 'visitTimeEnd', 'quotePrice', 'alipayAccount'].includes(f.role)
+        ) {
+          return false
+        }
+        return true
+      })
+      .map((f) => {
+        const meta = f.role ? ROLE_META[f.role] : null
+        const bindKey = meta ? meta.bindKey : `custom_${f.id}`
+        const type = f.type || (meta && meta.type) || 'text'
+        return {
+          ...f,
+          bindKey,
+          displayLabel: resolveFieldLabel(f, platform),
+          type,
+          isRegion: type === 'regionProvince' || type === 'regionCity',
+          isPicker: type === 'picker',
+          isDate: type === 'date',
+          isTime: type === 'time',
+          placeholder: f.placeholder || '',
+        }
+      })
+
+  const rows = mapRows(tpl.fields || [])
+  if (rows.length > 0) return rows
+  if (kind === 'shoot' || kind === 'edit') {
+    return mapRows(defaultSupplierApplyFields(kind))
+  }
+  return mapRows(defaultApplyFieldsMinimal())
 }
 
 function templatesStorageKey() {
@@ -420,16 +451,38 @@ export function saveApplyFormForMpOrder(
   )
 }
 
-export function getApplyConfigForMpOrder(mpOrderId: string, templateId?: string): ApplyTemplate {
+export function getApplyConfigForMpOrder(
+  mpOrderId: string,
+  templateId?: string,
+  orderMeta?: Record<string, unknown> | null,
+): ApplyTemplate {
+  const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : null
+  if (meta && Array.isArray(meta.applyFormFields) && meta.applyFormFields.length) {
+    const kind = templateKindFromRecruitTarget(String(meta.recruitTarget || 'talent'))
+    return {
+      id: String(meta.applyFormTemplateId || templateId || 'order-meta').trim() || 'order-meta',
+      name: String(meta.applyFormTemplateName || '报名模版').trim() || '报名模版',
+      kind,
+      fields: normalizeFields(meta.applyFormFields, kind),
+    }
+  }
   try {
     const raw = localStorage.getItem(mpApplyFormStorageKey(mpOrderId))
-    const j = raw ? (JSON.parse(raw) as { templateId?: string; templateName?: string; fields?: ApplyField[] }) : null
+    const j = raw
+      ? (JSON.parse(raw) as {
+          templateId?: string
+          templateName?: string
+          recruitTarget?: string
+          fields?: ApplyField[]
+        })
+      : null
     if (j && Array.isArray(j.fields) && j.fields.length) {
+      const kind = templateKindFromRecruitTarget(j.recruitTarget || 'talent')
       return {
         id: j.templateId || templateId || 'builtin-minimal',
         name: j.templateName || '报名模版',
-        kind: 'apply',
-        fields: normalizeFields(j.fields),
+        kind,
+        fields: normalizeFields(j.fields, kind),
       }
     }
   } catch {
@@ -439,7 +492,21 @@ export function getApplyConfigForMpOrder(mpOrderId: string, templateId?: string)
     const t = getTemplateById(templateId)
     if (t) return t
   }
-  return getTemplateForApply()
+  const kind = templateKindFromRecruitTarget(String(meta?.recruitTarget || 'talent'))
+  if (kind === 'shoot' || kind === 'edit') {
+    const activeId = getActiveTemplateId(kind)
+    if (activeId) {
+      const t = getTemplateById(activeId)
+      if (t) return t
+    }
+    return {
+      id: `builtin-${kind}`,
+      name: kind === 'shoot' ? '拍摄报名模版' : '剪辑报名模版',
+      kind,
+      fields: normalizeFields(defaultSupplierApplyFields(kind), kind),
+    }
+  }
+  return getTemplateForApply('talent')
 }
 
 export function validateTemplateFields(fields: ApplyField[], kind: TemplateKind = 'talent') {

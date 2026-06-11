@@ -4,12 +4,20 @@ import RegionSelect from '../components/mp/RegionSelect'
 import { applyToMpOrder, fetchMpRegistry, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { addApplication, hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
-import { getApplyConfigForMpOrder, resolveApplyRows } from '../lib/mpSync/applyFormTemplates'
+import {
+  getApplyConfigForMpOrder,
+  normalizeTemplateKind,
+  resolveApplyRows,
+} from '../lib/mpSync/applyFormTemplates'
 import {
   applyFieldsFromMember,
+  applyFieldsFromSupplierMember,
   emptyApplyFields,
+  emptySupplierApplyFields,
+  enrichApplicantFromMember,
   memberSyncAvailable,
   persistApplicantToMemberProfile,
+  supplierMemberSyncAvailable,
 } from '../lib/mpSync/applyFormState'
 import { buildApplicantFromRows, validateApplyRows } from '../lib/mpSync/applyTemplateRuntime'
 import type { ApplyRow } from '../lib/mpSync/applyFormTemplates'
@@ -19,14 +27,15 @@ import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { pushNotification } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder } from '../lib/mpSync/iceOrderDetect'
-import { validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
+import { recruitTargetFromMpOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
 import { countFreeEditPackSlots } from '../lib/mpSync/editIceSlots'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
   const [search] = useSearchParams()
   const nav = useNavigate()
-  if (getActiveRole() !== 'talent') return <Navigate to="/hall" replace />
+  const role = getActiveRole()
+  if (role === 'pr') return <Navigate to="/hall" replace />
   if (!mpOrderId) return <Navigate to="/hall" replace />
   const orderId = mpOrderId
 
@@ -37,35 +46,93 @@ export default function RecruitmentApplyPage() {
   const workIdentity = getWorkIdentity()
 
   const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
+  const [orderMeta, setOrderMeta] = useState<Record<string, unknown> | null>(null)
+  const recruitTarget = useMemo(() => {
+    if (mpOrder) return recruitTargetFromMpOrder(mpOrder)
+    return 'talent' as const
+  }, [mpOrder])
+
+  const tpl = useMemo(() => {
+    const t = getApplyConfigForMpOrder(orderId, templateId, orderMeta)
+    const kind = normalizeTemplateKind(t.kind || recruitTarget)
+    return { ...t, kind }
+  }, [orderId, templateId, orderMeta, recruitTarget])
+
+  const effectiveRecruitTarget = useMemo(() => {
+    const kind = normalizeTemplateKind(tpl.kind || recruitTarget)
+    return kind === 'shoot' || kind === 'edit' ? kind : recruitTarget
+  }, [tpl.kind, recruitTarget])
+
+  const isSupplierApply = effectiveRecruitTarget === 'shoot' || effectiveRecruitTarget === 'edit'
+  const supplierWorkId =
+    effectiveRecruitTarget === 'edit' ? 'edit' : effectiveRecruitTarget === 'shoot' ? 'shoot' : 'talent'
+
   const isEditIce = mpOrder ? isEditTeamIceMpOrder(mpOrder) : false
   const freeSlots = mpOrder ? countFreeEditPackSlots(mpOrder) : 0
+
+  const rows = useMemo(
+    () => resolveApplyRows(tpl, platform, { isIceMode, recruitTarget: effectiveRecruitTarget }),
+    [tpl, platform, isIceMode, effectiveRecruitTarget],
+  )
 
   useEffect(() => {
     void (async () => {
       try {
         const reg = await fetchMpRegistry({ includeMpOrderIds: [orderId] })
-        const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
+        const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
+          string,
+          unknown
+        >[]
         const mp = list.find((o) => o && o.id === orderId) || null
         setMpOrder(mp)
+        const meta =
+          mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+            ? (mp.mpPublishMeta as Record<string, unknown>)
+            : null
+        setOrderMeta(meta)
       } catch {
         setMpOrder(null)
+        setOrderMeta(null)
       }
     })()
   }, [orderId])
 
-  const tpl = useMemo(() => getApplyConfigForMpOrder(orderId, templateId), [orderId, templateId])
-  const rows = useMemo(() => resolveApplyRows(tpl, platform, { isIceMode }), [tpl, platform, isIceMode])
+  const member = readMember()
+  const canSyncMember = isSupplierApply
+    ? supplierMemberSyncAvailable(member, supplierWorkId)
+    : memberSyncAvailable(member, platform)
 
   const [form, setForm] = useState(() => ({
     ...emptyApplyFields(),
     ...(applyFieldsFromMember(readMember(), platform) || {}),
   }))
+  const [formReady, setFormReady] = useState(false)
+
+  useEffect(() => {
+    if (formReady) return
+    if (!mpOrder && !orderMeta) return
+    const memberFields = canSyncMember
+      ? isSupplierApply
+        ? applyFieldsFromSupplierMember(member, supplierWorkId)
+        : applyFieldsFromMember(member, platform)
+      : null
+    setForm({
+      ...(isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields()),
+      ...(memberFields || {}),
+    })
+    setFormReady(true)
+  }, [mpOrder, orderMeta, canSyncMember, isSupplierApply, supplierWorkId, member, platform, formReady])
+
   const [claimSlotCount, setClaimSlotCount] = useState('1')
   const [syncMember, setSyncMember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
-  const member = readMember()
   const lb = labels(platform)
+  const applyLabel = isSupplierApply
+    ? supplierWorkId === 'shoot'
+      ? '拍摄团队'
+      : '剪辑团队'
+    : platform
 
   const gate = mpOrder ? validateRecruitmentClaim(mpOrder, workIdentity) : { ok: true as const }
 
@@ -90,7 +157,10 @@ export default function RecruitmentApplyPage() {
       setErr(gate.message)
       return
     }
-    const errMsg = validateApplyRows(rows, form as unknown as Record<string, unknown>, platform, { isIceMode })
+    const errMsg = validateApplyRows(rows, form as unknown as Record<string, unknown>, platform, {
+      isIceMode,
+      isSupplierApply,
+    })
     if (errMsg) {
       setErr(errMsg)
       return
@@ -110,14 +180,27 @@ export default function RecruitmentApplyPage() {
     setErr('')
     try {
       const applicantId = `app-${Date.now()}`
-      const applicant = buildApplicantFromRows(rows, form as unknown as Record<string, unknown>, {
+      let applicant = buildApplicantFromRows(rows, form as unknown as Record<string, unknown>, {
         platform,
         isIceMode,
+        isSupplierApply,
+        supplierWorkId,
         mpOrderId: orderId,
         merchantOrderNo,
         applicantId,
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
+      applicant = enrichApplicantFromMember(applicant, readMember(), platform, {
+        isSupplierApply,
+        workId: supplierWorkId,
+      })
+      const displayName = isSupplierApply
+        ? String(applicant.teamName || applicant.name || applicant.contact || '').trim()
+        : String(applicant.platformNickname || applicant.name || '').trim()
+      if (!displayName) {
+        setErr(isSupplierApply ? '请填写团队名称或联系电话' : '请填写抖音昵称或完善我的信息')
+        return
+      }
       const slots = isEditIce ? Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1) : undefined
       await applyToMpOrder(orderId, applicant, workIdentity, slots)
       const persisted = persistApplicantToMemberProfile(readMember(), applicant, platform)
@@ -133,7 +216,7 @@ export default function RecruitmentApplyPage() {
       pushNotification({
         category: 'order',
         title: '报名已提交',
-        body: `${merchantOrderNo} · ${platform}`,
+        body: `${merchantOrderNo} · ${applyLabel}`,
         mpOrderId: orderId,
         applicantId,
       })
@@ -167,8 +250,12 @@ export default function RecruitmentApplyPage() {
       <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
         ← 返回详情
       </Link>
-      <h2 className="text-xl font-bold">{isEditIce ? '认领剪辑云剪' : '报名'} · {tpl.name}</h2>
-      <p className="text-sm text-slate-400">{platform} · {merchantOrderNo}</p>
+      <h2 className="text-xl font-bold">
+        {isEditIce ? '认领剪辑云剪' : '报名'} · {tpl.name}
+      </h2>
+      <p className="text-sm text-slate-400">
+        {applyLabel} · {merchantOrderNo}
+      </p>
 
       {isEditIce ? (
         <section className="surface-card rounded-xl border p-4 space-y-2 text-sm">
@@ -187,7 +274,7 @@ export default function RecruitmentApplyPage() {
         </section>
       ) : null}
 
-      {memberSyncAvailable(member, platform) ? (
+      {canSyncMember ? (
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -196,23 +283,39 @@ export default function RecruitmentApplyPage() {
               const on = e.target.checked
               setSyncMember(on)
               if (on) {
-                const fields = applyFieldsFromMember(member, platform)
+                const fields = isSupplierApply
+                  ? applyFieldsFromSupplierMember(member, supplierWorkId)
+                  : applyFieldsFromMember(member, platform)
                 if (fields) setForm((f) => ({ ...f, ...fields }))
+              } else {
+                setForm({
+                  ...(isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields()),
+                  customFields: {},
+                })
               }
             }}
           />
-          同步「我的信息」到本单
+          同步{isSupplierApply ? '团队' : '我的'}信息到本单
         </label>
       ) : (
         <p className="text-sm text-amber-500">
-          <Link to="/profile/talent" className="underline">
-            完善我的信息
+          <Link to={isSupplierApply ? '/profile/supplier' : '/profile/talent'} className="underline">
+            {isSupplierApply ? '完善团队信息' : '完善我的信息'}
           </Link>
           后可一键填入
         </p>
       )}
 
       <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
+        <h3 className="font-medium">
+          {isEditIce
+            ? '剪辑师信息'
+            : isSupplierApply
+              ? supplierWorkId === 'shoot'
+                ? '拍摄团队报名信息'
+                : '剪辑团队报名信息'
+              : '达人报名信息'}
+        </h3>
         {rows.map((row) => (
           <ApplyFieldInput key={row.id} row={row} value={fieldValue(row)} lb={lb} form={form} onChange={setField} />
         ))}

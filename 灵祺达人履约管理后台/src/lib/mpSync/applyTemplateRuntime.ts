@@ -14,7 +14,7 @@ export function validateApplyRows(
   rows: ApplyRow[],
   data: Record<string, unknown>,
   platform: string,
-  options?: { isIceMode?: boolean },
+  options?: { isIceMode?: boolean; isSupplierApply?: boolean },
 ): string | null {
   const isIce = options?.isIceMode
   const lb = labels(platform)
@@ -25,6 +25,11 @@ export function validateApplyRows(
     if (row.role === 'followers') {
       const n = Number.parseInt(s.replace(/,/g, ''), 10)
       if (!Number.isFinite(n) || n <= 0) return `请填写有效${row.displayLabel}`
+      continue
+    }
+    if (row.role === 'likesCollects') {
+      const n = Number.parseInt(s.replace(/,/g, ''), 10)
+      if (!Number.isFinite(n) || n < 0) return `请填写有效${row.displayLabel}`
       continue
     }
     if (!s) return `请填写${row.displayLabel}`
@@ -58,6 +63,8 @@ export function buildApplicantFromRows(
   meta: {
     platform: string
     isIceMode?: boolean
+    isSupplierApply?: boolean
+    supplierWorkId?: string
     mpOrderId: string
     merchantOrderNo: string
     applicantId: string
@@ -66,7 +73,13 @@ export function buildApplicantFromRows(
 ) {
   const platform = meta.platform
   const lb = labels(platform)
+  const isSupplier = !!meta.isSupplierApply
+  const teamName = String(data.teamName || '').trim()
   const platformNickname = String(data.platformNickname || '').trim()
+  const displayName = isSupplier
+    ? teamName || String(data.contact || '').trim() || platformNickname
+    : platformNickname
+  const portfolioLink = String(data.portfolioLink || data.profileLink || '').trim()
   const followers = Number.parseInt(String(data.followers || '').replace(/,/g, ''), 10)
   const visitTimeSlot = meta.isIceMode
     ? '云剪任务·无需探店'
@@ -79,11 +92,15 @@ export function buildApplicantFromRows(
   }
   const applicant: Record<string, unknown> = {
     id: meta.applicantId,
-    name: platformNickname,
-    platform,
+    name: displayName,
+    platform: isSupplier
+      ? meta.supplierWorkId === 'shoot'
+        ? '拍摄团队'
+        : '剪辑团队'
+      : platform,
     platformAccount: String(data.platformAccount || '').trim(),
-    platformNickname,
-    profileLink: String(data.profileLink || '').trim(),
+    platformNickname: isSupplier ? displayName : platformNickname,
+    profileLink: portfolioLink,
     followers: Number.isFinite(followers) ? Math.max(0, followers) : 0,
     contact: String(data.contact || '').trim(),
     wechatId: String(data.wechatId || '').trim(),
@@ -92,6 +109,26 @@ export function buildApplicantFromRows(
     province: String(data.province || '').trim(),
     city: String(data.city || '').trim(),
     appliedAt: meta.appliedAt,
+  }
+  if (teamName) applicant.teamName = teamName
+  if (portfolioLink) applicant.portfolioLink = portfolioLink
+  if (data.editStyles != null && String(data.editStyles).trim()) {
+    applicant.editStyles = String(data.editStyles).trim()
+  }
+  if (data.software != null && String(data.software).trim()) {
+    applicant.software = String(data.software).trim()
+  }
+  if (data.deliveryEta != null && String(data.deliveryEta).trim()) {
+    applicant.deliveryEta = String(data.deliveryEta).trim()
+  }
+  if (data.shootTypes != null && String(data.shootTypes).trim()) {
+    applicant.shootTypes = String(data.shootTypes).trim()
+  }
+  if (data.equipment != null && String(data.equipment).trim()) {
+    applicant.equipment = String(data.equipment).trim()
+  }
+  if (data.shootDate != null && String(data.shootDate).trim()) {
+    applicant.shootDate = String(data.shootDate).trim()
   }
   if (lb.showSalesLevel && data.douyinSalesLevel) {
     applicant.douyinSalesLevel = String(data.douyinSalesLevel).trim()
@@ -115,11 +152,13 @@ export function buildApplicantFromRows(
     applicant.avatar = String(member.wxAvatarUrl).trim()
     applicant.wxAvatarUrl = applicant.avatar
   }
-  const pid = platformIdFromName(platform)
-  const prof = member?.platformProfiles?.[pid]
-  if (prof) {
-    const tags = Array.isArray(prof.accountTags) ? prof.accountTags : []
-    if (tags.length) applicant.accountTags = [...tags]
+  if (!isSupplier) {
+    const pid = platformIdFromName(platform)
+    const prof = member?.platformProfiles?.[pid]
+    if (prof) {
+      const tags = Array.isArray(prof.accountTags) ? prof.accountTags : []
+      if (tags.length) applicant.accountTags = [...tags]
+    }
   }
   return applicant
 }

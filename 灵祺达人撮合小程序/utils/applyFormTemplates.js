@@ -505,7 +505,23 @@ function getApplyConfigForMpOrder(mpOrderId, templateId, orderMeta) {
     const t = getTemplateById(templateId)
     if (t) return t
   }
-  return getTemplateForApply()
+  const kind = templateKindFromRecruitTarget(
+    (orderMeta && orderMeta.recruitTarget) || 'talent',
+  )
+  if (kind === 'shoot' || kind === 'edit') {
+    const activeId = getActiveTemplateId(kind)
+    if (activeId) {
+      const t = getTemplateById(activeId)
+      if (t) return t
+    }
+    return {
+      id: `builtin-${kind}`,
+      name: kind === 'shoot' ? '拍摄报名模版' : '剪辑报名模版',
+      kind,
+      fields: normalizeFields(defaultSupplierApplyFields(kind), kind),
+    }
+  }
+  return getTemplateForApply(templateId)
 }
 
 function validateTemplateFields(fields, kind) {
