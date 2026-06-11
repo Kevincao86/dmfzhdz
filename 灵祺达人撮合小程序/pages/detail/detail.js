@@ -65,6 +65,8 @@ Page({
     readOnlyEnded: false,
     mpOrder: null,
     shareCoverPath: '',
+    showShareSheet: false,
+    shareTitle: '',
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -516,6 +518,17 @@ Page({
   goHome() {
     wx.reLaunch({ url: '/pages/index/index' })
   },
+  onOpenShareSheet() {
+    const v = this.data.view
+    this.setData({
+      showShareSheet: true,
+      shareTitle: (v && v.title) || '',
+    })
+  },
+  onCloseShareSheet() {
+    this.setData({ showShareSheet: false })
+  },
+  noopShareSheetTap() {},
   onContactPrPending() {
     const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
     wx.showModal({
