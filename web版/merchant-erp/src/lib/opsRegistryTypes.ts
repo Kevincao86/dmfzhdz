@@ -385,6 +385,8 @@ export type RegistryMpRecruitmentOrder = {
   createdAt: string
   updatedAt: string
   applicants?: RegistryMpRecruitmentApplicant[]
+  /** 推荐大厅 slim 响应：报名明细剥离后保留计数 */
+  applicantCount?: number
   orderKind?: RecruitmentOrderKind
   hall?: MpRecruitmentHall
   iceVideoSlots?: RegistryIceVideoSlot[]

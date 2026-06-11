@@ -16,6 +16,7 @@ import {
 import { buildMpGroupQrByOrderIdForSession } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
+import { slimRecommendHallPayload } from './slimRecommendHallPayload.js'
 
 const HALL_FETCH_MS = 20_000
 
@@ -241,9 +242,10 @@ function buildHallPayload(
     if (editLib.length) payload.editTeamLibraryEntries = editLib
     if (prUsers.length) payload.mpPrUsers = prUsers
   }
+  const finalPayload = includeRecommendPool ? slimRecommendHallPayload(payload) : payload
   return {
     partial: file,
-    payload,
+    payload: finalPayload,
   }
 }
 
@@ -289,7 +291,10 @@ function buildHallPayloadSafe(
       if (prUsers.length) payload.mpPrUsers = prUsers
     }
     if (mp.length || Object.keys(payload).length > 2) {
-      return { payload, partial }
+      return {
+        payload: includeRecommendPool ? slimRecommendHallPayload(payload) : payload,
+        partial,
+      }
     }
     return { payload: emptyHallPayload(), partial: {} }
   }
