@@ -11,7 +11,7 @@
 1. PR 推荐大厅 → 浏览模式「全部达人」：必须展示 `mpTalentMembers` + `talentLibraryEntries` 合并去重后的全部已注册达人（有 id + 昵称即可，**不要求** platformAccount）。
 2. 与「智能匹配」「招募大厅筛选」「推荐商单 filterRecommendHallOrders」等逻辑**隔离**；改其它板块时不得改上述文件或删除 `includeRecommendPool=1` 请求。
 3. 请求须带 `includeRecommendPool=1`（Web GET 或 MP POST `hall_registry`），服务端返回达人库切片。
-4. 服务端 `slimRecommendHallPayload` 会去掉内联 base64 头像与报名明细，保证云函数代理响应 <1MB；勿删此逻辑。
+4. 内联 `data:image` 过大时由 `recommendHallInlineImagesOss` 上传 OSS 并替换为 HTTPS URL；**禁止**删除头像/封面/报名明细等字段。
 
 ## 自测
 
