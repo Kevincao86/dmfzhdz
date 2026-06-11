@@ -387,10 +387,32 @@ async function postMpWithFallback(paths: string[], body: Record<string, unknown>
   throw new Error(lastErr)
 }
 
-export async function applyToMpOrder(mpOrderId: string, applicant: Record<string, unknown>) {
+export async function applyToMpOrder(
+  mpOrderId: string,
+  applicant: Record<string, unknown>,
+  workIdentity?: string,
+  claimSlotCount?: number,
+) {
+  const body: Record<string, unknown> = { mpOrderId, applicant }
+  const wid = String(workIdentity || '').trim()
+  if (wid) body.workIdentity = wid
+  if (claimSlotCount != null && Number.isFinite(claimSlotCount)) {
+    body.claimSlotCount = Math.max(1, Math.floor(claimSlotCount))
+  }
   return postMpWithFallback(
     ['/api/meoo-ops-mp-recruitment-orders-apply', '/api/ops-sync/mp-recruitment-orders/apply'],
-    { mpOrderId, applicant },
+    body,
+  )
+}
+
+export async function submitEditDeliverLinks(
+  mpOrderId: string,
+  applicantId: string,
+  deliverText: string,
+) {
+  return postMpWithFallback(
+    ['/api/meoo-ops-mp-recruitment-edit-deliver-submit', '/api/ops-sync/mp-recruitment-edit-deliver-submit'],
+    { mpOrderId, applicantId, deliverText },
   )
 }
 

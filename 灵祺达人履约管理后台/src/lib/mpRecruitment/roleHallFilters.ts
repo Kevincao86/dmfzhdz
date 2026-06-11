@@ -12,19 +12,23 @@ export const STATUS_FILTER_OPTIONS = HALL_STATUS_FILTERS
 export { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter, matchHallTabCountStatusFilter }
 
 function matchesRoleRecruit(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
+  const target = row.recruitTarget || 'talent'
+  /** 剪辑类招募全身份可见（含剪辑云剪任务包） */
+  if (target === 'edit') return true
   /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
   if (identity === 'pr' || identity === 'talent') return true
-  if (identity === 'shoot') return row.recruitTarget === 'shoot'
-  if (identity === 'edit') return row.recruitTarget === 'edit'
+  if (identity === 'shoot') return target === 'shoot'
+  if (identity === 'edit') return false
   return true
 }
 
 export function orderVisibleToWorkIdentity(row: RecruitmentOrderRow, identity: MpWorkIdentity): boolean {
+  const target = row.recruitTarget || 'talent'
+  if (target === 'edit') return true
   if (identity === 'pr' || identity === 'talent') return true
   if (row.isIce) return true
-  const target = row.recruitTarget || 'talent'
   if (identity === 'shoot') return target === 'shoot'
-  if (identity === 'edit') return target === 'edit'
+  if (identity === 'edit') return false
   return true
 }
 

@@ -55,6 +55,7 @@ const {
 } = publishOpts
 const supplierPublishForm = require('../../utils/supplierPublishForm.js')
 const livePublishForm = require('../../utils/livePublishForm.js')
+const mpGroupQr = require('../../utils/mpGroupQr.js')
 const { buildCompactBudgetText } = require('../../utils/recruitmentBudgetDisplay.js')
 
 /** 子页确认后滚动回表单对应字段 */
@@ -131,6 +132,7 @@ function emptyForm(recruitTarget) {
     signupDeadline: '',
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
+    editGroupQrImage: '',
     applyFormTemplateId: '',
     applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
     applyFormFields: afFields,
@@ -225,6 +227,7 @@ Page({
     fansTierPickerRanges: FANS_TIER_RANGES,
     editingFansTierIndex: -1,
     submitting: false,
+    editGroupQrUploading: false,
     createdOrder: null,
     shareTitle: '',
     groupCopyText: '',
@@ -1162,8 +1165,15 @@ Page({
       const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
       if (sErr) return sErr
     }
-    if (this.data.recruitMode === 'ice' || this.data.recruitMode === 'edit_ice') {
+    if (this.data.recruitMode === 'ice') {
       if (!resolveIceReferenceVideoUrl(f)) return '云剪任务请填写参考片链接'
+    }
+    if (
+      this.data.recruitMode === 'edit_ice' &&
+      (f.iceVerifyMode || 'ai') === 'ai' &&
+      !String(f.editGroupQrImage || '').trim()
+    ) {
+      return '剪辑云剪请上传剪辑师群二维码'
     }
     if (!(f.applyFormFields || []).length) {
       return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
@@ -1208,7 +1218,7 @@ Page({
       `招募模式：${mode.label}`,
       `招募城市：${this.buildRegionText(f)}`,
       `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
-      `招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`,
+      `${this.data.recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)}${this.data.recruitMode === 'edit_ice' ? ' 位' : ' 人'}`,
       `费用模式：${feeTypeLabel(f.feeTypeId)}`,
     ]
     if (!isSupplier) {
@@ -1253,8 +1263,11 @@ Page({
     lines.push('招募详情：')
     const recruitDetail = String(f.recruitDetail || '').trim()
     if (recruitDetail) lines.push(recruitDetail)
-    if ((mode.hall === 'ice' || mode.id === 'edit_ice') && resolveIceReferenceVideoUrl(f)) {
+    if (mode.id === 'ice' && resolveIceReferenceVideoUrl(f)) {
       lines.push(`云剪参考成片：${resolveIceReferenceVideoUrl(f)}`)
+      lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
+    }
+    if (mode.id === 'edit_ice') {
       lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
     }
     return lines.join('\n')
@@ -1277,6 +1290,30 @@ Page({
     if (!val) return
     const iceVerifyMode = val === 'pr' ? 'pr' : 'ai'
     this.setData({ form: { ...this.data.form, iceVerifyMode } })
+  },
+  async onUploadEditGroupQr() {
+    if (this.data.editGroupQrUploading) return
+    this.setData({ editGroupQrUploading: true })
+    try {
+      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
+      this.setData({ form: { ...this.data.form, editGroupQrImage: dataUrl } })
+      wx.showToast({ title: '已上传群码', icon: 'success' })
+    } catch (e) {
+      const msg = String((e && e.message) || e || '')
+      if (!/cancel/i.test(msg)) {
+        wx.showToast({ title: msg.slice(0, 24) || '上传失败', icon: 'none' })
+      }
+    } finally {
+      this.setData({ editGroupQrUploading: false })
+    }
+  },
+  onClearEditGroupQr() {
+    this.setData({ form: { ...this.data.form, editGroupQrImage: '' } })
+  },
+  onPreviewEditGroupQr() {
+    const url = String((this.data.form && this.data.form.editGroupQrImage) || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
   },
   onAspectRatioPick(e) {
     const val = e.currentTarget.dataset.val
@@ -1382,18 +1419,24 @@ Page({
           coverImage: coverFields.coverImage,
           coverLibraryId: coverFields.coverLibraryId,
           coverImageSource: coverFields.coverImageSource,
-          iceVideoUrl: resolveIceReferenceVideoUrl(f),
+          iceVideoUrl: mode.id === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+          ...(String(f.editGroupQrImage || '').trim() ? { editGroupQrImage: String(f.editGroupQrImage).trim() } : {}),
         },
           f,
         )
       })(),
     }
+    const editGroupQrImage = String(f.editGroupQrImage || '').trim()
+    if (editGroupQrImage) {
+      order.editGroupQrImage = editGroupQrImage
+    }
     if (mode.hall === 'ice' || mode.id === 'edit_ice') {
       order.orderKind = 'recruitment_ice'
       order.hall = 'ice'
       order.fulfillmentLoop = 'closed'
-      const url = resolveIceReferenceVideoUrl(f)
+      const isEditIce = mode.id === 'edit_ice'
+      const url = isEditIce ? '' : resolveIceReferenceVideoUrl(f)
       const slotN = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
       order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
         slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,

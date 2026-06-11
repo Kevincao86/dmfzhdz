@@ -1,16 +1,21 @@
 import { apiUrl, mpErpApiBase } from '../mpApiBase'
-import { isIceMpOrder } from '../mpRecruitment/orderCard'
 import { getToken } from '../mpSession'
 import { findMyApplicant } from './talentContactPrGate'
+import { isEditTeamIceMpOrder, getIceVerifyMode } from './iceOrderDetect'
+import { resolveClaimGroupQr } from './iceGroupQr'
+import { parseBatchDeliverUrls } from './editDeliverLinks'
+import { isIceMpOrder } from '../mpRecruitment/orderCard'
 
 export type IceApplicantState = {
   isIce: boolean
+  isEditTeamIce: boolean
   applicantId: string
   assignedVideoUrl: string
   assignedVideoLabel: string
   iceVerified: boolean
   icePendingConfirm: boolean
   iceRejected: boolean
+  iceConfirmed: boolean
   icePendingPrReview: boolean
   iceLinkRejected: boolean
   iceAiFailedNote: string
@@ -18,6 +23,10 @@ export type IceApplicantState = {
   iceSubmitLabel: string
   iceStatusHint: string
   douyinPublishUrl: string
+  claimedSlotCount: number
+  editGroupQrImage: string
+  editDeliverLinks: string[]
+  editDeliverPending: boolean
 }
 
 async function postIce(paths: string[], body: Record<string, unknown>) {
@@ -59,34 +68,37 @@ export function resolveIceDownloadUrl(raw: string): string {
 export function resolveIceApplicantState(
   mp: Record<string, unknown> | null,
   mpOrderId: string,
+  reg?: Record<string, unknown> | null,
 ): IceApplicantState {
   const isIce = mp ? isIceMpOrder(mp) : false
+  const isEditTeamIce = mp ? isEditTeamIceMpOrder(mp) : false
   const applicant = findMyApplicant(mp, mpOrderId)
   const applicantId = applicant ? String(applicant.id || '').trim() : ''
-  if (!isIce || !applicant) {
-    return {
-      isIce,
-      applicantId,
-      assignedVideoUrl: '',
-      assignedVideoLabel: '',
-      iceVerified: false,
-      icePendingConfirm: false,
-      iceRejected: false,
-      icePendingPrReview: false,
-      iceLinkRejected: false,
-      iceAiFailedNote: '',
-      iceVerifyMode: 'ai',
-      iceSubmitLabel: '提交链接 · AI 核查',
-      iceStatusHint: '',
-      douyinPublishUrl: '',
-    }
+  const empty: IceApplicantState = {
+    isIce,
+    isEditTeamIce,
+    applicantId,
+    assignedVideoUrl: '',
+    assignedVideoLabel: '',
+    iceVerified: false,
+    icePendingConfirm: false,
+    iceRejected: false,
+    iceConfirmed: false,
+    icePendingPrReview: false,
+    iceLinkRejected: false,
+    iceAiFailedNote: '',
+    iceVerifyMode: 'ai',
+    iceSubmitLabel: '提交链接 · AI 核查',
+    iceStatusHint: '',
+    douyinPublishUrl: '',
+    claimedSlotCount: 0,
+    editGroupQrImage: '',
+    editDeliverLinks: [],
+    editDeliverPending: false,
   }
-  const meta =
-    mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
-      ? (mp.mpPublishMeta as Record<string, unknown>)
-      : {}
-  const iceVerifyMode =
-    String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim().toLowerCase() === 'pr' ? 'pr' : 'ai'
+  if (!isIce || !applicant) return empty
+
+  const iceVerifyMode = getIceVerifyMode(mp!)
   const assignedVideoUrl = String(applicant.assignedVideoDownloadUrl || '').trim()
   const assignedVideoLabel = String(applicant.assignedVideoLabel || '').trim()
   const iceVerified =
@@ -94,8 +106,12 @@ export function resolveIceApplicantState(
     applicant.videoStatus === 'passed' ||
     !!String(applicant.completedAt || '').trim()
   const iceRejected = applicant.taskStatus === 'rejected'
+  const iceConfirmed = applicant.taskStatus === 'confirmed'
   const icePendingConfirm =
-    applicant.taskStatus === 'pending_confirm' || (!applicant.taskStatus && !assignedVideoUrl)
+    !iceConfirmed &&
+    (applicant.taskStatus === 'pending_confirm' ||
+      applicant.taskStatus === 'applied' ||
+      (!applicant.taskStatus && !assignedVideoUrl && !isEditTeamIce))
   const icePendingPrReview = applicant.videoStatus === 'pending' && !iceVerified
   const iceLinkRejected = applicant.videoStatus === 'rejected'
   const iceAiFailedNote =
@@ -103,19 +119,40 @@ export function resolveIceApplicantState(
       ? String(applicant.aiVerifyNote || 'AI核查不通过，视频与订单无关')
       : ''
   const iceSubmitLabel = iceVerifyMode === 'pr' ? '提交链接 · PR 审核' : '提交链接 · AI 核查'
+  const assignedSlotIds = applicant.assignedIceSlotIds
+  const assignedSlotLen = Array.isArray(assignedSlotIds) ? assignedSlotIds.length : 0
+  const claimedSlotCount = Math.max(
+    1,
+    Number.parseInt(String(applicant.claimedSlotCount ?? (assignedSlotLen || 1)), 10) || 1,
+  )
+  const editDeliverLinks = Array.isArray(applicant.editDeliverLinks)
+    ? (applicant.editDeliverLinks as string[]).map(String)
+    : []
+  const editDeliverPending =
+    isEditTeamIce && iceConfirmed && !iceVerified && editDeliverLinks.length < claimedSlotCount
+  const editGroupQrImage =
+    isEditTeamIce && iceConfirmed
+      ? resolveClaimGroupQr(reg || null, mpOrderId, mp)
+      : ''
+
   let iceStatusHint = ''
   if (iceVerified) iceStatusHint = '已完成'
-  else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
+  else if (isEditTeamIce && iceConfirmed && editDeliverPending) {
+    iceStatusHint = `请回传 ${claimedSlotCount} 条成片链接（已提交 ${editDeliverLinks.length} 条）`
+  } else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
   else if (iceLinkRejected) iceStatusHint = String(applicant.videoRejectReason || '链接已驳回，请重新提交')
   else if (iceAiFailedNote) iceStatusHint = iceAiFailedNote
+
   return {
     isIce,
+    isEditTeamIce,
     applicantId,
     assignedVideoUrl,
     assignedVideoLabel,
     iceVerified,
     icePendingConfirm,
     iceRejected,
+    iceConfirmed,
     icePendingPrReview,
     iceLinkRejected,
     iceAiFailedNote,
@@ -123,6 +160,10 @@ export function resolveIceApplicantState(
     iceSubmitLabel,
     iceStatusHint,
     douyinPublishUrl: String(applicant.douyinPublishUrl || '').trim(),
+    claimedSlotCount,
+    editGroupQrImage,
+    editDeliverLinks,
+    editDeliverPending,
   }
 }
 
@@ -139,3 +180,16 @@ export async function submitIceDouyin(mpOrderId: string, applicantId: string, do
     { mpOrderId, applicantId, douyinPublishUrl },
   )
 }
+
+export async function submitEditDeliverLinks(
+  mpOrderId: string,
+  applicantId: string,
+  deliverText: string,
+) {
+  await postIce(
+    ['/api/meoo-ops-mp-recruitment-edit-deliver-submit', '/api/ops-sync/mp-recruitment-edit-deliver-submit'],
+    { mpOrderId, applicantId, deliverText },
+  )
+}
+
+export { parseBatchDeliverUrls }

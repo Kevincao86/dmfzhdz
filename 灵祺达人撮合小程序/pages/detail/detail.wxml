@@ -56,7 +56,21 @@
         <view class="section-head-dot" />
         <text class="section-title">参与流程</text>
       </view>
-      <view class="steps" wx:if="{{isIce}}">
+      <view class="steps" wx:if="{{isIce && isEditIce}}">
+        <view class="step-item">
+          <text class="step-num">1</text>
+          <text class="step-body">剪辑身份认领并填写认领条数</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">2</text>
+          <text class="step-body">确认接收后查看剪辑师群码</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">3</text>
+          <text class="step-body">批量回传成片 https 链接</text>
+        </view>
+      </view>
+      <view class="steps" wx:elif="{{isIce}}">
         <view class="step-item">
           <text class="step-num">1</text>
           <text class="step-body">认领云剪任务（闭环）</text>
@@ -94,7 +108,47 @@
       </view>
     </view>
 
-    <view class="card card--success" wx:if="{{applied && isIce && icePendingConfirm}}">
+    <view class="card card--success" wx:if="{{applied && isIce && isEditIce && icePendingConfirm}}">
+      <text class="success-title">待确认接收</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">已认领 {{claimedSlotCount}} 条成片位，请确认是否接受该剪辑云剪任务；拒绝后名额将释放。</text>
+      <view style="display:flex;gap:16rpx;margin-top:20rpx;">
+        <button class="btn-primary" style="flex:1;" loading="{{iceConfirming}}" bindtap="confirmIceReceipt">确认接收</button>
+        <button class="btn-secondary" style="flex:1;" loading="{{iceConfirming}}" bindtap="rejectIceTask">拒绝</button>
+      </view>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && isEditIce && iceRejected}}">
+      <text class="success-title">已拒绝任务</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该剪辑云剪任务，可返回大厅查看其他任务。</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && isEditIce && iceConfirmed}}">
+      <text class="success-title">✓ 已确认认领</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">成片位 {{claimedSlotCount}} 条</text>
+      <view wx:if="{{editGroupQrImage}}" style="margin-top:20rpx;">
+        <text class="hint">剪辑师群二维码</text>
+        <image class="ice-qr-img" src="{{editGroupQrImage}}" mode="aspectFit" bindtap="previewEditGroupQr" />
+      </view>
+      <view wx:if="{{iceVerified}}" style="margin-top:24rpx;">
+        <text class="success-title">✓ 已完成</text>
+      </view>
+      <view wx:elif="{{icePendingPrReview}}" style="margin-top:24rpx;">
+        <text class="hint">{{iceStatusHint}}</text>
+      </view>
+      <view wx:elif="{{!iceVerified}}" style="margin-top:24rpx;">
+        <text wx:if="{{iceStatusHint}}" class="hint" style="display:block;margin-bottom:12rpx;color:#b45309;">{{iceStatusHint}}</text>
+        <text class="hint">粘贴 {{claimedSlotCount}} 条成片 https 链接（每行一条）：</text>
+        <textarea class="ice-input ice-textarea" placeholder="https://…" value="{{deliverText}}" bindinput="onDeliverField" />
+        <button class="btn-primary" style="margin-top:16rpx;" loading="{{editDeliverSubmitting}}" bindtap="submitEditDeliver">提交成片链接</button>
+      </view>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && isEditIce && !icePendingConfirm && !iceRejected && !iceConfirmed}}">
+      <text class="success-title">✓ 认领成功</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">请确认接收后开始剪辑并回传成片链接。</text>
+    </view>
+
+    <view class="card card--success" wx:elif="{{applied && isIce && !isEditIce && icePendingConfirm}}">
       <text class="success-title">待确认接收</text>
       <text class="hint" style="display:block;margin-top:12rpx;">请确认是否接受该云剪投放任务；拒绝后名额将释放。</text>
       <view style="display:flex;gap:16rpx;margin-top:20rpx;">
@@ -103,12 +157,12 @@
       </view>
     </view>
 
-    <view class="card card--success" wx:elif="{{applied && isIce && iceRejected}}">
+    <view class="card card--success" wx:elif="{{applied && isIce && !isEditIce && iceRejected}}">
       <text class="success-title">已拒绝任务</text>
       <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该云剪任务，可返回大厅查看其他任务。</text>
     </view>
 
-    <view class="card card--success" wx:elif="{{applied && isIce && assignedVideoUrl}}">
+    <view class="card card--success" wx:elif="{{applied && isIce && !isEditIce && assignedVideoUrl}}">
       <text class="success-title">✓ 已分配成片</text>
       <text class="hint" style="display:block;margin-top:12rpx;">{{assignedVideoLabel || '云剪成片'}}</text>
       <button class="btn-primary" style="margin-top:20rpx;" bindtap="openDownload">复制下载链接</button>
@@ -127,7 +181,7 @@
       </view>
     </view>
 
-    <view class="card card--success" wx:elif="{{applied && isIce && !icePendingConfirm && !iceRejected && !assignedVideoUrl}}">
+    <view class="card card--success" wx:elif="{{applied && isIce && !isEditIce && !icePendingConfirm && !iceRejected && !assignedVideoUrl}}">
       <text class="success-title">✓ 认领成功</text>
       <text class="hint" style="display:block;margin-top:12rpx;">正在同步任务状态，请下拉刷新；若长时间无响应请返回重进。</text>
     </view>
@@ -161,7 +215,7 @@
       wx:if="{{!applied && !isPr}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
-    >{{isIce ? '认领云剪' : '我要报名'}}</button>
+    >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : '我要报名'}}</button>
     <button
       wx:if="{{!applied && isPr}}"
       class="btn-secondary bottom-cta bottom-cta--muted"

@@ -26,10 +26,22 @@
     <text class="hint"> 后可下次一键填入。</text>
   </view>
 
+  <view class="card apply-form" wx:if="{{isEditIce}}">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">认领条数</text>
+    </view>
+    <view class="form-row">
+      <text class="form-label">认领条数 *</text>
+      <input class="input" type="number" placeholder="1" value="{{claimSlotCount}}" bindinput="onClaimSlotInput" />
+    </view>
+    <text class="hint" style="display:block;margin-top:8rpx;">剩余可认领 {{freeEditSlots}} 条成片位</text>
+  </view>
+
   <view class="card apply-form">
     <view class="section-head">
       <view class="section-head-dot" />
-      <text class="section-title">达人报名信息</text>
+      <text class="section-title">{{isEditIce ? '剪辑师信息' : '达人报名信息'}}</text>
     </view>
 
     <block wx:for="{{applyRows}}" wx:key="id">
@@ -94,7 +106,7 @@
 
   <view class="card card--flat submit-wrap">
     <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
-      提交报名
+      {{isEditIce || isIceMode ? '认领任务' : '提交报名'}}
     </button>
   </view>
 </view>

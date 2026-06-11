@@ -11,4 +11,38 @@ function isIceMpOrder(mp) {
   return false
 }
 
-module.exports = { isIceMpOrder }
+function getIceVerifyMode(mp) {
+  const meta = mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const raw = String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim().toLowerCase()
+  return raw === 'pr' ? 'pr' : 'ai'
+}
+
+/** 剪辑师云剪（edit_ice）：认领后上传成片，非达人直派下载 */
+function isEditTeamIceMpOrder(mp) {
+  if (!isIceMpOrder(mp)) return false
+  const meta = mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const target = String(meta.recruitTarget || mp.recruitTarget || '').trim()
+  const mode = String(meta.recruitMode || '').trim()
+  return target === 'edit' || mode === 'edit_ice'
+}
+
+function getEditGroupQrFromMp(mp) {
+  if (!mp) return ''
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  return String(mp.editGroupQrImage || meta.editGroupQrImage || '').trim()
+}
+
+/** 达人云剪直发群二维码（与剪辑师群分开） */
+function getTalentGroupQrFromMp(mp) {
+  if (!mp) return ''
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  return String(mp.groupQrImage || meta.groupQrImage || '').trim()
+}
+
+module.exports = {
+  isIceMpOrder,
+  getIceVerifyMode,
+  isEditTeamIceMpOrder,
+  getEditGroupQrFromMp,
+  getTalentGroupQrFromMp,
+}

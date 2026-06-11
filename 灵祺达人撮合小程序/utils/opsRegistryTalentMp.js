@@ -168,15 +168,22 @@ async function fetchRegistry(opts) {
   return task
 }
 
-async function applyToMpOrder(mpOrderId, applicant) {
+async function applyToMpOrder(mpOrderId, applicant, workIdentity, claimSlotCount) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-orders-apply',
     '/api/ops-sync/mp-recruitment-orders/apply',
   ]
+  const body = { mpOrderId, applicant }
+  const wid = String(workIdentity || '').trim()
+  if (wid) body.workIdentity = wid
+  if (claimSlotCount != null) {
+    const n = Number.parseInt(String(claimSlotCount), 10)
+    if (Number.isFinite(n) && n > 0) body.claimSlotCount = n
+  }
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, { mpOrderId, applicant })
+      return await api.post(path, body)
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
@@ -184,6 +191,24 @@ async function applyToMpOrder(mpOrderId, applicant) {
     }
   }
   throw lastErr || new Error('报名接口不可用')
+}
+
+async function submitEditDeliverLinks(mpOrderId, applicantId, deliverText) {
+  const paths = [
+    '/api/meoo-ops-mp-recruitment-edit-deliver-submit',
+    '/api/ops-sync/mp-recruitment-edit-deliver-submit',
+  ]
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await api.post(path, { mpOrderId, applicantId, deliverText })
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('成片回传接口不可用')
 }
 
 function registerAuthHeaders() {
@@ -311,6 +336,7 @@ module.exports = {
   findMpOrderInRegistry,
   readRegistryCache,
   applyToMpOrder,
+  submitEditDeliverLinks,
   registerTalentMember,
   registerPrUser,
   submitIceDouyin,

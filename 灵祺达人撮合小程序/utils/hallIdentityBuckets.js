@@ -12,6 +12,8 @@ function primaryRecruitTargetForIdentity(identity) {
 
 function orderMatchesIdentity(row, identity) {
   if (!row) return false
+  /** 剪辑类招募全身份可见（含剪辑云剪任务包） */
+  if (row.recruitTarget === 'edit') return true
   if (row.isIce) return true
   /** 招募大厅公开展示：达人/PR 可见全部对象（含剪辑/拍摄单） */
   if (identity === 'pr' || identity === 'talent') return true

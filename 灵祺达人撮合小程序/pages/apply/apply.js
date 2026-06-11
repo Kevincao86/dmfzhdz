@@ -13,6 +13,10 @@ const applyTemplates = require('../../utils/applyFormTemplates.js')
 const applyRuntime = require('../../utils/applyTemplateRuntime.js')
 const platformForm = require('../../utils/platformForm.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
+const iceOrderDetect = require('../../utils/iceOrderDetect.js')
+const recruitApplyGate = require('../../utils/recruitApplyGate.js')
+const editIceSlots = require('../../utils/editIceSlots.js')
+const userProfile = require('../../utils/userProfile.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
@@ -74,6 +78,10 @@ Page({
     syncMemberProfile: false,
     memberTypeLabel: '',
     isIceMode: false,
+    isEditIce: false,
+    claimSlotCount: '1',
+    freeEditSlots: 0,
+    gateMessage: '',
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
@@ -130,6 +138,11 @@ Page({
     const member = memberStore.readMember()
     const canSyncMember = memberSyncAvailable(member, platform)
     const memberFields = canSyncMember ? applyFieldsFromMember(member, platform, DOUYIN_LEVELS) : null
+    const isEditIce = loadedMp ? iceOrderDetect.isEditTeamIceMpOrder(loadedMp) : false
+    const freeEditSlots = loadedMp ? editIceSlots.countFreeEditPackSlots(loadedMp) : 0
+    const gate = loadedMp
+      ? recruitApplyGate.validateRecruitmentClaim(loadedMp, userProfile.readIdentity())
+      : { ok: true }
     const patch = {
       mpOrderId,
       merchantOrderNo,
@@ -142,6 +155,9 @@ Page({
       syncMemberProfile: !!memberFields,
       memberTypeLabel: member ? memberStore.memberTypeLabel(member) : '',
       isIceMode,
+      isEditIce,
+      freeEditSlots,
+      gateMessage: gate.ok ? '' : gate.message,
       customFields: {},
       ...(memberFields || emptyApplyFields(DOUYIN_LEVELS)),
       likesCollects: memberFields && memberFields.likesCollects != null ? String(memberFields.likesCollects) : '',
@@ -175,6 +191,17 @@ Page({
     if (!applyRowsRaw.length) {
       wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
     }
+    if (!gate.ok) {
+      wx.showModal({
+        title: '无法认领',
+        content: gate.message,
+        showCancel: false,
+        success: () => wx.navigateBack(),
+      })
+    }
+  },
+  onClaimSlotInput(e) {
+    this.setData({ claimSlotCount: e.detail.value })
   },
   onSyncMemberChange(e) {
     const sync = !!e.detail.value
@@ -265,6 +292,17 @@ Page({
       wx.showToast({ title: errMsg, icon: 'none' })
       return
     }
+    if (this.data.gateMessage) {
+      wx.showToast({ title: this.data.gateMessage, icon: 'none' })
+      return
+    }
+    if (this.data.isEditIce) {
+      const n = Math.max(1, Number.parseInt(String(this.data.claimSlotCount || '1'), 10) || 1)
+      if (n > this.data.freeEditSlots) {
+        wx.showToast({ title: `剩余可认领 ${this.data.freeEditSlots} 条`, icon: 'none' })
+        return
+      }
+    }
     if (applicationsStore.hasAppliedToOrder(this.data.mpOrderId)) {
       wx.showToast({ title: '您已报名该招募', icon: 'none' })
       return
@@ -292,7 +330,11 @@ Page({
         wx.showToast({ title: '请填写抖音昵称或完善我的信息', icon: 'none' })
         return
       }
-      await ops.applyToMpOrder(this.data.mpOrderId, applicant)
+      const workIdentity = userProfile.readIdentity()
+      const claimSlots = this.data.isEditIce
+        ? Math.max(1, Number.parseInt(String(this.data.claimSlotCount || '1'), 10) || 1)
+        : undefined
+      await ops.applyToMpOrder(this.data.mpOrderId, applicant, workIdentity, claimSlots)
       const persisted = persistApplicantToMemberProfile(
         memberStore.readMember(),
         applicant,
