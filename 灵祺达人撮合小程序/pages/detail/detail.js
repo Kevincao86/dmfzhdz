@@ -65,6 +65,9 @@ Page({
     readOnlyEnded: false,
     mpOrder: null,
     shareCoverPath: '',
+    deadlineMs: 0,
+    signupCountdownText: '—',
+    signupCountdownEnded: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -82,9 +85,41 @@ Page({
       const id = this.data.id
       wx.onCopyUrl(() => ({ query: `id=${encodeURIComponent(id)}` }))
     }
+    this.startSignupCountdownTimer()
+  },
+  onHide() {
+    this.stopSignupCountdownTimer()
   },
   onUnload() {
+    this.stopSignupCountdownTimer()
     if (wx.offCopyUrl) wx.offCopyUrl()
+  },
+  startSignupCountdownTimer() {
+    this.stopSignupCountdownTimer()
+    this.refreshSignupCountdown()
+    if (!this.data.deadlineMs) return
+    this._signupCountdownTimer = setInterval(() => {
+      this.refreshSignupCountdown()
+    }, 60000)
+  },
+  stopSignupCountdownTimer() {
+    if (this._signupCountdownTimer) {
+      clearInterval(this._signupCountdownTimer)
+      this._signupCountdownTimer = null
+    }
+  },
+  refreshSignupCountdown() {
+    const deadlineMs = Number(this.data.deadlineMs) || 0
+    if (!deadlineMs) {
+      this.setData({ signupCountdownText: '截止日期待定', signupCountdownEnded: false })
+      return
+    }
+    const listFilters = require('../../utils/recruitmentListFilters.js')
+    const text = listFilters.formatSignupCountdownText(deadlineMs)
+    const ended = text === '已截止'
+    const patch = { signupCountdownText: text, signupCountdownEnded: ended }
+    if (ended) this.stopSignupCountdownTimer()
+    this.setData(patch)
   },
   syncIceApplicantFromStorage() {
     try {
@@ -302,6 +337,7 @@ Page({
         view,
         loading: false,
         mpOrder: mp,
+        deadlineMs: Number(view.deadlineMs) || 0,
         isPr: userProfile.readIdentity() === 'pr',
         applyTemplateId,
         chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',
@@ -340,6 +376,8 @@ Page({
         applyGateHint,
         iceSlotsFull,
       })
+      this.refreshSignupCountdown()
+      this.startSignupCountdownTimer()
       try {
         const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
         const recruitShareCover = require('../../utils/recruitShareCover.js')

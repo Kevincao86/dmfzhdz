@@ -7,6 +7,7 @@ const {
   normalizeRecruitmentPlatform,
   isMerchantSyncedMpOrder,
 } = require('./recruitmentInfoFilter.js')
+const listFilters = require('./recruitmentListFilters.js')
 
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
@@ -128,12 +129,15 @@ function enrichMpOrder(mp, merchant) {
   }
 
   let recruitmentInfoLines = explodeAndFilterDisplayLines(recruitmentInfo)
+  recruitmentInfoLines = recruitmentInfoLines.filter((l) => !/^招募标题[:：]/.test(String(l || '').trim()))
   if (platform === '小红书') {
     recruitmentInfoLines = recruitmentInfoLines.filter((l) => !/带货等级/.test(l))
   }
   const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)
 
   const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
+  const summaryForDeadline = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const deadlineMs = listFilters.resolveDeadlineMs(mp, summaryForDeadline)
   const tags = [
     { text: platform, tone: platform.includes('红') ? 'pink' : 'blue' },
     isIce ? { text: '闭环·云剪', tone: 'pink' } : { text: '开环·线下', tone: 'gray' },
@@ -161,6 +165,7 @@ function enrichMpOrder(mp, merchant) {
     status: mp.status,
     summaryShort: recruitmentInfoLines[0] || title,
     isIce,
+    deadlineMs,
     iceSlotsTotal: isIce ? (mp.iceVideoSlots || []).length || Number(recruitCount) || 0 : 0,
     iceSlotsTaken: isIce
       ? (mp.iceVideoSlots || []).filter((s) => s && s.assignedApplicantId).length

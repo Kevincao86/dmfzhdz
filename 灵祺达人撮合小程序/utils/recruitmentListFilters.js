@@ -93,6 +93,22 @@ function formatDeadlineDaysText(deadlineMs) {
   return `剩余 ${days} 天`
 }
 
+/** 详情页：报名倒计时（天/时/分） */
+function formatSignupCountdownText(deadlineMs, nowMs) {
+  if (!deadlineMs || !Number.isFinite(deadlineMs)) return '截止日期待定'
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now()
+  const diff = deadlineMs - now
+  if (diff <= 0) return '已截止'
+  const totalMin = Math.floor(diff / 60000)
+  const days = Math.floor(totalMin / (24 * 60))
+  const hours = Math.floor((totalMin - days * 24 * 60) / 60)
+  const mins = totalMin % 60
+  if (days > 0) return `剩余 ${days}天 ${hours}小时 ${mins}分`
+  if (hours > 0) return `剩余 ${hours}小时 ${mins}分`
+  if (mins > 0) return `剩余 ${mins}分`
+  return '剩余不足 1 分'
+}
+
 function hallLabelFromLocal(localItem) {
   if (localItem && localItem.hall === 'urgent') return '急单大厅'
   if (localItem && localItem.hall === 'ice') return '云剪任务'
@@ -306,6 +322,7 @@ module.exports = {
   resolveDeadlineMs,
   parseRecruitCountFromMp,
   formatDeadlineDaysText,
+  formatSignupCountdownText,
   enrichMpOrderListItem,
   sortRecruitmentRows,
   buildMockRecruitmentRow,
