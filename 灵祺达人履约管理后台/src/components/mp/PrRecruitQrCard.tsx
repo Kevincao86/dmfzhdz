@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import { buildPrQrScanUrl } from '../../lib/mpSync/prRecruitQr'
 
 type Props = {
@@ -8,27 +9,33 @@ type Props = {
 }
 
 export default function PrRecruitQrCard({ mpOrderId, caption = '灵祺官方认证', size = 112 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [dataUrl, setDataUrl] = useState('')
   const [failed, setFailed] = useState(false)
   const url = buildPrQrScanUrl(mpOrderId)
 
   useEffect(() => {
-    if (!url || !canvasRef.current) return
+    if (!url) {
+      setDataUrl('')
+      setFailed(false)
+      return
+    }
     let cancelled = false
-    void (async () => {
-      try {
-        const QRCode = await import('qrcode')
-        if (cancelled || !canvasRef.current) return
-        await QRCode.toCanvas(canvasRef.current, url, {
-          width: size,
-          margin: 1,
-          color: { dark: '#1e293b', light: '#ffffff' },
-        })
+    void QRCode.toDataURL(url, {
+      width: size,
+      margin: 1,
+      color: { dark: '#1e293b', light: '#ffffff' },
+    })
+      .then((next) => {
+        if (cancelled) return
+        setDataUrl(next)
         setFailed(false)
-      } catch {
-        if (!cancelled) setFailed(true)
-      }
-    })()
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDataUrl('')
+          setFailed(true)
+        }
+      })
     return () => {
       cancelled = true
     }
@@ -46,8 +53,20 @@ export default function PrRecruitQrCard({ mpOrderId, caption = '灵祺官方认�
           >
             二维码加载失败
           </div>
+        ) : dataUrl ? (
+          <img
+            src={dataUrl}
+            width={size}
+            height={size}
+            className="block"
+            alt="招募方认证二维码"
+          />
         ) : (
-          <canvas ref={canvasRef} width={size} height={size} className="block" aria-label="招募方认证二维码" />
+          <div
+            className="animate-pulse rounded bg-slate-100"
+            style={{ width: size, height: size }}
+            aria-hidden
+          />
         )}
       </div>
       <p className="max-w-[7rem] text-center text-[10px] font-medium leading-snug text-slate-700">{caption}</p>
