@@ -5,7 +5,12 @@ import type {
   RegistryMpRecruitmentOrder,
 } from './opsRegistryTypes.js'
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
-import { getIceVerifyMode, isEditTeamIceMpOrder, isPackSlotIceOrder } from './iceOrderDetect.js'
+import {
+  getIceVerifyMode,
+  isEditTeamIceMpOrder,
+  isIceMpOrder,
+  isPackSlotIceOrder,
+} from './iceOrderDetect.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
 import { findDuplicateApplicant, applicantsSamePerson } from './mpApplicantIdentity.js'
 
