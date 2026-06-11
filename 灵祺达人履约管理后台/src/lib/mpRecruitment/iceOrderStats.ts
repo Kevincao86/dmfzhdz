@@ -1,5 +1,6 @@
 import { isIceMpOrder } from './orderCard'
 import { isEditTeamIceMpOrder } from '../mpSync/iceOrderDetect'
+import { parseIceSlotTotalFromMp } from './listFilters'
 
 export function getIceVerifyMode(mp: Record<string, unknown> | null | undefined): 'ai' | 'pr' {
   const meta =
@@ -37,40 +38,47 @@ export function countIceOrderStats(mp: Record<string, unknown> | null | undefine
   return { claimed, completed }
 }
 
+function countEditIceAssignedSlots(mp: Record<string, unknown> | null | undefined): number {
+  const slots = Array.isArray(mp?.iceVideoSlots)
+    ? (mp!.iceVideoSlots as { assignedApplicantId?: string }[])
+    : []
+  return slots.filter((s) => String(s.assignedApplicantId || '').trim()).length
+}
+
+function countEditIceReservedSlots(mp: Record<string, unknown> | null | undefined): number {
+  let reserved = 0
+  const applicants = Array.isArray(mp?.applicants)
+    ? (mp!.applicants as Record<string, unknown>[])
+    : []
+  for (const a of applicants) {
+    if (!a || a.taskStatus === 'rejected') continue
+    const ts = String(a.taskStatus || '')
+    const assignedN = Array.isArray(a.assignedIceSlotIds) ? a.assignedIceSlotIds.length : 0
+    if (assignedN > 0 || ts === 'confirmed') continue
+    if ((ts === 'pending_confirm' || ts === 'applied' || !ts) && String(a.appliedAt || '').trim()) {
+      reserved += Math.max(1, Number.parseInt(String(a.claimedSlotCount ?? 1), 10) || 1)
+    }
+  }
+  return reserved
+}
+
 export function countIceClaimedSlots(
   mp: Record<string, unknown> | null | undefined,
   recruitCap: number,
 ): { claimed: number; total: number } {
-  const slots = Array.isArray(mp?.iceVideoSlots)
-    ? (mp!.iceVideoSlots as { assignedApplicantId?: string }[])
-    : []
-  const total = slots.length || Math.max(0, Number(recruitCap) || 0)
+  const total = parseIceSlotTotalFromMp(mp || {}) || Math.max(0, Number(recruitCap) || 0)
   if (!total) return { claimed: 0, total: 0 }
 
   if (isEditTeamIceMpOrder(mp)) {
-    let claimed = 0
-    const applicants = Array.isArray(mp?.applicants)
-      ? (mp!.applicants as Record<string, unknown>[])
-      : []
-    for (const a of applicants) {
-      if (!a || a.taskStatus === 'rejected') continue
-      const ts = String(a.taskStatus || '')
-      const assignedIds = Array.isArray(a.assignedIceSlotIds) ? a.assignedIceSlotIds : []
-      const assignedN = assignedIds.length
-      if (ts === 'confirmed' || assignedN > 0) {
-        claimed +=
-          assignedN ||
-          Math.max(1, Number.parseInt(String(a.claimedSlotCount ?? 1), 10) || 1)
-      } else if ((ts === 'pending_confirm' || ts === 'applied' || !ts) && String(a.appliedAt || '').trim()) {
-        claimed += Math.max(1, Number.parseInt(String(a.claimedSlotCount ?? 1), 10) || 1)
-      }
+    return {
+      claimed: countEditIceAssignedSlots(mp) + countEditIceReservedSlots(mp),
+      total,
     }
-    if (!claimed) {
-      claimed = slots.filter((s) => String(s.assignedApplicantId || '').trim()).length
-    }
-    return { claimed, total }
   }
 
+  const slots = Array.isArray(mp?.iceVideoSlots)
+    ? (mp!.iceVideoSlots as { assignedApplicantId?: string }[])
+    : []
   const assigned = slots.filter((s) => String(s.assignedApplicantId || '').trim()).length
   if (assigned > 0) return { claimed: assigned, total }
   return { claimed: countIceOrderStats(mp).claimed, total }
@@ -89,7 +97,7 @@ export function buildSignupProgressLabel(
   }
   const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
   const cap = total > 0 ? total : recruitCap > 0 ? recruitCap : hall ? '不限' : '—'
-  return hall ? `认领${claimed}/${cap}` : `认领 ${claimed}/${cap} 条`
+  return hall ? `认领 ${claimed}/${cap} 条` : `认领 ${claimed}/${cap} 条`
 }
 
 export function buildHallSignupCountText(

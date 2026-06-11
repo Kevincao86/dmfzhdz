@@ -10,6 +10,7 @@ const iceOrderStats = require('../../utils/iceOrderStats.js')
 const iceOrderDetect = require('../../utils/iceOrderDetect.js')
 const iceGroupQr = require('../../utils/iceGroupQr.js')
 const editDeliverLinks = require('../../utils/editDeliverLinks.js')
+const { parseIceSlotTotalFromMp } = require('../../utils/mpRecruitCount.js')
 const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
@@ -41,7 +42,10 @@ Page({
     iceStatusHint: '',
     iceStep3Hint: '发布抖音并回传链接，AI 核查通过后自动完成',
     isEditIce: false,
+    iceSlotTotal: 0,
+    orderClaimedSlots: 0,
     claimedSlotCount: 1,
+    editDeliverSubmittedCount: 0,
     iceConfirmed: false,
     editGroupQrImage: '',
     deliverText: '',
@@ -207,9 +211,17 @@ Page({
           ? '发布抖音并回传链接，PR 审核通过后完成'
           : '发布抖音并回传链接，AI 核查通过后自动完成'
       let claimedSlotCount = 1
+      let editDeliverSubmittedCount = 0
+      let iceSlotTotal = 0
+      let orderClaimedSlots = 0
       let iceConfirmed = false
       let editGroupQrImage = ''
       let deliverText = ''
+      if (isEditIce) {
+        iceSlotTotal = parseIceSlotTotalFromMp(mp)
+        const orderProgress = iceOrderStats.countIceClaimedSlots(mp, iceSlotTotal)
+        orderClaimedSlots = orderProgress.claimed
+      }
       if (isIce && app) {
         claimedSlotCount = Math.max(
           1,
@@ -221,6 +233,7 @@ Page({
         }
         if (Array.isArray(app.editDeliverLinks) && app.editDeliverLinks.length) {
           deliverText = app.editDeliverLinks.join('\n')
+          editDeliverSubmittedCount = app.editDeliverLinks.filter((u) => String(u || '').trim()).length
         }
       }
       let iceStatusHint = ''
@@ -270,7 +283,10 @@ Page({
         applied: hasApplied,
         readOnlyEnded: isEnded && canViewEnded,
         isEditIce,
+        iceSlotTotal,
+        orderClaimedSlots,
         claimedSlotCount,
+        editDeliverSubmittedCount,
         iceConfirmed,
         editGroupQrImage,
         deliverText,

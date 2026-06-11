@@ -39,6 +39,40 @@
   padding-top: 8rpx;
 }
 
+.metrics--ice {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.ice-slot-stats {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 20rpx;
+}
+
+.ice-slot-stat {
+  flex: 1;
+  padding: 20rpx 16rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.ice-slot-stat__label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.ice-slot-stat__value {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #059669;
+}
+
 .region-value {
   font-size: 30rpx;
   font-weight: 600;

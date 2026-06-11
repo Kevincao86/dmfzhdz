@@ -29,15 +29,25 @@ export function resolvePublishedMs(mp: Record<string, unknown>): number {
   return parseTs(mp.createdAt ?? mp.updatedAt)
 }
 
+import { isEditTeamIceMpOrder } from '../mpSync/iceOrderDetect'
+
 export function parseRecruitCountFromMp(mp: Record<string, unknown>): number {
   if (mp.recruitCount != null) {
     const n = Number.parseInt(String(mp.recruitCount), 10)
     if (Number.isFinite(n) && n > 0) return n
   }
   const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const pack = String(summary).match(/成片位总数[:：]\s*(\d+)/)
+  if (pack) return Math.max(1, Number.parseInt(pack[1], 10) || 1)
   const m = String(summary).match(/招募人数[:：]\s*(\d+)/)
   if (m) return Math.max(1, Number.parseInt(m[1], 10) || 1)
   return 1
+}
+
+export function parseIceSlotTotalFromMp(mp: Record<string, unknown>): number {
+  const slots = Array.isArray(mp.iceVideoSlots) ? mp.iceVideoSlots : []
+  if (slots.length > 0) return slots.length
+  return parseRecruitCountFromMp(mp)
 }
 
 export function formatDeadlineDaysText(deadlineMs: number): string {
