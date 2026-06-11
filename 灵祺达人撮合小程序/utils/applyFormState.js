@@ -1,6 +1,7 @@
 const memberStore = require('./talentMember.js')
 const regionPicker = require('./regionPicker.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
+const supplierTeamProfile = require('./supplierTeamProfile.js')
 
 /** 报名表单空白初始值（探店时间每次需重新选择） */
 function emptyApplyFields(douyinLevels) {
@@ -21,6 +22,71 @@ function emptyApplyFields(douyinLevels) {
     visitTimeStart: '',
     visitTimeEnd: '',
     ...region,
+  }
+}
+
+/** 拍摄 / 剪辑团队报名表单空白初始值 */
+function emptySupplierApplyFields() {
+  const region = regionPicker.setupRegionState('', '')
+  return {
+    teamName: '',
+    portfolioLink: '',
+    editStyles: '',
+    software: '',
+    deliveryEta: '',
+    shootTypes: '',
+    equipment: '',
+    shootDate: '',
+    contact: '',
+    wechatId: '',
+    quotePrice: '',
+    alipayAccount: '',
+    platformAccount: '',
+    platformNickname: '',
+    profileLink: '',
+    followers: '',
+    likesCollects: '',
+    douyinSalesLevel: '',
+    douyinLevelIndex: 0,
+    visitDate: '',
+    visitTimeStart: '',
+    visitTimeEnd: '',
+    ...region,
+  }
+}
+
+function supplierMemberSyncAvailable(member, workId) {
+  if (!member || (workId !== 'shoot' && workId !== 'edit')) return false
+  const p = supplierTeamProfile.normalizeSupplierProfile(member.supplierProfile)
+  return Boolean(String(p.teamName || '').trim() && String(member.contact || '').trim())
+}
+
+function applyFieldsFromSupplierMember(member, workId) {
+  if (!supplierMemberSyncAvailable(member, workId)) return null
+  const p = supplierTeamProfile.normalizeSupplierProfile(member.supplierProfile)
+  const region = regionPicker.setupRegionState(member.province, member.city)
+  const base = {
+    teamName: p.teamName || member.wxNickName || '',
+    contact: member.contact || '',
+    wechatId: member.wechatId || '',
+    portfolioLink: p.portfolioLink || '',
+    quotePrice: String(p.perClipQuote || p.fullDayQuote || p.halfDayQuote || '').trim(),
+    alipayAccount: member.alipayAccount || '',
+    ...region,
+  }
+  if (workId === 'edit') {
+    return {
+      ...base,
+      editStyles: (p.editStyles || []).join('、'),
+      software: (p.software || []).join('、'),
+      deliveryEta: '',
+    }
+  }
+  return {
+    ...base,
+    shootTypes: (p.shootTypes || []).join('、'),
+    equipment: (p.equipment || []).join('、'),
+    shootDate: '',
   }
 }
 
@@ -81,8 +147,34 @@ function applyFieldsFromMember(member, platform, douyinLevels) {
 }
 
 /** 提交前兜底：报名表单缺昵称/账号时用「我的信息」补全 */
-function enrichApplicantFromMember(applicant, member, platform) {
+function enrichApplicantFromMember(applicant, member, platform, options) {
   if (!applicant || !member) return applicant
+  const isSupplierApply = options && options.isSupplierApply
+  const workId = options && options.workId
+  if (isSupplierApply && (workId === 'shoot' || workId === 'edit')) {
+    const fields = applyFieldsFromSupplierMember(member, workId)
+    if (!fields) return applicant
+    const next = { ...applicant }
+    if (!String(next.teamName || next.name || '').trim()) {
+      next.teamName = fields.teamName || ''
+      next.name = next.teamName
+      next.platformNickname = next.teamName
+    }
+    if (!String(next.contact || '').trim()) next.contact = fields.contact || ''
+    if (!String(next.wechatId || '').trim()) next.wechatId = fields.wechatId || ''
+    if (!String(next.province || '').trim()) next.province = fields.province || ''
+    if (!String(next.city || '').trim()) next.city = fields.city || ''
+    if (!String(next.portfolioLink || next.profileLink || '').trim()) {
+      next.portfolioLink = fields.portfolioLink || ''
+      next.profileLink = next.portfolioLink
+    }
+    if (!String(next.quotePrice || '').trim() && fields.quotePrice) next.quotePrice = fields.quotePrice
+    if (!String(next.alipayAccount || '').trim() && fields.alipayAccount) {
+      next.alipayAccount = fields.alipayAccount
+      next.paymentMethod = `支付宝：${fields.alipayAccount}`
+    }
+    return next
+  }
   const fields = applyFieldsFromMember(member, platform, [])
   if (!fields) return applicant
   const next = { ...applicant }
@@ -177,6 +269,9 @@ function persistApplicantToMemberProfile(member, applicant, platform) {
 
 module.exports = {
   emptyApplyFields,
+  emptySupplierApplyFields,
+  supplierMemberSyncAvailable,
+  applyFieldsFromSupplierMember,
   memberSyncAvailable,
   applyFieldsFromMember,
   enrichApplicantFromMember,

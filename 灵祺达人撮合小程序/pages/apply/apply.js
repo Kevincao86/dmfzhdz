@@ -22,8 +22,11 @@ const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 const {
   emptyApplyFields,
+  emptySupplierApplyFields,
   memberSyncAvailable,
+  supplierMemberSyncAvailable,
   applyFieldsFromMember,
+  applyFieldsFromSupplierMember,
   enrichApplicantFromMember,
   persistApplicantToMemberProfile,
 } = applyFormState
@@ -79,6 +82,9 @@ Page({
     memberTypeLabel: '',
     isIceMode: false,
     isEditIce: false,
+    recruitTarget: 'talent',
+    isSupplierApply: false,
+    supplierWorkId: 'talent',
     claimSlotCount: '1',
     freeEditSlots: 0,
     gateMessage: '',
@@ -136,13 +142,21 @@ Page({
       recruitTarget,
     })
     const member = memberStore.readMember()
-    const canSyncMember = memberSyncAvailable(member, platform)
-    const memberFields = canSyncMember ? applyFieldsFromMember(member, platform, DOUYIN_LEVELS) : null
     const isEditIce = loadedMp ? iceOrderDetect.isEditTeamIceMpOrder(loadedMp) : false
+    const isSupplierApply = recruitTarget === 'shoot' || recruitTarget === 'edit'
+    const supplierWorkId = recruitTarget === 'edit' ? 'edit' : recruitTarget === 'shoot' ? 'shoot' : 'talent'
     const freeEditSlots = loadedMp ? editIceSlots.countFreeEditPackSlots(loadedMp) : 0
     const gate = loadedMp
       ? recruitApplyGate.validateRecruitmentClaim(loadedMp, userProfile.readIdentity())
       : { ok: true }
+    const canSyncMember = isSupplierApply
+      ? supplierMemberSyncAvailable(member, supplierWorkId)
+      : memberSyncAvailable(member, platform)
+    const memberFields = canSyncMember
+      ? isSupplierApply
+        ? applyFieldsFromSupplierMember(member, supplierWorkId)
+        : applyFieldsFromMember(member, platform, DOUYIN_LEVELS)
+      : null
     const patch = {
       mpOrderId,
       merchantOrderNo,
@@ -156,11 +170,16 @@ Page({
       memberTypeLabel: member ? memberStore.memberTypeLabel(member) : '',
       isIceMode,
       isEditIce,
+      recruitTarget,
+      isSupplierApply,
+      supplierWorkId,
       freeEditSlots,
       gateMessage: gate.ok ? '' : gate.message,
       customFields: {},
-      ...(memberFields || emptyApplyFields(DOUYIN_LEVELS)),
-      likesCollects: memberFields && memberFields.likesCollects != null ? String(memberFields.likesCollects) : '',
+      ...(memberFields ||
+        (isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields(DOUYIN_LEVELS))),
+      likesCollects:
+        memberFields && memberFields.likesCollects != null ? String(memberFields.likesCollects) : '',
     }
     if (!patch.provinces?.length) {
       Object.assign(patch, setupRegionState('', ''))
@@ -207,9 +226,14 @@ Page({
     const sync = !!e.detail.value
     if (sync) {
       const member = memberStore.readMember()
-      const fields = applyFieldsFromMember(member, this.data.platform, DOUYIN_LEVELS)
+      const fields = this.data.isSupplierApply
+        ? applyFieldsFromSupplierMember(member, this.data.supplierWorkId)
+        : applyFieldsFromMember(member, this.data.platform, DOUYIN_LEVELS)
       if (!fields) {
-        wx.showToast({ title: '暂无可用会员资料', icon: 'none' })
+        wx.showToast({
+          title: this.data.isSupplierApply ? '暂无团队资料' : '暂无可用会员资料',
+          icon: 'none',
+        })
         this.setData({ syncMemberProfile: false })
         return
       }
@@ -220,7 +244,9 @@ Page({
       {
         syncMemberProfile: false,
         customFields: {},
-        ...emptyApplyFields(DOUYIN_LEVELS),
+        ...(this.data.isSupplierApply
+          ? emptySupplierApplyFields()
+          : emptyApplyFields(DOUYIN_LEVELS)),
         likesCollects: '',
       },
       () => syncApplyRows(this),
@@ -272,6 +298,7 @@ Page({
   validateForm() {
     return applyRuntime.validateApplyRows(this.data.applyRowsRaw, this.data, this.data.platform, {
       isIceMode: this.data.isIceMode,
+      isSupplierApply: this.data.isSupplierApply,
     })
   },
   async onSubmit() {
@@ -315,19 +342,32 @@ Page({
       let applicant = applyRuntime.buildApplicantFromRows(this.data.applyRowsRaw, this.data, {
         platform: this.data.platform,
         isIceMode: this.data.isIceMode,
+        isSupplierApply: this.data.isSupplierApply,
+        supplierWorkId: this.data.supplierWorkId,
         mpOrderId: this.data.mpOrderId,
         merchantOrderNo: this.data.merchantOrderNo,
         applicantId,
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
       const memberForApply = memberStore.readMember()
-      applicant = enrichApplicantFromMember(applicant, memberForApply, this.data.platform)
+      applicant = enrichApplicantFromMember(applicant, memberForApply, this.data.platform, {
+        isSupplierApply: this.data.isSupplierApply,
+        workId: this.data.supplierWorkId,
+      })
       const acct = auth.readAccount()
       if (acct && acct.openid) {
         applicant.wxOpenId = String(acct.openid).trim()
       }
-      if (!String(applicant.platformNickname || applicant.name || '').trim()) {
-        wx.showToast({ title: '请填写抖音昵称或完善我的信息', icon: 'none' })
+      const displayName = this.data.isSupplierApply
+        ? String(applicant.teamName || applicant.name || applicant.contact || '').trim()
+        : String(applicant.platformNickname || applicant.name || '').trim()
+      if (!displayName) {
+        wx.showToast({
+          title: this.data.isSupplierApply
+            ? '请填写团队名称或联系电话'
+            : '请填写抖音昵称或完善我的信息',
+          icon: 'none',
+        })
         return
       }
       const workIdentity = userProfile.readIdentity()

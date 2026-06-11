@@ -52,7 +52,13 @@ function validateApplyRows(rows, data, platform, options) {
 function buildApplicantFromRows(rows, data, meta) {
   const platform = meta.platform
   const lb = labels(platform)
+  const isSupplier = !!meta.isSupplierApply
+  const teamName = String(data.teamName || '').trim()
   const platformNickname = String(data.platformNickname || '').trim()
+  const displayName = isSupplier
+    ? teamName || String(data.contact || '').trim() || platformNickname
+    : platformNickname
+  const portfolioLink = String(data.portfolioLink || data.profileLink || '').trim()
   const followers = Number.parseInt(String(data.followers || '').replace(/,/g, ''), 10)
   const visitTimeSlot = meta.isIceMode
     ? '云剪任务·无需探店'
@@ -66,11 +72,15 @@ function buildApplicantFromRows(rows, data, meta) {
   }
   const applicant = {
     id: meta.applicantId,
-    name: platformNickname,
-    platform,
+    name: displayName,
+    platform: isSupplier
+      ? meta.supplierWorkId === 'shoot'
+        ? '拍摄团队'
+        : '剪辑团队'
+      : platform,
     platformAccount: String(data.platformAccount || '').trim(),
-    platformNickname,
-    profileLink: String(data.profileLink || '').trim(),
+    platformNickname: isSupplier ? displayName : platformNickname,
+    profileLink: portfolioLink,
     followers: Number.isFinite(followers) ? Math.max(0, followers) : 0,
     contact: String(data.contact || '').trim(),
     wechatId: String(data.wechatId || '').trim(),
@@ -79,6 +89,26 @@ function buildApplicantFromRows(rows, data, meta) {
     province: String(data.province || '').trim(),
     city: String(data.city || '').trim(),
     appliedAt: meta.appliedAt,
+  }
+  if (teamName) applicant.teamName = teamName
+  if (portfolioLink) applicant.portfolioLink = portfolioLink
+  if (data.editStyles != null && String(data.editStyles).trim()) {
+    applicant.editStyles = String(data.editStyles).trim()
+  }
+  if (data.software != null && String(data.software).trim()) {
+    applicant.software = String(data.software).trim()
+  }
+  if (data.deliveryEta != null && String(data.deliveryEta).trim()) {
+    applicant.deliveryEta = String(data.deliveryEta).trim()
+  }
+  if (data.shootTypes != null && String(data.shootTypes).trim()) {
+    applicant.shootTypes = String(data.shootTypes).trim()
+  }
+  if (data.equipment != null && String(data.equipment).trim()) {
+    applicant.equipment = String(data.equipment).trim()
+  }
+  if (data.shootDate != null && String(data.shootDate).trim()) {
+    applicant.shootDate = String(data.shootDate).trim()
   }
   if (data.likesCollects != null && String(data.likesCollects).trim()) {
     applicant.likesCollects = Number.parseInt(String(data.likesCollects).replace(/,/g, ''), 10) || 0
@@ -106,16 +136,18 @@ function buildApplicantFromRows(rows, data, meta) {
       applicant.avatar = String(member.wxAvatarUrl).trim()
       applicant.wxAvatarUrl = applicant.avatar
     }
-    const pid = talentPlatforms.platformIdFromName(platform)
-    const prof = member.platformProfiles && member.platformProfiles[pid]
-    if (prof) {
-      const tags = Array.isArray(prof.accountTags) ? prof.accountTags : []
-      if (tags.length) applicant.accountTags = [...tags]
-      if (!applicant.douyinSalesLevel && lb.showSalesLevel && prof.douyinSalesLevel) {
-        applicant.douyinSalesLevel = String(prof.douyinSalesLevel).trim()
-      }
-      if (!applicant.talentGrade && lb.showTalentGrade && prof.talentGrade) {
-        applicant.talentGrade = String(prof.talentGrade).trim()
+    if (!isSupplier) {
+      const pid = talentPlatforms.platformIdFromName(platform)
+      const prof = member.platformProfiles && member.platformProfiles[pid]
+      if (prof) {
+        const tags = Array.isArray(prof.accountTags) ? prof.accountTags : []
+        if (tags.length) applicant.accountTags = [...tags]
+        if (!applicant.douyinSalesLevel && lb.showSalesLevel && prof.douyinSalesLevel) {
+          applicant.douyinSalesLevel = String(prof.douyinSalesLevel).trim()
+        }
+        if (!applicant.talentGrade && lb.showTalentGrade && prof.talentGrade) {
+          applicant.talentGrade = String(prof.talentGrade).trim()
+        }
       }
     }
   }
