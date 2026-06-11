@@ -176,7 +176,7 @@ function resolveOrderCoverUrl(order) {
   return resolveDefaultCover(platform, tags).url
 }
 
-/** 微信分享 imageUrl：https OSS / 包内路径 / data URL */
+/** 微信分享 imageUrl 原图地址（5:4 裁剪见 recruitShareCover.js） */
 function resolveShareImageUrl(coverUrl) {
   const img = String(coverUrl || '').trim()
   if (!img) return ''

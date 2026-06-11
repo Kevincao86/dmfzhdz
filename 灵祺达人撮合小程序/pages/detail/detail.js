@@ -94,6 +94,7 @@ Page({
   onShareAppMessage() {
     const mpShare = require('../../utils/mpShare.js')
     const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../utils/recruitShareCover.js')
     mpShare.enableShareMenu()
     const v = this.data.view
     const mp = this.data.mpOrder
@@ -103,10 +104,25 @@ Page({
     }
     if (mp) {
       const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-      const imageUrl = recruitCoverLib.resolveShareImageUrl(coverUrl)
-      if (imageUrl) share.imageUrl = imageUrl
+      return recruitShareCover.attachShareCoverPromise(share, coverUrl)
     }
     return share
+  },
+  onShareTimeline() {
+    const mpShare = require('../../utils/mpShare.js')
+    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../utils/recruitShareCover.js')
+    const v = this.data.view
+    const mp = this.data.mpOrder
+    const id = this.data.id
+    if (!id) return mpShare.defaultTimelineShare()
+    const base = {
+      title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
+      query: `id=${encodeURIComponent(id)}`,
+    }
+    if (!mp) return base
+    const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+    return recruitShareCover.attachShareCoverPromise(base, coverUrl)
   },
   async loadOrder(id) {
     if (!api.hasApi()) {
@@ -305,6 +321,13 @@ Page({
         applyGateHint,
         iceSlotsFull,
       })
+      try {
+        const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+        const recruitShareCover = require('../../utils/recruitShareCover.js')
+        recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(mp))
+      } catch (_) {
+        /* ignore preload */
+      }
     } catch (e) {
       const msg = String(e.message || e)
       let hint = msg

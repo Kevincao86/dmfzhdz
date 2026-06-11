@@ -12,6 +12,7 @@ const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const mpOrderRestore = require('../../utils/mpOrderPublishRestore.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+const recruitShareCover = require('../../utils/recruitShareCover.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -1593,9 +1594,7 @@ Page({
       title: this.data.shareTitle || order.title,
       path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
     }
-    const imageUrl = recruitCoverLib.resolveShareImageUrl(coverUrl)
-    if (imageUrl) share.imageUrl = imageUrl
-    return share
+    return recruitShareCover.attachShareCoverPromise(share, coverUrl)
   },
   onCopyGroupShare() {
     const order = this.data.createdOrder
