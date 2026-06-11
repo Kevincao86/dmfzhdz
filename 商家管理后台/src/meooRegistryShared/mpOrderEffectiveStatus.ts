@@ -34,20 +34,19 @@ export function resolveMpOrderDeadlineMs(mp: RegistryMpRecruitmentOrder): number
 export function resolveEffectiveMpOrderStatus(
   mp: RegistryMpRecruitmentOrder,
   nowMs = Date.now(),
-): RegistryMpRecruitmentOrder['status'] {
+): RegistryMpRecruitmentOrder['status'] | 'expired' {
   let raw = String(mp.status || 'open').trim() || 'open'
   if (raw === 'pending_settlement') return 'done'
   if (raw === 'closed' || raw === 'done' || raw === 'deleted') return raw as RegistryMpRecruitmentOrder['status']
   const deadlineMs = resolveMpOrderDeadlineMs(mp)
-  /** 收集中：PR 反选/满员阶段，不因报名截止自动变已完成（避免大厅「失踪」） */
-  if (deadlineMs > 0 && nowMs >= deadlineMs && raw !== 'collecting') return 'done'
+  if (deadlineMs > 0 && nowMs >= deadlineMs && (raw === 'open' || raw === 'collecting')) return 'expired'
   return raw as RegistryMpRecruitmentOrder['status']
 }
 
-/** 招募大厅仍展示：招募中/收集中/已停止（closed = 运营台「已关闭」） */
+/** 招募大厅仍展示：招募中/收集中/已停止/已截止（closed = 运营台「已关闭」） */
 export function isMpOrderHallVisible(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
   const s = resolveEffectiveMpOrderStatus(mp, nowMs)
-  return s === 'open' || s === 'collecting' || s === 'closed'
+  return s === 'open' || s === 'collecting' || s === 'closed' || s === 'expired'
 }
 
 export function isMpOrderHallRecruiting(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {

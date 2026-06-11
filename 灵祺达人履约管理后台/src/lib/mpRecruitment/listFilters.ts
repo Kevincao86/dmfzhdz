@@ -6,7 +6,10 @@ import {
   resolveEffectiveMpStatus,
   statusLabel,
 } from './mpOrderStatus'
-import { buildSignupProgressLabel } from './iceOrderStats'
+import {
+  displayStatusLabel,
+  resolveDisplayStatus,
+} from '../mpSync/mpOrderIceStatus'
 
 export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
@@ -351,7 +354,7 @@ export function enrichMpOrderListItem(
 
   const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
   const deadlineMs = resolveDeadlineMsFromMp(mp, summary)
-  const status = resolveEffectiveMpStatus(mp?.status, deadlineMs)
+  const status = resolveDisplayStatus(mp, 'pr', deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
   const applicantCount = Array.isArray(mp?.applicants) ? mp.applicants.length : 0
   const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
@@ -361,7 +364,7 @@ export function enrichMpOrderListItem(
     ...localItem,
     title: localItem.title || String(mp?.title || mp?.customerName || localItem.mpOrderId),
     status,
-    statusLabel: statusLabel(status),
+    statusLabel: displayStatusLabel(status, mp, 'pr'),
     recruiting,
     canToggleRecruit: status !== 'done',
     toggleActionLabel: recruiting ? '停止' : '开始',

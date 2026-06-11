@@ -89,8 +89,8 @@ function shouldIncludeMpOrderInHallPool(mp) {
   const summary = String(mp.merchantRequirements || '').trim()
   const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
   const status = mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs)
-  /** 与 ECS mpRecruitmentOrdersForTalentHall 一致（含 closed/已停止，由状态筛选项过滤） */
-  return status === 'open' || status === 'collecting' || status === 'closed'
+  /** 与 ECS mpRecruitmentOrdersForTalentHall 一致（含 closed/已停止、expired/已截止） */
+  return status === 'open' || status === 'collecting' || status === 'closed' || status === 'expired'
 }
 
 function loadOpenOrderRows(reg) {

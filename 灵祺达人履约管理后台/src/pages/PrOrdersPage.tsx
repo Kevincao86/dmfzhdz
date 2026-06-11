@@ -44,6 +44,7 @@ const PR_ORDER_STATUS_FILTERS = [
   { value: '全部', label: '全部状态' },
   { value: '招募中', label: '招募中' },
   { value: '收集中', label: '收集中' },
+  { value: '已截止', label: '已截止' },
   { value: '已停止', label: '已停止' },
   { value: '已完成', label: '已完成' },
   { value: '已删除', label: '已删除' },

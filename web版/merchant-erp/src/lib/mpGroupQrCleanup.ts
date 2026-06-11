@@ -41,24 +41,24 @@ export function isGroupQrExpired(mp: RegistryMpRecruitmentOrder, nowMs = Date.no
   return nowMs > deadlineMs + GROUP_QR_RETENTION_MS
 }
 
-/** 与小程序 mpOrderStatus.resolveEffectiveMpStatus 一致 */
+/** 与小程序 mpOrderStatus.resolveEffectiveMpStatus 一致（含报名截止 → expired/已截止） */
 export function resolveEffectiveMpOrderStatus(
   mp: RegistryMpRecruitmentOrder,
   nowMs = Date.now(),
-): RegistryMpRecruitmentOrder['status'] {
+): RegistryMpRecruitmentOrder['status'] | 'expired' {
   let raw = String(mp.status || 'open').trim() || 'open'
   if (raw === 'pending_settlement') return 'done'
   if (raw === 'closed' || raw === 'done' || raw === 'deleted') return raw as RegistryMpRecruitmentOrder['status']
   const deadlineMs = resolveMpOrderDeadlineMs(mp)
-  if (deadlineMs > 0 && nowMs >= deadlineMs && raw !== 'collecting') return 'done'
+  if (deadlineMs > 0 && nowMs >= deadlineMs && (raw === 'open' || raw === 'collecting')) return 'expired'
   return raw as RegistryMpRecruitmentOrder['status']
 }
 
-/** 招募大厅应对达人/PR 可见（含截止判断；不含已完成/已删除） */
+/** 招募大厅应对达人/PR 可见（含已截止；不含已完成/已删除） */
 export function isMpOrderHallVisible(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
   const s = resolveEffectiveMpOrderStatus(mp, nowMs)
   /** closed = 星选「已停止」/ 运营台「已关闭」，仍应在招募大厅展示 */
-  return s === 'open' || s === 'collecting' || s === 'closed'
+  return s === 'open' || s === 'collecting' || s === 'closed' || s === 'expired'
 }
 
 /** 仍在开放报名阶段（不含 PR 手动停止的 closed） */

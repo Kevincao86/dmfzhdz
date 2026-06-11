@@ -140,7 +140,7 @@ export function sanitizeMpRecruitmentOrderForTalentHall(o: RegistryMpRecruitment
   }
 }
 
-/** 达人招募小程序大厅可读：招募中/收集中/已停止（closed，含截止判断） */
+/** 达人招募小程序大厅可读：招募中/收集中/已停止/已截止（closed，含截止判断） */
 export function mpRecruitmentOrdersForTalentHall(file: RegistryFile, nowMs = Date.now()) {
   return (file.mpRecruitmentOrders ?? [])
     .filter((o) => o && isMpOrderHallVisible(o, nowMs))
