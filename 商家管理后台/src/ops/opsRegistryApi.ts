@@ -411,7 +411,47 @@ export async function fetchRegistry(): Promise<RegistryFile> {
       lastErr = e instanceof Error ? e : new Error(String(e))
     }
   }
+  const hall = await fetchRegistryHallFallback()
+  if (hall) return hall
   throw lastErr ?? new Error('fetch_registry_failed')
+}
+
+/** sync-registry 500 时从大厅接口拉取达人/PR/团队库切片（只读回退） */
+async function fetchRegistryHallFallback(): Promise<RegistryFile | null> {
+  try {
+    const res = await fetchOpsErpApi('/api/meoo-ops-mp-hall-registry?includeRecommendPool=true', { method: 'GET' })
+    const text = await res.text()
+    if (!res.ok) return null
+    const hall = JSON.parse(text) as Record<string, unknown>
+    if (!hall || hall.ok === false) return null
+    const members = Array.isArray(hall.mpTalentMembers) ? hall.mpTalentMembers : []
+    const talentLib = Array.isArray(hall.talentLibraryEntries) ? hall.talentLibraryEntries : []
+    if (!members.length && !talentLib.length) return null
+    return {
+      tenants: [],
+      recruitmentOrders: [],
+      mpRecruitmentOrders: Array.isArray(hall.mpRecruitmentOrders) ? hall.mpRecruitmentOrders : [],
+      mpTalentMembers: members,
+      mpPrUsers: Array.isArray(hall.mpPrUsers) ? hall.mpPrUsers : [],
+      talentLibraryEntries: talentLib,
+      shootTeamLibraryEntries: Array.isArray(hall.shootTeamLibraryEntries) ? hall.shootTeamLibraryEntries : [],
+      editTeamLibraryEntries: Array.isArray(hall.editTeamLibraryEntries) ? hall.editTeamLibraryEntries : [],
+      vendorKeys: {},
+      aiModels: {
+        textModel: 'auto',
+        imageModel: 'auto',
+        updatedAt: new Date(0).toISOString(),
+        lastWriter: 'erp',
+        controlledByOps: false,
+      },
+      aiVendorCatalog: [],
+      vendorKeysUpdatedAt: new Date(0).toISOString(),
+      vendorKeysWriter: 'erp',
+      videoAi: {},
+    } as RegistryFile
+  } catch {
+    return null
+  }
 }
 
 export type ManualTenantPayload = {

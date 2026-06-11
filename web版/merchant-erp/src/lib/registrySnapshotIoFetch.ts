@@ -130,8 +130,13 @@ export async function loadRegistrySnapshotForGet(io: RegistrySnapshotIo): Promis
   if (qr.purgedOrderIds.length > 0 || qr.purgedInboxCount > 0) needSave = true
   const expired = syncExpiredMpOrdersInSnapshot(data)
   if (expired.syncedIds.length > 0) needSave = true
-  const pendingExpired = syncExpiredIcePendingConfirmInSnapshot(data)
-  if (pendingExpired.syncedOrderIds.length > 0) needSave = true
+  try {
+    const pendingExpired = syncExpiredIcePendingConfirmInSnapshot(data)
+    if (pendingExpired.syncedOrderIds.length > 0) needSave = true
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('[loadRegistrySnapshotForGet] ice pending confirm sync failed:', msg.slice(0, 500))
+  }
   if (needSave) {
     try {
       await io.save(data)

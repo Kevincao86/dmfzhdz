@@ -68,7 +68,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    let data = await loadRegistrySnapshotForGet(io)
+    let data
+    try {
+      data = await loadRegistrySnapshotForGet(io)
+    } catch (loadErr) {
+      const hint = loadErr instanceof Error ? loadErr.message : String(loadErr)
+      console.error('[meoo-ops-sync-registry] loadRegistrySnapshotForGet failed, fallback io.load:', hint.slice(0, 400))
+      data = await io.load()
+    }
 
     const auth = await requireMerchantRegistryAuth(req)
     if (auth.ok) {
