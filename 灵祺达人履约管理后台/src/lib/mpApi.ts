@@ -387,16 +387,10 @@ async function postMpWithFallback(paths: string[], body: Record<string, unknown>
   throw new Error(lastErr)
 }
 
-export async function applyToMpOrder(
-  mpOrderId: string,
-  applicant: Record<string, unknown>,
-  workIdentity?: string,
-) {
-  const body: Record<string, unknown> = { mpOrderId, applicant }
-  if (workIdentity) body.workIdentity = workIdentity
+export async function applyToMpOrder(mpOrderId: string, applicant: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-recruitment-orders-apply', '/api/ops-sync/mp-recruitment-orders/apply'],
-    body,
+    { mpOrderId, applicant },
   )
 }
 

@@ -11,12 +11,4 @@ function isIceMpOrder(mp) {
   return false
 }
 
-function isEditTeamIceMp(mp) {
-  if (!isIceMpOrder(mp)) return false
-  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
-  const target = String(meta.recruitTarget || mp.recruitTarget || '').trim()
-  const mode = String(meta.recruitMode || '').trim()
-  return target === 'edit' || mode === 'edit_ice'
-}
-
-module.exports = { isIceMpOrder, isEditTeamIceMp }
+module.exports = { isIceMpOrder }

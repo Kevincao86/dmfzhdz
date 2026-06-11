@@ -168,17 +168,15 @@ async function fetchRegistry(opts) {
   return task
 }
 
-async function applyToMpOrder(mpOrderId, applicant, workIdentity) {
+async function applyToMpOrder(mpOrderId, applicant) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-orders-apply',
     '/api/ops-sync/mp-recruitment-orders/apply',
   ]
-  const body = { mpOrderId, applicant }
-  if (workIdentity) body.workIdentity = workIdentity
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, body)
+      return await api.post(path, { mpOrderId, applicant })
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)

@@ -11,8 +11,6 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
-const iceGroupQr = require('../../utils/iceGroupQr.js')
-const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 
 Page({
   data: {
@@ -47,11 +45,6 @@ Page({
     contactPrPending: false,
     readOnlyEnded: false,
     mpOrder: null,
-    claimGroupQr: '',
-    claimGroupQrHint: '',
-    isEditTeamIce: false,
-    canClaim: false,
-    claimBlockHint: '',
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -214,17 +207,6 @@ Page({
         : null
       const hasApplied = this.data.applied || iceApplied || gate.hasApplication
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
-      const isEditTeamIce = isIce && iceGroupQr.isEditTeamIceMp(mp)
-      const identity = userProfile.readIdentity()
-      const canClaim = recruitApplyGate.canClaimRecruitment(mp, identity)
-      const claimBlockHint = recruitApplyGate.claimBlockHint(mp, identity)
-      let claimGroupQr = ''
-      if (hasApplied && isIce && !iceRejected) {
-        claimGroupQr = iceGroupQr.resolveClaimGroupQr(mp, reg, id, identity)
-      }
-      const claimGroupQrHint = isEditTeamIce
-        ? '认领成功，请尽快扫码进入剪辑师群沟通交付'
-        : '认领成功，请尽快扫码进入达人群沟通发布与结算'
       this.setData({
         view,
         loading: false,
@@ -251,11 +233,6 @@ Page({
         iceStep3Hint,
         applied: hasApplied,
         readOnlyEnded: isEnded && canViewEnded,
-        claimGroupQr,
-        claimGroupQrHint,
-        isEditTeamIce,
-        canClaim,
-        claimBlockHint,
       })
     } catch (e) {
       const msg = String(e.message || e)
@@ -426,11 +403,8 @@ Page({
     }
   },
   goApply() {
-    if (!this.data.canClaim) {
-      wx.showToast({
-        title: (this.data.claimBlockHint || '当前身份不可报名').slice(0, 28),
-        icon: 'none',
-      })
+    if (this.data.isPr) {
+      wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
       return
     }
     const v = this.data.view
