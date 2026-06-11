@@ -1,0 +1,60 @@
+---
+description: ECS 固定部署命令 + 禁止擅自动库（动库须用户确认 10 次）
+alwaysApply: true
+---
+
+# ECS 运维：固定命令 & 数据库门禁
+
+## 固定命令（Agent 默认唯一推荐/执行）
+
+**轻量 139.196.42.5（admin）— 只拉代码 + 重启 auth-api，不写数据库：**
+
+```bash
+cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-deploy-auth-api.sh
+```
+
+等价脚本（本机远程 SSH 时）：
+
+```bash
+bash scripts/ecs-deploy-light-safe.sh
+```
+
+**只读验收（HTTP，不写库）：**
+
+```bash
+curl -sS "http://139.196.42.5/erp-api/meoo-erp-api-health"
+curl -sS "http://139.196.42.5/erp-api/meoo-ops-mp-hall-registry?includeRecommendPool=true" | head -c 400
+```
+
+Agent 遇到部署、API 502、运营台读不到注册表、达人库显示 0 等，**优先且默认只给/只跑上述固定部署命令 + 只读 curl**；不得顺带执行任何写库脚本或 recover API。
+
+---
+
+## 一律视为「动数据库」（默认禁止）
+
+- 对 Postgres / PostgREST 的 **写**：INSERT、UPDATE、PATCH、DELETE、TRUNCATE、DROP、迁移、还原备份
+- 写 `ops_registry_snapshot.registry`（含 `io.save`、`persistRegistry`、`registrySnapshotIo.save`）
+- 大厅/读路径 **persist** 注册表（历史事故：部分切片覆盖全库）
+- `POST /api/meoo-ops-registry-recover-libraries`
+- `POST /api/meoo-ops-supplier-team-library-sync`（会 save 注册表）
+- `bash scripts/ecs-repair-registry-talent-libraries.sh`
+- `bash scripts/ecs-hotfix-sync-registry-read.sh`（内含 repair，等同动库）
+- `bash scripts/ecs-fix-ops-registry-rls.sh` 等会 PATCH registry 的脚本
+- 任何「恢复/重建/扫描会员池/覆盖注册表」类操作
+
+**允许（只读）：** `GET` sync-registry / hall-registry、诊断脚本仅计数、`ecs-diagnose-ops-registry.sh`、代码修复后 **仅** `ecs-deploy-light-safe.sh`。
+
+---
+
+## 动库须用户确认 10 次
+
+若用户明确要求动库，或 Agent 判断只有动库能解，Agent **不得**自行执行，须：
+
+1. **先说明**将执行的具体命令/SQL/API 与风险（覆盖、不可回滚等）
+2. **连续发出 10 条独立提示**，第 k 条末尾必须为：  
+   `【动库确认 k/10】请回复：确认动库 k`
+3. 用户须 **逐条** 回复 `确认动库 1` … `确认动库 10`（共 10 次，缺一不可）
+4. **未凑齐 10 次** → 禁止动库；仅部署 + 只读诊断
+5. 凑齐后仍 **禁止** force push、DROP、无备份的 pg_restore
+
+Agent 不得在一条消息里合并 10 次确认；不得替用户假设同意。
