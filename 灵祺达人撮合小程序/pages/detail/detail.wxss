@@ -137,12 +137,22 @@
   top: 0;
   bottom: 0;
   z-index: 10000;
+}
+
+.detail-share-sheet-mask-bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   background: rgba(53, 50, 74, 0.32);
-  display: flex;
-  align-items: flex-end;
 }
 
 .detail-share-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
   background: #fff;

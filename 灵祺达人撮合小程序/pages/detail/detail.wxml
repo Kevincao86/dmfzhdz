@@ -273,15 +273,16 @@
   </view>
 </view>
 
-<view class="detail-share-sheet-mask" wx:if="{{showShareSheet}}" bindtap="onCloseShareSheet">
-  <view class="detail-share-sheet" catchtap="noopShareSheetTap">
+<view class="detail-share-sheet-mask" wx:if="{{showShareSheet}}">
+  <view class="detail-share-sheet-mask-bg" bindtap="onCloseShareSheet"></view>
+  <view class="detail-share-sheet">
     <view class="detail-share-sheet-head">
       <text class="detail-share-sheet-title">分享招募</text>
       <text class="detail-share-sheet-close" bindtap="onCloseShareSheet">×</text>
     </view>
     <text wx:if="{{shareTitle}}" class="detail-share-sheet-sub">{{shareTitle}}</text>
-    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share">分享小程序</button>
-    <view class="detail-share-sheet-item" bindtap="onShareTimelineTap">分享朋友圈</view>
+    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share" bindtap="onShareSheetActionTap">分享小程序</button>
+    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="shareTimeline" bindtap="onShareSheetActionTap">分享朋友圈</button>
     <view class="detail-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
   </view>
 </view>
