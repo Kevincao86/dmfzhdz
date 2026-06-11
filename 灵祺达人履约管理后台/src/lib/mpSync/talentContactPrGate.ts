@@ -1,8 +1,9 @@
-import { readApplications } from './applicationsStore'
+import { readApplications, removeApplication } from './applicationsStore'
 import { selectedIdsFromMp } from './mpApplicantSelection'
 import { readMember } from './talentMember'
 import { platformIdFromName } from './talentPlatformProfiles'
 import { getAccount } from '../mpSession'
+import { isIceMpOrder } from './iceOrderDetect'
 
 const ICE_APPLICANT_PREFIX = 'meoo_ice_applicant_v1_'
 
@@ -51,6 +52,30 @@ export function findMyApplicant(mp: Record<string, unknown> | null, mpOrderId: s
   )
   if (active) return active
   return applicants.find((a) => applicantMatchesCurrentTalent(a)) || null
+}
+
+export function canReclaimIceOrder(mp: Record<string, unknown> | null, mpOrderId: string): boolean {
+  if (!mp || !isIceMpOrder(mp)) return false
+  const gate = evaluateContactPrGate(mp, mpOrderId)
+  if (gate.reason === 'rejected') return true
+  const app = findMyApplicant(mp, mpOrderId)
+  if (app?.taskStatus === 'rejected') return true
+  const localId = localApplicantIdForOrder(mpOrderId)
+  if (!localId) return false
+  const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
+  const byId = applicants.find((a) => a && String(a.id) === localId)
+  return !!(byId && byId.taskStatus === 'rejected')
+}
+
+export function clearLocalIceApplyState(mpOrderId: string) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  removeApplication(id)
+  try {
+    localStorage.removeItem(`meoo_ice_applicant_v1_${id}`)
+  } catch {
+    /* ignore */
+  }
 }
 
 export type ContactPrGate = {

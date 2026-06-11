@@ -89,6 +89,7 @@ Page({
     claimSlotCount: '1',
     freeEditSlots: 0,
     gateMessage: '',
+    canReclaim: false,
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
@@ -180,6 +181,7 @@ Page({
       supplierWorkId,
       freeEditSlots,
       gateMessage: gate.ok ? '' : gate.message,
+      canReclaim,
       customFields: {},
       ...(memberFields ||
         (isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields(DOUYIN_LEVELS))),
@@ -194,20 +196,19 @@ Page({
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
       return
     }
-    if (applicationsStore.hasAppliedToOrder(mpOrderId)) {
-      const gateEarly = loadedMp ? talentContactPrGate.evaluate(loadedMp, mpOrderId) : null
-      if (!gateEarly || gateEarly.reason !== 'rejected') {
-        wx.showToast({ title: '您已报名该招募', icon: 'none' })
-        setTimeout(() => {
-          wx.redirectTo({
-            url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
-          })
-        }, 800)
-        return
-      }
-      applicationsStore.removeApplication(mpOrderId)
+    const canReclaim = loadedMp ? talentContactPrGate.canReclaimIceOrder(loadedMp, mpOrderId) : false
+    if (canReclaim) {
+      talentContactPrGate.clearLocalIceApplyState(mpOrderId)
+    } else if (applicationsStore.hasAppliedToOrder(mpOrderId)) {
+      wx.showToast({ title: '您已报名该招募', icon: 'none' })
+      setTimeout(() => {
+        wx.redirectTo({
+          url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
+        })
+      }, 800)
+      return
     }
-    if (loadedMp && talentContactPrGate.evaluate(loadedMp, mpOrderId).hasApplication) {
+    if (loadedMp && talentContactPrGate.evaluate(loadedMp, mpOrderId).hasApplication && !canReclaim) {
       wx.showToast({ title: '您已报名该招募', icon: 'none' })
       setTimeout(() => {
         wx.redirectTo({
@@ -339,7 +340,19 @@ Page({
         return
       }
     }
-    if (applicationsStore.hasAppliedToOrder(this.data.mpOrderId)) {
+    let canReclaim = this.data.canReclaim
+    if (this.data.mpOrderId && api.hasApi()) {
+      try {
+        const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
+        const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === this.data.mpOrderId)
+        if (mp) canReclaim = talentContactPrGate.canReclaimIceOrder(mp, this.data.mpOrderId)
+      } catch {
+        /* ignore */
+      }
+    }
+    if (canReclaim) {
+      talentContactPrGate.clearLocalIceApplyState(this.data.mpOrderId)
+    } else if (applicationsStore.hasAppliedToOrder(this.data.mpOrderId)) {
       wx.showToast({ title: '您已报名该招募', icon: 'none' })
       return
     }
