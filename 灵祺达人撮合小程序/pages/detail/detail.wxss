@@ -25,7 +25,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 56rpx;
+  align-self: flex-end;
 }
 
 .detail-hero-qr-img {
