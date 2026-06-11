@@ -20,9 +20,9 @@ function matchHallStatusFilter(label, filterLabel) {
   return label === filterLabel
 }
 
-/** Tab 角标与列表展示使用同一套状态规则 */
-function matchHallTabCountStatusFilter(label, filterLabel) {
-  return matchHallStatusFilter(label, filterLabel)
+/** Tab 角标：统计分类内全部状态，不受状态筛选项影响 */
+function matchHallTabCountStatusFilter(_label, _filterLabel) {
+  return true
 }
 
 function resolveEffectiveMpStatus(rawStatus, deadlineMs, nowMs) {

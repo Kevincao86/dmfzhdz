@@ -137,22 +137,22 @@ Page({
       return true
     })
     rows = listFilters.sortHallRecruitmentRows(rows, this.data.sortBy)
-    const countFiltered = (list) =>
+    const countForTab = (list) =>
       (list || []).filter((r) => {
         if (!showDemoOrders() && r && r.isMock) return false
         if (!listKeywordSearch.matchListKeyword(r, kw)) return false
         if (!hallFilters.matchPlatform(r.platform, pf)) return false
         if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
         if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
-        if (!listFilters.matchHallStatus(r, statusF)) return false
+        if (!listFilters.matchHallTabCountStatus(r, statusF)) return false
         return true
       }).length
     const tabCounts = {
-      normal: countFiltered(this.data.normalRows),
-      urgent: countFiltered(this.data.urgentRows),
-      shoot: countFiltered(this.data.shootRows),
-      edit: countFiltered(this.data.editRows),
-      ice: countFiltered(this.data.iceRows),
+      normal: countForTab(this.data.normalRows),
+      urgent: countForTab(this.data.urgentRows),
+      shoot: countForTab(this.data.shootRows),
+      edit: countForTab(this.data.editRows),
+      ice: countForTab(this.data.iceRows),
     }
     const baseRows = rows.map((r) => ({
       ...r,
