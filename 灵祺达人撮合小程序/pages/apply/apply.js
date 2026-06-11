@@ -449,10 +449,12 @@ Page({
         }
       }
       const detailUrl = `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`
-      if (this.data.isIceMode && this.data.isEditIce) {
+      const confirmHint =
+        '剪辑认领成功，请在30分钟内去「我的报名」确认订单，超时将自动放弃并释放条数。'
+      if (this.data.isIceMode) {
         wx.showModal({
           title: '认领成功',
-          content: '请到「我的报名」中确认接收订单',
+          content: confirmHint,
           showCancel: false,
           confirmText: '知道了',
           success: () => wx.redirectTo({ url: detailUrl }),

@@ -5,6 +5,7 @@
 import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 import { purgeExpiredGroupQrsInSnapshot, syncExpiredMpOrdersInSnapshot } from './mpGroupQrCleanup.js'
+import { syncExpiredIcePendingConfirmInSnapshot } from './mpRecruitmentIceCore.js'
 import type { RegistryFile } from './opsRegistryTypes.js'
 
 const SNAPSHOT_FETCH_TIMEOUT_MS = 22_000
@@ -112,6 +113,8 @@ export async function loadRegistrySnapshotForGet(io: RegistrySnapshotIo): Promis
   if (qr.purgedOrderIds.length > 0 || qr.purgedInboxCount > 0) needSave = true
   const expired = syncExpiredMpOrdersInSnapshot(data)
   if (expired.syncedIds.length > 0) needSave = true
+  const pendingExpired = syncExpiredIcePendingConfirmInSnapshot(data)
+  if (pendingExpired.syncedOrderIds.length > 0) needSave = true
   if (needSave) {
     try {
       await io.save(data)

@@ -221,6 +221,8 @@ export type RegistryMpRecruitmentApplicant = {
   aiVerifyNote?: string
   completedAt?: string
   taskStatus?: MpApplicantTaskStatus
+  /** 拒绝/超时释放原因 */
+  rejectReason?: string
   /** PR 已确认选择该报名 */
   prSelected?: boolean
   /** 商家 ERP 反选 */

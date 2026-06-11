@@ -210,6 +210,66 @@ function isIceRecruitFull(mp: RegistryMpRecruitmentOrder): boolean {
   return countActiveIceApplicants(mp) >= cap
 }
 
+/** 剪辑认领后须在「我的报名」确认接收的时限 */
+export const ICE_PENDING_CONFIRM_TIMEOUT_MS = 30 * 60 * 1000
+
+function parseAppliedAtMs(appliedAt: unknown): number {
+  if (!appliedAt) return 0
+  const t = Date.parse(String(appliedAt).trim().replace(/-/g, '/'))
+  return Number.isFinite(t) ? t : 0
+}
+
+/** 满额关闭后若名额释放，恢复为收集中 */
+export function maybeReopenIceWhenNotFull(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
+  if (String(mp.status || '') !== 'closed') return mp
+  const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
+  const full = isPack ? isEditPackFull(mp) : isIceRecruitFull(mp)
+  if (full) return mp
+  return {
+    ...mp,
+    status: 'collecting',
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+}
+
+export function expireStaleIcePendingConfirm(
+  mp: RegistryMpRecruitmentOrder,
+  nowMs = Date.now(),
+): { mp: RegistryMpRecruitmentOrder; expiredApplicantIds: string[] } {
+  if (!isIceMpOrder(mp as unknown as Record<string, unknown>)) {
+    return { mp, expiredApplicantIds: [] }
+  }
+  const expiredApplicantIds: string[] = []
+  let next = mp
+  for (const app of mp.applicants ?? []) {
+    if (!app || app.taskStatus !== 'pending_confirm') continue
+    const appliedMs = parseAppliedAtMs(app.appliedAt)
+    if (!appliedMs || nowMs - appliedMs < ICE_PENDING_CONFIRM_TIMEOUT_MS) continue
+    const rejected = rejectIceMpTask(next, app.id, { rejectReason: '确认超时，名额已释放' })
+    if (!rejected.ok) continue
+    next = maybeReopenIceWhenNotFull(rejected.mp)
+    expiredApplicantIds.push(String(app.id))
+  }
+  return { mp: next, expiredApplicantIds }
+}
+
+export function syncExpiredIcePendingConfirmInSnapshot(
+  data: { mpRecruitmentOrders?: RegistryMpRecruitmentOrder[] },
+  nowMs = Date.now(),
+): { syncedOrderIds: string[]; expiredApplicantIds: string[] } {
+  const syncedOrderIds: string[] = []
+  const expiredApplicantIds: string[] = []
+  for (const mp of data.mpRecruitmentOrders ?? []) {
+    if (!mp?.id) continue
+    const { mp: next, expiredApplicantIds: ids } = expireStaleIcePendingConfirm(mp, nowMs)
+    if (!ids.length) continue
+    Object.assign(mp, next)
+    syncedOrderIds.push(String(mp.id))
+    expiredApplicantIds.push(...ids)
+  }
+  return { syncedOrderIds, expiredApplicantIds }
+}
+
 /** 云剪满额：大厅展示已停止，PR 发单仍履约中 */
 export function maybeCloseIceWhenFull(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
   const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
@@ -476,6 +536,7 @@ export function confirmIceMpReceipt(
 export function rejectIceMpTask(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
+  opts?: { rejectReason?: string },
 ): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
   const applicants = [...(mp.applicants ?? [])]
   const idx = applicants.findIndex((a) => a.id === applicantId)
@@ -507,6 +568,7 @@ export function rejectIceMpTask(
   applicants[idx] = {
     ...app,
     taskStatus: 'rejected',
+    rejectReason: opts?.rejectReason || app.rejectReason,
     assignedIceSlotId: undefined,
     assignedIceSlotIds: undefined,
     claimedSlotCount: undefined,

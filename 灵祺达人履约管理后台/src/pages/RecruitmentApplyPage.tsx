@@ -231,8 +231,14 @@ export default function RecruitmentApplyPage() {
         applicantId,
       })
       if (isIceMode) localStorage.setItem(`meoo_ice_applicant_v1_${orderId}`, applicantId)
-      if (isEditIce) {
-        window.alert('剪辑认领成功，请尽快加入微信群')
+      if (isEditIce || isPackIce) {
+        window.alert(
+          '剪辑认领成功，请在30分钟内去「我的报名」确认订单，超时将自动放弃并释放条数。',
+        )
+      } else if (isIceMode) {
+        window.alert(
+          '认领成功，请在30分钟内去「我的报名」确认订单，超时将自动放弃并释放条数。',
+        )
       }
       nav(`/recruitment/${encodeURIComponent(orderId)}?applied=1`)
     } catch (e) {
