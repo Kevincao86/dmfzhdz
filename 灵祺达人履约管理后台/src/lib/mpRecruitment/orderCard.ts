@@ -1,6 +1,7 @@
 import type { MpRegistry, RecruitmentOrderRow } from './types'
 import { normalizeHallPlatform } from './hallFilters'
 import * as listFilters from './listFilters'
+import { buildRecruitContentForAi } from '@merchant/lib/mpRecruitmentMatchShared'
 import { isMpOrderRecruiting, resolveEffectiveMpStatus } from './mpOrderStatus'
 import { buildHallSignupCountText, countIceClaimedSlots, isIceSlotsFull } from './iceOrderStats'
 import {
@@ -95,6 +96,21 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
       ? Math.max(0, recruitCap - applicantCount)
       : 999
 
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const talentTags = Array.isArray(meta.talentTags) ? (meta.talentTags as string[]) : []
+  const recruitmentInfo = String(mp.recruitmentInfo || '').trim()
+  const merchantRequirements = String(mp.merchantRequirements || '').trim()
+  const taskDetail = String(mp.taskDetail || '').trim()
+  const recruitContent = buildRecruitContentForAi({
+    title,
+    merchantRequirements,
+    recruitmentInfo,
+    taskDetail,
+  })
+
   return {
     id: String(mp.id),
     merchantOrderNo: String(mp.id || '').trim(),
@@ -115,6 +131,11 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     budgetDisplay: buildBudgetDisplay(budgetText),
     fansRequirement: String(mp.fansRequirement || '不限'),
     summary: String(mp.recruitmentInfo || mp.merchantRequirements || '').slice(0, 120),
+    talentTags,
+    recruitmentInfo,
+    merchantRequirements,
+    taskDetail,
+    recruitContent,
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : '不限',
     claimedSlotCount: shownClaimed,

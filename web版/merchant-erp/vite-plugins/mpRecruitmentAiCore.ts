@@ -15,6 +15,7 @@ export type MpRecruitmentAiOrderInput = {
   platform?: string
   region?: string
   category?: string
+  categoryTagsText?: string
   budgetText?: string
   fansRequirement?: string
   hall?: string
@@ -23,7 +24,14 @@ export type MpRecruitmentAiOrderInput = {
   summary?: string
   recruitTarget?: string
   priceAmount?: number
+  feeMode?: string
+  cpsPercent?: number | null
+  hasCommission?: boolean
   talentTags?: string[]
+  recruitmentInfo?: string
+  merchantRequirements?: string
+  taskDetail?: string
+  recruitContent?: string
   infoSummary?: string
   recruitDetail?: string
 }
@@ -121,18 +129,31 @@ function isRetryableAiError(e: unknown): boolean {
 }
 
 function compactOrder(o: MpRecruitmentAiOrderInput): Record<string, unknown> {
+  const recruitContent = String(
+    o.recruitContent ||
+      [o.recruitmentInfo, o.merchantRequirements, o.taskDetail, o.summary].filter(Boolean).join('\n'),
+  ).slice(0, 2400)
   return {
     id: o.id,
-    title: (o.title || '').slice(0, 80),
+    title: (o.title || '').slice(0, 120),
     platform: o.platform || '',
     region: o.region || '',
     category: o.category || '',
+    categoryTagsText: String(o.categoryTagsText || '').slice(0, 80),
+    talentTags: Array.isArray(o.talentTags) ? o.talentTags.slice(0, 8) : [],
     budget: o.budgetText || '',
+    feeMode: o.feeMode || '',
+    cpsPercent: o.cpsPercent ?? null,
+    hasCommission: o.hasCommission === true,
     priceAmount: o.priceAmount ?? 0,
     fans: o.fansRequirement || '',
     recruitTarget: o.recruitTarget || 'talent',
     hall: o.hall || (o.isIce ? 'ice' : o.urgent ? 'urgent' : 'normal'),
-    summary: String(o.summary || '').slice(0, 220),
+    summary: String(o.summary || '').slice(0, 400),
+    recruitContent,
+    recruitmentInfo: String(o.recruitmentInfo || '').slice(0, 1000),
+    merchantRequirements: String(o.merchantRequirements || '').slice(0, 1000),
+    taskDetail: String(o.taskDetail || '').slice(0, 800),
   }
 }
 
@@ -342,13 +363,16 @@ ${MATCH_SCORE_GUIDE}
       return { status: 200, body: { ok: true, provider, mode: 'match', items } }
     }
 
-    const system = `你是本地生活招募商单解读助手。逐条阅读商单的平台、城市/区域、品类标签 categoryTagsText、预算与报价模式 feeMode、CPS 比例 cpsPercent（hasCommission 为 true 才有佣金）、粉丝与带货等级要求、招募对象（达人/拍摄/剪辑）及描述摘要，提炼最能吸引对应供给方的一个短标签（2-4 个汉字，勿与「收集中/急单/演示」等状态重复）。
-规则：CPS 为 0 或 hasCommission 为 false 时，禁止使用「佣金友好」「高佣优选」「高佣」等佣金类标签；应优先用自报价、一口价、置换友好、阶梯报价、品类标签（如生活记录、美食探店）等。
+    const system = `你是本地生活招募商单解读助手。必须通读每条商单的 recruitContent（招募全文，含标题/要求/说明/任务详情）、categoryTagsText、talentTags、平台、城市、预算 feeMode/cpsPercent/hasCommission、粉丝要求与招募对象，综合理解业务场景与供给方价值后，提炼一个最能概括「这条单特点」的短标签（2-4 个汉字）。
+要求：
+- 标签应体现内容形态、品类、难度、场景或收益特点（如：剪辑单、探店向、母婴向、稳定需求、短视频），不要只复述报价方式（禁止仅用「自报价」「一口价」作为标签，除非全文无其它亮点）。
+- 勿与订单状态重复（收集中、急单、演示等）。
+- CPS 为 0 或 hasCommission 为 false 时，禁止「佣金友好」「高佣优选」「高佣」。
 只输出 JSON 数组。每项：id、tag（2-4字）、tone（hot|match|urgent|ice|budget|niche|default）。
-示例：自报价、一口价、同城急单、云剪直派、粉丝友好、美食探店、置换友好、生活记录、佣金友好（仅 hasCommission 为 true 时）。`
-    const user = `商单列表（含 platform/region/categoryTagsText/feeMode/cpsPercent/hasCommission/budget/priceAmount/fans/recruitTarget/summary）：${orderJson}
+示例：剪辑向、美食探店、稳定需求、云剪直派、生活记录、粉丝友好、佣金友好（仅 hasCommission 为 true）。`
+    const user = `商单列表（JSON，含 recruitContent 全文）：${orderJson}
 
-请为每条商单生成一个最贴切、可点击的展示标签。`
+请为每条商单生成一个基于全文分析的最贴切展示标签。`
     const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
     const orderById = new Map(orders.map((o) => [String(o.id), o as OrderMatchPayload]))
     const items = extractJsonArray(text)

@@ -63,11 +63,34 @@ function sanitizeAiOrderTag(tag, tone, row) {
   return { tag: t, tone: String(tone || 'default').trim() || 'default' }
 }
 
+function buildRecruitContentForAi(mp) {
+  const parts = []
+  const title = String((mp && mp.title) || '').trim()
+  if (title) parts.push(`招募标题：${title}`)
+  const req = String((mp && mp.merchantRequirements) || '').trim()
+  if (req) parts.push(`招募要求：${req}`)
+  const info = String((mp && mp.recruitmentInfo) || '').trim()
+  if (info) parts.push(`招募说明：${info}`)
+  const task = String((mp && mp.taskDetail) || '').trim()
+  if (task) parts.push(`任务详情：${task}`)
+  return parts.join('\n').slice(0, 2400)
+}
+
 function enrichOrderAiPayload(row) {
   const traits = resolveOrderFeeTraits(row)
+  const recruitContent =
+    String((row && row.recruitContent) || '').trim() ||
+    buildRecruitContentForAi({
+      title: row.title,
+      merchantRequirements: row.merchantRequirements,
+      recruitmentInfo: row.recruitmentInfo,
+      taskDetail: row.taskDetail,
+    })
   return {
     ...row,
     categoryTagsText: row.categoryTagsText || '',
+    talentTags: Array.isArray(row.talentTags) ? row.talentTags : [],
+    recruitContent,
     cpsPercent: traits.cpsPercent,
     feeMode: traits.feeMode,
     hasCommission: traits.hasCommission,
@@ -75,6 +98,7 @@ function enrichOrderAiPayload(row) {
 }
 
 module.exports = {
+  buildRecruitContentForAi,
   fallbackOrderHighlightTag,
   sanitizeAiOrderTag,
   enrichOrderAiPayload,

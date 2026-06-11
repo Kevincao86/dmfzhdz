@@ -155,8 +155,9 @@ Page({
     }
     const baseRows = rows.map((r) => ({
       ...r,
-      ...recruitmentAi.fallbackTagForRow(r),
-      aiTagSource: 'local',
+      aiTag: '',
+      aiTagTone: 'default',
+      aiTagSource: 'pending',
     }))
     const token = Date.now()
     this._aiTagToken = token
