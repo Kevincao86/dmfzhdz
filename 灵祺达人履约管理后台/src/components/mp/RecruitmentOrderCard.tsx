@@ -1,16 +1,7 @@
+import { resolveHallAiTagStyle } from '@merchant/lib/hallAiTagStyle'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { SIGNUP_COUNTDOWN_TONE_CLASS } from '../../lib/mpRecruitment/listFilters'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
-
-const TONE_CLASS: Record<string, string> = {
-  match: 'order-tag--match',
-  urgent: 'order-tag--urgent',
-  ice: 'order-tag--ice',
-  hot: 'order-tag--hot',
-  budget: 'order-tag--budget',
-  niche: 'order-tag--niche',
-  default: 'order-tag--default',
-}
 
 type Props = {
   row: RecruitmentOrderRow
@@ -19,7 +10,9 @@ type Props = {
 }
 
 export default function RecruitmentOrderCard({ row, onClick, showMatchScore = false }: Props) {
-  const tagTone = TONE_CLASS[row.aiTagTone || 'default'] || TONE_CLASS.default
+  const tagStyle = row.aiTag
+    ? resolveHallAiTagStyle(row.aiTag, row.aiTagTone || 'default')
+    : null
   const countdownTone =
     SIGNUP_COUNTDOWN_TONE_CLASS[row.signupCountdownTone || 'unknown'] ||
     SIGNUP_COUNTDOWN_TONE_CLASS.unknown
@@ -34,14 +27,10 @@ export default function RecruitmentOrderCard({ row, onClick, showMatchScore = fa
       {showMatchScore && row.matchScore ? (
         <MatchScoreBadge score={row.matchScore} className="absolute top-3 right-3" />
       ) : null}
-      {row.aiTag ? (
+      {row.aiTag && tagStyle ? (
         <span
-          className={row.aiTagBg ? 'order-tag' : `order-tag ${tagTone}`}
-          style={
-            row.aiTagBg && row.aiTagFg
-              ? { background: row.aiTagBg, color: row.aiTagFg }
-              : undefined
-          }
+          className="order-tag"
+          style={{ background: tagStyle.bg, color: tagStyle.fg }}
         >
           {row.aiTag}
         </span>

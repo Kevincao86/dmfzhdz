@@ -401,14 +401,21 @@ function applyMatchMap(rows, map, talent, talentCity) {
   return applyOrderMatchResults(rows, map, talent, talentCity)
 }
 
+function attachRowTagStyle(row) {
+  return orderHighlightTag.attachRowTagStyle(row)
+}
+
 async function enrichOrderTags(rows, opts) {
   const list = (rows || []).filter((r) => r && r.id)
   const talentCity = (opts && opts.talentCity) || ''
   const persisted = list.filter((r) => r.aiTagSource === 'persisted' && r.aiTag)
   const pending = list.filter((r) => r.aiTagSource !== 'persisted')
-  if (!pending.length) return list
+  if (!pending.length) return list.map(attachRowTagStyle)
   if (!api.hasApi()) {
-    return [...persisted, ...applyTagMap(pending, {}, talentCity, { allowLocalFallback: true })]
+    const merged = [...persisted, ...applyTagMap(pending, {}, talentCity, { allowLocalFallback: true })]
+    const byId = {}
+    for (const r of merged) byId[r.id] = r
+    return list.map((r) => attachRowTagStyle(byId[r.id] || r))
   }
 
   const cache = readCache(TAG_CACHE_KEY)
@@ -435,7 +442,7 @@ async function enrichOrderTags(rows, opts) {
   const tagged = applyTagMap(pending, map, talentCity, { allowLocalFallback: !aiHit })
   const byId = {}
   for (const r of [...persisted, ...tagged]) byId[r.id] = r
-  return list.map((r) => byId[r.id] || r)
+  return list.map((r) => attachRowTagStyle(byId[r.id] || r))
 }
 
 function mergeCardAiTags(scored, tagged) {

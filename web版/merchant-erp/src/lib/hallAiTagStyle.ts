@@ -18,10 +18,10 @@ const TONE_BG: Record<string, string> = {
 }
 
 const TAG_RULES: Array<{ re: RegExp; bg: string; tone: string }> = [
-  { re: /剪辑|后期|视频|云剪/, bg: '#8b7ae8', tone: 'match' },
-  { re: /美食|餐饮|探店|口播/, bg: '#e8926e', tone: 'hot' },
-  { re: /稳定|长期|月|持续/, bg: '#b4a8f0', tone: 'budget' },
+  { re: /美食|餐饮|探店|果园|杨梅|口播/, bg: '#e8926e', tone: 'hot' },
+  { re: /稳定|长期|月|持续|官号/, bg: '#b4a8f0', tone: 'budget' },
   { re: /生活|记录|日常|vlog/i, bg: '#6ec4bc', tone: 'niche' },
+  { re: /剪辑|后期|视频|云剪/, bg: '#8b7ae8', tone: 'match' },
   { re: /佣金|高佣|cps/i, bg: '#e07082', tone: 'hot' },
   { re: /急|速|紧/, bg: '#f08a9a', tone: 'urgent' },
   { re: /同城|本地|区域/, bg: '#6bc4a0', tone: 'match' },
