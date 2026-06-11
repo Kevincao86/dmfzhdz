@@ -193,7 +193,10 @@ function enrichMpOrderListItem(mp, localItem) {
 
   const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
   const recruitCount = parseRecruitCountFromMp(mp)
-  const applicantCount = Array.isArray(mp.applicants) ? mp.applicants.length : 0
+  const applicantCount =
+    Array.isArray(mp.applicants) && mp.applicants.length > 0
+      ? mp.applicants.length
+      : Number(mp.applicantCount) || 0
   const isIce = iceOrderStats.isIceMpOrder(mp)
   const deadlineMs = resolveDeadlineMs(mp, summary)
   const status = mpOrderIce.resolveDisplayStatus(mp, 'pr', deadlineMs)
