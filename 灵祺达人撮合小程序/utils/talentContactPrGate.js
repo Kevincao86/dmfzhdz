@@ -49,6 +49,11 @@ function findMyApplicant(mp, mpOrderId) {
     if (byId) return byId
   }
   for (let i = 0; i < applicants.length; i++) {
+    if (applicantMatchesCurrentTalent(applicants[i]) && applicants[i].taskStatus !== 'rejected') {
+      return applicants[i]
+    }
+  }
+  for (let i = 0; i < applicants.length; i++) {
     if (applicantMatchesCurrentTalent(applicants[i])) return applicants[i]
   }
   return null
@@ -70,9 +75,9 @@ function evaluate(mp, mpOrderId) {
     if (applicant.taskStatus === 'rejected') {
       return {
         canContact: false,
-        hasApplication: true,
+        hasApplication: false,
         reason: 'rejected',
-        message: '您已拒绝该云剪任务',
+        message: '任务已拒绝，可重新认领',
         applicant,
       }
     }

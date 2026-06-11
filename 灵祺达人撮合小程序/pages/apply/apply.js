@@ -195,13 +195,17 @@ Page({
       return
     }
     if (applicationsStore.hasAppliedToOrder(mpOrderId)) {
-      wx.showToast({ title: '您已报名该招募', icon: 'none' })
-      setTimeout(() => {
-        wx.redirectTo({
-          url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
-        })
-      }, 800)
-      return
+      const gateEarly = loadedMp ? talentContactPrGate.evaluate(loadedMp, mpOrderId) : null
+      if (!gateEarly || gateEarly.reason !== 'rejected') {
+        wx.showToast({ title: '您已报名该招募', icon: 'none' })
+        setTimeout(() => {
+          wx.redirectTo({
+            url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
+          })
+        }, 800)
+        return
+      }
+      applicationsStore.removeApplication(mpOrderId)
     }
     if (loadedMp && talentContactPrGate.evaluate(loadedMp, mpOrderId).hasApplication) {
       wx.showToast({ title: '您已报名该招募', icon: 'none' })

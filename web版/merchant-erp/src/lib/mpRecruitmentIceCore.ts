@@ -7,7 +7,7 @@ import type {
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 import { getIceVerifyMode, isEditTeamIceMpOrder, isPackSlotIceOrder } from './iceOrderDetect.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
-import { findDuplicateApplicant } from './mpApplicantIdentity.js'
+import { findDuplicateApplicant, applicantsSamePerson } from './mpApplicantIdentity.js'
 
 export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel, isEditTeamIceMpOrder, isPackSlotIceOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
 export type { IceVerifyMode } from './iceOrderDetect.js'
@@ -316,9 +316,6 @@ export function claimIceMpRecruitment(
     if (existing.taskStatus === 'pending_confirm' || !existing.taskStatus) {
       return { ok: true, applicant: existing, needConfirm: true }
     }
-    if (existing.taskStatus === 'rejected') {
-      return { ok: false, error: '您已拒绝该任务，无法再次认领', code: 'rejected' }
-    }
   }
 
   if (isPack) {
@@ -332,6 +329,13 @@ export function claimIceMpRecruitment(
       ...applicant,
       taskStatus: 'pending_confirm',
       claimedSlotCount: n,
+      assignedIceSlotId: undefined,
+      assignedIceSlotIds: undefined,
+      assignedVideoDownloadUrl: undefined,
+      assignedVideoLabel: undefined,
+      editDeliverLinks: undefined,
+      videoStatus: undefined,
+      videoRejectReason: undefined,
       aiVerifyStatus: 'pending',
       appliedAt: applicant.appliedAt || now,
     }
@@ -352,6 +356,16 @@ export function claimIceMpRecruitment(
     appliedAt: applicant.appliedAt || now,
   }
   return { ok: true, applicant: row, needConfirm: true }
+}
+
+function dropRejectedIdentityPeers(
+  applicants: RegistryMpRecruitmentApplicant[] | undefined,
+  incoming: RegistryMpRecruitmentApplicant,
+  platform: string,
+): RegistryMpRecruitmentApplicant[] {
+  return (applicants ?? []).filter(
+    (a) => !(a?.taskStatus === 'rejected' && applicantsSamePerson(a, incoming, platform)),
+  )
 }
 
 /** 闭环第二步：确认接收并分配成片槽位 */
@@ -719,7 +733,7 @@ export function handleIceMpApply(
   | { ok: true; mp: RegistryMpRecruitmentOrder; body: Record<string, unknown> }
   | { ok: false; error: string; code?: string } {
   const isPack = isPackSlotIceOrder(mp as unknown as Record<string, unknown>)
-  const dup = (mp.applicants ?? []).find((a) => a.id === row.id)
+  let dup = (mp.applicants ?? []).find((a) => a.id === row.id)
   if (dup?.taskStatus === 'confirmed' && (dup.assignedIceSlotIds?.length || dup.assignedVideoDownloadUrl)) {
     return {
       ok: true,
@@ -772,7 +786,7 @@ export function handleIceMpApply(
     }
   }
   if (dup?.taskStatus === 'rejected') {
-    return { ok: false, error: '您已拒绝该任务', code: 'rejected' }
+    dup = undefined
   }
 
   if (!dup) {
@@ -782,13 +796,15 @@ export function handleIceMpApply(
     }
   }
 
+  const platform = mp.platform || '抖音'
+  const cleanedApplicants = dropRejectedIdentityPeers(mp.applicants, row, platform)
   const claim = claimIceMpRecruitment(
-    mp,
+    { ...mp, applicants: cleanedApplicants },
     row,
     claimSlotCount ?? row.claimedSlotCount,
   )
   if (!claim.ok) return claim
-  const applicants = upsertApplicant(mp.applicants, claim.applicant)
+  const applicants = upsertApplicant(cleanedApplicants, claim.applicant)
   let next: RegistryMpRecruitmentOrder = {
     ...mp,
     applicants,

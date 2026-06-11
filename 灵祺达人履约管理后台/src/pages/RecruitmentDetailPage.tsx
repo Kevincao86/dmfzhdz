@@ -45,7 +45,11 @@ export default function RecruitmentDetailPage() {
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const appliedFromUrl = search.get('applied') === '1'
-  const applied = appliedFromUrl || (id ? hasAppliedToOrder(id) : false) || contactGate.hasApplication
+  const iceState = resolveIceApplicantState(mpRaw, id || '', mpRegistry)
+  const canReclaimIce = iceState.isIce && iceState.iceRejected
+  const applied =
+    (appliedFromUrl || (id ? hasAppliedToOrder(id) : false) || contactGate.hasApplication) &&
+    !canReclaimIce
   const myApplicant = contactGate.applicant
   const videoStatus = myApplicant ? String(myApplicant.videoStatus || '') : ''
   const videoRejectReason = myApplicant && myApplicant.videoRejectReason ? String(myApplicant.videoRejectReason) : ''
@@ -58,7 +62,6 @@ export default function RecruitmentDetailPage() {
     )
   const workIdentity = getWorkIdentity()
   const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
-  const iceState = resolveIceApplicantState(mpRaw, id || '', mpRegistry)
   const applyGateHint = mpRaw && role !== 'pr' ? claimBlockHint(mpRaw, workIdentity) : ''
 
   useEffect(() => {
@@ -317,6 +320,10 @@ export default function RecruitmentDetailPage() {
             </p>
           ) : null}
 
+          {canReclaimIce ? (
+            <p className="text-sm text-slate-500">任务已拒绝，名额已释放，可重新认领。</p>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
             {role === 'talent' && !applied && !readOnlyEnded ? (
               applyGateHint ? (
@@ -325,7 +332,15 @@ export default function RecruitmentDetailPage() {
                 </p>
               ) : (
                 <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
-                  {view.isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪任务') : '立即报名'}
+                  {canReclaimIce
+                    ? isEditIce
+                      ? '重新认领剪辑云剪'
+                      : '重新认领云剪'
+                    : view.isIce
+                      ? isEditIce
+                        ? '认领剪辑云剪'
+                        : '认领云剪任务'
+                      : '立即报名'}
                 </button>
               )
             ) : null}

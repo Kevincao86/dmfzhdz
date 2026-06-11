@@ -208,4 +208,11 @@ export function hasAppliedToOrder(mpOrderId: string) {
   return readApplications().some((a) => a.mpOrderId === mpOrderId)
 }
 
+export function removeApplication(mpOrderId: string) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const list = readApplications().filter((a) => String(a.mpOrderId || '').trim() !== id)
+  writeApplications(list)
+}
+
 export { currentScopeId }

@@ -190,6 +190,16 @@ function hasAppliedToOrder(mpOrderId) {
   return readApplications().some((a) => a && String(a.mpOrderId || '').trim() === id)
 }
 
+function removeApplication(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const ids = ownerIdsForFilter()
+  const list = readApplicationsRaw().filter(
+    (item) => entryBelongsToCurrentAccount(item, ids) && String(item.mpOrderId || '').trim() !== id,
+  )
+  writeListToKey(scope.scopedStorageKey(APPLICATIONS_BASE), list)
+}
+
 module.exports = {
   readApplications,
   addApplication,
@@ -202,4 +212,5 @@ module.exports = {
   touchPublishedOrderSnapshot,
   markPublishedOrderDeleted,
   hasAppliedToOrder,
+  removeApplication,
 }

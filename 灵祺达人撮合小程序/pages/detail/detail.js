@@ -33,6 +33,7 @@ Page({
     iceVerified: false,
     icePendingConfirm: false,
     iceRejected: false,
+    canReclaimIce: false,
     iceConfirming: false,
     iceVerifyMode: 'ai',
     icePendingPrReview: false,
@@ -256,7 +257,8 @@ Page({
             prWxAvatarUrl: meta.prWxAvatarUrl || '',
           }
         : null
-      const hasApplied = this.data.applied || iceApplied || gate.hasApplication
+      const canReclaimIce = isIce && iceRejected
+      const hasApplied = (this.data.applied || iceApplied || gate.hasApplication) && !canReclaimIce
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
       this.setData({
         view,
@@ -275,6 +277,7 @@ Page({
         iceVerified,
         icePendingConfirm,
         iceRejected,
+        canReclaimIce,
         iceVerifyMode,
         icePendingPrReview,
         iceLinkRejected,
@@ -401,7 +404,13 @@ Page({
         ops
           .confirmIceTask(that.data.id, that.data.iceApplicantId, 'reject')
           .then(() => {
-            wx.showToast({ title: '已拒绝', icon: 'none' })
+            try {
+              applicationsStore.removeApplication(that.data.id)
+              wx.removeStorageSync(iceOrderStats.iceApplicantStorageKey(that.data.id))
+            } catch {
+              /* ignore */
+            }
+            wx.showToast({ title: '已拒绝，可重新认领', icon: 'none' })
             return that.loadOrder(that.data.id)
           })
           .catch((e) => wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' }))
@@ -513,9 +522,10 @@ Page({
     const v = this.data.view
     if (!v || !this.data.id) return
     if (
-      this.data.applied ||
-      applicationsStore.hasAppliedToOrder(this.data.id) ||
-      (this.data.mpOrder && contactGate.evaluate(this.data.mpOrder, this.data.id).hasApplication)
+      !this.data.canReclaimIce &&
+      (this.data.applied ||
+        applicationsStore.hasAppliedToOrder(this.data.id) ||
+        (this.data.mpOrder && contactGate.evaluate(this.data.mpOrder, this.data.id).hasApplication))
     ) {
       wx.showToast({ title: '您已报名该招募', icon: 'none' })
       return
