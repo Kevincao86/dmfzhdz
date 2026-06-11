@@ -189,6 +189,7 @@
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
               <text class="job-card-compact__tag job-card-compact__tag--ice" wx:elif="{{item.isIce}}">云剪</text>
             </view>
+            <text class="job-card-compact__countdown job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}">报名倒计时 {{item.signupCountdownText}}</text>
             <view class="job-card-compact__fee" wx:if="{{!item.hideBudget && item.budgetDisplay.kind === 'tiers'}}">
               <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
               <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>

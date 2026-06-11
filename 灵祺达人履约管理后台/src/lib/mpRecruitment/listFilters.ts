@@ -106,6 +106,27 @@ export const SIGNUP_COUNTDOWN_TONE_CLASS: Record<SignupCountdownTone, string> = 
   unknown: 'signup-countdown signup-countdown--unknown',
 }
 
+/** 大厅/推荐招募卡片：与详情页相同的报名倒计时文案与色调 */
+export function attachHallSignupCountdown<T extends { deadlineMs?: number; publishedAtMs?: number }>(
+  row: T,
+  nowMs: number = Date.now(),
+): T & { signupCountdownText: string; signupCountdownTone: SignupCountdownTone } {
+  const deadlineMs = Number(row.deadlineMs) || 0
+  const publishedMs = Number(row.publishedAtMs) || 0
+  return {
+    ...row,
+    signupCountdownText: formatSignupCountdownText(deadlineMs, nowMs),
+    signupCountdownTone: resolveSignupCountdownTone(deadlineMs, publishedMs, nowMs),
+  }
+}
+
+export function attachHallSignupCountdowns<T extends { deadlineMs?: number; publishedAtMs?: number }>(
+  rows: T[],
+  nowMs: number = Date.now(),
+): Array<T & { signupCountdownText: string; signupCountdownTone: SignupCountdownTone }> {
+  return (rows || []).map((r) => attachHallSignupCountdown(r, nowMs))
+}
+
 export function resolveSignupClosed(
   mp: Record<string, unknown> | null | undefined,
   opts?: { readOnlyEnded?: boolean; nowMs?: number },

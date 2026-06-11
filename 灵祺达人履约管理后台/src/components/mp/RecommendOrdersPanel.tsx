@@ -89,13 +89,20 @@ export default function RecommendOrdersPanel() {
       if (orderSegment === 'city' && !talentCity) hint = '请先在「我的」完善城市信息'
       else hint = '暂无匹配商单，试试切换分类或筛选'
     }
-    setOrderDisplayRows(rows.slice(0, 50))
+    setOrderDisplayRows(listFilters.attachHallSignupCountdowns(rows.slice(0, 50)))
     setOrderEmptyHint(hint)
   }, [allOrderRows, searchKeyword, orderSegment, filterPlatform, filterProvince, filterCity, priceSelected, talentCity])
 
   useEffect(() => {
     void applyOrderFilters()
   }, [applyOrderFilters])
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setOrderDisplayRows((prev) => listFilters.attachHallSignupCountdowns(prev))
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     ;(async () => {

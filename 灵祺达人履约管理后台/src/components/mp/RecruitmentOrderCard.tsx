@@ -1,4 +1,5 @@
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
+import { SIGNUP_COUNTDOWN_TONE_CLASS } from '../../lib/mpRecruitment/listFilters'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
 
 const TONE_CLASS: Record<string, string> = {
@@ -19,6 +20,9 @@ type Props = {
 
 export default function RecruitmentOrderCard({ row, onClick, showMatchScore = false }: Props) {
   const tagTone = TONE_CLASS[row.aiTagTone || 'default'] || TONE_CLASS.default
+  const countdownTone =
+    SIGNUP_COUNTDOWN_TONE_CLASS[row.signupCountdownTone || 'unknown'] ||
+    SIGNUP_COUNTDOWN_TONE_CLASS.unknown
   return (
     <article
       role={onClick ? 'button' : undefined}
@@ -54,6 +58,9 @@ export default function RecruitmentOrderCard({ row, onClick, showMatchScore = fa
           <span className="order-chip order-chip--ice">云剪</span>
         ) : null}
       </div>
+      <p className={`hall-order-countdown ${countdownTone}`}>
+        报名倒计时 {row.signupCountdownText || '—'}
+      </p>
       {!row.hideBudget && row.budgetDisplay.kind === 'text' ? (
         <p className="order-price">{row.budgetDisplay.line}</p>
       ) : null}
