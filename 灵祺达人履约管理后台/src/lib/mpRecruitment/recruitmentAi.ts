@@ -194,13 +194,22 @@ async function fetchOrderMatchMap(
   return map
 }
 
+function attachRowTagStyle(row: RecruitmentOrderRow): RecruitmentOrderRow {
+  if (!row.aiTag) return row
+  const styled = withHallAiTagColors(row.aiTag, row.aiTagTone || 'default', {
+    bg: row.aiTagBg,
+    fg: row.aiTagFg,
+  })
+  return { ...row, ...styled }
+}
+
 export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = '') {
   const list = rows.filter((r) => r.id)
   if (!list.length) return list
 
   const persisted = list.filter((r) => r.aiTagSource === 'persisted' && r.aiTag)
   const pending = list.filter((r) => r.aiTagSource !== 'persisted')
-  if (!pending.length) return list
+  if (!pending.length) return list.map(attachRowTagStyle)
 
   const cache = readWebTagCache()
   const missing: RecruitmentOrderRow[] = []
@@ -261,7 +270,7 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
   })
 
   const byId = new Map([...persisted, ...tagged].map((r) => [r.id, r]))
-  return list.map((r) => byId.get(r.id) || r)
+  return list.map((r) => attachRowTagStyle(byId.get(r.id) || r))
 }
 
 export async function enrichOrderMatches(

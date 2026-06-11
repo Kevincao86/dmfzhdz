@@ -173,8 +173,8 @@
       >
         <text
           wx:if="{{item.aiTag}}"
-          class="job-card-compact__ai-tag {{item.aiTagBg ? '' : 'job-card-compact__ai-tag--' + item.aiTagTone}}"
-          style="{{item.aiTagBg ? 'background:' + item.aiTagBg + ';color:' + item.aiTagFg + ';' : ''}}"
+          class="job-card-compact__ai-tag"
+          style="background:{{item.aiTagBg}};color:{{item.aiTagFg}};"
         >{{item.aiTag}}</text>
         <text class="job-card-compact__ribbon job-card-compact__ribbon--demo" wx:if="{{item.isMock && !item.aiTag}}">演示</text>
         <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">推荐</text>

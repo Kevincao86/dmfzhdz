@@ -120,6 +120,15 @@ function enrichOrderAiPayload(row) {
   }
 }
 
+function attachRowTagStyle(row) {
+  if (!row || !row.aiTag) return row
+  const styled = hallAiTagStyle.withHallAiTagColors(row.aiTag, row.aiTagTone || 'default', {
+    bg: row.aiTagBg,
+    fg: row.aiTagFg,
+  })
+  return Object.assign({}, row, styled)
+}
+
 module.exports = {
   readHallAiTagFromMeta,
   buildRecruitContentForAi,
@@ -127,4 +136,5 @@ module.exports = {
   sanitizeAiOrderTag,
   enrichOrderAiPayload,
   withHallAiTagColors: hallAiTagStyle.withHallAiTagColors,
+  attachRowTagStyle,
 }

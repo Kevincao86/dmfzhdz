@@ -153,9 +153,10 @@ Page({
       edit: countForTab(this.data.editRows),
       ice: countForTab(this.data.iceRows),
     }
+    const orderHighlightTag = require('../../utils/orderHighlightTag.js')
     const baseRows = rows.map((r) =>
       r.aiTagSource === 'persisted' && r.aiTag
-        ? r
+        ? orderHighlightTag.attachRowTagStyle(r)
         : { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' },
     )
     const token = Date.now()
