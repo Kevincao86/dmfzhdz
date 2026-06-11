@@ -82,5 +82,9 @@ export type MpRegistry = {
   mpTalentMembers?: Record<string, unknown>[]
   mpTalentInbox?: Record<string, unknown>[]
   talentLibraryEntries?: Record<string, unknown>[]
+  shootTeamLibraryEntries?: Record<string, unknown>[]
+  editTeamLibraryEntries?: Record<string, unknown>[]
+  mpPrUsers?: Record<string, unknown>[]
   recruitmentOrders?: Record<string, unknown>[]
+  _recommendPoolMeta?: Record<string, unknown>
 }

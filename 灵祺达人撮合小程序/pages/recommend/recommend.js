@@ -385,6 +385,7 @@ Page({
         edit: prBoard.buildBoardPool(reg, 'edit'),
       }
       const pool = this._boardPools[board] || []
+      require('../../utils/recommendPoolVerify.js').logRecommendPoolParity(reg, board)
       const prBoardOrderCount = prBoard.countPrOrdersForBoard(reg, board)
       const eligible = recruitmentAi.listPrEligibleOrders(reg, { board })
       const matchOptions = prMatchOrderSelect.buildPrMatchOrderOptions(eligible)

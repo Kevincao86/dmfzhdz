@@ -36,6 +36,10 @@ function normalizeHallPayload(data) {
     shootTeamLibraryEntries: Array.isArray(data.shootTeamLibraryEntries) ? data.shootTeamLibraryEntries : [],
     editTeamLibraryEntries: Array.isArray(data.editTeamLibraryEntries) ? data.editTeamLibraryEntries : [],
     mpPrUsers: Array.isArray(data.mpPrUsers) ? data.mpPrUsers : [],
+    _recommendPoolMeta:
+      data._recommendPoolMeta && typeof data._recommendPoolMeta === 'object'
+        ? data._recommendPoolMeta
+        : undefined,
   }
 }
 
