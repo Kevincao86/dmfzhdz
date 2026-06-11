@@ -9,7 +9,7 @@ const userProfile = require('./userProfile.js')
 const identityTypes = require('./identityTypes.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
 
-const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v2'
+const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v3'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v3'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
 const CACHE_TTL_MS = 6 * 3600 * 1000
@@ -56,6 +56,7 @@ function orderAiPayload(row) {
     region: row.region,
     category: row.category,
     categoryTagsText: row.categoryTagsText,
+    talentTags: row.talentTags,
     budgetText: row.budgetText,
     budgetDisplay: row.budgetDisplay,
     fansRequirement: row.fansRequirement,
@@ -65,6 +66,10 @@ function orderAiPayload(row) {
     isIce: !!row.isIce,
     isMock: !!row.isMock,
     summary: row.summary || '',
+    recruitmentInfo: row.recruitmentInfo,
+    merchantRequirements: row.merchantRequirements,
+    taskDetail: row.taskDetail,
+    recruitContent: row.recruitContent,
     priceAmount: row.priceAmount || 0,
   })
 }
@@ -279,7 +284,8 @@ function fallbackTagForRow(row, talentCity) {
   return orderHighlightTag.fallbackOrderHighlightTag(orderAiPayload(row), talentCity)
 }
 
-function applyTagMap(rows, map, talentCity) {
+function applyTagMap(rows, map, talentCity, opts) {
+  const allowLocal = !opts || opts.allowLocalFallback !== false
   return rows.map((row) => {
     const hit = map[row.id]
     if (hit && hit.tag) {
@@ -293,8 +299,11 @@ function applyTagMap(rows, map, talentCity) {
         }
       }
     }
-    const fb = fallbackTagForRow(row, talentCity)
-    return { ...row, ...fb, aiTagSource: 'local' }
+    if (allowLocal) {
+      const fb = fallbackTagForRow(row, talentCity)
+      return { ...row, ...fb, aiTagSource: 'local' }
+    }
+    return { ...row, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' }
   })
 }
 
@@ -317,7 +326,11 @@ async function fetchTagItems(orders) {
       for (const it of items) {
         if (it && it.id && it.tag) map[it.id] = { tag: it.tag, tone: it.tone || 'default' }
       }
-    } catch {
+      if (res && res.provider) {
+        console.log('[recruitmentAi] tag batch ok provider=', res.provider, 'count=', items.length)
+      }
+    } catch (e) {
+      console.warn('[recruitmentAi] tag batch failed', e && e.message ? e.message : e)
       break
     }
   }
@@ -390,8 +403,9 @@ function applyMatchMap(rows, map, talent, talentCity) {
 async function enrichOrderTags(rows, opts) {
   const list = (rows || []).filter((r) => r && r.id)
   const talentCity = (opts && opts.talentCity) || ''
-  const withLocal = applyTagMap(list, {}, talentCity)
-  if (!api.hasApi() || !list.length) return withLocal
+  if (!api.hasApi() || !list.length) {
+    return applyTagMap(list, {}, talentCity, { allowLocalFallback: true })
+  }
 
   const cache = readCache(TAG_CACHE_KEY)
   const missing = []
@@ -401,8 +415,10 @@ async function enrichOrderTags(rows, opts) {
     if (cache[ck]) map[row.id] = cache[ck]
     else missing.push(row)
   }
+  let aiHit = Object.keys(map).length > 0
   if (missing.length) {
     const fresh = await fetchTagItems(missing)
+    if (Object.keys(fresh).length) aiHit = true
     for (const row of missing) {
       const ck = `${row.id}:${hallKey(row)}`
       if (fresh[row.id]) {
@@ -412,7 +428,7 @@ async function enrichOrderTags(rows, opts) {
     }
     writeCache(TAG_CACHE_KEY, cache)
   }
-  return applyTagMap(list, map, talentCity)
+  return applyTagMap(list, map, talentCity, { allowLocalFallback: !aiHit })
 }
 
 function mergeCardAiTags(scored, tagged) {

@@ -7,6 +7,7 @@ const listFilters = require('./recruitmentListFilters.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
+const orderHighlightTag = require('./orderHighlightTag.js')
 
 const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
@@ -41,6 +42,17 @@ function mapMpOrderRow(mp, reg) {
   const effectiveStatus = mpOrderIce.resolveDisplayStatus(mp, 'hall', deadlineMs)
   let rowStatusLabel = mpOrderIce.displayStatusLabel(effectiveStatus, mp, 'hall')
   if (iceSlotsFull && effectiveStatus !== 'expired') rowStatusLabel = '已收满'
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const talentTags = Array.isArray(meta.talentTags) ? meta.talentTags : []
+  const recruitmentInfo = String(mp.recruitmentInfo || '').trim()
+  const merchantRequirements = String(mp.merchantRequirements || view.recruitmentInfo || '').trim()
+  const taskDetail = String(mp.taskDetail || view.taskDetail || '').trim()
+  const recruitContent = orderHighlightTag.buildRecruitContentForAi({
+    title: view.title,
+    merchantRequirements,
+    recruitmentInfo,
+    taskDetail,
+  })
   return {
     id: mp.id,
     isMock: false,
@@ -63,6 +75,11 @@ function mapMpOrderRow(mp, reg) {
       : budgetDisplayUtil.buildBudgetDisplay(budgetText, mp.mpPublishMeta),
     fansRequirement: view.fansRequirement || '不限',
     summary: view.summaryShort,
+    talentTags,
+    recruitmentInfo,
+    merchantRequirements,
+    taskDetail,
+    recruitContent,
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : view.recruitCount || '不限',
     claimedSlotCount: iceProgress ? Math.min(iceProgress.claimed, iceProgress.total || iceProgress.claimed) : 0,

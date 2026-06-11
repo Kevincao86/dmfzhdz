@@ -51,6 +51,11 @@ export type OrderMatchPayload = {
   feeMode?: string
   hasCommission?: boolean
   budgetDisplay?: { cps?: string; mode?: string; line?: string; kind?: string }
+  talentTags?: string[]
+  recruitmentInfo?: string
+  merchantRequirements?: string
+  taskDetail?: string
+  recruitContent?: string
 }
 
 export type RegionMatchLevel = 'same_city' | 'same_province' | 'national' | 'mismatch' | 'unknown'
@@ -130,15 +135,45 @@ export function sanitizeAiOrderTag(
   return { tag: t, tone: String(tone || 'default').trim() || 'default' }
 }
 
+/** 合并招募单全文供 AI 分析（标题 + 要求 + 说明 + 任务详情） */
+export function buildRecruitContentForAi(mp: {
+  title?: unknown
+  merchantRequirements?: unknown
+  recruitmentInfo?: unknown
+  taskDetail?: unknown
+}): string {
+  const parts: string[] = []
+  const title = String(mp.title || '').trim()
+  if (title) parts.push(`招募标题：${title}`)
+  const req = String(mp.merchantRequirements || '').trim()
+  if (req) parts.push(`招募要求：${req}`)
+  const info = String(mp.recruitmentInfo || '').trim()
+  if (info) parts.push(`招募说明：${info}`)
+  const task = String(mp.taskDetail || '').trim()
+  if (task) parts.push(`任务详情：${task}`)
+  return parts.join('\n').slice(0, 2400)
+}
+
 export function enrichOrderAiPayload<T extends OrderMatchPayload>(row: T): T & {
   cpsPercent: number | null
   feeMode: string
   hasCommission: boolean
+  recruitContent: string
 } {
   const traits = resolveOrderFeeTraits(row)
+  const recruitContent =
+    String(row.recruitContent || '').trim() ||
+    buildRecruitContentForAi({
+      title: row.title,
+      merchantRequirements: row.merchantRequirements,
+      recruitmentInfo: row.recruitmentInfo,
+      taskDetail: row.taskDetail,
+    })
   return {
     ...row,
     categoryTagsText: row.categoryTagsText || '',
+    talentTags: Array.isArray(row.talentTags) ? row.talentTags : [],
+    recruitContent,
     cpsPercent: traits.cpsPercent,
     feeMode: traits.feeMode,
     hasCommission: traits.hasCommission,
