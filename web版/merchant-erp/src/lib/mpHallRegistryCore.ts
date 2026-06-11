@@ -5,9 +5,6 @@ import {
 import type { RegistryFile, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
-import { syncExpiredMpOrdersInSnapshot } from './mpGroupQrCleanup.js'
-import { syncExpiredIcePendingConfirmInSnapshot } from './mpRecruitmentIceCore.js'
-import { syncDedupeApplicantsInSnapshot } from './mpApplicantIdentity.js'
 import {
   mergeMpRecruitmentOrdersForHallContext,
   type PrOwnerKeys,
@@ -146,6 +143,55 @@ function emptyHallPayload(): Record<string, unknown> {
   return { ok: true, mpRecruitmentOrders: [] }
 }
 
+/** 推荐大厅 / PR 库：拉取达人·团队·PR 相关切片（禁止写回 DB） */
+async function fetchRegistryRecommendPoolFromDb(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<Partial<RegistryFile>> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const select = [
+    'mpRecruitmentOrders:registry->mpRecruitmentOrders',
+    'mpTalentMembers:registry->mpTalentMembers',
+    'talentLibraryEntries:registry->talentLibraryEntries',
+    'shootTeamLibraryEntries:registry->shootTeamLibraryEntries',
+    'editTeamLibraryEntries:registry->editTeamLibraryEntries',
+    'mpPrUsers:registry->mpPrUsers',
+  ].join(',')
+  const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=${encodeURIComponent(select)}`
+  const res = await supabaseAdminFetch(url, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      Accept: 'application/json',
+    },
+    signal: hallFetchSignal(),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`registry_recommend_pool_${res.status}:${text.slice(0, 240)}`)
+  }
+  let rows: Record<string, unknown>[]
+  try {
+    rows = JSON.parse(text || '[]') as Record<string, unknown>[]
+  } catch {
+    throw new Error(`registry_recommend_pool_parse:${text.slice(0, 120)}`)
+  }
+  const row = rows[0]
+  if (!row || typeof row !== 'object') return {}
+  return row as Partial<RegistryFile>
+}
+
+function recommendPoolCount(partial: Partial<RegistryFile>): number {
+  const n = (key: keyof RegistryFile) => (Array.isArray(partial[key]) ? (partial[key] as unknown[]).length : 0)
+  return (
+    n('mpTalentMembers') +
+    n('talentLibraryEntries') +
+    n('shootTeamLibraryEntries') +
+    n('editTeamLibraryEntries') +
+    n('mpPrUsers')
+  )
+}
+
 function buildHallPayload(
   partial: Partial<RegistryFile>,
   includeMpOrderIds?: string[],
@@ -153,20 +199,16 @@ function buildHallPayload(
   talentMember?: RegistryMpTalentMember | null,
   talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null },
   includeRecommendPool?: boolean,
-): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
+): { payload: Record<string, unknown>; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
   const mpRaw = Array.isArray(file.mpRecruitmentOrders)
     ? (file.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
     : []
-  /** 须先于 sync* 变更 status，否则 open 单被提前标 done 后大厅过滤为空 */
   const mpRecruitmentOrders = mergeMpRecruitmentOrdersForHallContext(
     mpRaw,
     includeMpOrderIds,
     prOwnerKeys,
   )
-  const deduped = syncDedupeApplicantsInSnapshot(file)
-  const expired = syncExpiredMpOrdersInSnapshot(file)
-  const pendingExpired = syncExpiredIcePendingConfirmInSnapshot(file)
   const inboxKeys =
     talentAccount && talentMember
       ? talentInboxMatchKeysFromProfile(talentAccount, talentMember)
@@ -192,16 +234,14 @@ function buildHallPayload(
     const library = Array.isArray(file.talentLibraryEntries) ? file.talentLibraryEntries : []
     const shootLib = Array.isArray(file.shootTeamLibraryEntries) ? file.shootTeamLibraryEntries : []
     const editLib = Array.isArray(file.editTeamLibraryEntries) ? file.editTeamLibraryEntries : []
+    const prUsers = Array.isArray(file.mpPrUsers) ? file.mpPrUsers : []
     if (members.length) payload.mpTalentMembers = members
     if (library.length) payload.talentLibraryEntries = library
     if (shootLib.length) payload.shootTeamLibraryEntries = shootLib
     if (editLib.length) payload.editTeamLibraryEntries = editLib
+    if (prUsers.length) payload.mpPrUsers = prUsers
   }
   return {
-    needPersist:
-      expired.syncedIds.length > 0 ||
-      deduped.syncedOrderIds.length > 0 ||
-      pendingExpired.syncedOrderIds.length > 0,
     partial: file,
     payload,
   }
@@ -218,7 +258,7 @@ function buildHallPayloadSafe(
   talentMember?: RegistryMpTalentMember | null,
   talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null },
   includeRecommendPool?: boolean,
-): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
+): { payload: Record<string, unknown>; partial: Partial<RegistryFile> } {
   try {
     return buildHallPayload(
       partial,
@@ -234,21 +274,29 @@ function buildHallPayloadSafe(
     const mp = Array.isArray(partial.mpRecruitmentOrders)
       ? partial.mpRecruitmentOrders.filter((o) => o && o.id)
       : []
-    if (mp.length) {
-      return {
-        payload: { ok: true, mpRecruitmentOrders: mp },
-        needPersist: false,
-        partial,
-      }
+    const payload: Record<string, unknown> =
+      mp.length > 0 ? { ok: true, mpRecruitmentOrders: mp } : emptyHallPayload()
+    if (includeRecommendPool) {
+      const members = Array.isArray(partial.mpTalentMembers) ? partial.mpTalentMembers : []
+      const library = Array.isArray(partial.talentLibraryEntries) ? partial.talentLibraryEntries : []
+      const shootLib = Array.isArray(partial.shootTeamLibraryEntries) ? partial.shootTeamLibraryEntries : []
+      const editLib = Array.isArray(partial.editTeamLibraryEntries) ? partial.editTeamLibraryEntries : []
+      const prUsers = Array.isArray(partial.mpPrUsers) ? partial.mpPrUsers : []
+      if (members.length) payload.mpTalentMembers = members
+      if (library.length) payload.talentLibraryEntries = library
+      if (shootLib.length) payload.shootTeamLibraryEntries = shootLib
+      if (editLib.length) payload.editTeamLibraryEntries = editLib
+      if (prUsers.length) payload.mpPrUsers = prUsers
     }
-    return { payload: emptyHallPayload(), needPersist: false, partial: {} }
+    if (mp.length || Object.keys(payload).length > 2) {
+      return { payload, partial }
+    }
+    return { payload: emptyHallPayload(), partial: {} }
   }
 }
 
 async function tryLoadHallFromPartial(
   partialLoader: () => Promise<Partial<RegistryFile>>,
-  supabaseUrl: string,
-  serviceRole: string,
   opts: {
     includeMpOrderIds: string[]
     prOwnerKeys?: PrOwnerKeys
@@ -266,44 +314,7 @@ async function tryLoadHallFromPartial(
     opts.talentAccount,
     opts.includeRecommendPool,
   )
-  if (built.needPersist) {
-    void persistRegistryIfNeeded(supabaseUrl, serviceRole, built.partial).catch((e) => {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.warn('[hall_registry] async persist failed:', msg.slice(0, 200))
-    })
-  }
   return built.payload
-}
-
-async function persistRegistryIfNeeded(
-  supabaseUrl: string,
-  serviceRole: string,
-  partial: Partial<RegistryFile>,
-): Promise<void> {
-  const base = supabaseUrl.replace(/\/$/, '')
-  const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
-  const persist = registryForPersistentFile(partial as RegistryFile)
-  const nowIso = new Date().toISOString()
-  const body = JSON.stringify({
-    id: 1,
-    registry: persist as unknown as Record<string, unknown>,
-    updated_at: nowIso,
-  })
-  const res = await supabaseAdminFetch(`${base}/rest/v1/ops_registry_snapshot`, {
-    method: 'POST',
-    headers: {
-      apikey: serviceRole,
-      Authorization: `Bearer ${serviceRole}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal',
-    },
-    body,
-    signal: hallFetchSignal(),
-  })
-  if (!res.ok) {
-    const t = await res.text()
-    console.warn('[hall_registry] persist expired sync failed:', t.slice(0, 240))
-  }
 }
 
 export async function loadMpHallRegistryPayload(opts?: {
@@ -335,8 +346,8 @@ export async function loadMpHallRegistryPayload(opts?: {
   if (missingParts.length === 0) {
     const loaders: Array<() => Promise<Partial<RegistryFile>>> = includeRecommendPool
       ? [
+          () => fetchRegistryRecommendPoolFromDb(supabaseUrl, serviceRole),
           () => fetchRegistryPartialFromDb(supabaseUrl, serviceRole),
-          () => fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole),
         ]
       : [
           () => fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole),
@@ -346,8 +357,11 @@ export async function loadMpHallRegistryPayload(opts?: {
     let lastPayload: Record<string, unknown> | null = null
     for (let i = 0; i < loaders.length; i++) {
       try {
-        const payload = await tryLoadHallFromPartial(loaders[i]!, supabaseUrl, serviceRole, buildOpts)
-        if (hallOrderCount(payload) > 0) return payload!
+        const partial = await loaders[i]!()
+        const payload = await tryLoadHallFromPartial(async () => partial, buildOpts)
+        const orders = hallOrderCount(payload)
+        const pool = includeRecommendPool ? recommendPoolCount(partial) : 0
+        if (orders > 0 || (includeRecommendPool && pool > 0)) return payload!
         lastPayload = payload
         attempts.push(`loader_${i}:built_empty`)
       } catch (e) {

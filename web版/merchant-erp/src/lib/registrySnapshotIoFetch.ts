@@ -70,6 +70,11 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
     },
 
     async save(data: RegistryFile): Promise<void> {
+      const { isRegistrySnapshotSafeToPersist } = await import('./mpRecruitmentRegistryPersist.js')
+      if (!isRegistrySnapshotSafeToPersist(data)) {
+        console.error('[registrySnapshotIoFetch] blocked unsafe partial registry persist')
+        return
+      }
       const { registryForPersistentFile } = await import('../../vite-plugins/opsRegistryGatewayCore.js')
       const persist = registryForPersistentFile(data)
       const nowIso = new Date().toISOString()
