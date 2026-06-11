@@ -233,7 +233,7 @@
 
 <view wx:if="{{view && !loading}}" class="bottom-bar">
   <view class="bottom-bar__tools">
-    <button class="bottom-icon" bindtap="onOpenShareSheet">分享</button>
+    <button class="bottom-icon" open-type="share">分享</button>
     <button class="bottom-icon" bindtap="goHome">首页</button>
   </view>
   <view class="bottom-bar__actions">
@@ -270,39 +270,5 @@
       bindtap="goApply"
     >请切换身份后再报名</button>
     <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
-  </view>
-</view>
-
-<view wx:if="{{showShareSheet}}" class="detail-share-sheet-mask">
-  <view class="detail-share-sheet-mask-bg" bindtap="onCloseShareSheet"></view>
-  <view class="detail-share-float" catchtap="noopShareSheetTap">
-    <view class="detail-share-float-handle"></view>
-    <view class="detail-share-float-head">
-      <text class="detail-share-float-title">分享招募</text>
-      <text class="detail-share-float-close" bindtap="onCloseShareSheet">×</text>
-    </view>
-    <text wx:if="{{shareTitle}}" class="detail-share-float-sub">{{shareTitle}}</text>
-    <view class="detail-share-float-options">
-      <button class="detail-share-float-opt" open-type="share" plain="{{true}}" hover-class="detail-share-float-opt--active">
-        <view class="detail-share-float-icon detail-share-float-icon--mp">
-          <image class="detail-share-float-icon-img" src="/images/platforms/wechat.png" mode="aspectFit" />
-        </view>
-        <text class="detail-share-float-opt-label">分享小程序</text>
-        <text class="detail-share-float-opt-hint">发给好友或群聊</text>
-      </button>
-      <view class="detail-share-float-opt" bindtap="onPickShareTimeline" hover-class="detail-share-float-opt--active">
-        <view class="detail-share-float-icon detail-share-float-icon--timeline">
-          <view class="detail-share-float-moments">
-            <view class="detail-share-float-moment detail-share-float-moment--1"></view>
-            <view class="detail-share-float-moment detail-share-float-moment--2"></view>
-            <view class="detail-share-float-moment detail-share-float-moment--3"></view>
-            <view class="detail-share-float-moment detail-share-float-moment--4"></view>
-          </view>
-        </view>
-        <text class="detail-share-float-opt-label">分享朋友圈</text>
-        <text class="detail-share-float-opt-hint">复制文案 · 右上角发布</text>
-      </view>
-    </view>
-    <view class="detail-share-float-cancel" bindtap="onCloseShareSheet">取消</view>
   </view>
 </view>
