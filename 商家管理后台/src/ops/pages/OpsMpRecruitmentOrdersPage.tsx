@@ -27,7 +27,46 @@ import {
 } from '../opsRegistryApi'
 
 type MpStatus = RegistryMpRecruitmentOrder['status']
+type EffectiveMpStatus = MpStatus | 'expired'
 type RecruitTarget = 'talent' | 'shoot' | 'edit'
+
+function mpStatusLabel(s: EffectiveMpStatus): string {
+  const m: Record<EffectiveMpStatus, string> = {
+    open: '招募中',
+    collecting: '收集中',
+    expired: '已截止',
+    pending_settlement: '待结算',
+    closed: '已关闭',
+    done: '已完成',
+  }
+  return m[s] ?? s
+}
+
+function mpStatusStyle(s: EffectiveMpStatus): string {
+  if (s === 'open') return 'bg-emerald-500/15 text-emerald-400'
+  if (s === 'collecting') return 'bg-sky-500/15 text-sky-400'
+  if (s === 'expired') return 'bg-slate-500/20 text-slate-300'
+  if (s === 'pending_settlement') return 'bg-violet-500/15 text-violet-300'
+  if (s === 'done') return 'bg-indigo-500/15 text-indigo-300'
+  return 'bg-slate-600 text-slate-300'
+}
+
+function mpOrderStatusView(o: RegistryMpRecruitmentOrder): {
+  effective: EffectiveMpStatus
+  staleRaw: boolean
+  hallVisible: boolean
+} {
+  const effective = resolveEffectiveMpOrderStatus(o)
+  const raw = o.status
+  const staleRaw =
+    (raw === 'open' || raw === 'collecting') && effective !== raw
+  const hallVisible =
+    effective === 'open' ||
+    effective === 'collecting' ||
+    effective === 'closed' ||
+    effective === 'expired'
+  return { effective, staleRaw, hallVisible }
+}
 
 function inferRecruitTarget(o: RegistryMpRecruitmentOrder): RecruitTarget {
   const raw = o as RegistryMpRecruitmentOrder & { recruitTarget?: string }
@@ -53,7 +92,7 @@ function publisherLabel(o: RegistryMpRecruitmentOrder): string {
   return o.publisherIdentity === 'pr' ? 'PR' : '商家'
 }
 
-function mpStatusLabel(s: MpStatus): string {
+function rawMpStatusLabel(s: MpStatus): string {
   const m: Record<MpStatus, string> = {
     open: '招募中',
     collecting: '收集中',
@@ -64,33 +103,12 @@ function mpStatusLabel(s: MpStatus): string {
   return m[s] ?? s
 }
 
-function mpStatusStyle(s: MpStatus): string {
-  if (s === 'open') return 'bg-emerald-500/15 text-emerald-400'
-  if (s === 'collecting') return 'bg-sky-500/15 text-sky-400'
-  if (s === 'pending_settlement') return 'bg-violet-500/15 text-violet-300'
-  if (s === 'done') return 'bg-indigo-500/15 text-indigo-300'
-  return 'bg-slate-600 text-slate-300'
-}
-
-function mpOrderStatusView(o: RegistryMpRecruitmentOrder): {
-  effective: MpStatus
-  staleRaw: boolean
-  hallVisible: boolean
-} {
-  const effective = resolveEffectiveMpOrderStatus(o) as MpStatus
-  const raw = o.status
-  const staleRaw =
-    (raw === 'open' || raw === 'collecting') && effective !== raw
-  const hallVisible = effective === 'open' || effective === 'collecting' || effective === 'closed'
-  return { effective, staleRaw, hallVisible }
-}
-
 function loopBadgeStyle(loop: RecruitmentFulfillmentLoop): string {
   return loop === 'closed' ? 'bg-amber-500/15 text-amber-300' : 'bg-teal-500/15 text-teal-300'
 }
 
 export default function OpsMpRecruitmentOrdersPage() {
-  const [status, setStatus] = useState<'all' | MpStatus>('all')
+  const [status, setStatus] = useState<'all' | EffectiveMpStatus>('all')
   const [loopFilter, setLoopFilter] = useState<'all' | RecruitmentFulfillmentLoop>('all')
   const [targetFilter, setTargetFilter] = useState<'all' | RecruitTarget>('all')
   const [publisherFilter, setPublisherFilter] = useState<'all' | 'pr' | 'merchant'>('all')
@@ -233,6 +251,7 @@ export default function OpsMpRecruitmentOrdersPage() {
           <option value="all">全部</option>
           <option value="open">招募中</option>
           <option value="collecting">收集中</option>
+          <option value="expired">已截止</option>
           <option value="pending_settlement">待结算</option>
           <option value="closed">已关闭</option>
           <option value="done">已完成</option>
@@ -381,7 +400,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                               </span>
                               {sv.staleRaw ? (
                                 <p className="text-[10px] leading-tight text-amber-400/90">
-                                  库内仍标「{mpStatusLabel(o.status)}」· 报名已截止，大厅不可见
+                                  库内仍标「{rawMpStatusLabel(o.status)}」· 星选展示为「{mpStatusLabel(sv.effective)}」
                                 </p>
                               ) : null}
                               {!sv.hallVisible && !sv.staleRaw ? (

@@ -1,13 +1,14 @@
-/** 星选 Web / 小程序对齐：有效状态（含截止自动已完成） */
+/** 星选 Web / 小程序对齐：有效状态（含报名截止 → 已截止） */
 export const MP_STATUS_LABEL: Record<string, string> = {
   open: '招募中',
   collecting: '收集中',
+  expired: '已截止',
   closed: '已停止',
   done: '已完成',
   deleted: '已删除',
 }
 
-export const HALL_STATUS_FILTERS = ['全部', '招募中/收集中', '招募中', '收集中', '已停止', '已完成'] as const
+export const HALL_STATUS_FILTERS = ['全部', '招募中/收集中', '招募中', '收集中', '已截止', '已停止', '已完成'] as const
 
 export const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
 
@@ -33,7 +34,7 @@ export function resolveEffectiveMpStatus(
   let raw = String(rawStatus || 'open').trim() || 'open'
   if (raw === 'pending_settlement') raw = 'done'
   if (raw === 'closed' || raw === 'done') return raw
-  if (deadlineMs > 0 && nowMs >= deadlineMs && raw !== 'collecting') return 'done'
+  if (deadlineMs > 0 && nowMs >= deadlineMs && (raw === 'open' || raw === 'collecting')) return 'expired'
   return raw
 }
 

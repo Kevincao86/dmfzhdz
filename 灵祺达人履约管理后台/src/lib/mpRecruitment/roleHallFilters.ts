@@ -40,7 +40,8 @@ export function prioritizeActiveStatus<T extends { statusLabel?: string; publish
   const rank = (label?: string) => {
     if (label === '招募中') return 0
     if (label === '收集中') return 1
-    return 2
+    if (label === '已截止') return 2
+    return 3
   }
   return [...rows].sort((a, b) => {
     const d = rank(a.statusLabel) - rank(b.statusLabel)

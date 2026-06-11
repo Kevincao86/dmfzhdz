@@ -1,13 +1,14 @@
-/** 小程序/大厅共用：招募单有效状态（含截止自动已完成） */
+/** 小程序/大厅共用：招募单有效状态（含报名截止 → 已截止） */
 const MP_STATUS_LABEL = {
   open: '招募中',
   collecting: '收集中',
+  expired: '已截止',
   closed: '已停止',
   done: '已完成',
   deleted: '已删除',
 }
 
-const HALL_STATUS_FILTERS = ['全部', '招募中/收集中', '招募中', '收集中', '已停止', '已完成']
+const HALL_STATUS_FILTERS = ['全部', '招募中/收集中', '招募中', '收集中', '已截止', '已停止', '已完成']
 
 const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
 
@@ -30,7 +31,9 @@ function resolveEffectiveMpStatus(rawStatus, deadlineMs, nowMs) {
   let raw = String(rawStatus || 'open').trim() || 'open'
   if (raw === 'pending_settlement') raw = 'done'
   if (raw === 'closed' || raw === 'done') return raw
-  if (deadlineMs && Number(deadlineMs) > 0 && now >= Number(deadlineMs) && raw !== 'collecting') return 'done'
+  if (deadlineMs && Number(deadlineMs) > 0 && now >= Number(deadlineMs) && (raw === 'open' || raw === 'collecting')) {
+    return 'expired'
+  }
   return raw
 }
 

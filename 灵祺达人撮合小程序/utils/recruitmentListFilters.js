@@ -16,9 +16,10 @@ function isMpOrderRecruiting(status) {
 function statusPriority(status) {
   if (status === 'open') return 0
   if (status === 'collecting') return 1
-  if (status === 'closed') return 2
-  if (status === 'done') return 3
-  return 4
+  if (status === 'expired') return 2
+  if (status === 'closed') return 3
+  if (status === 'done') return 4
+  return 5
 }
 
 function matchHallStatus(row, filterLabel) {
