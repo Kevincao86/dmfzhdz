@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchMpRegistry } from '../../lib/mpApi'
+import { fetchMpRegistry, clearMpRegistryCache } from '../../lib/mpApi'
 import { buildHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 import { getActiveRole } from '../../lib/mpSession'
@@ -81,7 +81,12 @@ export default function HallHomeDashboard() {
       try {
         const reg = await fetchMpRegistry()
         const identity = role === 'pr' ? 'pr' : workId
-        setStats(buildHallDashboardStats(reg, identity))
+        const next = buildHallDashboardStats(reg, identity)
+        setStats(next)
+        const mpCount = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders.length : 0
+        if (mpCount === 0 && next.total === 0) {
+          setErr('暂未拉取到招募单数据，请刷新重试')
+        }
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -89,6 +94,11 @@ export default function HallHomeDashboard() {
       }
     })()
   }, [role, workId])
+
+  function retryLoad() {
+    clearMpRegistryCache()
+    window.location.reload()
+  }
 
   const maxPlatform = Math.max(...(stats?.platformCounts.map((p) => p.count) || [1]), 1)
   const maxCategory = Math.max(...(stats?.categoryCounts.map((c) => c.count) || [1]), 1)
@@ -109,7 +119,7 @@ export default function HallHomeDashboard() {
           <button
             type="button"
             className="ml-2 text-violet-600 underline"
-            onClick={() => window.location.reload()}
+            onClick={retryLoad}
           >
             刷新重试
           </button>

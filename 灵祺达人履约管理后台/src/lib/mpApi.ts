@@ -309,6 +309,10 @@ async function fetchRegistryRemoteWithRetry(
   }
 }
 
+function hallRegistryHasOrders(data: Record<string, unknown> | null | undefined): boolean {
+  return Array.isArray(data?.mpRecruitmentOrders) && data!.mpRecruitmentOrders!.length > 0
+}
+
 export function clearMpRegistryCache(): void {
   hallRegistryCache = {}
   hallRegistryInflight = {}
@@ -337,7 +341,7 @@ export async function fetchMpRegistry(opts?: {
   const now = Date.now()
   const cacheKey = hallRegistryCacheKey(scope)
   const cached = hallRegistryCache[cacheKey]
-  if (cached && cached.expiresAt > now) {
+  if (cached && cached.expiresAt > now && hallRegistryHasOrders(cached.data)) {
     return cached.data
   }
   const inflight = hallRegistryInflight[cacheKey]
@@ -356,11 +360,13 @@ export async function fetchMpRegistry(opts?: {
 
   const pending = fetchRegistryRemoteWithRetry(fetchOnce)
     .then((data) => {
-      hallRegistryCache[cacheKey] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
+      if (hallRegistryHasOrders(data)) {
+        hallRegistryCache[cacheKey] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
+      }
       return data
     })
     .catch((e) => {
-      if (cached?.data) return cached.data
+      if (cached?.data && hallRegistryHasOrders(cached.data)) return cached.data
       const msg = e instanceof Error ? e.message : String(e)
       throw new Error(formatMpApiErr(new Error(msg), '招募数据加载失败，请刷新重试'))
     })
