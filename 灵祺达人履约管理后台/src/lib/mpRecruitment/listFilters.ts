@@ -95,11 +95,11 @@ export function resolveSignupCountdownTone(
 }
 
 export const SIGNUP_COUNTDOWN_TONE_CLASS: Record<SignupCountdownTone, string> = {
-  green: 'text-emerald-300',
-  orange: 'text-orange-300',
-  danger: 'text-red-300',
-  ended: 'text-white/55',
-  unknown: 'text-amber-200',
+  green: 'signup-countdown signup-countdown--green',
+  orange: 'signup-countdown signup-countdown--orange',
+  danger: 'signup-countdown signup-countdown--danger',
+  ended: 'signup-countdown signup-countdown--ended',
+  unknown: 'signup-countdown signup-countdown--unknown',
 }
 
 export function resolveSignupClosed(
