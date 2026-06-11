@@ -11,6 +11,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const iceGroupQr = require('../../utils/iceGroupQr.js')
 
 Page({
   data: {
@@ -45,6 +46,9 @@ Page({
     contactPrPending: false,
     readOnlyEnded: false,
     mpOrder: null,
+    claimGroupQr: '',
+    claimGroupQrHint: '',
+    isEditTeamIce: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -207,6 +211,15 @@ Page({
         : null
       const hasApplied = this.data.applied || iceApplied || gate.hasApplication
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
+      const isEditTeamIce = isIce && iceGroupQr.isEditTeamIceMp(mp)
+      const identity = userProfile.readIdentity()
+      let claimGroupQr = ''
+      if (hasApplied && isIce && !iceRejected) {
+        claimGroupQr = iceGroupQr.resolveClaimGroupQr(mp, reg, id, identity)
+      }
+      const claimGroupQrHint = isEditTeamIce
+        ? '认领成功，请尽快扫码进入剪辑师群沟通交付'
+        : '认领成功，请尽快扫码进入达人群沟通发布与结算'
       this.setData({
         view,
         loading: false,
@@ -233,6 +246,9 @@ Page({
         iceStep3Hint,
         applied: hasApplied,
         readOnlyEnded: isEnded && canViewEnded,
+        claimGroupQr,
+        claimGroupQrHint,
+        isEditTeamIce,
       })
     } catch (e) {
       const msg = String(e.message || e)

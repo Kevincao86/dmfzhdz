@@ -5,11 +5,11 @@ import type {
   RegistryMpRecruitmentOrder,
 } from './opsRegistryTypes.js'
 import { extractDouyinShareFromText, resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
-import { getIceVerifyMode } from './iceOrderDetect.js'
+import { getIceVerifyMode, isEditTeamIceMpOrder } from './iceOrderDetect.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'
 import { findDuplicateApplicant } from './mpApplicantIdentity.js'
 
-export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel } from './iceOrderDetect.js'
+export { isIceMpOrder, getIceVerifyMode, iceVerifyModeLabel, isEditTeamIceMpOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
 export type { IceVerifyMode } from './iceOrderDetect.js'
 
 function parseIceRecruitCapacity(mp: RegistryMpRecruitmentOrder): number {
@@ -199,8 +199,9 @@ export function claimIceMpRecruitment(
   mp: RegistryMpRecruitmentOrder,
   applicant: RegistryMpRecruitmentApplicant,
 ): ClaimIceMpResult {
-  const slots = ensureIceVideoSlots(mp)
-  if (!slots.length || !resolveIceReferenceDownloadUrl(mp)) {
+  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
+  const slots = isEditTeam ? [] : ensureIceVideoSlots(mp)
+  if (!isEditTeam && (!slots.length || !resolveIceReferenceDownloadUrl(mp))) {
     return { ok: false, error: '云剪任务未配置成片', code: 'no_slots' }
   }
 
@@ -220,7 +221,7 @@ export function claimIceMpRecruitment(
     }
   }
 
-  const capacity = parseIceRecruitCapacity(mp)
+  const capacity = isEditTeam ? 9999 : parseIceRecruitCapacity(mp)
   const occupied = countActiveIceApplicants(mp, applicant.id)
   if (occupied >= capacity) {
     return { ok: false, error: '任务已满，暂无可用名额', code: 'slots_full' }
@@ -241,7 +242,8 @@ export function confirmIceMpReceipt(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
 ): ConfirmIceMpResult {
-  const slots = ensureIceVideoSlots(mp)
+  const isEditTeam = isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)
+  const slots = isEditTeam ? [...(mp.iceVideoSlots ?? [])] : ensureIceVideoSlots(mp)
   const applicants = [...(mp.applicants ?? [])]
   const idx = applicants.findIndex((a) => a.id === applicantId)
   if (idx < 0) return { ok: false, error: '未找到认领记录', code: 'not_found' }
@@ -254,6 +256,16 @@ export function confirmIceMpReceipt(
   }
   if (app.taskStatus !== 'pending_confirm' && app.taskStatus !== 'applied' && !app.taskStatus) {
     return { ok: false, error: '当前状态不可确认接收', code: 'invalid_state' }
+  }
+
+  if (isEditTeam) {
+    const row: RegistryMpRecruitmentApplicant = {
+      ...app,
+      taskStatus: 'confirmed',
+      aiVerifyStatus: 'pending',
+    }
+    applicants[idx] = row
+    return { ok: true, applicant: row, slot: slots[0] || { slotId: '', label: '', downloadUrl: '', iceJobId: '' }, iceVideoSlots: slots }
   }
 
   const existingSlot = slots.find((s) => s.assignedApplicantId === applicantId)

@@ -15,7 +15,7 @@ import {
   filterTalentInboxForHall,
   talentInboxMatchKeysFromProfile,
 } from './mpTalentInboxHallFilter.js'
-import { buildMpGroupQrByOrderIdForTalent } from './mpGroupQrHallSlice.js'
+import { buildMpGroupQrByOrderIdForSession } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 
 const HALL_FETCH_MS = 20_000
@@ -65,7 +65,7 @@ function buildHallPayload(
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
   talentMember?: RegistryMpTalentMember | null,
-  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null },
+  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null },
   includeRecommendPool?: boolean,
 ): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
@@ -85,8 +85,14 @@ function buildHallPayload(
       : new Set<string>()
   const mpTalentInbox = filterTalentInboxForHall(file.mpTalentInbox, inboxKeys)
   const mpGroupQrByOrderId = talentMember
-    ? buildMpGroupQrByOrderIdForTalent(file, talentMember)
-    : {}
+    ? buildMpGroupQrByOrderIdForSession(
+        file,
+        talentMember,
+        talentAccount?.openid || talentMember.wxOpenId,
+      )
+    : talentAccount?.openid
+      ? buildMpGroupQrByOrderIdForSession(file, null, talentAccount.openid)
+      : {}
   const payload: Record<string, unknown> = {
     ok: true,
     mpRecruitmentOrders,
@@ -145,7 +151,7 @@ export async function loadMpHallRegistryPayload(opts?: {
   includeMpOrderIds?: string[]
   prOwnerKeys?: PrOwnerKeys
   talentMember?: RegistryMpTalentMember | null
-  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null }
+  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
   /** 已登录 PR 推荐大厅：附带达人/团队库（轻量大厅默认不含） */
   includeRecommendPool?: boolean
 }): Promise<Record<string, unknown>> {

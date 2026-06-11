@@ -365,7 +365,7 @@
                 </picker>
               </view>
             </view>
-            <view class="pub-field">
+            <view class="pub-field" wx:if="{{recruitMode !== 'edit_ice'}}">
               <text class="pub-label">{{recruitMode === 'edit_ice' ? '参考片链接 *' : '参考片链接'}}</text>
               <input class="pub-input" placeholder="{{recruitMode === 'edit_ice' ? 'https://…mp4 云剪成片下载链接' : '选填'}}" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
             </view>
@@ -433,7 +433,7 @@
             <text class="pub-label">佣金 CPS（%）</text>
             <input class="pub-input" type="digit" placeholder="选填" value="{{form.cpsPercent}}" data-key="cpsPercent" bindinput="onFieldInput" />
           </view>
-          <view class="pub-field" id="field-recruit-count">
+          <view class="pub-field" id="field-recruit-count" wx:if="{{recruitMode !== 'edit_ice'}}">
             <text class="pub-label">招募人数 *</text>
             <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
           </view>
@@ -448,6 +448,28 @@
               maxlength="2000"
               show-confirm-bar="{{false}}"
             />
+          </view>
+          <view class="pub-field" wx:if="{{recruitMode === 'ice' && !isSupplierPublish}}">
+            <text class="pub-label">参考片链接 *</text>
+            <input class="pub-input" placeholder="https://…mp4 云剪参考成片下载链接" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
+          </view>
+          <view class="pub-field" wx:if="{{recruitMode === 'edit_ice'}}">
+            <text class="pub-label">剪辑师进群二维码 *</text>
+            <text class="pub-cover-hint">认领成功后向剪辑师展示，请尽快进群沟通交付</text>
+            <image wx:if="{{form.editGroupQrImage}}" class="pub-cover-preview pub-qr-preview" src="{{form.editGroupQrImage}}" mode="aspectFit" />
+            <view class="pub-cover-actions">
+              <button class="pub-cover-btn" bindtap="onUploadEditGroupQr">上传群二维码</button>
+              <button wx:if="{{form.editGroupQrImage}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearEditGroupQr">清除</button>
+            </view>
+          </view>
+          <view class="pub-field" wx:if="{{recruitMode === 'ice'}}">
+            <text class="pub-label">达人进群二维码 *</text>
+            <text class="pub-cover-hint">达人认领成功后展示，与剪辑师群分开</text>
+            <image wx:if="{{form.groupQrImage}}" class="pub-cover-preview pub-qr-preview" src="{{form.groupQrImage}}" mode="aspectFit" />
+            <view class="pub-cover-actions">
+              <button class="pub-cover-btn" bindtap="onUploadTalentGroupQr">上传群二维码</button>
+              <button wx:if="{{form.groupQrImage}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearTalentGroupQr">清除</button>
+            </view>
           </view>
           <view class="pub-field" wx:if="{{recruitMode === 'ice' || recruitMode === 'edit_ice'}}">
             <text class="pub-label">云剪审核方式 *</text>

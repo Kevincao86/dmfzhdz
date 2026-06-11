@@ -68,8 +68,10 @@ function validateSupplierPublish(workId, f, recruitMode) {
   }
   if (workId === 'edit') {
     if (!String(f.materialSource || '').trim()) return '请选择素材来源'
-    if (
-      (f.materialSource === 'PR提供链接' || recruitMode === 'edit_ice') &&
+    if (recruitMode === 'edit_ice') {
+      /* 剪辑云剪：参考片由后续成片上传/转直发生成，创建时不填 */
+    } else if (
+      (f.materialSource === 'PR提供链接') &&
       !String(f.materialUrl || '').trim()
     ) {
       return '请填写素材链接'
@@ -78,9 +80,6 @@ function validateSupplierPublish(workId, f, recruitMode) {
     if (!String(f.targetDuration || '').trim()) return '请选择目标时长'
     if (!(f.styleTags || []).length) return '请选择剪辑风格'
     if (!String(f.deliveryDeadline || '').trim()) return '请选择交付截止时间'
-    if (recruitMode === 'edit_ice' && !String(f.referenceUrl || f.materialUrl || f.iceVideoUrl || '').trim()) {
-      return '云剪任务请填写参考片链接'
-    }
   }
   return null
 }
@@ -105,7 +104,9 @@ function buildSupplierRecruitmentLines(workId, f, mode, helpers) {
     lines.push(`剪辑风格：${(f.styleTags || []).join('、') || '—'}`)
     if ((f.packageTags || []).length) lines.push(`包装要求：${f.packageTags.join('、')}`)
     lines.push(`交付截止：${f.deliveryDeadline ? String(f.deliveryDeadline).slice(0, 16) : '—'}`)
-    if (String(f.referenceUrl || '').trim()) lines.push(`参考片：${f.referenceUrl}`)
+    if (mode && mode.id !== 'edit_ice' && String(f.referenceUrl || '').trim()) {
+      lines.push(`参考片：${f.referenceUrl}`)
+    }
   }
   if (helpers && typeof helpers.buildBudgetDetailText === 'function') {
     lines.push(`酬劳摘要：${helpers.buildBudgetDetailText(f)}`)

@@ -6,13 +6,28 @@ import {
   submitIceDouyin,
 } from '../../lib/mpSync/iceTaskRuntime'
 
+function IceClaimGroupQr({ qr, hint }: { qr: string; hint: string }) {
+  if (!qr) return null
+  return (
+    <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-4 space-y-2">
+      <h4 className="font-medium text-violet-950">进群二维码</h4>
+      <p className="text-sm text-violet-900/90">{hint}</p>
+      <button type="button" className="block" onClick={() => window.open(qr, '_blank')}>
+        <img src={qr} alt="进群二维码" className="h-36 w-36 rounded-lg border bg-white object-contain" />
+      </button>
+    </div>
+  )
+}
+
 type Props = {
   mpOrderId: string
   state: IceApplicantState
+  claimGroupQr?: string
+  claimGroupQrHint?: string
   onRefresh: () => void | Promise<void>
 }
 
-export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
+export default function IceTaskPanel({ mpOrderId, state, claimGroupQr = '', claimGroupQrHint = '', onRefresh }: Props) {
   const [douyinUrl, setDouyinUrl] = useState(state.douyinPublishUrl)
   const [confirming, setConfirming] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -92,6 +107,7 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
       <section className="surface-card rounded-xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
         <h3 className="font-medium text-amber-950">待确认接收</h3>
         <p className="text-sm text-amber-900/90">请确认是否接受该云剪投放任务；拒绝后名额将释放。</p>
+        <IceClaimGroupQr qr={claimGroupQr} hint={claimGroupQrHint} />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -117,6 +133,7 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
   if (state.assignedVideoUrl) {
     return (
       <section className="surface-card rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+        <IceClaimGroupQr qr={claimGroupQr} hint={claimGroupQrHint} />
         <div>
           <h3 className="font-medium text-emerald-900">✓ 已分配成片</h3>
           <p className="text-sm text-emerald-800/90 mt-1">{state.assignedVideoLabel || '云剪成片'}</p>
@@ -159,9 +176,14 @@ export default function IceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
   }
 
   return (
-    <section className="surface-card rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
+    <section className="surface-card rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3">
+      <IceClaimGroupQr qr={claimGroupQr} hint={claimGroupQrHint} />
       <h3 className="font-medium text-emerald-900">✓ 认领成功</h3>
-      <p className="text-sm text-emerald-800/90">等待 PR 分配成片，分配后可在此下载并回传抖音链接。</p>
+      <p className="text-sm text-emerald-800/90">
+        {state.isEditTeamIce
+          ? '请在「我的报名」上传成片；交付细节可通过上方进群二维码沟通。'
+          : '等待 PR 分配成片，分配后可在此下载并回传抖音链接。'}
+      </p>
     </section>
   )
 }

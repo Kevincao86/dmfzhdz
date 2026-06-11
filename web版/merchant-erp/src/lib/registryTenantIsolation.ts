@@ -121,7 +121,11 @@ export function sanitizeMpRecruitmentOrderForTalentHall(o: RegistryMpRecruitment
   )
   const meta =
     o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
-      ? { ...o.mpPublishMeta, groupQrImage: undefined }
+      ? {
+          ...o.mpPublishMeta,
+          groupQrImage: undefined,
+          editGroupQrImage: undefined,
+        }
       : o.mpPublishMeta
   const applicants = (o.applicants ?? []).map((a) => ({
     ...a,
@@ -130,6 +134,7 @@ export function sanitizeMpRecruitmentOrderForTalentHall(o: RegistryMpRecruitment
   return {
     ...o,
     groupQrImage: undefined,
+    editGroupQrImage: undefined,
     applicants,
     mpPublishMeta: meta,
   }
