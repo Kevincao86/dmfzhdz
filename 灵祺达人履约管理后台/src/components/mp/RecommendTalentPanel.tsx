@@ -22,6 +22,7 @@ import {
   smartMatchNeedRecruitHint,
   type PrBoardId,
 } from '../../lib/mpRecruitment/prRecommendBoard'
+import { logRecommendPoolParity } from '../../lib/mpRecruitment/recommendPoolVerify'
 import type { MpRegistry, TalentCardRow } from '../../lib/mpRecruitment/types'
 import { matchTalentFilters } from '../../lib/mpRecruitment/talentFormat'
 import {
@@ -184,6 +185,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         edit: buildBoardPool(reg, 'edit'),
       }
       setBoardPools(pools)
+      logRecommendPoolParity(reg, prBoard)
       const pool = pools[prBoard]
       const orderCount = countPrOrdersForBoard(reg, prBoard)
       const eligible = recruitmentAi.listPrEligibleOrders(reg, { board: prBoard })

@@ -241,6 +241,14 @@ function buildHallPayload(
     if (shootLib.length) payload.shootTeamLibraryEntries = shootLib
     if (editLib.length) payload.editTeamLibraryEntries = editLib
     if (prUsers.length) payload.mpPrUsers = prUsers
+    payload._recommendPoolMeta = {
+      source: 'ops_registry_snapshot',
+      talentLibraryCount: library.length,
+      shootTeamLibraryCount: shootLib.length,
+      editTeamLibraryCount: editLib.length,
+      mpTalentMembersCount: members.length,
+      mpPrUsersCount: prUsers.length,
+    }
   }
   return {
     partial: file,
@@ -288,6 +296,14 @@ function buildHallPayloadSafe(
       if (shootLib.length) payload.shootTeamLibraryEntries = shootLib
       if (editLib.length) payload.editTeamLibraryEntries = editLib
       if (prUsers.length) payload.mpPrUsers = prUsers
+      payload._recommendPoolMeta = {
+        source: 'ops_registry_snapshot',
+        talentLibraryCount: library.length,
+        shootTeamLibraryCount: shootLib.length,
+        editTeamLibraryCount: editLib.length,
+        mpTalentMembersCount: members.length,
+        mpPrUsersCount: prUsers.length,
+      }
     }
     if (mp.length || Object.keys(payload).length > 2) {
       return { payload, partial }

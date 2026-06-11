@@ -229,39 +229,53 @@ function buildTalentPool(reg) {
   return require('./recommendAllTalentsPool.js').buildAllTalentsPool(reg)
 }
 
-function suppliersFromRegistry(reg, board) {
-  const target = boardRecruitTarget(board)
-  const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
-  const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const byId = new Map()
-
-  for (const m of members) {
-    if (!m || !m.id) continue
-    if (!memberMatchesBoard(m, board)) continue
-    byId.set(String(m.id), formatSupplierFromMember(m, board))
+function formatSupplierFromTeamLibrary(e, board) {
+  const accountTags = Array.isArray(e.accountTags) ? e.accountTags : []
+  const baseTags = board === 'shoot' ? ['拍摄团队'] : ['剪辑团队']
+  const platform = e.platform || '抖音'
+  return {
+    id: String(e.memberId || e.id || ''),
+    boardType: board,
+    isPreview: false,
+    isSupplier: true,
+    name: String(
+      e.platformNickname || e.wxNickName || (board === 'shoot' ? '拍摄团队' : '剪辑团队'),
+    ),
+    avatar: e.wxAvatarUrl || '',
+    platform,
+    platformIcon: hallFilters.platformIcon(platform),
+    followers: '团队',
+    followersRaw: 0,
+    salesGrade: board === 'shoot' ? '拍摄服务' : '剪辑服务',
+    douyinSalesLevel: '',
+    quality: board === 'shoot' ? '拍摄' : '剪辑',
+    tags: [...baseTags, ...accountTags.slice(0, 3)],
+    accountTags,
+    region: [e.province, e.city].filter(Boolean).join(' · '),
+    gender: '不限',
+    online: true,
+    matchScore: 0,
+    aiTag: '',
+    aiTagTone: 'default',
+    aiMatch: false,
   }
+}
 
-  let idx = 0
-  for (const mp of mpList) {
-    if (!mp) continue
-    const rt = recruitTargetFromMp(mp)
-    if (rt !== target && !(board === 'edit' && isIceMpOrder(mp))) continue
-    const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
-    for (const a of applicants) {
-      if (!a) continue
-      const key = String(a.talentMemberId || a.id || `ap-${idx}`)
-      if (byId.has(key)) continue
-      byId.set(key, formatSupplierFromApplicant(a, board, idx))
-      idx += 1
-    }
-  }
-
-  return [...byId.values()]
+function suppliersFromTeamLibrary(reg, board) {
+  const list =
+    board === 'shoot'
+      ? Array.isArray(reg.shootTeamLibraryEntries)
+        ? reg.shootTeamLibraryEntries
+        : []
+      : Array.isArray(reg.editTeamLibraryEntries)
+        ? reg.editTeamLibraryEntries
+        : []
+  return list.map((e) => formatSupplierFromTeamLibrary(e, board)).filter((r) => r.id)
 }
 
 function buildBoardPool(reg, board) {
   if (board === 'talent') return buildTalentPool(reg)
-  return suppliersFromRegistry(reg, board)
+  return suppliersFromTeamLibrary(reg, board)
 }
 
 function countPrOrdersForBoard(reg, board) {

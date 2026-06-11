@@ -6,17 +6,24 @@
 - `灵祺达人撮合小程序/utils/recommendAllTalentsPool.js`
 - Web `fetchMpRegistry({ includeRecommendPool: true })` 的缓存键须含 `:rec`，且不得用无达人库的 hall 缓存顶替
 
-## 行为契约
+## 行为契约（权威数据源 = 商家管理后台只读库）
 
-1. PR 推荐大厅 → 浏览模式「全部达人」：必须展示 `mpTalentMembers` + `talentLibraryEntries` 合并去重后的全部已注册达人（有 id + 昵称即可，**不要求** platformAccount）。
-2. 与「智能匹配」「招募大厅筛选」「推荐商单 filterRecommendHallOrders」等逻辑**隔离**；改其它板块时不得改上述文件或删除 `includeRecommendPool=1` 请求。
-3. 请求须带 `includeRecommendPool=1`（Web GET 或 MP POST `hall_registry`），服务端返回达人库切片。
-4. 内联 `data:image` 过大时由 `recommendHallInlineImagesOss` 上传 OSS 并替换为 HTTPS URL；**禁止**删除头像/封面/报名明细等字段。
+1. **达人**：`talentLibraryEntries` **1:1** 展示（当前约 66 条），粉丝数用库内 `followers` 字段；`mpTalentMembers` 仅补头像/私信 MTM id/标签，**禁止**用空壳 wx 会员凑数或替代达人库。
+2. **拍摄/剪辑团队**：`shootTeamLibraryEntries` / `editTeamLibraryEntries` **1:1**（与运营台团队库一致）。
+3. 与「智能匹配」「招募大厅筛选」「推荐商单 filterRecommendHallOrders」等逻辑**隔离**；不得删除 `includeRecommendPool=1`。
+4. 内联图过大走 `recommendHallInlineImagesOss`；**禁止**删字段瘦身。
+5. 轻量响应含 `_recommendPoolMeta` 计数；客户端 `recommendPoolVerify` 须 pool.length === 库条数。
 
 ## 自测
 
 ```bash
-curl -sS "http://139.196.42.5/erp-api/meoo-ops-mp-hall-registry?includeRecommendPool=1" | python3 -c "import sys,json;d=json.load(sys.stdin);print('members',len(d.get('mpTalentMembers')or[]),'lib',len(d.get('talentLibraryEntries')or[]))"
+bash scripts/verify-recommend-pool-parity.sh
+cd 灵祺达人撮合小程序 && node -e "
+const fs=require('fs');const p=require('./utils/recommendAllTalentsPool.js');
+const r=JSON.parse(fs.readFileSync('/tmp/reg.json','utf8'));
+const o=p.buildAllTalentsPool(r);
+console.log('pool',o.length,'lib',r.talentLibraryEntries.length);
+"
 ```
 
-members + lib 应 > 0；Web/小程序「全部达人」列表非空。
+pool 条数须等于 `talentLibraryEntries.length`；粉丝与商家后台达人库一致。

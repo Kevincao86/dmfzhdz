@@ -38,5 +38,9 @@ export function normalizeHallRegistryPayload(data: Record<string, unknown>): Rec
       ? data.editTeamLibraryEntries
       : [],
     mpPrUsers: Array.isArray(data.mpPrUsers) ? data.mpPrUsers : [],
+    _recommendPoolMeta:
+      data._recommendPoolMeta && typeof data._recommendPoolMeta === 'object'
+        ? data._recommendPoolMeta
+        : undefined,
   }
 }
