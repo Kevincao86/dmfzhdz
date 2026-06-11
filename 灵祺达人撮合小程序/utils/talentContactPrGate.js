@@ -1,6 +1,7 @@
 const applicationsStore = require('./applicationsStore.js')
 const selection = require('./mpApplicantSelection.js')
 const talentMember = require('./talentMember.js')
+const auth = require('./auth.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { iceApplicantStorageKey } = require('./iceOrderStats.js')
@@ -22,6 +23,9 @@ function localApplicantIdForOrder(mpOrderId) {
 
 function applicantMatchesCurrentTalent(applicant) {
   const a = applicant || {}
+  const acct = auth.readAccount()
+  const openid = acct && String(acct.openid || '').trim()
+  if (openid && String(a.wxOpenId || '').trim() === openid) return true
   const member = talentMember.readMember()
   if (member && member.id && a.talentMemberId) {
     return String(a.talentMemberId).trim() === String(member.id).trim()

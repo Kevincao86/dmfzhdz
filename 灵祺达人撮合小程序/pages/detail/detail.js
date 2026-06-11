@@ -10,7 +10,6 @@ const iceOrderStats = require('../../utils/iceOrderStats.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
-const talentMember = require('../../utils/talentMember.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 Page({
@@ -98,7 +97,7 @@ Page({
     this.setData({ loading: true, err: '' })
     try {
       const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
-      appRegistrySync.reconcileApplicationsFromRegistry(reg, talentMember.readMember())
+      appRegistrySync.reconcileApplicationsFromRegistry(reg)
       const mp = ops.findMpOrderInRegistry(reg, id)
       if (!mp) {
         this.setData({ loading: false, err: '招募单不存在或已结束' })
@@ -108,6 +107,10 @@ Page({
       const isEnded =
         rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
       const gate = contactGate.evaluate(mp, id)
+      if (gate.hasApplication && gate.applicant) {
+        const entry = appRegistrySync.applicationFromMpOrder(mp, gate.applicant)
+        if (entry) applicationsStore.upsertApplication(entry)
+      }
       const account = auth.readAccount()
       const isPrViewer = userProfile.readIdentity() === 'pr'
       const isPrOwner = isPrViewer && prPublishedOrders.mpOrderOwnedByCurrentPr(mp, account)
