@@ -7,6 +7,10 @@ const applicationsStore = require('../../utils/applicationsStore.js')
 const chat = require('../../utils/talentChat.js')
 const contactGate = require('../../utils/talentContactPrGate.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
+const iceOrderDetect = require('../../utils/iceOrderDetect.js')
+const iceGroupQr = require('../../utils/iceGroupQr.js')
+const editDeliverLinks = require('../../utils/editDeliverLinks.js')
+const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
@@ -36,6 +40,13 @@ Page({
     iceSubmitLabel: '提交链接 · AI 核查',
     iceStatusHint: '',
     iceStep3Hint: '发布抖音并回传链接，AI 核查通过后自动完成',
+    isEditIce: false,
+    claimedSlotCount: 1,
+    iceConfirmed: false,
+    editGroupQrImage: '',
+    deliverText: '',
+    editDeliverSubmitting: false,
+    applyGateHint: '',
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -126,6 +137,9 @@ Page({
       const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
       const view = display.enrichMpOrder(mp, merchantOrder)
       const isIce = !!view.isIce
+      const isEditIce = isIce && iceOrderDetect.isEditTeamIceMpOrder(mp)
+      const workId = userProfile.readIdentity()
+      const applyGateHint = recruitApplyGate.claimBlockHint(mp, workId)
       let iceApplicantId = this.data.iceApplicantId
       try {
         const stored = wx.getStorageSync(iceOrderStats.iceApplicantStorageKey(id))
@@ -158,8 +172,9 @@ Page({
       let iceRejectReason = ''
       const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
       let iceVerifyMode = iceOrderStats.getIceVerifyMode(mp)
+      let app = null
       if (isIce) {
-        let app =
+        app =
           iceApplicantId && (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
         if (!app && gate.applicant) app = gate.applicant
         if (app) {
@@ -170,9 +185,10 @@ Page({
             app.videoStatus === 'passed' ||
             !!String(app.completedAt || '').trim()
           icePendingConfirm =
-            app.taskStatus === 'pending_confirm' ||
-            app.taskStatus === 'applied' ||
-            (!app.taskStatus && !assignedVideoUrl)
+            app.taskStatus !== 'confirmed' &&
+            (app.taskStatus === 'pending_confirm' ||
+              app.taskStatus === 'applied' ||
+              (!app.taskStatus && !assignedVideoUrl && !isEditIce))
           iceRejected = app.taskStatus === 'rejected'
           icePendingPrReview =
             iceVerifyMode === 'pr' && app.videoStatus === 'pending' && !iceVerified
@@ -190,9 +206,29 @@ Page({
         iceVerifyMode === 'pr'
           ? '发布抖音并回传链接，PR 审核通过后完成'
           : '发布抖音并回传链接，AI 核查通过后自动完成'
+      let claimedSlotCount = 1
+      let iceConfirmed = false
+      let editGroupQrImage = ''
+      let deliverText = ''
+      if (isIce && app) {
+        claimedSlotCount = Math.max(
+          1,
+          Number.parseInt(String(app.claimedSlotCount || app.assignedIceSlotIds?.length || 1), 10) || 1,
+        )
+        iceConfirmed = app.taskStatus === 'confirmed'
+        if (isEditIce && iceConfirmed) {
+          editGroupQrImage = iceGroupQr.resolveClaimGroupQr(reg, id, mp)
+        }
+        if (Array.isArray(app.editDeliverLinks) && app.editDeliverLinks.length) {
+          deliverText = app.editDeliverLinks.join('\n')
+        }
+      }
       let iceStatusHint = ''
       if (iceVerified) iceStatusHint = '已完成'
-      else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
+      else if (isEditIce && iceConfirmed && !iceVerified) {
+        const submitted = Array.isArray(app && app.editDeliverLinks) ? app.editDeliverLinks.length : 0
+        iceStatusHint = `请回传 ${claimedSlotCount} 条成片链接（已提交 ${submitted} 条）`
+      } else if (icePendingPrReview) iceStatusHint = '链接已提交，待 PR 审核'
       else if (iceLinkRejected) iceStatusHint = iceRejectReason || '链接已驳回，请重新提交'
       else if (iceAiFailedNote) iceStatusHint = iceAiFailedNote
       const iceApplied = Boolean(iceApplicantId) || (isIce && gate.hasApplication)
@@ -233,6 +269,12 @@ Page({
         iceStep3Hint,
         applied: hasApplied,
         readOnlyEnded: isEnded && canViewEnded,
+        isEditIce,
+        claimedSlotCount,
+        iceConfirmed,
+        editGroupQrImage,
+        deliverText,
+        applyGateHint,
       })
     } catch (e) {
       const msg = String(e.message || e)
@@ -247,6 +289,44 @@ Page({
   },
   onDouyinField(e) {
     this.setData({ douyinUrl: e.detail.value })
+  },
+  onDeliverField(e) {
+    this.setData({ deliverText: e.detail.value })
+  },
+  previewEditGroupQr() {
+    const url = String(this.data.editGroupQrImage || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  async submitEditDeliver() {
+    const text = String(this.data.deliverText || '').trim()
+    const links = editDeliverLinks.parseBatchDeliverUrls(text)
+    const need = this.data.claimedSlotCount || 1
+    if (!links.length) {
+      wx.showToast({ title: '请粘贴 https 成片链接', icon: 'none' })
+      return
+    }
+    if (links.length !== need) {
+      wx.showToast({ title: `需 ${need} 条，识别到 ${links.length} 条`, icon: 'none' })
+      return
+    }
+    if (!this.data.iceApplicantId) {
+      wx.showToast({ title: '请先认领任务', icon: 'none' })
+      return
+    }
+    this.setData({ editDeliverSubmitting: true })
+    try {
+      await ops.submitEditDeliverLinks(this.data.id, this.data.iceApplicantId, text)
+      wx.showToast({
+        title: this.data.iceVerifyMode === 'pr' ? '已提交，待 PR 审核' : '成片已提交',
+        icon: 'success',
+      })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
+    } finally {
+      this.setData({ editDeliverSubmitting: false })
+    }
   },
   copyDownloadUrl() {
     const url = this.data.assignedVideoUrl
@@ -405,6 +485,10 @@ Page({
   goApply() {
     if (this.data.isPr) {
       wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
+      return
+    }
+    if (this.data.applyGateHint) {
+      wx.showToast({ title: this.data.applyGateHint, icon: 'none' })
       return
     }
     const v = this.data.view

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
-import { applyToMpOrder, registerTalentMember } from '../lib/mpApi'
+import { applyToMpOrder, fetchMpRegistry, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { addApplication, hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { getApplyConfigForMpOrder, resolveApplyRows } from '../lib/mpSync/applyFormTemplates'
@@ -17,6 +17,10 @@ import { labels, normalizePlatform } from '../lib/mpSync/platformLabels'
 import { DOUYIN_LEVELS } from '../lib/mpSync/platformForm'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { pushNotification } from '../lib/mpSync/messagesStore'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
+import { isEditTeamIceMpOrder } from '../lib/mpSync/iceOrderDetect'
+import { validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
+import { countFreeEditPackSlots } from '../lib/mpSync/editIceSlots'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -30,6 +34,24 @@ export default function RecruitmentApplyPage() {
   const merchantOrderNo = search.get('merchantOrderNo') || mpOrderId
   const isIceMode = search.get('ice') === '1'
   const templateId = search.get('templateId') || ''
+  const workIdentity = getWorkIdentity()
+
+  const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
+  const isEditIce = mpOrder ? isEditTeamIceMpOrder(mpOrder) : false
+  const freeSlots = mpOrder ? countFreeEditPackSlots(mpOrder) : 0
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const reg = await fetchMpRegistry({ includeMpOrderIds: [orderId] })
+        const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
+        const mp = list.find((o) => o && o.id === orderId) || null
+        setMpOrder(mp)
+      } catch {
+        setMpOrder(null)
+      }
+    })()
+  }, [orderId])
 
   const tpl = useMemo(() => getApplyConfigForMpOrder(orderId, templateId), [orderId, templateId])
   const rows = useMemo(() => resolveApplyRows(tpl, platform, { isIceMode }), [tpl, platform, isIceMode])
@@ -38,11 +60,14 @@ export default function RecruitmentApplyPage() {
     ...emptyApplyFields(),
     ...(applyFieldsFromMember(readMember(), platform) || {}),
   }))
+  const [claimSlotCount, setClaimSlotCount] = useState('1')
   const [syncMember, setSyncMember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
   const member = readMember()
   const lb = labels(platform)
+
+  const gate = mpOrder ? validateRecruitmentClaim(mpOrder, workIdentity) : { ok: true as const }
 
   function setField(key: string, value: string) {
     if (key.startsWith('custom_')) {
@@ -61,10 +86,21 @@ export default function RecruitmentApplyPage() {
   }
 
   async function onSubmit() {
+    if (!gate.ok) {
+      setErr(gate.message)
+      return
+    }
     const errMsg = validateApplyRows(rows, form as unknown as Record<string, unknown>, platform, { isIceMode })
     if (errMsg) {
       setErr(errMsg)
       return
+    }
+    if (isEditIce) {
+      const n = Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1)
+      if (n > freeSlots) {
+        setErr(`剩余可认领 ${freeSlots} 条，无法认领 ${n} 条`)
+        return
+      }
     }
     if (hasAppliedToOrder(orderId)) {
       setErr('您已报名该招募，请勿重复提交')
@@ -82,7 +118,8 @@ export default function RecruitmentApplyPage() {
         applicantId,
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
-      await applyToMpOrder(orderId, applicant)
+      const slots = isEditIce ? Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1) : undefined
+      await applyToMpOrder(orderId, applicant, workIdentity, slots)
       const persisted = persistApplicantToMemberProfile(readMember(), applicant, platform)
       if (persisted) writeMember(persisted)
       if (member && syncMember) {
@@ -114,13 +151,41 @@ export default function RecruitmentApplyPage() {
     }
   }
 
+  if (mpOrder && !gate.ok) {
+    return (
+      <div className="max-w-2xl space-y-4">
+        <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
+          ← 返回详情
+        </Link>
+        <p className="text-amber-400">{gate.message}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl space-y-4">
       <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
         ← 返回详情
       </Link>
-      <h2 className="text-xl font-bold">报名 · {tpl.name}</h2>
+      <h2 className="text-xl font-bold">{isEditIce ? '认领剪辑云剪' : '报名'} · {tpl.name}</h2>
       <p className="text-sm text-slate-400">{platform} · {merchantOrderNo}</p>
+
+      {isEditIce ? (
+        <section className="surface-card rounded-xl border p-4 space-y-2 text-sm">
+          <label className="block">
+            <span className="text-slate-400">认领条数 *</span>
+            <input
+              className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+              type="number"
+              min={1}
+              max={Math.max(1, freeSlots)}
+              value={claimSlotCount}
+              onChange={(e) => setClaimSlotCount(e.target.value)}
+            />
+          </label>
+          <p className="text-xs text-[var(--shell-muted)]">剩余可认领 {freeSlots} 条成片位</p>
+        </section>
+      ) : null}
 
       {memberSyncAvailable(member, platform) ? (
         <label className="flex items-center gap-2 text-sm">
@@ -160,7 +225,7 @@ export default function RecruitmentApplyPage() {
         className="w-full py-3 rounded-xl bg-violet-600 font-medium disabled:opacity-50"
         onClick={() => void onSubmit()}
       >
-        {submitting ? '提交中…' : isIceMode ? '认领任务' : '提交报名'}
+        {submitting ? '提交中…' : isEditIce || isIceMode ? '认领任务' : '提交报名'}
       </button>
     </div>
   )

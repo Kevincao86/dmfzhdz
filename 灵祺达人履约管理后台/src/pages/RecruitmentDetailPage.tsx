@@ -22,6 +22,9 @@ import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
 import { canTalentUploadRecruitmentVideo } from '../lib/mpRecruitment/talentApplicationStatus'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
+import { isEditTeamIceMpOrder } from '../lib/mpSync/iceOrderDetect'
+import { claimBlockHint } from '../lib/mpSync/recruitApplyGate'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -32,6 +35,7 @@ export default function RecruitmentDetailPage() {
   const [err, setErr] = useState('')
   const [view, setView] = useState<ReturnType<typeof enrichMpOrder> | null>(null)
   const [mpRaw, setMpRaw] = useState<Record<string, unknown> | null>(null)
+  const [mpRegistry, setMpRegistry] = useState<Record<string, unknown> | null>(null)
   const [contactGate, setContactGate] = useState(evaluateContactPrGate(null, id || ''))
   const [prChatMeta, setPrChatMeta] = useState<ReturnType<typeof extractPrChatMeta>>(null)
   const [contacting, setContacting] = useState(false)
@@ -52,7 +56,10 @@ export default function RecruitmentDetailPage() {
       myApplicant as Record<string, unknown> | null,
       !!view?.isIce,
     )
-  const iceState = resolveIceApplicantState(mpRaw, id || '')
+  const workIdentity = getWorkIdentity()
+  const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
+  const iceState = resolveIceApplicantState(mpRaw, id || '', mpRegistry)
+  const applyGateHint = mpRaw && role !== 'pr' ? claimBlockHint(mpRaw, workIdentity) : ''
 
   useEffect(() => {
     if (!id) {
@@ -84,6 +91,7 @@ export default function RecruitmentDetailPage() {
           return
         }
         const enriched = enrichMpOrder(mp)
+        setMpRegistry(reg as Record<string, unknown>)
         setMpRaw(mp)
         setView(enriched)
         setReadOnlyEnded(isEnded && canViewEnded)
@@ -167,6 +175,7 @@ export default function RecruitmentDetailPage() {
       (role === 'pr' && mpOrderOwnedByCurrentPr(mp, getAccount()))
     if (isEnded && !canViewEnded) return
     const enriched = enrichMpOrder(mp)
+    setMpRegistry(reg as Record<string, unknown>)
     setMpRaw(mp)
     setView(enriched)
     setReadOnlyEnded(isEnded && canViewEnded)
@@ -247,7 +256,7 @@ export default function RecruitmentDetailPage() {
             </div>
           ) : null}
 
-          {role === 'talent' && applied && view.isIce ? (
+          {role === 'talent' && applied && view.isIce && (isEditIce ? workIdentity === 'edit' : workIdentity === 'talent') ? (
             <IceTaskPanel mpOrderId={id || ''} state={iceState} onRefresh={reloadOrder} />
           ) : null}
 
@@ -310,9 +319,15 @@ export default function RecruitmentDetailPage() {
 
           <div className="flex flex-wrap gap-2">
             {role === 'talent' && !applied && !readOnlyEnded ? (
-              <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
-                {view.isIce ? '认领云剪任务' : '立即报名'}
-              </button>
+              applyGateHint ? (
+                <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200 flex-1">
+                  {applyGateHint}
+                </p>
+              ) : (
+                <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
+                  {view.isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪任务') : '立即报名'}
+                </button>
+              )
             ) : null}
             {role === 'talent' ? (
               <button

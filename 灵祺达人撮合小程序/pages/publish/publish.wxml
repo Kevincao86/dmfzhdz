@@ -365,9 +365,9 @@
                 </picker>
               </view>
             </view>
-            <view class="pub-field">
-              <text class="pub-label">{{recruitMode === 'edit_ice' ? '参考片链接 *' : '参考片链接'}}</text>
-              <input class="pub-input" placeholder="{{recruitMode === 'edit_ice' ? 'https://…mp4 云剪成片下载链接' : '选填'}}" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
+            <view class="pub-field" wx:if="{{recruitMode !== 'edit_ice'}}">
+              <text class="pub-label">参考片链接</text>
+              <input class="pub-input" placeholder="选填" value="{{form.referenceUrl}}" data-key="referenceUrl" bindinput="onFieldInput" />
             </view>
           </block>
           <view class="pub-field" id="field-req-level" wx:if="{{showDouyinLevel && !isSupplierPublish}}">
@@ -434,7 +434,7 @@
             <input class="pub-input" type="digit" placeholder="选填" value="{{form.cpsPercent}}" data-key="cpsPercent" bindinput="onFieldInput" />
           </view>
           <view class="pub-field" id="field-recruit-count">
-            <text class="pub-label">招募人数 *</text>
+            <text class="pub-label">{{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}}</text>
             <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
           </view>
           <view class="pub-field" id="field-recruit-detail">
@@ -463,7 +463,15 @@
                 catchtap="onIceVerifyModePick"
               >PR 审核</view>
             </view>
-            <text class="pub-cover-hint">AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。</text>
+            <text class="pub-cover-hint">{{recruitMode === 'edit_ice' ? '剪辑师确认认领后可见群码，并批量回传成片链接。' : 'AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。'}}</text>
+            <view class="pub-field" wx:if="{{recruitMode === 'edit_ice' && form.iceVerifyMode !== 'pr'}}">
+              <text class="pub-label">上传剪辑师群二维码 *</text>
+              <view class="pub-cover-actions">
+                <button class="pub-cover-btn" loading="{{editGroupQrUploading}}" bindtap="onUploadEditGroupQr">{{form.editGroupQrImage ? '已上传群码' : '选择图片'}}</button>
+                <button wx:if="{{form.editGroupQrImage}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onClearEditGroupQr">清除</button>
+              </view>
+              <image wx:if="{{form.editGroupQrImage}}" class="pub-cover-preview" src="{{form.editGroupQrImage}}" mode="aspectFit" bindtap="onPreviewEditGroupQr" />
+            </view>
           </view>
           <view class="pub-field" id="field-apply-form">
             <text class="pub-label">{{isSupplierPublish ? '团队报名必填信息 *' : '达人报名必填信息 *'}}</text>
