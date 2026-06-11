@@ -55,6 +55,7 @@ function mapMpOrderRow(mp, reg) {
     platformIcon: platformIcon(platform),
     region: view.region,
     category: view.category || '本地生活',
+    categoryTagsText: listFilters.resolveRequiredCategoryTagsText(mp, view.category),
     hideBudget,
     budgetText,
     budgetDisplay: hideBudget

@@ -109,6 +109,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     platform,
     region,
     category: String(mp.category || '本地生活'),
+    categoryTagsText: listFilters.resolveRequiredCategoryTagsText(mp, String(mp.category || '')),
     hideBudget,
     budgetText,
     budgetDisplay: buildBudgetDisplay(budgetText),
