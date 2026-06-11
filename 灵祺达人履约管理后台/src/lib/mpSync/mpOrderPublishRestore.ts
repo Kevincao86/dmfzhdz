@@ -89,8 +89,6 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     packageTags: Array.isArray(meta.packageTags) ? [...(meta.packageTags as string[])] : [],
     deliveryDeadline: String(meta.deliveryDeadline || ''),
     referenceUrl: String(meta.referenceUrl || ''),
-    groupQrImage: String(mp.groupQrImage || meta.groupQrImage || '').trim(),
-    editGroupQrImage: String(mp.editGroupQrImage || meta.editGroupQrImage || '').trim(),
     ...restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp.region && mp.region !== '全国') {

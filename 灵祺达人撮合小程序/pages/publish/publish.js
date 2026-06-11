@@ -13,7 +13,6 @@ const mpOrderRestore = require('../../utils/mpOrderPublishRestore.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitCoverImage = require('../../utils/recruitCoverImage.js')
-const mpGroupQr = require('../../utils/mpGroupQr.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
 const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
@@ -132,8 +131,6 @@ function emptyForm(recruitTarget) {
     signupDeadline: '',
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
-    groupQrImage: '',
-    editGroupQrImage: '',
     applyFormTemplateId: '',
     applyFormTemplateName: target === 'talent' ? '' : '团队报名默认项',
     applyFormFields: afFields,
@@ -569,34 +566,6 @@ Page({
       if (/cancel/i.test(msg)) return
       wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })
     }
-  },
-  async onUploadEditGroupQr() {
-    try {
-      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
-      this.setData({ 'form.editGroupQrImage': dataUrl })
-      wx.showToast({ title: '已上传剪辑师群码', icon: 'success' })
-    } catch (e) {
-      const msg = String((e && e.message) || e || '')
-      if (/cancel/i.test(msg)) return
-      wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })
-    }
-  },
-  async onUploadTalentGroupQr() {
-    try {
-      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
-      this.setData({ 'form.groupQrImage': dataUrl })
-      wx.showToast({ title: '已上传达人群码', icon: 'success' })
-    } catch (e) {
-      const msg = String((e && e.message) || e || '')
-      if (/cancel/i.test(msg)) return
-      wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })
-    }
-  },
-  onClearEditGroupQr() {
-    this.setData({ 'form.editGroupQrImage': '' })
-  },
-  onClearTalentGroupQr() {
-    this.setData({ 'form.groupQrImage': '' })
   },
   openCoverGallery() {
     const f = this.data.form || {}
@@ -1187,18 +1156,14 @@ Page({
     const feeErr = this.validateFee(f)
     if (feeErr) return feeErr
     const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
-    if (this.data.recruitMode !== 'edit_ice' && n < 1) return '招募人数至少为 1'
+    if (n < 1) return '招募人数至少为 1'
     if (!String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
     if (isSupplier) {
       const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
       if (sErr) return sErr
     }
-    if (this.data.recruitMode === 'ice') {
+    if (this.data.recruitMode === 'ice' || this.data.recruitMode === 'edit_ice') {
       if (!resolveIceReferenceVideoUrl(f)) return '云剪任务请填写参考片链接'
-      if (!String(f.groupQrImage || '').trim()) return '请上传达人进群二维码'
-    }
-    if (this.data.recruitMode === 'edit_ice') {
-      if (!String(f.editGroupQrImage || '').trim()) return '请上传剪辑师进群二维码'
     }
     if (!(f.applyFormFields || []).length) {
       return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
@@ -1243,9 +1208,7 @@ Page({
       `招募模式：${mode.label}`,
       `招募城市：${this.buildRegionText(f)}`,
       `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
-      ...(this.data.recruitMode === 'edit_ice'
-        ? []
-        : [`招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`]),
+      `招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`,
       `费用模式：${feeTypeLabel(f.feeTypeId)}`,
     ]
     if (!isSupplier) {
@@ -1290,7 +1253,7 @@ Page({
     lines.push('招募详情：')
     const recruitDetail = String(f.recruitDetail || '').trim()
     if (recruitDetail) lines.push(recruitDetail)
-    if ((mode.hall === 'ice' || mode.id === 'edit_ice') && mode.id === 'ice' && resolveIceReferenceVideoUrl(f)) {
+    if ((mode.hall === 'ice' || mode.id === 'edit_ice') && resolveIceReferenceVideoUrl(f)) {
       lines.push(`云剪参考成片：${resolveIceReferenceVideoUrl(f)}`)
       lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
     }
@@ -1421,8 +1384,6 @@ Page({
           coverImageSource: coverFields.coverImageSource,
           iceVideoUrl: resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
-          editGroupQrImage: String(f.editGroupQrImage || '').trim(),
-          groupQrImage: String(f.groupQrImage || '').trim(),
         },
           f,
         )
@@ -1432,23 +1393,14 @@ Page({
       order.orderKind = 'recruitment_ice'
       order.hall = 'ice'
       order.fulfillmentLoop = 'closed'
-      if (mode.id === 'edit_ice') {
-        const editQr = String(f.editGroupQrImage || '').trim()
-        if (editQr) {
-          order.editGroupQrImage = editQr
-        }
-      } else {
-        const url = resolveIceReferenceVideoUrl(f)
-        const talentQr = String(f.groupQrImage || '').trim()
-        if (talentQr) order.groupQrImage = talentQr
-        const slotN = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
-        order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
-          slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
-          label: `成片${i + 1}`,
-          downloadUrl: url,
-          iceJobId: '',
-        }))
-      }
+      const url = resolveIceReferenceVideoUrl(f)
+      const slotN = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
+      order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
+        slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
+        label: `成片${i + 1}`,
+        downloadUrl: url,
+        iceJobId: '',
+      }))
     } else {
       order.hall = 'normal'
     }

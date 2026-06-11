@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
-import { applyToMpOrder, fetchMpRegistry, registerTalentMember } from '../lib/mpApi'
+import { applyToMpOrder, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
-import { getWorkIdentity } from '../lib/mpWorkIdentity'
-import { canClaimRecruitment, claimBlockHint } from '../lib/mpSync/recruitApplyGate'
 import { addApplication, hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
 import { getApplyConfigForMpOrder, resolveApplyRows } from '../lib/mpSync/applyFormTemplates'
 import {
@@ -24,31 +22,12 @@ export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
   const [search] = useSearchParams()
   const nav = useNavigate()
-  const role = getActiveRole()
-  const workIdentity = getWorkIdentity()
-  const orderId = mpOrderId || ''
-
-  const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
-  const [gateChecked, setGateChecked] = useState(false)
-
-  useEffect(() => {
-    if (!orderId) return
-    void (async () => {
-      try {
-        const reg = await fetchMpRegistry({ includeMpOrderIds: [orderId] })
-        const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
-          string,
-          unknown
-        >[]
-        setMpOrder(list.find((o) => o && o.id === orderId) || null)
-      } finally {
-        setGateChecked(true)
-      }
-    })()
-  }, [orderId])
+  if (getActiveRole() !== 'talent') return <Navigate to="/hall" replace />
+  if (!mpOrderId) return <Navigate to="/hall" replace />
+  const orderId = mpOrderId
 
   const platform = normalizePlatform(search.get('platform') || '抖音')
-  const merchantOrderNo = search.get('merchantOrderNo') || orderId
+  const merchantOrderNo = search.get('merchantOrderNo') || mpOrderId
   const isIceMode = search.get('ice') === '1'
   const templateId = search.get('templateId') || ''
 
@@ -62,27 +41,8 @@ export default function RecruitmentApplyPage() {
   const [syncMember, setSyncMember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
-
-  const canClaim = mpOrder ? canClaimRecruitment(mpOrder, workIdentity) : false
-  const blockHint = mpOrder ? claimBlockHint(mpOrder, workIdentity) : ''
   const member = readMember()
   const lb = labels(platform)
-
-  if (role === 'pr') return <Navigate to="/hall" replace />
-  if (!mpOrderId) return <Navigate to="/hall" replace />
-
-  if (gateChecked && mpOrder && !canClaim) {
-    return (
-      <div className="max-w-lg mx-auto p-4 space-y-3">
-        <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm">
-          {blockHint || '当前身份不可报名该招募'}
-        </p>
-        <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-violet-600 text-sm underline">
-          返回招募详情
-        </Link>
-      </div>
-    )
-  }
 
   function setField(key: string, value: string) {
     if (key.startsWith('custom_')) {
@@ -122,7 +82,7 @@ export default function RecruitmentApplyPage() {
         applicantId,
         appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
       })
-      await applyToMpOrder(orderId, applicant, workIdentity)
+      await applyToMpOrder(orderId, applicant)
       const persisted = persistApplicantToMemberProfile(readMember(), applicant, platform)
       if (persisted) writeMember(persisted)
       if (member && syncMember) {

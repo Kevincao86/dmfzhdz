@@ -15,8 +15,6 @@ const platformForm = require('../../utils/platformForm.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
-const userProfile = require('../../utils/userProfile.js')
-const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 
 const {
   emptyApplyFields,
@@ -76,9 +74,6 @@ Page({
     syncMemberProfile: false,
     memberTypeLabel: '',
     isIceMode: false,
-    loadedMp: null,
-    canClaim: true,
-    claimBlockHint: '',
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
@@ -147,9 +142,6 @@ Page({
       syncMemberProfile: !!memberFields,
       memberTypeLabel: member ? memberStore.memberTypeLabel(member) : '',
       isIceMode,
-      loadedMp,
-      canClaim: loadedMp ? recruitApplyGate.canClaimRecruitment(loadedMp) : true,
-      claimBlockHint: loadedMp ? recruitApplyGate.claimBlockHint(loadedMp) : '',
       customFields: {},
       ...(memberFields || emptyApplyFields(DOUYIN_LEVELS)),
       likesCollects: memberFields && memberFields.likesCollects != null ? String(memberFields.likesCollects) : '',
@@ -268,13 +260,6 @@ Page({
       wx.showToast({ title: '报名表单未加载，请返回详情页重试', icon: 'none' })
       return
     }
-    if (!this.data.canClaim) {
-      wx.showToast({
-        title: (this.data.claimBlockHint || '当前身份不可报名').slice(0, 28),
-        icon: 'none',
-      })
-      return
-    }
     const errMsg = this.validateForm()
     if (errMsg) {
       wx.showToast({ title: errMsg, icon: 'none' })
@@ -307,7 +292,7 @@ Page({
         wx.showToast({ title: '请填写抖音昵称或完善我的信息', icon: 'none' })
         return
       }
-      await ops.applyToMpOrder(this.data.mpOrderId, applicant, userProfile.readIdentity())
+      await ops.applyToMpOrder(this.data.mpOrderId, applicant)
       const persisted = persistApplicantToMemberProfile(
         memberStore.readMember(),
         applicant,

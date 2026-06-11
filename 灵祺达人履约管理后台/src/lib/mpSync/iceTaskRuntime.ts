@@ -2,7 +2,6 @@ import { apiUrl, mpErpApiBase } from '../mpApiBase'
 import { isIceMpOrder } from '../mpRecruitment/orderCard'
 import { getToken } from '../mpSession'
 import { findMyApplicant } from './talentContactPrGate'
-import { isEditTeamIceMpOrder } from './iceOrderDetect'
 
 export type IceApplicantState = {
   isIce: boolean
@@ -19,7 +18,6 @@ export type IceApplicantState = {
   iceSubmitLabel: string
   iceStatusHint: string
   douyinPublishUrl: string
-  isEditTeamIce: boolean
 }
 
 async function postIce(paths: string[], body: Record<string, unknown>) {
@@ -81,7 +79,6 @@ export function resolveIceApplicantState(
       iceSubmitLabel: '提交链接 · AI 核查',
       iceStatusHint: '',
       douyinPublishUrl: '',
-      isEditTeamIce: mp ? isEditTeamIceMpOrder(mp) : false,
     }
   }
   const meta =
@@ -126,7 +123,6 @@ export function resolveIceApplicantState(
     iceSubmitLabel,
     iceStatusHint,
     douyinPublishUrl: String(applicant.douyinPublishUrl || '').trim(),
-    isEditTeamIce: isEditTeamIceMpOrder(mp),
   }
 }
 
