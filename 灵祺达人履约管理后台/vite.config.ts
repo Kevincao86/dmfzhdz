@@ -49,7 +49,7 @@ export default defineConfig(({ mode, command }) => {
     plugins: [react(), tailwindcss(), merchantPublicAssetsPlugin(), ...devOnlyPlugins],
     resolve: reactResolve,
     optimizeDeps: {
-      include: ['react', 'react-dom', 'react-router-dom'],
+      include: ['react', 'react-dom', 'react-router-dom', 'qrcode'],
     },
     server: {
       port: 5176,
