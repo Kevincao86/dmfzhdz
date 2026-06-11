@@ -1,5 +1,5 @@
 import type { RegistryFile, RegistryMpRecruitmentApplicant } from './opsRegistryTypes.js'
-import { dedupeMpOrderApplicants, findDuplicateApplicant } from './mpApplicantIdentity.js'
+import { dedupeMpOrderApplicants, findDuplicateApplicant, applicantsSamePerson } from './mpApplicantIdentity.js'
 import { handleIceMpApply, isIceMpOrder } from './mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
 import { validateRecruitmentClaim } from './mpRecruitApplyGate.js'
@@ -57,6 +57,17 @@ export function applyToMpRecruitmentOrderInSnapshot(
     paymentMethod:
       applicant.paymentMethod ||
       (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
+  }
+
+  if (isIceMpOrder(cur)) {
+    const before = cur.applicants ?? []
+    const after = before.filter(
+      (a) => !(a?.taskStatus === 'rejected' && applicantsSamePerson(a, row, platform)),
+    )
+    if (after.length !== before.length) {
+      cur = { ...cur, applicants: after }
+      data.mpRecruitmentOrders[idx] = cur
+    }
   }
 
   const existingDup = findDuplicateApplicant(cur.applicants, row, platform)

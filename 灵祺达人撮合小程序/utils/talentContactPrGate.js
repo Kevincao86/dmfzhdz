@@ -46,7 +46,7 @@ function findMyApplicant(mp, mpOrderId) {
   const localId = localApplicantIdForOrder(mpOrderId)
   if (localId) {
     const byId = applicants.find((a) => a && String(a.id) === localId)
-    if (byId) return byId
+    if (byId && byId.taskStatus !== 'rejected') return byId
   }
   for (let i = 0; i < applicants.length; i++) {
     if (applicantMatchesCurrentTalent(applicants[i]) && applicants[i].taskStatus !== 'rejected') {
@@ -57,6 +57,34 @@ function findMyApplicant(mp, mpOrderId) {
     if (applicantMatchesCurrentTalent(applicants[i])) return applicants[i]
   }
   return null
+}
+
+function canReclaimIceOrder(mp, mpOrderId) {
+  if (!mp || !isIceMpOrder(mp)) return false
+  const gate = evaluate(mp, mpOrderId)
+  if (gate.reason === 'rejected') return true
+  const app = findMyApplicant(mp, mpOrderId)
+  if (app && app.taskStatus === 'rejected') return true
+  const localId = localApplicantIdForOrder(mpOrderId)
+  if (!localId) return false
+  const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+  const byId = applicants.find((a) => a && String(a.id) === localId)
+  return !!(byId && byId.taskStatus === 'rejected')
+}
+
+function clearLocalIceApplyState(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  try {
+    applicationsStore.removeApplication(id)
+  } catch {
+    /* ignore */
+  }
+  try {
+    wx.removeStorageSync(iceApplicantStorageKey(id))
+  } catch {
+    /* ignore */
+  }
 }
 
 /** @returns {{ canContact: boolean, hasApplication: boolean, reason: string, message: string, applicant: object|null }} */
@@ -114,4 +142,6 @@ module.exports = {
   evaluate,
   findMyApplicant,
   localApplicantIdForOrder,
+  canReclaimIceOrder,
+  clearLocalIceApplyState,
 }

@@ -4,6 +4,7 @@ import RegionSelect from '../components/mp/RegionSelect'
 import { applyToMpOrder, fetchMpRegistry, registerTalentMember } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { addApplication, hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
+import { canReclaimIceOrder, clearLocalIceApplyState } from '../lib/mpSync/talentContactPrGate'
 import {
   getApplyConfigForMpOrder,
   normalizeTemplateKind,
@@ -135,6 +136,7 @@ export default function RecruitmentApplyPage() {
     : platform
 
   const gate = mpOrder ? validateRecruitmentClaim(mpOrder, workIdentity) : { ok: true as const }
+  const canReclaim = mpOrder ? canReclaimIceOrder(mpOrder, orderId) : false
 
   function setField(key: string, value: string) {
     if (key.startsWith('custom_')) {
@@ -172,7 +174,9 @@ export default function RecruitmentApplyPage() {
         return
       }
     }
-    if (hasAppliedToOrder(orderId)) {
+    if (canReclaim) {
+      clearLocalIceApplyState(orderId)
+    } else if (hasAppliedToOrder(orderId)) {
       setErr('您已报名该招募，请勿重复提交')
       return
     }
