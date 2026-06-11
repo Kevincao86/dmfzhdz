@@ -1,4 +1,4 @@
-const { isIceMpOrder, isEditTeamIceMpOrder } = require('./iceOrderDetect.js')
+const { isIceMpOrder, isPackSlotIceOrder } = require('./iceOrderDetect.js')
 const { parseIceSlotTotalFromMp } = require('./mpRecruitCount.js')
 
 const ICE_APPLICANT_STORAGE_PREFIX = 'meoo_ice_applicant_v1_'
@@ -84,7 +84,7 @@ function countIceClaimedSlots(mp, recruitCap) {
   const total = parseIceSlotTotalFromMp(mp) || Math.max(0, Number(recruitCap) || 0)
   if (!total) return { claimed: 0, total: 0 }
 
-  if (isEditTeamIceMpOrder(mp)) {
+  if (isPackSlotIceOrder(mp)) {
     const assigned = countEditIceAssignedSlots(mp)
     const reserved = countEditIceReservedSlots(mp)
     return { claimed: assigned + reserved, total }

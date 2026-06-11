@@ -27,7 +27,7 @@
     <text class="hint"> 后可下次一键填入。</text>
   </view>
 
-  <view class="card apply-form" wx:if="{{isEditIce}}">
+  <view class="card apply-form" wx:if="{{isPackIce}}">
     <view class="section-head">
       <view class="section-head-dot" />
       <text class="section-title">认领条数</text>
