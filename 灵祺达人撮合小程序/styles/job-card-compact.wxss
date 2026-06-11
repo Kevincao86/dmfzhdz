@@ -149,11 +149,15 @@
 }
 
 .job-card-compact__countdown {
-  display: block;
-  margin-top: 8rpx;
-  font-size: 22rpx;
+  position: absolute;
+  right: 18rpx;
+  bottom: 14rpx;
+  z-index: 1;
+  max-width: 52%;
+  font-size: 20rpx;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .job-card-compact__countdown--green {
@@ -248,6 +252,7 @@
 .job-card-compact__line3 {
   display: block;
   margin-top: 6rpx;
+  padding-right: 50%;
   font-size: 20rpx;
   color: var(--lq-text-secondary);
   overflow: hidden;

@@ -250,7 +250,6 @@
               <text class="job-card-compact__tag job-card-compact__tag--gray">{{item.signupCountText}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
             </view>
-            <text class="job-card-compact__countdown job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}">报名倒计时 {{item.signupCountdownText}}</text>
             <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay.kind === 'tiers'}}">
               <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
               <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>
@@ -268,6 +267,10 @@
             <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
           </view>
         </view>
+        <text
+          wx:if="{{item.signupCountdownText}}"
+          class="job-card-compact__countdown job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}"
+        >{{item.signupCountdownText}}</text>
       </view>
     <view wx:if="{{orderEmptyHint}}" class="rec-foot-hint">
       <text class="hint">{{orderEmptyHint}}</text>
