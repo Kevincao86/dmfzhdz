@@ -74,15 +74,21 @@ function memberMatchesBoard(m, board) {
   return true
 }
 
+function parseFollowers(raw) {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(0, raw)
+  const n = Number.parseInt(String(raw == null ? '0' : raw).replace(/,/g, ''), 10)
+  return Number.isFinite(n) ? Math.max(0, n) : 0
+}
+
 function formatFans(n) {
-  const followers = Number(n) || 0
+  const followers = parseFollowers(n)
   if (followers >= 10000) return `${(followers / 10000).toFixed(1)}万`
   if (followers > 0) return `${followers}`
   return '—'
 }
 
 function formatTalentRow(row) {
-  const followersRaw = Number(row.followers) || 0
+  const followersRaw = parseFollowers(row.followers)
   const platform = row.platform || '抖音'
   const tags = []
   if (row.qualityTag) tags.push(row.qualityTag)

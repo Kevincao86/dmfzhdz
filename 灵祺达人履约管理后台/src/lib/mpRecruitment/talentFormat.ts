@@ -1,6 +1,12 @@
 import type { TalentCardRow } from './types'
 import { matchPlatform, matchRegionFilter, normalizeHallPlatform } from './hallFilters'
 
+export function parseFollowers(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(0, raw)
+  const n = Number.parseInt(String(raw ?? '0').replace(/,/g, ''), 10)
+  return Number.isFinite(n) ? Math.max(0, n) : 0
+}
+
 export function formatFans(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(1)}万`
   return `${n}`
@@ -15,7 +21,7 @@ export function salesGradeFromFollowers(n: number): string {
 }
 
 export function formatTalent(row: Record<string, unknown>): TalentCardRow {
-  const followersRaw = Number(row.followers) || 0
+  const followersRaw = parseFollowers(row.followers)
   const platform = normalizeHallPlatform(row.platform || '抖音')
   const tags: string[] = []
   if (row.qualityTag) tags.push(String(row.qualityTag))
