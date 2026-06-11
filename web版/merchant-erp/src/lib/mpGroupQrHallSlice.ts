@@ -13,10 +13,9 @@ function groupQrFromOrderRaw(data: RegistrySnapshot, mpOrderId: string): string 
 function isIceApplicantClaimed(a: RegistryMpRecruitmentApplicant | null | undefined): boolean {
   if (!a) return false
   if (a.taskStatus === 'rejected') return false
-  if (a.taskStatus === 'pending_confirm' || a.taskStatus === 'confirmed' || a.taskStatus === 'applied') {
-    return true
-  }
-  return !!String(a.appliedAt || '').trim()
+  if (a.taskStatus === 'confirmed') return true
+  if (a.prSelected === true || a.merchantSelected === true || a.taskStatus === 'approved') return true
+  return false
 }
 
 function applicantMatchesViewer(

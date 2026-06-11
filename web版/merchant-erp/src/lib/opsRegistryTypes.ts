@@ -95,6 +95,9 @@ export type RegistryIceVideoSlot = {
   iceJobId?: string
   assignedApplicantId?: string
   assignedAt?: string
+  /** 剪辑师回传的成片链接（edit_ice 阶段一） */
+  deliverUrl?: string
+  deliverStatus?: 'pending' | 'passed' | 'rejected'
 }
 
 export type KolTierKey = 'v3' | 'v4' | 'v5' | 'v5plus'
@@ -205,8 +208,14 @@ export type RegistryMpRecruitmentApplicant = {
   gender?: string
   accountTags?: string[]
   assignedIceSlotId?: string
+  /** 剪辑师认领条数（edit_ice） */
+  claimedSlotCount?: number
+  /** 认领锁定的成片位 id 列表 */
+  assignedIceSlotIds?: string[]
   assignedVideoLabel?: string
   assignedVideoDownloadUrl?: string
+  /** 剪辑师批量回传的成片链接 */
+  editDeliverLinks?: string[]
   douyinPublishUrl?: string
   aiVerifyStatus?: 'pending' | 'passed' | 'failed'
   aiVerifyNote?: string

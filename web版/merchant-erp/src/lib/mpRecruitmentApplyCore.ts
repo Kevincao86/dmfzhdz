@@ -13,6 +13,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
   mpOrderId: string,
   applicant: RegistryMpRecruitmentApplicant,
   workIdentity?: string | null,
+  claimSlotCount?: number | null,
 ): ApplyMpRecruitmentResult {
   const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
   if (!data.mpRecruitmentOrders || idx < 0) {
@@ -49,6 +50,10 @@ export function applyToMpRecruitmentOrderInSnapshot(
     ...applicant,
     mpOrderId,
     merchantOrderNo,
+    claimedSlotCount:
+      claimSlotCount != null
+        ? Math.max(1, Number.parseInt(String(claimSlotCount), 10) || 1)
+        : applicant.claimedSlotCount,
     paymentMethod:
       applicant.paymentMethod ||
       (applicant.alipayAccount ? `支付宝：${applicant.alipayAccount}` : '支付宝'),
@@ -66,7 +71,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
       }
     }
     if (isIceMpOrder(cur)) {
-      const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' })
+      const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' }, claimSlotCount)
       if (!iceResult.ok) {
         return {
           ok: false,
@@ -96,7 +101,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
   }
 
   if (isIceMpOrder(cur)) {
-    const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' })
+    const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' }, claimSlotCount)
     if (!iceResult.ok) {
       return {
         ok: false,
