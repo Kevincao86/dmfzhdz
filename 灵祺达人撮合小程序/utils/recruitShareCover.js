@@ -1,7 +1,8 @@
 /**
- * 招募单分享封面：微信卡片推荐 5:4，竖版海报需居中裁剪避免上下黑边
+ * 招募单分享封面：微信卡片 5:4，竖/横版海报居中裁剪，禁止回退 https（否则上下黑边）
  */
 const recruitCoverLib = require('./recruitCoverLibrary.js')
+const mpShare = require('./mpShare.js')
 
 const SHARE_W = 500
 const SHARE_H = 400
@@ -17,6 +18,13 @@ function hashStr(s) {
     h = ((h << 5) - h + t.charCodeAt(i)) | 0
   }
   return Math.abs(h).toString(36)
+}
+
+function isLocalSharePath(p) {
+  const s = String(p || '').trim()
+  if (!s) return false
+  if (/^https?:\/\//i.test(s)) return false
+  return true
 }
 
 function ensureCacheDir() {
@@ -39,7 +47,7 @@ function cachePathFor(coverUrl) {
 function readCached(coverUrl) {
   const key = String(coverUrl || '').trim()
   if (!key) return ''
-  if (memCache[key]) return memCache[key]
+  if (memCache[key] && isLocalSharePath(memCache[key])) return memCache[key]
   const path = cachePathFor(key)
   try {
     wx.getFileSystemManager().accessSync(path)
@@ -95,6 +103,37 @@ function ensureLocalImagePath(src) {
   })
 }
 
+function exportCanvasToFile(canvas) {
+  return new Promise((resolve, reject) => {
+    wx.canvasToTempFilePath({
+      canvas,
+      x: 0,
+      y: 0,
+      width: SHARE_W,
+      height: SHARE_H,
+      destWidth: SHARE_W,
+      destHeight: SHARE_H,
+      fileType: 'jpg',
+      quality: 0.9,
+      success(res) {
+        if (res.tempFilePath) resolve(res.tempFilePath)
+        else reject(new Error('empty_temp'))
+      },
+      fail(err) {
+        try {
+          if (typeof canvas.toDataURL === 'function') {
+            writeDataUrlToTemp(canvas.toDataURL('image/jpeg', 0.9)).then(resolve).catch(() => reject(err))
+            return
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        reject(err)
+      },
+    })
+  })
+}
+
 function cropToShareRatio(localPath) {
   return new Promise((resolve, reject) => {
     wx.getImageInfo({
@@ -133,17 +172,9 @@ function cropToShareRatio(localPath) {
         const img = canvas.createImage()
         img.onload = () => {
           ctx.drawImage(img, sx, sy, sw, sh, 0, 0, SHARE_W, SHARE_H)
-          wx.canvasToTempFilePath({
-            canvas,
-            fileType: 'jpg',
-            quality: 0.88,
-            success(res) {
-              resolve(res.tempFilePath || '')
-            },
-            fail: reject,
-          })
+          exportCanvasToFile(canvas).then(resolve).catch(reject)
         }
-        img.onerror = reject
+        img.onerror = () => reject(new Error('image_load_failed'))
         img.src = info.path || localPath
       },
       fail: reject,
@@ -170,10 +201,14 @@ function persistCache(coverUrl, tempPath) {
   })
 }
 
-/** 将封面裁成 5:4 本地路径，供 onShareAppMessage imageUrl 使用 */
+function fallbackDefaultCover() {
+  return mpShare.prepareShareCoverPath().catch(() => mpShare.LOCAL_SHARE_COVER)
+}
+
+/** 将封面裁成 5:4 本地路径；失败时用包内默认分享图，不用 https 原图 */
 function prepareShareImageUrl(coverUrl) {
   const key = String(coverUrl || '').trim()
-  if (!key) return Promise.resolve('')
+  if (!key) return fallbackDefaultCover()
 
   const cached = readCached(key)
   if (cached) return Promise.resolve(cached)
@@ -184,8 +219,8 @@ function prepareShareImageUrl(coverUrl) {
     .then((local) => cropToShareRatio(local))
     .then((temp) => persistCache(key, temp))
     .catch((err) => {
-      console.warn('[recruitShareCover] crop failed, fallback raw url', err)
-      return recruitCoverLib.resolveShareImageUrl(key)
+      console.warn('[recruitShareCover] crop failed, use default cover', err)
+      return fallbackDefaultCover()
     })
     .finally(() => {
       delete inflight[key]
@@ -194,27 +229,34 @@ function prepareShareImageUrl(coverUrl) {
   return inflight[key]
 }
 
-/** 构建带 promise 的分享 payload（裁剪完成后返回 imageUrl） */
+/** 构建分享 payload：优先同步返回已缓存本地图，否则 promise 异步裁剪 */
 function attachShareCoverPromise(shareBase, coverUrl) {
   const key = String(coverUrl || '').trim()
   if (!key) return shareBase
-  const fallback = recruitCoverLib.resolveShareImageUrl(key)
+
+  const cached = readCached(key)
+  if (cached) {
+    return { ...shareBase, imageUrl: cached }
+  }
+
   return {
     ...shareBase,
     promise: prepareShareImageUrl(key).then((imageUrl) => ({
       ...shareBase,
-      imageUrl: imageUrl || fallback,
+      imageUrl: isLocalSharePath(imageUrl) ? imageUrl : undefined,
     })),
   }
 }
 
 function preloadShareImageUrl(coverUrl) {
-  void prepareShareImageUrl(coverUrl)
+  return prepareShareImageUrl(coverUrl)
 }
 
 module.exports = {
   SHARE_W,
   SHARE_H,
+  readCached,
+  isLocalSharePath,
   prepareShareImageUrl,
   attachShareCoverPromise,
   preloadShareImageUrl,

@@ -294,6 +294,7 @@ Page({
       shareTitle: shareCopy.buildShareTitle(order),
       showShareSheet: true,
     })
+    recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
   },
   noopShareSheetTap() {},
   onCloseShareSheet() {
