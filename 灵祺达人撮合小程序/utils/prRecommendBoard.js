@@ -211,54 +211,7 @@ function appendTalentIfNew(row, keys, seen, out) {
 }
 
 function buildTalentPool(reg) {
-  const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
-  const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
-  const seen = new Set()
-  const out = []
-
-  for (let i = 0; i < members.length; i++) {
-    const m = members[i]
-    if (!memberMatchesBoard(m, 'talent')) continue
-    const primary = memberStore.primaryPlatformProfile(m)
-    const p = (primary && primary.profile) || {}
-    const platformAccount = String(p.platformAccount || '').trim()
-    if (!platformAccount) continue
-    const raw = Number(p.followers) || 0
-    const tags = accountTagsFromMember(m)
-    const mid = String((m && m.id) || '').trim()
-    if (!mid) continue
-    const row = formatTalentRow({
-      id: mid,
-      platformNickname: p.platformNickname || m.wxNickName,
-      wxAvatarUrl: m.wxAvatarUrl,
-      platform: (primary && primary.platform) || '抖音',
-      followers: raw,
-      province: m.province,
-      city: m.city,
-      qualityTag: '会员',
-      gender: m.gender,
-      accountTags: tags,
-      douyinSalesLevel: p.douyinSalesLevel || '',
-    })
-    appendTalentIfNew(row, collectTalentDedupeKeys(m, primary), seen, out)
-  }
-
-  for (let j = 0; j < library.length; j++) {
-    const e = library[j]
-    const raw = Number(e.followers) || 0
-    const chatId =
-      chatKeys.canonicalTalentMemberIdFromRegistry(reg, String(e.id || e.lingqiTalentId || '')) ||
-      String(e.id || e.lingqiTalentId || '')
-    const row = formatTalentRow({
-      ...e,
-      id: chatId,
-      qualityTag: raw >= 50000 ? '优质' : '推荐',
-      gender: e.gender,
-    })
-    appendTalentIfNew(row, collectTalentDedupeKeys(e), seen, out)
-  }
-
-  return out
+  return require('./recommendAllTalentsPool.js').buildAllTalentsPool(reg)
 }
 
 function suppliersFromRegistry(reg, board) {

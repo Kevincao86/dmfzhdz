@@ -115,7 +115,9 @@ async function fetchRegistryViaErpApi(opts) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const data = await fetchRegistryOnce(opts)
-      registryCache.save(data, attempt === 0 ? HALL_GET : `${HALL_POST}:retry`)
+      registryCache.save(data, attempt === 0 ? HALL_GET : `${HALL_POST}:retry`, {
+        recommendPool: includeRecommendPool,
+      })
       return data
     } catch (e) {
       lastErr = e
@@ -129,15 +131,25 @@ async function fetchRegistryViaErpApi(opts) {
   throw lastErr || new Error('hall_fetch_failed')
 }
 
-function readRegistryCache() {
-  const cached = registryCache.load({ allowStale: true })
+function hasRecommendPool(data) {
+  if (!data || typeof data !== 'object') return false
+  const lib = Array.isArray(data.talentLibraryEntries) ? data.talentLibraryEntries.length : 0
+  const mem = Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers.length : 0
+  return lib + mem > 0
+}
+
+function readRegistryCache(opts) {
+  const recommendPool = !!(opts && opts.recommendPool)
+  const cached = registryCache.load({ allowStale: true, recommendPool })
   return cached && cached.data ? cached.data : null
 }
 
 async function fetchRegistryFromServer(opts) {
-  const data = await fetchRegistryViaErpApi(opts)
-  registryCache.save(data, 'erp-api:hall-registry')
-  return data
+      const data = await fetchRegistryViaErpApi(opts)
+      registryCache.save(data, 'erp-api:hall-registry', {
+        recommendPool: !!(opts && opts.includeRecommendPool),
+      })
+      return data
 }
 
 /**
@@ -154,10 +166,13 @@ async function fetchRegistry(opts) {
       return await fetchRegistryFromServer(opts)
     } catch (e) {
       console.warn('[mp] fetchRegistry server failed', String(e && e.message ? e.message : e).slice(0, 240))
-      const cached = readRegistryCache()
+      const includeRecommendPool = !!(opts && opts.includeRecommendPool)
+      const cached = readRegistryCache({ recommendPool: includeRecommendPool })
       if (cached && hasMpOrders(cached)) {
-        console.warn('[mp] fetchRegistry use cache after server fail')
-        return cached
+        if (!includeRecommendPool || hasRecommendPool(cached)) {
+          console.warn('[mp] fetchRegistry use cache after server fail')
+          return cached
+        }
       }
       throw e
     }

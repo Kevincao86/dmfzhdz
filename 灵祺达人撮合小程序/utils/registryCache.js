@@ -1,9 +1,14 @@
 /** 招募注册表本地缓存：微信 Cronet reset 时仍可展示上次成功数据 */
 const KEY = 'meoo_mp_registry_cache_v1'
+const KEY_RECOMMEND = 'meoo_mp_registry_recommend_v1'
 /** 视为「新鲜」的时长（仍会后台刷新） */
 const FRESH_TTL_MS = 30 * 60 * 1000
 /** 网络失败时允许使用的最长离线时间（昨晚成功 → 今早仍应能看列表） */
 const STALE_MAX_MS = 7 * 24 * 60 * 60 * 1000
+
+function storageKey(opts) {
+  return opts && opts.recommendPool ? KEY_RECOMMEND : KEY
+}
 
 function parseEntry(raw) {
   if (!raw) return null
@@ -25,7 +30,7 @@ function parseEntry(raw) {
 function load(opts) {
   const allowStale = !opts || opts.allowStale !== false
   try {
-    const entry = parseEntry(wx.getStorageSync(KEY))
+    const entry = parseEntry(wx.getStorageSync(storageKey(opts)))
     if (!entry) return null
     if (!allowStale && entry.stale) return null
     return entry
@@ -34,15 +39,16 @@ function load(opts) {
   }
 }
 
-function save(data, path) {
+function save(data, path, opts) {
+  const key = storageKey(opts)
   try {
     const mp = data && data.mpRecruitmentOrders
     if (Array.isArray(mp) && mp.length === 0) {
-      const prev = load({ allowStale: true })
+      const prev = load({ allowStale: true, recommendPool: !!(opts && opts.recommendPool) })
       const prevMp = prev && prev.data && prev.data.mpRecruitmentOrders
       if (Array.isArray(prevMp) && prevMp.length > 0) return
     }
-    wx.setStorageSync(KEY, {
+    wx.setStorageSync(key, {
       data,
       path: String(path || ''),
       savedAt: Date.now(),

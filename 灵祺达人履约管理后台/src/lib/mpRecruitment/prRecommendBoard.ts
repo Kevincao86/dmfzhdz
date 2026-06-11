@@ -1,9 +1,8 @@
 import type { MpRegistry, TalentCardRow } from './types'
 import { isIceMpOrder, recruitTargetFromMp } from './orderCard'
 import { listPrEligibleOrders } from './recruitmentAi'
-import { formatTalent } from './talentFormat'
+import { buildAllTalentsPool } from './recommendAllTalentsPool'
 import { primaryPlatformProfile } from '../mpSync/talentMember'
-import { canonicalTalentMemberIdFromRegistry } from '../mpSync/talentChatKeys'
 
 export type PrBoardId = 'talent' | 'shoot' | 'edit'
 
@@ -134,93 +133,6 @@ function formatSupplierFromApplicant(a: Record<string, unknown>, board: 'shoot' 
   }
 }
 
-function platAccountDedupeKey(platform: string, account: string): string | null {
-  const a = String(account || '').trim().toLowerCase()
-  if (!a) return null
-  return `${String(platform || '抖音').trim()}::${a}`
-}
-
-/** 会员与达人库常为同一人但 id 不同（TL-* vs MTM-*），按灵祺 ID / 平台账号 / 手机号去重 */
-function collectTalentDedupeKeys(source: Record<string, unknown>, primary?: ReturnType<typeof primaryPlatformProfile>) {
-  const keys: string[] = []
-  const id = String(source.id || '').trim()
-  const lq = String(source.lingqiTalentId || '').trim()
-  if (id) keys.push(`id:${id}`)
-  if (lq) keys.push(`lq:${lq}`)
-  const p = primary?.profile
-  const plat = String(primary?.platform || source.platform || '抖音')
-  const pk = platAccountDedupeKey(plat, String(p?.platformAccount || source.platformAccount || ''))
-  if (pk) keys.push(`pk:${pk}`)
-  const phone = String(source.contact || '').replace(/\D/g, '').slice(-11)
-  if (phone.length >= 11) keys.push(`ph:${phone}`)
-  return keys
-}
-
-function appendTalentIfNew(
-  row: TalentCardRow | null,
-  keys: string[],
-  seen: Set<string>,
-  out: TalentCardRow[],
-) {
-  if (!row?.id) return
-  if (keys.some((k) => seen.has(k))) return
-  keys.forEach((k) => seen.add(k))
-  seen.add(`id:${row.id}`)
-  out.push(row)
-}
-
-function buildTalentPool(reg: MpRegistry): TalentCardRow[] {
-  const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
-  const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
-  const seen = new Set<string>()
-  const out: TalentCardRow[] = []
-
-  for (const m of members) {
-    const mem = m as Record<string, unknown>
-    if (!memberMatchesBoard(mem, 'talent')) continue
-    const primary = primaryPlatformProfile(mem)
-    const p = primary?.profile
-    const platformAccount = String(p?.platformAccount || '').trim()
-    if (!platformAccount) continue
-    const raw = Number(p?.followers) || 0
-    const nick = String(p?.platformNickname || mem.wxNickName || mem.contact || '').trim()
-    if (!nick) continue
-    const mid = String(mem.id || '').trim()
-    if (!mid) continue
-    const row = formatTalent({
-      id: mid,
-      platformNickname: nick,
-      wxAvatarUrl: mem.wxAvatarUrl,
-      platform: primary?.platform || '抖音',
-      followers: raw,
-      province: mem.province,
-      city: mem.city,
-      qualityTag: '会员',
-      gender: mem.gender,
-      accountTags: accountTagsFromMember(mem),
-      douyinSalesLevel: p?.douyinSalesLevel || '',
-    })
-    appendTalentIfNew(row, collectTalentDedupeKeys(mem, primary), seen, out)
-  }
-
-  for (const e of library) {
-    const row = e as Record<string, unknown>
-    const raw = Number(row.followers) || 0
-    const chatId =
-      canonicalTalentMemberIdFromRegistry(reg, String(row.id || row.lingqiTalentId || '')) ||
-      String(row.id || row.lingqiTalentId || '')
-    const card = formatTalent({
-      ...row,
-      id: chatId,
-      platformNickname: row.platformNickname || row.name,
-      qualityTag: raw >= 50000 ? '优质' : '推荐',
-    })
-    appendTalentIfNew(card, collectTalentDedupeKeys(row), seen, out)
-  }
-
-  return out
-}
-
 function suppliersFromRegistry(reg: MpRegistry, board: 'shoot' | 'edit'): TalentCardRow[] {
   const target = board
   const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
@@ -255,7 +167,7 @@ function suppliersFromRegistry(reg: MpRegistry, board: 'shoot' | 'edit'): Talent
 }
 
 export function buildBoardPool(reg: MpRegistry, board: PrBoardId): TalentCardRow[] {
-  if (board === 'talent') return buildTalentPool(reg)
+  if (board === 'talent') return buildAllTalentsPool(reg)
   return suppliersFromRegistry(reg, board)
 }
 
